@@ -1,0 +1,45 @@
+[package]
+name = "bulletproofs"
+version = "0.1.0"
+authors = ["Cathie Yun <cathie@chain.com>", 
+           "Henry de Valence <hdevalence@hdevalence.ca>",
+           "Oleg Andreev <oleganza@gmail.com>"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/dalek-cryptography/bulletproofs"
+categories = ["cryptography"]
+keywords = ["cryptography", "ristretto", "zero-knowledge", "bulletproofs"]
+description = "A pure-Rust implementation of Bulletproofs using Ristretto"
+build = "build.rs"
+
+
+
+
+[dependencies]
+subtle = "1"
+sha3 = "0.7"
+digest = "0.7"
+rand = "0.5"
+byteorder = "1"
+serde = "1"
+serde_derive = "1"
+failure = "0.1"
+merlin = "0.4"
+clear_on_drop = "0.2.3"
+
+curve25519-dalek = { version = "0.21", features = ["serde"] }
+
+
+
+[dev-dependencies]
+hex = "0.3"
+criterion = "0.2"
+bincode = "1"
+
+[features]
+avx2_backend = ["curve25519-dalek/avx2_backend"]
+
+[[bench]]
+name = "bulletproofs"
+harness = false
+
