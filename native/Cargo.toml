@@ -1,0 +1,17 @@
+[package]
+name = "zei"
+version = "0.0.1"
+authors = ["efe <efe@eian.io>"]
+license = "MIT"
+build = "build.rs"
+exclude = ["artifacts.json", "index.node"]
+
+[lib]
+name = "zei"
+crate-type = ["dylib"]
+
+[build-dependencies]
+neon-build = "0.2.0"
+
+[dependencies]
+neon = "0.2.0"
