@@ -17,7 +17,7 @@ pub fn random_data_test_helper(len: usize) -> Vec<u8> {
     message
 }
 
-//helper to cinvert slice to ixed array of 32bytes
+//helper to convert slice to ixed array of 32bytes
 pub fn slice_to_fixed32(data: &[u8]) -> [u8; 32] {
         //convert slice to fixed
         let mut a: [u8; 32] = Default::default();

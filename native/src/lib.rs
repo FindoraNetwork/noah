@@ -21,22 +21,21 @@ use neon::prelude::*;
 use core::keypair;
 // use zei::transaction;
 
+// // //sample keys
+// fn keypair(mut cx: FunctionContext) -> JsResult<JsString> {
+//     let sampled_keypair = Keypair::new();
+//     let json = serde_json::to_string(&sampled_keypair)?;
+//     Ok(json)
+// }
 
-// //sample keys
-fn keypair(mut cx: FunctionContext) -> JsResult<JsString> {
-    let sampled_keypair = Keypair::new();
-    let json = serde_json::to_string(&sampled_keypair)?;
-    Ok(json)
-}
+// //construct transaction
+// fn create_tx(mut cx: FunctionContext) -> JsResult<JsString> {
+//     Ok(cx.string("hello node"))
+// }
 
-//construct transaction
-fn create_tx(mut cx: FunctionContext) -> JsResult<JsString> {
-    Ok(cx.string("hello node"))
-}
+// register_module!(mut cx, {
+//     cx.export_function("keypair", keypair)?;
+//     cx.export_function("create_tx", create_tx)
+//     //Ok(())
 
-register_module!(mut cx, {
-    cx.export_function("keypair", keypair)?;
-    cx.export_function("create_tx", create_tx)
-    //Ok(())
-
-});
+// });

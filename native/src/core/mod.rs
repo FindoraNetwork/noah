@@ -8,5 +8,8 @@ mod hex;
 mod elgamal;
 mod microsalt;
 
+pub mod account;
 pub mod transaction;
 pub mod keypair;
+
+
