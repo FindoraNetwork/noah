@@ -1,6 +1,6 @@
 # Zei
 
-** Confidential Payments for Accounts **
+**Confidential Payments for Accounts**
 
 
 ## NodeJS API
