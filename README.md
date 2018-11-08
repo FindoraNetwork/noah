@@ -2,6 +2,10 @@
 
 **Confidential Payments for Accounts**
 
+Zei is a library to help manage an account system that blindes transaction ammounts.
+It Implements Confidential Transactions that was first proposed by [Greg Maxwell](https://people.xiph.org/~greg/confidential_values.txt). It however utilzes [Bulletproofs by Benedikt et al.](https://eprint.iacr.org/2017/1066.pdf) for shorter Rangeproofs. Furthermore, Elgamal Publickey encryption over the [Ristretto Group](https://ristretto.group) is utlized to reveal plaintext amounts & blinding factors to the reciever.
+This implementation uses Pedersen Commitments and is open to account poisoning. 
+
 
 ## NodeJS API
 
