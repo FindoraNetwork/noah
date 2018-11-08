@@ -4,7 +4,7 @@
 
 Zei is a library to help manage an account system that blindes transaction amounts.
 It Implements Confidential Transactions that was first proposed by [Greg Maxwell](https://people.xiph.org/~greg/confidential_values.txt). It however utilizes [Bulletproofs by Benedikt et al.](https://eprint.iacr.org/2017/1066.pdf) for shorter Rangeproofs. Furthermore, Elgamal Publickey encryption over the [Ristretto Group](https://ristretto.group) is utilized to reveal plaintext amounts & blinding factors to the reciever.
-This implementation uses Pedersen Commitments and is open to account poisoning. 
+This implementation uses Pedersen Commitments and is vulnerable to account poisoning. 
 
 
 ## NodeJS API
@@ -44,6 +44,32 @@ var account = create_account();
     }
 ```
 Using the above JSON as an example the address to this account is *keys.public*
+
+#### How to get an acconts Public Address & convert into HEX
+
+```javascript
+
+//helper function to convert a byte array to hex string
+function toHexString(byteArray) {
+    return byteArray.reduce((output, elem) => 
+      (output + ('0' + elem.toString(16)).slice(-2)),
+      '');
+}
+
+//create a new ZEI account
+var account = create_account();
+//convert the JSON into JS object to use.
+var parsed = JSON.parse(account);
+
+//console.log(account);
+//console.log(parsed);
+
+//This example uses 'ZEI_' extension to denote our address 
+console.log("Account address in hex is : ZEI_" + toHexString(parsed.keys.public));
+
+
+```
+
 
 #### How to Send a Confidential Transaction
 
