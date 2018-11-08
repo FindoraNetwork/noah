@@ -18,16 +18,12 @@ mod core;
 
 use neon::prelude::*;
 
-use core::keypair::Keypair;
+use core::account::Account;
 // use zei::transaction;
 
-// //sample keys
-fn keypair(mut cx: FunctionContext) -> JsResult<JsString> {
-    let sampled_keypair = Keypair::new();
-    let json = serde_json::to_string(&sampled_keypair).unwrap();
-    //let val = JsString::new(call.scope, json).unwrap();
-   
-    Ok(cx.string(json))
+//create a new account
+fn create_account(mut cx: FunctionContext) -> JsResult<JsString> {
+    Ok(cx.string(serde_json::to_string(&Account::new()).unwrap()))
 }
 
 // //construct transaction
@@ -36,7 +32,7 @@ fn keypair(mut cx: FunctionContext) -> JsResult<JsString> {
 // }
 
 register_module!(mut cx, {
-    cx.export_function("keypair", keypair)
+    cx.export_function("create_account", create_account)
     //cx.export_function("create_tx", create_tx)
     // Ok(())
 
