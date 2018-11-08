@@ -26,23 +26,24 @@ After each hidden transaction the commitments must be updated to reflect the new
 //This string contains sensitive information so must be handled with care.
 var account = create_account();
 
-//An example of what it returns
+//An example of what it returns, never change this data, only zei should.
     {
-        "counter":0,
-        "balance":0,
-        "opening":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-        "commitment":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        "counter": 0,
+
+        "balance": 0,
+
+        "opening": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+
+        "commitment": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+
         "keys":{
-            "secret":{
-                "inner":[100,208,32,60,172,238,201,237,185,80,243,255,62,180,99,93,101,224,179,85,152,184,185,53,146,2,145,110,163,204,16,7]
-                },
-            "public":{
-                "inner":[10,127,221,55,39,154,45,154,100,222,164,174,229,244,209,217,66,171,184,21,117,176,88,205,130,21,21,208,15,220,201,103]
-                }
+            "secret": [100,208,32,60,172,238,201,237,185,80,243,255,62,180,99,93,101,224,179,85,152,184,185,53,146,2,145,110,163,204,16,7],
+
+            "public":[10,127,221,55,39,154,45,154,100,222,164,174,229,244,209,217,66,171,184,21,117,176,88,205,130,21,21,208,15,220,201,103]
         }
     }
 ```
-Using the above JSON as an example the address to this account is *keys.public.inner*
+Using the above JSON as an example the address to this account is *keys.public*
 
 #### How to Send a Confidential Transaction
 
