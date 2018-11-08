@@ -66,7 +66,7 @@ var parsed = JSON.parse(account);
 
 //This example uses 'ZEI_' extension to denote our address 
 console.log("Account address in hex is : ZEI_" + toHexString(parsed.keys.public));
-
+//Account address in hex is : ZEI_a2305a019d05a19f7f1dbbb93ed172da356fc702dcd797d25681fdbe710ae56e
 
 ```
 
