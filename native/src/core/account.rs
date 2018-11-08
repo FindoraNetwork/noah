@@ -2,7 +2,7 @@
 
 use curve25519_dalek::scalar::Scalar;
 use crate::core::keypair::Keypair;
-use crate::core::transaction::Transaction;
+use crate::core::transaction::{CreateTx, Transaction};
 use rand::OsRng;
 use crate::core::elgamal::{SecretKey, PublicKey};
 
@@ -34,6 +34,11 @@ impl Account {
         }
     }
 
+    //helper to get public key aka. address
+    pub fn address(&self) -> PublicKey {
+        self.keys.public.clone()
+    }
+
     //update account state from a new balance and opening
     pub fn update_account(&mut self, amount: u32, opening: Scalar) {
         self.balance += amount;
@@ -41,7 +46,7 @@ impl Account {
     }
 
     //send a transaction using this account 
-    pub fn send(&mut self, dest: PublicKey, amount: Balance) {
+    pub fn send(&mut self, tx_meta: ) {
         //sample some randomness for the new opening 
         //TODO: Handle Errors better
         let mut csprng: OsRng = OsRng::new().unwrap();

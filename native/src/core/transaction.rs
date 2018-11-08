@@ -29,6 +29,13 @@ pub struct Transaction {
         lockbox: Lockbox
 }
 
+//helper structure to recieve the data for a transaction
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateTx {
+        receiver: PublicKey,
+        receiver_commit: CompressedRistretto,
+        transfer_amount: u32,
+}
 
 
 impl Transaction {
