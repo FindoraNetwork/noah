@@ -19,7 +19,13 @@ These accounts also have arbitary KEY-VALUE pairs that may be set.
 We will set the hidden account publickey as the KEY & set the latest balance commitment as a VALUE.
 After each hidden transaction the commitments must be updated to reflect the new state.
 
-#### How to create a new Confidential Account with Zei
+#### How to create a new Hidden Account with Zei
+
+```javascript
+//Accounts are stored by the owner as a json string. 
+//This string contains sensative information so must be handled with care.
+var account = create_account();
+```
 
 #### How to Send a Confidential Transaction
 
