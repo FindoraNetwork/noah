@@ -2,8 +2,8 @@
 
 **Confidential Payments for Accounts**
 
-Zei is a library to help manage an account system that blindes transaction ammounts.
-It Implements Confidential Transactions that was first proposed by [Greg Maxwell](https://people.xiph.org/~greg/confidential_values.txt). It however utilzes [Bulletproofs by Benedikt et al.](https://eprint.iacr.org/2017/1066.pdf) for shorter Rangeproofs. Furthermore, Elgamal Publickey encryption over the [Ristretto Group](https://ristretto.group) is utlized to reveal plaintext amounts & blinding factors to the reciever.
+Zei is a library to help manage an account system that blindes transaction amounts.
+It Implements Confidential Transactions that was first proposed by [Greg Maxwell](https://people.xiph.org/~greg/confidential_values.txt). It however utilizes [Bulletproofs by Benedikt et al.](https://eprint.iacr.org/2017/1066.pdf) for shorter Rangeproofs. Furthermore, Elgamal Publickey encryption over the [Ristretto Group](https://ristretto.group) is utilized to reveal plaintext amounts & blinding factors to the reciever.
 This implementation uses Pedersen Commitments and is open to account poisoning. 
 
 
@@ -14,7 +14,7 @@ This implementation uses Pedersen Commitments and is open to account poisoning.
 The account api has an send() function that consumes a JSON structure that needs to be constructed
 with data from the stellar network.
 
-Stellar accounts have there own signatire keypairs that are used to send transactions on the network.
+Stellar accounts have there own signature keypairs that are used to send transactions on the network.
 These accounts also have arbitary KEY-VALUE pairs that may be set.
 We will set the hidden account publickey as the KEY & set the latest balance commitment as a VALUE.
 After each hidden transaction the commitments must be updated to reflect the new state.
@@ -23,7 +23,7 @@ After each hidden transaction the commitments must be updated to reflect the new
 
 ```javascript
 //Accounts are stored by the owner as a json string. 
-//This string contains sensative information so must be handled with care.
+//This string contains sensitive information so must be handled with care.
 var account = create_account();
 ```
 
