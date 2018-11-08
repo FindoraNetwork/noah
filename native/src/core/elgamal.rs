@@ -14,10 +14,8 @@ pub const KEY_LENGTH: usize = 32;
 
 //Secret Key, stored as a scalar
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SecretKey {
-    //inner scalar
-    pub inner: Scalar
-}
+pub struct SecretKey(pub Scalar);
+
 
 impl SecretKey {
 
@@ -35,19 +33,17 @@ impl SecretKey {
         //if s == 0 { return Err(ElgamalError::BadSecretError); }
 
         //consturct private key struct
-        Ok(SecretKey {
-            inner: s
-        })
+        Ok(SecretKey(s))
     }
 
     //returns underlying scalar point as bytes
     pub fn to_bytes(&self) -> [u8; KEY_LENGTH] { 
-        self.inner.to_bytes() 
+        self.0.to_bytes() 
     }
     
     //returns reference to underlying scalar point as bytes
     pub fn as_bytes(&self) -> &[u8; KEY_LENGTH] { 
-        self.inner.as_bytes() 
+        self.0.as_bytes() 
     }
 
 
@@ -55,20 +51,15 @@ impl SecretKey {
 
 //Public Key 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PublicKey {
-    //inner point
-    pub inner: RistrettoPoint
-}
+pub struct PublicKey(pub RistrettoPoint);
 
 
 impl PublicKey {
 
     //new private key from given private key
     pub fn from_secret(sk: &SecretKey) -> PublicKey {
-        PublicKey {
-            //y = g^x where x = secret key
-            inner: (&sk.inner * &RISTRETTO_BASEPOINT_TABLE)
-        }
+        //y = g^x where x = secret key
+        PublicKey((&sk.0 * &RISTRETTO_BASEPOINT_TABLE))
     }
 
     //returns underlying curve point as bytes
@@ -96,13 +87,11 @@ mod tests {
     fn test_keys() {
    
         //generate sk
-        let sk = SecretKey {
-            inner: Scalar::zero()
-        };
+        let sk = SecretKey(Scalar::zero());
         //generate our pk
         let pk = PublicKey::from_secret(&sk);
         
-        assert_eq!(pk.inner, RistrettoPoint::identity());
+        assert_eq!(pk.0, RistrettoPoint::identity());
     }
 
 }

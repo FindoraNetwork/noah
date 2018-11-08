@@ -103,7 +103,7 @@ impl Lockbox {
         let randomness = Scalar::random(&mut csprng);
 
         //pk^R
-        let shared_key = randomness * pk.inner;
+        let shared_key = randomness * pk.0;
         
         //g^R where R = randomness used to derive shared key
         let blind_rand = &randomness * &RISTRETTO_BASEPOINT_TABLE;
