@@ -1,7 +1,6 @@
-# zei
+# Zei
 
-Confidential Payments for Accounts
-
+** Confidential Payments for Accounts **
 
 
 ## NodeJS API
@@ -14,6 +13,8 @@ with data from the stellar network.
 Stellar accounts have there own signatire keypairs that are used to send transactions on the network.
 These accounts also have arbitary KEY-VALUE pairs that may be set.
 We will set the hidden account publickey as the KEY & set the latest balance commitment as a VALUE.
+
+#### How to create a new Confidential Account with Zei
 
 #### How to Send a Confidential Transaction
 
