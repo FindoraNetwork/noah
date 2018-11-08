@@ -20,7 +20,6 @@ pub struct Account {
     opening: Scalar,
     //account keys
     keys: Keypair
-
     //public_params
 }
 
