@@ -13,7 +13,7 @@ pub const KEY_LENGTH: usize = 32;
 
 
 //Secret Key, stored as a scalar
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SecretKey {
     //inner scalar
     pub inner: Scalar
@@ -54,7 +54,7 @@ impl SecretKey {
 }
 
 //Public Key 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PublicKey {
     //inner point
     pub inner: RistrettoPoint

@@ -188,37 +188,30 @@ pub fn reciever_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPo
 
 #[cfg(test)]
 mod test {
-        //use crate::core::elgamal::{SecretKey, PublicKey};
+        use crate::core::account::Account;
+        use curve25519_dalek::scalar::Scalar;
+        use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 
-        // #[test]
-        // fn test_new_transaction() {
-        //         //def pederson from lib with Common Reference String
-        //         let pc_gens = PedersenGens::default();
+        #[test]
+        fn test_new_transaction() {
+                //def pederson from lib with Common Reference String
+                let pc_gens = PedersenGens::default();
 
-        //         let mut csprng: OsRng = OsRng::new().unwrap();
+                //Account A
+                let mut acc_a = Account::new();
+                //Account B
+                let mut acc_b = Account::new();
 
-        //         //Account A
-        //         //generate sk
-        //         let acc_a_sk = SecretKey::new(&mut csprng).unwrap();
-        //         //generate our pk
-        //         let acc_a_pk = PublicKey::from_secret(sk);
+                //the initial commitment is to zero
+                let acc_a_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
+                let acc_b_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
 
-        //         //Account B
-        //         //generate sk
-        //         let acc_b_sk = SecretKey::new(&mut csprng).unwrap();
-        //         //generate our pk
-        //         let acc_b_pk = PublicKey::from_secret(sk);
+                //create a dummy tx
+                //let tx = new_transaction(acc_b_pk, 100u32, 0u32, acc_a_comm_inital, acc_b_comm_inital);
 
-        //         //the initial commitment is to zero
-        //         let acc_a_comm_inital = pc_gens.commit(Scalar::from(0), Scalar::from(0));
-        //         let acc_b_comm_inital = pc_gens.commit(Scalar::from(0), Scalar::from(0));
-
-        //         //create a dummy tx
-        //         let tx = new_transaction(acc_b_pk, 100u32, 0u32, acc_a_comm_inital, acc_b_comm_inital);
-
-        //         //verify reciver commitment
-        //         assert_eq!(reciever_verify(p_amount, recovered_blind_scalar, tx.receiver_new_commit, acc_b_comm_inital), true);
+                //verify reciver commitment
+                //assert_eq!(reciever_verify(p_amount, recovered_blind_scalar, tx.receiver_new_commit, acc_b_comm_inital), true);
 
 
-        // }
+        }
 }

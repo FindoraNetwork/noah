@@ -5,6 +5,8 @@ use crate::core::keypair::Keypair;
 use crate::core::transaction::{CreateTx, Transaction};
 use rand::OsRng;
 use crate::core::elgamal::{SecretKey, PublicKey};
+use curve25519_dalek::ristretto::CompressedRistretto;
+use bulletproofs::{PedersenGens};
 
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
@@ -18,6 +20,8 @@ pub struct Account {
     balance: Balance,
     //opening from latest payment
     opening: Scalar,
+    //commitment
+    commitment: CompressedRistretto,
     //account keys
     keys: Keypair
     //public_params
@@ -26,10 +30,16 @@ pub struct Account {
 impl Account {
     //initiate a new hidden account 
     pub fn new() -> Account {
+        //def pederson from lib with Common Reference String
+        let pc_gens = PedersenGens::default();
+
+
         Account {
             counter: 0,
             balance: 0,
             opening: Scalar::from(0u32),
+            //initial commitment is to 0 for balance and blind
+            commitment: pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32)).compress(),
             keys: Keypair::new()
         }
     }
@@ -46,14 +56,14 @@ impl Account {
     }
 
     //send a transaction using this account 
-    pub fn send(&mut self, tx_meta: ) {
+    pub fn send(&mut self, tx_meta: CreateTx) {
         //sample some randomness for the new opening 
         //TODO: Handle Errors better
         let mut csprng: OsRng = OsRng::new().unwrap();
         let new_opening = Scalar::random(&mut csprng);
 
         //update account balance
-        self.balance -= amount;
+       // self.balance -= tx_meta.transfer_amount;
 
 
 
