@@ -17,6 +17,7 @@ with data from the stellar network.
 Stellar accounts have there own signatire keypairs that are used to send transactions on the network.
 These accounts also have arbitary KEY-VALUE pairs that may be set.
 We will set the hidden account publickey as the KEY & set the latest balance commitment as a VALUE.
+After each hidden transaction the commitments must be updated to reflect the new state.
 
 #### How to create a new Confidential Account with Zei
 
