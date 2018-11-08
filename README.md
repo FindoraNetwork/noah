@@ -45,7 +45,7 @@ var account = create_account();
 ```
 Using the above JSON as an example the address to this account is *keys.public*
 
-#### How to get an acconts Public Address & convert into HEX
+#### How to get an accounts Public Address & convert into HEX
 
 ```javascript
 
@@ -69,7 +69,6 @@ console.log("Account address in hex is : ZEI_" + toHexString(parsed.keys.public)
 //Account address in hex is : ZEI_a2305a019d05a19f7f1dbbb93ed172da356fc702dcd797d25681fdbe710ae56e
 
 ```
-
 
 #### How to Send a Confidential Transaction
 
