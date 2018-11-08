@@ -1,4 +1,4 @@
-# Zei
+![alt text](https://github.com/eianio/zei/raw/master/zei_logo.png)
 
 **Confidential Payments for Accounts**
 
