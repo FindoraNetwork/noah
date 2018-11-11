@@ -2,7 +2,7 @@
 
 **Confidential Payments for Accounts**
 
-Zei is a library to help manage an account system that blindes transaction amounts.
+Zei is a library to help manage an account system that hides transaction amounts.
 It Implements Confidential Transactions that was first proposed by [Greg Maxwell](https://people.xiph.org/~greg/confidential_values.txt). It however utilizes [Bulletproofs by Benedikt et al.](https://eprint.iacr.org/2017/1066.pdf) for shorter Rangeproofs. Furthermore, [Elgamal](https://caislab.kaist.ac.kr/lecture/2010/spring/cs548/basic/B02.pdf) Publickey encryption over the [Ristretto Group](https://ristretto.group) is utilized to reveal plaintext amounts & blinding factors to the reciever.
 This implementation uses Pedersen Commitments and is vulnerable to account poisoning. 
 
@@ -73,11 +73,17 @@ console.log("Account address in hex is : ZEI_" + toHexString(parsed.keys.public)
 #### How to Send a Confidential Transaction
 
 ```javascript
-//This is a JSON string
+//This is a JSON string, the key names must be the same!!!
 var new_tx = {
     receiver: "", //public key for destination secret account
     receiver_commit: "", //the latest commitment associated with that public key
     transfer_amount: "", //the senders desired amount
-}
+};
+
+//pass serilized JSON as function argument first and the second is our account JSON
+var net_tx = create_tx(JSON.stringify(new_tx), account);
+//As a results a full transaction is generated as seen bellow.
+
+
 ```
 

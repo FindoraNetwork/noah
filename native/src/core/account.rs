@@ -15,15 +15,15 @@ pub type Balance = u32;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Account {
     //account tx count
-    counter: u128,
+    pub counter: u128,
     //Hidden
-    balance: Balance,
+    pub balance: Balance,
     //opening from latest payment
-    opening: Scalar,
+    pub opening: Scalar,
     //commitment
-    commitment: CompressedRistretto,
+    pub commitment: CompressedRistretto,
     //account keys
-    keys: Keypair
+    pub keys: Keypair
     //public_params
 }
 

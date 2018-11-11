@@ -19,21 +19,37 @@ mod core;
 use neon::prelude::*;
 
 use core::account::Account;
-// use zei::transaction;
+use core::transaction::{CreateTx};
 
 //create a new account
 fn create_account(mut cx: FunctionContext) -> JsResult<JsString> {
     Ok(cx.string(serde_json::to_string(&Account::new()).unwrap()))
 }
 
-// //construct transaction
-// fn create_tx(mut cx: FunctionContext) -> JsResult<JsString> {
-//     Ok(cx.string("hello node"))
-// }
+//construct transaction
+fn create_tx(mut cx: FunctionContext) -> JsResult<JsString> {
+    //get new tx JSON
+    let user_input_tx = cx.argument::<JsString>(0)?.value();
+    //deserizlize tx struct
+    let newtx: CreateTx = serde_json::from_str(&user_input_tx).unwrap();
+    //get account JSON
+    let user_account = cx.argument::<JsString>(1)?.value();
+    //deserilize account
+    let account: Account = serde_json::from_str(&user_account).unwrap();
+
+    
+
+    println!("create_tx: {:?}",newtx);
+    Ok(cx.string("eege"))
+}
 
 register_module!(mut cx, {
-    cx.export_function("create_account", create_account)
-    //cx.export_function("create_tx", create_tx)
-    // Ok(())
+    cx.export_function("create_account", create_account)?;
+
+    cx.export_function("create_tx", create_tx)?;
+
+
+
+    Ok(())
 
 });
