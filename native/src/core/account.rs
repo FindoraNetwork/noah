@@ -6,7 +6,7 @@ use crate::core::transaction::{CreateTx, Transaction};
 use rand::OsRng;
 use crate::core::elgamal::{SecretKey, PublicKey};
 use curve25519_dalek::ristretto::CompressedRistretto;
-use bulletproofs::{PedersenGens};
+use crate::core::setup::PublicParams;
 
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
@@ -23,24 +23,20 @@ pub struct Account {
     //commitment
     pub commitment: CompressedRistretto,
     //account keys
-    pub keys: Keypair
-    //public_params
+    pub keys: Keypair,
 }
 
 impl Account {
     //initiate a new hidden account 
     pub fn new() -> Account {
-        //def pederson from lib with Common Reference String
-        let pc_gens = PedersenGens::default();
-
-
+        let pp = PublicParams::new();
         Account {
             counter: 0,
             balance: 0,
             opening: Scalar::from(0u32),
             //initial commitment is to 0 for balance and blind
-            commitment: pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32)).compress(),
-            keys: Keypair::new()
+            commitment: pp.pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32)).compress(),
+            keys: Keypair::new(),
         }
     }
 
@@ -49,38 +45,37 @@ impl Account {
         self.keys.public.clone()
     }
 
-    //update account state from a new balance and opening
-    pub fn update_account(&mut self, amount: u32, opening: Scalar) {
-        self.balance += amount;
-        self.opening = opening;
-    }
-
     //send a transaction using this account 
-    pub fn send(&mut self, tx_meta: CreateTx) {
-        //sample some randomness for the new opening 
-        //TODO: Handle Errors better
-        let mut csprng: OsRng = OsRng::new().unwrap();
-        let new_opening = Scalar::random(&mut csprng);
-
-        //update account balance
-       // self.balance -= tx_meta.transfer_amount;
-
-
-
-        //update our account opening
-        self.opening = self.opening - new_opening;
-        //increment counter
+    pub fn send(&mut self, tx_meta: &CreateTx) -> Transaction {
+        return Transaction::new(&tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening, tx_meta.receiver_commit.decompress().unwrap());
+    }
+    
+    //take a transaction that this account has sent and apply to current state once network accepts
+    pub fn apply_tx(&mut self, tx: &Transaction) {
+        //update our balamce
+        self.balance -= tx.transfer_amount;
+        //update counter
         self.counter += 1;
+        //
     }
 
     //once a transaction has been sent to us we need to apply it to our account
     pub fn recieve(&mut self, tx: Transaction) {
+        //
 
-        //update balance
 
+      
 
-        //update our account opening
-        //self.opening = self.opening + tx.opening;
+        // //update our account opening
+        // //self.opening = self.opening + tx.opening;
+        // //update our account commitment
+        // self.commitment = tx.sender_updated_balance_commitment;
+
+        // //update our account opening
+        // self.opening = self.opening - new_opening;
+       
+        // //increment counter
+        // self.counter += 1;
     }
 }
 

@@ -1,11 +1,14 @@
 //The Public Setup needed for Proofs
 
-use bulletproofs::BulletproofGens;
+use bulletproofs::{PedersenGens, BulletproofGens};
+use merlin::Transcript;
 
 //Shared by all members of the ledger
 pub struct PublicParams {
-    bp_gens: BulletproofGens,
-    range_proof_bits: usize,
+    pub bp_gens: BulletproofGens,
+    pub pc_gens: PedersenGens,
+    pub range_proof_bits: usize,
+    pub transcript: Transcript,
 }
 
 
@@ -19,13 +22,23 @@ pub struct PublicParams {
 //Number of values or parties
 //is the maximum number of parties that can produce an aggregated proof.
 
-//helper function todo public setup
-pub fn setup(gens_capacity: usize, party_capacity: usize) -> PublicParams {
-    //Create a new BulletproofGens object
-    let generators = BulletproofGens::new(gens_capacity, party_capacity);
-
-    return PublicParams {
-        bp_gens: generators,
-        range_proof_bits: gens_capacity
-    };
+impl PublicParams {
+    //helper function todo public setup
+    pub fn new() -> PublicParams {
+        //public params with default 32bit range and also 2 provers
+        //Create a new BulletproofGens object
+        let generators = BulletproofGens::new(32, 2);
+        //def pederson from lib with Common Reference String
+        let pc_gens = PedersenGens::default();
+        //Common Reference String
+        let mut transcript = Transcript::new(b"Zei Range Proof");
+        
+    
+        return PublicParams {
+            bp_gens: generators,
+            pc_gens: pc_gens,
+            range_proof_bits: 32,
+            transcript: transcript
+        };
+    }
 }

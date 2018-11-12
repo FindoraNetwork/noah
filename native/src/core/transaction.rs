@@ -1,15 +1,14 @@
 //Transctions in zei
 
-use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+use bulletproofs::RangeProof;
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
-use merlin::Transcript;
 use curve25519_dalek::scalar::Scalar;
 use rand::OsRng;
 use crate::core::lockbox::Lockbox;
 use crate::core::util::{ be_u8_from_u32, slice_to_fixed32 };
 use crate::core::errors::Error;
 use crate::core::elgamal::{SecretKey, PublicKey};
-
+use crate::core::setup::PublicParams;
 
 //A Confidential transaction
 // range proof that balance - balance_inc is between (0, val_max)
@@ -17,37 +16,32 @@ use crate::core::elgamal::{SecretKey, PublicKey};
 pub struct Transaction {
         //this transaction range proof
         //senders updated balance range proof
-        transaction_range_proof: bulletproofs::RangeProof,
+        pub transaction_range_proof: bulletproofs::RangeProof,
         //transactions pedderson commitment
-        transaction_commitment: CompressedRistretto,
+        pub transaction_commitment: CompressedRistretto,
         //senders updated balance pedderson commitment
-        sender_updated_balance_commitment: CompressedRistretto,
+        pub sender_updated_balance_commitment: CompressedRistretto,
         //reciever updated commit
-        receiver_new_commit: CompressedRistretto,
+        pub receiver_new_commit: CompressedRistretto,
         //lock box
-        lockbox: Lockbox
+        pub lockbox: Lockbox
 }
 
 //helper structure to recieve the data for a transaction
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateTx {
-        receiver: PublicKey,
-        receiver_commit: CompressedRistretto,
-        transfer_amount: u32,
+        pub receiver: PublicKey,
+        pub receiver_commit: CompressedRistretto,
+        pub transfer_amount: u32,
 }
 
 
 impl Transaction {
 
         //create a new transaction 
-        pub fn new_transaction(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> Transaction {
-        //Common Reference String
-                let mut transcript = Transcript::new(b"Zei Range Proof");
-                //def pederson from lib with Common Reference String
-                let pc_gens = PedersenGens::default();
-                //32bit range for now & one prover
-                let bp_gens = BulletproofGens::new(32, 2);
-
+        pub fn new(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> Transaction {
+                //public params
+                let mut params = PublicParams::new();
                 //1. Sample Fresh blinding factor [blind], its a scalar
                 let mut csprng: OsRng = OsRng::new().unwrap();
                 let blinding_t = Scalar::random(&mut csprng);
@@ -62,15 +56,14 @@ impl Transaction {
                 //5. Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
                 // Create an aggregated 32-bit rangeproof and corresponding commitments.
                 let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
-                        &bp_gens,
-                        &pc_gens,
-                        &mut transcript,
+                        &params.bp_gens,
+                        &params.pc_gens,
+                        &mut params.transcript,
                         &[transfer_amount as u64, sender_updated_balance as u64],
                         &[blinding_t, account_blind],
                         32,
                 ).expect("HANDLE ERRORS BETTER");
 
-               
                 //updated account blind
                 let sender_updated_acount_blind = account_blind - blinding_t;
 
@@ -117,36 +110,36 @@ impl Transaction {
 
         //verify transaction under sk
         //pub fn verify_transaction(&self) -> Result<bool , Error> {
-        pub fn verify_transaction(&self) -> bool {
-                //Common Reference String
-                let mut transcript = Transcript::new(b"Zei Range Proof");
-                //def pederson from lib with Common Reference String
-                let pc_gens = PedersenGens::default();
-                //32bit range for now & one prover
-                let bp_gens = BulletproofGens::new(32, 2);
+        // pub fn verify_transaction(&self) -> bool {
+        //         //Common Reference String
+        //         let mut transcript = Transcript::new(b"Zei Range Proof");
+        //         //def pederson from lib with Common Reference String
+        //         let pc_gens = PedersenGens::default();
+        //         //32bit range for now & one prover
+        //         let bp_gens = BulletproofGens::new(32, 2);
         
-                //This should take C_t as input
-                //veriy the transactions proofs
-                //This should take  C_A'=C_A-C_T as input
-                //verify the sender proofs
-                let veriy_t = RangeProof::verify_multiple(
-                        &self.transaction_range_proof,
-                        &bp_gens,
-                        &pc_gens,
-                        &mut transcript,
-                        &[self.transaction_commitment, self.sender_updated_balance_commitment],
-                        32
-                );
+        //         //This should take C_t as input
+        //         //veriy the transactions proofs
+        //         //This should take  C_A'=C_A-C_T as input
+        //         //verify the sender proofs
+        //         let veriy_t = RangeProof::verify_multiple(
+        //                 &self.transaction_range_proof,
+        //                 &bp_gens,
+        //                 &pc_gens,
+        //                 &mut transcript,
+        //                 &[self.transaction_commitment, self.sender_updated_balance_commitment],
+        //                 32
+        //         );
                 
 
-                if veriy_t.is_ok() {
-                        return true;
-                } else {
-                        return false;
-                }
+        //         if veriy_t.is_ok() {
+        //                 return true;
+        //         } else {
+        //                 return false;
+        //         }
 
              
-        }
+        // }
 
 
 
@@ -157,6 +150,7 @@ impl Transaction {
 //veriy commitments 
 pub fn reciever_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPoint, recv_old_commit: RistrettoPoint) -> bool {
         //def pederson from lib with Common Reference String
+        use bulletproofs::PedersenGens;
         let pc_gens = PedersenGens::default();
 
         let compute_new_commit = pc_gens.commit(Scalar::from(tx_amount), tx_blind);
@@ -181,6 +175,7 @@ mod test {
         use crate::core::account::Account;
         use curve25519_dalek::scalar::Scalar;
         use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+        use merlin::Transcript;
 
         #[test]
         fn test_new_transaction() {

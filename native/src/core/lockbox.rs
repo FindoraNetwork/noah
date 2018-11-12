@@ -7,9 +7,9 @@
 // Cipher: XSALSA20_POLY1305
 // Curve: Curve25519 over Ristretto
 
-//Protocol Overview:
-//
-//Sender -> Receiver (pk)
+// Protocol Overview:
+
+// Sender -> Receiver (pk)
 // 1. Sample Some Fresh Randomness (R)
 // 2. Take pk^R = KEY , this key is used for encryption
 // 3. Encrypt: AES_ENC(HASH(KEY), message) = cipherText
@@ -18,8 +18,8 @@
 //      5a. Knows g^x = pk. x is secret key
 //      5b. Recall sender took pk^R as key, thus REDERIVED_KEY == pk^R == (g^x)^R == g^xR == (g^R)^x
 // 6. Decrypt: AES_DEC(HASH(REDERIVED_KEY), cipherText)
-// 
-//
+
+
 
 use blake2_rfc::blake2b::blake2b;
 use rand::{CryptoRng, Rng, OsRng};

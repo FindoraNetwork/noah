@@ -35,13 +35,16 @@ fn create_tx(mut cx: FunctionContext) -> JsResult<JsString> {
     //get account JSON
     let user_account = cx.argument::<JsString>(1)?.value();
     //deserilize account
-    let account: Account = serde_json::from_str(&user_account).unwrap();
+    let mut account: Account = serde_json::from_str(&user_account).unwrap();
+    //apply tx with account and get back the network transaction
+    let net_tx = account.send(&newtx);
 
-    
-
-    println!("create_tx: {:?}",newtx);
-    Ok(cx.string("eege"))
+    println!("create_tx: {:?}", newtx);
+    Ok(cx.string(serde_json::to_string(&net_tx).unwrap()))
 }
+
+//fn apply_tx()
+//fn recieve_tx()
 
 register_module!(mut cx, {
     cx.export_function("create_account", create_account)?;
