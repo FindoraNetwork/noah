@@ -16,6 +16,8 @@ Sender -> Receiver (pk)
 
 ## Confidential Payments for Accounts
 
+### Accounts
+
 We use an Account Model. An account is defined as:
 
     type Account = {
@@ -30,7 +32,7 @@ We use an Account Model. An account is defined as:
     - Scalar = unsigned 256bit integer
     - CurvePoint = A point that lies on an eliptic curve
 
-  
+### Keypair & Addresses
 
 Each account is associated with a keypair, in this case an elgamal keypair over the Ristretto curve.
 
@@ -40,7 +42,9 @@ Generating an Elgamal Keypair:
     2. Too generate a public key for this secret key we multiply this scalar over the basepoint of the chosen curve.
         In this case it is over the ristretto curve.
 
+We also use an accounts public key as the address on the network. This is used to encrypt packets to that account only.
 
+### Ledger
 Accounts are tracked on a Ledger. A ledger is a mapping between Address and commitments.
 
     type Ledger = {
@@ -51,4 +55,5 @@ Accounts are tracked on a Ledger. A ledger is a mapping between Address and comm
     A commitment is a curvepoint. 
 
 
-
+### Hidden Transactions
+Hidden Transactions hide the amount that is being sent. 
