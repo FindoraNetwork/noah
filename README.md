@@ -80,10 +80,25 @@ var new_tx = {
     transfer_amount: "", //the senders desired amount
 };
 
+//pass serilized account JSON as function argument first and the second is serilzed new tx info.
+var net_tx = create_tx(account, JSON.stringify(new_tx));
+//As a results a full transaction is generated as seen bellow.
+
+```
+
+#### How to Recieve a Confidential Transaction
+When an account hears about a new transaction that has been sent to it,
+it will apply that transaction to its local account to update its balance and latest
+blinding factor so it may spend the funds.
+
+```javascript
+//This is a JSON string, it is the transaction that we heared from the network for us
+//We pass our account JSON and the transaction JSON and get back our asccount JSON updated.
+var updated_account = recieve_tx(account, )
+
+
 //pass serilized JSON as function argument first and the second is our account JSON
 var net_tx = create_tx(JSON.stringify(new_tx), account);
 //As a results a full transaction is generated as seen bellow.
 
-
 ```
-

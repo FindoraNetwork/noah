@@ -2,7 +2,7 @@
 
 use curve25519_dalek::scalar::Scalar;
 use crate::core::keypair::Keypair;
-use crate::core::transaction::{CreateTx, Transaction};
+use crate::core::transaction::{CreateTx, Transaction, reciever_verify};
 use rand::OsRng;
 use crate::core::elgamal::{SecretKey, PublicKey};
 use curve25519_dalek::ristretto::CompressedRistretto;
@@ -54,28 +54,27 @@ impl Account {
     pub fn apply_tx(&mut self, tx: &Transaction) {
         //update our balamce
         self.balance -= tx.transfer_amount;
-        //update counter
+        //increment counter
         self.counter += 1;
         //
     }
 
     //once a transaction has been sent to us we need to apply it to our account
     pub fn recieve(&mut self, tx: Transaction) {
-        //
+        //unlock the box that was sent to us
+        //this gets us the amount and new blind
+        let (recoverd_amount, recoverd_blind) = tx.recover_plaintext(&self.keys.secret);
+        //update our account opening
+        self.opening = self.opening + tx.opening;
+        //update our account commitment
+        //veriy that commitments are correct that is sent
+        //if reciever_verify(recoverd_amount, recoverd_blind, tx.receiver_new_commit, self.commitment) {} else {}
+        
+        self.commitment = tx.sender_updated_balance_commitment;
 
+        //update our account opening
+        self.opening = self.opening + recoverd_blind;
 
-      
-
-        // //update our account opening
-        // //self.opening = self.opening + tx.opening;
-        // //update our account commitment
-        // self.commitment = tx.sender_updated_balance_commitment;
-
-        // //update our account opening
-        // self.opening = self.opening - new_opening;
-       
-        // //increment counter
-        // self.counter += 1;
     }
 }
 
