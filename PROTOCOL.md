@@ -1,7 +1,9 @@
 # Zei Protocol Outline
 
-## Public Key based non interactive encryption
+## PublicKey based NonInteractive Encryption
 
+We desire to send an ecrypted packet so that only the holder of the secret key accoiated with
+a Publickey 
 
 Sender -> Receiver (pk)
 1. Sample Some Fresh Randomness (R)
