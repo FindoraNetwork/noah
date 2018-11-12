@@ -4,16 +4,17 @@
 
 We desire to send an ecrypted packet so that only the holder of the secret key accoiated with
 a Publickey can unlock the packet. This is used in Zei to send plaintext balance and the blinding used for a transaction.
+We assume an authenticated cipher is used such as AES_GCM or XSALSA20_POLY1305 as we use.
 
-Sender -> Receiver (pk)
-1. Sample Some Fresh Randomness (R)
-2. Take pk^R = KEY , this key is used for encryption
-3. Encrypt: AES_ENC(HASH(KEY), message) = cipherText
-4. Send (cipherText, g^R) to recipient
-5. Receiver Must Derive shared key
-     5a. Knows g^x = pk. x is secret key
-     5b. Recall sender took pk^R as key, thus REDERIVED_KEY == pk^R == (g^x)^R == g^xR == (g^R)^x
-6. Decrypt: AES_DEC(HASH(REDERIVED_KEY), cipherText)
+    Sender -> Receiver (pk)
+    1. Sample Some Fresh Randomness (R)
+    2. Take pk^R = KEY , this key is used for encryption
+    3. Encrypt: ENC(HASH(KEY), message) = cipherText
+    4. Send (cipherText, g^R) to recipient
+    5. Receiver Must Derive shared key
+        5a. Knows g^x = pk. x is secret key
+        5b. Recall sender took pk^R as key, thus REDERIVED_KEY == pk^R == (g^x)^R == g^xR == (g^R)^x
+    6. Decrypt: DEC(HASH(REDERIVED_KEY), cipherText)
 
 
 ## Confidential Payments for Accounts
