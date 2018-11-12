@@ -3,7 +3,7 @@
 ## PublicKey based NonInteractive Encryption
 
 We desire to send an ecrypted packet so that only the holder of the secret key accoiated with
-a Publickey 
+a Publickey can unlock the packet. This is used in Zei to send plaintext balance and the blinding used for a transaction.
 
 Sender -> Receiver (pk)
 1. Sample Some Fresh Randomness (R)
