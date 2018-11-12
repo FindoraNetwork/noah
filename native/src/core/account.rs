@@ -50,18 +50,18 @@ impl Account {
     pub fn send(&mut self, tx_meta: &CreateTx) -> Transaction {
         //update our balance
         //TODO: CHECK IF BALANCE IS ENOUGH
-        self.balance -= tx.transfer_amount;
+        self.balance -= tx_meta.transfer_amount;
 
         //generate our transaction
-        let (tx, updated_blind) = Transaction::new(&tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening, tx_meta.receiver_commit.decompress().unwrap());
+        let (newtx, updated_blind) = Transaction::new(&tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening, tx_meta.receiver_commit.decompress().unwrap());
         //update our account blinding
         self.opening = updated_blind;
         //update our commitment
-        self.commitment = tx.sender_updated_balance_commitment;     
+        self.commitment = newtx.sender_updated_balance_commitment;     
         //increment counter
         self.counter += 1;
         //return our tx
-        return tx;
+        return newtx;
     }
     
     //take a transaction that this account has sent and apply to current state once network accepts
@@ -79,11 +79,13 @@ impl Account {
         //update our account commitment
         //veriy that commitments are correct that is sent
         //if reciever_verify(recoverd_amount, recoverd_blind, tx.receiver_new_commit, self.commitment) {} else {}
-        
         self.commitment = tx.sender_updated_balance_commitment;
 
         //update our account opening
         self.opening = self.opening + recoverd_blind;
+
+        //update our balance
+        self.balance += recoverd_amount;
 
     }
 }
