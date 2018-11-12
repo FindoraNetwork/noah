@@ -94,11 +94,8 @@ blinding factor so it may spend the funds.
 ```javascript
 //This is a JSON string, it is the transaction that we heared from the network for us
 //We pass our account JSON and the transaction JSON and get back our asccount JSON updated.
-var updated_account = recieve_tx(account, )
+var updated_account = recieve_tx(account, tx);
 
-
-//pass serilized JSON as function argument first and the second is our account JSON
-var net_tx = create_tx(JSON.stringify(new_tx), account);
 //As a results a full transaction is generated as seen bellow.
 
 ```
