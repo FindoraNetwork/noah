@@ -47,6 +47,8 @@ Generating an Elgamal Keypair:
 
 We also use an accounts public key as the address on the network. This is used to encrypt packets to that account only.
 
+Each account has secret storage that the owner stores. Here there is the plaintext balance for that account and the opening Scalar value that is needed to spend the transactions.
+
 ### Ledger
 Accounts are tracked on a Ledger. A ledger is a mapping between Address and commitments.
 
@@ -60,3 +62,31 @@ Accounts are tracked on a Ledger. A ledger is a mapping between Address and comm
 
 ### Hidden Transactions
 Hidden Transactions hide the amount that is being sent. 
+
+
+#### Sending a Transaction
+
+To send a transacting using an account:
+
+    1. A before a Transaction can be generated we need to know:
+
+        a. Public Key of the Reciever
+        b. Latest commitment of that reciever
+        c. The transfer amount
+
+    2. We must generate a new transaction with the needed proofs and commitments.
+      We also send a reciver encrypted package of the plaintext balance and new blinding.
+
+
+        a. Reduce account local balance with current transfer ammount
+        b. Sample Fresh blinding factor [blind], its a scalar (blinding_t)
+        c. Create Commitment ->  g^amount * h^[blind] == comm_t
+        d. Create Commitment ->  g^(Balance - amount) * h^(Opening - blind) == new_comm_sender
+        e. Create rangeproof for amount & use [blind] as randomness == RP_T
+        f. Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
+        g. Multiply Commitment ->  oldCommR * CommT == CommR
+        h. Encrypt to receiver pubkey both the transfer_amount transferred and the blinding factor [blind] 
+    
+#### Recieve a Transaction
+
+When a new transaction is found on the network for this account we must process it and reflect our local account with our updated balance and new openning. This is crucial as the new opening allows us to spend from the account.
