@@ -53,19 +53,19 @@ impl Account {
     //take a transaction that this account has sent and apply to current state once network accepts
     pub fn apply_tx(&mut self, tx: &Transaction) {
         //update our balamce
-        self.balance -= tx.transfer_amount;
+        //self.balance -= tx.transfer_amount;
         //increment counter
-        self.counter += 1;
+        //self.counter += 1;
         //
     }
 
     //once a transaction has been sent to us we need to apply it to our account
-    pub fn recieve(&mut self, tx: Transaction) {
+    pub fn recieve(&mut self, tx: &Transaction) {
         //unlock the box that was sent to us
         //this gets us the amount and new blind
         let (recoverd_amount, recoverd_blind) = tx.recover_plaintext(&self.keys.secret);
         //update our account opening
-        self.opening = self.opening + tx.opening;
+        self.opening = self.opening + recoverd_blind;
         //update our account commitment
         //veriy that commitments are correct that is sent
         //if reciever_verify(recoverd_amount, recoverd_blind, tx.receiver_new_commit, self.commitment) {} else {}
