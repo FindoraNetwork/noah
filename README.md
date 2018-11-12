@@ -81,7 +81,12 @@ var new_tx = {
 };
 
 //pass serilized account JSON as function argument first and the second is serilzed new tx info.
-var net_tx = create_tx(account, JSON.stringify(new_tx));
+var jsobj = create_tx(account, JSON.stringify(new_tx));
+//This jsobj containts two items.
+//The key 'account' has the updated account JSON as a string
+//The key 'tx' has the transaction packed up as JSON as a string
+//It is important to keep the account as it is now updated as if the transaction is accepted by network
+
 //As a results a full transaction is generated as seen bellow.
 
 ```
@@ -97,5 +102,24 @@ blinding factor so it may spend the funds.
 var updated_account = recieve_tx(account, tx);
 
 //As a results a full transaction is generated as seen bellow.
+
+```
+
+### Example
+
+```javascript
+
+
+//Create Accounts, these are JSON
+var sender = create_account();
+var reciever = create_account();
+
+//Parse JSON into JS object
+var sender_p = JSON.parse(sender);
+var reciever_p = JSON.parse(reciever);
+
+//set the account balances to some values
+sender.balance = 100;
+reciever.balance = 10;
 
 ```

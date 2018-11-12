@@ -27,7 +27,25 @@ fn create_account(mut cx: FunctionContext) -> JsResult<JsString> {
 }
 
 //construct transaction
-fn create_tx(mut cx: FunctionContext) -> JsResult<JsString> {
+// fn create_tx(mut cx: FunctionContext) -> JsResult<JsString> {
+//     //get account JSON
+//     let user_account = cx.argument::<JsString>(0)?.value();
+//     //deserilize account
+//     let mut account: Account = serde_json::from_str(&user_account).unwrap();
+//     //get new tx JSON
+//     let user_input_tx = cx.argument::<JsString>(1)?.value();
+//     //deserizlize tx struct
+//     let newtx: CreateTx = serde_json::from_str(&user_input_tx).unwrap();
+
+//     //apply tx with account and get back the network transaction
+//     let net_tx = account.send(&newtx);
+
+//     //println!("create_tx: {:?}", newtx);
+//     Ok(cx.string(serde_json::to_string(&net_tx).unwrap()))
+// }
+
+//construct transaction, return object with updated account and tx
+fn create_tx(mut cx: FunctionContext) -> JsResult<JsObject> {
     //get account JSON
     let user_account = cx.argument::<JsString>(0)?.value();
     //deserilize account
@@ -40,8 +58,17 @@ fn create_tx(mut cx: FunctionContext) -> JsResult<JsString> {
     //apply tx with account and get back the network transaction
     let net_tx = account.send(&newtx);
 
-    //println!("create_tx: {:?}", newtx);
-    Ok(cx.string(serde_json::to_string(&net_tx).unwrap()))
+    //new js object to send back
+    let js_object: Handle<JsObject> = cx.empty_object();
+    //create account string
+    let js_acc = cx.string(serde_json::to_string(&account).unwrap());
+    //set updated account
+    js_object.set(&mut cx, "account", js_acc)?;
+    //create tx string 
+    let js_tx = cx.string(serde_json::to_string(&net_tx).unwrap());
+    js_object.set(&mut cx, "tx", js_tx)?;
+
+    Ok(js_object)
 }
 
 //fn apply_tx()

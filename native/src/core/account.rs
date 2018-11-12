@@ -30,12 +30,14 @@ impl Account {
     //initiate a new hidden account 
     pub fn new() -> Account {
         let pp = PublicParams::new();
+        //let inital_balance: u32 = 1_000_000_000;
+        let inital_balance: u32 = 0;
         Account {
             counter: 0,
-            balance: 0,
+            balance: inital_balance,
             opening: Scalar::from(0u32),
             //initial commitment is to 0 for balance and blind
-            commitment: pp.pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32)).compress(),
+            commitment: pp.pc_gens.commit(Scalar::from(inital_balance), Scalar::from(0u32)).compress(),
             keys: Keypair::new(),
         }
     }
