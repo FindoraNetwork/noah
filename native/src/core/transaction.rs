@@ -39,7 +39,7 @@ pub struct CreateTx {
 impl Transaction {
 
         //create a new transaction 
-        pub fn new(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> Transaction {
+        pub fn new(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> (Transaction, Scalar) {
                 //public params
                 let mut params = PublicParams::new();
                 //1. Sample Fresh blinding factor [blind], its a scalar
@@ -50,7 +50,7 @@ impl Transaction {
                 //let commit_t = pc_gens.commit(Scalar::from(transfer_amount), blinding_t);
 
                 //4. create Commitment ->  g^(Balance - amount) * h^(Opening - blind) == CommS
-                let sender_updated_balance = account_balance - transfer_amount;
+                //let sender_updated_balance = account_balance - transfer_amount;
 
                 //3. Create rangeproof for amount & use [blind] as randomness == RP_T
                 //5. Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
@@ -59,7 +59,7 @@ impl Transaction {
                         &params.bp_gens,
                         &params.pc_gens,
                         &mut params.transcript,
-                        &[transfer_amount as u64, sender_updated_balance as u64],
+                        &[transfer_amount as u64, account_balance as u64],
                         &[blinding_t, account_blind],
                         32,
                 ).expect("HANDLE ERRORS BETTER");
@@ -79,13 +79,14 @@ impl Transaction {
                 //lock em up
                 let lbox = Lockbox::lock(dest_pk, &to_encrypt);
 
-                return Transaction {
+                //return transaction structure and new blind
+                return (Transaction {
                         transaction_range_proof: proof_agg,
                         transaction_commitment: commitments_agg[0],
                         sender_updated_balance_commitment: commitments_agg[1],
                         receiver_new_commit: new_commit_reciever.compress(),
                         lockbox: lbox
-                };
+                }, sender_updated_acount_blind);
         }
 
         //helper function to recover the sent amount and blind factor

@@ -45,19 +45,29 @@ impl Account {
         self.keys.public.clone()
     }
 
-    //send a transaction using this account 
+    //send a transaction using this account
+    //this updates the accounts info as the transaction has been accepted by the network 
     pub fn send(&mut self, tx_meta: &CreateTx) -> Transaction {
-        return Transaction::new(&tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening, tx_meta.receiver_commit.decompress().unwrap());
+        //update our balance
+        //TODO: CHECK IF BALANCE IS ENOUGH
+        self.balance -= tx.transfer_amount;
+
+        //generate our transaction
+        let (tx, updated_blind) = Transaction::new(&tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening, tx_meta.receiver_commit.decompress().unwrap());
+        //update our account blinding
+        self.opening = updated_blind;
+        //update our commitment
+        self.commitment = tx.sender_updated_balance_commitment;     
+        //increment counter
+        self.counter += 1;
+        //return our tx
+        return tx;
     }
     
     //take a transaction that this account has sent and apply to current state once network accepts
-    pub fn apply_tx(&mut self, tx: &Transaction) {
-        //update our balamce
-        //self.balance -= tx.transfer_amount;
-        //increment counter
-        //self.counter += 1;
-        //
-    }
+    // pub fn apply_tx(&mut self, tx: &Transaction) {
+
+    // }
 
     //once a transaction has been sent to us we need to apply it to our account
     pub fn recieve(&mut self, tx: &Transaction) {
