@@ -37,15 +37,10 @@ We use an Account Model. An account is defined as:
 
 ### Keypair & Addresses
 
-Each account is associated with a keypair, in this case an elgamal keypair over the Ristretto curve.
-
-Generating an Elgamal Keypair:
-
-    1. Sample some randomness at 32byte length as a Scalar. This is the secret key.
-    2. Too generate a public key for this secret key we multiply this scalar over the basepoint of the chosen curve.
-        In this case it is over the ristretto curve.
+Each account is associated with a keypair, in this case an Schnorr keypair over the Ristretto curve.
 
 We also use an accounts public key as the address on the network. This is used to encrypt packets to that account only.
+Zei Network Addresses are the base58 of the account Public key with the 'ZEI_' prefix added.
 
 Each account has secret storage that the owner stores. Here there is the plaintext balance for that account and the opening Scalar value that is needed to spend the transactions.
 

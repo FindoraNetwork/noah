@@ -1,6 +1,7 @@
 //Zei: Confidential Payments for Accounts
 
 extern crate schnorr;
+extern crate organism_utils;
 extern crate bulletproofs;
 extern crate rand;
 extern crate blake2_rfc;
@@ -19,10 +20,9 @@ extern crate serde_json;
 mod util;
 mod lockbox;
 mod errors;
-mod hex;
 mod microsalt;
 mod setup;
-
+pub mod address;
 
 
 

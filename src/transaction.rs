@@ -51,7 +51,7 @@ impl Transaction {
                 //public params
                 let mut params = PublicParams::new();
                 //1. Sample Fresh blinding factor [blind], its a scalar
-                let blinding_t = Scalar::random(&mut csprng);
+                let blinding_t = Scalar::random(csprng);
 
                 //2. Create Commitment ->  g^amount * h^[blind] == CommT
                 //let commit_t = pc_gens.commit(Scalar::from(transfer_amount), blinding_t);
@@ -84,7 +84,7 @@ impl Transaction {
                 //next add the blind
                 to_encrypt.extend_from_slice(&blinding_t.to_bytes());
                 //lock em up
-                let lbox = Lockbox::lock(dest_pk, &to_encrypt);
+                let lbox = Lockbox::lock(csprng, dest_pk, &to_encrypt);
 
                 //return transaction structure and new blind
                 return (Transaction {

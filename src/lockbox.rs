@@ -28,7 +28,7 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use crate::util::{slice_to_fixed32, decode_scalar};
-use std::iter::repeat;
+// use std::iter::repeat;
 use crate::microsalt::secretbox::{secretbox_seal, secretbox_open};
 
 use schnorr::PublicKey;
@@ -58,7 +58,7 @@ impl Lockbox {
 
         //get our enc key and blinded randomness
         //g^(x*r),g^r
-        let (enc_point, bigr) = Lockbox::derive_key(publickey);
+        let (enc_point, bigr) = Lockbox::derive_key(csprng, publickey);
         lbox.rand = bigr;
         //println!("enckey: {:?}", enc_point);
         //println!("bigr: {:?}", bigr);
@@ -107,7 +107,7 @@ impl Lockbox {
         where R: CryptoRng + Rng, 
     {
         //sample fresh randomness
-        let randomness = Scalar::random(&mut csprng);
+        let randomness = Scalar::random(csprng);
 
         //pk^R
         let shared_key = randomness * pk.get_curve_point().unwrap();
@@ -132,7 +132,6 @@ impl Lockbox {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::hex;
     use crate::util::{ be_u8_from_u32 };
     use rand::OsRng;
     use schnorr::PublicKey;
@@ -164,7 +163,7 @@ mod test {
         //println!("to_encrypt: {:?}", to_encrypt);
         
         //lock em up
-        let lbox = Lockbox::lock(&keypair.public, &to_encrypt);
+        let lbox = Lockbox::lock(&mut csprng, &keypair.public, &to_encrypt);
 
         //Now we unbox to check if we get same results
         

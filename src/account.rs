@@ -14,6 +14,7 @@ use rand::Rng;
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
 pub type Balance = u32;
 
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Account {
     //account tx count
@@ -36,14 +37,14 @@ impl Account {
         let pp = PublicParams::new();
         //let inital_balance: u32 = 1_000_000_000;
         let inital_balance: u32 = 0;
-        
+
         Account {
             counter: 0,
             balance: inital_balance,
             opening: Scalar::from(0u32),
             //initial commitment is to 0 for balance and blind
             commitment: pp.pc_gens.commit(Scalar::from(inital_balance), Scalar::from(0u32)).compress(),
-            keys: Keypair::generate(&mut csprng)
+            keys: Keypair::generate(csprng)
         }
     }
 
@@ -54,13 +55,15 @@ impl Account {
 
     //send a transaction using this account
     //this updates the accounts info as the transaction has been accepted by the network 
-    pub fn send(&mut self, tx_meta: &CreateTx) -> Transaction {
+    pub fn send<R>(&mut self, csprng: &mut R, tx_meta: &CreateTx) -> Transaction
+        where R: CryptoRng + Rng,  
+    {
         //update our balance
         //TODO: CHECK IF BALANCE IS ENOUGH
         self.balance -= tx_meta.transfer_amount;
 
         //generate our transaction
-        let (newtx, updated_blind) = Transaction::new(&tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening, tx_meta.receiver_commit.decompress().unwrap());
+        let (newtx, updated_blind) = Transaction::new(csprng, &tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening, tx_meta.receiver_commit.decompress().unwrap());
         //update our account blinding
         self.opening = updated_blind;
         //update our commitment
