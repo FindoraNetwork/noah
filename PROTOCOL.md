@@ -42,6 +42,9 @@ Each account is associated with a keypair, in this case an Schnorr keypair over 
 We also use an accounts public key as the address on the network. This is used to encrypt packets to that account only.
 Zei Network Addresses are the base58 of the account Public key with the 'ZEI_' prefix added.
 
+```
+ZEI_gvcCi6ovrMgnBN7bMdNaxyRXoZxM1NrpGM9jY8whNizeMizCs
+```
 Each account has secret storage that the owner stores. Here there is the plaintext balance for that account and the opening Scalar value that is needed to spend the transactions.
 
 ### Ledger
