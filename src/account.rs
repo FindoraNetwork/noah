@@ -9,7 +9,8 @@ use schnorr::SecretKey;
 use schnorr::Keypair;
 use rand::CryptoRng;
 use rand::Rng;
-
+use crate::address;
+use crate::address::Address;
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
 pub type Balance = u32;
@@ -49,8 +50,8 @@ impl Account {
     }
 
     //helper to get public key aka. address
-    pub fn address(&self) -> PublicKey {
-        self.keys.public.clone()
+    pub fn address(&self) -> Address {
+        address::enc(&self.keys.public)
     }
 
     //send a transaction using this account
