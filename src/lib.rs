@@ -22,10 +22,8 @@ mod lockbox;
 mod errors;
 mod microsalt;
 mod setup;
+
 pub mod address;
-
-
-
 pub mod account;
 pub mod transaction;
 

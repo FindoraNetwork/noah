@@ -7,9 +7,36 @@ It Implements Confidential Transactions that was first proposed by [Greg Maxwell
 This implementation uses Pedersen Commitments and is vulnerable to account poisoning. 
 
 # Internal
+View [Protocol](https://raw.githubusercontent.com/eianio/zei/master/PROTOCOL.md?token=AGZpc6wNTflpZbvqpp-IzoDfGkCCLGo_ks5cBDciwA%3D%3D)
+
 
 
 
 
 
 # Benchmarks
+
+
+# Installation
+
+To install, add the following to your project's `Cargo.toml`:
+
+```toml
+[dependencies.zei]
+version = "0.0.1"
+```
+
+Then, in your library or executable source, add:
+
+```rust
+extern crate zei;
+```
+
+By default, `zei` builds against `curve25519-dalek`'s `u64_backend`
+feature, which uses Rust's `i128` feature to achieve roughly double the speed as
+the `u32_backend` feature.  When targetting 32-bit systems, however, you'll
+likely want to compile with
+ `cargo build --no-default-features --features="u32_backend"`.
+If you're building for a machine with avx2 instructions, there's also the
+experimental `avx2_backend`.  To use it, compile with
+`RUSTFLAGS="-C target_cpu=native" cargo build --no-default-features --features="avx2_backend"`
