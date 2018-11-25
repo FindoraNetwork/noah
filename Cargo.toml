@@ -22,7 +22,7 @@ organism_utils = { git = "https://github.com/stichtingorganism/utils" }
 criterion = "0.2"
 
 [[bench]]
-name = "schnorr_benchmarks"
+name = "zei_benchmarks"
 harness = false
 
 [features]

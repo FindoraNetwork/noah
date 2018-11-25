@@ -7,7 +7,7 @@ It Implements Confidential Transactions that was first proposed by [Greg Maxwell
 This implementation uses Pedersen Commitments and is vulnerable to account poisoning. 
 
 # Internal
-View [Protocol](https://raw.githubusercontent.com/eianio/zei/master/PROTOCOL.md?token=AGZpc6wNTflpZbvqpp-IzoDfGkCCLGo_ks5cBDciwA%3D%3D)
+View [Protocol](https://github.com/eianio/zei/blob/master/PROTOCOL.md)
 
 
 
