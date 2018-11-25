@@ -1,7 +1,6 @@
 //zei utils 
 
 use curve25519_dalek::scalar::Scalar;
-use rand::Rng;
 use rand::RngCore;
 
 //random byte generator

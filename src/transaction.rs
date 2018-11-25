@@ -4,11 +4,16 @@ use bulletproofs::RangeProof;
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
 use rand::OsRng;
-use crate::core::lockbox::Lockbox;
-use crate::core::util::{ be_u8_from_u32, slice_to_fixed32 };
-use crate::core::errors::Error;
-use crate::core::elgamal::{SecretKey, PublicKey};
-use crate::core::setup::PublicParams;
+use crate::lockbox::Lockbox;
+use crate::util::{ be_u8_from_u32, slice_to_fixed32 };
+use crate::errors::Error;
+use crate::setup::PublicParams;
+use merlin::Transcript;
+
+use schnorr::PublicKey;
+use schnorr::SecretKey;
+
+
 
 //A Confidential transaction
 // range proof that balance - balance_inc is between (0, val_max)
@@ -170,93 +175,93 @@ pub fn reciever_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPo
 
 
 
-#[cfg(test)]
-mod test {
-        use super::*;
-        use crate::core::account::Account;
-        use curve25519_dalek::scalar::Scalar;
-        use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
-        use merlin::Transcript;
+// #[cfg(test)]
+// mod test {
+//         use super::*;
+//         use crate::core::account::Account;
+//         use curve25519_dalek::scalar::Scalar;
+//         use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+//         use merlin::transaction::Transcript;
 
-        #[test]
-        fn test_new_transaction() {
-                //def pederson from lib with Common Reference String
-                let pc_gens = PedersenGens::default();
+//         #[test]
+//         fn test_new_transaction() {
+//                 //def pederson from lib with Common Reference String
+//                 let pc_gens = PedersenGens::default();
 
-                //Account A
-                let mut acc_a = Account::new();
-                //Account B
-                let mut acc_b = Account::new();
+//                 //Account A
+//                 let mut acc_a = Account::new();
+//                 //Account B
+//                 let mut acc_b = Account::new();
 
-                //the initial commitment is to zero
-                let acc_a_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
-                let acc_b_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
+//                 //the initial commitment is to zero
+//                 let acc_a_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
+//                 let acc_b_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
 
-                let new_tx = CreateTx {
-                        receiver: acc_b.keys.public,
-                        receiver_commit: acc_b.commitment,
-                        transfer_amount: 100u32
-                };
+//                 let new_tx = CreateTx {
+//                         receiver: acc_b.keys.public,
+//                         receiver_commit: acc_b.commitment,
+//                         transfer_amount: 100u32
+//                 };
                 
-                //
-                //Create Proofs
-                //
+//                 //
+//                 //Create Proofs
+//                 //
 
-                let mut transcript = Transcript::new(b"Zei Range Proof");
-                //32bit range for now & one prover
-                let bp_gens = BulletproofGens::new(32, 2);
+//                 let mut transcript = Transcript::new(b"Zei Range Proof");
+//                 //32bit range for now & one prover
+//                 let bp_gens = BulletproofGens::new(32, 2);
 
 
-                //1. Sample Fresh blinding factor [blind], its a scalar
-                let mut csprng: OsRng = OsRng::new().unwrap();
-                let blinding_t = Scalar::random(&mut csprng);
+//                 //1. Sample Fresh blinding factor [blind], its a scalar
+//                 let mut csprng: OsRng = OsRng::new().unwrap();
+//                 let blinding_t = Scalar::random(&mut csprng);
 
-                //update sending account balance 
-                //acc_a.balance = acc_a.balance - new_tx.transfer_amount; 
-                //update account blind 
-                let sender_updated_acount_blind = &acc_a.opening - &blinding_t;
+//                 //update sending account balance 
+//                 //acc_a.balance = acc_a.balance - new_tx.transfer_amount; 
+//                 //update account blind 
+//                 let sender_updated_acount_blind = &acc_a.opening - &blinding_t;
                 
-                // Create an aggregated 32-bit rangeproof and corresponding commitments.
-                let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
-                        &bp_gens,
-                        &pc_gens,
-                        &mut transcript,
-                        &[new_tx.transfer_amount as u64, acc_a.balance as u64],
-                        &[blinding_t, acc_a.opening],
-                        32,
-                ).expect("A real program could handle errors");
+//                 // Create an aggregated 32-bit rangeproof and corresponding commitments.
+//                 let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
+//                         &bp_gens,
+//                         &pc_gens,
+//                         &mut transcript,
+//                         &[new_tx.transfer_amount as u64, acc_a.balance as u64],
+//                         &[blinding_t, acc_a.opening],
+//                         32,
+//                 ).expect("A real program could handle errors");
 
-                let tx_derived_commit = pc_gens.commit(Scalar::from(new_tx.transfer_amount), blinding_t);
-                //println!("tx_derived_commit: {:?}", tx_derived_commit.compress());
-                //println!("commitments_agg[0]: {:?}", commitments_agg[0]);
+//                 let tx_derived_commit = pc_gens.commit(Scalar::from(new_tx.transfer_amount), blinding_t);
+//                 //println!("tx_derived_commit: {:?}", tx_derived_commit.compress());
+//                 //println!("commitments_agg[0]: {:?}", commitments_agg[0]);
 
-                assert_eq!(tx_derived_commit, commitments_agg[0].decompress().unwrap());
-                //create a dummy tx
-                //let tx = new_transaction(new_tx.receiver, new_tx.transfer_amount, acc_a.balance, acc_a.commitment, new_tx.receiver_commit);
+//                 assert_eq!(tx_derived_commit, commitments_agg[0].decompress().unwrap());
+//                 //create a dummy tx
+//                 //let tx = new_transaction(new_tx.receiver, new_tx.transfer_amount, acc_a.balance, acc_a.commitment, new_tx.receiver_commit);
 
-                //verify reciver commitment
-                //assert_eq!(reciever_verify(p_amount, recovered_blind_scalar, tx.receiver_new_commit, acc_b_comm_inital), true);
-                // pub fn new_transaction(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> Transaction {
+//                 //verify reciver commitment
+//                 //assert_eq!(reciever_verify(p_amount, recovered_blind_scalar, tx.receiver_new_commit, acc_b_comm_inital), true);
+//                 // pub fn new_transaction(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> Transaction {
                 
-                //7. Encrypt to receiver pubkey both the transfer_amount transferred and the blinding factor [blind] 
-                // let mut to_encrypt = Vec::new();
-                // //first add transfer_amount which is fixed 4 bytes in big endian
-                // to_encrypt.extend_from_slice(&be_u8_from_u32(transfer_amount));
-                // //next add the blind
-                // to_encrypt.extend_from_slice(&blinding_t.to_bytes());
-                // //lock em up
-                // let lbox = Lockbox::lock(dest_pk, &to_encrypt);
+//                 //7. Encrypt to receiver pubkey both the transfer_amount transferred and the blinding factor [blind] 
+//                 // let mut to_encrypt = Vec::new();
+//                 // //first add transfer_amount which is fixed 4 bytes in big endian
+//                 // to_encrypt.extend_from_slice(&be_u8_from_u32(transfer_amount));
+//                 // //next add the blind
+//                 // to_encrypt.extend_from_slice(&blinding_t.to_bytes());
+//                 // //lock em up
+//                 // let lbox = Lockbox::lock(dest_pk, &to_encrypt);
 
-                // let final_tx = Transaction {
-                //         transaction_range_proof: range_proof_t,
-                //         transaction_commitment: commit_t,
-                //         sender_updated_balance_range_proof: range_proof_s,
-                //         sender_updated_balance_commitment: commit_s,
-                //         receiver_new_commit: new_commit_reciever.compress(),
-                //         lockbox: lbox
-                // };
+//                 // let final_tx = Transaction {
+//                 //         transaction_range_proof: range_proof_t,
+//                 //         transaction_commitment: commit_t,
+//                 //         sender_updated_balance_range_proof: range_proof_s,
+//                 //         sender_updated_balance_commitment: commit_s,
+//                 //         receiver_new_commit: new_commit_reciever.compress(),
+//                 //         lockbox: lbox
+//                 // };
 
 
 
-        }
-}
+//         }
+// }

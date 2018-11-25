@@ -1,5 +1,5 @@
-use crate::core::microsalt::stream;
-use crate::core::microsalt::onetimeauth;
+use crate::microsalt::stream;
+use crate::microsalt::onetimeauth;
 
 //Length of key
 pub const SECRETBOX_KEY_LEN : usize = 32;

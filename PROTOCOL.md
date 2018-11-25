@@ -63,6 +63,15 @@ Accounts are tracked on a Ledger. A ledger is a mapping between Address and comm
 ### Hidden Transactions
 Hidden Transactions hide the amount that is being sent. 
 
+Pedersen commitment in the Elliptic Curve context:
+
+>                C = mG + rH
+
+G is now a generator point (sometimes called base point)
+
+C is a point on the EC. 
+
+So an EC point (for a 256 bit curve, anyway) can be encoded into 33 bytes.
 
 #### Sending a Transaction
 

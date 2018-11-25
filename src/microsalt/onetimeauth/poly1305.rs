@@ -1,4 +1,4 @@
-use crate::core::microsalt::shared;
+use crate::microsalt::shared;
 use std::cmp;
 
 pub const ONETIMEAUTH_KEY_LEN : usize = 32;

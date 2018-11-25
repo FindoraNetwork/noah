@@ -1,13 +1,13 @@
 //Hidden Accounts
 
 use curve25519_dalek::scalar::Scalar;
-use crate::core::keypair::Keypair;
-use crate::core::transaction::{CreateTx, Transaction, reciever_verify};
+use crate::transaction::{CreateTx, Transaction, reciever_verify};
 use rand::OsRng;
-use crate::core::elgamal::{SecretKey, PublicKey};
 use curve25519_dalek::ristretto::CompressedRistretto;
-use crate::core::setup::PublicParams;
-
+use crate::setup::PublicParams;
+use schnorr::PublicKey;
+use schnorr::SecretKey;
+use schnorr::Keypair;
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
 pub type Balance = u32;
@@ -30,6 +30,9 @@ impl Account {
     //initiate a new hidden account 
     pub fn new() -> Account {
         let pp = PublicParams::new();
+        //Sample Fresh Keypair
+        let mut csprng: OsRng = OsRng::new().unwrap();
+
         //let inital_balance: u32 = 1_000_000_000;
         let inital_balance: u32 = 0;
         Account {
@@ -38,7 +41,7 @@ impl Account {
             opening: Scalar::from(0u32),
             //initial commitment is to 0 for balance and blind
             commitment: pp.pc_gens.commit(Scalar::from(inital_balance), Scalar::from(0u32)).compress(),
-            keys: Keypair::new(),
+            keys: Keypair::generate(&mut csprng)
         }
     }
 

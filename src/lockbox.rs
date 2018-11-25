@@ -26,10 +26,13 @@ use rand::{CryptoRng, Rng, OsRng};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::CompressedRistretto;
-use crate::core::util::{slice_to_fixed32, decode_scalar};
+use crate::util::{slice_to_fixed32, decode_scalar};
 use std::iter::repeat;
-use crate::core::elgamal::{SecretKey, PublicKey};
-use crate::core::microsalt::secretbox::{secretbox_seal, secretbox_open};
+use crate::microsalt::secretbox::{secretbox_seal, secretbox_open};
+
+use schnorr::PublicKey;
+use schnorr::SecretKey;
+
 
 
 
@@ -103,7 +106,7 @@ impl Lockbox {
         let randomness = Scalar::random(&mut csprng);
 
         //pk^R
-        let shared_key = randomness * pk.0;
+        let shared_key = randomness * pk.get_curve_point().unwrap();
         
         //g^R where R = randomness used to derive shared key
         let blind_rand = &randomness * &RISTRETTO_BASEPOINT_TABLE;
@@ -125,22 +128,22 @@ impl Lockbox {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::core::hex;
-    use crate::core::util::{ be_u8_from_u32 };
-    use crate::core::elgamal;
-        use rand::OsRng;
+    use crate::hex;
+    use crate::util::{ be_u8_from_u32 };
+    use rand::OsRng;
+    use schnorr::PublicKey;
+    use schnorr::SecretKey;
+    use schnorr::Keypair;
+
+
 
     #[test]
     fn test_lock_unlock() { 
         //Sample Fresh Keypair
-
+        let mut csprng: OsRng = OsRng::new().unwrap();
+        let keypair: Keypair = Keypair::generate(&mut csprng);
         
         //1. Sample Fresh blinding factor [blind], its a scalar
-        let mut csprng: OsRng = OsRng::new().unwrap();
-        let sk = elgamal::SecretKey::new(&mut csprng).unwrap();
-        let pk = elgamal::PublicKey::from_secret(&sk);
-
-
         let blinding_t = Scalar::random(&mut csprng);
 
         let amount: u32 = 101;
@@ -157,12 +160,12 @@ mod test {
         //println!("to_encrypt: {:?}", to_encrypt);
         
         //lock em up
-        let lbox = Lockbox::lock(&pk, &to_encrypt);
+        let lbox = Lockbox::lock(&keypair.public, &to_encrypt);
 
         //Now we unbox to check if we get same results
-
+        
         //unlock encrypted box
-        let unlocked = lbox.unlock(&sk);
+        let unlocked = lbox.unlock(&keypair.secret);
         //extract balance value & blind value
         let (raw_amount, raw_blind) = unlocked.split_at(5);
         //println!("unlocked value: {:?}", unlocked);

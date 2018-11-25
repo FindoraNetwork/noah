@@ -27,8 +27,8 @@ negligible risk of collision.
 This package is interoperable with NaCl: https://nacl.cr.yp.to/secretbox.html.
 */
 pub mod xsalsa20poly1305;
-use crate::core::microsalt::shared;
-use crate::core::util::{random_data_test_helper, randombytes};
+use crate::microsalt::shared;
+use crate::util::{random_data_test_helper, randombytes};
 
 
 const ZERO_BYTES: usize = 32;

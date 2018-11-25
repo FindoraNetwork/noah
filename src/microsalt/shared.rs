@@ -1,6 +1,6 @@
 //Internal Shared Functions
 use std::num::Wrapping as W;
-use crate::core::util::randombytes;
+use crate::util::randombytes;
 
 
 fn vn(x: &[u8], y: &[u8]) -> isize {
