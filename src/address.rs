@@ -1,5 +1,5 @@
 //Zei Network Address
-//An account has an address that it is public key. 
+//An account has an address that is it's encoded public key. 
 
 //Create an address:
 //  1. Convert PublicKey to base58, it has built in checksum
@@ -7,7 +7,7 @@
 
 //Get Publickey from Address
 // 1. Remove 'ZEI_' prefix 
-// 2.
+// 2. Decode from base58
 
 use organism_utils::base58;
 use schnorr::PublicKey;
