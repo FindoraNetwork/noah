@@ -9,7 +9,7 @@
 
 #[macro_use]
 extern crate criterion;
-extern crate schnorr;
+extern crate zei;
 extern crate rand;
 extern crate blake2;
 
