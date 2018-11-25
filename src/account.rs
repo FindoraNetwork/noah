@@ -2,12 +2,14 @@
 
 use curve25519_dalek::scalar::Scalar;
 use crate::transaction::{CreateTx, Transaction, reciever_verify};
-use rand::OsRng;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use crate::setup::PublicParams;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use schnorr::Keypair;
+use rand::CryptoRng;
+use rand::Rng;
+
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
 pub type Balance = u32;
@@ -28,13 +30,13 @@ pub struct Account {
 
 impl Account {
     //initiate a new hidden account 
-    pub fn new() -> Account {
+    pub fn new<R>(csprng: &mut R) -> Account
+        where R: CryptoRng + Rng, 
+    {
         let pp = PublicParams::new();
-        //Sample Fresh Keypair
-        let mut csprng: OsRng = OsRng::new().unwrap();
-
         //let inital_balance: u32 = 1_000_000_000;
         let inital_balance: u32 = 0;
+        
         Account {
             counter: 0,
             balance: inital_balance,

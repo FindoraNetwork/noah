@@ -22,7 +22,8 @@
 
 
 use blake2_rfc::blake2b::blake2b;
-use rand::{CryptoRng, Rng, OsRng};
+use rand::CryptoRng;
+use rand::Rng;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::CompressedRistretto;
@@ -47,7 +48,9 @@ pub struct Lockbox {
 impl Lockbox {
 
     //locks a given amount with reciever PK and returns cipher text and rand
-    pub fn lock(publickey: &PublicKey, message: &[u8]) -> Lockbox {
+    pub fn lock<R>(csprng: &mut R, publickey: &PublicKey, message: &[u8]) -> Lockbox 
+        where R: CryptoRng + Rng, 
+    {
         let mut lbox : Lockbox = Lockbox {
             data: Vec::new(),
             rand: Default::default()
@@ -100,9 +103,10 @@ impl Lockbox {
     //     where T: CryptoRng + Rng,
     // {
     //given pk, samples randomness to generate the symmetric key
-    fn derive_key(pk: &PublicKey) -> (CompressedRistretto, CompressedRistretto) {
+    fn derive_key<R>(csprng: &mut R, pk: &PublicKey) -> (CompressedRistretto, CompressedRistretto) 
+        where R: CryptoRng + Rng, 
+    {
         //sample fresh randomness
-        let mut csprng: OsRng = OsRng::new().unwrap();
         let randomness = Scalar::random(&mut csprng);
 
         //pk^R

@@ -3,7 +3,8 @@
 use bulletproofs::RangeProof;
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
-use rand::OsRng;
+use rand::CryptoRng;
+use rand::Rng;
 use crate::lockbox::Lockbox;
 use crate::util::{ be_u8_from_u32, slice_to_fixed32 };
 use crate::errors::Error;
@@ -44,11 +45,12 @@ pub struct CreateTx {
 impl Transaction {
 
         //create a new transaction 
-        pub fn new(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> (Transaction, Scalar) {
+        pub fn new<R>(csprng: &mut R, dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> (Transaction, Scalar) 
+                where R: CryptoRng + Rng, 
+        {
                 //public params
                 let mut params = PublicParams::new();
                 //1. Sample Fresh blinding factor [blind], its a scalar
-                let mut csprng: OsRng = OsRng::new().unwrap();
                 let blinding_t = Scalar::random(&mut csprng);
 
                 //2. Create Commitment ->  g^amount * h^[blind] == CommT
