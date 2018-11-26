@@ -4,7 +4,7 @@
 
 We desire to send an ecrypted packet so that only the holder of the secret key accoiated with
 a Publickey can unlock the packet. This is used in Zei to send plaintext balance and the blinding used for a transaction.
-We assume an authenticated cipher is used such as AES_GCM or XSALSA20_POLY1305 as we use.
+We assume an authenticated cipher and we use AEAD_CHACHA20_POLY1305.
 
     Sender -> Receiver (pk)
     1. Sample Some Fresh Randomness (R)
@@ -15,6 +15,9 @@ We assume an authenticated cipher is used such as AES_GCM or XSALSA20_POLY1305 a
         5a. Knows g^x = pk. x is secret key
         5b. Recall sender took pk^R as key, thus REDERIVED_KEY == pk^R == (g^x)^R == g^xR == (g^R)^x
     6. Decrypt: DEC(HASH(REDERIVED_KEY), cipherText)
+
+
+To help bind the blinded curvepoint to the ciphertext, we feed that as part of the Arbitrary length additional authenticated data (AAD). This helps provide another level of integrity to the package as they are both heavly related.
 
 
 ## Confidential Payments for Accounts
@@ -97,3 +100,33 @@ To send a transacting using an account:
 #### Recieve a Transaction
 
 When a new transaction is found on the network for this account we must process it and reflect our local account with our updated balance and new openning. This is crucial as the new opening allows us to spend from the account.
+
+
+
+## Proof of Solvency
+
+A simple proof of solvency
+
+Notation: 
+This document uses additive notation for group operations. 
+Capitalized letters denote group elements and lower case letters are scalars. 
+Let 𝔾 be a group of prime order p in which the discrete logarithm holds. 
+Concretely this can be the ristretto group (https://ristretto.group ). 
+G,H G,H𝔾 are generators that generated as G=Hash(“EianG”) and H=Hash(“EianH”), 
+G+H𝔾 denotes the group operation.
+
+ Commit(x,r)=x*G+r*H is the peddersen commitment function
+
+Input: 
+Asset account commitments: CA,1,CA,2...CA,n such that CA,i=Commit(bA,i,rA,i)
+Liability account commitments: CL,1,CL,2...CL,msuch that CL,i=Commit(bL,i,rL,i)
+Proof:
+Let CBalance=i=1nCA,i-i=1mCL,i. Let bBalance=i=1nbA,i-i=1mbL,iand rBalance=i=1nrA,i-i=1mrL,i. Note that CBalance=Commit(bBalance,rBalance). The solvency proof is a range proof that CBalanceis positive, i.e. is between [0,232-1] using bBalance,rBalanceas the witness. 
+Proof((bA,1,rA,1)(bA,n,rA,n),(bL,1,bL,1),,(bL,m,bL,m)):
+bBalance=i=1nbA,i-i=1mbL,i
+rBalance=i=1nrA,i-i=1mrL,i
+=RangeProof(bBalance,rBalance)
+Output 
+Verify(CA,1,,CA,n,CL,1,,CL,m,):
+Compute CBalance=i=1nCA,i-i=1mCL,i and then verify using CBalance
+

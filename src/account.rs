@@ -7,10 +7,12 @@ use crate::setup::PublicParams;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use schnorr::Keypair;
+use schnorr::Signature;
 use rand::CryptoRng;
 use rand::Rng;
 use crate::address;
 use crate::address::Address;
+use blake2::Blake2b;
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
 pub type Balance = u32;
@@ -99,6 +101,15 @@ impl Account {
         self.balance += recoverd_amount;
 
     }
+
+    //Create a signature from this account on arbitary data
+    pub fn sign<R>(&self, csprng: &mut R, msg: &[u8]) -> Signature
+        where R: CryptoRng + Rng,    
+    {
+        self.keys.sign::<Blake2b, _>(csprng, &msg)
+    }
+
+    //Veriy signature from 
 }
 
 
