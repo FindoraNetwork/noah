@@ -33,9 +33,9 @@ pub struct Account {
 }
 
 impl Account {
-    //initiate a new hidden account 
+    //initiate a new hidden account
     pub fn new<R>(csprng: &mut R) -> Account
-        where R: CryptoRng + Rng, 
+        where R: CryptoRng + Rng,
     {
         let pp = PublicParams::new();
         //let inital_balance: u32 = 1_000_000_000;
@@ -57,9 +57,9 @@ impl Account {
     }
 
     //send a transaction using this account
-    //this updates the accounts info as the transaction has been accepted by the network 
+    //this updates the accounts info as the transaction has been accepted by the network
     pub fn send<R>(&mut self, csprng: &mut R, tx_meta: &CreateTx) -> Transaction
-        where R: CryptoRng + Rng,  
+        where R: CryptoRng + Rng,
     {
         //update our balance
         //TODO: CHECK IF BALANCE IS ENOUGH
@@ -70,13 +70,13 @@ impl Account {
         //update our account blinding
         self.opening = updated_blind;
         //update our commitment
-        self.commitment = newtx.sender_updated_balance_commitment;     
+        self.commitment = newtx.sender_updated_balance_commitment;
         //increment counter
         self.counter += 1;
         //return our tx
         return newtx;
     }
-    
+
     //take a transaction that this account has sent and apply to current state once network accepts
     // pub fn apply_tx(&mut self, tx: &Transaction) {
 
@@ -104,12 +104,12 @@ impl Account {
 
     //Create a signature from this account on arbitary data
     pub fn sign<R>(&self, csprng: &mut R, msg: &[u8]) -> Signature
-        where R: CryptoRng + Rng,    
+        where R: CryptoRng + Rng,
     {
         self.keys.sign::<Blake2b, _>(csprng, &msg)
     }
 
-    //Veriy signature from 
+    //Veriy signature from
 }
 
 

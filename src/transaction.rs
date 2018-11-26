@@ -61,18 +61,18 @@ impl Transaction {
 
                 //3. Create rangeproof for amount & use [blind] as randomness == RP_T
                 //5. Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
+                //updated account blind
+                let sender_updated_acount_blind = account_blind - blinding_t;
                 // Create an aggregated 32-bit rangeproof and corresponding commitments.
                 let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
                         &params.bp_gens,
                         &params.pc_gens,
                         &mut params.transcript,
-                        &[transfer_amount as u64, account_balance as u64],
-                        &[blinding_t, account_blind],
+                        &[transfer_amount as u64, (account_balance-transfer_amount) as u64],
+                        &[blinding_t, sender_updated_acount_blind],
                         32,
                 ).expect("HANDLE ERRORS BETTER");
 
-                //updated account blind
-                let sender_updated_acount_blind = account_blind - blinding_t;
 
                 //6. Multiply Commitment ->  oldCommR * CommT == CommR
                 let new_commit_reciever = receiver_commit + commitments_agg[0].decompress().unwrap();
