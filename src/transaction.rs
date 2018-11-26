@@ -62,6 +62,8 @@ impl Transaction {
                 //3. Create rangeproof for amount & use [blind] as randomness == RP_T
                 //5. Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
                 // Create an aggregated 32-bit rangeproof and corresponding commitments.
+                
+                //TODO: Fix range proof should be applied to sender_updated_balance not account_balance 
                 let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
                         &params.bp_gens,
                         &params.pc_gens,
