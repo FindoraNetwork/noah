@@ -107,26 +107,27 @@ When a new transaction is found on the network for this account we must process 
 
 A simple proof of solvency
 
-Notation: 
-This document uses additive notation for group operations. 
-Capitalized letters denote group elements and lower case letters are scalars. 
-Let 𝔾 be a group of prime order p in which the discrete logarithm holds. 
-Concretely this can be the ristretto group (https://ristretto.group ). 
-G,H G,H𝔾 are generators that generated as G=Hash(“EianG”) and H=Hash(“EianH”), 
-G+H𝔾 denotes the group operation.
+1.Take two list of accounts, one is accounts that hold assets & the other is the liabilities
 
- Commit(x,r)=x*G+r*H is the peddersen commitment function
+2. Each Account has associated pedersen commitment that is blinding the account balance and the randomness (i.e secret key) that authorizes spending.
 
-Input: 
-Asset account commitments: CA,1,CA,2...CA,n such that CA,i=Commit(bA,i,rA,i)
-Liability account commitments: CL,1,CL,2...CL,msuch that CL,i=Commit(bL,i,rL,i)
-Proof:
-Let CBalance=i=1nCA,i-i=1mCL,i. Let bBalance=i=1nbA,i-i=1mbL,iand rBalance=i=1nrA,i-i=1mrL,i. Note that CBalance=Commit(bBalance,rBalance). The solvency proof is a range proof that CBalanceis positive, i.e. is between [0,232-1] using bBalance,rBalanceas the witness. 
-Proof((bA,1,rA,1)(bA,n,rA,n),(bL,1,bL,1),,(bL,m,bL,m)):
-bBalance=i=1nbA,i-i=1mbL,i
-rBalance=i=1nrA,i-i=1mrL,i
-=RangeProof(bBalance,rBalance)
-Output 
-Verify(CA,1,,CA,n,CL,1,,CL,m,):
-Compute CBalance=i=1nCA,i-i=1mCL,i and then verify using CBalance
+3. We must create a proof of solvency showing that the assets amount is greater or equal to the liabilities. This proof is a rangeproof. 
 
+4. To create our range proof we need a commitment (Cr), an amount (Ar), and a blinding scalar (Br).
+
+5. The rangeproof that acts as our proof of solvency is derived such that:
+
+	5a. Ar = total sum of balance in assets accounts (plaintext u32) minus liabilities accounts (plaintext u32)    
+
+	5b. Br =  total sum of blinds in assets accounts (scalar) minus liabilities accounts (scalar)    
+
+6. Rangeproof with Ar & Br
+
+7. To verify the solvency proof we
+	7a. Ca = add all the assets commitments
+	7b. Cl = add all the liabilities commitments
+	7c. Cr = Ca - Cl
+8. Verify range proof via the given proof with commitment Cr
+
+	Assumptions:
+		All accounts are controlled by a single party.

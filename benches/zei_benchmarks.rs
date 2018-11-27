@@ -1,14 +1,5 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ed25519-dalek.
-// Copyright (c) 2018 Isis Lovecruft
-// See LICENSE for licensing information.
-//
-// Authors:
-// - Isis Agora Lovecruft <isis@patternsinthevoid.net>
 
-#[macro_use]
-extern crate criterion;
+#[macro_use] extern crate criterion;
 extern crate zei;
 extern crate rand;
 extern crate blake2;
