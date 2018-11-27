@@ -7,7 +7,6 @@ description = "Zei: Confidential Payments for Accounts"
 
 [dependencies]
 rand = "0.6"
-blake2-rfc = "0.2"
 curve25519-dalek = { version =  "1.0.0-pre.0", features = ["serde"] }
 bulletproofs =  "1.0.0-pre.0"
 merlin = "1.0.0-pre.0"

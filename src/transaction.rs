@@ -1,16 +1,16 @@
 //Transctions in zei
 
-use bulletproofs::RangeProof;
+// use bulletproofs::RangeProof;
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;
 use rand::Rng;
-use crate::lockbox::Lockbox;
-use crate::util::{ be_u8_from_u32, slice_to_fixed32 };
+use organism_utils::crypto::lockbox::Lockbox;
+use organism_utils::helpers::{ be_u8_from_u32, slice_to_fixed32 };
 use crate::errors::Error;
 use crate::setup::PublicParams;
 use merlin::Transcript;
-
+use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 
@@ -57,19 +57,19 @@ impl Transaction {
                 //let commit_t = pc_gens.commit(Scalar::from(transfer_amount), blinding_t);
 
                 //4. create Commitment ->  g^(Balance - amount) * h^(Opening - blind) == CommS
-                //let sender_updated_balance = account_balance - transfer_amount;
+                let sender_updated_balance = account_balance - transfer_amount;
 
                 //3. Create rangeproof for amount & use [blind] as randomness == RP_T
                 //5. Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
                 //updated account blind
                 let sender_updated_acount_blind = account_blind - blinding_t;
+
                 // Create an aggregated 32-bit rangeproof and corresponding commitments.
-                
                 let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
                         &params.bp_gens,
                         &params.pc_gens,
                         &mut params.transcript,
-                        &[transfer_amount as u64, (account_balance-transfer_amount) as u64],
+                        &[transfer_amount as u64, sender_updated_balance as u64],
                         &[blinding_t, sender_updated_acount_blind],
                         32,
                 ).expect("HANDLE ERRORS BETTER");
@@ -116,42 +116,39 @@ impl Transaction {
                 return (p_amount, recovered_blind_scalar);
         }
 
+}
 
-        //verify transaction under sk
-        //pub fn verify_transaction(&self) -> Result<bool , Error> {
-        // pub fn verify_transaction(&self) -> bool {
-        //         //Common Reference String
-        //         let mut transcript = Transcript::new(b"Zei Range Proof");
-        //         //def pederson from lib with Common Reference String
-        //         let pc_gens = PedersenGens::default();
-        //         //32bit range for now & one prover
-        //         let bp_gens = BulletproofGens::new(32, 2);
-        
-        //         //This should take C_t as input
-        //         //veriy the transactions proofs
-        //         //This should take  C_A'=C_A-C_T as input
-        //         //verify the sender proofs
-        //         let veriy_t = RangeProof::verify_multiple(
-        //                 &self.transaction_range_proof,
-        //                 &bp_gens,
-        //                 &pc_gens,
-        //                 &mut transcript,
-        //                 &[self.transaction_commitment, self.sender_updated_balance_commitment],
-        //                 32
-        //         );
+
+//verify transaction used by validator.
+//We just check if the public visible parts are correctly computed 
+
+pub fn validator_verify(tx: &Transaction) -> bool {
+        //Common Reference String
+        let mut transcript = Transcript::new(b"Zei Range Proof");
+        //def pederson from lib with Common Reference String
+        let pc_gens = PedersenGens::default();
+        //32bit range for now & one prover
+        let bp_gens = BulletproofGens::new(32, 2);
+        let mut transcript = Transcript::new(b"Zei Range Proof");
+    
+        //verify the sender proofs
+        let veriy_t = RangeProof::verify_multiple(
+                &tx.transaction_range_proof,
+                &bp_gens,
+                &pc_gens,
+                &mut transcript,
+                &[tx.transaction_commitment, tx.sender_updated_balance_commitment],
+                32
+        );
+
+        //TODO:: Calculate the commitments again to verify them 
                 
 
-        //         if veriy_t.is_ok() {
-        //                 return true;
-        //         } else {
-        //                 return false;
-        //         }
-
-             
-        // }
-
-
-
+        if veriy_t.is_ok() {
+                return true;
+        } else {
+                return false;
+        }
 
 }
 
