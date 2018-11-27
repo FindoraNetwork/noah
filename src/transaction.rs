@@ -65,7 +65,6 @@ impl Transaction {
                 let sender_updated_acount_blind = account_blind - blinding_t;
                 // Create an aggregated 32-bit rangeproof and corresponding commitments.
                 
-                //TODO: Fix range proof should be applied to sender_updated_balance not account_balance 
                 let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
                         &params.bp_gens,
                         &params.pc_gens,
