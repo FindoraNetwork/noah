@@ -89,7 +89,7 @@ pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liab
         return false;
     }
 
-	return false;
+
 }
 
 
