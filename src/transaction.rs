@@ -128,8 +128,7 @@ pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint, recie
         let pc_gens = PedersenGens::default();
         //32bit range for now & one prover
         let bp_gens = BulletproofGens::new(32, 2);
-        let mut transcript = Transcript::new(b"Zei Range Proof");
-
+     
         //We start our verification pipline with the commitment calcualtions as cheaper than rangeproof.
 
         //1. the sender commitment is old from network - this tx commitment
