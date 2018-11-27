@@ -27,20 +27,18 @@ use rand::Rng;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::CompressedRistretto;
-use crate::util::{slice_to_fixed32, decode_scalar};
-// use std::iter::repeat;
-use crate::microsalt::secretbox::{secretbox_seal, secretbox_open};
+use crate::util::decode_scalar;
 
 use schnorr::PublicKey;
 use schnorr::SecretKey;
-
+use organism_utils::crypto::secretbox;
 
 
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Lockbox {
     //data
-    pub data: Vec<u8>,
+    pub data: secretbox::SecretBox,
     //our blinded randomned g^R
     pub rand: CompressedRistretto,
 }
@@ -51,27 +49,24 @@ impl Lockbox {
     pub fn lock<R>(csprng: &mut R, publickey: &PublicKey, message: &[u8]) -> Lockbox 
         where R: CryptoRng + Rng, 
     {
-        let mut lbox : Lockbox = Lockbox {
-            data: Vec::new(),
-            rand: Default::default()
-        };
-
+     
         //get our enc key and blinded randomness
         //g^(x*r),g^r
         let (enc_point, bigr) = Lockbox::derive_key(csprng, publickey);
-        lbox.rand = bigr;
-        //println!("enckey: {:?}", enc_point);
-        //println!("bigr: {:?}", bigr);
 
-        //hash key at 32 bytes
-        let enc_key = blake2b(32, &[], enc_point.as_bytes()).as_bytes().to_vec();
-        //println!("enckey_hash: {:?}", enc_key);
-        //println!("blind open_init: {:?}", bigr);
+        //secret key via hash 
+        let enc_key = secretbox::SymmetricKey::from_bytes(&blake2b(32, &[], enc_point.as_bytes()).as_bytes()).unwrap();
 
-        //output buf at input len zeroed out
-        lbox.data = secretbox_seal(&slice_to_fixed32(&enc_key), message);
+        //sample new nonce;
+        let nonce = secretbox::NonceKey::generate(csprng);
 
-        return lbox;
+        //we also add the rand to commit to it
+        let b = secretbox::SecretBox::lock(&enc_key, nonce, message, bigr.as_bytes()).unwrap();
+
+        return Lockbox {
+            data: b,
+            rand: bigr
+        };
     }
 
     //given the box with the corresponding secret key & randomness
@@ -80,17 +75,11 @@ impl Lockbox {
         
         //REDERIVED_KEY == (g^R)^x
         let dec_point = self.rand.decompress().unwrap() * decode_scalar(&secretkey.as_bytes());
-        //println!("bigr_open: {:?}", &lockedbox.rand);
-        //println!("deckey: {:?}", dec_key.compress().to_bytes());
-        //println!("deckey: {:?}", dec_point.compress());
         
         //hash key at 32 bytes
-        let dec_key =  blake2b(32, &[], &dec_point.compress().to_bytes()).as_bytes().to_vec();
-        //println!("deckey_hash: {:?}", dec_key);
-        
-        let out = secretbox_open(&slice_to_fixed32(&dec_key), &self.data).unwrap();
+        let dec_key = secretbox::SymmetricKey::from_bytes(&blake2b(32, &[], &dec_point.compress().to_bytes()).as_bytes()).unwrap();
 
-        return out;    
+        return self.data.unlock(&dec_key, &self.rand.to_bytes()).unwrap();    
     }
 
     //

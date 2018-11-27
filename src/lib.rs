@@ -21,7 +21,6 @@ extern crate serde_json;
 mod util;
 mod lockbox;
 mod errors;
-mod microsalt;
 mod setup;
 
 pub mod address;
