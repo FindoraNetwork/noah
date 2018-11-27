@@ -133,11 +133,11 @@ pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint, recie
         //We start our verification pipline with the commitment calcualtions as cheaper than rangeproof.
 
         //1. the sender commitment is old from network - this tx commitment
-        let derived_sender_com = sender_prev_com - tx.transaction_commitment;
-        if derived_sender_com == tx.sender_updated_balance_commitment {
+        let derived_sender_com = sender_prev_com - tx.transaction_commitment.decompress().unwrap();
+        if derived_sender_com == tx.sender_updated_balance_commitment.decompress().unwrap() {
                 //2. the reciever commitment is old from network + this tx commitment
-                let derived_receiver_com = reciever_prev_com + tx.transaction_commitment;
-                if derived_receiver_com == tx.receiver_new_commit {
+                let derived_receiver_com = reciever_prev_com + tx.transaction_commitment.decompress().unwrap();
+                if derived_receiver_com == tx.receiver_new_commit.decompress().unwrap() {
 
                         //verify the sender proofs
                         let veriy_t = RangeProof::verify_multiple(
