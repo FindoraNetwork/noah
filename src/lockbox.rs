@@ -34,7 +34,6 @@ use schnorr::SecretKey;
 use organism_utils::crypto::secretbox;
 
 
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Lockbox {
     //data
@@ -86,11 +85,6 @@ impl Lockbox {
     //INTERNAL HELPERS
     //
 
-    //TODO: make randomness passed around
-    //given pk, samples randomness to generate the symmetric key
-    // fn derive_key<T>(pk: &PublicKey, csprng: &mut T) -> ([u8; 32], CompressedRistretto) 
-    //     where T: CryptoRng + Rng,
-    // {
     //given pk, samples randomness to generate the symmetric key
     fn derive_key<R>(csprng: &mut R, pk: &PublicKey) -> (CompressedRistretto, CompressedRistretto) 
         where R: CryptoRng + Rng, 
@@ -108,14 +102,7 @@ impl Lockbox {
         return (shared_key.compress(), blind_rand.compress());
     }
 
-
-
 }
-
-
-
-
-
 
 
 #[cfg(test)]
