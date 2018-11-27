@@ -121,8 +121,7 @@ impl Transaction {
 
 //verify transaction used by validator.
 //We just check if the public visible parts are correctly computed 
-
-pub fn validator_verify(tx: &Transaction) -> bool {
+pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint, reciever_prev_com: RistrettoPoint) -> bool {
         //Common Reference String
         let mut transcript = Transcript::new(b"Zei Range Proof");
         //def pederson from lib with Common Reference String
@@ -130,24 +129,38 @@ pub fn validator_verify(tx: &Transaction) -> bool {
         //32bit range for now & one prover
         let bp_gens = BulletproofGens::new(32, 2);
         let mut transcript = Transcript::new(b"Zei Range Proof");
-    
-        //verify the sender proofs
-        let veriy_t = RangeProof::verify_multiple(
-                &tx.transaction_range_proof,
-                &bp_gens,
-                &pc_gens,
-                &mut transcript,
-                &[tx.transaction_commitment, tx.sender_updated_balance_commitment],
-                32
-        );
 
-        //TODO:: Calculate the commitments again to verify them 
-                
+        //We start our verification pipline with the commitment calcualtions as cheaper than rangeproof.
 
-        if veriy_t.is_ok() {
-                return true;
-        } else {
-                return false;
+        //1. the sender commitment is old from network - this tx commitment
+        let derived_sender_com = sender_prev_com - tx.transaction_commitment;
+        if derived_sender_com == tx.sender_updated_balance_commitment {
+                //2. the reciever commitment is old from network + this tx commitment
+                let derived_receiver_com = reciever_prev_com + tx.transaction_commitment;
+                if derived_receiver_com == tx.receiver_new_commit {
+
+                        //verify the sender proofs
+                        let veriy_t = RangeProof::verify_multiple(
+                                &tx.transaction_range_proof,
+                                &bp_gens,
+                                &pc_gens,
+                                &mut transcript,
+                                &[tx.transaction_commitment, tx.sender_updated_balance_commitment],
+                                32
+                        );
+
+                        //check rangeproof
+                        if veriy_t.is_ok() {
+                                return true;
+                        } else {
+                                return false;
+                        }
+
+                } else { 
+                        return false; 
+                }
+        } else { 
+                return false; 
         }
 
 }
