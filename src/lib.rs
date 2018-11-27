@@ -11,8 +11,7 @@ extern crate merlin;
 #[macro_use] extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
-//microsalt
-#[macro_use] extern crate index_fixed;
+
 
 
 //internal core
