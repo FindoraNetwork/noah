@@ -31,14 +31,14 @@ impl PublicParams {
         //def pederson from lib with Common Reference String
         let pc_gens = PedersenGens::default();
         //Common Reference String
-        let mut transcript = Transcript::new(b"Zei Range Proof");
+        let transcript = Transcript::new(b"Zei Range Proof");
         
     
-        return PublicParams {
+        PublicParams {
             bp_gens: generators,
-            pc_gens: pc_gens,
+            pc_gens,
             range_proof_bits: 32,
-            transcript: transcript
-        };
+            transcript
+        }
     }
 }

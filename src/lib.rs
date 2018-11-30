@@ -11,8 +11,6 @@ extern crate merlin;
 extern crate serde;
 extern crate serde_json;
 
-
-
 mod setup;
 mod errors;
 

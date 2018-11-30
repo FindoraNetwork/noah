@@ -8,32 +8,32 @@ use merlin::Transcript;
 use curve25519_dalek::traits::Identity;
 
 pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> RangeProof {
-	//Common Reference String
+	// Common Reference String
     let mut transcript = Transcript::new(b"Zei Range Proof");
-    //def pederson from lib with Common Reference String
+    // def pederson from lib with Common Reference String
     let pc_gens = PedersenGens::default();
-    //32bit range for now & one prover
+    // 32bit range for now & one prover
     let bp_gens = BulletproofGens::new(32, 1);
 
-	//Calculate Amount
-	let mut assets_ammount : u32 = 0;
+	// Calculate Amount
+	let mut assets_amount : u32 = 0;
 	let mut assets_blind : Scalar = Scalar::zero();
 
 	for a in assets {
-		assets_ammount += a.balance;
+		assets_amount += a.balance;
 		assets_blind += a.opening;
 	}
 
-	//Calculate Liabilities
-	let mut liabilities_ammount : u32 = 0;
+	// Calculate liabilities
+	let mut liabilities_amount : u32 = 0;
 	let mut liabilities_blind : Scalar = Scalar::zero();
 
 	for a in liabilities {
-		liabilities_ammount += a.balance;
+		liabilities_amount += a.balance;
 		liabilities_blind += a.opening;
 	}
 
-	let proof_balance = assets_ammount - liabilities_ammount;
+	let proof_balance = assets_amount - liabilities_amount;
 	let proof_blind = assets_blind - liabilities_blind;
 	
     // Create a 32-bit rangeproof.
@@ -41,13 +41,12 @@ pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> Range
         &bp_gens,
         &pc_gens,
         &mut transcript,
-        proof_balance as u64,
+        u64::from(proof_balance),
         &proof_blind,
         32,
     ).expect("A real program could handle errors");
 
-	return proof;
-
+	proof
 }
 
 pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liabilities: Vec<RistrettoPoint>, proof: RangeProof) -> bool {
@@ -73,7 +72,7 @@ pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liab
     //32bit range for now & one prover
     let bp_gens = BulletproofGens::new(32, 1);
 
-	let veriy_t = RangeProof::verify_single(
+	let verify_t = RangeProof::verify_single(
 		&proof,
 		&bp_gens,
         &pc_gens,
@@ -83,13 +82,7 @@ pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liab
 	);
 
 	//check rangeproof
-    if veriy_t.is_ok() {
-        return true;
-    } else {
-        return false;
-    }
-
-
+    verify_t.is_ok()
 }
 
 

@@ -7,7 +7,6 @@ use rand::CryptoRng;
 use rand::Rng;
 use organism_utils::crypto::lockbox::Lockbox;
 use organism_utils::helpers::{ be_u8_from_u32, slice_to_fixed32 };
-use crate::errors::Error;
 use crate::setup::PublicParams;
 use merlin::Transcript;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
@@ -15,25 +14,24 @@ use schnorr::PublicKey;
 use schnorr::SecretKey;
 
 
-
-//A Confidential transaction
+// A Confidential transaction
 // range proof that balance - balance_inc is between (0, val_max)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
         //this transaction range proof
         //senders updated balance range proof
         pub transaction_range_proof: bulletproofs::RangeProof,
-        //transactions pedderson commitment
+        //transactions Pederson commitment
         pub transaction_commitment: CompressedRistretto,
-        //senders updated balance pedderson commitment
+        //senders updated balance Pederson commitment
         pub sender_updated_balance_commitment: CompressedRistretto,
-        //reciever updated commit
+        //receiver updated commit
         pub receiver_new_commit: CompressedRistretto,
         //lock box
         pub lockbox: Lockbox
 }
 
-//helper structure to recieve the data for a transaction
+//helper structure to receive the data for a transaction
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateTx {
         pub receiver: PublicKey,
@@ -62,21 +60,21 @@ impl Transaction {
                 //3. Create rangeproof for amount & use [blind] as randomness == RP_T
                 //5. Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
                 //updated account blind
-                let sender_updated_acount_blind = account_blind - blinding_t;
+                let sender_updated_account_blind = account_blind - blinding_t;
 
                 // Create an aggregated 32-bit rangeproof and corresponding commitments.
                 let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
                         &params.bp_gens,
                         &params.pc_gens,
                         &mut params.transcript,
-                        &[transfer_amount as u64, sender_updated_balance as u64],
-                        &[blinding_t, sender_updated_acount_blind],
+                        &[u64::from(transfer_amount), u64::from(sender_updated_balance)],
+                        &[blinding_t, sender_updated_account_blind],
                         32,
                 ).expect("HANDLE ERRORS BETTER");
 
 
                 //6. Multiply Commitment ->  oldCommR * CommT == CommR
-                let new_commit_reciever = receiver_commit + commitments_agg[0].decompress().unwrap();
+                let new_commit_receiver = receiver_commit + commitments_agg[0].decompress().unwrap();
 
                 //7. Encrypt to receiver pubkey both the transfer_amount transferred and the blinding factor [blind] 
                 let mut to_encrypt = Vec::new();
@@ -88,13 +86,13 @@ impl Transaction {
                 let lbox = Lockbox::lock(csprng, dest_pk, &to_encrypt);
 
                 //return transaction structure and new blind
-                return (Transaction {
+                (Transaction {
                         transaction_range_proof: proof_agg,
                         transaction_commitment: commitments_agg[0],
                         sender_updated_balance_commitment: commitments_agg[1],
-                        receiver_new_commit: new_commit_reciever.compress(),
+                        receiver_new_commit: new_commit_receiver.compress(),
                         lockbox: lbox
-                }, sender_updated_acount_blind);
+                }, sender_updated_account_blind)
         }
 
         //helper function to recover the sent amount and blind factor
@@ -113,7 +111,7 @@ impl Transaction {
                 //recover blind from bytes to scalar
                 let recovered_blind_scalar = Scalar::from_bits(slice_to_fixed32(raw_blind));
 
-                return (p_amount, recovered_blind_scalar);
+                (p_amount, recovered_blind_scalar)
         }
 
 }
@@ -121,7 +119,7 @@ impl Transaction {
 
 //verify transaction used by validator.
 //We just check if the public visible parts are correctly computed 
-pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint, reciever_prev_com: RistrettoPoint) -> bool {
+pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint, receiver_prev_com: RistrettoPoint) -> bool {
         //Common Reference String
         let mut transcript = Transcript::new(b"Zei Range Proof");
         //def pederson from lib with Common Reference String
@@ -129,17 +127,17 @@ pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint, recie
         //32bit range for now & one prover
         let bp_gens = BulletproofGens::new(32, 2);
      
-        //We start our verification pipline with the commitment calcualtions as cheaper than rangeproof.
+        //We start our verification pipeline with the commitment calculations as cheaper than rangeproof.
 
         //1. the sender commitment is old from network - this tx commitment
         let derived_sender_com = sender_prev_com - tx.transaction_commitment.decompress().unwrap();
         if derived_sender_com == tx.sender_updated_balance_commitment.decompress().unwrap() {
-                //2. the reciever commitment is old from network + this tx commitment
-                let derived_receiver_com = reciever_prev_com + tx.transaction_commitment.decompress().unwrap();
+                //2. the receiver commitment is old from network + this tx commitment
+                let derived_receiver_com = receiver_prev_com + tx.transaction_commitment.decompress().unwrap();
                 if derived_receiver_com == tx.receiver_new_commit.decompress().unwrap() {
 
                         //verify the sender proofs
-                        let veriy_t = RangeProof::verify_multiple(
+                        let verify_t = RangeProof::verify_multiple(
                                 &tx.transaction_range_proof,
                                 &bp_gens,
                                 &pc_gens,
@@ -149,40 +147,29 @@ pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint, recie
                         );
 
                         //check rangeproof
-                        if veriy_t.is_ok() {
-                                return true;
-                        } else {
-                                return false;
-                        }
-
+                        verify_t.is_ok()
                 } else { 
-                        return false; 
+                        false
                 }
         } else { 
-                return false; 
+                false
         }
 
 }
 
 
-//veriy commitments 
-pub fn reciever_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPoint, recv_old_commit: RistrettoPoint) -> bool {
-        //def pederson from lib with Common Reference String
+// verify commitments
+pub fn receiver_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPoint, recv_old_commit: RistrettoPoint) -> bool {
+        // def pederson from lib with Common Reference String
         use bulletproofs::PedersenGens;
         let pc_gens = PedersenGens::default();
 
         let compute_new_commit = pc_gens.commit(Scalar::from(tx_amount), tx_blind);
 
-        let updated_commitmen = compute_new_commit + recv_old_commit;
+        let updated_commitment = compute_new_commit + recv_old_commit;
 
-        if new_commit == updated_commitmen { 
-                return true; 
-        } else {
-                return false;
-        }
+        new_commit == updated_commitment
 }
-
-
 
 
 
@@ -228,7 +215,6 @@ mod test {
                 //32bit range for now & one prover
                 let bp_gens = BulletproofGens::new(32, 2);
 
-
                 //1. Sample Fresh blinding factor [blind], its a scalar
                 // let mut csprng: OsRng = OsRng::new().unwrap();
                 let blinding_t = Scalar::random(&mut csprng);
@@ -236,7 +222,7 @@ mod test {
                 //update sending account balance 
                 //acc_a.balance = acc_a.balance - new_tx.transfer_amount; 
                 //update account blind 
-                let sender_updated_acount_blind = &acc_a.opening - &blinding_t;
+                let sender_updated_account_blind = &acc_a.opening - &blinding_t;
                 
                 // Create an aggregated 32-bit rangeproof and corresponding commitments.
                 let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
@@ -257,7 +243,7 @@ mod test {
                 //let tx = new_transaction(new_tx.receiver, new_tx.transfer_amount, acc_a.balance, acc_a.commitment, new_tx.receiver_commit);
 
                 //verify reciver commitment
-                //assert_eq!(reciever_verify(p_amount, recovered_blind_scalar, tx.receiver_new_commit, acc_b_comm_inital), true);
+                //assert_eq!(receiver_verify(p_amount, recovered_blind_scalar, tx.receiver_new_commit, acc_b_comm_inital), true);
                 // pub fn new_transaction(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> Transaction {
                 
                 //7. Encrypt to receiver pubkey both the transfer_amount transferred and the blinding factor [blind] 
@@ -274,11 +260,8 @@ mod test {
                 //         transaction_commitment: commit_t,
                 //         sender_updated_balance_range_proof: range_proof_s,
                 //         sender_updated_balance_commitment: commit_s,
-                //         receiver_new_commit: new_commit_reciever.compress(),
+                //         receiver_new_commit: new_commit_receiver.compress(),
                 //         lockbox: lbox
                 // };
-
-
-
         }
 }

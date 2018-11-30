@@ -1,11 +1,9 @@
 //Hidden Accounts
 
 use curve25519_dalek::scalar::Scalar;
-use crate::transaction::{CreateTx, Transaction, reciever_verify};
+use crate::transaction::{CreateTx, Transaction};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use crate::setup::PublicParams;
-use schnorr::PublicKey;
-use schnorr::SecretKey;
 use schnorr::Keypair;
 use schnorr::Signature;
 use rand::CryptoRng;
@@ -38,15 +36,15 @@ impl Account {
         where R: CryptoRng + Rng,
     {
         let pp = PublicParams::new();
-        //let inital_balance: u32 = 1_000_000_000;
-        let inital_balance: u32 = 0;
+        //let initial_balance: u32 = 1_000_000_000;
+        let initial_balance: u32 = 0;
 
         Account {
             counter: 0,
-            balance: inital_balance,
+            balance: initial_balance,
             opening: Scalar::from(0u32),
             //initial commitment is to 0 for balance and blind
-            commitment: pp.pc_gens.commit(Scalar::from(inital_balance), Scalar::from(0u32)).compress(),
+            commitment: pp.pc_gens.commit(Scalar::from(initial_balance), Scalar::from(0u32)).compress(),
             keys: Keypair::generate(csprng)
         }
     }
@@ -74,7 +72,7 @@ impl Account {
         //increment counter
         self.counter += 1;
         //return our tx
-        return newtx;
+        newtx
     }
 
     //take a transaction that this account has sent and apply to current state once network accepts
@@ -83,23 +81,22 @@ impl Account {
     // }
 
     //once a transaction has been sent to us we need to apply it to our account
-    pub fn recieve(&mut self, tx: &Transaction) {
+    pub fn receive(&mut self, tx: &Transaction) {
         //unlock the box that was sent to us
         //this gets us the amount and new blind
-        let (recoverd_amount, recoverd_blind) = tx.recover_plaintext(&self.keys.secret);
+        let (recovered_amount, recovered_blind) = tx.recover_plaintext(&self.keys.secret);
         //update our account opening
-        self.opening = self.opening + recoverd_blind;
+        self.opening += recovered_blind;
         //update our account commitment
-        //veriy that commitments are correct that is sent
-        //if reciever_verify(recoverd_amount, recoverd_blind, tx.receiver_new_commit, self.commitment) {} else {}
+        //verify that commitments are correct that is sent
+        //if receiver_verify(recovered_amount, recovered_blind, tx.receiver_new_commit, self.commitment) {} else {}
         self.commitment = tx.sender_updated_balance_commitment;
 
         //update our account opening
-        self.opening = self.opening + recoverd_blind;
+        self.opening += recovered_blind;
 
         //update our balance
-        self.balance += recoverd_amount;
-
+        self.balance += recovered_amount;
     }
 
     //Create a signature from this account on arbitary data
@@ -109,7 +106,7 @@ impl Account {
         self.keys.sign::<Blake2b, _>(csprng, &msg)
     }
 
-    //Veriy signature from
+    //Verify signature from
 }
 
 
