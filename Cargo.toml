@@ -5,6 +5,10 @@ authors = ["efe"]
 edition = "2018"
 description = "Zei: Confidential Payments for Accounts"
 
+[lib]
+name = "zei"
+crate-type = ["dylib"]
+
 [dependencies]
 rand = "0.6"
 curve25519-dalek = { version =  "1.0.0-pre.0", features = ["serde"] }
