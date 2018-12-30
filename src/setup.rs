@@ -12,9 +12,9 @@ pub struct PublicParams {
 }
 
 
-//gens_capacity -> 
+//gens_capacity ->
 //The maximum number of usable generators for each party.
-//Is the number of generators to precompute for each party. 
+//Is the number of generators to precompute for each party.
 //For rangeproofs, it is sufficient to pass 64, the maximum bitsize of the rangeproofs.
 // bitsize: 32-bit (0, 2^32-1)
 //
@@ -32,8 +32,8 @@ impl PublicParams {
         let pc_gens = PedersenGens::default();
         //Common Reference String
         let transcript = Transcript::new(b"Zei Range Proof");
-        
-    
+
+
         PublicParams {
             bp_gens: generators,
             pc_gens,

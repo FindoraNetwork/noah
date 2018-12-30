@@ -45,7 +45,7 @@ impl Account {
             opening: Scalar::from(0u32),
             //initial commitment is to 0 for balance and blind
             commitment: pp.pc_gens.commit(Scalar::from(initial_balance), Scalar::from(0u32)).compress(),
-            keys: Keypair::generate(csprng)
+            keys: Keypair::generate(csprng),
         }
     }
 
@@ -64,7 +64,7 @@ impl Account {
         self.balance -= tx_meta.transfer_amount;
 
         //generate our transaction
-        let (newtx, updated_blind) = Transaction::new(csprng, &tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening, tx_meta.receiver_commit.decompress().unwrap());
+        let (newtx, updated_blind) = Transaction::new(csprng, &tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening);
         //update our account blinding
         self.opening = updated_blind;
         //update our commitment
@@ -85,6 +85,7 @@ impl Account {
         //unlock the box that was sent to us
         //this gets us the amount and new blind
         let (recovered_amount, recovered_blind) = tx.recover_plaintext(&self.keys.secret);
+
         //update our account opening
         self.opening += recovered_blind;
         //update our account commitment
@@ -109,5 +110,24 @@ impl Account {
     //Verify signature from
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rand::ChaChaRng;
+    use rand::SeedableRng;
+    #[test]
+    pub fn test_account_creation() {
+        let mut csprng: ChaChaRng;
+        csprng  = ChaChaRng::from_seed([0u8; 32]);
+        let mut acc = Account::new(&mut csprng);
+        assert_eq!(acc.counter,0);
+        assert_eq!(acc.balance,0);
+
+        acc.balance=13;
+        assert_eq!(acc.balance,13);
+        let mut acc2 = Account::new(&mut csprng);
+
+    }
+}
 
 

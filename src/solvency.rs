@@ -35,7 +35,7 @@ pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> Range
 
 	let proof_balance = assets_amount - liabilities_amount;
 	let proof_blind = assets_blind - liabilities_blind;
-	
+
     // Create a 32-bit rangeproof.
     let (proof, _) = RangeProof::prove_single(
         &bp_gens,
@@ -46,7 +46,7 @@ pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> Range
         32,
     ).expect("A real program could handle errors");
 
-	proof
+	return proof;
 }
 
 pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liabilities: Vec<RistrettoPoint>, proof: RangeProof) -> bool {
@@ -57,7 +57,7 @@ pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liab
 		assets_total_comm += c;
 	}
 
-	let mut liabilities_total_comm: RistrettoPoint = RistrettoPoint::identity(); 
+	let mut liabilities_total_comm: RistrettoPoint = RistrettoPoint::identity();
 
 	for c in commitments_liabilities {
 		liabilities_total_comm += c;
@@ -82,13 +82,12 @@ pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liab
 	);
 
 	//check rangeproof
-    verify_t.is_ok()
+    return verify_t.is_ok()
 }
 
 
 
 #[cfg(test)]
 mod test {
-
 
 }
