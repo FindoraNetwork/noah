@@ -10,6 +10,8 @@ name = "zei"
 crate-type = ["dylib"]
 
 [dependencies]
+num-traits = "0.2"
+num-bigint = "0.2.2"
 rand = "0.6"
 curve25519-dalek = { version =  "1.0.0-pre.0", features = ["serde"] }
 bulletproofs =  "1.0.0-pre.0"

@@ -13,6 +13,7 @@ extern crate serde_json;
 
 mod setup;
 mod errors;
+mod utils;
 
 pub mod address;
 pub mod account;
