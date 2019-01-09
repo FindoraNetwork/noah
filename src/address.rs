@@ -38,7 +38,10 @@ pub fn enc(pk: &PublicKey) -> Address {
 /// Decode a Given Zei Address to Publickey
 pub fn dec(zei_addr: &str) -> PublicKey {
     let addr = &zei_addr[4..];
-    let decoded = from_base58(addr);
+    let decoded = match from_base58(addr){
+        Ok(decoded) => decoded,
+        Err(e) => panic!("ZEI address not in base58 format"),
+    };
 
     let hash_start = decoded.len() - 4;
     let mut hasher = VarBlake2b::new(32).unwrap();
@@ -79,7 +82,7 @@ mod test {
     fn test_base58(){
         let data = vec![1,2,3];
         let base58str = to_base58(&data);
-        assert_eq!(data, from_base58(&base58str[..]));
+        assert_eq!(data, from_base58(&base58str[..]).unwrap());
     }
 }
 

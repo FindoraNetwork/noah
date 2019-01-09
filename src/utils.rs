@@ -7,7 +7,7 @@ use num_bigint::Sign::Plus;
 
 use num_traits::{Zero};
 use num_traits::{FromPrimitive,ToPrimitive};
-use std::panic;
+use crate::errors::Error;
 
 
 static BASE58_ALPHABET: &'static [u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -75,7 +75,7 @@ pub fn to_base58(data: &[u8]) -> String {
 
 }
 
-pub fn from_base58(data: &str) -> Vec<u8> {
+pub fn from_base58(data: &str) -> Result<Vec<u8>, Error>  {
     /*
      * I convert a string in base58 format to bigendian vector of bytes.
      * Leading ones base58 chars in original strings are translates to leading 0u8 in results
@@ -97,7 +97,7 @@ pub fn from_base58(data: &str) -> Vec<u8> {
         let base58 = match BASE58_INVERSE[d as usize] {
           Some(x) => x as u32,
           None => {
-              panic!("Bad base58 format");
+              return Err(Error::BadBase58Format);
           }
         };
         big_int += &factor * base58;
@@ -116,7 +116,7 @@ pub fn from_base58(data: &str) -> Vec<u8> {
     }
 
     vec.reverse();
-    vec
+    Ok(vec)
 }
 
 #[cfg(test)]
@@ -127,14 +127,14 @@ mod test {
     fn test_base58_encoding_decoding() {
         let v = vec![1,2,3,4,5];
         let b58_str = to_base58(&v[..]);
-        assert_eq!(v, from_base58(&b58_str[..]));
+        assert_eq!(v, from_base58(&b58_str[..]).unwrap());
     }
 
     #[test]
     fn test_base58_leading_zeroes() {
         let v = vec![0,1,2,3,4,5];
         let b58_str = to_base58(&v[..]);
-        assert_eq!(v, from_base58(&b58_str[..]));
+        assert_eq!(v, from_base58(&b58_str[..]).unwrap());
     }
     
 }
