@@ -15,7 +15,6 @@ use blake2::digest::{Input, VariableOutput};
 use crate::utils::{from_base58, to_base58};
 
 
-//use organism_utils::base58;
 use schnorr::PublicKey;
 
 //Account Address is just its encoded public key
@@ -61,7 +60,6 @@ mod test {
     use rand::ChaChaRng;
     use rand::SeedableRng;
     use schnorr::Keypair;
-    use blake2_rfc::blake2b::blake2b;
     use blake2::VarBlake2b;
     use blake2::digest::{Input, VariableOutput};
 
