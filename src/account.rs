@@ -11,6 +11,7 @@ use rand::Rng;
 use crate::address;
 use crate::address::Address;
 use blake2::Blake2b;
+use crate::asset::Asset;
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
 pub type Balance = u32;
@@ -18,21 +19,17 @@ pub type Balance = u32;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Account {
-    //account tx count
     pub counter: u128,
-    //Hidden
     pub balance: Balance,
-    //opening from latest payment
     pub opening: Scalar,
-    //commitment
     pub commitment: CompressedRistretto,
-    //account keys
     pub keys: Keypair,
+    pub asset: Asset,
 }
 
 impl Account {
     //initiate a new hidden account
-    pub fn new<R>(csprng: &mut R) -> Account
+    pub fn new<R>(csprng: &mut R, asset_type: &str) -> Account
         where R: CryptoRng + Rng,
     {
         let pp = PublicParams::new();
@@ -46,6 +43,7 @@ impl Account {
             //initial commitment is to 0 for balance and blind
             commitment: pp.pc_gens.commit(Scalar::from(initial_balance), Scalar::from(0u32)).compress(),
             keys: Keypair::generate(csprng),
+            asset: Asset::new(asset_type),
         }
     }
 
@@ -119,13 +117,13 @@ mod test {
     pub fn test_account_creation() {
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
-        let mut acc = Account::new(&mut csprng);
+        let mut acc = Account::new(&mut csprng, "default currency");
         assert_eq!(acc.counter,0);
         assert_eq!(acc.balance,0);
 
         acc.balance=13;
         assert_eq!(acc.balance,13);
-        let mut acc2 = Account::new(&mut csprng);
+        let mut acc2 = Account::new(&mut csprng, "default currency");
 
     }
 }

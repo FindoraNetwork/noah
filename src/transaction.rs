@@ -68,10 +68,9 @@ impl Transaction {
             &[blinding_t, sender_updated_account_blind],
             32);
 
-
         let (proof_agg, commitments_agg) = match range_proof_result {
             Ok((pf_agg, comm_agg)) => (pf_agg, comm_agg),
-            Err(error) => {return Err(ZeiError::TxProofError);},
+            Err(_) => {return Err(ZeiError::TxProofError);},
         };
 
         let mut to_encrypt = Vec::new();
@@ -183,9 +182,9 @@ mod test {
         let pc_gens = PedersenGens::default();
 
         //Account A
-        let mut acc_a = Account::new(&mut csprng);
+        let mut acc_a = Account::new(&mut csprng,"default currency");
         //Account B
-        let mut acc_b = Account::new(&mut csprng);
+        let mut acc_b = Account::new(&mut csprng,"default currency");
 
         //the initial commitment is to zero
         let acc_a_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
@@ -253,4 +252,4 @@ mod test {
         //         lockbox: lbox
         // };
     }
-    }
+}

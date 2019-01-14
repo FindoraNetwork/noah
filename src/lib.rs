@@ -28,7 +28,8 @@ use rand::rngs::OsRng;
 #[no_mangle]
 pub extern fn test_function() -> f32 {
     let mut csprng: OsRng = OsRng::new().unwrap();
-    Account::new(&mut csprng);
+    let asset_type = "bank1_usd";
+    Account::new(&mut csprng, asset_type);
     42.0
 }
 
