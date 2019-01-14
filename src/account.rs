@@ -64,7 +64,7 @@ impl Account {
         self.balance -= tx_meta.transfer_amount;
 
         //generate our transaction
-        let (newtx, updated_blind) = Transaction::new(csprng, &tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening);
+        let (newtx, updated_blind) = Transaction::new(csprng, &tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening).unwrap();
         //update our account blinding
         self.opening = updated_blind;
         //update our commitment

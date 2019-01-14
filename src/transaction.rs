@@ -12,6 +12,7 @@ use merlin::Transcript;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use schnorr::PublicKey;
 use schnorr::SecretKey;
+use crate::errors::Error as ZeiError;
 
 
 // A Confidential transaction
@@ -38,56 +39,54 @@ pub struct CreateTx {
 
 
 impl Transaction {
-
-    //create a new transaction 
-    pub fn new<R>(csprng: &mut R, dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar) -> (Transaction, Scalar) 
+    
+    pub fn new<R>(csprng: &mut R, dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar) -> Result<(Transaction, Scalar), ZeiError> 
         where R: CryptoRng + Rng, 
     {
-        //public params
+        /*
+         * I create a new transaction. 
+         * - Create new public parameters
+         * - Sample Fresh blinding factor [blind], its a scalar.
+         * - Create Commitment ->  g^amount * h^[blind] == CommT
+         * - Create rangeproof for amount & use [blind] as randomness == RP_T
+         * - Create Commitment ->  g^(Balance - amount) * h^(Opening - blind) == CommS
+         * - Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
+         * - Encrypt transfered amount and blinding factor to receiver
+         * - Create and return the transaction
+         */
+
         let mut params = PublicParams::new();
-        //1. Sample Fresh blinding factor [blind], its a scalar
         let blinding_t = Scalar::random(csprng);
-
-        //2. Create Commitment ->  g^amount * h^[blind] == CommT
-        //let commit_t = pc_gens.commit(Scalar::from(transfer_amount), blinding_t);
-
-        //4. create Commitment ->  g^(Balance - amount) * h^(Opening - blind) == CommS
         let sender_updated_balance = account_balance - transfer_amount;
-
-        //3. Create rangeproof for amount & use [blind] as randomness == RP_T
-        //5. Create rangeproof for (Balance - transfer_amount) & use Opening - blind as randomness == RP_S
-        //updated account blind
         let sender_updated_account_blind = account_blind - blinding_t;
 
-        // Create an aggregated 32-bit rangeproof and corresponding commitments.
-        let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
+        let range_proof_result = RangeProof::prove_multiple(
             &params.bp_gens,
             &params.pc_gens,
             &mut params.transcript,
             &[u64::from(transfer_amount), u64::from(sender_updated_balance)],
             &[blinding_t, sender_updated_account_blind],
-            32,
-            ).expect("HANDLE ERRORS BETTER");
+            32);
 
 
-        //6. Multiply Commitment ->  oldCommR * CommT == CommR
+        let (proof_agg, commitments_agg) = match range_proof_result {
+            Ok((pf_agg, comm_agg)) => (pf_agg, comm_agg),
+            Err(error) => {return Err(ZeiError::TxProofError);},
+        };
 
-        //7. Encrypt to receiver pubkey both the transfer_amount transferred and the blinding factor [blind] 
         let mut to_encrypt = Vec::new();
-        //first add transfer_amount which is fixed 4 bytes in big endian
         to_encrypt.extend_from_slice(&be_u8_from_u32(transfer_amount));
-        //next add the blind
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
-        //lock em up
         let lbox = Lockbox::lock(csprng, dest_pk, &to_encrypt);
 
-        //return transaction structure and new blind
-        (Transaction {
+        let tx = Transaction {
             transaction_range_proof: proof_agg,
             transaction_commitment: commitments_agg[0],
             sender_updated_balance_commitment: commitments_agg[1],
             lockbox: lbox
-        }, sender_updated_account_blind)
+        };
+
+       Ok((tx, sender_updated_account_blind))
     }
 
     //helper function to recover the sent amount and blind factor
