@@ -2,8 +2,8 @@
 
 ## PublicKey based NonInteractive Encryption
 
-We desire to send an ecrypted packet so that only the holder of the secret key accoiated with
-a Publickey can unlock the packet. This is used in Zei to send plaintext balance and the blinding used for a transaction.
+We desire to send an encrypted packet so that only the holder of the secret key accosiated with
+the corresponding Publickey can decrypt the packet. This is used in Zei to send plaintext balance and the blinding used for a transaction.
 We assume an authenticated cipher and we use AEAD_CHACHA20_POLY1305.
 
     Sender -> Receiver (pk)
@@ -42,8 +42,8 @@ We use an Account Model. An account is defined as:
 
 Each account is associated with a keypair, in this case an Schnorr keypair over the Ristretto curve.
 
-We also use an accounts public key as the address on the network. This is used to encrypt packets to that account only.
-Zei Network Addresses are the base58 of the account Public key with the 'ZEI_' prefix added.
+We also use an account's public key as the address on the network. This is used to encrypt packets to that account only.
+Zei Network Addresses are the Base58Check of the account Public key with the 'ZEI_' prefix added.
 
 ```
 ZEI_gvcCi6ovrMgnBN7bMdNaxyRXoZxM1NrpGM9jY8whNizeMizCs
@@ -85,10 +85,10 @@ To send a transacting using an account:
         c. The transfer amount
 
     2. We must generate a new transaction with the needed proofs and commitments.
-      We also send a reciver encrypted package of the plaintext balance and new blinding.
+      We also send a reciever encrypted package of the plaintext balance and new blinding.
 
 
-        a. Reduce account local balance with current transfer ammount
+        a. Reduce local account balance with current transfer ammount
         b. Sample Fresh blinding factor [blind], its a scalar (blinding_t)
         c. Create Commitment ->  g^amount * h^[blind] == comm_t
         d. Create Commitment ->  g^(Balance - amount) * h^(Opening - blind) == new_comm_sender
