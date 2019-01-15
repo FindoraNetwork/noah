@@ -2,7 +2,6 @@ use blake2::VarBlake2b;
 use blake2::digest::{Input, VariableOutput};
 use crate::constants::HASH_256_BYTE_LENGTH;
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -1,6 +1,5 @@
 //Transctions in zei
 
-// use bulletproofs::RangeProof;
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;
@@ -19,20 +18,26 @@ use crate::errors::Error as ZeiError;
 // range proof that balance - balance_inc is between (0, val_max)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
-    //this transaction range proof
-    //senders updated balance range proof
+    /*
+     * I represent a transaction. I contain
+     * - a range proof (0, val_max) for the senders updated balance and transaction amount,
+     * - a pedersen commitmment for the transfer,
+     * - a pedersen commitment of the senders new balance,
+     * - and a encrypted box for the receiver that includes the transfered amount and the blinding
+     * factor of the transaction commitment.
+     */
     pub transaction_range_proof: bulletproofs::RangeProof,
-    //transactions Pederson commitment
     pub transaction_commitment: CompressedRistretto,
-    //senders updated balance Pederson commitment
     pub sender_updated_balance_commitment: CompressedRistretto,
-    //lock box
     pub lockbox: Lockbox
 }
 
-//helper structure to receive the data for a transaction
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateTx {
+    /*
+     * I am helper structure to receive the data for a transaction
+     *
+     */
     pub receiver: PublicKey,
     pub transfer_amount: u32,
 }
@@ -88,11 +93,13 @@ impl Transaction {
        Ok((tx, sender_updated_account_blind))
     }
 
-    //helper function to recover the sent amount and blind factor
     pub fn recover_plaintext(&self, sk: &SecretKey) -> (u32, Scalar) {
-        //unlock encrypted box
+        /*
+         * I recover the sent amount and blind factor from the encryted box in a transaction
+         *
+         */
+
         let unlocked = self.lockbox.unlock(sk);
-        //extract balance value & blind value
         let (raw_amount, raw_blind) = unlocked.split_at(5);
 
         //convert to u32
@@ -101,7 +108,6 @@ impl Transaction {
             u32::from(raw_amount[2]) << 8 |
             u32::from(raw_amount[3]);
 
-        //recover blind from bytes to scalar
         let recovered_blind_scalar = Scalar::from_bits(slice_to_fixed32(raw_blind));
 
         (p_amount, recovered_blind_scalar)
@@ -109,26 +115,23 @@ impl Transaction {
 
 }
 
-
-//verify transaction used by validator.
-//We just check if the public visible parts are correctly computed 
 pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint) -> bool {
-    //Common Reference String
+    /*
+     * I verify the transaction:
+     * a) sender new balance commitment must match commitmment in transaction
+     * b) Verify range proofs
+     */
+
     let mut transcript = Transcript::new(b"Zei Range Proof");
-    //def pederson from lib with Common Reference String
     let pc_gens = PedersenGens::default();
-    //32bit range for now & one prover
     //TODO:This probably shouldn't be regenerated every time
     let bp_gens = BulletproofGens::new(32, 2);
 
-    //We start our verification pipeline with the commitment calculations as cheaper than rangeproof.
+    let tx_comm = tx.transaction_commitment.decompress().unwrap();
+    let derived_sender_comm = sender_prev_com - tx_comm;
+    let tx_sender_updated_balance_comm = tx.sender_updated_balance_commitment.decompress().unwrap();
 
-    //1. the sender commitment is old from network - this tx commitment
-    let derived_sender_com = sender_prev_com - tx.transaction_commitment.decompress().unwrap();
-    if derived_sender_com == tx.sender_updated_balance_commitment.decompress().unwrap() {
-        //2. the receiver commitment is old from network + this tx commitment
-
-        //verify the sender proofs
+    if derived_sender_comm == tx_sender_updated_balance_comm {
         let verify_t = RangeProof::verify_multiple(
             &tx.transaction_range_proof,
             &bp_gens,
@@ -136,31 +139,24 @@ pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint) -> bo
             &mut transcript,
             &[tx.transaction_commitment, tx.sender_updated_balance_commitment],
             32
-            );
-
-        //check rangeproof
-        verify_t.is_ok()
-    } else { 
-        false
+        );
+        return verify_t.is_ok();
     }
 
+    false
+
 }
 
-
-// verify commitments
 pub fn receiver_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPoint, recv_old_commit: RistrettoPoint) -> bool {
-    // def pederson from lib with Common Reference String
-    use bulletproofs::PedersenGens;
+    /*
+     * Run by receiver: I verify the new commitment to my balance using the new blinding factor
+     * and old balance commitment
+     */
     let pc_gens = PedersenGens::default();
-
     let compute_new_commit = pc_gens.commit(Scalar::from(tx_amount), tx_blind);
-
     let updated_commitment = compute_new_commit + recv_old_commit;
-
     new_commit == updated_commitment
 }
-
-
 
 
 #[cfg(test)]
