@@ -7,7 +7,7 @@ description = "Zei: Confidential Payments for Accounts"
 
 [lib]
 name = "zei"
-crate-type = ["dylib"]
+crate-type = ["rlib"]
 
 [dependencies]
 rand_chacha = "0.1.1"

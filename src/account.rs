@@ -12,6 +12,7 @@ use crate::address;
 use crate::address::Address;
 use blake2::Blake2b;
 use crate::asset::Asset;
+use crate::errors::Error as ZeiError;
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
 pub type Balance = u32;
@@ -21,59 +22,71 @@ pub type Balance = u32;
 pub struct Account {
     pub counter: u128,
     pub balance: Balance,
-    pub opening: Scalar,
+    pub blinding: Scalar,
     pub commitment: CompressedRistretto,
     pub keys: Keypair,
     pub asset: Asset,
 }
 
 impl Account {
-    //initiate a new hidden account
+
     pub fn new<R>(csprng: &mut R, asset_type: &str) -> Account
         where R: CryptoRng + Rng,
     {
+        /*! I create a new hidden account with balance 0
+         *
+         */
         let pp = PublicParams::new();
-        let initial_balance: u32 = 0;
+        let balance: u32 = 0;
+        let blinding = Scalar::from(0u32);
+        let value = Scalar::from(balance);
+        let commitment = pp.pc_gens.commit(value, blinding);
 
         Account {
             counter: 0,
-            balance: initial_balance,
-            opening: Scalar::from(0u32),
-            //initial commitment is to 0 for balance and blind
-            commitment: pp.pc_gens.commit(Scalar::from(initial_balance), Scalar::from(0u32)).compress(),
+            balance,
+            blinding,
+            commitment: commitment.compress(),
             keys: Keypair::generate(csprng),
-            asset: Asset::new(asset_type),
+            asset: Asset::new(asset_type)
         }
     }
 
-    //helper to get public key aka. address
+
     pub fn address(&self) -> Address {
+        /*! I return an address from the account's public key
+         *
+         */
         address::enc(&self.keys.public)
     }
 
-    //send a transaction using this account
-    //this updates the accounts info as the transaction has been accepted by the network
-    pub fn send<R>(&mut self, csprng: &mut R, tx_meta: &TxInfo, do_confidential_asset: bool) -> Transaction
+    pub fn send<R>(&mut self, csprng: &mut R, tx_info: &TxInfo, do_confidential_asset: bool)
+        -> Result<Transaction, ZeiError>
         where R: CryptoRng + Rng,
     {
-        //update our balance
-        //TODO: CHECK IF BALANCE IS ENOUGH
-        self.balance -= tx_meta.transfer_amount;
+        /*! I create and send a transaction from this account. Transactions can hide the asset id
+         *  if @do_confidential_asset is set to true.
+         * If there are enough funds, account is updated. Otherwise an NotEnoughFunds error is
+         * generated.
+         */
 
-        //generate our transaction
+
+        if tx_info.transfer_amount > self.balance {
+            return Err(ZeiError::NotEnoughFunds);
+        }
+
+        self.balance -= tx_info.transfer_amount;
         let (newtx, updated_blind) = Transaction::new(csprng,
-                                                      &tx_meta,
+                                                      &tx_info,
                                                       self.balance,
-                                                      self.opening,
+                                                      self.blinding,
                                                       do_confidential_asset).unwrap();
-        //update our account blinding
-        self.opening = updated_blind;
-        //update our commitment
+
+        self.blinding = updated_blind;
         self.commitment = newtx.sender_updated_balance_commitment;
-        //increment counter
         self.counter += 1;
-        //return our tx
-        newtx
+
+        Ok(newtx)
     }
 
     //take a transaction that this account has sent and apply to current state once network accepts
@@ -81,30 +94,25 @@ impl Account {
 
     // }
 
-    //once a transaction has been sent to us we need to apply it to our account
     pub fn receive(&mut self, tx: &Transaction) {
-        //unlock the box that was sent to us
-        //this gets us the amount and new blind
-        let (recovered_amount, recovered_blind) = tx.recover_plaintext(&self.keys.secret);
+        /*! I receive a transaction to this account and update it accordingly
+         *
+         */
 
-        //update our account opening
-        self.opening += recovered_blind;
-        //update our account commitment
+        let (recovered_amount, recovered_blind) = tx.recover_plaintext(&self.keys.secret);
+        self.blinding += recovered_blind;
         //verify that commitments are correct that is sent
         //if receiver_verify(recovered_amount, recovered_blind, tx.receiver_new_commit, self.commitment) {} else {}
         self.commitment = tx.sender_updated_balance_commitment;
-
-        //update our account opening
-        self.opening += recovered_blind;
-
-        //update our balance
+        self.blinding += recovered_blind;
         self.balance += recovered_amount;
     }
 
-    //Create a signature from this account on arbitary data
     pub fn sign<R>(&self, csprng: &mut R, msg: &[u8]) -> Signature
         where R: CryptoRng + Rng,
     {
+        /*! I Sign a u8 slice data using this account secret key
+         */
         self.keys.sign::<Blake2b, _>(csprng, &msg)
     }
 

@@ -244,7 +244,7 @@ mod test {
             &pc_gens,
             &mut transcript,
             &[new_tx.transfer_amount as u64, acc_a.balance as u64],
-            &[blinding_t, acc_a.opening],
+            &[blinding_t, acc_a.blinding],
             32,
             ).expect("A real program could handle errors");
 
@@ -265,7 +265,7 @@ mod test {
         // accounts asset match
         let mut acc_src = Account::new(&mut csprng,"default currency");
         acc_src.balance = 10000;
-        acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.opening).compress();
+        acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.blinding).compress();
         let acc_dst = Account::new(&mut csprng,"default currency");
 
         let (src_asset_comm, src_asset_comm_blind) =
@@ -283,10 +283,10 @@ mod test {
         };
 
         let (tx,_)  = Transaction::new(&mut csprng,
-                                  &new_tx,
-                                  acc_src.balance,
-                                  acc_src.opening,
-                                  true).unwrap();
+                                       &new_tx,
+                                       acc_src.balance,
+                                       acc_src.blinding,
+                                       true).unwrap();
 
         let vrfy_ok = validator_verify(&tx,
                                        acc_src.commitment.decompress().unwrap(),
@@ -311,7 +311,7 @@ mod test {
         let (tx,_)  = Transaction::new(&mut csprng,
                                        &new_tx,
                                        acc_src.balance,
-                                       acc_src.opening,
+                                       acc_src.blinding,
                                        true).unwrap();
 
         let vrfy_ok = validator_verify(&tx,
@@ -332,7 +332,7 @@ mod test {
 
         let mut acc_src = Account::new(&mut csprng,"default currency");
         acc_src.balance = 10000;
-        acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.opening).compress();
+        acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.blinding).compress();
         let acc_dst = Account::new(&mut csprng,"default currency");
 
         let src_asset = acc_src.asset.compute_ristretto_point_hash();
@@ -348,7 +348,7 @@ mod test {
         let (tx,_)  = Transaction::new(&mut csprng,
                                        &new_tx,
                                        acc_src.balance,
-                                       acc_src.opening,
+                                       acc_src.blinding,
                                        false).unwrap();
 
         let vrfy_ok = validator_verify(&tx,

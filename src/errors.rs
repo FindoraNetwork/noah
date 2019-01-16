@@ -7,7 +7,7 @@ pub enum Error {
     //Invalid format is passed to function
     BadSecretError,
     TxProofError,
-
+    NotEnoughFunds,
 }
 
 impl fmt::Display for Error {
@@ -15,6 +15,7 @@ impl fmt::Display for Error {
         f.write_str(match self {
             Error::BadSecretError => "Given Secret Key is not good",
             Error::TxProofError => "Could not create transation due to range proof error",
+            Error::NotEnoughFunds => "There is not enough funds to make this transaction",
         })
     }
 }
@@ -24,6 +25,7 @@ impl error::Error for Error {
         match self {
             Error::BadSecretError => "Given Secret Key is not good",
             Error::TxProofError => "Could not create transation due to range proof error",
+            Error::NotEnoughFunds => "There is not enough funds to make this transaction",
         }
     }
 }

@@ -21,7 +21,7 @@ pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> Range
 
 	for a in assets {
 		assets_amount += a.balance;
-		assets_blind += a.opening;
+		assets_blind += a.blinding;
 	}
 
 	// Calculate liabilities
@@ -30,7 +30,7 @@ pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> Range
 
 	for a in liabilities {
 		liabilities_amount += a.balance;
-		liabilities_blind += a.opening;
+		liabilities_blind += a.blinding;
 	}
 
 	let proof_balance = assets_amount - liabilities_amount;
