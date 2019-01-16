@@ -1,7 +1,7 @@
 //Hidden Accounts
 
 use curve25519_dalek::scalar::Scalar;
-use crate::transaction::{CreateTx, Transaction};
+use crate::transaction::{TxInfo, Transaction};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use crate::setup::PublicParams;
 use schnorr::Keypair;
@@ -33,7 +33,6 @@ impl Account {
         where R: CryptoRng + Rng,
     {
         let pp = PublicParams::new();
-        //let initial_balance: u32 = 1_000_000_000;
         let initial_balance: u32 = 0;
 
         Account {
@@ -54,7 +53,7 @@ impl Account {
 
     //send a transaction using this account
     //this updates the accounts info as the transaction has been accepted by the network
-    pub fn send<R>(&mut self, csprng: &mut R, tx_meta: &CreateTx) -> Transaction
+    pub fn send<R>(&mut self, csprng: &mut R, tx_meta: &TxInfo, do_confidential_asset: bool) -> Transaction
         where R: CryptoRng + Rng,
     {
         //update our balance
@@ -62,7 +61,11 @@ impl Account {
         self.balance -= tx_meta.transfer_amount;
 
         //generate our transaction
-        let (newtx, updated_blind) = Transaction::new(csprng, &tx_meta.receiver, tx_meta.transfer_amount, self.balance, self.opening).unwrap();
+        let (newtx, updated_blind) = Transaction::new(csprng,
+                                                      &tx_meta,
+                                                      self.balance,
+                                                      self.opening,
+                                                      do_confidential_asset).unwrap();
         //update our account blinding
         self.opening = updated_blind;
         //update our commitment
@@ -111,7 +114,7 @@ impl Account {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::ChaChaRng;
+    use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     #[test]
     pub fn test_account_creation() {
@@ -123,8 +126,6 @@ mod test {
 
         acc.balance=13;
         assert_eq!(acc.balance,13);
-        let mut acc2 = Account::new(&mut csprng, "default currency");
-
     }
 }
 

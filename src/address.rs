@@ -39,7 +39,7 @@ pub fn dec(addy: &str) -> PublicKey {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::ChaChaRng;
+    use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use schnorr::Keypair;
 

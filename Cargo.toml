@@ -10,6 +10,7 @@ name = "zei"
 crate-type = ["dylib"]
 
 [dependencies]
+rand_chacha = "0.1.1"
 rand = "0.6"
 curve25519-dalek = { version =  "1.0.0-pre.0", features = ["serde"] }
 bulletproofs =  "1.0.0-pre.0"

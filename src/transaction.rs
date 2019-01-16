@@ -1,5 +1,3 @@
-//Transctions in zei
-
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;
@@ -8,44 +6,55 @@ use organism_utils::crypto::lockbox::Lockbox;
 use organism_utils::helpers::{ be_u8_from_u32, slice_to_fixed32 };
 use crate::setup::PublicParams;
 use merlin::Transcript;
-use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+use bulletproofs::{BulletproofGens, RangeProof};
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use crate::errors::Error as ZeiError;
+use crate::asset::Asset;
+use bulletproofs::PedersenGens;
 
 
-// A Confidential transaction
-// range proof that balance - balance_inc is between (0, val_max)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
     /*
      * I represent a transaction. I contain
      * - a range proof (0, val_max) for the senders updated balance and transaction amount,
-     * - a pedersen commitmment for the transfer,
-     * - a pedersen commitment of the senders new balance,
+     * - a Pedersen commitment for the transfer,
+     * - a Pedersen commitment of the senders new balance,
      * - and a encrypted box for the receiver that includes the transfered amount and the blinding
      * factor of the transaction commitment.
+     * - boolean indicating whether transaction is confidential for asset type or not
+     * - A proof of equality of asset type
      */
     pub transaction_range_proof: bulletproofs::RangeProof,
     pub transaction_commitment: CompressedRistretto,
     pub sender_updated_balance_commitment: CompressedRistretto,
-    pub lockbox: Lockbox
+    pub lockbox: Lockbox,
+    pub do_confidential_asset: bool,
+    pub asset_eq_proof: Scalar,
 }
 
+
 #[derive(Serialize, Deserialize, Debug)]
-pub struct CreateTx {
+pub struct TxInfo {
     /*
-     * I am helper structure to receive the data for a transaction
+     * I am helper structure to send/receive the data for a transaction
      *
      */
-    pub receiver: PublicKey,
+    pub receiver_pk: PublicKey,
+    pub receiver_asset_opening: Scalar,
+    pub sender_asset_opening: Scalar,
     pub transfer_amount: u32,
 }
 
 
 impl Transaction {
     
-    pub fn new<R>(csprng: &mut R, dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar) -> Result<(Transaction, Scalar), ZeiError> 
+    pub fn new<R>(csprng: &mut R,
+                  tx_info: &TxInfo,
+                  account_balance: u32,
+                  account_blind: Scalar,
+                  do_confidential_asset: bool) -> Result<(Transaction, Scalar), ZeiError>
         where R: CryptoRng + Rng, 
     {
         /*
@@ -62,14 +71,15 @@ impl Transaction {
 
         let mut params = PublicParams::new();
         let blinding_t = Scalar::random(csprng);
-        let sender_updated_balance = account_balance - transfer_amount;
+        let tx_amount = tx_info.transfer_amount;
+        let sender_updated_balance = account_balance - tx_amount;
         let sender_updated_account_blind = account_blind - blinding_t;
 
         let range_proof_result = RangeProof::prove_multiple(
             &params.bp_gens,
             &params.pc_gens,
             &mut params.transcript,
-            &[u64::from(transfer_amount), u64::from(sender_updated_balance)],
+            &[u64::from(tx_amount), u64::from(sender_updated_balance)],
             &[blinding_t, sender_updated_account_blind],
             32);
 
@@ -78,16 +88,26 @@ impl Transaction {
             Err(_) => {return Err(ZeiError::TxProofError);},
         };
 
+        let mut asset_eq_proof: Scalar;
+
+        asset_eq_proof = Scalar::from(0u8);
+        if do_confidential_asset {
+            asset_eq_proof = Asset::prove_eq(tx_info.sender_asset_opening,
+                                    tx_info.receiver_asset_opening);
+        }
+
         let mut to_encrypt = Vec::new();
-        to_encrypt.extend_from_slice(&be_u8_from_u32(transfer_amount));
+        to_encrypt.extend_from_slice(&be_u8_from_u32(tx_amount));
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
-        let lbox = Lockbox::lock(csprng, dest_pk, &to_encrypt);
+        let lbox = Lockbox::lock(csprng, &tx_info.receiver_pk, &to_encrypt);
 
         let tx = Transaction {
             transaction_range_proof: proof_agg,
             transaction_commitment: commitments_agg[0],
             sender_updated_balance_commitment: commitments_agg[1],
-            lockbox: lbox
+            lockbox: lbox,
+            do_confidential_asset,
+            asset_eq_proof,
         };
 
        Ok((tx, sender_updated_account_blind))
@@ -108,18 +128,25 @@ impl Transaction {
             u32::from(raw_amount[2]) << 8 |
             u32::from(raw_amount[3]);
 
-        let recovered_blind_scalar = Scalar::from_bits(slice_to_fixed32(raw_blind));
+        let blind_scalar = Scalar::from_bits(slice_to_fixed32(raw_blind));
 
-        (p_amount, recovered_blind_scalar)
+        (p_amount, blind_scalar)
     }
 
 }
 
-pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint) -> bool {
+
+pub fn validator_verify(tx: &Transaction,
+                        sender_prev_com: RistrettoPoint,
+                        sender_asset: RistrettoPoint,
+                        receiver_asset: RistrettoPoint) -> bool {
     /*
-     * I verify the transaction:
+     * Run by validator. I verify the transaction:
      * a) sender new balance commitment must match commitmment in transaction
      * b) Verify range proofs
+     * c) Verify same asset type
+     * If tx.do_confidential_asset, then sender_asset and receiver_asset are commitments, otherwise
+     * they are simple digests of the the asset structure
      */
 
     let mut transcript = Transcript::new(b"Zei Range Proof");
@@ -130,8 +157,10 @@ pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint) -> bo
     let tx_comm = tx.transaction_commitment.decompress().unwrap();
     let derived_sender_comm = sender_prev_com - tx_comm;
     let tx_sender_updated_balance_comm = tx.sender_updated_balance_commitment.decompress().unwrap();
+    let mut vrfy_ok = derived_sender_comm == tx_sender_updated_balance_comm;
 
-    if derived_sender_comm == tx_sender_updated_balance_comm {
+    println!("new commitment vrf: {}", vrfy_ok);
+    if vrfy_ok {
         let verify_t = RangeProof::verify_multiple(
             &tx.transaction_range_proof,
             &bp_gens,
@@ -140,17 +169,32 @@ pub fn validator_verify(tx: &Transaction, sender_prev_com: RistrettoPoint) -> bo
             &[tx.transaction_commitment, tx.sender_updated_balance_commitment],
             32
         );
-        return verify_t.is_ok();
+
+        vrfy_ok = verify_t.is_ok();
+        println!("range_proof_vrf: {}", vrfy_ok);
     }
-
-    false
-
+    if vrfy_ok {
+        if tx.do_confidential_asset {
+            let h = PedersenGens::default().B_blinding;
+            vrfy_ok = Asset::verify_eq(&receiver_asset,
+                                       &sender_asset,
+                                       tx.asset_eq_proof,
+                                       &h);
+            println!("confidential_asset_vrf: {}", vrfy_ok);
+        }
+        else{
+            vrfy_ok = sender_asset == receiver_asset;
+        }
+    }
+    vrfy_ok
 }
+
 
 pub fn receiver_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPoint, recv_old_commit: RistrettoPoint) -> bool {
     /*
      * Run by receiver: I verify the new commitment to my balance using the new blinding factor
-     * and old balance commitment
+     * and old balance commitment.
+     *
      */
     let pc_gens = PedersenGens::default();
     let compute_new_commit = pc_gens.commit(Scalar::from(tx_amount), tx_blind);
@@ -166,7 +210,7 @@ mod test {
     use curve25519_dalek::scalar::Scalar;
     use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
     use merlin::Transcript;
-    use rand::ChaChaRng;
+    use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
 
     #[test]
@@ -178,17 +222,15 @@ mod test {
         let pc_gens = PedersenGens::default();
 
         //Account A
-        let mut acc_a = Account::new(&mut csprng,"default currency");
+        let acc_a = Account::new(&mut csprng,"default currency");
         //Account B
-        let mut acc_b = Account::new(&mut csprng,"default currency");
+        let acc_b = Account::new(&mut csprng,"default currency");
 
-        //the initial commitment is to zero
-        let acc_a_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
-        let acc_b_comm_inital = pc_gens.commit(Scalar::from(0u32), Scalar::from(0u32));
-
-        let new_tx = CreateTx {
-            receiver: acc_b.keys.public,
-            transfer_amount: 100u32
+        let new_tx = TxInfo {
+            receiver_pk: acc_b.keys.public,
+            transfer_amount: 100u32,
+            receiver_asset_opening: Scalar::from(0u8),
+            sender_asset_opening: Scalar::from(0u8),
         };
 
         //
@@ -196,20 +238,11 @@ mod test {
         //
 
         let mut transcript = Transcript::new(b"Zei Range Proof");
-        //32bit range for now & one prover
         let bp_gens = BulletproofGens::new(32, 2);
 
-        //1. Sample Fresh blinding factor [blind], its a scalar
-        // let mut csprng: OsRng = OsRng::new().unwrap();
         let blinding_t = Scalar::random(&mut csprng);
 
-        //update sending account balance 
-        //acc_a.balance = acc_a.balance - new_tx.transfer_amount; 
-        //update account blind 
-        let sender_updated_account_blind = &acc_a.opening - &blinding_t;
-
-        // Create an aggregated 32-bit rangeproof and corresponding commitments.
-        let (proof_agg, commitments_agg) = RangeProof::prove_multiple(
+        let (_, commitments_agg) = RangeProof::prove_multiple(
             &bp_gens,
             &pc_gens,
             &mut transcript,
@@ -219,33 +252,49 @@ mod test {
             ).expect("A real program could handle errors");
 
         let tx_derived_commit = pc_gens.commit(Scalar::from(new_tx.transfer_amount), blinding_t);
-        //println!("tx_derived_commit: {:?}", tx_derived_commit.compress());
-        //println!("commitments_agg[0]: {:?}", commitments_agg[0]);
 
         assert_eq!(tx_derived_commit, commitments_agg[0].decompress().unwrap());
-        //create a dummy tx
-        //let tx = new_transaction(new_tx.receiver, new_tx.transfer_amount, acc_a.balance, acc_a.commitment, new_tx.receiver_commit);
 
-        //verify reciver commitment
-        //assert_eq!(receiver_verify(p_amount, recovered_blind_scalar, tx.receiver_new_commit, acc_b_comm_inital), true);
-        // pub fn new_transaction(dest_pk: &PublicKey, transfer_amount: u32, account_balance: u32, account_blind: Scalar, receiver_commit: RistrettoPoint) -> Transaction {
+    }
 
-        //7. Encrypt to receiver pubkey both the transfer_amount transferred and the blinding factor [blind] 
-        // let mut to_encrypt = Vec::new();
-        // //first add transfer_amount which is fixed 4 bytes in big endian
-        // to_encrypt.extend_from_slice(&be_u8_from_u32(transfer_amount));
-        // //next add the blind
-        // to_encrypt.extend_from_slice(&blinding_t.to_bytes());
-        // //lock em up
-        // let lbox = Lockbox::lock(dest_pk, &to_encrypt);
+    #[test]
+    fn test_confidential_asset_transaction(){
+        let mut csprng: ChaChaRng;
+        csprng  = ChaChaRng::from_seed([0u8; 32]);
 
-        // let final_tx = Transaction {
-        //         transaction_range_proof: range_proof_t,
-        //         transaction_commitment: commit_t,
-        //         sender_updated_balance_range_proof: range_proof_s,
-        //         sender_updated_balance_commitment: commit_s,
-        //         receiver_new_commit: new_commit_receiver.compress(),
-        //         lockbox: lbox
-        // };
+        //def pederson from lib with Common Reference String
+        let pc_gens = PedersenGens::default();
+
+        let mut acc_src = Account::new(&mut csprng,"default currency");
+        acc_src.balance = 10000;
+        acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.opening).compress();
+        let acc_dst = Account::new(&mut csprng,"default currency");
+
+        let (src_asset_comm, src_asset_comm_blind) =
+            acc_src.asset.compute_commitment(&mut csprng);
+
+        let (dst_asset_comm, dst_asset_comm_blind) =
+            acc_dst.asset.compute_commitment(&mut csprng);
+
+
+        let new_tx = TxInfo {
+            receiver_pk: acc_src.keys.public,
+            transfer_amount: 100u32,
+            receiver_asset_opening: src_asset_comm_blind,
+            sender_asset_opening: dst_asset_comm_blind,
+        };
+
+        let (tx,_)  = Transaction::new(&mut csprng,
+                                  &new_tx,
+                                  acc_src.balance,
+                                  acc_src.opening,
+                                  true).unwrap();
+
+        let vrfy_ok = validator_verify(&tx,
+                                       acc_src.commitment.decompress().unwrap(),
+                                       src_asset_comm,
+                                       dst_asset_comm);
+        assert_eq!(true,vrfy_ok);
+
     }
 }
