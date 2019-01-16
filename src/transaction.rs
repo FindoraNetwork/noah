@@ -294,4 +294,41 @@ mod test {
         assert_eq!(true,vrfy_ok);
 
     }
+
+    #[test]
+    fn test_non_confidential_asset_transaction(){
+        let mut csprng: ChaChaRng;
+        csprng  = ChaChaRng::from_seed([0u8; 32]);
+
+        //def pederson from lib with Common Reference String
+        let pc_gens = PedersenGens::default();
+
+        let mut acc_src = Account::new(&mut csprng,"default currency");
+        acc_src.balance = 10000;
+        acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.opening).compress();
+        let acc_dst = Account::new(&mut csprng,"default currency");
+
+        let src_asset = acc_src.asset.compute_ristretto_point_hash();
+        let dst_asset = acc_dst.asset.compute_ristretto_point_hash();
+
+        let new_tx = TxInfo {
+            receiver_pk: acc_src.keys.public,
+            transfer_amount: 100u32,
+            receiver_asset_opening: Scalar::from(0u8), //any value (not used)
+            sender_asset_opening: Scalar::from(0u8) //any value (not used)
+        };
+
+        let (tx,_)  = Transaction::new(&mut csprng,
+                                       &new_tx,
+                                       acc_src.balance,
+                                       acc_src.opening,
+                                       false).unwrap();
+
+        let vrfy_ok = validator_verify(&tx,
+                                       acc_src.commitment.decompress().unwrap(),
+                                       src_asset,
+                                       dst_asset);
+        assert_eq!(true,vrfy_ok);
+
+    }
 }

@@ -27,6 +27,12 @@ impl Asset {
         (pd_bases.commit(value, blind), blind)
 
     }
+    pub fn compute_ristretto_point_hash(&self) -> RistrettoPoint {
+        let mut hash = Blake2b::new();
+        hash.input(&self.id);
+
+        RistrettoPoint::from_hash(hash)
+    }
     pub fn prove_eq(blinding_factor1: Scalar, blinding_factor2: Scalar) -> Scalar{
         blinding_factor1 - blinding_factor2
     }
