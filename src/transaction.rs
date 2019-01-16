@@ -159,7 +159,6 @@ pub fn validator_verify(tx: &Transaction,
     let tx_sender_updated_balance_comm = tx.sender_updated_balance_commitment.decompress().unwrap();
     let mut vrfy_ok = derived_sender_comm == tx_sender_updated_balance_comm;
 
-    println!("new commitment vrf: {}", vrfy_ok);
     if vrfy_ok {
         let verify_t = RangeProof::verify_multiple(
             &tx.transaction_range_proof,
@@ -171,7 +170,6 @@ pub fn validator_verify(tx: &Transaction,
         );
 
         vrfy_ok = verify_t.is_ok();
-        println!("range_proof_vrf: {}", vrfy_ok);
     }
     if vrfy_ok {
         if tx.do_confidential_asset {
@@ -180,7 +178,6 @@ pub fn validator_verify(tx: &Transaction,
                                        &sender_asset,
                                        tx.asset_eq_proof,
                                        &h);
-            println!("confidential_asset_vrf: {}", vrfy_ok);
         }
         else{
             vrfy_ok = sender_asset == receiver_asset;
