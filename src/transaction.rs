@@ -262,6 +262,7 @@ mod test {
         //def pederson from lib with Common Reference String
         let pc_gens = PedersenGens::default();
 
+        // accounts asset match
         let mut acc_src = Account::new(&mut csprng,"default currency");
         acc_src.balance = 10000;
         acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.opening).compress();
@@ -292,6 +293,32 @@ mod test {
                                        src_asset_comm,
                                        dst_asset_comm);
         assert_eq!(true,vrfy_ok);
+
+        // accounts asset do not match
+        let acc_dst = Account::new(&mut csprng,"other currency");
+
+        let (dst_asset_comm, dst_asset_comm_blind) =
+            acc_dst.asset.compute_commitment(&mut csprng);
+
+
+        let new_tx = TxInfo {
+            receiver_pk: acc_src.keys.public,
+            transfer_amount: 100u32,
+            receiver_asset_opening: src_asset_comm_blind,
+            sender_asset_opening: dst_asset_comm_blind,
+        };
+
+        let (tx,_)  = Transaction::new(&mut csprng,
+                                       &new_tx,
+                                       acc_src.balance,
+                                       acc_src.opening,
+                                       true).unwrap();
+
+        let vrfy_ok = validator_verify(&tx,
+                                       acc_src.commitment.decompress().unwrap(),
+                                       src_asset_comm,
+                                       dst_asset_comm);
+        assert_eq!(false,vrfy_ok);
 
     }
 
