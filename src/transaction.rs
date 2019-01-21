@@ -32,6 +32,8 @@ pub struct Transaction {
     pub lockbox: Lockbox,
     pub do_confidential_asset: bool,
     pub asset_eq_proof: Scalar,
+    pub sender_asset_commitment: CompressedRistretto,
+    pub receiver_asset_commitment: CompressedRistretto,
 }
 
 
@@ -42,7 +44,9 @@ pub struct TxInfo {
      *
      */
     pub receiver_pk: PublicKey,
+    pub receiver_asset_commitment: CompressedRistretto,
     pub receiver_asset_opening: Scalar,
+    pub sender_asset_commitment: CompressedRistretto,
     pub sender_asset_opening: Scalar,
     pub transfer_amount: u32,
 }
@@ -92,8 +96,8 @@ impl Transaction {
 
         asset_eq_proof = Scalar::from(0u8);
         if do_confidential_asset {
-            asset_eq_proof = Asset::prove_eq(tx_info.sender_asset_opening,
-                                    tx_info.receiver_asset_opening);
+            asset_eq_proof = Asset::prove_eq(tx_info.receiver_asset_opening,
+                                    tx_info.sender_asset_opening);
         }
 
         let mut to_encrypt = Vec::new();
@@ -108,6 +112,8 @@ impl Transaction {
             lockbox: lbox,
             do_confidential_asset,
             asset_eq_proof,
+            sender_asset_commitment: tx_info.sender_asset_commitment,
+            receiver_asset_commitment: tx_info.receiver_asset_commitment,
         };
 
        Ok((tx, sender_updated_account_blind))
@@ -158,7 +164,7 @@ pub fn validator_verify(tx: &Transaction,
     let derived_sender_comm = sender_prev_com - tx_comm;
     let tx_sender_updated_balance_comm = tx.sender_updated_balance_commitment.decompress().unwrap();
     let mut vrfy_ok = derived_sender_comm == tx_sender_updated_balance_comm;
-
+    println!("derived = updates: {}", vrfy_ok);
     if vrfy_ok {
         let verify_t = RangeProof::verify_multiple(
             &tx.transaction_range_proof,
@@ -171,6 +177,7 @@ pub fn validator_verify(tx: &Transaction,
 
         vrfy_ok = verify_t.is_ok();
     }
+    println!("range proof: {}", vrfy_ok);
     if vrfy_ok {
         if tx.do_confidential_asset {
             let h = PedersenGens::default().B_blinding;
@@ -209,9 +216,11 @@ mod test {
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
+    use crate::account::AssetBalance;
 
     #[test]
     fn test_new_transaction() {
+        let asset_id = "default currency";
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
 
@@ -219,15 +228,19 @@ mod test {
         let pc_gens = PedersenGens::default();
 
         //Account A
-        let acc_a = Account::new(&mut csprng,"default currency");
+        let mut acc_a = Account::new(&mut csprng);
+        acc_a.add_asset(&mut csprng, asset_id, false);
         //Account B
-        let acc_b = Account::new(&mut csprng,"default currency");
+        let mut acc_b = Account::new(&mut csprng);
+        acc_b.add_asset(&mut csprng, asset_id, false);
 
         let new_tx = TxInfo {
             receiver_pk: acc_b.keys.public,
             transfer_amount: 100u32,
             receiver_asset_opening: Scalar::from(0u8),
             sender_asset_opening: Scalar::from(0u8),
+            sender_asset_commitment:acc_a.get_asset_balance(asset_id).asset_commitment,
+            receiver_asset_commitment:acc_b.get_asset_balance(asset_id).asset_commitment,
         };
 
         //
@@ -239,123 +252,133 @@ mod test {
 
         let blinding_t = Scalar::random(&mut csprng);
 
+        let values = &[new_tx.transfer_amount as u64, acc_a.get_balance(asset_id) as u64];
+        let blindings = &[blinding_t, acc_a.get_asset_balance(asset_id).balance_blinding];
+
         let (_, commitments_agg) = RangeProof::prove_multiple(
             &bp_gens,
             &pc_gens,
             &mut transcript,
-            &[new_tx.transfer_amount as u64, acc_a.balance as u64],
-            &[blinding_t, acc_a.blinding],
+            values,
+            blindings,
             32,
             ).expect("A real program could handle errors");
 
         let tx_derived_commit = pc_gens.commit(Scalar::from(new_tx.transfer_amount), blinding_t);
 
         assert_eq!(tx_derived_commit, commitments_agg[0].decompress().unwrap());
-
     }
 
     #[test]
     fn test_confidential_asset_transaction(){
+        let asset_id = "default_currency";
+        let transfer_amount = 100u32;
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
-
-        //def pederson from lib with Common Reference String
         let pc_gens = PedersenGens::default();
 
-        // accounts asset match
-        let mut acc_src = Account::new(&mut csprng,"default currency");
-        acc_src.balance = 10000;
-        acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.blinding).compress();
-        let acc_dst = Account::new(&mut csprng,"default currency");
-
-        let (src_asset_comm, src_asset_comm_blind) =
-            acc_src.asset.compute_commitment(&mut csprng);
-
-        let (dst_asset_comm, dst_asset_comm_blind) =
-            acc_dst.asset.compute_commitment(&mut csprng);
+        // source account setup
+        let mut acc_src = Account::new(&mut csprng);
+        acc_src.add_asset(&mut csprng, asset_id, true);
+        let mut src_asset_balance = acc_src.get_asset_balance(asset_id);
+        src_asset_balance.balance = 10000;
+        src_asset_balance.balance_commitment =
+            pc_gens.commit(Scalar::from(src_asset_balance.balance), src_asset_balance.balance_blinding).compress();
 
 
-        let new_tx = TxInfo {
-            receiver_pk: acc_src.keys.public,
-            transfer_amount: 100u32,
-            receiver_asset_opening: src_asset_comm_blind,
-            sender_asset_opening: dst_asset_comm_blind,
-        };
+        // destination account setup
+        let mut acc_dst = Account::new(&mut csprng);
+        acc_dst.add_asset(&mut csprng, asset_id, true);
+        let dst_pk = acc_dst.get_public_key();
+        let dst_asset_balance = acc_dst.get_asset_balance(asset_id);
 
-        let (tx,_)  = Transaction::new(&mut csprng,
-                                       &new_tx,
-                                       acc_src.balance,
-                                       acc_src.blinding,
-                                       true).unwrap();
 
-        let vrfy_ok = validator_verify(&tx,
-                                       acc_src.commitment.decompress().unwrap(),
-                                       src_asset_comm,
-                                       dst_asset_comm);
-        assert_eq!(true,vrfy_ok);
+        do_transaction_validation(src_asset_balance, dst_asset_balance,dst_pk, transfer_amount, true);
 
         // accounts asset do not match
-        let acc_dst = Account::new(&mut csprng,"other currency");
+        acc_dst.add_asset(&mut csprng, "other asset", true);
 
-        let (dst_asset_comm, dst_asset_comm_blind) =
-            acc_dst.asset.compute_commitment(&mut csprng);
-
-
-        let new_tx = TxInfo {
-            receiver_pk: acc_src.keys.public,
-            transfer_amount: 100u32,
-            receiver_asset_opening: src_asset_comm_blind,
-            sender_asset_opening: dst_asset_comm_blind,
-        };
-
-        let (tx,_)  = Transaction::new(&mut csprng,
-                                       &new_tx,
-                                       acc_src.balance,
-                                       acc_src.blinding,
-                                       true).unwrap();
-
-        let vrfy_ok = validator_verify(&tx,
-                                       acc_src.commitment.decompress().unwrap(),
-                                       src_asset_comm,
-                                       dst_asset_comm);
-        assert_eq!(false,vrfy_ok);
+        let dst_asset_balance = acc_dst.get_asset_balance("other asset");
+        do_transaction_validation(src_asset_balance, dst_asset_balance,dst_pk, transfer_amount, false);
 
     }
 
     #[test]
     fn test_non_confidential_asset_transaction(){
+        let asset_id = "default_currency";
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
 
         //def pederson from lib with Common Reference String
         let pc_gens = PedersenGens::default();
 
-        let mut acc_src = Account::new(&mut csprng,"default currency");
-        acc_src.balance = 10000;
-        acc_src.commitment = pc_gens.commit(Scalar::from(acc_src.balance), acc_src.blinding).compress();
-        let acc_dst = Account::new(&mut csprng,"default currency");
+        let mut acc_src = Account::new(&mut csprng);
+        acc_src.add_asset(&mut csprng, asset_id, false);
+        let mut src_asset_balance = acc_src.get_asset_balance(asset_id);
+        src_asset_balance.balance = 10000;
+        src_asset_balance.balance_commitment =
+            pc_gens.commit(Scalar::from(src_asset_balance.balance),
+                           src_asset_balance.balance_blinding).compress();
 
-        let src_asset = acc_src.asset.compute_ristretto_point_hash();
-        let dst_asset = acc_dst.asset.compute_ristretto_point_hash();
+
+        // destination account setup
+        let mut acc_dst = Account::new(&mut csprng);
+        acc_dst.add_asset(&mut csprng, asset_id, false);
+        let dst_pk = acc_dst.get_public_key();
+        let dst_asset_balance = acc_dst.get_asset_balance(asset_id);
+
 
         let new_tx = TxInfo {
-            receiver_pk: acc_src.keys.public,
+            receiver_pk: dst_pk,
             transfer_amount: 100u32,
-            receiver_asset_opening: Scalar::from(0u8), //any value (not used)
-            sender_asset_opening: Scalar::from(0u8) //any value (not used)
+            receiver_asset_opening: dst_asset_balance.asset_blinding,
+            sender_asset_opening: src_asset_balance.asset_blinding,
+            sender_asset_commitment:src_asset_balance.asset_commitment,
+            receiver_asset_commitment: src_asset_balance.asset_commitment,
         };
 
         let (tx,_)  = Transaction::new(&mut csprng,
                                        &new_tx,
-                                       acc_src.balance,
-                                       acc_src.blinding,
-                                       false).unwrap();
+                                       src_asset_balance.balance,
+                                       src_asset_balance.balance_blinding,
+                                       true).unwrap();
 
         let vrfy_ok = validator_verify(&tx,
-                                       acc_src.commitment.decompress().unwrap(),
-                                       src_asset,
-                                       dst_asset);
+                                       src_asset_balance.balance_commitment.decompress().unwrap(),
+                                       src_asset_balance.asset_commitment.decompress().unwrap(),
+                                       dst_asset_balance.asset_commitment.decompress().unwrap());
         assert_eq!(true,vrfy_ok);
+
+    }
+
+    fn do_transaction_validation(src_asset_balance: &AssetBalance,
+                                 dst_asset_balance: &AssetBalance,
+                                 dst_pk: PublicKey,
+                                 transfer_amount: u32, expected: bool){
+
+        let mut csprng: ChaChaRng;
+        csprng  = ChaChaRng::from_seed([0u8; 32]);
+
+        let new_tx = TxInfo {
+            receiver_pk: dst_pk,
+            transfer_amount: transfer_amount,
+            receiver_asset_opening: dst_asset_balance.asset_blinding,
+            sender_asset_opening: src_asset_balance.asset_blinding,
+            sender_asset_commitment:src_asset_balance.asset_commitment,
+            receiver_asset_commitment: src_asset_balance.asset_commitment,
+        };
+
+        let (tx,_)  = Transaction::new(&mut csprng,
+                                       &new_tx,
+                                       src_asset_balance.balance,
+                                       src_asset_balance.balance_blinding,
+                                       true).unwrap();
+
+        let vrfy_ok = validator_verify(&tx,
+                                       src_asset_balance.balance_commitment.decompress().unwrap(),
+                                       src_asset_balance.asset_commitment.decompress().unwrap(),
+                                       dst_asset_balance.asset_commitment.decompress().unwrap());
+        assert_eq!(expected, vrfy_ok);
 
     }
 }

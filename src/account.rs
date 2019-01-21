@@ -4,8 +4,7 @@ use curve25519_dalek::scalar::Scalar;
 use crate::transaction::{TxInfo, Transaction};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use crate::setup::PublicParams;
-use schnorr::Keypair;
-use schnorr::Signature;
+use schnorr::{Keypair, PublicKey, Signature};
 use rand::CryptoRng;
 use rand::Rng;
 use crate::address;
@@ -13,43 +12,95 @@ use crate::address::Address;
 use blake2::Blake2b;
 use crate::asset::Asset;
 use crate::errors::Error as ZeiError;
+use std::collections::HashMap;
+use curve25519_dalek::ristretto::RistrettoPoint;
 
 //Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
 pub type Balance = u32;
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AssetBalance {
+    pub tx_counter: u128,
+    pub balance: Balance,
+    pub balance_commitment: CompressedRistretto,
+    pub balance_blinding: Scalar,
+    pub asset_info: Asset,
+    pub confidential_asset: bool,
+    //if confidential_asset is false, this is just a hash of asset_info
+    pub asset_commitment: CompressedRistretto,
+    pub asset_blinding: Scalar, //0 if confidential_asset is false
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Account {
-    pub counter: u128,
-    pub balance: Balance,
-    pub blinding: Scalar,
-    pub commitment: CompressedRistretto,
+    pub tx_counter: u128,
     pub keys: Keypair,
-    pub asset: Asset,
+    pub balances: HashMap<String, AssetBalance>,
 }
 
 impl Account {
 
-    pub fn new<R>(csprng: &mut R, asset_type: &str) -> Account
+    pub fn new<R>(csprng: &mut R) -> Account
         where R: CryptoRng + Rng,
     {
-        /*! I create a new hidden account with balance 0
+        /*! I create a new hidden empty account
          *
          */
+        Account {
+            tx_counter: 0,
+            keys: Keypair::generate(csprng),
+            balances: HashMap::new(),
+        }
+    }
+
+    pub fn add_asset<R>(&mut self, csprng: &mut R, asset_id: &str, confidential_asset: bool)
+        where R: CryptoRng + Rng,
+    {
+        /*!I add an asset with 0 balance to this account
+         *
+         */
+        let asset_info = Asset::new(asset_id);
         let pp = PublicParams::new();
         let balance: u32 = 0;
-        let blinding = Scalar::from(0u32);
+        let balance_blinding = Scalar::from(0u32);
         let value = Scalar::from(balance);
-        let commitment = pp.pc_gens.commit(value, blinding);
+        let asset_commitment: RistrettoPoint;
+        let asset_blinding: Scalar;
 
-        Account {
-            counter: 0,
-            balance,
-            blinding,
-            commitment: commitment.compress(),
-            keys: Keypair::generate(csprng),
-            asset: Asset::new(asset_type)
+        if confidential_asset {
+            let (a_comm, a_blind) = asset_info.compute_commitment(csprng);
+            asset_commitment = a_comm;
+            asset_blinding = a_blind;
         }
+        else {
+            asset_commitment = asset_info.compute_ristretto_point_hash();
+            asset_blinding = Scalar::from(0u8);
+        }
+        let asset_commitment= asset_commitment.compress();
+        let asset_balance = AssetBalance {
+            tx_counter: 0,
+            balance,
+            balance_blinding,
+            balance_commitment: pp.pc_gens.commit(value, balance_blinding).compress(),
+            asset_info,
+            confidential_asset,
+            asset_commitment,
+            asset_blinding,
+        };
+
+        self.balances.insert(String::from(asset_id), asset_balance);
+    }
+
+    pub fn get_balance(&self, asset_id: &str) -> u32 {
+        self.balances.get(asset_id).unwrap().balance
+    }
+
+    pub fn get_asset_balance(&mut self, asset_id: &str) -> &mut AssetBalance {
+        self.balances.get_mut(asset_id).unwrap()
+    }
+
+    pub fn get_public_key(&self) -> PublicKey {
+        self.keys.public
     }
 
 
@@ -60,7 +111,7 @@ impl Account {
         address::enc(&self.keys.public)
     }
 
-    pub fn send<R>(&mut self, csprng: &mut R, tx_info: &TxInfo, do_confidential_asset: bool)
+    pub fn send<R>(&mut self, csprng: &mut R, tx_info: &TxInfo, asset_id: &str)
         -> Result<Transaction, ZeiError>
         where R: CryptoRng + Rng,
     {
@@ -70,22 +121,21 @@ impl Account {
          * generated.
          */
 
-
-        if tx_info.transfer_amount > self.balance {
+        let mut asset_balance = self.balances.get_mut(asset_id).unwrap();
+        if tx_info.transfer_amount > asset_balance.balance {
             return Err(ZeiError::NotEnoughFunds);
         }
 
-        self.balance -= tx_info.transfer_amount;
+        asset_balance.balance -= tx_info.transfer_amount;
         let (newtx, updated_blind) = Transaction::new(csprng,
                                                       &tx_info,
-                                                      self.balance,
-                                                      self.blinding,
-                                                      do_confidential_asset).unwrap();
+                                                      asset_balance.balance,
+                                                      asset_balance.balance_blinding,
+                                                      asset_balance.confidential_asset).unwrap();
 
-        self.blinding = updated_blind;
-        self.commitment = newtx.sender_updated_balance_commitment;
-        self.counter += 1;
-
+        asset_balance.balance_blinding = updated_blind;
+        asset_balance.balance_commitment = newtx.sender_updated_balance_commitment;
+        self.tx_counter += 1;
         Ok(newtx)
     }
 
@@ -99,13 +149,23 @@ impl Account {
          *
          */
 
+        let mut asset_id= String::from("");
+        {
+            for (a_id, asset_balance) in self.balances.iter() {
+                if asset_balance.asset_commitment == tx.receiver_asset_commitment {
+                    asset_id = a_id.clone();
+                    break;
+                }
+            }
+        }
+
+        let mut asset_balance = self.balances.get_mut(&asset_id).unwrap();
         let (recovered_amount, recovered_blind) = tx.recover_plaintext(&self.keys.secret);
-        self.blinding += recovered_blind;
         //verify that commitments are correct that is sent
         //if receiver_verify(recovered_amount, recovered_blind, tx.receiver_new_commit, self.commitment) {} else {}
-        self.commitment = tx.sender_updated_balance_commitment;
-        self.blinding += recovered_blind;
-        self.balance += recovered_amount;
+        asset_balance.balance_commitment = tx.sender_updated_balance_commitment;
+        asset_balance.balance_blinding += recovered_blind;
+        asset_balance.balance += recovered_amount;
     }
 
     pub fn sign<R>(&self, csprng: &mut R, msg: &[u8]) -> Signature
@@ -128,12 +188,11 @@ mod test {
     pub fn test_account_creation() {
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
-        let mut acc = Account::new(&mut csprng, "default currency");
-        assert_eq!(acc.counter,0);
-        assert_eq!(acc.balance,0);
-
-        acc.balance=13;
-        assert_eq!(acc.balance,13);
+        let mut acc = Account::new(&mut csprng);
+        let asset_id = "default currency";
+        acc.add_asset(&mut csprng, asset_id, false);
+        assert_eq!(acc.tx_counter, 0);
+        assert_eq!(acc.get_balance(asset_id),0);
     }
 }
 
