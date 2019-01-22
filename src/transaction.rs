@@ -306,6 +306,7 @@ mod test {
     #[test]
     fn test_non_confidential_asset_transaction(){
         let asset_id = "default_currency";
+        let transfer_amount = 100u32;
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
 
@@ -327,28 +328,7 @@ mod test {
         let dst_pk = acc_dst.get_public_key();
         let dst_asset_balance = acc_dst.get_asset_balance(asset_id);
 
-
-        let new_tx = TxInfo {
-            receiver_pk: dst_pk,
-            transfer_amount: 100u32,
-            receiver_asset_opening: dst_asset_balance.asset_blinding,
-            sender_asset_opening: src_asset_balance.asset_blinding,
-            sender_asset_commitment:src_asset_balance.asset_commitment,
-            receiver_asset_commitment: src_asset_balance.asset_commitment,
-        };
-
-        let (tx,_)  = Transaction::new(&mut csprng,
-                                       &new_tx,
-                                       src_asset_balance.balance,
-                                       src_asset_balance.balance_blinding,
-                                       true).unwrap();
-
-        let vrfy_ok = validator_verify(&tx,
-                                       src_asset_balance.balance_commitment.decompress().unwrap(),
-                                       src_asset_balance.asset_commitment.decompress().unwrap(),
-                                       dst_asset_balance.asset_commitment.decompress().unwrap());
-        assert_eq!(true,vrfy_ok);
-
+        do_transaction_validation(src_asset_balance, dst_asset_balance, dst_pk,transfer_amount, true);
     }
 
     fn do_transaction_validation(src_asset_balance: &AssetBalance,
