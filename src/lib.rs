@@ -14,6 +14,7 @@ extern crate serde_json;
 mod setup;
 mod errors;
 mod constants;
+mod serialization;
 
 pub mod asset;
 pub mod address;

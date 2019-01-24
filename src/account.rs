@@ -179,11 +179,16 @@ impl Account {
     //Verify signature from
 }
 
+
 #[cfg(test)]
 mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
+    use serde::ser::Serialize;
+    use std::str;
+    use serde::private::ser::Error;
+
     #[test]
     pub fn test_account_creation() {
         let mut csprng: ChaChaRng;
@@ -195,5 +200,3 @@ mod test {
         assert_eq!(acc.get_balance(asset_id),0);
     }
 }
-
-

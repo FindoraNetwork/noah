@@ -7,7 +7,7 @@ use rand::Rng;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Asset {
-    id: String,
+    pub id: String,
 }
 
 
