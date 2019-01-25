@@ -23,7 +23,9 @@ pub fn account_to_json(account: &Account) -> String {
         json.push_str(&asset_balance_to_json(balance));
         json.push_str("},");
     }
-    json.pop();
+    if account.balances.len() > 0 {
+        json.pop();
+    }
     json.push_str("}}");
     json
 
@@ -181,6 +183,19 @@ mod test {
         assert_eq!(acc_deserialized.balances.get("another currency").unwrap().asset_commitment, acc.balances.get("another currency").unwrap().asset_commitment);
         assert_eq!(acc_deserialized.balances.get("another currency").unwrap().asset_blinding, acc.balances.get("another currency").unwrap().asset_blinding);
         assert_eq!(acc_deserialized.balances.get("another currency").unwrap().asset_info.id, acc.balances.get("another currency").unwrap().asset_info.id);
+    }
+    #[test]
+    pub fn test_empty_account() {
+        let mut csprng : ChaChaRng;
+        csprng = ChaChaRng::from_seed([0u8; 32]);
+        let mut acc = Account::new(&mut csprng);
+        let json = account_to_json(&acc);
+        let acc_deserialized = json_to_account(&json);
+        assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
+        assert_eq!(acc_deserialized.keys.public, acc.keys.public);
+        assert_eq!(acc_deserialized.keys.secret.to_bytes(), acc.keys.secret.to_bytes());
+        assert_eq!(acc_deserialized.balances.len(), acc.balances.len());
+
 
     }
 
