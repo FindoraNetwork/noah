@@ -7,6 +7,43 @@ use crate::account::AssetBalance;
 use crate::account::Account;
 use std::collections::HashMap;
 use serde_json::Value;
+use schnorr::PublicKey;
+
+use crate::transaction::TxInfo;
+
+// helper struct to save us from manually constructing json
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TxInfoString {
+    pub receiver_pk: String,
+    pub receiver_asset_commitment: String,
+    pub receiver_asset_opening: String,
+    pub sender_asset_commitment: String,
+    pub sender_asset_opening: String,
+    pub transfer_amount: u32,
+}
+
+pub fn txinfostring_to_txinfo(txinfo_str: &TxInfoString) -> TxInfo{
+    TxInfo {
+        receiver_pk: hex_str_to_pub_key(&txinfo_str.receiver_pk),
+        receiver_asset_commitment: hex_str_to_compressed_ristretto(&txinfo_str.receiver_asset_commitment),
+        receiver_asset_opening: hex_str_to_scalar(&txinfo_str.receiver_asset_opening),
+        sender_asset_commitment: hex_str_to_compressed_ristretto(&txinfo_str.sender_asset_commitment),
+        sender_asset_opening: hex_str_to_scalar(&txinfo_str.sender_asset_opening),
+        transfer_amount: txinfo_str.transfer_amount
+    }
+
+}
+
+pub fn txinfo_to_txinfostring(txinfo: TxInfo) -> String {
+    serde_json::to_string(&TxInfoString{
+        receiver_pk: pub_key_to_hex_str(&txinfo.receiver_pk),
+        receiver_asset_commitment: compressed_ristretto_to_hex(&txinfo.receiver_asset_commitment),
+        receiver_asset_opening: scalar_to_hex(&txinfo.receiver_asset_opening),
+        sender_asset_commitment: compressed_ristretto_to_hex(&txinfo.sender_asset_commitment),
+        sender_asset_opening: scalar_to_hex(&txinfo.sender_asset_opening),
+        transfer_amount: txinfo.transfer_amount
+    }).unwrap()
+}
 
 pub fn account_to_json(account: &Account) -> String {
     let mut json: String = String::from("{\"tx_counter\":\"");
@@ -111,6 +148,16 @@ pub fn hex_str_to_keypair(hex_str: &str) -> Keypair{
     Keypair::from_bytes(bytes).unwrap()
 }
 
+pub fn hex_str_to_pub_key(hex_str: &str) -> PublicKey{
+    let vector = hex::decode(hex_str).unwrap();
+    let bytes = vector.as_slice();
+    PublicKey::from_bytes(bytes).unwrap()
+}
+
+pub fn pub_key_to_hex_str(pk: &PublicKey) -> String{
+    let bytes = pk.to_bytes();
+    hex::encode(&bytes[..])
+}
 
 pub fn json_to_account(json: &str) -> Account{
     let v: Value = serde_json::from_str(json).unwrap();

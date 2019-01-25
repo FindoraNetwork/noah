@@ -12,9 +12,9 @@ extern crate serde;
 extern crate serde_json;
 
 mod setup;
-mod errors;
 mod constants;
 
+pub mod errors;
 pub mod serialization;
 pub mod asset;
 pub mod address;
