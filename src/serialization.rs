@@ -159,7 +159,6 @@ mod test {
         acc.add_asset(&mut csprng, "another currency", true);
 
         let json = account_to_json(&acc);
-        println!("{}", json);
 
         let acc_deserialized = json_to_account(&json);
 
