@@ -1,4 +1,5 @@
 use crate::account::Balance;
+use bulletproofs::{RangeProof};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use schnorr::Keypair;
@@ -8,187 +9,504 @@ use crate::account::Account;
 use std::collections::HashMap;
 use serde_json::Value;
 use schnorr::PublicKey;
+use organism_utils::crypto::secretbox::SecretBox;
+use organism_utils::crypto::secretbox::NonceKey;
+use organism_utils::crypto::lockbox::Lockbox;
 
 use crate::transaction::TxInfo;
+use crate::transaction::Transaction;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AssetBalanceString{
+    tx_counter: u128,
+    balance: u32,
+    balance_commitment: CompressedRistrettoString,
+    balance_blinding: ScalarString,
+    // TODO
+    asset_info: Asset,
+    confidential_asset: bool,
+    asset_commitment: CompressedRistrettoString,
+    asset_blinding: ScalarString
+}
+
+impl From<AssetBalance> for AssetBalanceString{
+    fn from(a: AssetBalance) -> AssetBalanceString{
+        AssetBalanceString{
+            tx_counter: a.tx_counter,
+            balance: a.balance,
+            balance_commitment: CompressedRistrettoString::from(a.balance_commitment),
+            balance_blinding: ScalarString::from(a.balance_blinding),
+            asset_info: a.asset_info,
+            confidential_asset: a.confidential_asset,
+            asset_commitment: CompressedRistrettoString::from(a.asset_commitment),
+            asset_blinding: ScalarString::from(a.asset_blinding)
+        }
+    }
+}
+
+impl From<AssetBalanceString> for AssetBalance{
+    fn from(a: AssetBalanceString) -> AssetBalance {
+        AssetBalance{
+            tx_counter: a.tx_counter,
+            balance: a.balance,
+            balance_commitment: CompressedRistretto::from(a.balance_commitment),
+            balance_blinding: Scalar::from(a.balance_blinding),
+            asset_info: a.asset_info,
+            confidential_asset: a.confidential_asset,
+            asset_commitment: CompressedRistretto::from(a.asset_commitment),
+            asset_blinding: Scalar::from(a.asset_blinding)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KeypairString {
+    val: String
+}
+
+impl From<KeypairString> for Keypair {
+    fn from(a: KeypairString) -> Keypair {
+        let vector = hex::decode(&a.val).unwrap();
+        let bytes = vector.as_slice();
+        Keypair::from_bytes(bytes).unwrap()
+    }
+}
+
+impl From<Keypair>  for KeypairString {
+    fn from(a: Keypair) -> KeypairString {
+        let bytes = a.to_bytes();
+        KeypairString{val: hex::encode(&bytes[..])}
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AccountString {
+    tx_counter: u128,
+    keys: KeypairString,
+    balances: HashMap<String, AssetBalanceString>
+
+}
+impl From<Account> for AccountString {
+    fn from(a: Account) -> AccountString {
+        AccountString{
+            tx_counter: a.tx_counter,
+            keys: KeypairString::from(a.keys),
+            balances: a.balances.into_iter().map(
+                |(k, v)| {(k, AssetBalanceString::from(v))}).collect()
+        }
+    }
+}
+
+impl From<AccountString> for Account {
+    fn from(a: AccountString) -> Account {
+        Account{
+            tx_counter: a.tx_counter,
+            keys: Keypair::from(a.keys),
+            balances: a.balances.into_iter().map(
+                |(k, v)| {(k, AssetBalance::from(v))}).collect()
+        }
+    }
+}
+
+
+// helper struct to save us from manually constructing json
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TransactionString{
+    transaction_range_proof: RangeProofString,
+    transaction_commitment: CompressedRistrettoString,
+    sender_updated_balance_commitment: CompressedRistrettoString,
+    lockbox: LockboxString,
+    do_confidential_asset: bool,
+    asset_eq_proof: ScalarString,
+    sender_asset_commitment: CompressedRistrettoString,
+    receiver_asset_commitment: CompressedRistrettoString,
+}
+
+impl From<Transaction> for TransactionString {
+    fn from(a: Transaction) -> TransactionString{
+        TransactionString{
+            transaction_range_proof: RangeProofString::from(a.transaction_range_proof),
+            transaction_commitment: CompressedRistrettoString::from(a.transaction_commitment),
+            sender_updated_balance_commitment: CompressedRistrettoString::from(a.sender_updated_balance_commitment),
+            lockbox: LockboxString::from(a.lockbox),
+            do_confidential_asset: a.do_confidential_asset,
+            asset_eq_proof: ScalarString::from(a.asset_eq_proof),
+            sender_asset_commitment: CompressedRistrettoString::from(a.sender_asset_commitment),
+            receiver_asset_commitment: CompressedRistrettoString::from(a.receiver_asset_commitment),
+        }
+    }
+}
+
+impl From<TransactionString> for Transaction{
+    fn from(a: TransactionString) -> Transaction {
+        Transaction{
+            transaction_range_proof: RangeProof::from(a.transaction_range_proof),
+            transaction_commitment: CompressedRistretto::from(a.transaction_commitment),
+            sender_updated_balance_commitment: CompressedRistretto::from(a.sender_updated_balance_commitment),
+            lockbox: Lockbox::from(a.lockbox),
+            do_confidential_asset: a.do_confidential_asset,
+            asset_eq_proof: Scalar::from(a.asset_eq_proof),
+            sender_asset_commitment: CompressedRistretto::from(a.sender_asset_commitment),
+            receiver_asset_commitment: CompressedRistretto::from(a.receiver_asset_commitment),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CompressedRistrettoString {
+    val: String
+}
+
+impl From<CompressedRistretto> for CompressedRistrettoString {
+    fn from(point: CompressedRistretto) -> CompressedRistrettoString{
+        CompressedRistrettoString{val:hex::encode(point.to_bytes())}
+    }
+}
+
+impl From<CompressedRistrettoString> for CompressedRistretto {
+    fn from(hex_str: CompressedRistrettoString) -> CompressedRistretto{
+        let vector = hex::decode(hex_str.val).unwrap();
+        let bytes = vector.as_slice();
+        CompressedRistretto::from_slice(bytes)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ScalarString {
+    val: String
+}
+
+impl From<Scalar> for ScalarString {
+    fn from(scalar: Scalar) -> ScalarString {
+        ScalarString {
+            val: hex::encode(scalar.to_bytes())
+        }
+    }
+}
+
+impl From<ScalarString> for Scalar {
+    fn from(scalar: ScalarString) -> Scalar {
+        let vector = hex::decode(&scalar.val).unwrap();
+        let bytes = vector.as_slice();
+        let mut array = [0u8; 32];
+        array.copy_from_slice(bytes);
+        Scalar::from_bits(array)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PublicKeyString {
+    val: String
+}
+
+
+
+impl From<PublicKeyString> for PublicKey {
+    fn from(a: PublicKeyString) -> PublicKey {
+        let vector = hex::decode(&a.val).unwrap();
+        let bytes = vector.as_slice();
+        let mut array = [0u8; 32];
+        array.copy_from_slice(bytes);
+        PublicKey::from_bytes(&array).unwrap()
+    }
+}
+
+impl From<PublicKey> for PublicKeyString {
+    fn from(a: PublicKey) -> PublicKeyString {
+        PublicKeyString{val: hex::encode(a.to_bytes())}
+    }
+}
 
 // helper struct to save us from manually constructing json
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TxInfoString {
-    pub receiver_pk: String,
-    pub receiver_asset_commitment: String,
-    pub receiver_asset_opening: String,
-    pub sender_asset_commitment: String,
-    pub sender_asset_opening: String,
-    pub transfer_amount: u32,
+    receiver_pk: PublicKey,
+    receiver_asset_commitment: CompressedRistrettoString,
+    receiver_asset_opening: ScalarString,
+    sender_asset_commitment: CompressedRistrettoString,
+    sender_asset_opening: ScalarString,
+    transfer_amount: u32,
 }
 
-pub fn txinfostring_to_txinfo(txinfo_str: &TxInfoString) -> TxInfo{
-    TxInfo {
-        receiver_pk: hex_str_to_pub_key(&txinfo_str.receiver_pk),
-        receiver_asset_commitment: hex_str_to_compressed_ristretto(&txinfo_str.receiver_asset_commitment),
-        receiver_asset_opening: hex_str_to_scalar(&txinfo_str.receiver_asset_opening),
-        sender_asset_commitment: hex_str_to_compressed_ristretto(&txinfo_str.sender_asset_commitment),
-        sender_asset_opening: hex_str_to_scalar(&txinfo_str.sender_asset_opening),
-        transfer_amount: txinfo_str.transfer_amount
-    }
-
-}
-
-pub fn txinfo_to_txinfostring(txinfo: TxInfo) -> String {
-    serde_json::to_string(&TxInfoString{
-        receiver_pk: pub_key_to_hex_str(&txinfo.receiver_pk),
-        receiver_asset_commitment: compressed_ristretto_to_hex(&txinfo.receiver_asset_commitment),
-        receiver_asset_opening: scalar_to_hex(&txinfo.receiver_asset_opening),
-        sender_asset_commitment: compressed_ristretto_to_hex(&txinfo.sender_asset_commitment),
-        sender_asset_opening: scalar_to_hex(&txinfo.sender_asset_opening),
-        transfer_amount: txinfo.transfer_amount
-    }).unwrap()
-}
-
-pub fn account_to_json(account: &Account) -> String {
-    let mut json: String = String::from("{\"tx_counter\":\"");
-    //push tx counter
-    let number = account.tx_counter;
-    json.push_str(&u128_to_str(number));
-    json.push_str("\",\"keys\":\"");
-    json.push_str(&keys_to_json(&account.keys));
-    json.push_str("\",\"balances\":{");
-    for (id,balance) in account.balances.iter() {
-        json.push_str("\"");
-        json.push_str(id);
-        json.push_str("\":{");
-        json.push_str(&asset_balance_to_json(balance));
-        json.push_str("},");
-    }
-    if account.balances.len() > 0 {
-        json.pop();
-    }
-    json.push_str("}}");
-    json
-
-}
-
-pub fn keys_to_json(keypair: &Keypair) -> String {
-    let bytes = keypair.to_bytes();
-    hex::encode(&bytes[..])
-}
-
-pub fn asset_balance_to_json(asset_balance: &AssetBalance) -> String {
-    let mut json = String::from("\"tx_counter\":\"");
-    json.push_str(&u128_to_str(asset_balance.tx_counter));
-    json.push_str("\",\"balance\":");
-    json.push_str(&balance_to_str(asset_balance.balance));
-    json.push_str(",\"balance_commitment\":\"");
-    json.push_str(&compressed_ristretto_to_hex(&asset_balance.balance_commitment));
-    json.push_str("\",\"balance_blinding\":\"");
-    json.push_str(&scalar_to_hex(&asset_balance.balance_blinding));
-    json.push_str("\",\"asset_info\":");
-    json.push_str(&asset_to_hex(&asset_balance.asset_info));
-    json.push_str(",\"confidential_asset\":");
-    json.push_str(&asset_balance.confidential_asset.to_string());
-    json.push_str(",\"asset_commitment\":\"");
-    json.push_str(&compressed_ristretto_to_hex(&asset_balance.asset_commitment));
-    json.push_str("\",\"asset_blinding\":\"");
-    json.push_str(&scalar_to_hex(&asset_balance.asset_blinding));
-    json.push_str("\"");
-
-    json
-
-}
-
-pub fn balance_to_str(balance: Balance) -> String{
-    balance.to_string()
-}
-
-pub fn u128_to_str(number: u128) -> String{
-    let bytes = number.to_be_bytes();
-    hex::encode(bytes)
-}
-
-pub fn compressed_ristretto_to_hex(point: &CompressedRistretto) -> String{
-    hex::encode(point.to_bytes())
-}
-
-pub fn scalar_to_hex(scalar: &Scalar) -> String {
-    hex::encode(scalar.to_bytes())
-}
-
-pub fn asset_to_hex(asset: &Asset) -> String {
-    let mut json = String::from("{\"id\":\"");
-    json.push_str(&asset.id);
-    json.push_str("\"}");
-    json
-}
-
-pub fn hex_str_to_compressed_ristretto(hex_str: &str) -> CompressedRistretto {
-    let vector = hex::decode(hex_str).unwrap();
-    let bytes = vector.as_slice();
-    CompressedRistretto::from_slice(bytes)
-}
-
-pub fn hex_str_to_scalar(hex_str: &str) ->Scalar {
-    let vector = hex::decode(hex_str).unwrap();
-    let bytes = vector.as_slice();
-    let mut array = [0u8; 32];
-    array.copy_from_slice(bytes);
-    Scalar::from_bits(array)
-}
-
-pub fn hex_str_to_u128(hex_str: &str) -> u128{
-    let vector = hex::decode(hex_str).unwrap();
-    let bytes = vector.as_slice();
-    let mut array = [0u8; 16];
-    array.copy_from_slice(bytes);
-    u128::from_be_bytes(array)
-}
-
-pub fn hex_str_to_keypair(hex_str: &str) -> Keypair{
-    let vector = hex::decode(hex_str).unwrap();
-    let bytes = vector.as_slice();
-    Keypair::from_bytes(bytes).unwrap()
-}
-
-pub fn hex_str_to_pub_key(hex_str: &str) -> PublicKey{
-    let vector = hex::decode(hex_str).unwrap();
-    let bytes = vector.as_slice();
-    PublicKey::from_bytes(bytes).unwrap()
-}
-
-pub fn pub_key_to_hex_str(pk: &PublicKey) -> String{
-    let bytes = pk.to_bytes();
-    hex::encode(&bytes[..])
-}
-
-pub fn json_to_account(json: &str) -> Account{
-    let v: Value = serde_json::from_str(json).unwrap();
-    let tx_counter: u128 = hex_str_to_u128(v["tx_counter"].as_str().unwrap());
-
-    let keys = hex_str_to_keypair(v["keys"].as_str().unwrap());
-
-    let balances_value = v["balances"].as_object().unwrap();
-    let mut balances: HashMap<String, AssetBalance> =  HashMap::new();
-    for (id, balance_value) in balances_value.iter() {
-        let asset_balance = AssetBalance {
-            tx_counter: hex_str_to_u128(balance_value["tx_counter"].as_str().unwrap()),
-            balance: balance_value["balance"].as_u64().unwrap() as u32,
-            balance_commitment: hex_str_to_compressed_ristretto(balance_value["balance_commitment"].as_str().unwrap()),
-            balance_blinding: hex_str_to_scalar(balance_value["balance_blinding"].as_str().unwrap()),
-            confidential_asset: balance_value["confidential_asset"].as_bool().unwrap(),
-            asset_commitment: hex_str_to_compressed_ristretto(balance_value["asset_commitment"].as_str().unwrap()),
-            asset_blinding: hex_str_to_scalar(balance_value["asset_blinding"].as_str().unwrap()),
-            asset_info: Asset {
-                id: String::from(balance_value["asset_info"]["id"].as_str().unwrap()),
-            }
-        };
-        balances.insert((*id).to_string(), asset_balance);
-    }
-
-    Account{
-        tx_counter,
-        balances,
-        keys,
+impl From<TxInfoString> for TxInfo {
+    fn from(tx: TxInfoString) -> TxInfo {
+        TxInfo{
+            receiver_pk: PublicKey::from(tx.receiver_pk),
+            receiver_asset_commitment: CompressedRistretto::from(tx.receiver_asset_commitment),
+            receiver_asset_opening: Scalar::from(tx.receiver_asset_opening),
+            sender_asset_commitment: CompressedRistretto::from(tx.sender_asset_commitment),
+            sender_asset_opening: Scalar::from(tx.sender_asset_opening),
+            transfer_amount: tx.transfer_amount,
+        }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LockboxString{
+    data: SecretBoxString,
+    rand: CompressedRistrettoString
+}
+
+impl From<LockboxString> for Lockbox {
+    fn from(a: LockboxString) -> Lockbox{
+        Lockbox {
+            data: SecretBox::from(a.data),
+            rand: CompressedRistretto::from(a.rand)
+        }
+
+    }
+}
+
+impl From<Lockbox> for LockboxString {
+    fn from(a: Lockbox) -> LockboxString{
+        LockboxString{
+            data: SecretBoxString::from(a.data),
+            rand: CompressedRistrettoString::from(a.rand)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SecretBoxString{
+    nonce: Vec<u8>,
+    tag: Vec<u8>,
+    cipher: Vec<u8>
+}
+
+impl From<SecretBoxString> for SecretBox{
+    fn from(a: SecretBoxString) -> SecretBox{
+        let mut array = [0u8; 16];
+        array.copy_from_slice(a.tag.as_slice());
+        SecretBox{
+            nonce: NonceKey::from_bytes(a.nonce.as_slice()).unwrap(),
+            tag: array,
+            cipher: a.cipher
+        }
+    }
+}
+
+impl From<SecretBox> for SecretBoxString{
+    fn from(a: SecretBox) -> SecretBoxString{
+        // to_bytes or as bytes ?
+        SecretBoxString {
+            nonce: a.nonce.as_bytes().to_vec(),
+            tag: a.tag.to_vec(),
+            cipher: a.cipher
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RangeProofString{
+    val: Vec<u8>
+}
+
+impl From<RangeProofString> for RangeProof {
+    fn from(a: RangeProofString) -> RangeProof{
+        RangeProof::from_bytes(&a.val).unwrap()
+    }
+}
+
+impl From<RangeProof> for RangeProofString {
+    fn from(a: RangeProof) -> RangeProofString{
+        RangeProofString{val: a.to_bytes()}
+    }
+}
+
+
+
+
+
+
+// pub fn json_to_tx(tx_str: &str) -> Transaction{
+    
+// }
+
+// pub fn tx_to_json(tx: &Transaction) -> String{
+//     serde_json::to_string(&TransactionString{
+//         transaction_range_proof: bulletproofs::RangeProof,
+//         transaction_commitment: compressed_ristretto_to_hex(&tx.transaction_commitment),
+//         sender_updated_balance_commitment: compressed_ristretto_to_hex(&tx.sender_updated_balance_commitment),
+//         // TODO
+//         lockbox: ,
+//         do_confidential_asset: tx.do_confidential_asset,
+//         asset_eq_proof: scalar_to_hex(&tx.asset_eq_proof),
+//         sender_asset_commitment: compressed_ristretto_to_hex(&tx.sender_asset_commitment),
+//         receiver_asset_commitment: compressed_ristretto_to_hex(&tx.receiver_asset_commitment),
+//     });
+//     // TransactionString
+// }
+
+// pub fn json_to_txinfo(txinfo_str: &str) -> TxInfo{
+//     let txinfo_str:TxInfoString = serde_json::from_str(txinfo_str).unwrap();
+//     TxInfo {
+//         receiver_pk: hex_str_to_pub_key(&txinfo_str.receiver_pk),
+//         receiver_asset_commitment: hex_str_to_compressed_ristretto(&txinfo_str.receiver_asset_commitment),
+//         receiver_asset_opening: hex_str_to_scalar(&txinfo_str.receiver_asset_opening),
+//         sender_asset_commitment: hex_str_to_compressed_ristretto(&txinfo_str.sender_asset_commitment),
+//         sender_asset_opening: hex_str_to_scalar(&txinfo_str.sender_asset_opening),
+//         transfer_amount: txinfo_str.transfer_amount
+//     }
+
+// }
+
+// // TODO fix name
+// pub fn txinfo_to_json(txinfo: TxInfo) -> String {
+//     serde_json::to_string(&TxInfoString{
+//         receiver_pk: pub_key_to_hex_str(&txinfo.receiver_pk),
+//         receiver_asset_commitment: compressed_ristretto_to_hex(&txinfo.receiver_asset_commitment),
+//         receiver_asset_opening: scalar_to_hex(&txinfo.receiver_asset_opening),
+//         sender_asset_commitment: compressed_ristretto_to_hex(&txinfo.sender_asset_commitment),
+//         sender_asset_opening: scalar_to_hex(&txinfo.sender_asset_opening),
+//         transfer_amount: txinfo.transfer_amount
+//     }).unwrap()
+// }
+
+// pub fn account_to_json(account: &Account) -> String {
+//     let mut json: String = String::from("{\"tx_counter\":\"");
+//     //push tx counter
+//     let number = account.tx_counter;
+//     json.push_str(&u128_to_str(number));
+//     json.push_str("\",\"keys\":\"");
+//     json.push_str(&keys_to_json(&account.keys));
+//     json.push_str("\",\"balances\":{");
+//     for (id,balance) in account.balances.iter() {
+//         json.push_str("\"");
+//         json.push_str(id);
+//         json.push_str("\":{");
+//         json.push_str(&asset_balance_to_json(balance));
+//         json.push_str("},");
+//     }
+//     if account.balances.len() > 0 {
+//         json.pop();
+//     }
+//     json.push_str("}}");
+//     json
+
+// }
+
+
+// pub fn keys_to_json(keypair: &Keypair) -> String {
+//     let bytes = keypair.to_bytes();
+//     hex::encode(&bytes[..])
+// }
+
+// pub fn asset_balance_to_json(asset_balance: &AssetBalance) -> String {
+//     let mut json = String::from("\"tx_counter\":\"");
+//     json.push_str(&u128_to_str(asset_balance.tx_counter));
+//     json.push_str("\",\"balance\":");
+//     json.push_str(&balance_to_str(asset_balance.balance));
+//     json.push_str(",\"balance_commitment\":\"");
+//     json.push_str(&compressed_ristretto_to_hex(&asset_balance.balance_commitment));
+//     json.push_str("\",\"balance_blinding\":\"");
+//     json.push_str(&scalar_to_hex(&asset_balance.balance_blinding));
+//     json.push_str("\",\"asset_info\":");
+//     json.push_str(&asset_to_hex(&asset_balance.asset_info));
+//     json.push_str(",\"confidential_asset\":");
+//     json.push_str(&asset_balance.confidential_asset.to_string());
+//     json.push_str(",\"asset_commitment\":\"");
+//     json.push_str(&compressed_ristretto_to_hex(&asset_balance.asset_commitment));
+//     json.push_str("\",\"asset_blinding\":\"");
+//     json.push_str(&scalar_to_hex(&asset_balance.asset_blinding));
+//     json.push_str("\"");
+
+//     json
+
+// }
+
+// pub fn balance_to_str(balance: Balance) -> String{
+//     balance.to_string()
+// }
+
+// pub fn u128_to_str(number: u128) -> String{
+//     let bytes = number.to_be_bytes();
+//     hex::encode(bytes)
+// }
+
+// pub fn compressed_ristretto_to_hex(point: &CompressedRistretto) -> String{
+//     hex::encode(point.to_bytes())
+// }
+
+// pub fn scalar_to_hex(scalar: &Scalar) -> String {
+//     hex::encode(scalar.to_bytes())
+// }
+
+// pub fn asset_to_hex(asset: &Asset) -> String {
+//     let mut json = String::from("{\"id\":\"");
+//     json.push_str(&asset.id);
+//     json.push_str("\"}");
+//     json
+// }
+
+// pub fn hex_str_to_compressed_ristretto(hex_str: &str) -> CompressedRistretto {
+//     let vector = hex::decode(hex_str).unwrap();
+//     let bytes = vector.as_slice();
+//     CompressedRistretto::from_slice(bytes)
+// }
+
+// pub fn hex_str_to_scalar(hex_str: &str) ->Scalar {
+//     let vector = hex::decode(hex_str).unwrap();
+//     let bytes = vector.as_slice();
+//     let mut array = [0u8; 32];
+//     array.copy_from_slice(bytes);
+//     Scalar::from_bits(array)
+// }
+
+// pub fn hex_str_to_u128(hex_str: &str) -> u128{
+//     let vector = hex::decode(hex_str).unwrap();
+//     let bytes = vector.as_slice();
+//     let mut array = [0u8; 16];
+//     array.copy_from_slice(bytes);
+//     u128::from_be_bytes(array)
+// }
+
+// pub fn hex_str_to_keypair(hex_str: &str) -> Keypair{
+//     let vector = hex::decode(hex_str).unwrap();
+//     let bytes = vector.as_slice();
+//     Keypair::from_bytes(bytes).unwrap()
+// }
+
+// pub fn hex_str_to_pub_key(hex_str: &str) -> PublicKey{
+//     let vector = hex::decode(hex_str).unwrap();
+//     let bytes = vector.as_slice();
+//     PublicKey::from_bytes(bytes).unwrap()
+// }
+
+// pub fn pub_key_to_hex_str(pk: &PublicKey) -> String{
+//     let bytes = pk.to_bytes();
+//     hex::encode(&bytes[..])
+// }
+
+// pub fn json_to_account(json: &str) -> Account{
+//     let v: Value = serde_json::from_str(json).unwrap();
+//     let tx_counter: u128 = hex_str_to_u128(v["tx_counter"].as_str().unwrap());
+
+//     let keys = hex_str_to_keypair(v["keys"].as_str().unwrap());
+
+//     let balances_value = v["balances"].as_object().unwrap();
+//     let mut balances: HashMap<String, AssetBalance> =  HashMap::new();
+//     for (id, balance_value) in balances_value.iter() {
+//         let asset_balance = AssetBalance {
+//             tx_counter: hex_str_to_u128(balance_value["tx_counter"].as_str().unwrap()),
+//             balance: balance_value["balance"].as_u64().unwrap() as u32,
+//             balance_commitment: hex_str_to_compressed_ristretto(balance_value["balance_commitment"].as_str().unwrap()),
+//             balance_blinding: hex_str_to_scalar(balance_value["balance_blinding"].as_str().unwrap()),
+//             confidential_asset: balance_value["confidential_asset"].as_bool().unwrap(),
+//             asset_commitment: hex_str_to_compressed_ristretto(balance_value["asset_commitment"].as_str().unwrap()),
+//             asset_blinding: hex_str_to_scalar(balance_value["asset_blinding"].as_str().unwrap()),
+//             asset_info: Asset {
+//                 id: String::from(balance_value["asset_info"]["id"].as_str().unwrap()),
+//             }
+//         };
+//         balances.insert((*id).to_string(), asset_balance);
+//     }
+
+//     Account{
+//         tx_counter,
+//         balances,
+//         keys,
+//     }
+// }
 
 #[cfg(test)]
 mod test {
@@ -198,18 +516,35 @@ mod test {
     use serde::ser::Serialize;
     use std::str;
     use serde::private::ser::Error;
+    use curve25519_dalek::ristretto::CompressedRistretto;
     #[test]
+    pub fn serialization_compressed_ristretto(){
+        let id = CompressedRistrettoString::from(CompressedRistretto::default());
+        let serialized = serde_json::to_string(&id).unwrap();
+        println!("{:#?}", serialized);
+        let deserialized = serde_json::from_str::<CompressedRistrettoString>(&serialized).unwrap();
+        println!("{:#?}", deserialized);
+        let final_deserialized = CompressedRistretto::from(deserialized);
+
+
+    }
     pub fn test_account_to_json() {
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
-        let mut acc = Account::new(&mut csprng);
+        let mut acc_old = Account::new(&mut csprng);
         let asset_id = "default currency";
+        acc_old.add_asset(&mut csprng, asset_id, false);
+        acc_old.add_asset(&mut csprng, "another currency", true);
+
+        let mut acc = Account::new(&mut csprng);
         acc.add_asset(&mut csprng, asset_id, false);
         acc.add_asset(&mut csprng, "another currency", true);
 
-        let json = account_to_json(&acc);
+        let acc_str = AccountString::from(acc_old);
 
-        let acc_deserialized = json_to_account(&json);
+        let json = serde_json::to_string(&acc_str).unwrap();
+
+        let acc_deserialized = Account::from(serde_json::from_str::<AccountString>(&json).unwrap());
 
         assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
         assert_eq!(acc_deserialized.keys.public, acc.keys.public);
@@ -233,17 +568,14 @@ mod test {
     }
     #[test]
     pub fn test_empty_account() {
-        let mut csprng : ChaChaRng;
-        csprng = ChaChaRng::from_seed([0u8; 32]);
-        let mut acc = Account::new(&mut csprng);
-        let json = account_to_json(&acc);
-        let acc_deserialized = json_to_account(&json);
-        assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
-        assert_eq!(acc_deserialized.keys.public, acc.keys.public);
-        assert_eq!(acc_deserialized.keys.secret.to_bytes(), acc.keys.secret.to_bytes());
-        assert_eq!(acc_deserialized.balances.len(), acc.balances.len());
-
-
+        // let mut csprng : ChaChaRng;
+        // csprng = ChaChaRng::from_seed([0u8; 32]);
+        // let mut acc = Account::new(&mut csprng);
+        // let json = account_to_json(&acc);
+        // let acc_deserialized = json_to_account(&json);
+        // assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
+        // assert_eq!(acc_deserialized.keys.public, acc.keys.public);
+        // assert_eq!(acc_deserialized.keys.secret.to_bytes(), acc.keys.secret.to_bytes());
+        // assert_eq!(acc_deserialized.balances.len(), acc.balances.len());
     }
-
 }
