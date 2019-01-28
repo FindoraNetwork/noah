@@ -220,7 +220,7 @@ impl From<PublicKey> for PublicKeyString {
 // helper struct to save us from manually constructing json
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TxInfoString {
-    receiver_pk: PublicKey,
+    receiver_pk: PublicKeyString,
     receiver_asset_commitment: CompressedRistrettoString,
     receiver_asset_opening: ScalarString,
     sender_asset_commitment: CompressedRistrettoString,
@@ -521,12 +521,8 @@ mod test {
     pub fn serialization_compressed_ristretto(){
         let id = CompressedRistrettoString::from(CompressedRistretto::default());
         let serialized = serde_json::to_string(&id).unwrap();
-        println!("{:#?}", serialized);
         let deserialized = serde_json::from_str::<CompressedRistrettoString>(&serialized).unwrap();
-        println!("{:#?}", deserialized);
         let final_deserialized = CompressedRistretto::from(deserialized);
-
-
     }
     pub fn test_account_to_json() {
         let mut csprng: ChaChaRng;

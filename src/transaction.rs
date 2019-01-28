@@ -126,7 +126,7 @@ impl Transaction {
          */
 
         let unlocked = self.lockbox.unlock(sk);
-        let (raw_amount, raw_blind) = unlocked.split_at(5);
+        let (raw_amount, raw_blind) = unlocked.split_at(4);
 
         //convert to u32
         let p_amount = u32::from(raw_amount[0]) << 24 |

@@ -61,7 +61,7 @@ impl Account {
          */
         let asset_info = Asset::new(asset_id);
         let pp = PublicParams::new();
-        let balance: u32 = 0;
+        let balance: u32 = 50;
         let balance_blinding = Scalar::from(0u32);
         let value = Scalar::from(balance);
         let asset_commitment: RistrettoPoint;
@@ -198,5 +198,32 @@ mod test {
         acc.add_asset(&mut csprng, asset_id, false);
         assert_eq!(acc.tx_counter, 0);
         assert_eq!(acc.get_balance(asset_id),0);
+    }
+
+    #[test]
+    pub fn test_account_interactions() {
+        let mut csprng1: ChaChaRng;
+        csprng1 = ChaChaRng::from_seed([0u8; 32]);
+        let mut csprng2: ChaChaRng;
+        csprng2 = ChaChaRng::from_seed([0u8; 32]);
+        let mut sender = Account::new(&mut csprng1);
+        let mut rec = Account::new(&mut csprng2);
+        let mut csprng3: ChaChaRng;
+        csprng3 = ChaChaRng::from_seed([0u8; 32]);
+        let asset_id = "exampel_asset";
+        sender.add_asset(&mut csprng3, &asset_id, true);
+        rec.add_asset(&mut csprng3, &asset_id, true);
+        let tx = TxInfo {
+            receiver_pk: rec.keys.public,
+            receiver_asset_commitment: rec.balances.get(asset_id).unwrap().asset_commitment,
+            receiver_asset_opening: rec.balances.get(asset_id).unwrap().asset_blinding,
+            sender_asset_commitment: sender.balances.get(asset_id).unwrap().asset_commitment,
+            sender_asset_opening: sender.balances.get(asset_id).unwrap().asset_blinding,
+            transfer_amount: 10,
+        };
+        let mut csprng4: ChaChaRng;
+        csprng4 = ChaChaRng::from_seed([0u8; 32]);
+        let tx = sender.send(&mut csprng4, &tx, &asset_id).unwrap();
+        rec.receive(&tx);
     }
 }
