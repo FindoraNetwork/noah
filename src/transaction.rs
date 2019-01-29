@@ -254,13 +254,13 @@ pub struct TransactionString{
     receiver_asset_commitment: CompressedRistrettoString,
 }
 
-impl From<Transaction> for TransactionString {
-    fn from(a: Transaction) -> TransactionString{
+impl From<&Transaction> for TransactionString {
+    fn from(a: &Transaction) -> TransactionString{
         TransactionString{
-            transaction_range_proof: RangeProofString::from(a.transaction_range_proof),
+            transaction_range_proof: RangeProofString::from(&a.transaction_range_proof),
             transaction_commitment: CompressedRistrettoString::from(a.transaction_commitment),
             sender_updated_balance_commitment: CompressedRistrettoString::from(a.sender_updated_balance_commitment),
-            lockbox: LockboxString::from(a.lockbox),
+            lockbox: LockboxString::from(&a.lockbox),
             do_confidential_asset: a.do_confidential_asset,
             asset_eq_proof: ScalarString::from(a.asset_eq_proof),
             sender_asset_commitment: CompressedRistrettoString::from(a.sender_asset_commitment),
@@ -437,5 +437,51 @@ mod test {
                                        dst_asset_balance.asset_commitment.decompress().unwrap());
         assert_eq!(expected, vrfy_ok);
 
+    }
+
+    #[test]
+    fn test_transaction_serialization(){
+        let asset_id = "default_currency";
+        let transfer_amount = 100u32;
+        let mut csprng: ChaChaRng;
+        csprng  = ChaChaRng::from_seed([0u8; 32]);
+
+        // source account setup
+        let mut acc_src = Account::new(&mut csprng);
+        acc_src.add_asset(&mut csprng, asset_id, true, 100);
+
+        // destination account stup
+        let mut acc_dst = Account::new(&mut csprng);
+        acc_dst.add_asset(&mut csprng, asset_id, true, 0);
+
+        let new_tx = TxParams {
+            receiver_pk: acc_dst.keys.public,
+            transfer_amount: transfer_amount,
+            receiver_asset_opening: acc_dst.balances[asset_id].asset_blinding,
+            receiver_asset_commitment: acc_dst.balances[asset_id].asset_commitment,
+        };
+
+        let (tx,_)  = Transaction::new(&mut csprng,
+                                       &new_tx,
+                                       acc_src.balances[asset_id].balance,
+                                       acc_src.balances[asset_id].balance_blinding,
+                                       acc_src.balances[asset_id].asset_blinding,
+                                       acc_src.balances[asset_id].asset_commitment,
+                                       true).unwrap();
+
+        let tx_json = serde_json::to_string(&TransactionString::from(&tx)).unwrap();
+        let desarialized_tx = Transaction::try_from(
+            serde_json::from_str::<TransactionString>(&tx_json).unwrap()).unwrap();
+
+        assert_eq!(tx.transaction_commitment, desarialized_tx.transaction_commitment);
+        assert_eq!(tx.receiver_asset_commitment, desarialized_tx.receiver_asset_commitment);
+        assert_eq!(tx.sender_asset_commitment, desarialized_tx.sender_asset_commitment);
+        assert_eq!(tx.do_confidential_asset, desarialized_tx.do_confidential_asset);
+        assert_eq!(tx.asset_eq_proof, desarialized_tx.asset_eq_proof);
+        assert_eq!(tx.sender_updated_balance_commitment, desarialized_tx.sender_updated_balance_commitment);
+        assert_eq!(tx.lockbox.rand, desarialized_tx.lockbox.rand);
+        assert_eq!(tx.lockbox.data.cipher, desarialized_tx.lockbox.data.cipher);
+        assert_eq!(tx.lockbox.data.nonce, desarialized_tx.lockbox.data.nonce);
+        assert_eq!(tx.lockbox.data.tag, desarialized_tx.lockbox.data.tag);
     }
 }

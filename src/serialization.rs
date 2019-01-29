@@ -119,10 +119,10 @@ impl TryFrom<LockboxString> for Lockbox {
     }
 }
 
-impl From<Lockbox> for LockboxString {
-    fn from(a: Lockbox) -> LockboxString{
+impl From<&Lockbox> for LockboxString {
+    fn from(a: &Lockbox) -> LockboxString{
         LockboxString{
-            data: SecretBoxString::from(a.data),
+            data: SecretBoxString::from(&a.data),
             rand: CompressedRistrettoString::from(a.rand)
         }
     }
@@ -148,13 +148,13 @@ impl TryFrom<SecretBoxString> for SecretBox{
     }
 }
 
-impl From<SecretBox> for SecretBoxString{
-    fn from(a: SecretBox) -> SecretBoxString{
+impl From<&SecretBox> for SecretBoxString{
+    fn from(a: &SecretBox) -> SecretBoxString{
         // to_bytes or as bytes ?
         SecretBoxString {
             nonce: a.nonce.as_bytes().to_vec(),
             tag: a.tag.to_vec(),
-            cipher: a.cipher
+            cipher: a.cipher.clone()
         }
     }
 }
@@ -171,8 +171,8 @@ impl TryFrom<RangeProofString> for RangeProof {
     }
 }
 
-impl From<RangeProof> for RangeProofString {
-    fn from(a: RangeProof) -> RangeProofString{
+impl From<&RangeProof> for RangeProofString {
+    fn from(a: &RangeProof) -> RangeProofString{
         RangeProofString{val: a.to_bytes()}
     }
 }
