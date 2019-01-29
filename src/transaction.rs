@@ -229,10 +229,10 @@ mod test {
 
         //Account A
         let mut acc_a = Account::new(&mut csprng);
-        acc_a.add_asset(&mut csprng, asset_id, false);
+        acc_a.add_asset(&mut csprng, asset_id, false, 50);
         //Account B
         let mut acc_b = Account::new(&mut csprng);
-        acc_b.add_asset(&mut csprng, asset_id, false);
+        acc_b.add_asset(&mut csprng, asset_id, false, 50);
 
         let new_tx = TxInfo {
             receiver_pk: acc_b.keys.public,
@@ -279,7 +279,7 @@ mod test {
 
         // source account setup
         let mut acc_src = Account::new(&mut csprng);
-        acc_src.add_asset(&mut csprng, asset_id, true);
+        acc_src.add_asset(&mut csprng, asset_id, true, 50);
         let mut src_asset_balance = acc_src.get_asset_balance(asset_id);
         src_asset_balance.balance = 10000;
         src_asset_balance.balance_commitment =
@@ -288,7 +288,7 @@ mod test {
 
         // destination account setup
         let mut acc_dst = Account::new(&mut csprng);
-        acc_dst.add_asset(&mut csprng, asset_id, true);
+        acc_dst.add_asset(&mut csprng, asset_id, true, 50);
         let dst_pk = acc_dst.get_public_key();
         let dst_asset_balance = acc_dst.get_asset_balance(asset_id);
 
@@ -296,7 +296,7 @@ mod test {
         do_transaction_validation(src_asset_balance, dst_asset_balance,dst_pk, transfer_amount, true);
 
         // accounts asset do not match
-        acc_dst.add_asset(&mut csprng, "other asset", true);
+        acc_dst.add_asset(&mut csprng, "other asset", true, 50);
 
         let dst_asset_balance = acc_dst.get_asset_balance("other asset");
         do_transaction_validation(src_asset_balance, dst_asset_balance,dst_pk, transfer_amount, false);
@@ -314,7 +314,7 @@ mod test {
         let pc_gens = PedersenGens::default();
 
         let mut acc_src = Account::new(&mut csprng);
-        acc_src.add_asset(&mut csprng, asset_id, false);
+        acc_src.add_asset(&mut csprng, asset_id, false, 50);
         let mut src_asset_balance = acc_src.get_asset_balance(asset_id);
         src_asset_balance.balance = 10000;
         src_asset_balance.balance_commitment =
@@ -324,7 +324,7 @@ mod test {
 
         // destination account setup
         let mut acc_dst = Account::new(&mut csprng);
-        acc_dst.add_asset(&mut csprng, asset_id, false);
+        acc_dst.add_asset(&mut csprng, asset_id, false, 50);
         let dst_pk = acc_dst.get_public_key();
         let dst_asset_balance = acc_dst.get_asset_balance(asset_id);
 

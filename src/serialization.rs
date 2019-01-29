@@ -329,17 +329,18 @@ mod test {
         let deserialized = serde_json::from_str::<CompressedRistrettoString>(&serialized).unwrap();
         let final_deserialized = CompressedRistretto::from(deserialized);
     }
+    #[test]
     pub fn test_account_to_json() {
-        let mut csprng: ChaChaRng;
-        csprng  = ChaChaRng::from_seed([0u8; 32]);
-        let mut acc_old = Account::new(&mut csprng);
+        let mut csprng1 = ChaChaRng::from_seed([0u8; 32]);
+        let mut csprng2 = ChaChaRng::from_seed([0u8; 32]);
+        let mut acc_old = Account::new(&mut csprng1);
         let asset_id = "default currency";
-        acc_old.add_asset(&mut csprng, asset_id, false);
-        acc_old.add_asset(&mut csprng, "another currency", true);
+        acc_old.add_asset(&mut csprng1, asset_id, false, 50);
+        acc_old.add_asset(&mut csprng1, "another currency", true, 50);
 
-        let mut acc = Account::new(&mut csprng);
-        acc.add_asset(&mut csprng, asset_id, false);
-        acc.add_asset(&mut csprng, "another currency", true);
+        let mut acc = Account::new(&mut csprng2);
+        acc.add_asset(&mut csprng2, asset_id, false, 50);
+        acc.add_asset(&mut csprng2, "another currency", true, 50);
 
         let acc_str = AccountString::from(acc_old);
 
