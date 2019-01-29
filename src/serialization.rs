@@ -93,20 +93,10 @@ impl From<&Account> for AccountString {
             let value = AssetBalanceString::from(v);
             balances.insert(k.to_string(),value);
         }
-        /*
-        let balances = a.balances.into_iter().map(
-          |(k,v)| {
-              (k, AssetBalance::from(v))
-          }).collect();
-          */
-
         AccountString{
             tx_counter: a.tx_counter,
             keys: KeypairString::from(&a.keys),
             balances,
-
-            //balances: a.balances.iter().map(
-            //    |(k, v)| {(k.clone(), AssetBalanceString::from(v))}).collect()
         }
     }
 }
