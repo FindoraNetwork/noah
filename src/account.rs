@@ -218,12 +218,10 @@ mod test {
         let asset_id = "example_asset";
         sender.add_asset(&mut csprng3, &asset_id, true, starting_bal);
         rec.add_asset(&mut csprng3, &asset_id, true, starting_bal);
-        let tx = TxInfo {
+        let tx = TxParams{
             receiver_pk: rec.keys.public,
             receiver_asset_commitment: rec.balances.get(asset_id).unwrap().asset_commitment,
             receiver_asset_opening: rec.balances.get(asset_id).unwrap().asset_blinding,
-            sender_asset_commitment: sender.balances.get(asset_id).unwrap().asset_commitment,
-            sender_asset_opening: sender.balances.get(asset_id).unwrap().asset_blinding,
             transfer_amount: 10,
         };
         let mut csprng4: ChaChaRng;

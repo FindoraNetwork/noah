@@ -231,12 +231,12 @@ mod test {
         let mut acc_b = Account::new(&mut csprng);
         acc_b.add_asset(&mut csprng, asset_id, false, 50);
 
-        let new_tx = TxInfo {
+        let new_tx = TxParams {
             receiver_pk: acc_b.keys.public,
             transfer_amount: 100u32,
             receiver_asset_opening: Scalar::from(0u8),
-            sender_asset_opening: Scalar::from(0u8),
-            sender_asset_commitment:acc_a.get_asset_balance(asset_id).asset_commitment,
+            // sender_asset_opening: Scalar::from(0u8),
+            // sender_asset_commitment:acc_a.get_asset_balance(asset_id).asset_commitment,
             receiver_asset_commitment:acc_b.get_asset_balance(asset_id).asset_commitment,
         };
 
@@ -336,12 +336,10 @@ mod test {
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
 
-        let new_tx = TxInfo {
+        let new_tx = TxParams {
             receiver_pk: dst_pk,
             transfer_amount: transfer_amount,
             receiver_asset_opening: dst_asset_balance.asset_blinding,
-            sender_asset_opening: src_asset_balance.asset_blinding,
-            sender_asset_commitment:src_asset_balance.asset_commitment,
             receiver_asset_commitment: src_asset_balance.asset_commitment,
         };
 
@@ -349,6 +347,8 @@ mod test {
                                        &new_tx,
                                        src_asset_balance.balance,
                                        src_asset_balance.balance_blinding,
+                                       src_asset_balance.balance_blinding,
+                                       src_asset_balance.asset_commitment,
                                        true).unwrap();
 
         let vrfy_ok = validator_verify(&tx,
