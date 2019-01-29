@@ -188,9 +188,6 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use serde::ser::Serialize;
-    use std::str;
-    use serde::private::ser::Error;
 
     #[test]
     pub fn test_account_creation() {

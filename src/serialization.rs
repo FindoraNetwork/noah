@@ -11,8 +11,6 @@ use schnorr::{Keypair,PublicKey};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AssetBalanceString{
     tx_counter: u128,
@@ -26,14 +24,14 @@ pub struct AssetBalanceString{
     asset_blinding: ScalarString
 }
 
-impl From<AssetBalance> for AssetBalanceString{
-    fn from(a: AssetBalance) -> AssetBalanceString{
+impl From<&AssetBalance> for AssetBalanceString{
+    fn from(a: &AssetBalance) -> AssetBalanceString{
         AssetBalanceString{
             tx_counter: a.tx_counter,
             balance: a.balance,
             balance_commitment: CompressedRistrettoString::from(a.balance_commitment),
             balance_blinding: ScalarString::from(a.balance_blinding),
-            asset_info: a.asset_info,
+            asset_info: Asset{ id: a.asset_info.id.to_string()},
             confidential_asset: a.confidential_asset,
             asset_commitment: CompressedRistrettoString::from(a.asset_commitment),
             asset_blinding: ScalarString::from(a.asset_blinding)
@@ -72,8 +70,8 @@ impl TryFrom<KeypairString> for Keypair {
     }
 }
 
-impl From<Keypair>  for KeypairString {
-    fn from(a: Keypair) -> KeypairString {
+impl From<&Keypair>  for KeypairString {
+    fn from(a: &Keypair) -> KeypairString {
         let bytes = a.to_bytes();
         KeypairString{val: hex::encode(&bytes[..])}
     }
@@ -86,13 +84,29 @@ pub struct AccountString {
     balances: HashMap<String, AssetBalanceString>
 
 }
-impl From<Account> for AccountString {
-    fn from(a: Account) -> AccountString {
+
+impl From<&Account> for AccountString {
+    fn from(a: &Account) -> AccountString {
+
+        let mut balances = HashMap::new();
+        for (k,v) in a.balances.iter(){
+            let value = AssetBalanceString::from(v);
+            balances.insert(k.to_string(),value);
+        }
+        /*
+        let balances = a.balances.into_iter().map(
+          |(k,v)| {
+              (k, AssetBalance::from(v))
+          }).collect();
+          */
+
         AccountString{
             tx_counter: a.tx_counter,
-            keys: KeypairString::from(a.keys),
-            balances: a.balances.into_iter().map(
-                |(k, v)| {(k, AssetBalanceString::from(v))}).collect()
+            keys: KeypairString::from(&a.keys),
+            balances,
+
+            //balances: a.balances.iter().map(
+            //    |(k, v)| {(k.clone(), AssetBalanceString::from(v))}).collect()
         }
     }
 }
@@ -101,15 +115,19 @@ impl TryFrom<AccountString> for Account {
     type Error = ZeiError;
     fn try_from(a: AccountString) -> Result<Account,ZeiError> {
         let keys = Keypair::try_from(a.keys)?;
+
+        let mut balances = HashMap::new();
+        for (k,v) in a.balances.into_iter(){
+            let value = AssetBalance::try_from(v)?;
+            balances.insert(k, value);
+        }
         Ok(Account{
             tx_counter: a.tx_counter,
             keys,
-            balances: a.balances.into_iter().map(
-                |(k, v)| {(k, AssetBalance::try_from(v).unwrap())}).collect()
+            balances,
         })
     }
 }
-
 
 // helper struct to save us from manually constructing json
 #[derive(Serialize, Deserialize, Debug)]
@@ -204,8 +222,6 @@ pub struct PublicKeyString {
     val: String
 }
 
-
-
 impl TryFrom<PublicKeyString> for PublicKey {
     type Error = ZeiError;
     fn try_from(a: PublicKeyString) -> Result<PublicKey, ZeiError> {
@@ -222,32 +238,6 @@ impl From<PublicKey> for PublicKeyString {
         PublicKeyString{val: hex::encode(a.to_bytes())}
     }
 }
-
-// // helper struct to save us from manually constructing json
-// #[derive(Serialize, Deserialize, Debug)]
-// pub struct TxInfoString {
-//     receiver_pk: PublicKeyString,
-//     receiver_asset_commitment: CompressedRistrettoString,
-//     receiver_asset_opening: ScalarString,
-//     sender_asset_commitment: CompressedRistrettoString,
-//     sender_asset_opening: ScalarString,
-//     transfer_amount: u32,
-// }
-
-// impl TryFrom<TxInfoString> for TxInfo {
-//     type Error = ZeiError;
-//     fn try_from(tx: TxInfoString) -> Result<TxInfo, ZeiError> {
-//         Ok(TxInfo{
-//             receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
-//             receiver_asset_commitment: CompressedRistretto::try_from(tx.receiver_asset_commitment)?,
-//             receiver_asset_opening: Scalar::try_from(tx.receiver_asset_opening)?,
-//             sender_asset_commitment: CompressedRistretto::try_from(tx.sender_asset_commitment)?,
-//             sender_asset_opening: Scalar::try_from(tx.sender_asset_opening)?,
-//             transfer_amount: tx.transfer_amount,
-//         }
-//         )
-//     }
-// }
 
 // helper struct to save us from manually constructing json
 #[derive(Serialize, Deserialize, Debug)]
@@ -367,16 +357,18 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use serde::ser::Serialize;
-    use std::str;
-    use serde::private::ser::Error;
     use curve25519_dalek::ristretto::CompressedRistretto;
+    use curve25519_dalek::ristretto::RistrettoPoint;
+
     #[test]
     pub fn serialization_compressed_ristretto(){
-        let id = CompressedRistrettoString::from(CompressedRistretto::default());
+        let mut csprng1 = ChaChaRng::from_seed([0u8; 32]);
+        let point = RistrettoPoint::random(&mut csprng1).compress();
+        let id = CompressedRistrettoString::from(point);
         let serialized = serde_json::to_string(&id).unwrap();
         let deserialized = serde_json::from_str::<CompressedRistrettoString>(&serialized).unwrap();
         let final_deserialized = CompressedRistretto::try_from(deserialized).unwrap();
+        assert_eq!(point,final_deserialized);
     }
     #[test]
     pub fn test_account_to_json() {
@@ -391,7 +383,7 @@ mod test {
         acc.add_asset(&mut csprng2, asset_id, false, 50);
         acc.add_asset(&mut csprng2, "another currency", true, 50);
 
-        let acc_str = AccountString::from(acc_old);
+        let acc_str = AccountString::from(&acc_old);
 
         let json = serde_json::to_string(&acc_str).unwrap();
 
@@ -419,14 +411,16 @@ mod test {
     }
     #[test]
     pub fn test_empty_account() {
-        // let mut acc = Account::new(&mut ChaChaRng::from_seed([0u8; 32]));
-        // let json = (&acc);
-        // let acc_deserialized = json_to_account(&json);
+        let acc = Account::new(&mut ChaChaRng::from_seed([0u8; 32]));
+        let acc_str = AccountString::from(&acc);
 
-        // let mut acc = Account::new(&mut ChaChaRng::from_seed([0u8; 32]));
-        // assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
-        // assert_eq!(acc_deserialized.keys.public, acc.keys.public);
-        // assert_eq!(acc_deserialized.keys.secret.to_bytes(), acc.keys.secret.to_bytes());
-        // assert_eq!(acc_deserialized.balances.len(), acc.balances.len());
+        let json = serde_json::to_string(&acc_str).unwrap();
+
+        let acc_deserialized = Account::try_from(serde_json::from_str::<AccountString>(&json).unwrap()).unwrap();
+
+        assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
+        assert_eq!(acc_deserialized.keys.public, acc.keys.public);
+        assert_eq!(acc_deserialized.keys.secret.to_bytes(), acc.keys.secret.to_bytes());
+        assert_eq!(acc_deserialized.balances.len(), acc.balances.len());
     }
 }
