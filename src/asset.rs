@@ -41,10 +41,8 @@ impl Asset {
                      commitment2: &RistrettoPoint,
                      proof: Scalar,
                      h: &RistrettoPoint) -> bool {
-        if commitment1 - commitment2 == h * proof {
-            return true;
-        }
-        false
+
+        (commitment1 - commitment2) == h * proof
     }
 }
 

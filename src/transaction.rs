@@ -289,7 +289,6 @@ mod test {
         let dst_pk = acc_dst.get_public_key();
         let dst_asset_balance = acc_dst.get_asset_balance(asset_id);
 
-
         do_transaction_validation(src_asset_balance, dst_asset_balance,dst_pk, transfer_amount, true);
 
         // accounts asset do not match
@@ -347,7 +346,7 @@ mod test {
                                        &new_tx,
                                        src_asset_balance.balance,
                                        src_asset_balance.balance_blinding,
-                                       src_asset_balance.balance_blinding,
+                                       src_asset_balance.asset_blinding,
                                        src_asset_balance.asset_commitment,
                                        true).unwrap();
 
