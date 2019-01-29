@@ -1,20 +1,15 @@
-use crate::account::Balance;
 use bulletproofs::{RangeProof};
+use crate::account::{AssetBalance,Account};
+use crate::errors::Error as ZeiError;
+use crate::asset::Asset;
+use crate::transaction::{TxInfo, Transaction};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
-use schnorr::Keypair;
-use crate::asset::Asset;
-use crate::account::AssetBalance;
-use crate::account::Account;
-use std::collections::HashMap;
-use serde_json::Value;
-use schnorr::PublicKey;
-use organism_utils::crypto::secretbox::SecretBox;
-use organism_utils::crypto::secretbox::NonceKey;
 use organism_utils::crypto::lockbox::Lockbox;
-
-use crate::transaction::TxInfo;
-use crate::transaction::Transaction;
+use organism_utils::crypto::secretbox::{SecretBox, NonceKey};
+use schnorr::{Keypair,PublicKey};
+use std::collections::HashMap;
+use std::convert::TryFrom;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AssetBalanceString{
@@ -44,18 +39,19 @@ impl From<AssetBalance> for AssetBalanceString{
     }
 }
 
-impl From<AssetBalanceString> for AssetBalance{
-    fn from(a: AssetBalanceString) -> AssetBalance {
-        AssetBalance{
+impl TryFrom<AssetBalanceString> for AssetBalance{
+    type Error = ZeiError;
+    fn try_from(a: AssetBalanceString) -> Result<AssetBalance, ZeiError> {
+        Ok(AssetBalance{
             tx_counter: a.tx_counter,
             balance: a.balance,
-            balance_commitment: CompressedRistretto::from(a.balance_commitment),
-            balance_blinding: Scalar::from(a.balance_blinding),
+            balance_commitment: CompressedRistretto::try_from(a.balance_commitment)?,
+            balance_blinding: Scalar::try_from(a.balance_blinding)?,
             asset_info: a.asset_info,
             confidential_asset: a.confidential_asset,
-            asset_commitment: CompressedRistretto::from(a.asset_commitment),
-            asset_blinding: Scalar::from(a.asset_blinding)
-        }
+            asset_commitment: CompressedRistretto::try_from(a.asset_commitment)?,
+            asset_blinding: Scalar::try_from(a.asset_blinding)?
+        })
     }
 }
 
@@ -64,11 +60,13 @@ pub struct KeypairString {
     val: String
 }
 
-impl From<KeypairString> for Keypair {
-    fn from(a: KeypairString) -> Keypair {
-        let vector = hex::decode(&a.val).unwrap();
+impl TryFrom<KeypairString> for Keypair {
+    type Error = ZeiError;
+    fn try_from(value: KeypairString) -> Result<Keypair, ZeiError> {
+        let vector = hex::decode(&value.val)?;
         let bytes = vector.as_slice();
-        Keypair::from_bytes(bytes).unwrap()
+        let keypair = Keypair::from_bytes(bytes)?;
+        Ok(keypair)
     }
 }
 
@@ -97,14 +95,16 @@ impl From<Account> for AccountString {
     }
 }
 
-impl From<AccountString> for Account {
-    fn from(a: AccountString) -> Account {
-        Account{
+impl TryFrom<AccountString> for Account {
+    type Error = ZeiError;
+    fn try_from(a: AccountString) -> Result<Account,ZeiError> {
+        let keys = Keypair::try_from(a.keys)?;
+        Ok(Account{
             tx_counter: a.tx_counter,
-            keys: Keypair::from(a.keys),
+            keys,
             balances: a.balances.into_iter().map(
-                |(k, v)| {(k, AssetBalance::from(v))}).collect()
-        }
+                |(k, v)| {(k, AssetBalance::try_from(v).unwrap())}).collect()
+        })
     }
 }
 
@@ -137,18 +137,19 @@ impl From<Transaction> for TransactionString {
     }
 }
 
-impl From<TransactionString> for Transaction{
-    fn from(a: TransactionString) -> Transaction {
-        Transaction{
-            transaction_range_proof: RangeProof::from(a.transaction_range_proof),
-            transaction_commitment: CompressedRistretto::from(a.transaction_commitment),
-            sender_updated_balance_commitment: CompressedRistretto::from(a.sender_updated_balance_commitment),
-            lockbox: Lockbox::from(a.lockbox),
+impl TryFrom<TransactionString> for Transaction{
+    type Error = ZeiError;
+    fn try_from(a: TransactionString) -> Result<Transaction, ZeiError> {
+        Ok(Transaction{
+            transaction_range_proof: RangeProof::try_from(a.transaction_range_proof)?,
+            transaction_commitment: CompressedRistretto::try_from(a.transaction_commitment)?,
+            sender_updated_balance_commitment: CompressedRistretto::try_from(a.sender_updated_balance_commitment)?,
+            lockbox: Lockbox::try_from(a.lockbox)?,
             do_confidential_asset: a.do_confidential_asset,
-            asset_eq_proof: Scalar::from(a.asset_eq_proof),
-            sender_asset_commitment: CompressedRistretto::from(a.sender_asset_commitment),
-            receiver_asset_commitment: CompressedRistretto::from(a.receiver_asset_commitment),
-        }
+            asset_eq_proof: Scalar::try_from(a.asset_eq_proof)?,
+            sender_asset_commitment: CompressedRistretto::try_from(a.sender_asset_commitment)?,
+            receiver_asset_commitment: CompressedRistretto::try_from(a.receiver_asset_commitment)?,
+        })
     }
 }
 
@@ -163,11 +164,12 @@ impl From<CompressedRistretto> for CompressedRistrettoString {
     }
 }
 
-impl From<CompressedRistrettoString> for CompressedRistretto {
-    fn from(hex_str: CompressedRistrettoString) -> CompressedRistretto{
-        let vector = hex::decode(hex_str.val).unwrap();
+impl TryFrom<CompressedRistrettoString> for CompressedRistretto {
+    type Error = ZeiError;
+    fn try_from(hex_str: CompressedRistrettoString) -> Result<CompressedRistretto, ZeiError>{
+        let vector = hex::decode(hex_str.val)?;
         let bytes = vector.as_slice();
-        CompressedRistretto::from_slice(bytes)
+        Ok(CompressedRistretto::from_slice(bytes))
     }
 }
 
@@ -184,13 +186,14 @@ impl From<Scalar> for ScalarString {
     }
 }
 
-impl From<ScalarString> for Scalar {
-    fn from(scalar: ScalarString) -> Scalar {
-        let vector = hex::decode(&scalar.val).unwrap();
+impl TryFrom<ScalarString> for Scalar {
+    type Error = ZeiError;
+    fn try_from(scalar: ScalarString) -> Result<Scalar, ZeiError> {
+        let vector = hex::decode(&scalar.val)?;
         let bytes = vector.as_slice();
         let mut array = [0u8; 32];
         array.copy_from_slice(bytes);
-        Scalar::from_bits(array)
+        Ok(Scalar::from_bits(array))
     }
 }
 
@@ -201,13 +204,14 @@ pub struct PublicKeyString {
 
 
 
-impl From<PublicKeyString> for PublicKey {
-    fn from(a: PublicKeyString) -> PublicKey {
-        let vector = hex::decode(&a.val).unwrap();
+impl TryFrom<PublicKeyString> for PublicKey {
+    type Error = ZeiError;
+    fn try_from(a: PublicKeyString) -> Result<PublicKey, ZeiError> {
+        let vector = hex::decode(&a.val)?;
         let bytes = vector.as_slice();
         let mut array = [0u8; 32];
         array.copy_from_slice(bytes);
-        PublicKey::from_bytes(&array).unwrap()
+        Ok(PublicKey::from_bytes(&array)?)
     }
 }
 
@@ -228,16 +232,18 @@ pub struct TxInfoString {
     transfer_amount: u32,
 }
 
-impl From<TxInfoString> for TxInfo {
-    fn from(tx: TxInfoString) -> TxInfo {
-        TxInfo{
-            receiver_pk: PublicKey::from(tx.receiver_pk),
-            receiver_asset_commitment: CompressedRistretto::from(tx.receiver_asset_commitment),
-            receiver_asset_opening: Scalar::from(tx.receiver_asset_opening),
-            sender_asset_commitment: CompressedRistretto::from(tx.sender_asset_commitment),
-            sender_asset_opening: Scalar::from(tx.sender_asset_opening),
+impl TryFrom<TxInfoString> for TxInfo {
+    type Error = ZeiError;
+    fn try_from(tx: TxInfoString) -> Result<TxInfo, ZeiError> {
+        Ok(TxInfo{
+            receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
+            receiver_asset_commitment: CompressedRistretto::try_from(tx.receiver_asset_commitment)?,
+            receiver_asset_opening: Scalar::try_from(tx.receiver_asset_opening)?,
+            sender_asset_commitment: CompressedRistretto::try_from(tx.sender_asset_commitment)?,
+            sender_asset_opening: Scalar::try_from(tx.sender_asset_opening)?,
             transfer_amount: tx.transfer_amount,
         }
+        )
     }
 }
 
@@ -247,12 +253,13 @@ pub struct LockboxString{
     rand: CompressedRistrettoString
 }
 
-impl From<LockboxString> for Lockbox {
-    fn from(a: LockboxString) -> Lockbox{
-        Lockbox {
-            data: SecretBox::from(a.data),
-            rand: CompressedRistretto::from(a.rand)
-        }
+impl TryFrom<LockboxString> for Lockbox {
+    type Error = ZeiError;
+    fn try_from(a: LockboxString) -> Result<Lockbox, ZeiError>{
+        Ok(Lockbox {
+            data: SecretBox::try_from(a.data)?,
+            rand: CompressedRistretto::try_from(a.rand)?,
+        })
 
     }
 }
@@ -270,18 +277,19 @@ impl From<Lockbox> for LockboxString {
 pub struct SecretBoxString{
     nonce: Vec<u8>,
     tag: Vec<u8>,
-    cipher: Vec<u8>
+    cipher: Vec<u8>,
 }
 
-impl From<SecretBoxString> for SecretBox{
-    fn from(a: SecretBoxString) -> SecretBox{
+impl TryFrom<SecretBoxString> for SecretBox{
+    type Error = ZeiError;
+    fn try_from(a: SecretBoxString) -> Result<SecretBox,ZeiError>{
         let mut array = [0u8; 16];
         array.copy_from_slice(a.tag.as_slice());
-        SecretBox{
-            nonce: NonceKey::from_bytes(a.nonce.as_slice()).unwrap(),
+        Ok(SecretBox{
+            nonce: NonceKey::from_bytes(a.nonce.as_slice())?,
             tag: array,
             cipher: a.cipher
-        }
+        })
     }
 }
 
@@ -301,9 +309,10 @@ pub struct RangeProofString{
     val: Vec<u8>
 }
 
-impl From<RangeProofString> for RangeProof {
-    fn from(a: RangeProofString) -> RangeProof{
-        RangeProof::from_bytes(&a.val).unwrap()
+impl TryFrom<RangeProofString> for RangeProof {
+    type Error = ZeiError;
+    fn try_from(a: RangeProofString) -> Result<RangeProof, ZeiError>{
+        Ok(RangeProof::from_bytes(&a.val)?)
     }
 }
 
@@ -327,7 +336,7 @@ mod test {
         let id = CompressedRistrettoString::from(CompressedRistretto::default());
         let serialized = serde_json::to_string(&id).unwrap();
         let deserialized = serde_json::from_str::<CompressedRistrettoString>(&serialized).unwrap();
-        let final_deserialized = CompressedRistretto::from(deserialized);
+        let final_deserialized = CompressedRistretto::try_from(deserialized).unwrap();
     }
     pub fn test_account_to_json() {
         let mut csprng: ChaChaRng;
@@ -345,7 +354,7 @@ mod test {
 
         let json = serde_json::to_string(&acc_str).unwrap();
 
-        let acc_deserialized = Account::from(serde_json::from_str::<AccountString>(&json).unwrap());
+        let acc_deserialized = Account::try_from(serde_json::from_str::<AccountString>(&json).unwrap()).unwrap();
 
         assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
         assert_eq!(acc_deserialized.keys.public, acc.keys.public);
