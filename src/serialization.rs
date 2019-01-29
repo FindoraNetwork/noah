@@ -1,60 +1,15 @@
 use bulletproofs::{RangeProof};
-use crate::account::{AssetBalance,Account};
 use crate::errors::Error as ZeiError;
-use crate::asset::Asset;
-use crate::transaction::{TxParams, Transaction};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use organism_utils::crypto::lockbox::Lockbox;
 use organism_utils::crypto::secretbox::{SecretBox, NonceKey};
 use schnorr::{Keypair,PublicKey};
-use std::collections::HashMap;
 use std::convert::TryFrom;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AssetBalanceString{
-    tx_counter: u128,
-    balance: u32,
-    balance_commitment: CompressedRistrettoString,
-    balance_blinding: ScalarString,
-    // TODO
-    asset_info: Asset,
-    confidential_asset: bool,
-    asset_commitment: CompressedRistrettoString,
-    asset_blinding: ScalarString
-}
 
-impl From<&AssetBalance> for AssetBalanceString{
-    fn from(a: &AssetBalance) -> AssetBalanceString{
-        AssetBalanceString{
-            tx_counter: a.tx_counter,
-            balance: a.balance,
-            balance_commitment: CompressedRistrettoString::from(a.balance_commitment),
-            balance_blinding: ScalarString::from(a.balance_blinding),
-            asset_info: Asset{ id: a.asset_info.id.to_string()},
-            confidential_asset: a.confidential_asset,
-            asset_commitment: CompressedRistrettoString::from(a.asset_commitment),
-            asset_blinding: ScalarString::from(a.asset_blinding)
-        }
-    }
-}
-
-impl TryFrom<AssetBalanceString> for AssetBalance{
-    type Error = ZeiError;
-    fn try_from(a: AssetBalanceString) -> Result<AssetBalance, ZeiError> {
-        Ok(AssetBalance{
-            tx_counter: a.tx_counter,
-            balance: a.balance,
-            balance_commitment: CompressedRistretto::try_from(a.balance_commitment)?,
-            balance_blinding: Scalar::try_from(a.balance_blinding)?,
-            asset_info: a.asset_info,
-            confidential_asset: a.confidential_asset,
-            asset_commitment: CompressedRistretto::try_from(a.asset_commitment)?,
-            asset_blinding: Scalar::try_from(a.asset_blinding)?
-        })
-    }
-}
-
+//serialization of external structures KeyPair, PublicKey, CompressedRistretto, Scalar,
+// SecretBox, RangeProofs
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KeypairString {
     val: String
@@ -77,91 +32,7 @@ impl From<&Keypair>  for KeypairString {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AccountString {
-    tx_counter: u128,
-    keys: KeypairString,
-    balances: HashMap<String, AssetBalanceString>
 
-}
-
-impl From<&Account> for AccountString {
-    fn from(a: &Account) -> AccountString {
-
-        let mut balances = HashMap::new();
-        for (k,v) in a.balances.iter(){
-            let value = AssetBalanceString::from(v);
-            balances.insert(k.to_string(),value);
-        }
-        AccountString{
-            tx_counter: a.tx_counter,
-            keys: KeypairString::from(&a.keys),
-            balances,
-        }
-    }
-}
-
-impl TryFrom<AccountString> for Account {
-    type Error = ZeiError;
-    fn try_from(a: AccountString) -> Result<Account,ZeiError> {
-        let keys = Keypair::try_from(a.keys)?;
-
-        let mut balances = HashMap::new();
-        for (k,v) in a.balances.into_iter(){
-            let value = AssetBalance::try_from(v)?;
-            balances.insert(k, value);
-        }
-        Ok(Account{
-            tx_counter: a.tx_counter,
-            keys,
-            balances,
-        })
-    }
-}
-
-// helper struct to save us from manually constructing json
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TransactionString{
-    transaction_range_proof: RangeProofString,
-    transaction_commitment: CompressedRistrettoString,
-    sender_updated_balance_commitment: CompressedRistrettoString,
-    lockbox: LockboxString,
-    do_confidential_asset: bool,
-    asset_eq_proof: ScalarString,
-    sender_asset_commitment: CompressedRistrettoString,
-    receiver_asset_commitment: CompressedRistrettoString,
-}
-
-impl From<Transaction> for TransactionString {
-    fn from(a: Transaction) -> TransactionString{
-        TransactionString{
-            transaction_range_proof: RangeProofString::from(a.transaction_range_proof),
-            transaction_commitment: CompressedRistrettoString::from(a.transaction_commitment),
-            sender_updated_balance_commitment: CompressedRistrettoString::from(a.sender_updated_balance_commitment),
-            lockbox: LockboxString::from(a.lockbox),
-            do_confidential_asset: a.do_confidential_asset,
-            asset_eq_proof: ScalarString::from(a.asset_eq_proof),
-            sender_asset_commitment: CompressedRistrettoString::from(a.sender_asset_commitment),
-            receiver_asset_commitment: CompressedRistrettoString::from(a.receiver_asset_commitment),
-        }
-    }
-}
-
-impl TryFrom<TransactionString> for Transaction{
-    type Error = ZeiError;
-    fn try_from(a: TransactionString) -> Result<Transaction, ZeiError> {
-        Ok(Transaction{
-            transaction_range_proof: RangeProof::try_from(a.transaction_range_proof)?,
-            transaction_commitment: CompressedRistretto::try_from(a.transaction_commitment)?,
-            sender_updated_balance_commitment: CompressedRistretto::try_from(a.sender_updated_balance_commitment)?,
-            lockbox: Lockbox::try_from(a.lockbox)?,
-            do_confidential_asset: a.do_confidential_asset,
-            asset_eq_proof: Scalar::try_from(a.asset_eq_proof)?,
-            sender_asset_commitment: CompressedRistretto::try_from(a.sender_asset_commitment)?,
-            receiver_asset_commitment: CompressedRistretto::try_from(a.receiver_asset_commitment)?,
-        })
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CompressedRistrettoString {
@@ -229,43 +100,7 @@ impl From<PublicKey> for PublicKeyString {
     }
 }
 
-// helper struct to save us from manually constructing json
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TxParamsString{
-    receiver_pk: PublicKeyString,
-    receiver_asset_commitment: CompressedRistrettoString,
-    receiver_asset_opening: ScalarString,
-    // sender_asset_commitment: CompressedRistrettoString,
-    // sender_asset_opening: ScalarString,
-    transfer_amount: u32,
-}
 
-impl TryFrom<TxParamsString> for TxParams{
-    type Error = ZeiError;
-    fn try_from(tx: TxParamsString) -> Result<TxParams, ZeiError> {
-        Ok(
-            TxParams{
-                receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
-                receiver_asset_commitment: CompressedRistretto::try_from(tx.receiver_asset_commitment)?,
-                receiver_asset_opening: Scalar::try_from(tx.receiver_asset_opening)?,
-                // sender_asset_commitment: CompressedRistretto::from(tx.sender_asset_commitment),
-                // sender_asset_opening: Scalar::from(tx.sender_asset_opening),
-                transfer_amount: tx.transfer_amount,
-            }
-        )
-    }
-}
-
-impl From<TxParams> for TxParamsString{
-    fn from(tx: TxParams) -> TxParamsString {
-        TxParamsString{
-            receiver_pk: PublicKeyString::from(tx.receiver_pk),
-            receiver_asset_commitment: CompressedRistrettoString::from(tx.receiver_asset_commitment),
-            receiver_asset_opening: ScalarString::from(tx.receiver_asset_opening),
-            transfer_amount: tx.transfer_amount,
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LockboxString{
@@ -349,6 +184,8 @@ mod test {
     use rand::SeedableRng;
     use curve25519_dalek::ristretto::CompressedRistretto;
     use curve25519_dalek::ristretto::RistrettoPoint;
+    use crate::account::AccountString;
+    use crate::account::Account;
 
     #[test]
     pub fn serialization_compressed_ristretto(){

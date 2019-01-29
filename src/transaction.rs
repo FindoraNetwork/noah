@@ -12,6 +12,12 @@ use schnorr::SecretKey;
 use crate::errors::Error as ZeiError;
 use crate::asset::Asset;
 use bulletproofs::PedersenGens;
+use crate::serialization::RangeProofString;
+use crate::serialization::CompressedRistrettoString;
+use crate::serialization::LockboxString;
+use crate::serialization::ScalarString;
+use std::convert::TryFrom;
+use crate::serialization::PublicKeyString;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -47,6 +53,42 @@ pub struct TxParams{
     pub receiver_asset_opening: Scalar,
     pub transfer_amount: u32,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TxParamsString{
+    receiver_pk: PublicKeyString,
+    receiver_asset_commitment: CompressedRistrettoString,
+    receiver_asset_opening: ScalarString,
+    transfer_amount: u32,
+}
+
+impl TryFrom<TxParamsString> for TxParams{
+    type Error = ZeiError;
+    fn try_from(tx: TxParamsString) -> Result<TxParams, ZeiError> {
+        Ok(
+            TxParams{
+                receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
+                receiver_asset_commitment: CompressedRistretto::try_from(tx.receiver_asset_commitment)?,
+                receiver_asset_opening: Scalar::try_from(tx.receiver_asset_opening)?,
+                // sender_asset_commitment: CompressedRistretto::from(tx.sender_asset_commitment),
+                // sender_asset_opening: Scalar::from(tx.sender_asset_opening),
+                transfer_amount: tx.transfer_amount,
+            }
+        )
+    }
+}
+
+impl From<TxParams> for TxParamsString{
+    fn from(tx: TxParams) -> TxParamsString {
+        TxParamsString{
+            receiver_pk: PublicKeyString::from(tx.receiver_pk),
+            receiver_asset_commitment: CompressedRistrettoString::from(tx.receiver_asset_commitment),
+            receiver_asset_opening: ScalarString::from(tx.receiver_asset_opening),
+            transfer_amount: tx.transfer_amount,
+        }
+    }
+}
+
 
 impl Transaction {
     pub fn new<R>(csprng: &mut R,
@@ -203,6 +245,50 @@ pub fn receiver_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPo
     new_commit == updated_commitment
 }
 
+
+//serialization of transaction strucures
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TransactionString{
+    transaction_range_proof: RangeProofString,
+    transaction_commitment: CompressedRistrettoString,
+    sender_updated_balance_commitment: CompressedRistrettoString,
+    lockbox: LockboxString,
+    do_confidential_asset: bool,
+    asset_eq_proof: ScalarString,
+    sender_asset_commitment: CompressedRistrettoString,
+    receiver_asset_commitment: CompressedRistrettoString,
+}
+
+impl From<Transaction> for TransactionString {
+    fn from(a: Transaction) -> TransactionString{
+        TransactionString{
+            transaction_range_proof: RangeProofString::from(a.transaction_range_proof),
+            transaction_commitment: CompressedRistrettoString::from(a.transaction_commitment),
+            sender_updated_balance_commitment: CompressedRistrettoString::from(a.sender_updated_balance_commitment),
+            lockbox: LockboxString::from(a.lockbox),
+            do_confidential_asset: a.do_confidential_asset,
+            asset_eq_proof: ScalarString::from(a.asset_eq_proof),
+            sender_asset_commitment: CompressedRistrettoString::from(a.sender_asset_commitment),
+            receiver_asset_commitment: CompressedRistrettoString::from(a.receiver_asset_commitment),
+        }
+    }
+}
+
+impl TryFrom<TransactionString> for Transaction{
+    type Error = ZeiError;
+    fn try_from(a: TransactionString) -> Result<Transaction, ZeiError> {
+        Ok(Transaction{
+            transaction_range_proof: RangeProof::try_from(a.transaction_range_proof)?,
+            transaction_commitment: CompressedRistretto::try_from(a.transaction_commitment)?,
+            sender_updated_balance_commitment: CompressedRistretto::try_from(a.sender_updated_balance_commitment)?,
+            lockbox: Lockbox::try_from(a.lockbox)?,
+            do_confidential_asset: a.do_confidential_asset,
+            asset_eq_proof: Scalar::try_from(a.asset_eq_proof)?,
+            sender_asset_commitment: CompressedRistretto::try_from(a.sender_asset_commitment)?,
+            receiver_asset_commitment: CompressedRistretto::try_from(a.receiver_asset_commitment)?,
+        })
+    }
+}
 
 #[cfg(test)]
 mod test {
