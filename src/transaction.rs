@@ -36,9 +36,8 @@ pub struct Transaction {
     pub receiver_asset_commitment: CompressedRistretto,
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
-pub struct TxInfo {
+pub struct TxParams{
     /*
      * I am helper structure to send/receive the data for a transaction
      *
@@ -46,20 +45,18 @@ pub struct TxInfo {
     pub receiver_pk: PublicKey,
     pub receiver_asset_commitment: CompressedRistretto,
     pub receiver_asset_opening: Scalar,
-    pub sender_asset_commitment: CompressedRistretto,
-    pub sender_asset_opening: Scalar,
     pub transfer_amount: u32,
 }
 
-
 impl Transaction {
-    
     pub fn new<R>(csprng: &mut R,
-                  tx_info: &TxInfo,
+                  tx_params: &TxParams,
                   account_balance: u32,
                   account_blind: Scalar,
+                  sender_asset_opening: Scalar,
+                  sender_asset_commitment: CompressedRistretto,
                   do_confidential_asset: bool) -> Result<(Transaction, Scalar), ZeiError>
-        where R: CryptoRng + Rng, 
+    where R: CryptoRng + Rng,
     {
         /*
          * I create a new transaction. 
@@ -75,7 +72,7 @@ impl Transaction {
 
         let mut params = PublicParams::new();
         let blinding_t = Scalar::random(csprng);
-        let tx_amount = tx_info.transfer_amount;
+        let tx_amount = tx_params.transfer_amount;
         let sender_updated_balance = account_balance - tx_amount;
         let sender_updated_account_blind = account_blind - blinding_t;
 
@@ -96,14 +93,14 @@ impl Transaction {
 
         asset_eq_proof = Scalar::from(0u8);
         if do_confidential_asset {
-            asset_eq_proof = Asset::prove_eq(tx_info.receiver_asset_opening,
-                                    tx_info.sender_asset_opening);
+            asset_eq_proof = Asset::prove_eq(tx_params.receiver_asset_opening,
+                                    sender_asset_opening);
         }
 
         let mut to_encrypt = Vec::new();
         to_encrypt.extend_from_slice(&be_u8_from_u32(tx_amount));
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
-        let lbox = Lockbox::lock(csprng, &tx_info.receiver_pk, &to_encrypt);
+        let lbox = Lockbox::lock(csprng, &tx_params.receiver_pk, &to_encrypt);
 
         let tx = Transaction {
             transaction_range_proof: proof_agg,
@@ -112,8 +109,8 @@ impl Transaction {
             lockbox: lbox,
             do_confidential_asset,
             asset_eq_proof,
-            sender_asset_commitment: tx_info.sender_asset_commitment,
-            receiver_asset_commitment: tx_info.receiver_asset_commitment,
+            sender_asset_commitment: sender_asset_commitment,
+            receiver_asset_commitment: tx_params.receiver_asset_commitment,
         };
 
        Ok((tx, sender_updated_account_blind))

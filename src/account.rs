@@ -1,7 +1,7 @@
 //Hidden Accounts
 
 use curve25519_dalek::scalar::Scalar;
-use crate::transaction::{TxInfo, Transaction};
+use crate::transaction::{TxParams, Transaction};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use crate::setup::PublicParams;
 use schnorr::{Keypair, PublicKey, Signature};
@@ -111,9 +111,9 @@ impl Account {
         address::enc(&self.keys.public)
     }
 
-    pub fn send<R>(&mut self, csprng: &mut R, tx_info: &TxInfo, asset_id: &str)
-        -> Result<Transaction, ZeiError>
-        where R: CryptoRng + Rng,
+    pub fn send<R>(&mut self, csprng: &mut R, tx_params: &TxParams, asset_id: &str)
+                   -> Result<Transaction, ZeiError>
+    where R: CryptoRng + Rng,
     {
         /*! I create and send a transaction from this account. Transactions can hide the asset id
          *  if @do_confidential_asset is set to true.
@@ -122,16 +122,19 @@ impl Account {
          */
 
         let mut asset_balance = self.balances.get_mut(asset_id).unwrap();
-        if tx_info.transfer_amount > asset_balance.balance {
+        if tx_params.transfer_amount > asset_balance.balance {
             return Err(ZeiError::NotEnoughFunds);
         }
 
-        asset_balance.balance -= tx_info.transfer_amount;
-        let (newtx, updated_blind) = Transaction::new(csprng,
-                                                      &tx_info,
-                                                      asset_balance.balance,
-                                                      asset_balance.balance_blinding,
-                                                      asset_balance.confidential_asset).unwrap();
+        asset_balance.balance -= tx_params.transfer_amount;
+        let (newtx, updated_blind) = Transaction::new(
+            csprng,
+            &tx_params,
+            asset_balance.balance,
+            asset_balance.balance_blinding,
+            asset_balance.asset_blinding,
+            asset_balance.asset_commitment,
+            asset_balance.confidential_asset).unwrap();
 
         asset_balance.balance_blinding = updated_blind;
         asset_balance.balance_commitment = newtx.sender_updated_balance_commitment;

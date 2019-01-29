@@ -2,7 +2,7 @@ use bulletproofs::{RangeProof};
 use crate::account::{AssetBalance,Account};
 use crate::errors::Error as ZeiError;
 use crate::asset::Asset;
-use crate::transaction::{TxInfo, Transaction};
+use crate::transaction::{TxParams, Transaction};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use organism_utils::crypto::lockbox::Lockbox;
@@ -223,29 +223,67 @@ impl From<PublicKey> for PublicKeyString {
     }
 }
 
+// // helper struct to save us from manually constructing json
+// #[derive(Serialize, Deserialize, Debug)]
+// pub struct TxInfoString {
+//     receiver_pk: PublicKeyString,
+//     receiver_asset_commitment: CompressedRistrettoString,
+//     receiver_asset_opening: ScalarString,
+//     sender_asset_commitment: CompressedRistrettoString,
+//     sender_asset_opening: ScalarString,
+//     transfer_amount: u32,
+// }
+
+// impl TryFrom<TxInfoString> for TxInfo {
+//     type Error = ZeiError;
+//     fn try_from(tx: TxInfoString) -> Result<TxInfo, ZeiError> {
+//         Ok(TxInfo{
+//             receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
+//             receiver_asset_commitment: CompressedRistretto::try_from(tx.receiver_asset_commitment)?,
+//             receiver_asset_opening: Scalar::try_from(tx.receiver_asset_opening)?,
+//             sender_asset_commitment: CompressedRistretto::try_from(tx.sender_asset_commitment)?,
+//             sender_asset_opening: Scalar::try_from(tx.sender_asset_opening)?,
+//             transfer_amount: tx.transfer_amount,
+//         }
+//         )
+//     }
+// }
+
 // helper struct to save us from manually constructing json
 #[derive(Serialize, Deserialize, Debug)]
-pub struct TxInfoString {
+pub struct TxParamsString{
     receiver_pk: PublicKeyString,
     receiver_asset_commitment: CompressedRistrettoString,
     receiver_asset_opening: ScalarString,
-    sender_asset_commitment: CompressedRistrettoString,
-    sender_asset_opening: ScalarString,
+    // sender_asset_commitment: CompressedRistrettoString,
+    // sender_asset_opening: ScalarString,
     transfer_amount: u32,
 }
 
-impl TryFrom<TxInfoString> for TxInfo {
+impl TryFrom<TxParamsString> for TxParams{
     type Error = ZeiError;
-    fn try_from(tx: TxInfoString) -> Result<TxInfo, ZeiError> {
-        Ok(TxInfo{
-            receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
-            receiver_asset_commitment: CompressedRistretto::try_from(tx.receiver_asset_commitment)?,
-            receiver_asset_opening: Scalar::try_from(tx.receiver_asset_opening)?,
-            sender_asset_commitment: CompressedRistretto::try_from(tx.sender_asset_commitment)?,
-            sender_asset_opening: Scalar::try_from(tx.sender_asset_opening)?,
+    fn try_from(tx: TxParamsString) -> Result<TxParams, ZeiError> {
+        Ok(
+            TxParams{
+                receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
+                receiver_asset_commitment: CompressedRistretto::try_from(tx.receiver_asset_commitment)?,
+                receiver_asset_opening: Scalar::try_from(tx.receiver_asset_opening)?,
+                // sender_asset_commitment: CompressedRistretto::from(tx.sender_asset_commitment),
+                // sender_asset_opening: Scalar::from(tx.sender_asset_opening),
+                transfer_amount: tx.transfer_amount,
+            }
+        )
+    }
+}
+
+impl From<TxParams> for TxParamsString{
+    fn from(tx: TxParams) -> TxParamsString {
+        TxParamsString{
+            receiver_pk: PublicKeyString::from(tx.receiver_pk),
+            receiver_asset_commitment: CompressedRistrettoString::from(tx.receiver_asset_commitment),
+            receiver_asset_opening: ScalarString::from(tx.receiver_asset_opening),
             transfer_amount: tx.transfer_amount,
         }
-        )
     }
 }
 
