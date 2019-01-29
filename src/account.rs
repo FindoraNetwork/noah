@@ -212,7 +212,7 @@ mod test {
         let mut rec = Account::new(&mut csprng2);
         let mut csprng3: ChaChaRng;
         csprng3 = ChaChaRng::from_seed([0u8; 32]);
-        let asset_id = "exampel_asset";
+        let asset_id = "example_asset";
         sender.add_asset(&mut csprng3, &asset_id, true, starting_bal);
         rec.add_asset(&mut csprng3, &asset_id, true, starting_bal);
         let tx = TxInfo {
