@@ -53,7 +53,7 @@ impl Account {
         }
     }
 
-    pub fn add_asset<R>(&mut self, csprng: &mut R, asset_id: &str, confidential_asset: bool)
+    pub fn add_asset<R>(&mut self, csprng: &mut R, asset_id: &str, confidential_asset: bool, starting_bal: u32)
         where R: CryptoRng + Rng,
     {
         /*!I add an asset with 0 balance to this account
@@ -61,7 +61,7 @@ impl Account {
          */
         let asset_info = Asset::new(asset_id);
         let pp = PublicParams::new();
-        let balance: u32 = 50;
+        let balance: u32 = starting_bal;
         let balance_blinding = Scalar::from(0u32);
         let value = Scalar::from(balance);
         let asset_commitment: RistrettoPoint;
@@ -195,13 +195,15 @@ mod test {
         csprng  = ChaChaRng::from_seed([0u8; 32]);
         let mut acc = Account::new(&mut csprng);
         let asset_id = "default currency";
-        acc.add_asset(&mut csprng, asset_id, false);
+        let starting_bal = 50;
+        acc.add_asset(&mut csprng, asset_id, false, 50);
         assert_eq!(acc.tx_counter, 0);
-        assert_eq!(acc.get_balance(asset_id),0);
+        assert_eq!(acc.get_balance(asset_id),starting_bal);
     }
 
     #[test]
     pub fn test_account_interactions() {
+        let starting_bal = 50;
         let mut csprng1: ChaChaRng;
         csprng1 = ChaChaRng::from_seed([0u8; 32]);
         let mut csprng2: ChaChaRng;
@@ -211,8 +213,8 @@ mod test {
         let mut csprng3: ChaChaRng;
         csprng3 = ChaChaRng::from_seed([0u8; 32]);
         let asset_id = "exampel_asset";
-        sender.add_asset(&mut csprng3, &asset_id, true);
-        rec.add_asset(&mut csprng3, &asset_id, true);
+        sender.add_asset(&mut csprng3, &asset_id, true, starting_bal);
+        rec.add_asset(&mut csprng3, &asset_id, true, starting_bal);
         let tx = TxInfo {
             receiver_pk: rec.keys.public,
             receiver_asset_commitment: rec.balances.get(asset_id).unwrap().asset_commitment,
