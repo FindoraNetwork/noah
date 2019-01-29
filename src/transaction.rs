@@ -1,23 +1,20 @@
+use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
+use crate::asset::Asset;
+use crate::errors::Error as ZeiError;
+use crate::serialization::{RangeProofString, CompressedRistrettoString, LockboxString,
+                           ScalarString, PublicKeyString};
+use crate::setup::PublicParams;
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
-use rand::CryptoRng;
-use rand::Rng;
+use merlin::Transcript;
 use organism_utils::crypto::lockbox::Lockbox;
 use organism_utils::helpers::{ be_u8_from_u32, slice_to_fixed32 };
-use crate::setup::PublicParams;
-use merlin::Transcript;
-use bulletproofs::{BulletproofGens, RangeProof};
+use rand::CryptoRng;
+use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
-use crate::errors::Error as ZeiError;
-use crate::asset::Asset;
-use bulletproofs::PedersenGens;
-use crate::serialization::RangeProofString;
-use crate::serialization::CompressedRistrettoString;
-use crate::serialization::LockboxString;
-use crate::serialization::ScalarString;
 use std::convert::TryFrom;
-use crate::serialization::PublicKeyString;
+
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -70,8 +67,6 @@ impl TryFrom<TxParamsString> for TxParams{
                 receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
                 receiver_asset_commitment: CompressedRistretto::try_from(tx.receiver_asset_commitment)?,
                 receiver_asset_opening: Scalar::try_from(tx.receiver_asset_opening)?,
-                // sender_asset_commitment: CompressedRistretto::from(tx.sender_asset_commitment),
-                // sender_asset_opening: Scalar::from(tx.sender_asset_opening),
                 transfer_amount: tx.transfer_amount,
             }
         )
