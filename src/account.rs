@@ -131,25 +131,41 @@ impl Account {
         }
 
         asset_balance.balance -= tx_params.transfer_amount;
-        let (newtx, updated_blind) = Transaction::new(
+        let (newtx, tx_blind) = Transaction::new(
             csprng,
             &tx_params,
             asset_balance.balance,
-            asset_balance.balance_blinding,
-            asset_balance.asset_blinding,
-            asset_balance.asset_commitment,
+            &asset_balance.balance_blinding,
+            &asset_balance.asset_blinding,
+            &asset_balance.asset_commitment,
             asset_balance.confidential_asset).unwrap();
 
-        asset_balance.balance_blinding = updated_blind;
+        asset_balance.balance_blinding -= tx_blind;
         asset_balance.balance_commitment = newtx.sender_updated_balance_commitment;
         self.tx_counter += 1;
         Ok(newtx)
     }
 
-    //take a transaction that this account has sent and apply to current state once network accepts
-    // pub fn apply_tx(&mut self, tx: &Transaction) {
+    pub fn apply_tx(&mut self,
+                    tx: &Transaction,
+                    amount: u32,
+                    asset_type: &str,
+                    tx_blinding: &Scalar) -> Result<(),ZeiError>{
+        /*! I should be called once the network has accepted a transaction issued by this account
+         * I update the current status of this account.
+         */
+        let mut asset_balance = self.balances.get_mut(asset_type)?;
+        let old_balance_com = asset_balance.balance_commitment.decompress()?;
+        let tx_commitment = tx.transaction_commitment.decompress()?;
+        let new_balance_commitment = old_balance_com - tx_commitment;
 
-    // }
+        asset_balance.balance -= amount;
+        asset_balance.balance_commitment = new_balance_commitment.compress();
+        asset_balance.balance_blinding -= tx_blinding;
+        self.tx_counter += 1;
+        asset_balance.tx_counter += 1;
+        Ok(())
+    }
 
     pub fn receive(&mut self, tx: &Transaction) {
         /*! I receive a transaction to this account and update it accordingly
@@ -278,6 +294,7 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
+    use bulletproofs::PedersenGens;
 
     #[test]
     pub fn test_account_creation() {
@@ -315,5 +332,46 @@ mod test {
         csprng4 = ChaChaRng::from_seed([0u8; 32]);
         let tx = sender.send(&mut csprng4, &tx, &asset_id).unwrap();
         rec.receive(&tx);
+    }
+
+    #[test]
+    pub fn test_account_apply_tx() {
+        let starting_bal = 50;
+        let mut csprng: ChaChaRng;
+        csprng = ChaChaRng::from_seed([0u8; 32]);
+        let transfer_amount = 10;
+
+        let mut sender = Account::new(&mut csprng);
+        let mut rec = Account::new(&mut csprng);
+        let asset_id = "example_asset";
+        sender.add_asset(&mut csprng, &asset_id, true, starting_bal);
+        rec.add_asset(&mut csprng, &asset_id, true, starting_bal);
+        let tx_params = TxParams{
+            receiver_pk: rec.keys.public,
+            receiver_asset_commitment: rec.balances.get(asset_id).unwrap().asset_commitment,
+            receiver_asset_opening: rec.balances.get(asset_id).unwrap().asset_blinding,
+            transfer_amount,
+        };
+        let account_balance = sender.balances[asset_id].balance;
+        let account_blind = &sender.balances[asset_id].balance_blinding;
+        let sender_asset_opening = &sender.balances[asset_id].asset_blinding;
+        let sender_asset_commitment = &sender.balances[asset_id].asset_commitment;
+        let (tx,tx_blind) = Transaction::new(
+            &mut csprng, &tx_params, account_balance, account_blind, sender_asset_opening,
+        sender_asset_commitment, true).unwrap();
+        let old_account_blind = account_blind.clone();
+
+        sender.apply_tx(&tx,transfer_amount,asset_id,&tx_blind).unwrap();
+
+        let expected_new_balance = starting_bal - transfer_amount;
+        let new_balance = sender.balances[asset_id].balance;
+        assert_eq!(expected_new_balance, new_balance);
+
+        let new_blinding = sender.balances[asset_id].balance_blinding;
+        assert_eq!(old_account_blind - tx_blind, new_blinding);
+
+        let pc_gens = PedersenGens::default();
+        let com = pc_gens.commit(Scalar::from(new_balance), new_blinding).compress();
+        assert_eq!(sender.balances[asset_id].balance_commitment, com);
     }
 }

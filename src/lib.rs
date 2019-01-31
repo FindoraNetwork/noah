@@ -1,5 +1,6 @@
 //Zei: Confidential Payments for Accounts
 #![feature(try_from)]
+#![feature(try_trait)]
 extern crate schnorr;
 extern crate organism_utils;
 extern crate bulletproofs;

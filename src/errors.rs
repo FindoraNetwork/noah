@@ -12,6 +12,7 @@ pub enum Error {
     TxProofError,
     NotEnoughFunds,
     DeserializationError,
+    NoneError,
 }
 
 impl fmt::Display for Error {
@@ -21,6 +22,7 @@ impl fmt::Display for Error {
             Error::TxProofError => "Could not create transation due to range proof error",
             Error::NotEnoughFunds => "There is not enough funds to make this transaction",
             Error::DeserializationError => "Could not deserialize object",
+            Error::NoneError => "Could not unwrap option due to None value",
         })
     }
 }
@@ -32,6 +34,7 @@ impl error::Error for Error {
             Error::TxProofError => "Could not create transation due to range proof error",
             Error::NotEnoughFunds => "There is not enough funds to make this transaction",
             Error::DeserializationError => "Could not deserialize object",
+            Error::NoneError => "Could not unwrap option due to None value",
         }
     }
 }
@@ -65,3 +68,10 @@ impl From<bulletproofs::ProofError> for Error {
         Error::DeserializationError
     }
 }
+
+impl From<std::option::NoneError> for Error {
+    fn from(_error: std::option::NoneError) -> Self {
+        Error::NoneError
+    }
+}
+

@@ -33,7 +33,7 @@ impl Asset {
 
         RistrettoPoint::from_hash(hash)
     }
-    pub fn prove_eq(blinding_factor1: Scalar, blinding_factor2: Scalar) -> Scalar{
+    pub fn prove_eq(blinding_factor1: &Scalar, blinding_factor2: &Scalar) -> Scalar{
         blinding_factor1 - blinding_factor2
     }
 
@@ -69,11 +69,11 @@ mod test {
         let c1 = pedersen_bases.commit(value1, bf1);
         let c2 = pedersen_bases.commit(value2, bf2);
 
-        let proof = Asset::prove_eq(bf1, bf2);
+        let proof = Asset::prove_eq(&bf1, &bf2);
         assert_eq!(false, Asset::verify_eq(&c1,&c2, proof, &pedersen_bases.B_blinding));
 
         let c3 = pedersen_bases.commit(value1, bf2);
-        let proof = Asset::prove_eq(bf1, bf2);
+        let proof = Asset::prove_eq(&bf1, &bf2);
         assert_eq!(true, Asset::verify_eq(&c1,&c3, proof, &pedersen_bases.B_blinding));
     }
 }

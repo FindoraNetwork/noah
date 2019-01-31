@@ -89,9 +89,9 @@ impl Transaction {
     pub fn new<R>(csprng: &mut R,
                   tx_params: &TxParams,
                   account_balance: u32,
-                  account_blind: Scalar,
-                  sender_asset_opening: Scalar,
-                  sender_asset_commitment: CompressedRistretto,
+                  account_blind: &Scalar,
+                  sender_asset_opening: &Scalar,
+                  sender_asset_commitment: &CompressedRistretto,
                   do_confidential_asset: bool) -> Result<(Transaction, Scalar), ZeiError>
     where R: CryptoRng + Rng,
     {
@@ -130,8 +130,8 @@ impl Transaction {
 
         asset_eq_proof = Scalar::from(0u8);
         if do_confidential_asset {
-            asset_eq_proof = Asset::prove_eq(tx_params.receiver_asset_opening,
-                                    sender_asset_opening);
+            asset_eq_proof = Asset::prove_eq(&tx_params.receiver_asset_opening,
+                                    &sender_asset_opening);
         }
 
         let mut to_encrypt = Vec::new();
@@ -146,11 +146,11 @@ impl Transaction {
             lockbox: lbox,
             do_confidential_asset,
             asset_eq_proof,
-            sender_asset_commitment: sender_asset_commitment,
+            sender_asset_commitment: sender_asset_commitment.clone(),
             receiver_asset_commitment: tx_params.receiver_asset_commitment,
         };
 
-       Ok((tx, sender_updated_account_blind))
+       Ok((tx, blinding_t))
     }
 
     pub fn recover_plaintext(&self, sk: &SecretKey) -> (u32, Scalar) {
@@ -198,7 +198,6 @@ pub fn validator_verify(tx: &Transaction,
     let derived_sender_comm = sender_prev_com - tx_comm;
     let tx_sender_updated_balance_comm = tx.sender_updated_balance_commitment.decompress().unwrap();
     let mut vrfy_ok = derived_sender_comm == tx_sender_updated_balance_comm;
-    println!("derived = updates: {}", vrfy_ok);
     if vrfy_ok {
         let verify_t = RangeProof::verify_multiple(
             &tx.transaction_range_proof,
@@ -211,7 +210,6 @@ pub fn validator_verify(tx: &Transaction,
 
         vrfy_ok = verify_t.is_ok();
     }
-    println!("range proof: {}", vrfy_ok);
     if vrfy_ok {
         if tx.do_confidential_asset {
             let h = PedersenGens::default().B_blinding;
@@ -426,9 +424,9 @@ mod test {
         let (tx,_)  = Transaction::new(&mut csprng,
                                        &new_tx,
                                        src_asset_balance.balance,
-                                       src_asset_balance.balance_blinding,
-                                       src_asset_balance.asset_blinding,
-                                       src_asset_balance.asset_commitment,
+                                       &src_asset_balance.balance_blinding,
+                                       &src_asset_balance.asset_blinding,
+                                       &src_asset_balance.asset_commitment,
                                        true).unwrap();
 
         let vrfy_ok = validator_verify(&tx,
@@ -464,9 +462,9 @@ mod test {
         let (tx,_)  = Transaction::new(&mut csprng,
                                        &new_tx,
                                        acc_src.balances[asset_id].balance,
-                                       acc_src.balances[asset_id].balance_blinding,
-                                       acc_src.balances[asset_id].asset_blinding,
-                                       acc_src.balances[asset_id].asset_commitment,
+                                       &acc_src.balances[asset_id].balance_blinding,
+                                       &acc_src.balances[asset_id].asset_blinding,
+                                       &acc_src.balances[asset_id].asset_commitment,
                                        true).unwrap();
 
         let tx_json = serde_json::to_string(&TransactionString::from(&tx)).unwrap();
