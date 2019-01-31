@@ -13,6 +13,7 @@ use rand::CryptoRng;
 use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
+use blake2::{Digest};
 use std::convert::TryFrom;
 
 
@@ -130,8 +131,8 @@ impl Transaction {
 
         asset_eq_proof = Scalar::from(0u8);
         if do_confidential_asset {
-            asset_eq_proof = Asset::prove_eq(tx_params.receiver_asset_opening,
-                                    sender_asset_opening);
+            asset_eq_proof = Asset::prove_eq(&tx_params.receiver_asset_opening,
+                                    &sender_asset_opening);
         }
 
         let mut to_encrypt = Vec::new();
@@ -284,6 +285,8 @@ impl TryFrom<TransactionString> for Transaction{
         })
     }
 }
+
+
 
 #[cfg(test)]
 mod test {

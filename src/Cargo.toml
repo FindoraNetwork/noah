@@ -22,6 +22,7 @@ schnorr = { git = "https://github.com/stichtingorganism/schnorr" }
 organism_utils = { git = "https://github.com/stichtingorganism/utils",rev= "1f7990e" }
 blake2 = "0.8.0"
 hex = "0.3.2"
+sha2 = "0.8.0"
 
 [dev-dependencies]
 criterion = "0.2"

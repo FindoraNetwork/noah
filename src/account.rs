@@ -91,7 +91,6 @@ impl Account {
             asset_commitment,
             asset_blinding,
         };
-
         self.balances.insert(String::from(asset_id), asset_balance);
     }
 
