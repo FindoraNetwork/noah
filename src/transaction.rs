@@ -8,14 +8,12 @@ use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 use organism_utils::crypto::lockbox::Lockbox;
-use organism_utils::helpers::{ be_u8_from_u32, slice_to_fixed32 };
 use rand::CryptoRng;
 use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use std::convert::TryFrom;
-
-
+use crate::utils::u32_to_bigendian_u8array;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
@@ -135,7 +133,7 @@ impl Transaction {
         }
 
         let mut to_encrypt = Vec::new();
-        to_encrypt.extend_from_slice(&be_u8_from_u32(tx_amount));
+        to_encrypt.extend_from_slice(&u32_to_bigendian_u8array(tx_amount));
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
         let lbox = Lockbox::lock(csprng, &tx_params.receiver_pk, &to_encrypt);
 
@@ -168,7 +166,9 @@ impl Transaction {
             u32::from(raw_amount[2]) << 8 |
             u32::from(raw_amount[3]);
 
-        let blind_scalar = Scalar::from_bits(slice_to_fixed32(raw_blind));
+        let mut bytes: [u8;32] = Default::default();
+        bytes.copy_from_slice(&raw_blind[0..32]);
+        let blind_scalar = Scalar::from_bits(bytes);
 
         (p_amount, blind_scalar)
     }

@@ -119,6 +119,25 @@ pub fn from_base58(data: &str) -> Result<Vec<u8>, Error>  {
     Ok(vec)
 }
 
+pub fn u32_to_bigendian_u8array(n: u32) -> [u8;4]{
+    let mut array = [0u8;4];
+    array[0] = ((n>>24)&0xFF) as u8;
+    array[1] = ((n>>16)&0xFF) as u8;
+    array[2] = ((n>>8)&0xFF) as u8;
+    array[3] = (n & 0xFF) as u8;
+    array
+
+}
+
+/*
+pub fn u8_bigendian_slice_to_u32(array: &[u8; 4]) -> u32{
+        ((u32::from(array[0]))<<24) +
+        ((u32::from(array[1]))<<16) +
+        ((u32::from(array[2]))<<8) +
+        (u32::from(array[3]))
+}
+*/
+
 #[cfg(test)]
 mod test {
     use crate::utils::*;
@@ -136,5 +155,22 @@ mod test {
         let b58_str = to_base58(&v[..]);
         assert_eq!(v, from_base58(&b58_str[..]).unwrap());
     }
+    #[test]
+    fn test_u32_to_bignedian_u8array(){
+        let n:u32 = 0xFA01C673;
+        let n_array = u32_to_bigendian_u8array(n);
+        assert_eq!(0xFA, n_array[0]);
+        assert_eq!(0x01, n_array[1]);
+        assert_eq!(0xC6, n_array[2]);
+        assert_eq!(0x73, n_array[3]);
+    }
+    /*
+    #[test]
+    fn test_u8_bigendian_slice_to_u32(){
+        let array = [0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8];
+        let n = u8_bigendian_slice_to_u32(&array);
+        assert_eq!(0xFA01C673, n);
+    }
+    */
     
 }
