@@ -11,10 +11,8 @@
 
 use blake2::VarBlake2b;
 use blake2::digest::{Input, VariableOutput};
-
+use crate::errors::Error as ZeiError;
 use crate::utils::{from_base58, to_base58};
-
-
 use schnorr::PublicKey;
 
 //Account Address is just its encoded public key
@@ -36,12 +34,9 @@ pub fn enc(pk: &PublicKey) -> Address {
 
 
 /// Decode a Given Zei Address to Publickey
-pub fn dec(zei_addr: &str) -> PublicKey {
+pub fn dec(zei_addr: &str) -> Result<PublicKey, ZeiError> {
     let addr = &zei_addr[4..];
-    let decoded = match from_base58(addr){
-        Ok(decoded) => decoded,
-        Err(e) => panic!("ZEI address not in base58 format"),
-    };
+    let decoded = from_base58(addr)?;
 
     let hash_start = decoded.len() - 4;
     let mut hasher = VarBlake2b::new(32).unwrap();
@@ -49,10 +44,10 @@ pub fn dec(zei_addr: &str) -> PublicKey {
     let hash = hasher.vec_result();
     
     if hash[0..4] != decoded[hash_start..] {
-        panic!("Bad address: checksum failed");
+        return Err(ZeiError::BadBase58Format);
     }
     
-    PublicKey::from_bytes(&decoded[..hash_start]).unwrap()
+    Ok(PublicKey::from_bytes(&decoded[..hash_start])?)
 
 }
 
@@ -60,11 +55,9 @@ pub fn dec(zei_addr: &str) -> PublicKey {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::ChaChaRng;
+    use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use schnorr::Keypair;
-    use blake2::VarBlake2b;
-    use blake2::digest::{Input, VariableOutput};
 
 
     #[test]
@@ -74,7 +67,7 @@ mod test {
         let keypair: Keypair = Keypair::generate(&mut csprng);
 
         let enc = enc(&keypair.public);
-        let dec = dec(&enc);
+        let dec = dec(&enc).unwrap();
         assert_eq!(dec, keypair.public);
     }
 

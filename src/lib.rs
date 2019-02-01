@@ -1,5 +1,6 @@
 //Zei: Confidential Payments for Accounts
-
+#![feature(try_from)]
+#![feature(try_trait)]
 extern crate schnorr;
 extern crate organism_utils;
 extern crate bulletproofs;
@@ -16,7 +17,10 @@ extern crate num_traits;
 mod setup;
 mod errors;
 mod utils;
+mod constants;
 
+pub mod serialization;
+pub mod asset;
 pub mod address;
 pub mod account;
 pub mod transaction;

@@ -11,8 +11,6 @@ crate-type = ["rlib"]
 
 [dependencies]
 rand_chacha = "0.1.1"
-num-traits = "0.2"
-num-bigint = "0.2.2"
 rand = "0.6"
 curve25519-dalek = { version =  "1.0.0-pre.0", features = ["serde"] }
 bulletproofs =  "1.0.0-pre.0"
@@ -21,7 +19,7 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 schnorr = { git = "https://github.com/stichtingorganism/schnorr" }
-organism_utils = { git = "https://github.com/stichtingorganism/utils",rev= "32070eb" }
+organism_utils = { git = "https://github.com/stichtingorganism/utils",rev= "1f7990e" }
 blake2 = "0.8.0"
 hex = "0.3.2"
 

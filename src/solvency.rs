@@ -7,7 +7,7 @@ use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 use curve25519_dalek::traits::Identity;
 
-pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> RangeProof {
+pub fn prove_solvency(assets: Vec<Account>, liabilities: Vec<Account>, asset_id: &str) -> RangeProof {
 	// Common Reference String
     let mut transcript = Transcript::new(b"Zei Range Proof");
     // def pederson from lib with Common Reference String
@@ -20,8 +20,8 @@ pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> Range
 	let mut assets_blind : Scalar = Scalar::zero();
 
 	for a in assets {
-		assets_amount += a.balance;
-		assets_blind += a.opening;
+		assets_amount += a.balances[asset_id].balance;
+		assets_blind += a.balances[asset_id].balance_blinding;
 	}
 
 	// Calculate liabilities
@@ -29,8 +29,8 @@ pub fn proove_solvency(assets: Vec<Account>, liabilities: Vec<Account>) -> Range
 	let mut liabilities_blind : Scalar = Scalar::zero();
 
 	for a in liabilities {
-		liabilities_amount += a.balance;
-		liabilities_blind += a.opening;
+		liabilities_amount += a.balances[asset_id].balance;
+		liabilities_blind += a.balances[asset_id].balance_blinding;
 	}
 
 	let proof_balance = assets_amount - liabilities_amount;
