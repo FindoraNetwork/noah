@@ -18,6 +18,7 @@ mod setup;
 mod errors;
 mod utils;
 mod constants;
+mod encryption;
 
 pub mod serialization;
 pub mod asset;
