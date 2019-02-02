@@ -171,12 +171,25 @@ mod test {
         let msg = b"this is another message";
 
 
-        let cipherbox = ZeiRistrettoCipher::encrypt(&mut prng, &pk, msg).unwrap();
+        let mut cipherbox = ZeiRistrettoCipher::encrypt(&mut prng, &pk, msg).unwrap();
         let plaintext = cipherbox.decrypt(&sk).unwrap();
-
         assert_eq!(msg, plaintext.as_slice());
 
+        cipherbox.ciphertext.push(0u8);
+        let plaintext = cipherbox.decrypt(&sk);
+        assert_eq!(true, plaintext.is_err());
+        assert_eq!(Err(ZeiError::DecryptionError), plaintext);
 
+        cipherbox.ciphertext.pop();
+
+        cipherbox.ciphertext[3] = 0xFF as u8 - cipherbox.ciphertext[3];
+        let plaintext = cipherbox.decrypt(&sk);
+        assert_eq!(true, plaintext.is_err());
+        assert_eq!(Err(ZeiError::DecryptionError), plaintext);
+
+        cipherbox.ciphertext[3] = 0xFF as u8 - cipherbox.ciphertext[3];
+        let plaintext = cipherbox.decrypt(&sk).unwrap();
+        assert_eq!(msg, plaintext.as_slice());
     }
 }
 
