@@ -54,24 +54,24 @@ impl ZeiRistrettoCipher {
     pub fn encrypt<R>(
         prng: &mut R,
         public_key: &CompressedRistretto,
-        message: &[u8]) -> ZeiRistrettoCipher
+        message: &[u8]) -> Result<ZeiRistrettoCipher, ZeiError>
         where R: CryptoRng + Rng
     {
         let (key, encoded_rand) = symmetric_key_from_public_key(
             prng,
             public_key,
-            &base_point);
+            &base_point)?;
         let (ciphertext, nonce) = symmetric_encrypt(&key, message);
 
-        ZeiRistrettoCipher{
+        Ok(ZeiRistrettoCipher{
             ciphertext,
             nonce,
             encoded_rand,
-        }
+        })
     }
 
     pub fn decrypt(&self, secret_key: &Scalar) -> Result<Vec<u8>, ZeiError>{
-        let key = symmetric_key_from_secret_key(secret_key, &self.encoded_rand);
+        let key = symmetric_key_from_secret_key(secret_key, &self.encoded_rand)?;
         Ok(symmetric_decrypt(&key, self.ciphertext.as_slice(), &self.nonce)?)
     }
 }
@@ -79,31 +79,33 @@ impl ZeiRistrettoCipher {
 pub fn symmetric_key_from_public_key<R>(
     prng: &mut R,
     public_key: &CompressedRistretto,
-    curve_base:&CompressedRistretto) -> ([u8;32], CompressedRistretto) where R: CryptoRng + Rng
+    curve_base:&CompressedRistretto) -> Result<([u8;32], CompressedRistretto), ZeiError> where R: CryptoRng + Rng
 {
     /*! I derive a symmetric key from an ElGamal public key over the Ristretto group. Return symmetric key, and encoded
      * randonmess to be used by secret key holder to derive the same symmetric key
     */
     let rand  = Scalar::random(prng);
-    let encoded_rand = &rand * curve_base.decompress().unwrap();
-    let curve_key = &rand * public_key.decompress().unwrap();
-    let mut hasher = VarBlake2b::new(32).unwrap();
+    let encoded_rand = &rand * curve_base.decompress()?;
+    let curve_key = &rand * public_key.decompress()?;
+    let mut hasher = VarBlake2b::new(32).unwrap();//valid unwrap, should never fail
     hasher.input(curve_key.compress().as_bytes());
     let hash = hasher.vec_result();
     let mut symmetric_key: [u8;32] = Default::default();
     symmetric_key.copy_from_slice(hash.as_slice());
-    (symmetric_key, encoded_rand.compress())
+    Ok((symmetric_key, encoded_rand.compress()))
 }
 
-fn symmetric_key_from_secret_key<'a>(secret_key: &Scalar, rand: &CompressedRistretto) -> [u8;32]
+fn symmetric_key_from_secret_key(
+    secret_key: &Scalar,
+    rand: &CompressedRistretto) -> Result<[u8;32], ZeiError>
 {
-    let curve_key = secret_key * rand.decompress().unwrap();
-    let mut hasher = VarBlake2b::new(32).unwrap();
+    let curve_key = secret_key * rand.decompress()?;
+    let mut hasher = VarBlake2b::new(32).unwrap(); //valid unwrap: this should never fail
     hasher.input(curve_key.compress().as_bytes());
     let mut symmetric_key: [u8;32] = Default::default();
     let hash = hasher.vec_result();
     symmetric_key.copy_from_slice(hash.as_slice());
-    symmetric_key
+    Ok(symmetric_key)
 }
 
 fn build_key(key: &[u8;32]) -> Key{
@@ -145,8 +147,8 @@ mod test {
         let sk = Scalar::random(&mut prng);
         let base = RISTRETTO_BASEPOINT_COMPRESSED;
         let pk = (&sk * &base.decompress().unwrap()).compress();
-        let (from_pk_key, encoded_rand) = symmetric_key_from_public_key(&mut prng, &pk, &base);
-        let from_sk_key = symmetric_key_from_secret_key(&sk, &encoded_rand);
+        let (from_pk_key, encoded_rand) = symmetric_key_from_public_key(&mut prng, &pk, &base).unwrap();
+        let from_sk_key = symmetric_key_from_secret_key(&sk, &encoded_rand).unwrap();
         assert_eq!(from_pk_key, from_sk_key);
     }
 
@@ -169,7 +171,7 @@ mod test {
         let msg = b"this is another message";
 
 
-        let cipherbox = ZeiRistrettoCipher::encrypt(&mut prng, &pk, msg);
+        let cipherbox = ZeiRistrettoCipher::encrypt(&mut prng, &pk, msg).unwrap();
         let plaintext = cipherbox.decrypt(&sk).unwrap();
 
         assert_eq!(msg, plaintext.as_slice());

@@ -138,7 +138,7 @@ impl Transaction {
         to_encrypt.extend_from_slice(&u32_to_bigendian_u8array(tx_amount));
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
         let receiver_public_key = &tx_params.receiver_pk.get_curve_point().unwrap().compress();
-        let lbox = ZeiRistrettoCipher::encrypt(csprng, receiver_public_key, &to_encrypt);
+        let lbox = ZeiRistrettoCipher::encrypt(csprng, receiver_public_key, &to_encrypt)?;
 
         let tx = Transaction {
             transaction_range_proof: proof_agg,
