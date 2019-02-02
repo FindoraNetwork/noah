@@ -2,8 +2,6 @@ use bulletproofs::{RangeProof};
 use crate::errors::Error as ZeiError;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
-use organism_utils::crypto::lockbox::Lockbox;
-use organism_utils::crypto::secretbox::{SecretBox, NonceKey};
 use schnorr::{Keypair,PublicKey};
 use std::convert::TryFrom;
 
@@ -97,65 +95,6 @@ impl TryFrom<PublicKeyString> for PublicKey {
 impl From<PublicKey> for PublicKeyString {
     fn from(a: PublicKey) -> PublicKeyString {
         PublicKeyString{val: hex::encode(a.to_bytes())}
-    }
-}
-
-
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct LockboxString{
-    data: SecretBoxString,
-    rand: CompressedRistrettoString
-}
-
-impl TryFrom<LockboxString> for Lockbox {
-    type Error = ZeiError;
-    fn try_from(a: LockboxString) -> Result<Lockbox, ZeiError>{
-        Ok(Lockbox {
-            data: SecretBox::try_from(a.data)?,
-            rand: CompressedRistretto::try_from(a.rand)?,
-        })
-
-    }
-}
-
-impl From<&Lockbox> for LockboxString {
-    fn from(a: &Lockbox) -> LockboxString{
-        LockboxString{
-            data: SecretBoxString::from(&a.data),
-            rand: CompressedRistrettoString::from(a.rand)
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct SecretBoxString{
-    nonce: Vec<u8>,
-    tag: Vec<u8>,
-    cipher: Vec<u8>,
-}
-
-impl TryFrom<SecretBoxString> for SecretBox{
-    type Error = ZeiError;
-    fn try_from(a: SecretBoxString) -> Result<SecretBox,ZeiError>{
-        let mut array = [0u8; 16];
-        array.copy_from_slice(a.tag.as_slice());
-        Ok(SecretBox{
-            nonce: NonceKey::from_bytes(a.nonce.as_slice())?,
-            tag: array,
-            cipher: a.cipher
-        })
-    }
-}
-
-impl From<&SecretBox> for SecretBoxString{
-    fn from(a: &SecretBox) -> SecretBoxString{
-        // to_bytes or as bytes ?
-        SecretBoxString {
-            nonce: a.nonce.as_bytes().to_vec(),
-            tag: a.tag.to_vec(),
-            cipher: a.cipher.clone()
-        }
     }
 }
 

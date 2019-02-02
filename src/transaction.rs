@@ -1,19 +1,21 @@
 use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
 use crate::asset::Asset;
+use crate::encryption::ZeiRistrettoCipher;
 use crate::errors::Error as ZeiError;
-use crate::serialization::{RangeProofString, CompressedRistrettoString, LockboxString,
+use crate::serialization::{RangeProofString, CompressedRistrettoString,
                            ScalarString, PublicKeyString};
 use crate::setup::PublicParams;
+use crate::utils::u32_to_bigendian_u8array;
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
-use organism_utils::crypto::lockbox::Lockbox;
 use rand::CryptoRng;
 use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use std::convert::TryFrom;
-use crate::utils::u32_to_bigendian_u8array;
+use crate::encryption::ZeiRistrettoCipherString;
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
@@ -30,7 +32,7 @@ pub struct Transaction {
     pub transaction_range_proof: bulletproofs::RangeProof,
     pub transaction_commitment: CompressedRistretto,
     pub sender_updated_balance_commitment: CompressedRistretto,
-    pub lockbox: Lockbox,
+    pub lockbox: ZeiRistrettoCipher,
     pub do_confidential_asset: bool,
     pub asset_eq_proof: Scalar,
     pub sender_asset_commitment: CompressedRistretto,
@@ -135,7 +137,8 @@ impl Transaction {
         let mut to_encrypt = Vec::new();
         to_encrypt.extend_from_slice(&u32_to_bigendian_u8array(tx_amount));
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
-        let lbox = Lockbox::lock(csprng, &tx_params.receiver_pk, &to_encrypt);
+        let receiver_public_key = &tx_params.receiver_pk.get_curve_point().unwrap().compress();
+        let lbox = ZeiRistrettoCipher::encrypt(csprng, receiver_public_key, &to_encrypt);
 
         let tx = Transaction {
             transaction_range_proof: proof_agg,
@@ -156,8 +159,16 @@ impl Transaction {
          * I recover the sent amount and blind factor from the encryted box in a transaction
          *
          */
+        //secret key to scalar:
+        //decode secret key into scalar
+        //TODO have SecretKey = Scalar
+        let mut secret_key_bytes = sk.to_bytes();
+        secret_key_bytes[0]  &= 248;
+        secret_key_bytes[31] &= 127;
+        secret_key_bytes[31] |= 64;
 
-        let unlocked = self.lockbox.unlock(sk);
+        let secret_key = Scalar::from_bits(secret_key_bytes);
+        let unlocked = self.lockbox.decrypt(&secret_key).unwrap();
         let (raw_amount, raw_blind) = unlocked.split_at(4);
 
         //convert to u32
@@ -245,7 +256,7 @@ pub struct TransactionString{
     transaction_range_proof: RangeProofString,
     transaction_commitment: CompressedRistrettoString,
     sender_updated_balance_commitment: CompressedRistrettoString,
-    lockbox: LockboxString,
+    lockbox: ZeiRistrettoCipherString,
     do_confidential_asset: bool,
     asset_eq_proof: ScalarString,
     sender_asset_commitment: CompressedRistrettoString,
@@ -258,7 +269,7 @@ impl From<&Transaction> for TransactionString {
             transaction_range_proof: RangeProofString::from(&a.transaction_range_proof),
             transaction_commitment: CompressedRistrettoString::from(a.transaction_commitment),
             sender_updated_balance_commitment: CompressedRistrettoString::from(a.sender_updated_balance_commitment),
-            lockbox: LockboxString::from(&a.lockbox),
+            lockbox: ZeiRistrettoCipherString::from(&a.lockbox),
             do_confidential_asset: a.do_confidential_asset,
             asset_eq_proof: ScalarString::from(a.asset_eq_proof),
             sender_asset_commitment: CompressedRistrettoString::from(a.sender_asset_commitment),
@@ -270,15 +281,23 @@ impl From<&Transaction> for TransactionString {
 impl TryFrom<TransactionString> for Transaction{
     type Error = ZeiError;
     fn try_from(a: TransactionString) -> Result<Transaction, ZeiError> {
+        let transaction_range_proof = RangeProof::try_from(a.transaction_range_proof)?;
+        let transaction_commitment = CompressedRistretto::try_from(a.transaction_commitment)?;
+        let sender_updated_balance_commitment = CompressedRistretto::try_from(a.sender_updated_balance_commitment)?;
+        let lockbox: ZeiRistrettoCipher = ZeiRistrettoCipher::try_from(a.lockbox)?;
+        let do_confidential_asset = a.do_confidential_asset;
+        let asset_eq_proof = Scalar::try_from(a.asset_eq_proof)?;
+        let sender_asset_commitment = CompressedRistretto::try_from(a.sender_asset_commitment)?;
+        let receiver_asset_commitment = CompressedRistretto::try_from(a.receiver_asset_commitment)?;
         Ok(Transaction{
-            transaction_range_proof: RangeProof::try_from(a.transaction_range_proof)?,
-            transaction_commitment: CompressedRistretto::try_from(a.transaction_commitment)?,
-            sender_updated_balance_commitment: CompressedRistretto::try_from(a.sender_updated_balance_commitment)?,
-            lockbox: Lockbox::try_from(a.lockbox)?,
-            do_confidential_asset: a.do_confidential_asset,
-            asset_eq_proof: Scalar::try_from(a.asset_eq_proof)?,
-            sender_asset_commitment: CompressedRistretto::try_from(a.sender_asset_commitment)?,
-            receiver_asset_commitment: CompressedRistretto::try_from(a.receiver_asset_commitment)?,
+            transaction_range_proof,
+            transaction_commitment,
+            sender_updated_balance_commitment,
+            lockbox,
+            do_confidential_asset,
+            asset_eq_proof,
+            sender_asset_commitment,
+            receiver_asset_commitment,
         })
     }
 }
@@ -468,18 +487,23 @@ mod test {
                                        true).unwrap();
 
         let tx_json = serde_json::to_string(&TransactionString::from(&tx)).unwrap();
-        let desarialized_tx = Transaction::try_from(
-            serde_json::from_str::<TransactionString>(&tx_json).unwrap()).unwrap();
+        let deserialized_tx = Transaction::try_from(
+            serde_json::from_str::<TransactionString>(&tx_json).unwrap());
 
-        assert_eq!(tx.transaction_commitment, desarialized_tx.transaction_commitment);
-        assert_eq!(tx.receiver_asset_commitment, desarialized_tx.receiver_asset_commitment);
-        assert_eq!(tx.sender_asset_commitment, desarialized_tx.sender_asset_commitment);
-        assert_eq!(tx.do_confidential_asset, desarialized_tx.do_confidential_asset);
-        assert_eq!(tx.asset_eq_proof, desarialized_tx.asset_eq_proof);
-        assert_eq!(tx.sender_updated_balance_commitment, desarialized_tx.sender_updated_balance_commitment);
-        assert_eq!(tx.lockbox.rand, desarialized_tx.lockbox.rand);
-        assert_eq!(tx.lockbox.data.cipher, desarialized_tx.lockbox.data.cipher);
-        assert_eq!(tx.lockbox.data.nonce, desarialized_tx.lockbox.data.nonce);
-        assert_eq!(tx.lockbox.data.tag, desarialized_tx.lockbox.data.tag);
+        let dtx = deserialized_tx.unwrap();
+
+        assert_eq!(tx.transaction_commitment, dtx.transaction_commitment);
+        assert_eq!(tx.receiver_asset_commitment, dtx.receiver_asset_commitment);
+        assert_eq!(tx.sender_asset_commitment, dtx.sender_asset_commitment);
+        assert_eq!(tx.do_confidential_asset, dtx.do_confidential_asset);
+        assert_eq!(tx.asset_eq_proof, dtx.asset_eq_proof);
+        assert_eq!(tx.sender_updated_balance_commitment, dtx.sender_updated_balance_commitment);
+        assert_eq!(tx.lockbox, dtx.lockbox);
+        /*
+        assert_eq!(tx.lockbox.rand, deserialized_tx.lockbox.rand);
+        assert_eq!(tx.lockbox.data.cipher, deserialized_tx.lockbox.data.cipher);
+        assert_eq!(tx.lockbox.data.nonce, deserialized_tx.lockbox.data.nonce);
+        assert_eq!(tx.lockbox.data.tag, deserialized_tx.lockbox.data.tag);
+        */
     }
 }

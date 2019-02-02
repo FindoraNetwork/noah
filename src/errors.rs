@@ -3,7 +3,6 @@
 use std::{fmt, error};
 use hex::FromHexError;
 use schnorr::errors::SchnorrError;
-use organism_utils::crypto::secretbox::errors::SecretBoxError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Error {
@@ -60,12 +59,6 @@ impl From<serde_json::Error> for Error {
 
 impl From<SchnorrError> for Error {
     fn from(_error: SchnorrError) -> Self {
-        Error::DeserializationError
-    }
-}
-
-impl From<SecretBoxError> for Error {
-    fn from(_error: SecretBoxError) -> Self {
         Error::DeserializationError
     }
 }
