@@ -263,18 +263,19 @@ pub struct TransactionString{
     receiver_asset_commitment: CompressedRistrettoString,
 }
 
-impl From<&Transaction> for TransactionString {
-    fn from(a: &Transaction) -> TransactionString{
-        TransactionString{
+impl TryFrom<&Transaction> for TransactionString {
+    type Error = ZeiError;
+    fn try_from(a: &Transaction) -> Result<TransactionString, ZeiError>{
+        Ok(TransactionString{
             transaction_range_proof: RangeProofString::from(&a.transaction_range_proof),
             transaction_commitment: CompressedRistrettoString::from(&a.transaction_commitment),
             sender_updated_balance_commitment: CompressedRistrettoString::from(&a.sender_updated_balance_commitment),
-            lockbox: ZeiRistrettoCipherString::try_from(&a.lockbox).unwrap(),
+            lockbox: ZeiRistrettoCipherString::try_from(&a.lockbox)?,
             do_confidential_asset: a.do_confidential_asset,
             asset_eq_proof: ScalarString::from(a.asset_eq_proof),
             sender_asset_commitment: CompressedRistrettoString::from(&a.sender_asset_commitment),
             receiver_asset_commitment: CompressedRistrettoString::from(&a.receiver_asset_commitment),
-        }
+        })
     }
 }
 
@@ -486,7 +487,7 @@ mod test {
                                        &acc_src.balances[asset_id].asset_commitment,
                                        true).unwrap();
 
-        let tx_json = serde_json::to_string(&TransactionString::from(&tx)).unwrap();
+        let tx_json = serde_json::to_string(&TransactionString::try_from(&tx).unwrap()).unwrap();
         let deserialized_tx = Transaction::try_from(
             serde_json::from_str::<TransactionString>(&tx_json).unwrap());
 
