@@ -269,7 +269,7 @@ impl From<&Transaction> for TransactionString {
             transaction_range_proof: RangeProofString::from(&a.transaction_range_proof),
             transaction_commitment: CompressedRistrettoString::from(&a.transaction_commitment),
             sender_updated_balance_commitment: CompressedRistrettoString::from(&a.sender_updated_balance_commitment),
-            lockbox: ZeiRistrettoCipherString::from(&a.lockbox),
+            lockbox: ZeiRistrettoCipherString::try_from(&a.lockbox).unwrap(),
             do_confidential_asset: a.do_confidential_asset,
             asset_eq_proof: ScalarString::from(a.asset_eq_proof),
             sender_asset_commitment: CompressedRistrettoString::from(&a.sender_asset_commitment),

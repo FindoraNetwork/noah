@@ -26,13 +26,14 @@ pub struct ZeiRistrettoCipherString{
     encoded_rand: CompressedRistrettoString,
 }
 
-impl From<&ZeiRistrettoCipher> for ZeiRistrettoCipherString {
-    fn from(a: &ZeiRistrettoCipher) -> ZeiRistrettoCipherString {
-        ZeiRistrettoCipherString{
-            ciphertext: serde_json::to_string(&a.ciphertext).unwrap(),
-            nonce: serde_json::to_string(&a.nonce.0).unwrap(),
+impl TryFrom<&ZeiRistrettoCipher> for ZeiRistrettoCipherString {
+    type Error = ZeiError;
+    fn try_from(a: &ZeiRistrettoCipher) -> Result<ZeiRistrettoCipherString, ZeiError> {
+        Ok(ZeiRistrettoCipherString{
+            ciphertext: serde_json::to_string(&a.ciphertext)?,
+            nonce: serde_json::to_string(&a.nonce.0)?,
             encoded_rand: CompressedRistrettoString::from(&a.encoded_rand),
-        }
+        })
     }
 }
 
