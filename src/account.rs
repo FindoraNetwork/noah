@@ -263,11 +263,11 @@ impl From<&AssetBalance> for AssetBalanceString{
         AssetBalanceString{
             tx_counter: a.tx_counter,
             balance: a.balance,
-            balance_commitment: CompressedRistrettoString::from(a.balance_commitment),
+            balance_commitment: CompressedRistrettoString::from(&a.balance_commitment),
             balance_blinding: ScalarString::from(a.balance_blinding),
             asset_info: Asset{ id: a.asset_info.id.to_string()},
             confidential_asset: a.confidential_asset,
-            asset_commitment: CompressedRistrettoString::from(a.asset_commitment),
+            asset_commitment: CompressedRistrettoString::from(&a.asset_commitment),
             asset_blinding: ScalarString::from(a.asset_blinding)
         }
     }

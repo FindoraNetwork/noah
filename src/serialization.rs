@@ -37,8 +37,8 @@ pub struct CompressedRistrettoString {
     val: String
 }
 
-impl From<CompressedRistretto> for CompressedRistrettoString {
-    fn from(point: CompressedRistretto) -> CompressedRistrettoString{
+impl From<&CompressedRistretto> for CompressedRistrettoString {
+    fn from(point: &CompressedRistretto) -> CompressedRistrettoString{
         CompressedRistrettoString{val:hex::encode(point.to_bytes())}
     }
 }
@@ -130,7 +130,7 @@ mod test {
     pub fn serialization_compressed_ristretto(){
         let mut csprng1 = ChaChaRng::from_seed([0u8; 32]);
         let point = RistrettoPoint::random(&mut csprng1).compress();
-        let id = CompressedRistrettoString::from(point);
+        let id = CompressedRistrettoString::from(&point);
         let serialized = serde_json::to_string(&id).unwrap();
         let deserialized = serde_json::from_str::<CompressedRistrettoString>(&serialized).unwrap();
         let final_deserialized = CompressedRistretto::try_from(deserialized).unwrap();

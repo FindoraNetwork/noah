@@ -77,7 +77,7 @@ impl From<TxParams> for TxParamsString{
     fn from(tx: TxParams) -> TxParamsString {
         TxParamsString{
             receiver_pk: PublicKeyString::from(tx.receiver_pk),
-            receiver_asset_commitment: CompressedRistrettoString::from(tx.receiver_asset_commitment),
+            receiver_asset_commitment: CompressedRistrettoString::from(&tx.receiver_asset_commitment),
             receiver_asset_opening: ScalarString::from(tx.receiver_asset_opening),
             transfer_amount: tx.transfer_amount,
         }
@@ -267,13 +267,13 @@ impl From<&Transaction> for TransactionString {
     fn from(a: &Transaction) -> TransactionString{
         TransactionString{
             transaction_range_proof: RangeProofString::from(&a.transaction_range_proof),
-            transaction_commitment: CompressedRistrettoString::from(a.transaction_commitment),
-            sender_updated_balance_commitment: CompressedRistrettoString::from(a.sender_updated_balance_commitment),
+            transaction_commitment: CompressedRistrettoString::from(&a.transaction_commitment),
+            sender_updated_balance_commitment: CompressedRistrettoString::from(&a.sender_updated_balance_commitment),
             lockbox: ZeiRistrettoCipherString::from(&a.lockbox),
             do_confidential_asset: a.do_confidential_asset,
             asset_eq_proof: ScalarString::from(a.asset_eq_proof),
-            sender_asset_commitment: CompressedRistrettoString::from(a.sender_asset_commitment),
-            receiver_asset_commitment: CompressedRistrettoString::from(a.receiver_asset_commitment),
+            sender_asset_commitment: CompressedRistrettoString::from(&a.sender_asset_commitment),
+            receiver_asset_commitment: CompressedRistrettoString::from(&a.receiver_asset_commitment),
         }
     }
 }

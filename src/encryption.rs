@@ -31,7 +31,7 @@ impl From<&ZeiRistrettoCipher> for ZeiRistrettoCipherString {
         ZeiRistrettoCipherString{
             ciphertext: serde_json::to_string(&a.ciphertext).unwrap(),
             nonce: serde_json::to_string(&a.nonce.0).unwrap(),
-            encoded_rand: CompressedRistrettoString::from(a.encoded_rand),
+            encoded_rand: CompressedRistrettoString::from(&a.encoded_rand),
         }
     }
 }
