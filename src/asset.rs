@@ -1,4 +1,5 @@
 use blake2::{Blake2b, Digest};
+use crate::errors::Error as ZeiError;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use bulletproofs::PedersenGens;
@@ -86,17 +87,17 @@ impl Asset {
         pedersen_gens: &PedersenGens,
         source_asset_commitment: &CompressedRistretto,
         destination_asset_commitment: &CompressedRistretto,
-        proof: &CommitmentEqProof) -> bool
+        proof: &CommitmentEqProof) -> Result<bool, ZeiError>
     {
         let proof_challenge = Asset::compute_challenge(
             pedersen_gens, source_asset_commitment,destination_asset_commitment,
             &proof.commitment);
 
-        let src_com = source_asset_commitment.decompress().unwrap();
-        let dst_com = destination_asset_commitment.decompress().unwrap();
-        let pf_com = proof.commitment.decompress().unwrap();
+        let src_com = source_asset_commitment.decompress()?;
+        let dst_com = destination_asset_commitment.decompress()?;
+        let pf_com = proof.commitment.decompress()?;
 
-        proof.response * pedersen_gens.B_blinding == pf_com + proof_challenge*(src_com - dst_com)
+        Ok(proof.response * pedersen_gens.B_blinding == pf_com + proof_challenge*(src_com - dst_com))
     }
 }
 
@@ -140,7 +141,7 @@ mod test {
         assert_eq!(false, Asset::verify_eq(&pc_gens,
                                            &c1,
                                            &c2,
-                                           &proof));
+                                           &proof).unwrap());
 
         let c3 = pedersen_bases.commit(value1, bf2).compress();
         let proof = Asset::prove_eq(
@@ -154,7 +155,7 @@ mod test {
         assert_eq!(true, Asset::verify_eq(&pc_gens,
                                           &c1,
                                           &c3 ,
-                                          &proof));
+                                          &proof).unwrap());
     }
 }
 

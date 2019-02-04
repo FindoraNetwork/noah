@@ -142,7 +142,7 @@ impl Transaction {
         let mut to_encrypt = Vec::new();
         to_encrypt.extend_from_slice(&u32_to_bigendian_u8array(tx_amount));
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
-        let receiver_public_key = &tx_params.receiver_pk.get_curve_point().unwrap().compress();
+        let receiver_public_key = &tx_params.receiver_pk.get_curve_point()?.compress();
         let lbox = ZeiRistrettoCipher::encrypt(csprng, receiver_public_key, &to_encrypt)?;
 
         let tx = Transaction {
@@ -195,7 +195,7 @@ impl Transaction {
 pub fn validator_verify(tx: &Transaction,
                         sender_prev_com: &CompressedRistretto,
                         sender_asset: &CompressedRistretto,
-                        receiver_asset: &CompressedRistretto) -> bool {
+                        receiver_asset: &CompressedRistretto) -> Result<bool, ZeiError> {
     /*
      * Run by validator. I verify the transaction:
      * a) sender new balance commitment must match commitmment in transaction
@@ -210,9 +210,9 @@ pub fn validator_verify(tx: &Transaction,
     //TODO:This probably shouldn't be regenerated every time
     let bp_gens = BulletproofGens::new(32, 2);
 
-    let tx_comm = tx.transaction_commitment.decompress().unwrap();
-    let derived_sender_comm = sender_prev_com.decompress().unwrap() - tx_comm;
-    let tx_sender_updated_balance_comm = tx.sender_updated_balance_commitment.decompress().unwrap();
+    let tx_comm = tx.transaction_commitment.decompress()?;
+    let derived_sender_comm = sender_prev_com.decompress()? - tx_comm;
+    let tx_sender_updated_balance_comm = tx.sender_updated_balance_commitment.decompress()?;
     let mut vrfy_ok = derived_sender_comm == tx_sender_updated_balance_comm;
     if vrfy_ok {
         let verify_t = RangeProof::verify_multiple(
@@ -232,13 +232,13 @@ pub fn validator_verify(tx: &Transaction,
                 &pc_gens,
                 &sender_asset,
                 &receiver_asset,
-                &tx.asset_eq_proof);
+                &tx.asset_eq_proof)?;
         }
         else{
             vrfy_ok = sender_asset == receiver_asset;
         }
     }
-    vrfy_ok
+    Ok(vrfy_ok)
 }
 
 
@@ -457,7 +457,7 @@ mod test {
         let vrfy_ok = validator_verify(&tx,
                                        &src_asset_balance.balance_commitment,
                                        &src_asset_balance.asset_commitment,
-                                       &dst_asset_balance.asset_commitment);
+                                       &dst_asset_balance.asset_commitment).unwrap();
         assert_eq!(expected, vrfy_ok);
 
     }
