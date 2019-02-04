@@ -11,6 +11,11 @@ pub struct Asset {
     pub id: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+pub struct CommitmentEqProof {
+    pub commitment: CompressedRistretto,
+    pub response: Scalar,
+}
 
 impl Asset {
 
@@ -46,7 +51,7 @@ impl Asset {
         source_asset_commitment: &CompressedRistretto,
         destination_asset_commitment: &CompressedRistretto,
         blinding_factor1: &Scalar,
-        blinding_factor2: &Scalar) -> (CompressedRistretto, Scalar)
+        blinding_factor2: &Scalar) -> CommitmentEqProof
     {
         let u = Scalar::random(prng);
         let proof_commitment = u*pedersen_gens.B_blinding;
@@ -55,7 +60,10 @@ impl Asset {
             pedersen_gens, source_asset_commitment, destination_asset_commitment,
             &compressed_propf_commitment);
         let proof_response = proof_challenge*(blinding_factor1-blinding_factor2) + u;
-        (compressed_propf_commitment, proof_response)
+        CommitmentEqProof{
+            commitment: compressed_propf_commitment,
+            response: proof_response
+        }
     }
 
     pub fn compute_challenge(
@@ -78,17 +86,17 @@ impl Asset {
         pedersen_gens: &PedersenGens,
         source_asset_commitment: &CompressedRistretto,
         destination_asset_commitment: &CompressedRistretto,
-        proof_commitment: &CompressedRistretto,
-        proof_response: &Scalar) -> bool
+        proof: &CommitmentEqProof) -> bool
     {
         let proof_challenge = Asset::compute_challenge(
-            pedersen_gens, source_asset_commitment,destination_asset_commitment, proof_commitment);
+            pedersen_gens, source_asset_commitment,destination_asset_commitment,
+            &proof.commitment);
 
         let src_com = source_asset_commitment.decompress().unwrap();
         let dst_com = destination_asset_commitment.decompress().unwrap();
-        let pf_com = proof_commitment.decompress().unwrap();
+        let pf_com = proof.commitment.decompress().unwrap();
 
-        proof_response*pedersen_gens.B_blinding == pf_com + proof_challenge*(src_com - dst_com)
+        proof.response * pedersen_gens.B_blinding == pf_com + proof_challenge*(src_com - dst_com)
     }
 }
 
@@ -121,7 +129,7 @@ mod test {
         let c1 = pedersen_bases.commit(value1, bf1).compress();
         let c2 = pedersen_bases.commit(value2, bf2).compress();
 
-        let (proof_commitment, proof_response) = Asset::prove_eq(
+        let proof = Asset::prove_eq(
             &mut csprng,
             &pc_gens,
             &c1,
@@ -130,19 +138,23 @@ mod test {
             &bf2);
 
         assert_eq!(false, Asset::verify_eq(&pc_gens,
-                                           &c1,&c2, &proof_commitment, &proof_response));
+                                           &c1,
+                                           &c2,
+                                           &proof));
 
         let c3 = pedersen_bases.commit(value1, bf2).compress();
-        let (proof_commitment, proof_response) = Asset::prove_eq(
+        let proof = Asset::prove_eq(
             &mut csprng,
             &pc_gens,
             &c1,
             &c3,
             &bf1,
             &bf2);
-        assert_eq!(true, Asset::verify_eq(
-            &pc_gens,
-            &c1,&c3 , &proof_commitment, &proof_response));
+
+        assert_eq!(true, Asset::verify_eq(&pc_gens,
+                                          &c1,
+                                          &c3 ,
+                                          &proof));
     }
 }
 

@@ -1,6 +1,7 @@
 use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
-use crate::asset::Asset;
+use crate::asset::{Asset,CommitmentEqProof};
 use crate::encryption::ZeiRistrettoCipher;
+use crate::encryption::ZeiRistrettoCipherString;
 use crate::errors::Error as ZeiError;
 use crate::serialization::{RangeProofString, CompressedRistrettoString,
                            ScalarString, PublicKeyString};
@@ -14,7 +15,8 @@ use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use std::convert::TryFrom;
-use crate::encryption::ZeiRistrettoCipherString;
+
+
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -34,8 +36,7 @@ pub struct Transaction {
     pub sender_updated_balance_commitment: CompressedRistretto,
     pub lockbox: ZeiRistrettoCipher,
     pub do_confidential_asset: bool,
-    pub asset_eq_proof_commitment: CompressedRistretto,
-    pub asset_eq_proof_response: Scalar,
+    pub asset_eq_proof: CommitmentEqProof,
     pub sender_asset_commitment: CompressedRistretto,
     pub receiver_asset_commitment: CompressedRistretto,
 }
@@ -127,19 +128,15 @@ impl Transaction {
             Err(_) => {return Err(ZeiError::TxProofError);},
         };
 
-        let mut asset_eq_proof_response: Scalar;
-        let mut asset_eq_proof_commitment: CompressedRistretto = RistrettoPoint::default().compress();
-        asset_eq_proof_response = Scalar::from(0u8);
+        let mut asset_eq_proof = CommitmentEqProof::default();
 
         if do_confidential_asset {
-            let (pf_comm, pf_response) = Asset::prove_eq(&mut csprng,
+            asset_eq_proof = Asset::prove_eq(&mut csprng,
                                              &params.pc_gens,
                                              sender_asset_commitment,
                                              &tx_params.receiver_asset_commitment,
                                              &sender_asset_opening,
                                              &tx_params.receiver_asset_opening);
-            asset_eq_proof_commitment = pf_comm;
-            asset_eq_proof_response = pf_response;
         }
 
         let mut to_encrypt = Vec::new();
@@ -154,8 +151,7 @@ impl Transaction {
             sender_updated_balance_commitment: commitments_agg[1],
             lockbox: lbox,
             do_confidential_asset,
-            asset_eq_proof_commitment,
-            asset_eq_proof_response,
+            asset_eq_proof,
             sender_asset_commitment: sender_asset_commitment.clone(),
             receiver_asset_commitment: tx_params.receiver_asset_commitment,
         };
@@ -236,8 +232,7 @@ pub fn validator_verify(tx: &Transaction,
                 &pc_gens,
                 &sender_asset,
                 &receiver_asset,
-                &tx.asset_eq_proof_commitment,
-                &tx.asset_eq_proof_response);
+                &tx.asset_eq_proof);
         }
         else{
             vrfy_ok = sender_asset == receiver_asset;
@@ -283,8 +278,8 @@ impl TryFrom<&Transaction> for TransactionString {
             sender_updated_balance_commitment: CompressedRistrettoString::from(&a.sender_updated_balance_commitment),
             lockbox: ZeiRistrettoCipherString::try_from(&a.lockbox)?,
             do_confidential_asset: a.do_confidential_asset,
-            asset_eq_proof_commitment: CompressedRistrettoString::from(&a.asset_eq_proof_commitment),
-            asset_eq_proof_response: ScalarString::from(a.asset_eq_proof_response),
+            asset_eq_proof_commitment: CompressedRistrettoString::from(&a.asset_eq_proof.commitment),
+            asset_eq_proof_response: ScalarString::from(a.asset_eq_proof.response),
             sender_asset_commitment: CompressedRistrettoString::from(&a.sender_asset_commitment),
             receiver_asset_commitment: CompressedRistrettoString::from(&a.receiver_asset_commitment),
         })
@@ -301,6 +296,7 @@ impl TryFrom<TransactionString> for Transaction{
         let do_confidential_asset = a.do_confidential_asset;
         let asset_eq_proof_commitment = CompressedRistretto::try_from(a.asset_eq_proof_commitment)?;
         let asset_eq_proof_response = Scalar::try_from(a.asset_eq_proof_response)?;
+        let asset_eq_proof = CommitmentEqProof{commitment: asset_eq_proof_commitment, response: asset_eq_proof_response};
         let sender_asset_commitment = CompressedRistretto::try_from(a.sender_asset_commitment)?;
         let receiver_asset_commitment = CompressedRistretto::try_from(a.receiver_asset_commitment)?;
         Ok(Transaction{
@@ -309,8 +305,7 @@ impl TryFrom<TransactionString> for Transaction{
             sender_updated_balance_commitment,
             lockbox,
             do_confidential_asset,
-            asset_eq_proof_commitment,
-            asset_eq_proof_response,
+            asset_eq_proof,
             sender_asset_commitment,
             receiver_asset_commitment,
         })
@@ -507,8 +502,7 @@ mod test {
         assert_eq!(tx.receiver_asset_commitment, dtx.receiver_asset_commitment);
         assert_eq!(tx.sender_asset_commitment, dtx.sender_asset_commitment);
         assert_eq!(tx.do_confidential_asset, dtx.do_confidential_asset);
-        assert_eq!(tx.asset_eq_proof_commitment, dtx.asset_eq_proof_commitment);
-        assert_eq!(tx.asset_eq_proof_response, dtx.asset_eq_proof_response);
+        assert_eq!(tx.asset_eq_proof, dtx.asset_eq_proof);
         assert_eq!(tx.sender_updated_balance_commitment, dtx.sender_updated_balance_commitment);
         assert_eq!(tx.lockbox, dtx.lockbox);
     }
