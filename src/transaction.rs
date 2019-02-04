@@ -23,15 +23,14 @@ pub struct Transaction {
      * I represent a transaction. I contain
      * - a range proof (0, val_max) for the senders updated balance and transaction amount,
      * - a Pedersen commitment for the transfer,
-     * - a Pedersen commitment of the senders new balance,
      * - and a encrypted box for the receiver that includes the transfered amount and the blinding
      * factor of the transaction commitment.
      * - boolean indicating whether transaction is confidential for asset type or not
      * - A proof of equality of asset type
+     * - The sender and the receiver asset commitments
      */
     pub transaction_range_proof: bulletproofs::RangeProof,
     pub transaction_commitment: CompressedRistretto,
-    pub sender_updated_balance_commitment: CompressedRistretto,
     pub lockbox: ZeiRistrettoCipher,
     pub do_confidential_asset: bool,
     pub asset_eq_proof: Scalar,
@@ -143,7 +142,6 @@ impl Transaction {
         let tx = Transaction {
             transaction_range_proof: proof_agg,
             transaction_commitment: commitments_agg[0],
-            sender_updated_balance_commitment: commitments_agg[1],
             lockbox: lbox,
             do_confidential_asset,
             asset_eq_proof,
@@ -206,16 +204,15 @@ pub fn validator_verify(tx: &Transaction,
     let bp_gens = BulletproofGens::new(32, 2);
 
     let tx_comm = tx.transaction_commitment.decompress().unwrap();
-    let derived_sender_comm = sender_prev_com - tx_comm;
-    let tx_sender_updated_balance_comm = tx.sender_updated_balance_commitment.decompress().unwrap();
-    let mut vrfy_ok = derived_sender_comm == tx_sender_updated_balance_comm;
+    let derived_sender_comm = (sender_prev_com - tx_comm).compress();
+    let mut vrfy_ok = true;
     if vrfy_ok {
         let verify_t = RangeProof::verify_multiple(
             &tx.transaction_range_proof,
             &bp_gens,
             &pc_gens,
             &mut transcript,
-            &[tx.transaction_commitment, tx.sender_updated_balance_commitment],
+            &[tx.transaction_commitment, derived_sender_comm],
             32
         );
 
@@ -255,7 +252,6 @@ pub fn receiver_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPo
 pub struct TransactionString{
     transaction_range_proof: RangeProofString,
     transaction_commitment: CompressedRistrettoString,
-    sender_updated_balance_commitment: CompressedRistrettoString,
     lockbox: ZeiRistrettoCipherString,
     do_confidential_asset: bool,
     asset_eq_proof: ScalarString,
@@ -269,7 +265,6 @@ impl TryFrom<&Transaction> for TransactionString {
         Ok(TransactionString{
             transaction_range_proof: RangeProofString::from(&a.transaction_range_proof),
             transaction_commitment: CompressedRistrettoString::from(&a.transaction_commitment),
-            sender_updated_balance_commitment: CompressedRistrettoString::from(&a.sender_updated_balance_commitment),
             lockbox: ZeiRistrettoCipherString::try_from(&a.lockbox)?,
             do_confidential_asset: a.do_confidential_asset,
             asset_eq_proof: ScalarString::from(a.asset_eq_proof),
@@ -284,7 +279,6 @@ impl TryFrom<TransactionString> for Transaction{
     fn try_from(a: TransactionString) -> Result<Transaction, ZeiError> {
         let transaction_range_proof = RangeProof::try_from(a.transaction_range_proof)?;
         let transaction_commitment = CompressedRistretto::try_from(a.transaction_commitment)?;
-        let sender_updated_balance_commitment = CompressedRistretto::try_from(a.sender_updated_balance_commitment)?;
         let lockbox: ZeiRistrettoCipher = ZeiRistrettoCipher::try_from(a.lockbox)?;
         let do_confidential_asset = a.do_confidential_asset;
         let asset_eq_proof = Scalar::try_from(a.asset_eq_proof)?;
@@ -293,7 +287,6 @@ impl TryFrom<TransactionString> for Transaction{
         Ok(Transaction{
             transaction_range_proof,
             transaction_commitment,
-            sender_updated_balance_commitment,
             lockbox,
             do_confidential_asset,
             asset_eq_proof,
@@ -498,7 +491,6 @@ mod test {
         assert_eq!(tx.sender_asset_commitment, dtx.sender_asset_commitment);
         assert_eq!(tx.do_confidential_asset, dtx.do_confidential_asset);
         assert_eq!(tx.asset_eq_proof, dtx.asset_eq_proof);
-        assert_eq!(tx.sender_updated_balance_commitment, dtx.sender_updated_balance_commitment);
         assert_eq!(tx.lockbox, dtx.lockbox);
         /*
         assert_eq!(tx.lockbox.rand, deserialized_tx.lockbox.rand);

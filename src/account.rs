@@ -141,7 +141,7 @@ impl Account {
             asset_balance.confidential_asset).unwrap();
 
         asset_balance.balance_blinding -= tx_blind;
-        asset_balance.balance_commitment = newtx.sender_updated_balance_commitment;
+        asset_balance.balance_commitment = (asset_balance.balance_commitment.decompress().unwrap() - newtx.transaction_commitment.decompress().unwrap()).compress();
         self.tx_counter += 1;
         Ok(newtx)
     }
@@ -167,11 +167,11 @@ impl Account {
         Ok(())
     }
 
-    pub fn receive(&mut self, tx: &Transaction) {
+    pub fn receive(&mut self, tx: &Transaction) -> bool{
         /*! I receive a transaction to this account and update it accordingly
          *
          */
-
+        let params = PublicParams::new();
         let mut asset_id= String::from("");
         {
             for (a_id, asset_balance) in self.balances.iter() {
@@ -184,11 +184,21 @@ impl Account {
 
         let mut asset_balance = self.balances.get_mut(&asset_id).unwrap();
         let (recovered_amount, recovered_blind) = tx.recover_plaintext(&self.keys.secret);
-        //verify that commitments are correct that is sent
-        //if receiver_verify(recovered_amount, recovered_blind, tx.receiver_new_commit, self.commitment) {} else {}
-        asset_balance.balance_commitment = tx.sender_updated_balance_commitment;
+
+        let derived_tx_commitment = params.pc_gens.commit(Scalar::from(recovered_amount), recovered_blind);
+        if derived_tx_commitment.compress() != tx.transaction_commitment {
+            return false;
+        }
+
+        let new_balance_commitment = asset_balance.balance_commitment.decompress().unwrap() -
+            tx.transaction_commitment.decompress().unwrap();
+
+
+
+        asset_balance.balance_commitment = new_balance_commitment.compress();
         asset_balance.balance_blinding += recovered_blind;
         asset_balance.balance += recovered_amount;
+        true
     }
 
     pub fn sign<R>(&self, csprng: &mut R, msg: &[u8]) -> Signature
