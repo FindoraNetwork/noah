@@ -6,7 +6,7 @@ use crate::errors::Error as ZeiError;
 use crate::serialization::{RangeProofString, CompressedRistrettoString,
                            ScalarString, PublicKeyString};
 use crate::setup::PublicParams;
-use crate::utils::u32_to_bigendian_u8array;
+use crate::utils::u64_to_bigendian_u8array;
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
@@ -15,8 +15,9 @@ use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use std::convert::TryFrom;
-
-
+use crate::utils::u8_bigendian_slice_to_u64;
+use crate::setup::Balance;
+use crate::setup::BULLET_PROOF_RANGE;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -49,7 +50,7 @@ pub struct TxParams{
     pub receiver_pk: PublicKey,
     pub receiver_asset_commitment: CompressedRistretto,
     pub receiver_asset_opening: Scalar,
-    pub transfer_amount: u32,
+    pub transfer_amount: Balance,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -57,7 +58,7 @@ pub struct TxParamsString{
     receiver_pk: PublicKeyString,
     receiver_asset_commitment: CompressedRistrettoString,
     receiver_asset_opening: ScalarString,
-    transfer_amount: u32,
+    transfer_amount: u64,
 }
 
 impl TryFrom<TxParamsString> for TxParams{
@@ -89,7 +90,7 @@ impl From<TxParams> for TxParamsString{
 impl Transaction {
     pub fn new<R>(mut csprng: &mut R,
                   tx_params: &TxParams,
-                  account_balance: u32,
+                  account_balance: Balance,
                   account_blind: &Scalar,
                   sender_asset_opening: &Scalar,
                   sender_asset_commitment: &CompressedRistretto,
@@ -120,13 +121,12 @@ impl Transaction {
             &mut params.transcript,
             &[u64::from(tx_amount), u64::from(sender_updated_balance)],
             &[blinding_t, sender_updated_account_blind],
-            32);
+            BULLET_PROOF_RANGE);
 
         let (proof_agg, commitments_agg) = match range_proof_result {
             Ok((pf_agg, comm_agg)) => (pf_agg, comm_agg),
-            Err(_) => {return Err(ZeiError::TxProofError);},
+            Err(_) => { return Err(ZeiError::TxProofError);},
         };
-
         let mut asset_eq_proof = CommitmentEqProof::default();
 
         if do_confidential_asset {
@@ -139,7 +139,7 @@ impl Transaction {
         }
 
         let mut to_encrypt = Vec::new();
-        to_encrypt.extend_from_slice(&u32_to_bigendian_u8array(tx_amount));
+        to_encrypt.extend_from_slice(&u64_to_bigendian_u8array(tx_amount));
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
         let receiver_public_key = &tx_params.receiver_pk.get_curve_point()?.compress();
         let lbox = ZeiRistrettoCipher::encrypt(csprng, receiver_public_key, &to_encrypt)?;
@@ -157,7 +157,7 @@ impl Transaction {
        Ok((tx, blinding_t))
     }
 
-    pub fn recover_plaintext(&self, sk: &SecretKey) -> (u32, Scalar) {
+    pub fn recover_plaintext(&self, sk: &SecretKey) -> (Balance, Scalar) {
         /*
          * I recover the sent amount and blind factor from the encryted box in a transaction
          *
@@ -172,13 +172,10 @@ impl Transaction {
 
         let secret_key = Scalar::from_bits(secret_key_bytes);
         let unlocked = self.lockbox.decrypt(&secret_key).unwrap();
-        let (raw_amount, raw_blind) = unlocked.split_at(4);
+        let (raw_amount, raw_blind) = unlocked.split_at(8);
 
-        //convert to u32
-        let p_amount = u32::from(raw_amount[0]) << 24 |
-            u32::from(raw_amount[1]) << 16 |
-            u32::from(raw_amount[2]) << 8 |
-            u32::from(raw_amount[3]);
+        //TODO: the following assume amounts are 64 bits
+        let p_amount = u8_bigendian_slice_to_u64(&raw_amount);
 
         let mut bytes: [u8;32] = Default::default();
         bytes.copy_from_slice(&raw_blind[0..32]);
@@ -206,7 +203,7 @@ pub fn validator_verify(tx: &Transaction,
     let mut transcript = Transcript::new(b"Zei Range Proof");
     let pc_gens = PedersenGens::default();
     //TODO:This probably shouldn't be regenerated every time
-    let bp_gens = BulletproofGens::new(32, 2);
+    let bp_gens = BulletproofGens::new(BULLET_PROOF_RANGE, 2);
 
     let tx_comm = tx.transaction_commitment.decompress()?;
     let derived_sender_comm = (sender_prev_com.decompress()? - tx_comm).compress();
@@ -217,11 +214,10 @@ pub fn validator_verify(tx: &Transaction,
         &pc_gens,
         &mut transcript,
         &[tx.transaction_commitment, derived_sender_comm],
-        32
+        BULLET_PROOF_RANGE,
     );
 
     let mut vrfy_ok = verify_t.is_ok();
-
     if vrfy_ok {
         if tx.do_confidential_asset {
             vrfy_ok = Asset::verify_eq(
@@ -326,17 +322,15 @@ mod test {
 
         //Account A
         let mut acc_a = Account::new(&mut csprng);
-        acc_a.add_asset(&mut csprng, asset_id, false, 50);
+        acc_a.add_asset(&mut csprng, asset_id, false, 8000000000);
         //Account B
         let mut acc_b = Account::new(&mut csprng);
         acc_b.add_asset(&mut csprng, asset_id, false, 50);
 
         let new_tx = TxParams {
             receiver_pk: acc_b.keys.public,
-            transfer_amount: 100u32,
+            transfer_amount: 5000000000,
             receiver_asset_opening: Scalar::from(0u8),
-            // sender_asset_opening: Scalar::from(0u8),
-            // sender_asset_commitment:acc_a.get_asset_balance(asset_id).asset_commitment,
             receiver_asset_commitment:acc_b.get_asset_balance(asset_id).asset_commitment,
         };
 
@@ -345,12 +339,12 @@ mod test {
         //
 
         let mut transcript = Transcript::new(b"Zei Range Proof");
-        let bp_gens = BulletproofGens::new(32, 2);
+        let bp_gens = BulletproofGens::new(BULLET_PROOF_RANGE, 2);
 
         let blinding_t = Scalar::random(&mut csprng);
 
-        let values = &[new_tx.transfer_amount as u64, acc_a.get_balance(asset_id) as u64];
-        let blindings = &[blinding_t, acc_a.get_asset_balance(asset_id).balance_blinding];
+        let values = &[new_tx.transfer_amount, acc_a.get_balance(asset_id) - 100u64];
+        let blindings = &[blinding_t, acc_a.get_asset_balance(asset_id).balance_blinding - blinding_t];
 
         let (_, commitments_agg) = RangeProof::prove_multiple(
             &bp_gens,
@@ -358,7 +352,7 @@ mod test {
             &mut transcript,
             values,
             blindings,
-            32,
+            BULLET_PROOF_RANGE,
             ).expect("A real program could handle errors");
 
         let tx_derived_commit = pc_gens.commit(Scalar::from(new_tx.transfer_amount), blinding_t);
@@ -369,13 +363,13 @@ mod test {
     #[test]
     fn test_confidential_asset_transaction(){
         let asset_id = "default_currency";
-        let transfer_amount = 100u32;
+        let transfer_amount = 0x01234567;
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
 
         // source account setup
         let mut acc_src = Account::new(&mut csprng);
-        acc_src.add_asset(&mut csprng, asset_id, true, 1000);
+        acc_src.add_asset(&mut csprng, asset_id, true, 0x12345678);
         let src_asset_balance = acc_src.get_asset_balance(asset_id);
 
 
@@ -398,21 +392,14 @@ mod test {
     #[test]
     fn test_non_confidential_asset_transaction(){
         let asset_id = "default_currency";
-        let transfer_amount = 100u32;
+        let transfer_amount = 0x01234567;
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
-
-        //def pederson from lib with Common Reference String
-        let pc_gens = PedersenGens::default();
+        
 
         let mut acc_src = Account::new(&mut csprng);
-        acc_src.add_asset(&mut csprng, asset_id, false, 50);
-        let mut src_asset_balance = acc_src.get_asset_balance(asset_id);
-        src_asset_balance.balance = 10000;
-        src_asset_balance.balance_commitment =
-            pc_gens.commit(Scalar::from(src_asset_balance.balance),
-                           src_asset_balance.balance_blinding).compress();
-
+        acc_src.add_asset(&mut csprng, asset_id, false, 0x12345678);
+        let src_asset_balance = acc_src.get_asset_balance(asset_id);
 
         // destination account setup
         let mut acc_dst = Account::new(&mut csprng);
@@ -426,7 +413,7 @@ mod test {
     fn do_transaction_validation(src_asset_balance: &AssetBalance,
                                  dst_asset_balance: &AssetBalance,
                                  dst_pk: PublicKey,
-                                 transfer_amount: u32, expected: bool){
+                                 transfer_amount: u64, expected: bool){
 
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
@@ -457,13 +444,13 @@ mod test {
     #[test]
     fn test_transaction_serialization(){
         let asset_id = "default_currency";
-        let transfer_amount = 100u32;
+        let transfer_amount = 0x01000000;
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
 
         // source account setup
         let mut acc_src = Account::new(&mut csprng);
-        acc_src.add_asset(&mut csprng, asset_id, true, 100);
+        acc_src.add_asset(&mut csprng, asset_id, true, 0x02000000);
 
         // destination account stup
         let mut acc_dst = Account::new(&mut csprng);

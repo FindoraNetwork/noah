@@ -129,14 +129,39 @@ pub fn u32_to_bigendian_u8array(n: u32) -> [u8;4]{
 
 }
 
-/*
+pub fn u64_to_bigendian_u8array(n: u64) -> [u8;8]{
+    let mut array = [0u8;8];
+    array[0] = ((n>>56)&0xFF) as u8;
+    array[1] = ((n>>48)&0xFF) as u8;
+    array[2] = ((n>>40)&0xFF) as u8;
+    array[3] = ((n>>32)&0xFF) as u8;
+    array[4] = ((n>>24)&0xFF) as u8;
+    array[5] = ((n>>16)&0xFF) as u8;
+    array[6] = ((n>>8)&0xFF) as u8;
+    array[7] = (n & 0xFF) as u8;
+    array
+
+}
+
+pub fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64{
+    u64::from(array[0]) << 56 |
+        u64::from(array[1]) << 48 |
+        u64::from(array[2]) << 40 |
+        u64::from(array[3]) << 32 |
+        u64::from(array[4]) << 24 |
+        u64::from(array[5]) << 16 |
+        u64::from(array[6]) << 8 |
+        u64::from(array[7])
+}
+
+
 pub fn u8_bigendian_slice_to_u32(array: &[u8; 4]) -> u32{
         ((u32::from(array[0]))<<24) +
         ((u32::from(array[1]))<<16) +
         ((u32::from(array[2]))<<8) +
         (u32::from(array[3]))
 }
-*/
+
 
 #[cfg(test)]
 mod test {
@@ -155,6 +180,7 @@ mod test {
         let b58_str = to_base58(&v[..]);
         assert_eq!(v, from_base58(&b58_str[..]).unwrap());
     }
+
     #[test]
     fn test_u32_to_bignedian_u8array(){
         let n:u32 = 0xFA01C673;
@@ -164,13 +190,34 @@ mod test {
         assert_eq!(0xC6, n_array[2]);
         assert_eq!(0x73, n_array[3]);
     }
-    /*
+
     #[test]
     fn test_u8_bigendian_slice_to_u32(){
         let array = [0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8];
         let n = u8_bigendian_slice_to_u32(&array);
         assert_eq!(0xFA01C673, n);
     }
-    */
+
+    #[test]
+    fn test_u64_to_bignedian_u8array(){
+        let n:u64 = 0xFA01C67322E498A2;
+        let n_array = u64_to_bigendian_u8array(n);
+        assert_eq!(0xFA, n_array[0]);
+        assert_eq!(0x01, n_array[1]);
+        assert_eq!(0xC6, n_array[2]);
+        assert_eq!(0x73, n_array[3]);
+        assert_eq!(0x22, n_array[4]);
+        assert_eq!(0xE4, n_array[5]);
+        assert_eq!(0x98, n_array[6]);
+        assert_eq!(0xA2, n_array[7]);
+    }
+
+    #[test]
+    fn test_u8_bigendian_slice_to_u64(){
+        let array = [0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8, 0x22, 0xE4, 0x98, 0xA2];
+        let n = u8_bigendian_slice_to_u64(&array);
+        assert_eq!(0xFA01C67322E498A2, n);
+    }
+
     
 }

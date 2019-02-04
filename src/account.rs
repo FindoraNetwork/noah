@@ -18,9 +18,8 @@ use crate::serialization::ScalarString;
 use std::convert::TryFrom;
 use crate::serialization::KeypairString;
 use crate::asset::Asset;
+use crate::setup::Balance;
 
-//Balance, currently as 32bits; TODO: make 64bits via (u32, u32)
-pub type Balance = u32;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AssetBalance {
@@ -57,7 +56,7 @@ impl Account {
         }
     }
 
-    pub fn add_asset<R>(&mut self, csprng: &mut R, asset_id: &str, confidential_asset: bool, starting_bal: u32)
+    pub fn add_asset<R>(&mut self, csprng: &mut R, asset_id: &str, confidential_asset: bool, starting_bal: Balance)
         where R: CryptoRng + Rng,
     {
         /*!I add an asset with 0 balance to this account
@@ -65,7 +64,7 @@ impl Account {
          */
         let asset_info = Asset::new(asset_id);
         let pp = PublicParams::new();
-        let balance: u32 = starting_bal;
+        let balance  = starting_bal;
         let balance_blinding = Scalar::from(0u32);
         let value = Scalar::from(balance);
         let asset_commitment: RistrettoPoint;
@@ -95,7 +94,7 @@ impl Account {
         self.balances.insert(String::from(asset_id), asset_balance);
     }
 
-    pub fn get_balance(&self, asset_id: &str) -> u32 {
+    pub fn get_balance(&self, asset_id: &str) -> Balance {
         self.balances.get(asset_id).unwrap().balance
     }
 
@@ -148,7 +147,7 @@ impl Account {
 
     pub fn apply_tx(&mut self,
                     tx: &Transaction,
-                    amount: u32,
+                    amount: Balance,
                     asset_type: &str,
                     tx_blinding: &Scalar) -> Result<(),ZeiError>{
         /*! I should be called once the network has accepted a transaction issued by this account
@@ -258,7 +257,7 @@ impl TryFrom<AccountString> for Account {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AssetBalanceString{
     tx_counter: u128,
-    balance: u32,
+    balance: u64,
     balance_commitment: CompressedRistrettoString,
     balance_blinding: ScalarString,
     // TODO
@@ -346,11 +345,10 @@ mod test {
 
     #[test]
     pub fn test_account_apply_tx() {
-        let starting_bal = 50;
+        let starting_bal = 8*1000*1000*1000*1000;
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
-        let transfer_amount = 10;
-
+        let transfer_amount = 5*1000*1000*1000*1000;
         let mut sender = Account::new(&mut csprng);
         let mut rec = Account::new(&mut csprng);
         let asset_id = "example_asset";

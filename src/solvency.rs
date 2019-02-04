@@ -6,6 +6,7 @@ use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 use curve25519_dalek::traits::Identity;
+use crate::setup::BULLET_PROOF_RANGE;
 
 pub fn prove_solvency(assets: Vec<Account>, liabilities: Vec<Account>, asset_id: &str) -> RangeProof {
 	// Common Reference String
@@ -13,10 +14,10 @@ pub fn prove_solvency(assets: Vec<Account>, liabilities: Vec<Account>, asset_id:
     // def pederson from lib with Common Reference String
     let pc_gens = PedersenGens::default();
     // 32bit range for now & one prover
-    let bp_gens = BulletproofGens::new(32, 1);
+    let bp_gens = BulletproofGens::new(BULLET_PROOF_RANGE, 1);
 
 	// Calculate Amount
-	let mut assets_amount : u32 = 0;
+	let mut assets_amount : u64 = 0;
 	let mut assets_blind : Scalar = Scalar::zero();
 
 	for a in assets {
@@ -25,7 +26,7 @@ pub fn prove_solvency(assets: Vec<Account>, liabilities: Vec<Account>, asset_id:
 	}
 
 	// Calculate liabilities
-	let mut liabilities_amount : u32 = 0;
+	let mut liabilities_amount : u64 = 0;
 	let mut liabilities_blind : Scalar = Scalar::zero();
 
 	for a in liabilities {
@@ -43,7 +44,7 @@ pub fn prove_solvency(assets: Vec<Account>, liabilities: Vec<Account>, asset_id:
         &mut transcript,
         u64::from(proof_balance),
         &proof_blind,
-        32,
+		BULLET_PROOF_RANGE,
     ).expect("A real program could handle errors");
 
 	return proof;
@@ -70,7 +71,7 @@ pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liab
     //def pederson from lib with Common Reference String
     let pc_gens = PedersenGens::default();
     //32bit range for now & one prover
-    let bp_gens = BulletproofGens::new(32, 1);
+    let bp_gens = BulletproofGens::new(BULLET_PROOF_RANGE, 1);
 
 	let verify_t = RangeProof::verify_single(
 		&proof,
@@ -78,7 +79,7 @@ pub fn verify_solvency(commitments_assets: Vec<RistrettoPoint>, commitments_liab
         &pc_gens,
         &mut transcript,
 		&proof_comm.compress(),
-		32
+		BULLET_PROOF_RANGE
 	);
 
 	//check rangeproof
