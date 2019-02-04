@@ -1,6 +1,7 @@
 use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
-use crate::asset::Asset;
+use crate::asset::{Asset,CommitmentEqProof};
 use crate::encryption::ZeiRistrettoCipher;
+use crate::encryption::ZeiRistrettoCipherString;
 use crate::errors::Error as ZeiError;
 use crate::serialization::{RangeProofString, CompressedRistrettoString,
                            ScalarString, PublicKeyString};
@@ -14,7 +15,8 @@ use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use std::convert::TryFrom;
-use crate::encryption::ZeiRistrettoCipherString;
+
+
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -33,7 +35,7 @@ pub struct Transaction {
     pub transaction_commitment: CompressedRistretto,
     pub lockbox: ZeiRistrettoCipher,
     pub do_confidential_asset: bool,
-    pub asset_eq_proof: Scalar,
+    pub asset_eq_proof: CommitmentEqProof,
     pub sender_asset_commitment: CompressedRistretto,
     pub receiver_asset_commitment: CompressedRistretto,
 }
@@ -85,7 +87,7 @@ impl From<TxParams> for TxParamsString{
 
 
 impl Transaction {
-    pub fn new<R>(csprng: &mut R,
+    pub fn new<R>(mut csprng: &mut R,
                   tx_params: &TxParams,
                   account_balance: u32,
                   account_blind: &Scalar,
@@ -125,18 +127,21 @@ impl Transaction {
             Err(_) => {return Err(ZeiError::TxProofError);},
         };
 
-        let mut asset_eq_proof: Scalar;
+        let mut asset_eq_proof = CommitmentEqProof::default();
 
-        asset_eq_proof = Scalar::from(0u8);
         if do_confidential_asset {
-            asset_eq_proof = Asset::prove_eq(&tx_params.receiver_asset_opening,
-                                    &sender_asset_opening);
+            asset_eq_proof = Asset::prove_eq(&mut csprng,
+                                             &params.pc_gens,
+                                             sender_asset_commitment,
+                                             &tx_params.receiver_asset_commitment,
+                                             &sender_asset_opening,
+                                             &tx_params.receiver_asset_opening);
         }
 
         let mut to_encrypt = Vec::new();
         to_encrypt.extend_from_slice(&u32_to_bigendian_u8array(tx_amount));
         to_encrypt.extend_from_slice(&blinding_t.to_bytes());
-        let receiver_public_key = &tx_params.receiver_pk.get_curve_point().unwrap().compress();
+        let receiver_public_key = &tx_params.receiver_pk.get_curve_point()?.compress();
         let lbox = ZeiRistrettoCipher::encrypt(csprng, receiver_public_key, &to_encrypt)?;
 
         let tx = Transaction {
@@ -186,9 +191,9 @@ impl Transaction {
 
 
 pub fn validator_verify(tx: &Transaction,
-                        sender_prev_com: RistrettoPoint,
-                        sender_asset: RistrettoPoint,
-                        receiver_asset: RistrettoPoint) -> bool {
+                        sender_prev_com: &CompressedRistretto,
+                        sender_asset: &CompressedRistretto,
+                        receiver_asset: &CompressedRistretto) -> Result<bool, ZeiError> {
     /*
      * Run by validator. I verify the transaction:
      * a) sender new balance commitment must match commitmment in transaction
@@ -203,34 +208,33 @@ pub fn validator_verify(tx: &Transaction,
     //TODO:This probably shouldn't be regenerated every time
     let bp_gens = BulletproofGens::new(32, 2);
 
-    let tx_comm = tx.transaction_commitment.decompress().unwrap();
-    let derived_sender_comm = (sender_prev_com - tx_comm).compress();
-    let mut vrfy_ok = true;
-    if vrfy_ok {
-        let verify_t = RangeProof::verify_multiple(
-            &tx.transaction_range_proof,
-            &bp_gens,
-            &pc_gens,
-            &mut transcript,
-            &[tx.transaction_commitment, derived_sender_comm],
-            32
-        );
+    let tx_comm = tx.transaction_commitment.decompress()?;
+    let derived_sender_comm = (sender_prev_com.decompress()? - tx_comm).compress();
 
-        vrfy_ok = verify_t.is_ok();
-    }
+    let verify_t = RangeProof::verify_multiple(
+        &tx.transaction_range_proof,
+        &bp_gens,
+        &pc_gens,
+        &mut transcript,
+        &[tx.transaction_commitment, derived_sender_comm],
+        32
+    );
+
+    let mut vrfy_ok = verify_t.is_ok();
+
     if vrfy_ok {
         if tx.do_confidential_asset {
-            let h = PedersenGens::default().B_blinding;
-            vrfy_ok = Asset::verify_eq(&receiver_asset,
-                                       &sender_asset,
-                                       tx.asset_eq_proof,
-                                       &h);
+            vrfy_ok = Asset::verify_eq(
+                &pc_gens,
+                &sender_asset,
+                &receiver_asset,
+                &tx.asset_eq_proof)?;
         }
         else{
             vrfy_ok = sender_asset == receiver_asset;
         }
     }
-    vrfy_ok
+    Ok(vrfy_ok)
 }
 
 
@@ -254,7 +258,8 @@ pub struct TransactionString{
     transaction_commitment: CompressedRistrettoString,
     lockbox: ZeiRistrettoCipherString,
     do_confidential_asset: bool,
-    asset_eq_proof: ScalarString,
+    asset_eq_proof_commitment: CompressedRistrettoString,
+    asset_eq_proof_response: ScalarString,
     sender_asset_commitment: CompressedRistrettoString,
     receiver_asset_commitment: CompressedRistrettoString,
 }
@@ -267,7 +272,8 @@ impl TryFrom<&Transaction> for TransactionString {
             transaction_commitment: CompressedRistrettoString::from(&a.transaction_commitment),
             lockbox: ZeiRistrettoCipherString::try_from(&a.lockbox)?,
             do_confidential_asset: a.do_confidential_asset,
-            asset_eq_proof: ScalarString::from(a.asset_eq_proof),
+            asset_eq_proof_commitment: CompressedRistrettoString::from(&a.asset_eq_proof.commitment),
+            asset_eq_proof_response: ScalarString::from(a.asset_eq_proof.response),
             sender_asset_commitment: CompressedRistrettoString::from(&a.sender_asset_commitment),
             receiver_asset_commitment: CompressedRistrettoString::from(&a.receiver_asset_commitment),
         })
@@ -281,7 +287,9 @@ impl TryFrom<TransactionString> for Transaction{
         let transaction_commitment = CompressedRistretto::try_from(a.transaction_commitment)?;
         let lockbox: ZeiRistrettoCipher = ZeiRistrettoCipher::try_from(a.lockbox)?;
         let do_confidential_asset = a.do_confidential_asset;
-        let asset_eq_proof = Scalar::try_from(a.asset_eq_proof)?;
+        let asset_eq_proof_commitment = CompressedRistretto::try_from(a.asset_eq_proof_commitment)?;
+        let asset_eq_proof_response = Scalar::try_from(a.asset_eq_proof_response)?;
+        let asset_eq_proof = CommitmentEqProof{commitment: asset_eq_proof_commitment, response: asset_eq_proof_response};
         let sender_asset_commitment = CompressedRistretto::try_from(a.sender_asset_commitment)?;
         let receiver_asset_commitment = CompressedRistretto::try_from(a.receiver_asset_commitment)?;
         Ok(Transaction{
@@ -364,15 +372,11 @@ mod test {
         let transfer_amount = 100u32;
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = PedersenGens::default();
 
         // source account setup
         let mut acc_src = Account::new(&mut csprng);
-        acc_src.add_asset(&mut csprng, asset_id, true, 50);
-        let mut src_asset_balance = acc_src.get_asset_balance(asset_id);
-        src_asset_balance.balance = 10000;
-        src_asset_balance.balance_commitment =
-            pc_gens.commit(Scalar::from(src_asset_balance.balance), src_asset_balance.balance_blinding).compress();
+        acc_src.add_asset(&mut csprng, asset_id, true, 1000);
+        let src_asset_balance = acc_src.get_asset_balance(asset_id);
 
 
         // destination account setup
@@ -431,7 +435,7 @@ mod test {
             receiver_pk: dst_pk,
             transfer_amount: transfer_amount,
             receiver_asset_opening: dst_asset_balance.asset_blinding,
-            receiver_asset_commitment: src_asset_balance.asset_commitment,
+            receiver_asset_commitment: dst_asset_balance.asset_commitment,
         };
 
         let (tx,_)  = Transaction::new(&mut csprng,
@@ -443,9 +447,9 @@ mod test {
                                        true).unwrap();
 
         let vrfy_ok = validator_verify(&tx,
-                                       src_asset_balance.balance_commitment.decompress().unwrap(),
-                                       src_asset_balance.asset_commitment.decompress().unwrap(),
-                                       dst_asset_balance.asset_commitment.decompress().unwrap());
+                                       &src_asset_balance.balance_commitment,
+                                       &src_asset_balance.asset_commitment,
+                                       &dst_asset_balance.asset_commitment).unwrap();
         assert_eq!(expected, vrfy_ok);
 
     }
@@ -492,11 +496,5 @@ mod test {
         assert_eq!(tx.do_confidential_asset, dtx.do_confidential_asset);
         assert_eq!(tx.asset_eq_proof, dtx.asset_eq_proof);
         assert_eq!(tx.lockbox, dtx.lockbox);
-        /*
-        assert_eq!(tx.lockbox.rand, deserialized_tx.lockbox.rand);
-        assert_eq!(tx.lockbox.data.cipher, deserialized_tx.lockbox.data.cipher);
-        assert_eq!(tx.lockbox.data.nonce, deserialized_tx.lockbox.data.nonce);
-        assert_eq!(tx.lockbox.data.tag, deserialized_tx.lockbox.data.tag);
-        */
     }
 }
