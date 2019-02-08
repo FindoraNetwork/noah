@@ -8,6 +8,18 @@ use curve25519_dalek::scalar::Scalar;
 use blake2::{Blake2b, Digest};
 use curve25519_dalek::ristretto::RistrettoPoint;
 
+fn compute_challenge(context: &[&CompressedRistretto]) -> Scalar{
+    /*! I compute zk challenges for Dlog based proof. The challenge is a hash of the
+    current context of the proof*/
+    let mut hasher = Blake2b::new();
+
+    for point in context.iter(){
+        hasher.input((*point).as_bytes());
+    }
+
+    Scalar::from_hash(hasher)
+}
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenCommitmentEqProof {
     c3: CompressedRistretto,
@@ -43,8 +55,8 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     let c3 = pedersen_gens.commit(r3, r4).compress();
     let c4 = pedersen_gens.commit(r3, r5).compress();
 
-    let c = chaum_perdersen_compute_eq_challenge(
-        [&commitment1, &commitment2,
+    let c = compute_challenge(
+        &[&commitment1, &commitment2,
             &c3, &c4]);
 
     let z1 = c*value + r3;
@@ -54,15 +66,6 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     ChaumPedersenCommitmentEqProof{
         c3,c4,z1,z2,z3
     }
-}
-
-fn chaum_perdersen_compute_eq_challenge(commitments: [&CompressedRistretto;4]) -> Scalar{
-    let mut hasher = Blake2b::new();
-    hasher.input(commitments[0].as_bytes());
-    hasher.input(commitments[1].as_bytes());
-    hasher.input(commitments[2].as_bytes());
-    hasher.input(commitments[3].as_bytes());
-    Scalar::from_hash(hasher)
 }
 
 pub fn chaum_pedersen_eq_verify(
@@ -80,8 +83,8 @@ pub fn chaum_pedersen_eq_verify(
     let g = &pc_gens.B;
     let h = &pc_gens.B_blinding;
 
-    let c = chaum_perdersen_compute_eq_challenge(
-        [c1, c2, &proof.c3, &proof.c4]);
+    let c = compute_challenge(
+        &[c1, c2, &proof.c3, &proof.c4]);
 
     let mut vrfy_ok = c3_d + c*c1_d == z1*g + z2*h;
     vrfy_ok = vrfy_ok && c4_d + c*c2_d == z1*g + z3*h;
@@ -91,8 +94,8 @@ pub fn chaum_pedersen_eq_verify(
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct DlogProof{
-    proof_commitment: CompressedRistretto,
-    response: Scalar,
+    pub proof_commitment: CompressedRistretto,
+    pub response: Scalar,
 }
 
 pub fn prove_knowledge_dlog<R: CryptoRng + Rng>(
@@ -102,7 +105,7 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng>(
     dlog: &Scalar) -> DlogProof{
     let u = Scalar::random(prng);
     let proof_commitment = (u*base).compress();
-    let challenge = compute_dlog_challenge(
+    let challenge = compute_challenge(
         &[&base.compress(), &proof_commitment, point]);
     let response = challenge * dlog + u;
 
@@ -112,23 +115,12 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng>(
     }
 }
 
-pub fn compute_dlog_challenge(context: &[&CompressedRistretto]) -> Scalar{
-    let mut hasher = Blake2b::new();
-
-    for point in context.iter(){
-        hasher.input((*point).as_bytes());
-    }
-
-    Scalar::from_hash(hasher)
-}
-
-
 pub fn verify_proof_of_knowledge_dlog(
     base: &RistrettoPoint,
     point: &CompressedRistretto,
     proof:&DlogProof) -> Result<bool, ZeiError>{
 
-    let challenge = compute_dlog_challenge(
+    let challenge = compute_challenge(
         &[&base.compress(), &proof.proof_commitment, point]);
 
     let dpoint = point.decompress()?;
@@ -140,48 +132,29 @@ pub fn verify_proof_of_knowledge_dlog(
 }
 
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct CommitmentEqProof {
-    pub commitment: CompressedRistretto,
-    pub response: Scalar,
-}
+//TODO: verify the following proof is good, otherwise use Chaum-Pedersen above.
+//The following proof systems assumes that source asset commitment is a valid
+//perdersen commitment. Otherwise, it is not secure. If source asset commitment
+//cannot be assumed to be a valid pedersen commitment, then use Chaum-Pedersen
+pub type CommitmentEqProof = DlogProof;
 
-pub fn prove_eq<R: CryptoRng + Rng>(
+pub fn prove_commitment_eq<R: CryptoRng + Rng>(
     prng: &mut R,
     pedersen_gens: &PedersenGens,
     source_asset_commitment: &CompressedRistretto,
     destination_asset_commitment: &CompressedRistretto,
     blinding_factor1: &Scalar,
-    blinding_factor2: &Scalar) -> CommitmentEqProof
+    blinding_factor2: &Scalar) -> Result<CommitmentEqProof, ZeiError>
 {
-    let u = Scalar::random(prng);
-    let proof_commitment = u*pedersen_gens.B_blinding;
-    let compressed_propf_commitment = proof_commitment.compress();
-    let proof_challenge = compute_challenge(
-        pedersen_gens, source_asset_commitment, destination_asset_commitment,
-        &compressed_propf_commitment);
-    let proof_response = proof_challenge*(blinding_factor1-blinding_factor2) + u;
-    CommitmentEqProof{
-        commitment: compressed_propf_commitment,
-        response: proof_response
-    }
-}
+    let src = source_asset_commitment.decompress()?;
+    let dst = destination_asset_commitment.decompress()?;
+    let point = src - dst;
 
+    let dlog = blinding_factor1 - blinding_factor2;
 
-pub fn compute_challenge(
-    pedersen_gens: &PedersenGens,
-    source_asset_commitment: &CompressedRistretto,
-    destination_asset_commitment: &CompressedRistretto,
-    proof_commitment: &CompressedRistretto) -> Scalar
-{
-    let mut hasher = Blake2b::new();
-    hasher.input(pedersen_gens.B.compress().as_bytes());
-    hasher.input(pedersen_gens.B_blinding.compress().as_bytes());
-    hasher.input(source_asset_commitment.as_bytes());
-    hasher.input(destination_asset_commitment.as_bytes());
-    hasher.input(proof_commitment.as_bytes());
+    let proof = prove_knowledge_dlog(prng, &pedersen_gens.B_blinding, &point.compress(), &dlog);
 
-    Scalar::from_hash(hasher)
+    Ok(proof)
 }
 
 pub fn verify_eq(
@@ -190,15 +163,11 @@ pub fn verify_eq(
     destination_asset_commitment: &CompressedRistretto,
     proof: &CommitmentEqProof) -> Result<bool, ZeiError>
 {
-    let proof_challenge = compute_challenge(
-        pedersen_gens, source_asset_commitment,destination_asset_commitment,
-        &proof.commitment);
+    let src = source_asset_commitment.decompress()?;
+    let dst = destination_asset_commitment.decompress()?;
 
-    let src_com = source_asset_commitment.decompress()?;
-    let dst_com = destination_asset_commitment.decompress()?;
-    let pf_com = proof.commitment.decompress()?;
-
-    Ok(proof.response * pedersen_gens.B_blinding == pf_com + proof_challenge*(src_com - dst_com))
+    let point = src - dst;
+    verify_proof_of_knowledge_dlog(&pedersen_gens.B_blinding, &point.compress(), proof)
 }
 
 #[cfg(test)]
@@ -221,13 +190,13 @@ mod test {
         let c1 = pedersen_bases.commit(value1, bf1).compress();
         let c2 = pedersen_bases.commit(value2, bf2).compress();
 
-        let proof = prove_eq(
+        let proof = prove_commitment_eq(
             &mut csprng,
             &pc_gens,
             &c1,
             &c2,
             &bf1,
-            &bf2);
+            &bf2).unwrap();
 
         assert_eq!(false, verify_eq(&pc_gens,
                                            &c1,
@@ -235,13 +204,13 @@ mod test {
                                            &proof).unwrap());
 
         let c3 = pedersen_bases.commit(value1, bf2).compress();
-        let proof = prove_eq(
+        let proof = prove_commitment_eq(
             &mut csprng,
             &pc_gens,
             &c1,
             &c3,
             &bf1,
-            &bf2);
+            &bf2).unwrap();
 
         assert_eq!(true, verify_eq(&pc_gens,
                                           &c1,
