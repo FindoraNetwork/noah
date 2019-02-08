@@ -6,6 +6,7 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
 use blake2::{Blake2b, Digest};
+use curve25519_dalek::ristretto::RistrettoPoint;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenCommitmentEqProof {
@@ -89,6 +90,57 @@ pub fn chaum_pedersen_eq_verify(
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+pub struct DlogProof{
+    proof_commitment: CompressedRistretto,
+    response: Scalar,
+}
+
+pub fn prove_knowledge_dlog<R: CryptoRng + Rng>(
+    prng: &mut R,
+    base: &RistrettoPoint,
+    point: &CompressedRistretto,
+    dlog: &Scalar) -> DlogProof{
+    let u = Scalar::random(prng);
+    let proof_commitment = (u*base).compress();
+    let challenge = compute_dlog_challenge(
+        &[&base.compress(), &proof_commitment, point]);
+    let response = challenge * dlog + u;
+
+    DlogProof {
+        proof_commitment,
+        response,
+    }
+}
+
+pub fn compute_dlog_challenge(context: &[&CompressedRistretto]) -> Scalar{
+    let mut hasher = Blake2b::new();
+
+    for point in context.iter(){
+        hasher.input((*point).as_bytes());
+    }
+
+    Scalar::from_hash(hasher)
+}
+
+
+pub fn verify_proof_of_knowledge_dlog(
+    base: &RistrettoPoint,
+    point: &CompressedRistretto,
+    proof:&DlogProof) -> Result<bool, ZeiError>{
+
+    let challenge = compute_dlog_challenge(
+        &[&base.compress(), &proof.proof_commitment, point]);
+
+    let dpoint = point.decompress()?;
+    let dproof_commit = proof.proof_commitment.decompress()?;
+
+    let vrfy_ok = proof.response * base == challenge * dpoint + dproof_commit;
+
+    Ok(vrfy_ok)
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct CommitmentEqProof {
     pub commitment: CompressedRistretto,
     pub response: Scalar,
@@ -114,6 +166,7 @@ pub fn prove_eq<R: CryptoRng + Rng>(
         response: proof_response
     }
 }
+
 
 pub fn compute_challenge(
     pedersen_gens: &PedersenGens,
@@ -255,4 +308,25 @@ mod test {
             &c3,
             &proof).unwrap());
     }
+
+    #[test]
+    fn test_pok_dlog(){
+        let mut csprng: ChaChaRng;
+        csprng = ChaChaRng::from_seed([0u8; 32]);
+
+        let base = RistrettoPoint::random(&mut csprng);
+        let scalar = Scalar::random(&mut csprng);
+        let scalar2 = scalar + Scalar::from(1u8);
+        let point = scalar * base;
+
+        let proof = prove_knowledge_dlog(&mut csprng, &base, &point.compress(),
+                                         &scalar);
+        assert_eq!(true,
+                   verify_proof_of_knowledge_dlog(&base, &point.compress(), &proof).unwrap());
+
+        let proof = prove_knowledge_dlog(&mut csprng, &base, &point.compress(),
+                                         &scalar2);
+        assert_eq!(false, verify_proof_of_knowledge_dlog(&base, &point.compress(), &proof).unwrap())
+    }
+
 }
