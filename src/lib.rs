@@ -26,6 +26,7 @@ pub mod address;
 pub mod account;
 pub mod transaction;
 pub mod solvency;
+pub mod chaum_perdersen;
 
 // TODO(jackson): Real C bindings for zei
 use self::account::Account;

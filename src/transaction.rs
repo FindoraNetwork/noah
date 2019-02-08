@@ -1,5 +1,5 @@
 use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
-use crate::asset::{Asset,CommitmentEqProof};
+use crate::chaum_perdersen::CommitmentEqProof;
 use crate::encryption::ZeiRistrettoCipher;
 use crate::encryption::ZeiRistrettoCipherString;
 use crate::errors::Error as ZeiError;
@@ -18,6 +18,8 @@ use std::convert::TryFrom;
 use crate::utils::u8_bigendian_slice_to_u64;
 use crate::setup::Balance;
 use crate::setup::BULLET_PROOF_RANGE;
+use crate::chaum_perdersen::prove_eq;
+use crate::chaum_perdersen::verify_eq;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -130,7 +132,7 @@ impl Transaction {
         let mut asset_eq_proof = CommitmentEqProof::default();
 
         if do_confidential_asset {
-            asset_eq_proof = Asset::prove_eq(&mut csprng,
+            asset_eq_proof = prove_eq(&mut csprng,
                                              &params.pc_gens,
                                              sender_asset_commitment,
                                              &tx_params.receiver_asset_commitment,
@@ -220,7 +222,7 @@ pub fn validator_verify(tx: &Transaction,
     let mut vrfy_ok = verify_t.is_ok();
     if vrfy_ok {
         if tx.do_confidential_asset {
-            vrfy_ok = Asset::verify_eq(
+            vrfy_ok = verify_eq(
                 &pc_gens,
                 &sender_asset,
                 &receiver_asset,
