@@ -1,5 +1,6 @@
 use bulletproofs::PedersenGens;
 use crate::errors::Error as ZeiError;
+use crate::utils::u32_to_bigendian_u8array;
 use rand::CryptoRng;
 use rand::Rng;
 use curve25519_dalek::ristretto::CompressedRistretto;
@@ -8,7 +9,7 @@ use curve25519_dalek::scalar::Scalar;
 use blake2::{Blake2b, Digest};
 use curve25519_dalek::ristretto::RistrettoPoint;
 
-fn compute_challenge(context: &[&CompressedRistretto]) -> Scalar{
+fn compute_challenge(context: Vec<&CompressedRistretto>) -> Scalar{
     /*! I compute zk challenges for Dlog based proof. The challenge is a hash of the
     current context of the proof*/
     let mut hasher = Blake2b::new();
@@ -56,8 +57,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     let c4 = pedersen_gens.commit(r3, r5).compress();
 
     let c = compute_challenge(
-        &[&commitment1, &commitment2,
-            &c3, &c4]);
+        vec![commitment1, commitment2, &c3, &c4]);
 
     let z1 = c*value + r3;
     let z2 = c*r1 + r4;
@@ -83,8 +83,7 @@ pub fn chaum_pedersen_eq_verify(
     let g = &pc_gens.B;
     let h = &pc_gens.B_blinding;
 
-    let c = compute_challenge(
-        &[c1, c2, &proof.c3, &proof.c4]);
+    let c = compute_challenge(vec![c1, c2, &proof.c3, &proof.c4]);
 
     let mut vrfy_ok = c3_d + c*c1_d == z1*g + z2*h;
     vrfy_ok = vrfy_ok && c4_d + c*c2_d == z1*g + z3*h;
@@ -105,8 +104,7 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng>(
     dlog: &Scalar) -> DlogProof{
     let u = Scalar::random(prng);
     let proof_commitment = (u*base).compress();
-    let challenge = compute_challenge(
-        &[&base.compress(), &proof_commitment, point]);
+    let challenge = compute_challenge(vec![&base.compress(), &proof_commitment, point]);
     let response = challenge * dlog + u;
 
     DlogProof {
@@ -121,7 +119,7 @@ pub fn verify_proof_of_knowledge_dlog(
     proof:&DlogProof) -> Result<bool, ZeiError>{
 
     let challenge = compute_challenge(
-        &[&base.compress(), &proof.proof_commitment, point]);
+        vec![&base.compress(), &proof.proof_commitment, point]);
 
     let dpoint = point.decompress()?;
     let dproof_commit = proof.proof_commitment.decompress()?;
@@ -129,6 +127,53 @@ pub fn verify_proof_of_knowledge_dlog(
     let vrfy_ok = proof.response * base == challenge * dpoint + dproof_commit;
 
     Ok(vrfy_ok)
+}
+
+pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
+    prng: &mut R,
+    base: &RistrettoPoint,
+    points: &[&CompressedRistretto],
+    dlogs: &[&Scalar]) -> DlogProof{
+
+    let u = Scalar::random(prng);
+    let proof_commitment = (u*base).compress();
+    let base_compressed = base.compress();
+    let mut context = vec![&base_compressed, &proof_commitment];
+    context.extend_from_slice(points);
+    let challenge = compute_challenge(context);
+    let mut response = u;
+    for i in 0..dlogs.len() {
+        let mut hasher = Blake2b::new();
+        hasher.input(challenge.as_bytes());
+        hasher.input(u32_to_bigendian_u8array(i as u32));
+        let challenge_i = Scalar::from_hash(hasher);
+        response = response + challenge_i * dlogs[i];
+    }
+    DlogProof {
+        proof_commitment,
+        response,
+    }
+}
+
+pub fn verify_multiple_knowledge_dlog(
+    base: &RistrettoPoint,
+    points: &[&CompressedRistretto],
+    proof: &DlogProof) -> Result<bool, ZeiError>{
+
+    let base_compressed = base.compress();
+    let mut context = vec![&base_compressed, &proof.proof_commitment];
+    context.extend_from_slice(points);
+    let challenge = compute_challenge(context);
+    let mut check = proof.proof_commitment.decompress()?;
+    for i in 0..points.len() {
+        let mut hasher = Blake2b::new();
+        hasher.input(challenge.as_bytes());
+        hasher.input(u32_to_bigendian_u8array(i as u32));
+        let challenge_i = Scalar::from_hash(hasher);
+        check = check + challenge_i * points[i].decompress()?;
+    }
+    Ok(check == proof.response * base)
+
 }
 
 
@@ -296,6 +341,44 @@ mod test {
         let proof = prove_knowledge_dlog(&mut csprng, &base, &point.compress(),
                                          &scalar2);
         assert_eq!(false, verify_proof_of_knowledge_dlog(&base, &point.compress(), &proof).unwrap())
+    }
+
+    #[test]
+    fn test_multiple_pok_dlog(){
+        let mut csprng: ChaChaRng;
+        csprng = ChaChaRng::from_seed([0u8; 32]);
+
+        let base = RistrettoPoint::random(&mut csprng);
+        let scalar1 = Scalar::random(&mut csprng);
+        let scalar2 = Scalar::random(&mut csprng);
+        let scalar3 = Scalar::random(&mut csprng);
+        let scalar4 = Scalar::random(&mut csprng);
+        let scalar5 = Scalar::random(&mut csprng);
+        let scalar6 = Scalar::random(&mut csprng);
+        let scalar7 = Scalar::random(&mut csprng);
+
+        let point1 = scalar1 * base;
+        let point2 = scalar2 * base;
+        let point3 = scalar3 * base;
+        let point4 = scalar4 * base;
+        let point5 = scalar5 * base;
+        let point6 = scalar6 * base;
+        let point7 = scalar7 * base;
+
+
+        let proof = prove_multiple_knowledge_dlog(
+            &mut csprng,
+            &base,
+            &[&point1.compress(), &point2.compress(), &point3.compress(),
+                &point4.compress(), &point5.compress(), &point6.compress(), &point7.compress()],
+            &[&scalar1, &scalar2, &scalar3, &scalar4, &scalar5, &scalar6, &scalar7]);
+
+        assert_eq!(true,
+                   verify_multiple_knowledge_dlog(
+                       &base,
+                       &[&point1.compress(), &point2.compress(), &point3.compress(),
+                               &point4.compress(), &point5.compress(), &point6.compress(), &point7.compress()],
+                       &proof).unwrap());
     }
 
 }
