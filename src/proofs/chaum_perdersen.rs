@@ -1,14 +1,38 @@
 use bulletproofs::PedersenGens;
 use crate::errors::Error as ZeiError;
-use crate::utils::u32_to_bigendian_u8array;
-use crate::proofs::dlog::{compute_challenge, compute_sub_challenge};
+use crate::proofs::{compute_challenge, compute_sub_challenge};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
 
+/*
+ * This file contains code for Chaum-Pedersen proof of equality of commitments.
+ * Proof algorithm:
+   a) Let C1 = pedersen(a, r1) = C2 = pedersen(a, r2), (G,H) pedersen base points
+   b) Sample random scalars r3, r4 and r5
+   c) Compute new commitments on C3 = pedersen(r3,r4) and C4 = (r3,r5)
+   d) Compute challenge c = HASH(C1,C2,C3,C4)
+   e) Compute response z1 = cm + r3, z2 = cr1 + r4, z3 = cr2 + r5
+   f) Output proof = C1,C2,z1,z2,z3
+
+ * Verify algorithm:
+   a) Compute challenge c = HASH(C1,C2,C3,C4)
+   b) Output true iff c3 + c*c1 = z1*G + z2*H AND c4 + c*c2 == z1*G + z3*H
+
+ * Proof equality for multiple commitments
+   a) {challenge_i = HASH(C1,...,Cn, i)}
+   b) {di = challenge_i * (C1 - Ci)}
+   c) {zi = challenge_i * (r1 - ri)}
+   d) Ouput Chaum-Pedersen Zero-Knowledge proof that D = \sum di commits to 0
+      (using blinding z = sum zi}
+   (Current implementation uses equality proof above with (D,  Commit(0, 0)) commitment pair)
+ */
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenCommitmentEqProof {
+    /// I represent a Chaum-Perdersen equality of commitment proof
+
     c3: CompressedRistretto,
     c4: CompressedRistretto,
     z1: Scalar,
@@ -25,13 +49,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     blinding_factor1: &Scalar,
     blinding_factor2: &Scalar) -> ChaumPedersenCommitmentEqProof
 {
-    //let C1 = pedersen(a, r1) = commitment1
-    //let C2 = pedersen(a, r2) = commitment2
-    //Sample random scalars r3, r4 and r5
-    //compute new commitments on C3 = pedersen(r3,r4) and C4 = (r3,r5)
-    //compute challenge c = HASH(C1,C2,C3,C4)
-    //compute response z1 = cm + r3, z2 = cr1 + r4, z3 = cr2 + r5
-    //output proof = C1,C2,z1,z2,z3
+    /*! I compute a Chaum-Pedersen proof that two commitments are to the same value */
 
     let r1 = blinding_factor1;
     let r2 = blinding_factor2;
@@ -54,18 +72,14 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     }
 }
 
-fn get_fake_zero_commitment() -> CompressedRistretto {
-    RistrettoPoint::identity().compress()
-}
-
-fn get_fake_zero_commitment_blinding() -> Scalar {
-    Scalar::from(0u8)
-}
-
 pub fn chaum_pedersen_eq_verify(
     pc_gens: &PedersenGens,
     c1: &CompressedRistretto, c2: &CompressedRistretto,
     proof:&ChaumPedersenCommitmentEqProof) -> Result<bool, ZeiError> {
+
+    /*! I verify a chaum-pedersen equality proof. Return Ok(true) in case of success, Ok(false)
+     in case of verification failure, and Err(Error::DeserializationError) in case some CompressedRistretto can not be
+     decompressed*/
 
     let c1_d = c1.decompress()?;
     let c2_d = c2.decompress()?;
@@ -85,6 +99,17 @@ pub fn chaum_pedersen_eq_verify(
 
 }
 
+//Helper functions for the proof of multiple commitments equality below
+fn get_fake_zero_commitment() -> CompressedRistretto {
+    /*! I return a fake compressed commitment to zero, eg The identity*/
+    RistrettoPoint::identity().compress()
+}
+
+fn get_fake_zero_commitment_blinding() -> Scalar {
+    /*! I return the blinding used in the get_fake_zero_commitment*/
+    Scalar::zero()
+}
+
 pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     prng: &mut R,
     pedersen_gens: &PedersenGens,
@@ -93,7 +118,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
 {
     /*! I produce a proof that all commitments are to the same value.
      *
-    */
+     */
     let k = compute_challenge(&commitments);
     let mut d = RistrettoPoint::identity();
     let mut z = Scalar::from(0u8);
@@ -129,9 +154,11 @@ pub fn chaum_pedersen_verify_multiple_eq(
     commitments: &Vec<&CompressedRistretto>,
     proof: &ChaumPedersenCommitmentEqProof) -> Result<bool, ZeiError>
 {
-    /*! I produce a proof that all commitments are to the same value.
-     *
-    */
+    /*! I verify a proof that all commitments are to the same value.
+     * Return Ok(true) in case of success, Ok(false) in case of verification failure,
+     * and Err(Error::DeserializationError) in case some CompressedRistretto can not be
+     decompressed
+     */
     let k = compute_challenge(&commitments);
     let mut d = RistrettoPoint::identity();
     let c1 = commitments.get(0)?;
@@ -156,8 +183,6 @@ pub fn chaum_pedersen_verify_multiple_eq(
 
     Ok(vrfy_ok)
 }
-
-
 
 
 #[cfg(test)]

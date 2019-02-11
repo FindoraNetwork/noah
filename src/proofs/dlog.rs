@@ -1,35 +1,11 @@
-use blake2::{Blake2b, Digest};
 use bulletproofs::PedersenGens;
 use crate::errors::Error as ZeiError;
-use crate::utils::u32_to_bigendian_u8array;
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;
 use rand::Rng;
+use crate::proofs::{compute_challenge, compute_sub_challenge};
 
-pub fn compute_challenge(context: &Vec<&CompressedRistretto>) -> Scalar{
-    /*! I compute zk challenges for Dlog based proof. The challenge is a hash of the
-    current context of the proof*/
-    let mut hasher = Blake2b::new();
-
-    for point in context.iter(){
-        hasher.input((*point).as_bytes());
-    }
-
-    Scalar::from_hash(hasher)
-}
-
-pub fn compute_sub_challenge(challenge: &Scalar, i: u32) -> Scalar{
-    /*! I compute zk sub challenges for multiple Dlog based proofs.
-    The sub-challenge is a hash of the challenge and the position i of the sub-challenge*/
-    let mut hasher = Blake2b::new();
-
-    hasher.input(challenge.as_bytes());
-    hasher.input(u32_to_bigendian_u8array(i));
-
-    Scalar::from_hash(hasher)
-}
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct DlogProof{
@@ -42,6 +18,8 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng>(
     base: &RistrettoPoint,
     point: &CompressedRistretto,
     dlog: &Scalar) -> DlogProof{
+
+    /*! I compute a proof for the knowledge of dlog for point with respect to base*/
     let u = Scalar::random(prng);
     let proof_commitment = (u*base).compress();
     let challenge = compute_challenge(&vec![&base.compress(), &proof_commitment, point]);
@@ -57,6 +35,8 @@ pub fn verify_proof_of_knowledge_dlog(
     base: &RistrettoPoint,
     point: &CompressedRistretto,
     proof:&DlogProof) -> Result<bool, ZeiError>{
+
+    /*! I verify a proof of knowledge of dlog for point with respect to base*/
 
     let challenge = compute_challenge(
         &vec![&base.compress(), &proof.proof_commitment, point]);
@@ -75,6 +55,8 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
     points: &[&CompressedRistretto],
     dlogs: &[&Scalar]) -> DlogProof{
 
+    /*! I compute a proof for the knowledge of dlogs for points for the base*/
+
     let u = Scalar::random(prng);
     let proof_commitment = (u*base).compress();
     let base_compressed = base.compress();
@@ -83,12 +65,10 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
     let challenge = compute_challenge(&context);
     let mut response = u;
     for i in 0..dlogs.len() {
-        let mut hasher = Blake2b::new();
-        hasher.input(challenge.as_bytes());
-        hasher.input(u32_to_bigendian_u8array(i as u32));
         let challenge_i = compute_sub_challenge(&challenge, i as u32);
         response = response + challenge_i * dlogs[i];
     }
+
     DlogProof {
         proof_commitment,
         response,
@@ -100,16 +80,14 @@ pub fn verify_multiple_knowledge_dlog(
     points: &[&CompressedRistretto],
     proof: &DlogProof) -> Result<bool, ZeiError>{
 
+    /*! I verify a proof of knowledge of dlogs for points in the base*/
+
     let base_compressed = base.compress();
     let mut context = vec![&base_compressed, &proof.proof_commitment];
     context.extend_from_slice(points);
     let challenge = compute_challenge(&context);
     let mut check = proof.proof_commitment.decompress()?;
-    for i in 0..points.len() {
-        let mut hasher = Blake2b::new();
-        hasher.input(challenge.as_bytes());
-        hasher.input(u32_to_bigendian_u8array(i as u32));
-        let challenge_i = Scalar::from_hash(hasher);
+    for i in 0..points.len() {let challenge_i = compute_sub_challenge(&challenge, i as u32);
         check = check + challenge_i * points[i].decompress()?;
     }
     Ok(check == proof.response * base)
@@ -128,14 +106,20 @@ pub fn dlog_based_prove_commitment_eq<R: CryptoRng + Rng>(
     pedersen_gens: &PedersenGens,
     source_asset_commitment: &CompressedRistretto,
     destination_asset_commitment: &CompressedRistretto,
-    blinding_factor1: &Scalar,
-    blinding_factor2: &Scalar) -> Result<CommitmentEqProof, ZeiError>
+    source_blinding_factor: &Scalar,
+    destination_blinding_factor: &Scalar) -> Result<CommitmentEqProof, ZeiError>
 {
+    /*! Assuming source_asset_commitment is a pedersen commitment, I compute a Dlog-equality-based
+     * proof that source and destination_asset_commitments commit to the same value, using source
+     * and destination blinding factors respectively. Return Ok(proof) in case of success,
+     * and Err(Error::DeserializationError) in case a Ristretto points cannot be decompressed.
+     */
+
     let src = source_asset_commitment.decompress()?;
     let dst = destination_asset_commitment.decompress()?;
     let point = src - dst;
 
-    let dlog = blinding_factor1 - blinding_factor2;
+    let dlog = source_blinding_factor - destination_blinding_factor;
 
     let proof = prove_knowledge_dlog(prng, &pedersen_gens.B_blinding, &point.compress(), &dlog);
 
@@ -148,6 +132,12 @@ pub fn dlog_based_verify_commitment_eq(
     destination_asset_commitment: &CompressedRistretto,
     proof: &CommitmentEqProof) -> Result<bool, ZeiError>
 {
+    /*! Assuming source_asset_commitment is a pedersen commitment, I compute a Dlog-equality-based
+     * proof that source and destination_asset_commitments commit to the same value.
+     * Return Ok(true) in case of success, Ok(false) in case of verification error,
+     * and Err(Error::DeserializationError) in case a Ristretto points cannot be decompressed.
+     */
+
     let src = source_asset_commitment.decompress()?;
     let dst = destination_asset_commitment.decompress()?;
 
@@ -260,5 +250,5 @@ mod test {
                                                          &c3,
                                                          &proof).unwrap());
     }
-    
+
 }
