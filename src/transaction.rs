@@ -1,5 +1,5 @@
 use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
-use crate::proofs::chaum_perdersen::CommitmentEqProof;
+use crate::proofs::dlog::CommitmentEqProof;
 use crate::encryption::ZeiRistrettoCipher;
 use crate::encryption::ZeiRistrettoCipherString;
 use crate::errors::Error as ZeiError;
@@ -7,6 +7,11 @@ use crate::serialization::{RangeProofString, CompressedRistrettoString,
                            ScalarString, PublicKeyString};
 use crate::setup::PublicParams;
 use crate::utils::u64_to_bigendian_u8array;
+use crate::utils::u8_bigendian_slice_to_u64;
+use crate::setup::Balance;
+use crate::setup::BULLET_PROOF_RANGE;
+use crate::proofs::dlog::{dlog_based_prove_commitment_eq, dlog_based_verify_commitment_eq};
+
 use curve25519_dalek::ristretto::{ CompressedRistretto, RistrettoPoint };
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
@@ -15,11 +20,6 @@ use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use std::convert::TryFrom;
-use crate::utils::u8_bigendian_slice_to_u64;
-use crate::setup::Balance;
-use crate::setup::BULLET_PROOF_RANGE;
-use crate::proofs::chaum_perdersen::prove_commitment_eq;
-use crate::proofs::chaum_perdersen::verify_eq;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -132,12 +132,12 @@ impl Transaction {
         let mut asset_eq_proof = CommitmentEqProof::default();
 
         if do_confidential_asset {
-            asset_eq_proof = prove_commitment_eq(&mut csprng,
-                                                 &params.pc_gens,
-                                                 sender_asset_commitment,
-                                                 &tx_params.receiver_asset_commitment,
-                                                 &sender_asset_opening,
-                                                 &tx_params.receiver_asset_opening)?;
+            asset_eq_proof = dlog_based_prove_commitment_eq(&mut csprng,
+                                                            &params.pc_gens,
+                                                            sender_asset_commitment,
+                                                            &tx_params.receiver_asset_commitment,
+                                                            &sender_asset_opening,
+                                                            &tx_params.receiver_asset_opening)?;
         }
 
         let mut to_encrypt = Vec::new();
@@ -222,7 +222,7 @@ pub fn validator_verify(tx: &Transaction,
     let mut vrfy_ok = verify_t.is_ok();
     if vrfy_ok {
         if tx.do_confidential_asset {
-            vrfy_ok = verify_eq(
+            vrfy_ok = dlog_based_verify_commitment_eq(
                 &pc_gens,
                 &sender_asset,
                 &receiver_asset,
