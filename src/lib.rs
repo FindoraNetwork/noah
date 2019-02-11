@@ -1,32 +1,34 @@
 //Zei: Confidential Payments for Accounts
 #![feature(try_from)]
 #![feature(try_trait)]
-extern crate schnorr;
-extern crate bulletproofs;
-extern crate rand;
+
 extern crate blake2;
+extern crate bulletproofs;
 extern crate curve25519_dalek;
 extern crate merlin;
-#[macro_use] extern crate serde_derive;
-extern crate serde;
-extern crate serde_json;
 extern crate num_bigint;
 extern crate num_traits;
+extern crate rand;
+extern crate schnorr;
+extern crate serde;
+#[macro_use] extern crate serde_derive;
+extern crate serde_json;
 extern crate sodiumoxide;
 
-mod setup;
-mod errors;
-mod utils;
+mod asset;
 mod constants;
 mod encryption;
+mod errors;
+mod setup;
+mod utils;
 
-pub mod serialization;
-pub mod asset;
-pub mod address;
+
 pub mod account;
-pub mod transaction;
+pub mod address;
+pub mod proofs;
+pub mod serialization;
 pub mod solvency;
-pub mod chaum_perdersen;
+pub mod transaction;
 
 // TODO(jackson): Real C bindings for zei
 use self::account::Account;

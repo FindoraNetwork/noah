@@ -1,5 +1,5 @@
 use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
-use crate::chaum_perdersen::CommitmentEqProof;
+use crate::proofs::chaum_perdersen::CommitmentEqProof;
 use crate::encryption::ZeiRistrettoCipher;
 use crate::encryption::ZeiRistrettoCipherString;
 use crate::errors::Error as ZeiError;
@@ -18,8 +18,8 @@ use std::convert::TryFrom;
 use crate::utils::u8_bigendian_slice_to_u64;
 use crate::setup::Balance;
 use crate::setup::BULLET_PROOF_RANGE;
-use crate::chaum_perdersen::prove_commitment_eq;
-use crate::chaum_perdersen::verify_eq;
+use crate::proofs::chaum_perdersen::prove_commitment_eq;
+use crate::proofs::chaum_perdersen::verify_eq;
 
 
 #[derive(Serialize, Deserialize, Debug)]
