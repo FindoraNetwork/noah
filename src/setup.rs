@@ -11,12 +11,18 @@ pub struct PublicParams {
     pub transcript: Transcript,
 }
 
+pub const BULLET_PROOF_RANGE: usize = 64;
+pub type Balance = u64;
+
+//TODO: make balance 32bits via (u32, u32) and BULLET_PROOF_RANGE 64
+
+
 
 //gens_capacity ->
 //The maximum number of usable generators for each party.
 //Is the number of generators to precompute for each party.
 //For rangeproofs, it is sufficient to pass 64, the maximum bitsize of the rangeproofs.
-// bitsize: 32-bit (0, 2^32-1)
+// bitsize: BULLET_PROOF_RANGE-bit (0, 2^BULLET_PROOF_RANGE-1)
 //
 //party_capacity ->
 //Number of values or parties
@@ -25,9 +31,9 @@ pub struct PublicParams {
 impl PublicParams {
     //helper function todo public setup
     pub fn new() -> PublicParams {
-        //public params with default 32bit range and also 2 provers
+        //public params with default BULLET_PROOF_RANGE bit range and also 2 provers
         //Create a new BulletproofGens object
-        let generators = BulletproofGens::new(32, 2);
+        let generators = BulletproofGens::new(BULLET_PROOF_RANGE, 2);
         //def pederson from lib with Common Reference String
         let pc_gens = PedersenGens::default();
         //Common Reference String
@@ -37,7 +43,7 @@ impl PublicParams {
         PublicParams {
             bp_gens: generators,
             pc_gens,
-            range_proof_bits: 32,
+            range_proof_bits: BULLET_PROOF_RANGE,
             transcript
         }
     }

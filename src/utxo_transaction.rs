@@ -9,6 +9,7 @@ use bulletproofs::PedersenGens;
 use blake2::{Blake2b,Digest};
 use schnorr::PublicKey;
 use crate::errors::Error as ZeiError;
+use crate::proofs::chaum_perdersen::chaum_pedersen_prove_eq;
 
 
 pub fn create_n_m_utxo_transaction<R>(
@@ -78,10 +79,11 @@ pub fn create_n_m_utxo_transaction<R>(
         asset_commitments.push(asset_comm);
         asset_blindings.push(asset_blind);
     }
-    let mut asset_eq_proofs = Vec::new();
+    //let mut asset_eq_proofs = Vec::new();
+    /*
     for i in 1..num_inputs {
         let proof =
-            Asset::prove_eq(
+            chaum_perdersen_prove_eq(
                 &asset_blindings[0], &input_asset_blinding[i]);
         asset_eq_proofs.push(proof);
     }
@@ -89,6 +91,7 @@ pub fn create_n_m_utxo_transaction<R>(
         let proof = Asset::prove_eq(&asset_blindings[0], &asset_blindings[i]);
         asset_eq_proofs.push(proof);
     }
+    */
     Ok(())
 }
 
