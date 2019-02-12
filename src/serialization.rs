@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 
 //serialization of external structures KeyPair, PublicKey, CompressedRistretto, Scalar,
 // SecretBox, RangeProofs
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct KeypairString {
     val: String
 }
@@ -32,7 +32,7 @@ impl From<&Keypair>  for KeypairString {
 
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct CompressedRistrettoString {
     val: String
 }
@@ -43,31 +43,31 @@ impl From<&CompressedRistretto> for CompressedRistrettoString {
     }
 }
 
-impl TryFrom<CompressedRistrettoString> for CompressedRistretto {
+impl TryFrom<&CompressedRistrettoString> for CompressedRistretto {
     type Error = ZeiError;
-    fn try_from(hex_str: CompressedRistrettoString) -> Result<CompressedRistretto, ZeiError>{
-        let vector = hex::decode(hex_str.val)?;
+    fn try_from(hex_str: &CompressedRistrettoString) -> Result<CompressedRistretto, ZeiError>{
+        let vector = hex::decode(&hex_str.val)?;
         let bytes = vector.as_slice();
         Ok(CompressedRistretto::from_slice(bytes))
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ScalarString {
     val: String
 }
 
-impl From<Scalar> for ScalarString {
-    fn from(scalar: Scalar) -> ScalarString {
+impl From<&Scalar> for ScalarString {
+    fn from(scalar: &Scalar) -> ScalarString {
         ScalarString {
             val: hex::encode(scalar.to_bytes())
         }
     }
 }
 
-impl TryFrom<ScalarString> for Scalar {
+impl TryFrom<&ScalarString> for Scalar {
     type Error = ZeiError;
-    fn try_from(scalar: ScalarString) -> Result<Scalar, ZeiError> {
+    fn try_from(scalar: &ScalarString) -> Result<Scalar, ZeiError> {
         let vector = hex::decode(&scalar.val)?;
         let bytes = vector.as_slice();
         let mut array = [0u8; 32];
@@ -103,9 +103,9 @@ pub struct RangeProofString{
     val: Vec<u8>
 }
 
-impl TryFrom<RangeProofString> for RangeProof {
+impl TryFrom<&RangeProofString> for RangeProof {
     type Error = ZeiError;
-    fn try_from(a: RangeProofString) -> Result<RangeProof, ZeiError>{
+    fn try_from(a: &RangeProofString) -> Result<RangeProof, ZeiError>{
         Ok(RangeProof::from_bytes(&a.val)?)
     }
 }
@@ -133,7 +133,7 @@ mod test {
         let id = CompressedRistrettoString::from(&point);
         let serialized = serde_json::to_string(&id).unwrap();
         let deserialized = serde_json::from_str::<CompressedRistrettoString>(&serialized).unwrap();
-        let final_deserialized = CompressedRistretto::try_from(deserialized).unwrap();
+        let final_deserialized = CompressedRistretto::try_from(&deserialized).unwrap();
         assert_eq!(point,final_deserialized);
     }
     #[test]

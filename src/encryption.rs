@@ -37,12 +37,12 @@ impl TryFrom<&ZeiRistrettoCipher> for ZeiRistrettoCipherString {
     }
 }
 
-impl TryFrom<ZeiRistrettoCipherString> for ZeiRistrettoCipher {
+impl TryFrom<&ZeiRistrettoCipherString> for ZeiRistrettoCipher {
     type Error = ZeiError;
-    fn try_from(a: ZeiRistrettoCipherString) -> Result<ZeiRistrettoCipher, ZeiError> {
+    fn try_from(a: &ZeiRistrettoCipherString) -> Result<ZeiRistrettoCipher, ZeiError> {
         let ciphertext = serde_json::from_str(&a.ciphertext)?;
         let nonce = Nonce(serde_json::from_str(&a.nonce)?);
-        let encoded_rand = CompressedRistretto::try_from(a.encoded_rand)?;
+        let encoded_rand = CompressedRistretto::try_from(&a.encoded_rand)?;
         Ok(ZeiRistrettoCipher {
             ciphertext,
             nonce,

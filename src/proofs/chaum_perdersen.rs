@@ -1,10 +1,13 @@
 use bulletproofs::PedersenGens;
 use crate::errors::Error as ZeiError;
 use crate::proofs::{compute_challenge, compute_sub_challenge};
+use crate::serialization::{CompressedRistrettoString, ScalarString};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
+use std::convert::TryFrom;
+
 
 /*
  * This file contains code for Chaum-Pedersen proof of equality of commitments.
@@ -40,6 +43,42 @@ pub struct ChaumPedersenCommitmentEqProof {
     z3: Scalar,
 }
 
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+pub(crate) struct ChaumPedersenCommitmentEqProofString{
+    c3: CompressedRistrettoString,
+    c4: CompressedRistrettoString,
+    z1: ScalarString,
+    z2: ScalarString,
+    z3: ScalarString,
+}
+
+impl TryFrom<&ChaumPedersenCommitmentEqProofString> for ChaumPedersenCommitmentEqProof{
+    type Error = ZeiError;
+    fn try_from(proof: &ChaumPedersenCommitmentEqProofString) -> Result<ChaumPedersenCommitmentEqProof, ZeiError> {
+        Ok(
+            ChaumPedersenCommitmentEqProof{
+                c3: CompressedRistretto::try_from(&proof.c3)?,
+                c4: CompressedRistretto::try_from(&proof.c4)?,
+                z1: Scalar::try_from(&proof.z1)?,
+                z2: Scalar::try_from(&proof.z2)?,
+                z3: Scalar::try_from(&proof.z3)?,
+            }
+        )
+    }
+}
+
+impl From<&ChaumPedersenCommitmentEqProof> for ChaumPedersenCommitmentEqProofString{
+    fn from(proof: &ChaumPedersenCommitmentEqProof) -> ChaumPedersenCommitmentEqProofString {
+        ChaumPedersenCommitmentEqProofString{
+            c3: CompressedRistrettoString::from(&proof.c3),
+            c4: CompressedRistrettoString::from(&proof.c4),
+            z1: ScalarString::from(&proof.z1),
+            z2: ScalarString::from(&proof.z2),
+            z3: ScalarString::from(&proof.z3),
+        }
+    }
+}
+
 pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     prng: &mut R,
     pedersen_gens: &PedersenGens,
@@ -72,7 +111,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     }
 }
 
-pub fn chaum_pedersen_eq_verify(
+pub fn chaum_pedersen_verify_eq(
     pc_gens: &PedersenGens,
     c1: &CompressedRistretto, c2: &CompressedRistretto,
     proof:&ChaumPedersenCommitmentEqProof) -> Result<bool, ZeiError> {
@@ -174,7 +213,7 @@ pub fn chaum_pedersen_verify_multiple_eq(
 
     //TODO can we produce proof to zero commitment in a more direct way?
     //produce fake commitment to 0 for chaum pedersen commitment
-    let vrfy_ok = chaum_pedersen_eq_verify(
+    let vrfy_ok = chaum_pedersen_verify_eq(
         pedersen_gens,
         &d.compress(),
         &get_fake_zero_commitment(),
@@ -214,7 +253,7 @@ mod test {
             &bf1,
             &bf2);
 
-        assert_eq!(false, chaum_pedersen_eq_verify(
+        assert_eq!(false, chaum_pedersen_verify_eq(
             &pc_gens,
             &c1,
             &c2,
@@ -229,10 +268,10 @@ mod test {
             &bf1,
             &bf2);
 
-        assert_eq!(false, chaum_pedersen_eq_verify(&pc_gens,
-                                                &c1,
-                                                &c2,
-                                                &proof).unwrap());
+        assert_eq!(false, chaum_pedersen_verify_eq(&pc_gens,
+                                                   &c1,
+                                                   &c2,
+                                                   &proof).unwrap());
 
 
         let c3 = pedersen_bases.commit(value1, bf2).compress();
@@ -245,7 +284,7 @@ mod test {
             &bf1,
             &bf2);
 
-        assert_eq!(true, chaum_pedersen_eq_verify(
+        assert_eq!(true, chaum_pedersen_verify_eq(
             &pc_gens,
             &c1,
             &c3,

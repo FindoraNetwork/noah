@@ -135,6 +135,7 @@ impl Account {
             &tx_params,
             asset_balance.balance,
             &asset_balance.balance_blinding,
+            &asset_balance.asset_info.compute_scalar_hash(),
             &asset_balance.asset_blinding,
             &asset_balance.asset_commitment,
             asset_balance.confidential_asset).unwrap();
@@ -273,11 +274,11 @@ impl From<&AssetBalance> for AssetBalanceString{
             tx_counter: a.tx_counter,
             balance: a.balance,
             balance_commitment: CompressedRistrettoString::from(&a.balance_commitment),
-            balance_blinding: ScalarString::from(a.balance_blinding),
+            balance_blinding: ScalarString::from(&a.balance_blinding),
             asset_info: Asset{ id: a.asset_info.id.to_string()},
             confidential_asset: a.confidential_asset,
             asset_commitment: CompressedRistrettoString::from(&a.asset_commitment),
-            asset_blinding: ScalarString::from(a.asset_blinding)
+            asset_blinding: ScalarString::from(&a.asset_blinding)
         }
     }
 }
@@ -288,12 +289,12 @@ impl TryFrom<AssetBalanceString> for AssetBalance{
         Ok(AssetBalance{
             tx_counter: a.tx_counter,
             balance: a.balance,
-            balance_commitment: CompressedRistretto::try_from(a.balance_commitment)?,
-            balance_blinding: Scalar::try_from(a.balance_blinding)?,
+            balance_commitment: CompressedRistretto::try_from(&a.balance_commitment)?,
+            balance_blinding: Scalar::try_from(&a.balance_blinding)?,
             asset_info: a.asset_info,
             confidential_asset: a.confidential_asset,
-            asset_commitment: CompressedRistretto::try_from(a.asset_commitment)?,
-            asset_blinding: Scalar::try_from(a.asset_blinding)?
+            asset_commitment: CompressedRistretto::try_from(&a.asset_commitment)?,
+            asset_blinding: Scalar::try_from(&a.asset_blinding)?
         })
     }
 }
@@ -360,12 +361,13 @@ mod test {
             receiver_asset_opening: rec.balances.get(asset_id).unwrap().asset_blinding,
             transfer_amount,
         };
+        let asset = sender.balances[asset_id].asset_info.compute_scalar_hash();
         let account_balance = sender.balances[asset_id].balance;
         let account_blind = &sender.balances[asset_id].balance_blinding;
         let sender_asset_opening = &sender.balances[asset_id].asset_blinding;
         let sender_asset_commitment = &sender.balances[asset_id].asset_commitment;
         let (tx,tx_blind) = Transaction::new(
-            &mut csprng, &tx_params, account_balance, account_blind, sender_asset_opening,
+            &mut csprng, &tx_params, account_balance, account_blind, &asset, sender_asset_opening,
         sender_asset_commitment, true).unwrap();
         let old_account_blind = account_blind.clone();
 
