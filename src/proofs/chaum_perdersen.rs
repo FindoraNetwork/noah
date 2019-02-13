@@ -152,24 +152,33 @@ fn get_fake_zero_commitment_blinding() -> Scalar {
 pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     prng: &mut R,
     pedersen_gens: &PedersenGens,
+    value: &Scalar,
     commitments: &Vec<&CompressedRistretto>,
-    blinding_factors: Vec<&Scalar>) -> ChaumPedersenCommitmentEqProof
+    blinding_factors: Vec<&Scalar>,
+    ) -> Result<(ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof), ZeiError>
 {
     /*! I produce a proof that all commitments are to the same value.
      *
      */
+    if commitments.len() <= 2 || commitments.len() != blinding_factors.len(){
+        return Err(ZeiError::ParameterError);
+    }
+    let proof_c1_c2 = chaum_pedersen_prove_eq(
+        prng, pedersen_gens, value, commitments[0], commitments[1],
+        blinding_factors[0], blinding_factors[1]);
+
     let k = compute_challenge(&commitments);
     let mut d = RistrettoPoint::identity();
     let mut z = Scalar::from(0u8);
-    let c1 = commitments.get(0).unwrap();
-    let c1_decompressed = (*c1).decompress().unwrap();
-    let r1 = blinding_factors.get(0).unwrap();
-    for i in 1..commitments.len(){
-        let ci = commitments.get(i).unwrap();
+    let c1 = commitments.get(0)?;
+    let c1_decompressed = (*c1).decompress()?;
+    let r1 = blinding_factors.get(0)?;
+    for i in 3..commitments.len(){
+        let ci = commitments.get(i)?;
         let ai = compute_sub_challenge(&k, i as u32);
-        let ci_decompressed = ci.decompress().unwrap();
+        let ci_decompressed = ci.decompress()?;
         let di = ai * (c1_decompressed - ci_decompressed);
-        let ri = blinding_factors.get(i).unwrap();
+        let ri = blinding_factors.get(i)?;
         let zi = ai * (*r1 - *ri);
         d = d + di;
         z = z + zi;
@@ -178,20 +187,20 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
 
     //TODO can we produce proof to zero commitment in a more direct way?
     //produce fake commitment to 0 for chaum pedersen commitment
-    let proof = chaum_pedersen_prove_eq(prng,
+    let proof_zero = chaum_pedersen_prove_eq(prng,
                                         pedersen_gens,
                                         &Scalar::from(0u8),
                                         &d.compress(),
                                         &get_fake_zero_commitment(),
                                         &z,
                                         &get_fake_zero_commitment_blinding());
-    proof
+    Ok((proof_c1_c2, proof_zero))
 }
 
 pub fn chaum_pedersen_verify_multiple_eq(
     pedersen_gens: &PedersenGens,
     commitments: &Vec<&CompressedRistretto>,
-    proof: &ChaumPedersenCommitmentEqProof) -> Result<bool, ZeiError>
+    proof: &(ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof)) -> Result<bool, ZeiError>
 {
     /*! I verify a proof that all commitments are to the same value.
      * Return Ok(true) in case of success, Ok(false) in case of verification failure,
@@ -202,7 +211,7 @@ pub fn chaum_pedersen_verify_multiple_eq(
     let mut d = RistrettoPoint::identity();
     let c1 = commitments.get(0)?;
     let c1_decompressed = c1.decompress()?;
-    for i in 1..commitments.len(){
+    for i in 3..commitments.len(){
         let ci = commitments.get(i)?;
         let ai = compute_sub_challenge(&k, i as u32);
         let ci_decompressed = ci.decompress()?;
@@ -213,11 +222,13 @@ pub fn chaum_pedersen_verify_multiple_eq(
 
     //TODO can we produce proof to zero commitment in a more direct way?
     //produce fake commitment to 0 for chaum pedersen commitment
-    let vrfy_ok = chaum_pedersen_verify_eq(
+    let mut vrfy_ok = chaum_pedersen_verify_eq(
+        pedersen_gens, commitments[0], commitments[1], &proof.0)?;
+    vrfy_ok = vrfy_ok && chaum_pedersen_verify_eq(
         pedersen_gens,
         &d.compress(),
         &get_fake_zero_commitment(),
-        proof,
+        &proof.1,
     )?;
 
     Ok(vrfy_ok)
@@ -312,8 +323,9 @@ mod test {
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut csprng,
             &pc_gens,
+            &value1,
             &com_vec,
-            blind_vec);
+            blind_vec).unwrap();
 
         assert_eq!(false, chaum_pedersen_verify_multiple_eq(
             &pc_gens,
@@ -330,8 +342,9 @@ mod test {
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut csprng,
             &pc_gens,
+            &value1,
             &com_vec,
-            blind_vec);
+            blind_vec).unwrap();
 
         assert_eq!(true, chaum_pedersen_verify_multiple_eq(
             &pc_gens,
