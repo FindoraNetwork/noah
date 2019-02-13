@@ -14,6 +14,7 @@ pub enum Error {
     DeserializationError,
     DecryptionError,
     NoneError,
+    ParameterError,
 }
 
 impl fmt::Display for Error {
@@ -26,6 +27,7 @@ impl fmt::Display for Error {
             Error::DeserializationError => "Could not deserialize object",
             Error::DecryptionError => "Ciphertext failed authentication verification",
             Error::NoneError => "Could not unwrap option due to None value",
+            Error::ParameterError => "Unexpected parameter for method or function",
         })
     }
 }
@@ -40,6 +42,7 @@ impl error::Error for Error {
             Error::DeserializationError => "Could not deserialize object",
             Error::DecryptionError => "Could not decrypt message",
             Error::NoneError => "Could not unwrap option due to None value",
+            Error::ParameterError => "Unexpected parameter for method or function",
         }
     }
 }
