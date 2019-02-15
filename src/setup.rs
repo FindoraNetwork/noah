@@ -30,10 +30,10 @@ pub type Balance = u64;
 
 impl PublicParams {
     //helper function todo public setup
-    pub fn new() -> PublicParams {
-        //public params with default BULLET_PROOF_RANGE bit range and also 2 provers
+    pub fn new(n: usize) -> PublicParams {
+        //public params with default BULLET_PROOF_RANGE bit range and also n provers
         //Create a new BulletproofGens object
-        let generators = BulletproofGens::new(BULLET_PROOF_RANGE, 2);
+        let generators = BulletproofGens::new(BULLET_PROOF_RANGE, n);
         //def pederson from lib with Common Reference String
         let pc_gens = PedersenGens::default();
         //Common Reference String

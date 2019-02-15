@@ -63,7 +63,7 @@ impl Account {
          *
          */
         let asset_info = Asset::new(asset_id);
-        let pp = PublicParams::new();
+        let pp = PublicParams::new(2);
         let balance  = starting_bal;
         let balance_blinding = Scalar::from(0u32);
         let value = Scalar::from(balance);
@@ -170,7 +170,7 @@ impl Account {
         /*! I receive a transaction to this account and update it accordingly
          *
          */
-        let params = PublicParams::new();
+        let params = PublicParams::new(2);
         let mut asset_id= String::from("");
         {
             for (a_id, asset_balance) in self.balances.iter() {

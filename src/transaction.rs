@@ -109,7 +109,7 @@ impl Transaction {
          * - Create and return the transaction
          */
 
-        let mut params = PublicParams::new();
+        let mut params = PublicParams::new(2);
         let blinding_t = Scalar::random(csprng);
         let tx_amount = tx_params.transfer_amount;
         let sender_updated_balance = account_balance - tx_amount;

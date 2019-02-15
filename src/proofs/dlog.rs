@@ -22,7 +22,7 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng>(
     /*! I compute a proof for the knowledge of dlog for point with respect to base*/
     let u = Scalar::random(prng);
     let proof_commitment = (u*base).compress();
-    let challenge = compute_challenge(&vec![&base.compress(), &proof_commitment, point]);
+    let challenge = compute_challenge(&vec![base.compress(), proof_commitment, point.clone()]);
     let response = challenge * dlog + u;
 
     DlogProof {
@@ -39,7 +39,7 @@ pub fn verify_proof_of_knowledge_dlog(
     /*! I verify a proof of knowledge of dlog for point with respect to base*/
 
     let challenge = compute_challenge(
-        &vec![&base.compress(), &proof.proof_commitment, point]);
+        &[base.compress(), proof.proof_commitment, *point]);
 
     let dpoint = point.decompress()?;
     let dproof_commit = proof.proof_commitment.decompress()?;
@@ -52,7 +52,7 @@ pub fn verify_proof_of_knowledge_dlog(
 pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
     prng: &mut R,
     base: &RistrettoPoint,
-    points: &[&CompressedRistretto],
+    points: &[CompressedRistretto],
     dlogs: &[&Scalar]) -> DlogProof{
 
     /*! I compute a proof for the knowledge of dlogs for points for the base*/
@@ -60,9 +60,9 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
     let u = Scalar::random(prng);
     let proof_commitment = (u*base).compress();
     let base_compressed = base.compress();
-    let mut context = vec![&base_compressed, &proof_commitment];
+    let mut context = vec![base_compressed, proof_commitment];
     context.extend_from_slice(points);
-    let challenge = compute_challenge(&context);
+    let challenge = compute_challenge(context.as_slice());
     let mut response = u;
     for i in 0..dlogs.len() {
         let challenge_i = compute_sub_challenge(&challenge, i as u32);
@@ -77,15 +77,15 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
 
 pub fn verify_multiple_knowledge_dlog(
     base: &RistrettoPoint,
-    points: &[&CompressedRistretto],
+    points: &[CompressedRistretto],
     proof: &DlogProof) -> Result<bool, ZeiError>{
 
     /*! I verify a proof of knowledge of dlogs for points in the base*/
 
     let base_compressed = base.compress();
-    let mut context = vec![&base_compressed, &proof.proof_commitment];
+    let mut context = vec![base_compressed, proof.proof_commitment];
     context.extend_from_slice(points);
-    let challenge = compute_challenge(&context);
+    let challenge = compute_challenge(context.as_slice());
     let mut check = proof.proof_commitment.decompress()?;
     for i in 0..points.len() {let challenge_i = compute_sub_challenge(&challenge, i as u32);
         check = check + challenge_i * points[i].decompress()?;
@@ -198,15 +198,15 @@ mod test {
         let proof = prove_multiple_knowledge_dlog(
             &mut csprng,
             &base,
-            &[&point1.compress(), &point2.compress(), &point3.compress(),
-                &point4.compress(), &point5.compress(), &point6.compress(), &point7.compress()],
+            &[point1.compress(), point2.compress(), point3.compress(),
+                point4.compress(), point5.compress(), point6.compress(), point7.compress()],
             &[&scalar1, &scalar2, &scalar3, &scalar4, &scalar5, &scalar6, &scalar7]);
 
         assert_eq!(true,
                    verify_multiple_knowledge_dlog(
                        &base,
-                       &[&point1.compress(), &point2.compress(), &point3.compress(),
-                           &point4.compress(), &point5.compress(), &point6.compress(), &point7.compress()],
+                       &[point1.compress(), point2.compress(), point3.compress(),
+                           point4.compress(), point5.compress(), point6.compress(), point7.compress()],
                        &proof).unwrap());
     }
 

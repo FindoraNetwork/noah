@@ -27,7 +27,6 @@ pub mod account;
 pub mod address;
 pub mod proofs;
 pub mod serialization;
-pub mod solvency;
 pub mod transaction;
 pub mod utxo_transaction;
 

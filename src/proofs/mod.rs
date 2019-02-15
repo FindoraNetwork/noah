@@ -6,13 +6,13 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use crate::utils::u32_to_bigendian_u8array;
 
-fn compute_challenge(context: &Vec<&CompressedRistretto>) -> Scalar {
+fn compute_challenge(context: &[CompressedRistretto]) -> Scalar {
     /*! I compute zk challenges for Dlog based proof. The challenge is a hash of the
     current context of the proof*/
     let mut hasher = Blake2b::new();
 
     for point in context.iter() {
-        hasher.input((*point).as_bytes());
+        hasher.input(point.as_bytes());
     }
 
     Scalar::from_hash(hasher)

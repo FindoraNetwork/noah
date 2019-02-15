@@ -15,6 +15,7 @@ pub enum Error {
     DecryptionError,
     NoneError,
     ParameterError,
+    ProofError, //TODO need better/fine grained  proof error handling
 }
 
 impl fmt::Display for Error {
@@ -28,6 +29,7 @@ impl fmt::Display for Error {
             Error::DecryptionError => "Ciphertext failed authentication verification",
             Error::NoneError => "Could not unwrap option due to None value",
             Error::ParameterError => "Unexpected parameter for method or function",
+            Error::ProofError => "Invalid proof or bad proof parameters",
         })
     }
 }
@@ -43,6 +45,7 @@ impl error::Error for Error {
             Error::DecryptionError => "Could not decrypt message",
             Error::NoneError => "Could not unwrap option due to None value",
             Error::ParameterError => "Unexpected parameter for method or function",
+            Error::ProofError => "Invalid proof",
         }
     }
 }
@@ -68,7 +71,7 @@ impl From<SchnorrError> for Error {
 
 impl From<bulletproofs::ProofError> for Error {
     fn from(_error: bulletproofs::ProofError) -> Self {
-        Error::DeserializationError
+        Error::ProofError
     }
 }
 
