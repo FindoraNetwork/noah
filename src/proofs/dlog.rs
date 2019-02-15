@@ -53,7 +53,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
     prng: &mut R,
     base: &RistrettoPoint,
     points: &[CompressedRistretto],
-    dlogs: &[&Scalar]) -> DlogProof{
+    dlogs: &[Scalar]) -> DlogProof{
 
     /*! I compute a proof for the knowledge of dlogs for points for the base*/
 
@@ -200,7 +200,7 @@ mod test {
             &base,
             &[point1.compress(), point2.compress(), point3.compress(),
                 point4.compress(), point5.compress(), point6.compress(), point7.compress()],
-            &[&scalar1, &scalar2, &scalar3, &scalar4, &scalar5, &scalar6, &scalar7]);
+            &[scalar1, scalar2, scalar3, scalar4, scalar5, scalar6, scalar7]);
 
         assert_eq!(true,
                    verify_multiple_knowledge_dlog(
