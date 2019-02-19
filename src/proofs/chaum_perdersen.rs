@@ -160,7 +160,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     /*! I produce a proof that all commitments are to the same value.
      *
      */
-    if commitments.len() <= 2 || commitments.len() != blinding_factors.len(){
+    if commitments.len() <= 1 || commitments.len() != blinding_factors.len(){
         return Err(ZeiError::ParameterError);
     }
     let proof_c1_c2 = chaum_pedersen_prove_eq(
@@ -183,7 +183,6 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
         d = d + di;
         z = z + zi;
     }
-
 
     //TODO can we produce proof to zero commitment in a more direct way?
     //produce fake commitment to 0 for chaum pedersen commitment
@@ -350,7 +349,53 @@ mod test {
             &pc_gens,
             com_vec,
             &proof).unwrap());
+    }
 
+    #[test]
+    fn test_chaum_perdersen_multiple_eq_proof_using_two(){
+        let mut csprng: ChaChaRng;
+        csprng = ChaChaRng::from_seed([0u8; 32]);
+        let pc_gens = PedersenGens::default();
+        let value1 = Scalar::from(16u8);
+        let value2 = Scalar::from(32u8);
+        let bf1 = Scalar::from(10u8);
+        let bf2 = Scalar::from(100u8);
+        let pedersen_bases = PedersenGens::default();
+        let c1 = pedersen_bases.commit(value1, bf1).compress();
+        let c2 = pedersen_bases.commit(value2, bf2).compress();
 
+        let com_vec = &[c1,c2];
+        let blind_vec = vec![bf1,bf2];
+
+        let proof = chaum_pedersen_prove_multiple_eq(
+            &mut csprng,
+            &pc_gens,
+            &value1,
+            com_vec,
+            &blind_vec).unwrap();
+
+        assert_eq!(false, chaum_pedersen_verify_multiple_eq(
+            &pc_gens,
+            com_vec,
+            &proof).unwrap(),
+        "Values were different");
+
+        let c1 = pedersen_bases.commit(value1, bf1).compress();
+        let c2 = pedersen_bases.commit(value1, bf2).compress();
+
+        let com_vec = &[c1,c2];
+        let blind_vec = vec![bf1,bf2];
+
+        let proof = chaum_pedersen_prove_multiple_eq(
+            &mut csprng,
+            &pc_gens,
+            &value1,
+            com_vec,
+            &blind_vec).unwrap();
+        assert_eq!(true, chaum_pedersen_verify_multiple_eq(
+            &pc_gens,
+            com_vec,
+            &proof).unwrap(),
+                   "Values are the same");
     }
 }
