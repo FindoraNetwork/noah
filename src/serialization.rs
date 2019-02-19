@@ -5,6 +5,71 @@ use curve25519_dalek::scalar::Scalar;
 use schnorr::{Keypair,PublicKey};
 use std::convert::TryFrom;
 
+// preferred approach for handling of fields of types that don't provide correct default serde serialize/deserialize
+
+pub mod keypair {
+    use schnorr::Keypair;
+    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    pub fn serialize<S>(kp: &Keypair, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer,
+    {
+        let bytes = kp.to_bytes();
+        let encoded = hex::encode(&bytes[..]);
+        serializer.serialize_str(&encoded)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Keypair, D::Error>
+    where D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let vector = hex::decode(s).map_err(de::Error::custom)?;
+        let bytes = vector.as_slice();
+        let keypair = Keypair::from_bytes(bytes).map_err(de::Error::custom)?;
+        Ok(keypair)
+    }
+}
+
+pub mod scalar {
+    use curve25519_dalek::scalar::Scalar;
+    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    pub fn serialize<S>(sc: &Scalar, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer,
+    {
+        let bytes = sc.to_bytes();
+        let encoded = hex::encode(&bytes[..]);
+        serializer.serialize_str(&encoded)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Scalar, D::Error>
+    where D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let vector = hex::decode(s).map_err(de::Error::custom)?;
+        let bytes = vector.as_slice();
+        let mut array = [0u8; 32];
+        array.copy_from_slice(bytes);
+        Ok(Scalar::from_bits(array))
+    }
+}
+
+pub mod compressed_ristretto {
+    use curve25519_dalek::ristretto::CompressedRistretto;
+    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    pub fn serialize<S>(cr: &CompressedRistretto, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer,
+    {
+        let bytes = cr.to_bytes();
+        let encoded = hex::encode(&bytes[..]);
+        serializer.serialize_str(&encoded)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<CompressedRistretto, D::Error>
+    where D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let vector = hex::decode(s).map_err(de::Error::custom)?;
+        let bytes = vector.as_slice();
+        let ristretto = CompressedRistretto::from_slice(bytes);
+        Ok(ristretto)
+    }
+}
 
 //serialization of external structures KeyPair, PublicKey, CompressedRistretto, Scalar,
 // SecretBox, RangeProofs
@@ -123,7 +188,6 @@ mod test {
     use rand::SeedableRng;
     use curve25519_dalek::ristretto::CompressedRistretto;
     use curve25519_dalek::ristretto::RistrettoPoint;
-    use crate::account::AccountString;
     use crate::account::Account;
 
     #[test]
@@ -149,11 +213,9 @@ mod test {
         acc.add_asset(&mut csprng2, asset_id, false, 50);
         acc.add_asset(&mut csprng2, "another currency", true, 50);
 
-        let acc_str = AccountString::from(&acc_old);
+        let json = serde_json::to_string(&acc_old).unwrap();
 
-        let json = serde_json::to_string(&acc_str).unwrap();
-
-        let acc_deserialized = Account::try_from(serde_json::from_str::<AccountString>(&json).unwrap()).unwrap();
+        let acc_deserialized: Account = serde_json::from_str(&json).unwrap();
 
         assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
         assert_eq!(acc_deserialized.keys.public, acc.keys.public);
@@ -178,11 +240,9 @@ mod test {
     #[test]
     pub fn test_empty_account() {
         let acc = Account::new(&mut ChaChaRng::from_seed([0u8; 32]));
-        let acc_str = AccountString::from(&acc);
+        let json = serde_json::to_string(&acc).unwrap();
 
-        let json = serde_json::to_string(&acc_str).unwrap();
-
-        let acc_deserialized = Account::try_from(serde_json::from_str::<AccountString>(&json).unwrap()).unwrap();
+        let acc_deserialized: Account = serde_json::from_str(&json).unwrap();
 
         assert_eq!(acc_deserialized.tx_counter, acc.tx_counter);
         assert_eq!(acc_deserialized.keys.public, acc.keys.public);
