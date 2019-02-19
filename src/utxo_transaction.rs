@@ -19,8 +19,11 @@ use std::collections::HashSet;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
 use core::borrow::Borrow;
+use crate::utils::u64_to_bigendian_u8array;
+use crate::utils::u8_bigendian_slice_to_u64;
 
 
+#[derive(Default)]
 pub struct TxAddressParams{
     amount: u64, //input or output amount
     amount_commitment: Option<CompressedRistretto>, //input or output balance
@@ -42,7 +45,7 @@ pub struct TxPublicAddressInfo{
 
 pub struct TxDestinationInfo{
     public_info: TxPublicAddressInfo,
-    lock_box: ZeiRistrettoCipher,
+    lock_box: Option<ZeiRistrettoCipher>,
 }
 
 pub struct TxProofs{
@@ -83,23 +86,16 @@ impl Tx{
         //tmp values
         let mut src_amount_option = vec![];
         let mut dst_amount_option = vec![];
+        let mut dst_amount_blind = vec![];
         let mut dst_asset_com: Vec<Option<CompressedRistretto>>;
         let mut dst_asset_blind: Vec<Option<Scalar>>;
-        let mut out_amount_com_option: Vec<Option<CompressedRistretto>>;
-        let out_amount_blind: Vec<Scalar>;
+        let mut out_amount_coms_option: Vec<Option<CompressedRistretto>>;
 
         //extract values from input struct
-        let src_amount_com_option: Vec<Option<CompressedRistretto>> =
-            input.iter().map(|x| x.amount_commitment).collect();
-        let src_amount_blind_option: Vec<Option<Scalar>> =
-            input.iter().map(|x| x.amount_blinding).collect();
         let src_asset_type_com_option: Vec<Option<CompressedRistretto>> =
             input.iter().map(|x| x.asset_type_commitment).collect();
-        let src_asset_type_blind_option: Vec<Option<Scalar>> =
-            input.iter().map(|x| x.asset_type_blinding).collect();
         let src_pks: Vec<PublicKey> =
             input.iter().map(|x| x.public_key).collect();
-        let in_amounts: Vec<u64> = input.iter().map(|x| x.amount ).collect();
 
         //extract values from output struct
         let dst_asset_type_com_option: Vec<Option<CompressedRistretto>> =
@@ -111,24 +107,14 @@ impl Tx{
 
         //do amount handling
         if confidential_amount {
-            //let in_amounts: Vec<u64> = input.iter().map(|x| x.amount ).collect();
-            let mut out_amounts: Vec<u64> = output.iter().map(|x| x.amount ).collect();
+            let (range_pf, out_coms, out_blinds)
+                = Tx::do_confidential_amount_range_proof(prng, input, output)?;
 
-            let mut src_amount_blind: Vec<Scalar> = src_amount_blind_option.iter().map(|x| x.unwrap()).collect();
+            out_amount_coms_option = out_coms.into_iter().map(|x| Some(x)).collect();
+            range_proof = Some(range_pf);
+            dst_amount_blind = out_blinds;
 
-            let (proof, tx_com, tx_blind) =
-                Tx::build_range_proof(
-                    prng,
-                    src_amount_blind.as_slice(),
-                    in_amounts.as_slice(),
-                    out_amounts.as_slice(),
-                    destination_public_keys.as_slice()
-                )?;
-            range_proof = Some(proof);
-
-            out_amount_com_option = tx_com.into_iter().map(|x| Some(x)).collect();
-            out_amount_blind = tx_blind;
-
+            //in confidential amount transaction, amounts are hidden, use None value
             for _ in 0..input.len(){
                src_amount_option.push(None);
             }
@@ -139,12 +125,13 @@ impl Tx{
         else{
             src_amount_option = input.iter().map(|x| Some(x.amount)).collect();
             dst_amount_option = output.iter().map(|x| Some(x.amount)).collect();
-            out_amount_com_option = (0..output.len()).map(|_| None).collect();
+            out_amount_coms_option = (0..output.len()).map(|_| None).collect();
         }
 
         if confidential_asset{
             let src_asset_com: Vec<CompressedRistretto> = src_asset_type_com_option.iter().map(|x| x.unwrap()).collect();
-            let src_asset_blind: Vec<Scalar> = src_asset_type_blind_option.iter().map(|x| x.unwrap()).collect();
+            let src_asset_blind: Vec<Scalar> =
+                input.iter().map(|x| x.asset_type_blinding.unwrap()).collect();
 
 
             let (proof_asset, out_asset_com, out_asset_blind) = Tx::build_asset_proof(
@@ -176,7 +163,7 @@ impl Tx{
             source_info.push(
                 TxPublicAddressInfo{
                     amount: src_amount_option[i],
-                    amount_commitment: src_amount_com_option[i],
+                    amount_commitment: input[i].amount_commitment,
                     asset_type: match confidential_asset{ true => None, false => Some(input[i].asset_type.clone())},
                     asset_type_commitment: src_asset_type_com_option[i],
                     public_key: src_pks[i],
@@ -186,11 +173,32 @@ impl Tx{
 
         //compute output struct
         for i in 0..output.len(){
+            let lbox: Option<ZeiRistrettoCipher>;
+            if confidential_amount || confidential_asset{
+                let mut memo = vec![];
+                if confidential_amount {
+                    memo.extend_from_slice(&u64_to_bigendian_u8array(output[i].amount));
+                    memo.extend_from_slice(dst_amount_blind[i].as_bytes());
+                }
+                if confidential_asset {
+                    memo.extend_from_slice(dst_asset_blind[i].unwrap().as_bytes());
+                }
+                let ciphertext = ZeiRistrettoCipher::encrypt(
+                    prng,
+                    &destination_public_keys[i].get_curve_point()?.compress(),
+                    memo.as_slice(),
+                )?;
+                lbox = Some(ciphertext);
+            }
+            else {
+                lbox = None;
+            }
+
             destination_info.push(
                 TxDestinationInfo{
                     public_info: TxPublicAddressInfo{
                         amount: dst_amount_option[i],
-                        amount_commitment: out_amount_com_option[i],
+                        amount_commitment: out_amount_coms_option[i],
                         asset_type: match confidential_asset {
                             true => None,
                             false => Some(output[i].asset_type.clone()),
@@ -198,11 +206,7 @@ impl Tx{
                         asset_type_commitment: dst_asset_com[i],
                         public_key: destination_public_keys[i],
                     },
-                    lock_box: ZeiRistrettoCipher::encrypt(
-                        prng,
-                        &destination_public_keys[i].get_curve_point()?.compress(),
-                        &[0u8,0u8],
-                    )?,
+                    lock_box: lbox,
                 }
             );
         }
@@ -222,59 +226,28 @@ impl Tx{
         Ok(Tx::build_tx_struct(source_info, destination_info, range_proof, asset_proof, signatures))
     }
 
-    fn build_asset_proof<R: CryptoRng + Rng>(
-        prng: &mut R,
-        pc_gens: &PedersenGens,
-        asset_type: &str,
-        source_asset_commitments: &[CompressedRistretto],
-        source_asset_blindings: &[Scalar],
-        destination_asset_commitments: Vec<Option<CompressedRistretto>>,
-        destination_asset_blindings: Vec<Option<Scalar>>,
-        destination_public_keys: &Vec<PublicKey>,
-
-    ) -> Result<((ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof),
-                 Vec<CompressedRistretto>, Vec<Scalar>), ZeiError>
+    fn do_confidential_amount_range_proof<R: CryptoRng + Rng>(prng: &mut R,
+        input: &[TxAddressParams],
+        output: &[TxAddressParams]
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>, Vec<Scalar>), ZeiError>
     {
-        let num_output = destination_public_keys.len();
-        let mut out_asset_com = vec![];
-        let mut out_asset_blind = vec![];
-        let asset = Asset {id: String::from(asset_type)};
 
-        let mut all_asset_com = Vec::new();
-        all_asset_com.extend_from_slice(source_asset_commitments);
+        let in_amount_blinds: Vec<Scalar> =
+            input.iter().map(|x| x.amount_blinding.unwrap()).collect();
+        let in_amounts: Vec<u64> = input.iter().map(|x| x.amount ).collect();
+        let out_amounts: Vec<u64> = output.iter().map(|x| x.amount ).collect();
+        let destination_public_keys: Vec<PublicKey> =
+            output.iter().map(|x| x.public_key ).collect();
 
-        let mut all_asset_blind = Vec::new();
-        all_asset_blind.extend_from_slice(source_asset_blindings);
-
-        //create commitments and blindings if they don't exits (UTXO or new type for account)
-        for i in 0..num_output{
-            if destination_asset_commitments.len() >= i || destination_asset_commitments[i].is_none() {
-                let (asset_comm, asset_blind) =
-                    compute_asset_commitment(
-                        prng, pc_gens, &destination_public_keys[i], &asset)?;
-                out_asset_com.push(asset_comm.compress());
-                out_asset_blind.push(asset_blind);
-            }
-            else{
-                out_asset_com.push(destination_asset_commitments[i].unwrap());
-                out_asset_blind.push(destination_asset_blindings[i].unwrap());
-
-            }
-        }
-
-        all_asset_com.extend(out_asset_com.iter());
-        all_asset_blind.extend(out_asset_blind.iter());
-
-        let asset_as_scalar = asset.compute_scalar_hash();
-
-        let proof_asset = chaum_pedersen_prove_multiple_eq(
-            prng,
-            pc_gens,
-            &asset_as_scalar,
-            all_asset_com.as_slice(),
-            all_asset_blind.as_slice())?;
-
-        Ok((proof_asset, out_asset_com, out_asset_blind))
+        let (proof, tx_coms, tx_blinds) =
+            Tx::build_range_proof(
+                prng,
+                in_amount_blinds.as_slice(),
+                in_amounts.as_slice(),
+                out_amounts.as_slice(),
+                destination_public_keys.as_slice()
+            )?;
+        Ok((proof, tx_coms, tx_blinds))
     }
 
     fn build_range_proof<R: CryptoRng + Rng>(
@@ -332,6 +305,63 @@ impl Tx{
 
         Ok((proof, commitments, blindings))
     }
+
+    fn build_asset_proof<R: CryptoRng + Rng>(
+        prng: &mut R,
+        pc_gens: &PedersenGens,
+        asset_type: &str,
+        source_asset_commitments: &[CompressedRistretto],
+        source_asset_blindings: &[Scalar],
+        destination_asset_commitments: Vec<Option<CompressedRistretto>>,
+        destination_asset_blindings: Vec<Option<Scalar>>,
+        destination_public_keys: &Vec<PublicKey>,
+
+    ) -> Result<((ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof),
+                 Vec<CompressedRistretto>, Vec<Scalar>), ZeiError>
+    {
+        let num_output = destination_public_keys.len();
+        let mut out_asset_com = vec![];
+        let mut out_asset_blind = vec![];
+        let asset = Asset {id: String::from(asset_type)};
+
+        let mut all_asset_com = Vec::new();
+        all_asset_com.extend_from_slice(source_asset_commitments);
+
+        let mut all_asset_blind = Vec::new();
+        all_asset_blind.extend_from_slice(source_asset_blindings);
+
+        //create commitments and blindings if they don't exits (UTXO or new type for account)
+        for i in 0..num_output{
+            if destination_asset_commitments.len() >= i || destination_asset_commitments[i].is_none() {
+                let (asset_comm, asset_blind) =
+                    compute_asset_commitment(
+                        prng, pc_gens, &destination_public_keys[i], &asset)?;
+                out_asset_com.push(asset_comm.compress());
+                out_asset_blind.push(asset_blind);
+            }
+            else{
+                out_asset_com.push(destination_asset_commitments[i].unwrap());
+                out_asset_blind.push(destination_asset_blindings[i].unwrap());
+
+            }
+        }
+
+        all_asset_com.extend(out_asset_com.iter());
+        all_asset_blind.extend(out_asset_blind.iter());
+
+        let asset_as_scalar = asset.compute_scalar_hash();
+
+        let proof_asset = chaum_pedersen_prove_multiple_eq(
+            prng,
+            pc_gens,
+            &asset_as_scalar,
+            all_asset_com.as_slice(),
+            all_asset_blind.as_slice())?;
+
+        Ok((proof_asset, out_asset_com, out_asset_blind))
+    }
+
+
     fn build_tx_struct(
         source_info: Vec<TxPublicAddressInfo>,
         destination_info: Vec<TxDestinationInfo>,
@@ -362,7 +392,7 @@ impl Tx{
         //1 signature TODO
         //2 amounts
         if self.body.confidential_amount {
-            if !self.verify_confidential_ammount(){
+            if !self.verify_confidential_amount(){
                 return false;
             }
         }
@@ -399,7 +429,7 @@ impl Tx{
         true
     }
 
-    fn verify_confidential_ammount(&self) -> bool {
+    fn verify_confidential_amount(&self) -> bool {
         let num_output = self.body.destination_info.len();
         let upper_power2 = smallest_greater_power_of_two((num_output + 1) as u32) as usize;
 
@@ -458,222 +488,43 @@ impl Tx{
         r.unwrap()
     }
 
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-pub struct UtxoTx{
-    input_balance_commitment: Vec<CompressedRistretto>,
-    input_asset_commitment: Vec<CompressedRistretto>,// TODO replace and above this with UTXO address
-    output_balance_commitment: Vec<CompressedRistretto>,
-    output_asset_commitment: Vec<CompressedRistretto>,
-    output_address: Vec<PublicKey>,
-    range_proof: bulletproofs::RangeProof,
-    proof_asset: (ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof),
-}
-
-impl UtxoTx{
-
-    pub fn create<R: CryptoRng + Rng>(
-        csprng: &mut R,
-        input_balance: &[u64],
-        input_balance_commitment: &[CompressedRistretto],
-        input_balance_blinding: &[Scalar],
-        input_asset_commitment: &[CompressedRistretto],
-        input_asset_blinding: &[Scalar],
-        asset_type: &Asset,
-        output_address: &[PublicKey],
-        output_amount: &[u64]) -> Result<UtxoTx, ZeiError>
+    pub fn receiver_unlock_memo(
+        lbox: &ZeiRistrettoCipher,
+        sk: &Scalar,
+        confidential_amount: bool,
+        confidential_asset: bool,
+    ) -> Result<(Option<u64>, Option<Scalar>, Option<Scalar>), ZeiError>
     {
-        /*! I create a transaction from n inputs to m ouputs.
- * Algorithm:
-    For each output:
-    - sample balance_blind_key
-    - compute balance_blind_factor as SHA256 (balance_blind_key*OUT_PK_i)
-    - compute amount_commitment (value = outputs_amounts[i], blind = blind_factor)
-    - compute balance_blind_share = balance_blind_key * G
-    - append balance_commitment and balance_blind_share to output
-    - sample asset_blind_key
-    - compute asset_blind_factor as SHA256 (asset_blind_key*OUT_PK_i)
-    - compute asset_commitment (value = asset.id, blind = blind_factor)
-    - append balance_commitment and balance_blind_share to output
-    Append proof that all balances remain non-negative and that all asset types are equal
- */
+        let mut amount = None;
+        let mut amount_blind = None;
+        let mut asset_blind = None;
 
-        let num_input: usize = input_balance.len();
-        let num_output: usize = output_amount.len();
+        let mut bytes = [0u8;32];
 
-        if num_input != input_balance_commitment.len() || num_input != input_balance_blinding.len()
-            || num_input != input_asset_commitment.len() || num_input != input_asset_blinding.len()
-            || num_output != output_address.len()
-        {
-            return Err(ZeiError::ParameterError);
+        let message = lbox.decrypt(sk)?;
+        if confidential_amount {
+            let (value, scalars) = message.split_at(8);
+            amount = Some(u8_bigendian_slice_to_u64(value));
+
+            bytes.copy_from_slice(&scalars[0..32]);
+            amount_blind = Some(Scalar::from_bits(bytes));
+
+            if confidential_asset {
+                bytes.copy_from_slice(&scalars[32..64]);
+                asset_blind = Some(Scalar::from_bits(bytes));
+            }
         }
-        //bullet proofs only allow power of 2 aggregation
-        let upper_power2 = smallest_greater_power_of_two((num_output + 1) as u32) as usize;
-
-        let mut params = PublicParams::new(upper_power2);
-
-        //range proofs and output commitments
-        //commitements and blindings
-        let mut blindings = Vec::new(); //for all outputs and sum(inputs) - sum(outputs)
-        for i in 0..num_output {
-            let blind = sample_blinding_factor(csprng, &output_address[i])?;
-            blindings.push(blind);
-
-
-            /*let output_commitment = params.pc_gens.commit(
-                Scalar::from(output_amount[i]), blind);
-            output_balance_commitment.push(output_commitment.compress());
-            */
+        else if confidential_asset {
+            bytes.copy_from_slice(message.as_slice());
+            asset_blind = Some(Scalar::from_bits(bytes));
         }
 
-        let blind_diff =
-            input_balance_blinding.iter().sum::<Scalar>() - blindings.iter().sum::<Scalar>();
-        blindings.push(blind_diff);
+        Ok((amount, amount_blind, asset_blind))
 
-        for _ in blindings.len()..upper_power2 {
-            blindings.push(Scalar::from(0u8));
-        }
-
-        let tx_diff = input_balance.into_iter().sum::<u64>() - output_amount.into_iter().sum::<u64>();
-
-        let mut values = Vec::new();
-        for i in output_amount.iter(){
-            values.push(*i);
-        }
-        values.push(tx_diff);
-
-        for _ in values.len()..upper_power2 {
-            values.push(0);
-        }
-
-        let (proof,vec) = RangeProof::prove_multiple(
-            &params.bp_gens,
-            &params.pc_gens,
-            &mut params.transcript,
-            //&[output_amount[0], output_amount[1], output_amount[2], output_amount[3], tx_diff],
-            //&[blindings[0], blindings[1], blindings[2], blindings[3], blind_diff],
-            values.as_slice(),
-            blindings.as_slice(),
-            BULLET_PROOF_RANGE)?;
-
-        let mut output_balance_commitment = Vec::new();
-
-        for i in 0..num_output{
-            output_balance_commitment.push(vec[i]);
-        }
-
-        //asset commitment
-        let mut asset_commitments = Vec::new();
-        asset_commitments.extend_from_slice(input_asset_commitment);
-
-        let mut asset_blindings = Vec::new();
-        asset_blindings.extend_from_slice(input_asset_blinding);
-
-        //add output
-        let mut output_asset_commitment = vec![];
-        let mut output_asset_blinding = vec![];
-        for i in 0..num_output {
-            let (asset_comm, asset_blind) =
-                compute_asset_commitment(
-                    csprng,&params.pc_gens,&output_address[i], &asset_type)?;
-
-            output_asset_commitment.push(asset_comm.compress());
-            output_asset_blinding.push(asset_blind);
-        }
-
-        asset_commitments.extend(output_asset_commitment.iter());
-        asset_blindings.extend(output_asset_blinding.iter());
-
-        let asset_as_scalar = asset_type.compute_scalar_hash();
-        let proof_asset = chaum_pedersen_prove_multiple_eq(
-            csprng, &params.pc_gens, &asset_as_scalar,
-            asset_commitments.as_slice(), asset_blindings.as_slice())?;
-
-        Ok(UtxoTx{
-            input_balance_commitment: Vec::from(input_balance_commitment),
-            input_asset_commitment: Vec::from(input_asset_commitment),
-            output_balance_commitment: Vec::from(output_balance_commitment.as_slice()),
-            output_asset_commitment: Vec::from(output_asset_commitment.as_slice()),
-            output_address: Vec::from(output_address),
-            range_proof: proof,
-            proof_asset: proof_asset,
-        })
-    }
-
-    pub fn verify(&self) -> Result<bool, ZeiError>{
-        let num_output = self.output_address.len();
-        let upper_power2 = smallest_greater_power_of_two((num_output + 1) as u32) as usize;
-
-        let params = PublicParams::new(upper_power2);
-        let mut transcript = Transcript::new(b"Zei Range Proof");
-
-        let mut input_com = vec![];
-        for x in self.input_balance_commitment.iter(){
-            input_com.push(x.decompress()?);
-        }
-
-        let mut output_com = vec![];
-        for x in self.output_balance_commitment.iter(){
-            output_com.push(x.decompress()?);
-        }
-
-        let mut range_proof_commitments: Vec<_> = output_com.iter().map(|x| x.compress()).collect();
-
-        let diff_comm = input_com.iter().sum::<RistrettoPoint>() - output_com.iter().sum::<RistrettoPoint>();
-
-        range_proof_commitments.push(diff_comm.compress());
-
-        for _ in range_proof_commitments.len()..upper_power2{
-            range_proof_commitments.push(RistrettoPoint::identity().compress());
-        }
-
-        let verify_range_proof = self.range_proof.verify_multiple(
-            &params.bp_gens,
-            &params.pc_gens,
-            &mut transcript,
-            range_proof_commitments.as_slice(),
-            BULLET_PROOF_RANGE,
-        );
-
-        if verify_range_proof.is_err(){
-            return Ok(false);
-        }
-
-        let mut all_asset_commitment = self.input_asset_commitment.clone();
-        all_asset_commitment.extend(self.output_asset_commitment.iter());
-        let verify_asset_eq = chaum_pedersen_verify_multiple_eq(&params.pc_gens,
-        all_asset_commitment.as_slice(), &self.proof_asset)?;
-
-        Ok(verify_asset_eq)
     }
 
 }
 
-*/
 
 #[inline]
 fn smallest_greater_power_of_two(n: u32) -> u32{
@@ -709,11 +560,12 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use schnorr::Keypair;
+    use crate::encryption::from_secret_key_to_scalar;
 
     fn build_address_params<R: CryptoRng + Rng>(prng: &mut R, amount: u64, asset: &str,
                                                 input: bool, //input or output
                                                 confidential_amount: bool,
-                                                confidential_asset: bool) -> TxAddressParams {
+                                                confidential_asset: bool) -> (TxAddressParams, Scalar) {
         let pc_gens = PedersenGens::default();
 
 
@@ -721,8 +573,9 @@ mod test {
         let mut amount_blinding = None;
         let mut asset_type_commitment = None;
         let mut asset_type_blinding = None;
+        let mut sk = None;
 
-        if confidential_amount && input{
+        if confidential_amount && input {
             let blind = Scalar::random(prng);
             let com = pc_gens.commit(Scalar::from(amount), blind);
 
@@ -738,7 +591,15 @@ mod test {
             asset_type_blinding = Some(blind);
         }
         let key = Keypair::generate(prng);
-        TxAddressParams {
+
+        let secret_key_bytes = key.secret.to_bytes();
+
+        let scalar_secret_key = from_secret_key_to_scalar(&secret_key_bytes);
+
+        if input {
+            sk = Some(key.secret);
+        }
+        (TxAddressParams {
             amount,
             amount_commitment,
             amount_blinding,
@@ -746,197 +607,241 @@ mod test {
             asset_type_commitment,
             asset_type_blinding,
             public_key: key.public,
-            secret_key: Some(key.secret),
-        }
+            secret_key: sk,
+        }, scalar_secret_key)
     }
 
     #[test]
     fn test_transaction_not_confidential() {
+        /*! I test simple transaction from 3 input to 4 output that do not provide any
+        confidentiality*/
         let asset_id = "default_currency";
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = PedersenGens::default();
+        let num_inputs = 3;
+        let num_outputs = 4;
+        let input_amount = [10u64, 10u64, 10u64];
+        let mut in_addrs = vec![];
+        let mut out_addrs  = vec![];
+        let out_amount = [1u64, 2u64, 3u64, 4u64];
+        let mut out_sks: Vec<Scalar> = vec![];
 
-        let addr1 = build_address_params(&mut prng, 10u64,
-                                         asset_id, true, false, false);
+        for i in 0..num_inputs{
+            let (addr,_) =
+                build_address_params(&mut prng, input_amount[i], asset_id,
+                                     true,false, false);
+            in_addrs.push(addr);
+        }
 
-        let addr2 = build_address_params(&mut prng, 10u64,
-                                         asset_id, true, false, false);
+        for i in 0..num_outputs{
+            let (addr, sk) =
+                build_address_params(&mut prng, out_amount[i], asset_id,
+                                     false,false, false);
+            out_addrs.push(addr);
+            out_sks.push(sk);
+        }
 
-        let addr3 = build_address_params(&mut prng, 10u64,
-                                         asset_id, true, false, false);
-
-        let addr4 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false,false, false);
-
-        let addr5 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false,false, false);
-
-        let addr6 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false, false, false);
-
-        let addr7 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false, false, false);
-
-        let mut input = [addr1, addr2, addr3];
-        let mut output = [addr4, addr5, addr6, addr7];
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, false).unwrap();
 
-        assert_eq!(true, tx.verify());
+        assert_eq!(true, tx.verify(), "Not confidential simple transaction should verify ok");
+
+        for i in 0..num_outputs {
+            assert_eq!(None, tx.body.destination_info[i].lock_box);
+        }
 
         //overflow transfer
-        output[3].amount = 0xFFFFFFFFFF;
-
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        out_addrs[3].amount = 0xFFFFFFFFFF;
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, false).unwrap();
-
-        assert_eq!(false, tx.verify());
+        assert_eq!(false, tx.verify(),
+                   "Output amounts are greater than input, should fail in verify");
 
         //exact transfer
-        output[3].amount = 27;
-
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        out_addrs[3].amount = 24;
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, false).unwrap();
-
-        assert_eq!(true, tx.verify());
+        assert_eq!(true, tx.verify(),
+                   "Not confidential tx with exact input and output should pass");
 
         //first different from rest
-        input[0].asset_type = String::from("another asset");
-
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        in_addrs[0].asset_type = String::from("another asset");
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, false).unwrap();
-
-        assert_eq!(false, tx.verify());
+        assert_eq!(false, tx.verify(),
+                   "Not confidential transaction with different asset type on first input should \
+                   fail verification ok");
 
         //input does not match
-        input[0].asset_type = String::from(asset_id);
-        input[1].asset_type = String::from("another asset");
-
-
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        in_addrs[0].asset_type = String::from(asset_id);
+        in_addrs[1].asset_type = String::from("another asset");
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, false).unwrap();
-
-        assert_eq!(false, tx.verify());
+        assert_eq!(false, tx.verify(),
+                   "Not confidential transaction with different asset type on non first input \
+                   should fail verification ok");
 
         //output does not match
-        input[1].asset_type = String::from(asset_id);
-        output[1].asset_type = String::from("another asset");
-
-
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        in_addrs[1].asset_type = String::from(asset_id);
+        out_addrs[1].asset_type = String::from("another asset");
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, false).unwrap();
-
-        assert_eq!(false, tx.verify());
+        assert_eq!(false, tx.verify(),
+                   "Not confidential transaction with different asset type on output \
+                   should fail verification ok");
     }
 
     #[test]
     fn test_transaction_confidential_asset() {
+        /*! I test transaction from 3 input to 4 output that hide the asset type
+        but not the amount*/
         let asset_id = "default_currency";
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = PedersenGens::default();
 
-        let addr1 = build_address_params(&mut prng, 10u64,
-                                         asset_id, true,false, true);
+        let num_inputs = 3;
+        let num_outputs = 4;
+        let input_amount = [10u64, 10u64, 10u64];
+        let mut in_addrs = vec![];
+        let mut out_addrs  = vec![];
+        let out_amount = [1u64, 2u64, 3u64, 4u64];
+        let mut out_sks: Vec<Scalar> = vec![];
 
-        let addr2 = build_address_params(&mut prng, 10u64,
-                                         asset_id, true,false, true);
+        for i in 0..num_inputs{
+            let (addr,_) =
+                build_address_params(&mut prng, input_amount[i], asset_id,
+                                     true,false, true);
+            in_addrs.push(addr);
+        }
 
-        let addr3 = build_address_params(&mut prng, 10u64,
-                                         asset_id, true,false, true);
+        for i in 0..num_outputs{
+            let (addr, sk) =
+                build_address_params(&mut prng, out_amount[i], asset_id,
+                                     false,false, true);
+            out_addrs.push(addr);
+            out_sks.push(sk);
+        }
 
-        let addr4 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false,false, true);
-
-        let addr5 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false,false, true);
-
-        let addr6 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false, false, true);
-
-        let addr7 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false,false, true);
-
-
-        let mut input = [addr1, addr2, addr3];
-        let mut output = [addr4, addr5, addr6, addr7];
-        println!("Building tx");
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, true).unwrap();
 
-        assert_eq!(true, tx.verify());
+        assert_eq!(true, tx.verify(), "Conf. asset tx: Transaction is valid");
 
-        input[1] = build_address_params(&mut prng, 10, "another asset", true, false, true);
+        //check receivers memos decryption
+        for i in 0..4 {
+            let (amount, amount_blind, asset_blind) =
+                Tx::receiver_unlock_memo(
+                    tx.body.destination_info[i].lock_box.as_ref().unwrap(),
+                    &out_sks[i], false, true).unwrap();
 
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+            assert_eq!(None, amount, "Conf. asset tx: Decryption should not contain amount");
+            assert_eq!(None, amount_blind, " Conf. asset tx: Decryption should not contain amount blinding");
+            let blind_com = pc_gens.commit(Asset { id: String::from(asset_id) }.
+                compute_scalar_hash(), asset_blind.unwrap());
+            assert_eq!(blind_com.compress(),
+                       tx.body.destination_info[i].public_info.asset_type_commitment.unwrap(),
+                       "Conf. asset tx: Decryption should contain valit asset blinding");
+            //TODO what if output blinding was provided (account based)
+        }
+
+        //one input does not match
+        let (new_in1,_) =
+            build_address_params(&mut prng, 10, "another asset",
+                                 true, false, true);
+        in_addrs[1] = new_in1;
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, true).unwrap();
+        assert_eq!(false, tx.verify(), "Confidential asset tx, one input asset does not match");
 
-        assert_eq!(false, tx.verify());
-
-
-        //output does not match
-        input[1] = build_address_params(&mut prng, 10, asset_id, true, false, true);
-        output[2] = build_address_params(&mut prng, 1, "another asset", false, false, true);
-
-
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        //one output does not match
+        let (new_in1, _) =
+            build_address_params(&mut prng, 10, asset_id,
+                                 true, false, true);
+        in_addrs[1] = new_in1;
+        let (new_out2, _) =
+            build_address_params(&mut prng, 1, "another asset",
+                                 false, false, true);
+        out_addrs[2] = new_out2;
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          false, false).unwrap();
-
-        assert_eq!(false, tx.verify());
+        assert_eq!(false, tx.verify(), "Confidential asset tx, one output asset does not match");
     }
 
     #[test]
     fn test_confidential_amount() {
+        /*! I test transactions from 3 input to 4 output that hide the amount
+        but not the asset type*/
+
         let asset_id = "default_currency";
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = PedersenGens::default();
+        let num_inputs = 3;
+        let num_outputs = 4;
+        let in_amount = [10u64, 10u64, 10u64];
+        let mut in_addrs = vec![];
+        let mut out_addrs  = vec![];
+        let out_amount = [1u64, 2u64, 3u64, 4u64];
+        let mut out_sks: Vec<Scalar> = vec![];
 
-        let addr1 = build_address_params(&mut prng, 10u64,
-                                         asset_id,true, true, false);
+        for i in 0..num_inputs{
+            let (addr,_) =
+                build_address_params(&mut prng, in_amount[i], asset_id,
+                                     true, true, false);
+            in_addrs.push(addr);
+        }
 
-        let addr2 = build_address_params(&mut prng, 10u64,
-                                         asset_id,true, true, false);
+        for i in 0..num_outputs{
+            let (addr, sk) =
+                build_address_params(&mut prng, out_amount[i], asset_id,
+                                     false, true, false);
+            out_addrs.push(addr);
+            out_sks.push(sk);
+        }
 
-        let addr3 = build_address_params(&mut prng, 10u64,
-                                         asset_id,true, true, false);
-
-        let addr4 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false, true, false);
-
-        let addr5 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false,true, false);
-
-        let addr6 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false,true, false);
-
-        let addr7 = build_address_params(&mut prng, 1u64,
-                                         asset_id, false,true, false);
-
-
-        let mut input = [addr1, addr2, addr3];
-        let mut output = [addr4, addr5, addr6, addr7];
-
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          true, false).unwrap();
+        assert_eq!(true, tx.verify(),
+                   "Conf. amount tx: Transaction should be valid");
 
-        assert_eq!(true, tx.verify());
+        //check receivers memos decryption
+        for i in 0..num_outputs {
+            let (amount, amount_blind, asset_blind) =
+                Tx::receiver_unlock_memo(tx.body.destination_info[i].lock_box.as_ref().unwrap(),
+                                         &out_sks[i],
+                                         true, false).unwrap();
 
-        output[3] = build_address_params(&mut prng, 50, asset_id, false, true, false);
+            assert_eq!(None, asset_blind,
+                       "Conf. amount tx: memo decryption should not contain asset blinding,\
+                       since it is not a confidential asset tx");
+            assert_eq!(out_amount[i], amount.unwrap(),
+                       "Conf. amount tx: memo decryption should contain original tx amount");
+            let amount_com = pc_gens.commit(Scalar::from(out_amount[i]),
+                                            amount_blind.unwrap());
+            assert_eq!(amount_com.compress(),
+                       tx.body.destination_info[i].public_info.amount_commitment.unwrap(),
+                       "Conf. amount tx: memo decryption should contain valid amount blinding");
+        }
 
-        let tx = Tx::new(&mut prng, &input,
-                         &output,
+        let (new_out3, _) =
+            build_address_params(&mut prng, 50, asset_id,
+                                 false, true, false);
+        out_addrs[3] = new_out3;
+
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
                          true, false);
 
-        assert_eq!(ZeiError::TxProofError, tx.err().unwrap());
+        assert_eq!(ZeiError::TxProofError, tx.err().unwrap(),
+                   "Conf. amount tx: tx should have not be able to produce range proof");
     }
 }

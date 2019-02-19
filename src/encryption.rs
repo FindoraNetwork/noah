@@ -1,15 +1,16 @@
 use blake2::VarBlake2b;
 use blake2::digest::{Input, VariableOutput};
+use crate::errors::Error as ZeiError;
+use crate::serialization::CompressedRistrettoString;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED as base_point;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use sodiumoxide::crypto::secretbox;
 use sodiumoxide::crypto::secretbox::{Nonce,Key};
+use std::convert::TryFrom;
 use rand::CryptoRng;
 use rand::Rng;
-use crate::errors::Error as ZeiError;
-use crate::serialization::CompressedRistrettoString;
-use std::convert::TryFrom;
+
 
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -129,6 +130,15 @@ fn symmetric_decrypt(
         Ok(ciphertext) => Ok(ciphertext),
         Err(_) => Err(ZeiError::DecryptionError)
     }
+}
+
+pub(crate) fn from_secret_key_to_scalar(secret_key: &[u8;32]) -> Scalar{
+    let mut bits = [0u8;32];
+    bits.copy_from_slice(secret_key);
+    bits[0] &= 248;
+    bits[31] &= 127;
+    bits[31] |= 64;
+    Scalar::from_bits(bits)
 }
 
 #[cfg(test)]
