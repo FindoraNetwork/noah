@@ -228,6 +228,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::account::AssetBalance;
+    use crate::utils::compute_str_scalar_hash;
 
     #[test]
     fn test_new_transaction() {
@@ -297,7 +298,7 @@ mod test {
         let dst_pk = acc_dst.get_public_key();
         let dst_asset_balance = acc_dst.get_asset_balance(asset_id);
 
-        let asset_scalar = dst_asset_balance.asset_info.compute_scalar_hash();
+        let asset_scalar = compute_str_scalar_hash(&dst_asset_balance.asset_type);
 
         do_transaction_validation(src_asset_balance, dst_asset_balance,&asset_scalar,dst_pk, transfer_amount, true, true);
 
@@ -327,7 +328,7 @@ mod test {
         let dst_pk = acc_dst.get_public_key();
         let dst_asset_balance = acc_dst.get_asset_balance(asset_id);
 
-        let asset_scalar = dst_asset_balance.asset_info.compute_scalar_hash();
+        let asset_scalar = compute_str_scalar_hash(&dst_asset_balance.asset_type);
 
         do_transaction_validation(src_asset_balance, dst_asset_balance, &asset_scalar, dst_pk,transfer_amount, false, true);
     }
@@ -382,7 +383,7 @@ mod test {
         let mut acc_dst = Account::new(&mut csprng);
         acc_dst.add_asset(&mut csprng, asset_id, true, 0);
 
-        let asset_scalar = acc_dst.balances[asset_id].asset_info.compute_scalar_hash();
+        let asset_scalar = compute_str_scalar_hash(&acc_dst.balances[asset_id].asset_type);
 
         let new_tx = TxParams {
             receiver_pk: acc_dst.keys.public,

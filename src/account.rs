@@ -1,9 +1,11 @@
 //Hidden Accounts
 
-use curve25519_dalek::scalar::Scalar;
 use crate::transaction::{TxParams, Transaction};
-use curve25519_dalek::ristretto::CompressedRistretto;
 use crate::setup::PublicParams;
+use curve25519_dalek::scalar::Scalar;
+
+use curve25519_dalek::ristretto::CompressedRistretto;
+
 use schnorr::{Keypair, PublicKey, Signature};
 use rand::CryptoRng;
 use rand::Rng;
@@ -14,8 +16,10 @@ use crate::errors::Error as ZeiError;
 use std::collections::HashMap;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use crate::serialization;
-use crate::asset::Asset;
 use crate::setup::Balance;
+use crate::utils::compute_str_commitment;
+use crate::utils::compute_str_ristretto_point_hash;
+use crate::utils::compute_str_scalar_hash;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -26,7 +30,7 @@ pub struct AssetBalance {
     pub balance_commitment: CompressedRistretto,
     #[serde(with = "serialization::scalar")]
     pub balance_blinding: Scalar,
-    pub asset_info: Asset,
+    pub asset_type: String,
     pub confidential_asset: bool,
     //if confidential_asset is false, this is just a hash of asset_info
     #[serde(with = "serialization::compressed_ristretto")]
@@ -64,7 +68,7 @@ impl Account {
         /*!I add an asset with 0 balance to this account
          *
          */
-        let asset_info = Asset::new(asset_id);
+        let asset_info = String::from(asset_id);
         let pp = PublicParams::new(2);
         let balance  = starting_bal;
         let balance_blinding = Scalar::from(0u32);
@@ -73,12 +77,12 @@ impl Account {
         let asset_blinding: Scalar;
 
         if confidential_asset {
-            let (a_comm, a_blind) = asset_info.compute_commitment(csprng);
+            let (a_comm, a_blind) = compute_str_commitment(csprng, asset_id);
             asset_commitment = a_comm;
             asset_blinding = a_blind;
         }
         else {
-            asset_commitment = asset_info.compute_ristretto_point_hash();
+            asset_commitment = compute_str_ristretto_point_hash(asset_id);
             asset_blinding = Scalar::from(0u8);
         }
         let asset_commitment= asset_commitment.compress();
@@ -87,7 +91,7 @@ impl Account {
             balance,
             balance_blinding,
             balance_commitment: pp.pc_gens.commit(value, balance_blinding).compress(),
-            asset_info,
+            asset_type: asset_info,
             confidential_asset,
             asset_commitment,
             asset_blinding,
@@ -136,7 +140,7 @@ impl Account {
             &tx_params,
             asset_balance.balance,
             &asset_balance.balance_blinding,
-            &asset_balance.asset_info.compute_scalar_hash(),
+            &compute_str_scalar_hash(&asset_balance.asset_type),
             &asset_balance.asset_blinding,
             &asset_balance.asset_commitment,
             asset_balance.confidential_asset).unwrap();
@@ -362,7 +366,7 @@ mod test {
             receiver_asset_opening: rec.balances.get(asset_id).unwrap().asset_blinding,
             transfer_amount,
         };
-        let asset = sender.balances[asset_id].asset_info.compute_scalar_hash();
+        let asset = compute_str_scalar_hash(&sender.balances[asset_id].asset_type);
         let account_balance = sender.balances[asset_id].balance;
         let account_blind = &sender.balances[asset_id].balance_blinding;
         let sender_asset_opening = &sender.balances[asset_id].asset_blinding;

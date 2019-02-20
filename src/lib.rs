@@ -15,7 +15,6 @@ extern crate serde;
 extern crate serde_json;
 extern crate sodiumoxide;
 
-mod asset;
 mod constants;
 mod encryption;
 mod errors;

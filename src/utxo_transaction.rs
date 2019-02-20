@@ -1,7 +1,6 @@
 use blake2::{Blake2b,Digest};
 use bulletproofs::{PedersenGens, RangeProof};
 use core::borrow::Borrow;
-use crate::asset::Asset;
 use crate::errors::Error as ZeiError;
 use crate::encryption::ZeiRistrettoCipher;
 use crate::proofs::chaum_perdersen::{chaum_pedersen_prove_multiple_eq,
@@ -18,6 +17,7 @@ use rand::CryptoRng;
 use rand::Rng;
 use schnorr::{PublicKey, SecretKey,Signature};
 use std::collections::HashSet;
+use crate::utils::compute_str_scalar_hash;
 
 
 #[derive(Default, Serialize, Deserialize, Debug)]
@@ -386,7 +386,7 @@ impl Tx{
         let num_output = destination_public_keys.len();
         let mut out_asset_com = vec![];
         let mut out_asset_blind = vec![];
-        let asset = Asset {id: String::from(asset_type)};
+        let asset =String::from(asset_type);
 
         let mut all_asset_com = Vec::new();
         all_asset_com.extend_from_slice(source_asset_commitments);
@@ -413,7 +413,7 @@ impl Tx{
         all_asset_com.extend(out_asset_com.iter());
         all_asset_blind.extend(out_asset_blind.iter());
 
-        let asset_as_scalar = asset.compute_scalar_hash();
+        let asset_as_scalar = compute_str_scalar_hash(&asset);
 
         let proof_asset = chaum_pedersen_prove_multiple_eq(
             prng,
@@ -600,11 +600,11 @@ fn compute_asset_commitment<R>(
     csprng: &mut R,
     pc_gens: &PedersenGens,
     address: &PublicKey,
-    asset_type: &Asset) -> Result<(RistrettoPoint,Scalar), ZeiError>
+    asset_type: &str) -> Result<(RistrettoPoint,Scalar), ZeiError>
     where R:CryptoRng + Rng,
 {
     let blinding_factor = sample_blinding_factor(csprng, address)?;
-    let asset_hash = asset_type.compute_scalar_hash();
+    let asset_hash = compute_str_scalar_hash(asset_type);
 
     Ok((pc_gens.commit(asset_hash, blinding_factor), blinding_factor))
 }
@@ -626,6 +626,7 @@ mod test {
     use rand::SeedableRng;
     use schnorr::Keypair;
     use crate::encryption::from_secret_key_to_scalar;
+    use crate::utils::compute_str_commitment;
 
     fn build_address_params<R: CryptoRng + Rng>(prng: &mut R, amount: u64, asset: &str,
                                                 input: bool, //input or output
@@ -648,10 +649,7 @@ mod test {
             amount_blinding = Some(blind);
         }
         if confidential_asset {
-            let a = Asset {
-                id: String::from(asset),
-            };
-            let (com, blind) = a.compute_commitment(prng);
+            let (com, blind) = compute_str_commitment(prng, asset);
             asset_type_commitment = Some(com.compress());
             asset_type_blinding = Some(blind);
         }
@@ -808,8 +806,8 @@ mod test {
 
             assert_eq!(None, amount, "Conf. asset tx: Decryption should not contain amount");
             assert_eq!(None, amount_blind, " Conf. asset tx: Decryption should not contain amount blinding");
-            let blind_com = pc_gens.commit(Asset { id: String::from(asset_id) }.
-                compute_scalar_hash(), asset_blind.unwrap());
+            let blind_com = pc_gens.commit(
+                compute_str_scalar_hash(asset_id), asset_blind.unwrap());
             assert_eq!(blind_com.compress(),
                        tx.body.output[i].public.asset_type_commitment.unwrap(),
                        "Conf. asset tx: Decryption should contain valit asset blinding");

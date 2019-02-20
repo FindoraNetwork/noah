@@ -8,6 +8,12 @@ use num_bigint::Sign::Plus;
 use num_traits::{Zero};
 use num_traits::{FromPrimitive,ToPrimitive};
 use crate::errors::Error;
+use blake2::{Blake2b, Digest};
+use rand::Rng;
+use rand::CryptoRng;
+use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::scalar::Scalar;
+use bulletproofs::PedersenGens;
 
 
 static BASE58_ALPHABET: &'static [u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -161,6 +167,32 @@ pub fn u8_bigendian_slice_to_u32(array: &[u8; 4]) -> u32{
         ((u32::from(array[2]))<<8) +
         (u32::from(array[3]))
 }
+
+pub fn compute_str_commitment<R: Rng + CryptoRng>(rng: &mut R, s: &str) -> (RistrettoPoint,Scalar) {
+    let mut hash = Blake2b::new();
+    hash.input(s);
+
+    let pd_bases = PedersenGens::default();
+    let value = Scalar::from_hash(hash);
+    let blind = Scalar::random(rng);
+    (pd_bases.commit(value, blind), blind)
+
+}
+
+pub fn compute_str_ristretto_point_hash(s: &str) -> RistrettoPoint {
+    let mut hash = Blake2b::new();
+    hash.input(s);
+
+    RistrettoPoint::from_hash(hash)
+}
+
+pub fn compute_str_scalar_hash(s: &str) -> Scalar {
+    let mut hash = Blake2b::new();
+    hash.input(s);
+
+    Scalar::from_hash(hash)
+}
+
 
 
 #[cfg(test)]
