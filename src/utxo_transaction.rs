@@ -3,7 +3,7 @@ use bulletproofs::{PedersenGens, RangeProof};
 use core::borrow::Borrow;
 use crate::errors::Error as ZeiError;
 use crate::encryption::ZeiRistrettoCipher;
-use crate::proofs::chaum_perdersen::{chaum_pedersen_prove_multiple_eq,
+use crate::proofs::chaum_pedersen::{chaum_pedersen_prove_multiple_eq,
                                      chaum_pedersen_verify_multiple_eq,
                                      ChaumPedersenCommitmentEqProofMultiple};
 use crate::serialization;

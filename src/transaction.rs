@@ -1,7 +1,7 @@
 use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
 use crate::encryption::ZeiRistrettoCipher;
 use crate::errors::Error as ZeiError;
-use crate::proofs::chaum_perdersen::{ChaumPedersenCommitmentEqProof,
+use crate::proofs::chaum_pedersen::{ChaumPedersenCommitmentEqProof,
                                      chaum_pedersen_prove_eq, chaum_pedersen_verify_eq};
 use crate::serialization;
 use crate::setup::PublicParams;

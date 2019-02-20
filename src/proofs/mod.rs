@@ -1,4 +1,4 @@
-pub mod chaum_perdersen;
+pub mod chaum_pedersen;
 pub mod dlog;
 
 use blake2::{Blake2b, Digest};
