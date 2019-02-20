@@ -1,11 +1,60 @@
 use bulletproofs::{RangeProof};
-use crate::errors::Error as ZeiError;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
-use schnorr::{Keypair,PublicKey};
-use std::convert::TryFrom;
+use schnorr::SecretKey;
 
 // preferred approach for handling of fields of types that don't provide correct default serde serialize/deserialize
+
+pub trait ZeiFromToBytes {
+    fn zei_to_bytes(&self) -> Vec<u8>;
+    fn zei_from_bytes(bytes: &[u8]) -> Self;
+}
+
+impl ZeiFromToBytes for SecretKey{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(&self.to_bytes()[..]);
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> SecretKey{
+        SecretKey::from_bytes(bytes).unwrap()
+    }
+}
+
+impl ZeiFromToBytes for Scalar{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(&self.to_bytes()[..]);
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> Scalar{
+        let mut bits = [0u8; 32];
+        bits.copy_from_slice(bytes);
+        Scalar::from_bits(bits)
+    }
+}
+
+impl ZeiFromToBytes for CompressedRistretto{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(&self.to_bytes()[..]);
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> CompressedRistretto{
+        CompressedRistretto::from_slice(bytes)
+    }
+}
+
+impl ZeiFromToBytes for RangeProof{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(&self.to_bytes()[..]);
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> RangeProof{
+        RangeProof::from_bytes(bytes).unwrap()
+    }
+}
 
 pub mod keypair {
     use schnorr::Keypair;
@@ -25,6 +74,48 @@ pub mod keypair {
         let bytes = vector.as_slice();
         let keypair = Keypair::from_bytes(bytes).map_err(de::Error::custom)?;
         Ok(keypair)
+    }
+}
+
+pub mod public_key {
+    use schnorr::PublicKey;
+    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    pub fn serialize<S>(pk: &PublicKey, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer,
+    {
+        let bytes = pk.to_bytes();
+        let encoded = hex::encode(&bytes[..]);
+        serializer.serialize_str(&encoded)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<PublicKey, D::Error>
+        where D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let vector = hex::decode(s).map_err(de::Error::custom)?;
+        let bytes = vector.as_slice();
+        let public_key = PublicKey::from_bytes(bytes).map_err(de::Error::custom)?;
+        Ok(public_key)
+    }
+}
+
+pub mod secret_key {
+    use schnorr::SecretKey;
+    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    pub fn serialize<S>(sk: &SecretKey, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer,
+    {
+        let bytes = sk.to_bytes();
+        let encoded = hex::encode(&bytes[..]);
+        serializer.serialize_str(&encoded)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<SecretKey, D::Error>
+        where D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let vector = hex::decode(s).map_err(de::Error::custom)?;
+        let bytes = vector.as_slice();
+        let secret_key = SecretKey::from_bytes(bytes).map_err(de::Error::custom)?;
+        Ok(secret_key)
     }
 }
 
@@ -71,135 +162,82 @@ pub mod compressed_ristretto {
     }
 }
 
-//serialization of external structures KeyPair, PublicKey, CompressedRistretto, Scalar,
-// SecretBox, RangeProofs
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct KeypairString {
-    val: String
-}
-
-impl TryFrom<KeypairString> for Keypair {
-    type Error = ZeiError;
-    fn try_from(value: KeypairString) -> Result<Keypair, ZeiError> {
-        let vector = hex::decode(&value.val)?;
+pub mod range_proof{
+    use bulletproofs::RangeProof;
+    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    pub fn serialize<S>(cr: &RangeProof, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer,
+    {
+        let bytes = cr.to_bytes();
+        let encoded = hex::encode(&bytes[..]);
+        serializer.serialize_str(&encoded)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<RangeProof, D::Error>
+        where D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let vector = hex::decode(s).map_err(de::Error::custom)?;
         let bytes = vector.as_slice();
-        let keypair = Keypair::from_bytes(bytes)?;
-        Ok(keypair)
+        let range_proof = RangeProof::from_bytes(bytes).
+            map_err(de::Error::custom)?;
+        Ok(range_proof)
     }
 }
 
-impl From<&Keypair>  for KeypairString {
-    fn from(a: &Keypair) -> KeypairString {
-        let bytes = a.to_bytes();
-        KeypairString{val: hex::encode(&bytes[..])}
+pub mod option_bytes {
+    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    use crate::serialization::ZeiFromToBytes;
+
+    pub fn serialize<S,T>(object: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer, T: ZeiFromToBytes,
+    {
+        if object.is_none() {
+            serializer.serialize_none()
+        }
+        else {
+            let bytes = object.as_ref().unwrap().zei_to_bytes();
+            let encoded = hex::encode(&bytes[..]);
+            serializer.serialize_str(&encoded)
+        }
     }
-}
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+        where D: Deserializer<'de>, T: ZeiFromToBytes,
+    {
 
+        let s: Option<String> = Option::deserialize(deserializer)?;
 
-
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct CompressedRistrettoString {
-    val: String
-}
-
-impl From<&CompressedRistretto> for CompressedRistrettoString {
-    fn from(point: &CompressedRistretto) -> CompressedRistrettoString{
-        CompressedRistrettoString{val:hex::encode(point.to_bytes())}
-    }
-}
-
-impl TryFrom<&CompressedRistrettoString> for CompressedRistretto {
-    type Error = ZeiError;
-    fn try_from(hex_str: &CompressedRistrettoString) -> Result<CompressedRistretto, ZeiError>{
-        let vector = hex::decode(&hex_str.val)?;
-        let bytes = vector.as_slice();
-        Ok(CompressedRistretto::from_slice(bytes))
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct ScalarString {
-    val: String
-}
-
-impl From<&Scalar> for ScalarString {
-    fn from(scalar: &Scalar) -> ScalarString {
-        ScalarString {
-            val: hex::encode(scalar.to_bytes())
+        if s.is_some() {
+            let vector = hex::decode(s.unwrap()).map_err(de::Error::custom)?;
+            let object = T::zei_from_bytes(&vector.as_slice());
+            Ok(Some(object))
+        }
+        else {
+            Ok(None)
         }
     }
 }
 
-impl TryFrom<&ScalarString> for Scalar {
-    type Error = ZeiError;
-    fn try_from(scalar: &ScalarString) -> Result<Scalar, ZeiError> {
-        let vector = hex::decode(&scalar.val)?;
-        let bytes = vector.as_slice();
-        let mut array = [0u8; 32];
-        array.copy_from_slice(bytes);
-        Ok(Scalar::from_bits(array))
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PublicKeyString {
-    val: String
-}
-
-impl TryFrom<PublicKeyString> for PublicKey {
-    type Error = ZeiError;
-    fn try_from(a: PublicKeyString) -> Result<PublicKey, ZeiError> {
-        let vector = hex::decode(&a.val)?;
-        let bytes = vector.as_slice();
-        let mut array = [0u8; 32];
-        array.copy_from_slice(bytes);
-        Ok(PublicKey::from_bytes(&array)?)
-    }
-}
-
-impl From<PublicKey> for PublicKeyString {
-    fn from(a: PublicKey) -> PublicKeyString {
-        PublicKeyString{val: hex::encode(a.to_bytes())}
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RangeProofString{
-    val: Vec<u8>
-}
-
-impl TryFrom<&RangeProofString> for RangeProof {
-    type Error = ZeiError;
-    fn try_from(a: &RangeProofString) -> Result<RangeProof, ZeiError>{
-        Ok(RangeProof::from_bytes(&a.val)?)
-    }
-}
-
-impl From<&RangeProof> for RangeProofString {
-    fn from(a: &RangeProof) -> RangeProofString{
-        RangeProofString{val: a.to_bytes()}
-    }
-}
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    //use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use curve25519_dalek::ristretto::CompressedRistretto;
-    use curve25519_dalek::ristretto::RistrettoPoint;
+    //use curve25519_dalek::ristretto::CompressedRistretto;
+    //use curve25519_dalek::ristretto::RistrettoPoint;
     use crate::account::Account;
 
+
+    /*
     #[test]
     pub fn serialization_compressed_ristretto(){
         let mut csprng1 = ChaChaRng::from_seed([0u8; 32]);
         let point = RistrettoPoint::random(&mut csprng1).compress();
-        let id = CompressedRistrettoString::from(&point);
-        let serialized = serde_json::to_string(&id).unwrap();
-        let deserialized = serde_json::from_str::<CompressedRistrettoString>(&serialized).unwrap();
-        let final_deserialized = CompressedRistretto::try_from(&deserialized).unwrap();
-        assert_eq!(point,final_deserialized);
+        let serialized = serde_json::to_string(&point).unwrap();
+        let deserialized: CompressedRistretto = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(point,deserialized);
     }
+    */
     #[test]
     pub fn test_account_to_json() {
         let mut csprng1 = ChaChaRng::from_seed([0u8; 32]);

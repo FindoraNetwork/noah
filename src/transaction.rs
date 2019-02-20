@@ -1,10 +1,9 @@
 use bulletproofs::{BulletproofGens, RangeProof, PedersenGens};
 use crate::encryption::ZeiRistrettoCipher;
-use crate::encryption::ZeiRistrettoCipherString;
 use crate::errors::Error as ZeiError;
-use crate::proofs::chaum_perdersen::{ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProofString, chaum_pedersen_prove_eq, chaum_pedersen_verify_eq};
-use crate::serialization::{RangeProofString, CompressedRistrettoString,
-                           ScalarString, PublicKeyString};
+use crate::proofs::chaum_perdersen::{ChaumPedersenCommitmentEqProof,
+                                     chaum_pedersen_prove_eq, chaum_pedersen_verify_eq};
+use crate::serialization;
 use crate::setup::PublicParams;
 use crate::utils::u64_to_bigendian_u8array;
 use crate::utils::u8_bigendian_slice_to_u64;
@@ -17,7 +16,6 @@ use rand::CryptoRng;
 use rand::Rng;
 use schnorr::PublicKey;
 use schnorr::SecretKey;
-use std::convert::TryFrom;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
@@ -31,12 +29,16 @@ pub struct Transaction {
      * - A proof of equality of asset type
      * - The sender and the receiver asset commitments
      */
+    #[serde(with = "serialization::range_proof")]
     pub transaction_range_proof: bulletproofs::RangeProof,
+    #[serde(with = "serialization::compressed_ristretto")]
     pub transaction_commitment: CompressedRistretto,
     pub lockbox: ZeiRistrettoCipher,
     pub do_confidential_asset: bool,
     pub asset_eq_proof: ChaumPedersenCommitmentEqProof,
+    #[serde(with = "serialization::compressed_ristretto")]
     pub sender_asset_commitment: CompressedRistretto,
+    #[serde(with = "serialization::compressed_ristretto")]
     pub receiver_asset_commitment: CompressedRistretto,
 }
 
@@ -46,45 +48,14 @@ pub struct TxParams{
      * I am helper structure to send/receive the data for a transaction
      *
      */
+    #[serde(with = "serialization::public_key")]
     pub receiver_pk: PublicKey,
+    #[serde(with = "serialization::compressed_ristretto")]
     pub receiver_asset_commitment: CompressedRistretto,
+    #[serde(with = "serialization::scalar")]
     pub receiver_asset_opening: Scalar,
     pub transfer_amount: Balance,
 }
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TxParamsString{
-    receiver_pk: PublicKeyString,
-    receiver_asset_commitment: CompressedRistrettoString,
-    receiver_asset_opening: ScalarString,
-    transfer_amount: u64,
-}
-
-impl TryFrom<TxParamsString> for TxParams{
-    type Error = ZeiError;
-    fn try_from(tx: TxParamsString) -> Result<TxParams, ZeiError> {
-        Ok(
-            TxParams{
-                receiver_pk: PublicKey::try_from(tx.receiver_pk)?,
-                receiver_asset_commitment: CompressedRistretto::try_from(&tx.receiver_asset_commitment)?,
-                receiver_asset_opening: Scalar::try_from(&tx.receiver_asset_opening)?,
-                transfer_amount: tx.transfer_amount,
-            }
-        )
-    }
-}
-
-impl From<TxParams> for TxParamsString{
-    fn from(tx: TxParams) -> TxParamsString {
-        TxParamsString{
-            receiver_pk: PublicKeyString::from(tx.receiver_pk),
-            receiver_asset_commitment: CompressedRistrettoString::from(&tx.receiver_asset_commitment),
-            receiver_asset_opening: ScalarString::from(&tx.receiver_asset_opening),
-            transfer_amount: tx.transfer_amount,
-        }
-    }
-}
-
 
 impl Transaction {
     pub fn new<R>(mut csprng: &mut R,
@@ -245,56 +216,6 @@ pub fn receiver_verify(tx_amount: u32, tx_blind: Scalar, new_commit: RistrettoPo
     let compute_new_commit = pc_gens.commit(Scalar::from(tx_amount), tx_blind);
     let updated_commitment = compute_new_commit + recv_old_commit;
     new_commit == updated_commitment
-}
-
-
-//serialization of transaction strucures
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TransactionString{
-    transaction_range_proof: RangeProofString,
-    transaction_commitment: CompressedRistrettoString,
-    lockbox: ZeiRistrettoCipherString,
-    do_confidential_asset: bool,
-    asset_eq_proof: ChaumPedersenCommitmentEqProofString,
-    sender_asset_commitment: CompressedRistrettoString,
-    receiver_asset_commitment: CompressedRistrettoString,
-}
-
-impl TryFrom<&Transaction> for TransactionString {
-    type Error = ZeiError;
-    fn try_from(a: &Transaction) -> Result<TransactionString, ZeiError>{
-        Ok(TransactionString{
-            transaction_range_proof: RangeProofString::from(&a.transaction_range_proof),
-            transaction_commitment: CompressedRistrettoString::from(&a.transaction_commitment),
-            lockbox: ZeiRistrettoCipherString::try_from(&a.lockbox)?,
-            do_confidential_asset: a.do_confidential_asset,
-            asset_eq_proof: ChaumPedersenCommitmentEqProofString::from(&a.asset_eq_proof),
-            sender_asset_commitment: CompressedRistrettoString::from(&a.sender_asset_commitment),
-            receiver_asset_commitment: CompressedRistrettoString::from(&a.receiver_asset_commitment),
-        })
-    }
-}
-
-impl TryFrom<&TransactionString> for Transaction{
-    type Error = ZeiError;
-    fn try_from(a: &TransactionString) -> Result<Transaction, ZeiError> {
-        let transaction_range_proof = RangeProof::try_from(&a.transaction_range_proof)?;
-        let transaction_commitment = CompressedRistretto::try_from(&a.transaction_commitment)?;
-        let lockbox: ZeiRistrettoCipher = ZeiRistrettoCipher::try_from(&a.lockbox)?;
-        let do_confidential_asset = a.do_confidential_asset;
-        let asset_eq_proof = ChaumPedersenCommitmentEqProof::try_from(&a.asset_eq_proof)?;
-        let sender_asset_commitment = CompressedRistretto::try_from(&a.sender_asset_commitment)?;
-        let receiver_asset_commitment = CompressedRistretto::try_from(&a.receiver_asset_commitment)?;
-        Ok(Transaction{
-            transaction_range_proof,
-            transaction_commitment,
-            lockbox,
-            do_confidential_asset,
-            asset_eq_proof,
-            sender_asset_commitment,
-            receiver_asset_commitment,
-        })
-    }
 }
 
 #[cfg(test)]
@@ -479,11 +400,8 @@ mod test {
                                        &acc_src.balances[asset_id].asset_commitment,
                                        true).unwrap();
 
-        let tx_json = serde_json::to_string(&TransactionString::try_from(&tx).unwrap()).unwrap();
-        let deserialized_tx = Transaction::try_from(
-            &serde_json::from_str::<TransactionString>(&tx_json).unwrap());
-
-        let dtx = deserialized_tx.unwrap();
+        let tx_json = serde_json::to_string(&tx).unwrap();
+        let dtx = serde_json::from_str::<Transaction>(&tx_json).unwrap();
 
         assert_eq!(tx.transaction_commitment, dtx.transaction_commitment);
         assert_eq!(tx.receiver_asset_commitment, dtx.receiver_asset_commitment);

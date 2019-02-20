@@ -1,12 +1,11 @@
 use bulletproofs::PedersenGens;
 use crate::errors::Error as ZeiError;
 use crate::proofs::{compute_challenge, compute_sub_challenge};
-use crate::serialization::{CompressedRistrettoString, ScalarString};
+use crate::serialization;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
-use std::convert::TryFrom;
 
 
 /*
@@ -35,48 +34,23 @@ use std::convert::TryFrom;
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenCommitmentEqProof {
     /// I represent a Chaum-Perdersen equality of commitment proof
-
+    #[serde(with = "serialization::compressed_ristretto")]
     c3: CompressedRistretto,
+    #[serde(with = "serialization::compressed_ristretto")]
     c4: CompressedRistretto,
+    #[serde(with = "serialization::scalar")]
     z1: Scalar,
+    #[serde(with = "serialization::scalar")]
     z2: Scalar,
+    #[serde(with = "serialization::scalar")]
     z3: Scalar,
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub(crate) struct ChaumPedersenCommitmentEqProofString{
-    c3: CompressedRistrettoString,
-    c4: CompressedRistrettoString,
-    z1: ScalarString,
-    z2: ScalarString,
-    z3: ScalarString,
-}
-
-impl TryFrom<&ChaumPedersenCommitmentEqProofString> for ChaumPedersenCommitmentEqProof{
-    type Error = ZeiError;
-    fn try_from(proof: &ChaumPedersenCommitmentEqProofString) -> Result<ChaumPedersenCommitmentEqProof, ZeiError> {
-        Ok(
-            ChaumPedersenCommitmentEqProof{
-                c3: CompressedRistretto::try_from(&proof.c3)?,
-                c4: CompressedRistretto::try_from(&proof.c4)?,
-                z1: Scalar::try_from(&proof.z1)?,
-                z2: Scalar::try_from(&proof.z2)?,
-                z3: Scalar::try_from(&proof.z3)?,
-            }
-        )
-    }
-}
-
-impl From<&ChaumPedersenCommitmentEqProof> for ChaumPedersenCommitmentEqProofString{
-    fn from(proof: &ChaumPedersenCommitmentEqProof) -> ChaumPedersenCommitmentEqProofString {
-        ChaumPedersenCommitmentEqProofString{
-            c3: CompressedRistrettoString::from(&proof.c3),
-            c4: CompressedRistrettoString::from(&proof.c4),
-            z1: ScalarString::from(&proof.z1),
-            z2: ScalarString::from(&proof.z2),
-            z3: ScalarString::from(&proof.z3),
-        }
-    }
+pub struct ChaumPedersenCommitmentEqProofMultiple {
+    /// I represent a Chaum-Perdersen equality of commitment proof
+    c1_eq_c2: ChaumPedersenCommitmentEqProof,
+    zero: ChaumPedersenCommitmentEqProof,
 }
 
 pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
@@ -155,7 +129,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     value: &Scalar,
     commitments: &[CompressedRistretto],
     blinding_factors: &[Scalar],
-    ) -> Result<(ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof), ZeiError>
+    ) -> Result<ChaumPedersenCommitmentEqProofMultiple, ZeiError>
 {
     /*! I produce a proof that all commitments are to the same value.
      *
@@ -193,13 +167,16 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
                                         &get_fake_zero_commitment(),
                                         &z,
                                         &get_fake_zero_commitment_blinding());
-    Ok((proof_c1_c2, proof_zero))
+    Ok(ChaumPedersenCommitmentEqProofMultiple{
+        c1_eq_c2: proof_c1_c2,
+        zero: proof_zero,
+    })
 }
 
 pub fn chaum_pedersen_verify_multiple_eq(
     pedersen_gens: &PedersenGens,
     commitments: &[CompressedRistretto],
-    proof: &(ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof)) -> Result<bool, ZeiError>
+    proof: &ChaumPedersenCommitmentEqProofMultiple) -> Result<bool, ZeiError>
 {
     /*! I verify a proof that all commitments are to the same value.
      * Return Ok(true) in case of success, Ok(false) in case of verification failure,
@@ -222,12 +199,12 @@ pub fn chaum_pedersen_verify_multiple_eq(
     //TODO can we produce proof to zero commitment in a more direct way?
     //produce fake commitment to 0 for chaum pedersen commitment
     let mut vrfy_ok = chaum_pedersen_verify_eq(
-        pedersen_gens, &commitments[0], &commitments[1], &proof.0)?;
+        pedersen_gens, &commitments[0], &commitments[1], &proof.c1_eq_c2)?;
     vrfy_ok = vrfy_ok && chaum_pedersen_verify_eq(
         pedersen_gens,
         &d.compress(),
         &get_fake_zero_commitment(),
-        &proof.1,
+        &proof.zero,
     )?;
 
     Ok(vrfy_ok)

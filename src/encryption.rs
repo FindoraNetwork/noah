@@ -1,13 +1,12 @@
 use blake2::VarBlake2b;
 use blake2::digest::{Input, VariableOutput};
 use crate::errors::Error as ZeiError;
-use crate::serialization::CompressedRistrettoString;
+use crate::serialization;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED as base_point;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use sodiumoxide::crypto::secretbox;
 use sodiumoxide::crypto::secretbox::{Nonce,Key};
-use std::convert::TryFrom;
 use rand::CryptoRng;
 use rand::Rng;
 
@@ -17,40 +16,10 @@ use rand::Rng;
 pub struct ZeiRistrettoCipher{
     pub ciphertext: Vec<u8>,
     pub nonce: Nonce,
+    #[serde(with = "serialization::compressed_ristretto")]
     pub encoded_rand: CompressedRistretto,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ZeiRistrettoCipherString{
-    ciphertext: String,
-    nonce: String,
-    encoded_rand: CompressedRistrettoString,
-}
-
-impl TryFrom<&ZeiRistrettoCipher> for ZeiRistrettoCipherString {
-    type Error = ZeiError;
-    fn try_from(a: &ZeiRistrettoCipher) -> Result<ZeiRistrettoCipherString, ZeiError> {
-        Ok(ZeiRistrettoCipherString{
-            ciphertext: serde_json::to_string(&a.ciphertext)?,
-            nonce: serde_json::to_string(&a.nonce.0)?,
-            encoded_rand: CompressedRistrettoString::from(&a.encoded_rand),
-        })
-    }
-}
-
-impl TryFrom<&ZeiRistrettoCipherString> for ZeiRistrettoCipher {
-    type Error = ZeiError;
-    fn try_from(a: &ZeiRistrettoCipherString) -> Result<ZeiRistrettoCipher, ZeiError> {
-        let ciphertext = serde_json::from_str(&a.ciphertext)?;
-        let nonce = Nonce(serde_json::from_str(&a.nonce)?);
-        let encoded_rand = CompressedRistretto::try_from(&a.encoded_rand)?;
-        Ok(ZeiRistrettoCipher {
-            ciphertext,
-            nonce,
-            encoded_rand,
-        })
-    }
-}
 impl ZeiRistrettoCipher {
     pub fn encrypt<R>(
         prng: &mut R,

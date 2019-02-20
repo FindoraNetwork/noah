@@ -5,7 +5,9 @@ use crate::asset::Asset;
 use crate::errors::Error as ZeiError;
 use crate::encryption::ZeiRistrettoCipher;
 use crate::proofs::chaum_perdersen::{chaum_pedersen_prove_multiple_eq,
-                                     chaum_pedersen_verify_multiple_eq, ChaumPedersenCommitmentEqProof};
+                                     chaum_pedersen_verify_multiple_eq,
+                                     ChaumPedersenCommitmentEqProofMultiple};
+use crate::serialization;
 use crate::setup::{BULLET_PROOF_RANGE,PublicParams};
 use crate::utils::{u64_to_bigendian_u8array, u8_bigendian_slice_to_u64};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -18,42 +20,96 @@ use schnorr::{PublicKey, SecretKey,Signature};
 use std::collections::HashSet;
 
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxAddressParams{
     /// Address parameters used as input and output to create transactiona
     amount: u64, // Input or output amount
+    #[serde(with = "serialization::option_bytes")]
     amount_commitment: Option<CompressedRistretto>, // Input or output balance
+    #[serde(with = "serialization::option_bytes")]
     amount_blinding: Option<Scalar>, // None for output
     asset_type: String,
+    #[serde(with = "serialization::option_bytes")]
     asset_type_commitment: Option<CompressedRistretto>, // None if non confidential asset or
                                                         // account is new, or Utxo model
+    #[serde(with = "serialization::option_bytes")]
     asset_type_blinding: Option<Scalar>, // None if non confidential asset or
                                          // account is new or Utxo model
+    #[serde(with = "serialization::public_key")]
     public_key: PublicKey,
+    #[serde(with = "serialization::option_bytes")]
     secret_key: Option<SecretKey>, //None for output account
 }
 
+impl PartialEq for TxAddressParams{
+    fn eq(&self, other: &TxAddressParams) -> bool {
+        let b = self.amount == other.amount &&
+            self.amount_commitment == other.amount_commitment &&
+            self.amount_blinding == other.amount_blinding &&
+            self.asset_type == other.asset_type &&
+            self.asset_type_commitment == other.asset_type_commitment &&
+            self.asset_type_blinding == other.asset_type_blinding &&
+            self.public_key == other.public_key;
+        let mut sk_eq = false;
+        if self.secret_key.is_none() && other.secret_key.is_none(){
+            sk_eq = true;
+        }
+        else if self.secret_key.is_some() && other.secret_key.is_some(){
+            sk_eq = self.secret_key.as_ref().unwrap().as_bytes() ==
+                other.secret_key.as_ref().unwrap().as_bytes()
+        }
+
+        b && sk_eq
+    }
+}
+
+impl Eq for TxAddressParams {}
+
+#[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct TxPublicFields {
     /// Address information for input and output that is safe to add to transaction
     amount: Option<u64>, // None only if confidential
+    #[serde(with = "serialization::option_bytes")]
     amount_commitment: Option<CompressedRistretto>, // None if not confidential balance
     asset_type: Option<String>, // None only if confidential asset
+    #[serde(with = "serialization::option_bytes")]
     asset_type_commitment: Option<CompressedRistretto>,  // None if not confidential balance
+    #[serde(with = "serialization::public_key")]
     public_key: PublicKey, // source or destination
 }
 
+#[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct TxOutput {
     /// Output structure for output
     public: TxPublicFields,
     lock_box: Option<ZeiRistrettoCipher>,
 }
 
+#[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxProofs{
     /// Proof to be included in transactions
     range_proof: Option<RangeProof>,
-    asset_proof: Option<(ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof)>,
+    asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
 }
 
+impl PartialEq for TxProofs {
+    fn eq(&self, other: &TxProofs) -> bool {
+        let mut rp = false;
+        if self.range_proof.is_none() && other.range_proof.is_none(){
+            rp = true;
+        }
+        else if self.range_proof.is_some() && other.range_proof.is_some(){
+            rp = self.range_proof.as_ref().unwrap().to_bytes() ==
+                other.range_proof.as_ref().unwrap().to_bytes()
+        }
+
+        rp && self.asset_proof == other.asset_proof
+    }
+}
+
+impl Eq for TxProofs {}
+
+#[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct TxBody{
     /// Transaction body structure
     input: Vec<TxPublicFields>,
@@ -63,10 +119,11 @@ pub struct TxBody{
     confidential_asset: bool,
 }
 
+#[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Tx{
     /// Transaction structure
     body: TxBody,
-    signatures: Vec<Signature>,
+    //signatures: Vec<Signature>, TODO
 }
 
 impl Tx{
@@ -77,7 +134,6 @@ impl Tx{
         confidential_amount: bool,
         confidential_asset: bool,
     ) -> Result<Tx, ZeiError> {
-
         let pc_gens = PedersenGens::default();
 
         //output values to be build
@@ -217,6 +273,7 @@ impl Tx{
         }
 
         //compute signatures on transaction
+        /*
         let mut signatures = vec![];
         let mut pk_set = HashSet::new();
         for i in 0..input.len(){
@@ -227,8 +284,10 @@ impl Tx{
                 signatures.push(sk.as_ref().unwrap().sign::<blake2::Blake2b, R>(prng, &[0u8,0u8], &src_pks[i]));
             }
         }
+        */
 
-        Ok(Tx::build_tx_struct(tx_input, tx_output, tx_range_proof, tx_asset_proof, signatures))
+        Ok(Tx::build_tx_struct(tx_input, tx_output, tx_range_proof, tx_asset_proof))
+        //signatures))
     }
 
     fn do_confidential_amount_range_proof<R: CryptoRng + Rng>(prng: &mut R,
@@ -321,7 +380,7 @@ impl Tx{
         destination_asset_blindings: Vec<Option<Scalar>>,
         destination_public_keys: &Vec<PublicKey>,
 
-    ) -> Result<((ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof),
+    ) -> Result<(ChaumPedersenCommitmentEqProofMultiple,
                  Vec<CompressedRistretto>, Vec<Scalar>), ZeiError>
     {
         let num_output = destination_public_keys.len();
@@ -371,8 +430,9 @@ impl Tx{
         source_info: Vec<TxPublicFields>,
         destination_info: Vec<TxOutput>,
         range_proof: Option<RangeProof>,
-        asset_proof: Option<(ChaumPedersenCommitmentEqProof, ChaumPedersenCommitmentEqProof)>,
-        signatures: Vec<Signature>) -> Tx
+        asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
+        //signatures: Vec<Signature>
+        ) -> Tx
     {
         let confidential_amount = range_proof.is_some();
         let confidential_asset = asset_proof.is_some();
@@ -389,7 +449,7 @@ impl Tx{
         };
         Tx{
             body,
-            signatures,
+            //signatures,
         }
     }
 
@@ -848,5 +908,65 @@ mod test {
 
         assert_eq!(ZeiError::TxProofError, tx.err().unwrap(),
                    "Conf. amount tx: tx should have not be able to produce range proof");
+    }
+
+    #[test]
+    fn test_ser(){
+        let asset_id = "default_currency";
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let pc_gens = PedersenGens::default();
+        let num_inputs = 3;
+        let num_outputs = 4;
+        let in_amount = [10u64, 10u64, 10u64];
+        let mut in_addrs = vec![];
+        let mut out_addrs  = vec![];
+        let out_amount = [1u64, 2u64, 3u64, 4u64];
+        let mut out_sks: Vec<Scalar> = vec![];
+
+        for i in 0..num_inputs{
+            let (addr,_) =
+                build_address_params(&mut prng, in_amount[i], asset_id,
+                                     true, false, false);
+            in_addrs.push(addr);
+        }
+
+        for i in 0..num_outputs{
+            let (addr, sk) =
+                build_address_params(&mut prng, out_amount[i], asset_id,
+                                     false, false, false);
+            out_addrs.push(addr);
+            out_sks.push(sk);
+        }
+
+        let tx = Tx::new(&mut prng, &in_addrs,
+                         &out_addrs,
+                         false, false).unwrap();
+
+        let json = serde_json::to_string(&tx).unwrap();
+
+        println!("{}", json);
+
+        let dtx = serde_json::from_str::<Tx>(&json).unwrap();
+
+        assert_eq!(tx, dtx);
+
+        /*
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let n = Tmp{secret_key: None};
+        let s = serde_json::to_string(&n).unwrap();
+        let n2: Tmp = serde_json::from_str(&s).unwrap();
+        assert_eq!(true, n2.secret_key.is_none());
+
+        let keypair = Keypair::generate(&mut prng);
+
+        let sk = keypair.secret;
+        let m = Tmp{secret_key: Some(sk)};
+
+        let s = serde_json::to_string(&m).unwrap();
+
+        let m2: Tmp = serde_json::from_str(&s).unwrap();
+        assert_eq!(true, m2.secret_key.is_some());
+        assert_eq!(m.secret_key.unwrap().as_bytes(), m2.secret_key.unwrap().as_bytes());
+        */
     }
 }
