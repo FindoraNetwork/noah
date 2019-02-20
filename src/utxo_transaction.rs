@@ -23,22 +23,22 @@ use crate::utils::compute_str_scalar_hash;
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxAddressParams{
     /// Address parameters used as input and output to create transactiona
-    amount: u64, // Input or output amount
+    pub(crate) amount: u64, // Input or output amount
     #[serde(with = "serialization::option_bytes")]
-    amount_commitment: Option<CompressedRistretto>, // Input or output balance
+    pub(crate) amount_commitment: Option<CompressedRistretto>, // Input or output balance
     #[serde(with = "serialization::option_bytes")]
-    amount_blinding: Option<Scalar>, // None for output
-    asset_type: String,
+    pub(crate) amount_blinding: Option<Scalar>, // None for output
+    pub(crate) asset_type: String,
     #[serde(with = "serialization::option_bytes")]
-    asset_type_commitment: Option<CompressedRistretto>, // None if non confidential asset or
+    pub(crate) asset_type_commitment: Option<CompressedRistretto>, // None if non confidential asset or
                                                         // account is new, or Utxo model
     #[serde(with = "serialization::option_bytes")]
-    asset_type_blinding: Option<Scalar>, // None if non confidential asset or
+    pub(crate) asset_type_blinding: Option<Scalar>, // None if non confidential asset or
                                          // account is new or Utxo model
     #[serde(with = "serialization::public_key")]
-    public_key: PublicKey,
+    pub(crate) public_key: PublicKey,
     #[serde(with = "serialization::option_bytes")]
-    secret_key: Option<SecretKey>, //None for output account
+    pub(crate) secret_key: Option<SecretKey>, //None for output account
 }
 
 impl PartialEq for TxAddressParams{
@@ -68,28 +68,28 @@ impl Eq for TxAddressParams {}
 #[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct TxPublicFields {
     /// Address information for input and output that is safe to add to transaction
-    amount: Option<u64>, // None only if confidential
+    pub(crate) amount: Option<u64>, // None only if confidential
     #[serde(with = "serialization::option_bytes")]
-    amount_commitment: Option<CompressedRistretto>, // None if not confidential balance
-    asset_type: Option<String>, // None only if confidential asset
+    pub(crate) amount_commitment: Option<CompressedRistretto>, // None if not confidential balance
+    pub(crate) asset_type: Option<String>, // None only if confidential asset
     #[serde(with = "serialization::option_bytes")]
-    asset_type_commitment: Option<CompressedRistretto>,  // None if not confidential balance
+    pub(crate) asset_type_commitment: Option<CompressedRistretto>,  // None if not confidential balance
     #[serde(with = "serialization::public_key")]
-    public_key: PublicKey, // source or destination
+    pub(crate) public_key: PublicKey, // source or destination
 }
 
 #[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct TxOutput {
     /// Output structure for output
-    public: TxPublicFields,
-    lock_box: Option<ZeiRistrettoCipher>,
+    pub(crate) public: TxPublicFields,
+    pub(crate) lock_box: Option<ZeiRistrettoCipher>,
 }
 
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxProofs{
     /// Proof to be included in transactions
-    range_proof: Option<RangeProof>,
-    asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
+    pub(crate) range_proof: Option<RangeProof>,
+    pub(crate) asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
 }
 
 impl PartialEq for TxProofs {
@@ -112,17 +112,17 @@ impl Eq for TxProofs {}
 #[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct TxBody{
     /// Transaction body structure
-    input: Vec<TxPublicFields>,
-    output: Vec<TxOutput>,
-    proofs: TxProofs,
-    confidential_amount:bool,
-    confidential_asset: bool,
+    pub(crate) input: Vec<TxPublicFields>,
+    pub(crate) output: Vec<TxOutput>,
+    pub(crate) proofs: TxProofs,
+    pub(crate) confidential_amount:bool,
+    pub(crate) confidential_asset: bool,
 }
 
 #[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Tx{
     /// Transaction structure
-    body: TxBody,
+    pub body: TxBody,
     //signatures: Vec<Signature>, TODO
 }
 
@@ -133,7 +133,7 @@ impl Tx{
         output: &[TxAddressParams],
         confidential_amount: bool,
         confidential_asset: bool,
-    ) -> Result<Tx, ZeiError> {
+    ) -> Result<(Tx, Option<Vec<Scalar>>), ZeiError> {
         let pc_gens = PedersenGens::default();
 
         //output values to be build
@@ -285,8 +285,14 @@ impl Tx{
             }
         }
         */
-
-        Ok(Tx::build_tx_struct(tx_input, tx_output, tx_range_proof, tx_asset_proof))
+        let out_amount_blindings = match confidential_amount{
+            true => Some(memo_out_amount_blind),
+            false => None,
+        };
+        Ok( (Tx::build_tx_struct(
+            tx_input, tx_output, tx_range_proof, tx_asset_proof),
+            out_amount_blindings )
+        )
         //signatures))
     }
 
@@ -396,7 +402,7 @@ impl Tx{
 
         //create commitments and blindings if they don't exits (UTXO or new type for account)
         for i in 0..num_output{
-            if destination_asset_commitments.len() >= i || destination_asset_commitments[i].is_none() {
+            if destination_asset_commitments[i].is_none() {
                 let (asset_comm, asset_blind) =
                     compute_asset_commitment(
                         prng, pc_gens, &destination_public_keys[i], &asset)?;
@@ -585,7 +591,6 @@ impl Tx{
         }
 
         Ok((amount, amount_blind, asset_blind))
-
     }
 
 }
@@ -704,7 +709,7 @@ mod test {
             out_sks.push(sk);
         }
 
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, false).unwrap();
 
@@ -716,7 +721,7 @@ mod test {
 
         //overflow transfer
         out_addrs[3].amount = 0xFFFFFFFFFF;
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, false).unwrap();
         assert_eq!(false, tx.verify(),
@@ -724,7 +729,7 @@ mod test {
 
         //exact transfer
         out_addrs[3].amount = 24;
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, false).unwrap();
         assert_eq!(true, tx.verify(),
@@ -732,7 +737,7 @@ mod test {
 
         //first different from rest
         in_addrs[0].asset_type = String::from("another asset");
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, false).unwrap();
         assert_eq!(false, tx.verify(),
@@ -742,7 +747,7 @@ mod test {
         //input does not match
         in_addrs[0].asset_type = String::from(asset_id);
         in_addrs[1].asset_type = String::from("another asset");
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, false).unwrap();
         assert_eq!(false, tx.verify(),
@@ -752,7 +757,7 @@ mod test {
         //output does not match
         in_addrs[1].asset_type = String::from(asset_id);
         out_addrs[1].asset_type = String::from("another asset");
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, false).unwrap();
         assert_eq!(false, tx.verify(),
@@ -791,7 +796,7 @@ mod test {
             out_sks.push(sk);
         }
 
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, true).unwrap();
 
@@ -819,7 +824,7 @@ mod test {
             build_address_params(&mut prng, 10, "another asset",
                                  true, false, true);
         in_addrs[1] = new_in1;
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, true).unwrap();
         assert_eq!(false, tx.verify(), "Confidential asset tx, one input asset does not match");
@@ -833,7 +838,7 @@ mod test {
             build_address_params(&mut prng, 1, "another asset",
                                  false, false, true);
         out_addrs[2] = new_out2;
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, false).unwrap();
         assert_eq!(false, tx.verify(), "Confidential asset tx, one output asset does not match");
@@ -870,7 +875,7 @@ mod test {
             out_sks.push(sk);
         }
 
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          true, false).unwrap();
         assert_eq!(true, tx.verify(),
@@ -935,7 +940,7 @@ mod test {
             out_sks.push(sk);
         }
 
-        let tx = Tx::new(&mut prng, &in_addrs,
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
                          &out_addrs,
                          false, false).unwrap();
 
