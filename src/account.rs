@@ -13,10 +13,7 @@ use blake2::Blake2b;
 use crate::errors::Error as ZeiError;
 use std::collections::HashMap;
 use curve25519_dalek::ristretto::RistrettoPoint;
-use crate::serialization::CompressedRistrettoString;
-use crate::serialization::ScalarString;
-use std::convert::TryFrom;
-use crate::serialization::KeypairString;
+use crate::serialization;
 use crate::asset::Asset;
 use crate::setup::Balance;
 
@@ -25,18 +22,23 @@ use crate::setup::Balance;
 pub struct AssetBalance {
     pub tx_counter: u128,
     pub balance: Balance,
+    #[serde(with = "serialization::compressed_ristretto")]
     pub balance_commitment: CompressedRistretto,
+    #[serde(with = "serialization::scalar")]
     pub balance_blinding: Scalar,
     pub asset_info: Asset,
     pub confidential_asset: bool,
     //if confidential_asset is false, this is just a hash of asset_info
+    #[serde(with = "serialization::compressed_ristretto")]
     pub asset_commitment: CompressedRistretto,
+    #[serde(with = "serialization::scalar")]
     pub asset_blinding: Scalar, //0 if confidential_asset is false
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Account {
     pub tx_counter: u128,
+    #[serde(with = "serialization::keypair")]
     pub keys: Keypair,
     pub balances: HashMap<String, AssetBalance>,
 }
@@ -211,92 +213,92 @@ impl Account {
     //Verify signature from
 }
 
-//Serialization of Account Struct
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AccountString {
-    tx_counter: u128,
-    keys: KeypairString,
-    balances: HashMap<String, AssetBalanceString>
+// //Serialization of Account Struct
+// #[derive(Serialize, Deserialize, Debug)]
+// pub struct AccountString {
+//     tx_counter: u128,
+//     keys: KeypairString,
+//     balances: HashMap<String, AssetBalanceString>
 
-}
+// }
 
-impl From<&Account> for AccountString {
-    fn from(a: &Account) -> AccountString {
+// impl From<&Account> for AccountString {
+//     fn from(a: &Account) -> AccountString {
 
-        let mut balances = HashMap::new();
-        for (k,v) in a.balances.iter(){
-            let value = AssetBalanceString::from(v);
-            balances.insert(k.to_string(),value);
-        }
-        AccountString{
-            tx_counter: a.tx_counter,
-            keys: KeypairString::from(&a.keys),
-            balances,
-        }
-    }
-}
+//         let mut balances = HashMap::new();
+//         for (k,v) in a.balances.iter(){
+//             let value = AssetBalanceString::from(v);
+//             balances.insert(k.to_string(),value);
+//         }
+//         AccountString{
+//             tx_counter: a.tx_counter,
+//             keys: a.keys,
+//             balances,
+//         }
+//     }
+// }
 
-impl TryFrom<AccountString> for Account {
-    type Error = ZeiError;
-    fn try_from(a: AccountString) -> Result<Account,ZeiError> {
-        let keys = Keypair::try_from(a.keys)?;
+// impl TryFrom<AccountString> for Account {
+//     type Error = ZeiError;
+//     fn try_from(a: AccountString) -> Result<Account,ZeiError> {
+//         let keys = a.keys;
 
-        let mut balances = HashMap::new();
-        for (k,v) in a.balances.into_iter(){
-            let value = AssetBalance::try_from(v)?;
-            balances.insert(k, value);
-        }
-        Ok(Account{
-            tx_counter: a.tx_counter,
-            keys,
-            balances,
-        })
-    }
-}
+//         let mut balances = HashMap::new();
+//         for (k,v) in a.balances.into_iter(){
+//             let value = AssetBalance::try_from(v)?;
+//             balances.insert(k, value);
+//         }
+//         Ok(Account{
+//             tx_counter: a.tx_counter,
+//             keys,
+//             balances,
+//         })
+//     }
+// }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AssetBalanceString{
-    tx_counter: u128,
-    balance: u64,
-    balance_commitment: CompressedRistrettoString,
-    balance_blinding: ScalarString,
-    // TODO
-    asset_info: Asset,
-    confidential_asset: bool,
-    asset_commitment: CompressedRistrettoString,
-    asset_blinding: ScalarString
-}
+// #[derive(Serialize, Deserialize, Debug)]
+// pub struct AssetBalanceString{
+//     tx_counter: u128,
+//     balance: u64,
+//     balance_commitment: CompressedRistrettoString,
+//     balance_blinding: ScalarString,
+//     // TODO
+//     asset_info: Asset,
+//     confidential_asset: bool,
+//     asset_commitment: CompressedRistrettoString,
+//     asset_blinding: ScalarString
+// }
 
-impl From<&AssetBalance> for AssetBalanceString{
-    fn from(a: &AssetBalance) -> AssetBalanceString{
-        AssetBalanceString{
-            tx_counter: a.tx_counter,
-            balance: a.balance,
-            balance_commitment: CompressedRistrettoString::from(&a.balance_commitment),
-            balance_blinding: ScalarString::from(&a.balance_blinding),
-            asset_info: Asset{ id: a.asset_info.id.to_string()},
-            confidential_asset: a.confidential_asset,
-            asset_commitment: CompressedRistrettoString::from(&a.asset_commitment),
-            asset_blinding: ScalarString::from(&a.asset_blinding)
-        }
-    }
-}
+// impl From<&AssetBalance> for AssetBalanceString{
+//     fn from(a: &AssetBalance) -> AssetBalanceString{
+//         AssetBalanceString{
+//             tx_counter: a.tx_counter,
+//             balance: a.balance,
+//             balance_commitment: CompressedRistrettoString::from(&a.balance_commitment),
+//             balance_blinding: ScalarString::from(&a.balance_blinding),
+//             asset_info: Asset{ id: a.asset_info.id.to_string()},
+//             confidential_asset: a.confidential_asset,
+//             asset_commitment: CompressedRistrettoString::from(&a.asset_commitment),
+//             asset_blinding: ScalarString::from(&a.asset_blinding)
+//         }
+//     }
+// }
 
-impl TryFrom<AssetBalanceString> for AssetBalance{
-    type Error = ZeiError;
-    fn try_from(a: AssetBalanceString) -> Result<AssetBalance, ZeiError> {
-        Ok(AssetBalance{
-            tx_counter: a.tx_counter,
-            balance: a.balance,
-            balance_commitment: CompressedRistretto::try_from(&a.balance_commitment)?,
-            balance_blinding: Scalar::try_from(&a.balance_blinding)?,
-            asset_info: a.asset_info,
-            confidential_asset: a.confidential_asset,
-            asset_commitment: CompressedRistretto::try_from(&a.asset_commitment)?,
-            asset_blinding: Scalar::try_from(&a.asset_blinding)?
-        })
-    }
-}
+// impl TryFrom<AssetBalanceString> for AssetBalance{
+//     type Error = ZeiError;
+//     fn try_from(a: AssetBalanceString) -> Result<AssetBalance, ZeiError> {
+//         Ok(AssetBalance{
+//             tx_counter: a.tx_counter,
+//             balance: a.balance,
+//             balance_commitment: CompressedRistretto::try_from(&a.balance_commitment)?,
+//             balance_blinding: Scalar::try_from(&a.balance_blinding)?,
+//             asset_info: a.asset_info,
+//             confidential_asset: a.confidential_asset,
+//             asset_commitment: CompressedRistretto::try_from(&a.asset_commitment)?,
+//             asset_blinding: Scalar::try_from(&a.asset_blinding)?
+//         })
+//     }
+// }
 
 #[cfg(test)]
 mod test {
