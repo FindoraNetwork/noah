@@ -909,10 +909,9 @@ mod test {
     }
 
     #[test]
-    fn test_ser(){
+    fn test_tx_serialization(){
         let asset_id = "default_currency";
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = PedersenGens::default();
         let num_inputs = 3;
         let num_outputs = 4;
         let in_amount = [10u64, 10u64, 10u64];
@@ -941,30 +940,9 @@ mod test {
                          false, false).unwrap();
 
         let json = serde_json::to_string(&tx).unwrap();
-
-        println!("{}", json);
-
+        
         let dtx = serde_json::from_str::<Tx>(&json).unwrap();
 
         assert_eq!(tx, dtx);
-
-        /*
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let n = Tmp{secret_key: None};
-        let s = serde_json::to_string(&n).unwrap();
-        let n2: Tmp = serde_json::from_str(&s).unwrap();
-        assert_eq!(true, n2.secret_key.is_none());
-
-        let keypair = Keypair::generate(&mut prng);
-
-        let sk = keypair.secret;
-        let m = Tmp{secret_key: Some(sk)};
-
-        let s = serde_json::to_string(&m).unwrap();
-
-        let m2: Tmp = serde_json::from_str(&s).unwrap();
-        assert_eq!(true, m2.secret_key.is_some());
-        assert_eq!(m.secret_key.unwrap().as_bytes(), m2.secret_key.unwrap().as_bytes());
-        */
     }
 }

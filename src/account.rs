@@ -22,7 +22,7 @@ use crate::utils::compute_str_ristretto_point_hash;
 use crate::utils::compute_str_scalar_hash;
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct AssetBalance {
     pub tx_counter: u128,
     pub balance: Balance,
@@ -46,6 +46,17 @@ pub struct Account {
     pub keys: Keypair,
     pub balances: HashMap<String, AssetBalance>,
 }
+
+impl PartialEq for Account{
+    fn eq(&self, other: &Account) -> bool {
+        self.balances == other.balances &&
+            self.tx_counter == other.tx_counter &&
+            self.keys.to_bytes()[..] == other.keys.to_bytes()[..]
+
+    }
+}
+
+impl Eq for Account {}
 
 impl Account {
 
@@ -302,5 +313,32 @@ mod test {
         let pc_gens = PedersenGens::default();
         let com = pc_gens.commit(Scalar::from(new_balance), new_blinding).compress();
         assert_eq!(sender.balances[asset_id].balance_commitment, com);
+    }
+
+    #[test]
+    pub fn test_account_ser() {
+        let mut csprng1 = ChaChaRng::from_seed([0u8; 32]);
+        let mut csprng2 = ChaChaRng::from_seed([0u8; 32]);
+        let mut acc_old = Account::new(&mut csprng1);
+        let asset_id = "default currency";
+        acc_old.add_asset(&mut csprng1, asset_id, false, 50);
+        acc_old.add_asset(&mut csprng1, "another currency", true, 50);
+
+        let mut acc = Account::new(&mut csprng2);
+        acc.add_asset(&mut csprng2, asset_id, false, 50);
+        acc.add_asset(&mut csprng2, "another currency", true, 50);
+
+        let json = serde_json::to_string(&acc_old).unwrap();
+
+        let acc_deserialized: Account = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(acc_deserialized, acc);
+
+        let acc = Account::new(&mut ChaChaRng::from_seed([0u8; 32]));
+        let json = serde_json::to_string(&acc).unwrap();
+
+        let acc_deserialized: Account = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(acc_deserialized, acc);
     }
 }
