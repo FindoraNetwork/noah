@@ -245,13 +245,13 @@ impl Account {
             }
         }
         else{
-            asset_id = out_info.public.asset_type.as_ref().unwrap().clone();
+            asset_id = out_info.public.asset_type.as_ref()?.clone();
         }
 
         let mut asset_balance = self.balances.get_mut(&asset_id)?;
         let (amount, amount_blind, _) =
             Tx::receiver_unlock_memo(
-                out_info.lock_box.as_ref().unwrap(),
+                out_info.lock_box.as_ref()?,
                 &from_secret_key_to_scalar(&self.keys.secret.to_bytes()),
                 true,
                 tx.body.confidential_asset,
@@ -266,8 +266,8 @@ impl Account {
             return Ok(false);
         }
 
-        let new_balance_commitment = asset_balance.balance_commitment.decompress().unwrap() -
-            amount_commitment.decompress().unwrap();
+        let new_balance_commitment = asset_balance.balance_commitment.decompress()? +
+            amount_commitment.decompress()?;
 
         asset_balance.balance_commitment = new_balance_commitment.compress();
         asset_balance.balance_blinding += blind;
@@ -325,48 +325,46 @@ mod test {
         rec.receive(&tx, 0).unwrap();
     }
 
-    /*
     #[test]
     pub fn test_account_apply_tx() {
-        let starting_bal = 8*1000*1000*1000*1000;
+        /*! I test that valid transactions are applied correctly to sender and receiver accounts */
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
+        let pc_gens = PedersenGens::default();
+        let starting_bal = 8*1000*1000*1000*1000;
         let transfer_amount = 5*1000*1000*1000*1000;
         let mut sender = Account::new(&mut csprng);
         let mut rec = Account::new(&mut csprng);
         let asset_id = "example_asset";
         sender.add_asset(&mut csprng, &asset_id, true, starting_bal);
         rec.add_asset(&mut csprng, &asset_id, true, starting_bal);
+
         let tx_params = TxParams{
             receiver_pk: rec.keys.public,
             receiver_asset_commitment: rec.balances.get(asset_id).unwrap().asset_commitment,
             receiver_asset_opening: rec.balances.get(asset_id).unwrap().asset_blinding,
             transfer_amount,
         };
-        let asset = compute_str_scalar_hash(&sender.balances[asset_id].asset_type);
-        let account_balance = sender.balances[asset_id].balance;
-        let account_blind = &sender.balances[asset_id].balance_blinding;
-        let sender_asset_opening = &sender.balances[asset_id].asset_blinding;
-        let sender_asset_commitment = &sender.balances[asset_id].asset_commitment;
-        //let (tx,tx_blind) = Tx::new(
-        //    &mut csprng, &tx_params, account_balance, account_blind, &asset, sender_asset_opening,
-        //sender_asset_commitment, true).unwrap();
-        let old_account_blind = account_blind.clone();
 
-        sender.sender_apply_tx(&tx,transfer_amount,asset_id,&tx_blind).unwrap();
+        let (tx,blind) = sender.send(&mut csprng, &tx_params, asset_id).unwrap();
 
-        let expected_new_balance = starting_bal - transfer_amount;
-        let new_balance = sender.balances[asset_id].balance;
-        assert_eq!(expected_new_balance, new_balance);
+        sender.sender_apply_tx(&tx, transfer_amount, asset_id, &blind).unwrap();
 
-        let new_blinding = sender.balances[asset_id].balance_blinding;
-        assert_eq!(old_account_blind - tx_blind, new_blinding);
+        assert_eq!(sender.balances[asset_id].balance, starting_bal - transfer_amount);
 
-        let pc_gens = PedersenGens::default();
-        let com = pc_gens.commit(Scalar::from(new_balance), new_blinding).compress();
-        assert_eq!(sender.balances[asset_id].balance_commitment, com);
+        let com = pc_gens.commit(
+            Scalar::from(starting_bal - transfer_amount), sender.balances[asset_id].balance_blinding);
+        assert_eq!(sender.balances[asset_id].balance_commitment, com.compress());
+
+        assert_eq!(true, rec.receiver_apply_tx(&tx));
+
+        assert_eq!(rec.balances[asset_id].balance, starting_bal + transfer_amount);
+
+        let com = pc_gens.commit(
+            Scalar::from(starting_bal + transfer_amount), rec.balances[asset_id].balance_blinding);
+        assert_eq!(rec.balances[asset_id].balance_commitment, com.compress());
     }
-    */
+
     #[test]
     pub fn test_account_ser() {
         let mut csprng1 = ChaChaRng::from_seed([0u8; 32]);
