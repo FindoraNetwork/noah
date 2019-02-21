@@ -26,7 +26,6 @@ pub mod account;
 pub mod address;
 pub mod proofs;
 pub mod serialization;
-pub mod transaction;
 pub mod utxo_transaction;
 
 // TODO(jackson): Real C bindings for zei

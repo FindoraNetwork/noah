@@ -1,6 +1,5 @@
 //Hidden Accounts
 
-use crate::transaction::{TxParams};
 use curve25519_dalek::scalar::Scalar;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
@@ -24,6 +23,20 @@ use crate::utxo_transaction::TxAddressParams;
 use schnorr::SecretKey;
 use crate::encryption::from_secret_key_to_scalar;
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TxParams{
+    /*
+     * I am helper structure to send/receive the data for a transaction
+     *
+     */
+    #[serde(with = "serialization::public_key")]
+    pub receiver_pk: PublicKey,
+    #[serde(with = "serialization::compressed_ristretto")]
+    pub receiver_asset_commitment: CompressedRistretto,
+    #[serde(with = "serialization::scalar")]
+    pub receiver_asset_opening: Scalar,
+    pub transfer_amount: Balance,
+}
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct AssetBalance {
@@ -292,7 +305,6 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::utils::compute_str_scalar_hash;
 
     #[test]
     pub fn test_account_creation() {
