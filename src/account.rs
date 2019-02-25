@@ -134,8 +134,17 @@ impl Account {
         self.balances.get_mut(asset_id).unwrap()
     }
 
-    pub fn get_public_key(&self) -> PublicKey {
-        self.keys.public
+    pub fn get_public_key(&self) -> &PublicKey {
+        &self.keys.public
+    }
+
+    pub fn get_public_key_as_hex(&self) -> String {
+
+        hex::encode(&self.keys.public.as_bytes())
+    }
+
+    pub fn get_secret_key(&self) -> &SecretKey {
+        &self.keys.secret
     }
 
     pub fn address(&self) -> Address {
@@ -155,7 +164,7 @@ impl Account {
         Ok(tx)
     }
 
-    pub fn send<R>(&mut self, csprng: &mut R, tx_params: &TxParams, asset_id: &str)
+    pub fn send<R>(&self, csprng: &mut R, tx_params: &TxParams, asset_id: &str)
                    -> Result<(Tx, Scalar), ZeiError>
     where R: CryptoRng + Rng,
     {
@@ -165,7 +174,7 @@ impl Account {
          * generated.
          */
 
-        let asset_balance = self.balances.get_mut(asset_id)?;
+        let asset_balance = self.balances.get(asset_id)?;
         if tx_params.transfer_amount > asset_balance.balance {
             return Err(ZeiError::NotEnoughFunds);
         }
@@ -379,18 +388,14 @@ mod test {
 
     #[test]
     pub fn test_account_ser() {
-        let mut csprng1 = ChaChaRng::from_seed([0u8; 32]);
-        let mut csprng2 = ChaChaRng::from_seed([0u8; 32]);
-        let mut acc_old = Account::new(&mut csprng1);
+        let mut csprng = ChaChaRng::from_seed([0u8; 32]);
         let asset_id = "default currency";
-        acc_old.add_asset(&mut csprng1, asset_id, false, 50);
-        acc_old.add_asset(&mut csprng1, "another currency", true, 50);
 
-        let mut acc = Account::new(&mut csprng2);
-        acc.add_asset(&mut csprng2, asset_id, false, 50);
-        acc.add_asset(&mut csprng2, "another currency", true, 50);
+        let mut acc = Account::new(&mut csprng);
+        acc.add_asset(&mut csprng, asset_id, false, 50);
+        acc.add_asset(&mut csprng, "another currency", true, 50);
 
-        let json = serde_json::to_string(&acc_old).unwrap();
+        let json = serde_json::to_string(&acc).unwrap();
 
         let acc_deserialized: Account = serde_json::from_str(&json).unwrap();
 

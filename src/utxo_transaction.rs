@@ -88,7 +88,9 @@ pub struct TxOutput {
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxProofs{
     /// Proof to be included in transactions
+    #[serde(with = "serialization::option_bytes")]
     pub(crate) range_proof: Option<RangeProof>,
+    #[serde(with = "serialization::option_bytes")]
     pub(crate) asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
 }
 
@@ -135,7 +137,6 @@ impl Tx{
         confidential_asset: bool,
     ) -> Result<(Tx, Option<Vec<Scalar>>), ZeiError> {
         let pc_gens = PedersenGens::default();
-
         //output values to be build
         let mut tx_range_proof = None;
         let mut tx_asset_proof = None;
@@ -328,7 +329,6 @@ impl Tx{
         destination_public_keys: &[PublicKey],
     )-> Result<(RangeProof, Vec<CompressedRistretto>, Vec<Scalar>),ZeiError>
     {
-
         let num_output = destination_amounts.len();
 
         let upper_power2 = smallest_greater_power_of_two((num_output + 1) as u32) as usize;
@@ -618,7 +618,8 @@ fn sample_blinding_factor<R>(csprng: &mut R, address: &PublicKey) -> Result<Scal
     where R: CryptoRng + Rng,
 {
     let blinding_key = Scalar::random(csprng);
-    let aux: RistrettoPoint = blinding_key * address.get_curve_point()?;
+    let pk_curve_point = address.get_curve_point()?;
+    let aux: RistrettoPoint = blinding_key * pk_curve_point;
     let mut hasher = Blake2b::new();
     hasher.input(&aux.compress().to_bytes());
     Ok(Scalar::from_hash(hasher))
@@ -914,7 +915,7 @@ mod test {
     }
 
     #[test]
-    fn test_tx_serialization(){
+    fn test_tx_serialization_plain(){
         let asset_id = "default_currency";
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let num_inputs = 3;
@@ -950,4 +951,45 @@ mod test {
 
         assert_eq!(tx, dtx);
     }
+
+    #[test]
+    fn test_tx_serialization_conf_amount(){
+        let asset_id = "default_currency";
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let num_inputs = 3;
+        let num_outputs = 4;
+        let in_amount = [10u64, 10u64, 10u64];
+        let mut in_addrs = vec![];
+        let mut out_addrs  = vec![];
+        let out_amount = [1u64, 2u64, 3u64, 4u64];
+        let mut out_sks: Vec<Scalar> = vec![];
+
+        for i in 0..num_inputs{
+            let (addr,_) =
+                build_address_params(&mut prng, in_amount[i], asset_id,
+                                     true, true, false);
+            in_addrs.push(addr);
+        }
+
+        for i in 0..num_outputs{
+            let (addr, sk) =
+                build_address_params(&mut prng, out_amount[i], asset_id,
+                                     false, true, false);
+            out_addrs.push(addr);
+            out_sks.push(sk);
+        }
+
+        let (tx,_) = Tx::new(&mut prng, &in_addrs,
+                             &out_addrs,
+                             true, false).unwrap();
+
+        let json = serde_json::to_string(&tx).unwrap();
+
+
+        let dtx = serde_json::from_str::<Tx>(&json).unwrap();
+
+        assert_eq!(tx, dtx);
+    }
+
+
 }

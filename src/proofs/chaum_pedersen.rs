@@ -35,22 +35,22 @@ use rand::{CryptoRng, Rng};
 pub struct ChaumPedersenCommitmentEqProof {
     /// I represent a Chaum-Perdersen equality of commitment proof
     #[serde(with = "serialization::compressed_ristretto")]
-    c3: CompressedRistretto,
+    pub(crate)c3: CompressedRistretto,
     #[serde(with = "serialization::compressed_ristretto")]
-    c4: CompressedRistretto,
+    pub(crate)c4: CompressedRistretto,
     #[serde(with = "serialization::scalar")]
-    z1: Scalar,
+    pub(crate)z1: Scalar,
     #[serde(with = "serialization::scalar")]
-    z2: Scalar,
+    pub(crate) z2: Scalar,
     #[serde(with = "serialization::scalar")]
-    z3: Scalar,
+    pub(crate) z3: Scalar,
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenCommitmentEqProofMultiple {
     /// I represent a Chaum-Perdersen equality of commitment proof
-    c1_eq_c2: ChaumPedersenCommitmentEqProof,
-    zero: ChaumPedersenCommitmentEqProof,
+    pub(crate) c1_eq_c2: ChaumPedersenCommitmentEqProof,
+    pub(crate) zero: ChaumPedersenCommitmentEqProof,
 }
 
 pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
@@ -206,7 +206,6 @@ pub fn chaum_pedersen_verify_multiple_eq(
         &get_fake_zero_commitment(),
         &proof.zero,
     )?;
-
     Ok(vrfy_ok)
 }
 

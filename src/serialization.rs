@@ -2,6 +2,8 @@ use bulletproofs::{RangeProof};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use schnorr::SecretKey;
+use crate::proofs::chaum_pedersen::ChaumPedersenCommitmentEqProofMultiple;
+use crate::proofs::chaum_pedersen::ChaumPedersenCommitmentEqProof;
 
 // preferred approach for handling of fields of types that don't provide correct default serde serialize/deserialize
 
@@ -55,6 +57,46 @@ impl ZeiFromToBytes for RangeProof{
         RangeProof::from_bytes(bytes).unwrap()
     }
 }
+
+impl ZeiFromToBytes for ChaumPedersenCommitmentEqProof{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(&self.c3.zei_to_bytes());
+        v.extend_from_slice(&self.c4.zei_to_bytes());
+        v.extend_from_slice(&self.z1.zei_to_bytes());
+        v.extend_from_slice(&self.z2.zei_to_bytes());
+        v.extend_from_slice(&self.z3.zei_to_bytes());
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenCommitmentEqProof{
+        ChaumPedersenCommitmentEqProof{
+            c3: CompressedRistretto::zei_from_bytes(&bytes[0..32]),
+            c4: CompressedRistretto::zei_from_bytes(&bytes[32..64]),
+            z1: Scalar::zei_from_bytes(&bytes[64..96]),
+            z2: Scalar::zei_from_bytes(&bytes[96..128]),
+            z3: Scalar::zei_from_bytes(&bytes[128..160]),
+        }
+    }
+}
+impl ZeiFromToBytes for ChaumPedersenCommitmentEqProofMultiple{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(&self.c1_eq_c2.zei_to_bytes());
+        v.extend_from_slice(&self.zero.zei_to_bytes());
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenCommitmentEqProofMultiple{
+        let c1_eq_c2 =
+            ChaumPedersenCommitmentEqProof::zei_from_bytes(&bytes[0..32*5]);
+        let zero =
+            ChaumPedersenCommitmentEqProof::zei_from_bytes(&bytes[32*5..]);
+        ChaumPedersenCommitmentEqProofMultiple{
+            c1_eq_c2,
+            zero
+        }
+    }
+}
+
 
 pub mod keypair {
     use schnorr::Keypair;
