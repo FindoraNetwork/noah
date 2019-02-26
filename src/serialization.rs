@@ -226,6 +226,29 @@ pub mod range_proof{
     }
 }
 
+pub mod signature {
+    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    use schnorr::Signature;
+
+    pub fn serialize<S>(s: &Signature, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer,
+    {
+        let bytes = s.to_bytes();
+        let encoded = hex::encode(&bytes[..]);
+        serializer.serialize_str(&encoded)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Signature, D::Error>
+        where D: Deserializer<'de>,
+    {
+        let sign_str = String::deserialize(deserializer)?;
+        let vector = hex::decode(sign_str).map_err(de::Error::custom)?;
+        let bytes = vector.as_slice();
+        let signature = Signature::from_bytes(bytes).map_err(de::Error::custom)?;
+        Ok(signature)
+    }
+}
+
 pub mod option_bytes {
     use serde::{self, de, Deserialize, Serializer, Deserializer};
     use crate::serialization::ZeiFromToBytes;

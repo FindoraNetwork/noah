@@ -19,6 +19,11 @@ use schnorr::{PublicKey, SecretKey,Signature};
 use std::collections::HashSet;
 use crate::utils::compute_str_scalar_hash;
 
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct ZeiSignature{
+    #[serde(with = "serialization::signature")]
+    pub(crate) signature: Signature,
+}
 
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxAddressParams{
@@ -125,7 +130,7 @@ pub struct TxBody{
 pub struct Tx{
     /// Transaction structure
     pub body: TxBody,
-    //signatures: Vec<Signature>, TODO
+    signatures: Vec<ZeiSignature>,
 }
 
 impl Tx{
@@ -273,28 +278,20 @@ impl Tx{
             );
         }
 
-        //compute signatures on transaction
-        /*
-        let mut signatures = vec![];
-        let mut pk_set = HashSet::new();
-        for i in 0..input.len(){
-            let pk = src_pks[i].as_bytes();
-            if pk_set.contains(pk) == false {
-                pk_set.insert(pk);
-                let sk = &input[i].secret_key;
-                signatures.push(sk.as_ref().unwrap().sign::<blake2::Blake2b, R>(prng, &[0u8,0u8], &src_pks[i]));
-            }
-        }
-        */
+
+
+        let body = Tx::build_body(
+            tx_input, tx_output,
+            tx_range_proof, tx_asset_proof);
+
+        let signatures = Tx::compute_signatures(prng, &body, input);
+
         let out_amount_blindings = match confidential_amount{
             true => Some(memo_out_amount_blind),
             false => None,
         };
-        Ok( (Tx::build_tx_struct(
-            tx_input, tx_output, tx_range_proof, tx_asset_proof),
-            out_amount_blindings )
-        )
-        //signatures))
+
+        Ok( ( Tx{body, signatures }, out_amount_blindings))
     }
 
     fn do_confidential_amount_range_proof<R: CryptoRng + Rng>(prng: &mut R,
@@ -432,13 +429,31 @@ impl Tx{
     }
 
 
-    fn build_tx_struct(
+    fn compute_signatures<R: CryptoRng + Rng>(
+        prng: &mut R, body: &TxBody, input: &[TxAddressParams]) -> Vec<ZeiSignature>{
+        let msg = serde_json::to_vec(body).unwrap();
+        let mut signatures = vec![];
+        let mut pk_set = HashSet::new();
+        for i in 0..input.len(){
+            let pk = &input[i].public_key;
+            //let pk = src_pks[i].as_bytes();
+            if pk_set.contains(pk.as_bytes()) == false {
+                pk_set.insert(pk.as_bytes());
+                let sign = input[i].secret_key.as_ref().unwrap().sign::<blake2::Blake2b, R>(prng, msg.as_slice(),
+                                                                                            pk);
+                signatures.push(ZeiSignature{signature: sign});
+            }
+        }
+        signatures
+    }
+
+    fn build_body(
         source_info: Vec<TxPublicFields>,
         destination_info: Vec<TxOutput>,
         range_proof: Option<RangeProof>,
         asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
         //signatures: Vec<Signature>
-        ) -> Tx
+        ) -> TxBody
     {
         let confidential_amount = range_proof.is_some();
         let confidential_asset = asset_proof.is_some();
@@ -446,21 +461,20 @@ impl Tx{
             range_proof,
             asset_proof,
         };
-        let body = TxBody{
+        TxBody{
             input: source_info,
             output: destination_info,
             proofs,
             confidential_amount,
             confidential_asset,
-        };
-        Tx{
-            body,
-            //signatures,
         }
     }
 
     pub fn verify(&self) -> bool{
-        //1 signature TODO
+        //1 signature
+        if ! self.verify_signatures(){
+            return false;
+        }
         //2 amounts
         if self.body.confidential_amount {
             if !self.verify_confidential_amount(){
@@ -497,6 +511,30 @@ impl Tx{
                 return false;
             }
         }
+        true
+    }
+
+    fn verify_signatures(&self) -> bool{
+        let msg = serde_json::to_vec(&self.body).unwrap();
+        let input = &self.body.input;
+        let signatures = &self.signatures;
+        let pk_in: Vec<&PublicKey> = self.body.input.iter().map(|x|&x.public_key).collect();
+        let mut pk_set = HashSet::new();
+        for i in 0..input.len(){
+            let pk = &input[i].public_key;
+            if pk_set.contains(pk.as_bytes()) == false {
+                pk_set.insert(pk.as_bytes());
+
+                if pk.verify::<blake2::Blake2b>(msg.as_slice(),&signatures[i].signature).is_err(){
+                    return false;
+                }
+            }
+        }
+        //number of different keys == number of signatures in tx
+        if pk_set.iter().len() != signatures.len() {
+            return false;
+        }
+
         true
     }
 
@@ -881,6 +919,8 @@ mod test {
                          true, false).unwrap();
         assert_eq!(true, tx.verify(),
                    "Conf. amount tx: Transaction should be valid");
+
+        return;
 
         //check receivers memos decryption
         for i in 0..num_outputs {
