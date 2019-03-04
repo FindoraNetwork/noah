@@ -23,21 +23,26 @@ pub struct ZeiKeyPair {
 pub const ZEI_SECRET_KEY_LENGTH: usize = schnorr::SECRET_KEY_LENGTH;
 pub const ZEI_PUBLIC_KEY_LENGTH: usize = schnorr::PUBLIC_KEY_LENGTH;
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct ZeiSignature(pub Signature);
+
+
 impl ZeiPublicKey {
     pub(crate) fn get_curve_point(&self) -> Result<RistrettoPoint, Error>{
         Ok(self.0.get_curve_point()?)
     }
 
-    pub(crate) fn verify<D>(&self,  message: &[u8], signature: &Signature) -> Result<(), Error>
+    pub(crate) fn verify<D>(&self,  message: &[u8], signature: &ZeiSignature) -> Result<(), Error>
     where  D:  Digest<OutputSize = U64> + Default,
     {
-        Ok(self.0.verify::<D>(message, signature)?)
+        Ok(self.0.verify::<D>(message, &signature.0)?)
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8]{
         self.0.as_bytes()
     }
 }
+
 impl ZeiFromToBytes for ZeiPublicKey {
     fn zei_to_bytes(&self) -> Vec<u8> {
         let bytes = self.0.to_bytes();
@@ -53,10 +58,10 @@ impl ZeiFromToBytes for ZeiPublicKey {
 
 impl ZeiSecretKey{
     pub fn sign<D, R>(
-        &self, prng: &mut R, message: &[u8], public_key: &ZeiPublicKey) -> Signature
+        &self, prng: &mut R, message: &[u8], public_key: &ZeiPublicKey) -> ZeiSignature
         where D:  Digest<OutputSize = U64> + Default, R: CryptoRng + Rng,
     {
-        self.0.sign::<D, _>(prng, message, &public_key.0)
+        ZeiSignature(self.0.sign::<D, _>(prng, message, &public_key.0))
     }
 
     fn clone(&self) -> Self {
@@ -100,7 +105,7 @@ impl ZeiKeyPair{
         self.secret.clone()
     }
 
-    pub fn sign<D,R>(&self, prng: &mut R, msg: &[u8]) -> Signature
+    pub fn sign<D,R>(&self, prng: &mut R, msg: &[u8]) -> ZeiSignature
         where D:  Digest<OutputSize = U64> + Default, R: CryptoRng + Rng,
     {
         self.secret.sign::<D,_>(prng, msg, &self.public)

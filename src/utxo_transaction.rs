@@ -15,19 +15,12 @@ use curve25519_dalek::traits::Identity;
 use merlin::Transcript;
 use rand::CryptoRng;
 use rand::Rng;
-use schnorr::{Signature};
 use std::collections::HashSet;
 use crate::utils::compute_str_scalar_hash;
 use crate::keys::ZeiPublicKey;
 use crate::keys::ZeiSecretKey;
 use crate::serialization::ZeiFromToBytes;
-
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-pub struct ZeiSignature{
-    //#[serde(with = "serialization::signature")]
-    #[serde(with = "serialization::zei_obj_serde")]
-    pub(crate) signature: Signature,
-}
+use crate::keys::ZeiSignature;
 
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxAddressParams{
@@ -444,7 +437,7 @@ impl Tx{
                 pk_set.insert(pk.as_bytes());
                 let sign = input[i].secret_key.as_ref().unwrap().sign::<blake2::Blake2b, R>(prng, msg.as_slice(),
                                                                                             pk);
-                signatures.push(ZeiSignature{signature: sign});
+                signatures.push(sign);
             }
         }
         signatures
@@ -455,7 +448,6 @@ impl Tx{
         destination_info: Vec<TxOutput>,
         range_proof: Option<RangeProof>,
         asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
-        //signatures: Vec<Signature>
         ) -> TxBody
     {
         let confidential_amount = range_proof.is_some();
@@ -527,7 +519,7 @@ impl Tx{
             if pk_set.contains(pk.as_bytes()) == false {
                 pk_set.insert(pk.as_bytes());
 
-                if pk.verify::<blake2::Blake2b>(msg.as_slice(),&signatures[i].signature).is_err(){
+                if pk.verify::<blake2::Blake2b>(msg.as_slice(),&signatures[i]).is_err(){
                     return false;
                 }
             }

@@ -7,6 +7,11 @@ use crate::proofs::chaum_pedersen::ChaumPedersenCommitmentEqProof;
 use schnorr::Signature;
 use schnorr::PublicKey;
 use schnorr::Keypair;
+use crate::keys::ZeiSignature;
+use serde::Serialize;
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::Serializer;
 
 // preferred approach for handling of fields of types that don't provide correct default serde serialize/deserialize
 
@@ -134,6 +139,38 @@ impl ZeiFromToBytes for ChaumPedersenCommitmentEqProofMultiple{
     }
 }
 
+impl ZeiFromToBytes for ZeiSignature{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let bytes = self.0.to_bytes();
+        let mut vec = vec![];
+        vec.extend_from_slice(&bytes[..]);
+        vec
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Self {
+        ZeiSignature(Signature::from_bytes(bytes).unwrap())
+    }
+}
+
+impl Serialize for ZeiSignature{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+    }
+}
+
+impl<'de> Deserialize<'de> for ZeiSignature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>
+    {
+        let v = deserializer.deserialize_bytes(zei_obj_serde::BytesVisitor).unwrap();
+        Ok(ZeiSignature::zei_from_bytes(v.as_slice()))
+    }
+}
+
 pub mod zei_obj_serde {
     use crate::serialization::ZeiFromToBytes;
     use serde::Serializer;
@@ -141,7 +178,7 @@ pub mod zei_obj_serde {
     use serde::de::SeqAccess;
     use serde::Deserializer;
 
-    struct BytesVisitor;
+    pub struct BytesVisitor;
 
     impl<'de> Visitor<'de> for BytesVisitor {
         type Value = Vec<u8>;

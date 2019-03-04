@@ -4,7 +4,6 @@ use curve25519_dalek::scalar::Scalar;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 
-use schnorr::{Signature};
 use crate::keys::ZeiPublicKey;
 use rand::CryptoRng;
 use rand::Rng;
@@ -26,6 +25,7 @@ use crate::keys::ZeiKeyPair;
 use crate::keys::ZeiSecretKey;
 use crate::serialization::ZeiFromToBytes;
 use crate::keys::ZEI_SECRET_KEY_LENGTH;
+use crate::keys::ZeiSignature;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TxParams{
@@ -305,7 +305,7 @@ impl Account {
         Ok(true)
     }
 
-    pub fn sign<R>(&self, csprng: &mut R, msg: &[u8]) -> Signature
+    pub fn sign<R>(&self, csprng: &mut R, msg: &[u8]) -> ZeiSignature
         where R: CryptoRng + Rng,
     {
         /*! I Sign a u8 slice data using this account secret key
