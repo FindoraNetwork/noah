@@ -16,7 +16,7 @@ use rand::Rng;
 pub struct ZeiRistrettoCipher{
     pub ciphertext: Vec<u8>,
     pub nonce: Nonce,
-    #[serde(with = "serialization::compressed_ristretto")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub encoded_rand: CompressedRistretto,
 }
 

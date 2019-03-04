@@ -21,7 +21,8 @@ use crate::utils::compute_str_scalar_hash;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct ZeiSignature{
-    #[serde(with = "serialization::signature")]
+    //#[serde(with = "serialization::signature")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub(crate) signature: Signature,
 }
 
@@ -40,7 +41,7 @@ pub struct TxAddressParams{
     #[serde(with = "serialization::option_bytes")]
     pub(crate) asset_type_blinding: Option<Scalar>, // None if non confidential asset or
                                          // account is new or Utxo model
-    #[serde(with = "serialization::public_key")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub(crate) public_key: PublicKey,
     #[serde(with = "serialization::option_bytes")]
     pub(crate) secret_key: Option<SecretKey>, //None for output account
@@ -79,7 +80,7 @@ pub struct TxPublicFields {
     pub(crate) asset_type: Option<String>, // None only if confidential asset
     #[serde(with = "serialization::option_bytes")]
     pub(crate) asset_type_commitment: Option<CompressedRistretto>, // None if not confidential asset
-    #[serde(with = "serialization::public_key")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub(crate) public_key: PublicKey, // source or destination
 }
 

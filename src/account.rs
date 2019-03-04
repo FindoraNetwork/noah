@@ -29,11 +29,11 @@ pub struct TxParams{
      * I am helper structure to send/receive the data for a transaction
      *
      */
-    #[serde(with = "serialization::public_key")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub receiver_pk: PublicKey,
-    #[serde(with = "serialization::compressed_ristretto")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub receiver_asset_commitment: CompressedRistretto,
-    #[serde(with = "serialization::scalar")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub receiver_asset_opening: Scalar,
     pub transfer_amount: Balance,
 }
@@ -42,23 +42,23 @@ pub struct TxParams{
 pub struct AssetBalance {
     pub tx_counter: u128,
     pub balance: Balance,
-    #[serde(with = "serialization::compressed_ristretto")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub balance_commitment: CompressedRistretto,
-    #[serde(with = "serialization::scalar")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub balance_blinding: Scalar,
     pub asset_type: String,
     pub confidential_asset: bool,
     //if confidential_asset is false, this is just a hash of asset_info
-    #[serde(with = "serialization::compressed_ristretto")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub asset_commitment: CompressedRistretto,
-    #[serde(with = "serialization::scalar")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub asset_blinding: Scalar, //0 if confidential_asset is false
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Account {
     pub tx_counter: u128,
-    #[serde(with = "serialization::keypair")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub keys: Keypair,
     pub balances: HashMap<String, AssetBalance>,
 }
@@ -68,7 +68,6 @@ impl PartialEq for Account{
         self.balances == other.balances &&
             self.tx_counter == other.tx_counter &&
             self.keys.to_bytes()[..] == other.keys.to_bytes()[..]
-
     }
 }
 

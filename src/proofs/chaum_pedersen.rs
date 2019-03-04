@@ -34,15 +34,15 @@ use rand::{CryptoRng, Rng};
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenCommitmentEqProof {
     /// I represent a Chaum-Perdersen equality of commitment proof
-    #[serde(with = "serialization::compressed_ristretto")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub(crate)c3: CompressedRistretto,
-    #[serde(with = "serialization::compressed_ristretto")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub(crate)c4: CompressedRistretto,
-    #[serde(with = "serialization::scalar")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub(crate)z1: Scalar,
-    #[serde(with = "serialization::scalar")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub(crate) z2: Scalar,
-    #[serde(with = "serialization::scalar")]
+    #[serde(with = "serialization::zei_obj_serde")]
     pub(crate) z3: Scalar,
 }
 
