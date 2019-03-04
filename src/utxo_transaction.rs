@@ -78,7 +78,7 @@ pub struct TxPublicFields {
     pub(crate) amount_commitment: Option<CompressedRistretto>, // None if not confidential balance
     pub(crate) asset_type: Option<String>, // None only if confidential asset
     #[serde(with = "serialization::option_bytes")]
-    pub(crate) asset_type_commitment: Option<CompressedRistretto>,  // None if not confidential balance
+    pub(crate) asset_type_commitment: Option<CompressedRistretto>, // None if not confidential asset
     #[serde(with = "serialization::public_key")]
     pub(crate) public_key: PublicKey, // source or destination
 }

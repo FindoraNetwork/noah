@@ -100,129 +100,244 @@ impl ZeiFromToBytes for ChaumPedersenCommitmentEqProofMultiple{
 
 pub mod keypair {
     use schnorr::Keypair;
-    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    use serde::{self, Serializer, Deserializer};
+    use serde::de::Visitor;
+    use serde::de::SeqAccess;
+
     pub fn serialize<S>(kp: &Keypair, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer,
     {
         let bytes = kp.to_bytes();
-        let encoded = hex::encode(&bytes[..]);
-        serializer.serialize_str(&encoded)
+        serializer.serialize_bytes(&bytes[..])
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Keypair, D::Error>
     where D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let vector = hex::decode(s).map_err(de::Error::custom)?;
-        let bytes = vector.as_slice();
-        let keypair = Keypair::from_bytes(bytes).map_err(de::Error::custom)?;
-        Ok(keypair)
+        struct KeypairVisitor;
+
+        impl<'de> Visitor<'de> for KeypairVisitor {
+            type Value = Keypair;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a valid Keypair")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Keypair, V::Error>
+                where
+                    V: SeqAccess<'de>
+            {
+                let mut vec = vec![];
+                for _ in 0..64{
+                    let x = seq.next_element().map_err(serde::de::Error::custom)?.unwrap();
+                    vec.push(x);
+                }
+                Keypair::from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
+            }
+        }
+        deserializer.deserialize_bytes(KeypairVisitor)
     }
 }
 
 pub mod public_key {
     use schnorr::PublicKey;
-    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    use serde::{self, Serializer, Deserializer};
+    use serde::de::Visitor;
+    use serde::de::SeqAccess;
+
     pub fn serialize<S>(pk: &PublicKey, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer,
     {
         let bytes = pk.to_bytes();
-        let encoded = hex::encode(&bytes[..]);
-        serializer.serialize_str(&encoded)
+        serializer.serialize_bytes(&bytes[..])
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<PublicKey, D::Error>
         where D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let vector = hex::decode(s).map_err(de::Error::custom)?;
-        let bytes = vector.as_slice();
-        let public_key = PublicKey::from_bytes(bytes).map_err(de::Error::custom)?;
-        Ok(public_key)
+        struct PublickeyVisitor;
+
+        impl<'de> Visitor<'de> for PublickeyVisitor {
+            type Value = PublicKey;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a valid PublicKey")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<PublicKey, V::Error>
+                where
+                    V: SeqAccess<'de>
+            {
+                let mut vec = vec![];
+                for _ in 0..32{
+                    let x = seq.next_element().map_err(serde::de::Error::custom)?.unwrap();
+                    vec.push(x);
+                }
+                PublicKey::from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
+            }
+        }
+        deserializer.deserialize_bytes(PublickeyVisitor)
     }
 }
 
 pub mod secret_key {
     use schnorr::SecretKey;
-    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    use serde::{self, Serializer, Deserializer};
+    use serde::de::Visitor;
+    use serde::de::SeqAccess;
+
     pub fn serialize<S>(sk: &SecretKey, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer,
     {
         let bytes = sk.to_bytes();
-        let encoded = hex::encode(&bytes[..]);
-        serializer.serialize_str(&encoded)
+        serializer.serialize_bytes(&bytes[..])
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<SecretKey, D::Error>
         where D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let vector = hex::decode(s).map_err(de::Error::custom)?;
-        let bytes = vector.as_slice();
-        let secret_key = SecretKey::from_bytes(bytes).map_err(de::Error::custom)?;
-        Ok(secret_key)
+        struct SecretkeyVisitor;
+
+        impl<'de> Visitor<'de> for SecretkeyVisitor {
+            type Value = SecretKey;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a valid SecretKey")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<SecretKey, V::Error>
+                where
+                    V: SeqAccess<'de>
+            {
+                let mut vec = vec![];
+                for _ in 0..32{
+                    let x = seq.next_element().map_err(serde::de::Error::custom)?.unwrap();
+                    vec.push(x);
+                }
+                SecretKey::from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
+            }
+        }
+        deserializer.deserialize_bytes(SecretkeyVisitor)
     }
 }
 
 pub mod scalar {
     use curve25519_dalek::scalar::Scalar;
-    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    use serde::{self, Serializer, Deserializer};
+    use serde::de::SeqAccess;
+    use serde::de::Visitor;
+
     pub fn serialize<S>(sc: &Scalar, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer,
     {
         let bytes = sc.to_bytes();
-        let encoded = hex::encode(&bytes[..]);
-        serializer.serialize_str(&encoded)
+        serializer.serialize_bytes(&bytes[..])
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Scalar, D::Error>
     where D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let vector = hex::decode(s).map_err(de::Error::custom)?;
-        let bytes = vector.as_slice();
-        let mut array = [0u8; 32];
-        array.copy_from_slice(bytes);
-        Ok(Scalar::from_bits(array))
+        struct ScalarVisitor;
+
+        impl<'de> Visitor<'de> for ScalarVisitor {
+            type Value = Scalar;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a valid Scalar")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Scalar, V::Error>
+                where
+                    V: SeqAccess<'de>
+            {
+                let mut vec = vec![];
+                for _ in 0..32{
+                    let x = seq.next_element().map_err(serde::de::Error::custom)?.unwrap();
+                    vec.push(x);
+                }
+                let mut bytes = [0u8;32];
+                bytes.copy_from_slice(vec.as_slice());
+                Ok(Scalar::from_bits(bytes))
+            }
+        }
+        deserializer.deserialize_bytes(ScalarVisitor)
     }
 }
 
 pub mod compressed_ristretto {
     use curve25519_dalek::ristretto::CompressedRistretto;
-    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    use serde::{self, de, Serializer, Deserializer};
+    use serde::de::Visitor;
+    use serde::de::SeqAccess;
+
     pub fn serialize<S>(cr: &CompressedRistretto, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer,
     {
         let bytes = cr.to_bytes();
-        let encoded = hex::encode(&bytes[..]);
-        serializer.serialize_str(&encoded)
+        serializer.serialize_bytes(&bytes[..])
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<CompressedRistretto, D::Error>
     where D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let vector = hex::decode(s).map_err(de::Error::custom)?;
-        let bytes = vector.as_slice();
-        let ristretto = CompressedRistretto::from_slice(bytes);
-        Ok(ristretto)
+        struct CRVisitor;
+
+        impl<'de> Visitor<'de> for CRVisitor {
+            type Value = CompressedRistretto;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a valid CompressedRistretto")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<CompressedRistretto, V::Error>
+                where
+                    V: SeqAccess<'de>
+            {
+                let mut vec = vec![];
+                for _ in 0..32{
+                    let x = seq.next_element().map_err(de::Error::custom)?.unwrap();
+                    vec.push(x);
+                }
+                Ok(CompressedRistretto::from_slice(vec.as_slice()))
+            }
+        }
+        deserializer.deserialize_bytes(CRVisitor)
     }
 }
 
 pub mod range_proof{
     use bulletproofs::RangeProof;
-    use serde::{self, de, Deserialize, Serializer, Deserializer};
-    pub fn serialize<S>(cr: &RangeProof, serializer: S) -> Result<S::Ok, S::Error>
+    use serde::{self, Serializer, Deserializer};
+    use serde::de::Visitor;
+    use serde::de::SeqAccess;
+
+    pub fn serialize<S>(rp: &RangeProof, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer,
     {
-        let bytes = cr.to_bytes();
-        let encoded = hex::encode(&bytes[..]);
-        serializer.serialize_str(&encoded)
+        let bytes = rp.to_bytes();
+        serializer.serialize_bytes(&bytes)
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<RangeProof, D::Error>
         where D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let vector = hex::decode(s).map_err(de::Error::custom)?;
-        let bytes = vector.as_slice();
-        let range_proof = RangeProof::from_bytes(bytes).
-            map_err(de::Error::custom)?;
-        Ok(range_proof)
+        struct RPVisitor;
+        let mut len = 0usize;
+
+        impl<'de> Visitor<'de> for RPVisitor {
+            type Value = RangeProof;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a valid RangeProof")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<RangeProof, V::Error>
+                where
+                    V: SeqAccess<'de>
+            {
+                let mut vec: Vec<u8> = vec![];
+                while let Some(x) = seq.next_element().unwrap() {
+                    vec.push(x);
+                }
+                let rp = RangeProof::from_bytes(vec.as_slice()).unwrap();
+                Ok(rp)
+            }
+        }
+        deserializer.deserialize_bytes(RPVisitor)
     }
 }
 
@@ -250,8 +365,31 @@ pub mod signature {
 }
 
 pub mod option_bytes {
-    use serde::{self, de, Deserialize, Serializer, Deserializer};
+    use serde::{self, Deserialize, Serializer, Deserializer};
     use crate::serialization::ZeiFromToBytes;
+    use serde::de::SeqAccess;
+    use serde::de::Visitor;
+
+    struct BytesVisitor;
+
+    impl<'de> Visitor<'de> for BytesVisitor{
+        type Value = Vec<u8>;
+
+        fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            formatter.write_str("a valid ZeiFromTo Object")
+        }
+
+        fn visit_seq<V>(self, mut seq: V) -> Result<Vec<u8>, V::Error>
+            where
+                V: SeqAccess<'de>,
+        {
+            let mut vec: Vec<u8> = vec![];
+            while let Some(x) = seq.next_element().unwrap() {
+                vec.push(x);
+            }
+            Ok(vec)
+        }
+    }
 
     pub fn serialize<S,T>(object: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer, T: ZeiFromToBytes,
@@ -261,20 +399,19 @@ pub mod option_bytes {
         }
         else {
             let bytes = object.as_ref().unwrap().zei_to_bytes();
-            let encoded = hex::encode(&bytes[..]);
-            serializer.serialize_str(&encoded)
+            //let encoded = hex::encode(&bytes[..]);
+            serializer.serialize_bytes(bytes.as_slice())
         }
     }
     pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
         where D: Deserializer<'de>, T: ZeiFromToBytes,
     {
 
-        let s: Option<String> = Option::deserialize(deserializer)?;
+        let vec: Option<Vec<u8>> = Option::deserialize(deserializer)?;
 
-        if s.is_some() {
-            let vector = hex::decode(s.unwrap()).map_err(de::Error::custom)?;
-            let object = T::zei_from_bytes(&vector.as_slice());
-            Ok(Some(object))
+        if vec.is_some() {
+            Ok(Some(T::zei_from_bytes(vec.unwrap().as_slice())))
+
         }
         else {
             Ok(None)
