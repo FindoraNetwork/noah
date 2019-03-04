@@ -4,7 +4,8 @@ use curve25519_dalek::scalar::Scalar;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 
-use schnorr::{Keypair, PublicKey, Signature};
+use schnorr::{Signature};
+use crate::keys::ZeiPublicKey;
 use rand::CryptoRng;
 use rand::Rng;
 use crate::address;
@@ -20,8 +21,11 @@ use crate::utils::compute_str_ristretto_point_hash;
 use bulletproofs::PedersenGens;
 use crate::utxo_transaction::Tx;
 use crate::utxo_transaction::TxAddressParams;
-use schnorr::SecretKey;
 use crate::encryption::from_secret_key_to_scalar;
+use crate::keys::ZeiKeyPair;
+use crate::keys::ZeiSecretKey;
+use crate::serialization::ZeiFromToBytes;
+use crate::keys::ZEI_SECRET_KEY_LENGTH;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TxParams{
@@ -30,7 +34,7 @@ pub struct TxParams{
      *
      */
     #[serde(with = "serialization::zei_obj_serde")]
-    pub receiver_pk: PublicKey,
+    pub receiver_pk: ZeiPublicKey,
     #[serde(with = "serialization::zei_obj_serde")]
     pub receiver_asset_commitment: CompressedRistretto,
     #[serde(with = "serialization::zei_obj_serde")]
@@ -59,7 +63,7 @@ pub struct AssetBalance {
 pub struct Account {
     pub tx_counter: u128,
     #[serde(with = "serialization::zei_obj_serde")]
-    pub keys: Keypair,
+    pub keys: ZeiKeyPair,
     pub balances: HashMap<String, AssetBalance>,
 }
 
@@ -67,7 +71,7 @@ impl PartialEq for Account{
     fn eq(&self, other: &Account) -> bool {
         self.balances == other.balances &&
             self.tx_counter == other.tx_counter &&
-            self.keys.to_bytes()[..] == other.keys.to_bytes()[..]
+            self.keys.zei_to_bytes() == other.keys.zei_to_bytes()
     }
 }
 
@@ -83,7 +87,7 @@ impl Account {
          */
         Account {
             tx_counter: 0,
-            keys: Keypair::generate(csprng),
+            keys: ZeiKeyPair::generate(csprng),
             balances: HashMap::new(),
         }
     }
@@ -133,24 +137,26 @@ impl Account {
         self.balances.get_mut(asset_id).unwrap()
     }
 
-    pub fn get_public_key(&self) -> &PublicKey {
-        &self.keys.public
+    pub fn get_public_key(&self) -> &ZeiPublicKey {
+        self.keys.get_pk_ref()
     }
 
+    /*
     pub fn get_public_key_as_hex(&self) -> String {
 
         hex::encode(&self.keys.public.as_bytes())
     }
+    */
 
-    pub fn get_secret_key(&self) -> &SecretKey {
-        &self.keys.secret
+    pub fn get_secret_key(&self) -> &ZeiSecretKey {
+        self.keys.get_sk_ref()
     }
 
     pub fn address(&self) -> Address {
         /*! I return an address from the account's public key
          *
          */
-        address::enc(&self.keys.public)
+        address::enc(self.get_public_key())
     }
 
     pub fn send_and_update<R>(&mut self, csprng: &mut R, tx_params: &TxParams, asset_id: &str)
@@ -179,7 +185,7 @@ impl Account {
         }
 
 
-        let secret_key_bytes = self.keys.secret.to_bytes();
+        let secret_key_bytes = self.keys.get_sk_ref().zei_to_bytes();
         let input = TxAddressParams{
             amount: asset_balance.balance,
             amount_commitment: Some(asset_balance.balance_commitment),
@@ -193,8 +199,8 @@ impl Account {
                 true => Some(asset_balance.asset_blinding),
                 false => None,
             },
-            public_key: self.keys.public,
-            secret_key: Some(SecretKey::from_bytes(&secret_key_bytes[..])?),
+            public_key: self.keys.get_pk_ref().clone(),
+            secret_key: Some(ZeiSecretKey::zei_from_bytes(&secret_key_bytes[..])),
         };
 
         let output = TxAddressParams{
@@ -270,10 +276,13 @@ impl Account {
         }
 
         let mut asset_balance = self.balances.get_mut(&asset_id)?;
+        let mut sk = [0u8; ZEI_SECRET_KEY_LENGTH];
+        sk.copy_from_slice(self.keys.get_sk_ref().zei_to_bytes().as_slice());
+
         let (amount, amount_blind, _) =
             Tx::receiver_unlock_memo(
                 out_info.lock_box.as_ref()?,
-                &from_secret_key_to_scalar(&self.keys.secret.to_bytes()),
+                &from_secret_key_to_scalar(&sk),
                 true,
                 tx.body.confidential_asset,
         )?;
@@ -336,7 +345,7 @@ mod test {
         sender.add_asset(&mut prng, &asset_id, true, starting_bal);
         rec.add_asset(&mut prng, &asset_id, true, starting_bal);
         let tx = TxParams{
-            receiver_pk: rec.keys.public,
+            receiver_pk: rec.keys.get_pk_ref().clone(),
             receiver_asset_commitment: rec.balances.get(asset_id).unwrap().asset_commitment,
             receiver_asset_opening: rec.balances.get(asset_id).unwrap().asset_blinding,
             transfer_amount: 10,
@@ -360,7 +369,7 @@ mod test {
         rec.add_asset(&mut csprng, &asset_id, true, starting_bal);
 
         let tx_params = TxParams{
-            receiver_pk: rec.keys.public,
+            receiver_pk: rec.keys.get_pk_ref().clone(),
             receiver_asset_commitment: rec.balances.get(asset_id).unwrap().asset_commitment,
             receiver_asset_opening: rec.balances.get(asset_id).unwrap().asset_blinding,
             transfer_amount,

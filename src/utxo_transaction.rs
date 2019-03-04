@@ -2,7 +2,7 @@ use blake2::{Blake2b,Digest};
 use bulletproofs::{PedersenGens, RangeProof};
 use core::borrow::Borrow;
 use crate::errors::Error as ZeiError;
-use crate::encryption::ZeiRistrettoCipher;
+use crate::encryption::ZeiCipher;
 use crate::proofs::chaum_pedersen::{chaum_pedersen_prove_multiple_eq,
                                      chaum_pedersen_verify_multiple_eq,
                                      ChaumPedersenCommitmentEqProofMultiple};
@@ -15,9 +15,12 @@ use curve25519_dalek::traits::Identity;
 use merlin::Transcript;
 use rand::CryptoRng;
 use rand::Rng;
-use schnorr::{PublicKey, SecretKey,Signature};
+use schnorr::{Signature};
 use std::collections::HashSet;
 use crate::utils::compute_str_scalar_hash;
+use crate::keys::ZeiPublicKey;
+use crate::keys::ZeiSecretKey;
+use crate::serialization::ZeiFromToBytes;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct ZeiSignature{
@@ -42,9 +45,9 @@ pub struct TxAddressParams{
     pub(crate) asset_type_blinding: Option<Scalar>, // None if non confidential asset or
                                          // account is new or Utxo model
     #[serde(with = "serialization::zei_obj_serde")]
-    pub(crate) public_key: PublicKey,
+    pub(crate) public_key: ZeiPublicKey,
     #[serde(with = "serialization::option_bytes")]
-    pub(crate) secret_key: Option<SecretKey>, //None for output account
+    pub(crate) secret_key: Option<ZeiSecretKey>, //None for output account
 }
 
 impl PartialEq for TxAddressParams{
@@ -61,8 +64,8 @@ impl PartialEq for TxAddressParams{
             sk_eq = true;
         }
         else if self.secret_key.is_some() && other.secret_key.is_some(){
-            sk_eq = self.secret_key.as_ref().unwrap().as_bytes() ==
-                other.secret_key.as_ref().unwrap().as_bytes()
+            sk_eq = self.secret_key.as_ref().unwrap().zei_to_bytes() ==
+                other.secret_key.as_ref().unwrap().zei_to_bytes()
         }
 
         b && sk_eq
@@ -81,14 +84,14 @@ pub struct TxPublicFields {
     #[serde(with = "serialization::option_bytes")]
     pub(crate) asset_type_commitment: Option<CompressedRistretto>, // None if not confidential asset
     #[serde(with = "serialization::zei_obj_serde")]
-    pub(crate) public_key: PublicKey, // source or destination
+    pub(crate) public_key: ZeiPublicKey, // source or destination
 }
 
 #[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct TxOutput {
     /// Output structure for output
     pub(crate) public: TxPublicFields,
-    pub(crate) lock_box: Option<ZeiRistrettoCipher>,
+    pub(crate) lock_box: Option<ZeiCipher>,
 }
 
 #[derive(Default, Serialize, Deserialize, Debug)]
@@ -159,7 +162,7 @@ impl Tx{
         // extract values from input struct
         let src_asset_type_com_option: Vec<Option<CompressedRistretto>> =
             input.iter().map(|x| x.asset_type_commitment).collect();
-        let src_pks: Vec<PublicKey> =
+        let src_pks: Vec<ZeiPublicKey> =
             input.iter().map(|x| x.public_key).collect();
 
         // extract values from output struct
@@ -167,7 +170,7 @@ impl Tx{
             output.iter().map(|x| x.asset_type_commitment).collect();
         let dst_asset_type_blind_option: Vec<Option<Scalar>> =
             output.iter().map(|x| x.asset_type_blinding).collect();
-        let destination_public_keys: Vec<PublicKey> =
+        let destination_public_keys: Vec<ZeiPublicKey> =
             output.iter().map(|x| x.public_key ).collect();
 
         // do amount handling
@@ -241,7 +244,7 @@ impl Tx{
 
         //compute output struct
         for i in 0..output.len(){
-            let lbox: Option<ZeiRistrettoCipher>;
+            let lbox: Option<ZeiCipher>;
             if confidential_amount || confidential_asset{
                 let mut memo = vec![];
                 if confidential_amount {
@@ -251,7 +254,7 @@ impl Tx{
                 if confidential_asset {
                     memo.extend_from_slice(memo_out_asset_blind[i].unwrap().as_bytes());
                 }
-                let ciphertext = ZeiRistrettoCipher::encrypt(
+                let ciphertext = ZeiCipher::encrypt(
                     prng,
                     &destination_public_keys[i].get_curve_point()?.compress(),
                     memo.as_slice(),
@@ -305,7 +308,7 @@ impl Tx{
             input.iter().map(|x| x.amount_blinding.unwrap()).collect();
         let in_amounts: Vec<u64> = input.iter().map(|x| x.amount ).collect();
         let out_amounts: Vec<u64> = output.iter().map(|x| x.amount ).collect();
-        let destination_public_keys: Vec<PublicKey> =
+        let destination_public_keys: Vec<ZeiPublicKey> =
             output.iter().map(|x| x.public_key ).collect();
 
         let (proof, tx_coms, tx_blinds) =
@@ -324,7 +327,7 @@ impl Tx{
         source_blindings: &[Scalar],
         source_amounts: &[u64],
         destination_amounts: &[u64],
-        destination_public_keys: &[PublicKey],
+        destination_public_keys: &[ZeiPublicKey],
     )-> Result<(RangeProof, Vec<CompressedRistretto>, Vec<Scalar>),ZeiError>
     {
         let num_output = destination_amounts.len();
@@ -382,7 +385,7 @@ impl Tx{
         source_asset_blindings: &[Scalar],
         destination_asset_commitments: Vec<Option<CompressedRistretto>>,
         destination_asset_blindings: Vec<Option<Scalar>>,
-        destination_public_keys: &Vec<PublicKey>,
+        destination_public_keys: &Vec<ZeiPublicKey>,
 
     ) -> Result<(ChaumPedersenCommitmentEqProofMultiple,
                  Vec<CompressedRistretto>, Vec<Scalar>), ZeiError>
@@ -437,7 +440,6 @@ impl Tx{
         let mut pk_set = HashSet::new();
         for i in 0..input.len(){
             let pk = &input[i].public_key;
-            //let pk = src_pks[i].as_bytes();
             if pk_set.contains(pk.as_bytes()) == false {
                 pk_set.insert(pk.as_bytes());
                 let sign = input[i].secret_key.as_ref().unwrap().sign::<blake2::Blake2b, R>(prng, msg.as_slice(),
@@ -598,7 +600,7 @@ impl Tx{
     }
 
     pub fn receiver_unlock_memo(
-        lbox: &ZeiRistrettoCipher,
+        lbox: &ZeiCipher,
         sk: &Scalar,
         confidential_amount: bool,
         confidential_asset: bool,
@@ -642,7 +644,7 @@ fn smallest_greater_power_of_two(n: u32) -> u32{
 fn compute_asset_commitment<R>(
     csprng: &mut R,
     pc_gens: &PedersenGens,
-    address: &PublicKey,
+    address: &ZeiPublicKey,
     asset_type: &str) -> Result<(RistrettoPoint,Scalar), ZeiError>
     where R:CryptoRng + Rng,
 {
@@ -652,7 +654,7 @@ fn compute_asset_commitment<R>(
     Ok((pc_gens.commit(asset_hash, blinding_factor), blinding_factor))
 }
 
-fn sample_blinding_factor<R>(csprng: &mut R, address: &PublicKey) -> Result<Scalar, ZeiError>
+fn sample_blinding_factor<R>(csprng: &mut R, address: &ZeiPublicKey) -> Result<Scalar, ZeiError>
     where R: CryptoRng + Rng,
 {
     let blinding_key = Scalar::random(csprng);
@@ -668,9 +670,10 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use schnorr::Keypair;
     use crate::encryption::from_secret_key_to_scalar;
     use crate::utils::compute_str_commitment;
+    use crate::keys::ZeiKeyPair;
+    use crate::keys::ZEI_SECRET_KEY_LENGTH;
 
     fn build_address_params<R: CryptoRng + Rng>(prng: &mut R, amount: u64, asset: &str,
                                                 input: bool, //input or output
@@ -697,14 +700,17 @@ mod test {
             asset_type_commitment = Some(com.compress());
             asset_type_blinding = Some(blind);
         }
-        let key = Keypair::generate(prng);
+        let key = ZeiKeyPair::generate(prng);
 
-        let secret_key_bytes = key.secret.to_bytes();
+        let secret_key_bytes = key.get_sk_ref().zei_to_bytes();
 
-        let scalar_secret_key = from_secret_key_to_scalar(&secret_key_bytes);
+        let mut secret_key_array = [0u8; ZEI_SECRET_KEY_LENGTH];
+        secret_key_array.copy_from_slice(secret_key_bytes.as_slice());
+
+        let scalar_secret_key = from_secret_key_to_scalar(&secret_key_array);
 
         if input {
-            sk = Some(key.secret);
+            sk = Some(key.get_sk());
         }
         (TxAddressParams {
             amount,
@@ -713,7 +719,7 @@ mod test {
             asset_type: String::from(asset),
             asset_type_commitment,
             asset_type_blinding,
-            public_key: key.public,
+            public_key: key.get_pk_ref().clone(),
             secret_key: sk,
         }, scalar_secret_key)
     }

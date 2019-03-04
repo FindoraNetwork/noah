@@ -11,20 +11,19 @@ use rand::CryptoRng;
 use rand::Rng;
 
 
-
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-pub struct ZeiRistrettoCipher{
+pub struct ZeiCipher {
     pub ciphertext: Vec<u8>,
     pub nonce: Nonce,
     #[serde(with = "serialization::zei_obj_serde")]
     pub encoded_rand: CompressedRistretto,
 }
 
-impl ZeiRistrettoCipher {
+impl ZeiCipher {
     pub fn encrypt<R>(
         prng: &mut R,
         public_key: &CompressedRistretto,
-        message: &[u8]) -> Result<ZeiRistrettoCipher, ZeiError>
+        message: &[u8]) -> Result<ZeiCipher, ZeiError>
         where R: CryptoRng + Rng
     {
         let (key, encoded_rand) = symmetric_key_from_public_key(
@@ -33,7 +32,7 @@ impl ZeiRistrettoCipher {
             &base_point)?;
         let (ciphertext, nonce) = symmetric_encrypt(&key, message);
 
-        Ok(ZeiRistrettoCipher{
+        Ok(ZeiCipher {
             ciphertext,
             nonce,
             encoded_rand,
@@ -150,7 +149,7 @@ mod test {
         let msg = b"this is another message";
 
 
-        let mut cipherbox = ZeiRistrettoCipher::encrypt(&mut prng, &pk, msg).unwrap();
+        let mut cipherbox = ZeiCipher::encrypt(&mut prng, &pk, msg).unwrap();
         let plaintext = cipherbox.decrypt(&sk).unwrap();
         assert_eq!(msg, plaintext.as_slice());
 

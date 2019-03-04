@@ -21,7 +21,7 @@ pub fn test_transfer(){
     receiver.add_asset(&mut csprng, asset_id, true, 300);
 
     let txparams = TxParams {
-        receiver_pk: receiver.keys.public,
+        receiver_pk: receiver.keys.get_pk_ref().clone(),
         receiver_asset_commitment: receiver.balances[asset_id].asset_commitment,
         receiver_asset_opening: receiver.balances[asset_id].asset_blinding,
         transfer_amount: amount,

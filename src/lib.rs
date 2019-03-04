@@ -24,6 +24,7 @@ mod utils;
 
 pub mod account;
 pub mod address;
+pub mod keys;
 pub mod proofs;
 pub mod serialization;
 pub mod utxo_transaction;
