@@ -518,7 +518,6 @@ impl Tx{
         let msg = serde_json::to_vec(&self.body).unwrap();
         let input = &self.body.input;
         let signatures = &self.signatures;
-        let pk_in: Vec<&PublicKey> = self.body.input.iter().map(|x|&x.public_key).collect();
         let mut pk_set = HashSet::new();
         for i in 0..input.len(){
             let pk = &input[i].public_key;
@@ -919,8 +918,6 @@ mod test {
                          true, false).unwrap();
         assert_eq!(true, tx.verify(),
                    "Conf. amount tx: Transaction should be valid");
-
-        return;
 
         //check receivers memos decryption
         for i in 0..num_outputs {
