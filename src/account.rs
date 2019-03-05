@@ -20,11 +20,9 @@ use crate::utils::compute_str_ristretto_point_hash;
 use bulletproofs::PedersenGens;
 use crate::utxo_transaction::Tx;
 use crate::utxo_transaction::TxAddressParams;
-use crate::encryption::from_secret_key_to_scalar;
 use crate::keys::ZeiKeyPair;
 use crate::keys::ZeiSecretKey;
 use crate::serialization::ZeiFromToBytes;
-use crate::keys::ZEI_SECRET_KEY_LENGTH;
 use crate::keys::ZeiSignature;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -276,13 +274,11 @@ impl Account {
         }
 
         let mut asset_balance = self.balances.get_mut(&asset_id)?;
-        let mut sk = [0u8; ZEI_SECRET_KEY_LENGTH];
-        sk.copy_from_slice(self.keys.get_sk_ref().zei_to_bytes().as_slice());
 
         let (amount, amount_blind, _) =
             Tx::receiver_unlock_memo(
                 out_info.lock_box.as_ref()?,
-                &from_secret_key_to_scalar(&sk),
+                self.keys.get_sk_ref(),
                 true,
                 tx.body.confidential_asset,
         )?;
@@ -305,15 +301,12 @@ impl Account {
         Ok(true)
     }
 
-    pub fn sign<R>(&self, csprng: &mut R, msg: &[u8]) -> ZeiSignature
-        where R: CryptoRng + Rng,
+    pub fn sign(&self, msg: &[u8]) -> ZeiSignature
     {
         /*! I Sign a u8 slice data using this account secret key
          */
-        self.keys.sign::<Blake2b, _>(csprng, &msg)
+        self.keys.sign::<Blake2b>(&msg)
     }
-
-    //Verify signature from
 }
 
 

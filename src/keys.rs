@@ -1,35 +1,43 @@
-use schnorr::PublicKey;
-use schnorr::SecretKey;
-use schnorr::Keypair;
 use rand::CryptoRng;
 use crate::serialization::ZeiFromToBytes;
 use rand::Rng;
-use schnorr::Signature;
 use curve25519_dalek::digest::Digest;
 use curve25519_dalek::digest::generic_array::typenum::U64;
-use curve25519_dalek::ristretto::RistrettoPoint;
 use crate::errors::Error;
+
+use ed25519_dalek::Signature;
+use ed25519_dalek::PublicKey;
+use ed25519_dalek::SecretKey;
+use curve25519_dalek::edwards::EdwardsPoint;
+use curve25519_dalek::edwards::CompressedEdwardsY;
+use curve25519_dalek::scalar::Scalar;
+
+pub const ZEI_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
+pub const ZEI_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
+
+pub const KEY_BASE_POINT: CompressedEdwardsY =
+    curve25519_dalek::constants::ED25519_BASEPOINT_COMPRESSED;
+
 
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub struct ZeiPublicKey(PublicKey);
 #[derive(Default, Debug)]
 pub struct ZeiSecretKey(SecretKey);
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct ZeiKeyPair {
     public: ZeiPublicKey,
     secret: ZeiSecretKey,
-
 }
-pub const ZEI_SECRET_KEY_LENGTH: usize = schnorr::SECRET_KEY_LENGTH;
-pub const ZEI_PUBLIC_KEY_LENGTH: usize = schnorr::PUBLIC_KEY_LENGTH;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ZeiSignature(pub Signature);
 
 
 impl ZeiPublicKey {
-    pub(crate) fn get_curve_point(&self) -> Result<RistrettoPoint, Error>{
-        Ok(self.0.get_curve_point()?)
+    pub(crate) fn get_curve_point(&self) -> Result<EdwardsPoint, Error>{
+        let pk_point = CompressedEdwardsY::from_slice(
+            self.zei_to_bytes().as_slice()).decompress()?;
+        Ok(pk_point)
     }
 
     pub(crate) fn verify<D>(&self,  message: &[u8], signature: &ZeiSignature) -> Result<(), Error>
@@ -57,11 +65,25 @@ impl ZeiFromToBytes for ZeiPublicKey {
 }
 
 impl ZeiSecretKey{
-    pub fn sign<D, R>(
-        &self, prng: &mut R, message: &[u8], public_key: &ZeiPublicKey) -> ZeiSignature
-        where D:  Digest<OutputSize = U64> + Default, R: CryptoRng + Rng,
+    pub fn sign<D>(
+        &self, message: &[u8], public_key: &ZeiPublicKey) -> ZeiSignature
+        where D:  Digest<OutputSize = U64> + Default,
     {
-        ZeiSignature(self.0.sign::<D, _>(prng, message, &public_key.0))
+        let expanded = self.0.expand::<D>();
+        let sign = expanded.sign::<D>(message, &public_key.0);
+
+        ZeiSignature(sign)
+    }
+
+    pub fn as_scalar_multiply_by_curve_point<D>(&self, y: &EdwardsPoint) -> EdwardsPoint
+    where D: Digest<OutputSize = U64> + Default,
+    {
+        let expanded = self.0.expand::<D>();
+        //expanded.key is not public, I need to extract it via serialization
+        let mut key_bytes = [0u8; 32];
+        key_bytes.copy_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
+        let key_scalar = Scalar::from_bits(key_bytes);
+        key_scalar * y
     }
 
     fn clone(&self) -> Self {
@@ -85,8 +107,10 @@ impl ZeiFromToBytes for ZeiSecretKey {
 
 
 impl ZeiKeyPair{
-    pub fn generate<R: CryptoRng + Rng>(prng: &mut R)->Self{
-        let kp = Keypair::generate(prng);
+    pub fn generate<R: CryptoRng + Rng>(prng: &mut R)->Self
+    where R: CryptoRng + Rng,
+    {
+        let kp = ed25519_dalek::Keypair::generate::<blake2::Blake2b,_>(prng);
         ZeiKeyPair{
             public: ZeiPublicKey(kp.public),
             secret: ZeiSecretKey(kp.secret),
@@ -105,10 +129,10 @@ impl ZeiKeyPair{
         self.secret.clone()
     }
 
-    pub fn sign<D,R>(&self, prng: &mut R, msg: &[u8]) -> ZeiSignature
-        where D:  Digest<OutputSize = U64> + Default, R: CryptoRng + Rng,
+    pub fn sign<D>(&self, msg: &[u8]) -> ZeiSignature
+        where D:  Digest<OutputSize = U64> + Default,
     {
-        self.secret.sign::<D,_>(prng, msg, &self.public)
+        self.secret.sign::<D>( msg, &self.public)
     }
 }
 

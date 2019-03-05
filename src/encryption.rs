@@ -2,13 +2,13 @@ use blake2::VarBlake2b;
 use blake2::digest::{Input, VariableOutput};
 use crate::errors::Error as ZeiError;
 use crate::serialization;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED as base_point;
-use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use sodiumoxide::crypto::secretbox;
 use sodiumoxide::crypto::secretbox::{Nonce,Key};
 use rand::CryptoRng;
 use rand::Rng;
+use crate::keys::{ZeiPublicKey, KEY_BASE_POINT, ZeiSecretKey};
+use curve25519_dalek::edwards::CompressedEdwardsY;
 
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -16,20 +16,19 @@ pub struct ZeiCipher {
     pub ciphertext: Vec<u8>,
     pub nonce: Nonce,
     #[serde(with = "serialization::zei_obj_serde")]
-    pub encoded_rand: CompressedRistretto,
+    pub encoded_rand: CompressedEdwardsY,
 }
 
 impl ZeiCipher {
     pub fn encrypt<R>(
         prng: &mut R,
-        public_key: &CompressedRistretto,
+        public_key: &ZeiPublicKey,
         message: &[u8]) -> Result<ZeiCipher, ZeiError>
         where R: CryptoRng + Rng
     {
         let (key, encoded_rand) = symmetric_key_from_public_key(
             prng,
-            public_key,
-            &base_point)?;
+            public_key)?;
         let (ciphertext, nonce) = symmetric_encrypt(&key, message);
 
         Ok(ZeiCipher {
@@ -39,7 +38,7 @@ impl ZeiCipher {
         })
     }
 
-    pub fn decrypt(&self, secret_key: &Scalar) -> Result<Vec<u8>, ZeiError>{
+    pub fn decrypt(&self, secret_key: &ZeiSecretKey) -> Result<Vec<u8>, ZeiError>{
         let key = symmetric_key_from_secret_key(secret_key, &self.encoded_rand)?;
         Ok(symmetric_decrypt(&key, self.ciphertext.as_slice(), &self.nonce)?)
     }
@@ -47,15 +46,14 @@ impl ZeiCipher {
 
 pub fn symmetric_key_from_public_key<R>(
     prng: &mut R,
-    public_key: &CompressedRistretto,
-    curve_base:&CompressedRistretto) -> Result<([u8;32], CompressedRistretto), ZeiError> where R: CryptoRng + Rng
+    public_key: &ZeiPublicKey) -> Result<([u8;32], CompressedEdwardsY), ZeiError> where R: CryptoRng + Rng
 {
     /*! I derive a symmetric key from an ElGamal public key over the Ristretto group. Return symmetric key, and encoded
      * randonmess to be used by secret key holder to derive the same symmetric key
     */
     let rand  = Scalar::random(prng);
-    let encoded_rand = &rand * curve_base.decompress()?;
-    let curve_key = &rand * public_key.decompress()?;
+    let encoded_rand = &rand * KEY_BASE_POINT.decompress()?;
+    let curve_key = &rand * public_key.get_curve_point()?;
     let mut hasher = VarBlake2b::new(32).unwrap();//valid unwrap, should never fail
     hasher.input(curve_key.compress().as_bytes());
     let hash = hasher.vec_result();
@@ -65,10 +63,12 @@ pub fn symmetric_key_from_public_key<R>(
 }
 
 fn symmetric_key_from_secret_key(
-    secret_key: &Scalar,
-    rand: &CompressedRistretto) -> Result<[u8;32], ZeiError>
+    secret_key: &ZeiSecretKey,
+    rand: &CompressedEdwardsY) -> Result<[u8;32], ZeiError>
 {
-    let curve_key = secret_key * rand.decompress()?;
+    //let curve_key = secret_key * rand.decompress()?;
+    let curve_key = secret_key.
+        as_scalar_multiply_by_curve_point::<blake2::Blake2b>(&rand.decompress()?);
     let mut hasher = VarBlake2b::new(32).unwrap(); //valid unwrap: this should never fail
     hasher.input(curve_key.compress().as_bytes());
     let mut symmetric_key: [u8;32] = Default::default();
@@ -100,33 +100,24 @@ fn symmetric_decrypt(
     }
 }
 
-pub(crate) fn from_secret_key_to_scalar(secret_key: &[u8;32]) -> Scalar{
-    let mut bits = [0u8;32];
-    bits.copy_from_slice(secret_key);
-    bits[0] &= 248;
-    bits[31] &= 127;
-    bits[31] |= 64;
-    Scalar::from_bits(bits)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use curve25519_dalek::scalar::Scalar;
-    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
+    use crate::keys::ZeiKeyPair;
 
 
     #[test]
     fn test_key_derivation(){
         let mut prng: ChaChaRng;
         prng  = ChaChaRng::from_seed([0u8; 32]);
-        let sk = Scalar::random(&mut prng);
-        let base = RISTRETTO_BASEPOINT_COMPRESSED;
+        /*let sk = Scalar::random(&mut prng);
         let pk = (&sk * &base.decompress().unwrap()).compress();
-        let (from_pk_key, encoded_rand) = symmetric_key_from_public_key(&mut prng, &pk, &base).unwrap();
-        let from_sk_key = symmetric_key_from_secret_key(&sk, &encoded_rand).unwrap();
+        */
+        let keypair = ZeiKeyPair::generate(&mut prng);
+        let (from_pk_key, encoded_rand) = symmetric_key_from_public_key(&mut prng, keypair.get_pk_ref()).unwrap();
+        let from_sk_key = symmetric_key_from_secret_key(keypair.get_sk_ref(), &encoded_rand).unwrap();
         assert_eq!(from_pk_key, from_sk_key);
     }
 
@@ -143,30 +134,28 @@ mod test {
     fn test_zei_ristretto_cipher(){
         let mut prng: ChaChaRng;
         prng  = ChaChaRng::from_seed([0u8; 32]);
-        let sk = Scalar::random(&mut prng);
-        let base = RISTRETTO_BASEPOINT_COMPRESSED;
-        let pk = (&sk * &base.decompress().unwrap()).compress();
+        let key_pair = ZeiKeyPair::generate(&mut prng);
         let msg = b"this is another message";
 
 
-        let mut cipherbox = ZeiCipher::encrypt(&mut prng, &pk, msg).unwrap();
-        let plaintext = cipherbox.decrypt(&sk).unwrap();
+        let mut cipherbox = ZeiCipher::encrypt(&mut prng, key_pair.get_pk_ref(), msg).unwrap();
+        let plaintext = cipherbox.decrypt(key_pair.get_sk_ref()).unwrap();
         assert_eq!(msg, plaintext.as_slice());
 
         cipherbox.ciphertext.push(0u8);
-        let plaintext = cipherbox.decrypt(&sk);
+        let plaintext = cipherbox.decrypt(key_pair.get_sk_ref());
         assert_eq!(true, plaintext.is_err());
         assert_eq!(Err(ZeiError::DecryptionError), plaintext);
 
         cipherbox.ciphertext.pop();
 
         cipherbox.ciphertext[3] = 0xFF as u8 - cipherbox.ciphertext[3];
-        let plaintext = cipherbox.decrypt(&sk);
+        let plaintext = cipherbox.decrypt(key_pair.get_sk_ref());
         assert_eq!(true, plaintext.is_err());
         assert_eq!(Err(ZeiError::DecryptionError), plaintext);
 
         cipherbox.ciphertext[3] = 0xFF as u8 - cipherbox.ciphertext[3];
-        let plaintext = cipherbox.decrypt(&sk).unwrap();
+        let plaintext = cipherbox.decrypt(key_pair.get_sk_ref()).unwrap();
         assert_eq!(msg, plaintext.as_slice());
     }
 }

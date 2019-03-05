@@ -1,17 +1,14 @@
 use bulletproofs::{RangeProof};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
-use schnorr::SecretKey;
 use crate::proofs::chaum_pedersen::ChaumPedersenCommitmentEqProofMultiple;
 use crate::proofs::chaum_pedersen::ChaumPedersenCommitmentEqProof;
-use schnorr::Signature;
-use schnorr::PublicKey;
-use schnorr::Keypair;
 use crate::keys::ZeiSignature;
 use serde::Serialize;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serializer;
+use curve25519_dalek::edwards::CompressedEdwardsY;
 
 // preferred approach for handling of fields of types that don't provide correct default serde serialize/deserialize
 
@@ -19,50 +16,6 @@ use serde::Serializer;
 pub trait ZeiFromToBytes {
     fn zei_to_bytes(&self) -> Vec<u8>;
     fn zei_from_bytes(bytes: &[u8]) -> Self;
-}
-
-impl ZeiFromToBytes for Signature{
-    fn zei_to_bytes(&self) -> Vec<u8> {
-        let mut v = vec![];
-        v.extend_from_slice(&self.to_bytes()[..]);
-        v
-    }
-    fn zei_from_bytes(bytes: &[u8]) -> Signature{
-        Signature::from_bytes(bytes).unwrap()
-    }
-}
-
-impl ZeiFromToBytes for PublicKey{
-    fn zei_to_bytes(&self) -> Vec<u8> {
-        let mut v = vec![];
-        v.extend_from_slice(&self.to_bytes()[..]);
-        v
-    }
-    fn zei_from_bytes(bytes: &[u8]) -> PublicKey{
-        PublicKey::from_bytes(bytes).unwrap()
-    }
-}
-
-impl ZeiFromToBytes for SecretKey{
-    fn zei_to_bytes(&self) -> Vec<u8> {
-        let mut v = vec![];
-        v.extend_from_slice(&self.to_bytes()[..]);
-        v
-    }
-    fn zei_from_bytes(bytes: &[u8]) -> SecretKey{
-        SecretKey::from_bytes(bytes).unwrap()
-    }
-}
-
-impl ZeiFromToBytes for Keypair{
-    fn zei_to_bytes(&self) -> Vec<u8> {
-        let mut v = vec![];
-        v.extend_from_slice(&self.to_bytes()[..]);
-        v
-    }
-    fn zei_from_bytes(bytes: &[u8]) -> Keypair{
-        Keypair::from_bytes(bytes).unwrap()
-    }
 }
 
 impl ZeiFromToBytes for Scalar{
@@ -97,6 +50,17 @@ impl ZeiFromToBytes for RangeProof{
     }
     fn zei_from_bytes(bytes: &[u8]) -> RangeProof{
         RangeProof::from_bytes(bytes).unwrap()
+    }
+}
+
+impl ZeiFromToBytes for CompressedEdwardsY{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(&self.to_bytes()[..]);
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> CompressedEdwardsY{
+        CompressedEdwardsY::from_slice(bytes)
     }
 }
 
@@ -148,7 +112,7 @@ impl ZeiFromToBytes for ZeiSignature{
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Self {
-        ZeiSignature(Signature::from_bytes(bytes).unwrap())
+        ZeiSignature(ed25519_dalek::Signature::from_bytes(bytes).unwrap())
     }
 }
 

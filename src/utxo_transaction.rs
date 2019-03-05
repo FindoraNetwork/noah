@@ -21,6 +21,7 @@ use crate::keys::ZeiPublicKey;
 use crate::keys::ZeiSecretKey;
 use crate::serialization::ZeiFromToBytes;
 use crate::keys::ZeiSignature;
+use curve25519_dalek::edwards::EdwardsPoint;
 
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxAddressParams{
@@ -249,7 +250,7 @@ impl Tx{
                 }
                 let ciphertext = ZeiCipher::encrypt(
                     prng,
-                    &destination_public_keys[i].get_curve_point()?.compress(),
+                    &destination_public_keys[i],
                     memo.as_slice(),
                 )?;
                 lbox = Some(ciphertext);
@@ -281,7 +282,7 @@ impl Tx{
             tx_input, tx_output,
             tx_range_proof, tx_asset_proof);
 
-        let signatures = Tx::compute_signatures(prng, &body, input);
+        let signatures = Tx::compute_signatures(&body, input);
 
         let out_amount_blindings = match confidential_amount{
             true => Some(memo_out_amount_blind),
@@ -426,8 +427,9 @@ impl Tx{
     }
 
 
-    fn compute_signatures<R: CryptoRng + Rng>(
-        prng: &mut R, body: &TxBody, input: &[TxAddressParams]) -> Vec<ZeiSignature>{
+    fn compute_signatures(
+        body: &TxBody, input: &[TxAddressParams]) -> Vec<ZeiSignature>
+    {
         let msg = serde_json::to_vec(body).unwrap();
         let mut signatures = vec![];
         let mut pk_set = HashSet::new();
@@ -435,7 +437,7 @@ impl Tx{
             let pk = &input[i].public_key;
             if pk_set.contains(pk.as_bytes()) == false {
                 pk_set.insert(pk.as_bytes());
-                let sign = input[i].secret_key.as_ref().unwrap().sign::<blake2::Blake2b, R>(prng, msg.as_slice(),
+                let sign = input[i].secret_key.as_ref().unwrap().sign::<blake2::Blake2b>(msg.as_slice(),
                                                                                             pk);
                 signatures.push(sign);
             }
@@ -593,7 +595,7 @@ impl Tx{
 
     pub fn receiver_unlock_memo(
         lbox: &ZeiCipher,
-        sk: &Scalar,
+        sk: &ZeiSecretKey,
         confidential_amount: bool,
         confidential_asset: bool,
     ) -> Result<(Option<u64>, Option<Scalar>, Option<Scalar>), ZeiError>
@@ -651,7 +653,7 @@ fn sample_blinding_factor<R>(csprng: &mut R, address: &ZeiPublicKey) -> Result<S
 {
     let blinding_key = Scalar::random(csprng);
     let pk_curve_point = address.get_curve_point()?;
-    let aux: RistrettoPoint = blinding_key * pk_curve_point;
+    let aux: EdwardsPoint = blinding_key * pk_curve_point;
     let mut hasher = Blake2b::new();
     hasher.input(&aux.compress().to_bytes());
     Ok(Scalar::from_hash(hasher))
@@ -662,15 +664,13 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::encryption::from_secret_key_to_scalar;
     use crate::utils::compute_str_commitment;
     use crate::keys::ZeiKeyPair;
-    use crate::keys::ZEI_SECRET_KEY_LENGTH;
 
     fn build_address_params<R: CryptoRng + Rng>(prng: &mut R, amount: u64, asset: &str,
                                                 input: bool, //input or output
                                                 confidential_amount: bool,
-                                                confidential_asset: bool) -> (TxAddressParams, Scalar) {
+                                                confidential_asset: bool) -> (TxAddressParams, ZeiSecretKey) {
         let pc_gens = PedersenGens::default();
 
 
@@ -694,13 +694,6 @@ mod test {
         }
         let key = ZeiKeyPair::generate(prng);
 
-        let secret_key_bytes = key.get_sk_ref().zei_to_bytes();
-
-        let mut secret_key_array = [0u8; ZEI_SECRET_KEY_LENGTH];
-        secret_key_array.copy_from_slice(secret_key_bytes.as_slice());
-
-        let scalar_secret_key = from_secret_key_to_scalar(&secret_key_array);
-
         if input {
             sk = Some(key.get_sk());
         }
@@ -713,7 +706,7 @@ mod test {
             asset_type_blinding,
             public_key: key.get_pk_ref().clone(),
             secret_key: sk,
-        }, scalar_secret_key)
+        }, key.get_sk())
     }
 
     #[test]
@@ -729,7 +722,7 @@ mod test {
         let mut in_addrs = vec![];
         let mut out_addrs  = vec![];
         let out_amount = [1u64, 2u64, 3u64, 4u64];
-        let mut out_sks: Vec<Scalar> = vec![];
+        let mut out_sks: Vec<ZeiSecretKey> = vec![];
 
         for i in 0..num_inputs{
             let (addr,_) =
@@ -816,7 +809,7 @@ mod test {
         let mut in_addrs = vec![];
         let mut out_addrs  = vec![];
         let out_amount = [1u64, 2u64, 3u64, 4u64];
-        let mut out_sks: Vec<Scalar> = vec![];
+        let mut out_sks: Vec<ZeiSecretKey> = vec![];
 
         for i in 0..num_inputs{
             let (addr,_) =
@@ -895,7 +888,7 @@ mod test {
         let mut in_addrs = vec![];
         let mut out_addrs  = vec![];
         let out_amount = [1u64, 2u64, 3u64, 4u64];
-        let mut out_sks: Vec<Scalar> = vec![];
+        let mut out_sks: Vec<ZeiSecretKey> = vec![];
 
         for i in 0..num_inputs{
             let (addr,_) =
@@ -960,7 +953,7 @@ mod test {
         let mut in_addrs = vec![];
         let mut out_addrs  = vec![];
         let out_amount = [1u64, 2u64, 3u64, 4u64];
-        let mut out_sks: Vec<Scalar> = vec![];
+        let mut out_sks = vec![];
 
         for i in 0..num_inputs{
             let (addr,_) =
@@ -998,7 +991,7 @@ mod test {
         let mut in_addrs = vec![];
         let mut out_addrs  = vec![];
         let out_amount = [1u64, 2u64, 3u64, 4u64];
-        let mut out_sks: Vec<Scalar> = vec![];
+        let mut out_sks = vec![];
 
         for i in 0..num_inputs{
             let (addr,_) =

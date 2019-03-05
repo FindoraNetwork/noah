@@ -2,7 +2,7 @@
 
 use std::{fmt, error};
 use hex::FromHexError;
-use schnorr::errors::SchnorrError;
+use ed25519_dalek::errors::SignatureError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Error {
@@ -16,6 +16,7 @@ pub enum Error {
     NoneError,
     ParameterError,
     ProofError, //TODO need better/fine grained  proof error handling
+    SignatureError,
 }
 
 impl fmt::Display for Error {
@@ -30,6 +31,7 @@ impl fmt::Display for Error {
             Error::NoneError => "Could not unwrap option due to None value",
             Error::ParameterError => "Unexpected parameter for method or function",
             Error::ProofError => "Invalid proof or bad proof parameters",
+            Error::SignatureError => "Signature verification failed",
         })
     }
 }
@@ -46,6 +48,7 @@ impl error::Error for Error {
             Error::NoneError => "Could not unwrap option due to None value",
             Error::ParameterError => "Unexpected parameter for method or function",
             Error::ProofError => "Invalid proof",
+            Error::SignatureError => "Signature verification failed",
         }
     }
 }
@@ -63,12 +66,6 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<SchnorrError> for Error {
-    fn from(_error: SchnorrError) -> Self {
-        Error::DeserializationError
-    }
-}
-
 impl From<bulletproofs::ProofError> for Error {
     fn from(_error: bulletproofs::ProofError) -> Self {
         Error::ProofError
@@ -79,5 +76,9 @@ impl From<std::option::NoneError> for Error {
     fn from(_error: std::option::NoneError) -> Self {
         Error::NoneError
     }
+}
+
+impl From<SignatureError> for Error {
+    fn from(_error: SignatureError) -> Self { Error::SignatureError }
 }
 
