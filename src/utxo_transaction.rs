@@ -68,7 +68,7 @@ impl PartialEq for TxAddressParams{
 
 impl Eq for TxAddressParams {}
 
-#[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug, Clone)]
 pub struct TxPublicFields {
     /// Address information for input and output that is safe to add to transaction
     pub(crate) amount: Option<u64>, // None only if confidential
@@ -81,7 +81,7 @@ pub struct TxPublicFields {
     pub(crate) public_key: ZeiPublicKey, // source or destination
 }
 
-#[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug, Clone)]
 pub struct TxOutput {
     /// Output structure for output
     pub(crate) public: TxPublicFields,

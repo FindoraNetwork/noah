@@ -11,7 +11,7 @@ use crate::keys::{ZeiPublicKey, KEY_BASE_POINT, ZeiSecretKey};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct ZeiCipher {
     pub ciphertext: Vec<u8>,
     pub nonce: Nonce,

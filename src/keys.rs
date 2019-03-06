@@ -34,19 +34,19 @@ pub struct ZeiSignature(pub Signature);
 
 
 impl ZeiPublicKey {
-    pub(crate) fn get_curve_point(&self) -> Result<EdwardsPoint, Error>{
+    pub fn get_curve_point(&self) -> Result<EdwardsPoint, Error>{
         let pk_point = CompressedEdwardsY::from_slice(
             self.zei_to_bytes().as_slice()).decompress()?;
         Ok(pk_point)
     }
 
-    pub(crate) fn verify<D>(&self,  message: &[u8], signature: &ZeiSignature) -> Result<(), Error>
+    pub fn verify<D>(&self,  message: &[u8], signature: &ZeiSignature) -> Result<(), Error>
     where  D:  Digest<OutputSize = U64> + Default,
     {
         Ok(self.0.verify::<D>(message, &signature.0)?)
     }
 
-    pub(crate) fn as_bytes(&self) -> &[u8]{
+    pub fn as_bytes(&self) -> &[u8]{
         self.0.as_bytes()
     }
 }
