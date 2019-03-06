@@ -473,6 +473,10 @@ impl Tx{
         }
     }
 
+     pub fn get_outputs(&self) -> Vec<TxOutput> {
+        self.body.output.clone()
+     }
+
     pub fn verify(&self) -> bool{
         //1 signature
         if ! self.verify_signatures(){
