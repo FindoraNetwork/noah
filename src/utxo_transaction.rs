@@ -88,6 +88,12 @@ pub struct TxOutput {
     pub(crate) lock_box: Option<ZeiCipher>,
 }
 
+impl TxOutput {
+    pub fn get_pk(&self) -> ZeiPublicKey {
+        self.public.public_key
+    }
+}
+
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct TxProofs{
     /// Proof to be included in transactions
