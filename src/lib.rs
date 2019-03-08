@@ -3,6 +3,7 @@
 #![feature(try_trait)]
 //#![feature(custom_attribute)]
 
+extern crate rustc_serialize;
 extern crate blake2;
 extern crate bulletproofs;
 extern crate curve25519_dalek;
@@ -15,14 +16,17 @@ extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
 extern crate sodiumoxide;
+extern crate bn;
 
 mod constants;
 mod encryption;
 mod errors;
 mod setup;
 mod utils;
+mod pairing;
 
 
+pub mod sd_identity;
 pub mod account;
 pub mod address;
 pub mod keys;
