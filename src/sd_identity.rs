@@ -1,6 +1,6 @@
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use crate::pairing::{PairingScalar, G1Elem, G2Elem, pairing};
+use crate::bn_pairing::{PairingScalar, G1Elem, G2Elem, pairing};
 use blake2::{Blake2b, Digest};
 use crate::errors::Error;
 
@@ -393,43 +393,3 @@ mod test {
 
     }
 }
-
-/*
-pub struct SDIdentity{
-    cred_public_key: CredIssuerPublicKey,
-    attributes: Vec<String>,
-    atrribute_bitmap: Vec<u8>,
-    signature: CredSignature,
-}
-
-impl SDIdentity {
-    pub fn generate_keys<R: CryptoRng + Rng>(prng: &mut R) -> CredKeyPair{
-        CredKeyPair::generate(prng)
-    }
-
-    pub fn new_form(attrs: Vec<String>, public_key: CredPublicKey) -> SDIdentity{
-        SDIdentity{
-            cred_public_key: CredPublicKey,
-            attributes: attrs,
-            atrribute_bitmap: Vec::new(),
-            signature: CredSignature{},
-        }
-    }
-
-    pub fn identity_provider_signature(&mut self, accepted_attributes: &HashSet<String>)
-    {
-        for attr in self.attributes{
-            if accepted_attributes.contains(&attr){
-                self.atrribute_bitmap.push(1);
-            }
-            else{
-                self.atrribute_bitmap.push(0);
-            }
-        }
-    }
-
-    pub fn reveal(&self, reveal_bitmap: &[u8]){
-
-    }
-}
-*/

@@ -3,6 +3,8 @@
 #![feature(try_trait)]
 //#![feature(custom_attribute)]
 
+extern crate rand_04;
+extern crate pairing;
 extern crate rustc_serialize;
 extern crate blake2;
 extern crate bulletproofs;
@@ -23,7 +25,8 @@ mod encryption;
 mod errors;
 mod setup;
 mod utils;
-mod pairing;
+mod bn_pairing;
+mod bls12_381_pairing;
 
 
 pub mod sd_identity;
