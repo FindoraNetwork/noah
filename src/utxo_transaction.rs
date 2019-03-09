@@ -620,11 +620,12 @@ impl Tx{
         if confidential_amount {
             let (value, scalars) = message.split_at(8);
             amount = Some(u8_bigendian_slice_to_u64(value));
-
-            bytes.copy_from_slice(&scalars[0..32]);
+            bytes.copy_from_slice(&scalars[0..32]);    
+         //@Ben: We have changed the protocol. The blind is shared through a key exchange blind_share not here in lbox.
             amount_blind = Some(Scalar::from_bits(bytes));
-
+          
             if confidential_asset {
+            //@Ben: Do we not encrypt the asset type in lbox because it can be brute forced given the blind? 
                 bytes.copy_from_slice(&scalars[32..64]);
                 asset_blind = Some(Scalar::from_bits(bytes));
             }
