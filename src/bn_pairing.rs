@@ -10,12 +10,14 @@ impl PairingScalar {
     pub(crate) fn random<R: CryptoRng + Rng>(prng: &mut R) -> Self{
         PairingScalar(bn::Fr::random(prng))
     }
+    /*
     pub(crate) fn zero() -> Self{
         PairingScalar(bn::Fr::zero())
     }
     pub(crate) fn one() -> Self{
         PairingScalar(bn::Fr::one())
     }
+    */
 }
 
 impl Add<PairingScalar> for PairingScalar {
@@ -61,16 +63,16 @@ impl G1Elem{
     pub(crate) fn random<R: CryptoRng + Rng>(prng: &mut R) -> Self{
         G1Elem(bn::G1::random(prng))
     }
+    /*
     pub(crate) fn zero() -> Self{
         G1Elem(bn::G1::zero())
     }
+    */
     pub(crate) fn one() -> Self{
         G1Elem(bn::G1::one())
     }
 
-    pub(crate) fn to_str(&self) -> String{
-        rustc_serialize::json::encode(&self.0).unwrap()
-    }
+    //pub(crate) fn to_str(&self) -> String{ rustc_serialize::json::encode(&self.0).unwrap()}
 }
 
 impl Add<&G1Elem> for G1Elem {
@@ -116,6 +118,7 @@ impl G2Elem{
     pub(crate) fn zero() -> Self{
         G2Elem(bn::G2::zero())
     }
+
     pub(crate) fn one() -> Self{
         G2Elem(bn::G2::one())
     }
@@ -146,22 +149,6 @@ impl Neg for G2Elem {
     fn neg(self) -> G2Elem { G2Elem(-self.0) }
 }
 
-/*
-impl Mul<&PairingScalar> for G2Elem {
-    type Output = G2Elem;
-    fn mul(self, other: &PairingScalar) -> G2Elem { G2Elem(self.0 * other.0) }
-}
-
-impl Mul<PairingScalar> for G2Elem {
-    type Output = G2Elem;
-    fn mul(self, other: PairingScalar) -> G2Elem { G2Elem(self.0 * other.0) }
-}
-
-impl Mul<PairingScalar> for &G2Elem {
-    type Output = G2Elem;
-    fn mul(self, other: PairingScalar) -> G2Elem { G2Elem(self.0 * other.0) }
-}
-*/
 impl Mul<&PairingScalar> for &G2Elem {
     type Output = G2Elem;
     fn mul(self, other: &PairingScalar) -> G2Elem { G2Elem(self.0 * other.0) }
@@ -171,9 +158,9 @@ impl Mul<&PairingScalar> for &G2Elem {
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct GtElem(bn::Gt);
 impl GtElem {
-    pub fn one() -> Self { GtElem(bn::Gt::one()) }
+    //pub fn one() -> Self { GtElem(bn::Gt::one()) }
     pub fn pow(&self, exp: PairingScalar) -> Self { GtElem(self.0.pow(exp.0)) }
-    pub fn inverse(&self) -> Self { GtElem(self.0.inverse()) }
+    //pub fn inverse(&self) -> Self { GtElem(self.0.inverse()) }
 }
 
 impl Mul<GtElem> for GtElem {

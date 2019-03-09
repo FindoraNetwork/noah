@@ -29,7 +29,8 @@ mod bn_pairing;
 mod bls12_381_pairing;
 
 
-pub mod sd_identity;
+pub mod bls12_381_credentials;
+pub mod bn_credentials;
 pub mod account;
 pub mod address;
 pub mod keys;

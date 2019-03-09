@@ -1,11 +1,9 @@
 
-use pairing::bls12_381::{Fr, G1, G2, G1Affine, Fq12};
+use pairing::bls12_381::{Fr, G1, G2, Fq12};
 use pairing::{CurveAffine, CurveProjective, PrimeField};
-use rand::{CryptoRng, Rng};
 use rand_04::Rand;
 use std::ops::{Add, Sub, Neg, Mul};
 use pairing::Field;
-use crate::errors::Error;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct BLSScalar(Fr);
@@ -16,15 +14,18 @@ pub struct BLSGtElem(Fq12);
 
 
 impl BLSScalar {
-    pub(crate) fn random<R: CryptoRng + rand_04::Rng>(prng: &mut R) -> Self{
+    pub(crate) fn random<R:rand_04::Rng>(prng: &mut R) -> Self{
         BLSScalar(Fr::rand(prng))
     }
+    /*
     pub(crate) fn zero() -> Self{
         BLSScalar(Fr::zero())
     }
+
     pub(crate) fn one() -> Self{
         BLSScalar(Fr::one())
     }
+    */
 }
 
 
@@ -67,12 +68,14 @@ impl Mul<&BLSScalar> for &BLSScalar {
 
 
 impl BLSG1Elem{
-    pub(crate) fn random<R: CryptoRng + rand_04::Rng>(prng: &mut R) -> Self{
+    pub(crate) fn random<R:rand_04::Rng>(prng: &mut R) -> Self{
         BLSG1Elem(G1::rand(prng))
     }
+    /*
     pub(crate) fn zero() -> Self{
         BLSG1Elem(G1::zero())
     }
+    */
     pub(crate) fn one() -> Self{
         BLSG1Elem(G1::one())
     }
@@ -125,21 +128,24 @@ impl Mul<&BLSScalar> for &BLSG1Elem {
 }
 
 impl BLSG2Elem{
-    pub(crate) fn random<R: CryptoRng + rand_04::Rng>(prng: &mut R) -> Self{
+    pub(crate) fn random<R:rand_04::Rng>(prng: &mut R) -> Self{
         BLSG2Elem(G2::rand(prng))
     }
     pub(crate) fn zero() -> Self{
         BLSG2Elem(G2::zero())
     }
+
     pub(crate) fn one() -> Self{
         BLSG2Elem(G2::one())
     }
 
-    /*
-    pub(crate) fn to_str(&self) -> String{
-        rustc_serialize::json::encode(&self.0).unwrap()
+    pub(crate) fn to_bytes(&self) -> [u8;96] {
+        let a = (self.0).into_affine();
+        let c: pairing::bls12_381::G2Compressed = a.into_compressed();
+        let mut r = [0u8;96];
+        r.copy_from_slice(c.as_ref());
+        r
     }
-    */
 }
 
 
@@ -183,13 +189,16 @@ impl Mul<&BLSScalar> for &BLSG2Elem {
 
 /// Multiplicative pairing target group
 impl BLSGtElem {
+    /*
     pub fn one() -> Self {
         BLSGtElem(Fq12::one())
     }
-    pub fn pow(&self, exp: BLSScalar) -> Self {
+    */
+    pub(crate) fn pow(&self, exp: BLSScalar) -> Self {
         let r = self.0.pow(exp.0.into_repr().as_ref());
         BLSGtElem(r)
     }
+    /*
     pub fn inverse(&self) -> Option<BLSGtElem> {
         let r = self.0.inverse();
         if r.is_some() {
@@ -198,7 +207,7 @@ impl BLSGtElem {
         else {
             None
         }
-    }
+    }*/
 }
 
 impl Mul<&BLSGtElem> for BLSGtElem {
@@ -217,51 +226,18 @@ pub(crate) fn pairing(e1: &BLSG1Elem, e2: &BLSG2Elem) -> BLSGtElem{
     BLSGtElem(g1_affine.pairing_with(&g2_affine))
 }
 
-/*
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand_chacha::ChaChaRng;
-    use rand::SeedableRng;
+    use rand_04::ChaChaRng;
+    use rand_04::SeedableRng;
+
 
     #[test]
     fn test_pairing(){
         let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
-
-        let s1 = PairingScalar::random(&mut prng);
-        let s2 = PairingScalar::random(&mut prng);
-
-        let element_1 = &G1Elem::one() * &s1;
-        let element_2 = &G2Elem::one() * &s2;
-
-        let gt_element = pairing(&element_1, &element_2);
-
-        let gt_element_2 = pairing(&G1Elem::one(), &G2Elem::one()).pow(&s1 * &s2);
-
-        assert_eq!(true, gt_element.eq(&gt_element_2));
-
-        let gt_element_3 = pairing(&G1Elem::one(), &(&G2Elem::one() * &( &s1 * &s2)));
-
-        assert_eq!(true, gt_element.eq(&gt_element_3));
-
-        let gt_element_4 = pairing(&(& G1Elem::one() * &(&s1 * &s2)), &G2Elem::one());
-
-        assert_eq!(true, gt_element.eq(&gt_element_4));
-    }
-}
-*/
-#[cfg(test)]
-mod test {
-    use super::*;
-    use rand_chacha::ChaChaRng;
-    use rand::SeedableRng;
-
-    /*
-    #[test]
-    fn test_pairing(){
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        prng = ChaChaRng::from_seed(&[0u32; 8]);
 
         let s1 = BLSScalar::random(&mut prng);
         let s2 = BLSScalar::random(&mut prng);
@@ -269,20 +245,19 @@ mod test {
         let element_1 = &BLSG1Elem::one() * &s1;
         let element_2 = &BLSG2Elem::one() * &s2;
 
-        let gt_element = bls12_381::Bls12::pairing(&element_1.0, &element_2.0);
+        let gt_element = pairing(&element_1, &element_2);
 
-        let gt_element_2 = bls12_381::Bls12::pairing(&BLSG1Elem::one(), &BLSG2Elem::one()).pow(&s1 * &s2);
+        let gt_element_2 = pairing(&BLSG1Elem::one(), &BLSG2Elem::one()).pow(&s1 * &s2);
 
         assert_eq!(true, gt_element.eq(&gt_element_2));
 
-        let gt_element_3 = bls12_381::Bls12::pairing(&BLSG1Elem::one(), &(&BLSG2Elem::one() * &( &s1 * &s2)));
+        let gt_element_3 = pairing(&BLSG1Elem::one(), &(&BLSG2Elem::one() * &( &s1 * &s2)));
 
         assert_eq!(true, gt_element.eq(&gt_element_3));
 
-        let gt_element_4 = bls12_381::Bls12::pairing((&(& BLSG1Elem::one() * &(&s1 * &s2)), &BLSG2Elem::one());
+        let gt_element_4 = pairing(&(& BLSG1Elem::one() * &(&s1 * &s2)), &BLSG2Elem::one());
 
         assert_eq!(true, gt_element.eq(&gt_element_4));
     }
-    */
 }
 

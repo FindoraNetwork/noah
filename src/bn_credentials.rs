@@ -53,7 +53,7 @@ pub struct CredRevealProof {
 
 /// I'm a proof of knowledge for t, sk (CredUserSecretKey), and hidden attributes that satisfy a
 /// certain relation.
-pub struct ProofOfKnowledgeCredentials{
+pub(crate) struct ProofOfKnowledgeCredentials{
     commitment: G2Elem,
     response_t: PairingScalar,
     response_sk: PairingScalar,
@@ -72,6 +72,9 @@ impl CredUserSecretKey{
             public,
         }
     }
+     pub fn get_public_key_ref(&self) -> &CredUserPublicKey{
+         &self.public
+     }
 
     /// I compute a proof that a credential provider with pk issuer_public_key has giving me
     /// credentials for certain attributes. The attributes to reveal are the ones indicated
@@ -292,6 +295,14 @@ impl CredIssuerKeyPair {
             },
         }
     }
+
+    pub fn public_key_ref(&self) -> &CredIssuerPublicKey {
+        &self.public
+    }
+
+    pub fn secret_key_ref(&self) -> &CredIssuerSecretKey {
+        &self.secret
+    }
 }
 
 #[cfg(test)]
@@ -305,19 +316,21 @@ mod test {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let issuer_keypair = CredIssuerKeyPair::generate(&mut prng, 1);
+        let issuer_pk = issuer_keypair.public_key_ref();
+        let issuer_sk = issuer_keypair.secret_key_ref();
         let user_key = CredUserSecretKey::generate(&mut prng, &issuer_keypair.public);
         let attr = PairingScalar::random(&mut prng);
 
-        let signature = issuer_keypair.secret.sign(&mut prng, &user_key.public, vec![attr.clone()]);
+        let signature = issuer_sk.sign(&mut prng, &user_key.public, vec![attr.clone()]);
 
         let proof = user_key.reveal(
             &mut prng,
-            &issuer_keypair.public,
+            issuer_pk,
             &signature,
             vec![attr.clone()],
             vec![true]);
 
-        assert_eq!(true, issuer_keypair.public.verify(
+        assert_eq!(true, issuer_pk.verify(
             vec![attr.clone()],
             vec![true],
             &proof,
@@ -329,23 +342,25 @@ mod test {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let issuer_keypair = CredIssuerKeyPair::generate(&mut prng, 2);
+        let issuer_pk = issuer_keypair.public_key_ref();
+        let issuer_sk = issuer_keypair.secret_key_ref();
 
-        let user_key = CredUserSecretKey::generate(&mut prng, &issuer_keypair.public);
+        let user_key = CredUserSecretKey::generate(&mut prng, issuer_pk);
 
         let attr1 = PairingScalar::random(&mut prng);
         let attr2 = PairingScalar::random(&mut prng);
 
-        let signature = issuer_keypair.secret.sign(
-            &mut prng, &user_key.public, vec![attr1.clone(),attr2.clone()]);
+        let signature = issuer_sk.sign(
+            &mut prng, &user_key.get_public_key_ref(), vec![attr1.clone(),attr2.clone()]);
 
         let proof = user_key.reveal(
             &mut prng,
-            &issuer_keypair.public,
+            issuer_pk,
             &signature,
             vec![attr1.clone(), attr2.clone()],
             vec![true, false]);
 
-        assert_eq!(true, issuer_keypair.public.verify(
+        assert_eq!(true, issuer_pk.verify(
             vec![attr1.clone()],
             vec![true, false],
             &proof,
@@ -353,12 +368,12 @@ mod test {
 
         let proof = user_key.reveal(
             &mut prng,
-            &issuer_keypair.public,
+            issuer_pk,
             &signature,
             vec![attr1.clone(), attr2.clone()],
             vec![false, true]);
 
-        assert_eq!(true, issuer_keypair.public.verify(
+        assert_eq!(true, issuer_pk.verify(
             vec![attr2.clone()],
             vec![false, true],
             &proof,
@@ -366,12 +381,12 @@ mod test {
 
         let proof = user_key.reveal(
             &mut prng,
-            &issuer_keypair.public,
+            issuer_pk,
             &signature,
             vec![attr1.clone(), attr2.clone()],
             vec![false, false]);
 
-        assert_eq!(true, issuer_keypair.public.verify(
+        assert_eq!(true, issuer_pk.verify(
             vec![],
             vec![false, false],
             &proof,
@@ -379,17 +394,15 @@ mod test {
 
         let proof = user_key.reveal(
             &mut prng,
-            &issuer_keypair.public,
+            issuer_pk,
             &signature,
             vec![attr1.clone(), attr2.clone()],
             vec![true, true]);
 
-        assert_eq!(true, issuer_keypair.public.verify(
+        assert_eq!(true, issuer_pk.verify(
             vec![attr1.clone(), attr2.clone()],
             vec![true, true],
             &proof,
         ).is_ok(), "Error revealing both attributes")
-
-
     }
 }
