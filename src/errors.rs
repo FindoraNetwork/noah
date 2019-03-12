@@ -17,6 +17,12 @@ pub enum Error {
     ParameterError,
     ProofError, //TODO need better/fine grained  proof error handling
     SignatureError,
+    XfrVerifyAmountError,
+    XfrVerifyAssetError,
+    XfrVerifyConfidentialAssetError,
+    XfrCreationAmountError,
+    XfrCreationAssetError,
+    XfrVerifyConfidentialAmountError,
 }
 
 impl fmt::Display for Error {
@@ -32,6 +38,12 @@ impl fmt::Display for Error {
             Error::ParameterError => "Unexpected parameter for method or function",
             Error::ProofError => "Invalid proof or bad proof parameters",
             Error::SignatureError => "Signature verification failed",
+            Error::XfrVerifyAmountError => "Invalid amounts in non confidential amount transfer",
+            Error::XfrVerifyAssetError => "Invalid asset type in non confidential asset transfer",
+            Error::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
+            Error::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
+            Error::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
+            Error::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
         })
     }
 }
@@ -49,6 +61,12 @@ impl error::Error for Error {
             Error::ParameterError => "Unexpected parameter for method or function",
             Error::ProofError => "Invalid proof",
             Error::SignatureError => "Signature verification failed",
+            Error::XfrVerifyAmountError => "Invalid amounts in non confidential transfer",
+            Error::XfrVerifyAssetError => "Invalid asset type in non confidential asset transfer",
+            Error::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
+            Error::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
+            Error::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
+            Error::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
         }
     }
 }
@@ -68,7 +86,7 @@ impl From<serde_json::Error> for Error {
 
 impl From<bulletproofs::ProofError> for Error {
     fn from(_error: bulletproofs::ProofError) -> Self {
-        Error::ProofError
+        Error::XfrVerifyConfidentialAmountError
     }
 }
 

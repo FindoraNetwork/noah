@@ -149,6 +149,47 @@ pub fn u64_to_bigendian_u8array(n: u64) -> [u8;8]{
 
 }
 
+pub fn u128_to_bigendian_u8array(n: u128) -> [u8;16]{
+    let mut array = [0u8;16];
+    array[0] = ((n>>120)&0xFF) as u8;
+    array[1] = ((n>>112)&0xFF) as u8;
+    array[2] = ((n>>104)&0xFF) as u8;
+    array[3] = ((n>>96)&0xFF) as u8;
+    array[4] = ((n>>88)&0xFF) as u8;
+    array[5] = ((n>>80)&0xFF) as u8;
+    array[6] = ((n>>72)&0xFF) as u8;
+    array[7] = ((n>>64)&0xFF) as u8;
+    array[8] = ((n>>56)&0xFF) as u8;
+    array[9] = ((n>>48)&0xFF) as u8;
+    array[10] = ((n>>40)&0xFF) as u8;
+    array[11] = ((n>>32)&0xFF) as u8;
+    array[12] = ((n>>24)&0xFF) as u8;
+    array[13] = ((n>>16)&0xFF) as u8;
+    array[14] = ((n>>8)&0xFF) as u8;
+    array[15] = (n & 0xFF) as u8;
+    array
+
+}
+
+pub fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128{
+    u128::from(array[0]) << 120 |
+        u128::from(array[1]) << 112 |
+        u128::from(array[2]) << 104 |
+        u128::from(array[3]) << 96 |
+        u128::from(array[4]) << 88 |
+        u128::from(array[5]) << 80 |
+        u128::from(array[6]) << 72 |
+        u128::from(array[7]) << 64 |
+        u128::from(array[8]) << 56 |
+        u128::from(array[9]) << 48 |
+        u128::from(array[10]) << 40 |
+        u128::from(array[11]) << 32 |
+        u128::from(array[12]) << 24 |
+        u128::from(array[13]) << 16 |
+        u128::from(array[14]) << 8 |
+        u128::from(array[15])
+}
+
 pub fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64{
     u64::from(array[0]) << 56 |
         u64::from(array[1]) << 48 |
@@ -193,6 +234,10 @@ pub fn compute_str_scalar_hash(s: &str) -> Scalar {
     Scalar::from_hash(hash)
 }
 
+#[inline]
+pub(crate) fn smallest_greater_power_of_two(n: u32) -> u32{
+    2.0f64.powi((n as f64).log2().ceil() as i32) as u32
+}
 
 
 #[cfg(test)]

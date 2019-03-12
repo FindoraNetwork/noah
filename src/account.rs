@@ -4,12 +4,11 @@ use curve25519_dalek::scalar::Scalar;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 
-use crate::keys::ZeiPublicKey;
+use crate::keys::XfrPublicKey;
 use rand::CryptoRng;
 use rand::Rng;
 use crate::address;
 use crate::address::Address;
-use blake2::Blake2b;
 use crate::errors::Error as ZeiError;
 use std::collections::HashMap;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -20,10 +19,10 @@ use crate::utils::compute_str_ristretto_point_hash;
 use bulletproofs::PedersenGens;
 use crate::utxo_transaction::Tx;
 use crate::utxo_transaction::TxAddressParams;
-use crate::keys::ZeiKeyPair;
-use crate::keys::ZeiSecretKey;
+use crate::keys::XfrKeyPair;
+use crate::keys::XfrSecretKey;
 use crate::serialization::ZeiFromToBytes;
-use crate::keys::ZeiSignature;
+use crate::keys::XfrSignature;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TxParams{
@@ -32,7 +31,7 @@ pub struct TxParams{
      *
      */
     #[serde(with = "serialization::zei_obj_serde")]
-    pub receiver_pk: ZeiPublicKey,
+    pub receiver_pk: XfrPublicKey,
     #[serde(with = "serialization::zei_obj_serde")]
     pub receiver_asset_commitment: CompressedRistretto,
     #[serde(with = "serialization::zei_obj_serde")]
@@ -61,7 +60,7 @@ pub struct AssetBalance {
 pub struct Account {
     pub tx_counter: u128,
     #[serde(with = "serialization::zei_obj_serde")]
-    pub keys: ZeiKeyPair,
+    pub keys: XfrKeyPair,
     pub balances: HashMap<String, AssetBalance>,
 }
 
@@ -85,7 +84,7 @@ impl Account {
          */
         Account {
             tx_counter: 0,
-            keys: ZeiKeyPair::generate(csprng),
+            keys: XfrKeyPair::generate(csprng),
             balances: HashMap::new(),
         }
     }
@@ -135,7 +134,7 @@ impl Account {
         self.balances.get_mut(asset_id).unwrap()
     }
 
-    pub fn get_public_key(&self) -> &ZeiPublicKey {
+    pub fn get_public_key(&self) -> &XfrPublicKey {
         self.keys.get_pk_ref()
     }
 
@@ -146,7 +145,7 @@ impl Account {
     }
     */
 
-    pub fn get_secret_key(&self) -> &ZeiSecretKey {
+    pub fn get_secret_key(&self) -> &XfrSecretKey {
         self.keys.get_sk_ref()
     }
 
@@ -198,7 +197,7 @@ impl Account {
                 false => None,
             },
             public_key: self.keys.get_pk_ref().clone(),
-            secret_key: Some(ZeiSecretKey::zei_from_bytes(&secret_key_bytes[..])),
+            secret_key: Some(XfrSecretKey::zei_from_bytes(&secret_key_bytes[..])),
         };
 
         let output = TxAddressParams{
@@ -301,11 +300,11 @@ impl Account {
         Ok(true)
     }
 
-    pub fn sign(&self, msg: &[u8]) -> ZeiSignature
+    pub fn sign(&self, msg: &[u8]) -> XfrSignature
     {
         /*! I Sign a u8 slice data using this account secret key
          */
-        self.keys.sign::<Blake2b>(&msg)
+        self.keys.sign(&msg)
     }
 }
 

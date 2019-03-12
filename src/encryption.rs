@@ -7,7 +7,7 @@ use sodiumoxide::crypto::secretbox;
 use sodiumoxide::crypto::secretbox::{Nonce,Key};
 use rand::CryptoRng;
 use rand::Rng;
-use crate::keys::{ZeiPublicKey, KEY_BASE_POINT, ZeiSecretKey};
+use crate::keys::{XfrPublicKey, KEY_BASE_POINT, XfrSecretKey};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 
 
@@ -22,7 +22,7 @@ pub struct ZeiCipher {
 impl ZeiCipher {
     pub fn encrypt<R>(
         prng: &mut R,
-        public_key: &ZeiPublicKey,
+        public_key: &XfrPublicKey,
         message: &[u8]) -> Result<ZeiCipher, ZeiError>
         where R: CryptoRng + Rng
     {
@@ -38,7 +38,7 @@ impl ZeiCipher {
         })
     }
 
-    pub fn decrypt(&self, secret_key: &ZeiSecretKey) -> Result<Vec<u8>, ZeiError>{
+    pub fn decrypt(&self, secret_key: &XfrSecretKey) -> Result<Vec<u8>, ZeiError>{
         let key = symmetric_key_from_secret_key(secret_key, &self.encoded_rand)?;
         Ok(symmetric_decrypt(&key, self.ciphertext.as_slice(), &self.nonce)?)
     }
@@ -46,7 +46,7 @@ impl ZeiCipher {
 
 pub fn symmetric_key_from_public_key<R>(
     prng: &mut R,
-    public_key: &ZeiPublicKey) -> Result<([u8;32], CompressedEdwardsY), ZeiError> where R: CryptoRng + Rng
+    public_key: &XfrPublicKey) -> Result<([u8;32], CompressedEdwardsY), ZeiError> where R: CryptoRng + Rng
 {
     /*! I derive a symmetric key from an ElGamal public key over the Ristretto group. Return symmetric key, and encoded
      * randonmess to be used by secret key holder to derive the same symmetric key
@@ -63,12 +63,12 @@ pub fn symmetric_key_from_public_key<R>(
 }
 
 fn symmetric_key_from_secret_key(
-    secret_key: &ZeiSecretKey,
+    secret_key: &XfrSecretKey,
     rand: &CompressedEdwardsY) -> Result<[u8;32], ZeiError>
 {
     //let curve_key = secret_key * rand.decompress()?;
     let curve_key = secret_key.
-        as_scalar_multiply_by_curve_point::<blake2::Blake2b>(&rand.decompress()?);
+        as_scalar_multiply_by_curve_point(&rand.decompress()?);
     let mut hasher = VarBlake2b::new(32).unwrap(); //valid unwrap: this should never fail
     hasher.input(curve_key.compress().as_bytes());
     let mut symmetric_key: [u8;32] = Default::default();
@@ -105,7 +105,7 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::keys::ZeiKeyPair;
+    use crate::keys::XfrKeyPair;
 
 
     #[test]
@@ -115,7 +115,7 @@ mod test {
         /*let sk = Scalar::random(&mut prng);
         let pk = (&sk * &base.decompress().unwrap()).compress();
         */
-        let keypair = ZeiKeyPair::generate(&mut prng);
+        let keypair = XfrKeyPair::generate(&mut prng);
         let (from_pk_key, encoded_rand) = symmetric_key_from_public_key(&mut prng, keypair.get_pk_ref()).unwrap();
         let from_sk_key = symmetric_key_from_secret_key(keypair.get_sk_ref(), &encoded_rand).unwrap();
         assert_eq!(from_pk_key, from_sk_key);
@@ -134,7 +134,7 @@ mod test {
     fn test_zei_ristretto_cipher(){
         let mut prng: ChaChaRng;
         prng  = ChaChaRng::from_seed([0u8; 32]);
-        let key_pair = ZeiKeyPair::generate(&mut prng);
+        let key_pair = XfrKeyPair::generate(&mut prng);
         let msg = b"this is another message";
 
 

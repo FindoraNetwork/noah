@@ -32,7 +32,7 @@ use rand::{CryptoRng, Rng};
  */
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct ChaumPedersenCommitmentEqProof {
+pub struct ChaumPedersenProof {
     /// I represent a Chaum-Perdersen equality of commitment proof
     #[serde(with = "serialization::zei_obj_serde")]
     pub(crate)c3: CompressedRistretto,
@@ -47,10 +47,10 @@ pub struct ChaumPedersenCommitmentEqProof {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct ChaumPedersenCommitmentEqProofMultiple {
+pub struct ChaumPedersenProofX {
     /// I represent a Chaum-Perdersen equality of commitment proof
-    pub(crate) c1_eq_c2: ChaumPedersenCommitmentEqProof,
-    pub(crate) zero: ChaumPedersenCommitmentEqProof,
+    pub(crate) c1_eq_c2: ChaumPedersenProof,
+    pub(crate) zero: ChaumPedersenProof,
 }
 
 pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
@@ -60,7 +60,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     commitment1: &CompressedRistretto,
     commitment2: &CompressedRistretto,
     blinding_factor1: &Scalar,
-    blinding_factor2: &Scalar) -> ChaumPedersenCommitmentEqProof
+    blinding_factor2: &Scalar) -> ChaumPedersenProof
 {
     /*! I compute a Chaum-Pedersen proof that two commitments are to the same value */
 
@@ -79,7 +79,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     let z2 = c*r1 + r4;
     let z3 = c*r2 + r5;
 
-    ChaumPedersenCommitmentEqProof{
+    ChaumPedersenProof {
         c3,c4,z1,z2,z3
     }
 }
@@ -87,7 +87,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
 pub fn chaum_pedersen_verify_eq(
     pc_gens: &PedersenGens,
     c1: &CompressedRistretto, c2: &CompressedRistretto,
-    proof:&ChaumPedersenCommitmentEqProof) -> Result<bool, ZeiError> {
+    proof:&ChaumPedersenProof) -> Result<bool, ZeiError> {
 
     /*! I verify a chaum-pedersen equality proof. Return Ok(true) in case of success, Ok(false)
      in case of verification failure, and Err(Error::DeserializationError) in case some CompressedRistretto can not be
@@ -129,7 +129,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     value: &Scalar,
     commitments: &[CompressedRistretto],
     blinding_factors: &[Scalar],
-    ) -> Result<ChaumPedersenCommitmentEqProofMultiple, ZeiError>
+    ) -> Result<ChaumPedersenProofX, ZeiError>
 {
     /*! I produce a proof that all commitments are to the same value.
      *
@@ -167,7 +167,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
                                         &get_fake_zero_commitment(),
                                         &z,
                                         &get_fake_zero_commitment_blinding());
-    Ok(ChaumPedersenCommitmentEqProofMultiple{
+    Ok(ChaumPedersenProofX {
         c1_eq_c2: proof_c1_c2,
         zero: proof_zero,
     })
@@ -176,7 +176,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
 pub fn chaum_pedersen_verify_multiple_eq(
     pedersen_gens: &PedersenGens,
     commitments: &[CompressedRistretto],
-    proof: &ChaumPedersenCommitmentEqProofMultiple) -> Result<bool, ZeiError>
+    proof: &ChaumPedersenProofX) -> Result<bool, ZeiError>
 {
     /*! I verify a proof that all commitments are to the same value.
      * Return Ok(true) in case of success, Ok(false) in case of verification failure,

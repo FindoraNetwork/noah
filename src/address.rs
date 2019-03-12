@@ -13,7 +13,7 @@ use blake2::VarBlake2b;
 use blake2::digest::{Input, VariableOutput};
 use crate::errors::Error as ZeiError;
 use crate::utils::{from_base58, to_base58};
-use crate::keys::ZeiPublicKey;
+use crate::keys::XfrPublicKey;
 use crate::serialization::ZeiFromToBytes;
 
 //Account Address is just its encoded public key
@@ -21,7 +21,7 @@ pub type Address = String;
 
 
 /// Encode a Given Publickey to Zei Address
-pub fn enc(pk: &ZeiPublicKey) -> Address {
+pub fn enc(pk: &XfrPublicKey) -> Address {
     let data = &mut pk.zei_to_bytes();
     let mut hasher = VarBlake2b::new(32).unwrap();
     hasher.input(&data);
@@ -34,7 +34,7 @@ pub fn enc(pk: &ZeiPublicKey) -> Address {
 
 
 /// Decode a Given Zei Address to Publickey
-pub fn dec(zei_addr: &str) -> Result<ZeiPublicKey, ZeiError> {
+pub fn dec(zei_addr: &str) -> Result<XfrPublicKey, ZeiError> {
     let addr = &zei_addr[4..];
     let decoded = from_base58(addr)?;
 
@@ -47,7 +47,7 @@ pub fn dec(zei_addr: &str) -> Result<ZeiPublicKey, ZeiError> {
         return Err(ZeiError::BadBase58Format);
     }
     
-    Ok(ZeiPublicKey::zei_from_bytes(&decoded[..hash_start]))
+    Ok(XfrPublicKey::zei_from_bytes(&decoded[..hash_start]))
 
 }
 
@@ -57,14 +57,14 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::keys::ZeiKeyPair;
+    use crate::keys::XfrKeyPair;
 
 
     #[test]
     fn test_address_encoding() {
         let mut csprng: ChaChaRng;
         csprng  = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = ZeiKeyPair::generate(&mut csprng);
+        let keypair = XfrKeyPair::generate(&mut csprng);
 
         let enc = enc(keypair.get_pk_ref());
         let dec = dec(&enc).unwrap();

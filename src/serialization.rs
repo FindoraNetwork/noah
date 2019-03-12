@@ -1,9 +1,9 @@
 use bulletproofs::{RangeProof};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
-use crate::proofs::chaum_pedersen::ChaumPedersenCommitmentEqProofMultiple;
-use crate::proofs::chaum_pedersen::ChaumPedersenCommitmentEqProof;
-use crate::keys::ZeiSignature;
+use crate::proofs::chaum_pedersen::ChaumPedersenProofX;
+use crate::proofs::chaum_pedersen::ChaumPedersenProof;
+use crate::keys::XfrSignature;
 use serde::Serialize;
 use serde::Deserialize;
 use serde::Deserializer;
@@ -64,7 +64,7 @@ impl ZeiFromToBytes for CompressedEdwardsY{
     }
 }
 
-impl ZeiFromToBytes for ChaumPedersenCommitmentEqProof{
+impl ZeiFromToBytes for ChaumPedersenProof {
     fn zei_to_bytes(&self) -> Vec<u8> {
         let mut v = vec![];
         v.extend_from_slice(&self.c3.zei_to_bytes());
@@ -74,8 +74,8 @@ impl ZeiFromToBytes for ChaumPedersenCommitmentEqProof{
         v.extend_from_slice(&self.z3.zei_to_bytes());
         v
     }
-    fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenCommitmentEqProof{
-        ChaumPedersenCommitmentEqProof{
+    fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenProof {
+        ChaumPedersenProof {
             c3: CompressedRistretto::zei_from_bytes(&bytes[0..32]),
             c4: CompressedRistretto::zei_from_bytes(&bytes[32..64]),
             z1: Scalar::zei_from_bytes(&bytes[64..96]),
@@ -84,26 +84,26 @@ impl ZeiFromToBytes for ChaumPedersenCommitmentEqProof{
         }
     }
 }
-impl ZeiFromToBytes for ChaumPedersenCommitmentEqProofMultiple{
+impl ZeiFromToBytes for ChaumPedersenProofX {
     fn zei_to_bytes(&self) -> Vec<u8> {
         let mut v = vec![];
         v.extend_from_slice(&self.c1_eq_c2.zei_to_bytes());
         v.extend_from_slice(&self.zero.zei_to_bytes());
         v
     }
-    fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenCommitmentEqProofMultiple{
+    fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenProofX {
         let c1_eq_c2 =
-            ChaumPedersenCommitmentEqProof::zei_from_bytes(&bytes[0..32*5]);
+            ChaumPedersenProof::zei_from_bytes(&bytes[0..32*5]);
         let zero =
-            ChaumPedersenCommitmentEqProof::zei_from_bytes(&bytes[32*5..]);
-        ChaumPedersenCommitmentEqProofMultiple{
+            ChaumPedersenProof::zei_from_bytes(&bytes[32*5..]);
+        ChaumPedersenProofX {
             c1_eq_c2,
             zero
         }
     }
 }
 
-impl ZeiFromToBytes for ZeiSignature{
+impl ZeiFromToBytes for XfrSignature {
     fn zei_to_bytes(&self) -> Vec<u8> {
         let bytes = self.0.to_bytes();
         let mut vec = vec![];
@@ -112,11 +112,11 @@ impl ZeiFromToBytes for ZeiSignature{
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Self {
-        ZeiSignature(ed25519_dalek::Signature::from_bytes(bytes).unwrap())
+        XfrSignature(ed25519_dalek::Signature::from_bytes(bytes).unwrap())
     }
 }
 
-impl Serialize for ZeiSignature{
+impl Serialize for XfrSignature {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer
@@ -125,13 +125,13 @@ impl Serialize for ZeiSignature{
     }
 }
 
-impl<'de> Deserialize<'de> for ZeiSignature {
+impl<'de> Deserialize<'de> for XfrSignature {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>
     {
         let v = deserializer.deserialize_bytes(zei_obj_serde::BytesVisitor).unwrap();
-        Ok(ZeiSignature::zei_from_bytes(v.as_slice()))
+        Ok(XfrSignature::zei_from_bytes(v.as_slice()))
     }
 }
 

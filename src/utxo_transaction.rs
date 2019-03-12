@@ -5,7 +5,7 @@ use crate::errors::Error as ZeiError;
 use crate::encryption::ZeiCipher;
 use crate::proofs::chaum_pedersen::{chaum_pedersen_prove_multiple_eq,
                                      chaum_pedersen_verify_multiple_eq,
-                                     ChaumPedersenCommitmentEqProofMultiple};
+                                    ChaumPedersenProofX};
 use crate::serialization;
 use crate::setup::{BULLET_PROOF_RANGE,PublicParams};
 use crate::utils::{u64_to_bigendian_u8array, u8_bigendian_slice_to_u64};
@@ -17,10 +17,10 @@ use rand::CryptoRng;
 use rand::Rng;
 use std::collections::HashSet;
 use crate::utils::compute_str_scalar_hash;
-use crate::keys::ZeiPublicKey;
-use crate::keys::ZeiSecretKey;
+use crate::keys::XfrPublicKey;
+use crate::keys::XfrSecretKey;
 use crate::serialization::ZeiFromToBytes;
-use crate::keys::ZeiSignature;
+use crate::keys::XfrSignature;
 use curve25519_dalek::edwards::EdwardsPoint;
 
 #[derive(Default, Serialize, Deserialize, Debug)]
@@ -39,9 +39,9 @@ pub struct TxAddressParams{
     pub(crate) asset_type_blinding: Option<Scalar>, // None if non confidential asset or
                                          // account is new or Utxo model
     #[serde(with = "serialization::zei_obj_serde")]
-    pub(crate) public_key: ZeiPublicKey,
+    pub(crate) public_key: XfrPublicKey,
     #[serde(with = "serialization::option_bytes")]
-    pub(crate) secret_key: Option<ZeiSecretKey>, //None for output account
+    pub(crate) secret_key: Option<XfrSecretKey>, //None for output account
 }
 
 impl PartialEq for TxAddressParams{
@@ -78,7 +78,7 @@ pub struct TxPublicFields {
     #[serde(with = "serialization::option_bytes")]
     pub(crate) asset_type_commitment: Option<CompressedRistretto>, // None if not confidential asset
     #[serde(with = "serialization::zei_obj_serde")]
-    pub(crate) public_key: ZeiPublicKey, // source or destination
+    pub(crate) public_key: XfrPublicKey, // source or destination
 }
 
 #[derive(Default, Serialize, Deserialize, Eq, PartialEq, Debug, Clone)]
@@ -89,7 +89,7 @@ pub struct TxOutput {
 }
 
 impl TxOutput {
-    pub fn get_pk(&self) -> ZeiPublicKey {
+    pub fn get_pk(&self) -> XfrPublicKey {
         self.public.public_key
     }
 }
@@ -100,7 +100,7 @@ pub struct TxProofs{
     #[serde(with = "serialization::option_bytes")]
     pub(crate) range_proof: Option<RangeProof>,
     #[serde(with = "serialization::option_bytes")]
-    pub(crate) asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
+    pub(crate) asset_proof: Option<ChaumPedersenProofX>,
 }
 
 impl PartialEq for TxProofs {
@@ -134,7 +134,7 @@ pub struct TxBody{
 pub struct Tx{
     /// Transaction structure
     pub body: TxBody,
-    signatures: Vec<ZeiSignature>,
+    signatures: Vec<XfrSignature>,
 }
 
 impl Tx{
@@ -162,7 +162,7 @@ impl Tx{
         // extract values from input struct
         let src_asset_type_com_option: Vec<Option<CompressedRistretto>> =
             input.iter().map(|x| x.asset_type_commitment).collect();
-        let src_pks: Vec<ZeiPublicKey> =
+        let src_pks: Vec<XfrPublicKey> =
             input.iter().map(|x| x.public_key).collect();
 
         // extract values from output struct
@@ -170,7 +170,7 @@ impl Tx{
             output.iter().map(|x| x.asset_type_commitment).collect();
         let dst_asset_type_blind_option: Vec<Option<Scalar>> =
             output.iter().map(|x| x.asset_type_blinding).collect();
-        let destination_public_keys: Vec<ZeiPublicKey> =
+        let destination_public_keys: Vec<XfrPublicKey> =
             output.iter().map(|x| x.public_key ).collect();
 
         // do amount handling
@@ -308,7 +308,7 @@ impl Tx{
             input.iter().map(|x| x.amount_blinding.unwrap()).collect();
         let in_amounts: Vec<u64> = input.iter().map(|x| x.amount ).collect();
         let out_amounts: Vec<u64> = output.iter().map(|x| x.amount ).collect();
-        let destination_public_keys: Vec<ZeiPublicKey> =
+        let destination_public_keys: Vec<XfrPublicKey> =
             output.iter().map(|x| x.public_key ).collect();
 
         let (proof, tx_coms, tx_blinds) =
@@ -327,8 +327,8 @@ impl Tx{
         source_blindings: &[Scalar],
         source_amounts: &[u64],
         destination_amounts: &[u64],
-        destination_public_keys: &[ZeiPublicKey],
-    )-> Result<(RangeProof, Vec<CompressedRistretto>, Vec<Scalar>),ZeiError>
+        destination_public_keys: &[XfrPublicKey],
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>, Vec<Scalar>),ZeiError>
     {
         let num_output = destination_amounts.len();
 
@@ -385,9 +385,9 @@ impl Tx{
         source_asset_blindings: &[Scalar],
         destination_asset_commitments: Vec<Option<CompressedRistretto>>,
         destination_asset_blindings: Vec<Option<Scalar>>,
-        destination_public_keys: &Vec<ZeiPublicKey>,
+        destination_public_keys: &Vec<XfrPublicKey>,
 
-    ) -> Result<(ChaumPedersenCommitmentEqProofMultiple,
+    ) -> Result<(ChaumPedersenProofX,
                  Vec<CompressedRistretto>, Vec<Scalar>), ZeiError>
     {
         let num_output = destination_public_keys.len();
@@ -434,7 +434,7 @@ impl Tx{
 
 
     fn compute_signatures(
-        body: &TxBody, input: &[TxAddressParams]) -> Vec<ZeiSignature>
+        body: &TxBody, input: &[TxAddressParams]) -> Vec<XfrSignature>
     {
         let msg = serde_json::to_vec(body).unwrap();
         let mut signatures = vec![];
@@ -443,7 +443,7 @@ impl Tx{
             let pk = &input[i].public_key;
             if pk_set.contains(pk.as_bytes()) == false {
                 pk_set.insert(pk.as_bytes());
-                let sign = input[i].secret_key.as_ref().unwrap().sign::<blake2::Blake2b>(msg.as_slice(),
+                let sign = input[i].secret_key.as_ref().unwrap().sign(msg.as_slice(),
                                                                                             pk);
                 signatures.push(sign);
             }
@@ -455,7 +455,7 @@ impl Tx{
         source_info: Vec<TxPublicFields>,
         destination_info: Vec<TxOutput>,
         range_proof: Option<RangeProof>,
-        asset_proof: Option<ChaumPedersenCommitmentEqProofMultiple>,
+        asset_proof: Option<ChaumPedersenProofX>,
         ) -> TxBody
     {
         let confidential_amount = range_proof.is_some();
@@ -531,7 +531,7 @@ impl Tx{
             if pk_set.contains(pk.as_bytes()) == false {
                 pk_set.insert(pk.as_bytes());
 
-                if pk.verify::<blake2::Blake2b>(msg.as_slice(),&signatures[i]).is_err(){
+                if pk.verify(msg.as_slice(),&signatures[i]).is_err(){
                     return false;
                 }
             }
@@ -605,7 +605,7 @@ impl Tx{
 
     pub fn receiver_unlock_memo(
         lbox: &ZeiCipher,
-        sk: &ZeiSecretKey,
+        sk: &XfrSecretKey,
         confidential_amount: bool,
         confidential_asset: bool,
     ) -> Result<(Option<u64>, Option<Scalar>, Option<Scalar>), ZeiError>
@@ -649,7 +649,7 @@ fn smallest_greater_power_of_two(n: u32) -> u32{
 fn compute_asset_commitment<R>(
     csprng: &mut R,
     pc_gens: &PedersenGens,
-    address: &ZeiPublicKey,
+    address: &XfrPublicKey,
     asset_type: &str) -> Result<(RistrettoPoint,Scalar), ZeiError>
     where R:CryptoRng + Rng,
 {
@@ -659,7 +659,7 @@ fn compute_asset_commitment<R>(
     Ok((pc_gens.commit(asset_hash, blinding_factor), blinding_factor))
 }
 
-fn sample_blinding_factor<R>(csprng: &mut R, address: &ZeiPublicKey) -> Result<Scalar, ZeiError>
+fn sample_blinding_factor<R>(csprng: &mut R, address: &XfrPublicKey) -> Result<Scalar, ZeiError>
     where R: CryptoRng + Rng,
 {
     let blinding_key = Scalar::random(csprng);
@@ -676,12 +676,12 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::utils::compute_str_commitment;
-    use crate::keys::ZeiKeyPair;
+    use crate::keys::XfrKeyPair;
 
     fn build_address_params<R: CryptoRng + Rng>(prng: &mut R, amount: u64, asset: &str,
                                                 input: bool, //input or output
                                                 confidential_amount: bool,
-                                                confidential_asset: bool) -> (TxAddressParams, ZeiSecretKey) {
+                                                confidential_asset: bool) -> (TxAddressParams, XfrSecretKey) {
         let pc_gens = PedersenGens::default();
 
 
@@ -703,7 +703,7 @@ mod test {
             asset_type_commitment = Some(com.compress());
             asset_type_blinding = Some(blind);
         }
-        let key = ZeiKeyPair::generate(prng);
+        let key = XfrKeyPair::generate(prng);
 
         if input {
             sk = Some(key.get_sk());
@@ -733,7 +733,7 @@ mod test {
         let mut in_addrs = vec![];
         let mut out_addrs  = vec![];
         let out_amount = [1u64, 2u64, 3u64, 4u64];
-        let mut out_sks: Vec<ZeiSecretKey> = vec![];
+        let mut out_sks: Vec<XfrSecretKey> = vec![];
 
         for i in 0..num_inputs{
             let (addr,_) =
@@ -820,7 +820,7 @@ mod test {
         let mut in_addrs = vec![];
         let mut out_addrs  = vec![];
         let out_amount = [1u64, 2u64, 3u64, 4u64];
-        let mut out_sks: Vec<ZeiSecretKey> = vec![];
+        let mut out_sks: Vec<XfrSecretKey> = vec![];
 
         for i in 0..num_inputs{
             let (addr,_) =
@@ -899,7 +899,7 @@ mod test {
         let mut in_addrs = vec![];
         let mut out_addrs  = vec![];
         let out_amount = [1u64, 2u64, 3u64, 4u64];
-        let mut out_sks: Vec<ZeiSecretKey> = vec![];
+        let mut out_sks: Vec<XfrSecretKey> = vec![];
 
         for i in 0..num_inputs{
             let (addr,_) =

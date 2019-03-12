@@ -14,7 +14,9 @@ extern crate rand;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
+extern crate sha2;
 extern crate sodiumoxide;
+extern crate itertools;
 
 mod constants;
 mod encryption;
@@ -29,15 +31,4 @@ pub mod keys;
 pub mod proofs;
 pub mod serialization;
 pub mod utxo_transaction;
-
-// TODO(jackson): Real C bindings for zei
-use self::account::Account;
-use rand::rngs::OsRng;
-
-#[no_mangle]
-pub extern fn test_function() -> f32 {
-    let mut csprng: OsRng = OsRng::new().unwrap();
-    Account::new(&mut csprng);
-    42.0
-}
-
+pub mod transfers;
