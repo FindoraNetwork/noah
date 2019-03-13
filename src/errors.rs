@@ -5,7 +5,7 @@ use hex::FromHexError;
 use ed25519_dalek::errors::SignatureError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Error {
+pub enum ZeiError {
     //Invalid format is passed to function
     BadSecretError,
     BadBase58Format,
@@ -26,84 +26,84 @@ pub enum Error {
     XfrVerifyConfidentialAmountError,
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for ZeiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match self {
-            Error::BadSecretError => "Given Secret Key is not good",
-            Error::BadBase58Format => "Base58 string cannot be decoded",
-            Error::TxProofError => "Could not create transation due to range proof error",
-            Error::NotEnoughFunds => "There is not enough funds to make this transaction",
-            Error::DeserializationError => "Could not deserialize object",
-            Error::SerializationError => "Could not serialize object",
-            Error::DecryptionError => "Ciphertext failed authentication verification",
-            Error::NoneError => "Could not unwrap option due to None value",
-            Error::ParameterError => "Unexpected parameter for method or function",
-            Error::ProofError => "Invalid proof or bad proof parameters",
-            Error::SignatureError => "Signature verification failed",
-            Error::XfrVerifyAmountError => "Invalid amounts in non confidential amount transfer",
-            Error::XfrVerifyAssetError => "Invalid asset type in non confidential asset transfer",
-            Error::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
-            Error::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
-            Error::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
-            Error::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
+            ZeiError::BadSecretError => "Given Secret Key is not good",
+            ZeiError::BadBase58Format => "Base58 string cannot be decoded",
+            ZeiError::TxProofError => "Could not create transation due to range proof error",
+            ZeiError::NotEnoughFunds => "There is not enough funds to make this transaction",
+            ZeiError::DeserializationError => "Could not deserialize object",
+            ZeiError::SerializationError => "Could not serialize object",
+            ZeiError::DecryptionError => "Ciphertext failed authentication verification",
+            ZeiError::NoneError => "Could not unwrap option due to None value",
+            ZeiError::ParameterError => "Unexpected parameter for method or function",
+            ZeiError::ProofError => "Invalid proof or bad proof parameters",
+            ZeiError::SignatureError => "Signature verification failed",
+            ZeiError::XfrVerifyAmountError => "Invalid amounts in non confidential amount transfer",
+            ZeiError::XfrVerifyAssetError => "Invalid asset type in non confidential asset transfer",
+            ZeiError::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
+            ZeiError::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
+            ZeiError::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
+            ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
         })
     }
 }
 
-impl error::Error for Error {
+impl error::Error for ZeiError {
     fn description(&self) -> &str {
         match self {
-            Error::BadSecretError => "Given Secret Key is not good",
-            Error::BadBase58Format => "Base58 string cannot be decoded",
-            Error::TxProofError => "Could not create transation due to range proof error",
-            Error::NotEnoughFunds => "There is not enough funds to make this transaction",
-            Error::DeserializationError => "Could not deserialize object",
-            Error::SerializationError => "Could not serialize object",
-            Error::DecryptionError => "Could not decrypt message",
-            Error::NoneError => "Could not unwrap option due to None value",
-            Error::ParameterError => "Unexpected parameter for method or function",
-            Error::ProofError => "Invalid proof",
-            Error::SignatureError => "Signature verification failed",
-            Error::XfrVerifyAmountError => "Invalid amounts in non confidential transfer",
-            Error::XfrVerifyAssetError => "Invalid asset type in non confidential asset transfer",
-            Error::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
-            Error::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
-            Error::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
-            Error::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
+            ZeiError::BadSecretError => "Given Secret Key is not good",
+            ZeiError::BadBase58Format => "Base58 string cannot be decoded",
+            ZeiError::TxProofError => "Could not create transation due to range proof error",
+            ZeiError::NotEnoughFunds => "There is not enough funds to make this transaction",
+            ZeiError::DeserializationError => "Could not deserialize object",
+            ZeiError::SerializationError => "Could not serialize object",
+            ZeiError::DecryptionError => "Could not decrypt message",
+            ZeiError::NoneError => "Could not unwrap option due to None value",
+            ZeiError::ParameterError => "Unexpected parameter for method or function",
+            ZeiError::ProofError => "Invalid proof",
+            ZeiError::SignatureError => "Signature verification failed",
+            ZeiError::XfrVerifyAmountError => "Invalid amounts in non confidential transfer",
+            ZeiError::XfrVerifyAssetError => "Invalid asset type in non confidential asset transfer",
+            ZeiError::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
+            ZeiError::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
+            ZeiError::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
+            ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
         }
     }
 }
 
 
-impl From<FromHexError> for Error {
+impl From<FromHexError> for ZeiError {
     fn from(_error: FromHexError) -> Self {
-        Error::DeserializationError
+        ZeiError::DeserializationError
     }
 }
 
-impl From<serde_json::Error> for Error {
+impl From<serde_json::Error> for ZeiError {
     fn from(_error: serde_json::Error) -> Self {
-        Error::DeserializationError
+        ZeiError::DeserializationError
     }
 }
 
-impl From<bulletproofs::ProofError> for Error {
+impl From<bulletproofs::ProofError> for ZeiError {
     fn from(_error: bulletproofs::ProofError) -> Self {
-        Error::XfrVerifyConfidentialAmountError
+        ZeiError::XfrVerifyConfidentialAmountError
     }
 }
 
-impl From<std::option::NoneError> for Error {
+impl From<std::option::NoneError> for ZeiError {
     fn from(_error: std::option::NoneError) -> Self {
-        Error::NoneError
+        ZeiError::NoneError
     }
 }
 
-impl From<SignatureError> for Error {
-    fn from(_error: SignatureError) -> Self { Error::SignatureError }
+impl From<SignatureError> for ZeiError {
+    fn from(_error: SignatureError) -> Self { ZeiError::SignatureError }
 }
 
-impl From<rmp_serde::encode::Error> for Error {
-    fn from(_error: rmp_serde::encode::Error) -> Self { Error::SerializationError }
+impl From<rmp_serde::encode::Error> for ZeiError {
+    fn from(_error: rmp_serde::encode::Error) -> Self { ZeiError::SerializationError }
 }
 

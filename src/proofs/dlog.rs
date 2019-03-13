@@ -1,5 +1,5 @@
 use bulletproofs::PedersenGens;
-use crate::errors::Error as ZeiError;
+use crate::errors::ZeiError;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;

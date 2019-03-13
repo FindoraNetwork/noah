@@ -1,13 +1,13 @@
 use blake2::VarBlake2b;
 use blake2::digest::{Input, VariableOutput};
-use crate::errors::Error as ZeiError;
+use crate::errors::ZeiError;
 use crate::serialization;
 use curve25519_dalek::scalar::Scalar;
 use sodiumoxide::crypto::secretbox;
 use sodiumoxide::crypto::secretbox::{Nonce,Key};
 use rand::CryptoRng;
 use rand::Rng;
-use crate::keys::{XfrPublicKey, KEY_BASE_POINT, XfrSecretKey};
+use super::signatures::{XfrPublicKey, KEY_BASE_POINT, XfrSecretKey};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 
 
@@ -105,7 +105,7 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::keys::XfrKeyPair;
+    use super::super::signatures::XfrKeyPair;
 
 
     #[test]

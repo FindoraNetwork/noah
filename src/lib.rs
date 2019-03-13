@@ -20,16 +20,14 @@ extern crate itertools;
 extern crate rmp_serde;
 
 mod constants;
-mod encryption;
 mod errors;
 mod setup;
+mod basic_crypto;
 mod utils;
-
 
 pub mod account;
 pub mod address;
-pub mod keys;
-pub mod proofs;
 pub mod serialization;
-pub mod utxo_transaction;
+pub mod proofs;
 pub mod transfers;
+pub mod utxo_transaction;

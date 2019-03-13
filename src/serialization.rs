@@ -3,7 +3,7 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use crate::proofs::chaum_pedersen::ChaumPedersenProofX;
 use crate::proofs::chaum_pedersen::ChaumPedersenProof;
-use crate::keys::{XfrSignature, XfrPublicKey};
+use crate::basic_crypto::signatures::{XfrSignature, XfrPublicKey};
 use serde::Serialize;
 use serde::Deserialize;
 use serde::Deserializer;
@@ -295,7 +295,7 @@ pub mod option_bytes {
 
 #[cfg(test)]
 mod test {
-    use crate::keys::{XfrPublicKey, XfrKeyPair, XfrSignature};
+    use crate::basic_crypto::signatures::{XfrPublicKey, XfrKeyPair, XfrSignature};
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use rmp_serde::{Serializer, Deserializer};

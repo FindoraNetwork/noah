@@ -1,7 +1,7 @@
 use rand::CryptoRng;
 use crate::serialization::ZeiFromToBytes;
 use rand::Rng;
-use crate::errors::Error;
+use crate::errors::ZeiError;
 
 use ed25519_dalek::Signature;
 use ed25519_dalek::PublicKey;
@@ -11,7 +11,7 @@ use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::scalar::Scalar;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
-pub const XFR_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
+//pub const XFR_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
 
 pub const KEY_BASE_POINT: CompressedEdwardsY =
     curve25519_dalek::constants::ED25519_BASEPOINT_COMPRESSED;
@@ -34,13 +34,13 @@ pub struct XfrSignature(pub Signature);
 
 
 impl XfrPublicKey {
-    pub fn get_curve_point(&self) -> Result<EdwardsPoint, Error>{
+    pub fn get_curve_point(&self) -> Result<EdwardsPoint, ZeiError>{
         let pk_point = CompressedEdwardsY::from_slice(
             self.zei_to_bytes().as_slice()).decompress()?;
         Ok(pk_point)
     }
 
-    pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), Error>
+    pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), ZeiError>
     {
         Ok(self.0.verify::<HashFnc>(message, &signature.0)?)
     }
@@ -146,4 +146,31 @@ impl ZeiFromToBytes for XfrKeyPair {
             public: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..])
         }
     }
+}
+
+////Primitive for multisignatures /////
+///A multisignature is defined as a signature on a message that must verify against a list of public keys instead of one
+// naive implementation below
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub(crate) struct XfrMultiSig{
+    pub(crate) signatures: Vec<XfrSignature>,
+}
+
+pub(crate) fn verify_multisig(keylist: &[XfrPublicKey],
+                   message: &[u8],
+                   multi_signature: &XfrMultiSig) -> Result<(), ZeiError>
+{
+    for (pk, signature) in keylist.iter().zip(multi_signature.signatures.iter()){
+        pk.verify(message, signature)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
+    let mut signatures = vec![];
+    for keypair in keylist.iter(){
+        let signature = keypair.sign(message);
+        signatures.push(signature);
+    }
+    XfrMultiSig{signatures}
 }

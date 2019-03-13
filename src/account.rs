@@ -4,12 +4,11 @@ use curve25519_dalek::scalar::Scalar;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 
-use crate::keys::XfrPublicKey;
 use rand::CryptoRng;
 use rand::Rng;
 use crate::address;
 use crate::address::Address;
-use crate::errors::Error as ZeiError;
+use crate::errors::ZeiError;
 use std::collections::HashMap;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use crate::serialization;
@@ -19,10 +18,8 @@ use crate::utils::compute_str_ristretto_point_hash;
 use bulletproofs::PedersenGens;
 use crate::utxo_transaction::Tx;
 use crate::utxo_transaction::TxAddressParams;
-use crate::keys::XfrKeyPair;
-use crate::keys::XfrSecretKey;
+use crate::basic_crypto::signatures::{XfrKeyPair, XfrSignature, XfrSecretKey, XfrPublicKey};
 use crate::serialization::ZeiFromToBytes;
-use crate::keys::XfrSignature;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TxParams{

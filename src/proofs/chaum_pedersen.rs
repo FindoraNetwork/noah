@@ -1,5 +1,5 @@
 use bulletproofs::PedersenGens;
-use crate::errors::Error as ZeiError;
+use crate::errors::ZeiError;
 use crate::proofs::{compute_challenge, compute_sub_challenge};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::traits::Identity;

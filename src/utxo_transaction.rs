@@ -1,8 +1,8 @@
 use blake2::{Blake2b,Digest};
 use bulletproofs::{PedersenGens, RangeProof};
 use core::borrow::Borrow;
-use crate::errors::Error as ZeiError;
-use crate::encryption::ZeiCipher;
+use crate::errors::ZeiError;
+use crate::basic_crypto::hybrid_encryption::ZeiCipher;
 use crate::proofs::chaum_pedersen::{chaum_pedersen_prove_multiple_eq,
                                      chaum_pedersen_verify_multiple_eq,
                                     ChaumPedersenProofX};
@@ -17,10 +17,8 @@ use rand::CryptoRng;
 use rand::Rng;
 use std::collections::HashSet;
 use crate::utils::compute_str_scalar_hash;
-use crate::keys::XfrPublicKey;
-use crate::keys::XfrSecretKey;
+use crate::basic_crypto::signatures::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use crate::serialization::ZeiFromToBytes;
-use crate::keys::XfrSignature;
 use curve25519_dalek::edwards::EdwardsPoint;
 
 #[derive(Default, Serialize, Deserialize, Debug)]
@@ -677,7 +675,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::utils::compute_str_commitment;
-    use crate::keys::XfrKeyPair;
+    use crate::basic_crypto::signatures::XfrKeyPair;
 
     fn build_address_params<R: CryptoRng + Rng>(prng: &mut R, amount: u64, asset: &str,
                                                 input: bool, //input or output

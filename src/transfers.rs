@@ -1,14 +1,14 @@
 use sha2::{Sha512, Digest};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use crate::encryption::ZeiCipher;
+use crate::basic_crypto::hybrid_encryption::ZeiCipher;
 use curve25519_dalek::scalar::Scalar;
 use bulletproofs::{RangeProof, PedersenGens};
-use crate::keys::{XfrPublicKey, XfrSignature, XfrKeyPair, XfrSecretKey};
+use crate::basic_crypto::signatures::{XfrPublicKey, XfrKeyPair, XfrSecretKey, XfrMultiSig, sign_multisig, verify_multisig};
 use crate::utils::{u8_bigendian_slice_to_u128, smallest_greater_power_of_two, u8_bigendian_slice_to_u64, u64_to_bigendian_u8array};
 use rand::{CryptoRng, Rng};
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE};
 use crate::proofs::chaum_pedersen::{ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq};
-use crate::errors::Error as ZeiError;
+use crate::errors::ZeiError;
 use merlin::Transcript;
 use core::borrow::Borrow;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
@@ -33,33 +33,6 @@ pub struct XfrBody{
     pub(crate) outputs: Vec<BlindAssetRecord>,
     pub(crate) proofs: XfrProofs,
 }
-
-////Primitive for multisignatures /////
-///A multisignature is defined as a signature on a message that must verify against a list of public keys instead of one
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct XfrMultiSig{
-    pub(crate) signatures: Vec<XfrSignature>,
-}
-
-fn verify_multisig(keylist: &[XfrPublicKey],
-                         message: &[u8],
-                         multi_signature: &XfrMultiSig) -> Result<(), ZeiError>
-{
-    for (pk, signature) in keylist.iter().zip(multi_signature.signatures.iter()){
-        pk.verify(message, signature)?;
-    }
-    Ok(())
-}
-
-fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
-    let mut signatures = vec![];
-    for keypair in keylist.iter(){
-        let signature = keypair.sign(message);
-        signatures.push(signature);
-    }
-    XfrMultiSig{signatures}
-}
-
 
 /// I represent an Asset Record as presented in the public ledger.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -544,8 +517,8 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::keys::XfrKeyPair;
-    use crate::errors::Error::{XfrVerifyAmountError, XfrVerifyAssetError, XfrCreationAmountError, XfrCreationAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError};
+    use crate::basic_crypto::signatures::XfrKeyPair;
+    use crate::errors::ZeiError::{XfrVerifyAmountError, XfrVerifyAssetError, XfrCreationAmountError, XfrCreationAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError};
     use serde::ser::{Serialize};
     use serde::de::{Deserialize};
 

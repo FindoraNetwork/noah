@@ -11,9 +11,9 @@
 
 use blake2::VarBlake2b;
 use blake2::digest::{Input, VariableOutput};
-use crate::errors::Error as ZeiError;
+use crate::errors::ZeiError;
 use crate::utils::{from_base58, to_base58};
-use crate::keys::XfrPublicKey;
+use crate::basic_crypto::signatures::XfrPublicKey;
 use crate::serialization::ZeiFromToBytes;
 
 //Account Address is just its encoded public key
@@ -57,7 +57,7 @@ mod test {
     use super::*;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::keys::XfrKeyPair;
+    use crate::basic_crypto::signatures::XfrKeyPair;
 
 
     #[test]

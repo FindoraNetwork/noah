@@ -7,7 +7,7 @@ use num_bigint::Sign::Plus;
 
 use num_traits::{Zero};
 use num_traits::{FromPrimitive,ToPrimitive};
-use crate::errors::Error;
+use crate::errors::ZeiError;
 use blake2::{Blake2b, Digest};
 use rand::Rng;
 use rand::CryptoRng;
@@ -81,7 +81,7 @@ pub(crate) fn to_base58(data: &[u8]) -> String {
 
 }
 
-pub(crate) fn from_base58(data: &str) -> Result<Vec<u8>, Error>  {
+pub(crate) fn from_base58(data: &str) -> Result<Vec<u8>, ZeiError>  {
     /*
      * I convert a string in base58 format to bigendian vector of bytes.
      * Leading ones base58 chars in original strings are translates to leading 0u8 in results
@@ -103,7 +103,7 @@ pub(crate) fn from_base58(data: &str) -> Result<Vec<u8>, Error>  {
         let base58 = match BASE58_INVERSE[d as usize] {
           Some(x) => x as u32,
           None => {
-              return Err(Error::BadBase58Format);
+              return Err(ZeiError::BadBase58Format);
           }
         };
         big_int += &factor * base58;
