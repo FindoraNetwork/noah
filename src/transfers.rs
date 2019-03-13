@@ -17,6 +17,7 @@ use curve25519_dalek::traits::Identity;
 use itertools::Itertools;
 use serde::ser::Serialize;
 
+type AssetType = [u8;16];
 
 /// I represent a transfer note
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -64,7 +65,7 @@ fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct BlindAssetRecord{
     pub(crate) amount: Option<u64>, // None if confidential transfers
-    pub(crate) asset_type: Option<[u8;16]>, // None if confidential asset
+    pub(crate) asset_type: Option<AssetType>, // None if confidential asset
     //#[serde(with = "serialization::zei_obj_serde")]
     pub(crate) public_key: XfrPublicKey, // ownership address
     //#[serde(with = "serialization::option_bytes")]
@@ -82,14 +83,14 @@ pub struct OpenAssetRecord{
     pub(crate) asset_record: BlindAssetRecord, //TODO have a reference here, and lifetime parameter. We will avoid copying info unnecessarily.
     pub(crate) amount: u64,
     pub(crate) amount_blind: Scalar,
-    pub(crate) asset_type: [u8;16],
+    pub(crate) asset_type: AssetType,
     pub(crate) type_blind: Scalar,
 }
 
 /// I'am a plaintext asset record, used to indicate output information when creating a transfer note
 pub struct AssetRecord{
     pub(crate) amount: u64,
-    pub(crate) asset_type: [u8;16],
+    pub(crate) asset_type: AssetType,
     pub(crate) public_key: XfrPublicKey, // ownership address
 }
 
@@ -583,7 +584,7 @@ mod test {
     fn create_xfr(
         prng: &mut ChaChaRng,
         input_amounts: &[u64], output_amounts: &[u64],
-        asset_type: [u8;16],
+        asset_type: AssetType,
         confidential_amount: bool, confidential_asset: bool)
         -> (XfrNote, Vec<XfrKeyPair>, Vec<OpenAssetRecord>, Vec<AssetRecord>, Vec<XfrKeyPair>){
         let pc_gens = PedersenGens::default();
