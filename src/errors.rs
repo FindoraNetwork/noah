@@ -12,6 +12,7 @@ pub enum Error {
     TxProofError,
     NotEnoughFunds,
     DeserializationError,
+    SerializationError,
     DecryptionError,
     NoneError,
     ParameterError,
@@ -33,6 +34,7 @@ impl fmt::Display for Error {
             Error::TxProofError => "Could not create transation due to range proof error",
             Error::NotEnoughFunds => "There is not enough funds to make this transaction",
             Error::DeserializationError => "Could not deserialize object",
+            Error::SerializationError => "Could not serialize object",
             Error::DecryptionError => "Ciphertext failed authentication verification",
             Error::NoneError => "Could not unwrap option due to None value",
             Error::ParameterError => "Unexpected parameter for method or function",
@@ -56,6 +58,7 @@ impl error::Error for Error {
             Error::TxProofError => "Could not create transation due to range proof error",
             Error::NotEnoughFunds => "There is not enough funds to make this transaction",
             Error::DeserializationError => "Could not deserialize object",
+            Error::SerializationError => "Could not serialize object",
             Error::DecryptionError => "Could not decrypt message",
             Error::NoneError => "Could not unwrap option due to None value",
             Error::ParameterError => "Unexpected parameter for method or function",
@@ -98,5 +101,9 @@ impl From<std::option::NoneError> for Error {
 
 impl From<SignatureError> for Error {
     fn from(_error: SignatureError) -> Self { Error::SignatureError }
+}
+
+impl From<rmp_serde::encode::Error> for Error {
+    fn from(_error: rmp_serde::encode::Error) -> Self { Error::SerializationError }
 }
 

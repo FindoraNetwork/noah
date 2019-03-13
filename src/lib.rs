@@ -17,6 +17,7 @@ extern crate serde_json;
 extern crate sha2;
 extern crate sodiumoxide;
 extern crate itertools;
+extern crate rmp_serde;
 
 mod constants;
 mod encryption;

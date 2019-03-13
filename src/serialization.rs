@@ -3,14 +3,62 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use crate::proofs::chaum_pedersen::ChaumPedersenProofX;
 use crate::proofs::chaum_pedersen::ChaumPedersenProof;
-use crate::keys::XfrSignature;
+use crate::keys::{XfrSignature, XfrPublicKey};
 use serde::Serialize;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serializer;
 use curve25519_dalek::edwards::CompressedEdwardsY;
+use serde::de::{Visitor, SeqAccess};
+use ed25519_dalek::{PublicKey};
 
-// preferred approach for handling of fields of types that don't provide correct default serde serialize/deserialize
+impl Serialize for XfrPublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        serializer.serialize_bytes(self.as_bytes())
+    }
+}
+
+impl<'de> Deserialize<'de> for XfrPublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        struct XfrPublicKeyVisitor;
+
+        impl<'de> Visitor<'de> for XfrPublicKeyVisitor {
+            type Value = XfrPublicKey;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("CompressedEdwardsY ")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<XfrPublicKey, E>
+                where E: serde::de::Error
+            {
+                if v.len() == 32 {
+                    let mut bytes = [0u8;32];
+                    bytes.copy_from_slice(v);
+
+                    static ERRMSG: &'static str = "Bad public key encoding";
+
+                    let pk = match PublicKey::from_bytes(&bytes[..]){
+                        Ok(pk) => pk,
+                        Err(_) => {
+                            return Err(serde::de::Error::invalid_value( serde::de::Unexpected::Bytes(v),
+                            &ERRMSG));
+                        },
+                    };
+                    Ok(XfrPublicKey(pk))
+                } else {
+                    Err(serde::de::Error::invalid_length(v.len(), &self))
+                }
+            }
+        }
+
+        deserializer.deserialize_bytes(XfrPublicKeyVisitor)
+    }
+}
 
 /// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
 pub trait ZeiFromToBytes {
@@ -130,8 +178,36 @@ impl<'de> Deserialize<'de> for XfrSignature {
         where
             D: Deserializer<'de>
     {
-        let v = deserializer.deserialize_bytes(zei_obj_serde::BytesVisitor).unwrap();
-        Ok(XfrSignature::zei_from_bytes(v.as_slice()))
+        struct XfrSignatureVisitor;
+
+        impl<'de> Visitor<'de> for XfrSignatureVisitor {
+            type Value = XfrSignature;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a encoded Signature")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<XfrSignature, E>
+                where E: serde::de::Error
+            {
+                Ok(XfrSignature::zei_from_bytes(v))
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<XfrSignature, V::Error>
+                where V: SeqAccess<'de>,
+            {
+                let mut vec: Vec<u8> = vec![];
+                while let Some(x) = seq.next_element().unwrap() {
+                    vec.push(x);
+                }
+                Ok(XfrSignature::zei_from_bytes(vec.as_slice()))
+            }
+        }
+
+
+        //let v = deserializer.deserialize_bytes(zei_obj_serde::BytesVisitor).unwrap();
+        //Ok(XfrSignature::zei_from_bytes(v.as_slice()))
+        deserializer.deserialize_bytes(XfrSignatureVisitor)
     }
 }
 
@@ -159,6 +235,12 @@ pub mod zei_obj_serde {
             while let Some(x) = seq.next_element().unwrap() {
                 vec.push(x);
             }
+            Ok(vec)
+        }
+
+        fn visit_bytes<E>(self, v: &[u8]) -> Result<Vec<u8>, E>{
+            let mut vec: Vec<u8> = vec![];
+            vec.extend_from_slice(v);
             Ok(vec)
         }
     }
@@ -195,10 +277,10 @@ pub mod option_bytes {
             serializer.serialize_bytes(bytes.as_slice())
         }
     }
+
     pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
         where D: Deserializer<'de>, T: ZeiFromToBytes,
     {
-
         let vec: Option<Vec<u8>> = Option::deserialize(deserializer)?;
 
         if vec.is_some() {
@@ -208,5 +290,48 @@ pub mod option_bytes {
         else {
             Ok(None)
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::keys::{XfrPublicKey, XfrKeyPair, XfrSignature};
+    use rand_chacha::ChaChaRng;
+    use rand::SeedableRng;
+    use rmp_serde::{Serializer, Deserializer};
+    use serde::ser::Serialize;
+    use serde::de::Deserialize;
+
+    #[test]
+    fn public_key_message_pack_serialization(){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair = XfrKeyPair::generate(&mut prng);
+        let pk = keypair.get_pk_ref();
+
+        let mut pk_mp_vec = vec![];
+        assert_eq!(true, pk.serialize(&mut Serializer::new(&mut pk_mp_vec)).is_ok());
+        let mut de = Deserializer::new(&pk_mp_vec[..]);
+        let pk2: XfrPublicKey = Deserialize::deserialize(&mut de).unwrap();
+
+        assert_eq!(pk, &pk2);
+    }
+
+    #[test]
+    fn signature_message_pack_serialization(){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair = XfrKeyPair::generate(&mut prng);
+        let message = [10u8;55];
+
+        let signature = keypair.sign(&message);
+
+        let mut vec = vec![];
+        assert_eq!(true, signature.serialize(&mut Serializer::new(&mut vec)).is_ok());
+        
+        let mut de = Deserializer::new(&vec[..]);
+        let signature2  = XfrSignature::deserialize(&mut de).unwrap();
+
+        assert_eq!(signature, signature2);
     }
 }

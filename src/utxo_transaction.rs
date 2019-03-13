@@ -85,6 +85,7 @@ pub struct TxPublicFields {
 pub struct TxOutput {
     /// Output structure for output
     pub(crate) public: TxPublicFields,
+    //#[serde(with = "serialization::option_bytes")]
     pub(crate) lock_box: Option<ZeiCipher>,
 }
 
@@ -134,7 +135,7 @@ pub struct TxBody{
 pub struct Tx{
     /// Transaction structure
     pub body: TxBody,
-    signatures: Vec<XfrSignature>,
+    pub signatures: Vec<XfrSignature>,
 }
 
 impl Tx{
@@ -1023,9 +1024,23 @@ mod test {
                              &out_addrs,
                              true, false).unwrap();
 
+        let json = serde_json::to_string(&tx.signatures).unwrap();
+        let dsigs = serde_json::from_str::<Vec<XfrSignature>>(&json).unwrap();
+        assert_eq!(tx.signatures, dsigs);
+
+        let json = serde_json::to_string(&tx.body.proofs).unwrap();
+        let dproofs = serde_json::from_str::<TxProofs>(&json).unwrap();
+        assert_eq!(tx.body.proofs, dproofs);
+
+        let json = serde_json::to_string(&tx.body.input).unwrap();
+        let dinput = serde_json::from_str::<Vec<TxPublicFields>>(&json).unwrap();
+        assert_eq!(tx.body.input, dinput);
+
+        let json = serde_json::to_string(&tx.body.output).unwrap();
+        let doutput = serde_json::from_str::<Vec<TxOutput>>(&json).unwrap();
+        assert_eq!(tx.body.output, doutput);
+
         let json = serde_json::to_string(&tx).unwrap();
-
-
         let dtx = serde_json::from_str::<Tx>(&json).unwrap();
 
         assert_eq!(tx, dtx);

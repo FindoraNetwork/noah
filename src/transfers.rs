@@ -14,8 +14,8 @@ use core::borrow::Borrow;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{EdwardsPoint, CompressedEdwardsY};
 use curve25519_dalek::traits::Identity;
-use crate::serialization;
 use itertools::Itertools;
+use serde::ser::Serialize;
 
 
 /// I represent a transfer note
@@ -65,13 +65,13 @@ fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 pub struct BlindAssetRecord{
     pub(crate) amount: Option<u64>, // None if confidential transfers
     pub(crate) asset_type: Option<[u8;16]>, // None if confidential asset
-    #[serde(with = "serialization::zei_obj_serde")]
+    //#[serde(with = "serialization::zei_obj_serde")]
     pub(crate) public_key: XfrPublicKey, // ownership address
-    #[serde(with = "serialization::option_bytes")]
+    //#[serde(with = "serialization::option_bytes")]
     pub(crate) amount_commitment: Option<CompressedRistretto>, //None if not confidential transfer
-    #[serde(with = "serialization::option_bytes")]
+    //#[serde(with = "serialization::option_bytes")]
     pub(crate) asset_type_commitment: Option<CompressedRistretto>, //Noe if not confidential asset
-    #[serde(with = "serialization::zei_obj_serde")]
+    //#[serde(with = "serialization::zei_obj_serde")]
     pub(crate) blind_share:  CompressedEdwardsY, // Used by pukey holder to derive blinding factors
     pub(crate) lock_amount: Option<ZeiCipher>,  // If confidential transfer lock the amount to the pubkey in asset_record
     pub(crate) lock_type: Option<ZeiCipher>, // If confidential type lock the type to the public key in asset_record
@@ -96,9 +96,9 @@ pub struct AssetRecord{
 /// I contain the proofs of a transfer note
 #[derive(Serialize, Deserialize, Debug)]
 pub struct XfrProofs{
-    #[serde(with = "serialization::option_bytes")]
+    //#[serde(with = "serialization::option_bytes")]
     pub(crate) range_proof: Option<RangeProof>,
-    #[serde(with = "serialization::option_bytes")]
+    //#[serde(with = "serialization::option_bytes")]
     pub(crate) asset_proof: Option<ChaumPedersenProofX>
 }
 
@@ -169,7 +169,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(
         proofs: xfr_proofs,
     };
 
-    let multisig = compute_transfer_multisig(&body, input_keys);
+    let multisig = compute_transfer_multisig(&body, input_keys)?;
 
     Ok(XfrNote{body, multisig})
 }
@@ -286,19 +286,21 @@ fn check_assets(inputs: &[OpenAssetRecord], outputs: &[OpenAssetRecord]) -> bool
 }
 
 /// I compute a multisignature over the transfer's body
-fn compute_transfer_multisig(body: &XfrBody, keys: &[XfrKeyPair]) -> XfrMultiSig{
-    let body_json = serde_json::to_string(&body).unwrap();
-    sign_multisig(keys, body_json.as_bytes())
+fn compute_transfer_multisig(body: &XfrBody, keys: &[XfrKeyPair]) -> Result<XfrMultiSig, ZeiError>{
+    let mut vec = vec![];
+    body.serialize(&mut rmp_serde::Serializer::new(&mut vec))?;
+    Ok(sign_multisig(keys, vec.as_slice()))
 }
 
 /// I verify the transfer multisignature over the its body
 fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiError>{
-    let body_json = serde_json::to_string(&xfr_note.body)?;
+    let mut vec = vec![];
+    xfr_note.body.serialize(&mut rmp_serde::Serializer::new(&mut vec))?;
     let mut public_keys = vec![];
     for x in xfr_note.body.inputs.iter() {public_keys.push(x.public_key)}
     verify_multisig(
         public_keys.as_slice(),
-        body_json.as_bytes(),
+        vec.as_slice(),
         &xfr_note.multisig)
 }
 
@@ -543,6 +545,8 @@ mod test {
     use rand::SeedableRng;
     use crate::keys::XfrKeyPair;
     use crate::errors::Error::{XfrVerifyAmountError, XfrVerifyAssetError, XfrCreationAmountError, XfrCreationAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError};
+    use serde::ser::{Serialize};
+    use serde::de::{Deserialize};
 
     #[test]
     fn test_build_open_asset_record_not_confidential() {
@@ -678,7 +682,7 @@ mod test {
             xfr_note.body.outputs[3].amount = Some(0xFFFFFFFFFF);
             error = XfrVerifyAmountError;
         }
-        xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice());
+        xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
         assert_eq!(Err(error), verify_xfr_note(&xfr_note),
                    "Confidential transfer with invalid amounts should fail verification");
 
@@ -719,7 +723,7 @@ mod test {
             xfr_note.body.outputs[1].asset_type = Some([1u8;16]);
             error = XfrVerifyAssetError;
         }
-        xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice());
+        xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
         assert_eq!(Err(error), verify_xfr_note(&xfr_note),
                    "Transfer with different asset types should fail verification");
 
@@ -753,7 +757,7 @@ mod test {
             xfr_note.body.inputs[1].asset_type = Some([1u8;16]);
             error = XfrVerifyAssetError;
         }
-        xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice());
+        xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
         assert_eq!(Err(error), verify_xfr_note(&xfr_note),
                    "Confidential transfer with different asset types should fail verification ok");
     }
@@ -780,33 +784,6 @@ mod test {
     fn test_transfer_confidential() {
         /*! I test confidential amount and confidential asset transfers*/
         do_transfer_tests(true, true);
-    }
-
-    fn do_test_serialization(confidential_amount: bool, confidential_asset: bool){
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
-
-        let input_amount = [10u64, 20u64];
-        let out_amount = [1u64, 2u64, 1u64, 10u64, 3u64];
-
-        let (xfr_note, _,_,_,_)  = create_xfr(
-            &mut prng,
-            &input_amount,
-            &out_amount,
-            [0u8;16],
-            confidential_amount,
-            confidential_asset);
-        let json = serde_json::to_string(&xfr_note).unwrap();
-        let xfr_note_de = serde_json::from_str(&json).unwrap();
-        assert_eq!(xfr_note, xfr_note_de);
-    }
-
-    #[test]
-    fn test_serialization(){
-        do_test_serialization(false, false);
-        do_test_serialization(false, true);
-        do_test_serialization(true, false);
-        do_test_serialization(true, true);
     }
 
     fn do_test_transfer_multisig(confidential_amount: bool, confidential_asset: bool){
@@ -876,5 +853,58 @@ mod test {
         do_test_open_asset_record(true, false);
         do_test_open_asset_record(false, true);
         do_test_open_asset_record(true, true);
+    }
+
+    fn do_test_serialization(confidential_amount: bool, confidential_asset: bool){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let input_amount = [10u64, 20u64];
+        let out_amount = [1u64, 2u64, 1u64, 10u64, 3u64];
+
+        let (xfr_note, _,_,_,_)  = create_xfr(
+            &mut prng,
+            &input_amount,
+            &out_amount,
+            [0u8;16],
+            confidential_amount,
+            confidential_asset);
+
+        //serializing signatures
+        use rmp_serde::{Deserializer, Serializer};
+        let mut vec = vec![];
+        assert_eq!(true, xfr_note.multisig.serialize(&mut Serializer::new(&mut vec)).is_ok());
+        let mut de = Deserializer::new(&vec[..]);
+        let multisig_de: XfrMultiSig = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note.multisig, multisig_de);
+
+        //serializing proofs
+        let mut vec = vec![];
+        assert_eq!(true, xfr_note.body.proofs.serialize(&mut Serializer::new(&mut vec)).is_ok());
+        let mut de = Deserializer::new(&vec[..]);
+        let proofs_de = XfrProofs::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note.body.proofs, proofs_de);
+
+        //serializing body
+        let mut vec = vec![];
+        assert_eq!(true, xfr_note.body.serialize(&mut Serializer::new(&mut vec)).is_ok());
+        let mut de = Deserializer::new(&vec[..]);
+        let body_de = XfrBody::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note.body, body_de);
+
+        //serializing whole Xfr
+        let mut vec = vec![];
+        assert_eq!(true, xfr_note.serialize(&mut Serializer::new(&mut vec)).is_ok());
+        let mut de = Deserializer::new(&vec[..]);
+        let xfr_de = XfrNote::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note, xfr_de);
+    }
+
+    #[test]
+    fn test_serialization(){
+        do_test_serialization(false, false);
+        do_test_serialization(false, true);
+        do_test_serialization(true, false);
+        do_test_serialization(true, true);
     }
 }

@@ -18,7 +18,7 @@ pub const KEY_BASE_POINT: CompressedEdwardsY =
 
 
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
-pub struct XfrPublicKey(PublicKey);
+pub struct XfrPublicKey(pub PublicKey);
 #[derive(Default, Debug)]
 pub struct XfrSecretKey(SecretKey);
 #[derive(Default, Debug)]
