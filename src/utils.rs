@@ -46,7 +46,7 @@ static BASE58_INVERSE: [Option<u8>; 128] =  [
     None,     None,     None,     None      //124-127
 ];
 
-pub fn to_base58(data: &[u8]) -> String {
+pub(crate) fn to_base58(data: &[u8]) -> String {
     /*
      * I convert a u8 slice @data into a base58 string.
      * @data is read as a Bigendian big integer.
@@ -81,7 +81,7 @@ pub fn to_base58(data: &[u8]) -> String {
 
 }
 
-pub fn from_base58(data: &str) -> Result<Vec<u8>, Error>  {
+pub(crate) fn from_base58(data: &str) -> Result<Vec<u8>, Error>  {
     /*
      * I convert a string in base58 format to bigendian vector of bytes.
      * Leading ones base58 chars in original strings are translates to leading 0u8 in results
@@ -125,7 +125,7 @@ pub fn from_base58(data: &str) -> Result<Vec<u8>, Error>  {
     Ok(vec)
 }
 
-pub fn u32_to_bigendian_u8array(n: u32) -> [u8;4]{
+pub(crate) fn u32_to_bigendian_u8array(n: u32) -> [u8;4]{
     let mut array = [0u8;4];
     array[0] = ((n>>24)&0xFF) as u8;
     array[1] = ((n>>16)&0xFF) as u8;
@@ -135,7 +135,7 @@ pub fn u32_to_bigendian_u8array(n: u32) -> [u8;4]{
 
 }
 
-pub fn u64_to_bigendian_u8array(n: u64) -> [u8;8]{
+pub(crate) fn u64_to_bigendian_u8array(n: u64) -> [u8;8]{
     let mut array = [0u8;8];
     array[0] = ((n>>56)&0xFF) as u8;
     array[1] = ((n>>48)&0xFF) as u8;
@@ -149,6 +149,7 @@ pub fn u64_to_bigendian_u8array(n: u64) -> [u8;8]{
 
 }
 
+/*
 pub fn u128_to_bigendian_u8array(n: u128) -> [u8;16]{
     let mut array = [0u8;16];
     array[0] = ((n>>120)&0xFF) as u8;
@@ -168,10 +169,10 @@ pub fn u128_to_bigendian_u8array(n: u128) -> [u8;16]{
     array[14] = ((n>>8)&0xFF) as u8;
     array[15] = (n & 0xFF) as u8;
     array
-
 }
+*/
 
-pub fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128{
+pub(crate) fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128{
     u128::from(array[0]) << 120 |
         u128::from(array[1]) << 112 |
         u128::from(array[2]) << 104 |
@@ -190,7 +191,7 @@ pub fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128{
         u128::from(array[15])
 }
 
-pub fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64{
+pub(crate) fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64{
     u64::from(array[0]) << 56 |
         u64::from(array[1]) << 48 |
         u64::from(array[2]) << 40 |
@@ -201,15 +202,16 @@ pub fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64{
         u64::from(array[7])
 }
 
-
+/*
 pub fn u8_bigendian_slice_to_u32(array: &[u8; 4]) -> u32{
         ((u32::from(array[0]))<<24) +
         ((u32::from(array[1]))<<16) +
         ((u32::from(array[2]))<<8) +
         (u32::from(array[3]))
 }
+*/
 
-pub fn compute_str_commitment<R: Rng + CryptoRng>(rng: &mut R, s: &str) -> (RistrettoPoint,Scalar) {
+pub(crate) fn compute_str_commitment<R: Rng + CryptoRng>(rng: &mut R, s: &str) -> (RistrettoPoint,Scalar) {
     let mut hash = Blake2b::new();
     hash.input(s);
 
@@ -220,14 +222,14 @@ pub fn compute_str_commitment<R: Rng + CryptoRng>(rng: &mut R, s: &str) -> (Rist
 
 }
 
-pub fn compute_str_ristretto_point_hash(s: &str) -> RistrettoPoint {
+pub(crate) fn compute_str_ristretto_point_hash(s: &str) -> RistrettoPoint {
     let mut hash = Blake2b::new();
     hash.input(s);
 
     RistrettoPoint::from_hash(hash)
 }
 
-pub fn compute_str_scalar_hash(s: &str) -> Scalar {
+pub(crate) fn compute_str_scalar_hash(s: &str) -> Scalar {
     let mut hash = Blake2b::new();
     hash.input(s);
 
@@ -268,13 +270,14 @@ mod test {
         assert_eq!(0x73, n_array[3]);
     }
 
+    /*
     #[test]
     fn test_u8_bigendian_slice_to_u32(){
         let array = [0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8];
         let n = u8_bigendian_slice_to_u32(&array);
         assert_eq!(0xFA01C673, n);
     }
-
+    */
     #[test]
     fn test_u64_to_bignedian_u8array(){
         let n:u64 = 0xFA01C67322E498A2;
