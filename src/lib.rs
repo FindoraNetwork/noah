@@ -25,9 +25,6 @@ mod setup;
 mod basic_crypto;
 mod utils;
 
-pub mod account;
-pub mod address;
 pub mod serialization;
 pub mod proofs;
 pub mod transfers;
-pub mod utxo_transaction;

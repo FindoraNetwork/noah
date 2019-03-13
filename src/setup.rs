@@ -12,7 +12,7 @@ pub struct PublicParams {
 }
 
 pub const BULLET_PROOF_RANGE: usize = 64;
-pub type Balance = u64;
+//pub type Balance = u64;
 
 //TODO: make balance 32bits via (u32, u32) and BULLET_PROOF_RANGE 64
 
