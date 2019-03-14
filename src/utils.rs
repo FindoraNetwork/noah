@@ -1,6 +1,6 @@
 // Utility functions
 
-
+/// I convert a u32 into a 4 bytes array (bigendian)
 pub(crate) fn u32_to_bigendian_u8array(n: u32) -> [u8;4]{
     let mut array = [0u8;4];
     array[0] = ((n>>24)&0xFF) as u8;
@@ -11,6 +11,7 @@ pub(crate) fn u32_to_bigendian_u8array(n: u32) -> [u8;4]{
 
 }
 
+/// I convert a u64 into a 8 bytes array (bigendian)
 pub(crate) fn u64_to_bigendian_u8array(n: u64) -> [u8;8]{
     let mut array = [0u8;8];
     array[0] = ((n>>56)&0xFF) as u8;
@@ -48,6 +49,7 @@ pub fn u128_to_bigendian_u8array(n: u128) -> [u8;16]{
 }
 */
 
+/// I convert a 16 byte array into a u128 (bigendian)
 pub(crate) fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128{
     u128::from(array[0]) << 120 |
         u128::from(array[1]) << 112 |
@@ -67,6 +69,7 @@ pub(crate) fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128{
         u128::from(array[15])
 }
 
+/// I convert a 8 byte array into a u64 (bigendian)
 pub(crate) fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64{
     u64::from(array[0]) << 56 |
         u64::from(array[1]) << 48 |
@@ -78,8 +81,9 @@ pub(crate) fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64{
         u64::from(array[7])
 }
 
+/// I compute the minimum power of two that is greater or equal to the input
 #[inline]
-pub(crate) fn smallest_greater_power_of_two(n: u32) -> u32{
+pub(crate) fn min_greater_equal_power_of_two(n: u32) -> u32{
     2.0f64.powi((n as f64).log2().ceil() as i32) as u32
 }
 
@@ -222,13 +226,11 @@ mod test {
 
 #[cfg(test)]
 mod test {
-    use crate::utils::*;
-
 
     #[test]
-    fn test_u32_to_bignedian_u8array(){
+    fn u32_to_bignedian_u8array(){
         let n:u32 = 0xFA01C673;
-        let n_array = u32_to_bigendian_u8array(n);
+        let n_array = super::u32_to_bigendian_u8array(n);
         assert_eq!(0xFA, n_array[0]);
         assert_eq!(0x01, n_array[1]);
         assert_eq!(0xC6, n_array[2]);
@@ -244,9 +246,9 @@ mod test {
     }
     */
     #[test]
-    fn test_u64_to_bignedian_u8array(){
+    fn u64_to_bignedian_u8array(){
         let n:u64 = 0xFA01C67322E498A2;
-        let n_array = u64_to_bigendian_u8array(n);
+        let n_array = super::u64_to_bigendian_u8array(n);
         assert_eq!(0xFA, n_array[0]);
         assert_eq!(0x01, n_array[1]);
         assert_eq!(0xC6, n_array[2]);
@@ -258,9 +260,24 @@ mod test {
     }
 
     #[test]
-    fn test_u8_bigendian_slice_to_u64(){
+    fn u8_bigendian_slice_to_u64(){
         let array = [0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8, 0x22, 0xE4, 0x98, 0xA2];
-        let n = u8_bigendian_slice_to_u64(&array);
+        let n = super::u8_bigendian_slice_to_u64(&array);
         assert_eq!(0xFA01C67322E498A2, n);
+    }
+
+    #[test]
+    fn min_greater_equal_power_of_two(){
+        assert_eq!(16, super::min_greater_equal_power_of_two(16));
+        assert_eq!(16, super::min_greater_equal_power_of_two(15));
+        assert_eq!(16, super::min_greater_equal_power_of_two(9));
+        assert_eq!(8, super::min_greater_equal_power_of_two(8));
+        assert_eq!(8, super::min_greater_equal_power_of_two(6));
+        assert_eq!(8, super::min_greater_equal_power_of_two(5));
+        assert_eq!(4, super::min_greater_equal_power_of_two(4));
+        assert_eq!(4, super::min_greater_equal_power_of_two(3));
+        assert_eq!(2, super::min_greater_equal_power_of_two(2));
+        assert_eq!(1, super::min_greater_equal_power_of_two(1));
+        assert_eq!(0, super::min_greater_equal_power_of_two(0));
     }
 }

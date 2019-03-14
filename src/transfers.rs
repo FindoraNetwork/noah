@@ -4,7 +4,7 @@ use crate::basic_crypto::hybrid_encryption::{ZeiHybridCipher, hybrid_encrypt, hy
 use curve25519_dalek::scalar::Scalar;
 use bulletproofs::{RangeProof, PedersenGens};
 use crate::basic_crypto::signatures::{XfrPublicKey, XfrKeyPair, XfrSecretKey, XfrMultiSig, sign_multisig, verify_multisig};
-use crate::utils::{u8_bigendian_slice_to_u128, smallest_greater_power_of_two, u8_bigendian_slice_to_u64, u64_to_bigendian_u8array};
+use crate::utils::{u8_bigendian_slice_to_u128, min_greater_equal_power_of_two, u8_bigendian_slice_to_u64, u64_to_bigendian_u8array};
 use rand::{CryptoRng, Rng};
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE};
 use crate::proofs::chaum_pedersen::{ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq};
@@ -157,7 +157,7 @@ fn range_proof(
     -> Result<RangeProof, ZeiError>
 {
     let num_output = outputs.len();
-    let upper_power2 = smallest_greater_power_of_two((num_output + 1) as u32) as usize;
+    let upper_power2 = min_greater_equal_power_of_two((num_output + 1) as u32) as usize;
     let mut params = PublicParams::new(upper_power2);
 
     //build values vector (out amounts + amount difference)
@@ -301,7 +301,7 @@ pub fn verify_xfr_note(xfr_note: &XfrNote) -> Result<(), ZeiError>{
 
 fn verify_confidential_amount(xfr_body: &XfrBody) -> Result<(), ZeiError> {
     let num_output = xfr_body.outputs.len();
-    let upper_power2 = smallest_greater_power_of_two((num_output + 1) as u32) as usize;
+    let upper_power2 = min_greater_equal_power_of_two((num_output + 1) as u32) as usize;
 
     let params = PublicParams::new(upper_power2);
     let mut transcript = Transcript::new(b"Zei Range Proof");
