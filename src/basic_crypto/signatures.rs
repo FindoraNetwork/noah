@@ -19,9 +19,9 @@ pub const KEY_BASE_POINT: CompressedEdwardsY =
 
 
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
-pub struct XfrPublicKey(pub PublicKey);
+pub struct XfrPublicKey(pub(crate) PublicKey);
 #[derive(Default, Debug)]
-pub struct XfrSecretKey(SecretKey);
+pub struct XfrSecretKey(pub(crate) SecretKey);
 #[derive(Default, Debug)]
 pub struct XfrKeyPair {
     public: XfrPublicKey,
@@ -237,7 +237,7 @@ mod test {
         }
         v
     }
-    
+
     #[test]
     fn multisig(){
         let mut prng = rand_chacha::ChaChaRng::from_seed([1u8;32]);

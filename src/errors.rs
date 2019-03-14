@@ -7,6 +7,7 @@ use ed25519_dalek::errors::SignatureError;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ZeiError {
     //Invalid format is passed to function
+    DecompressElementError,
     BadSecretError,
     BadBase58Format,
     TxProofError,
@@ -29,6 +30,7 @@ pub enum ZeiError {
 impl fmt::Display for ZeiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match self {
+            ZeiError::DecompressElementError => "Could not decompress group Element",
             ZeiError::BadSecretError => "Given Secret Key is not good",
             ZeiError::BadBase58Format => "Base58 string cannot be decoded",
             ZeiError::TxProofError => "Could not create transation due to range proof error",
@@ -53,6 +55,7 @@ impl fmt::Display for ZeiError {
 impl error::Error for ZeiError {
     fn description(&self) -> &str {
         match self {
+            ZeiError::DecompressElementError => "Could not decompress group Element",
             ZeiError::BadSecretError => "Given Secret Key is not good",
             ZeiError::BadBase58Format => "Base58 string cannot be decoded",
             ZeiError::TxProofError => "Could not create transation due to range proof error",

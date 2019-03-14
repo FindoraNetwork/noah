@@ -1,6 +1,6 @@
 use sha2::{Sha512, Digest};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use crate::basic_crypto::hybrid_encryption::ZeiCipher;
+use crate::basic_crypto::hybrid_encryption::{ZeiHybridCipher, hybrid_encrypt, hybrid_decrypt};
 use curve25519_dalek::scalar::Scalar;
 use bulletproofs::{RangeProof, PedersenGens};
 use crate::basic_crypto::signatures::{XfrPublicKey, XfrKeyPair, XfrSecretKey, XfrMultiSig, sign_multisig, verify_multisig};
@@ -47,8 +47,8 @@ pub struct BlindAssetRecord{
     pub(crate) asset_type_commitment: Option<CompressedRistretto>, //Noe if not confidential asset
     //#[serde(with = "serialization::zei_obj_serde")]
     pub(crate) blind_share:  CompressedEdwardsY, // Used by pukey holder to derive blinding factors
-    pub(crate) lock_amount: Option<ZeiCipher>,  // If confidential transfer lock the amount to the pubkey in asset_record
-    pub(crate) lock_type: Option<ZeiCipher>, // If confidential type lock the type to the public key in asset_record
+    pub(crate) lock_amount: Option<ZeiHybridCipher>,  // If confidential transfer lock the amount to the pubkey in asset_record
+    pub(crate) lock_type: Option<ZeiHybridCipher>, // If confidential type lock the type to the public key in asset_record
 }
 
 /// I'm a BlindAssetRecors with revealed commitment openings.
@@ -395,7 +395,7 @@ fn build_open_asset_record<R: CryptoRng + Rng>(
     let (bar_amount, bar_amount_commitment,amount_blind)
         = match confidential_amount{
             true => {
-                lock_amount = Some(ZeiCipher::encrypt(
+                lock_amount = Some(hybrid_encrypt(
                     prng,
                     &asset_record.public_key,
                     &u64_to_bigendian_u8array(asset_record.amount)).unwrap());
@@ -412,8 +412,8 @@ fn build_open_asset_record<R: CryptoRng + Rng>(
     let (bar_type, bar_type_commitment, type_blind)
         = match confidential_asset{
         true => {
-            lock_type = Some(ZeiCipher::encrypt(prng, &asset_record.public_key,
-                                             &asset_record.asset_type).unwrap());
+            lock_type = Some(hybrid_encrypt(prng, &asset_record.public_key,
+                                            &asset_record.asset_type).unwrap());
 
             let type_blind = compute_blind_factor(&derived_point, "asset_type");
             let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type[..]);
@@ -485,7 +485,7 @@ pub fn open_asset_record(
     let type_blind;
     let shared_point = derive_point_from_blind_share(&input.blind_share, secret_key)?;
     if confidential_amount{
-        let amount_bytes = input.lock_amount.as_ref().unwrap().decrypt(secret_key)?;
+        let amount_bytes = hybrid_decrypt(input.lock_amount.as_ref().unwrap(), secret_key)?;
         amount = u8_bigendian_slice_to_u64(amount_bytes.as_slice());
         amount_blind = compute_blind_factor(&shared_point, "amount");
     }
@@ -495,7 +495,7 @@ pub fn open_asset_record(
     }
 
     if confidential_asset{
-        asset_type.copy_from_slice(input.lock_type.as_ref().unwrap().decrypt(secret_key)?.as_slice());
+        asset_type.copy_from_slice(hybrid_decrypt(input.lock_type.as_ref().unwrap(), secret_key)?.as_slice());
         type_blind = compute_blind_factor(&shared_point, "asset_type");
     }
     else{
