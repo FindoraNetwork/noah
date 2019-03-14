@@ -41,7 +41,6 @@ pub fn hybrid_encrypt<R: CryptoRng + Rng>(
 /// I decrypt a hybrid ciphertext for a secret key.
 /// In case of success, I return vector of plain text bytes. Otherwise, I return either
 /// ZeiError::DecompressElementError or Zei::DecryptionError
-//TODO specify errors returned
 pub fn hybrid_decrypt(ctext: &ZeiHybridCipher, secret_key: &XfrSecretKey)
     -> Result<Vec<u8>, ZeiError>
 {
