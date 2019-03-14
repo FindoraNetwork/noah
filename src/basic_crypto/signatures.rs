@@ -28,8 +28,7 @@ pub struct XfrKeyPair {
     secret: XfrSecretKey,
 }
 
-//type HashFnc = sha2::Sha512;
-type HashFnc = blake2::Blake2b;
+type HashFnc = sha2::Sha512;
 #[derive(Debug, Eq, PartialEq)]
 pub struct XfrSignature(pub Signature);
 
