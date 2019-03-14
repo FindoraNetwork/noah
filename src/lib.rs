@@ -1,5 +1,3 @@
-#![feature(try_trait)]
-
 extern crate bulletproofs;
 extern crate curve25519_dalek;
 extern crate ed25519_dalek;

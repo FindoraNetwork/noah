@@ -459,7 +459,8 @@ fn sample_point_and_blind_share<R: CryptoRng + Rng>(prng: &mut R, public_key: &X
 fn derive_point_from_blind_share(blind_share: &CompressedEdwardsY, secret_key: &XfrSecretKey)
     -> Result<CompressedEdwardsY, ZeiError>{
 
-    let blind_share_decompressed = blind_share.decompress()?;
+    let blind_share_decompressed = blind_share.decompress().
+        ok_or(ZeiError::DecompressElementError)?;
     Ok(secret_key.as_scalar_multiply_by_curve_point(&blind_share_decompressed).compress())
 }
 

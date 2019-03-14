@@ -35,9 +35,8 @@ pub struct XfrSignature(pub Signature);
 
 impl XfrPublicKey {
     pub fn get_curve_point(&self) -> Result<EdwardsPoint, ZeiError>{
-        let pk_point = CompressedEdwardsY::from_slice(
-            self.zei_to_bytes().as_slice()).decompress()?;
-        Ok(pk_point)
+        CompressedEdwardsY::from_slice(self.zei_to_bytes().as_slice()).decompress().
+            ok_or(ZeiError::DecompressElementError)
     }
 
     pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), ZeiError>

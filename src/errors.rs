@@ -15,7 +15,7 @@ pub enum ZeiError {
     DeserializationError,
     SerializationError,
     DecryptionError,
-    NoneError,
+    IndexError,
     ParameterError,
     ProofError, //TODO need better/fine grained  proof error handling
     SignatureError,
@@ -38,7 +38,7 @@ impl fmt::Display for ZeiError {
             ZeiError::DeserializationError => "Could not deserialize object",
             ZeiError::SerializationError => "Could not serialize object",
             ZeiError::DecryptionError => "Ciphertext failed authentication verification",
-            ZeiError::NoneError => "Could not unwrap option due to None value",
+            ZeiError::IndexError => "Index out of bounds",
             ZeiError::ParameterError => "Unexpected parameter for method or function",
             ZeiError::ProofError => "Invalid proof or bad proof parameters",
             ZeiError::SignatureError => "Signature verification failed",
@@ -63,7 +63,7 @@ impl error::Error for ZeiError {
             ZeiError::DeserializationError => "Could not deserialize object",
             ZeiError::SerializationError => "Could not serialize object",
             ZeiError::DecryptionError => "Could not decrypt message",
-            ZeiError::NoneError => "Could not unwrap option due to None value",
+            ZeiError::IndexError => "Index out of bounds",
             ZeiError::ParameterError => "Unexpected parameter for method or function",
             ZeiError::ProofError => "Invalid proof",
             ZeiError::SignatureError => "Signature verification failed",
@@ -93,12 +93,6 @@ impl From<serde_json::Error> for ZeiError {
 impl From<bulletproofs::ProofError> for ZeiError {
     fn from(_error: bulletproofs::ProofError) -> Self {
         ZeiError::XfrVerifyConfidentialAmountError
-    }
-}
-
-impl From<std::option::NoneError> for ZeiError {
-    fn from(_error: std::option::NoneError) -> Self {
-        ZeiError::NoneError
     }
 }
 

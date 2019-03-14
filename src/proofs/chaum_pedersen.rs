@@ -92,10 +92,10 @@ pub fn chaum_pedersen_verify_eq(
      in case of verification failure, and Err(Error::DeserializationError) in case some CompressedRistretto can not be
      decompressed*/
 
-    let c1_d = c1.decompress()?;
-    let c2_d = c2.decompress()?;
-    let c3_d = proof.c3.decompress()?;
-    let c4_d = proof.c4.decompress()?;
+    let c1_d = c1.decompress().ok_or(ZeiError::DecompressElementError)?;
+    let c2_d = c2.decompress().ok_or(ZeiError::DecompressElementError)?;
+    let c3_d = proof.c3.decompress().ok_or(ZeiError::DecompressElementError)?;
+    let c4_d = proof.c4.decompress().ok_or(ZeiError::DecompressElementError)?;
     let z1 = proof.z1;
     let z2 = proof.z2;
     let z3 = proof.z3;
@@ -143,15 +143,17 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     let k = compute_challenge(commitments);
     let mut d = RistrettoPoint::identity();
     let mut z = Scalar::from(0u8);
-    let c1 = commitments.get(0)?;
-    let c1_decompressed = (*c1).decompress()?;
-    let r1 = blinding_factors.get(0)?;
+    let c1 = commitments.get(0).ok_or(ZeiError::IndexError)?;
+    let c1_decompressed = (*c1).decompress().
+        ok_or(ZeiError::DecompressElementError)?;
+    let r1 = blinding_factors.get(0).ok_or(ZeiError::IndexError)?;
     for i in 3..commitments.len(){
-        let ci = commitments.get(i)?;
+        let ci = commitments.get(i).ok_or(ZeiError::IndexError)?;
         let ai = compute_sub_challenge(&k, i as u32);
-        let ci_decompressed = ci.decompress()?;
+        let ci_decompressed = ci.decompress().
+            ok_or(ZeiError::DecompressElementError)?;
         let di = ai * (c1_decompressed - ci_decompressed);
-        let ri = blinding_factors.get(i)?;
+        let ri = blinding_factors.get(i).ok_or(ZeiError::IndexError)?;
         let zi = ai * (*r1 - *ri);
         d = d + di;
         z = z + zi;
@@ -184,12 +186,13 @@ pub fn chaum_pedersen_verify_multiple_eq(
      */
     let k = compute_challenge(commitments);
     let mut d = RistrettoPoint::identity();
-    let c1 = commitments.get(0)?;
-    let c1_decompressed = c1.decompress()?;
+    let c1 = commitments.get(0).ok_or(ZeiError::IndexError)?;
+    let c1_decompressed = c1.decompress().ok_or(ZeiError::DecompressElementError)?;
     for i in 3..commitments.len(){
-        let ci = commitments.get(i)?;
+        let ci = commitments.get(i).ok_or(ZeiError::IndexError)?;
         let ai = compute_sub_challenge(&k, i as u32);
-        let ci_decompressed = ci.decompress()?;
+        let ci_decompressed = ci.decompress().
+            ok_or(ZeiError::DecompressElementError)?;
         let di = ai * (c1_decompressed - ci_decompressed);
         d = d + di;
     }

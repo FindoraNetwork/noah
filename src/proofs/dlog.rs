@@ -41,8 +41,9 @@ pub fn verify_proof_of_knowledge_dlog(
     let challenge = compute_challenge(
         &[base.compress(), proof.proof_commitment, *point]);
 
-    let dpoint = point.decompress()?;
-    let dproof_commit = proof.proof_commitment.decompress()?;
+    let dpoint = point.decompress().ok_or(ZeiError::DecompressElementError)?;
+    let dproof_commit = proof.proof_commitment.decompress().
+        ok_or(ZeiError::DecompressElementError)?;
 
     let vrfy_ok = proof.response * base == challenge * dpoint + dproof_commit;
 
@@ -86,9 +87,12 @@ pub fn verify_multiple_knowledge_dlog(
     let mut context = vec![base_compressed, proof.proof_commitment];
     context.extend_from_slice(points);
     let challenge = compute_challenge(context.as_slice());
-    let mut check = proof.proof_commitment.decompress()?;
-    for i in 0..points.len() {let challenge_i = compute_sub_challenge(&challenge, i as u32);
-        check = check + challenge_i * points[i].decompress()?;
+    let mut check = proof.proof_commitment.decompress().
+        ok_or(ZeiError::DecompressElementError)?;
+    for i in 0..points.len() {
+        let challenge_i = compute_sub_challenge(&challenge, i as u32);
+        check = check + challenge_i * points[i].decompress().
+            ok_or(ZeiError::DecompressElementError)?;
     }
     Ok(check == proof.response * base)
 
@@ -115,8 +119,10 @@ pub fn dlog_based_prove_commitment_eq<R: CryptoRng + Rng>(
      * and Err(Error::DeserializationError) in case a Ristretto points cannot be decompressed.
      */
 
-    let src = source_asset_commitment.decompress()?;
-    let dst = destination_asset_commitment.decompress()?;
+    let src = source_asset_commitment.decompress().
+        ok_or(ZeiError::DecompressElementError)?;
+    let dst = destination_asset_commitment.decompress().
+        ok_or(ZeiError::DecompressElementError)?;
     let point = src - dst;
 
     let dlog = source_blinding_factor - destination_blinding_factor;
@@ -138,8 +144,10 @@ pub fn dlog_based_verify_commitment_eq(
      * and Err(Error::DeserializationError) in case a Ristretto points cannot be decompressed.
      */
 
-    let src = source_asset_commitment.decompress()?;
-    let dst = destination_asset_commitment.decompress()?;
+    let src = source_asset_commitment.decompress().
+        ok_or(ZeiError::DecompressElementError)?;
+    let dst = destination_asset_commitment.decompress().
+        ok_or(ZeiError::DecompressElementError)?;
 
     let point = src - dst;
     verify_proof_of_knowledge_dlog(&pedersen_gens.B_blinding, &point.compress(), proof)
