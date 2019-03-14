@@ -169,7 +169,7 @@ fn range_proof(
         in_total - out_total
     }
     else {
-        return Err(ZeiError::TxProofError);
+        return Err(ZeiError::RangeProofProveError);
     };
     let mut values = vec![];
     values.extend_from_slice(out_amounts.as_slice());
@@ -190,13 +190,16 @@ fn range_proof(
         blindings.push(Scalar::default());
     }
 
-    let (proof,_) = RangeProof::prove_multiple(
+    let (proof,_)  = match RangeProof::prove_multiple(
         &params.bp_gens,
         &params.pc_gens,
         &mut params.transcript,
         values.as_slice(),
         blindings.as_slice(),
-        BULLET_PROOF_RANGE)?;
+        BULLET_PROOF_RANGE){
+        Ok(x) => x,
+        Err(_) => { return Err(ZeiError::RangeProofProveError);},
+        };
 
     Ok(proof)
 }
