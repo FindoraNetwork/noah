@@ -19,7 +19,6 @@ extern crate sodiumoxide;
 extern crate itertools;
 extern crate rmp_serde;
 
-mod constants;
 mod errors;
 mod setup;
 mod basic_crypto;
