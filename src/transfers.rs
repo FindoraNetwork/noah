@@ -6,7 +6,7 @@ use bulletproofs::{RangeProof, PedersenGens};
 use crate::basic_crypto::signatures::{XfrPublicKey, XfrKeyPair, XfrSecretKey, XfrMultiSig, sign_multisig, verify_multisig};
 use crate::utils::{u8_bigendian_slice_to_u128, min_greater_equal_power_of_two, u8_bigendian_slice_to_u64, u64_to_bigendian_u8array};
 use rand::{CryptoRng, Rng};
-use crate::setup::{PublicParams, BULLET_PROOF_RANGE};
+use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::proofs::chaum_pedersen::{ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq};
 use crate::errors::ZeiError;
 use merlin::Transcript;
@@ -16,6 +16,8 @@ use curve25519_dalek::edwards::{EdwardsPoint, CompressedEdwardsY};
 use curve25519_dalek::traits::Identity;
 use itertools::Itertools;
 use serde::ser::Serialize;
+
+//TODO: make amounts 64bits via (u32, u32)
 
 type AssetType = [u8;16];
 
@@ -158,7 +160,10 @@ fn range_proof(
 {
     let num_output = outputs.len();
     let upper_power2 = min_greater_equal_power_of_two((num_output + 1) as u32) as usize;
-    let mut params = PublicParams::new(upper_power2);
+    if upper_power2 > MAX_PARTY_NUMBER {
+        return Err(ZeiError::RangeProofProveError);
+    }
+    let mut params = PublicParams::new();
 
     //build values vector (out amounts + amount difference)
     let in_amounts:Vec<u64> = inputs.iter().map(|x| x.amount).collect();
@@ -306,7 +311,11 @@ fn verify_confidential_amount(xfr_body: &XfrBody) -> Result<(), ZeiError> {
     let num_output = xfr_body.outputs.len();
     let upper_power2 = min_greater_equal_power_of_two((num_output + 1) as u32) as usize;
 
-    let params = PublicParams::new(upper_power2);
+    if upper_power2 > MAX_PARTY_NUMBER {
+        return Err(ZeiError::XfrVerifyConfidentialAmountError);
+    }
+
+    let params = PublicParams::new();
     let mut transcript = Transcript::new(b"Zei Range Proof");
 
     let input_com: Vec<RistrettoPoint> = xfr_body.inputs.iter().
@@ -328,15 +337,16 @@ fn verify_confidential_amount(xfr_body: &XfrBody) -> Result<(), ZeiError> {
         range_coms.push(CompressedRistretto::identity());
     }
 
-    xfr_body.proofs.range_proof.
-        as_ref().unwrap().verify_multiple(
+    match xfr_body.proofs.range_proof. as_ref().unwrap().verify_multiple(
         &params.bp_gens,
         &params.pc_gens,
         &mut transcript,
         range_coms.as_slice(),
-        BULLET_PROOF_RANGE)?;
-
-    Ok(())
+        BULLET_PROOF_RANGE)
+        {
+            Ok(()) => Ok(()),
+            Err(_) => Err(ZeiError::XfrVerifyConfidentialAmountError),
+        }
 }
 
 fn verify_plain_amounts(xfr_body: &XfrBody) -> Result<(), ZeiError>{

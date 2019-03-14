@@ -70,12 +70,6 @@ impl From<serde_json::Error> for ZeiError {
     }
 }
 
-impl From<bulletproofs::ProofError> for ZeiError {
-    fn from(_error: bulletproofs::ProofError) -> Self {
-        ZeiError::XfrVerifyConfidentialAmountError
-    }
-}
-
 impl From<SignatureError> for ZeiError {
     fn from(_error: SignatureError) -> Self { ZeiError::SignatureError }
 }
