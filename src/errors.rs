@@ -1,11 +1,8 @@
-//Zei error types
-
 use std::{fmt, error};
 use ed25519_dalek::errors::SignatureError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ZeiError {
-    //Invalid format is passed to function
     DecompressElementError,
     RangeProofProveError,
     DeserializationError,
