@@ -132,24 +132,30 @@ impl ZeiFromToBytes for ChaumPedersenProof {
         }
     }
 }
+
 impl ZeiFromToBytes for ChaumPedersenProofX {
     fn zei_to_bytes(&self) -> Vec<u8> {
         let mut v = vec![];
         v.extend_from_slice(&self.c1_eq_c2.zei_to_bytes());
-        v.extend_from_slice(&self.zero.zei_to_bytes());
+        if self.zero.is_some(){
+            v.extend_from_slice(&self.zero.as_ref().unwrap().zei_to_bytes());
+        }
         v
     }
     fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenProofX {
         let c1_eq_c2 =
             ChaumPedersenProof::zei_from_bytes(&bytes[0..32*5]);
-        let zero =
-            ChaumPedersenProof::zei_from_bytes(&bytes[32*5..]);
+        let mut zero = None;
+        if bytes.len() > 32*5 {
+            zero = Some(ChaumPedersenProof::zei_from_bytes(&bytes[32*5..]));
+        }
         ChaumPedersenProofX {
             c1_eq_c2,
             zero
         }
     }
 }
+
 
 impl ZeiFromToBytes for XfrSignature {
     fn zei_to_bytes(&self) -> Vec<u8> {
