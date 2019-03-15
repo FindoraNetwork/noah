@@ -5,6 +5,7 @@ use ed25519_dalek::errors::SignatureError;
 pub enum ZeiError {
     DecompressElementError,
     RangeProofProveError,
+    RangeProofVerifyError,
     DeserializationError,
     SerializationError,
     DecryptionError,
@@ -24,6 +25,7 @@ impl fmt::Display for ZeiError {
         f.write_str(match self {
             ZeiError::DecompressElementError => "Could not decompress group Element",
             ZeiError::RangeProofProveError => "Could not create range proof due to incorrect input or parameters",
+            ZeiError::RangeProofVerifyError => "Range proof invalid for input commitments or parameters",
             ZeiError::DeserializationError => "Could not deserialize object",
             ZeiError::SerializationError => "Could not serialize object",
             ZeiError::DecryptionError => "Ciphertext failed authentication verification",
@@ -45,6 +47,7 @@ impl error::Error for ZeiError {
         match self {
             ZeiError::DecompressElementError => "Could not decompress group Element",
             ZeiError::RangeProofProveError => "Could not create range proof due to incorrect input or parameters",
+            ZeiError::RangeProofVerifyError => "Range proof invalid for input commitments or parameters",
             ZeiError::DeserializationError => "Could not deserialize object",
             ZeiError::SerializationError => "Could not serialize object",
             ZeiError::DecryptionError => "Could not decrypt message",
