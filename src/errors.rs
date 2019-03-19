@@ -18,6 +18,8 @@ pub enum ZeiError {
     XfrCreationAmountError,
     XfrCreationAssetError,
     XfrVerifyConfidentialAmountError,
+    ElGamalVerificationError,
+    ElGamalDecryptionError,
 }
 
 impl fmt::Display for ZeiError {
@@ -38,6 +40,8 @@ impl fmt::Display for ZeiError {
             ZeiError::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
             ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
+            ZeiError::ElGamalVerificationError => "ElGamal Ciphertext not valid for proposed scalar message",
+            ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
         })
     }
 }
@@ -60,6 +64,8 @@ impl error::Error for ZeiError {
             ZeiError::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
             ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
+            ZeiError::ElGamalVerificationError => "ElGamal Ciphertext not valid for proposed scalar message",
+            ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
         }
     }
 }
