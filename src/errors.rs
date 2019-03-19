@@ -20,6 +20,7 @@ pub enum ZeiError {
     XfrVerifyConfidentialAmountError,
     ElGamalVerificationError,
     ElGamalDecryptionError,
+    VerifyPedersenElGamalEqError,
 }
 
 impl fmt::Display for ZeiError {
@@ -42,6 +43,7 @@ impl fmt::Display for ZeiError {
             ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
             ZeiError::ElGamalVerificationError => "ElGamal Ciphertext not valid for proposed scalar message",
             ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
+            ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
         })
     }
 }
@@ -66,6 +68,7 @@ impl error::Error for ZeiError {
             ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
             ZeiError::ElGamalVerificationError => "ElGamal Ciphertext not valid for proposed scalar message",
             ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
+            ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
         }
     }
 }

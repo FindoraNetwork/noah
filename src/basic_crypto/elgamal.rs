@@ -11,6 +11,12 @@ pub struct ElGamalPublicKey(pub(crate) CompressedRistretto);  //PK = sk*G
 #[derive(Debug, PartialEq, Eq)]
 pub struct ElGamalSecretKey(pub(crate) Scalar); //sk
 
+impl ElGamalPublicKey{
+    pub fn get_curve_point(&self) -> RistrettoPoint{
+        (self.0).decompress().unwrap()
+    }
+}
+
 pub fn elgamal_generate_secret_key<R:CryptoRng + Rng>(prng: &mut R) -> ElGamalSecretKey{
     ElGamalSecretKey(Scalar::random(prng))
 }
@@ -25,8 +31,8 @@ pub fn elgamal_derive_public_key(
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ElGamalCiphertext {
-    e1: CompressedRistretto, //r*G
-    e2: CompressedRistretto, //m*G + r*PK
+    pub(crate) e1: CompressedRistretto, //r*G
+    pub(crate) e2: CompressedRistretto, //m*G + r*PK
 }
 
 impl Serialize for ElGamalPublicKey {
