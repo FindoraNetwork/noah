@@ -5,7 +5,10 @@ use rand::{CryptoRng, Rng};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Visitor, SeqAccess};
 
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct ElGamalPublicKey(pub(crate) CompressedRistretto);  //PK = sk*G
+#[derive(Debug, PartialEq, Eq)]
 pub struct ElGamalSecretKey(pub(crate) Scalar); //sk
 
 pub fn elgamal_generate_secret_key<R:CryptoRng + Rng>(prng: &mut R) -> ElGamalSecretKey{
@@ -25,6 +28,97 @@ pub struct ElGamalCiphertext {
     e1: CompressedRistretto, //r*G
     e2: CompressedRistretto, //m*G + r*PK
 }
+
+impl Serialize for ElGamalPublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_bytes(self.0.as_bytes())
+    }
+}
+
+impl<'de> Deserialize<'de> for ElGamalPublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>
+    {
+        struct ElGamalVisitor;
+
+        impl<'de> Visitor<'de> for ElGamalVisitor {
+            type Value = ElGamalPublicKey;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a encoded ElGamalPublicKey (Compressed Ristretto")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalPublicKey, E>
+                where E: serde::de::Error
+            {
+                Ok(ElGamalPublicKey(CompressedRistretto::from_slice(v)))
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalPublicKey, V::Error>
+                where V: SeqAccess<'de>,
+            {
+                let mut vec: Vec<u8> = vec![];
+                while let Some(x) = seq.next_element().unwrap() {
+                    vec.push(x);
+                }
+                Ok(ElGamalPublicKey(CompressedRistretto::from_slice(vec.as_slice())))
+            }
+        }
+        deserializer.deserialize_bytes(ElGamalVisitor)
+    }
+}
+
+impl Serialize for ElGamalSecretKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_bytes(self.0.as_bytes())
+    }
+}
+
+impl<'de> Deserialize<'de> for ElGamalSecretKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>
+    {
+        struct ElGamalVisitor;
+
+        impl<'de> Visitor<'de> for ElGamalVisitor {
+            type Value = ElGamalSecretKey;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a encoded ElGamalPublicKey (Compressed Ristretto")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalSecretKey, E>
+                where E: serde::de::Error
+            {
+                let mut bytes = [0u8;32];
+                bytes.copy_from_slice(v);
+                Ok(ElGamalSecretKey(Scalar::from_bits(bytes)))
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalSecretKey, V::Error>
+                where V: SeqAccess<'de>,
+            {
+                let mut bytes = [0u8;32];
+                let mut i = 0;
+                while let Some(x) = seq.next_element().unwrap() {
+                    bytes[i] = x;
+                    i += 1;
+                }
+                Ok(ElGamalSecretKey(Scalar::from_bits(bytes)))
+            }
+        }
+        deserializer.deserialize_bytes(ElGamalVisitor)
+    }
+}
+
 
 impl Serialize for ElGamalCiphertext {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -164,7 +258,7 @@ mod test{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::errors::ZeiError;
-    use crate::basic_crypto::elgamal::ElGamalCiphertext;
+    use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalSecretKey, ElGamalPublicKey};
     use serde::ser::Serialize;
     use serde::de::Deserialize;
     use rmp_serde::Deserializer;
@@ -225,6 +319,17 @@ mod test{
         let secret_key = super::elgamal_generate_secret_key(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
+        //keys serialization
+        let json_str = serde_json::to_string(&secret_key).unwrap();
+        let sk_de: ElGamalSecretKey = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(secret_key, sk_de);
+
+        let json_str = serde_json::to_string(&public_key).unwrap();
+        let pk_de: ElGamalPublicKey = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(public_key, pk_de);
+
+
+        //ciphertext serialization
         let m = Scalar::from(100u32);
         let r = Scalar::random(&mut prng);
 
@@ -243,6 +348,21 @@ mod test{
         let secret_key = super::elgamal_generate_secret_key(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
+        //keys serialization
+        let mut vec = vec![];
+        secret_key.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        let mut de = Deserializer::new(&vec[..]);
+        let sk_de: ElGamalSecretKey = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(secret_key, sk_de);
+
+        //public key serialization
+        let mut vec = vec![];
+        public_key.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        let mut de = Deserializer::new(&vec[..]);
+        let pk_de: ElGamalPublicKey = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(public_key, pk_de);
+
+        //ciphertext serialization
         let m = Scalar::from(100u32);
         let r = Scalar::random(&mut prng);
 
