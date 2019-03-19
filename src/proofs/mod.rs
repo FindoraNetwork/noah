@@ -1,7 +1,7 @@
 pub mod chaum_pedersen;
 pub mod dlog;
 pub mod solvency;
-pub mod pedersen_elgmal;
+pub mod pedersen_elgamal;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;

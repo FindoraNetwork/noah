@@ -4,6 +4,7 @@ use crate::errors::ZeiError;
 use rand::{CryptoRng, Rng};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Visitor, SeqAccess};
+use crate::serialization::ZeiFromToBytes;
 
 
 #[derive(Debug, PartialEq, Eq)]
@@ -33,6 +34,21 @@ pub fn elgamal_derive_public_key(
 pub struct ElGamalCiphertext {
     pub(crate) e1: CompressedRistretto, //r*G
     pub(crate) e2: CompressedRistretto, //m*G + r*PK
+}
+
+impl ZeiFromToBytes for ElGamalCiphertext{
+    fn zei_to_bytes(&self) -> Vec<u8>{
+        let mut v  = vec![];
+        v.extend_from_slice(self.e1.as_bytes());
+        v.extend_from_slice(self.e2.as_bytes());
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> Self{
+        ElGamalCiphertext{
+            e1: CompressedRistretto::from_slice(&bytes[..32]),
+            e2: CompressedRistretto::from_slice(&bytes[32..]),
+        }
+    }
 }
 
 impl Serialize for ElGamalPublicKey {
