@@ -8,18 +8,6 @@ use curve25519_dalek::scalar::Scalar;
 use crate::utils::u32_to_bigendian_u8array;
 use sha2::Digest;
 
-fn compute_challenge_ref(context: &[&CompressedRistretto]) -> Scalar {
-    /*! I compute zk challenges for Dlog based proof. The challenge is a hash of the
-    current context of the proof*/
-    let mut hasher = sha2::Sha512::new();
-
-    for point in context.iter() {
-        hasher.input(*point.as_bytes());
-    }
-
-    Scalar::from_hash(hasher)
-}
-
 fn compute_challenge(context: &[CompressedRistretto]) -> Scalar {
     /*! I compute zk challenges for Dlog based proof. The challenge is a hash of the
     current context of the proof*/

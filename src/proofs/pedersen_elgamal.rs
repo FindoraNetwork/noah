@@ -4,10 +4,28 @@ use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPu
 use rand::{CryptoRng, Rng};
 use bulletproofs::PedersenGens;
 use crate::errors::ZeiError;
-use crate::proofs::{compute_challenge_ref};
+use crate::proofs::compute_challenge;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Visitor, SeqAccess};
 use crate::serialization::ZeiFromToBytes;
+
+/*
+ * This file implements a Chaum-Pedersen proof of equality of
+ * a commitment C = m*G + r*H, and ciphertext E = (r*G, m*G + r*PK)
+
+ * Proof algorithm:
+   a) Sample random scalars r1, r2
+   b) Compute commitment on r1 using r2 as randomness: C1 = r1*G + r2*H
+   c) Compute encryption of r1 using r2 as randomness: E1 = (r2*G, r1*G + r2*PK)
+   d) Compute challenge c = HASH(C, E, C1, E1)
+   e) Compute response z1 = cm + r1, z2 = cr + r2
+   f) Output proof = C1,E1,z1,z2
+
+ * Verify algorithm:
+   a) Compute challenge c = HASH(C, E, C, E)
+   b) Output Ok iff C1 + c * C == z1 * G + z2 * H
+          and       E1 + c * E == (z2 * G, z1 * pc_gens.B + z2 * PK)
+ */
 
 pub const PEDERSEN_ELGAMAL_EQ_PROOF_LEN: usize = 96 + ELGAMAL_CTEXT_LEN;
 
@@ -101,7 +119,7 @@ pub fn pedersen_elgamal_eq_prove<R: CryptoRng + Rng>(
     let pc_gens = PedersenGens::default();
     let com = pc_gens.commit(r1, r2);
     let enc = elgamal_encrypt(&pc_gens.B, &r1, &r2, public_key).unwrap();
-    let c = compute_challenge_ref(&[&ctext.e1, &ctext.e2, commitment, &enc.e1, &enc.e2, &com.compress()]);
+    let c = compute_challenge(&[ctext.e1, ctext.e2, *commitment, enc.e1, enc.e2, com.compress()]);
     let z1 = c * m + r1;
     let z2 = c * r + r2;
 
@@ -119,7 +137,7 @@ pub fn pedersen_elgamal_eq_verify(
 ) -> Result<(), ZeiError>
 {
     let pc_gens = PedersenGens::default();
-    let c = compute_challenge_ref(&[&ctext.e1, &ctext.e2, commitment, &proof.e1.e1, &proof.e1.e2, &proof.c1]);
+    let c = compute_challenge(&[ctext.e1, ctext.e2, *commitment, proof.e1.e1, proof.e1.e2, proof.c1]);
 
     // decompress input values
     let enc_e1 = ctext.e1.decompress().ok_or(ZeiError::DecompressElementError)?;
