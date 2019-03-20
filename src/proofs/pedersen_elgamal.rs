@@ -1,6 +1,6 @@
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::{CompressedRistretto};
-use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPublicKey};
+use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPublicKey, ELGAMAL_CTEXT_LEN};
 use rand::{CryptoRng, Rng};
 use bulletproofs::PedersenGens;
 use crate::errors::ZeiError;
@@ -8,6 +8,8 @@ use crate::proofs::{compute_challenge_ref};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Visitor, SeqAccess};
 use crate::serialization::ZeiFromToBytes;
+
+pub const PEDERSEN_ELGAMAL_EQ_PROOF_LEN: usize = 96 + ELGAMAL_CTEXT_LEN;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct PedersenElGamalEqProof{
@@ -17,17 +19,35 @@ pub struct PedersenElGamalEqProof{
     c1: CompressedRistretto, // r_1*g + r_2*H
 }
 
+impl ZeiFromToBytes for PedersenElGamalEqProof{
+    fn zei_to_bytes(&self) -> Vec<u8>{
+        let mut v = vec![];
+        v.extend_from_slice(self.z1.as_bytes());
+        v.extend_from_slice(self.z2.as_bytes());
+        let mut e1_vec = self.e1.zei_to_bytes();
+        v.append(&mut e1_vec);
+        v.extend_from_slice(self.c1.as_bytes());
+        v
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> Self{
+        let mut array = [0u8;32];
+        array.copy_from_slice(&bytes[..32]);
+        let z1 = Scalar::from_bits(array);
+        array.copy_from_slice(&bytes[32..64]);
+        let z2 = Scalar::from_bits(array);
+        let e1 = ElGamalCiphertext::zei_from_bytes(&bytes[64..64 + ELGAMAL_CTEXT_LEN]);
+        let c1 = CompressedRistretto::from_slice(&bytes[64 + ELGAMAL_CTEXT_LEN..]);
+
+        PedersenElGamalEqProof{ z1,z2,e1,c1}
+    }
+}
+
 impl Serialize for PedersenElGamalEqProof {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer
     {
-        let mut v = vec![];
-        v.extend_from_slice(self.z1.as_bytes());
-        v.extend_from_slice(self.z2.as_bytes());
-        v.extend_from_slice(self.e1.zei_to_bytes().as_slice());
-        v.extend_from_slice(self.c1.as_bytes());
-        serializer.serialize_bytes(v.as_slice())
+        serializer.serialize_bytes(self.zei_to_bytes().as_slice())
     }
 }
 
@@ -48,21 +68,7 @@ impl<'de> Deserialize<'de> for PedersenElGamalEqProof {
             fn visit_bytes<E>(self, v: &[u8]) -> Result<PedersenElGamalEqProof, E>
                 where E: serde::de::Error
             {
-                let mut bytes = [0u8;32];
-                bytes.copy_from_slice(&v[0..32]);
-                let z1 = Scalar::from_bits(bytes);
-                bytes.copy_from_slice(&v[32..32*2]);
-                let z2 = Scalar::from_bits(bytes);
-
-                let e1 = ElGamalCiphertext::zei_from_bytes(&v[32*2..32*4]);
-                let c1 = CompressedRistretto::from_slice(&v[32*4..]);
-
-                Ok(PedersenElGamalEqProof{
-                    z1,
-                    z2,
-                    e1,
-                    c1,
-                })
+                Ok(PedersenElGamalEqProof::zei_from_bytes(v))
             }
 
             fn visit_seq<V>(self, mut seq: V) -> Result<PedersenElGamalEqProof, V::Error>
@@ -72,21 +78,7 @@ impl<'de> Deserialize<'de> for PedersenElGamalEqProof {
                 while let Some(x) = seq.next_element().unwrap() {
                     vec.push(x);
                 }
-                let mut bytes = [0u8;32];
-                bytes.copy_from_slice(&vec[0..32]);
-                let z1 = Scalar::from_bits(bytes);
-                bytes.copy_from_slice(&vec[32..32*2]);
-                let z2 = Scalar::from_bits(bytes);
-
-                let e1 = ElGamalCiphertext::zei_from_bytes(&vec[32*2..32*4]);
-                let c1 = CompressedRistretto::from_slice(&vec[32*4..]);
-
-                Ok(PedersenElGamalEqProof{
-                    z1,
-                    z2,
-                    e1,
-                    c1,
-                })
+                Ok(PedersenElGamalEqProof::zei_from_bytes(vec.as_slice()))
             }
         }
         deserializer.deserialize_bytes(ProofVisitor)

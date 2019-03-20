@@ -30,6 +30,8 @@ pub fn elgamal_derive_public_key(
     ElGamalPublicKey((base * secret_key.0).compress())
 }
 
+pub const ELGAMAL_CTEXT_LEN: usize = 64; //2 compressed ristretto points
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ElGamalCiphertext {
     pub(crate) e1: CompressedRistretto, //r*G
@@ -147,10 +149,8 @@ impl Serialize for ElGamalCiphertext {
         where
             S: Serializer
     {
-        let mut v = vec![];
-        v.extend_from_slice(self.e1.as_bytes());
-        v.extend_from_slice(self.e2.as_bytes());
-        serializer.serialize_bytes(v.as_slice())
+
+        serializer.serialize_bytes(self.zei_to_bytes().as_slice())
     }
 }
 
@@ -171,10 +171,7 @@ impl<'de> Deserialize<'de> for ElGamalCiphertext {
             fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalCiphertext, E>
                 where E: serde::de::Error
             {
-                Ok(ElGamalCiphertext{
-                    e1: CompressedRistretto::from_slice(&v[0..32]),
-                    e2: CompressedRistretto::from_slice(&v[32..]),
-                })
+                Ok(ElGamalCiphertext::zei_from_bytes(v))
             }
 
             fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalCiphertext, V::Error>
@@ -184,10 +181,7 @@ impl<'de> Deserialize<'de> for ElGamalCiphertext {
                 while let Some(x) = seq.next_element().unwrap() {
                     vec.push(x);
                 }
-                Ok(ElGamalCiphertext{
-                    e1: CompressedRistretto::from_slice(&vec[0..32]),
-                    e2: CompressedRistretto::from_slice(&vec[32..]),
-                })
+                Ok(ElGamalCiphertext::zei_from_bytes(vec.as_slice()))
             }
         }
         deserializer.deserialize_bytes(ElGamalVisitor)
