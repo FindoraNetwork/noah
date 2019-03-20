@@ -29,7 +29,7 @@ use crate::serialization::ZeiFromToBytes;
 
 pub const PEDERSEN_ELGAMAL_EQ_PROOF_LEN: usize = 96 + ELGAMAL_CTEXT_LEN;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PedersenElGamalEqProof{
     z1: Scalar, // c*m + r_1
     z2: Scalar, // c*r + r_2

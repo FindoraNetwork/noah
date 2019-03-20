@@ -11,12 +11,14 @@ pub enum ZeiError {
     DecryptionError,
     IndexError,
     ParameterError,
+    InconsistentStructureError,
     SignatureError,
     XfrVerifyAmountError,
     XfrVerifyAssetError,
     XfrVerifyConfidentialAssetError,
     XfrCreationAmountError,
     XfrCreationAssetError,
+    XfrVerifyIssuerTrackingAssetTypeError,
     XfrVerifyConfidentialAmountError,
     ElGamalVerificationError,
     ElGamalDecryptionError,
@@ -38,12 +40,14 @@ impl fmt::Display for ZeiError {
             ZeiError::XfrVerifyAmountError => "Invalid amounts in non confidential amount transfer",
             ZeiError::XfrVerifyAssetError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
+            ZeiError::XfrVerifyIssuerTrackingAssetTypeError => "Asset Tracking error. Asset commitment and asset ciphertext do not match.",
             ZeiError::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
             ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
             ZeiError::ElGamalVerificationError => "ElGamal Ciphertext not valid for proposed scalar message",
             ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
             ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
+            ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
         })
     }
 }
@@ -63,12 +67,14 @@ impl error::Error for ZeiError {
             ZeiError::XfrVerifyAmountError => "Invalid amounts in non confidential transfer",
             ZeiError::XfrVerifyAssetError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
+            ZeiError::XfrVerifyIssuerTrackingAssetTypeError => "Asset Tracking error. Asset commitment and asset ciphertext do not match.",
             ZeiError::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
             ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
             ZeiError::ElGamalVerificationError => "ElGamal Ciphertext not valid for proposed scalar message",
             ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
             ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
+            ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
         }
     }
 }

@@ -7,7 +7,7 @@ use serde::de::{Visitor, SeqAccess};
 use crate::serialization::ZeiFromToBytes;
 
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ElGamalPublicKey(pub(crate) CompressedRistretto);  //PK = sk*G
 #[derive(Debug, PartialEq, Eq)]
 pub struct ElGamalSecretKey(pub(crate) Scalar); //sk
@@ -32,7 +32,7 @@ pub fn elgamal_derive_public_key(
 
 pub const ELGAMAL_CTEXT_LEN: usize = 64; //2 compressed ristretto points
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ElGamalCiphertext {
     pub(crate) e1: CompressedRistretto, //r*G
     pub(crate) e2: CompressedRistretto, //m*G + r*PK
