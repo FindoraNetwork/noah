@@ -87,6 +87,10 @@ pub(crate) fn min_greater_equal_power_of_two(n: u32) -> u32{
     2.0f64.powi((n as f64).log2().ceil() as i32) as u32
 }
 
+pub(crate) fn u64_to_u32_pair(x: u64) -> (u32,u32)
+{
+    ((x & 0xFFFFFFFF) as u32, (x >> 32) as u32)
+}
 
 /*
 // **base58 translation functions**
@@ -279,5 +283,12 @@ mod test {
         assert_eq!(2, super::min_greater_equal_power_of_two(2));
         assert_eq!(1, super::min_greater_equal_power_of_two(1));
         assert_eq!(0, super::min_greater_equal_power_of_two(0));
+    }
+
+    #[test]
+    fn u64_to_u32_pair(){
+        assert_eq!((32,0), super::u64_to_u32_pair(32u64));
+        assert_eq!((0xFFFFFFFF,0xFFFFFFFF), super::u64_to_u32_pair(0xFFFFFFFFFFFFFFFFu64));
+        assert_eq!((0,0xFFFFFFFF), super::u64_to_u32_pair(0xFFFFFFFF00000000u64));
     }
 }

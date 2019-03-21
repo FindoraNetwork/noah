@@ -11,7 +11,7 @@ pub struct PublicParams {
     pub transcript: Transcript,
 }
 
-pub const BULLET_PROOF_RANGE: usize = 64;
+pub const BULLET_PROOF_RANGE: usize = 32;
 pub const MAX_PARTY_NUMBER: usize = 32;
 
 //gens_capacity ->
