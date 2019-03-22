@@ -1045,12 +1045,18 @@ mod test {
         }
         // test bad asset tracking
         if asset_tracking && confidential_asset {
-            let old_enc = xfr_note.body.outputs[0].issuer_lock_type.as_ref().unwrap();
+            let old_enc = xfr_note.body.outputs[0].issuer_lock_type.as_ref().unwrap().clone();
             let new_enc = (old_enc.e2.decompress().unwrap() + pc_gens.B).compress(); //adding 1 to the exponent
             xfr_note.body.outputs[0].issuer_lock_type = Some(ElGamalCiphertext{e1:old_enc.e1, e2: new_enc});
             xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
             assert_eq!(Err(XfrVerifyIssuerTrackingAssetTypeError), verify_xfr_note(&xfr_note),
                        "Transfer verification should fail due to error in AssetTracing verification");
+
+            //restore
+            xfr_note.body.outputs[0].issuer_lock_type = Some(old_enc);
+            xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
+            assert_eq!(Ok(()), verify_xfr_note(&xfr_note),
+                       "Transfer is ok");
         }
         // test bad amount tracking
         if asset_tracking && confidential_amount {
