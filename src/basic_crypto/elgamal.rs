@@ -27,8 +27,6 @@ pub fn elgamal_derive_public_key<G: Group>(
     ElGamalPublicKey(base.mul_by_scalar(&secret_key.0))
 }
 
-pub const ELGAMAL_CTEXT_LEN: usize = 64; //2 compressed ristretto points
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ElGamalCiphertext<G: Group> {
     pub(crate) e1: G, //r*G
@@ -43,10 +41,9 @@ impl<G: Group> ZeiFromToBytes for ElGamalCiphertext<G>{
         v
     }
     fn zei_from_bytes(bytes: &[u8]) -> Self{
-        let len = G::get_compressed_len();
         ElGamalCiphertext{
-            e1: G::from_compressed_bytes(&bytes[0..len]).unwrap(),
-            e2: G::from_compressed_bytes(&bytes[len..]).unwrap(),
+            e1: G::from_compressed_bytes(&bytes[0..G::COMPRESSED_LEN]).unwrap(),
+            e2: G::from_compressed_bytes(&bytes[G::COMPRESSED_LEN..]).unwrap(),
         }
     }
 }

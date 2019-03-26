@@ -1,6 +1,6 @@
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPublicKey, ELGAMAL_CTEXT_LEN};
+use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPublicKey};
 use rand::{CryptoRng, Rng};
 use bulletproofs::PedersenGens;
 use crate::errors::ZeiError;
@@ -26,7 +26,7 @@ use crate::serialization::ZeiFromToBytes;
    b) Output Ok iff C1 + c * C == z1 * G + z2 * H
           and       E1 + c * E == (z2 * G, z1 * pc_gens.B + z2 * PK)
  */
-
+const ELGAMAL_CTEXT_LEN: usize = 64;
 pub const PEDERSEN_ELGAMAL_EQ_PROOF_LEN: usize = 96 + ELGAMAL_CTEXT_LEN;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

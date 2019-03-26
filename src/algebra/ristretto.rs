@@ -8,6 +8,8 @@ use digest::generic_array::typenum::U64;
 
 impl Group for RistrettoPoint{
     type ScalarType = Scalar;
+    const COMPRESSED_LEN: usize = 32;
+    const SCALAR_BYTES_LEN: usize = 32;
 
     fn get_identity() -> RistrettoPoint{
         curve25519_dalek::ristretto::RistrettoPoint::identity()
@@ -25,10 +27,6 @@ impl Group for RistrettoPoint{
 
     fn from_compressed_bytes(bytes: &[u8]) -> Option<RistrettoPoint>{
         CompressedRistretto::from_slice(bytes).decompress()
-    }
-
-    fn get_compressed_len() -> usize {
-        32
     }
 
     fn gen_random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> Scalar {
@@ -64,6 +62,12 @@ impl Group for RistrettoPoint{
         let mut v = vec![];
         v.extend_from_slice(a.as_bytes());
         v
+    }
+
+    fn scalar_from_bytes(bytes: &[u8]) -> Scalar{
+        let mut array  = [0u8; Self::SCALAR_BYTES_LEN];
+        array.copy_from_slice(bytes);
+        Scalar::from_bits(array)
     }
 }
 

@@ -4,12 +4,13 @@ use digest::Digest;
 
 pub trait Group: Sized + PartialEq + Eq + Clone{
     type ScalarType;
+    const COMPRESSED_LEN: usize;
+    const SCALAR_BYTES_LEN: usize;
     fn get_identity() -> Self;
 
     // compression/serialization helpers
     fn to_compressed_bytes(&self) -> Vec<u8>;
     fn from_compressed_bytes(bytes: &[u8]) -> Option<Self>;
-    fn get_compressed_len() -> usize;
 
     //arithmetic
     fn mul_by_scalar(&self, scalar: &Self::ScalarType) -> Self;
@@ -28,5 +29,6 @@ pub trait Group: Sized + PartialEq + Eq + Clone{
 
     //scalar serialization
     fn scalar_to_bytes(a: &Self::ScalarType) -> Vec<u8>;
+    fn scalar_from_bytes(bytes: &[u8]) -> Self::ScalarType;
 }
 
