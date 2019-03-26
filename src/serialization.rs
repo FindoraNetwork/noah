@@ -1,5 +1,5 @@
 use bulletproofs::{RangeProof};
-use curve25519_dalek::ristretto::CompressedRistretto;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use crate::proofs::chaum_pedersen::ChaumPedersenProofX;
 use crate::proofs::chaum_pedersen::ChaumPedersenProof;
@@ -79,6 +79,16 @@ impl ZeiFromToBytes for Scalar{
     }
 }
 
+impl ZeiFromToBytes for RistrettoPoint{
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        self.compress().zei_to_bytes()
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> RistrettoPoint{
+        let compressed =  CompressedRistretto::from_slice(bytes);
+        compressed.decompress().unwrap() //TODO handle error
+    }
+}
+
 impl ZeiFromToBytes for CompressedRistretto{
     fn zei_to_bytes(&self) -> Vec<u8> {
         let mut v = vec![];
@@ -124,8 +134,8 @@ impl ZeiFromToBytes for ChaumPedersenProof {
     }
     fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenProof {
         ChaumPedersenProof {
-            c3: CompressedRistretto::zei_from_bytes(&bytes[0..32]),
-            c4: CompressedRistretto::zei_from_bytes(&bytes[32..64]),
+            c3: RistrettoPoint::zei_from_bytes(&bytes[0..32]),
+            c4: RistrettoPoint::zei_from_bytes(&bytes[32..64]),
             z1: Scalar::zei_from_bytes(&bytes[64..96]),
             z2: Scalar::zei_from_bytes(&bytes[96..128]),
             z3: Scalar::zei_from_bytes(&bytes[128..160]),
