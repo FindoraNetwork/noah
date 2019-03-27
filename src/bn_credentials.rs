@@ -1,8 +1,8 @@
-use rand::{CryptoRng, Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
+use rand_04::{Rng, SeedableRng};
 use crate::bn_pairing::{PairingScalar, G1Elem, G2Elem, pairing};
 use blake2::{Blake2b, Digest};
 use crate::errors::ZeiError;
+use crate::utils::u8_bigendian_slice_to_u32;
 
 /// I represent the Credentials' Issuer Public key
 pub struct CredIssuerPublicKey{
@@ -61,7 +61,7 @@ pub(crate) struct ProofOfKnowledgeCredentials{
 }
 
 impl CredUserSecretKey{
-    pub fn generate<R: CryptoRng + Rng>(prng: &mut R, issuer_public_key: &CredIssuerPublicKey) -> CredUserSecretKey{
+    pub fn generate<R: Rng>(prng: &mut R, issuer_public_key: &CredIssuerPublicKey) -> CredUserSecretKey{
         /*! given the issuer public key, I compute a CredUserSecretKet and correspondig
          *  CredUserPublicKey
          */
@@ -87,7 +87,7 @@ impl CredUserSecretKey{
     ///     = e(r*(\sigma2 + r + (t*sigma1), g_2)
     ///     Where X2, Z2, Y2 belongs to the issuer's public key and e is bilinear map.
     ///  4. Return randomized_signature, and the proof of knowledge
-    pub fn reveal<R: CryptoRng + Rng>(
+    pub fn reveal<R: Rng>(
         &self, prng: &mut R,
         issuer_public_key: &CredIssuerPublicKey,
         issuer_signature: &CredSignature,
@@ -117,7 +117,7 @@ impl CredUserSecretKey{
         }
     }
 
-    fn prove_pok<R:CryptoRng + Rng>(
+    fn prove_pok<R: Rng>(
         &self, prng:
         &mut R,
         issuer_public_key: &CredIssuerPublicKey,
@@ -181,15 +181,24 @@ fn compute_challenge(proof_commitment: &G2Elem) -> PairingScalar{
     hasher.input(c.as_bytes());
 
     let result = hasher.result();
-    let mut seed = [0u8;32];
-    seed.copy_from_slice(&result.as_slice()[0..32]);
+    let mut seed =  [0u32;8];
 
-    let mut prg = ChaChaRng::from_seed(seed);
+    seed[0] = u8_bigendian_slice_to_u32(&result.as_slice()[..4]);
+    seed[1] = u8_bigendian_slice_to_u32(&result.as_slice()[4..8]);
+    seed[2] = u8_bigendian_slice_to_u32(&result.as_slice()[8..12]);
+    seed[3] = u8_bigendian_slice_to_u32(&result.as_slice()[12..16]);
+    seed[4] = u8_bigendian_slice_to_u32(&result.as_slice()[16..20]);
+    seed[5] = u8_bigendian_slice_to_u32(&result.as_slice()[20..24]);
+    seed[6] = u8_bigendian_slice_to_u32(&result.as_slice()[24..28]);
+    seed[7] = u8_bigendian_slice_to_u32(&result.as_slice()[28..32]);
+
+
+    let mut prg = rand_04::ChaChaRng::from_seed(&seed[..]);
     PairingScalar::random(&mut prg)
 }
 
 impl CredIssuerSecretKey {
-    pub fn sign<R:CryptoRng + Rng>(
+    pub fn sign<R: Rng>(
         &self,
         prng: &mut R,
         user_public_key: &CredUserPublicKey,
@@ -263,7 +272,7 @@ impl CredIssuerPublicKey {
 
 impl CredIssuerKeyPair {
     pub fn generate<R>(prng: &mut R, num_attributes: u32) -> Self
-    where R: CryptoRng + Rng,
+    where R: Rng,
     {
         /*! I generate e key pair for a credential issuer */
         let x = PairingScalar::random(prng);
@@ -308,13 +317,12 @@ impl CredIssuerKeyPair {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand_chacha::ChaChaRng;
-    use rand::SeedableRng;
+    use rand_04::{SeedableRng, ChaChaRng};
 
     #[test]
     fn test_single_attribute(){
         let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        prng = ChaChaRng::from_seed(&[032; 8]);
         let issuer_keypair = CredIssuerKeyPair::generate(&mut prng, 1);
         let issuer_pk = issuer_keypair.public_key_ref();
         let issuer_sk = issuer_keypair.secret_key_ref();
@@ -340,7 +348,7 @@ mod test {
     #[test]
     fn test_two_attributes(){
         let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        prng = ChaChaRng::from_seed(&[032; 8]);
         let issuer_keypair = CredIssuerKeyPair::generate(&mut prng, 2);
         let issuer_pk = issuer_keypair.public_key_ref();
         let issuer_sk = issuer_keypair.secret_key_ref();

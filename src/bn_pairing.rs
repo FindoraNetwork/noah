@@ -1,13 +1,13 @@
-use rand::{CryptoRng, Rng};
 use std::ops::{Add, Sub, Neg, Mul};
 use bn::Group;
+use rand_04::Rng as Rng;
 
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct PairingScalar(bn::Fr);
 
 impl PairingScalar {
-    pub(crate) fn random<R: CryptoRng + Rng>(prng: &mut R) -> Self{
+    pub(crate) fn random<R: Rng>(prng: &mut R) -> Self{
         PairingScalar(bn::Fr::random(prng))
     }
     /*
@@ -60,7 +60,7 @@ impl Mul<PairingScalar> for PairingScalar {
 pub(crate) struct G1Elem(bn::G1);
 
 impl G1Elem{
-    pub(crate) fn random<R: CryptoRng + Rng>(prng: &mut R) -> Self{
+    pub(crate) fn random<R: Rng>(prng: &mut R) -> Self{
         G1Elem(bn::G1::random(prng))
     }
     /*
@@ -112,7 +112,7 @@ impl Mul<&PairingScalar> for &G1Elem {
 pub(crate) struct G2Elem(bn::G2);
 
 impl G2Elem{
-    pub(crate) fn random<R: CryptoRng + Rng>(prng: &mut R) -> Self{
+    pub(crate) fn random<R: Rng>(prng: &mut R) -> Self{
         G2Elem(bn::G2::random(prng))
     }
     pub(crate) fn zero() -> Self{
@@ -176,13 +176,12 @@ pub(crate) fn pairing(e1: &G1Elem, e2: &G2Elem) -> GtElem{
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand_chacha::ChaChaRng;
-    use rand::SeedableRng;
+    use rand_04::{SeedableRng, ChaChaRng};
 
     #[test]
     fn test_pairing(){
         let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        prng = ChaChaRng::from_seed(&[0u32; 8]);
 
         let s1 = PairingScalar::random(&mut prng);
         let s2 = PairingScalar::random(&mut prng);

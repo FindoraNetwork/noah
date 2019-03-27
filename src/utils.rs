@@ -81,6 +81,14 @@ pub(crate) fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64{
         u64::from(array[7])
 }
 
+/// I convert a 4 byte array into a u32 (bigendian)
+pub(crate) fn u8_bigendian_slice_to_u32(array: &[u8]) -> u32{
+        u32::from(array[0]) << 24 |
+        u32::from(array[1]) << 16 |
+        u32::from(array[2]) << 8 |
+        u32::from(array[3])
+}
+
 /// I compute the minimum power of two that is greater or equal to the input
 #[inline]
 pub(crate) fn min_greater_equal_power_of_two(n: u32) -> u32{
@@ -241,14 +249,14 @@ mod test {
         assert_eq!(0x73, n_array[3]);
     }
 
-    /*
+
     #[test]
     fn test_u8_bigendian_slice_to_u32(){
         let array = [0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8];
-        let n = u8_bigendian_slice_to_u32(&array);
+        let n = super::u8_bigendian_slice_to_u32(&array);
         assert_eq!(0xFA01C673, n);
     }
-    */
+
     #[test]
     fn u64_to_bignedian_u8array(){
         let n:u64 = 0xFA01C67322E498A2;
