@@ -2,7 +2,7 @@ use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use crate::bn_pairing::{PairingScalar, G1Elem, G2Elem, pairing};
 use blake2::{Blake2b, Digest};
-use crate::errors::Error;
+use crate::errors::ZeiError;
 
 /// I represent the Credentials' Issuer Public key
 pub struct CredIssuerPublicKey{
@@ -215,7 +215,7 @@ impl CredIssuerSecretKey {
 /// e(sigma1,X2) + e(sigma1, g_2^t) + e(sigma1, Z2^sk) + e(sigma1, \\sum Y2_i^attr_i)
 /// equals e(sigma2, g_2)
 /// Revealed attributes attr corresponds to the positions where the bitmap is true
-/// I return Ok() in case signatures and proofs are correct. Otherwise, I return Err(Error:SignatureError)
+/// I return Ok() in case signatures and proofs are correct. Otherwise, I return Err(ZeiError:SignatureError)
 /// Algorithm:
 /// 1. Compute challenge c as hash of proof_commitment
 /// 2. Compute p \= -proof_commitment c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
@@ -226,7 +226,7 @@ impl CredIssuerPublicKey {
         &self,
         revealed_attrs: Vec<PairingScalar>,
         bitmap: Vec<bool>,
-        credential: &CredRevealProof) -> Result<(), Error>{
+        credential: &CredRevealProof) -> Result<(), ZeiError>{
         let challenge = compute_challenge(&credential.pok.commitment);
 
         let mut q = &self.xx2 * &challenge - &credential.pok.commitment;
@@ -253,7 +253,7 @@ impl CredIssuerPublicKey {
         let a = pairing(&credential.signature.sigma1, &q);
         let b = pairing(&credential.signature.sigma2, &(&self.gen2 * &challenge));
         if a != b {
-            return Err(Error::SignatureError);
+            return Err(ZeiError::SignatureError);
         }
 
         Ok(())

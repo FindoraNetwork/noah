@@ -10,18 +10,19 @@ extern crate blake2;
 extern crate bulletproofs;
 extern crate curve25519_dalek;
 extern crate ed25519_dalek;
+extern crate itertools;
 extern crate merlin;
 extern crate num_bigint;
 extern crate num_traits;
 extern crate rand;
+extern crate rmp_serde;
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
+extern crate sha2;
 extern crate sodiumoxide;
 extern crate bn;
 
-mod constants;
-mod encryption;
 mod errors;
 mod setup;
 mod utils;
@@ -31,21 +32,7 @@ mod bls12_381_pairing;
 
 pub mod bls12_381_credentials;
 pub mod bn_credentials;
-pub mod account;
-pub mod address;
-pub mod keys;
 pub mod proofs;
+pub mod basic_crypto;
 pub mod serialization;
-pub mod utxo_transaction;
-
-// TODO(jackson): Real C bindings for zei
-use self::account::Account;
-use rand::rngs::OsRng;
-
-#[no_mangle]
-pub extern fn test_function() -> f32 {
-    let mut csprng: OsRng = OsRng::new().unwrap();
-    Account::new(&mut csprng);
-    42.0
-}
-
+pub mod transfers;
