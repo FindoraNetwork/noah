@@ -4,8 +4,7 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Visitor, SeqAccess};
 use crate::serialization::ZeiFromToBytes;
 use crate::algebra::groups::Group;
-use curve25519_dalek::ristretto::{RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
+use std::marker::PhantomData;
 
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -57,39 +56,49 @@ impl<G: Group> Serialize for ElGamalPublicKey<G> {
     }
 }
 
-impl<'de> Deserialize<'de> for ElGamalPublicKey<RistrettoPoint> {
+impl<'de, G: Group> Deserialize<'de> for ElGamalPublicKey<G> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>
     {
-        struct ElGamalVisitor;
+        struct ElGamalVisitor<G: Group> {
+            marker: PhantomData<fn()->ElGamalPublicKey<G>>
+        }
 
-        impl<'de> Visitor<'de> for ElGamalVisitor {
-            type Value = ElGamalPublicKey<RistrettoPoint>;
+        impl<G: Group> ElGamalVisitor<G> {
+            fn new() -> Self {
+                ElGamalVisitor {
+                    marker: PhantomData
+                } 
+            }
+        }
+
+        impl<'de, G: Group> Visitor<'de> for ElGamalVisitor<G> {
+            type Value = ElGamalPublicKey<G>;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                 formatter.write_str("a encoded ElGamalPublicKey")
             }
 
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalPublicKey<RistrettoPoint>, E>
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalPublicKey<G>, E>
                 where E: serde::de::Error
             {
-                let point = RistrettoPoint::from_compressed_bytes(v).unwrap();
-                Ok(ElGamalPublicKey::<RistrettoPoint>(point))
+                let point = G::from_compressed_bytes(v).unwrap();
+                Ok(ElGamalPublicKey::<G>(point))
             }
 
-            fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalPublicKey<RistrettoPoint>, V::Error>
+            fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalPublicKey<G>, V::Error>
                 where V: SeqAccess<'de>,
             {
                 let mut vec: Vec<u8> = vec![];
                 while let Some(x) = seq.next_element().unwrap() {
                     vec.push(x);
                 }
-                let point = RistrettoPoint::from_compressed_bytes(vec.as_slice()).unwrap();
-                Ok(ElGamalPublicKey::<RistrettoPoint>(point))
+                let point = G::from_compressed_bytes(vec.as_slice()).unwrap();
+                Ok(ElGamalPublicKey::<G>(point))
             }
         }
-        deserializer.deserialize_bytes(ElGamalVisitor)
+        deserializer.deserialize_bytes(ElGamalVisitor::new())
     }
 }
 
@@ -104,30 +113,41 @@ impl<G: Group> Serialize for ElGamalSecretKey<G> {
     }
 }
 
-impl<'de> Deserialize<'de> for ElGamalSecretKey<RistrettoPoint> {
+impl<'de, G: Group> Deserialize<'de> for ElGamalSecretKey<G> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>
     {
-        struct ElGamalVisitor;
+        struct ElGamalVisitor<G: Group> {
+            marker: PhantomData<fn()->ElGamalSecretKey<G>>
+        }
 
-        impl<'de> Visitor<'de> for ElGamalVisitor{
-            type Value = ElGamalSecretKey<RistrettoPoint>;
+        impl<G: Group> ElGamalVisitor<G> {
+            fn new() -> Self {
+                ElGamalVisitor {
+                    marker: PhantomData
+                } 
+            }
+        }
+
+
+        impl<'de, G: Group> Visitor<'de> for ElGamalVisitor<G>{
+            type Value = ElGamalSecretKey<G>;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                 formatter.write_str("a encoded ElGamalSecretKey")
             }
 
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalSecretKey<RistrettoPoint>, E>
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalSecretKey<G>, E>
                 where E: serde::de::Error
             {
                 let mut array = [0u8; 32];
                 array.copy_from_slice(v);
-                let scalar = Scalar::from_bits(array);
-                Ok(ElGamalSecretKey::<RistrettoPoint>(scalar))
+                let scalar = G::scalar_from_bytes(&array);
+                Ok(ElGamalSecretKey::<G>(scalar))
             }
 
-            fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalSecretKey<RistrettoPoint>, V::Error>
+            fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalSecretKey<G>, V::Error>
                 where V: SeqAccess<'de>,
             {
                 let mut bytes = [0u8;32];
@@ -136,11 +156,11 @@ impl<'de> Deserialize<'de> for ElGamalSecretKey<RistrettoPoint> {
                     bytes[i] = x;
                     i += 1;
                 }
-                let scalar = Scalar::from_bits(bytes);
-                Ok(ElGamalSecretKey::<RistrettoPoint>(scalar))
+                let scalar = G::scalar_from_bytes(&bytes);
+                Ok(ElGamalSecretKey::<G>(scalar))
             }
         }
-        deserializer.deserialize_bytes(ElGamalVisitor)
+        deserializer.deserialize_bytes(ElGamalVisitor::new())
     }
 }
 
@@ -154,37 +174,47 @@ impl<G: Group> Serialize for ElGamalCiphertext<G> {
     }
 }
 
-impl<'de> Deserialize<'de> for ElGamalCiphertext<RistrettoPoint> {
+impl<'de, G: Group> Deserialize<'de> for ElGamalCiphertext<G> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>
     {
-        struct ElGamalVisitor;
+        struct ElGamalVisitor<G: Group> {
+            marker: PhantomData<fn()->ElGamalCiphertext<G>>
+        }
 
-        impl<'de> Visitor<'de> for ElGamalVisitor{
-            type Value = ElGamalCiphertext<RistrettoPoint>;
+        impl<G: Group> ElGamalVisitor<G> {
+            fn new() -> Self {
+                ElGamalVisitor {
+                    marker: PhantomData
+                } 
+            }
+        }
+
+        impl<'de, G: Group> Visitor<'de> for ElGamalVisitor<G>{
+            type Value = ElGamalCiphertext<G>;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                 formatter.write_str("a encoded ElGamal Ciphertext")
             }
 
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalCiphertext<RistrettoPoint>, E>
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<ElGamalCiphertext<G>, E>
                 where E: serde::de::Error
             {
-                Ok(ElGamalCiphertext::<RistrettoPoint>::zei_from_bytes(v))
+                Ok(ElGamalCiphertext::<G>::zei_from_bytes(v))
             }
 
-            fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalCiphertext<RistrettoPoint>, V::Error>
+            fn visit_seq<V>(self, mut seq: V) -> Result<ElGamalCiphertext<G>, V::Error>
                 where V: SeqAccess<'de>,
             {
                 let mut vec: Vec<u8> = vec![];
                 while let Some(x) = seq.next_element().unwrap() {
                     vec.push(x);
                 }
-                Ok(ElGamalCiphertext::<RistrettoPoint>::zei_from_bytes(vec.as_slice()))
+                Ok(ElGamalCiphertext::<G>::zei_from_bytes(vec.as_slice()))
             }
         }
-        deserializer.deserialize_bytes(ElGamalVisitor)
+        deserializer.deserialize_bytes(ElGamalVisitor::new())
     }
 }
 
