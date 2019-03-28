@@ -29,6 +29,12 @@ pub struct XfrNote{
     pub(crate) multisig: XfrMultiSig,
 }
 
+impl XfrNote {
+    pub fn outputs_iter(&self) -> std::slice::Iter<BlindAssetRecord> {
+        self.body.outputs.iter()
+    }
+}
+
 /// I am the body of a transfer note
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct XfrBody{
