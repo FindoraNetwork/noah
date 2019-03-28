@@ -1,10 +1,10 @@
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::ristretto::{CompressedRistretto};
-use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPublicKey, ELGAMAL_CTEXT_LEN};
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPublicKey};
 use rand::{CryptoRng, Rng};
 use bulletproofs::PedersenGens;
 use crate::errors::ZeiError;
-use crate::proofs::compute_challenge;
+use crate::proofs::{compute_challenge_ref};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Visitor, SeqAccess};
 use crate::serialization::ZeiFromToBytes;
@@ -26,15 +26,15 @@ use crate::serialization::ZeiFromToBytes;
    b) Output Ok iff C1 + c * C == z1 * G + z2 * H
           and       E1 + c * E == (z2 * G, z1 * pc_gens.B + z2 * PK)
  */
-
+const ELGAMAL_CTEXT_LEN: usize = 64;
 pub const PEDERSEN_ELGAMAL_EQ_PROOF_LEN: usize = 96 + ELGAMAL_CTEXT_LEN;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PedersenElGamalEqProof{
     z1: Scalar, // c*m + r_1
     z2: Scalar, // c*r + r_2
-    e1: ElGamalCiphertext, // (r_2*G, r1*g + r2*PK)
-    c1: CompressedRistretto, // r_1*g + r_2*H
+    e1: ElGamalCiphertext<RistrettoPoint>, // (r_2*G, r1*g + r2*PK)
+    c1: RistrettoPoint, // r_1*g + r_2*H
 }
 
 impl ZeiFromToBytes for PedersenElGamalEqProof{
@@ -44,7 +44,7 @@ impl ZeiFromToBytes for PedersenElGamalEqProof{
         v.extend_from_slice(self.z2.as_bytes());
         let mut e1_vec = self.e1.zei_to_bytes();
         v.append(&mut e1_vec);
-        v.extend_from_slice(self.c1.as_bytes());
+        v.extend_from_slice(self.c1.compress().as_bytes());
         v
     }
     fn zei_from_bytes(bytes: &[u8]) -> Self{
@@ -54,7 +54,7 @@ impl ZeiFromToBytes for PedersenElGamalEqProof{
         array.copy_from_slice(&bytes[32..64]);
         let z2 = Scalar::from_bits(array);
         let e1 = ElGamalCiphertext::zei_from_bytes(&bytes[64..64 + ELGAMAL_CTEXT_LEN]);
-        let c1 = CompressedRistretto::from_slice(&bytes[64 + ELGAMAL_CTEXT_LEN..]);
+        let c1 = CompressedRistretto::from_slice(&bytes[64 + ELGAMAL_CTEXT_LEN..]).decompress().unwrap();
 
         PedersenElGamalEqProof{ z1,z2,e1,c1}
     }
@@ -109,49 +109,42 @@ pub fn pedersen_elgamal_eq_prove<R: CryptoRng + Rng>(
     prng: &mut R,
     m: &Scalar,
     r: &Scalar,
-    public_key: &ElGamalPublicKey,
-    ctext: &ElGamalCiphertext,
-    commitment: &CompressedRistretto
+    public_key: &ElGamalPublicKey<RistrettoPoint>,
+    ctext: &ElGamalCiphertext<RistrettoPoint>,
+    commitment: &RistrettoPoint
 ) -> PedersenElGamalEqProof
 {
     let r1 = Scalar::random(prng);
     let r2 = Scalar::random(prng);
     let pc_gens = PedersenGens::default();
     let com = pc_gens.commit(r1, r2);
-    let enc = elgamal_encrypt(&pc_gens.B, &r1, &r2, public_key).unwrap();
-    let c = compute_challenge(&[ctext.e1, ctext.e2, *commitment, enc.e1, enc.e2, com.compress()]);
+    let enc = elgamal_encrypt(&pc_gens.B, &r1, &r2, public_key);
+    let c = compute_challenge_ref::<RistrettoPoint>(&[&ctext.e1, &ctext.e2, commitment, &enc.e1, &enc.e2, &com]);
     let z1 = c * m + r1;
     let z2 = c * r + r2;
 
     PedersenElGamalEqProof{
-      z1,z2, e1:enc, c1:com.compress(),
+      z1,z2, e1:enc, c1:com,
     }
 }
 
 /// I verify perdersen/elgamal equality proof againts ctext and commitment.
 pub fn pedersen_elgamal_eq_verify(
-    public_key: &ElGamalPublicKey,
-    ctext: &ElGamalCiphertext,
-    commitment: &CompressedRistretto,
+    public_key: &ElGamalPublicKey<RistrettoPoint>,
+    ctext: &ElGamalCiphertext<RistrettoPoint>,
+    commitment: &RistrettoPoint,
     proof: &PedersenElGamalEqProof,
 ) -> Result<(), ZeiError>
 {
     let pc_gens = PedersenGens::default();
-    let c = compute_challenge(&[ctext.e1, ctext.e2, *commitment, proof.e1.e1, proof.e1.e2, proof.c1]);
+    let c = compute_challenge_ref::<RistrettoPoint>(&[&ctext.e1, &ctext.e2, commitment, &proof.e1.e1, &proof.e1.e2, &proof.c1]);
 
-    // decompress input values
-    let enc_e1 = ctext.e1.decompress().ok_or(ZeiError::DecompressElementError)?;
-    let enc_e2 = ctext.e2.decompress().ok_or(ZeiError::DecompressElementError)?;
-    let commitment = commitment.decompress().ok_or(ZeiError::DecompressElementError)?;
+    let proof_enc_e1 = &proof.e1.e1;
+    let proof_enc_e2 = &proof.e1.e2;
 
-    // decompress proof values
-    let proof_enc_e1 = proof.e1.e1.decompress().ok_or(ZeiError::DecompressElementError)?;
-    let proof_enc_e2 = proof.e1.e2.decompress().ok_or(ZeiError::DecompressElementError)?;
-    let proof_c1 = proof.c1.decompress().ok_or(ZeiError::DecompressElementError)?;
-
-    if proof_c1 + c * commitment == proof.z1 * pc_gens.B + proof.z2 * pc_gens.B_blinding {
-        if proof_enc_e1 + c * enc_e1 == proof.z2 * pc_gens.B &&
-            proof_enc_e2 + c * enc_e2 == proof.z1 * pc_gens.B + proof.z2 * public_key.get_curve_point() {
+    if proof.c1 + c * commitment == proof.z1 * pc_gens.B + proof.z2 * pc_gens.B_blinding {
+        if proof_enc_e1 + c * ctext.e1 == proof.z2 * pc_gens.B &&
+            proof_enc_e2 + c * ctext.e2 == proof.z1 * pc_gens.B + proof.z2 * public_key.0 {
             return Ok(());
         }
     }
@@ -170,6 +163,7 @@ mod test{
     use serde::de::Deserialize;
     use rmp_serde::Deserializer;
     use crate::proofs::pedersen_elgamal::PedersenElGamalEqProof;
+    use curve25519_dalek::ristretto::RistrettoPoint;
 
     #[test]
     fn good_proof_verify(){
@@ -178,10 +172,10 @@ mod test{
         let mut prng = ChaChaRng::from_seed([0u8;32]);
         let pc_gens = PedersenGens::default();
 
-        let sk = elgamal_generate_secret_key(&mut prng);
+        let sk = elgamal_generate_secret_key::<_,RistrettoPoint>(&mut prng);
         let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
-        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk).unwrap();
-        let commitment = pc_gens.commit(m,r).compress();
+        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
+        let commitment = pc_gens.commit(m,r);
 
         let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);
         let verify = super::pedersen_elgamal_eq_verify(&pk, &ctext, &commitment, &proof);
@@ -196,10 +190,10 @@ mod test{
         let mut prng = ChaChaRng::from_seed([0u8;32]);
         let pc_gens = PedersenGens::default();
 
-        let sk = elgamal_generate_secret_key(&mut prng);
+        let sk = elgamal_generate_secret_key::<_, RistrettoPoint>(&mut prng);
         let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
-        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk).unwrap();
-        let commitment = pc_gens.commit(m2,r).compress();
+        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
+        let commitment = pc_gens.commit(m2,r);
 
         let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);
         let verify = super::pedersen_elgamal_eq_verify(&pk, &ctext, &commitment, &proof);
@@ -214,10 +208,10 @@ mod test{
         let mut prng = ChaChaRng::from_seed([0u8;32]);
         let pc_gens = PedersenGens::default();
 
-        let sk = elgamal_generate_secret_key(&mut prng);
+        let sk = elgamal_generate_secret_key::<_, RistrettoPoint>(&mut prng);
         let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
-        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk).unwrap();
-        let commitment = pc_gens.commit(m,r).compress();
+        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
+        let commitment = pc_gens.commit(m,r);
         let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);
 
         let json_str = serde_json::to_string(&proof).unwrap();
@@ -232,10 +226,10 @@ mod test{
         let mut prng = ChaChaRng::from_seed([0u8;32]);
         let pc_gens = PedersenGens::default();
 
-        let sk = elgamal_generate_secret_key(&mut prng);
+        let sk = elgamal_generate_secret_key::<_, RistrettoPoint>(&mut prng);
         let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
-        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk).unwrap();
-        let commitment = pc_gens.commit(m,r).compress();
+        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
+        let commitment = pc_gens.commit(m,r);
         let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);
 
         let mut vec = vec![];

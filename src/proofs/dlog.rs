@@ -1,73 +1,71 @@
 use bulletproofs::PedersenGens;
-use crate::errors::ZeiError;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;
 use rand::Rng;
-use crate::proofs::{compute_challenge, compute_sub_challenge};
+use crate::proofs::{compute_sub_challenge, compute_challenge_ref};
+use crate::algebra::groups::Group;
 
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct DlogProof{
-    pub proof_commitment: CompressedRistretto,
-    pub response: Scalar,
+pub struct DlogProof<G: Group>{
+    pub proof_commitment: G,
+    pub response: G::ScalarType,
 }
 
-pub fn prove_knowledge_dlog<R: CryptoRng + Rng>(
+pub fn prove_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     prng: &mut R,
-    base: &RistrettoPoint,
-    point: &CompressedRistretto,
-    dlog: &Scalar) -> DlogProof{
+    base: &G,
+    point: &G,
+    dlog: &G::ScalarType) -> DlogProof<G>{
 
     /*! I compute a proof for the knowledge of dlog for point with respect to base*/
-    let u = Scalar::random(prng);
-    let proof_commitment = (u*base).compress();
-    let challenge = compute_challenge(&vec![base.compress(), proof_commitment, point.clone()]);
-    let response = challenge * dlog + u;
+    let u = G::gen_random_scalar(prng);
+    let proof_commitment = base.mul_by_scalar(&u);
+    let challenge = compute_challenge_ref::<G>(&[base, &proof_commitment, point]);
+    let response = G::scalar_add(&G::scalar_mul(&challenge, dlog),&u);
 
     DlogProof {
-        proof_commitment,
+        proof_commitment: proof_commitment,
         response,
     }
 }
 
-pub fn verify_proof_of_knowledge_dlog(
-    base: &RistrettoPoint,
-    point: &CompressedRistretto,
-    proof:&DlogProof) -> Result<bool, ZeiError>{
+pub fn verify_proof_of_knowledge_dlog<G: Group>(
+    base: &G,
+    point: &G,
+    proof:&DlogProof<G>) -> bool{
 
     /*! I verify a proof of knowledge of dlog for point with respect to base*/
 
-    let challenge = compute_challenge(
-        &[base.compress(), proof.proof_commitment, *point]);
+    let challenge = compute_challenge_ref::<G>(
+        &[base, &proof.proof_commitment, point]);
 
-    let dpoint = point.decompress().ok_or(ZeiError::DecompressElementError)?;
-    let dproof_commit = proof.proof_commitment.decompress().
-        ok_or(ZeiError::DecompressElementError)?;
+    let vrfy_ok = base.mul_by_scalar(&proof.response) == point.mul_by_scalar(&challenge).add(&proof.proof_commitment);
 
-    let vrfy_ok = proof.response * base == challenge * dpoint + dproof_commit;
-
-    Ok(vrfy_ok)
+    vrfy_ok
 }
 
-pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
+pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     prng: &mut R,
-    base: &RistrettoPoint,
-    points: &[CompressedRistretto],
-    dlogs: &[Scalar]) -> DlogProof{
+    base: &G,
+    points: &[G],
+    dlogs: &[G::ScalarType]) -> DlogProof<G>{
 
     /*! I compute a proof for the knowledge of dlogs for points for the base*/
 
-    let u = Scalar::random(prng);
-    let proof_commitment = (u*base).compress();
-    let base_compressed = base.compress();
-    let mut context = vec![base_compressed, proof_commitment];
-    context.extend_from_slice(points);
-    let challenge = compute_challenge(context.as_slice());
+    let u = G::gen_random_scalar(prng);
+    let proof_commitment = base.mul_by_scalar(&u);
+    let mut context = vec![base, &proof_commitment];
+    for point in points.iter(){
+        context.push(point);
+    }
+    //context.extend_from_slice(points.iter());
+    let challenge = compute_challenge_ref::<G>(context.as_slice());
     let mut response = u;
     for i in 0..dlogs.len() {
-        let challenge_i = compute_sub_challenge(&challenge, i as u32);
-        response = response + challenge_i * dlogs[i];
+        let challenge_i = compute_sub_challenge::<G>(&challenge, i as u32);
+        response = G::scalar_add(&response, &G::scalar_mul(&challenge_i, &dlogs[i]));
     }
 
     DlogProof {
@@ -76,25 +74,25 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng>(
     }
 }
 
-pub fn verify_multiple_knowledge_dlog(
-    base: &RistrettoPoint,
-    points: &[CompressedRistretto],
-    proof: &DlogProof) -> Result<bool, ZeiError>{
+pub fn verify_multiple_knowledge_dlog<G: Group>(
+    base: &G,
+    points: &[G],
+    proof: &DlogProof<G>) -> bool{
 
     /*! I verify a proof of knowledge of dlogs for points in the base*/
 
-    let base_compressed = base.compress();
-    let mut context = vec![base_compressed, proof.proof_commitment];
-    context.extend_from_slice(points);
-    let challenge = compute_challenge(context.as_slice());
-    let mut check = proof.proof_commitment.decompress().
-        ok_or(ZeiError::DecompressElementError)?;
-    for i in 0..points.len() {
-        let challenge_i = compute_sub_challenge(&challenge, i as u32);
-        check = check + challenge_i * points[i].decompress().
-            ok_or(ZeiError::DecompressElementError)?;
+    let mut context = vec![base, &proof.proof_commitment];
+    for point in points{
+        context.push(point);
     }
-    Ok(check == proof.response * base)
+    //context.extend_from_slice(points);
+    let challenge = compute_challenge_ref::<G>(context.as_slice());
+    let mut check = proof.proof_commitment.clone();
+    for i in 0..points.len() {
+        let challenge_i = compute_sub_challenge::<G>(&challenge, i as u32);
+        check = check.add(&points[i].mul_by_scalar(&challenge_i));
+    }
+    check == base.mul_by_scalar(&proof.response)
 
 }
 
@@ -103,54 +101,43 @@ pub fn verify_multiple_knowledge_dlog(
 //The following proof systems assumes that source asset commitment is a valid
 //perdersen commitment. Otherwise, it is not secure. If source asset commitment
 //cannot be assumed to be a valid pedersen commitment, then use Chaum-Pedersen
-pub type CommitmentEqProof = DlogProof;
+pub type CommitmentEqProof = DlogProof<RistrettoPoint>;
 
 pub fn dlog_based_prove_commitment_eq<R: CryptoRng + Rng>(
     prng: &mut R,
     pedersen_gens: &PedersenGens,
-    source_asset_commitment: &CompressedRistretto,
-    destination_asset_commitment: &CompressedRistretto,
+    source_asset_commitment: &RistrettoPoint,
+    destination_asset_commitment: &RistrettoPoint,
     source_blinding_factor: &Scalar,
-    destination_blinding_factor: &Scalar) -> Result<CommitmentEqProof, ZeiError>
+    destination_blinding_factor: &Scalar) -> CommitmentEqProof
 {
     /*! Assuming source_asset_commitment is a pedersen commitment, I compute a Dlog-equality-based
      * proof that source and destination_asset_commitments commit to the same value, using source
-     * and destination blinding factors respectively. Return Ok(proof) in case of success,
-     * and Err(Error::DeserializationError) in case a Ristretto points cannot be decompressed.
+     * and destination blinding factors respectively. Returns a DLog proof proof.
      */
 
-    let src = source_asset_commitment.decompress().
-        ok_or(ZeiError::DecompressElementError)?;
-    let dst = destination_asset_commitment.decompress().
-        ok_or(ZeiError::DecompressElementError)?;
-    let point = src - dst;
+    let point = source_asset_commitment - destination_asset_commitment;
 
     let dlog = source_blinding_factor - destination_blinding_factor;
 
-    let proof = prove_knowledge_dlog(prng, &pedersen_gens.B_blinding, &point.compress(), &dlog);
+    let proof = prove_knowledge_dlog(prng, &pedersen_gens.B_blinding, &point, &dlog);
 
-    Ok(proof)
+    proof
 }
 
 pub fn dlog_based_verify_commitment_eq(
     pedersen_gens: &PedersenGens,
-    source_asset_commitment: &CompressedRistretto,
-    destination_asset_commitment: &CompressedRistretto,
-    proof: &CommitmentEqProof) -> Result<bool, ZeiError>
+    source_asset_commitment: &RistrettoPoint,
+    destination_asset_commitment: &RistrettoPoint,
+    proof: &CommitmentEqProof) ->bool
 {
     /*! Assuming source_asset_commitment is a pedersen commitment, I compute a Dlog-equality-based
      * proof that source and destination_asset_commitments commit to the same value.
-     * Return Ok(true) in case of success, Ok(false) in case of verification error,
-     * and Err(Error::DeserializationError) in case a Ristretto points cannot be decompressed.
+     * Return true in case of success and false in case of verification error.
      */
 
-    let src = source_asset_commitment.decompress().
-        ok_or(ZeiError::DecompressElementError)?;
-    let dst = destination_asset_commitment.decompress().
-        ok_or(ZeiError::DecompressElementError)?;
-
-    let point = src - dst;
-    verify_proof_of_knowledge_dlog(&pedersen_gens.B_blinding, &point.compress(), proof)
+    let point = source_asset_commitment - destination_asset_commitment;
+    verify_proof_of_knowledge_dlog(&pedersen_gens.B_blinding, &point, proof)
 }
 
 #[cfg(test)]
@@ -170,14 +157,14 @@ mod test {
         let scalar2 = scalar + Scalar::from(1u8);
         let point = scalar * base;
 
-        let proof = prove_knowledge_dlog(&mut csprng, &base, &point.compress(),
+        let proof = prove_knowledge_dlog(&mut csprng, &base, &point,
                                          &scalar);
         assert_eq!(true,
-                   verify_proof_of_knowledge_dlog(&base, &point.compress(), &proof).unwrap());
+                   verify_proof_of_knowledge_dlog(&base, &point, &proof));
 
-        let proof = prove_knowledge_dlog(&mut csprng, &base, &point.compress(),
+        let proof = prove_knowledge_dlog(&mut csprng, &base, &point,
                                          &scalar2);
-        assert_eq!(false, verify_proof_of_knowledge_dlog(&base, &point.compress(), &proof).unwrap())
+        assert_eq!(false, verify_proof_of_knowledge_dlog(&base, &point, &proof))
     }
 
     #[test]
@@ -206,16 +193,16 @@ mod test {
         let proof = prove_multiple_knowledge_dlog(
             &mut csprng,
             &base,
-            &[point1.compress(), point2.compress(), point3.compress(),
-                point4.compress(), point5.compress(), point6.compress(), point7.compress()],
+            &[point1, point2, point3,
+                point4, point5, point6, point7],
             &[scalar1, scalar2, scalar3, scalar4, scalar5, scalar6, scalar7]);
 
         assert_eq!(true,
                    verify_multiple_knowledge_dlog(
                        &base,
-                       &[point1.compress(), point2.compress(), point3.compress(),
-                           point4.compress(), point5.compress(), point6.compress(), point7.compress()],
-                       &proof).unwrap());
+                       &[point1, point2, point3,
+                           point4, point5, point6, point7],
+                       &proof));
     }
 
     #[test]
@@ -228,8 +215,8 @@ mod test {
         let bf1 = Scalar::from(10u8);
         let bf2 = Scalar::from(100u8);
         let pedersen_bases = PedersenGens::default();
-        let c1 = pedersen_bases.commit(value1, bf1).compress();
-        let c2 = pedersen_bases.commit(value2, bf2).compress();
+        let c1 = pedersen_bases.commit(value1, bf1);
+        let c2 = pedersen_bases.commit(value2, bf2);
 
         let proof = dlog_based_prove_commitment_eq(
             &mut csprng,
@@ -237,26 +224,26 @@ mod test {
             &c1,
             &c2,
             &bf1,
-            &bf2).unwrap();
+            &bf2);
 
         assert_eq!(false, dlog_based_verify_commitment_eq(&pc_gens,
                                                           &c1,
                                                           &c2,
-                                                          &proof).unwrap());
+                                                          &proof));
 
-        let c3 = pedersen_bases.commit(value1, bf2).compress();
+        let c3 = pedersen_bases.commit(value1, bf2);
         let proof = dlog_based_prove_commitment_eq(
             &mut csprng,
             &pc_gens,
             &c1,
             &c3,
             &bf1,
-            &bf2).unwrap();
+            &bf2);
 
         assert_eq!(true, dlog_based_verify_commitment_eq(&pc_gens,
                                                          &c1,
                                                          &c3,
-                                                         &proof).unwrap());
+                                                         &proof));
     }
 
 }

@@ -12,10 +12,12 @@ extern crate serde;
 extern crate serde_json;
 extern crate sha2;
 extern crate sodiumoxide;
+extern crate digest;
 
 mod errors;
 mod setup;
 mod utils;
+mod algebra;
 
 pub mod basic_crypto;
 pub mod serialization;
