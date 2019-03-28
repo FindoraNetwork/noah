@@ -1,7 +1,7 @@
 use rand_04::{SeedableRng};
 use crate::bls12_381_pairing::{BLSScalar, BLSG1Elem, BLSG2Elem, pairing};
-use blake2::{Blake2b, Digest};
 use crate::errors::ZeiError;
+use sha2::{Sha512, Digest};
 
 /// I represent the Credentials' Issuer Public key
 pub struct CredIssuerPublicKey{
@@ -177,7 +177,7 @@ impl CredUserSecretKey{
 fn compute_challenge(proof_commitment: &BLSG2Elem) -> BLSScalar{
     /*! In a sigma protocol, I compute a hash of the proof commitment */
     let c = proof_commitment.to_bytes();
-    let mut hasher = Blake2b::new();
+    let mut hasher = Sha512::new();
     hasher.input(&c[..]);
 
     let result = hasher.result();

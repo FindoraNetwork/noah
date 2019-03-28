@@ -1,8 +1,8 @@
 use rand_04::{Rng, SeedableRng};
 use crate::bn_pairing::{PairingScalar, G1Elem, G2Elem, pairing};
-use blake2::{Blake2b, Digest};
 use crate::errors::ZeiError;
 use crate::utils::u8_bigendian_slice_to_u32;
+use sha2::{Sha512, Digest};
 
 /// I represent the Credentials' Issuer Public key
 pub struct CredIssuerPublicKey{
@@ -177,7 +177,7 @@ impl CredUserSecretKey{
 fn compute_challenge(proof_commitment: &G2Elem) -> PairingScalar{
     /*! In a sigma protocol, I compute a hash of the proof commitment */
     let c = proof_commitment.to_str();
-    let mut hasher = Blake2b::new();
+    let mut hasher = Sha512::new();
     hasher.input(c.as_bytes());
 
     let result = hasher.result();

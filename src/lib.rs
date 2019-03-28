@@ -6,7 +6,6 @@
 extern crate rand_04;
 extern crate pairing;
 extern crate rustc_serialize;
-extern crate blake2;
 extern crate bulletproofs;
 extern crate curve25519_dalek;
 extern crate ed25519_dalek;
@@ -22,12 +21,14 @@ extern crate serde_json;
 extern crate sha2;
 extern crate sodiumoxide;
 extern crate bn;
+extern crate digest;
 
 mod errors;
 mod setup;
 mod utils;
 mod bn_pairing;
 mod bls12_381_pairing;
+mod algebra;
 
 
 pub mod bls12_381_credentials;

@@ -1,7 +1,7 @@
 use bulletproofs::PedersenGens;
 use crate::errors::ZeiError;
-use crate::proofs::{compute_challenge, compute_sub_challenge};
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use crate::proofs::{compute_sub_challenge, compute_challenge_ref};
+use curve25519_dalek::ristretto::{RistrettoPoint};
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
@@ -34,9 +34,9 @@ use rand::{CryptoRng, Rng};
 pub struct ChaumPedersenProof {
     /// I represent a Chaum-Perdersen equality of commitment proof
     //#[serde(with = "serialization::zei_obj_serde")]
-    pub(crate)c3: CompressedRistretto,
+    pub(crate)c3: RistrettoPoint,
     //#[serde(with = "serialization::zei_obj_serde")]
-    pub(crate)c4: CompressedRistretto,
+    pub(crate)c4: RistrettoPoint,
     //#[serde(with = "serialization::zei_obj_serde")]
     pub(crate)z1: Scalar,
     //#[serde(with = "serialization::zei_obj_serde")]
@@ -57,8 +57,8 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     prng: &mut R,
     pedersen_gens: &PedersenGens,
     value: &Scalar,
-    commitment1: &CompressedRistretto,
-    commitment2: &CompressedRistretto,
+    commitment1: &RistrettoPoint,
+    commitment2: &RistrettoPoint,
     blinding_factor1: &Scalar,
     blinding_factor2: &Scalar) -> ChaumPedersenProof
 {
@@ -69,17 +69,17 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     let r4 = Scalar::random(prng);
     let r5 = Scalar::random(prng);
 
-    let c3 = pedersen_gens.commit(r3, r4).compress();
-    let c4 = pedersen_gens.commit(r3, r5).compress();
+    let c3 = pedersen_gens.commit(r3, r4);
+    let c4 = pedersen_gens.commit(r3, r5);
 
-    let c = compute_challenge(&[*commitment1, *commitment2, c3, c4]);
+    let c = compute_challenge_ref::<RistrettoPoint>(&[commitment1, commitment2, &c3, &c4]);
 
     let z1 = c*value + r3;
     let z2 = c*r1 + r4;
     let z3 = c*r2 + r5;
 
     ChaumPedersenProof {
-        c3,c4,z1,z2,z3
+        c3,c4, z1,z2,z3
     }
 }
 
@@ -88,30 +88,26 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
 /// CompressedRistretto can not be decompressed*/
 pub fn chaum_pedersen_verify_eq(
     pc_gens: &PedersenGens,
-    c1: &CompressedRistretto, c2: &CompressedRistretto,
+    c1: &RistrettoPoint, c2: &RistrettoPoint,
     proof:&ChaumPedersenProof) -> Result<bool, ZeiError> {
 
-    let c1_d = c1.decompress().ok_or(ZeiError::DecompressElementError)?;
-    let c2_d = c2.decompress().ok_or(ZeiError::DecompressElementError)?;
-    let c3_d = proof.c3.decompress().ok_or(ZeiError::DecompressElementError)?;
-    let c4_d = proof.c4.decompress().ok_or(ZeiError::DecompressElementError)?;
     let z1 = proof.z1;
     let z2 = proof.z2;
     let z3 = proof.z3;
     let g = &pc_gens.B;
     let h = &pc_gens.B_blinding;
 
-    let c = compute_challenge(&[*c1, *c2, proof.c3, proof.c4]);
+    let c = compute_challenge_ref::<RistrettoPoint>(&[c1, c2, &proof.c3, &proof.c4]);
 
-    let mut vrfy_ok = c3_d + c*c1_d == z1*g + z2*h;
-    vrfy_ok = vrfy_ok && c4_d + c*c2_d == z1*g + z3*h;
+    let mut vrfy_ok = proof.c3 + c*c1 == z1*g + z2*h;
+    vrfy_ok = vrfy_ok && proof.c4 + c*c2 == z1*g + z3*h;
     Ok(vrfy_ok)
 }
 
 //Helper functions for the proof of multiple commitments equality below
 /// I return a fake compressed commitment to zero, eg The identity
-fn get_fake_zero_commitment() -> CompressedRistretto {
-    RistrettoPoint::identity().compress()
+fn get_fake_zero_commitment() -> RistrettoPoint {
+    RistrettoPoint::identity()
 }
 
 /// I return the blinding used in the get_fake_zero_commitment
@@ -124,7 +120,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     prng: &mut R,
     pedersen_gens: &PedersenGens,
     value: &Scalar,
-    commitments: &[CompressedRistretto],
+    commitments: &[RistrettoPoint],
     blinding_factors: &[Scalar],
     ) -> Result<ChaumPedersenProofX, ZeiError>
 {
@@ -141,20 +137,19 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
             zero: None,
         });
     }
-
-    let k = compute_challenge(commitments);
+    let mut points_refs = vec![];
+    for com in commitments{
+        points_refs.push(com);
+    }
+    let k = compute_challenge_ref::<RistrettoPoint>(points_refs.as_slice());
     let mut d = RistrettoPoint::identity();
     let mut z = Scalar::from(0u8);
     let c1 = commitments.get(0).ok_or(ZeiError::IndexError)?;
-    let c1_decompressed = (*c1).decompress().
-        ok_or(ZeiError::DecompressElementError)?;
     let r1 = blinding_factors.get(0).ok_or(ZeiError::IndexError)?;
     for i in 3..commitments.len(){
         let ci = commitments.get(i).ok_or(ZeiError::IndexError)?;
-        let ai = compute_sub_challenge(&k, i as u32);
-        let ci_decompressed = ci.decompress().
-            ok_or(ZeiError::DecompressElementError)?;
-        let di = ai * (c1_decompressed - ci_decompressed);
+        let ai = compute_sub_challenge::<RistrettoPoint>(&k, i as u32);
+        let di = ai * (c1 - ci);
         let ri = blinding_factors.get(i).ok_or(ZeiError::IndexError)?;
         let zi = ai * (*r1 - *ri);
         d = d + di;
@@ -166,7 +161,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     let proof_zero = chaum_pedersen_prove_eq(prng,
                                         pedersen_gens,
                                         &Scalar::from(0u8),
-                                        &d.compress(),
+                                        &d,
                                         &get_fake_zero_commitment(),
                                         &z,
                                         &get_fake_zero_commitment_blinding());
@@ -181,19 +176,20 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
 ///  * and Err(Error::DecompressElementError) in case some CompressedRistretto can not be decompressed
 pub fn chaum_pedersen_verify_multiple_eq(
     pedersen_gens: &PedersenGens,
-    commitments: &[CompressedRistretto],
+    commitments: &[RistrettoPoint],
     proof: &ChaumPedersenProofX) -> Result<bool, ZeiError>
 {
-    let k = compute_challenge(commitments);
+    let mut points_refs = vec![];
+    for com in commitments{
+        points_refs.push(com);
+    }
+    let k = compute_challenge_ref::<RistrettoPoint>(points_refs.as_slice());
     let mut d = RistrettoPoint::identity();
     let c1 = commitments.get(0).ok_or(ZeiError::IndexError)?;
-    let c1_decompressed = c1.decompress().ok_or(ZeiError::DecompressElementError)?;
     for i in 3..commitments.len(){
         let ci = commitments.get(i).ok_or(ZeiError::IndexError)?;
-        let ai = compute_sub_challenge(&k, i as u32);
-        let ci_decompressed = ci.decompress().
-            ok_or(ZeiError::DecompressElementError)?;
-        let di = ai * (c1_decompressed - ci_decompressed);
+        let ai = compute_sub_challenge::<RistrettoPoint>(&k, i as u32);
+        let di = ai * (c1 - ci);
         d = d + di;
     }
 
@@ -208,7 +204,7 @@ pub fn chaum_pedersen_verify_multiple_eq(
     }
     vrfy_ok = vrfy_ok && chaum_pedersen_verify_eq(
         pedersen_gens,
-        &d.compress(),
+        &d,
         &get_fake_zero_commitment(),
         proof.zero.as_ref().unwrap(),
     )?;
@@ -233,8 +229,8 @@ mod test {
         let bf1 = Scalar::from(10u8);
         let bf2 = Scalar::from(100u8);
         let pedersen_bases = PedersenGens::default();
-        let c1 = pedersen_bases.commit(value1, bf1).compress();
-        let c2 = pedersen_bases.commit(value2, bf2).compress();
+        let c1 = pedersen_bases.commit(value1, bf1);
+        let c2 = pedersen_bases.commit(value2, bf2);
 
         let proof = chaum_pedersen_prove_eq(
             &mut csprng,
@@ -266,7 +262,7 @@ mod test {
                                                    &proof).unwrap());
 
 
-        let c3 = pedersen_bases.commit(value1, bf2).compress();
+        let c3 = pedersen_bases.commit(value1, bf2);
         let proof = chaum_pedersen_prove_eq(
             &mut csprng,
             &pc_gens,
@@ -294,9 +290,9 @@ mod test {
         let bf2 = Scalar::from(100u8);
         let bf3 = Scalar::from(1000u32);
         let pedersen_bases = PedersenGens::default();
-        let c1 = pedersen_bases.commit(value1, bf1).compress();
-        let c2 = pedersen_bases.commit(value2, bf2).compress();
-        let c3 = pedersen_bases.commit(value1, bf3).compress();
+        let c1 = pedersen_bases.commit(value1, bf1);
+        let c2 = pedersen_bases.commit(value2, bf2);
+        let c3 = pedersen_bases.commit(value1, bf3);
 
         let com_vec = &[c1,c2,c3];
         let blind_vec = vec![bf1,bf2,bf3];
@@ -313,9 +309,9 @@ mod test {
             com_vec,
             &proof).unwrap());
 
-        let c1 = pedersen_bases.commit(value1, bf1).compress();
-        let c2 = pedersen_bases.commit(value1, bf2).compress();
-        let c3 = pedersen_bases.commit(value1, bf3).compress();
+        let c1 = pedersen_bases.commit(value1, bf1);
+        let c2 = pedersen_bases.commit(value1, bf2);
+        let c3 = pedersen_bases.commit(value1, bf3);
 
         let com_vec = &[c1,c2,c3];
         let blind_vec = vec![bf1,bf2,bf3];
@@ -343,8 +339,8 @@ mod test {
         let bf1 = Scalar::from(10u8);
         let bf2 = Scalar::from(100u8);
         let pedersen_bases = PedersenGens::default();
-        let c1 = pedersen_bases.commit(value1, bf1).compress();
-        let c2 = pedersen_bases.commit(value2, bf2).compress();
+        let c1 = pedersen_bases.commit(value1, bf1);
+        let c2 = pedersen_bases.commit(value2, bf2);
 
         let com_vec = &[c1,c2];
         let blind_vec = vec![bf1,bf2];
@@ -362,8 +358,8 @@ mod test {
             &proof).unwrap(),
         "Values were different");
 
-        let c1 = pedersen_bases.commit(value1, bf1).compress();
-        let c2 = pedersen_bases.commit(value1, bf2).compress();
+        let c1 = pedersen_bases.commit(value1, bf1);
+        let c2 = pedersen_bases.commit(value1, bf2);
 
         let com_vec = &[c1,c2];
         let blind_vec = vec![bf1,bf2];
