@@ -286,10 +286,8 @@ fn brute_force<G: Group>(base: &G, encoded: &G, lower_bound: u32, upper_bound: u
     Err(ZeiError::ElGamalDecryptionError)
 }
 
-#[cfg(test)]
-mod test{
-    use bulletproofs::PedersenGens;
-    use curve25519_dalek::scalar::Scalar;
+
+pub mod elgamal_test{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::errors::ZeiError;
@@ -297,36 +295,36 @@ mod test{
     use serde::ser::Serialize;
     use serde::de::Deserialize;
     use rmp_serde::Deserializer;
-    use curve25519_dalek::ristretto::RistrettoPoint;
+    use crate::algebra::groups::Group;
 
-    #[test]
-    fn verification(){
+
+
+    pub fn verification<G: Group>(){
         let mut prng = ChaChaRng::from_seed([0u8;32]);
-        let base = PedersenGens::default().B;
+        let base = G::get_base();
 
-        let secret_key = super::elgamal_generate_secret_key::<_,RistrettoPoint>(&mut prng);
+        let secret_key = super::elgamal_generate_secret_key::<_,G>(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
-        let m = Scalar::from(100u32);
-        let r = Scalar::random(&mut prng);
-        let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
-        assert_eq!(Ok(()), super::elgamal_verify(&base, &m, &ctext, &secret_key));
+        let m = G::scalar_from_u32(100u32);
+        let r = G::gen_random_scalar(&mut prng);
+        let ctext = super::elgamal_encrypt::<G>(&base, &m, &r, &public_key);
+        assert_eq!(Ok(()), super::elgamal_verify::<G>(&base, &m, &ctext, &secret_key));
 
-        let wrong_m = &Scalar::from(99u32);
-        let err = super::elgamal_verify(&base, wrong_m, &ctext, &secret_key).err().unwrap();
+        let wrong_m = G::scalar_from_u32(99u32);
+        let err = super::elgamal_verify(&base, &wrong_m, &ctext, &secret_key).err().unwrap();
         assert_eq!(ZeiError::ElGamalVerificationError,err);
     }
 
-    #[test]
-    fn decrypt(){
+    pub fn decrypt<G: Group>(){
         let mut prng = ChaChaRng::from_seed([0u8;32]);
-        let base = PedersenGens::default().B;
+        let base = G::get_base();
 
-        let secret_key = super::elgamal_generate_secret_key::<_, RistrettoPoint>(&mut prng);
+        let secret_key = super::elgamal_generate_secret_key::<_, G>(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
-        let m = Scalar::from(100u32);
-        let r = Scalar::random(&mut prng);
+        let m = G::scalar_from_u32(100u32);
+        let r = G::gen_random_scalar(&mut prng);
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         assert_eq!(Ok(()), super::elgamal_verify(&base, &m, &ctext, &secret_key));
 
@@ -339,7 +337,7 @@ mod test{
         let err  = super::elgamal_decrypt_hinted(&base, &ctext, &secret_key, 200, 300).err().unwrap();
         assert_eq!(ZeiError::ElGamalDecryptionError, err);
 
-        let m = Scalar::from(u64::max_value());
+        let m = G::scalar_from_u64(u64::max_value());
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         assert_eq!(Ok(()), super::elgamal_verify(&base, &m, &ctext, &secret_key));
 
@@ -347,60 +345,58 @@ mod test{
         assert_eq!(ZeiError::ElGamalDecryptionError, err);
     }
 
-    #[test]
-    fn to_json(){
+    pub fn to_json<G: Group>(){
         let mut prng = ChaChaRng::from_seed([0u8;32]);
-        let base = PedersenGens::default().B;
+        let base = G::get_base();
 
-        let secret_key = super::elgamal_generate_secret_key::<_, RistrettoPoint>(&mut prng);
+        let secret_key = super::elgamal_generate_secret_key::<_, G>(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
         //keys serialization
         let json_str = serde_json::to_string(&secret_key).unwrap();
-        let sk_de: ElGamalSecretKey<RistrettoPoint> = serde_json::from_str(&json_str).unwrap();
+        let sk_de: ElGamalSecretKey<G> = serde_json::from_str(&json_str).unwrap();
         assert_eq!(secret_key, sk_de);
 
         let json_str = serde_json::to_string(&public_key).unwrap();
-        let pk_de: ElGamalPublicKey<RistrettoPoint> = serde_json::from_str(&json_str).unwrap();
+        let pk_de: ElGamalPublicKey<G> = serde_json::from_str(&json_str).unwrap();
         assert_eq!(public_key, pk_de);
 
 
         //ciphertext serialization
-        let m = Scalar::from(100u32);
-        let r = Scalar::random(&mut prng);
+        let m = G::scalar_from_u32(100u32);
+        let r = G::gen_random_scalar(&mut prng);
 
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         let json_str = serde_json::to_string(&ctext).unwrap();
-        let ctext_de: ElGamalCiphertext<RistrettoPoint> = serde_json::from_str(&json_str).unwrap();
+        let ctext_de: ElGamalCiphertext<G> = serde_json::from_str(&json_str).unwrap();
 
         assert_eq!(ctext, ctext_de);
     }
 
-    #[test]
-    fn to_message_pack(){
+    pub fn to_message_pack<G: Group>(){
         let mut prng = ChaChaRng::from_seed([0u8;32]);
-        let base = PedersenGens::default().B;
+        let base = G::get_base();
 
-        let secret_key = super::elgamal_generate_secret_key::<_, RistrettoPoint>(&mut prng);
+        let secret_key = super::elgamal_generate_secret_key::<_, G>(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
         //keys serialization
         let mut vec = vec![];
         secret_key.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
         let mut de = Deserializer::new(&vec[..]);
-        let sk_de: ElGamalSecretKey<RistrettoPoint> = Deserialize::deserialize(&mut de).unwrap();
+        let sk_de: ElGamalSecretKey<G> = Deserialize::deserialize(&mut de).unwrap();
         assert_eq!(secret_key, sk_de);
 
         //public key serialization
         let mut vec = vec![];
         public_key.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
         let mut de = Deserializer::new(&vec[..]);
-        let pk_de: ElGamalPublicKey<RistrettoPoint> = Deserialize::deserialize(&mut de).unwrap();
+        let pk_de: ElGamalPublicKey<G> = Deserialize::deserialize(&mut de).unwrap();
         assert_eq!(public_key, pk_de);
 
         //ciphertext serialization
-        let m = Scalar::from(100u32);
-        let r = Scalar::random(&mut prng);
+        let m = G::scalar_from_u32(100u32);
+        let r = G::gen_random_scalar(&mut prng);
 
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
 
@@ -408,7 +404,7 @@ mod test{
         ctext.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
 
         let mut de = Deserializer::new(&vec[..]);
-        let ctext_de: ElGamalCiphertext<RistrettoPoint> = Deserialize::deserialize(&mut de).unwrap();
+        let ctext_de: ElGamalCiphertext<G> = Deserialize::deserialize(&mut de).unwrap();
         assert_eq!(ctext, ctext_de);
     }
 
