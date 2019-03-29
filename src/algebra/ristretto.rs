@@ -6,7 +6,47 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use rand::{CryptoRng, Rng};
 use digest::Digest;
 use digest::generic_array::typenum::U64;
+use crate::algebra::groups::Scalar as ZeiScalar;
 
+impl ZeiScalar for Scalar {
+    fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> Scalar {
+        Scalar::random(rng)
+    }
+
+    fn scalar_from_u32(x: u32) -> Scalar{
+        Scalar::from(x)
+    }
+
+    fn scalar_from_u64(x: u64) -> Scalar{
+        Scalar::from(x)
+    }
+
+    fn scalar_from_hash<D>(hash: D) -> Scalar
+        where D: Digest<OutputSize = U64> + Default,
+    {
+        Scalar::from_hash(hash)
+    }
+
+    fn scalar_add(a: &Scalar, b: &Scalar) -> Scalar{
+        a + b
+    }
+
+    fn scalar_mul(a: &Scalar, b: &Scalar) -> Scalar{
+        a * b
+    }
+
+    fn scalar_to_bytes(a: &Scalar) -> Vec<u8>{
+        let mut v = vec![];
+        v.extend_from_slice(a.as_bytes());
+        v
+    }
+
+    fn scalar_from_bytes(bytes: &[u8]) -> Scalar{
+        let mut array  = [0u8; 32];
+        array.copy_from_slice(bytes);
+        Scalar::from_bits(array)
+    }
+}
 impl Group for RistrettoPoint{
     type ScalarType = Scalar;
     const COMPRESSED_LEN: usize = 32;
@@ -41,44 +81,6 @@ impl Group for RistrettoPoint{
     fn sub(&self, other: &RistrettoPoint) -> RistrettoPoint {
         self - other
     }
-
-    fn gen_random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> Scalar {
-        Scalar::random(rng)
-    }
-
-    fn scalar_from_u32(x: u32) -> Scalar{
-        Scalar::from(x)
-    }
-
-    fn scalar_from_u64(x: u64) -> Scalar{
-        Scalar::from(x)
-    }
-
-    fn scalar_from_hash<D>(hash: D) -> Scalar
-    where D: Digest<OutputSize = U64> + Default,
-    {
-        Scalar::from_hash(hash)
-    }
-
-    fn scalar_add(a: &Scalar, b: &Scalar) -> Scalar{
-        a + b
-    }
-
-    fn scalar_mul(a: &Scalar, b: &Scalar) -> Scalar{
-        a * b
-    }
-
-    fn scalar_to_bytes(a: &Scalar) -> Vec<u8>{
-        let mut v = vec![];
-        v.extend_from_slice(a.as_bytes());
-        v
-    }
-
-    fn scalar_from_bytes(bytes: &[u8]) -> Scalar{
-        let mut array  = [0u8; Self::SCALAR_BYTES_LEN];
-        array.copy_from_slice(bytes);
-        Scalar::from_bits(array)
-    }
 }
 
 #[cfg(test)]
@@ -93,7 +95,7 @@ mod elgamal_over_ristretto_tests {
 
     #[test]
     fn decrypt(){
-        elgamal_test::decrypt::<RistrettoPoint>();
+        elgamal_test::decryption::<RistrettoPoint>();
     }
 
     #[test]

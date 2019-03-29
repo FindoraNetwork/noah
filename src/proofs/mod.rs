@@ -5,7 +5,7 @@ pub mod pedersen_elgamal;
 
 use crate::utils::u32_to_bigendian_u8array;
 use sha2::Digest;
-use crate::algebra::groups::Group;
+use crate::algebra::groups::{Group, Scalar};
 
 fn compute_challenge_ref<G: Group>(context: &[&G]) -> G::ScalarType {
     /*! I compute zk challenges for Dlog based proof. The challenge is a hash of the
@@ -16,7 +16,7 @@ fn compute_challenge_ref<G: Group>(context: &[&G]) -> G::ScalarType {
         hasher.input(point.to_compressed_bytes().as_slice());
     }
 
-    G::scalar_from_hash(hasher)
+    G::ScalarType::scalar_from_hash(hasher)
 }
 
 fn compute_sub_challenge<G: Group>(challenge: &G::ScalarType, i: u32) -> G::ScalarType {
@@ -24,8 +24,8 @@ fn compute_sub_challenge<G: Group>(challenge: &G::ScalarType, i: u32) -> G::Scal
     The sub-challenge is a hash of the challenge and the position i of the sub-challenge*/
     let mut hasher = sha2::Sha512::new();
 
-    hasher.input(G::scalar_to_bytes(&challenge).as_slice());
+    hasher.input(G::ScalarType::scalar_to_bytes(&challenge).as_slice());
     hasher.input(u32_to_bigendian_u8array(i));
 
-    G::scalar_from_hash(hasher)
+    G::ScalarType::scalar_from_hash(hasher)
 }

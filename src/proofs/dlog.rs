@@ -4,7 +4,7 @@ use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;
 use rand::Rng;
 use crate::proofs::{compute_sub_challenge, compute_challenge_ref};
-use crate::algebra::groups::Group;
+use crate::algebra::groups::{Group, Scalar as ZeiScalar};
 
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
@@ -18,12 +18,11 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     base: &G,
     point: &G,
     dlog: &G::ScalarType) -> DlogProof<G>{
-
     /*! I compute a proof for the knowledge of dlog for point with respect to base*/
-    let u = G::gen_random_scalar(prng);
+    let u = G::ScalarType::random_scalar(prng);
     let proof_commitment = base.mul_by_scalar(&u);
     let challenge = compute_challenge_ref::<G>(&[base, &proof_commitment, point]);
-    let response = G::scalar_add(&G::scalar_mul(&challenge, dlog),&u);
+    let response = G::ScalarType::scalar_add(&G::ScalarType::scalar_mul(&challenge, dlog),&u);
 
     DlogProof {
         proof_commitment: proof_commitment,
@@ -54,7 +53,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
 
     /*! I compute a proof for the knowledge of dlogs for points for the base*/
 
-    let u = G::gen_random_scalar(prng);
+    let u = G::ScalarType::random_scalar(prng);
     let proof_commitment = base.mul_by_scalar(&u);
     let mut context = vec![base, &proof_commitment];
     for point in points.iter(){
@@ -65,7 +64,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     let mut response = u;
     for i in 0..dlogs.len() {
         let challenge_i = compute_sub_challenge::<G>(&challenge, i as u32);
-        response = G::scalar_add(&response, &G::scalar_mul(&challenge_i, &dlogs[i]));
+        response = G::ScalarType::scalar_add(&response, &G::ScalarType::scalar_mul(&challenge_i, &dlogs[i]));
     }
 
     DlogProof {

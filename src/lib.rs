@@ -26,13 +26,12 @@ extern crate digest;
 mod errors;
 mod setup;
 mod utils;
-mod bn_pairing;
-mod bls12_381_pairing;
 mod algebra;
 
 
-pub mod bls12_381_credentials;
-pub mod bn_credentials;
+//pub mod bls12_381_credentials;
+//pub mod bn_credentials;
+//pub mod credentials;
 pub mod proofs;
 pub mod basic_crypto;
 pub mod serialization;

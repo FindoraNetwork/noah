@@ -1,5 +1,5 @@
 use rand_04::{Rng, SeedableRng};
-use crate::bn_pairing::{PairingScalar, G1Elem, G2Elem, pairing};
+use crate::algebra::bn_pairing::{PairingScalar, G1Elem, G2Elem, pairing};
 use crate::errors::ZeiError;
 use crate::utils::u8_bigendian_slice_to_u32;
 use sha2::{Sha512, Digest};

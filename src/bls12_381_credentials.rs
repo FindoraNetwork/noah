@@ -1,5 +1,5 @@
 use rand_04::{SeedableRng};
-use crate::bls12_381_pairing::{BLSScalar, BLSG1Elem, BLSG2Elem, pairing};
+use crate::algebra::bls12_381_pairing::{BLSScalar, BLSG1Elem, BLSG2Elem, pairing};
 use crate::errors::ZeiError;
 use sha2::{Sha512, Digest};
 

@@ -30,6 +30,7 @@ pairing = "0.14.2"
 bn = "0.4.3"
 rustc-serialize = "0.3"
 digest = "0.8"
+bincode = "1.1.2"
 
 [dev-dependencies]
 criterion = "0.2"
