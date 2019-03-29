@@ -1,10 +1,11 @@
-use super::groups::Group;
+use super::groups::{Group};
+use super::pairing::Pairing;
 use rand::{CryptoRng, Rng};
 use digest::Digest;
 use digest::generic_array::typenum::U64;
 use crate::utils::u8_bigendian_slice_to_u32;
 use std::fmt;
-use bn::Group as BNGroup;
+use bn::{Group as BNGroup};
 
 pub struct BNScalar(pub(crate) bn::Fr);
 pub struct BNG1(pub(crate) bn::G1);
@@ -222,6 +223,22 @@ impl fmt::Debug for BNGt{
     }
 }
 
+impl Pairing for BNGt {
+    type G1 = BNG1;
+    type G2 = BNG2;
+    type ScalarType = BNScalar;
+
+    fn pairing(a: &Self::G1, b: &Self::G2) -> BNGt{
+        BNGt(bn::pairing(a.0, b.0))
+    }
+    fn scalar_mul(&self, a: &Self::ScalarType) -> BNGt{
+        BNGt(self.0.pow(a.0))
+    }
+    fn add(&self, other: &Self) -> BNGt{
+        BNGt(self.0 * other.0)
+    }
+}
+
 #[cfg(test)]
 mod elgamal_over_bn_groups {
     use crate::basic_crypto::elgamal::elgamal_test;
@@ -245,7 +262,7 @@ mod elgamal_over_bn_groups {
     fn decryption_g2(){
         elgamal_test::decryption::<super::BNG2>();
     }
-        
+
 
     /*
     #[test]
