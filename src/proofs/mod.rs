@@ -16,7 +16,7 @@ fn compute_challenge_ref<G: Group>(context: &[&G]) -> G::ScalarType {
         hasher.input(point.to_compressed_bytes().as_slice());
     }
 
-    G::ScalarType::scalar_from_hash(hasher)
+    G::ScalarType::from_hash(hasher)
 }
 
 fn compute_sub_challenge<G: Group>(challenge: &G::ScalarType, i: u32) -> G::ScalarType {
@@ -24,8 +24,8 @@ fn compute_sub_challenge<G: Group>(challenge: &G::ScalarType, i: u32) -> G::Scal
     The sub-challenge is a hash of the challenge and the position i of the sub-challenge*/
     let mut hasher = sha2::Sha512::new();
 
-    hasher.input(G::ScalarType::scalar_to_bytes(&challenge).as_slice());
+    hasher.input(G::ScalarType::to_bytes(&challenge).as_slice());
     hasher.input(u32_to_bigendian_u8array(i));
 
-    G::ScalarType::scalar_from_hash(hasher)
+    G::ScalarType::from_hash(hasher)
 }

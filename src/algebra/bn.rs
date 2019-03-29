@@ -49,11 +49,11 @@ impl crate::algebra::groups::Scalar for BNScalar {
         BNScalar(bn::Fr::random(&mut prng_04))
     }
 
-    fn scalar_from_u32(value: u32) -> BNScalar{
-        Self::scalar_from_u64(value as u64)
+    fn from_u32(value: u32) -> BNScalar{
+        Self::from_u64(value as u64)
     }
 
-    fn scalar_from_u64(value: u64) -> BNScalar {
+    fn from_u64(value: u64) -> BNScalar {
         let mut v  = value;
         let two = bn::Fr::one() + bn::Fr::one();
         let mut result = bn::Fr::zero();
@@ -69,7 +69,7 @@ impl crate::algebra::groups::Scalar for BNScalar {
         BNScalar(result)
     }
 
-    fn scalar_from_hash<D>(hash: D) -> BNScalar
+    fn from_hash<D>(hash: D) -> BNScalar
         where D: Digest<OutputSize = U64> + Default{
         let result = hash.result();
         let mut seed = [0u32; 16];
@@ -82,21 +82,21 @@ impl crate::algebra::groups::Scalar for BNScalar {
     }
 
     // scalar arithmetic
-    fn scalar_add(a: &BNScalar, b: &BNScalar) -> BNScalar{
-        BNScalar(a.0 + b.0)
+    fn add(&self, b: &BNScalar) -> BNScalar{
+        BNScalar(self.0 + b.0)
     }
-    fn scalar_mul(a: &BNScalar, b: &BNScalar) -> BNScalar{
-        BNScalar(a.0 * b.0)
+    fn mul(&self, b: &BNScalar) -> BNScalar{
+        BNScalar(self.0 * b.0)
     }
 
     //scalar serialization
-    fn scalar_to_bytes(a: &BNScalar) -> Vec<u8>{
+    fn to_bytes(a: &BNScalar) -> Vec<u8>{
         let json = rustc_serialize::json::encode(&a.0).unwrap();
         let bytes = json.into_bytes();
         bytes
 
     }
-    fn scalar_from_bytes(bytes: &[u8]) -> BNScalar {
+    fn from_bytes(bytes: &[u8]) -> BNScalar {
         let json = &String::from_utf8(bytes.to_vec()).unwrap();
         BNScalar(rustc_serialize::json::decode(json).unwrap())
     }
@@ -148,7 +148,7 @@ impl Group for BNG1{
     }
 
     //arithmetic
-    fn mul_by_scalar(&self, scalar: &BNScalar) -> BNG1 {
+    fn mul(&self, scalar: &BNScalar) -> BNG1 {
         return BNG1(self.0 * scalar.0)
     }
     fn add(&self, other: &Self) -> BNG1{
@@ -206,7 +206,7 @@ impl Group for BNG2{
     }
 
     //arithmetic
-    fn mul_by_scalar(&self, scalar: &BNScalar) -> BNG2 {
+    fn mul(&self, scalar: &BNScalar) -> BNG2 {
         return BNG2(self.0 * scalar.0)
     }
     fn add(&self, other: &Self) -> BNG2{
@@ -236,6 +236,13 @@ impl Pairing for BNGt {
     }
     fn add(&self, other: &Self) -> BNGt{
         BNGt(self.0 * other.0)
+    }
+
+    fn g1_mul_scalar(a: &Self::G1, b: &Self::ScalarType) -> Self::G1{
+        a.mul(b)
+    }
+    fn g2_mul_scalar(a: &Self::G2, b: &Self::ScalarType) -> Self::G2{
+        a.mul(b)
     }
 }
 

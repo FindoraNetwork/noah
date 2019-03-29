@@ -20,9 +20,9 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     dlog: &G::ScalarType) -> DlogProof<G>{
     /*! I compute a proof for the knowledge of dlog for point with respect to base*/
     let u = G::ScalarType::random_scalar(prng);
-    let proof_commitment = base.mul_by_scalar(&u);
+    let proof_commitment = base.mul(&u);
     let challenge = compute_challenge_ref::<G>(&[base, &proof_commitment, point]);
-    let response = G::ScalarType::scalar_add(&G::ScalarType::scalar_mul(&challenge, dlog),&u);
+    let response = challenge.mul(dlog).add(&u);
 
     DlogProof {
         proof_commitment: proof_commitment,
@@ -40,7 +40,7 @@ pub fn verify_proof_of_knowledge_dlog<G: Group>(
     let challenge = compute_challenge_ref::<G>(
         &[base, &proof.proof_commitment, point]);
 
-    let vrfy_ok = base.mul_by_scalar(&proof.response) == point.mul_by_scalar(&challenge).add(&proof.proof_commitment);
+    let vrfy_ok = base.mul(&proof.response) == point.mul(&challenge).add(&proof.proof_commitment);
 
     vrfy_ok
 }
@@ -54,7 +54,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     /*! I compute a proof for the knowledge of dlogs for points for the base*/
 
     let u = G::ScalarType::random_scalar(prng);
-    let proof_commitment = base.mul_by_scalar(&u);
+    let proof_commitment = base.mul(&u);
     let mut context = vec![base, &proof_commitment];
     for point in points.iter(){
         context.push(point);
@@ -64,7 +64,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     let mut response = u;
     for i in 0..dlogs.len() {
         let challenge_i = compute_sub_challenge::<G>(&challenge, i as u32);
-        response = G::ScalarType::scalar_add(&response, &G::ScalarType::scalar_mul(&challenge_i, &dlogs[i]));
+        response = response.add( &challenge_i.mul(&dlogs[i]) );
     }
 
     DlogProof {
@@ -89,9 +89,9 @@ pub fn verify_multiple_knowledge_dlog<G: Group>(
     let mut check = proof.proof_commitment.clone();
     for i in 0..points.len() {
         let challenge_i = compute_sub_challenge::<G>(&challenge, i as u32);
-        check = check.add(&points[i].mul_by_scalar(&challenge_i));
+        check = check.add(&points[i].mul(&challenge_i));
     }
-    check == base.mul_by_scalar(&proof.response)
+    check == base.mul(&proof.response)
 
 }
 

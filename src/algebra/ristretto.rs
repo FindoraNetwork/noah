@@ -13,35 +13,35 @@ impl ZeiScalar for Scalar {
         Scalar::random(rng)
     }
 
-    fn scalar_from_u32(x: u32) -> Scalar{
+    fn from_u32(x: u32) -> Scalar{
         Scalar::from(x)
     }
 
-    fn scalar_from_u64(x: u64) -> Scalar{
+    fn from_u64(x: u64) -> Scalar{
         Scalar::from(x)
     }
 
-    fn scalar_from_hash<D>(hash: D) -> Scalar
+    fn from_hash<D>(hash: D) -> Scalar
         where D: Digest<OutputSize = U64> + Default,
     {
         Scalar::from_hash(hash)
     }
 
-    fn scalar_add(a: &Scalar, b: &Scalar) -> Scalar{
-        a + b
+    fn add(&self, b: &Scalar) -> Scalar{
+        self + b
     }
 
-    fn scalar_mul(a: &Scalar, b: &Scalar) -> Scalar{
-        a * b
+    fn mul(&self, b: &Scalar) -> Scalar{
+        self * b
     }
 
-    fn scalar_to_bytes(a: &Scalar) -> Vec<u8>{
+    fn to_bytes(a: &Scalar) -> Vec<u8>{
         let mut v = vec![];
         v.extend_from_slice(a.as_bytes());
         v
     }
 
-    fn scalar_from_bytes(bytes: &[u8]) -> Scalar{
+    fn from_bytes(bytes: &[u8]) -> Scalar{
         let mut array  = [0u8; 32];
         array.copy_from_slice(bytes);
         Scalar::from_bits(array)
@@ -70,7 +70,7 @@ impl Group for RistrettoPoint{
         CompressedRistretto::from_slice(bytes).decompress()
     }
 
-    fn mul_by_scalar(&self, scalar: &Scalar) -> Self{
+    fn mul(&self, scalar: &Scalar) -> Self{
         self * scalar
     }
 
