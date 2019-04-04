@@ -211,7 +211,7 @@ fn constant_terms_addition<Gt: Pairing>(
 mod test{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::credentials::{CredIssuerKeyPair, CredUserSecretKey};
+    use crate::credentials::{generate_cred_user_keys, reveal, issuer_sign, generate_cred_issuer_keys};
     use crate::algebra::bn::{BNScalar, BNGt, BNG1};
     use crate::algebra::groups::{Group, Scalar};
     use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify};
@@ -221,23 +221,24 @@ mod test{
     fn one_confidential_reveal(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let cred_issuer_keypair = CredIssuerKeyPair::<BNGt>::generate(&mut prng, 3);
+        let cred_issuer_keypair = generate_cred_issuer_keys::<_, BNGt>(&mut prng, 3);
         let cred_issuer_pk = cred_issuer_keypair.public_key_ref();
         let cred_issuer_sk = cred_issuer_keypair.secret_key_ref();
 
         let asset_issuer_secret_key = elgamal_generate_secret_key::<_,BNG1>(&mut prng);
         let asset_issuer_public_key = elgamal_derive_public_key(&BNG1::get_base(), &asset_issuer_secret_key);
 
-        let user_key = CredUserSecretKey::generate(&mut prng, cred_issuer_pk);
+        let user_key = generate_cred_user_keys(&mut prng, cred_issuer_pk);
 
         let attr1 = BNScalar::random_scalar(&mut prng);
         let attr2 = BNScalar::random_scalar(&mut prng);
         let attr3 = BNScalar::random_scalar(&mut prng);
 
-        let signature = cred_issuer_sk.sign(
-            &mut prng, &user_key.get_public_key_ref(), vec![attr1.clone(),attr2.clone(), attr3.clone()]);
+        let signature = issuer_sign(
+            &mut prng, &cred_issuer_sk, &user_key.get_public_key_ref(), vec![attr1.clone(),attr2.clone(), attr3.clone()]);
 
-        let proof = user_key.reveal(
+        let proof = reveal(
+            &user_key,
             &mut prng,
             cred_issuer_pk,
             &signature,
