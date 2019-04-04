@@ -153,28 +153,31 @@ fn verify_credential<Gt: Pairing>(
 ) -> Result<(), ZeiError>
 {
     //compute credential proof constants and multiply them by challenge
-    let cred_challenge = compute_challenge::<Gt>(&reveal_proof.pok.commitment);
-    let cred_lhs_constant = constant_terms_addition(&cred_challenge, reveal_proof, cred_issuer_public_key, bitmap);
-    let cred_rhs_constant = Gt::g2_mul_scalar(&cred_issuer_public_key.gen2, &challenge); //c*G2
+    let cred_challenge = compute_challenge::<Gt>(&reveal_proof.pok.commitment); //c
+    // lhs constant c*X2 + - pf.com + r_t*G2 + r_sk * Z2 + sum a_i + Y2i (a_i in hidden)
+    let cred_lhs_constant = constant_terms_addition(&cred_challenge, reveal_proof, cred_issuer_public_key, bitmap); // c*X2 + - pf.com + r_t*G2 + r_sk * Z2 + sum a_i + Y2i (a_i in hidden)
+    let cred_rhs_constant = Gt::g2_mul_scalar(&cred_issuer_public_key.gen2, &cred_challenge); //c*G2
 
+    // c' * (c*X2 + - pf.com + r_t*G2 + r_sk * Z2 + sum a_i + Y2i (a_i in hidden))
     let lhs_constant = Gt::g2_mul_scalar(&cred_lhs_constant, challenge);
-    let rhs_constant = Gt::g2_mul_scalar(&cred_rhs_constant, challenge);
+
 
     //add pok response terms to left hand side
-    let mut blinded_attr_sum = Gt::G2::get_identity(); // cred_challenge* sum response_i*Y2_i = cred_challenge * sum (c*a_i + b_i)*Y2_i
+    let mut blinded_attr_sum = Gt::G2::get_identity(); // c * sum r_{a_i}*Y2_i (ai in revealed) = c * sum r_{a_i}*Y2_i (ai in revealed)
     let mut attrs_responses_iter = pok_attrs.attr_responses.iter();
     for (b, yy2i) in bitmap.iter().zip(cred_issuer_public_key.yy2.iter()) {
         if *b {
             let response = attrs_responses_iter.next().unwrap();
-            blinded_attr_sum = blinded_attr_sum.add(&Gt::g2_mul_scalar(yy2i, response)); // cred_challenge*(blinded attr)*YY2_i
+            blinded_attr_sum = blinded_attr_sum.add(&Gt::g2_mul_scalar(yy2i, response));
         }
     }
-    // subtract commitment scaled by cred_challenge: cred_challenge * pok_aattrs.attr_commitment = cred_challenge \sum b_i* Y2i
+    // subtract commitment scaled by cred_challenge: c * pok_aattrs.attr_commitment = c * \sum b_i* Y2i
     blinded_attr_sum = blinded_attr_sum.sub(&pok_attrs.attr_blind_cred_commitment);
     blinded_attr_sum = Gt::g2_mul_scalar(&blinded_attr_sum, &cred_challenge);
     let lhs = lhs_constant.add(&blinded_attr_sum);
+    let rhs = Gt::g2_mul_scalar(&cred_rhs_constant, challenge);
     let a = Gt::pairing(&reveal_proof.signature.sigma1, &lhs);
-    let b = Gt::pairing(&reveal_proof.signature.sigma2, &rhs_constant);
+    let b = Gt::pairing(&reveal_proof.signature.sigma2, &rhs); // e(s2, c' * c * G2)
     match a == b {
         true => Ok(()),
         false => Err(ZeiError::IdentityRevealVerificationError),
@@ -189,7 +192,7 @@ fn constant_terms_addition<Gt: Pairing>(
 ) -> Gt::G2
 {
     //compute X_2*challenge - commitment + &G2 * &response_t + &PK.Z2 * response_sk + sum response_attr_i * PK.Y2_i
-    let mut q = Gt::g2_mul_scalar(&cred_issuer_public_key.xx2, &challenge).sub(&reveal_proof.pok.commitment); //X_2*challente + proof.commitment
+    let mut q = Gt::g2_mul_scalar(&cred_issuer_public_key.xx2, &challenge).sub(&reveal_proof.pok.commitment); //X_2*challente - proof.commitment
 
     q = q.add(&Gt::g2_mul_scalar(&cred_issuer_public_key.gen2, &reveal_proof.pok.response_t));
     q = q.add(&Gt::g2_mul_scalar(&cred_issuer_public_key.zz2, &reveal_proof.pok.response_sk));
@@ -206,5 +209,55 @@ fn constant_terms_addition<Gt: Pairing>(
 
 #[cfg(test)]
 mod test{
-    
+    use rand_chacha::ChaChaRng;
+    use rand::SeedableRng;
+    use crate::credentials::{CredIssuerKeyPair, CredUserSecretKey};
+    use crate::algebra::bn::{BNScalar, BNGt, BNG1};
+    use crate::algebra::groups::{Group, Scalar};
+    use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify};
+    use crate::basic_crypto::elgamal::{elgamal_generate_secret_key, elgamal_derive_public_key, elgamal_encrypt};
+
+    #[test]
+    fn one_confidential_reveal(){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let cred_issuer_keypair = CredIssuerKeyPair::<BNGt>::generate(&mut prng, 3);
+        let cred_issuer_pk = cred_issuer_keypair.public_key_ref();
+        let cred_issuer_sk = cred_issuer_keypair.secret_key_ref();
+
+        let asset_issuer_secret_key = elgamal_generate_secret_key::<_,BNG1>(&mut prng);
+        let asset_issuer_public_key = elgamal_derive_public_key(&BNG1::get_base(), &asset_issuer_secret_key);
+
+        let user_key = CredUserSecretKey::generate(&mut prng, cred_issuer_pk);
+
+        let attr1 = BNScalar::random_scalar(&mut prng);
+        let attr2 = BNScalar::random_scalar(&mut prng);
+        let attr3 = BNScalar::random_scalar(&mut prng);
+
+        let signature = cred_issuer_sk.sign(
+            &mut prng, &user_key.get_public_key_ref(), vec![attr1.clone(),attr2.clone(), attr3.clone()]);
+
+        let proof = user_key.reveal(
+            &mut prng,
+            cred_issuer_pk,
+            &signature,
+            &[attr1.clone(), attr2.clone(), attr3.clone()],
+            &[false, true, false],
+        );
+
+        let rand = BNScalar::random_scalar(&mut prng);
+        let ctext = elgamal_encrypt(&BNG1::get_base(), &attr2, &rand, &asset_issuer_public_key);
+        let pok_attr = pok_attrs_prove::<_, BNGt>(
+            &mut prng,
+            &[attr2.clone()],
+            cred_issuer_pk,
+            &asset_issuer_public_key,
+            &[rand],
+            &[false, true, false]).unwrap();
+
+        let vrfy = pok_attrs_verify(&proof, &[ctext], &pok_attr, cred_issuer_pk, &asset_issuer_public_key, &[false, true, false]);
+        assert_eq!(Ok(()), vrfy);
+    }
+
+
 }
