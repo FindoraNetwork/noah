@@ -1,5 +1,5 @@
 use rand::{CryptoRng, Rng};
-use crate::credentials::{CredIssuerPublicKey, compute_challenge, CredRevealProof};
+use crate::credentials::{IssuerPublicKey, compute_challenge, AttrsRevealProof};
 use crate::errors::ZeiError;
 use crate::algebra::pairing::Pairing;
 use crate::algebra::groups::{Group, Scalar};
@@ -17,7 +17,7 @@ pub struct PoKAttrs<Gt: Pairing>{
 pub fn pok_attrs_prove<R, Gt>(
     prng: &mut R,
     attrs: &[Gt::ScalarType], // attributes to prove knowledge of
-    cred_issuer_pk: &CredIssuerPublicKey<Gt>,
+    cred_issuer_pk: &IssuerPublicKey<Gt>,
     asset_issuer_pk: &ElGamalPublicKey<Gt::G1>,
     ctexts_rand: &[Gt::ScalarType], // randomness used to encrypt attrs
     bitmap: &[bool], // indicates position of each attribute to prove
@@ -86,10 +86,10 @@ fn pok_attrs_challenge<Gt: Pairing>(attr_coms: &[Gt::G1], rand_coms: &[(Gt::G1, 
 }
 
 pub fn pok_attrs_verify<Gt: Pairing>(
-    reveal_proof: &CredRevealProof<Gt>,
+    reveal_proof: &AttrsRevealProof<Gt>,
     ctexts: &[ElGamalCiphertext<Gt::G1>],
     pok_attrs: &PoKAttrs<Gt>,
-    cred_issuer_public_key: &CredIssuerPublicKey<Gt>,
+    cred_issuer_public_key: &IssuerPublicKey<Gt>,
     asset_issuer_public_key: &ElGamalPublicKey<Gt::G1>,
     bitmap: &[bool], // indicates which attributes should be revealed to the asset issuer
 ) -> Result<(), ZeiError>
@@ -146,9 +146,9 @@ fn verify_ciphertext<Gt: Pairing>(
 
 fn verify_credential<Gt: Pairing>(
     challenge: &Gt::ScalarType,
-    reveal_proof: &CredRevealProof<Gt>,
+    reveal_proof: &AttrsRevealProof<Gt>,
     pok_attrs: &PoKAttrs<Gt>,
-    cred_issuer_public_key: &CredIssuerPublicKey<Gt>,
+    cred_issuer_public_key: &IssuerPublicKey<Gt>,
     bitmap: &[bool], //policy, indicates which attributes needs to be revealed to the asset issuer
 ) -> Result<(), ZeiError>
 {
@@ -176,8 +176,8 @@ fn verify_credential<Gt: Pairing>(
     blinded_attr_sum = Gt::g2_mul_scalar(&blinded_attr_sum, &cred_challenge);
     let lhs = lhs_constant.add(&blinded_attr_sum);
     let rhs = Gt::g2_mul_scalar(&cred_rhs_constant, challenge);
-    let a = Gt::pairing(&reveal_proof.signature.sigma1, &lhs);
-    let b = Gt::pairing(&reveal_proof.signature.sigma2, &rhs); // e(s2, c' * c * G2)
+    let a = Gt::pairing(&reveal_proof.sig.sigma1, &lhs);
+    let b = Gt::pairing(&reveal_proof.sig.sigma2, &rhs); // e(s2, c' * c * G2)
     match a == b {
         true => Ok(()),
         false => Err(ZeiError::IdentityRevealVerificationError),
@@ -186,8 +186,8 @@ fn verify_credential<Gt: Pairing>(
 
 fn constant_terms_addition<Gt: Pairing>(
     challenge: &Gt::ScalarType,
-    reveal_proof: &CredRevealProof<Gt>,
-    cred_issuer_public_key: &CredIssuerPublicKey<Gt>,
+    reveal_proof: &AttrsRevealProof<Gt>,
+    cred_issuer_public_key: &IssuerPublicKey<Gt>,
     bitmap: &[bool],
 ) -> Gt::G2
 {
@@ -211,7 +211,7 @@ fn constant_terms_addition<Gt: Pairing>(
 mod test{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::credentials::{generate_cred_user_keys, reveal, issuer_sign, generate_cred_issuer_keys};
+    use crate::credentials::{gen_user_keys, reveal_attrs, issuer_sign, gen_issuer_keys};
     use crate::algebra::bn::{BNScalar, BNGt, BNG1};
     use crate::algebra::groups::{Group, Scalar};
     use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify};
@@ -221,25 +221,25 @@ mod test{
     fn one_confidential_reveal(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let cred_issuer_keypair = generate_cred_issuer_keys::<_, BNGt>(&mut prng, 3);
-        let cred_issuer_pk = cred_issuer_keypair.public_key_ref();
-        let cred_issuer_sk = cred_issuer_keypair.secret_key_ref();
+        let cred_issuer_keypair = gen_issuer_keys::<_, BNGt>(&mut prng, 3);
+        let cred_issuer_pk = &cred_issuer_keypair.0;
+        let cred_issuer_sk = &cred_issuer_keypair.1;
 
         let asset_issuer_secret_key = elgamal_generate_secret_key::<_,BNG1>(&mut prng);
         let asset_issuer_public_key = elgamal_derive_public_key(&BNG1::get_base(), &asset_issuer_secret_key);
 
-        let user_key = generate_cred_user_keys(&mut prng, cred_issuer_pk);
+        let user_key = gen_user_keys(&mut prng, cred_issuer_pk);
 
         let attr1 = BNScalar::random_scalar(&mut prng);
         let attr2 = BNScalar::random_scalar(&mut prng);
         let attr3 = BNScalar::random_scalar(&mut prng);
 
         let signature = issuer_sign(
-            &mut prng, &cred_issuer_sk, &user_key.get_public_key_ref(), vec![attr1.clone(),attr2.clone(), attr3.clone()]);
+            &mut prng, &cred_issuer_sk, &user_key.pk_ref(), vec![attr1.clone(), attr2.clone(), attr3.clone()]);
 
-        let proof = reveal(
-            &user_key,
+        let proof = reveal_attrs(
             &mut prng,
+            &user_key,
             cred_issuer_pk,
             &signature,
             &[attr1.clone(), attr2.clone(), attr3.clone()],
