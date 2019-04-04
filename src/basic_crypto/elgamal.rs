@@ -273,11 +273,13 @@ pub fn elgamal_decrypt_hinted<G: Group>(
 
 fn brute_force<G: Group>(base: &G, encoded: &G, lower_bound: u32, upper_bound: u32) -> Result<G::ScalarType, ZeiError>{
 
+    let mut b = base.mul(&G::ScalarType::from_u32(lower_bound));
     for i in lower_bound..upper_bound{
-        let s = G::ScalarType::from_u32(i);
-        if base.mul(&s) == *encoded {
-            return Ok(s);
+        //let s = G::ScalarType::from_u32(i);
+        if b == *encoded{
+            return Ok (G::ScalarType::from_u32(i));
         }
+        b = b.add(base);
     }
     Err(ZeiError::ElGamalDecryptionError)
 }
