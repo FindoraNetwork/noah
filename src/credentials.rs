@@ -6,11 +6,11 @@ use rand::{CryptoRng, Rng};
 
 /// I represent the Credentials' Issuer Public key
 pub struct CredIssuerPublicKey<Gt: Pairing>{
-    gen2: Gt::G2, //random generator for G2
-    xx2: Gt::G2,  //gen2^x, x in CredIssuerSecretKey
-    zz1: Gt::G1,  //gen1^z, z random scalar, gen1 in CredIssuerSecretKey
-    zz2: Gt::G2,  //gen2^z, same z as above
-    yy2: Vec<Gt::G2>, //gen2^{y_i}, y_i in CredIssuerSecretKey
+    pub(crate) gen2: Gt::G2, //random generator for G2
+    pub(crate) xx2: Gt::G2,  //gen2^x, x in CredIssuerSecretKey
+    pub(crate) zz1: Gt::G1,  //gen1^z, z random scalar, gen1 in CredIssuerSecretKey
+    pub(crate) zz2: Gt::G2,  //gen2^z, same z as above
+    pub(crate) yy2: Vec<Gt::G2>, //gen2^{y_i}, y_i in CredIssuerSecretKey
 }
 
 /// I represent the Credentials' Issuer Secret key
@@ -29,9 +29,10 @@ pub struct CredIssuerKeyPair<Gt: Pairing> {
 
 ///I represent a credential signature produce by credential issuer and used by
 /// user to selectively disclose signed attributed
+#[derive(Clone)]
 pub struct CredSignature<Gt: Pairing>{
-    sigma1: Gt::G1,
-    sigma2: Gt::G1,
+    pub(crate) sigma1: Gt::G1,
+    pub(crate) sigma2: Gt::G1,
 }
 
 ///I represent a credential user public key used to request credentials to a credential issuer
@@ -45,19 +46,21 @@ pub struct CredUserSecretKey<Gt: Pairing>{
 
 /// I'm a proof computed by the CredUserSecretKey holder that an Issuer has signed certain
 /// attributes for the corresponding CredUserPublicKey
+#[derive(Clone)]
 pub struct CredRevealProof<Gt: Pairing> {
-    signature: CredSignature<Gt>,
-    pok: ProofOfKnowledgeCredentials<Gt>,
+    pub(crate) signature: CredSignature<Gt>,
+    pub(crate) pok: ProofOfKnowledgeCredentials<Gt>,
 
 }
 
 /// I'm a proof of knowledge for t, sk (CredUserSecretKey), and hidden attributes that satisfy a
 /// certain relation.
+#[derive(Clone)]
 pub(crate) struct ProofOfKnowledgeCredentials<Gt: Pairing>{
-    commitment: Gt::G2,
-    response_t: Gt::ScalarType,
-    response_sk: Gt::ScalarType,
-    response_attrs: Vec<Gt::ScalarType>,
+    pub(crate) commitment: Gt::G2, // r_t*G2 + r_sk*Z2 + sum_{a_i in hidden attrs} r_{a_i}*Y2_i
+    pub(crate) response_t: Gt::ScalarType, // c*t + r_t
+    pub(crate) response_sk: Gt::ScalarType, // c*sk + r_sk
+    pub(crate) response_attrs: Vec<Gt::ScalarType>,  // {c*a_i + r_{a_i}; a_i in hidden}
 }
 
 impl<Gt: Pairing> CredUserSecretKey<Gt>{
@@ -92,8 +95,8 @@ impl<Gt: Pairing> CredUserSecretKey<Gt>{
         &self, prng: &mut R,
         issuer_public_key: &CredIssuerPublicKey<Gt>,
         issuer_signature: &CredSignature<Gt>,
-        attributes: Vec<Gt::ScalarType>,
-        bitmap_reveal: Vec<bool>
+        attributes: &[Gt::ScalarType],
+        bitmap_reveal: &[bool],
     ) -> CredRevealProof<Gt> {
         let r = Gt::ScalarType::random_scalar(prng);
         let t = Gt::ScalarType::random_scalar(prng);
@@ -107,13 +110,13 @@ impl<Gt: Pairing> CredUserSecretKey<Gt>{
         };
 
         let mut hidden_attributes = vec![];
-        for (attr, revealed) in attributes.iter().zip(&bitmap_reveal){
+        for (attr, revealed) in attributes.iter().zip(bitmap_reveal){
             if !(*revealed) {
                 hidden_attributes.push(attr.clone());
             }
         }
         let proof = self.prove_pok(prng, issuer_public_key, &t,
-                                   hidden_attributes, &bitmap_reveal);
+                                   hidden_attributes.as_slice(), bitmap_reveal);
 
         CredRevealProof{
             signature: randomized_signature,
@@ -127,8 +130,9 @@ impl<Gt: Pairing> CredUserSecretKey<Gt>{
         &mut R,
         issuer_public_key: &CredIssuerPublicKey<Gt>,
         t: &Gt::ScalarType,
-        hidden_attributes: Vec<Gt::ScalarType>,
-        revealed_bitmap: &Vec<bool>) -> ProofOfKnowledgeCredentials<Gt>
+        hidden_attributes: &[Gt::ScalarType],
+        revealed_bitmap: &[bool],
+    ) -> ProofOfKnowledgeCredentials<Gt>
     {
         /*! I compute a proof of knowledge of t, sk (self), and hidden attributes such that
          * some relation on them holds.
@@ -148,11 +152,13 @@ impl<Gt: Pairing> CredUserSecretKey<Gt>{
         }
         let mut commitment = Gt::g2_mul_scalar(&issuer_public_key.gen2,&beta1).add(&Gt::g2_mul_scalar(&issuer_public_key.zz2, &beta2));
         let mut gamma_iter = gamma.iter();
+        //let mut attr_commitment = vec![];
         for (yy2i,x) in issuer_public_key.yy2.iter().zip(revealed_bitmap){
             if !(*x) {
                 let gammai = gamma_iter.next().unwrap();
                 let elem = Gt::g2_mul_scalar(&yy2i,gammai);
                 commitment = commitment.add(&elem);
+                //attr_commitment.push(elem);
             }
         }
         let challenge: Gt::ScalarType = compute_challenge::<Gt>(&commitment);
@@ -179,8 +185,8 @@ impl<Gt: Pairing> CredUserSecretKey<Gt>{
     }
 }
 
-fn compute_challenge<Gt: Pairing>(proof_commitment: &Gt::G2) -> Gt::ScalarType{
-    /*! In a sigma protocol, I compute a hash of the proof commitment */
+pub(crate) fn compute_challenge<Gt: Pairing>(proof_commitment: &Gt::G2) -> Gt::ScalarType{
+    /*! In a sigma protocol, I compute a hash of the proof commitment*/
     let c = proof_commitment.to_compressed_bytes();
     let mut hasher = Sha512::new();
     hasher.input(c.as_slice());
@@ -224,11 +230,11 @@ impl<Gt: Pairing> CredIssuerSecretKey<Gt> {
 impl<Gt: Pairing> CredIssuerPublicKey<Gt> {
     pub fn verify(
         &self,
-        revealed_attrs: Vec<Gt::ScalarType>,
-        bitmap: Vec<bool>,
+        revealed_attrs: &[Gt::ScalarType],
+        bitmap: &[bool],
         credential: &CredRevealProof<Gt>) -> Result<(), ZeiError>{
-        let challenge = compute_challenge::<Gt>(&credential.pok.commitment);
 
+        let challenge = compute_challenge::<Gt>(&credential.pok.commitment);
         //q = X_2*challenge - proof_commitment + &self.gen2 * &credential.pok.response_t + &self.zz2 * &credential.pok.response_sk;
         let mut q = Gt::g2_mul_scalar(&self.xx2, &challenge).sub(&credential.pok.commitment); //X_2*challente + proof.commitment
 
@@ -243,9 +249,9 @@ impl<Gt: Pairing> CredIssuerPublicKey<Gt> {
         let mut response_attr_iter = credential.pok.response_attrs.iter();
         let mut yy2_iter = self.yy2.iter();
 
-        for b in bitmap{
+        for b in bitmap.iter(){
             let yy2i = yy2_iter.next().unwrap();
-            if b {
+            if *b {
                 let attribute = attr_iter.next().unwrap();
                 let scalar = challenge.mul(&attribute);
                 y_shown_attr = y_shown_attr.add(&Gt::g2_mul_scalar(&yy2i, &scalar));
@@ -263,9 +269,7 @@ impl<Gt: Pairing> CredIssuerPublicKey<Gt> {
         if a != b {
             return Err(ZeiError::SignatureError);
         }
-
         Ok(())
-
     }
 }
 
@@ -336,12 +340,13 @@ mod test {
             &mut prng,
             issuer_pk,
             &signature,
-            vec![attr.clone()],
-            vec![true]);
+            &[attr.clone()],
+            &[true],
+        );
 
         assert_eq!(true, issuer_pk.verify(
-            vec![attr.clone()],
-            vec![true],
+            &[attr.clone()],
+            &[true],
             &proof,
         ).is_ok())
     }
@@ -366,12 +371,13 @@ mod test {
             &mut prng,
             issuer_pk,
             &signature,
-            vec![attr1.clone(), attr2.clone()],
-            vec![true, false]);
+            &[attr1.clone(), attr2.clone()],
+            &[true, false],
+        );
 
         assert_eq!(true, issuer_pk.verify(
-            vec![attr1.clone()],
-            vec![true, false],
+            &[attr1.clone()],
+            &[true, false],
             &proof,
         ).is_ok(), "Revaling first attribute");
 
@@ -379,12 +385,13 @@ mod test {
             &mut prng,
             issuer_pk,
             &signature,
-            vec![attr1.clone(), attr2.clone()],
-            vec![false, true]);
+            &[attr1.clone(), attr2.clone()],
+            &[false, true]
+        );
 
         assert_eq!(true, issuer_pk.verify(
-            vec![attr2.clone()],
-            vec![false, true],
+            &[attr2.clone()],
+            &[false, true],
             &proof,
         ).is_ok(), "Revealing second attribute");
 
@@ -392,12 +399,13 @@ mod test {
             &mut prng,
             issuer_pk,
             &signature,
-            vec![attr1.clone(), attr2.clone()],
-            vec![false, false]);
+            &[attr1.clone(), attr2.clone()],
+            &[false, false],
+        );
 
         assert_eq!(true, issuer_pk.verify(
-            vec![],
-            vec![false, false],
+            vec![].as_slice(),
+            &[false, false],
             &proof,
         ).is_ok(), "Error revealing no attribute");
 
@@ -405,14 +413,14 @@ mod test {
             &mut prng,
             issuer_pk,
             &signature,
-            vec![attr1.clone(), attr2.clone()],
-            vec![true, true]);
+            &[attr1.clone(), attr2.clone()],
+            &[true, true],
+        );
 
         assert_eq!(true, issuer_pk.verify(
-            vec![attr1.clone(), attr2.clone()],
-            vec![true, true],
+            &[attr1.clone(), attr2.clone()],
+            &[true, true],
             &proof,
         ).is_ok(), "Error revealing both attributes")
     }
-
 }

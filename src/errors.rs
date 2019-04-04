@@ -24,6 +24,7 @@ pub enum ZeiError {
     ElGamalVerificationError,
     ElGamalDecryptionError,
     VerifyPedersenElGamalEqError,
+    IdentityRevealVerificationError,
 }
 
 impl fmt::Display for ZeiError {
@@ -50,6 +51,7 @@ impl fmt::Display for ZeiError {
             ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
             ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
             ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
+            ZeiError::IdentityRevealVerificationError=> "Verification error for confidential identity reveal proof",
         })
     }
 }
@@ -78,6 +80,7 @@ impl error::Error for ZeiError {
             ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
             ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
             ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
+            ZeiError::IdentityRevealVerificationError=> "Verification error for confidential identity reveal proof",
         }
     }
 }

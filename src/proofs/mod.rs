@@ -2,6 +2,7 @@ pub mod chaum_pedersen;
 pub mod dlog;
 pub mod solvency;
 pub mod pedersen_elgamal;
+pub mod identity;
 
 use crate::utils::u32_to_bigendian_u8array;
 use sha2::Digest;
