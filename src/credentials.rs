@@ -1,10 +1,78 @@
+
+/*
+ This file implements anonymous credentials as described below:
+
+ Credential issuers can issue credentials for a set of n attributes by providing a signature
+ on this attributes for a given user.
+
+ Users can selectively reveal a subset of attributes that are signed in the credentials by
+  a) Randomizing the signature (provide unlinkability between reveals)
+  b) Revealing a subset of attributes
+  c) Provide a zero knowledge proof of knowledge of user secret key and hidden attributes for the
+     credential signature
+
+  Specifications:
+  Issuer secret key:
+      - G1 // random generator of group 1
+      - x // random scalar
+      - y // random scalar
+
+  Issuer public key:
+      - G2  // random generator of group 2
+      - X2 = x * G2
+      - Z1 = z * G1 //for a random scalar z
+      - Z2 = z * G2
+      - {Y2_i} = {y_i * G2} // one y_i per attribute
+
+  User secret key: sk // random scalar
+  User public key: sk * Z2
+
+
+  + Signature over a set of attributes {attr_i} for user public key user_pk = sk * Z1:
+    - Sample random exponent u
+    - Compute e = issuer_sk.x + \sum attr_i*y_i
+    - C = e * issuer_sk.G1
+    - sigma1 = u * issuer_sk.G1 // u * G1
+    - sigma2 = u * (C + user_pk) // u* (x + sum attr_i * y_i + sk * z) * G1
+    - output (sigma1, sigma2)
+
+  + Signature Verification for a set of attributes {attr_i} for user public key user_pk over
+    - compare e(sigma1, \sum attr_i * Y2 + user_pk + X2) =? e(sigma2, G2)
+
+  + Selective revealing: prove that a signature signs a subset of attributes that are revealed while
+    hiddidng the rest of the attributes and the user public key. Strategy:
+     a) randomize the signature to provide unlinkability.
+     b) provide a proof of knowledge of user's secret key,
+       hidden attributed and scalar used to randomize the signature.
+
+    Reveal Algorithm:
+     a) signature randomization
+       i) sigma1' = r * sigma1
+       ii) sigma2' = r* (sigma2 + t * sigma1)
+     b) NI proof of knowledge
+       i) produce blinding scalar  b_t, b_sk, {b_attri: one for each attributes to hide}
+       ii) Compute a proof commitment C = b_t * G2 + b_s * Z2 + sum b_attri * Y2_i
+           (sum over attrs to hide)
+       iii) Compute challenge c as Hash(C)
+       iv) Compute challenge responses r_t = c * t + r_t, r_sk = c * sk + b_sk, and
+                                      {r_attri = c* attr_i + b_attri}
+     c) Output (sigma1', sigma2', C, r_t, r_sk, {r_attri})
+
+   + Revealed attributes verify (Input: (sigma1', sigma2', C, r_t, r_sk, {r_attri}),
+    revealed attributes: {attrj}, issuer_pk)
+     - Compute challenge c = Hash(C)
+     - compute P = c * X2 + c*\sum Y2_j attr_j + r_t * G2 + r_sk * Z2 + \sum r_attr_i * Y2_i - C
+        (where i ranges for all hidden attributes and j ranges for all revealed attributes)
+     - compare e(sigma1, P) =? e(sigma2, c * G2)
+ */
+
 use crate::errors::ZeiError;
 use sha2::{Sha512, Digest};
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::Pairing;
 use rand::{CryptoRng, Rng};
 
-/// I represent the Credentials' Issuer Public key
+/// I contain Credentials' Issuer Public key fields
 pub struct IssuerPublicKey<Gt: Pairing>{
     pub(crate) gen2: Gt::G2, //random generator for G2
     pub(crate) xx2: Gt::G2,  //gen2^x, x in CredIssuerSecretKey
@@ -13,7 +81,7 @@ pub struct IssuerPublicKey<Gt: Pairing>{
     pub(crate) yy2: Vec<Gt::G2>, //gen2^{y_i}, y_i in CredIssuerSecretKey
 }
 
-/// I represent the Credentials' Issuer Secret key
+/// I contain the Credentials' Issuer Secret key fields
 pub struct IssuerSecretKey<Gt: Pairing> {
     gen1: Gt::G1, //random generator for G1
     x: Gt::ScalarType,
@@ -21,30 +89,21 @@ pub struct IssuerSecretKey<Gt: Pairing> {
 
 }
 
-/// I represent a credential signature produce by credential issuer and used by
-/// user to selectively disclose signed attributed
+/// I'm a signature for a set of attributes produced by issuer for a user
 #[derive(Clone)]
 pub struct AttrsSignature<Gt: Pairing>{
     pub(crate) sigma1: Gt::G1,
     pub(crate) sigma2: Gt::G1,
 }
 
-///I represent a credential user public key used to request credentials to a credential issuer
+///I'm a user public key used to request a signature for a set of attributes (credential)
 pub struct UserPublicKey<Gt: Pairing>(pub(crate) Gt::G1);
 
-///I represent a credential user secret key used to selectively reveals attributed of my credential
-pub struct UserSecretKey<Gt: Pairing>{
-    secret: Gt::ScalarType,
-    public: UserPublicKey<Gt>,
-}
+///I'm a user's secret key
+pub struct UserSecretKey<Gt: Pairing> (pub(crate) Gt::ScalarType);
 
-impl<Gt: Pairing> UserSecretKey<Gt> {
-    pub fn pk_ref(&self) -> &UserPublicKey<Gt> {
-        &self.public
-    }
-}
-/// I'm a proof computed by the CredUserSecretKey holder that an Issuer has signed certain
-/// attributes for the corresponding CredUserPublicKey
+/// I'm a proof computed by the UserSecretKey holder that an Issuer has signed certain
+/// attributes for the corresponding UserPublicKey
 #[derive(Clone)]
 pub struct AttrsRevealProof<Gt: Pairing> {
     pub(crate) sig: AttrsSignature<Gt>,
@@ -52,7 +111,7 @@ pub struct AttrsRevealProof<Gt: Pairing> {
 
 }
 
-/// I'm a proof of knowledge for t, sk (CredUserSecretKey), and hidden attributes that satisfy a
+/// I'm a proof of knowledge for t, sk (UserSecretKey), and hidden attributes that satisfy a
 /// certain relation.
 #[derive(Clone)]
 pub(crate) struct PoKCred<Gt: Pairing>{
@@ -107,17 +166,36 @@ pub fn gen_issuer_keys<R: CryptoRng + Rng, Gt: Pairing>(
 pub fn gen_user_keys<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
     issuer_pk: &IssuerPublicKey<Gt>,
-) -> UserSecretKey<Gt>
+) -> (UserPublicKey<Gt>, UserSecretKey<Gt>)
 {
     let secret = Gt::ScalarType::random_scalar(prng);
     let pk = Gt::g1_mul_scalar(&issuer_pk.zz1, &secret);
-    let public = UserPublicKey(pk);
-    UserSecretKey {
-        secret,
-        public,
+    (UserPublicKey(pk), UserSecretKey(secret))
+}
+
+/// I Compute a credential signature for a set of attributes. User can represent Null attributes by
+/// a fixes scalar (e.g. 0)
+pub fn issuer_sign<R: CryptoRng + Rng, Gt: Pairing>(
+    prng: &mut R,
+    issuer_sk: &IssuerSecretKey<Gt>,
+    user_pk: &UserPublicKey<Gt>,
+    attrs: Vec<Gt::ScalarType>,
+) -> AttrsSignature<Gt>
+{
+    let u = Gt::ScalarType::random_scalar(prng);
+    let mut exponent = issuer_sk.x.clone();
+    for (attr ,yi) in attrs.iter().
+        zip(issuer_sk.y.iter()){
+        exponent = exponent.add(&attr.mul(yi));
+    }
+    let cc = Gt::g1_mul_scalar(&issuer_sk.gen1, &exponent);
+    AttrsSignature::<Gt>{
+        sigma1: Gt::g1_mul_scalar(&issuer_sk.gen1, &u),
+        sigma2: Gt::g1_mul_scalar(&user_pk.0.add(&cc), &u),
     }
 }
 
+/// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed
 pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
     user_sk: &UserSecretKey<Gt>,
@@ -159,6 +237,14 @@ pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
     }
 }
 
+/// I produce selective attribute disclose proof of knowledge
+/// Algorithm:
+///     1. Sample beta1, beta2 and {gamma_j} (One for each hidden attribute)
+///     2. Compute a sigma proof commitment for the values in 1:
+///        beta1*g2 + beta2*Z2 + \sum gamma_j Y2_{j_i} for each j_i s.t revealed_itmap[j_i] = false
+///     3. Sample the challenge as a hash of the commitment.
+///     4. Compute challenge's responses  c*t + \beta1, c*sk + beta2, {c*y_i + gamma_i}
+///     5. Return proof commitment and responses
 fn prove_pok<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
     user_sk: &UserSecretKey<Gt>,
@@ -168,16 +254,6 @@ fn prove_pok<R: CryptoRng + Rng, Gt: Pairing>(
     bitmap: &[bool], // indicates reveales attributed
 ) -> PoKCred<Gt>
 {
-    /*! I compute a proof of knowledge of t, sk, and hidden attributes such that
-     * some relation on them holds.
-     * Algorithm:
-     * 1. Sample beta1, beta2 and {gamma_j} (One for each hidden attribute)
-     * 2. Compute a sigma proof commitment for the values in 1:
-     *    beta1*g2 + beta2*Z2 + \sum gamma_j Y2_{j_i} for each j_i s.t revealed_itmap[j_i] = false
-     * 3. Sample the challenge as a hash of the commitment.
-     * 4. Compute challenge's responses  c*t + \beta1, c*sk + beta2, {c*y_i + gamma_i}
-     * 5. Return proof commitment and responses
-    */
     let beta1 = Gt::ScalarType::random_scalar(prng);
     let beta2 = Gt::ScalarType::random_scalar(prng);
     let mut gamma = vec![];
@@ -187,18 +263,16 @@ fn prove_pok<R: CryptoRng + Rng, Gt: Pairing>(
     let mut commitment = Gt::g2_mul_scalar(&issuer_pk.gen2,&beta1).
         add(&Gt::g2_mul_scalar(&issuer_pk.zz2, &beta2));
     let mut gamma_iter = gamma.iter();
-    //let mut attr_commitment = vec![];
     for (yy2i,x) in issuer_pk.yy2.iter().zip(bitmap){
         if !(*x) {
             let gammai = gamma_iter.next().unwrap();
             let elem = Gt::g2_mul_scalar(&yy2i,gammai);
             commitment = commitment.add(&elem);
-            //attr_commitment.push(elem);
         }
     }
     let challenge: Gt::ScalarType = compute_challenge::<Gt>(&commitment);
     let response_t = challenge.mul(t).add(&beta1); // challente*t + beta1
-    let response_sk = challenge.mul(&user_sk.secret).add(&beta2);
+    let response_sk = challenge.mul(&user_sk.0).add(&beta2);
     let mut response_attrs = vec![];
     let mut gamma_iter = gamma.iter();
     let mut attr_iter = hidden_attrs.iter();
@@ -219,34 +293,13 @@ fn prove_pok<R: CryptoRng + Rng, Gt: Pairing>(
 
 }
 
+/// I compute proof of knowledge challenge for selective attribute disclosure proof
 pub(crate) fn compute_challenge<Gt: Pairing>(commitment: &Gt::G2) -> Gt::ScalarType{
-    /*! In a sigma protocol, I compute a hash of the proof commitment*/
     let c = commitment.to_compressed_bytes();
     let mut hasher = Sha512::new();
     hasher.input(c.as_slice());
 
     Gt::ScalarType::from_hash(hasher)
-}
-
-/// I Compute a credential signature for a set of attributes. User can represent Null attributes by
-/// a fixes scalar (e.g. 0)
-pub fn issuer_sign<R: CryptoRng + Rng, Gt: Pairing>(
-    prng: &mut R,
-    issuer_sk: &IssuerSecretKey<Gt>,
-    user_pk: &UserPublicKey<Gt>,
-    attrs: Vec<Gt::ScalarType>,
-) -> AttrsSignature<Gt>
-{
-    let u = Gt::ScalarType::random_scalar(prng);
-    let mut exponent = issuer_sk.x.clone();
-    for (attr ,yi) in attrs.iter().zip(issuer_sk.y.iter()){
-        exponent = exponent.add(&attr.mul(yi));
-    }
-    let cc = Gt::g1_mul_scalar(&issuer_sk.gen1, &exponent);
-    AttrsSignature::<Gt>{
-        sigma1: Gt::g1_mul_scalar(&issuer_sk.gen1, &u),
-        sigma2: Gt::g1_mul_scalar(&user_pk.0.add(&cc), &u),
-    }
 }
 
 /// Given a list of revealed attributes_{k}, and a credential structure composed by a signature
@@ -262,7 +315,6 @@ pub fn issuer_sign<R: CryptoRng + Rng, Gt: Pairing>(
 /// 2. Compute p \= -proof_commitment c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
 ///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
 /// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
-
 pub fn verify<Gt: Pairing>(
     issuer_pk: &IssuerPublicKey<Gt>,
     revealed_attrs: &[Gt::ScalarType],
@@ -326,17 +378,20 @@ mod test {
     fn test_single_attribute(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let issuer_keypair = super::gen_issuer_keys::<_,BNGt>(&mut prng, 1);
+        let issuer_keypair =
+            super::gen_issuer_keys::<_,BNGt>(&mut prng, 1);
         let issuer_pk = &issuer_keypair.0;
         let issuer_sk = &issuer_keypair.1;
-        let user_key = super::gen_user_keys(&mut prng, issuer_pk);
+        let (user_pk, user_sk) =
+            super::gen_user_keys(&mut prng, issuer_pk);
         let attr = BNScalar::random_scalar(&mut prng);
 
-        let signature = super::issuer_sign(&mut prng, &issuer_sk, &user_key.public, vec![attr.clone()]);
+        let signature =
+            super::issuer_sign(&mut prng, &issuer_sk, &user_pk, vec![attr.clone()]);
 
         let proof = super::reveal_attrs(
             &mut prng,
-            &user_key,
+            &user_sk,
             issuer_pk,
             &signature,
             &[attr.clone()],
@@ -354,21 +409,23 @@ mod test {
     fn test_two_attributes(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let issuer_keypair = super::gen_issuer_keys::<_,BNGt>(&mut prng, 2);
+        let issuer_keypair =
+            super::gen_issuer_keys::<_,BNGt>(&mut prng, 2);
         let issuer_pk = &issuer_keypair.0;
         let issuer_sk = &issuer_keypair.1;
 
-        let user_key = super::gen_user_keys(&mut prng, issuer_pk);
+        let (user_pk, user_sk) =
+            super::gen_user_keys(&mut prng, issuer_pk);
 
         let attr1 = BNScalar::random_scalar(&mut prng);
         let attr2 = BNScalar::random_scalar(&mut prng);
 
         let signature = super::issuer_sign(
-            &mut prng, &issuer_sk, &user_key.pk_ref(), vec![attr1.clone(), attr2.clone()]);
+            &mut prng, &issuer_sk, &user_pk, vec![attr1.clone(), attr2.clone()]);
 
         let proof = reveal_attrs(
             &mut prng,
-            &user_key,
+            &user_sk,
             issuer_pk,
             &signature,
             &[attr1.clone(), attr2.clone()],
@@ -380,11 +437,11 @@ mod test {
             &[attr1.clone()],
             &[true, false],
             &proof,
-        ).is_ok(), "Revaling first attribute");
+        ).is_ok(), "Revealing first attribute");
 
         let proof = reveal_attrs(
             &mut prng,
-            &user_key,
+            &user_sk,
             issuer_pk,
             &signature,
             &[attr1.clone(), attr2.clone()],
@@ -400,7 +457,7 @@ mod test {
 
         let proof = reveal_attrs(
             &mut prng,
-            &user_key,
+            &user_sk,
             issuer_pk,
             &signature,
             &[attr1.clone(), attr2.clone()],
@@ -416,7 +473,7 @@ mod test {
 
         let proof = reveal_attrs(
             &mut prng,
-            &user_key,
+            &user_sk,
             issuer_pk,
             &signature,
             &[attr1.clone(), attr2.clone()],
