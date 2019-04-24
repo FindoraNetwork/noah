@@ -367,24 +367,21 @@ pub fn verify<Gt: Pairing>(
 
 }
 
-#[cfg(test)]
-mod test {
+pub mod credentials_tests {
     use super::*;
     use rand::{SeedableRng};
     use rand_chacha::ChaChaRng;
-    use crate::algebra::bn::{BNGt, BNScalar};
 
-    #[test]
-    fn test_single_attribute(){
+    pub fn single_attribute<Gt: Pairing>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let issuer_keypair =
-            super::gen_issuer_keys::<_,BNGt>(&mut prng, 1);
+            super::gen_issuer_keys::<_,Gt>(&mut prng, 1);
         let issuer_pk = &issuer_keypair.0;
         let issuer_sk = &issuer_keypair.1;
         let (user_pk, user_sk) =
             super::gen_user_keys(&mut prng, issuer_pk);
-        let attr = BNScalar::random_scalar(&mut prng);
+        let attr = Gt::ScalarType::random_scalar(&mut prng);
 
         let signature =
             super::issuer_sign(&mut prng, &issuer_sk, &user_pk, vec![attr.clone()]);
@@ -405,20 +402,19 @@ mod test {
         ).is_ok())
     }
 
-    #[test]
-    fn test_two_attributes(){
+    pub fn two_attributes<Gt: Pairing>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let issuer_keypair =
-            super::gen_issuer_keys::<_,BNGt>(&mut prng, 2);
+            super::gen_issuer_keys::<_,Gt>(&mut prng, 2);
         let issuer_pk = &issuer_keypair.0;
         let issuer_sk = &issuer_keypair.1;
 
         let (user_pk, user_sk) =
             super::gen_user_keys(&mut prng, issuer_pk);
 
-        let attr1 = BNScalar::random_scalar(&mut prng);
-        let attr2 = BNScalar::random_scalar(&mut prng);
+        let attr1 = Gt::ScalarType::random_scalar(&mut prng);
+        let attr2 = Gt::ScalarType::random_scalar(&mut prng);
 
         let signature = super::issuer_sign(
             &mut prng, &issuer_sk, &user_pk, vec![attr1.clone(), attr2.clone()]);

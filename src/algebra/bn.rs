@@ -283,3 +283,17 @@ mod elgamal_over_bn_groups {
     }
     */
 }
+
+#[cfg(test)]
+mod credentials_over_bn {
+
+    #[test]
+    fn single_attribute(){
+        crate::credentials::credentials_tests::single_attribute::<super::BNGt>();
+    }
+
+    #[test]
+    fn two_attributes(){
+        crate::credentials::credentials_tests::two_attributes::<super::BNGt>();
+    }
+}

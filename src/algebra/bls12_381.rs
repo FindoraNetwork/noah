@@ -276,3 +276,17 @@ mod elgamal_over_bls_groups {
     }
 
 }
+
+#[cfg(test)]
+mod credentials_over_bls_12_381 {
+
+    #[test]
+    fn single_attribute(){
+        crate::credentials::credentials_tests::single_attribute::<super::BLSGt>();
+    }
+
+    #[test]
+    fn two_attributes(){
+        crate::credentials::credentials_tests::two_attributes::<super::BLSGt>();
+    }
+}

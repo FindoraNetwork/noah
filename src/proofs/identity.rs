@@ -239,7 +239,7 @@ fn constant_terms_addition<Gt: Pairing>(
 }
 
 #[cfg(test)]
-mod test{
+mod test_bn{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::credentials::{gen_user_keys, reveal_attrs, issuer_sign, gen_issuer_keys};
@@ -287,6 +287,73 @@ mod test{
         let ctext = elgamal_encrypt(
             &BNG1::get_base(), &attr2, &rand, &asset_issuer_public_key);
         let pok_attr = pok_attrs_prove::<_, BNGt>(
+            &mut prng,
+            &[attr2.clone()],
+            cred_issuer_pk,
+            &asset_issuer_public_key,
+            &[rand],
+            &[false, true, false]).unwrap();
+
+        let vrfy = pok_attrs_verify(
+            &proof,
+            &[ctext],
+            &pok_attr,
+            cred_issuer_pk,
+            &asset_issuer_public_key,
+            &[false, true, false]);
+        assert_eq!(Ok(()), vrfy);
+    }
+}
+
+#[cfg(test)]
+mod test_bls12_381{
+    use rand_chacha::ChaChaRng;
+    use rand::SeedableRng;
+    use crate::credentials::{gen_user_keys, reveal_attrs, issuer_sign, gen_issuer_keys};
+    use crate::algebra::groups::{Group, Scalar};
+    use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify};
+    use crate::basic_crypto::elgamal::{elgamal_generate_secret_key,
+                                       elgamal_derive_public_key, elgamal_encrypt};
+    use crate::algebra::bls12_381::{BLSGt, BLSG1, BLSScalar};
+
+    #[test]
+    fn one_confidential_reveal(){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let cred_issuer_keypair =
+            gen_issuer_keys::<_, BLSGt>(&mut prng, 3);
+        let cred_issuer_pk = &cred_issuer_keypair.0;
+        let cred_issuer_sk = &cred_issuer_keypair.1;
+
+        let asset_issuer_secret_key =
+            elgamal_generate_secret_key::<_,BLSG1>(&mut prng);
+        let asset_issuer_public_key =
+            elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_secret_key);
+
+        let (user_pk, user_sk) =
+            gen_user_keys(&mut prng, cred_issuer_pk);
+
+        let attr1 = BLSScalar::random_scalar(&mut prng);
+        let attr2 = BLSScalar::random_scalar(&mut prng);
+        let attr3 = BLSScalar::random_scalar(&mut prng);
+
+        let signature = issuer_sign(
+            &mut prng, &cred_issuer_sk, &user_pk,
+            vec![attr1.clone(), attr2.clone(), attr3.clone()]);
+
+        let proof = reveal_attrs(
+            &mut prng,
+            &user_sk,
+            cred_issuer_pk,
+            &signature,
+            &[attr1.clone(), attr2.clone(), attr3.clone()],
+            &[false, true, false],
+        );
+
+        let rand = BLSScalar::random_scalar(&mut prng);
+        let ctext = elgamal_encrypt(
+            &BLSG1::get_base(), &attr2, &rand, &asset_issuer_public_key);
+        let pok_attr = pok_attrs_prove::<_, BLSGt>(
             &mut prng,
             &[attr2.clone()],
             cred_issuer_pk,
