@@ -80,8 +80,8 @@ impl Scalar for BLSScalar {
     }
 
     //scalar serialization
-    fn to_bytes(a: &BLSScalar) -> Vec<u8>{
-        let repr = FrRepr::from(a.0);
+    fn to_bytes(&self) -> Vec<u8>{
+        let repr = FrRepr::from(self.0);
         let mut v = vec![];
         for a in &repr.0 {
             let array = crate::utils::u64_to_bigendian_u8array(*a);
@@ -227,6 +227,21 @@ impl Pairing for BLSGt {
     }
     fn g2_mul_scalar(a: &Self::G2, b: &Self::ScalarType) -> Self::G2{
         a.mul(b)
+    }
+}
+
+#[cfg(test)]
+mod bls12_381_groups_test{
+    use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serializarion};
+
+    #[test]
+    fn test_scalar_ops(){
+        test_scalar_operations::<super::BLSScalar>();
+    }
+
+    #[test]
+    fn test_scalar_serialization(){
+        test_scalar_serializarion::<super::BLSScalar>();
     }
 }
 

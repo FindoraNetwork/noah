@@ -90,8 +90,8 @@ impl crate::algebra::groups::Scalar for BNScalar {
     }
 
     //scalar serialization
-    fn to_bytes(a: &BNScalar) -> Vec<u8>{
-        let json = rustc_serialize::json::encode(&a.0).unwrap();
+    fn to_bytes(&self) -> Vec<u8>{
+        let json = rustc_serialize::json::encode(&self.0).unwrap();
         let bytes = json.into_bytes();
         bytes
 
@@ -245,6 +245,25 @@ impl Pairing for BNGt {
         a.mul(b)
     }
 }
+
+
+#[cfg(test)]
+mod bn_groups_test{
+    use crate::algebra::groups::group_tests::{test_scalar_operations};
+
+    #[test]
+    fn scalar_ops(){
+        test_scalar_operations::<super::BNScalar>();
+    }
+
+    /*
+    #[test]
+    fn test_scalar_ser(){
+        test_scalar_serializarion()::<super::BNScalar>();
+    }
+    */
+}
+
 
 #[cfg(test)]
 mod elgamal_over_bn_groups {

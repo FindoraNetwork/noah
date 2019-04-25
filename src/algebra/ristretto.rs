@@ -35,9 +35,9 @@ impl ZeiScalar for Scalar {
         self * b
     }
 
-    fn to_bytes(a: &Scalar) -> Vec<u8>{
+    fn to_bytes(&self) -> Vec<u8>{
         let mut v = vec![];
-        v.extend_from_slice(a.as_bytes());
+        v.extend_from_slice(self.as_bytes());
         v
     }
 
@@ -80,6 +80,19 @@ impl Group for RistrettoPoint{
 
     fn sub(&self, other: &RistrettoPoint) -> RistrettoPoint {
         self - other
+    }
+}
+
+#[cfg(test)]
+mod ristretto_group_test{
+    use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serializarion};
+    #[test]
+    fn scalar_ops(){
+        test_scalar_operations::<super::Scalar>();
+    }
+    #[test]
+    fn scalar_serialization(){
+        test_scalar_serializarion::<super::Scalar>();
     }
 }
 

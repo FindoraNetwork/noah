@@ -17,7 +17,7 @@ pub trait Scalar: Debug + Sized + PartialEq + Eq + Clone {
     fn mul(&self, b: &Self) -> Self;
 
     // serialization
-    fn to_bytes(a: &Self) -> Vec<u8>;
+    fn to_bytes(&self) -> Vec<u8>;
     fn from_bytes(bytes: &[u8]) -> Self;
 }
 
@@ -39,3 +39,35 @@ pub trait Group: Debug + Sized + PartialEq + Eq + Clone{
     fn sub(&self, other: &Self) -> Self;
 }
 
+
+
+pub mod group_tests {
+    use crate::algebra::groups::Scalar;
+
+    pub fn test_scalar_operations<S: Scalar>() {
+        let a = S::from_u32(40);
+        let b = S::from_u32(60);
+        let c = a.add(&b);
+        let d = S::from_u32(100);
+        assert_eq!(c, d);
+
+        let a = S::from_u32(10);
+        let b = S::from_u32(40);
+        let c = a.mul(&b);
+        let d = S::from_u32(400);
+        assert_eq!(c, d);
+
+        let a = S::from_u32(0xFFFFFFFF);
+        let b = S::from_u32(1);
+        let c = a.add(&b);
+        let d = S::from_u64(0x100000000);
+        assert_eq!(c, d);
+    }
+
+    pub fn test_scalar_serializarion<S: Scalar>(){
+        let a = S::from_u32(100);
+        let bytes = a.to_bytes();
+        let b = S::from_bytes(bytes.as_slice());
+        assert_eq!(a, b);
+    }
+}
