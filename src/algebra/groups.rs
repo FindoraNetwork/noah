@@ -2,9 +2,10 @@ use rand::{Rng, CryptoRng};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 
 
-pub trait Scalar: Debug + Sized + PartialEq + Eq + Clone {
+pub trait Scalar: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>{
     // generation
     fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> Self;
     fn from_u32(value: u32) -> Self;
@@ -22,7 +23,7 @@ pub trait Scalar: Debug + Sized + PartialEq + Eq + Clone {
 }
 
 
-pub trait Group: Debug + Sized + PartialEq + Eq + Clone{
+pub trait Group: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>{
     type ScalarType: Scalar;
     const COMPRESSED_LEN: usize;
     const SCALAR_BYTES_LEN: usize;
@@ -38,7 +39,6 @@ pub trait Group: Debug + Sized + PartialEq + Eq + Clone{
     fn add(&self, other: &Self) -> Self;
     fn sub(&self, other: &Self) -> Self;
 }
-
 
 
 pub mod group_tests {
