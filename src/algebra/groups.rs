@@ -64,7 +64,7 @@ pub mod group_tests {
         assert_eq!(c, d);
     }
 
-    pub fn test_scalar_serializarion<S: Scalar>(){
+    pub fn test_scalar_serialization<S: Scalar>(){
         let a = S::from_u32(100);
         let bytes = a.to_bytes();
         let b = S::from_bytes(bytes.as_slice());

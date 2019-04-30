@@ -377,6 +377,56 @@ impl Pairing for BNGt {
     fn g2_mul_scalar(a: &Self::G2, b: &Self::ScalarType) -> Self::G2{
         a.mul(b)
     }
+
+    fn to_compressed_bytes(&self) -> Vec<u8>{
+        vec![]
+    }
+    fn from_compressed_bytes(bytes: &[u8]) -> Option<Self>{
+        None
+    }
+}
+
+impl Serialize for BNGt {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_bytes(&[0u8])
+    }
+}
+
+impl<'de> Deserialize<'de> for BNGt {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>
+    {
+        struct GtVisitor;
+
+        impl<'de> Visitor<'de> for GtVisitor{
+            type Value = BNGt;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a encoded BNGt element")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<BNGt, E>
+                where E: serde::de::Error
+            {
+                Ok(BNGt::from_compressed_bytes(v).unwrap()) //TODO handle error
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<BNGt, V::Error>
+                where V: SeqAccess<'de>,
+            {
+                let mut vec: Vec<u8> = vec![];
+                while let Some(x) = seq.next_element().unwrap() {
+                    vec.push(x);
+                }
+                Ok(BNGt::from_compressed_bytes(vec.as_slice()).unwrap())
+            }
+        }
+        deserializer.deserialize_bytes(GtVisitor)
+    }
 }
 
 

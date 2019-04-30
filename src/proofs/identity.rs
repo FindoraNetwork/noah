@@ -4,9 +4,75 @@ use crate::errors::ZeiError;
 use crate::algebra::pairing::Pairing;
 use crate::algebra::groups::{Group, Scalar};
 use sha2::{Sha512, Digest};
-use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
+use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, elgamal_encrypt};
+use crate::algebra::bls12_381::{BLSG1, BLSGt, BLSScalar, BLSG2};
 
-pub struct PoKAttrs<Gt: Pairing>{
+// BLS12_381 implementation of confidential identity reveal protocol
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ConfIdReveal{
+    ctexts: Vec<ElGamalCiphertext<BLSG1>>,
+    attr_reveal_proof: AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
+    pok_attrs: PoKAttrs<BLSGt>,
+}
+
+pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
+    prng: &mut R,
+    attrs: &[BLSScalar],
+    attr_reveal_proof: &AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
+    cred_issuer_public_key: &IssuerPublicKey<BLSGt>,
+    asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
+    bitmap: &[bool], // this is the policy. It indicates which attributes should be revealed
+)
+ -> Result<ConfIdReveal, ZeiError>
+{
+    let mut ctexts = vec![];
+    let mut rands = vec![];
+    let base = BLSG1::get_base();
+    for attr in attrs{
+        let r = BLSScalar::random_scalar(prng);
+        let ctext = elgamal_encrypt(&base, attr, &r, asset_issuer_public_key);
+        rands.push(r);
+        ctexts.push(ctext);
+    }
+
+    let pok_attrs_proof = pok_attrs_prove::<_,BLSGt>(
+        prng,
+        attrs,
+        cred_issuer_public_key,
+        asset_issuer_public_key,
+        rands.as_slice(),
+        bitmap,
+    )?;
+
+    Ok(ConfIdReveal{
+        ctexts: ctexts,
+        attr_reveal_proof:attr_reveal_proof.clone(),
+        pok_attrs: pok_attrs_proof,
+    })
+
+}
+
+pub fn verify_conf_id_reveal(
+    conf_id_reveal: &ConfIdReveal,
+    cred_issuer_public_key: &IssuerPublicKey<BLSGt>,
+    asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
+    bitmap: &[bool], // this is the policy. It indicates which attributes should be revealed
+) -> Result<(), ZeiError>
+{
+    pok_attrs_verify(
+        &conf_id_reveal.attr_reveal_proof,
+        &conf_id_reveal.ctexts,
+        &conf_id_reveal.pok_attrs,
+        cred_issuer_public_key,
+        asset_issuer_public_key,
+        bitmap,
+    )
+}
+
+
+// Generic functions for confidential identity reveal features
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct PoKAttrs<Gt: Pairing>{
     attr_blind_cred_commitment: Gt::G2, // sum blind_{a_i} * Y2_i for a_i in encrypted attributes
     attr_commitments: Vec<Gt::G1>, // blind_{a_i} * G1 for a_i in encrypted attributes
     rand_commitments: Vec<(Gt::G1, Gt::G1)>, // (blind_{r_i} * G, blind_{r_i} * PK)
@@ -16,7 +82,7 @@ pub struct PoKAttrs<Gt: Pairing>{
 
 /// I compute a proof of knowledge of identity attributes to be verified against ciphertext of these
 /// and a anoymouns credential proof
-pub fn pok_attrs_prove<R, Gt>(
+fn pok_attrs_prove<R, Gt>(
     prng: &mut R,
     attrs: &[Gt::ScalarType], // attributes to prove knowledge of
     cred_issuer_pk: &IssuerPublicKey<Gt>,
@@ -98,8 +164,8 @@ fn pok_attrs_challenge<Gt: Pairing>(
 }
 
 /// I verify a proof of knowledge of attributes that satisfy a confidential identity proof
-pub fn pok_attrs_verify<Gt: Pairing>(
-    reveal_proof: &AttrsRevealProof<Gt>,
+fn pok_attrs_verify<Gt: Pairing>(
+    reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
     ctexts: &[ElGamalCiphertext<Gt::G1>],
     pok_attrs: &PoKAttrs<Gt>,
     cred_issuer_public_key: &IssuerPublicKey<Gt>,
@@ -167,7 +233,7 @@ fn verify_ciphertext<Gt: Pairing>(
 /// credential proof
 fn verify_credential<Gt: Pairing>(
     challenge: &Gt::ScalarType,
-    reveal_proof: &AttrsRevealProof<Gt>,
+    reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
     pok_attrs: &PoKAttrs<Gt>,
     cred_issuer_public_key: &IssuerPublicKey<Gt>,
     bitmap: &[bool], //policy, indicates which attributes needs to be revealed to the asset issuer
@@ -213,7 +279,7 @@ fn verify_credential<Gt: Pairing>(
 
 fn constant_terms_addition<Gt: Pairing>(
     challenge: &Gt::ScalarType,
-    reveal_proof: &AttrsRevealProof<Gt>,
+    reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
     cred_issuer_public_key: &IssuerPublicKey<Gt>,
     bitmap: &[bool],
 ) -> Gt::G2
@@ -304,6 +370,8 @@ mod test_bn{
         assert_eq!(Ok(()), vrfy);
     }
 }
+
+
 
 #[cfg(test)]
 mod test_bls12_381{

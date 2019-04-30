@@ -18,6 +18,7 @@ use itertools::Itertools;
 use serde::ser::Serialize;
 use crate::proofs::pedersen_elgamal::{PedersenElGamalEqProof, pedersen_elgamal_eq_prove, pedersen_elgamal_eq_verify};
 use crate::basic_crypto::elgamal::{ElGamalPublicKey, ElGamalCiphertext, elgamal_encrypt};
+use crate::proofs::identity::ConfIdReveal;
 
 const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 type AssetType = [u8;16];
@@ -105,7 +106,7 @@ pub struct XfrRangeProof{
 pub struct AssetTrackingProof{
     pub(crate) amount_proof: Option<(PedersenElGamalEqProof, PedersenElGamalEqProof)>, // None if confidential amount flag is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
     pub(crate) asset_type_proof: Option<PedersenElGamalEqProof>, //None if confidential asset_type is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
-    //pub(crate) identity_proof: Option<?> //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertext encrypts the identity of the output address owner
+    pub(crate) identity_proof: Option<ConfIdReveal> //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
 impl PartialEq for XfrRangeProof {
@@ -355,7 +356,11 @@ fn tracking_proofs<R:CryptoRng + Rng>(
                     amount_proof = Some((proof_low, proof_high));
                 }
                 //TODO do identity
-                v.push(Some(AssetTrackingProof { amount_proof, asset_type_proof }));
+                v.push(Some(AssetTrackingProof {
+                    amount_proof,
+                    asset_type_proof,
+                    identity_proof:None }));
+            //    }));
             }
         }
     }

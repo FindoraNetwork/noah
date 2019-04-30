@@ -90,10 +90,10 @@ pub struct IssuerSecretKey<Gt: Pairing> {
 }
 
 /// I'm a signature for a set of attributes produced by issuer for a user
-#[derive(Clone)]
-pub struct AttrsSignature<Gt: Pairing>{
-    pub(crate) sigma1: Gt::G1,
-    pub(crate) sigma2: Gt::G1,
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttrsSignature<G1>{
+    pub(crate) sigma1: G1,
+    pub(crate) sigma2: G1,
 }
 
 ///I'm a user public key used to request a signature for a set of attributes (credential)
@@ -104,21 +104,21 @@ pub struct UserSecretKey<Gt: Pairing> (pub(crate) Gt::ScalarType);
 
 /// I'm a proof computed by the UserSecretKey holder that an Issuer has signed certain
 /// attributes for the corresponding UserPublicKey
-#[derive(Clone)]
-pub struct AttrsRevealProof<Gt: Pairing> {
-    pub(crate) sig: AttrsSignature<Gt>,
-    pub(crate) pok: PoKCred<Gt>,
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttrsRevealProof<G1, G2, S> {
+    pub(crate) sig: AttrsSignature<G1>,
+    pub(crate) pok: PoKCred<G2, S>,
 
 }
 
 /// I'm a proof of knowledge for t, sk (UserSecretKey), and hidden attributes that satisfy a
 /// certain relation.
-#[derive(Clone)]
-pub(crate) struct PoKCred<Gt: Pairing>{
-    pub(crate) commitment: Gt::G2, // r_t*G2 + r_sk*Z2 + sum_{a_i in hidden attrs} r_{a_i}*Y2_i
-    pub(crate) response_t: Gt::ScalarType, // c*t + r_t
-    pub(crate) response_sk: Gt::ScalarType, // c*sk + r_sk
-    pub(crate) response_attrs: Vec<Gt::ScalarType>,  // {c*a_i + r_{a_i}; a_i in hidden}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct PoKCred<G2, S>{
+    pub(crate) commitment: G2, // r_t*G2 + r_sk*Z2 + sum_{a_i in hidden attrs} r_{a_i}*Y2_i
+    pub(crate) response_t: S, // c*t + r_t
+    pub(crate) response_sk: S, // c*sk + r_sk
+    pub(crate) response_attrs: Vec<S>,  // {c*a_i + r_{a_i}; a_i in hidden}
 }
 
 /// I generate e key pair for a credential issuer
@@ -180,7 +180,7 @@ pub fn issuer_sign<R: CryptoRng + Rng, Gt: Pairing>(
     issuer_sk: &IssuerSecretKey<Gt>,
     user_pk: &UserPublicKey<Gt>,
     attrs: Vec<Gt::ScalarType>,
-) -> AttrsSignature<Gt>
+) -> AttrsSignature<Gt::G1>
 {
     let u = Gt::ScalarType::random_scalar(prng);
     let mut exponent = issuer_sk.x.clone();
@@ -189,7 +189,7 @@ pub fn issuer_sign<R: CryptoRng + Rng, Gt: Pairing>(
         exponent = exponent.add(&attr.mul(yi));
     }
     let cc = Gt::g1_mul_scalar(&issuer_sk.gen1, &exponent);
-    AttrsSignature::<Gt>{
+    AttrsSignature::<Gt::G1>{
         sigma1: Gt::g1_mul_scalar(&issuer_sk.gen1, &u),
         sigma2: Gt::g1_mul_scalar(&user_pk.0.add(&cc), &u),
     }
@@ -200,10 +200,10 @@ pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
     user_sk: &UserSecretKey<Gt>,
     issuer_pk: &IssuerPublicKey<Gt>,
-    sig: &AttrsSignature<Gt>,
+    sig: &AttrsSignature<Gt::G1>,
     attrs: &[Gt::ScalarType],
     bitmap: &[bool], // indicates which attributes are revealed
-) -> AttrsRevealProof<Gt>
+) -> AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>
 {
     let r = Gt::ScalarType::random_scalar(prng);
     let t = Gt::ScalarType::random_scalar(prng);
@@ -211,7 +211,7 @@ pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
     let sigma1_t = Gt::g1_mul_scalar(&sig.sigma1,&t);
     let sigma2_aux = sig.sigma2.add(&sigma1_t);
     let sigma2_r = Gt::g1_mul_scalar(&sigma2_aux, &r);
-    let rand_sig = AttrsSignature::<Gt>{
+    let rand_sig = AttrsSignature::<Gt::G1>{
         sigma1: sigma1_r,
         sigma2: sigma2_r, //sigma2: r*(sigma2 + t*sigma1)
     };
@@ -252,7 +252,7 @@ fn prove_pok<R: CryptoRng + Rng, Gt: Pairing>(
     t: &Gt::ScalarType,
     hidden_attrs: &[Gt::ScalarType],
     bitmap: &[bool], // indicates reveales attributed
-) -> PoKCred<Gt>
+) -> PoKCred<Gt::G2, Gt::ScalarType>
 {
     let beta1 = Gt::ScalarType::random_scalar(prng);
     let beta2 = Gt::ScalarType::random_scalar(prng);
@@ -319,7 +319,7 @@ pub fn verify<Gt: Pairing>(
     issuer_pk: &IssuerPublicKey<Gt>,
     revealed_attrs: &[Gt::ScalarType],
     bitmap: &[bool],
-    reveal_proof: &AttrsRevealProof<Gt>,
+    reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
 ) -> Result<(), ZeiError>
 {
     let proof_commitment = &reveal_proof.pok.commitment;
