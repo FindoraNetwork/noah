@@ -73,19 +73,19 @@ use crate::algebra::pairing::Pairing;
 use rand::{CryptoRng, Rng};
 
 /// I contain Credentials' Issuer Public key fields
-pub struct IssuerPublicKey<Gt: Pairing>{
-    pub(crate) gen2: Gt::G2, //random generator for G2
-    pub(crate) xx2: Gt::G2,  //gen2^x, x in CredIssuerSecretKey
-    pub(crate) zz1: Gt::G1,  //gen1^z, z random scalar, gen1 in CredIssuerSecretKey
-    pub(crate) zz2: Gt::G2,  //gen2^z, same z as above
-    pub(crate) yy2: Vec<Gt::G2>, //gen2^{y_i}, y_i in CredIssuerSecretKey
+pub struct IssuerPublicKey<G1, G2>{
+    pub(crate) gen2: G2, //random generator for G2
+    pub(crate) xx2: G2,  //gen2^x, x in CredIssuerSecretKey
+    pub(crate) zz1: G1,  //gen1^z, z random scalar, gen1 in CredIssuerSecretKey
+    pub(crate) zz2: G2,  //gen2^z, same z as above
+    pub(crate) yy2: Vec<G2>, //gen2^{y_i}, y_i in CredIssuerSecretKey
 }
 
 /// I contain the Credentials' Issuer Secret key fields
-pub struct IssuerSecretKey<Gt: Pairing> {
-    gen1: Gt::G1, //random generator for G1
-    x: Gt::ScalarType,
-    y: Vec<Gt::ScalarType>,
+pub struct IssuerSecretKey<G1, S> {
+    gen1: G1, //random generator for G1
+    x: S,
+    y: Vec<S>,
 
 }
 
@@ -97,10 +97,10 @@ pub struct AttrsSignature<G1>{
 }
 
 ///I'm a user public key used to request a signature for a set of attributes (credential)
-pub struct UserPublicKey<Gt: Pairing>(pub(crate) Gt::G1);
+pub struct UserPublicKey<G1>(pub(crate) G1);
 
 ///I'm a user's secret key
-pub struct UserSecretKey<Gt: Pairing> (pub(crate) Gt::ScalarType);
+pub struct UserSecretKey<S> (pub(crate) S);
 
 /// I'm a proof computed by the UserSecretKey holder that an Issuer has signed certain
 /// attributes for the corresponding UserPublicKey
@@ -125,7 +125,7 @@ pub(crate) struct PoKCred<G2, S>{
 pub fn gen_issuer_keys<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
     num_attrs: usize,
-) -> (IssuerPublicKey<Gt>, IssuerSecretKey<Gt>)
+) -> (IssuerPublicKey<Gt::G1, Gt::G2>, IssuerSecretKey<Gt::G1, Gt::ScalarType>)
 {
     let x = Gt::ScalarType::random_scalar(prng);
     let z = Gt::ScalarType::random_scalar(prng);
@@ -165,8 +165,8 @@ pub fn gen_issuer_keys<R: CryptoRng + Rng, Gt: Pairing>(
 /// I generate a credential user key pair for a given credential issuer
 pub fn gen_user_keys<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
-    issuer_pk: &IssuerPublicKey<Gt>,
-) -> (UserPublicKey<Gt>, UserSecretKey<Gt>)
+    issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
+) -> (UserPublicKey<Gt::G1>, UserSecretKey<Gt::ScalarType>)
 {
     let secret = Gt::ScalarType::random_scalar(prng);
     let pk = Gt::g1_mul_scalar(&issuer_pk.zz1, &secret);
@@ -177,8 +177,8 @@ pub fn gen_user_keys<R: CryptoRng + Rng, Gt: Pairing>(
 /// a fixes scalar (e.g. 0)
 pub fn issuer_sign<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
-    issuer_sk: &IssuerSecretKey<Gt>,
-    user_pk: &UserPublicKey<Gt>,
+    issuer_sk: &IssuerSecretKey<Gt::G1, Gt::ScalarType>,
+    user_pk: &UserPublicKey<Gt::G1>,
     attrs: Vec<Gt::ScalarType>,
 ) -> AttrsSignature<Gt::G1>
 {
@@ -198,8 +198,8 @@ pub fn issuer_sign<R: CryptoRng + Rng, Gt: Pairing>(
 /// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed
 pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
-    user_sk: &UserSecretKey<Gt>,
-    issuer_pk: &IssuerPublicKey<Gt>,
+    user_sk: &UserSecretKey<Gt::ScalarType>,
+    issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
     sig: &AttrsSignature<Gt::G1>,
     attrs: &[Gt::ScalarType],
     bitmap: &[bool], // indicates which attributes are revealed
@@ -222,7 +222,7 @@ pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
             hidden_attrs.push(attr.clone());
         }
     }
-    let proof = prove_pok(
+    let proof = prove_pok::<_,Gt>(
         prng,
         user_sk,
         issuer_pk,
@@ -247,8 +247,8 @@ pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
 ///     5. Return proof commitment and responses
 fn prove_pok<R: CryptoRng + Rng, Gt: Pairing>(
     prng: &mut R,
-    user_sk: &UserSecretKey<Gt>,
-    issuer_pk: &IssuerPublicKey<Gt>,
+    user_sk: &UserSecretKey<Gt::ScalarType>,
+    issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
     t: &Gt::ScalarType,
     hidden_attrs: &[Gt::ScalarType],
     bitmap: &[bool], // indicates reveales attributed
@@ -316,7 +316,7 @@ pub(crate) fn compute_challenge<Gt: Pairing>(commitment: &Gt::G2) -> Gt::ScalarT
 ///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
 /// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
 pub fn verify<Gt: Pairing>(
-    issuer_pk: &IssuerPublicKey<Gt>,
+    issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
     revealed_attrs: &[Gt::ScalarType],
     bitmap: &[bool],
     reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
@@ -380,13 +380,13 @@ pub mod credentials_tests {
         let issuer_pk = &issuer_keypair.0;
         let issuer_sk = &issuer_keypair.1;
         let (user_pk, user_sk) =
-            super::gen_user_keys(&mut prng, issuer_pk);
+            super::gen_user_keys::<_, Gt>(&mut prng, issuer_pk);
         let attr = Gt::ScalarType::random_scalar(&mut prng);
 
         let signature =
-            super::issuer_sign(&mut prng, &issuer_sk, &user_pk, vec![attr.clone()]);
+            super::issuer_sign::<_, Gt>(&mut prng, &issuer_sk, &user_pk, vec![attr.clone()]);
 
-        let proof = super::reveal_attrs(
+        let proof = super::reveal_attrs::<_, Gt>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -395,7 +395,8 @@ pub mod credentials_tests {
             &[true],
         );
 
-        assert_eq!(true, verify(&issuer_pk,
+        assert_eq!(true, verify::<Gt>(
+            &issuer_pk,
             &[attr.clone()],
             &[true],
             &proof,
@@ -411,15 +412,15 @@ pub mod credentials_tests {
         let issuer_sk = &issuer_keypair.1;
 
         let (user_pk, user_sk) =
-            super::gen_user_keys(&mut prng, issuer_pk);
+            super::gen_user_keys::<_, Gt>(&mut prng, issuer_pk);
 
         let attr1 = Gt::ScalarType::random_scalar(&mut prng);
         let attr2 = Gt::ScalarType::random_scalar(&mut prng);
 
-        let signature = super::issuer_sign(
+        let signature = super::issuer_sign::<_, Gt>(
             &mut prng, &issuer_sk, &user_pk, vec![attr1.clone(), attr2.clone()]);
 
-        let proof = reveal_attrs(
+        let proof = reveal_attrs::<_, Gt>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -428,14 +429,14 @@ pub mod credentials_tests {
             &[true, false],
         );
 
-        assert_eq!(true, verify(
+        assert_eq!(true, verify::<Gt>(
             &issuer_pk,
             &[attr1.clone()],
             &[true, false],
             &proof,
         ).is_ok(), "Revealing first attribute");
 
-        let proof = reveal_attrs(
+        let proof = reveal_attrs::<_, Gt>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -444,14 +445,14 @@ pub mod credentials_tests {
             &[false, true]
         );
 
-        assert_eq!(true, verify(
+        assert_eq!(true, verify::<Gt>(
             &issuer_pk,
             &[attr2.clone()],
             &[false, true],
             &proof,
         ).is_ok(), "Revealing second attribute");
 
-        let proof = reveal_attrs(
+        let proof = reveal_attrs::<_, Gt>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -460,14 +461,14 @@ pub mod credentials_tests {
             &[false, false],
         );
 
-        assert_eq!(true, verify(
+        assert_eq!(true, verify::<Gt>(
             &issuer_pk,
             vec![].as_slice(),
             &[false, false],
             &proof,
         ).is_ok(), "Error revealing no attribute");
 
-        let proof = reveal_attrs(
+        let proof = reveal_attrs::<_,Gt>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -476,7 +477,7 @@ pub mod credentials_tests {
             &[true, true],
         );
 
-        assert_eq!(true, verify(
+        assert_eq!(true, verify::<Gt>(
             &issuer_pk,
             &[attr1.clone(), attr2.clone()],
             &[true, true],
