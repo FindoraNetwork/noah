@@ -48,6 +48,7 @@ impl<G: Group> ZeiFromToBytes for ElGamalCiphertext<G>{
     }
 }
 
+
 impl<G: Group> Serialize for ElGamalPublicKey<G> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -214,7 +215,6 @@ impl<'de, G: Group> Deserialize<'de> for ElGamalCiphertext<G> {
         deserializer.deserialize_bytes(ElGamalVisitor::new())
     }
 }
-
 
 /// I return an ElGamal ciphertext pair as (r*G, m*g + r*PK), where G is a curve base point
 pub fn elgamal_encrypt<G:Group>(

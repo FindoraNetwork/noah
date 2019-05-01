@@ -122,30 +122,30 @@ pub(crate) struct PoKCred<G2, S>{
 }
 
 /// I generate e key pair for a credential issuer
-pub fn gen_issuer_keys<R: CryptoRng + Rng, Gt: Pairing>(
+pub fn gen_issuer_keys<R: CryptoRng + Rng, P: Pairing>(
     prng: &mut R,
     num_attrs: usize,
-) -> (IssuerPublicKey<Gt::G1, Gt::G2>, IssuerSecretKey<Gt::G1, Gt::ScalarType>)
+) -> (IssuerPublicKey<P::G1, P::G2>, IssuerSecretKey<P::G1, P::ScalarType>)
 {
-    let x = Gt::ScalarType::random_scalar(prng);
-    let z = Gt::ScalarType::random_scalar(prng);
+    let x = P::ScalarType::random_scalar(prng);
+    let z = P::ScalarType::random_scalar(prng);
     //TODO check that G1 and G2 are of prime order so that every element is generator
-    let gen1 = Gt::g1_mul_scalar(
-        &Gt::G1::get_base(),
-        &Gt::ScalarType::random_scalar(prng));
-    let gen2 = Gt::g2_mul_scalar(
-        &Gt::G2::get_base(),
-        &Gt::ScalarType::random_scalar(prng));
+    let gen1 = P::g1_mul_scalar(
+        &P::G1::get_base(),
+        &P::ScalarType::random_scalar(prng));
+    let gen2 = P::g2_mul_scalar(
+        &P::G2::get_base(),
+        &P::ScalarType::random_scalar(prng));
     let mut y = vec![];
     let mut yy2 = vec![];
     for _ in 0..num_attrs {
-        let yi = Gt::ScalarType::random_scalar(prng);
-        yy2.push(Gt::g2_mul_scalar(&gen2, &yi));
+        let yi = P::ScalarType::random_scalar(prng);
+        yy2.push(P::g2_mul_scalar(&gen2, &yi));
         y.push(yi);
     }
-    let xx2 = Gt::g2_mul_scalar(&gen2, &x);
-    let zz1 = Gt::g1_mul_scalar(&gen1, &z);
-    let zz2 = Gt::g2_mul_scalar( &gen2, &z);
+    let xx2 = P::g2_mul_scalar(&gen2, &x);
+    let zz1 = P::g1_mul_scalar(&gen1, &z);
+    let zz2 = P::g2_mul_scalar( &gen2, &z);
     (
      IssuerPublicKey {
             gen2,
@@ -163,55 +163,55 @@ pub fn gen_issuer_keys<R: CryptoRng + Rng, Gt: Pairing>(
 }
 
 /// I generate a credential user key pair for a given credential issuer
-pub fn gen_user_keys<R: CryptoRng + Rng, Gt: Pairing>(
+pub fn gen_user_keys<R: CryptoRng + Rng, P: Pairing>(
     prng: &mut R,
-    issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
-) -> (UserPublicKey<Gt::G1>, UserSecretKey<Gt::ScalarType>)
+    issuer_pk: &IssuerPublicKey<P::G1, P::G2>,
+) -> (UserPublicKey<P::G1>, UserSecretKey<P::ScalarType>)
 {
-    let secret = Gt::ScalarType::random_scalar(prng);
-    let pk = Gt::g1_mul_scalar(&issuer_pk.zz1, &secret);
+    let secret = P::ScalarType::random_scalar(prng);
+    let pk = P::g1_mul_scalar(&issuer_pk.zz1, &secret);
     (UserPublicKey(pk), UserSecretKey(secret))
 }
 
 /// I Compute a credential signature for a set of attributes. User can represent Null attributes by
 /// a fixes scalar (e.g. 0)
-pub fn issuer_sign<R: CryptoRng + Rng, Gt: Pairing>(
+pub fn issuer_sign<R: CryptoRng + Rng, P: Pairing>(
     prng: &mut R,
-    issuer_sk: &IssuerSecretKey<Gt::G1, Gt::ScalarType>,
-    user_pk: &UserPublicKey<Gt::G1>,
-    attrs: Vec<Gt::ScalarType>,
-) -> AttrsSignature<Gt::G1>
+    issuer_sk: &IssuerSecretKey<P::G1, P::ScalarType>,
+    user_pk: &UserPublicKey<P::G1>,
+    attrs: Vec<P::ScalarType>,
+) -> AttrsSignature<P::G1>
 {
-    let u = Gt::ScalarType::random_scalar(prng);
+    let u = P::ScalarType::random_scalar(prng);
     let mut exponent = issuer_sk.x.clone();
     for (attr ,yi) in attrs.iter().
         zip(issuer_sk.y.iter()){
         exponent = exponent.add(&attr.mul(yi));
     }
-    let cc = Gt::g1_mul_scalar(&issuer_sk.gen1, &exponent);
-    AttrsSignature::<Gt::G1>{
-        sigma1: Gt::g1_mul_scalar(&issuer_sk.gen1, &u),
-        sigma2: Gt::g1_mul_scalar(&user_pk.0.add(&cc), &u),
+    let cc = P::g1_mul_scalar(&issuer_sk.gen1, &exponent);
+    AttrsSignature::<P::G1>{
+        sigma1: P::g1_mul_scalar(&issuer_sk.gen1, &u),
+        sigma2: P::g1_mul_scalar(&user_pk.0.add(&cc), &u),
     }
 }
 
 /// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed
-pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
+pub fn reveal_attrs<R: CryptoRng + Rng, P: Pairing>(
     prng: &mut R,
-    user_sk: &UserSecretKey<Gt::ScalarType>,
-    issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
-    sig: &AttrsSignature<Gt::G1>,
-    attrs: &[Gt::ScalarType],
+    user_sk: &UserSecretKey<P::ScalarType>,
+    issuer_pk: &IssuerPublicKey<P::G1, P::G2>,
+    sig: &AttrsSignature<P::G1>,
+    attrs: &[P::ScalarType],
     bitmap: &[bool], // indicates which attributes are revealed
-) -> AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>
+) -> AttrsRevealProof<P::G1, P::G2, P::ScalarType>
 {
-    let r = Gt::ScalarType::random_scalar(prng);
-    let t = Gt::ScalarType::random_scalar(prng);
-    let sigma1_r = Gt::g1_mul_scalar(&sig.sigma1, &r);
-    let sigma1_t = Gt::g1_mul_scalar(&sig.sigma1,&t);
+    let r = P::ScalarType::random_scalar(prng);
+    let t = P::ScalarType::random_scalar(prng);
+    let sigma1_r = P::g1_mul_scalar(&sig.sigma1, &r);
+    let sigma1_t = P::g1_mul_scalar(&sig.sigma1,&t);
     let sigma2_aux = sig.sigma2.add(&sigma1_t);
-    let sigma2_r = Gt::g1_mul_scalar(&sigma2_aux, &r);
-    let rand_sig = AttrsSignature::<Gt::G1>{
+    let sigma2_r = P::g1_mul_scalar(&sigma2_aux, &r);
+    let rand_sig = AttrsSignature::<P::G1>{
         sigma1: sigma1_r,
         sigma2: sigma2_r, //sigma2: r*(sigma2 + t*sigma1)
     };
@@ -222,7 +222,7 @@ pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
             hidden_attrs.push(attr.clone());
         }
     }
-    let proof = prove_pok::<_,Gt>(
+    let proof = prove_pok::<_,P>(
         prng,
         user_sk,
         issuer_pk,
@@ -245,32 +245,32 @@ pub fn reveal_attrs<R: CryptoRng + Rng, Gt: Pairing>(
 ///     3. Sample the challenge as a hash of the commitment.
 ///     4. Compute challenge's responses  c*t + \beta1, c*sk + beta2, {c*y_i + gamma_i}
 ///     5. Return proof commitment and responses
-fn prove_pok<R: CryptoRng + Rng, Gt: Pairing>(
+fn prove_pok<R: CryptoRng + Rng, P: Pairing>(
     prng: &mut R,
-    user_sk: &UserSecretKey<Gt::ScalarType>,
-    issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
-    t: &Gt::ScalarType,
-    hidden_attrs: &[Gt::ScalarType],
+    user_sk: &UserSecretKey<P::ScalarType>,
+    issuer_pk: &IssuerPublicKey<P::G1, P::G2>,
+    t: &P::ScalarType,
+    hidden_attrs: &[P::ScalarType],
     bitmap: &[bool], // indicates reveales attributed
-) -> PoKCred<Gt::G2, Gt::ScalarType>
+) -> PoKCred<P::G2, P::ScalarType>
 {
-    let beta1 = Gt::ScalarType::random_scalar(prng);
-    let beta2 = Gt::ScalarType::random_scalar(prng);
+    let beta1 = P::ScalarType::random_scalar(prng);
+    let beta2 = P::ScalarType::random_scalar(prng);
     let mut gamma = vec![];
     for _ in 0..hidden_attrs.len(){
-        gamma.push(Gt::ScalarType::random_scalar(prng));
+        gamma.push(P::ScalarType::random_scalar(prng));
     }
-    let mut commitment = Gt::g2_mul_scalar(&issuer_pk.gen2,&beta1).
-        add(&Gt::g2_mul_scalar(&issuer_pk.zz2, &beta2));
+    let mut commitment = P::g2_mul_scalar(&issuer_pk.gen2,&beta1).
+        add(&P::g2_mul_scalar(&issuer_pk.zz2, &beta2));
     let mut gamma_iter = gamma.iter();
     for (yy2i,x) in issuer_pk.yy2.iter().zip(bitmap){
         if !(*x) {
             let gammai = gamma_iter.next().unwrap();
-            let elem = Gt::g2_mul_scalar(&yy2i,gammai);
+            let elem = P::g2_mul_scalar(&yy2i,gammai);
             commitment = commitment.add(&elem);
         }
     }
-    let challenge: Gt::ScalarType = compute_challenge::<Gt>(&commitment);
+    let challenge: P::ScalarType = compute_challenge::<P>(&commitment);
     let response_t = challenge.mul(t).add(&beta1); // challente*t + beta1
     let response_sk = challenge.mul(&user_sk.0).add(&beta2);
     let mut response_attrs = vec![];
@@ -294,12 +294,12 @@ fn prove_pok<R: CryptoRng + Rng, Gt: Pairing>(
 }
 
 /// I compute proof of knowledge challenge for selective attribute disclosure proof
-pub(crate) fn compute_challenge<Gt: Pairing>(commitment: &Gt::G2) -> Gt::ScalarType{
+pub(crate) fn compute_challenge<P: Pairing>(commitment: &P::G2) -> P::ScalarType{
     let c = commitment.to_compressed_bytes();
     let mut hasher = Sha512::new();
     hasher.input(c.as_slice());
 
-    Gt::ScalarType::from_hash(hasher)
+    P::ScalarType::from_hash(hasher)
 }
 
 /// Given a list of revealed attributes_{k}, and a credential structure composed by a signature
@@ -315,26 +315,26 @@ pub(crate) fn compute_challenge<Gt: Pairing>(commitment: &Gt::G2) -> Gt::ScalarT
 /// 2. Compute p \= -proof_commitment c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
 ///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
 /// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
-pub fn verify<Gt: Pairing>(
-    issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
-    revealed_attrs: &[Gt::ScalarType],
+pub fn verify<P: Pairing>(
+    issuer_pk: &IssuerPublicKey<P::G1, P::G2>,
+    revealed_attrs: &[P::ScalarType],
     bitmap: &[bool],
-    reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
+    reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
 ) -> Result<(), ZeiError>
 {
     let proof_commitment = &reveal_proof.pok.commitment;
     let proof_resp_attrs = &reveal_proof.pok.response_attrs;
-    let challenge = compute_challenge::<Gt>(proof_commitment);
+    let challenge = compute_challenge::<P>(proof_commitment);
     //q = X_2*c - proof_commitment + &G2 * r_t + Z2 * r_sk;
-    let mut q = Gt::g2_mul_scalar(&issuer_pk.xx2, &challenge).sub(proof_commitment);
+    let mut q = P::g2_mul_scalar(&issuer_pk.xx2, &challenge).sub(proof_commitment);
 
-    let a = Gt::g2_mul_scalar(&issuer_pk.gen2, &reveal_proof.pok.response_t);
-    let b = Gt::g2_mul_scalar(&issuer_pk.zz2, &reveal_proof.pok.response_sk);
+    let a = P::g2_mul_scalar(&issuer_pk.gen2, &reveal_proof.pok.response_t);
+    let b = P::g2_mul_scalar(&issuer_pk.zz2, &reveal_proof.pok.response_sk);
     let c = a.add(&b);
     q = q.add(&c);
 
-    let mut y_shown_attr = Gt::G2::get_identity(); //sum (challenge * attr_i)*Y2
-    let mut y_hidden_attr = Gt::G2::get_identity(); //sum gamma_i*Y2
+    let mut y_shown_attr = P::G2::get_identity(); //sum (challenge * attr_i)*Y2
+    let mut y_hidden_attr = P::G2::get_identity(); //sum gamma_i*Y2
     let mut attr_iter = revealed_attrs.iter();
     let mut response_attr_iter = proof_resp_attrs.iter();
     let mut yy2_iter = issuer_pk.yy2.iter();
@@ -344,20 +344,20 @@ pub fn verify<Gt: Pairing>(
         if *b {
             let attribute = attr_iter.next().unwrap();
             let scalar = challenge.mul(&attribute);
-            y_shown_attr = y_shown_attr.add(&Gt::g2_mul_scalar(&yy2i, &scalar));
+            y_shown_attr = y_shown_attr.add(&P::g2_mul_scalar(&yy2i, &scalar));
         }
         else {
             let response_attr = response_attr_iter.next().unwrap();
-            y_hidden_attr = y_hidden_attr.add(&Gt::g2_mul_scalar(&yy2i, response_attr));
+            y_hidden_attr = y_hidden_attr.add(&P::g2_mul_scalar(&yy2i, response_attr));
         }
     }
     let shown_plus_hidden = y_shown_attr.add(&y_hidden_attr);
     q = q.add(&shown_plus_hidden);
 
-    let a = Gt::pairing(&reveal_proof.sig.sigma1, &q);
-    let b = Gt::pairing(
+    let a = P::pairing(&reveal_proof.sig.sigma1, &q);
+    let b = P::pairing(
         &reveal_proof.sig.sigma2,
-        &Gt::g2_mul_scalar(&issuer_pk.gen2, &challenge)
+        &P::g2_mul_scalar(&issuer_pk.gen2, &challenge)
     );
 
     match a == b {
@@ -372,21 +372,21 @@ pub mod credentials_tests {
     use rand::{SeedableRng};
     use rand_chacha::ChaChaRng;
 
-    pub fn single_attribute<Gt: Pairing>(){
+    pub fn single_attribute<P: Pairing>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let issuer_keypair =
-            super::gen_issuer_keys::<_,Gt>(&mut prng, 1);
+            super::gen_issuer_keys::<_,P>(&mut prng, 1);
         let issuer_pk = &issuer_keypair.0;
         let issuer_sk = &issuer_keypair.1;
         let (user_pk, user_sk) =
-            super::gen_user_keys::<_, Gt>(&mut prng, issuer_pk);
-        let attr = Gt::ScalarType::random_scalar(&mut prng);
+            super::gen_user_keys::<_, P>(&mut prng, issuer_pk);
+        let attr = P::ScalarType::random_scalar(&mut prng);
 
         let signature =
-            super::issuer_sign::<_, Gt>(&mut prng, &issuer_sk, &user_pk, vec![attr.clone()]);
+            super::issuer_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, vec![attr.clone()]);
 
-        let proof = super::reveal_attrs::<_, Gt>(
+        let proof = super::reveal_attrs::<_, P>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -395,7 +395,7 @@ pub mod credentials_tests {
             &[true],
         );
 
-        assert_eq!(true, verify::<Gt>(
+        assert_eq!(true, verify::<P>(
             &issuer_pk,
             &[attr.clone()],
             &[true],
@@ -403,24 +403,24 @@ pub mod credentials_tests {
         ).is_ok())
     }
 
-    pub fn two_attributes<Gt: Pairing>(){
+    pub fn two_attributes<P: Pairing>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let issuer_keypair =
-            super::gen_issuer_keys::<_,Gt>(&mut prng, 2);
+            super::gen_issuer_keys::<_,P>(&mut prng, 2);
         let issuer_pk = &issuer_keypair.0;
         let issuer_sk = &issuer_keypair.1;
 
         let (user_pk, user_sk) =
-            super::gen_user_keys::<_, Gt>(&mut prng, issuer_pk);
+            super::gen_user_keys::<_, P>(&mut prng, issuer_pk);
 
-        let attr1 = Gt::ScalarType::random_scalar(&mut prng);
-        let attr2 = Gt::ScalarType::random_scalar(&mut prng);
+        let attr1 = P::ScalarType::random_scalar(&mut prng);
+        let attr2 = P::ScalarType::random_scalar(&mut prng);
 
-        let signature = super::issuer_sign::<_, Gt>(
+        let signature = super::issuer_sign::<_, P>(
             &mut prng, &issuer_sk, &user_pk, vec![attr1.clone(), attr2.clone()]);
 
-        let proof = reveal_attrs::<_, Gt>(
+        let proof = reveal_attrs::<_, P>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -429,14 +429,14 @@ pub mod credentials_tests {
             &[true, false],
         );
 
-        assert_eq!(true, verify::<Gt>(
+        assert_eq!(true, verify::<P>(
             &issuer_pk,
             &[attr1.clone()],
             &[true, false],
             &proof,
         ).is_ok(), "Revealing first attribute");
 
-        let proof = reveal_attrs::<_, Gt>(
+        let proof = reveal_attrs::<_, P>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -445,14 +445,14 @@ pub mod credentials_tests {
             &[false, true]
         );
 
-        assert_eq!(true, verify::<Gt>(
+        assert_eq!(true, verify::<P>(
             &issuer_pk,
             &[attr2.clone()],
             &[false, true],
             &proof,
         ).is_ok(), "Revealing second attribute");
 
-        let proof = reveal_attrs::<_, Gt>(
+        let proof = reveal_attrs::<_, P>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -461,14 +461,14 @@ pub mod credentials_tests {
             &[false, false],
         );
 
-        assert_eq!(true, verify::<Gt>(
+        assert_eq!(true, verify::<P>(
             &issuer_pk,
             vec![].as_slice(),
             &[false, false],
             &proof,
         ).is_ok(), "Error revealing no attribute");
 
-        let proof = reveal_attrs::<_,Gt>(
+        let proof = reveal_attrs::<_,P>(
             &mut prng,
             &user_sk,
             issuer_pk,
@@ -477,7 +477,7 @@ pub mod credentials_tests {
             &[true, true],
         );
 
-        assert_eq!(true, verify::<Gt>(
+        assert_eq!(true, verify::<P>(
             &issuer_pk,
             &[attr1.clone(), attr2.clone()],
             &[true, true],

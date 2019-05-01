@@ -5,7 +5,7 @@ use crate::algebra::pairing::Pairing;
 use crate::algebra::groups::{Group, Scalar};
 use sha2::{Sha512, Digest};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, elgamal_encrypt};
-use crate::algebra::bls12_381::{BLSG1, BLSGt, BLSScalar, BLSG2};
+use crate::algebra::bls12_381::{BLSG1, BLSG2, BLSScalar, BLSGt};
 
 // BLS12_381 implementation of confidential identity reveal protocol
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -30,7 +30,7 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
     let base = BLSG1::get_base();
     for attr in attrs{
         let r = BLSScalar::random_scalar(prng);
-        let ctext = elgamal_encrypt(&base, attr, &r, asset_issuer_public_key);
+        let ctext = elgamal_encrypt::<BLSG1>(&base, attr, &r, asset_issuer_public_key);
         rands.push(r);
         ctexts.push(ctext);
     }
@@ -82,16 +82,16 @@ pub(crate) struct PoKAttrs<G1, G2, S>{
 
 /// I compute a proof of knowledge of identity attributes to be verified against ciphertext of these
 /// and a anoymouns credential proof
-fn pok_attrs_prove<R, Gt>(
+fn pok_attrs_prove<R, P>(
     prng: &mut R,
-    attrs: &[Gt::ScalarType], // attributes to prove knowledge of
-    cred_issuer_pk: &IssuerPublicKey<Gt::G1, Gt::G2>,
-    asset_issuer_pk: &ElGamalPublicKey<Gt::G1>,
-    ctexts_rand: &[Gt::ScalarType], // randomness used to encrypt attrs
+    attrs: &[P::ScalarType], // attributes to prove knowledge of
+    cred_issuer_pk: &IssuerPublicKey<P::G1, P::G2>,
+    asset_issuer_pk: &ElGamalPublicKey<P::G1>,
+    ctexts_rand: &[P::ScalarType], // randomness used to encrypt attrs
     bitmap: &[bool], // indicates position of each attribute to prove
 
-) -> Result<PoKAttrs<Gt::G1, Gt::G2, Gt::ScalarType>, ZeiError>
-    where R: CryptoRng + Rng, Gt: Pairing
+) -> Result<PoKAttrs<P::G1, P::G2, P::ScalarType>, ZeiError>
+    where R: CryptoRng + Rng, P: Pairing
 {
     let m = attrs.len();
     let mut attr_commitments = Vec::with_capacity(m);
@@ -99,20 +99,20 @@ fn pok_attrs_prove<R, Gt>(
     let mut rand_commitments =
         Vec::with_capacity(m);
     let mut rand_blind = Vec::with_capacity(m);
-    let mut attr_blind_cred_commitment = Gt::G2::get_identity();
+    let mut attr_blind_cred_commitment = P::G2::get_identity();
     for (yy2i, shown) in cred_issuer_pk.yy2.iter().zip(
         bitmap.iter()){
         if *shown {
-            let r: Gt::ScalarType = Gt::ScalarType::random_scalar(prng);
-            let com_y2i = Gt::g2_mul_scalar(yy2i, &r);
-            let com_g = Gt::g1_mul_scalar(&Gt::G1::get_base(), &r);
+            let r: P::ScalarType = P::ScalarType::random_scalar(prng);
+            let com_y2i = P::g2_mul_scalar(yy2i, &r);
+            let com_g = P::g1_mul_scalar(&P::G1::get_base(), &r);
             attr_blind.push(r);
             attr_commitments.push(com_g);
             attr_blind_cred_commitment = attr_blind_cred_commitment.add(&com_y2i);
 
-            let r: Gt::ScalarType = Gt::ScalarType::random_scalar(prng);
-            let com_g = Gt::g1_mul_scalar(&Gt::G1::get_base(), &r);
-            let com_pk = Gt::g1_mul_scalar(&asset_issuer_pk.0, &r);
+            let r: P::ScalarType = P::ScalarType::random_scalar(prng);
+            let com_g = P::g1_mul_scalar(&P::G1::get_base(), &r);
+            let com_pk = P::g1_mul_scalar(&asset_issuer_pk.0, &r);
             rand_blind.push(r);
             rand_commitments.push((com_g, com_pk));
         }
@@ -122,7 +122,7 @@ fn pok_attrs_prove<R, Gt>(
         return Err(ZeiError::ParameterError);
     }
 
-    let c = pok_attrs_challenge::<Gt>(
+    let c = pok_attrs_challenge::<P>(
         attr_commitments.as_slice(),
         rand_commitments.as_slice());
 
@@ -147,10 +147,10 @@ fn pok_attrs_prove<R, Gt>(
 }
 
 /// I compute the challenge in a proof of knowledge of identity attributes
-fn pok_attrs_challenge<Gt: Pairing>(
-    attr_coms: &[Gt::G1],
-    rand_coms: &[(Gt::G1, Gt::G1)]
-) -> Gt::ScalarType
+fn pok_attrs_challenge<P: Pairing>(
+    attr_coms: &[P::G1],
+    rand_coms: &[(P::G1, P::G1)]
+) -> P::ScalarType
 {
     let mut hash = Sha512::new();
     for com in attr_coms.iter(){
@@ -160,35 +160,35 @@ fn pok_attrs_challenge<Gt: Pairing>(
         hash.input(com.0.to_compressed_bytes());
         hash.input(com.1.to_compressed_bytes());
     }
-    Gt::ScalarType::from_hash(hash)
+    P::ScalarType::from_hash(hash)
 }
 
 /// I verify a proof of knowledge of attributes that satisfy a confidential identity proof
-fn pok_attrs_verify<Gt: Pairing>(
-    reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
-    ctexts: &[ElGamalCiphertext<Gt::G1>],
-    pok_attrs: &PoKAttrs<Gt::G1, Gt::G2, Gt::ScalarType>,
-    cred_issuer_public_key: &IssuerPublicKey<Gt::G1, Gt::G2>,
-    asset_issuer_public_key: &ElGamalPublicKey<Gt::G1>,
+fn pok_attrs_verify<P: Pairing>(
+    reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
+    ctexts: &[ElGamalCiphertext<P::G1>],
+    pok_attrs: &PoKAttrs<P::G1, P::G2, P::ScalarType>,
+    cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
+    asset_issuer_public_key: &ElGamalPublicKey<P::G1>,
     bitmap: &[bool], // indicates which attributes should be revealed to the asset issuer
 ) -> Result<(), ZeiError>
 {
     // 1. compute challenge
-    let challenge = pok_attrs_challenge::<Gt>(
+    let challenge = pok_attrs_challenge::<P>(
         pok_attrs.attr_commitments.as_slice(),
         pok_attrs.rand_commitments.as_slice());
     // 2. do ciphertexts verification
-    verify_ciphertext::<Gt>(&challenge, ctexts, pok_attrs, asset_issuer_public_key)?;
+    verify_ciphertext::<P>(&challenge, ctexts, pok_attrs, asset_issuer_public_key)?;
     // 3. do credential verification
-    verify_credential::<Gt>(&challenge, reveal_proof, pok_attrs, cred_issuer_public_key, bitmap)
+    verify_credential::<P>(&challenge, reveal_proof, pok_attrs, cred_issuer_public_key, bitmap)
 }
 
 /// I verify a proof of knowledge of a set of ElGamal encrypted messages
-fn verify_ciphertext<Gt: Pairing>(
-    challenge: &Gt::ScalarType,
-    ctexts: &[ElGamalCiphertext<Gt::G1>],
-    pok_attrs: &PoKAttrs<Gt::G1, Gt::G2, Gt::ScalarType>,
-    asset_issuer_public_key: &ElGamalPublicKey<Gt::G1>
+fn verify_ciphertext<P: Pairing>(
+    challenge: &P::ScalarType,
+    ctexts: &[ElGamalCiphertext<P::G1>],
+    pok_attrs: &PoKAttrs<P::G1, P::G2, P::ScalarType>,
+    asset_issuer_public_key: &ElGamalPublicKey<P::G1>
 ) -> Result<(), ZeiError>
 {
     let commitments = pok_attrs.rand_commitments.iter().
@@ -216,12 +216,12 @@ fn verify_ciphertext<Gt: Pairing>(
         let e2 = &ctext.e2;
 
         let verify_e1 =
-            Gt::g1_mul_scalar(e1, &challenge).add(rand_com_g) ==
-                Gt::g1_mul_scalar(&Gt::G1::get_base(), rand_response);
+            P::g1_mul_scalar(e1, &challenge).add(rand_com_g) ==
+                P::g1_mul_scalar(&P::G1::get_base(), rand_response);
         let verify_e2 =
-            Gt::g1_mul_scalar(e2, &challenge).add(rand_com_pk).add(attr_com) ==
-                Gt::g1_mul_scalar(&Gt::G1::get_base(), attr_response).add(
-                    &Gt::g1_mul_scalar(&asset_issuer_public_key.0, rand_response));
+            P::g1_mul_scalar(e2, &challenge).add(rand_com_pk).add(attr_com) ==
+                P::g1_mul_scalar(&P::G1::get_base(), attr_response).add(
+                    &P::g1_mul_scalar(&asset_issuer_public_key.0, rand_response));
         if !(verify_e1 && verify_e2) {
             return Err(ZeiError::IdentityRevealVerificationError);
         }
@@ -231,74 +231,74 @@ fn verify_ciphertext<Gt: Pairing>(
 
 /// I verify a proof of knowledge of a set of identity attributes that verify an identity
 /// credential proof
-fn verify_credential<Gt: Pairing>(
-    challenge: &Gt::ScalarType,
-    reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
-    pok_attrs: &PoKAttrs<Gt::G1, Gt::G2, Gt::ScalarType>,
-    cred_issuer_public_key: &IssuerPublicKey<Gt::G1, Gt::G2>,
+fn verify_credential<P: Pairing>(
+    challenge: &P::ScalarType,
+    reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
+    pok_attrs: &PoKAttrs<P::G1, P::G2, P::ScalarType>,
+    cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
     bitmap: &[bool], //policy, indicates which attributes needs to be revealed to the asset issuer
 ) -> Result<(), ZeiError>
 {
     //compute credential proof constants and multiply them by challenge
     let cred_challenge =
-        compute_challenge::<Gt>(&reveal_proof.pok.commitment); //c
+        compute_challenge::<P>(&reveal_proof.pok.commitment); //c
     // lhs constant c*X2 + - pf.com + r_t*G2 + r_sk * Z2 + sum a_i + Y2i (a_i in hidden)
     let cred_lhs_constant =
-        constant_terms_addition::<Gt>(&cred_challenge, reveal_proof, cred_issuer_public_key, bitmap);
-    let cred_rhs_constant = Gt::g2_mul_scalar(
+        constant_terms_addition::<P>(&cred_challenge, reveal_proof, cred_issuer_public_key, bitmap);
+    let cred_rhs_constant = P::g2_mul_scalar(
         &cred_issuer_public_key.gen2,
         &cred_challenge); //c*G2
 
     // c' * (c*X2 + - pf.com + r_t*G2 + r_sk * Z2 + sum a_i + Y2i (a_i in hidden))
-    let lhs_constant = Gt::g2_mul_scalar(&cred_lhs_constant, challenge);
+    let lhs_constant = P::g2_mul_scalar(&cred_lhs_constant, challenge);
 
 
     //add pok response terms to left hand side
     // c * sum r_{a_i}*Y2_i (ai in revealed) = c * sum r_{a_i}*Y2_i (ai in revealed)
-    let mut blinded_attr_sum = Gt::G2::get_identity();
+    let mut blinded_attr_sum = P::G2::get_identity();
     let mut attrs_responses_iter = pok_attrs.attr_responses.iter();
     for (b, yy2i) in bitmap.iter().
         zip(cred_issuer_public_key.yy2.iter()) {
         if *b {
             let response = attrs_responses_iter.next().unwrap();
-            blinded_attr_sum = blinded_attr_sum.add(&Gt::g2_mul_scalar(yy2i, response));
+            blinded_attr_sum = blinded_attr_sum.add(&P::g2_mul_scalar(yy2i, response));
         }
     }
     // subtract commitment scaled by cred_challenge: c*pok_aattrs.attr_commitment = c*\sum b_i* Y2i
     blinded_attr_sum = blinded_attr_sum.sub(&pok_attrs.attr_blind_cred_commitment);
-    blinded_attr_sum = Gt::g2_mul_scalar(&blinded_attr_sum, &cred_challenge);
+    blinded_attr_sum = P::g2_mul_scalar(&blinded_attr_sum, &cred_challenge);
     let lhs = lhs_constant.add(&blinded_attr_sum);
-    let rhs = Gt::g2_mul_scalar(&cred_rhs_constant, challenge);
-    let a = Gt::pairing(&reveal_proof.sig.sigma1, &lhs);
-    let b = Gt::pairing(&reveal_proof.sig.sigma2, &rhs); // e(s2, c' * c * G2)
+    let rhs = P::g2_mul_scalar(&cred_rhs_constant, challenge);
+    let a = P::pairing(&reveal_proof.sig.sigma1, &lhs);
+    let b = P::pairing(&reveal_proof.sig.sigma2, &rhs); // e(s2, c' * c * G2)
     match a == b {
         true => Ok(()),
         false => Err(ZeiError::IdentityRevealVerificationError),
     }
 }
 
-fn constant_terms_addition<Gt: Pairing>(
-    challenge: &Gt::ScalarType,
-    reveal_proof: &AttrsRevealProof<Gt::G1, Gt::G2, Gt::ScalarType>,
-    cred_issuer_public_key: &IssuerPublicKey<Gt::G1, Gt::G2>,
+fn constant_terms_addition<P: Pairing>(
+    challenge: &P::ScalarType,
+    reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
+    cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
     bitmap: &[bool],
-) -> Gt::G2
+) -> P::G2
 {
     //compute X_2*challenge - commitment + &G2 * &response_t + &PK.Z2 * response_sk +
     // sum response_attr_i * PK.Y2_i
-    let mut q = Gt::g2_mul_scalar(
+    let mut q = P::g2_mul_scalar(
         &cred_issuer_public_key.xx2,
         &challenge).sub(&reveal_proof.pok.commitment); //X_2*challente - proof.commitment
 
-    q = q.add(&Gt::g2_mul_scalar(&cred_issuer_public_key.gen2, &reveal_proof.pok.response_t));
-    q = q.add(&Gt::g2_mul_scalar(&cred_issuer_public_key.zz2, &reveal_proof.pok.response_sk));
+    q = q.add(&P::g2_mul_scalar(&cred_issuer_public_key.gen2, &reveal_proof.pok.response_t));
+    q = q.add(&P::g2_mul_scalar(&cred_issuer_public_key.zz2, &reveal_proof.pok.response_sk));
 
     let mut resp_attr_iter = reveal_proof.pok.response_attrs.iter();
     for (b, yy2i)  in bitmap.iter().
         zip(cred_issuer_public_key.yy2.iter()){
         if !b {
             let response = resp_attr_iter.next().unwrap();
-            q = q.add(&Gt::g2_mul_scalar(&yy2i, response));
+            q = q.add(&P::g2_mul_scalar(&yy2i, response));
         }
     }
     q
