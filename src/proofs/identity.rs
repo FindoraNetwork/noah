@@ -4,70 +4,7 @@ use crate::errors::ZeiError;
 use crate::algebra::pairing::Pairing;
 use crate::algebra::groups::{Group, Scalar};
 use sha2::{Sha512, Digest};
-use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, elgamal_encrypt};
-use crate::algebra::bls12_381::{BLSG1, BLSG2, BLSScalar, BLSGt};
-
-// BLS12_381 implementation of confidential identity reveal protocol
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ConfIdReveal{
-    ctexts: Vec<ElGamalCiphertext<BLSG1>>,
-    attr_reveal_proof: AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
-    pok_attrs: PoKAttrs<BLSG1, BLSG2, BLSScalar>,
-}
-
-pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
-    prng: &mut R,
-    attrs: &[BLSScalar],
-    attr_reveal_proof: &AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
-    cred_issuer_public_key: &IssuerPublicKey<BLSG1, BLSG2>,
-    asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
-    bitmap: &[bool], // this is the policy. It indicates which attributes should be revealed
-)
- -> Result<ConfIdReveal, ZeiError>
-{
-    let mut ctexts = vec![];
-    let mut rands = vec![];
-    let base = BLSG1::get_base();
-    for attr in attrs{
-        let r = BLSScalar::random_scalar(prng);
-        let ctext = elgamal_encrypt::<BLSG1>(&base, attr, &r, asset_issuer_public_key);
-        rands.push(r);
-        ctexts.push(ctext);
-    }
-
-    let pok_attrs_proof = pok_attrs_prove::<_,BLSGt>(
-        prng,
-        attrs,
-        cred_issuer_public_key,
-        asset_issuer_public_key,
-        rands.as_slice(),
-        bitmap,
-    )?;
-
-    Ok(ConfIdReveal{
-        ctexts: ctexts,
-        attr_reveal_proof:attr_reveal_proof.clone(),
-        pok_attrs: pok_attrs_proof,
-    })
-
-}
-
-pub fn verify_conf_id_reveal(
-    conf_id_reveal: &ConfIdReveal,
-    cred_issuer_public_key: &IssuerPublicKey<BLSG1, BLSG2>,
-    asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
-    bitmap: &[bool], // this is the policy. It indicates which attributes should be revealed
-) -> Result<(), ZeiError>
-{
-    pok_attrs_verify::<BLSGt>(
-        &conf_id_reveal.attr_reveal_proof,
-        &conf_id_reveal.ctexts,
-        &conf_id_reveal.pok_attrs,
-        cred_issuer_public_key,
-        asset_issuer_public_key,
-        bitmap,
-    )
-}
+use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 
 
 // Generic functions for confidential identity reveal features
@@ -82,7 +19,7 @@ pub(crate) struct PoKAttrs<G1, G2, S>{
 
 /// I compute a proof of knowledge of identity attributes to be verified against ciphertext of these
 /// and a anoymouns credential proof
-fn pok_attrs_prove<R, P>(
+pub(crate) fn pok_attrs_prove<R, P>(
     prng: &mut R,
     attrs: &[P::ScalarType], // attributes to prove knowledge of
     cred_issuer_pk: &IssuerPublicKey<P::G1, P::G2>,
@@ -164,7 +101,7 @@ fn pok_attrs_challenge<P: Pairing>(
 }
 
 /// I verify a proof of knowledge of attributes that satisfy a confidential identity proof
-fn pok_attrs_verify<P: Pairing>(
+pub(crate) fn pok_attrs_verify<P: Pairing>(
     reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
     ctexts: &[ElGamalCiphertext<P::G1>],
     pok_attrs: &PoKAttrs<P::G1, P::G2, P::ScalarType>,

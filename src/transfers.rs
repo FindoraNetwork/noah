@@ -1,11 +1,13 @@
 use bulletproofs::{RangeProof, PedersenGens};
-use crate::algebra::bls12_381::{BLSG1, BLSG2};
+use crate::algebra::groups::{Group, Scalar as ScalarTrait};
+use crate::algebra::bls12_381::{BLSG1, BLSG2, BLSScalar, BLSGt};
 use crate::basic_crypto::elgamal::{ElGamalPublicKey, ElGamalCiphertext, elgamal_encrypt};
 use crate::basic_crypto::hybrid_encryption::{ZeiHybridCipher, hybrid_encrypt, hybrid_decrypt};
 use crate::basic_crypto::signatures::{XfrPublicKey, XfrKeyPair, XfrSecretKey, XfrMultiSig, sign_multisig, verify_multisig};
+use crate::credentials::{AttrsRevealProof, IssuerPublicKey};
 use crate::errors::ZeiError;
 use crate::proofs::chaum_pedersen::{ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq};
-use crate::proofs::identity::ConfIdReveal;
+use crate::proofs::identity::{PoKAttrs, pok_attrs_prove, pok_attrs_verify};
 use crate::proofs::pedersen_elgamal::{PedersenElGamalEqProof, pedersen_elgamal_eq_prove, pedersen_elgamal_eq_verify};
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::utils::{u8_bigendian_slice_to_u128, min_greater_equal_power_of_two, u8_bigendian_slice_to_u64, u64_to_bigendian_u8array, u64_to_u32_pair};
@@ -613,7 +615,7 @@ fn verify_attribute_reveal_policy(
             match asset_tracking_proof.identity_proof.as_ref(){
                 None => return Err(ZeiError::XfrVerifyIssuerTrackingIdentityError),
                 Some(identity_proof) => {
-                    crate::proofs::identity::verify_conf_id_reveal(
+                    verify_conf_id_reveal(
                         &identity_proof,
                         &policy.cred_issuer_pk,
                         asset_issuer_pk,
@@ -624,6 +626,69 @@ fn verify_attribute_reveal_policy(
         }
     }
 }
+
+// BLS12_381 implementation of confidential identity reveal protocol
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ConfIdReveal{
+    ctexts: Vec<ElGamalCiphertext<BLSG1>>,
+    attr_reveal_proof: AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
+    pok_attrs: PoKAttrs<BLSG1, BLSG2, BLSScalar>,
+}
+
+pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
+    prng: &mut R,
+    attrs: &[BLSScalar],
+    attr_reveal_proof: &AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
+    cred_issuer_public_key: &IssuerPublicKey<BLSG1, BLSG2>,
+    asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
+    bitmap: &[bool], // this is the policy. It indicates which attributes should be revealed
+)
+    -> Result<ConfIdReveal, ZeiError>
+{
+    let mut ctexts = vec![];
+    let mut rands = vec![];
+    let base = BLSG1::get_base();
+    for attr in attrs{
+        let r = BLSScalar::random_scalar(prng);
+        let ctext = elgamal_encrypt::<BLSG1>(&base, attr, &r, asset_issuer_public_key);
+        rands.push(r);
+        ctexts.push(ctext);
+    }
+
+    let pok_attrs_proof = pok_attrs_prove::<_,BLSGt>(
+        prng,
+        attrs,
+        cred_issuer_public_key,
+        asset_issuer_public_key,
+        rands.as_slice(),
+        bitmap,
+    )?;
+
+    Ok(ConfIdReveal{
+        ctexts: ctexts,
+        attr_reveal_proof:attr_reveal_proof.clone(),
+        pok_attrs: pok_attrs_proof,
+    })
+
+}
+
+pub fn verify_conf_id_reveal(
+    conf_id_reveal: &ConfIdReveal,
+    cred_issuer_public_key: &IssuerPublicKey<BLSG1, BLSG2>,
+    asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
+    bitmap: &[bool], // this is the policy. It indicates which attributes should be revealed
+) -> Result<(), ZeiError>
+{
+    pok_attrs_verify::<BLSGt>(
+        &conf_id_reveal.attr_reveal_proof,
+        &conf_id_reveal.ctexts,
+        &conf_id_reveal.pok_attrs,
+        cred_issuer_public_key,
+        asset_issuer_public_key,
+        bitmap,
+    )
+}
+
 /// build complete OpenAssetRecord from AssetRecord structure
 fn build_open_asset_record<R: CryptoRng + Rng>(
     prng: &mut R,
