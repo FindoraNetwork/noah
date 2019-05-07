@@ -73,6 +73,7 @@ use crate::algebra::pairing::Pairing;
 use rand::{CryptoRng, Rng};
 
 /// I contain Credentials' Issuer Public key fields
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IssuerPublicKey<G1, G2>{
     pub(crate) gen2: G2, //random generator for G2
     pub(crate) xx2: G2,  //gen2^x, x in CredIssuerSecretKey
