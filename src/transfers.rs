@@ -123,7 +123,7 @@ pub struct AssetTrackingProof{
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct IdRevealPolicy{
-    pub cred_issuer_pk: crate::credentials::IssuerPublicKey<BLSG1, BLSG2>,
+    pub cred_issuer_pub_key: crate::credentials::IssuerPublicKey<BLSG1, BLSG2>,
     pub bitmap: Vec<bool>,
 }
 
@@ -617,9 +617,8 @@ fn verify_attribute_reveal_policy(
                 Some(identity_proof) => {
                     verify_conf_id_reveal(
                         &identity_proof,
-                        &policy.cred_issuer_pk,
                         asset_issuer_pk,
-                        policy.bitmap.as_slice(),
+                        policy,
                     )
                 }
             }
@@ -674,18 +673,17 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
 
 pub fn verify_conf_id_reveal(
     conf_id_reveal: &ConfIdReveal,
-    cred_issuer_public_key: &IssuerPublicKey<BLSG1, BLSG2>,
     asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
-    bitmap: &[bool], // this is the policy. It indicates which attributes should be revealed
+    attr_reveal_policy: &IdRevealPolicy,
 ) -> Result<(), ZeiError>
 {
     pok_attrs_verify::<BLSGt>(
         &conf_id_reveal.attr_reveal_proof,
         &conf_id_reveal.ctexts,
         &conf_id_reveal.pok_attrs,
-        cred_issuer_public_key,
         asset_issuer_public_key,
-        bitmap,
+        &attr_reveal_policy.cred_issuer_pub_key,
+        &attr_reveal_policy.bitmap,
     )
 }
 

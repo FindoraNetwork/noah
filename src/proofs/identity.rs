@@ -22,8 +22,8 @@ pub(crate) struct PoKAttrs<G1, G2, S>{
 pub(crate) fn pok_attrs_prove<R, P>(
     prng: &mut R,
     attrs: &[P::ScalarType], // attributes to prove knowledge of
-    cred_issuer_pk: &IssuerPublicKey<P::G1, P::G2>,
-    asset_issuer_pk: &ElGamalPublicKey<P::G1>,
+    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+    asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
     ctexts_rand: &[P::ScalarType], // randomness used to encrypt attrs
     bitmap: &[bool], // indicates position of each attribute to prove
 
@@ -37,7 +37,7 @@ pub(crate) fn pok_attrs_prove<R, P>(
         Vec::with_capacity(m);
     let mut rand_blind = Vec::with_capacity(m);
     let mut attr_blind_cred_commitment = P::G2::get_identity();
-    for (yy2i, shown) in cred_issuer_pk.yy2.iter().zip(
+    for (yy2i, shown) in cred_issuer_pub_key.yy2.iter().zip(
         bitmap.iter()){
         if *shown {
             let r: P::ScalarType = P::ScalarType::random_scalar(prng);
@@ -49,7 +49,7 @@ pub(crate) fn pok_attrs_prove<R, P>(
 
             let r: P::ScalarType = P::ScalarType::random_scalar(prng);
             let com_g = P::g1_mul_scalar(&P::G1::get_base(), &r);
-            let com_pk = P::g1_mul_scalar(&asset_issuer_pk.0, &r);
+            let com_pk = P::g1_mul_scalar(&asset_issuer_pub_key.0, &r);
             rand_blind.push(r);
             rand_commitments.push((com_g, com_pk));
         }
@@ -105,8 +105,8 @@ pub(crate) fn pok_attrs_verify<P: Pairing>(
     reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
     ctexts: &[ElGamalCiphertext<P::G1>],
     pok_attrs: &PoKAttrs<P::G1, P::G2, P::ScalarType>,
-    cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
     asset_issuer_public_key: &ElGamalPublicKey<P::G1>,
+    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
     bitmap: &[bool], // indicates which attributes should be revealed to the asset issuer
 ) -> Result<(), ZeiError>
 {
@@ -117,7 +117,7 @@ pub(crate) fn pok_attrs_verify<P: Pairing>(
     // 2. do ciphertexts verification
     verify_ciphertext::<P>(&challenge, ctexts, pok_attrs, asset_issuer_public_key)?;
     // 3. do credential verification
-    verify_credential::<P>(&challenge, reveal_proof, pok_attrs, cred_issuer_public_key, bitmap)
+    verify_credential::<P>(&challenge, reveal_proof, pok_attrs, cred_issuer_pub_key, bitmap)
 }
 
 /// I verify a proof of knowledge of a set of ElGamal encrypted messages
@@ -258,7 +258,7 @@ mod test_bn{
         prng = ChaChaRng::from_seed([0u8; 32]);
         let cred_issuer_keypair =
             gen_issuer_keys::<_, BNGt>(&mut prng, 3);
-        let cred_issuer_pk = &cred_issuer_keypair.0;
+        let cred_issuer_pub_key = &cred_issuer_keypair.0;
         let cred_issuer_sk = &cred_issuer_keypair.1;
 
         let asset_issuer_secret_key =
@@ -267,7 +267,7 @@ mod test_bn{
             elgamal_derive_public_key(&BNG1::get_base(), &asset_issuer_secret_key);
 
         let (user_pk, user_sk) =
-            gen_user_keys::<_, BNGt>(&mut prng, cred_issuer_pk);
+            gen_user_keys::<_, BNGt>(&mut prng, cred_issuer_pub_key);
 
         let attr1 = BNScalar::random_scalar(&mut prng);
         let attr2 = BNScalar::random_scalar(&mut prng);
@@ -280,7 +280,7 @@ mod test_bn{
         let proof = reveal_attrs::<_, BNGt>(
             &mut prng,
             &user_sk,
-            cred_issuer_pk,
+            cred_issuer_pub_key,
             &signature,
             &[attr1.clone(), attr2.clone(), attr3.clone()],
             &[false, true, false],
@@ -292,7 +292,7 @@ mod test_bn{
         let pok_attr = pok_attrs_prove::<_, BNGt>(
             &mut prng,
             &[attr2.clone()],
-            cred_issuer_pk,
+            cred_issuer_pub_key,
             &asset_issuer_public_key,
             &[rand],
             &[false, true, false]).unwrap();
@@ -301,8 +301,9 @@ mod test_bn{
             &proof,
             &[ctext],
             &pok_attr,
-            cred_issuer_pk,
             &asset_issuer_public_key,
+            cred_issuer_pub_key,
+
             &[false, true, false]);
         assert_eq!(Ok(()), vrfy);
     }
@@ -370,8 +371,8 @@ mod test_bls12_381{
             &proof,
             &[ctext],
             &pok_attr,
-            cred_issuer_pk,
             &asset_issuer_public_key,
+            cred_issuer_pk,
             &[false, true, false]);
         assert_eq!(Ok(()), vrfy);
     }
