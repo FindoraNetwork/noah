@@ -438,4 +438,42 @@ mod credentials_over_bls_12_381 {
     fn two_attributes(){
         crate::credentials::credentials_tests::two_attributes::<super::BLSGt>();
     }
+
+    #[test]
+    fn ten_attributes(){
+        crate::credentials::credentials_tests::ten_attributes::<super::BLSGt>();
+    }
+
+    #[test]
+    fn to_json_credential_structures(){
+        crate::credentials::credentials_tests::to_json_credential_structures::<super::BLSGt>();
+    }
+
+    #[test]
+    fn to_msg_pack_credential_structures(){
+        crate::credentials::credentials_tests::to_msg_pack_credential_structures::<super::BLSGt>();
+    }
+
+
+    /*
+    #[test]
+    fn to_json_issuer_priv_key(){
+        crate::credentials::credentials_tests::to_json_issuer_priv_key::<super::BLSGt>();
+    }
+
+    #[test]
+    fn to_msg_pack_issuer_priv_key(){
+        crate::credentials::credentials_tests::to_msg_pack_issuer_priv_key::<super::BLSGt>();
+    }
+
+    #[test]
+    fn to_json_user_pub_key(){
+        crate::credentials::credentials_tests::to_json_user_pub_key::<super::BLSGt>();
+    }
+
+    #[test]
+    fn to_msg_pack_user_pub_key(){
+        crate::credentials::credentials_tests::to_msg_pack_user_pub_key::<super::BLSGt>();
+    }
+    */
 }

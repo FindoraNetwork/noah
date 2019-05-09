@@ -466,7 +466,6 @@ mod test_serialization{
     use crate::algebra::groups::{Group, Scalar};
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::algebra::bn::{BNScalar, BNG2, BNG1};
 
     fn to_json<G1: Group, G2: Group, S: Scalar>(){
         let mut prng: ChaChaRng;

@@ -83,6 +83,7 @@ pub struct IssuerPublicKey<G1, G2>{
 }
 
 /// I contain the Credentials' Issuer Secret key fields
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IssuerSecretKey<G1, S> {
     gen1: G1, //random generator for G1
     x: S,
@@ -98,9 +99,11 @@ pub struct AttrsSignature<G1>{
 }
 
 ///I'm a user public key used to request a signature for a set of attributes (credential)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserPublicKey<G1>(pub(crate) G1);
 
 ///I'm a user's secret key
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserSecretKey<S> (pub(crate) S);
 
 /// I'm a proof computed by the UserSecretKey holder that an Issuer has signed certain
@@ -368,121 +371,168 @@ pub fn verify<P: Pairing>(
 
 }
 
-pub mod credentials_tests {
+#[cfg(test)]
+pub(crate) mod credentials_tests {
     use super::*;
     use rand::{SeedableRng};
     use rand_chacha::ChaChaRng;
+    use serde::{Serialize, Deserialize};
+    use rmp_serde::Deserializer;
 
-    pub fn single_attribute<P: Pairing>(){
+    fn reveal<P: Pairing>(bitmap: &[bool]){
+        let n = bitmap.len();
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let issuer_keypair =
-            super::gen_issuer_keys::<_,P>(&mut prng, 1);
+            super::gen_issuer_keys::<_,P>(&mut prng, n);
         let issuer_pk = &issuer_keypair.0;
         let issuer_sk = &issuer_keypair.1;
         let (user_pk, user_sk) =
             super::gen_user_keys::<_, P>(&mut prng, issuer_pk);
-        let attr = P::ScalarType::random_scalar(&mut prng);
 
-        let signature =
-            super::issuer_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &[attr.clone()]);
+        let mut attrs = vec![];
 
-        let proof = super::reveal_attrs::<_, P>(
+        for _ in bitmap {
+            attrs.push(P::ScalarType::random_scalar(&mut prng));
+        }
+
+        let sig =
+            super::issuer_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, attrs.as_slice());
+
+        let reveal_proof = super::reveal_attrs::<_, P>(
             &mut prng,
             &user_sk,
             issuer_pk,
-            &signature,
-            &[attr.clone()],
-            &[true],
+            &sig,
+            attrs.as_slice(),
+            bitmap,
         );
+
+        let mut revealed_attrs = vec![];
+
+        for (attr, b) in attrs.iter().zip(bitmap){
+            if *b {
+                revealed_attrs.push(attr.clone());
+            }
+        }
 
         assert_eq!(true, verify::<P>(
             &issuer_pk,
-            &[attr.clone()],
-            &[true],
-            &proof,
+            revealed_attrs.as_slice(),
+            bitmap,
+            &reveal_proof,
         ).is_ok())
     }
 
+    pub fn single_attribute<P: Pairing>(){
+        reveal::<P>(&[false]);
+        reveal::<P>(&[true]);
+    }
+
     pub fn two_attributes<P: Pairing>(){
+        reveal::<P>(&[false, false]);
+        reveal::<P>(&[true, false]);
+        reveal::<P>(&[false, true]);
+        reveal::<P>(&[true, true]);
+    }
+
+    pub fn ten_attributes<P: Pairing>(){
+        reveal::<P>(&[false;10]);
+        reveal::<P>(&[true, false, true, false, true, false, true, false,  true, false]);
+        reveal::<P>(&[false, true, false, true, false, true, false, true, false,  true]);
+        reveal::<P>(&[true; 10]);
+    }
+
+    pub fn to_json_credential_structures<P: Pairing>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let issuer_keypair =
-            super::gen_issuer_keys::<_,P>(&mut prng, 2);
-        let issuer_pk = &issuer_keypair.0;
-        let issuer_sk = &issuer_keypair.1;
+        //issuer keys
+        let issuer_keys = gen_issuer_keys::<_, P>(&mut prng, 10);
+        let json_str = serde_json::to_string(&issuer_keys.0).unwrap();
+        let issuer_pub_key_de: IssuerPublicKey<P::G1, P::G2> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(issuer_keys.0, issuer_pub_key_de);
 
-        let (user_pk, user_sk) =
-            super::gen_user_keys::<_, P>(&mut prng, issuer_pk);
+        let json_str = serde_json::to_string(&issuer_keys.1).unwrap();
+        let issuer_sec_key_de: IssuerSecretKey<P::G1, P::ScalarType> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(issuer_keys.1, issuer_sec_key_de);
 
-        let attr1 = P::ScalarType::random_scalar(&mut prng);
-        let attr2 = P::ScalarType::random_scalar(&mut prng);
+        //user keys
+        let user_keys = super::gen_user_keys::<_, P>(&mut prng, &issuer_keys.0);
+        let json_str = serde_json::to_string(&user_keys.0).unwrap();
+        let user_pub_key_de: UserPublicKey<P::G1> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(user_keys.0, user_pub_key_de);
 
-        let signature = super::issuer_sign::<_, P>(
-            &mut prng, &issuer_sk, &user_pk, &[attr1.clone(), attr2.clone()]);
+        let json_str = serde_json::to_string(&user_keys.1).unwrap();
+        let user_sec_key_de: UserSecretKey<P::ScalarType> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(user_keys.1, user_sec_key_de);
 
-        let proof = reveal_attrs::<_, P>(
+
+        // reveal proof containing signature and pok
+        let attrs = [P::ScalarType::from_u32(10), P::ScalarType::from_u32(10)];
+        let credential =
+            super::issuer_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, &attrs);
+        let reveal_proof = super::reveal_attrs::<_, P>(
             &mut prng,
-            &user_sk,
-            issuer_pk,
-            &signature,
-            &[attr1.clone(), attr2.clone()],
+            &user_keys.1,
+            &issuer_keys.0,
+            &credential,
+            &attrs,
+            &[true, false],
+        );
+        let json_str = serde_json::to_string(&reveal_proof).unwrap();
+        let reveal_proof_de: AttrsRevealProof<P::G1, P::G2, P::ScalarType> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(reveal_proof, reveal_proof_de);
+    }
+
+    pub fn to_msg_pack_credential_structures<P: Pairing>(){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        //issuer keys
+        let issuer_keys = gen_issuer_keys::<_, P>(&mut prng, 10);
+        let mut vec = vec![];
+        issuer_keys.0.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        let mut de = Deserializer::new(&vec[..]);
+        let issuer_pub_key_de: IssuerPublicKey<P::G1, P::G2> = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(issuer_keys.0, issuer_pub_key_de);
+
+        let mut vec = vec![];
+        issuer_keys.1.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        let mut de = Deserializer::new(&vec[..]);
+        let issuer_priv_key_de: IssuerSecretKey<P::G1, P::ScalarType> = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(issuer_keys.1, issuer_priv_key_de);
+
+        //user keys
+        let user_keys = super::gen_user_keys::<_, P>(&mut prng, &issuer_keys.0);
+        let mut vec = vec![];
+        user_keys.0.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        let mut de = Deserializer::new(&vec[..]);
+        let user_pub_key_de: UserPublicKey<P::G1> = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(user_keys.0, user_pub_key_de);
+
+        let mut vec = vec![];
+        user_keys.1.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        let mut de = Deserializer::new(&vec[..]);
+        let user_priv_key_de: UserSecretKey<P::ScalarType> = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(user_keys.1, user_priv_key_de);
+
+
+        // reveal proof containing signature and pok
+        let attrs = [P::ScalarType::from_u32(10), P::ScalarType::from_u32(10)];
+        let credential =
+            super::issuer_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, &attrs);
+        let reveal_proof = super::reveal_attrs::<_, P>(
+            &mut prng,
+            &user_keys.1,
+            &issuer_keys.0,
+            &credential,
+            &attrs,
             &[true, false],
         );
 
-        assert_eq!(true, verify::<P>(
-            &issuer_pk,
-            &[attr1.clone()],
-            &[true, false],
-            &proof,
-        ).is_ok(), "Revealing first attribute");
-
-        let proof = reveal_attrs::<_, P>(
-            &mut prng,
-            &user_sk,
-            issuer_pk,
-            &signature,
-            &[attr1.clone(), attr2.clone()],
-            &[false, true]
-        );
-
-        assert_eq!(true, verify::<P>(
-            &issuer_pk,
-            &[attr2.clone()],
-            &[false, true],
-            &proof,
-        ).is_ok(), "Revealing second attribute");
-
-        let proof = reveal_attrs::<_, P>(
-            &mut prng,
-            &user_sk,
-            issuer_pk,
-            &signature,
-            &[attr1.clone(), attr2.clone()],
-            &[false, false],
-        );
-
-        assert_eq!(true, verify::<P>(
-            &issuer_pk,
-            vec![].as_slice(),
-            &[false, false],
-            &proof,
-        ).is_ok(), "Error revealing no attribute");
-
-        let proof = reveal_attrs::<_,P>(
-            &mut prng,
-            &user_sk,
-            issuer_pk,
-            &signature,
-            &[attr1.clone(), attr2.clone()],
-            &[true, true],
-        );
-
-        assert_eq!(true, verify::<P>(
-            &issuer_pk,
-            &[attr1.clone(), attr2.clone()],
-            &[true, true],
-            &proof,
-        ).is_ok(), "Error revealing both attributes")
+        let mut vec = vec![];
+        reveal_proof.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        let mut de = Deserializer::new(&vec[..]);
+        let reveal_proof_de: AttrsRevealProof<P::G1, P::G2, P::ScalarType> = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(reveal_proof, reveal_proof_de);
     }
 }
