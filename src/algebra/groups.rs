@@ -40,11 +40,11 @@ pub trait Group: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> D
     fn sub(&self, other: &Self) -> Self;
 }
 
-
-pub mod group_tests {
+#[cfg(test)]
+pub(crate) mod group_tests {
     use crate::algebra::groups::Scalar;
 
-    pub fn test_scalar_operations<S: Scalar>() {
+    pub(crate) fn test_scalar_operations<S: Scalar>() {
         let a = S::from_u32(40);
         let b = S::from_u32(60);
         let c = a.add(&b);
@@ -64,7 +64,7 @@ pub mod group_tests {
         assert_eq!(c, d);
     }
 
-    pub fn test_scalar_serialization<S: Scalar>(){
+    pub(crate) fn test_scalar_serialization<S: Scalar>(){
         let a = S::from_u32(100);
         let bytes = a.to_bytes();
         let b = S::from_bytes(bytes.as_slice());

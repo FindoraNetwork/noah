@@ -26,7 +26,7 @@ extern crate digest;
 mod errors;
 mod setup;
 mod utils;
-mod algebra;
+pub mod algebra;
 
 
 //pub mod bls12_381_credentials;

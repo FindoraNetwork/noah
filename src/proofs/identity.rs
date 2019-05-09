@@ -160,7 +160,7 @@ fn verify_ciphertext<P: Pairing>(
                 P::g1_mul_scalar(&P::G1::get_base(), attr_response).add(
                     &P::g1_mul_scalar(&asset_issuer_public_key.0, rand_response));
         if !(verify_e1 && verify_e2) {
-            return Err(ZeiError::IdentityRevealVerificationError);
+            return Err(ZeiError::IdentityRevealVerifyError);
         }
     }
     Ok(())
@@ -181,7 +181,7 @@ fn verify_credential<P: Pairing>(
         compute_challenge::<P>(&reveal_proof.pok.commitment); //c
     // lhs constant c*X2 + - pf.com + r_t*G2 + r_sk * Z2 + sum a_i + Y2i (a_i in hidden)
     let cred_lhs_constant =
-        constant_terms_addition::<P>(&cred_challenge, reveal_proof, cred_issuer_public_key, bitmap);
+        constant_terms_addition::<P>(&cred_challenge, reveal_proof, cred_issuer_public_key, bitmap).map_err(|_| ZeiError::IdentityRevealVerifyError)?;
     let cred_rhs_constant = P::g2_mul_scalar(
         &cred_issuer_public_key.gen2,
         &cred_challenge); //c*G2
@@ -197,7 +197,7 @@ fn verify_credential<P: Pairing>(
     for (b, yy2i) in bitmap.iter().
         zip(cred_issuer_public_key.yy2.iter()) {
         if *b {
-            let response = attrs_responses_iter.next().unwrap();
+            let response = attrs_responses_iter.next().ok_or(ZeiError::IdentityRevealVerifyError)?;
             blinded_attr_sum = blinded_attr_sum.add(&P::g2_mul_scalar(yy2i, response));
         }
     }
@@ -210,7 +210,7 @@ fn verify_credential<P: Pairing>(
     let b = P::pairing(&reveal_proof.sig.sigma2, &rhs); // e(s2, c' * c * G2)
     match a == b {
         true => Ok(()),
-        false => Err(ZeiError::IdentityRevealVerificationError),
+        false => Err(ZeiError::IdentityRevealVerifyError),
     }
 }
 
@@ -219,7 +219,7 @@ fn constant_terms_addition<P: Pairing>(
     reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
     cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
     bitmap: &[bool],
-) -> P::G2
+) -> Result<P::G2, ZeiError>
 {
     //compute X_2*challenge - commitment + &G2 * &response_t + &PK.Z2 * response_sk +
     // sum response_attr_i * PK.Y2_i
@@ -234,11 +234,11 @@ fn constant_terms_addition<P: Pairing>(
     for (b, yy2i)  in bitmap.iter().
         zip(cred_issuer_public_key.yy2.iter()){
         if !b {
-            let response = resp_attr_iter.next().unwrap();
+            let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
             q = q.add(&P::g2_mul_scalar(&yy2i, response));
         }
     }
-    q
+    Ok(q)
 }
 
 #[cfg(test)]
@@ -275,7 +275,7 @@ mod test_bn{
 
         let signature = issuer_sign::<_, BNGt>(
             &mut prng, &cred_issuer_sk, &user_pk,
-            vec![attr1.clone(), attr2.clone(), attr3.clone()]);
+            &[attr1.clone(), attr2.clone(), attr3.clone()]);
 
         let proof = reveal_attrs::<_, BNGt>(
             &mut prng,
@@ -321,14 +321,16 @@ mod test_bls12_381{
     use crate::basic_crypto::elgamal::{elgamal_generate_secret_key,
                                        elgamal_derive_public_key, elgamal_encrypt};
     use crate::algebra::bls12_381::{BLSGt, BLSG1, BLSScalar};
+    use crate::errors::ZeiError;
 
-    #[test]
-    fn one_confidential_reveal(){
+    fn confidential_reveal(reveal_bitmap: &[bool]){
+        let num_attr = reveal_bitmap.len();
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let cred_issuer_keypair =
-            gen_issuer_keys::<_, BLSGt>(&mut prng, 3);
-        let cred_issuer_pk = &cred_issuer_keypair.0;
+            gen_issuer_keys::<_, BLSGt>(&mut prng, num_attr);
+
+        let cred_issuer_pub_key = &cred_issuer_keypair.0;
         let cred_issuer_sk = &cred_issuer_keypair.1;
 
         let asset_issuer_secret_key =
@@ -337,43 +339,176 @@ mod test_bls12_381{
             elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_secret_key);
 
         let (user_pk, user_sk) =
-            gen_user_keys::<_, BLSGt>(&mut prng, cred_issuer_pk);
+            gen_user_keys::<_, BLSGt>(&mut prng, cred_issuer_pub_key);
 
-        let attr1 = BLSScalar::random_scalar(&mut prng);
-        let attr2 = BLSScalar::random_scalar(&mut prng);
-        let attr3 = BLSScalar::random_scalar(&mut prng);
+        let mut attrs = vec![];
+
+        for _ in 0..num_attr{
+            attrs.push(BLSScalar::random_scalar(&mut prng));
+        }
 
         let signature = issuer_sign::<_, BLSGt>(
             &mut prng, &cred_issuer_sk, &user_pk,
-            vec![attr1.clone(), attr2.clone(), attr3.clone()]);
+            attrs.as_slice());
 
         let proof = reveal_attrs::<_, BLSGt>(
             &mut prng,
             &user_sk,
-            cred_issuer_pk,
+            cred_issuer_pub_key,
             &signature,
-            &[attr1.clone(), attr2.clone(), attr3.clone()],
-            &[false, true, false],
+            &attrs,
+            reveal_bitmap,
         );
 
-        let rand = BLSScalar::random_scalar(&mut prng);
-        let ctext = elgamal_encrypt(
-            &BLSG1::get_base(), &attr2, &rand, &asset_issuer_public_key);
-        let pok_attr = pok_attrs_prove::<_, BLSGt>(
+        let mut ctext_rands = vec![];
+        let mut ctexts = vec![];
+        let mut revealed_attrs = vec![];
+        for (attr, reveal) in attrs.iter().zip(reveal_bitmap){
+            if *reveal {
+                let rand = BLSScalar::random_scalar(&mut prng);
+                let ctext = elgamal_encrypt(
+                    &BLSG1::get_base(), attr, &rand, &asset_issuer_public_key);
+
+                ctext_rands.push(rand);
+                ctexts.push(ctext);
+                revealed_attrs.push(attr.clone());
+            }
+        }
+
+        let pok_attrs = pok_attrs_prove::<_, BLSGt>(
             &mut prng,
-            &[attr2.clone()],
-            cred_issuer_pk,
+            revealed_attrs.as_slice(),
+            cred_issuer_pub_key,
             &asset_issuer_public_key,
-            &[rand],
-            &[false, true, false]).unwrap();
+            ctext_rands.as_slice(),
+            reveal_bitmap).unwrap();
 
         let vrfy = pok_attrs_verify::<BLSGt>(
             &proof,
-            &[ctext],
-            &pok_attr,
+            ctexts.as_slice(),
+            &pok_attrs,
             &asset_issuer_public_key,
-            cred_issuer_pk,
-            &[false, true, false]);
+            cred_issuer_pub_key,
+            reveal_bitmap);
+
         assert_eq!(Ok(()), vrfy);
+
+
+        let mut tampered_bitmap = vec![];
+        tampered_bitmap.extend_from_slice(reveal_bitmap);
+
+        let b = reveal_bitmap.get(0).unwrap();
+
+        tampered_bitmap[0] = !(*b);
+        if *b {
+            ctexts.remove(0);
+        }
+
+
+        let vrfy = pok_attrs_verify::<BLSGt>(
+            &proof,
+            ctexts.as_slice(),
+            &pok_attrs,
+            &asset_issuer_public_key,
+            cred_issuer_pub_key,
+            tampered_bitmap.as_slice());
+
+
+        assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy);
+
+    }
+
+    #[test]
+    fn confidential_reveal_one_attr_hidden(){
+        confidential_reveal(&[false]);
+    }
+
+    #[test]
+    fn confidential_reveal_one_attr_revealed(){
+        confidential_reveal(&[true]);
+    }
+
+    #[test]
+    fn confidential_reveal_two_attr_hidden_first(){
+        confidential_reveal(&[false, false]);
+        confidential_reveal(&[false, true]);
+    }
+
+    #[test]
+    fn confidential_reveal_two_attr_revealed_first(){
+        confidential_reveal(&[true, false]);
+        confidential_reveal(&[true, true]);
+    }
+
+    #[test]
+    fn confidential_reveal_ten_attr_all_hidden(){
+        confidential_reveal(&[false;10]);
+    }
+
+    #[test]
+    fn confidential_reveal_ten_attr_all_revealed(){
+        confidential_reveal(&[true;10]);
+    }
+
+    #[test]
+    fn confidential_reveal_ten_attr_half_revealed(){
+        confidential_reveal(&[true,false,true,false,true,false,true,false,true,false]);
+        confidential_reveal(&[false,true,false,true,false,true,false,true,false,true]);
+    }
+}
+
+#[cfg(test)]
+mod test_serialization{
+    use crate::algebra::bls12_381::{BLSG1, BLSG2, BLSScalar};
+    use crate::proofs::identity::PoKAttrs;
+    use serde::{Deserialize, Serialize};
+    use rmp_serde::Deserializer;
+    use crate::algebra::groups::{Group, Scalar};
+    use rand_chacha::ChaChaRng;
+    use rand::SeedableRng;
+    use crate::algebra::bn::{BNScalar, BNG2, BNG1};
+
+    fn to_json<G1: Group, G2: Group, S: Scalar>(){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let pokattrs = PoKAttrs{
+            attr_blind_cred_commitment: G2::get_base(),
+            attr_commitments: vec![G1::get_identity()],
+            rand_commitments: vec![(G1::get_base(), G1::get_identity()), ((G1::get_base(), G1::get_identity()))], // (blind_{r_i} * G, blind_{r_i} * PK)
+            attr_responses: vec![S::from_u32(0), S::random_scalar(&mut prng)],
+            rand_responses: vec![S::from_u32(0), S::from_u32(0), S::from_u32(0), S::from_u32(0)],
+        };
+
+        let json_str = serde_json::to_string(&pokattrs).unwrap();
+        let pokattrs_de: PoKAttrs<G1, G2, S> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(pokattrs, pokattrs_de);
+    }
+
+    fn to_msg_pack<G1: Group, G2: Group, S: Scalar>(){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let pokattrs = PoKAttrs{
+            attr_blind_cred_commitment: G2::get_base(),
+            attr_commitments: vec![G1::get_identity()],
+            rand_commitments: vec![(G1::get_base(), G1::get_identity()), ((G1::get_base(), G1::get_identity()))], // (blind_{r_i} * G, blind_{r_i} * PK)
+            attr_responses: vec![S::from_u32(0), S::random_scalar(&mut prng)],
+            rand_responses: vec![S::from_u32(0), S::from_u32(0), S::from_u32(0), S::from_u32(0)],
+        };
+        //keys serialization
+        let mut vec = vec![];
+        pokattrs.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        let mut de = Deserializer::new(&vec[..]);
+        let pokattrs_de: PoKAttrs<G1, G2, S> = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(pokattrs, pokattrs_de);
+    }
+
+    #[test]
+    fn to_json_bls12_381(){
+        to_json::<BLSG1, BLSG2, BLSScalar>();
+    }
+
+    #[test]
+    fn to_msg_pack_bls12_381(){
+        to_msg_pack::<BLSG1, BLSG2, BLSScalar>();
     }
 }

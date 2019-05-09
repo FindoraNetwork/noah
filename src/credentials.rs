@@ -180,7 +180,7 @@ pub fn issuer_sign<R: CryptoRng + Rng, P: Pairing>(
     prng: &mut R,
     issuer_sk: &IssuerSecretKey<P::G1, P::ScalarType>,
     user_pk: &UserPublicKey<P::G1>,
-    attrs: Vec<P::ScalarType>,
+    attrs: &[P::ScalarType],
 ) -> AttrsSignature<P::G1>
 {
     let u = P::ScalarType::random_scalar(prng);
@@ -385,7 +385,7 @@ pub mod credentials_tests {
         let attr = P::ScalarType::random_scalar(&mut prng);
 
         let signature =
-            super::issuer_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, vec![attr.clone()]);
+            super::issuer_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &[attr.clone()]);
 
         let proof = super::reveal_attrs::<_, P>(
             &mut prng,
@@ -419,7 +419,7 @@ pub mod credentials_tests {
         let attr2 = P::ScalarType::random_scalar(&mut prng);
 
         let signature = super::issuer_sign::<_, P>(
-            &mut prng, &issuer_sk, &user_pk, vec![attr1.clone(), attr2.clone()]);
+            &mut prng, &issuer_sk, &user_pk, &[attr1.clone(), attr2.clone()]);
 
         let proof = reveal_attrs::<_, P>(
             &mut prng,
