@@ -4,7 +4,7 @@ use crate::algebra::bls12_381::{BLSG1, BLSG2, BLSScalar, BLSGt};
 use crate::basic_crypto::elgamal::{ElGamalPublicKey, ElGamalCiphertext, elgamal_encrypt};
 use crate::basic_crypto::hybrid_encryption::{ZeiHybridCipher, hybrid_encrypt, hybrid_decrypt};
 use crate::basic_crypto::signatures::{XfrPublicKey, XfrKeyPair, XfrSecretKey, XfrMultiSig, sign_multisig, verify_multisig};
-use crate::credentials::{AttrsRevealProof, IssuerPublicKey};
+use crate::credentials::{AttrsRevealProof};
 use crate::errors::ZeiError;
 use crate::proofs::chaum_pedersen::{ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq};
 use crate::proofs::identity::{PoKAttrs, pok_attrs_prove, pok_attrs_verify};
@@ -53,9 +53,9 @@ type EGCText = ElGamalCiphertext<RistrettoPoint>;
 
 /// I'm a bundle of public keys for the asset issuer
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct AssetIssuerPubKey{
-    xfr_pub_key: EGPubKey,
-    id_reveal_pub_key: EGPubKeyId,
+pub struct AssetIssuerPubKeys {
+    eg_ristretto_pub_key: EGPubKey,
+    eg_blsg1_pub_key: EGPubKeyId,
 
 }
 /// I represent an Asset Record as presented in the public ledger.
@@ -63,7 +63,7 @@ pub struct AssetIssuerPubKey{
 pub struct BlindAssetRecord{
     // amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
     // commitments and ciphertext
-    pub(crate) issuer_public_key: Option<AssetIssuerPubKey>, //None if issuer tracking is not required
+    pub(crate) issuer_public_key: Option<AssetIssuerPubKeys>, //None if issuer tracking is not required
     pub(crate) issuer_lock_amount: Option<(EGCText, EGCText)>, //None if issuer tracking not required or amount is not confidential
     pub(crate) issuer_lock_type: Option<EGCText>,
     pub(crate) amount_commitments: Option<(CompressedRistretto, CompressedRistretto)>, //None if not confidential transfer
@@ -351,7 +351,7 @@ fn tracking_proofs<R:CryptoRng + Rng>(
                         prng,
                         &asset_scalar,
                         asset_blind,
-                        &public_key.xfr_pub_key,
+                        &public_key.eg_ristretto_pub_key,
                         asset_ctext,
                         &asset_com.decompress().unwrap()));
                 }
@@ -363,14 +363,14 @@ fn tracking_proofs<R:CryptoRng + Rng>(
                         prng,
                         &Scalar::from(amount_low),
                         &output.amount_blinds.0,
-                        &public_key.xfr_pub_key,
+                        &public_key.eg_ristretto_pub_key,
                         &ctexts.0,
                         &commitments.0.decompress().unwrap());
                     let proof_high = pedersen_elgamal_eq_prove(
                         prng,
                         &Scalar::from(amount_high),
                         &output.amount_blinds.1,
-                        &public_key.xfr_pub_key,
+                        &public_key.eg_ristretto_pub_key,
                         &ctexts.1,
                         &commitments.1.decompress().unwrap());
                     amount_proof = Some((proof_low, proof_high));
@@ -577,7 +577,7 @@ fn verify_issuer_tracking_proof(xfr_body: &XfrBody, attribute_reveal_policies: &
                         ok_or(ZeiError::InconsistentStructureError)?;
                     let asset_proof = proof.as_ref().unwrap().asset_type_proof.
                         as_ref().ok_or(ZeiError::InconsistentStructureError)?;
-                    pedersen_elgamal_eq_verify(&issuer_pk.xfr_pub_key, ctext, &commitment.decompress().unwrap(), asset_proof).
+                    pedersen_elgamal_eq_verify(&issuer_pk.eg_ristretto_pub_key, ctext, &commitment.decompress().unwrap(), asset_proof).
                         map_err(|_| ZeiError::XfrVerifyIssuerTrackingAssetTypeError)?;
                 }
                 if conf_amount {
@@ -587,15 +587,15 @@ fn verify_issuer_tracking_proof(xfr_body: &XfrBody, attribute_reveal_policies: &
                         ok_or(ZeiError::InconsistentStructureError)?;
                     let amount_proof = proof.as_ref().unwrap().amount_proof.
                         as_ref().ok_or(ZeiError::InconsistentStructureError)?;
-                    pedersen_elgamal_eq_verify(&issuer_pk.xfr_pub_key, &ctext.0, &commitment.0.decompress().unwrap(), &amount_proof.0).
+                    pedersen_elgamal_eq_verify(&issuer_pk.eg_ristretto_pub_key, &ctext.0, &commitment.0.decompress().unwrap(), &amount_proof.0).
                         map_err(|_| ZeiError::XfrVerifyIssuerTrackingAmountError)?;
-                    pedersen_elgamal_eq_verify(&issuer_pk.xfr_pub_key, &ctext.1, &commitment.1.decompress().unwrap(), &amount_proof.1).
+                    pedersen_elgamal_eq_verify(&issuer_pk.eg_ristretto_pub_key, &ctext.1, &commitment.1.decompress().unwrap(), &amount_proof.1).
                         map_err(|_| ZeiError::XfrVerifyIssuerTrackingAmountError)?;
                 }
                 match attr_reveal_policy{
                     None => {},
                     Some(policy) => {
-                        verify_attribute_reveal_policy(&issuer_pk.id_reveal_pub_key, proof, policy).map_err(|_| ZeiError::XfrVerifyIssuerTrackingIdentityError)?;
+                        verify_attribute_reveal_policy(&issuer_pk.eg_blsg1_pub_key, proof, policy).map_err(|_| ZeiError::XfrVerifyIssuerTrackingIdentityError)?;
                     }
                 }
             }
@@ -637,30 +637,33 @@ pub struct ConfIdReveal{
 pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
     prng: &mut R,
     attrs: &[BLSScalar],
+    policy: &IdRevealPolicy,
     attr_reveal_proof: &AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
-    cred_issuer_public_key: &IssuerPublicKey<BLSG1, BLSG2>,
     asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
-    bitmap: &[bool], // this is the policy. It indicates which attributes should be revealed
 )
     -> Result<ConfIdReveal, ZeiError>
 {
     let mut ctexts = vec![];
     let mut rands = vec![];
     let base = BLSG1::get_base();
-    for attr in attrs{
-        let r = BLSScalar::random_scalar(prng);
-        let ctext = elgamal_encrypt::<BLSG1>(&base, attr, &r, asset_issuer_public_key);
-        rands.push(r);
-        ctexts.push(ctext);
+    let mut revealed_attrs = vec![];
+    for (attr,b) in attrs.iter().zip(policy.bitmap.iter()){
+        if *b {
+            let r = BLSScalar::random_scalar(prng);
+            let ctext = elgamal_encrypt::<BLSG1>(&base, attr, &r, asset_issuer_public_key);
+            rands.push(r);
+            ctexts.push(ctext);
+            revealed_attrs.push(attr.clone());
+        }
     }
 
     let pok_attrs_proof = pok_attrs_prove::<_,BLSGt>(
         prng,
-        attrs,
-        cred_issuer_public_key,
+        revealed_attrs.as_slice(),
+        &policy.cred_issuer_pub_key,
         asset_issuer_public_key,
         rands.as_slice(),
-        bitmap,
+        policy.bitmap.as_slice(),
     )?;
 
     Ok(ConfIdReveal{
@@ -694,7 +697,7 @@ fn build_open_asset_record<R: CryptoRng + Rng>(
     asset_record: &AssetRecord,
     confidential_amount: bool,
     confidential_asset: bool,
-    issuer_public_key: &Option<AssetIssuerPubKey> //none if no tracking is required
+    issuer_public_key: &Option<AssetIssuerPubKeys> //none if no tracking is required
 ) -> OpenAssetRecord
 {
     let mut lock_amount = None;
@@ -749,8 +752,8 @@ fn build_open_asset_record<R: CryptoRng + Rng>(
         None => None,
         Some(issuer_pk) => match confidential_amount {
             true => Some((
-                elgamal_encrypt(&pc_gens.B, &Scalar::from(amount_low), &amount_blind_low, &issuer_pk.xfr_pub_key),
-                elgamal_encrypt(&pc_gens.B, &Scalar::from(amount_high), &amount_blind_high, &issuer_pk.xfr_pub_key)
+                elgamal_encrypt(&pc_gens.B, &Scalar::from(amount_low), &amount_blind_low, &issuer_pk.eg_ristretto_pub_key),
+                elgamal_encrypt(&pc_gens.B, &Scalar::from(amount_high), &amount_blind_high, &issuer_pk.eg_ristretto_pub_key)
             )),
             false => None,
         }
@@ -759,7 +762,7 @@ fn build_open_asset_record<R: CryptoRng + Rng>(
     let issuer_lock_type = match issuer_public_key {
         None => None,
         Some( issuer_pk) => match confidential_asset {
-            true => Some(elgamal_encrypt(&pc_gens.B, &type_scalar, &type_blind, &issuer_pk.xfr_pub_key)),
+            true => Some(elgamal_encrypt(&pc_gens.B, &type_scalar, &type_blind, &issuer_pk.eg_ristretto_pub_key)),
             false => None,
         }
     };
@@ -868,9 +871,10 @@ mod test {
     use crate::errors::ZeiError::{XfrVerifyAmountError, XfrVerifyAssetError, XfrCreationAmountError, XfrCreationAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError, XfrVerifyIssuerTrackingAssetTypeError, XfrVerifyIssuerTrackingAmountError};
     use serde::ser::{Serialize};
     use serde::de::{Deserialize};
+    use rmp_serde::{Deserializer, Serializer};
     use crate::basic_crypto::elgamal::{elgamal_generate_secret_key, elgamal_derive_public_key};
     use crate::algebra::groups::Group;
-
+    use crate::credentials;
 
     fn do_test_build_open_asset_record(confidential_amount: bool, confidential_asset: bool, asset_tracking: bool){
         let mut prng: ChaChaRng;
@@ -893,9 +897,9 @@ mod test {
                 let sk = elgamal_generate_secret_key::<_, BLSG1>(&mut prng);
                 let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
-                Some(AssetIssuerPubKey {
-                    xfr_pub_key,
-                    id_reveal_pub_key
+                Some(AssetIssuerPubKeys {
+                    eg_ristretto_pub_key: xfr_pub_key,
+                    eg_blsg1_pub_key: id_reveal_pub_key
                 })
             },
             false => None,
@@ -949,7 +953,6 @@ mod test {
         assert_eq!(asset_tracking, open_ar.asset_record.issuer_public_key.is_some());
         assert_eq!(asset_tracking && confidential_asset, open_ar.asset_record.issuer_lock_type.is_some());
         assert_eq!(asset_tracking && confidential_amount, open_ar.asset_record.issuer_lock_amount.is_some());
-        //TODO check tracing identity
     }
 
     #[test]
@@ -979,9 +982,9 @@ mod test {
                 let sk = elgamal_generate_secret_key::<_, BLSG1>(prng);
                 let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
-                Some(AssetIssuerPubKey{
-                    xfr_pub_key,
-                    id_reveal_pub_key
+                Some(AssetIssuerPubKeys {
+                    eg_ristretto_pub_key: xfr_pub_key,
+                    eg_blsg1_pub_key: id_reveal_pub_key
                 })
             },
             false => None
@@ -1344,7 +1347,6 @@ mod test {
         );
 
         //serializing signatures
-        use rmp_serde::{Deserializer, Serializer};
         let mut vec = vec![];
         assert_eq!(true, xfr_note.multisig.serialize(&mut Serializer::new(&mut vec)).is_ok());
         let mut de = Deserializer::new(&vec[..]);
@@ -1381,5 +1383,71 @@ mod test {
         do_test_serialization(true, true, false);
         do_test_serialization(true, false, true);
         do_test_serialization(true, true, true);
+    }
+
+    #[test]
+    fn test_xfr_with_identity_tracking(){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let pc_gens = PedersenGens::default();
+        let asset_issuer_sec_key= elgamal_generate_secret_key::<_,RistrettoPoint>(&mut prng);
+        let asset_issuer_pub_key = elgamal_derive_public_key(&RistrettoPoint::get_base(), &asset_issuer_sec_key);
+        let asset_issuer_id_sec_key = elgamal_generate_secret_key::<_,BLSG1>(&mut prng);
+        let asset_issuer_id_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_id_sec_key);
+        let asset_issuer_public_key = Some(AssetIssuerPubKeys {
+                    eg_ristretto_pub_key: asset_issuer_pub_key,
+                    eg_blsg1_pub_key: asset_issuer_id_pub_key
+                });
+
+
+        let input_keypair = XfrKeyPair::generate(&mut prng);
+        let asset_record = AssetRecord {
+            amount: 10,
+            asset_type: [0;16],
+            public_key: input_keypair.get_pk_ref().clone()
+        };
+        let input = build_open_asset_record(
+            &mut prng,
+            &pc_gens,
+            &asset_record,
+            true, true, &asset_issuer_public_key);
+
+        let output = AssetRecord {
+                amount: 10,
+                asset_type: [0;16],
+                public_key: input_keypair.get_pk_ref().clone(),
+        };
+
+        let attrs = [BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng)];
+        let cred_issuer_keys = credentials::gen_issuer_keys::<_, BLSGt>(&mut prng, 4);
+        let receiver_ac_keys = credentials::gen_user_keys::<_, BLSGt>(&mut prng, &cred_issuer_keys.0);
+
+        let ac_signature = credentials::issuer_sign::<_, BLSGt>(&mut prng, &cred_issuer_keys.1, &receiver_ac_keys.0, &attrs);
+        let id_tracking_policy = IdRevealPolicy{
+            cred_issuer_pub_key: cred_issuer_keys.0.clone(),
+            bitmap: vec![false, true, false, true],
+        };
+        let proof = credentials::reveal_attrs::<_, BLSGt>(&mut prng, &receiver_ac_keys.1, &cred_issuer_keys.0, &ac_signature, &attrs, &id_tracking_policy.bitmap);
+        let identity_proof = create_conf_id_reveal(&mut prng, &attrs, &id_tracking_policy, &proof, &asset_issuer_public_key.unwrap().eg_blsg1_pub_key).unwrap();
+
+        let xfr_note = gen_xfr_note(
+            &mut prng,
+            &[input],
+            &[output],
+            &[input_keypair],
+            &[Some(identity_proof)],
+        ).unwrap();
+
+        assert_eq!(Ok(()), verify_xfr_note(&xfr_note, &[Some(id_tracking_policy)]));
+
+        //test serialization
+        //to msg pack whole Xfr
+        let mut vec = vec![];
+        assert_eq!(true, xfr_note.serialize(&mut Serializer::new(&mut vec)).is_ok());
+        let mut de = Deserializer::new(&vec[..]);
+        let xfr_de = XfrNote::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note, xfr_de);
+
     }
 }

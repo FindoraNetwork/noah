@@ -210,7 +210,7 @@ fn verify_credential<P: Pairing>(
     let b = P::pairing(&reveal_proof.sig.sigma2, &rhs); // e(s2, c' * c * G2)
     match a == b {
         true => Ok(()),
-        false => Err(ZeiError::IdentityRevealVerifyError),
+        false => {Err(ZeiError::IdentityRevealVerifyError)},
     }
 }
 
