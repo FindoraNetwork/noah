@@ -24,12 +24,12 @@ extern crate serde_json;
 extern crate sha2;
 extern crate sodiumoxide;
 
-mod algebra;
 mod setup;
 mod utils;
 
 //pub mod bls12_381_credentials;
 //pub mod bn_credentials;
+pub mod algebra;
 pub mod basic_crypto;
 pub mod credentials;
 pub mod errors;

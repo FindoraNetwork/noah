@@ -85,14 +85,14 @@ impl Group for RistrettoPoint{
 
 #[cfg(test)]
 mod ristretto_group_test{
-    use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serializarion};
+    use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
     #[test]
     fn scalar_ops(){
         test_scalar_operations::<super::Scalar>();
     }
     #[test]
     fn scalar_serialization(){
-        test_scalar_serializarion::<super::Scalar>();
+        test_scalar_serialization::<super::Scalar>();
     }
 }
 

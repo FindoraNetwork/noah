@@ -20,11 +20,12 @@ pub enum ZeiError {
     XfrCreationAssetError,
     XfrVerifyIssuerTrackingAssetTypeError,
     XfrVerifyIssuerTrackingAmountError,
+    XfrVerifyIssuerTrackingIdentityError,
     XfrVerifyConfidentialAmountError,
     ElGamalVerificationError,
     ElGamalDecryptionError,
     VerifyPedersenElGamalEqError,
-    IdentityRevealVerificationError,
+    IdentityRevealVerifyError,
 }
 
 impl fmt::Display for ZeiError {
@@ -44,6 +45,7 @@ impl fmt::Display for ZeiError {
             ZeiError::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrVerifyIssuerTrackingAssetTypeError => "Asset Tracking error. Asset commitment and asset ciphertext do not match.",
             ZeiError::XfrVerifyIssuerTrackingAmountError => "Asset Tracking error. Amount commitments and amount ciphertexts do not match",
+            ZeiError::XfrVerifyIssuerTrackingIdentityError => "Asset Tracking error. Identity reveal proof does not hold",
             ZeiError::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
             ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
@@ -51,7 +53,7 @@ impl fmt::Display for ZeiError {
             ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
             ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
             ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
-            ZeiError::IdentityRevealVerificationError=> "Verification error for confidential identity reveal proof",
+            ZeiError::IdentityRevealVerifyError => "Verification error for confidential identity reveal proof",
         })
     }
 }
@@ -73,6 +75,7 @@ impl error::Error for ZeiError {
             ZeiError::XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrVerifyIssuerTrackingAssetTypeError => "Asset Tracking error. Asset commitment and asset ciphertext do not match.",
             ZeiError::XfrVerifyIssuerTrackingAmountError => "Asset Tracking error. Amount commitments and amount ciphertexts do not match",
+            ZeiError::XfrVerifyIssuerTrackingIdentityError => "Asset Tracking error. Identity reveal proof does not hold",
             ZeiError::XfrVerifyConfidentialAssetError => "Invalid asset type in non confidential asset transfer",
             ZeiError::XfrCreationAmountError => "Could not create transfer. Output amount greater than input amount",
             ZeiError::XfrCreationAssetError => "Could not create transfer. Asset types do not match",
@@ -80,7 +83,7 @@ impl error::Error for ZeiError {
             ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
             ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
             ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
-            ZeiError::IdentityRevealVerificationError=> "Verification error for confidential identity reveal proof",
+            ZeiError::IdentityRevealVerifyError => "Verification error for confidential identity reveal proof",
         }
     }
 }

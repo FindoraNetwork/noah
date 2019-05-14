@@ -6,6 +6,9 @@ use digest::generic_array::typenum::U64;
 use crate::utils::u8_bigendian_slice_to_u32;
 use std::fmt;
 use bn::{Group as BNGroup};
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserializer, Serializer, Serialize, Deserialize};
+use crate::algebra::groups::Scalar;
 
 pub struct BNScalar(pub(crate) bn::Fr);
 pub struct BNG1(pub(crate) bn::G1);
@@ -102,6 +105,49 @@ impl crate::algebra::groups::Scalar for BNScalar {
     }
 }
 
+impl Serialize for BNScalar {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_bytes(self.to_bytes().as_slice())
+    }
+}
+
+impl<'de> Deserialize<'de> for BNScalar {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>
+    {
+        struct ScalarVisitor;
+
+        impl<'de> Visitor<'de> for ScalarVisitor{
+            type Value = BNScalar;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a encoded BLSG2 element")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<BNScalar, E>
+                where E: serde::de::Error
+            {
+                Ok(BNScalar::from_bytes(v))
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<BNScalar, V::Error>
+                where V: SeqAccess<'de>,
+            {
+                let mut vec: Vec<u8> = vec![];
+                while let Some(x) = seq.next_element().unwrap() {
+                    vec.push(x);
+                }
+                Ok(BNScalar::from_bytes(vec.as_slice()))
+            }
+        }
+        deserializer.deserialize_bytes(ScalarVisitor)
+    }
+}
+
 impl fmt::Debug for BNG1{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Fr:{}", rustc_serialize::json::encode(&self.0).unwrap())
@@ -160,6 +206,50 @@ impl Group for BNG1{
 }
 
 
+impl Serialize for BNG1 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
+    }
+}
+
+impl<'de> Deserialize<'de> for BNG1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>
+    {
+        struct G1Visitor;
+
+        impl<'de> Visitor<'de> for G1Visitor{
+            type Value = BNG1;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a encoded BLSG2 element")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<BNG1, E>
+                where E: serde::de::Error
+            {
+                Ok(BNG1::from_compressed_bytes(v).unwrap()) //TODO handle error
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<BNG1, V::Error>
+                where V: SeqAccess<'de>,
+            {
+                let mut vec: Vec<u8> = vec![];
+                while let Some(x) = seq.next_element().unwrap() {
+                    vec.push(x);
+                }
+                Ok(BNG1::from_compressed_bytes(vec.as_slice()).unwrap())
+            }
+        }
+        deserializer.deserialize_bytes(G1Visitor)
+    }
+}
+
+
 impl fmt::Debug for BNG2{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Fr:{}", rustc_serialize::json::encode(&self.0).unwrap())
@@ -214,6 +304,49 @@ impl Group for BNG2{
     }
     fn sub(&self, other: &Self) -> BNG2{
         BNG2(self.0 - other.0)
+    }
+}
+
+impl Serialize for BNG2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
+    }
+}
+
+impl<'de> Deserialize<'de> for BNG2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>
+    {
+        struct G2Visitor;
+
+        impl<'de> Visitor<'de> for G2Visitor{
+            type Value = BNG2;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a encoded BLSG2 element")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<BNG2, E>
+                where E: serde::de::Error
+            {
+                Ok(BNG2::from_compressed_bytes(v).unwrap()) //TODO handle error
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<BNG2, V::Error>
+                where V: SeqAccess<'de>,
+            {
+                let mut vec: Vec<u8> = vec![];
+                while let Some(x) = seq.next_element().unwrap() {
+                    vec.push(x);
+                }
+                Ok(BNG2::from_compressed_bytes(vec.as_slice()).unwrap())
+            }
+        }
+        deserializer.deserialize_bytes(G2Visitor)
     }
 }
 

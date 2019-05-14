@@ -8,16 +8,16 @@ use crate::algebra::groups::{Group, Scalar as ZeiScalar};
 
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct DlogProof<G: Group>{
+pub struct DlogProof<G,S>{
     pub proof_commitment: G,
-    pub response: G::ScalarType,
+    pub response: S,
 }
 
 pub fn prove_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     prng: &mut R,
     base: &G,
     point: &G,
-    dlog: &G::ScalarType) -> DlogProof<G>{
+    dlog: &G::ScalarType) -> DlogProof<G, G::ScalarType>{
     /*! I compute a proof for the knowledge of dlog for point with respect to base*/
     let u = G::ScalarType::random_scalar(prng);
     let proof_commitment = base.mul(&u);
@@ -33,7 +33,7 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
 pub fn verify_proof_of_knowledge_dlog<G: Group>(
     base: &G,
     point: &G,
-    proof:&DlogProof<G>) -> bool{
+    proof:&DlogProof<G, G::ScalarType>) -> bool{
 
     /*! I verify a proof of knowledge of dlog for point with respect to base*/
 
@@ -49,7 +49,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
     prng: &mut R,
     base: &G,
     points: &[G],
-    dlogs: &[G::ScalarType]) -> DlogProof<G>{
+    dlogs: &[G::ScalarType]) -> DlogProof<G, G::ScalarType>{
 
     /*! I compute a proof for the knowledge of dlogs for points for the base*/
 
@@ -76,7 +76,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
 pub fn verify_multiple_knowledge_dlog<G: Group>(
     base: &G,
     points: &[G],
-    proof: &DlogProof<G>) -> bool{
+    proof: &DlogProof<G, G::ScalarType>) -> bool{
 
     /*! I verify a proof of knowledge of dlogs for points in the base*/
 
@@ -100,7 +100,7 @@ pub fn verify_multiple_knowledge_dlog<G: Group>(
 //The following proof systems assumes that source asset commitment is a valid
 //perdersen commitment. Otherwise, it is not secure. If source asset commitment
 //cannot be assumed to be a valid pedersen commitment, then use Chaum-Pedersen
-pub type CommitmentEqProof = DlogProof<RistrettoPoint>;
+pub type CommitmentEqProof = DlogProof<RistrettoPoint, curve25519_dalek::scalar::Scalar>;
 
 pub fn dlog_based_prove_commitment_eq<R: CryptoRng + Rng>(
     prng: &mut R,

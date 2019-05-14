@@ -2,9 +2,10 @@ use rand::{Rng, CryptoRng};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 
 
-pub trait Scalar: Debug + Sized + PartialEq + Eq + Clone {
+pub trait Scalar: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>{
     // generation
     fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> Self;
     fn from_u32(value: u32) -> Self;
@@ -22,7 +23,7 @@ pub trait Scalar: Debug + Sized + PartialEq + Eq + Clone {
 }
 
 
-pub trait Group: Debug + Sized + PartialEq + Eq + Clone{
+pub trait Group: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>{
     type ScalarType: Scalar;
     const COMPRESSED_LEN: usize;
     const SCALAR_BYTES_LEN: usize;
@@ -39,12 +40,11 @@ pub trait Group: Debug + Sized + PartialEq + Eq + Clone{
     fn sub(&self, other: &Self) -> Self;
 }
 
-
-
-pub mod group_tests {
+#[cfg(test)]
+pub(crate) mod group_tests {
     use crate::algebra::groups::Scalar;
 
-    pub fn test_scalar_operations<S: Scalar>() {
+    pub(crate) fn test_scalar_operations<S: Scalar>() {
         let a = S::from_u32(40);
         let b = S::from_u32(60);
         let c = a.add(&b);
@@ -64,7 +64,7 @@ pub mod group_tests {
         assert_eq!(c, d);
     }
 
-    pub fn test_scalar_serializarion<S: Scalar>(){
+    pub(crate) fn test_scalar_serialization<S: Scalar>(){
         let a = S::from_u32(100);
         let bytes = a.to_bytes();
         let b = S::from_bytes(bytes.as_slice());

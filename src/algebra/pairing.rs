@@ -1,6 +1,6 @@
 use super::groups::{Group, Scalar};
 
-pub trait Pairing: PartialEq {
+pub trait Pairing: PartialEq{
     type G1: Group;
     type G2: Group;
     type ScalarType: Scalar;
