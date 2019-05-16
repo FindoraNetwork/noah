@@ -22,6 +22,7 @@ extern crate sha2;
 extern crate sodiumoxide;
 extern crate bn;
 extern crate digest;
+extern crate spacesuit;
 
 mod errors;
 mod setup;

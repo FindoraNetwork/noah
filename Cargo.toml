@@ -17,7 +17,9 @@ rand = "0.6"
 rand_04 = {package= "rand", version = "0.4"}
 curve25519-dalek = { version =  "1.0", features = ["serde"] }
 ed25519-dalek = "0.9.1"
-bulletproofs =  "1.0"
+bulletproofs =  {version = "1.0.2"}
+bulletproofs_yoloproof = { version = "1.0.1",  package = "bulletproofs", git = "https://github.com/dalek-cryptography/bulletproofs", branch = "develop", features = ["yoloproofs"]}
+spacesuit = {git = "https://github.com/interstellar/slingshot", branch = "main"}
 merlin = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
