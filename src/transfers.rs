@@ -993,9 +993,10 @@ mod test {
     use serde::ser::{Serialize};
     use serde::de::{Deserialize};
     use rmp_serde::{Deserializer, Serializer};
-    use crate::basic_crypto::elgamal::{elgamal_generate_secret_key, elgamal_derive_public_key};
     use crate::algebra::groups::Group;
     use crate::credentials;
+    use rand_chacha::ChaChaRng;
+    use rand::SeedableRng;
 
     fn do_test_build_open_asset_record(confidential_amount: bool, confidential_asset: bool, asset_tracking: bool){
         let mut prng: ChaChaRng;
