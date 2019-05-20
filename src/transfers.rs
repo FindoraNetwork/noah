@@ -22,6 +22,8 @@ use merlin::Transcript;
 use rand::{CryptoRng, Rng};
 use serde::ser::Serialize;
 use sha2::{Sha512, Digest};
+use std::collections::HashMap;
+use crate::proofs::asset_mixer::AssetMixProof;
 
 const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 type AssetType = [u8; 16];
@@ -122,14 +124,30 @@ impl AssetRecord {
     }
 }
 
+/*
+#[derive(Serialize, Deserialize, Debug)]
+pub enum AssetAmountProof{
+    AssetMix(AssetMixProof), // multi-type fully confidential Xfr
+    ConfAmount(XfrRangeProof), // single-type and public, confidental amount
+    ConfAsset(ChaumPedersenProofX), // single-type confidential, public amount
+    ConfAll((XfrRangeProof, ChaumPedersenProofX)), // fully confidential single type
+    NoProof, // non-confidential transaction
+}
+*/
+
 /// I contain the proofs of a transfer note
 #[derive(Serialize, Deserialize, Debug)]
 pub struct XfrProofs {
+   // pub(crate) asset_amount_proof: Option<AssetAmountProof>;
+    pub(crate) asset_tracking_proof: Vec<Option<AssetTrackingProof>>,
+
     //#[serde(with = "serialization::option_bytes")]
     pub(crate) range_proof: Option<XfrRangeProof>,
     //#[serde(with = "serialization::option_bytes")]
     pub(crate) asset_proof: Option<ChaumPedersenProofX>,
-    pub(crate) asset_tracking_proof: Vec<Option<AssetTrackingProof>>,
+    pub(crate) cloak_proof: Option<AssetMixProof>,
+
+    //pub(crate) asset_tracking_proof: Vec<Option<AssetTrackingProof>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -179,6 +197,32 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(
     identity_proofs: &[Option<ConfIdReveal>],
 ) -> Result<XfrNote, ZeiError>
 {
+    let single_asset = check_asset_amount(inputs, outputs)?;
+
+    match single_asset {
+        true => gen_xfr_note_single_asset(prng, inputs, outputs, input_keys, identity_proofs),
+        false => gen_xfr_note_multi_asset(prng, inputs, outputs, input_keys, identity_proofs)
+    }
+}
+
+fn gen_xfr_note_multi_asset<R: CryptoRng + Rng>(
+    prng: &mut R,
+    inputs: &[OpenAssetRecord],
+    outputs: &[AssetRecord],
+    input_keys: &[XfrKeyPair],
+    identity_proofs: &[Option<ConfIdReveal>],
+) -> Result<XfrNote, ZeiError>
+{
+    Err(ZeiError::XfrCreationAssetError)
+}
+fn gen_xfr_note_single_asset<R: CryptoRng + Rng>(
+    prng: &mut R,
+    inputs: &[OpenAssetRecord],
+    outputs: &[AssetRecord],
+    input_keys: &[XfrKeyPair],
+    identity_proofs: &[Option<ConfIdReveal>],
+) -> Result<XfrNote, ZeiError>
+{
     let confidential_amount = inputs[0].asset_record.amount.is_none();
     let confidential_asset = inputs[0].asset_record.asset_type.is_none();
     let issuer_pk = &inputs[0].asset_record.issuer_public_key;
@@ -198,10 +242,25 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(
         })
         .collect();
 
-    // do amount handling
-    if !check_amounts(inputs, open_outputs.as_slice()) {
-        return Err(ZeiError::XfrCreationAmountError);
-    }
+    let confidential_amount = inputs[0].asset_record.amount.is_none();
+    let confidential_asset = inputs[0].asset_record.asset_type.is_none();
+    let issuer_pk = &inputs[0].asset_record.issuer_public_key;
+    let pc_gens = PedersenGens::default();
+
+    let open_outputs: Vec<OpenAssetRecord> = outputs
+        .iter()
+        .map(|x| {
+            build_open_asset_record(
+                prng,
+                &pc_gens,
+                x,
+                confidential_amount,
+                confidential_asset,
+                issuer_pk,
+            )
+        })
+        .collect();
+
     let xfr_range_proof = match confidential_amount {
         true => Some(range_proof(inputs, open_outputs.as_slice())?),
         false => None,
@@ -239,6 +298,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(
         range_proof: xfr_range_proof,
         asset_proof: xfr_asset_proof,
         asset_tracking_proof: xfr_tracking_proof,
+        cloak_proof: None,
     };
 
     let body = XfrBody {
@@ -250,6 +310,34 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(
     let multisig = compute_transfer_multisig(&body, input_keys)?;
 
     Ok(XfrNote { body, multisig })
+}
+
+fn check_asset_amount(inputs: &[OpenAssetRecord], outputs:&[AssetRecord]) -> Result<bool, ZeiError>
+{
+    let mut amounts = HashMap::new();
+
+    for record in inputs.iter(){
+        match amounts.get_mut(&record.asset_type){
+            None => {amounts.insert(record.asset_type, vec![i128::from(record.amount)]);},
+            Some(vec) => {vec.push(i128::from(record.amount));}
+        };
+    }
+
+    for record in outputs.iter(){
+        match amounts.get_mut(&record.asset_type){
+            None => {amounts.insert(record.asset_type, vec![-i128::from(record.amount)]);},
+            Some(vec) => {vec.push(-i128::from(record.amount));}
+        };
+    }
+
+    for (_, a) in amounts.iter(){
+        let sum = a.iter().sum::<i128>();
+        if sum != 0i128{
+            return Err(ZeiError::XfrCreationAssetAmountError)
+        }
+    }
+
+    Ok(amounts.len() == 1)
 }
 
 /// I compute a range proof for confidential amount transfers.
@@ -461,6 +549,7 @@ fn tracking_proofs<R: CryptoRng + Rng>(
     Ok(v)
 }
 
+/*
 /// I check that total input amount is greater or equal than total output amount
 /// I return false only if output is greater than input
 fn check_amounts(inputs: &[OpenAssetRecord], outputs: &[OpenAssetRecord]) -> bool {
@@ -472,6 +561,7 @@ fn check_amounts(inputs: &[OpenAssetRecord], outputs: &[OpenAssetRecord]) -> boo
     }
     true
 }
+*/
 
 /// I check that asset types are all equal
 /// I return false only if output is greater than input
@@ -989,7 +1079,7 @@ mod test {
     use super::*;
     use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key};
     use crate::basic_crypto::signatures::XfrKeyPair;
-    use crate::errors::ZeiError::{XfrVerifyAmountError, XfrVerifyAssetError, XfrCreationAmountError, XfrCreationAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError, XfrVerifyIssuerTrackingAssetTypeError, XfrVerifyIssuerTrackingAmountError};
+    use crate::errors::ZeiError::{XfrVerifyAmountError, XfrVerifyAssetError, XfrCreationAmountError, XfrCreationAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError, XfrVerifyIssuerTrackingAssetTypeError, XfrVerifyIssuerTrackingAmountError, XfrCreationAssetAmountError};
     use serde::ser::{Serialize};
     use serde::de::{Deserialize};
     use rmp_serde::{Deserializer, Serializer};
@@ -1201,7 +1291,7 @@ mod test {
         let asset_type = [0u8; 16];
         let pc_gens = PedersenGens::default();
         let input_amount = [10u64, 10u64, 10u64];
-        let out_amount = [1u64, 2u64, 3u64, 4u64];
+        let out_amount = [1u64, 2u64, 3u64, 24u64];
 
         let tuple = create_xfr(
             &mut prng,
@@ -1235,10 +1325,10 @@ mod test {
         };
         let xfr_note = gen_xfr_note(&mut prng, inputs.as_slice(), outputs.as_slice(), inkeys.as_slice(), &id_proofs);
         assert_eq!(true, xfr_note.is_err(), "Xfr cannot be build if output total amount is greater than input amounts");
-        assert_eq!(XfrCreationAmountError, xfr_note.err().unwrap(), "Xfr cannot be build if output total amount is greater than input amounts");
+        assert_eq!(XfrCreationAssetAmountError, xfr_note.err().unwrap(), "Xfr cannot be build if output total amount is greater than input amounts");
         //output 3 back to original
         outputs[3] = AssetRecord {
-            amount: 4,
+            amount: 24,
             asset_type,
             public_key: outputs[3].public_key,
         };
@@ -1282,7 +1372,7 @@ mod test {
         };
         let xfr_note = gen_xfr_note(&mut prng, inputs.as_slice(), outputs.as_slice(), inkeys.as_slice(), &id_proofs);
         assert_eq!(true, xfr_note.is_err(), "Xfr cannot be build if output asset types are different");
-        assert_eq!(XfrCreationAssetError, xfr_note.err().unwrap(), "Xfr cannot be build if output asset types are different");
+        assert_eq!(XfrCreationAssetAmountError, xfr_note.err().unwrap(), "Xfr cannot be build if output asset types are different");
         outputs[3] = AssetRecord {
             amount: 24u64,
             asset_type: [0u8; 16],
@@ -1312,7 +1402,7 @@ mod test {
                                             confidential_amount, confidential_asset, &None);
         let xfr_note = gen_xfr_note(&mut prng, inputs.as_slice(), outputs.as_slice(), inkeys.as_slice(), &id_proofs);
         assert_eq!(true, xfr_note.is_err(), "Xfr cannot be build if output asset types are different");
-        assert_eq!(XfrCreationAssetError, xfr_note.err().unwrap(), "Xfr cannot be build if output asset types are different");
+        assert_eq!(XfrCreationAssetAmountError, xfr_note.err().unwrap(), "Xfr cannot be build if output asset types are different");
         //inputs[1] back to normal
         let ar = AssetRecord {
             amount: 10u64,
@@ -1442,7 +1532,7 @@ mod test {
         prng = ChaChaRng::from_seed([0u8; 32]);
 
         let input_amount = [10u64, 20u64];
-        let out_amount = [1u64, 2u64, 1u64, 10u64, 3u64];
+        let out_amount = [1u64, 2u64, 1u64, 10u64, 16u64];
 
         let (xfr_note, _, _, _, _) = create_xfr(
             &mut prng,
@@ -1544,7 +1634,7 @@ mod test {
         prng = ChaChaRng::from_seed([0u8; 32]);
 
         let input_amount = [10u64, 20u64];
-        let out_amount = [1u64, 2u64, 1u64, 10u64, 3u64];
+        let out_amount = [1u64, 2u64, 1u64, 10u64, 16u64];
 
         let (xfr_note, _, _, _, _) = create_xfr(
             &mut prng,
