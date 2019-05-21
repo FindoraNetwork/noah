@@ -28,6 +28,7 @@ pub enum ZeiError {
     VerifyPedersenElGamalEqError,
     IdentityRevealVerifyError,
     AssetMixerVerificationError,
+    XfrNotSupported,
 }
 
 impl fmt::Display for ZeiError {
@@ -57,7 +58,8 @@ impl fmt::Display for ZeiError {
             ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
             ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
             ZeiError::IdentityRevealVerifyError => "Verification error for confidential identity reveal proof",
-            ZeiError::AssetMixerVerificationError => "Verification error for asset mixing proof"
+            ZeiError::AssetMixerVerificationError => "Verification error for asset mixing proof",
+            ZeiError::XfrNotSupported => "Transaction type not supported",
         })
     }
 }
@@ -89,7 +91,8 @@ impl error::Error for ZeiError {
             ZeiError::VerifyPedersenElGamalEqError => "Wrong proof for Pedersen Commitment ElGamal equality proof",
             ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
             ZeiError::IdentityRevealVerifyError => "Verification error for confidential identity reveal proof",
-            ZeiError::AssetMixerVerificationError => "Verification error for asset mixing proof"
+            ZeiError::AssetMixerVerificationError => "Verification error for asset mixing proof",
+            ZeiError::XfrNotSupported => "Transaction type not supported",
         }
     }
 }

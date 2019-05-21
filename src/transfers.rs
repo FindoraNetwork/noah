@@ -11,7 +11,6 @@ use crate::proofs::identity::{PoKAttrs, pok_attrs_prove, pok_attrs_verify};
 use crate::proofs::pedersen_elgamal::{PedersenElGamalEqProof, pedersen_elgamal_eq_prove, pedersen_elgamal_eq_verify};
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::utils::{u8_bigendian_slice_to_u128, min_greater_equal_power_of_two, u8_bigendian_slice_to_u64, u64_to_bigendian_u8array, u64_to_u32_pair};
-use core::borrow::Borrow;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{EdwardsPoint, CompressedEdwardsY};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -23,7 +22,7 @@ use rand::{CryptoRng, Rng};
 use serde::ser::Serialize;
 use sha2::{Sha512, Digest};
 use std::collections::HashMap;
-use crate::proofs::asset_mixer::AssetMixProof;
+use crate::proofs::asset_mixer::{AssetMixProof, asset_mixer_proof, asset_mixer_verify};
 
 const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 type AssetType = [u8; 16];
@@ -124,8 +123,8 @@ impl AssetRecord {
     }
 }
 
-/*
-#[derive(Serialize, Deserialize, Debug)]
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum AssetAmountProof{
     AssetMix(AssetMixProof), // multi-type fully confidential Xfr
     ConfAmount(XfrRangeProof), // single-type and public, confidental amount
@@ -133,14 +132,13 @@ pub enum AssetAmountProof{
     ConfAll((XfrRangeProof, ChaumPedersenProofX)), // fully confidential single type
     NoProof, // non-confidential transaction
 }
-*/
 
 /// I contain the proofs of a transfer note
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct XfrProofs {
-   // pub(crate) asset_amount_proof: Option<AssetAmountProof>;
+    pub(crate) asset_amount_proof: AssetAmountProof,
     pub(crate) asset_tracking_proof: Vec<Option<AssetTrackingProof>>,
-
+    /*
     //#[serde(with = "serialization::option_bytes")]
     pub(crate) range_proof: Option<XfrRangeProof>,
     //#[serde(with = "serialization::option_bytes")]
@@ -148,13 +146,14 @@ pub struct XfrProofs {
     pub(crate) cloak_proof: Option<AssetMixProof>,
 
     //pub(crate) asset_tracking_proof: Vec<Option<AssetTrackingProof>>,
+    */
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct XfrRangeProof {
     range_proof: RangeProof,
     xfr_diff_commitment_low: CompressedRistretto, //lower 32 bits transfer amount difference commitment
-    xfr_diff_commitment_high: CompressedRistretto, //lower 32 bits transfer amount difference commitment
+    xfr_diff_commitment_high: CompressedRistretto, //higher 32 bits transfer amount difference commitment
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -180,6 +179,7 @@ impl PartialEq for XfrRangeProof {
 
 impl Eq for XfrRangeProof {}
 
+/*
 impl PartialEq for XfrProofs {
     fn eq(&self, other: &XfrProofs) -> bool {
         self.range_proof == other.range_proof && self.asset_proof == other.asset_proof
@@ -187,6 +187,8 @@ impl PartialEq for XfrProofs {
 }
 
 impl Eq for XfrProofs {}
+
+*/
 
 /// I Create a XfrNote from list of opened asset records inputs and asset record outputs
 pub fn gen_xfr_note<R: CryptoRng + Rng>(
@@ -197,44 +199,20 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(
     identity_proofs: &[Option<ConfIdReveal>],
 ) -> Result<XfrNote, ZeiError>
 {
+    let confidential_amount = inputs[0].asset_record.amount.is_none();
+    let confidential_asset = inputs[0].asset_record.asset_type.is_none();
+    let issuer_pk = &inputs[0].asset_record.issuer_public_key;
+    let pc_gens = PedersenGens::default();
+
     let single_asset = check_asset_amount(inputs, outputs)?;
 
-    match single_asset {
-        true => gen_xfr_note_single_asset(prng, inputs, outputs, input_keys, identity_proofs),
-        false => gen_xfr_note_multi_asset(prng, inputs, outputs, input_keys, identity_proofs)
-    }
-}
-
-fn gen_xfr_note_multi_asset<R: CryptoRng + Rng>(
-    prng: &mut R,
-    inputs: &[OpenAssetRecord],
-    outputs: &[AssetRecord],
-    input_keys: &[XfrKeyPair],
-    identity_proofs: &[Option<ConfIdReveal>],
-) -> Result<XfrNote, ZeiError>
-{
-    Err(ZeiError::XfrCreationAssetError)
-}
-fn gen_xfr_note_single_asset<R: CryptoRng + Rng>(
-    prng: &mut R,
-    inputs: &[OpenAssetRecord],
-    outputs: &[AssetRecord],
-    input_keys: &[XfrKeyPair],
-    identity_proofs: &[Option<ConfIdReveal>],
-) -> Result<XfrNote, ZeiError>
-{
-    let confidential_amount = inputs[0].asset_record.amount.is_none();
-    let confidential_asset = inputs[0].asset_record.asset_type.is_none();
-    let issuer_pk = &inputs[0].asset_record.issuer_public_key;
-    let pc_gens = PedersenGens::default();
-
     let open_outputs: Vec<OpenAssetRecord> = outputs
         .iter()
-        .map(|x| {
+        .map(|asset_record| {
             build_open_asset_record(
                 prng,
                 &pc_gens,
-                x,
+                asset_record,
                 confidential_amount,
                 confidential_asset,
                 issuer_pk,
@@ -242,47 +220,19 @@ fn gen_xfr_note_single_asset<R: CryptoRng + Rng>(
         })
         .collect();
 
-    let confidential_amount = inputs[0].asset_record.amount.is_none();
-    let confidential_asset = inputs[0].asset_record.asset_type.is_none();
-    let issuer_pk = &inputs[0].asset_record.issuer_public_key;
-    let pc_gens = PedersenGens::default();
-
-    let open_outputs: Vec<OpenAssetRecord> = outputs
-        .iter()
-        .map(|x| {
-            build_open_asset_record(
-                prng,
-                &pc_gens,
-                x,
-                confidential_amount,
-                confidential_asset,
-                issuer_pk,
-            )
-        })
-        .collect();
-
-    let xfr_range_proof = match confidential_amount {
-        true => Some(range_proof(inputs, open_outputs.as_slice())?),
-        false => None,
-    };
-
-    // do asset handling
-    if !check_assets(inputs, open_outputs.as_slice()) {
-        return Err(ZeiError::XfrCreationAssetError);
-    }
-    let xfr_asset_proof = match confidential_asset {
-        true => Some(asset_proof(
-            prng,
-            &pc_gens,
-            inputs,
-            open_outputs.as_slice(),
-        )?),
-        false => None,
+    let asset_amount_proof =  match single_asset {
+        true => gen_xfr_proofs_single_asset(prng, inputs, open_outputs.as_slice(), confidential_amount, confidential_asset)?,
+        false => gen_xfr_proofs_multi_asset(inputs, open_outputs.as_slice(), confidential_amount, confidential_asset)?
     };
 
     //do tracking proofs
-    let xfr_tracking_proof =
+    let asset_tracking_proof =
         tracking_proofs(prng, open_outputs.as_slice(), identity_proofs)?;
+
+    let proofs = XfrProofs{
+        asset_amount_proof,
+        asset_tracking_proof,
+    };
 
     let mut xfr_inputs = vec![];
     for x in inputs {
@@ -294,22 +244,108 @@ fn gen_xfr_note_single_asset<R: CryptoRng + Rng>(
         xfr_outputs.push(x.asset_record.clone())
     }
 
-    let xfr_proofs = XfrProofs {
-        range_proof: xfr_range_proof,
-        asset_proof: xfr_asset_proof,
-        asset_tracking_proof: xfr_tracking_proof,
-        cloak_proof: None,
-    };
-
     let body = XfrBody {
         inputs: xfr_inputs,
         outputs: xfr_outputs,
-        proofs: xfr_proofs,
+        proofs,
     };
 
     let multisig = compute_transfer_multisig(&body, input_keys)?;
 
     Ok(XfrNote { body, multisig })
+}
+
+fn gen_xfr_proofs_multi_asset(
+    //prng: &mut R,
+    inputs: &[OpenAssetRecord],
+    outputs: &[OpenAssetRecord],
+    confidential_amount: bool,
+    confidential_asset: bool,
+) -> Result<AssetAmountProof, ZeiError>
+{
+    let pc_gens = bulletproofs_yoloproof::PedersenGens::default();
+    let bp_gens = bulletproofs_yoloproof::BulletproofGens::new(1000, 1);
+    let pow2_32 = Scalar::from(POW_2_32);
+
+    let mut ins = vec![];
+
+    for x in inputs.iter(){
+        let type_as_u128 = u8_bigendian_slice_to_u128(&x.asset_type[..]);
+        let type_scalar = Scalar::from(type_as_u128);
+        ins.push((x.amount, type_scalar, x.amount_blinds.0 + pow2_32*x.amount_blinds.1, x.type_blind));
+    }
+
+    let mut out = vec![];
+    for x in outputs.iter(){
+        let type_as_u128 = u8_bigendian_slice_to_u128(&x.asset_type[..]);
+        let type_scalar = Scalar::from(type_as_u128);
+        out.push((x.amount, type_scalar, x.amount_blinds.0 + pow2_32*x.amount_blinds.1, x.type_blind));
+    }
+
+    if confidential_asset && confidential_amount {
+        let mix_proof = asset_mixer_proof(&pc_gens, &bp_gens, ins.as_slice(), out.as_slice())?;
+        return Ok(AssetAmountProof::AssetMix(mix_proof));
+
+        /*
+        let asset_amount_proofs = XfrProofs {
+            range_proof: None,
+            asset_proof: None,
+            asset_tracking_proof: vec![],
+            cloak_proof: Some(mix_proof) ,
+        };
+        return Ok(xfr_proofs);
+        */
+    }
+    if !confidential_asset && !confidential_amount{
+        return Ok(AssetAmountProof::NoProof);
+    }
+    Err(ZeiError::XfrCreationAssetError)
+}
+fn gen_xfr_proofs_single_asset<R: CryptoRng + Rng>(
+    prng: &mut R,
+    inputs: &[OpenAssetRecord],
+    outputs: &[OpenAssetRecord],
+    confidential_amount: bool,
+    confidential_asset: bool,
+) -> Result<AssetAmountProof, ZeiError>
+{
+    let pc_gens = PedersenGens::default();
+
+    let xfr_range_proof = match confidential_amount {
+        true => Some(range_proof(inputs, outputs)?),
+        false => None,
+    };
+
+    let xfr_asset_proof = match confidential_asset {
+        true => Some(asset_proof(
+            prng,
+            &pc_gens,
+            inputs,
+            outputs,
+        )?),
+        false => None,
+    };
+
+    if xfr_range_proof.is_none() && xfr_asset_proof.is_none(){
+        return Ok(AssetAmountProof::NoProof);
+    }
+    if xfr_range_proof.is_none() {
+        return Ok(AssetAmountProof::ConfAsset(xfr_asset_proof.unwrap()));
+    }
+    if xfr_asset_proof.is_none() {
+        return Ok(AssetAmountProof::ConfAmount(xfr_range_proof.unwrap()));
+    }
+
+    Ok(AssetAmountProof::ConfAll((xfr_range_proof.unwrap(), xfr_asset_proof.unwrap())))
+        /*
+    let xfr_proofs = XfrProofs {
+        range_proof: xfr_range_proof,
+        asset_proof: xfr_asset_proof,
+        asset_tracking_proof: vec![],
+        cloak_proof: None,
+    };
+    Ok (xfr_proofs)
+    */
 }
 
 fn check_asset_amount(inputs: &[OpenAssetRecord], outputs:&[AssetRecord]) -> Result<bool, ZeiError>
@@ -563,6 +599,7 @@ fn check_amounts(inputs: &[OpenAssetRecord], outputs: &[OpenAssetRecord]) -> boo
 }
 */
 
+/*
 /// I check that asset types are all equal
 /// I return false only if output is greater than input
 fn check_assets(inputs: &[OpenAssetRecord], outputs: &[OpenAssetRecord]) -> bool {
@@ -575,6 +612,7 @@ fn check_assets(inputs: &[OpenAssetRecord], outputs: &[OpenAssetRecord]) -> bool
     }
     list.iter().all_equal()
 }
+*/
 
 /// I compute a multisignature over the transfer's body
 fn compute_transfer_multisig(body: &XfrBody, keys: &[XfrKeyPair]) -> Result<XfrMultiSig, ZeiError> {
@@ -601,6 +639,33 @@ pub fn verify_xfr_note(xfr_note: &XfrNote, id_reveal_policies: &[Option<IdReveal
     // 1. verify signature
     verify_transfer_multisig(&xfr_note)?;
 
+    // 2. verify amounts and asset types
+    match &xfr_note.body.proofs.asset_amount_proof {
+        AssetAmountProof::ConfAll((range_proof, asset_proof)) => {
+            verify_confidential_amount(&xfr_note.body.inputs, &xfr_note.body.outputs, range_proof)?;
+            verify_confidential_asset(&xfr_note.body.inputs, &xfr_note.body.outputs, asset_proof)?;
+        }
+        AssetAmountProof::ConfAmount(range_proof) => {
+            verify_confidential_amount(&xfr_note.body.inputs, &xfr_note.body.outputs, range_proof)?;
+            verify_plain_asset(&xfr_note.body.inputs, &xfr_note.body.outputs)?;
+        }
+        AssetAmountProof::ConfAsset(asset_proof) => {
+            verify_plain_amounts(&xfr_note.body.inputs, &xfr_note.body.outputs)?; //TODO change body for input, output, proof
+            verify_confidential_asset(&xfr_note.body.inputs, &xfr_note.body.outputs, asset_proof)?;
+
+        }
+        AssetAmountProof::NoProof => {
+            verify_plain_amounts(&xfr_note.body.inputs, &xfr_note.body.outputs)?; //TODO change body for input, output, proof
+            verify_plain_asset(&xfr_note.body.inputs, &xfr_note.body.outputs)?; //TODO change body for input, output, proof
+        }
+        AssetAmountProof::AssetMix(asset_mix_proof) => {
+            verify_asset_mix(&xfr_note.body.inputs, &xfr_note.body.outputs, asset_mix_proof)?; //TODO change body for input, output, proof
+        }
+
+    }
+    // 3 verify tracking proofs
+    verify_issuer_tracking_proof(&xfr_note.body, id_reveal_policies)
+    /*
     //2. verify amounts
     let confidential_amount = xfr_note.body.inputs[0].amount_commitments.is_some();
     match confidential_amount {
@@ -615,13 +680,15 @@ pub fn verify_xfr_note(xfr_note: &XfrNote, id_reveal_policies: &[Option<IdReveal
         true => verify_confidential_asset(&xfr_note.body)?,
         false => verify_plain_asset(&xfr_note.body)?,
     }
+
     //4. Verify issuer asset tracing
     verify_issuer_tracking_proof(&xfr_note.body, id_reveal_policies)
+    */
 
 }
 
-fn verify_confidential_amount(xfr_body: &XfrBody) -> Result<(), ZeiError> {
-    let num_output = xfr_body.outputs.len();
+fn verify_confidential_amount(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord], range_proof: &XfrRangeProof) -> Result<(), ZeiError> {
+    let num_output = outputs.len();
     let upper_power2 = min_greater_equal_power_of_two((2 * num_output + 2) as u32) as usize;
     if upper_power2 > MAX_PARTY_NUMBER {
         return Err(ZeiError::XfrVerifyConfidentialAmountError);
@@ -629,15 +696,10 @@ fn verify_confidential_amount(xfr_body: &XfrBody) -> Result<(), ZeiError> {
     let pow2_32 = Scalar::from(POW_2_32);
     let params = PublicParams::new();
     let mut transcript = Transcript::new(b"Zei Range Proof");
-    let range_proof = xfr_body
-        .proofs
-        .range_proof
-        .as_ref()
-        .ok_or(ZeiError::InconsistentStructureError)?;
 
     // 1. verify proof commitment to transfer's input - output amounts match proof commitments
     let mut total_input_com = RistrettoPoint::identity();
-    for bar in xfr_body.inputs.iter() {
+    for bar in inputs.iter() {
         let coms = bar
             .amount_commitments
             .as_ref()
@@ -653,7 +715,7 @@ fn verify_confidential_amount(xfr_body: &XfrBody) -> Result<(), ZeiError> {
 
     let mut total_output_com = RistrettoPoint::identity();
     let mut range_coms: Vec<CompressedRistretto> = Vec::with_capacity(2 * num_output + 2);
-    for bar in xfr_body.outputs.iter() {
+    for bar in outputs.iter() {
         let coms = bar
             .amount_commitments
             .as_ref()
@@ -694,61 +756,50 @@ fn verify_confidential_amount(xfr_body: &XfrBody) -> Result<(), ZeiError> {
         range_coms.push(CompressedRistretto::identity());
     }
 
-    xfr_body
-        .proofs
-        .range_proof
-        .as_ref()
-        .unwrap()
-        .range_proof
-        .verify_multiple(
-            &params.bp_gens,
-            &params.pc_gens,
-            &mut transcript,
-            range_coms.as_slice(),
-            BULLET_PROOF_RANGE,
-        )
-        .map_err(|_| ZeiError::XfrVerifyConfidentialAmountError)
+    range_proof.range_proof.verify_multiple(
+        &params.bp_gens,
+        &params.pc_gens,
+        &mut transcript,
+        range_coms.as_slice(),
+        BULLET_PROOF_RANGE).map_err(|_| ZeiError::XfrVerifyConfidentialAmountError)
+
 }
 
-fn verify_plain_amounts(xfr_body: &XfrBody) -> Result<(), ZeiError> {
-    let in_amount: Vec<u64> = xfr_body.inputs.iter().map(|x| x.amount.unwrap()).collect();
-    let out_amount: Vec<u64> = xfr_body.outputs.iter().map(|x| x.amount.unwrap()).collect();
+fn verify_plain_amounts(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord]) -> Result<(), ZeiError> {
+    let in_amount: Vec<u64> = inputs.iter().map(|x| x.amount.unwrap()).collect();
+    let out_amount: Vec<u64> = outputs.iter().map(|x| x.amount.unwrap()).collect();
     if in_amount.into_iter().sum::<u64>() < out_amount.into_iter().sum::<u64>() {
         return Err(ZeiError::XfrVerifyAmountError);
     }
     Ok(())
 }
 
-fn verify_confidential_asset(xfr_body: &XfrBody) -> Result<(), ZeiError> {
+fn verify_confidential_asset(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord], asset_proof: &ChaumPedersenProofX) -> Result<(), ZeiError> {
     let pc_gens = PedersenGens::default();
-    let mut asset_commitments: Vec<RistrettoPoint> = xfr_body
-        .inputs
+    let mut asset_commitments: Vec<RistrettoPoint> = inputs
         .iter()
         .map(|x| x.asset_type_commitment.unwrap().decompress().unwrap())
         .collect();
 
-    let out_asset_commitments: Vec<RistrettoPoint> = xfr_body
-        .outputs
+    let out_asset_commitments: Vec<RistrettoPoint> = outputs
         .iter()
         .map(|x| x.asset_type_commitment.unwrap().decompress().unwrap())
         .collect();
 
     asset_commitments.extend(out_asset_commitments.iter());
 
-    let proof = xfr_body.proofs.asset_proof.borrow().as_ref().unwrap();
-
-    match chaum_pedersen_verify_multiple_eq(&pc_gens, asset_commitments.as_slice(), proof)? {
+    match chaum_pedersen_verify_multiple_eq(&pc_gens, asset_commitments.as_slice(), asset_proof)? {
         true => Ok(()),
         false => Err(ZeiError::XfrVerifyConfidentialAssetError),
     }
 }
 
-fn verify_plain_asset(xfr_body: &XfrBody) -> Result<(), ZeiError> {
+fn verify_plain_asset(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord]) -> Result<(), ZeiError> {
     let mut list = vec![];
-    for x in xfr_body.inputs.iter() {
+    for x in inputs.iter() {
         list.push(x.asset_type.unwrap());
     }
-    for x in xfr_body.outputs.iter() {
+    for x in outputs.iter() {
         list.push(x.asset_type.unwrap());
     }
 
@@ -756,6 +807,24 @@ fn verify_plain_asset(xfr_body: &XfrBody) -> Result<(), ZeiError> {
         true => Ok(()),
         false => Err(ZeiError::XfrVerifyAssetError),
     }
+}
+
+fn verify_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord], proof: &AssetMixProof) -> Result<(), ZeiError>{
+    let pc_gens = bulletproofs_yoloproof::PedersenGens::default();
+    let bp_gens = bulletproofs_yoloproof::BulletproofGens::new(1000, 1);
+    let pow2_32 = Scalar::from(POW_2_32);
+
+
+    let mut in_coms = vec![];
+    for x in inputs.iter(){
+        in_coms.push(((x.amount_commitments.unwrap().0.decompress().unwrap() + pow2_32*x.amount_commitments.unwrap().1.decompress().unwrap()).compress(), x.asset_type_commitment.unwrap()));
+    }
+
+    let mut out_coms = vec![];
+    for x in outputs.iter(){
+        out_coms.push(((x.amount_commitments.unwrap().0.decompress().unwrap() + pow2_32*x.amount_commitments.unwrap().1.decompress().unwrap()).compress(), x.asset_type_commitment.unwrap()));
+    }
+    asset_mixer_verify(&pc_gens, &bp_gens, in_coms.as_slice() , out_coms.as_slice(), proof )
 }
 
 fn verify_issuer_tracking_proof(xfr_body: &XfrBody, attribute_reveal_policies: &[Option<IdRevealPolicy>]) -> Result<(), ZeiError>{
@@ -1079,7 +1148,7 @@ mod test {
     use super::*;
     use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key};
     use crate::basic_crypto::signatures::XfrKeyPair;
-    use crate::errors::ZeiError::{XfrVerifyAmountError, XfrVerifyAssetError, XfrCreationAmountError, XfrCreationAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError, XfrVerifyIssuerTrackingAssetTypeError, XfrVerifyIssuerTrackingAmountError, XfrCreationAssetAmountError};
+    use crate::errors::ZeiError::{XfrVerifyAmountError, XfrVerifyAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError, XfrVerifyIssuerTrackingAssetTypeError, XfrVerifyIssuerTrackingAmountError, XfrCreationAssetAmountError};
     use serde::ser::{Serialize};
     use serde::de::{Deserialize};
     use rmp_serde::{Deserializer, Serializer};

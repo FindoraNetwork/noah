@@ -12,6 +12,15 @@ use spacesuit::{AllocatedValue, Value, cloak, CommittedValue, VerifierCommittabl
 pub struct AssetMixProof(pub(crate) R1CSProof);
 
 
+impl PartialEq for AssetMixProof {
+    fn eq(&self, other: &AssetMixProof) -> bool {
+        self.0.to_bytes() == other.0.to_bytes()
+    }
+}
+
+impl Eq for AssetMixProof {}
+
+
 pub fn asset_mixer_proof(
     pc_gens: &bulletproofs_yoloproof::PedersenGens,
     bp_gens: &bulletproofs_yoloproof::BulletproofGens,
