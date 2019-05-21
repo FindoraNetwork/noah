@@ -36,4 +36,4 @@ pub mod credentials;
 pub mod errors;
 pub mod proofs;
 pub mod serialization;
-pub mod transfers;
+pub mod xfr;
