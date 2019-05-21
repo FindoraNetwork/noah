@@ -1,16 +1,18 @@
-use crate::basic_crypto::signatures::{XfrMultiSig, XfrPublicKey};
-use curve25519_dalek::ristretto::{RistrettoPoint, CompressedRistretto};
-use crate::basic_crypto::elgamal::{ElGamalPublicKey, ElGamalCiphertext};
 use crate::algebra::bls12_381::{BLSG1, BLSG2};
-use curve25519_dalek::edwards::CompressedEdwardsY;
+use crate::basic_crypto::elgamal::{ElGamalPublicKey, ElGamalCiphertext};
 use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
-use curve25519_dalek::scalar::Scalar;
+use crate::basic_crypto::signatures::{XfrMultiSig, XfrPublicKey};
 use crate::errors::ZeiError;
 use crate::proofs::asset_mixer::AssetMixProof;
 use crate::proofs::chaum_pedersen::ChaumPedersenProofX;
-use bulletproofs::RangeProof;
 use crate::proofs::pedersen_elgamal::PedersenElGamalEqProof;
-use crate::xfr::transfers::ConfIdReveal;
+use crate::xfr::proofs::ConfIdReveal;
+use curve25519_dalek::edwards::CompressedEdwardsY;
+use curve25519_dalek::scalar::Scalar;
+
+use bulletproofs::RangeProof;
+
+use curve25519_dalek::ristretto::{RistrettoPoint, CompressedRistretto};
 
 pub type AssetType = [u8; 16];
 

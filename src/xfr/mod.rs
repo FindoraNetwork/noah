@@ -1,2 +1,4 @@
 pub mod structs;
-pub mod transfers;
+pub mod lib;
+pub mod proofs;
+pub mod asset_record;
