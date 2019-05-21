@@ -328,14 +328,14 @@ mod test {
         prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = PedersenGens::default();
 
-        let input_amount = [10u64, 20u64];
-        let out_amount = [30u64];
+        let asset_type = [1u8;16];
+        let input_amount = [(10u64,asset_type), (20u64,asset_type)];
+        let out_amount = [(30u64,asset_type)];
 
         let (xfr_note, _, _, _, outkeys) = create_xfr(
             &mut prng,
             &input_amount,
             &out_amount,
-            [1u8; 16],
             confidential_amount,
             confidential_asset,
             asset_tracking,

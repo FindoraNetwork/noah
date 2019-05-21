@@ -158,3 +158,96 @@ impl PartialEq for XfrRangeProof {
 }
 
 impl Eq for XfrRangeProof {}
+
+#[cfg(test)]
+mod test{
+    use rand::SeedableRng;
+    use rand_chacha::ChaChaRng;
+    use crate::xfr::lib::test::create_xfr;
+    use serde::ser::{Serialize};
+    use serde::de::{Deserialize};
+    use rmp_serde::{Deserializer, Serializer};
+    use crate::basic_crypto::signatures::XfrMultiSig;
+    use super::{XfrBody,XfrProofs, XfrNote};
+
+    fn do_test_serialization(
+        confidential_amount: bool,
+        confidential_asset: bool,
+        asset_tracking: bool,
+    ) {
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let asset_type = [0u8; 16];
+        let input_amount = [(10u64,asset_type), (20u64,asset_type)];
+        let out_amount = [(1u64,asset_type), (2u64,asset_type), (1u64,asset_type), (10u64,asset_type), (16u64,asset_type)];
+
+        let (xfr_note, _, _, _, _) = create_xfr(
+            &mut prng,
+            &input_amount,
+            &out_amount,
+            confidential_amount,
+            confidential_asset,
+            asset_tracking,
+        );
+
+        //serializing signatures
+        let mut vec = vec![];
+        assert_eq!(
+            true,
+            xfr_note
+                .multisig
+                .serialize(&mut Serializer::new(&mut vec))
+                .is_ok()
+        );
+        let mut de = Deserializer::new(&vec[..]);
+        let multisig_de: XfrMultiSig = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note.multisig, multisig_de);
+
+        //serializing proofs
+        let mut vec = vec![];
+        assert_eq!(
+            true,
+            xfr_note
+                .body
+                .proofs
+                .serialize(&mut Serializer::new(&mut vec))
+                .is_ok()
+        );
+        let mut de = Deserializer::new(&vec[..]);
+        let proofs_de = XfrProofs::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note.body.proofs, proofs_de);
+
+        //serializing body
+        let mut vec = vec![];
+        assert_eq!(
+            true,
+            xfr_note
+                .body
+                .serialize(&mut Serializer::new(&mut vec))
+                .is_ok()
+        );
+        let mut de = Deserializer::new(&vec[..]);
+        let body_de = XfrBody::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note.body, body_de);
+
+        //serializing whole Xfr
+        let mut vec = vec![];
+        assert_eq!(
+            true,
+            xfr_note.serialize(&mut Serializer::new(&mut vec)).is_ok()
+        );
+        let mut de = Deserializer::new(&vec[..]);
+        let xfr_de = XfrNote::deserialize(&mut de).unwrap();
+        assert_eq!(xfr_note, xfr_de);
+    }
+
+    #[test]
+    fn test_serialization() {
+        do_test_serialization(false, false, false);
+        do_test_serialization(false, true, false);
+        do_test_serialization(true, false, false);
+        do_test_serialization(true, true, false);
+        do_test_serialization(true, false, true);
+        do_test_serialization(true, true, true);
+    }
+}

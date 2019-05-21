@@ -113,7 +113,7 @@ fn gen_xfr_proofs_multi_asset(
     if !confidential_asset && !confidential_amount{
         return Ok(AssetAmountProof::NoProof);
     }
-    Err(ZeiError::XfrCreationAssetError)
+    Err(ZeiError::XfrCreationAssetAmountError)
 }
 fn gen_xfr_proofs_single_asset<R: CryptoRng + Rng>(
     prng: &mut R,
@@ -222,14 +222,13 @@ pub fn verify_xfr_note(xfr_note: &XfrNote, id_reveal_policies: &[Option<IdReveal
 
         }
         AssetAmountProof::NoProof => {
-            verify_plain_amounts(&xfr_note.body.inputs, &xfr_note.body.outputs)?;
-            verify_plain_asset(&xfr_note.body.inputs, &xfr_note.body.outputs)?;
+            verify_plain_asset_mix(&xfr_note.body.inputs, &xfr_note.body.outputs)?;
         }
         AssetAmountProof::AssetMix(asset_mix_proof) => {
             verify_asset_mix(&xfr_note.body.inputs, &xfr_note.body.outputs, asset_mix_proof)?;
         }
 
-    }
+    };
     // 3 verify tracking proofs
     verify_issuer_tracking_proof(&xfr_note.body, id_reveal_policies)
 }
@@ -242,8 +241,9 @@ fn verify_plain_amounts(
     let in_amount: Vec<u64> = inputs.iter().map(|x| x.amount.unwrap()).collect();
     let out_amount: Vec<u64> = outputs.iter().map(|x| x.amount.unwrap()).collect();
     if in_amount.into_iter().sum::<u64>() < out_amount.into_iter().sum::<u64>() {
-        return Err(ZeiError::XfrVerifyAmountError);
+        return Err(ZeiError::XfrVerifyAssetAmountError);
     }
+
     Ok(())
 }
 
@@ -262,8 +262,38 @@ fn verify_plain_asset(
 
     match list.iter().all_equal() {
         true => Ok(()),
-        false => Err(ZeiError::XfrVerifyAssetError),
+        false => Err(ZeiError::XfrVerifyAssetAmountError),
     }
+}
+
+fn verify_plain_asset_mix(
+    inputs: &[BlindAssetRecord],
+    outputs: &[BlindAssetRecord]
+) -> Result<(), ZeiError>
+{
+    let mut amounts = HashMap::new();
+
+    for record in inputs.iter(){
+        match amounts.get_mut(&record.asset_type.unwrap()){
+            None => {amounts.insert(record.asset_type.unwrap(), vec![i128::from(record.amount.unwrap())]);},
+            Some(vec) => {vec.push(i128::from(record.amount.unwrap()));}
+        };
+    }
+
+    for record in outputs.iter(){
+        match amounts.get_mut(&record.asset_type.unwrap()){
+            None => {amounts.insert(record.asset_type.unwrap(), vec![-i128::from(record.amount.unwrap())]);},
+            Some(vec) => {vec.push(-i128::from(record.amount.unwrap()));}
+        };
+    }
+
+    for (_, a) in amounts.iter(){
+        let sum = a.iter().sum::<i128>();
+        if sum != 0i128{
+            return Err(ZeiError::XfrVerifyAssetAmountError)
+        }
+    }
+    Ok(())
 }
 
 fn verify_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord], proof: &AssetMixProof) -> Result<(), ZeiError>{
@@ -300,10 +330,7 @@ pub(crate) mod test {
     use crate::algebra::groups::{Scalar as ScalarTrait};
     use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext};
     use crate::basic_crypto::signatures::XfrKeyPair;
-    use crate::errors::ZeiError::{XfrVerifyAmountError, XfrVerifyAssetError, XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError, XfrVerifyIssuerTrackingAssetTypeError, XfrVerifyIssuerTrackingAmountError, XfrCreationAssetAmountError};
-    use serde::ser::{Serialize};
-    use serde::de::{Deserialize};
-    use rmp_serde::{Deserializer, Serializer};
+    use crate::errors::ZeiError::{XfrVerifyConfidentialAssetError, XfrVerifyConfidentialAmountError, XfrVerifyIssuerTrackingAssetTypeError, XfrVerifyIssuerTrackingAmountError, XfrCreationAssetAmountError, XfrVerifyAssetAmountError};
     use crate::algebra::groups::Group;
     use crate::credentials;
     use rand_chacha::ChaChaRng;
@@ -312,12 +339,14 @@ pub(crate) mod test {
     use crate::algebra::bls12_381::{BLSG1, BLSScalar, BLSGt};
     use curve25519_dalek::ristretto::{RistrettoPoint, CompressedRistretto};
     use crate::utils::u64_to_u32_pair;
+    use serde::ser::{Serialize};
+    use serde::de::{Deserialize};
+    use rmp_serde::{Deserializer, Serializer};
 
     pub(crate) fn create_xfr(
         prng: &mut ChaChaRng,
-        input_amounts: &[u64],
-        output_amounts: &[u64],
-        asset_type: AssetType,
+        input_amounts: &[(u64, AssetType)],
+        output_amounts: &[(u64, AssetType)],
         confidential_amount: bool,
         confidential_asset: bool,
         asset_tracking: bool,
@@ -354,8 +383,8 @@ pub(crate) mod test {
         for x in input_amounts.iter() {
             let keypair = XfrKeyPair::generate(prng);
             let asset_record = AssetRecord {
-                amount: *x,
-                asset_type,
+                amount: x.0,
+                asset_type: x.1,
                 public_key: keypair.get_pk_ref().clone(),
             };
 
@@ -377,8 +406,8 @@ pub(crate) mod test {
             let keypair = XfrKeyPair::generate(prng);
 
             outputs.push(AssetRecord {
-                amount: *x,
-                asset_type,
+                amount: x.0,
+                asset_type: x.1,
                 public_key: keypair.get_pk_ref().clone(),
             });
             outkeys.push(keypair);
@@ -406,14 +435,13 @@ pub(crate) mod test {
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_type = [0u8; 16];
         let pc_gens = PedersenGens::default();
-        let input_amount = [10u64, 10u64, 10u64];
-        let out_amount = [1u64, 2u64, 3u64, 24u64];
+        let input_amount = [(10u64, asset_type), (10u64, asset_type), (10u64, asset_type)];
+        let out_amount = [(1u64,asset_type), (2u64,asset_type), (3u64,asset_type), (24u64, asset_type)];
 
         let tuple = create_xfr(
             &mut prng,
             &input_amount,
             &out_amount,
-            asset_type,
             confidential_amount,
             confidential_asset,
             asset_tracking,
@@ -462,7 +490,7 @@ pub(crate) mod test {
             error = XfrVerifyConfidentialAmountError;
         } else {
             xfr_note.body.outputs[3].amount = Some(0xFFFFFFFFFF);
-            error = XfrVerifyAmountError;
+            error = XfrVerifyAssetAmountError;
         }
         xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
         assert_eq!(Err(error), verify_xfr_note(&xfr_note, &null_policies),
@@ -502,7 +530,7 @@ pub(crate) mod test {
             error = XfrVerifyConfidentialAssetError;
         } else {
             xfr_note.body.outputs[1].asset_type = Some([1u8; 16]);
-            error = XfrVerifyAssetError;
+            error = XfrVerifyAssetAmountError;
         }
         xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
         assert_eq!(Err(error), verify_xfr_note(&xfr_note, &null_policies),
@@ -537,7 +565,7 @@ pub(crate) mod test {
             error = XfrVerifyConfidentialAssetError;
         } else {
             xfr_note.body.inputs[1].asset_type = Some([1u8; 16]);
-            error = XfrVerifyAssetError;
+            error = XfrVerifyAssetAmountError;
         }
         xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
         assert_eq!(Err(error), verify_xfr_note(&xfr_note, &null_policies),
@@ -647,14 +675,15 @@ pub(crate) mod test {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let input_amount = [10u64, 20u64];
-        let out_amount = [1u64, 2u64, 1u64, 10u64, 16u64];
+        let asset_type = [0u8; 16];
+
+        let input_amount = [(10u64,asset_type), (20u64,asset_type)];
+        let out_amount = [(1u64,asset_type), (2u64,asset_type), (1u64,asset_type), (10u64,asset_type), (16u64,asset_type)];
 
         let (xfr_note, _, _, _, _) = create_xfr(
             &mut prng,
             &input_amount,
             &out_amount,
-            [0u8; 16],
             confidential_amount,
             confidential_asset,
             asset_tracking,
@@ -672,88 +701,6 @@ pub(crate) mod test {
         do_test_transfer_multisig(false, true, true);
         do_test_transfer_multisig(true, false, true);
         do_test_transfer_multisig(true, true, true);
-    }
-
-    fn do_test_serialization(
-        confidential_amount: bool,
-        confidential_asset: bool,
-        asset_tracking: bool,
-    ) {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
-
-        let input_amount = [10u64, 20u64];
-        let out_amount = [1u64, 2u64, 1u64, 10u64, 16u64];
-
-        let (xfr_note, _, _, _, _) = create_xfr(
-            &mut prng,
-            &input_amount,
-            &out_amount,
-            [0u8; 16],
-            confidential_amount,
-            confidential_asset,
-            asset_tracking,
-        );
-
-        //serializing signatures
-        let mut vec = vec![];
-        assert_eq!(
-            true,
-            xfr_note
-                .multisig
-                .serialize(&mut Serializer::new(&mut vec))
-                .is_ok()
-        );
-        let mut de = Deserializer::new(&vec[..]);
-        let multisig_de: XfrMultiSig = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(xfr_note.multisig, multisig_de);
-
-        //serializing proofs
-        let mut vec = vec![];
-        assert_eq!(
-            true,
-            xfr_note
-                .body
-                .proofs
-                .serialize(&mut Serializer::new(&mut vec))
-                .is_ok()
-        );
-        let mut de = Deserializer::new(&vec[..]);
-        let proofs_de = XfrProofs::deserialize(&mut de).unwrap();
-        assert_eq!(xfr_note.body.proofs, proofs_de);
-
-        //serializing body
-        let mut vec = vec![];
-        assert_eq!(
-            true,
-            xfr_note
-                .body
-                .serialize(&mut Serializer::new(&mut vec))
-                .is_ok()
-        );
-        let mut de = Deserializer::new(&vec[..]);
-        let body_de = XfrBody::deserialize(&mut de).unwrap();
-        assert_eq!(xfr_note.body, body_de);
-
-        //serializing whole Xfr
-        let mut vec = vec![];
-        assert_eq!(
-            true,
-            xfr_note.serialize(&mut Serializer::new(&mut vec)).is_ok()
-        );
-        let mut de = Deserializer::new(&vec[..]);
-        let xfr_de = XfrNote::deserialize(&mut de).unwrap();
-        assert_eq!(xfr_note, xfr_de);
-    }
-
-    #[test]
-    fn test_serialization() {
-        do_test_serialization(false, false, false);
-        do_test_serialization(false, true, false);
-        do_test_serialization(true, false, false);
-        do_test_serialization(true, true, false);
-        do_test_serialization(true, false, true);
-        do_test_serialization(true, true, true);
     }
 
     #[test]
@@ -819,6 +766,56 @@ pub(crate) mod test {
         let mut de = Deserializer::new(&vec[..]);
         let xfr_de = XfrNote::deserialize(&mut de).unwrap();
         assert_eq!(xfr_note, xfr_de);
+
+    }
+
+
+    #[test]
+    fn do_multiasset_transfer_tests() {
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let asset_type0 = [0u8; 16];
+        let asset_type1 = [1u8; 16];
+        let asset_type2 = [2u8; 16];
+        let input_amount = [(10u64, asset_type0), (10u64, asset_type1), (10u64, asset_type0), (10u64, asset_type1), (10u64, asset_type1), (10u64, asset_type2)];
+        let out_amount = [(30u64,asset_type1), (5u64,asset_type2), (1u64,asset_type2), (4u64, asset_type2), (0u64, asset_type0), (20u64, asset_type0)];
+
+        let (xfr_note,_,_,_,_) = create_xfr(
+            &mut prng,
+            &input_amount,
+            &out_amount,
+            true,
+            true,
+            false,
+        );
+
+        let mut null_policies = vec![];
+        //let mut id_proofs = vec![];
+        null_policies.push(None); null_policies.push(None);
+        null_policies.push(None); null_policies.push(None);
+        null_policies.push(None); null_policies.push(None);
+
+
+        // test 1: simple transfer using confidential asset mixer
+        assert_eq!(Ok(()), verify_xfr_note(&xfr_note, &null_policies), "Multi asset transfer confidential");
+
+        //test 2: non confidential
+        let (mut xfr_note,inkeys,_,_,_) = create_xfr(
+            &mut prng,
+            &input_amount,
+            &out_amount,
+            false,
+            false,
+            false,
+        );
+
+        assert_eq!(Ok(()), verify_xfr_note(&xfr_note, &null_policies), "Multi asset transfer non confidential");
+
+        xfr_note.body.inputs[0].amount = Some(8u64);
+
+        xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
+
+        assert_eq!(Err(ZeiError::XfrVerifyAssetAmountError), verify_xfr_note(&xfr_note, &null_policies), "Multi asset transfer non confidential");
 
     }
 }
