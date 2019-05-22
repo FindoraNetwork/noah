@@ -216,7 +216,7 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(
     match &xfr_note.body.proofs.asset_amount_proof {
         AssetAmountProof::ConfAll((range_proof, asset_proof)) => {
             verify_confidential_amount(&xfr_note.body.inputs, &xfr_note.body.outputs, range_proof)?;
-            verify_confidential_asset(&xfr_note.body.inputs, &xfr_note.body.outputs, asset_proof)?;
+            verify_confidential_asset(prng, &xfr_note.body.inputs, &xfr_note.body.outputs, asset_proof)?;
         }
         AssetAmountProof::ConfAmount(range_proof) => {
             verify_confidential_amount(&xfr_note.body.inputs, &xfr_note.body.outputs, range_proof)?;
@@ -224,7 +224,7 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(
         }
         AssetAmountProof::ConfAsset(asset_proof) => {
             verify_plain_amounts(&xfr_note.body.inputs, &xfr_note.body.outputs)?;
-            verify_confidential_asset(&xfr_note.body.inputs, &xfr_note.body.outputs, asset_proof)?;
+            verify_confidential_asset(prng,&xfr_note.body.inputs, &xfr_note.body.outputs, asset_proof)?;
 
         }
         AssetAmountProof::NoProof => {

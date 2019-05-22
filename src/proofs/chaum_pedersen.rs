@@ -2,7 +2,7 @@ use bulletproofs::PedersenGens;
 use crate::errors::ZeiError;
 use crate::proofs::{compute_sub_challenge, compute_challenge_ref};
 use curve25519_dalek::ristretto::{RistrettoPoint};
-use curve25519_dalek::traits::Identity;
+use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
 
@@ -104,6 +104,35 @@ pub fn chaum_pedersen_verify_eq(
     Ok(vrfy_ok)
 }
 
+/// I verify a chaum-pedersen equality proof. Return Ok(true) in case of success, Ok(false)
+/// in case of verification failure, and Err(Error::DecompressElementError) in case some
+/// CompressedRistretto can not be decompressed. I use aggregation technique and a single
+/// multi-exponentiation check
+pub fn chaum_pedersen_verify_eq_fast<R: CryptoRng + Rng>(
+    prng: &mut R,
+    pc_gens: &PedersenGens,
+    c1: &RistrettoPoint,
+    c2: &RistrettoPoint,
+    proof:&ChaumPedersenProof) -> Result<bool, ZeiError> {
+
+    let z1 = proof.z1;
+    let z2 = proof.z2;
+    let z3 = proof.z3;
+    let g = pc_gens.B;
+    let h = pc_gens.B_blinding;
+
+    let c = compute_challenge_ref::<RistrettoPoint>(&[c1, c2, &proof.c3, &proof.c4]);
+
+    let a = Scalar::random(prng);
+
+    let verify = RistrettoPoint::multiscalar_mul(
+        &[ -a,       -c*a, a*z1 + z1 , a*z2 + z3, -Scalar::one(), -c],
+        &[  proof.c3, *c1,  g,          h,         proof.c4, *c2]);
+
+    Ok(verify == RistrettoPoint::identity())
+}
+
+
 //Helper functions for the proof of multiple commitments equality below
 /// I return a fake compressed commitment to zero, eg The identity
 fn get_fake_zero_commitment() -> RistrettoPoint {
@@ -174,7 +203,8 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
 /// I verify a proof that all commitments are to the same value.
 ///  * Return Ok(true) in case of success, Ok(false) in case of verification failure,
 ///  * and Err(Error::DecompressElementError) in case some CompressedRistretto can not be decompressed
-pub fn chaum_pedersen_verify_multiple_eq(
+pub fn chaum_pedersen_verify_multiple_eq<R:CryptoRng + Rng>(
+    prng: &mut R,
     pedersen_gens: &PedersenGens,
     commitments: &[RistrettoPoint],
     proof: &ChaumPedersenProofX) -> Result<bool, ZeiError>
@@ -196,13 +226,18 @@ pub fn chaum_pedersen_verify_multiple_eq(
 
     //TODO can we produce proof to zero commitment in a more direct way?
     //produce fake commitment to 0 for chaum pedersen commitment
-    let mut vrfy_ok = chaum_pedersen_verify_eq(
-        pedersen_gens, &commitments[0], &commitments[1], &proof.c1_eq_c2)?;
+    let mut vrfy_ok = chaum_pedersen_verify_eq_fast(
+        prng,
+        pedersen_gens,
+        &commitments[0],
+        &commitments[1],
+        &proof.c1_eq_c2)?;
 
     if commitments.len() ==  2{
         return Ok(vrfy_ok);
     }
-    vrfy_ok = vrfy_ok && chaum_pedersen_verify_eq(
+    vrfy_ok = vrfy_ok && chaum_pedersen_verify_eq_fast(
+        prng,
         pedersen_gens,
         &d,
         &get_fake_zero_commitment(),
@@ -220,7 +255,7 @@ mod test {
     use rand::SeedableRng;
 
     #[test]
-    pub fn test_chaum_perdersen_equality_commitment() {
+    pub fn test_chaum_pedersen_equality_commitment() {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = PedersenGens::default();
@@ -247,6 +282,13 @@ mod test {
             &c2,
             &proof).unwrap());
 
+        assert_eq!(false, chaum_pedersen_verify_eq_fast(
+            &mut csprng,
+            &pc_gens,
+            &c1,
+            &c2,
+            &proof).unwrap());
+
         let proof = chaum_pedersen_prove_eq(
             &mut csprng,
             &pc_gens,
@@ -260,6 +302,14 @@ mod test {
                                                    &c1,
                                                    &c2,
                                                    &proof).unwrap());
+
+        assert_eq!(false, chaum_pedersen_verify_eq_fast(
+            &mut csprng,
+            &pc_gens,
+            &c1,
+            &c2,
+            &proof).unwrap());
+
 
 
         let c3 = pedersen_bases.commit(value1, bf2);
@@ -277,10 +327,17 @@ mod test {
             &c1,
             &c3,
             &proof).unwrap());
+
+        assert_eq!(true, chaum_pedersen_verify_eq_fast(
+            &mut csprng,
+            &pc_gens,
+            &c1,
+            &c3,
+            &proof).unwrap());
     }
 
     #[test]
-    fn test_chaum_perdersen_multiple_eq_proof(){
+    fn test_chaum_pedersen_multiple_eq_proof(){
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = PedersenGens::default();
@@ -305,6 +362,7 @@ mod test {
             &blind_vec).unwrap();
 
         assert_eq!(false, chaum_pedersen_verify_multiple_eq(
+            &mut csprng,
             &pc_gens,
             com_vec,
             &proof).unwrap());
@@ -324,13 +382,14 @@ mod test {
             &blind_vec).unwrap();
 
         assert_eq!(true, chaum_pedersen_verify_multiple_eq(
+            &mut csprng,
             &pc_gens,
             com_vec,
             &proof).unwrap());
     }
 
     #[test]
-    fn test_chaum_perdersen_multiple_eq_proof_using_two(){
+    fn test_chaum_pedersen_multiple_eq_proof_using_two(){
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = PedersenGens::default();
@@ -353,6 +412,7 @@ mod test {
             &blind_vec).unwrap();
 
         assert_eq!(false, chaum_pedersen_verify_multiple_eq(
+            &mut csprng,
             &pc_gens,
             com_vec,
             &proof).unwrap(),
@@ -371,6 +431,7 @@ mod test {
             com_vec,
             &blind_vec).unwrap();
         assert_eq!(true, chaum_pedersen_verify_multiple_eq(
+            &mut csprng,
             &pc_gens,
             com_vec,
             &proof).unwrap(),

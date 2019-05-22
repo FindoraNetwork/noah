@@ -454,7 +454,8 @@ pub(crate) fn asset_proof<R: CryptoRng + Rng>(
     Ok(proof)
 }
 
-pub(crate) fn verify_confidential_asset(
+pub(crate) fn verify_confidential_asset<R: CryptoRng + Rng>(
+    prng: &mut R,
     inputs: &[BlindAssetRecord],
     outputs: &[BlindAssetRecord],
     asset_proof: &ChaumPedersenProofX
@@ -474,6 +475,7 @@ pub(crate) fn verify_confidential_asset(
     asset_commitments.extend(out_asset_commitments.iter());
 
     match chaum_pedersen_verify_multiple_eq(
+        prng,
         &pc_gens,
         asset_commitments.as_slice(),
         asset_proof)? {
