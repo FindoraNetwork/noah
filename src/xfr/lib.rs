@@ -11,6 +11,7 @@ use itertools::Itertools;
 use rand::{CryptoRng, Rng};
 use serde::ser::Serialize;
 use std::collections::HashMap;
+use crate::setup::BULLET_PROOF_CLOAK_GENS;
 
 const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 
@@ -88,7 +89,7 @@ fn gen_xfr_proofs_multi_asset(
 ) -> Result<AssetAmountProof, ZeiError>
 {
     let pc_gens = bulletproofs_yoloproof::PedersenGens::default();
-    let bp_gens = bulletproofs_yoloproof::BulletproofGens::new(1000, 1);
+    let bp_gens = bulletproofs_yoloproof::BulletproofGens::new(BULLET_PROOF_CLOAK_GENS, 1);
     let pow2_32 = Scalar::from(POW_2_32);
 
     let mut ins = vec![];
@@ -298,7 +299,7 @@ fn verify_plain_asset_mix(
 
 fn verify_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord], proof: &AssetMixProof) -> Result<(), ZeiError>{
     let pc_gens = bulletproofs_yoloproof::PedersenGens::default();
-    let bp_gens = bulletproofs_yoloproof::BulletproofGens::new(1000, 1);
+    let bp_gens = bulletproofs_yoloproof::BulletproofGens::new(BULLET_PROOF_CLOAK_GENS, 1);
     let pow2_32 = Scalar::from(POW_2_32);
 
 

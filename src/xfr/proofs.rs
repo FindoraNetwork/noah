@@ -155,6 +155,8 @@ pub(crate) fn verify_issuer_tracking_proof(
     }
 }
 
+/**** Confidential Identity Attributes Reveal *****/
+
 fn verify_attribute_reveal_policy(
     asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
     option_proof: &Option<AssetTrackingProof>,
@@ -234,6 +236,7 @@ pub fn verify_conf_id_reveal(
     )
 }
 
+/**** Range Proofs *****/
 
 /// I compute a range proof for confidential amount transfers.
 /// The proof guarantees that output amounts and difference between total input
@@ -402,6 +405,8 @@ pub(crate) fn verify_confidential_amount(
         BULLET_PROOF_RANGE).map_err(|_| ZeiError::XfrVerifyConfidentialAmountError)
 
 }
+
+/**** Asset Equality Proofs *****/
 
 /// I compute asset equality proof for confidential asset transfers
 pub(crate) fn asset_proof<R: CryptoRng + Rng>(
