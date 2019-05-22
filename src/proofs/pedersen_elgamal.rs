@@ -1,3 +1,4 @@
+use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPublicKey};
@@ -151,6 +152,36 @@ pub fn pedersen_elgamal_eq_verify(
     Err(ZeiError::VerifyPedersenElGamalEqError)
 }
 
+/// verify a pedersen/elgamal equality proof against ctext and commitment using aggregation
+/// technique and a single multiexponentiation check.
+pub fn pedersen_elgamal_eq_verify_fast<R: CryptoRng + Rng>(
+    prng: &mut R,
+    public_key: &ElGamalPublicKey<RistrettoPoint>,
+    ctext: &ElGamalCiphertext<RistrettoPoint>,
+    commitment: &RistrettoPoint,
+    proof: &PedersenElGamalEqProof,
+) -> Result<(), ZeiError>
+{
+    let pc_gens = PedersenGens::default();
+    let c = compute_challenge_ref::<RistrettoPoint>(&[&ctext.e1, &ctext.e2, commitment, &proof.e1.e1, &proof.e1.e2, &proof.c1]);
+
+    let proof_enc_e1 = proof.e1.e1;
+    let proof_enc_e2 = proof.e1.e2;
+
+    let a1 = Scalar::random(prng);
+    let a2 = Scalar::random(prng);
+
+    let ver = RistrettoPoint::multiscalar_mul(
+        &[-a1,     -c*a1,       proof.z1*(a1+Scalar::one()) + proof.z2*a2, proof.z2*a1,        -a2,         -c*a2,     -Scalar::one(), -c,       proof.z2],
+        &[proof.c1, *commitment, pc_gens.B,                                 pc_gens.B_blinding, proof_enc_e1, ctext.e1, proof_enc_e2,   ctext.e2, public_key.0]);
+
+    if ver != RistrettoPoint::identity() {
+        return Err(ZeiError::VerifyPedersenElGamalEqError);
+    }
+    
+    Ok(())
+}
+
 #[cfg(test)]
 mod test{
     use crate::errors::ZeiError;
@@ -180,6 +211,9 @@ mod test{
         let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);
         let verify = super::pedersen_elgamal_eq_verify(&pk, &ctext, &commitment, &proof);
         assert_eq!(true, verify.is_ok());
+
+        let verify = super::pedersen_elgamal_eq_verify_fast(&mut prng,&pk, &ctext, &commitment, &proof);
+        assert_eq!(true, verify.is_ok());
     }
 
     #[test]
@@ -197,6 +231,9 @@ mod test{
 
         let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);
         let verify = super::pedersen_elgamal_eq_verify(&pk, &ctext, &commitment, &proof);
+        assert_eq!(true, verify.is_err());
+        assert_eq!(ZeiError::VerifyPedersenElGamalEqError, verify.err().unwrap());
+        let verify = super::pedersen_elgamal_eq_verify_fast(&mut prng, &pk, &ctext, &commitment, &proof);
         assert_eq!(true, verify.is_err());
         assert_eq!(ZeiError::VerifyPedersenElGamalEqError, verify.err().unwrap());
     }
