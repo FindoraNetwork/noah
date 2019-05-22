@@ -6,7 +6,7 @@ use crate::credentials::AttrsRevealProof;
 use crate::errors::ZeiError;
 use crate::proofs::chaum_pedersen::{chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq};
 use crate::proofs::identity::{PoKAttrs, pok_attrs_prove, pok_attrs_verify};
-use crate::proofs::pedersen_elgamal::{pedersen_elgamal_eq_prove, pedersen_elgamal_eq_verify};
+use crate::proofs::pedersen_elgamal::{pedersen_elgamal_eq_prove, pedersen_elgamal_eq_verify_fast};
 use crate::setup::{MAX_PARTY_NUMBER, BULLET_PROOF_RANGE, PublicParams};
 use crate::xfr::structs::{OpenAssetRecord, AssetTrackingProof, XfrBody, IdRevealPolicy, XfrRangeProof, BlindAssetRecord};
 use crate::utils::{u8_bigendian_slice_to_u128, u64_to_u32_pair, min_greater_equal_power_of_two};
@@ -104,7 +104,8 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
     Ok(v)
 }
 
-pub(crate) fn verify_issuer_tracking_proof(
+pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(
+    prng: &mut R,
     xfr_body: &XfrBody,
     attribute_reveal_policies: &[Option<IdRevealPolicy>]
 ) -> Result<(), ZeiError>
@@ -128,7 +129,7 @@ pub(crate) fn verify_issuer_tracking_proof(
                         ok_or(ZeiError::InconsistentStructureError)?;
                     let asset_proof = proof.as_ref().unwrap().asset_type_proof.
                         as_ref().ok_or(ZeiError::InconsistentStructureError)?;
-                    pedersen_elgamal_eq_verify(&issuer_pk.eg_ristretto_pub_key, ctext, &commitment.decompress().unwrap(), asset_proof).
+                    pedersen_elgamal_eq_verify_fast(prng, &issuer_pk.eg_ristretto_pub_key, ctext, &commitment.decompress().unwrap(), asset_proof).
                         map_err(|_| ZeiError::XfrVerifyIssuerTrackingAssetTypeError)?;
                 }
                 if conf_amount {
@@ -138,9 +139,9 @@ pub(crate) fn verify_issuer_tracking_proof(
                         ok_or(ZeiError::InconsistentStructureError)?;
                     let amount_proof = proof.as_ref().unwrap().amount_proof.
                         as_ref().ok_or(ZeiError::InconsistentStructureError)?;
-                    pedersen_elgamal_eq_verify(&issuer_pk.eg_ristretto_pub_key, &ctext.0, &commitment.0.decompress().unwrap(), &amount_proof.0).
+                    pedersen_elgamal_eq_verify_fast(prng,&issuer_pk.eg_ristretto_pub_key, &ctext.0, &commitment.0.decompress().unwrap(), &amount_proof.0).
                         map_err(|_| ZeiError::XfrVerifyIssuerTrackingAmountError)?;
-                    pedersen_elgamal_eq_verify(&issuer_pk.eg_ristretto_pub_key, &ctext.1, &commitment.1.decompress().unwrap(), &amount_proof.1).
+                    pedersen_elgamal_eq_verify_fast(prng,&issuer_pk.eg_ristretto_pub_key, &ctext.1, &commitment.1.decompress().unwrap(), &amount_proof.1).
                         map_err(|_| ZeiError::XfrVerifyIssuerTrackingAmountError)?;
                 }
                 match attr_reveal_policy{

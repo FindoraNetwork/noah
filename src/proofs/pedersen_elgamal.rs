@@ -178,7 +178,7 @@ pub fn pedersen_elgamal_eq_verify_fast<R: CryptoRng + Rng>(
     if ver != RistrettoPoint::identity() {
         return Err(ZeiError::VerifyPedersenElGamalEqError);
     }
-    
+
     Ok(())
 }
 
