@@ -126,7 +126,7 @@ pub enum AssetAmountProof{
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct XfrProofs {
     pub(crate) asset_amount_proof: AssetAmountProof,
-    pub(crate) asset_tracking_proof: Vec<Option<AssetTrackingProof>>,
+    pub(crate) asset_tracking_proof: AssetTrackingProofs,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -141,6 +141,12 @@ pub struct AssetTrackingProof {
     pub(crate) amount_proof: Option<(PedersenElGamalEqProof, PedersenElGamalEqProof)>, // None if confidential amount flag is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
     pub(crate) asset_type_proof: Option<PedersenElGamalEqProof>, //None if confidential asset_type is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
     pub(crate) identity_proof: Option<ConfIdReveal> //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct AssetTrackingProofs {
+    pub(crate) aggregate_amount_asset_type_proof: Option<PedersenElGamalEqProof>, // None if confidential amount and confidential asset type flag are off. Otherwise, value proves that decryption of issuer_lock_amounts and/or asset type yield the same as values committed in amount_commitments in BlindAssetRecord outputs
+    pub(crate) identity_proofs: Vec<Option<ConfIdReveal>> //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

@@ -210,7 +210,7 @@ fn compute_linear_combination_scalar_vector(
     x.push(xi);
     x
 }
-pub fn pedersen_elgamal_aggragate_eq_proof<R: CryptoRng + Rng>(
+pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + Rng>(
     prng: &mut R,
     m: &[Scalar],
     r: &[Scalar],
@@ -409,33 +409,33 @@ mod test{
         let ctexts = [ctext1, ctext2, ctext3, ctext4];
         let commitments = [commitment1, commitment2, commitment3, commitment4];
 
-        let proof = super::pedersen_elgamal_aggragate_eq_proof(&mut prng, &[m1,m2,m3,m4], &[r1,r2,r3,r4], &pk, &ctexts, &commitments);
+        let proof = super::pedersen_elgamal_aggregate_eq_proof(&mut prng, &[m1,m2,m3,m4], &[r1,r2,r3,r4], &pk, &ctexts, &commitments);
         let verify = super::pedersen_elgamal_eq_aggregate_verify_fast(&mut prng, &pk, &ctexts, &commitments, &proof);
         assert_eq!(true, verify.is_ok());
 
-        let proof = super::pedersen_elgamal_aggragate_eq_proof(&mut prng, &[m1], &[r1], &pk, &ctexts[..1], &commitments[..1]);
+        let proof = super::pedersen_elgamal_aggregate_eq_proof(&mut prng, &[m1], &[r1], &pk, &ctexts[..1], &commitments[..1]);
         let verify = super::pedersen_elgamal_eq_aggregate_verify_fast(&mut prng, &pk, &ctexts[..1], &commitments[..1], &proof);
         assert_eq!(true, verify.is_ok());
 
-        let proof = super::pedersen_elgamal_aggragate_eq_proof(&mut prng, &[m2], &[r2], &pk, &ctexts[1..2], &commitments[1..2]);
+        let proof = super::pedersen_elgamal_aggregate_eq_proof(&mut prng, &[m2], &[r2], &pk, &ctexts[1..2], &commitments[1..2]);
         let verify = super::pedersen_elgamal_eq_aggregate_verify_fast(&mut prng, &pk, &ctexts[1..2], &commitments[1..2], &proof);
         assert_eq!(true, verify.is_ok());
 
-        let proof = super::pedersen_elgamal_aggragate_eq_proof(&mut prng, &[m2,m3], &[r2,r3], &pk, &ctexts[1..3], &commitments[1..3]);
+        let proof = super::pedersen_elgamal_aggregate_eq_proof(&mut prng, &[m2,m3], &[r2,r3], &pk, &ctexts[1..3], &commitments[1..3]);
         let verify = super::pedersen_elgamal_eq_aggregate_verify_fast(&mut prng, &pk, &ctexts[1..3], &commitments[1..3], &proof);
         assert_eq!(true, verify.is_ok());
 
-        let proof = super::pedersen_elgamal_aggragate_eq_proof(&mut prng, &[m1,m2,m3,m3], &[r1,r2,r3,r4], &pk, &ctexts, &commitments);
+        let proof = super::pedersen_elgamal_aggregate_eq_proof(&mut prng, &[m1,m2,m3,m3], &[r1,r2,r3,r4], &pk, &ctexts, &commitments);
         let verify = super::pedersen_elgamal_eq_aggregate_verify_fast(&mut prng, &pk, &ctexts, &commitments, &proof);
         assert_eq!(true, verify.is_err());
         assert_eq!(ZeiError::VerifyPedersenElGamalEqError, verify.err().unwrap());
 
-        let proof = super::pedersen_elgamal_aggragate_eq_proof(&mut prng, &[m1,m2,m3,m4], &[r1,r2,r3,r1], &pk, &ctexts, &commitments);
+        let proof = super::pedersen_elgamal_aggregate_eq_proof(&mut prng, &[m1,m2,m3,m4], &[r1,r2,r3,r1], &pk, &ctexts, &commitments);
         let verify = super::pedersen_elgamal_eq_aggregate_verify_fast(&mut prng, &pk, &ctexts, &commitments, &proof);
         assert_eq!(true, verify.is_err());
         assert_eq!(ZeiError::VerifyPedersenElGamalEqError, verify.err().unwrap());
 
-        let proof = super::pedersen_elgamal_aggragate_eq_proof(&mut prng, &[m1,m2,m3,m4], &[r2,r2,r3,r4], &pk, &ctexts, &commitments);
+        let proof = super::pedersen_elgamal_aggregate_eq_proof(&mut prng, &[m1,m2,m3,m4], &[r2,r2,r3,r4], &pk, &ctexts, &commitments);
         let verify = super::pedersen_elgamal_eq_aggregate_verify_fast(&mut prng, &pk, &ctexts, &commitments, &proof);
         assert_eq!(true, verify.is_err());
         assert_eq!(ZeiError::VerifyPedersenElGamalEqError, verify.err().unwrap());
