@@ -75,78 +75,6 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
     }
 
     Ok(proof)
-    /*
-    for (output, identity_proof) in outputs.iter().zip(identity_proofs.iter()) {
-        match output.asset_record.issuer_public_key.as_ref(){
-            None => v.push(None),
-            Some(public_key) => {
-
-                let mut asset_type_proof = None;
-                let mut amount_proof = None;
-                //do asset
-                if output.asset_record.asset_type_commitment.is_some() {
-                    let asset_blind = &output.type_blind;
-                    let asset_scalar =
-                        Scalar::from(u8_bigendian_slice_to_u128(&output.asset_type[..]));
-                    let asset_com = output
-                        .asset_record
-                        .asset_type_commitment
-                        .as_ref()
-                        .ok_or(ZeiError::InconsistentStructureError)?;
-                    let asset_ctext = output
-                        .asset_record
-                        .issuer_lock_type
-                        .as_ref()
-                        .ok_or(ZeiError::InconsistentStructureError)?;
-                    asset_type_proof = Some(pedersen_elgamal_eq_prove(
-                        prng,
-                        &asset_scalar,
-                        asset_blind,
-                        &public_key.eg_ristretto_pub_key,
-                        asset_ctext,
-                        &asset_com.decompress().unwrap(),
-                    ));
-                }
-                if output.asset_record.amount_commitments.is_some() {
-                    let (amount_low, amount_high) = u64_to_u32_pair(output.amount);
-                    let ctexts = output
-                        .asset_record
-                        .issuer_lock_amount
-                        .as_ref()
-                        .ok_or(ZeiError::InconsistentStructureError)?;
-                    let commitments = output
-                        .asset_record
-                        .amount_commitments
-                        .as_ref()
-                        .ok_or(ZeiError::InconsistentStructureError)?;
-                    let proof_low = pedersen_elgamal_eq_prove(
-                        prng,
-                        &Scalar::from(amount_low),
-                        &output.amount_blinds.0,
-                        &public_key.eg_ristretto_pub_key,
-                        &ctexts.0,
-                        &commitments.0.decompress().unwrap(),
-                    );
-                    let proof_high = pedersen_elgamal_eq_prove(
-                        prng,
-                        &Scalar::from(amount_high),
-                        &output.amount_blinds.1,
-                        &public_key.eg_ristretto_pub_key,
-                        &ctexts.1,
-                        &commitments.1.decompress().unwrap(),
-                    );
-                    amount_proof = Some((proof_low, proof_high));
-                }
-
-                v.push(Some(AssetTrackingProof {
-                    amount_proof,
-                    asset_type_proof,
-                    identity_proof: identity_proof.clone() }));
-            }
-        }
-    }
-    Ok(v)
-    */
 }
 
 pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(
@@ -203,52 +131,6 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(
     };
 
     Ok(())
-
-    /*
-    match xfr_body.inputs[0].issuer_public_key.as_ref() {
-        None => Ok(()), //no asset tracing required
-        Some(issuer_pk) => {
-            let conf_asset = xfr_body.inputs[0].asset_type.is_none();
-            let conf_amount = xfr_body.inputs[0].amount.is_none();
-
-            for ((proof, asset_record),attr_reveal_policy) in
-                xfr_body.proofs.asset_tracking_proof.iter().zip(xfr_body.outputs.iter()).zip(attribute_reveal_policies) {
-                if proof.is_none() {
-                    return Err(ZeiError::XfrVerifyIssuerTrackingAssetTypeError);
-                }
-                if conf_asset {
-                    let ctext = asset_record.issuer_lock_type.as_ref().
-                        ok_or(ZeiError::InconsistentStructureError)?;
-                    let commitment = asset_record.asset_type_commitment.as_ref().
-                        ok_or(ZeiError::InconsistentStructureError)?;
-                    let asset_proof = proof.as_ref().unwrap().asset_type_proof.
-                        as_ref().ok_or(ZeiError::InconsistentStructureError)?;
-                    pedersen_elgamal_eq_verify_fast(prng, &issuer_pk.eg_ristretto_pub_key, ctext, &commitment.decompress().unwrap(), asset_proof).
-                        map_err(|_| ZeiError::XfrVerifyIssuerTrackingAssetTypeError)?;
-                }
-                if conf_amount {
-                    let ctext = asset_record.issuer_lock_amount.as_ref().
-                        ok_or(ZeiError::InconsistentStructureError)?;
-                    let commitment = asset_record.amount_commitments.as_ref().
-                        ok_or(ZeiError::InconsistentStructureError)?;
-                    let amount_proof = proof.as_ref().unwrap().amount_proof.
-                        as_ref().ok_or(ZeiError::InconsistentStructureError)?;
-                    pedersen_elgamal_eq_verify_fast(prng,&issuer_pk.eg_ristretto_pub_key, &ctext.0, &commitment.0.decompress().unwrap(), &amount_proof.0).
-                        map_err(|_| ZeiError::XfrVerifyIssuerTrackingAmountError)?;
-                    pedersen_elgamal_eq_verify_fast(prng,&issuer_pk.eg_ristretto_pub_key, &ctext.1, &commitment.1.decompress().unwrap(), &amount_proof.1).
-                        map_err(|_| ZeiError::XfrVerifyIssuerTrackingAmountError)?;
-                }
-                match attr_reveal_policy{
-                    None => {},
-                    Some(policy) => {
-                        verify_attribute_reveal_policy(&issuer_pk.eg_blsg1_pub_key, proof, policy).map_err(|_| ZeiError::XfrVerifyIssuerTrackingIdentityError)?;
-                    }
-                }
-            }
-            Ok(())
-        }
-    }
-    */
 }
 
 /**** Confidential Identity Attributes Reveal *****/
