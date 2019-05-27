@@ -167,7 +167,7 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
     for (attr,b) in attrs.iter().zip(policy.bitmap.iter()){
         if *b {
             let r = BLSScalar::random_scalar(prng);
-            let ctext = elgamal_encrypt::<BLSG1>(
+            let ctext = elgamal_encrypt::<BLSScalar, BLSG1>(
                 &base, attr, &r, asset_issuer_public_key);
             rands.push(r);
             ctexts.push(ctext);
@@ -175,7 +175,7 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
         }
     }
 
-    let pok_attrs_proof = pok_attrs_prove::<_,BLSGt>(
+    let pok_attrs_proof = pok_attrs_prove::<_,BLSScalar,BLSGt>(
         prng,
         revealed_attrs.as_slice(),
         &policy.cred_issuer_pub_key,
@@ -198,7 +198,7 @@ pub fn verify_conf_id_reveal(
     attr_reveal_policy: &IdRevealPolicy,
 ) -> Result<(), ZeiError>
 {
-    pok_attrs_verify::<BLSGt>(
+    pok_attrs_verify::<BLSScalar,BLSGt>(
         &conf_id_reveal.attr_reveal_proof,
         &conf_id_reveal.ctexts,
         &conf_id_reveal.pok_attrs,

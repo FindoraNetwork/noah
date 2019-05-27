@@ -19,16 +19,16 @@ pub(crate) struct PoKAttrs<G1, G2, S>{
 
 /// I compute a proof of knowledge of identity attributes to be verified against ciphertext of these
 /// and a anoymouns credential proof
-pub(crate) fn pok_attrs_prove<R, P>(
+pub(crate) fn pok_attrs_prove<R, S, P>(
     prng: &mut R,
-    attrs: &[P::ScalarType], // attributes to prove knowledge of
+    attrs: &[S], // attributes to prove knowledge of
     cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
     asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
-    ctexts_rand: &[P::ScalarType], // randomness used to encrypt attrs
+    ctexts_rand: &[S], // randomness used to encrypt attrs
     bitmap: &[bool], // indicates position of each attribute to prove
 
-) -> Result<PoKAttrs<P::G1, P::G2, P::ScalarType>, ZeiError>
-    where R: CryptoRng + Rng, P: Pairing
+) -> Result<PoKAttrs<P::G1, P::G2, S>, ZeiError>
+    where R: CryptoRng + Rng, S: Scalar, P: Pairing<S>
 {
     let m = attrs.len();
     let mut attr_commitments = Vec::with_capacity(m);
@@ -40,14 +40,14 @@ pub(crate) fn pok_attrs_prove<R, P>(
     for (yy2i, shown) in cred_issuer_pub_key.yy2.iter().zip(
         bitmap.iter()){
         if *shown {
-            let r: P::ScalarType = P::ScalarType::random_scalar(prng);
+            let r: S = S::random_scalar(prng);
             let com_y2i = P::g2_mul_scalar(yy2i, &r);
             let com_g = P::g1_mul_scalar(&P::G1::get_base(), &r);
             attr_blind.push(r);
             attr_commitments.push(com_g);
             attr_blind_cred_commitment = attr_blind_cred_commitment.add(&com_y2i);
 
-            let r: P::ScalarType = P::ScalarType::random_scalar(prng);
+            let r = S::random_scalar(prng);
             let com_g = P::g1_mul_scalar(&P::G1::get_base(), &r);
             let com_pk = P::g1_mul_scalar(&asset_issuer_pub_key.0, &r);
             rand_blind.push(r);
@@ -59,7 +59,7 @@ pub(crate) fn pok_attrs_prove<R, P>(
         return Err(ZeiError::ParameterError);
     }
 
-    let c = pok_attrs_challenge::<P>(
+    let c = pok_attrs_challenge::<S,P>(
         attr_commitments.as_slice(),
         rand_commitments.as_slice());
 
@@ -84,10 +84,10 @@ pub(crate) fn pok_attrs_prove<R, P>(
 }
 
 /// I compute the challenge in a proof of knowledge of identity attributes
-fn pok_attrs_challenge<P: Pairing>(
+fn pok_attrs_challenge<S: Scalar, P: Pairing<S>>(
     attr_coms: &[P::G1],
     rand_coms: &[(P::G1, P::G1)]
-) -> P::ScalarType
+) -> S
 {
     let mut hash = Sha512::new();
     for com in attr_coms.iter(){
@@ -97,34 +97,34 @@ fn pok_attrs_challenge<P: Pairing>(
         hash.input(com.0.to_compressed_bytes());
         hash.input(com.1.to_compressed_bytes());
     }
-    P::ScalarType::from_hash(hash)
+    S::from_hash(hash)
 }
 
 /// I verify a proof of knowledge of attributes that satisfy a confidential identity proof
-pub(crate) fn pok_attrs_verify<P: Pairing>(
-    reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
+pub(crate) fn pok_attrs_verify<S: Scalar, P: Pairing<S>>(
+    reveal_proof: &AttrsRevealProof<P::G1, P::G2, S>,
     ctexts: &[ElGamalCiphertext<P::G1>],
-    pok_attrs: &PoKAttrs<P::G1, P::G2, P::ScalarType>,
+    pok_attrs: &PoKAttrs<P::G1, P::G2, S>,
     asset_issuer_public_key: &ElGamalPublicKey<P::G1>,
     cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
     bitmap: &[bool], // indicates which attributes should be revealed to the asset issuer
 ) -> Result<(), ZeiError>
 {
     // 1. compute challenge
-    let challenge = pok_attrs_challenge::<P>(
+    let challenge = pok_attrs_challenge::<S,P>(
         pok_attrs.attr_commitments.as_slice(),
         pok_attrs.rand_commitments.as_slice());
     // 2. do ciphertexts verification
-    verify_ciphertext::<P>(&challenge, ctexts, pok_attrs, asset_issuer_public_key)?;
+    verify_ciphertext::<S,P>(&challenge, ctexts, pok_attrs, asset_issuer_public_key)?;
     // 3. do credential verification
-    verify_credential::<P>(&challenge, reveal_proof, pok_attrs, cred_issuer_pub_key, bitmap)
+    verify_credential::<S,P>(&challenge, reveal_proof, pok_attrs, cred_issuer_pub_key, bitmap)
 }
 
 /// I verify a proof of knowledge of a set of ElGamal encrypted messages
-fn verify_ciphertext<P: Pairing>(
-    challenge: &P::ScalarType,
+fn verify_ciphertext<S: Scalar, P: Pairing<S>>(
+    challenge: &S,
     ctexts: &[ElGamalCiphertext<P::G1>],
-    pok_attrs: &PoKAttrs<P::G1, P::G2, P::ScalarType>,
+    pok_attrs: &PoKAttrs<P::G1, P::G2, S>,
     asset_issuer_public_key: &ElGamalPublicKey<P::G1>
 ) -> Result<(), ZeiError>
 {
@@ -168,20 +168,20 @@ fn verify_ciphertext<P: Pairing>(
 
 /// I verify a proof of knowledge of a set of identity attributes that verify an identity
 /// credential proof
-fn verify_credential<P: Pairing>(
-    challenge: &P::ScalarType,
-    reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
-    pok_attrs: &PoKAttrs<P::G1, P::G2, P::ScalarType>,
+fn verify_credential<S: Scalar, P: Pairing<S>>(
+    challenge: &S,
+    reveal_proof: &AttrsRevealProof<P::G1, P::G2, S>,
+    pok_attrs: &PoKAttrs<P::G1, P::G2, S>,
     cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
     bitmap: &[bool], //policy, indicates which attributes needs to be revealed to the asset issuer
 ) -> Result<(), ZeiError>
 {
     //compute credential proof constants and multiply them by challenge
     let cred_challenge =
-        compute_challenge::<P>(&reveal_proof.pok.commitment); //c
+        compute_challenge::<S,P>(&reveal_proof.pok.commitment); //c
     // lhs constant c*X2 + - pf.com + r_t*G2 + r_sk * Z2 + sum a_i + Y2i (a_i in hidden)
     let cred_lhs_constant =
-        constant_terms_addition::<P>(&cred_challenge, reveal_proof, cred_issuer_public_key, bitmap).map_err(|_| ZeiError::IdentityRevealVerifyError)?;
+        constant_terms_addition::<S,P>(&cred_challenge, reveal_proof, cred_issuer_public_key, bitmap).map_err(|_| ZeiError::IdentityRevealVerifyError)?;
     let cred_rhs_constant = P::g2_mul_scalar(
         &cred_issuer_public_key.gen2,
         &cred_challenge); //c*G2
@@ -214,9 +214,9 @@ fn verify_credential<P: Pairing>(
     }
 }
 
-fn constant_terms_addition<P: Pairing>(
-    challenge: &P::ScalarType,
-    reveal_proof: &AttrsRevealProof<P::G1, P::G2, P::ScalarType>,
+fn constant_terms_addition<S:Scalar, P: Pairing<S>>(
+    challenge: &S,
+    reveal_proof: &AttrsRevealProof<P::G1, P::G2, S>,
     cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
     bitmap: &[bool],
 ) -> Result<P::G2, ZeiError>
@@ -257,27 +257,27 @@ mod test_bn{
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let cred_issuer_keypair =
-            gen_issuer_keys::<_, BNGt>(&mut prng, 3);
+            gen_issuer_keys::<_, BNScalar, BNGt>(&mut prng, 3);
         let cred_issuer_pub_key = &cred_issuer_keypair.0;
         let cred_issuer_sk = &cred_issuer_keypair.1;
 
         let asset_issuer_secret_key =
-            elgamal_generate_secret_key::<_,BNG1>(&mut prng);
+            elgamal_generate_secret_key::<_,BNScalar>(&mut prng);
         let asset_issuer_public_key =
             elgamal_derive_public_key(&BNG1::get_base(), &asset_issuer_secret_key);
 
         let (user_pk, user_sk) =
-            gen_user_keys::<_, BNGt>(&mut prng, cred_issuer_pub_key);
+            gen_user_keys::<_, BNScalar,BNGt>(&mut prng, cred_issuer_pub_key);
 
         let attr1 = BNScalar::random_scalar(&mut prng);
         let attr2 = BNScalar::random_scalar(&mut prng);
         let attr3 = BNScalar::random_scalar(&mut prng);
 
-        let signature = issuer_sign::<_, BNGt>(
+        let signature = issuer_sign::<_, BNScalar,BNGt>(
             &mut prng, &cred_issuer_sk, &user_pk,
             &[attr1.clone(), attr2.clone(), attr3.clone()]);
 
-        let proof = reveal_attrs::<_, BNGt>(
+        let proof = reveal_attrs::<_, BNScalar, BNGt>(
             &mut prng,
             &user_sk,
             cred_issuer_pub_key,
@@ -289,7 +289,7 @@ mod test_bn{
         let rand = BNScalar::random_scalar(&mut prng);
         let ctext = elgamal_encrypt(
             &BNG1::get_base(), &attr2, &rand, &asset_issuer_public_key);
-        let pok_attr = pok_attrs_prove::<_, BNGt>(
+        let pok_attr = pok_attrs_prove::<_, BNScalar,BNGt>(
             &mut prng,
             &[attr2.clone()],
             cred_issuer_pub_key,
@@ -297,7 +297,7 @@ mod test_bn{
             &[rand],
             &[false, true, false]).unwrap();
 
-        let vrfy = pok_attrs_verify::<BNGt>(
+        let vrfy = pok_attrs_verify::<BNScalar,BNGt>(
             &proof,
             &[ctext],
             &pok_attr,
@@ -328,18 +328,18 @@ mod test_bls12_381{
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let cred_issuer_keypair =
-            gen_issuer_keys::<_, BLSGt>(&mut prng, num_attr);
+            gen_issuer_keys::<_, BLSScalar,BLSGt>(&mut prng, num_attr);
 
         let cred_issuer_pub_key = &cred_issuer_keypair.0;
         let cred_issuer_sk = &cred_issuer_keypair.1;
 
         let asset_issuer_secret_key =
-            elgamal_generate_secret_key::<_,BLSG1>(&mut prng);
+            elgamal_generate_secret_key::<_,BLSScalar>(&mut prng);
         let asset_issuer_public_key =
             elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_secret_key);
 
         let (user_pk, user_sk) =
-            gen_user_keys::<_, BLSGt>(&mut prng, cred_issuer_pub_key);
+            gen_user_keys::<_, BLSScalar,BLSGt>(&mut prng, cred_issuer_pub_key);
 
         let mut attrs = vec![];
 
@@ -347,11 +347,11 @@ mod test_bls12_381{
             attrs.push(BLSScalar::random_scalar(&mut prng));
         }
 
-        let signature = issuer_sign::<_, BLSGt>(
+        let signature = issuer_sign::<_, BLSScalar, BLSGt>(
             &mut prng, &cred_issuer_sk, &user_pk,
             attrs.as_slice());
 
-        let proof = reveal_attrs::<_, BLSGt>(
+        let proof = reveal_attrs::<_, BLSScalar, BLSGt>(
             &mut prng,
             &user_sk,
             cred_issuer_pub_key,
@@ -375,7 +375,7 @@ mod test_bls12_381{
             }
         }
 
-        let pok_attrs = pok_attrs_prove::<_, BLSGt>(
+        let pok_attrs = pok_attrs_prove::<_, BLSScalar, BLSGt>(
             &mut prng,
             revealed_attrs.as_slice(),
             cred_issuer_pub_key,
@@ -383,7 +383,7 @@ mod test_bls12_381{
             ctext_rands.as_slice(),
             reveal_bitmap).unwrap();
 
-        let vrfy = pok_attrs_verify::<BLSGt>(
+        let vrfy = pok_attrs_verify::<BLSScalar,BLSGt>(
             &proof,
             ctexts.as_slice(),
             &pok_attrs,
@@ -405,7 +405,7 @@ mod test_bls12_381{
         }
 
 
-        let vrfy = pok_attrs_verify::<BLSGt>(
+        let vrfy = pok_attrs_verify::<BLSScalar,BLSGt>(
             &proof,
             ctexts.as_slice(),
             &pok_attrs,
@@ -467,7 +467,7 @@ mod test_serialization{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
 
-    fn to_json<G1: Group, G2: Group, S: Scalar>(){
+    fn to_json<G1: Group<S>, G2: Group<S>, S: Scalar>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let pokattrs = PoKAttrs{
@@ -483,7 +483,7 @@ mod test_serialization{
         assert_eq!(pokattrs, pokattrs_de);
     }
 
-    fn to_msg_pack<G1: Group, G2: Group, S: Scalar>(){
+    fn to_msg_pack<G1: Group<S>, G2: Group<S>, S: Scalar>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let pokattrs = PoKAttrs{

@@ -1,39 +1,42 @@
 use crate::errors::ZeiError;
 use rand::{CryptoRng, Rng};
+/*
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Visitor, SeqAccess};
 use crate::serialization::ZeiFromToBytes;
+*/
 use crate::algebra::groups::{Group, Scalar};
-use std::marker::PhantomData;
+//use std::marker::PhantomData;
 
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElGamalPublicKey<G>(pub(crate) G);  //PK = sk*G
 
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElGamalSecretKey<S>(pub(crate) S); //sk
 
-pub fn elgamal_generate_secret_key<R:CryptoRng + Rng, G: Group>(prng: &mut R) -> ElGamalSecretKey<G::ScalarType>{
-    ElGamalSecretKey(G::ScalarType::random_scalar(prng))
+pub fn elgamal_generate_secret_key<R:CryptoRng + Rng, S: Scalar>(prng: &mut R) -> ElGamalSecretKey<S>{
+    ElGamalSecretKey(S::random_scalar(prng))
 }
 
-pub fn elgamal_derive_public_key<G: Group>(
+pub fn elgamal_derive_public_key<S: Scalar, G: Group<S>>(
     base: &G,
-    secret_key: &ElGamalSecretKey<G::ScalarType>,
+    secret_key: &ElGamalSecretKey<S>,
 ) -> ElGamalPublicKey<G>
 {
     ElGamalPublicKey(base.mul(&secret_key.0))
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElGamalCiphertext<G> {
     pub(crate) e1: G, //r*G
     pub(crate) e2: G, //m*G + r*PK
 }
 
 
-impl<G: Group> ZeiFromToBytes for ElGamalCiphertext<G>{
+/*
+impl<G> ZeiFromToBytes for ElGamalCiphertext<G> where G: Group<S>, S: Scalar{
     fn zei_to_bytes(&self) -> Vec<u8>{
         let mut v  = vec![];
         v.extend_from_slice(self.e1.to_compressed_bytes().as_slice());
@@ -49,7 +52,7 @@ impl<G: Group> ZeiFromToBytes for ElGamalCiphertext<G>{
 }
 
 
-impl<G: Group> Serialize for ElGamalPublicKey<G> {
+impl<Sc: Scalar, G: Group<Sc>> Serialize for ElGamalPublicKey<G> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer
@@ -58,16 +61,16 @@ impl<G: Group> Serialize for ElGamalPublicKey<G> {
     }
 }
 
-impl<'de, G: Group> Deserialize<'de> for ElGamalPublicKey<G> {
+impl<'de, Sc: Scalar,G: Group<Sc>> Deserialize<'de> for ElGamalPublicKey<G> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>
     {
-        struct ElGamalVisitor<G: Group> {
+        struct ElGamalVisitor<Sca: Scalar, G: Group<Sca>> {
             marker: PhantomData<fn()->ElGamalPublicKey<G>>
         }
 
-        impl<G: Group> ElGamalVisitor<G> {
+        impl<Sca: Scalar, G: Group<Sca>> ElGamalVisitor<Sca, G> {
             fn new() -> Self {
                 ElGamalVisitor {
                     marker: PhantomData
@@ -75,7 +78,7 @@ impl<'de, G: Group> Deserialize<'de> for ElGamalPublicKey<G> {
             }
         }
 
-        impl<'de, G: Group> Visitor<'de> for ElGamalVisitor<G> {
+        impl<'de, Sca: Scalar, G: Group<Sca>> Visitor<'de> for ElGamalVisitor<Sca, G> {
             type Value = ElGamalPublicKey<G>;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
@@ -162,7 +165,7 @@ impl<'de, S: Scalar> Deserialize<'de> for ElGamalSecretKey<S> {
     }
 }
 
-impl<G: Group> Serialize for ElGamalCiphertext<G> {
+impl<Sc: Scalar, G: Group<Sc>> Serialize for ElGamalCiphertext<G> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer
@@ -172,16 +175,16 @@ impl<G: Group> Serialize for ElGamalCiphertext<G> {
     }
 }
 
-impl<'de, G: Group> Deserialize<'de> for ElGamalCiphertext<G> {
+impl<'de,Sc: Scalar, G: Group<Sc>> Deserialize<'de> for ElGamalCiphertext<G> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>
     {
-        struct ElGamalVisitor<G: Group> {
+        struct ElGamalVisitor<Sca: Scalar, G: Group<Sca>> {
             marker: PhantomData<fn()->ElGamalCiphertext<G>>
         }
 
-        impl<G: Group> ElGamalVisitor<G> {
+        impl<Sca: Scalar, G: Group<Sca>> ElGamalVisitor<Sca, G> {
             fn new() -> Self {
                 ElGamalVisitor {
                     marker: PhantomData
@@ -189,7 +192,7 @@ impl<'de, G: Group> Deserialize<'de> for ElGamalCiphertext<G> {
             }
         }
 
-        impl<'de, G: Group> Visitor<'de> for ElGamalVisitor<G>{
+        impl<'de, Sca: Scalar, G: Group<Sca>> Visitor<'de> for ElGamalVisitor<Sca, G>{
             type Value = ElGamalCiphertext<G>;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
@@ -215,12 +218,13 @@ impl<'de, G: Group> Deserialize<'de> for ElGamalCiphertext<G> {
         deserializer.deserialize_bytes(ElGamalVisitor::new())
     }
 }
+*/
 
 /// I return an ElGamal ciphertext pair as (r*G, m*g + r*PK), where G is a curve base point
-pub fn elgamal_encrypt<G:Group>(
+pub fn elgamal_encrypt<S:Scalar, G:Group<S>>(
     base: &G,
-    m: &G::ScalarType,
-    r: &G::ScalarType,
+    m: &S,
+    r: &S,
     public_key: &ElGamalPublicKey<G>
 ) ->ElGamalCiphertext<G>
 {
@@ -234,11 +238,11 @@ pub fn elgamal_encrypt<G:Group>(
 }
 
 /// I verify that ctext encrypts m (ctext.e2 - ctext.e1 * sk = m* G)
-pub fn elgamal_verify<G:Group>(
+pub fn elgamal_verify<S: Scalar, G:Group<S>>(
     base: &G,
-    m: &G::ScalarType,
+    m: &S,
     ctext: &ElGamalCiphertext<G>,
-    secret_key: &ElGamalSecretKey<G::ScalarType>,
+    secret_key: &ElGamalSecretKey<S>,
 ) -> Result<(), ZeiError>{
     match  base.mul(m).add(&ctext.e1.mul(&secret_key.0)) == ctext.e2 {
         true => Ok(()),
@@ -248,37 +252,42 @@ pub fn elgamal_verify<G:Group>(
 
 /// I decrypt en el gamal ciphertext via brute force
 /// Return ZeiError::ElGamalDecryptionError if value is not in the range [0..2^32-1]
-pub fn elgamal_decrypt< G:Group>(
+pub fn elgamal_decrypt<S:Scalar, G:Group<S>>(
     base: &G,
     ctext: &ElGamalCiphertext<G>,
-    secret_key: &ElGamalSecretKey<G::ScalarType>,
-    ) -> Result<G::ScalarType, ZeiError>
+    secret_key: &ElGamalSecretKey<S>,
+    ) -> Result<S, ZeiError>
 {
-    elgamal_decrypt_hinted::<G>(base, ctext, secret_key, 0, u32::max_value())
+    elgamal_decrypt_hinted::<S,G>(base, ctext, secret_key, 0, u32::max_value())
 }
 
 /// I decrypt en el gamal ciphertext via brute force in the range [lower_bound..upper_bound]
 /// Return ZeiError::ElGamalDecryptionError if value is not in the range.
-pub fn elgamal_decrypt_hinted<G: Group>(
+pub fn elgamal_decrypt_hinted<S: Scalar, G: Group<S>>(
     base: &G,
     ctext: &ElGamalCiphertext<G>,
-    secret_key: &ElGamalSecretKey<G::ScalarType>,
+    secret_key: &ElGamalSecretKey<S>,
     lower_bound: u32,
     upper_bound: u32,
-) -> Result<G::ScalarType, ZeiError>
+) -> Result<S, ZeiError>
 {
     let encoded = &ctext.e2.sub(&ctext.e1.mul(&secret_key.0));
 
-    brute_force::<G>(base, &encoded, lower_bound, upper_bound)
+    brute_force::<S,G>(base, &encoded, lower_bound, upper_bound)
 }
 
-fn brute_force<G: Group>(base: &G, encoded: &G, lower_bound: u32, upper_bound: u32) -> Result<G::ScalarType, ZeiError>{
+fn brute_force<S: Scalar, G: Group<S>>(
+    base: &G,
+    encoded: &G,
+    lower_bound: u32,
+    upper_bound: u32
+) -> Result<S, ZeiError>{
 
-    let mut b = base.mul(&G::ScalarType::from_u32(lower_bound));
+    let mut b = base.mul(&S::from_u32(lower_bound));
     for i in lower_bound..upper_bound{
         //let s = G::ScalarType::from_u32(i);
         if b == *encoded{
-            return Ok (G::ScalarType::from_u32(i));
+            return Ok (S::from_u32(i));
         }
         b = b.add(base);
     }
@@ -296,32 +305,32 @@ pub mod elgamal_test{
     use rmp_serde::Deserializer;
     use crate::algebra::groups::{Group, Scalar};
 
-    pub fn verification<G: Group>(){
+    pub fn verification<S: Scalar, G: Group<S>>(){
         let mut prng = ChaChaRng::from_seed([0u8;32]);
         let base = G::get_base();
 
-        let secret_key = super::elgamal_generate_secret_key::<_,G>(&mut prng);
+        let secret_key = super::elgamal_generate_secret_key::<_,S>(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
-        let m = G::ScalarType::from_u32(100u32);
-        let r = G::ScalarType::random_scalar(&mut prng);
-        let ctext = super::elgamal_encrypt::<G>(&base, &m, &r, &public_key);
-        assert_eq!(Ok(()), super::elgamal_verify::<G>(&base, &m, &ctext, &secret_key));
+        let m = S::from_u32(100u32);
+        let r = S::random_scalar(&mut prng);
+        let ctext = super::elgamal_encrypt::<S,G>(&base, &m, &r, &public_key);
+        assert_eq!(Ok(()), super::elgamal_verify::<S,G>(&base, &m, &ctext, &secret_key));
 
-        let wrong_m = G::ScalarType::from_u32(99u32);
+        let wrong_m = S::from_u32(99u32);
         let err = super::elgamal_verify(&base, &wrong_m, &ctext, &secret_key).err().unwrap();
         assert_eq!(ZeiError::ElGamalVerificationError,err);
     }
 
-    pub fn decryption<G: Group>(){
+    pub fn decryption<S:Scalar, G: Group<S>>(){
         let mut prng = ChaChaRng::from_seed([0u8;32]);
         let base = G::get_base();
 
-        let secret_key = super::elgamal_generate_secret_key::<_, G>(&mut prng);
+        let secret_key = super::elgamal_generate_secret_key::<_, S>(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
-        let m = G::ScalarType::from_u32(100u32);
-        let r = G::ScalarType::random_scalar(&mut prng);
+        let m = S::from_u32(100u32);
+        let r = S::random_scalar(&mut prng);
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         assert_eq!(Ok(()), super::elgamal_verify(&base, &m, &ctext, &secret_key));
 
@@ -334,7 +343,7 @@ pub mod elgamal_test{
         let err  = super::elgamal_decrypt_hinted(&base, &ctext, &secret_key, 200, 300).err().unwrap();
         assert_eq!(ZeiError::ElGamalDecryptionError, err);
 
-        let m = G::ScalarType::from_u64(u64::max_value());
+        let m = S::from_u64(u64::max_value());
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         assert_eq!(Ok(()), super::elgamal_verify(&base, &m, &ctext, &secret_key));
 
@@ -342,16 +351,16 @@ pub mod elgamal_test{
         assert_eq!(ZeiError::ElGamalDecryptionError, err);
     }
 
-    pub fn to_json<G: Group>(){
+    pub fn to_json<S:Scalar, G: Group<S>>(){
         let mut prng = ChaChaRng::from_seed([0u8;32]);
         let base = G::get_base();
 
-        let secret_key = super::elgamal_generate_secret_key::<_, G>(&mut prng);
+        let secret_key = super::elgamal_generate_secret_key::<_, S>(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
         //keys serialization
         let json_str = serde_json::to_string(&secret_key).unwrap();
-        let sk_de: ElGamalSecretKey<G::ScalarType> = serde_json::from_str(&json_str).unwrap();
+        let sk_de: ElGamalSecretKey<S> = serde_json::from_str(&json_str).unwrap();
         assert_eq!(secret_key, sk_de);
 
         let json_str = serde_json::to_string(&public_key).unwrap();
@@ -360,8 +369,8 @@ pub mod elgamal_test{
 
 
         //ciphertext serialization
-        let m = G::ScalarType::from_u32(100u32);
-        let r = G::ScalarType::random_scalar(&mut prng);
+        let m = S::from_u32(100u32);
+        let r = S::random_scalar(&mut prng);
 
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         let json_str = serde_json::to_string(&ctext).unwrap();
@@ -370,18 +379,18 @@ pub mod elgamal_test{
         assert_eq!(ctext, ctext_de);
     }
 
-    pub fn to_message_pack<G: Group>(){
+    pub fn to_message_pack<S: Scalar, G: Group<S>>(){
         let mut prng = ChaChaRng::from_seed([0u8;32]);
         let base = G::get_base();
 
-        let secret_key = super::elgamal_generate_secret_key::<_, G>(&mut prng);
+        let secret_key = super::elgamal_generate_secret_key::<_, S>(&mut prng);
         let public_key = super::elgamal_derive_public_key(&base, &secret_key);
 
         //keys serialization
         let mut vec = vec![];
         secret_key.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
         let mut de = Deserializer::new(&vec[..]);
-        let sk_de: ElGamalSecretKey<G::ScalarType> = Deserialize::deserialize(&mut de).unwrap();
+        let sk_de: ElGamalSecretKey<S> = Deserialize::deserialize(&mut de).unwrap();
         assert_eq!(secret_key, sk_de);
 
         //public key serialization
@@ -392,8 +401,8 @@ pub mod elgamal_test{
         assert_eq!(public_key, pk_de);
 
         //ciphertext serialization
-        let m = G::ScalarType::from_u32(100u32);
-        let r = G::ScalarType::random_scalar(&mut prng);
+        let m = S::from_u32(100u32);
+        let r = S::random_scalar(&mut prng);
 
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
 

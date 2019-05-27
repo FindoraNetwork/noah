@@ -23,8 +23,7 @@ pub trait Scalar: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> 
 }
 
 
-pub trait Group: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>{
-    type ScalarType: Scalar;
+pub trait Group<S>: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>{
     const COMPRESSED_LEN: usize;
     const SCALAR_BYTES_LEN: usize;
     fn get_identity() -> Self;
@@ -35,7 +34,7 @@ pub trait Group: Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> D
     fn from_compressed_bytes(bytes: &[u8]) -> Option<Self>;
 
     //arithmetic
-    fn mul(&self, scalar: &Self::ScalarType) -> Self;
+    fn mul(&self, scalar: &S) -> Self;
     fn add(&self, other: &Self) -> Self;
     fn sub(&self, other: &Self) -> Self;
 }

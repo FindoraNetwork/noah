@@ -148,8 +148,7 @@ impl<'de> Deserialize<'de> for BLSScalar {
 }
 
 
-impl Group for BLSG1{
-    type ScalarType = BLSScalar;
+impl Group<BLSScalar> for BLSG1{
     const COMPRESSED_LEN: usize = 48;
     const SCALAR_BYTES_LEN: usize = 32;
     fn get_identity() -> BLSG1{
@@ -238,8 +237,7 @@ impl<'de> Deserialize<'de> for BLSG1 {
     }
 }
 
-impl Group for BLSG2{
-    type ScalarType = BLSScalar;
+impl Group<BLSScalar> for BLSG2{
     const COMPRESSED_LEN: usize = 96; // TODO
     const SCALAR_BYTES_LEN: usize = 32; // TODO
     fn get_identity() -> BLSG2{
@@ -336,15 +334,14 @@ impl fmt::Debug for BLSGt{
     }
 }
 
-impl Pairing for BLSGt {
+impl Pairing<BLSScalar> for BLSGt {
     type G1 = BLSG1;
     type G2 = BLSG2;
-    type ScalarType = BLSScalar;
 
     fn pairing(a: &Self::G1, b: &Self::G2) -> Self{
         BLSGt( a.0.into_affine().pairing_with(&b.0.into_affine()))
     }
-    fn scalar_mul(&self, a: &Self::ScalarType) -> BLSGt{
+    fn scalar_mul(&self, a: &BLSScalar) -> BLSGt{
 
         let r = self.0.pow(a.0.into_repr().as_ref());
         BLSGt(r)
@@ -355,10 +352,10 @@ impl Pairing for BLSGt {
         BLSGt(m)
     }
 
-    fn g1_mul_scalar(a: &Self::G1, b: &Self::ScalarType) -> Self::G1{
+    fn g1_mul_scalar(a: &Self::G1, b: &BLSScalar) -> Self::G1{
         a.mul(b)
     }
-    fn g2_mul_scalar(a: &Self::G2, b: &Self::ScalarType) -> Self::G2{
+    fn g2_mul_scalar(a: &Self::G2, b: &BLSScalar) -> Self::G2{
         a.mul(b)
     }
 
@@ -385,43 +382,43 @@ mod elgamal_over_bls_groups {
 
     #[test]
     fn verification_g1(){
-        elgamal_test::verification::<super::BLSG1>();
+        elgamal_test::verification::<super::BLSScalar,super::BLSG1>();
     }
 
     #[test]
     fn decryption_g1(){
-        elgamal_test::decryption::<super::BLSG1>();
+        elgamal_test::decryption::<super::BLSScalar,super::BLSG1>();
     }
 
     #[test]
     fn to_json_g1(){
-        elgamal_test::to_json::<super::BLSG1>();
+        elgamal_test::to_json::<super::BLSScalar,super::BLSG1>();
     }
 
 
     #[test]
     fn to_message_pack_g1(){
-        elgamal_test::to_message_pack::<super::BLSG1>();
+        elgamal_test::to_message_pack::<super::BLSScalar,super::BLSG1>();
     }
 
     #[test]
     fn verification_g2(){
-        elgamal_test::verification::<super::BLSG1>();
+        elgamal_test::verification::<super::BLSScalar,super::BLSG1>();
     }
 
     #[test]
     fn decryption_g2(){
-        elgamal_test::decryption::<super::BLSG2>();
+        elgamal_test::decryption::<super::BLSScalar,super::BLSG2>();
     }
 
     #[test]
     fn to_json_g2(){
-        elgamal_test::to_json::<super::BLSG2>();
+        elgamal_test::to_json::<super::BLSScalar,super::BLSG2>();
     }
 
     #[test]
     fn to_message_pack_g2(){
-        elgamal_test::to_message_pack::<super::BLSG2>();
+        elgamal_test::to_message_pack::<super::BLSScalar,super::BLSG2>();
     }
 
 }
@@ -431,27 +428,27 @@ mod credentials_over_bls_12_381 {
 
     #[test]
     fn single_attribute(){
-        crate::credentials::credentials_tests::single_attribute::<super::BLSGt>();
+        crate::credentials::credentials_tests::single_attribute::<super::BLSScalar, super::BLSGt>();
     }
 
     #[test]
     fn two_attributes(){
-        crate::credentials::credentials_tests::two_attributes::<super::BLSGt>();
+        crate::credentials::credentials_tests::two_attributes::<super::BLSScalar,super::BLSGt>();
     }
 
     #[test]
     fn ten_attributes(){
-        crate::credentials::credentials_tests::ten_attributes::<super::BLSGt>();
+        crate::credentials::credentials_tests::ten_attributes::<super::BLSScalar,super::BLSGt>();
     }
 
     #[test]
     fn to_json_credential_structures(){
-        crate::credentials::credentials_tests::to_json_credential_structures::<super::BLSGt>();
+        crate::credentials::credentials_tests::to_json_credential_structures::<super::BLSScalar,super::BLSGt>();
     }
 
     #[test]
     fn to_msg_pack_credential_structures(){
-        crate::credentials::credentials_tests::to_msg_pack_credential_structures::<super::BLSGt>();
+        crate::credentials::credentials_tests::to_msg_pack_credential_structures::<super::BLSScalar,super::BLSGt>();
     }
 
 

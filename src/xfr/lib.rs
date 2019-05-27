@@ -373,9 +373,9 @@ pub(crate) mod test {
         let pc_gens = PedersenGens::default();
         let issuer_public_key = match asset_tracking {
             true => {
-                let sk = elgamal_generate_secret_key::<_, RistrettoPoint>(prng);
+                let sk = elgamal_generate_secret_key::<_, Scalar>(prng);
                 let xfr_pub_key = elgamal_derive_public_key(&pc_gens.B, &sk);
-                let sk = elgamal_generate_secret_key::<_, BLSG1>(prng);
+                let sk = elgamal_generate_secret_key::<_, BLSScalar>(prng);
                 let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
                 Some(AssetIssuerPubKeys {
@@ -726,9 +726,9 @@ pub(crate) mod test {
         prng = ChaChaRng::from_seed([0u8; 32]);
 
         let pc_gens = PedersenGens::default();
-        let asset_issuer_sec_key= elgamal_generate_secret_key::<_,RistrettoPoint>(&mut prng);
+        let asset_issuer_sec_key= elgamal_generate_secret_key::<_,Scalar>(&mut prng);
         let asset_issuer_pub_key = elgamal_derive_public_key(&RistrettoPoint::get_base(), &asset_issuer_sec_key);
-        let asset_issuer_id_sec_key = elgamal_generate_secret_key::<_,BLSG1>(&mut prng);
+        let asset_issuer_id_sec_key = elgamal_generate_secret_key::<_,BLSScalar>(&mut prng);
         let asset_issuer_id_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_id_sec_key);
         let asset_issuer_public_key = Some(AssetIssuerPubKeys {
                     eg_ristretto_pub_key: asset_issuer_pub_key,
@@ -755,15 +755,15 @@ pub(crate) mod test {
         };
 
         let attrs = [BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng)];
-        let cred_issuer_keys = credentials::gen_issuer_keys::<_, BLSGt>(&mut prng, 4);
-        let receiver_ac_keys = credentials::gen_user_keys::<_, BLSGt>(&mut prng, &cred_issuer_keys.0);
+        let cred_issuer_keys = credentials::gen_issuer_keys::<_, BLSScalar,BLSGt>(&mut prng, 4);
+        let receiver_ac_keys = credentials::gen_user_keys::<_, BLSScalar,BLSGt>(&mut prng, &cred_issuer_keys.0);
 
-        let ac_signature = credentials::issuer_sign::<_, BLSGt>(&mut prng, &cred_issuer_keys.1, &receiver_ac_keys.0, &attrs);
+        let ac_signature = credentials::issuer_sign::<_, BLSScalar,BLSGt>(&mut prng, &cred_issuer_keys.1, &receiver_ac_keys.0, &attrs);
         let id_tracking_policy = IdRevealPolicy{
             cred_issuer_pub_key: cred_issuer_keys.0.clone(),
             bitmap: vec![false, true, false, true],
         };
-        let proof = credentials::reveal_attrs::<_, BLSGt>(&mut prng, &receiver_ac_keys.1, &cred_issuer_keys.0, &ac_signature, &attrs, &id_tracking_policy.bitmap);
+        let proof = credentials::reveal_attrs::<_, BLSScalar, BLSGt>(&mut prng, &receiver_ac_keys.1, &cred_issuer_keys.0, &ac_signature, &attrs, &id_tracking_policy.bitmap);
         let identity_proof = create_conf_id_reveal(&mut prng, &attrs, &id_tracking_policy, &proof, &asset_issuer_public_key.unwrap().eg_blsg1_pub_key).unwrap();
 
         let xfr_note = gen_xfr_note(

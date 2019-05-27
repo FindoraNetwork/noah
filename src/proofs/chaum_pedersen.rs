@@ -72,7 +72,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(
     let c3 = pedersen_gens.commit(r3, r4);
     let c4 = pedersen_gens.commit(r3, r5);
 
-    let c = compute_challenge_ref::<RistrettoPoint>(&[commitment1, commitment2, &c3, &c4]);
+    let c = compute_challenge_ref::<Scalar, RistrettoPoint>(&[commitment1, commitment2, &c3, &c4]);
 
     let z1 = c*value + r3;
     let z2 = c*r1 + r4;
@@ -97,7 +97,7 @@ pub fn chaum_pedersen_verify_eq(
     let g = &pc_gens.B;
     let h = &pc_gens.B_blinding;
 
-    let c = compute_challenge_ref::<RistrettoPoint>(&[c1, c2, &proof.c3, &proof.c4]);
+    let c = compute_challenge_ref::<Scalar, RistrettoPoint>(&[c1, c2, &proof.c3, &proof.c4]);
 
     let mut vrfy_ok = proof.c3 + c*c1 == z1*g + z2*h;
     vrfy_ok = vrfy_ok && proof.c4 + c*c2 == z1*g + z3*h;
@@ -121,7 +121,7 @@ pub fn chaum_pedersen_verify_eq_fast<R: CryptoRng + Rng>(
     let g = pc_gens.B;
     let h = pc_gens.B_blinding;
 
-    let c = compute_challenge_ref::<RistrettoPoint>(&[c1, c2, &proof.c3, &proof.c4]);
+    let c = compute_challenge_ref::<Scalar, RistrettoPoint>(&[c1, c2, &proof.c3, &proof.c4]);
 
     let a = Scalar::random(prng);
 
@@ -170,14 +170,14 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng +  Rng>(
     for com in commitments{
         points_refs.push(com);
     }
-    let k = compute_challenge_ref::<RistrettoPoint>(points_refs.as_slice());
+    let k = compute_challenge_ref::<Scalar, RistrettoPoint>(points_refs.as_slice());
     let mut d = RistrettoPoint::identity();
     let mut z = Scalar::from(0u8);
     let c1 = commitments.get(0).ok_or(ZeiError::IndexError)?;
     let r1 = blinding_factors.get(0).ok_or(ZeiError::IndexError)?;
     for i in 3..commitments.len(){
         let ci = commitments.get(i).ok_or(ZeiError::IndexError)?;
-        let ai = compute_sub_challenge::<RistrettoPoint>(&k, i as u32);
+        let ai = compute_sub_challenge::<Scalar>(&k, i as u32);
         let di = ai * (c1 - ci);
         let ri = blinding_factors.get(i).ok_or(ZeiError::IndexError)?;
         let zi = ai * (*r1 - *ri);
@@ -213,12 +213,12 @@ pub fn chaum_pedersen_verify_multiple_eq<R:CryptoRng + Rng>(
     for com in commitments{
         points_refs.push(com);
     }
-    let k = compute_challenge_ref::<RistrettoPoint>(points_refs.as_slice());
+    let k = compute_challenge_ref::<Scalar, RistrettoPoint>(points_refs.as_slice());
     let mut d = RistrettoPoint::identity();
     let c1 = commitments.get(0).ok_or(ZeiError::IndexError)?;
     for i in 3..commitments.len(){
         let ci = commitments.get(i).ok_or(ZeiError::IndexError)?;
-        let ai = compute_sub_challenge::<RistrettoPoint>(&k, i as u32);
+        let ai = compute_sub_challenge::<Scalar>(&k, i as u32);
         let di = ai * (c1 - ci);
         d = d + di;
     }

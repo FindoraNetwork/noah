@@ -28,8 +28,6 @@ extern crate spacesuit;
 mod setup;
 mod utils;
 
-//pub mod bls12_381_credentials;
-//pub mod bn_credentials;
 pub mod algebra;
 pub mod basic_crypto;
 pub mod credentials;

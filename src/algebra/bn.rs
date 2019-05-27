@@ -170,8 +170,7 @@ impl Clone for BNG1 {
 
 
 
-impl Group for BNG1{
-    type ScalarType = BNScalar;
+impl Group<BNScalar> for BNG1{
     const COMPRESSED_LEN: usize = 0; // TODO
     const SCALAR_BYTES_LEN: usize = 0; // TODO
     fn get_identity() -> BNG1{
@@ -272,8 +271,7 @@ impl Clone for BNG2 {
 
 
 
-impl Group for BNG2{
-    type ScalarType = BNScalar;
+impl Group<BNScalar> for BNG2{
     const COMPRESSED_LEN: usize = 0; // TODO
     const SCALAR_BYTES_LEN: usize = 0; // TODO
     fn get_identity() -> BNG2{
@@ -356,25 +354,24 @@ impl fmt::Debug for BNGt{
     }
 }
 
-impl Pairing for BNGt {
+impl Pairing<BNScalar> for BNGt {
     type G1 = BNG1;
     type G2 = BNG2;
-    type ScalarType = BNScalar;
 
     fn pairing(a: &Self::G1, b: &Self::G2) -> BNGt{
         BNGt(bn::pairing(a.0, b.0))
     }
-    fn scalar_mul(&self, a: &Self::ScalarType) -> BNGt{
+    fn scalar_mul(&self, a: &BNScalar) -> BNGt{
         BNGt(self.0.pow(a.0))
     }
     fn add(&self, other: &Self) -> BNGt{
         BNGt(self.0 * other.0)
     }
 
-    fn g1_mul_scalar(a: &Self::G1, b: &Self::ScalarType) -> Self::G1{
+    fn g1_mul_scalar(a: &Self::G1, b: &BNScalar) -> Self::G1{
         a.mul(b)
     }
-    fn g2_mul_scalar(a: &Self::G2, b: &Self::ScalarType) -> Self::G2{
+    fn g2_mul_scalar(a: &Self::G2, b: &BNScalar) -> Self::G2{
         a.mul(b)
     }
 }
@@ -404,22 +401,22 @@ mod elgamal_over_bn_groups {
 
     #[test]
     fn verification_g1(){
-        elgamal_test::verification::<super::BNG1>();
+        elgamal_test::verification::<super::BNScalar, super::BNG1>();
     }
 
     #[test]
     fn decryption_g1(){
-        elgamal_test::decryption::<super::BNG1>();
+        elgamal_test::decryption::<super::BNScalar, super::BNG1>();
     }
 
     #[test]
     fn verification_g2(){
-        elgamal_test::verification::<super::BNG1>();
+        elgamal_test::verification::<super::BNScalar, super::BNG1>();
     }
 
     #[test]
     fn decryption_g2(){
-        elgamal_test::decryption::<super::BNG2>();
+        elgamal_test::decryption::<super::BNScalar, super::BNG2>();
     }
 
 
@@ -441,11 +438,11 @@ mod credentials_over_bn {
 
     #[test]
     fn single_attribute(){
-        crate::credentials::credentials_tests::single_attribute::<super::BNGt>();
+        crate::credentials::credentials_tests::single_attribute::<super::BNScalar, super::BNGt>();
     }
 
     #[test]
     fn two_attributes(){
-        crate::credentials::credentials_tests::two_attributes::<super::BNGt>();
+        crate::credentials::credentials_tests::two_attributes::<super::BNScalar, super::BNGt>();
     }
 }

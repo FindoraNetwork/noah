@@ -204,8 +204,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::xfr::structs::{AssetRecord, AssetIssuerPubKeys};
-    use crate::algebra::bls12_381::{BLSG1};
-    use curve25519_dalek::ristretto::{RistrettoPoint};
+    use crate::algebra::bls12_381::{BLSG1, BLSScalar};
     use bulletproofs::PedersenGens;
     use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
     use crate::xfr::lib::test::create_xfr;
@@ -226,9 +225,9 @@ mod test {
 
         let issuer_public_key = match asset_tracking {
             true => {
-                let sk = elgamal_generate_secret_key::<_, RistrettoPoint>(&mut prng);
+                let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
                 let xfr_pub_key = elgamal_derive_public_key(&pc_gens.B, &sk);
-                let sk = elgamal_generate_secret_key::<_, BLSG1>(&mut prng);
+                let sk = elgamal_generate_secret_key::<_, BLSScalar>(&mut prng);
                 let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
                 Some(AssetIssuerPubKeys {
