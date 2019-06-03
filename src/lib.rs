@@ -25,7 +25,6 @@ extern crate sha2;
 extern crate sodiumoxide;
 extern crate spacesuit;
 
-mod setup;
 mod utils;
 
 pub mod algebra;
@@ -34,4 +33,5 @@ pub mod credentials;
 pub mod errors;
 pub mod proofs;
 pub mod serialization;
+pub mod setup;
 pub mod xfr;
