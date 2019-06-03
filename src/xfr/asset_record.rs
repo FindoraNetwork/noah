@@ -121,6 +121,106 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(
     open_asset_record
 }
 
+/// build BlindAssetRecord from AssetRecord structure
+pub fn build_blind_asset_record<R: CryptoRng + Rng>(
+    prng: &mut R,
+    pc_gens: &PedersenGens,
+    asset_record: &AssetRecord,
+    confidential_amount: bool,
+    confidential_asset: bool,
+    issuer_public_key: &Option<AssetIssuerPubKeys> //none if no tracking is required
+) -> BlindAssetRecord
+{
+    let mut lock_amount = None;
+    let mut lock_type = None;
+    let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type[..]);
+    let type_scalar = Scalar::from(type_as_u128);
+    let (derived_point, blind_share) = sample_point_and_blind_share(prng, &asset_record.public_key);
+    let type_blind = compute_blind_factor(&derived_point, "asset_type");
+    let amount_blind_low = compute_blind_factor(&derived_point, "amount_low");
+    let amount_blind_high = compute_blind_factor(&derived_point, "amount_high");
+    let (amount_low, amount_high) = u64_to_u32_pair(asset_record.amount);
+
+    // build amount fields
+    let (bar_amount, bar_amount_commitments) = match confidential_amount {
+        true => {
+            lock_amount = Some(
+                hybrid_encrypt(
+                    prng,
+                    &asset_record.public_key,
+                    &u64_to_bigendian_u8array(asset_record.amount),
+                )
+                    .unwrap(),
+            );
+
+            let amount_commitment_low = pc_gens.commit(Scalar::from(amount_low), amount_blind_low);
+            let amount_commitment_high =
+                pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
+
+            (
+                None,
+                Some((
+                    amount_commitment_low.compress(),
+                    amount_commitment_high.compress(),
+                )),
+            )
+        }
+        false => (
+            Some(asset_record.amount),
+            None,
+        ),
+    };
+
+    // build asset type fields
+    let (bar_type, bar_type_commitment, type_blind) = match confidential_asset {
+        true => {
+            lock_type = Some(
+                hybrid_encrypt(prng, &asset_record.public_key, &asset_record.asset_type).unwrap(),
+            );
+
+            let type_commitment = pc_gens.commit(type_scalar, type_blind);
+            (None, Some(type_commitment.compress()), type_blind)
+        }
+        false => (Some(asset_record.asset_type), None, Scalar::default()),
+    };
+
+    //issuer asset tracking amount
+    let issuer_lock_amount = match issuer_public_key {
+        None => None,
+        Some(issuer_pk) => match confidential_amount {
+            true => Some((
+                elgamal_encrypt(&pc_gens.B, &Scalar::from(amount_low), &amount_blind_low, &issuer_pk.eg_ristretto_pub_key),
+                elgamal_encrypt(&pc_gens.B, &Scalar::from(amount_high), &amount_blind_high, &issuer_pk.eg_ristretto_pub_key)
+            )),
+            false => None,
+        },
+    };
+    //issuer asset tracking asset type
+    let issuer_lock_type = match issuer_public_key {
+        None => None,
+        Some( issuer_pk) => match confidential_asset {
+            true => Some(elgamal_encrypt(&pc_gens.B, &type_scalar, &type_blind, &issuer_pk.eg_ristretto_pub_key)),
+            false => None,
+        },
+    };
+
+    let blind_asset_record = BlindAssetRecord {
+        issuer_public_key: issuer_public_key.clone(), //None if issuer tracking is not required
+        issuer_lock_type,
+        issuer_lock_amount,
+        amount: bar_amount,
+        asset_type: bar_type,
+        public_key: asset_record.public_key.clone(),
+        amount_commitments: bar_amount_commitments,
+        asset_type_commitment: bar_type_commitment,
+        blind_share,
+        lock_amount,
+        lock_type,
+    };
+
+    blind_asset_record
+}
+
 fn sample_point_and_blind_share<R: CryptoRng + Rng>(
     prng: &mut R,
     public_key: &XfrPublicKey,
