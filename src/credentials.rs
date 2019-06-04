@@ -316,7 +316,7 @@ pub(crate) fn compute_challenge<S: Scalar, P: Pairing<S>>(commitment: &P::G2) ->
 /// Otherwise, I return Err(ZeiError:SignatureError)
 /// Algorithm:
 /// 1. Compute challenge c as hash of proof_commitment
-/// 2. Compute p \= -proof_commitment c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
+/// 2. Compute p \= -proof_commitment + c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
 ///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
 /// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
 pub fn verify<S: Scalar, P: Pairing<S>>(

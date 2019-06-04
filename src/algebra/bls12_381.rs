@@ -358,6 +358,9 @@ impl Pairing<BLSScalar> for BLSGt {
     fn g2_mul_scalar(a: &Self::G2, b: &BLSScalar) -> Self::G2{
         a.mul(b)
     }
+    fn get_identity() -> BLSGt{
+        BLSGt(Fq12::zero())
+    }
 
 }
 

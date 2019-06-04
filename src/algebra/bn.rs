@@ -5,7 +5,7 @@ use digest::Digest;
 use digest::generic_array::typenum::U64;
 use crate::utils::u8_bigendian_slice_to_u32;
 use std::fmt;
-use bn::{Group as BNGroup};
+use bn::{Group as BNGroup, Gt};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserializer, Serializer, Serialize, Deserialize};
 use crate::algebra::groups::Scalar;
@@ -373,6 +373,10 @@ impl Pairing<BNScalar> for BNGt {
     }
     fn g2_mul_scalar(a: &Self::G2, b: &BNScalar) -> Self::G2{
         a.mul(b)
+    }
+
+    fn get_identity() -> BNGt{
+        BNGt(Gt::one())
     }
 }
 

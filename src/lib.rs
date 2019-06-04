@@ -6,6 +6,7 @@
 extern crate bulletproofs;
 extern crate curve25519_dalek;
 extern crate ed25519_dalek;
+#[macro_use]
 extern crate itertools;
 extern crate merlin;
 extern crate num_bigint;
