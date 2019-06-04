@@ -177,9 +177,9 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
 
     let pok_attrs_proof = pok_attrs_prove::<_,BLSScalar,BLSGt>(
         prng,
-        revealed_attrs.as_slice(),
         &policy.cred_issuer_pub_key,
         asset_issuer_public_key,
+        revealed_attrs.as_slice(),
         rands.as_slice(),
         policy.bitmap.as_slice(),
     )?;
@@ -199,11 +199,11 @@ pub fn verify_conf_id_reveal(
 ) -> Result<(), ZeiError>
 {
     pok_attrs_verify::<BLSScalar,BLSGt>(
+        &attr_reveal_policy.cred_issuer_pub_key,
+        asset_issuer_public_key,
         &conf_id_reveal.attr_reveal_proof,
         &conf_id_reveal.ctexts,
         &conf_id_reveal.pok_attrs,
-        asset_issuer_public_key,
-        &attr_reveal_policy.cred_issuer_pub_key,
         &attr_reveal_policy.bitmap,
     )
 }
