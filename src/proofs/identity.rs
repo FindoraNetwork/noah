@@ -392,7 +392,7 @@ fn sample_blinds_compute_commitments<R,S, P>(
             rands_coms_pk[k].push(asset_issuer_pub_key.0.mul(&rand_blind));
         }
     }
-    
+
     Ok((attr_sum_com_yy2, (attrs_coms_g, rands_coms_g, rands_coms_pk), (attrs_blinds, rands_blinds)))
 }
 
@@ -529,122 +529,47 @@ fn crendential_zk_revealed_terms_addition<S: Scalar, P: Pairing<S>>(
     Ok(addition)
 }
 
-
 #[cfg(test)]
-mod test_bn{
-    use rand_chacha::ChaChaRng;
-    use rand::SeedableRng;
-    use crate::credentials::{gen_user_keys, reveal_attrs, issuer_sign, gen_issuer_keys};
-    use crate::algebra::bn::{BNScalar, BNGt, BNG1};
-    use crate::algebra::groups::{Group, Scalar};
-    use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify};
-    use crate::basic_crypto::elgamal::{elgamal_generate_secret_key,
-                                       elgamal_derive_public_key, elgamal_encrypt};
-
-    #[test]
-    fn one_confidential_reveal(){
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
-        let cred_issuer_keypair =
-            gen_issuer_keys::<_, BNScalar, BNGt>(&mut prng, 3);
-        let cred_issuer_pub_key = &cred_issuer_keypair.0;
-        let cred_issuer_sk = &cred_issuer_keypair.1;
-
-        let asset_issuer_secret_key =
-            elgamal_generate_secret_key::<_,BNScalar>(&mut prng);
-        let asset_issuer_public_key =
-            elgamal_derive_public_key(&BNG1::get_base(), &asset_issuer_secret_key);
-
-        let (user_pk, user_sk) =
-            gen_user_keys::<_, BNScalar,BNGt>(&mut prng, cred_issuer_pub_key);
-
-        let attr1 = BNScalar::random_scalar(&mut prng);
-        let attr2 = BNScalar::random_scalar(&mut prng);
-        let attr3 = BNScalar::random_scalar(&mut prng);
-
-        let signature = issuer_sign::<_, BNScalar,BNGt>(
-            &mut prng, &cred_issuer_sk, &user_pk,
-            &[attr1.clone(), attr2.clone(), attr3.clone()]);
-
-        let proof = reveal_attrs::<_, BNScalar, BNGt>(
-            &mut prng,
-            &user_sk,
-            cred_issuer_pub_key,
-            &signature,
-            &[attr1.clone(), attr2.clone(), attr3.clone()],
-            &[false, true, false],
-        );
-
-        let rand = BNScalar::random_scalar(&mut prng);
-        let ctext = elgamal_encrypt(
-            &BNG1::get_base(), &attr2, &rand, &asset_issuer_public_key);
-
-        let ctexts = [ctext];
-        let pok_attr = pok_attrs_prove::<_, BNScalar,BNGt>(
-            &mut prng,
-            cred_issuer_pub_key,
-            &asset_issuer_public_key,
-            &[attr2.clone()],
-            &[rand],
-            &[false, true, false],
-            &ctexts,
-            &proof,
-        ).unwrap();
-
-        let vrfy = pok_attrs_verify::<BNScalar,BNGt>(
-            cred_issuer_pub_key,
-            &asset_issuer_public_key,
-            &proof,
-            &ctexts,
-            &pok_attr,
-            &[false, true, false]);
-        assert_eq!(Ok(()), vrfy);
-    }
-}
-
-
-
-#[cfg(test)]
-mod test_bls12_381{
+mod test{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::credentials::{gen_user_keys, reveal_attrs, issuer_sign, gen_issuer_keys};
     use crate::algebra::groups::{Group, Scalar};
+    use crate::algebra::pairing::Pairing;
     use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify};
     use crate::basic_crypto::elgamal::{elgamal_generate_secret_key,
                                        elgamal_derive_public_key, elgamal_encrypt};
-    use crate::algebra::bls12_381::{BLSGt, BLSG1, BLSScalar};
     use crate::errors::ZeiError;
 
-    fn confidential_reveal(reveal_bitmap: &[bool]){
+    pub(super) fn confidential_reveal<S: Scalar, P: Pairing<S>>(reveal_bitmap: &[bool]){
         let num_attr = reveal_bitmap.len();
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let cred_issuer_keypair =
-            gen_issuer_keys::<_, BLSScalar,BLSGt>(&mut prng, num_attr);
+            gen_issuer_keys::<_, S,P>(&mut prng, num_attr);
 
         let cred_issuer_pub_key = &cred_issuer_keypair.0;
         let cred_issuer_sk = &cred_issuer_keypair.1;
 
         let asset_issuer_secret_key =
-            elgamal_generate_secret_key::<_,BLSScalar>(&mut prng);
+            elgamal_generate_secret_key::<_,S>(&mut prng);
         let asset_issuer_public_key =
-            elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_secret_key);
+            elgamal_derive_public_key(&P::G1::get_base(), &asset_issuer_secret_key);
 
         let (user_pk, user_sk) =
-            gen_user_keys::<_, BLSScalar,BLSGt>(&mut prng, cred_issuer_pub_key);
+            gen_user_keys::<_, S,P>(&mut prng, cred_issuer_pub_key);
 
         let mut attrs = vec![];
 
         for _ in 0..num_attr{
-            attrs.push(BLSScalar::random_scalar(&mut prng));
+            attrs.push(S::random_scalar(&mut prng));
         }
 
-        let signature = issuer_sign::<_, BLSScalar, BLSGt>(
+        let signature = issuer_sign::<_, S, P>(
             &mut prng, &cred_issuer_sk, &user_pk,
             attrs.as_slice());
 
-        let mut proof = reveal_attrs::<_, BLSScalar, BLSGt>(
+        let mut proof = reveal_attrs::<_, S, P>(
             &mut prng,
             &user_sk,
             cred_issuer_pub_key,
@@ -658,9 +583,9 @@ mod test_bls12_381{
         let mut revealed_attrs = vec![];
         for (attr, reveal) in attrs.iter().zip(reveal_bitmap){
             if *reveal {
-                let rand = BLSScalar::random_scalar(&mut prng);
+                let rand = S::random_scalar(&mut prng);
                 let ctext = elgamal_encrypt(
-                    &BLSG1::get_base(), attr, &rand, &asset_issuer_public_key);
+                    &P::G1::get_base(), attr, &rand, &asset_issuer_public_key);
 
                 ctext_rands.push(rand);
                 ctexts.push(ctext);
@@ -668,7 +593,7 @@ mod test_bls12_381{
             }
         }
 
-        let mut pok_attrs = pok_attrs_prove::<_, BLSScalar, BLSGt>(
+        let mut pok_attrs = pok_attrs_prove::<_, S, P>(
             &mut prng,
             cred_issuer_pub_key,
             &asset_issuer_public_key,
@@ -679,7 +604,7 @@ mod test_bls12_381{
             &proof
         ).unwrap();
 
-        let vrfy = pok_attrs_verify::<BLSScalar,BLSGt>(
+        let vrfy = pok_attrs_verify::<S,P>(
             cred_issuer_pub_key,
             &asset_issuer_public_key,
             &proof,
@@ -701,25 +626,25 @@ mod test_bls12_381{
             pok_attrs.agg_rands_coms_pk.remove(0);
             pok_attrs.agg_attrs_coms_g.remove(0);
             pok_attrs.attrs_resps[0].remove(0);
-            proof.pok.response_attrs.push(BLSScalar::from_u32(0));
+            proof.pok.response_attrs.push(S::from_u32(0));
 
         }
         else{
             ctexts.push(elgamal_encrypt(
-                &BLSG1::get_base(), &BLSScalar::from_u32(0), &BLSScalar::from_u32(0), &asset_issuer_public_key));
-            pok_attrs.agg_rands_coms_g.push(BLSG1::get_identity());
-            pok_attrs.agg_rands_coms_pk.push(BLSG1::get_identity());
-            pok_attrs.agg_attrs_coms_g.push(BLSG1::get_identity());
+                &P::G1::get_base(), &S::from_u32(0), &S::from_u32(0), &asset_issuer_public_key));
+            pok_attrs.agg_rands_coms_g.push(P::G1::get_identity());
+            pok_attrs.agg_rands_coms_pk.push(P::G1::get_identity());
+            pok_attrs.agg_attrs_coms_g.push(P::G1::get_identity());
             if pok_attrs.attrs_resps.len() > 0{
-                pok_attrs.attrs_resps[0].push(BLSScalar::from_u32(0u32));
+                pok_attrs.attrs_resps[0].push(S::from_u32(0u32));
             }
             else{
-                pok_attrs.attrs_resps.push(vec![BLSScalar::from_u32(0u32)]);
+                pok_attrs.attrs_resps.push(vec![S::from_u32(0u32)]);
             }
             proof.pok.response_attrs.remove(0);
         }
 
-        let vrfy = pok_attrs_verify::<BLSScalar,BLSGt>(
+        let vrfy = pok_attrs_verify::<S,P>(
             cred_issuer_pub_key,
             &asset_issuer_public_key,
             &proof,
@@ -729,43 +654,93 @@ mod test_bls12_381{
 
         assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy, "proof should fail");
     }
+}
+
+#[cfg(test)]
+mod test_bn{
+    use super::test::confidential_reveal;
+    use crate::algebra::bn::{BNGt, BNScalar};
 
     #[test]
     fn confidential_reveal_one_attr_hidden(){
-        confidential_reveal(&[false]);
+        confidential_reveal::<BNScalar, BNGt>(&[false]);
     }
 
     #[test]
     fn confidential_reveal_one_attr_revealed(){
-        confidential_reveal(&[true]);
+        confidential_reveal::<BNScalar, BNGt>(&[true]);
     }
 
     #[test]
     fn confidential_reveal_two_attr_hidden_first(){
-        confidential_reveal(&[false, false]);
-        confidential_reveal(&[false, true]);
+        confidential_reveal::<BNScalar, BNGt>(&[false, false]);
+        confidential_reveal::<BNScalar, BNGt>(&[false, true]);
     }
 
     #[test]
     fn confidential_reveal_two_attr_revealed_first(){
-        confidential_reveal(&[true, false]);
-        confidential_reveal(&[true, true]);
+        confidential_reveal::<BNScalar, BNGt>(&[true, false]);
+        confidential_reveal::<BNScalar, BNGt>(&[true, true]);
     }
 
     #[test]
     fn confidential_reveal_ten_attr_all_hidden(){
-        confidential_reveal(&[false;10]);
+        confidential_reveal::<BNScalar, BNGt>(&[false;10]);
     }
 
     #[test]
     fn confidential_reveal_ten_attr_all_revealed(){
-        confidential_reveal(&[true;10]);
+        confidential_reveal::<BNScalar, BNGt>(&[true;10]);
     }
 
     #[test]
     fn confidential_reveal_ten_attr_half_revealed(){
-        confidential_reveal(&[true,false,true,false,true,false,true,false,true,false]);
-        confidential_reveal(&[false,true,false,true,false,true,false,true,false,true]);
+        confidential_reveal::<BNScalar, BNGt>(&[true,false,true,false,true,false,true,false,true,false]);
+        confidential_reveal::<BNScalar, BNGt>(&[false,true,false,true,false,true,false,true,false,true]);
+    }
+}
+
+#[cfg(test)]
+mod test_bls12_381{
+    use super::test::confidential_reveal;
+    use crate::algebra::bls12_381::{BLSGt, BLSScalar};
+
+    #[test]
+    fn confidential_reveal_one_attr_hidden(){
+        confidential_reveal::<BLSScalar, BLSGt>(&[false]);
+    }
+
+    #[test]
+    fn confidential_reveal_one_attr_revealed(){
+        confidential_reveal::<BLSScalar, BLSGt>(&[true]);
+    }
+
+    #[test]
+    fn confidential_reveal_two_attr_hidden_first(){
+        confidential_reveal::<BLSScalar, BLSGt>(&[false, false]);
+        confidential_reveal::<BLSScalar, BLSGt>(&[false, true]);
+    }
+
+    #[test]
+    fn confidential_reveal_two_attr_revealed_first(){
+        confidential_reveal::<BLSScalar, BLSGt>(&[true, false]);
+        confidential_reveal::<BLSScalar, BLSGt>(&[true, true]);
+    }
+
+    #[test]
+    fn confidential_reveal_ten_attr_all_hidden(){
+        confidential_reveal::<BLSScalar, BLSGt>(&[false;10]);
+    }
+
+    #[test]
+    fn confidential_reveal_ten_attr_all_revealed(){
+        confidential_reveal::<BLSScalar, BLSGt>(&[true;10]);
+    }
+
+    #[test]
+    fn confidential_reveal_ten_attr_half_revealed(){
+        confidential_reveal::<BLSScalar, BLSGt>(&[true,false,true,false,true,false,true,false,true,false]);
+        confidential_reveal::<BLSScalar, BLSGt>(&[false,true,false,true,false,true,false,true,false,true]);
     }
 }
 
