@@ -5,7 +5,7 @@ use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, elgamal_
 use crate::credentials::AttrsRevealProof;
 use crate::errors::ZeiError;
 use crate::proofs::chaum_pedersen::{chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq};
-use crate::proofs::identity::{PoKAttrs, pok_attrs_prove, pok_attrs_verify};
+use crate::proofs::identity::{AggPoKAttrs, pok_attrs_prove, pok_attrs_verify};
 use crate::proofs::pedersen_elgamal::{pedersen_elgamal_aggregate_eq_proof, PedersenElGamalEqProof, pedersen_elgamal_eq_aggregate_verify_fast};
 use crate::setup::{MAX_PARTY_NUMBER, BULLET_PROOF_RANGE, PublicParams};
 use crate::xfr::structs::{OpenAssetRecord, XfrBody, IdRevealPolicy, XfrRangeProof, BlindAssetRecord};
@@ -23,7 +23,7 @@ const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 pub struct ConfIdReveal{
     ctexts: Vec<ElGamalCiphertext<BLSG1>>,
     attr_reveal_proof: AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
-    pok_attrs: PoKAttrs<BLSG1, BLSG2, BLSScalar>,
+    pok_attrs: AggPoKAttrs<BLSG1, BLSG2, BLSScalar>,
 }
 
 
@@ -182,6 +182,8 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
         revealed_attrs.as_slice(),
         rands.as_slice(),
         policy.bitmap.as_slice(),
+        ctexts.as_slice(),
+        attr_reveal_proof,
     )?;
 
     Ok(ConfIdReveal{
