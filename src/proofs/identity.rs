@@ -1,12 +1,13 @@
-use rand::{CryptoRng, Rng};
+use crate::algebra::groups::{Group, Scalar};
+use crate::algebra::pairing::Pairing;
+use crate::algebra::utils::{scalar_linear_combination_rows, group_linear_combination_rows};
+use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::credentials::{IssuerPublicKey, compute_challenge, AttrsRevealProof};
 use crate::errors::ZeiError;
-use crate::algebra::pairing::Pairing;
-use crate::algebra::groups::{Group, Scalar};
-use sha2::{Sha512, Digest};
-use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
-use crate::algebra::utils::{scalar_linear_combination_rows, group_linear_combination_rows};
+use rand::{CryptoRng, Rng};
 use serde::ser::Serialize;
+use sha2::{Sha512, Digest};
+
 
 /// Aggregated proof of knowledge of revealed attributes for an anonymous credetial reveal proof
 /// that are encrypted under ElGamal
@@ -92,30 +93,22 @@ pub fn agg_pok_attrs_prove<R,S,P>(
         return Err(ZeiError::ParameterError);
     }
 
-    //1: compute proof commitments. That is, sample blinding factor for each secret value and "commit to them"
-    let mut attr_sum_com_yy2 = vec![];  // {\sum_j blind_{attr_{j,k}} * Y2_j}_k
-    let mut attrs_coms_g = vec![]; // { {blind_{attr_{j,k}} * G1}_j }_k
-    let mut rands_coms_g = vec![]; // { {blind_{rand_{j,k}} * G1}_j }_k
-    let mut rands_coms_pk = vec![]; // { {blind_{rand_{j,k}} * PK}_j }_k
-    let mut attrs_blinds = vec![]; // { {blind_{attr_{j,k}}}_j }_k
-    let mut rands_blinds = vec![]; // { {blind_{rand_{j,k}}}_j }_k
-    for _ in 0..attrs.len(){ // for each instance k
-        let (attr_sum_com_yy2_k,
-            (attrs_coms_g_k, rands_coms_g_k, rands_coms_pk_k),
-            (attrs_blinds_k, rands_blinds_k)
-        ) = sample_blinds_compute_commitments::<_, S, P>(prng, cred_issuer_pub_key, asset_issuer_pub_key, bitmap, n_attrs);
+    //1: sample secrets' blinds and compute proof commitments.
+    let (attr_sum_com_yy2,
+        (attrs_coms_g, rands_coms_g, rands_coms_pk),
+        (attrs_blinds, rands_blinds)) =
+        sample_blinds_compute_commitments::<_, S, P>(
+            prng,
+            cred_issuer_pub_key,
+            asset_issuer_pub_key,
+            bitmap,
+            n_attrs,
+            n_instances)?;
 
-        attr_sum_com_yy2.push(attr_sum_com_yy2_k);
-        attrs_coms_g.push(attrs_coms_g_k);
-        rands_coms_g.push(rands_coms_g_k);
-        rands_coms_pk.push(rands_coms_pk_k);
-        attrs_blinds.push(attrs_blinds_k);
-        rands_blinds.push(rands_blinds_k);
-    }
     //2: sample linear combination scalars
     let lc_scalars = compute_linear_combination_scalars::<S,P>(ctexts, cred_sigs);
 
-    //3: aggregate attributes blinding commitments under G
+    //3: aggregate attributes blinding commitments under G and PK
     let agg_attrs_coms_g = group_linear_combination_rows(
         lc_scalars.as_slice(),
         attrs_coms_g.as_slice());
@@ -287,22 +280,22 @@ fn verify_ciphertext<S: Scalar, P: Pairing<S>>(
 ) -> Result<(), ZeiError>
 {
 
+    //TODO Use multi-exponentiation, then aggregate
     for (ctext, attr_com, rand_coms_g, rand_coms_pk, attr_response, rand_response)
         in izip!(ctexts, attr_commitments, rand_commitments_g, rand_commitments_pk, attr_responses, rand_responses){
         let e1 = &ctext.e1;
         let e2 = &ctext.e2;
 
         let verify_e1 =
-            P::g1_mul_scalar(e1, &challenge).add(rand_coms_g) ==
-                P::g1_mul_scalar(&P::G1::get_base(), rand_response);
+            e1.mul(challenge).add(rand_coms_g) == P::G1::get_base().mul(rand_response);
         let verify_e2 =
-            P::g1_mul_scalar(e2, &challenge).add(rand_coms_pk).add(attr_com) ==
-                P::g1_mul_scalar(&P::G1::get_base(), attr_response).add(
-                    &P::g1_mul_scalar(&asset_issuer_public_key.0, rand_response));
+            e2.mul(&challenge).add(rand_coms_pk).add(attr_com) ==
+                P::G1::get_base().mul(attr_response).add( &asset_issuer_public_key.0.mul(rand_response));
         if !(verify_e1 && verify_e2) {
             return Err(ZeiError::IdentityRevealVerifyError);
         }
     }
+
     Ok(())
 }
 
@@ -372,33 +365,71 @@ fn sample_blinds_compute_commitments<R,S, P>(
     prng: &mut R,
     cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
     asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
-    bitmap: &[bool], m: usize) -> (P::G2, (Vec<P::G1>, Vec<P::G1>, Vec<P::G1>), (Vec<S>,  Vec<S>))
+    bitmap: &[bool], n_attrs: usize, n_instances: usize
+) -> Result<
+    (Vec<P::G2>, (Vec<Vec<P::G1>>, Vec<Vec<P::G1>>, Vec<Vec<P::G1>>), (Vec<Vec<S>>,  Vec<Vec<S>>)),
+    ZeiError>
     where R: CryptoRng + Rng, S: Scalar, P: Pairing<S>
 {
-    let mut attrs_blinds = Vec::with_capacity(m);
-    let mut rands_blinds = Vec::with_capacity(m);
-    let mut attrs_coms_g = Vec::with_capacity(m);
-    let mut rands_coms_g = Vec::with_capacity(m);
-    let mut rands_coms_pk = Vec::with_capacity(m);
+    let mut attr_sum_com_yy2 =  Vec::with_capacity(n_instances);
+    let mut attrs_coms_g: Vec<Vec<P::G1>> = Vec::with_capacity(n_instances);
+    let mut rands_coms_g = Vec::with_capacity(n_instances);
+    let mut rands_coms_pk = Vec::with_capacity(n_instances);
 
-    let mut attr_sum_com_yy2 = P::G2::get_identity(); // sum attr_j * Y2_j
-    for (yy2i, shown) in cred_issuer_pub_key.yy2.iter().zip(
-        bitmap.iter()){
-        if *shown {
-            let attr_blind = S::random_scalar(prng);
-            let attr_com_y2i = P::g2_mul_scalar(yy2i, &attr_blind);
-            attrs_coms_g.push(P::g1_mul_scalar(&P::G1::get_base(), &attr_blind));
-            attr_sum_com_yy2 = attr_sum_com_yy2.add(&attr_com_y2i);
-            attrs_blinds.push(attr_blind);
+    let (attrs_blinds, rands_blinds) = sample_blinds::<R,S>(prng, n_attrs, 1);
 
-            let rand_blind = S::random_scalar(prng);
-            rands_coms_g.push(P::g1_mul_scalar(&P::G1::get_base(), &rand_blind));
-            rands_coms_pk.push(P::g1_mul_scalar(&asset_issuer_pub_key.0, &rand_blind));
-            rands_blinds.push(rand_blind);
+    for k in 0..n_instances {
+        attr_sum_com_yy2.push(compute_attr_sum_yy2::<S,P>(
+            cred_issuer_pub_key,
+            attrs_blinds.get(0).ok_or(ZeiError::ParameterError)?,
+            bitmap)?);
+        attrs_coms_g.push(Vec::with_capacity(n_attrs));
+        rands_coms_g.push(Vec::with_capacity(n_attrs));
+        rands_coms_pk.push(Vec::with_capacity(n_attrs));
+        for (attr_blind, rand_blind) in izip!(attrs_blinds.get(k).unwrap(), rands_blinds.get(k).unwrap()) {
+            attrs_coms_g[k].push(P::G1::get_base().mul(&attr_blind));
+            rands_coms_g[k].push(P::G1::get_base().mul(&rand_blind));
+            rands_coms_pk[k].push(asset_issuer_pub_key.0.mul(&rand_blind));
         }
     }
+    
+    Ok((attr_sum_com_yy2, (attrs_coms_g, rands_coms_g, rands_coms_pk), (attrs_blinds, rands_blinds)))
+}
 
-    (attr_sum_com_yy2, (attrs_coms_g, rands_coms_g, rands_coms_pk), (attrs_blinds, rands_blinds))
+fn compute_attr_sum_yy2<S: Scalar, P: Pairing<S>>(
+    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+    attr_blinds: &Vec<S>,
+    bitmap: &[bool],
+) -> Result<P::G2, ZeiError>
+{
+    let mut attr_sum_com_yy2 = P::G2::get_identity();
+    let mut blind_iter = attr_blinds.iter();
+    for (yy2j, shown) in cred_issuer_pub_key.yy2.iter().zip(bitmap.iter()){
+        if *shown {
+            let attr_com_y2j = yy2j.mul(blind_iter.next().ok_or(ZeiError::ParameterError)?);
+            attr_sum_com_yy2 = attr_sum_com_yy2.add(&attr_com_y2j);
+        }
+    }
+    Ok(attr_sum_com_yy2)
+}
+
+/// I sample proof blindings for every attribute and encryption randomness for every instance
+fn sample_blinds<R,S>(
+    prng: &mut R,
+    n_attrs: usize,
+    n_instances: usize, ) -> (Vec<Vec<S>>, Vec<Vec<S>>)    where R: CryptoRng + Rng, S: Scalar
+{
+    let mut attr_blinds = vec![];
+    let mut rand_blinds = vec![];
+    for j in 0..n_instances {
+        attr_blinds.push(vec![]);
+        rand_blinds.push(vec![]);
+        for _ in 0..n_attrs {
+            attr_blinds[j].push(S::random_scalar(prng));
+            rand_blinds[j].push(S::random_scalar(prng));
+        }
+    }
+    (attr_blinds, rand_blinds)
 }
 
 /// I compute a challenge for the PoK of knowledge protocol for confidential attribute reveal
@@ -458,20 +489,17 @@ fn credential_hidden_terms_addition<S: Scalar, P: Pairing<S>>(
 {
     //compute X_2 * challenge - commitment + G2 * &response_t + PK.Z2 * response_sk +
     // sum PK.Y2_i * response_attr_i
-    let mut q = P::g2_mul_scalar(
-        &cred_issuer_public_key.xx2,
-        &challenge)
-        .sub(&reveal_proof.pok.commitment); //X_2*challenge - proof.commitment
+    let mut q = cred_issuer_public_key.xx2.mul(&challenge).sub(&reveal_proof.pok.commitment); //X_2*challenge - proof.commitment
 
-    q = q.add(&P::g2_mul_scalar(&cred_issuer_public_key.gen2, &reveal_proof.pok.response_t));
-    q = q.add(&P::g2_mul_scalar(&cred_issuer_public_key.zz2, &reveal_proof.pok.response_sk));
+    q = q.add(&cred_issuer_public_key.gen2.mul(&reveal_proof.pok.response_t));
+    q = q.add(&cred_issuer_public_key.zz2.mul(&reveal_proof.pok.response_sk));
 
     let mut resp_attr_iter = reveal_proof.pok.response_attrs.iter();
     for (b, yy2i)  in bitmap.iter().
         zip(cred_issuer_public_key.yy2.iter()){
         if !b {
             let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
-            q = q.add(&P::g2_mul_scalar(&yy2i, response));
+            q = q.add(&yy2i.mul(response));
         }
     }
     Ok(q)
