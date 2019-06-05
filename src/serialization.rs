@@ -16,7 +16,11 @@ impl Serialize for XfrPublicKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        serializer.serialize_bytes(self.as_bytes())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(&self.as_bytes()))
+        } else {
+            serializer.serialize_bytes(self.as_bytes())
+        }
     }
 }
 
@@ -30,7 +34,7 @@ impl<'de> Deserialize<'de> for XfrPublicKey {
             type Value = XfrPublicKey;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                formatter.write_str("CompressedEdwardsY ")
+                formatter.write_str("an array of 32 bytes")
             }
 
             fn visit_bytes<E>(self, v: &[u8]) -> Result<XfrPublicKey, E>
@@ -54,9 +58,18 @@ impl<'de> Deserialize<'de> for XfrPublicKey {
                     Err(serde::de::Error::invalid_length(v.len(), &self))
                 }
             }
+            fn visit_str<E>(self, s: &str) -> Result<XfrPublicKey, E>
+                where
+                    E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
-
-        deserializer.deserialize_bytes(XfrPublicKeyVisitor)
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(XfrPublicKeyVisitor)
+        } else {
+            deserializer.deserialize_bytes(XfrPublicKeyVisitor)
+        }
     }
 }
 
@@ -185,7 +198,11 @@ impl Serialize for XfrSignature {
         where
             S: Serializer
     {
-        serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(self.zei_to_bytes().as_slice()))
+        } else {
+            serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+        }
     }
 }
 
@@ -218,12 +235,22 @@ impl<'de> Deserialize<'de> for XfrSignature {
                 }
                 Ok(XfrSignature::zei_from_bytes(vec.as_slice()))
             }
+            fn visit_str<E>(self, s: &str) -> Result<XfrSignature, E>
+                where
+                    E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
 
 
         //let v = deserializer.deserialize_bytes(zei_obj_serde::BytesVisitor).unwrap();
         //Ok(XfrSignature::zei_from_bytes(v.as_slice()))
-        deserializer.deserialize_bytes(XfrSignatureVisitor)
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(XfrSignatureVisitor)
+        } else {
+            deserializer.deserialize_bytes(XfrSignatureVisitor)
+        }
     }
 }
 
@@ -259,6 +286,13 @@ pub mod zei_obj_serde {
             vec.extend_from_slice(v);
             Ok(vec)
         }
+
+        fn visit_str<E>(self, v: &str) -> Result<Vec<u8>, E>
+            where
+                E: serde::de::Error
+        {
+            base64::decode(v).map_err(serde::de::Error::custom)
+        }
     }
 
 
@@ -266,14 +300,24 @@ pub mod zei_obj_serde {
         where S: Serializer, T: ZeiFromToBytes
     {
         let bytes = obj.zei_to_bytes();
-        serializer.serialize_bytes(&bytes[..])
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(&bytes))
+        } else {
+            serializer.serialize_bytes(&bytes[..])
+
+        }
     }
 
     pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
         where D: Deserializer<'de>, T: ZeiFromToBytes,
     {
-        let v = deserializer.deserialize_bytes(BytesVisitor).unwrap();
-        Ok(T::zei_from_bytes(v.as_slice()))
+        if deserializer.is_human_readable() {
+            let bytes = deserializer.deserialize_str(BytesVisitor)?;
+            Ok(T::zei_from_bytes(bytes.as_slice()))
+        } else {
+            let v = deserializer.deserialize_bytes(BytesVisitor)?;
+            Ok(T::zei_from_bytes(v.as_slice()))
+        }
     }
 }
 
@@ -290,7 +334,11 @@ pub mod option_bytes {
         else {
             let bytes = object.as_ref().unwrap().zei_to_bytes();
             //let encoded = hex::encode(&bytes[..]);
-            serializer.serialize_bytes(bytes.as_slice())
+            if serializer.is_human_readable() {
+                serializer.serialize_str(&base64::encode(bytes.as_slice()))
+            } else {
+                serializer.serialize_bytes(bytes.as_slice())
+            }
         }
     }
 
@@ -301,7 +349,6 @@ pub mod option_bytes {
 
         if vec.is_some() {
             Ok(Some(T::zei_from_bytes(vec.unwrap().as_slice())))
-
         }
         else {
             Ok(None)
@@ -349,5 +396,32 @@ mod test {
         let signature2  = XfrSignature::deserialize(&mut de).unwrap();
 
         assert_eq!(signature, signature2);
+    }
+
+    #[derive(Serialize, Deserialize, Default)]
+    struct StructWithPubKey {
+        key: XfrPublicKey,
+    }
+
+    #[test]
+    fn serialize_and_deserialize_as_json() {
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair = XfrKeyPair::generate(&mut prng);
+        let pk = keypair.get_pk_ref();
+        let test_struct = StructWithPubKey { key: pk.clone() };
+        let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
+            res
+        } else {
+            println!("Failed to serialize XfrPublicKey to JSON");
+            assert!(false);
+            "{}".to_string()
+        };
+        if let Ok(restored) = serde_json::from_str::<StructWithPubKey>(&as_json) {
+            assert_eq!(test_struct.key, restored.key);
+        } else {
+            println!("Failed to deserialize XfrPublicKey from JSON");
+            assert!(false);
+        }
     }
 }
