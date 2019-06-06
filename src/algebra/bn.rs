@@ -110,7 +110,11 @@ impl Serialize for BNScalar {
         where
             S: Serializer
     {
-        serializer.serialize_bytes(self.to_bytes().as_slice())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(self.to_bytes().as_slice()))
+        } else {
+            serializer.serialize_bytes(self.to_bytes().as_slice())
+        }
     }
 }
 
@@ -143,8 +147,17 @@ impl<'de> Deserialize<'de> for BNScalar {
                 }
                 Ok(BNScalar::from_bytes(vec.as_slice()))
             }
+            fn visit_str<E>(self, s: &str) -> Result<BNScalar, E>
+                where E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
-        deserializer.deserialize_bytes(ScalarVisitor)
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(ScalarVisitor)
+        } else {
+            deserializer.deserialize_bytes(ScalarVisitor)
+        }
     }
 }
 
@@ -210,7 +223,11 @@ impl Serialize for BNG1 {
         where
             S: Serializer
     {
-        serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(self.to_compressed_bytes().as_slice()))
+        } else {
+            serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
+        }
     }
 }
 
@@ -243,8 +260,17 @@ impl<'de> Deserialize<'de> for BNG1 {
                 }
                 Ok(BNG1::from_compressed_bytes(vec.as_slice()).unwrap())
             }
+            fn visit_str<E>(self, s: &str) -> Result<BNG1, E>
+                where E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
-        deserializer.deserialize_bytes(G1Visitor)
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(G1Visitor)
+        } else {
+            deserializer.deserialize_bytes(G1Visitor)
+        }
     }
 }
 
@@ -310,7 +336,11 @@ impl Serialize for BNG2 {
         where
             S: Serializer
     {
-        serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(self.to_compressed_bytes().as_slice()))
+        } else {
+            serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
+        }
     }
 }
 
@@ -343,8 +373,17 @@ impl<'de> Deserialize<'de> for BNG2 {
                 }
                 Ok(BNG2::from_compressed_bytes(vec.as_slice()).unwrap())
             }
+            fn visit_str<E>(self, s: &str) -> Result<BNG2, E>
+                where E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
-        deserializer.deserialize_bytes(G2Visitor)
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(G2Visitor)
+        } else {
+            deserializer.deserialize_bytes(G2Visitor)
+        }
     }
 }
 
