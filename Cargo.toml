@@ -15,7 +15,7 @@ num-traits = "0.2"
 num-bigint = "0.2.2"
 rand = "0.6"
 rand_04 = {package= "rand", version = "0.4"}
-curve25519-dalek = { version =  "1.0", features = ["serde"] }
+curve25519-dalek = { version =  "1.1.4", features = ["serde"] }
 ed25519-dalek = "0.9.1"
 bulletproofs =  {version = "1.0.2"}
 bulletproofs_yoloproof = { version = "1.0.1",  package = "bulletproofs", git = "https://github.com/dalek-cryptography/bulletproofs", branch = "develop", features = ["yoloproofs"]}

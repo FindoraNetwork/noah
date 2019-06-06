@@ -348,7 +348,7 @@ impl Pairing<BLSScalar> for BLSGt {
     }
     fn add(&self, other: &Self) -> BLSGt{
         let mut m = other.0.clone();
-        m.add_assign(&self.0);
+        m.mul_assign(&self.0);
         BLSGt(m)
     }
 
@@ -359,7 +359,7 @@ impl Pairing<BLSScalar> for BLSGt {
         a.mul(b)
     }
     fn get_identity() -> BLSGt{
-        BLSGt(Fq12::zero())
+        BLSGt(Fq12::one())
     }
 
 }

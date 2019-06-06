@@ -162,7 +162,7 @@ pub fn agg_pok_attrs_prove<R,S,P>(
 
 pub(crate) fn agg_pok_attrs_verify<S: Scalar, P: Pairing<S>>(
     cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
-    asset_issuer_public_key: &ElGamalPublicKey<P::G1>,
+    asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
     reveal_proofs: &[&AttrsRevealProof<P::G1, P::G2, S>],
     ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
     agg_pok_attrs: &AggPoKAttrs<P::G1, P::G2, S>,
@@ -213,7 +213,7 @@ pub(crate) fn agg_pok_attrs_verify<S: Scalar, P: Pairing<S>>(
         agg_pok_attrs.agg_rands_coms_pk.as_slice(),
         agg_attr_resps.as_slice(),
         agg_pok_attrs.agg_rands_resps.as_slice(),
-        asset_issuer_public_key)?;
+        asset_issuer_pub_key)?;
 
     // 4. verify credentials
     verify_credential_agg::<S,P>(
@@ -318,6 +318,7 @@ fn verify_credential_agg<S: Scalar, P: Pairing<S>>(
     //    \sigma2 = challenge * \sum_k x_k * challenges_k * sigma2_k
     let mut pp = vec![];
     let mut agg_sigma2 = P::G1::get_identity();
+    let mut ck_vec = vec![];
     for (lc_scalar_k, reveal_proof_k, attr_sum_com_k, attr_resp_k)
         in izip!(lc_scalars, reveal_proofs, attr_sum_com_yy2, attr_resps) {
 
@@ -338,6 +339,8 @@ fn verify_credential_agg<S: Scalar, P: Pairing<S>>(
         let pp_k = hidden_k.mul(challenge).add(&revealed_k.mul(&c_k));
         pp.push(pp_k);
         agg_sigma2 = agg_sigma2.add(&reveal_proof_k.sig.sigma2.mul(&c_k.mul(lc_scalar_k)));
+
+        ck_vec.push(c_k);
     }
     agg_sigma2 = agg_sigma2.mul(challenge);
 
@@ -350,11 +353,13 @@ fn verify_credential_agg<S: Scalar, P: Pairing<S>>(
         let lhs_i= P::pairing(&reveal_proof_k.sig.sigma1.mul(lc_scalar_k), &pp_k);
         lhs = lhs.add(&lhs_i);
     }
+
     //5. return Ok if LHS = RHS
     match lhs == rhs {
         true => Ok(()),
         false => {Err(ZeiError::IdentityRevealVerifyError)},
     }
+
 }
 
 /// For each secret value,
@@ -376,12 +381,12 @@ fn sample_blinds_compute_commitments<R,S, P>(
     let mut rands_coms_g = Vec::with_capacity(n_instances);
     let mut rands_coms_pk = Vec::with_capacity(n_instances);
 
-    let (attrs_blinds, rands_blinds) = sample_blinds::<R,S>(prng, n_attrs, 1);
+    let (attrs_blinds, rands_blinds) = sample_blinds::<R,S>(prng, n_attrs, n_instances);
 
     for k in 0..n_instances {
         attr_sum_com_yy2.push(compute_attr_sum_yy2::<S,P>(
             cred_issuer_pub_key,
-            attrs_blinds.get(0).ok_or(ZeiError::ParameterError)?,
+            attrs_blinds.get(k).ok_or(ZeiError::ParameterError)?,
             bitmap)?);
         attrs_coms_g.push(Vec::with_capacity(n_attrs));
         rands_coms_g.push(Vec::with_capacity(n_attrs));
@@ -533,14 +538,171 @@ fn crendential_zk_revealed_terms_addition<S: Scalar, P: Pairing<S>>(
 mod test{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::credentials::{gen_user_keys, reveal_attrs, issuer_sign, gen_issuer_keys};
+    use crate::credentials::{gen_user_keys, reveal_attrs, issuer_sign, gen_issuer_keys,
+                             AttrsRevealProof, IssuerPublicKey, IssuerSecretKey,
+                             UserPublicKey, UserSecretKey};
     use crate::algebra::groups::{Group, Scalar};
     use crate::algebra::pairing::Pairing;
-    use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify};
+    use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify, agg_pok_attrs_prove, agg_pok_attrs_verify};
     use crate::basic_crypto::elgamal::{elgamal_generate_secret_key,
-                                       elgamal_derive_public_key, elgamal_encrypt};
+                                       elgamal_derive_public_key, elgamal_encrypt, ElGamalPublicKey, ElGamalCiphertext};
     use crate::errors::ZeiError;
 
+    fn setup<S: Scalar, P: Pairing<S>>(
+        prng: &mut ChaChaRng,
+        n_attr: usize) -> (
+        IssuerPublicKey<P::G1, P::G2>, IssuerSecretKey<P::G1,S>,
+        UserPublicKey<P::G1>, UserSecretKey<S>, ElGamalPublicKey<P::G1>)
+    {
+        let cred_issuer_keypair = gen_issuer_keys::<_, S,P>(prng, n_attr);
+        let cred_issuer_pub_key = cred_issuer_keypair.0;
+        let cred_issuer_sec_key = cred_issuer_keypair.1;
+        let (user_pub_key, user_sec_key) = gen_user_keys::<_, S,P>(prng, &cred_issuer_pub_key);
+        let asset_issuer_sec_key = elgamal_generate_secret_key::<_,S>(prng);
+        let asset_issuer_pub_key = elgamal_derive_public_key(&P::G1::get_base(), &asset_issuer_sec_key);
+        (cred_issuer_pub_key, cred_issuer_sec_key, user_pub_key, user_sec_key, asset_issuer_pub_key)
+    }
+
+    fn gen_credential_proof<S: Scalar, P: Pairing<S>>(
+        prng: &mut ChaChaRng,
+        cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+        cred_issuer_sec_key: &IssuerSecretKey<P::G1, S>,
+        user_pub_key: &UserPublicKey<P::G1>,
+        user_sec_key: &UserSecretKey<S>,
+        asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
+        reveal_bitmap: &[bool])
+    -> (Vec<ElGamalCiphertext<P::G1>>, Vec<S>, Vec<S>, AttrsRevealProof<P::G1, P::G2, S>)
+    {
+        let num_attr = reveal_bitmap.len();
+        let mut attrs = vec![];
+        for _ in 0..num_attr{
+            attrs.push(S::random_scalar(prng));
+        }
+        let signature = issuer_sign::<_, S, P>(
+            prng, &cred_issuer_sec_key, &user_pub_key,
+            attrs.as_slice());
+
+        let proof = reveal_attrs::<_, S, P>(
+            prng,
+            &user_sec_key,
+            cred_issuer_pub_key,
+            &signature,
+            &attrs,
+            reveal_bitmap,
+        );
+
+        let mut ctexts_rands = vec![];
+        let mut ctexts = vec![];
+        let mut revealed_attrs = vec![];
+        for (attr, reveal) in attrs.iter().zip(reveal_bitmap){
+            if *reveal {
+                let rand = S::random_scalar(prng);
+                let ctext = elgamal_encrypt(
+                    &P::G1::get_base(), attr, &rand, &asset_issuer_pub_key);
+
+                ctexts_rands.push(rand);
+                ctexts.push(ctext);
+                revealed_attrs.push(attr.clone());
+            }
+        }
+
+        (ctexts, ctexts_rands, revealed_attrs, proof)
+    }
+
+    pub(super) fn confidential_reveal_agg<S: Scalar, P: Pairing<S>>(reveal_bitmap: &[bool]){
+        let mut prng: ChaChaRng;
+        prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let (cred_issuer_pub_key, cred_issuer_sec_key,
+            user_pub_key, user_sec_key,
+            asset_issuer_pub_key)
+            = setup::<S,P>(&mut prng, reveal_bitmap.len());
+
+        let (ctexts1,
+            ctexts_rands1,
+            revealed_attrs1,
+            proof1) =
+            gen_credential_proof::<S, P>(&mut prng,
+                                         &cred_issuer_pub_key,
+                                         &cred_issuer_sec_key,
+                                         &user_pub_key,
+                                         &user_sec_key,
+                                         &asset_issuer_pub_key, reveal_bitmap);
+
+        let (ctexts2,
+            ctexts_rands2,
+            revealed_attrs2,
+            proof2) =
+            gen_credential_proof::<S, P>(&mut prng,
+                                         &cred_issuer_pub_key,
+                                         &cred_issuer_sec_key,
+                                         &user_pub_key,
+                                         &user_sec_key,
+                                         &asset_issuer_pub_key, reveal_bitmap);
+
+        let (ctexts3,
+            ctexts_rands3,
+            revealed_attrs3,
+            proof3) =
+            gen_credential_proof::<S, P>(&mut prng,
+                                         &cred_issuer_pub_key,
+                                         &cred_issuer_sec_key,
+                                         &user_pub_key,
+                                         &user_sec_key,
+                                         &asset_issuer_pub_key, reveal_bitmap);
+
+
+        let mut pok_attrs = agg_pok_attrs_prove::<_, S, P>(
+            &mut prng,
+            &cred_issuer_pub_key,
+            &asset_issuer_pub_key,
+            &[revealed_attrs1.as_slice(), revealed_attrs2.as_slice(), revealed_attrs3.as_slice()],
+            &[ctexts_rands1.as_slice(), ctexts_rands2.as_slice(), ctexts_rands3.as_slice()],
+            reveal_bitmap,
+            &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice()],
+            &[&proof1, &proof2, &proof3],
+        ).unwrap();
+
+        let vrfy = agg_pok_attrs_verify::<S,P>(
+            &cred_issuer_pub_key,
+            &asset_issuer_pub_key,
+            &[&proof1, &proof2, &proof3],
+            &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice() ],
+            &pok_attrs,
+            reveal_bitmap);
+
+        assert_eq!(Ok(()), vrfy);
+
+        //making one proof fail
+        let old = pok_attrs.attr_sum_com_yy2[2].clone();
+        pok_attrs.attr_sum_com_yy2[2] = P::G2::get_identity(); //making last proof fail due to bad credential
+
+        let vrfy = agg_pok_attrs_verify::<S,P>(
+            &cred_issuer_pub_key,
+            &asset_issuer_pub_key,
+            &[&proof1, &proof2, &proof3],
+            &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice() ],
+            &pok_attrs,
+            reveal_bitmap);
+
+        assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy);
+
+        pok_attrs.attr_sum_com_yy2[2] = old; //restoring credential
+        pok_attrs.agg_rands_coms_g[0] = P::G1::get_identity(); //making ciphertext fail
+
+        let vrfy = agg_pok_attrs_verify::<S,P>(
+            &cred_issuer_pub_key,
+            &asset_issuer_pub_key,
+            &[&proof1, &proof2, &proof3],
+            &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice() ],
+            &pok_attrs,
+            reveal_bitmap);
+
+        assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy);
+
+
+
+    }
     pub(super) fn confidential_reveal<S: Scalar, P: Pairing<S>>(reveal_bitmap: &[bool]){
         let num_attr = reveal_bitmap.len();
         let mut prng: ChaChaRng;
@@ -698,6 +860,11 @@ mod test_bn{
         confidential_reveal::<BNScalar, BNGt>(&[true,false,true,false,true,false,true,false,true,false]);
         confidential_reveal::<BNScalar, BNGt>(&[false,true,false,true,false,true,false,true,false,true]);
     }
+
+    #[test]
+    fn confidential_reveal_agg(){
+        super::test::confidential_reveal_agg::<BNScalar, BNGt>(&[true, true, false, false]);
+    }
 }
 
 #[cfg(test)]
@@ -741,6 +908,11 @@ mod test_bls12_381{
     fn confidential_reveal_ten_attr_half_revealed(){
         confidential_reveal::<BLSScalar, BLSGt>(&[true,false,true,false,true,false,true,false,true,false]);
         confidential_reveal::<BLSScalar, BLSGt>(&[false,true,false,true,false,true,false,true,false,true]);
+    }
+
+    #[test]
+    fn confidential_reveal_agg(){
+        super::test::confidential_reveal_agg::<BLSScalar, BLSGt>(&[true, true, false, false]);
     }
 }
 
