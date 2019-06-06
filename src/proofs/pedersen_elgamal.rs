@@ -67,7 +67,11 @@ impl Serialize for PedersenElGamalEqProof {
         where
             S: Serializer
     {
-        serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(self.zei_to_bytes().as_slice()))
+        } else {
+            serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+        }
     }
 }
 
@@ -100,8 +104,17 @@ impl<'de> Deserialize<'de> for PedersenElGamalEqProof {
                 }
                 Ok(PedersenElGamalEqProof::zei_from_bytes(vec.as_slice()))
             }
+            fn visit_str<E>(self, s: &str) -> Result<PedersenElGamalEqProof, E>
+                where E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
-        deserializer.deserialize_bytes(ProofVisitor)
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(ProofVisitor)
+        } else {
+            deserializer.deserialize_bytes(ProofVisitor)
+        }
     }
 }
 

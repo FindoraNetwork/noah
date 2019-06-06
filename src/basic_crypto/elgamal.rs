@@ -54,7 +54,11 @@ impl<G: Group> Serialize for ElGamalPublicKey<G> {
         where
             S: Serializer
     {
-        serializer.serialize_bytes(self.0.to_compressed_bytes().as_slice())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(self.0.to_compressed_bytes().as_slice()))
+        } else {
+            serializer.serialize_bytes(self.0.to_compressed_bytes().as_slice())
+        }
     }
 }
 
@@ -99,8 +103,17 @@ impl<'de, G: Group> Deserialize<'de> for ElGamalPublicKey<G> {
                 let point = G::from_compressed_bytes(vec.as_slice()).unwrap();
                 Ok(ElGamalPublicKey::<G>(point))
             }
+            fn visit_str<E>(self, s: &str) -> Result<ElGamalPublicKey<G>, E>
+                where E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
-        deserializer.deserialize_bytes(ElGamalVisitor::new())
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(ElGamalVisitor::new())
+        } else {
+            deserializer.deserialize_bytes(ElGamalVisitor::new())
+        }
     }
 }
 
@@ -111,7 +124,11 @@ impl<Sc: Scalar> Serialize for ElGamalSecretKey<Sc> {
             S: Serializer
     {
         let bytes = Sc::to_bytes(&self.0);
-        serializer.serialize_bytes(bytes.as_slice())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(bytes.as_slice()))
+        } else {
+            serializer.serialize_bytes(bytes.as_slice())
+        }
     }
 }
 
@@ -157,8 +174,17 @@ impl<'de, S: Scalar> Deserialize<'de> for ElGamalSecretKey<S> {
                 let scalar = S::from_bytes(bytes.as_slice());
                 Ok(ElGamalSecretKey::<S>(scalar))
             }
+            fn visit_str<E>(self, s: &str) -> Result<ElGamalSecretKey<S>, E>
+                where E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
-        deserializer.deserialize_bytes(ElGamalVisitor::new())
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(ElGamalVisitor::new())
+        } else {
+            deserializer.deserialize_bytes(ElGamalVisitor::new())
+        }
     }
 }
 
@@ -167,8 +193,11 @@ impl<G: Group> Serialize for ElGamalCiphertext<G> {
         where
             S: Serializer
     {
-
-        serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode(self.zei_to_bytes().as_slice()))
+        } else {
+            serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+        }
     }
 }
 
@@ -211,8 +240,17 @@ impl<'de, G: Group> Deserialize<'de> for ElGamalCiphertext<G> {
                 }
                 Ok(ElGamalCiphertext::<G>::zei_from_bytes(vec.as_slice()))
             }
+            fn visit_str<E>(self, s: &str) -> Result<ElGamalCiphertext<G>, E>
+                where E: serde::de::Error
+            {
+                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+            }
         }
-        deserializer.deserialize_bytes(ElGamalVisitor::new())
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(ElGamalVisitor::new())
+        } else {
+            deserializer.deserialize_bytes(ElGamalVisitor::new())
+        }
     }
 }
 
