@@ -468,7 +468,7 @@ mod elgamal_over_bls_groups {
 #[cfg(test)]
 mod credentials_over_bls_12_381 {
 
-    use crate::crypto::credentials::credentials_tests;
+    use crate::crypto::anon_creds::credentials_tests;
 
     #[test]
     fn single_attribute(){

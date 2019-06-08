@@ -1,4 +1,4 @@
-//Zei: Confidential Payments for Accounts
+//! Zei: Eian's cryptographic library
 //#![feature(try_from)]
 #![feature(try_trait)]
 //#![feature(custom_attribute)]
@@ -27,8 +27,7 @@ extern crate sodiumoxide;
 extern crate spacesuit;
 
 mod utils;
-
-pub mod algebra;
+mod algebra;
 pub mod basic_crypto;
 pub mod errors;
 pub mod proofs;
@@ -36,3 +35,4 @@ pub mod serialization;
 pub mod setup;
 pub mod xfr;
 pub mod crypto;
+

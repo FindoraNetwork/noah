@@ -322,9 +322,9 @@ pub(crate) fn ac_challenge<S: Scalar, P: Pairing<S>>(
     let c = commitment.to_compressed_bytes();
     let mut hasher = Sha512::new();
     let encoded_key = bincode::serialize(&issuer_pub_key).
-        map_err(|_| ZeiError::DeserializationError)?;
+        map_err(|_| ZeiError::SerializationError)?;
     let encoded_sig = bincode::serialize(&sig).
-        map_err(|_| ZeiError::DeserializationError)?;
+        map_err(|_| ZeiError::SerializationError)?;
 
     hasher.input("ZeiACReveal");
     hasher.input(encoded_key.as_slice());

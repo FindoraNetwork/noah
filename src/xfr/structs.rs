@@ -2,7 +2,7 @@ use crate::algebra::bls12_381::{BLSG1, BLSG2};
 use crate::basic_crypto::elgamal::{ElGamalPublicKey, ElGamalCiphertext};
 use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
 use crate::basic_crypto::signatures::{XfrMultiSig, XfrPublicKey};
-use crate::crypto::credentials::ACIssuerPublicKey;
+use crate::crypto::anon_creds::ACIssuerPublicKey;
 use crate::errors::ZeiError;
 use crate::proofs::asset_mixer::AssetMixProof;
 use crate::proofs::chaum_pedersen::ChaumPedersenProofX;
