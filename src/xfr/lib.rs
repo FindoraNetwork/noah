@@ -345,7 +345,7 @@ pub(crate) mod test {
                                   XfrCreationAssetAmountError,
                                   XfrVerifyAssetAmountError};
     use crate::algebra::groups::Group;
-    use crate::credentials;
+    use crate::crypto::credentials;
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
     use crate::xfr::proofs::create_conf_id_reveal;
@@ -755,15 +755,15 @@ pub(crate) mod test {
         };
 
         let attrs = [BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng), BLSScalar::random_scalar(&mut prng)];
-        let cred_issuer_keys = credentials::gen_issuer_keys::<_, BLSScalar,BLSGt>(&mut prng, 4);
-        let receiver_ac_keys = credentials::gen_user_keys::<_, BLSScalar,BLSGt>(&mut prng, &cred_issuer_keys.0);
+        let cred_issuer_keys = credentials::ac_keygen_issuer::<_, BLSScalar,BLSGt>(&mut prng, 4);
+        let receiver_ac_keys = credentials::ac_keygen_user::<_, BLSScalar,BLSGt>(&mut prng, &cred_issuer_keys.0);
 
-        let ac_signature = credentials::issuer_sign::<_, BLSScalar,BLSGt>(&mut prng, &cred_issuer_keys.1, &receiver_ac_keys.0, &attrs);
+        let ac_signature = credentials::ac_sign::<_, BLSScalar,BLSGt>(&mut prng, &cred_issuer_keys.1, &receiver_ac_keys.0, &attrs);
         let id_tracking_policy = IdRevealPolicy{
             cred_issuer_pub_key: cred_issuer_keys.0.clone(),
             bitmap: vec![false, true, false, true],
         };
-        let proof = credentials::reveal_attrs::<_, BLSScalar, BLSGt>(&mut prng, &receiver_ac_keys.1, &cred_issuer_keys.0, &ac_signature, &attrs, &id_tracking_policy.bitmap);
+        let proof = credentials::ac_reveal::<_, BLSScalar, BLSGt>(&mut prng, &receiver_ac_keys.1, &cred_issuer_keys.0, &ac_signature, &attrs, &id_tracking_policy.bitmap).unwrap();
         let identity_proof = create_conf_id_reveal(&mut prng, &attrs, &id_tracking_policy, &proof, &asset_issuer_public_key.unwrap().eg_blsg1_pub_key).unwrap();
 
         let xfr_note = gen_xfr_note(

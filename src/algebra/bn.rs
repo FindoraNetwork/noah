@@ -478,14 +478,15 @@ mod elgamal_over_bn_groups {
 
 #[cfg(test)]
 mod credentials_over_bn {
+    use crate::crypto::credentials::credentials_tests;
 
     #[test]
     fn single_attribute(){
-        crate::credentials::credentials_tests::single_attribute::<super::BNScalar, super::BNGt>();
+        credentials_tests::single_attribute::<super::BNScalar, super::BNGt>();
     }
 
     #[test]
     fn two_attributes(){
-        crate::credentials::credentials_tests::two_attributes::<super::BNScalar, super::BNGt>();
+        credentials_tests::two_attributes::<super::BNScalar, super::BNGt>();
     }
 }

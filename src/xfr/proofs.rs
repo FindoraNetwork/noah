@@ -2,7 +2,7 @@ use bulletproofs::{RangeProof, PedersenGens};
 use crate::algebra::bls12_381::{BLSG1, BLSG2, BLSScalar, BLSGt};
 use crate::algebra::groups::{Scalar as ScalarTrait, Group};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, elgamal_encrypt};
-use crate::credentials::AttrsRevealProof;
+use crate::crypto::credentials::ACRevealSig;
 use crate::errors::ZeiError;
 use crate::proofs::chaum_pedersen::{chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq};
 use crate::proofs::identity::{AggPoKAttrs, pok_attrs_prove, pok_attrs_verify};
@@ -22,7 +22,7 @@ const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ConfIdReveal{
     ctexts: Vec<ElGamalCiphertext<BLSG1>>,
-    attr_reveal_proof: AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
+    attr_reveal_proof: ACRevealSig<BLSG1, BLSG2, BLSScalar>,
     pok_attrs: AggPoKAttrs<BLSG1, BLSG2, BLSScalar>,
 }
 
@@ -155,7 +155,7 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
     prng: &mut R,
     attrs: &[BLSScalar],
     policy: &IdRevealPolicy,
-    attr_reveal_proof: &AttrsRevealProof<BLSG1, BLSG2, BLSScalar>,
+    attr_reveal_proof: &ACRevealSig<BLSG1, BLSG2, BLSScalar>,
     asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
 )
     -> Result<ConfIdReveal, ZeiError>

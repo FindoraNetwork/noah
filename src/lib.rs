@@ -30,9 +30,9 @@ mod utils;
 
 pub mod algebra;
 pub mod basic_crypto;
-pub mod credentials;
 pub mod errors;
 pub mod proofs;
 pub mod serialization;
 pub mod setup;
 pub mod xfr;
+pub mod crypto;

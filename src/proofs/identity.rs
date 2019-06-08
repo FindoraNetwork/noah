@@ -2,7 +2,7 @@ use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::Pairing;
 use crate::algebra::utils::{scalar_linear_combination_rows, group_linear_combination_rows};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
-use crate::credentials::{IssuerPublicKey, compute_challenge, AttrsRevealProof};
+use crate::crypto::credentials::{ACIssuerPublicKey, ac_challenge, ACRevealSig, ac_vrfy_hidden_terms_addition};
 use crate::errors::ZeiError;
 use rand::{CryptoRng, Rng};
 use serde::ser::Serialize;
@@ -25,13 +25,13 @@ pub struct AggPoKAttrs<G1, G2, S>{
 /// and a anonymous credential reveal proof
 pub fn pok_attrs_prove<R, S, P>(
     prng: &mut R,
-    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+    cred_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
     attrs: &[S], // attributes to prove knowledge of
     ctexts_rand: &[S], // randomness used to encrypt attrs
     bitmap: &[bool], // indicates position of each attribute to prove
     ctexts: &[ElGamalCiphertext<P::G1>],
-    cred_sig: &AttrsRevealProof<P::G1, P::G2, S>,
+    cred_sig: &ACRevealSig<P::G1, P::G2, S>,
 ) -> Result<AggPoKAttrs<P::G1, P::G2, S>, ZeiError>
     where R: CryptoRng + Rng, S: Scalar, P: Pairing<S>
 {
@@ -51,9 +51,9 @@ pub fn pok_attrs_prove<R, S, P>(
 /// a) satisfy a single anonymous credential reveal proof
 /// b) are encrypted under ctexts (ElGamal encryptions)
 pub(crate) fn pok_attrs_verify<S: Scalar, P: Pairing<S>>(
-    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+    cred_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     asset_issuer_public_key: &ElGamalPublicKey<P::G1>,
-    reveal_proof: &AttrsRevealProof<P::G1, P::G2, S>,
+    reveal_sig: &ACRevealSig<P::G1, P::G2, S>,
     ctexts: &[ElGamalCiphertext<P::G1>],
     pok_attrs: &AggPoKAttrs<P::G1, P::G2, S>,
     bitmap: &[bool], // indicates which attributes should be revealed to the asset issuer
@@ -62,7 +62,7 @@ pub(crate) fn pok_attrs_verify<S: Scalar, P: Pairing<S>>(
     agg_pok_attrs_verify::<S, P>(
         cred_issuer_pub_key,
         asset_issuer_public_key,
-        &[reveal_proof],
+        &[reveal_sig],
         &[ctexts],
         pok_attrs,
         bitmap
@@ -73,14 +73,14 @@ pub(crate) fn pok_attrs_verify<S: Scalar, P: Pairing<S>>(
 /// encryption of these and a set of anonymous credential reveal proofs
 pub fn agg_pok_attrs_prove<R,S,P>(
     prng: &mut R,
-    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+    cred_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
     attrs: &[&[S]],
     ctexts_rand: &[&[S]],
     bitmap: &[bool],
     ctexts: &[&[ElGamalCiphertext<P::G1>]],
-    cred_sigs: &[&AttrsRevealProof<P::G1, P::G2, S>]
-)-> Result<AggPoKAttrs<P::G1, P::G2, S>, ZeiError>
+    cred_sigs: &[&ACRevealSig<P::G1, P::G2, S>]
+) -> Result<AggPoKAttrs<P::G1, P::G2, S>, ZeiError>
     where R: CryptoRng + Rng, S: Scalar, P: Pairing<S>
 {
     //0: santity check on vector length
@@ -161,9 +161,9 @@ pub fn agg_pok_attrs_prove<R,S,P>(
 }
 
 pub(crate) fn agg_pok_attrs_verify<S: Scalar, P: Pairing<S>>(
-    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+    cred_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
-    reveal_proofs: &[&AttrsRevealProof<P::G1, P::G2, S>],
+    reveal_sigs: &[&ACRevealSig<P::G1, P::G2, S>],
     ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
     agg_pok_attrs: &AggPoKAttrs<P::G1, P::G2, S>,
     bitmap: &[bool], // indicates which attributes should be revealed to the asset issuer
@@ -173,7 +173,7 @@ pub(crate) fn agg_pok_attrs_verify<S: Scalar, P: Pairing<S>>(
 
     // 1. compute linear combination scalars
     let lc_scalars = compute_linear_combination_scalars::<S,P>(
-        ctexts_vecs, reveal_proofs);
+        ctexts_vecs, reveal_sigs);
 
 
     // 2. aggregate ctexts and attribute responses
@@ -219,7 +219,7 @@ pub(crate) fn agg_pok_attrs_verify<S: Scalar, P: Pairing<S>>(
     verify_credential_agg::<S,P>(
         &challenge,
         lc_scalars.as_slice(),
-        reveal_proofs,
+        reveal_sigs,
         agg_pok_attrs.attr_sum_com_yy2.as_slice(),
         agg_pok_attrs.attrs_resps.as_slice(),
         cred_issuer_pub_key,
@@ -231,7 +231,7 @@ pub(crate) fn agg_pok_attrs_verify<S: Scalar, P: Pairing<S>>(
 /// one scalar per instance. First scalar is 1.
 fn compute_linear_combination_scalars<S:Scalar, P: Pairing<S>> (
     ctexts: &[&[ElGamalCiphertext<P::G1>]],
-    cred_sigs: &[&AttrsRevealProof<P::G1, P::G2, S>]
+    cred_sigs: &[&ACRevealSig<P::G1, P::G2, S>]
 ) -> Vec<S>
 {
     if ctexts.len() == 0 {
@@ -303,10 +303,10 @@ fn verify_ciphertext<S: Scalar, P: Pairing<S>>(
 fn verify_credential_agg<S: Scalar, P: Pairing<S>>(
     challenge: &S,
     lc_scalars: &[S],
-    reveal_proofs: &[&AttrsRevealProof<P::G1, P::G2, S>],
+    reveal_sigs: &[&ACRevealSig<P::G1, P::G2, S>],
     attr_sum_com_yy2: &[P::G2],
     attr_resps: &[Vec<S>],
-    cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
+    issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     bitmap: &[bool], //policy, indicates which attributes needs to be revealed to the asset issuer
 ) -> Result<(), ZeiError>
 {
@@ -319,18 +319,18 @@ fn verify_credential_agg<S: Scalar, P: Pairing<S>>(
     let mut pp = vec![];
     let mut agg_sigma2 = P::G1::get_identity();
     let mut ck_vec = vec![];
-    for (lc_scalar_k, reveal_proof_k, attr_sum_com_k, attr_resp_k)
-        in izip!(lc_scalars, reveal_proofs, attr_sum_com_yy2, attr_resps) {
+    for (lc_scalar_k, reveal_sig_k, attr_sum_com_k, attr_resp_k)
+        in izip!(lc_scalars, reveal_sigs, attr_sum_com_yy2, attr_resps) {
 
-        let c_k = compute_challenge::<S, P>(&reveal_proof_k.pok.commitment);
+        let c_k = ac_challenge::<S, P>(issuer_pub_key, &reveal_sig_k.sig, &reveal_sig_k.pok.commitment)?;
 
-        let hidden_k = credential_hidden_terms_addition::<S,P>(
+        let hidden_k = ac_vrfy_hidden_terms_addition::<S,P>(
             &c_k,
-            reveal_proof_k,
-            cred_issuer_public_key, bitmap)?;
+            reveal_sig_k,
+            issuer_pub_key, bitmap)?;
 
         let revealed_k = crendential_zk_revealed_terms_addition::<S,P>(
-            cred_issuer_public_key,
+            issuer_pub_key,
             attr_sum_com_k,
             attr_resp_k,
             bitmap,
@@ -338,19 +338,19 @@ fn verify_credential_agg<S: Scalar, P: Pairing<S>>(
 
         let pp_k = hidden_k.mul(challenge).add(&revealed_k.mul(&c_k));
         pp.push(pp_k);
-        agg_sigma2 = agg_sigma2.add(&reveal_proof_k.sig.sigma2.mul(&c_k.mul(lc_scalar_k)));
+        agg_sigma2 = agg_sigma2.add(&reveal_sig_k.sig.sigma2.mul(&c_k.mul(lc_scalar_k)));
 
         ck_vec.push(c_k);
     }
     agg_sigma2 = agg_sigma2.mul(challenge);
 
     //3. Compute right hand side pairing: e(sigma2, G2)
-    let rhs = P::pairing(&agg_sigma2, &cred_issuer_public_key.gen2);
+    let rhs = P::pairing(&agg_sigma2, &issuer_pub_key.gen2);
 
     //4. Compute left hand side as \sum_k e(sigma1_k, P_k)
     let mut lhs = P::get_identity();
-    for (lc_scalar_k, reveal_proof_k, pp_k) in izip!(lc_scalars, reveal_proofs, pp){
-        let lhs_i= P::pairing(&reveal_proof_k.sig.sigma1.mul(lc_scalar_k), &pp_k);
+    for (lc_scalar_k, reveal_sig_k, pp_k) in izip!(lc_scalars, reveal_sigs, pp){
+        let lhs_i= P::pairing(&reveal_sig_k.sig.sigma1.mul(lc_scalar_k), &pp_k);
         lhs = lhs.add(&lhs_i);
     }
 
@@ -368,7 +368,7 @@ fn verify_credential_agg<S: Scalar, P: Pairing<S>>(
 /// verify an anonymous credential reveal proof and matched ElGamal encryptions
 fn sample_blinds_compute_commitments<R,S, P>(
     prng: &mut R,
-    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+    cred_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
     bitmap: &[bool], n_attrs: usize, n_instances: usize
 ) -> Result<
@@ -402,7 +402,7 @@ fn sample_blinds_compute_commitments<R,S, P>(
 }
 
 fn compute_attr_sum_yy2<S: Scalar, P: Pairing<S>>(
-    cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
+    cred_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     attr_blinds: &Vec<S>,
     bitmap: &[bool],
 ) -> Result<P::G2, ZeiError>
@@ -482,41 +482,12 @@ fn compute_proof_responses<S: Scalar>(
 }
 
 /// Helper function that compute the term of an anonymous credential verification
-/// that do not include the revealed attributes. That is:
-/// c * X2 + b_t * G1  + b_sk * Z2 + sum_{i\in Hidden} b_{attr_i} * Y2_i - reveal_proof.COM
-/// = c( x + t + sk * z + sum_{i\in Hidden} attr_i * y2_i) * G2
-fn credential_hidden_terms_addition<S: Scalar, P: Pairing<S>>(
-    challenge: &S,
-    reveal_proof: &AttrsRevealProof<P::G1, P::G2, S>,
-    cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
-    bitmap: &[bool],
-) -> Result<P::G2, ZeiError>
-{
-    //compute X_2 * challenge - commitment + G2 * &response_t + PK.Z2 * response_sk +
-    // sum PK.Y2_i * response_attr_i
-    let mut q = cred_issuer_public_key.xx2.mul(&challenge).sub(&reveal_proof.pok.commitment); //X_2*challenge - proof.commitment
-
-    q = q.add(&cred_issuer_public_key.gen2.mul(&reveal_proof.pok.response_t));
-    q = q.add(&cred_issuer_public_key.zz2.mul(&reveal_proof.pok.response_sk));
-
-    let mut resp_attr_iter = reveal_proof.pok.response_attrs.iter();
-    for (b, yy2i)  in bitmap.iter().
-        zip(cred_issuer_public_key.yy2.iter()){
-        if !b {
-            let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
-            q = q.add(&yy2i.mul(response));
-        }
-    }
-    Ok(q)
-}
-
-/// Helper function that compute the term of an anonymous credential verification
 /// that DO include the revealed attributes, using the proof of knowledge of these attributes
 /// rather than the plain attributes. That is:
 /// sum_{j\in Revealed} b'_{attr_j} * Y2_j - PoK.attr_sum_com_yy2
 ///  = c' * sum_{j\in Revealed} attr_j * y_j * G2
 fn crendential_zk_revealed_terms_addition<S: Scalar, P: Pairing<S>>(
-    cred_issuer_public_key: &IssuerPublicKey<P::G1, P::G2>,
+    cred_issuer_public_key: &ACIssuerPublicKey<P::G1, P::G2>,
     attr_sum_com: &P::G2,
     attr_resps: &[S],
     bitmap: &[bool]
@@ -538,9 +509,9 @@ fn crendential_zk_revealed_terms_addition<S: Scalar, P: Pairing<S>>(
 mod test{
     use rand_chacha::ChaChaRng;
     use rand::SeedableRng;
-    use crate::credentials::{gen_user_keys, reveal_attrs, issuer_sign, gen_issuer_keys,
-                             AttrsRevealProof, IssuerPublicKey, IssuerSecretKey,
-                             UserPublicKey, UserSecretKey};
+    use crate::crypto::credentials::{ac_keygen_user, ac_reveal, ac_sign, ac_keygen_issuer,
+                                     ACRevealSig, ACIssuerPublicKey, ACIssuerSecretKey,
+                                     ACUserPublicKey, ACUserSecretKey};
     use crate::algebra::groups::{Group, Scalar};
     use crate::algebra::pairing::Pairing;
     use crate::proofs::identity::{pok_attrs_prove, pok_attrs_verify, agg_pok_attrs_prove, agg_pok_attrs_verify};
@@ -551,13 +522,13 @@ mod test{
     fn setup<S: Scalar, P: Pairing<S>>(
         prng: &mut ChaChaRng,
         n_attr: usize) -> (
-        IssuerPublicKey<P::G1, P::G2>, IssuerSecretKey<P::G1,S>,
-        UserPublicKey<P::G1>, UserSecretKey<S>, ElGamalPublicKey<P::G1>)
+        ACIssuerPublicKey<P::G1, P::G2>, ACIssuerSecretKey<P::G1,S>,
+        ACUserPublicKey<P::G1>, ACUserSecretKey<S>, ElGamalPublicKey<P::G1>)
     {
-        let cred_issuer_keypair = gen_issuer_keys::<_, S,P>(prng, n_attr);
+        let cred_issuer_keypair = ac_keygen_issuer::<_, S,P>(prng, n_attr);
         let cred_issuer_pub_key = cred_issuer_keypair.0;
         let cred_issuer_sec_key = cred_issuer_keypair.1;
-        let (user_pub_key, user_sec_key) = gen_user_keys::<_, S,P>(prng, &cred_issuer_pub_key);
+        let (user_pub_key, user_sec_key) = ac_keygen_user::<_, S,P>(prng, &cred_issuer_pub_key);
         let asset_issuer_sec_key = elgamal_generate_secret_key::<_,S>(prng);
         let asset_issuer_pub_key = elgamal_derive_public_key(&P::G1::get_base(), &asset_issuer_sec_key);
         (cred_issuer_pub_key, cred_issuer_sec_key, user_pub_key, user_sec_key, asset_issuer_pub_key)
@@ -565,31 +536,31 @@ mod test{
 
     fn gen_credential_proof<S: Scalar, P: Pairing<S>>(
         prng: &mut ChaChaRng,
-        cred_issuer_pub_key: &IssuerPublicKey<P::G1, P::G2>,
-        cred_issuer_sec_key: &IssuerSecretKey<P::G1, S>,
-        user_pub_key: &UserPublicKey<P::G1>,
-        user_sec_key: &UserSecretKey<S>,
+        cred_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+        cred_issuer_sec_key: &ACIssuerSecretKey<P::G1, S>,
+        user_pub_key: &ACUserPublicKey<P::G1>,
+        user_sec_key: &ACUserSecretKey<S>,
         asset_issuer_pub_key: &ElGamalPublicKey<P::G1>,
         reveal_bitmap: &[bool])
-    -> (Vec<ElGamalCiphertext<P::G1>>, Vec<S>, Vec<S>, AttrsRevealProof<P::G1, P::G2, S>)
+        -> (Vec<ElGamalCiphertext<P::G1>>, Vec<S>, Vec<S>, ACRevealSig<P::G1, P::G2, S>)
     {
         let num_attr = reveal_bitmap.len();
         let mut attrs = vec![];
         for _ in 0..num_attr{
             attrs.push(S::random_scalar(prng));
         }
-        let signature = issuer_sign::<_, S, P>(
+        let signature = ac_sign::<_, S, P>(
             prng, &cred_issuer_sec_key, &user_pub_key,
             attrs.as_slice());
 
-        let proof = reveal_attrs::<_, S, P>(
+        let proof = ac_reveal::<_, S, P>(
             prng,
             &user_sec_key,
             cred_issuer_pub_key,
             &signature,
             &attrs,
             reveal_bitmap,
-        );
+        ).unwrap();
 
         let mut ctexts_rands = vec![];
         let mut ctexts = vec![];
@@ -708,7 +679,7 @@ mod test{
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let cred_issuer_keypair =
-            gen_issuer_keys::<_, S,P>(&mut prng, num_attr);
+            ac_keygen_issuer::<_, S,P>(&mut prng, num_attr);
 
         let cred_issuer_pub_key = &cred_issuer_keypair.0;
         let cred_issuer_sk = &cred_issuer_keypair.1;
@@ -719,7 +690,7 @@ mod test{
             elgamal_derive_public_key(&P::G1::get_base(), &asset_issuer_secret_key);
 
         let (user_pk, user_sk) =
-            gen_user_keys::<_, S,P>(&mut prng, cred_issuer_pub_key);
+            ac_keygen_user::<_, S,P>(&mut prng, cred_issuer_pub_key);
 
         let mut attrs = vec![];
 
@@ -727,18 +698,18 @@ mod test{
             attrs.push(S::random_scalar(&mut prng));
         }
 
-        let signature = issuer_sign::<_, S, P>(
+        let signature = ac_sign::<_, S, P>(
             &mut prng, &cred_issuer_sk, &user_pk,
             attrs.as_slice());
 
-        let mut proof = reveal_attrs::<_, S, P>(
+        let mut proof = ac_reveal::<_, S, P>(
             &mut prng,
             &user_sk,
             cred_issuer_pub_key,
             &signature,
             &attrs,
             reveal_bitmap,
-        );
+        ).unwrap();
 
         let mut ctext_rands = vec![];
         let mut ctexts = vec![];

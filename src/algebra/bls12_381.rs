@@ -468,29 +468,31 @@ mod elgamal_over_bls_groups {
 #[cfg(test)]
 mod credentials_over_bls_12_381 {
 
+    use crate::crypto::credentials::credentials_tests;
+
     #[test]
     fn single_attribute(){
-        crate::credentials::credentials_tests::single_attribute::<super::BLSScalar, super::BLSGt>();
+        credentials_tests::single_attribute::<super::BLSScalar, super::BLSGt>();
     }
 
     #[test]
     fn two_attributes(){
-        crate::credentials::credentials_tests::two_attributes::<super::BLSScalar,super::BLSGt>();
+        credentials_tests::two_attributes::<super::BLSScalar,super::BLSGt>();
     }
 
     #[test]
     fn ten_attributes(){
-        crate::credentials::credentials_tests::ten_attributes::<super::BLSScalar,super::BLSGt>();
+        credentials_tests::ten_attributes::<super::BLSScalar,super::BLSGt>();
     }
 
     #[test]
     fn to_json_credential_structures(){
-        crate::credentials::credentials_tests::to_json_credential_structures::<super::BLSScalar,super::BLSGt>();
+        credentials_tests::to_json_credential_structures::<super::BLSScalar,super::BLSGt>();
     }
 
     #[test]
     fn to_msg_pack_credential_structures(){
-        crate::credentials::credentials_tests::to_msg_pack_credential_structures::<super::BLSScalar,super::BLSGt>();
+        credentials_tests::to_msg_pack_credential_structures::<super::BLSScalar,super::BLSGt>();
     }
 
 
