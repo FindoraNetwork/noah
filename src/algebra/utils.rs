@@ -14,6 +14,7 @@ pub(crate) fn group_linear_combination_rows<S: Scalar, G: Group<S>>(lc_scalars: 
     result
 }
 
+/*
 /// I perform a vector matrix multiplication
 pub(crate) fn scalar_linear_combination_rows<S: Scalar>(lc_scalars: &[S], matrix: &[Vec<S>]) -> Vec<S>{
     if matrix.len() == 0 {
@@ -27,3 +28,4 @@ pub(crate) fn scalar_linear_combination_rows<S: Scalar>(lc_scalars: &[S], matrix
     }
     result
 }
+*/

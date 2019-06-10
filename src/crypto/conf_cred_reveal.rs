@@ -1,6 +1,6 @@
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::Pairing;
-use crate::algebra::utils::{scalar_linear_combination_rows, group_linear_combination_rows};
+use crate::algebra::utils::{group_linear_combination_rows};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::crypto::anon_creds::{ACIssuerPublicKey, ac_challenge, ACRevealSig, ac_vrfy_hidden_terms_addition};
 use crate::errors::ZeiError;
@@ -12,7 +12,7 @@ use sha2::{Sha512, Digest};
 /// Aggregated proof of knowledge of revealed attributes for an anonymous credential reveal signature
 /// that are encrypted under ElGamal
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AggPoKAttrs<G1, G2, S>{
+pub(crate) struct AggPoKAttrs<G1, G2, S>{
     pub attr_sum_com_yy2: Vec<G2>, // {sum blind_{attr_{j,k}} * Y2_j }_k for attr_{j,k} in encrypted attributes for each instance k. Cannot be aggregated
     pub agg_attrs_coms_g: Vec<G1>, // \sum_k x_k* blind_{a_{j,k}} * G1 for attr_{j,k} in encrypted attributes
     pub attrs_resps: Vec<Vec<S>>, // {{c*attr_{j,k} + blind_{attr_{j,k}} }_j}_k for each instance k, Cannot be aggregated
@@ -21,9 +21,106 @@ pub struct AggPoKAttrs<G1, G2, S>{
     pub rands_resps: Vec<Vec<S>>, //  {(c*r_{j,k} + blind_{r_{i,k}})}_j}_k, this cannot be aggregated unless public keys are all equal
 }
 
+/// Proof of knowlege of attributes that a) are elgamal encrypted, and b) verify an anonymous credential reveal proof.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CACProof<G1,G2,S>(pub(crate) AggPoKAttrs<G1,G2,S>);
+
+/// I produce a CACProof for a single instance of a confidential anonymous reveal. Proof asserts
+/// that a list of attributes can be decrypted from a list of ciphertexts under recv_enc_pub_key,
+/// and that these attributed verify an anonymous credential reveal proof.
+pub fn cac_prove<R, S, P>(
+    prng: &mut R,
+    ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+    recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
+    attrs: &[S], // attributes to prove knowledge of
+    ctexts_rand: &[S], // randomness used to encrypt attrs
+    bitmap: &[bool], // indicates position of each attribute to prove
+    ctexts: &[ElGamalCiphertext<P::G1>],
+    ac_reveal_sig: &ACRevealSig<P::G1, P::G2, S>,
+) -> Result<CACProof<P::G1, P::G2, S>, ZeiError>
+    where R: CryptoRng + Rng, S: Scalar, P: Pairing<S>
+{
+    cac_multi_prove::<R,S,P>(
+        prng,
+        ac_issuer_pub_key,
+        &[&recv_enc_pub_key],
+        &[attrs],
+        &[ctexts_rand],
+        bitmap,
+        &[ctexts],
+        &[ac_reveal_sig])
+}
+
+/// I produce a CACProof for a set of instance of confidential anonymous reveal proofs.
+/// For n > 1, instances, the proof produced is shorter than n independent CAC proofs produced by
+/// cac_prove function.
+pub fn cac_multi_prove<R, S, P>(
+    prng: &mut R,
+    ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+    recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
+    attrs: &[&[S]],
+    ctexts_rand: &[&[S]],
+    bitmap: &[bool],
+    ctexts: &[&[ElGamalCiphertext<P::G1>]],
+    ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, S>]
+) -> Result<CACProof<P::G1, P::G2, S>, ZeiError>
+    where R: CryptoRng + Rng, S: Scalar, P: Pairing<S>
+{
+    Ok(CACProof(agg_pok_attrs_prove::<R,S,P>(
+        prng,
+        ac_issuer_pub_key,
+        recv_enc_pub_keys,
+        attrs,
+        ctexts_rand,
+        bitmap,
+        ctexts,
+        ac_reveal_sigs,
+    )?))
+}
+
+/// I verify a CACProof.
+pub fn cac_verify<S: Scalar, P: Pairing<S>>(
+    ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+    recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
+    reveal_sig: &ACRevealSig<P::G1, P::G2, S>,
+    ctexts: &[ElGamalCiphertext<P::G1>],
+    cac_proof: &CACProof<P::G1, P::G2, S>,
+    bitmap: &[bool], // indicates which attributes should be revealed to the receiver
+) -> Result<(), ZeiError>
+{
+    cac_multi_verify::<S, P>(
+        ac_issuer_pub_key,
+        &[recv_enc_pub_key],
+        &[reveal_sig],
+        &[ctexts],
+        cac_proof,
+        bitmap
+    )
+}
+
+/// I verify a CACProof for a set of Confidential Anonumous Credental instances.
+pub fn cac_multi_verify<S: Scalar, P: Pairing<S>>(
+    ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+    recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
+    ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, S>],
+    ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
+    cac_proof: &CACProof<P::G1, P::G2, S>,
+    bitmap: &[bool], // indicates which attributes should be revealed to the receiver
+) -> Result<(), ZeiError>
+{
+    agg_pok_attrs_verify::<S, P>(
+        ac_issuer_pub_key,
+        recv_enc_pub_keys,
+        ac_reveal_sigs,
+        ctexts_vecs,
+        &cac_proof.0,
+        bitmap
+    )
+}
+
 /// I compute a proof of knowledge of identity attributes to be verified against encryption of these
 /// and a anonymous credential reveal proof
-pub fn pok_attrs_prove<R, S, P>(
+pub(crate) fn pok_attrs_prove<R, S, P>(
     prng: &mut R,
     ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
@@ -71,7 +168,7 @@ pub(crate) fn pok_attrs_verify<S: Scalar, P: Pairing<S>>(
 
 /// I compute an aggregated proof of knowledge of identity attribute sets to be verified against
 /// encryption of these and a set of anonymous credential reveal proofs
-pub fn agg_pok_attrs_prove<R,S,P>(
+pub(crate) fn agg_pok_attrs_prove<R,S,P>(
     prng: &mut R,
     ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
     recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
@@ -278,7 +375,7 @@ fn verify_ciphertext<S: Scalar, P: Pairing<S>>(
                recv_enc_pub_keys.iter(),
                rand_responses.iter(),
                attr_responses.iter(),
-               ctexts.iter()
+               ctexts.iter(),
                lc_scalars.iter()) {
             let scalar_factor = rand_resp_inst[i].mul(scalar);
             sum_pk_rand = sum_pk_rand.add(&(*pub_key).0.mul(&scalar_factor));
@@ -557,10 +654,10 @@ mod test{
                                     ACUserPublicKey, ACUserSecretKey};
     use crate::algebra::groups::{Group, Scalar};
     use crate::algebra::pairing::Pairing;
-    use super::{pok_attrs_prove, pok_attrs_verify, agg_pok_attrs_prove, agg_pok_attrs_verify};
     use crate::basic_crypto::elgamal::{elgamal_generate_secret_key,
                                        elgamal_derive_public_key, elgamal_encrypt, ElGamalPublicKey, ElGamalCiphertext};
     use crate::errors::ZeiError;
+    use super::{cac_multi_prove, cac_multi_verify, cac_prove, cac_verify};
 
     fn setup<S: Scalar, P: Pairing<S>>(
         prng: &mut ChaChaRng,
@@ -669,7 +766,7 @@ mod test{
                                       reveal_bitmap);
 
 
-        let mut pok_attrs = agg_pok_attrs_prove::<_, S, P>(
+        let mut cac_proof = cac_multi_prove::<_, S, P>(
             &mut prng,
             &ac_issuer_pub_key,
             &[&recv_pub_key1,&recv_pub_key2,&recv_pub_key3],
@@ -680,45 +777,42 @@ mod test{
             &[&proof1, &proof2, &proof3],
         ).unwrap();
 
-        let vrfy = agg_pok_attrs_verify::<S,P>(
+        let vrfy = cac_multi_verify::<S,P>(
             &ac_issuer_pub_key,
             &[&recv_pub_key1,&recv_pub_key2,&recv_pub_key3],
             &[&proof1, &proof2, &proof3],
             &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice() ],
-            &pok_attrs,
+            &cac_proof,
             reveal_bitmap);
 
         assert_eq!(Ok(()), vrfy);
 
         //making one proof fail
-        let old = pok_attrs.attr_sum_com_yy2[2].clone();
-        pok_attrs.attr_sum_com_yy2[2] = P::G2::get_identity(); //making last proof fail due to bad credential
+        let old = cac_proof.0.attr_sum_com_yy2[2].clone();
+        cac_proof.0.attr_sum_com_yy2[2] = P::G2::get_identity(); //making last proof fail due to bad credential
 
-        let vrfy = agg_pok_attrs_verify::<S,P>(
+        let vrfy = cac_multi_verify::<S,P>(
             &ac_issuer_pub_key,
             &[&recv_pub_key1, &recv_pub_key2, &recv_pub_key3],
             &[&proof1, &proof2, &proof3],
             &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice() ],
-            &pok_attrs,
+            &cac_proof,
             reveal_bitmap);
 
         assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy);
 
-        pok_attrs.attr_sum_com_yy2[2] = old; //restoring credential
-        pok_attrs.agg_rands_coms_g[0] = P::G1::get_identity(); //making ciphertext fail
+        cac_proof.0.attr_sum_com_yy2[2] = old; //restoring credential
+        cac_proof.0.agg_rands_coms_g[0] = P::G1::get_identity(); //making ciphertext fail
 
-        let vrfy = agg_pok_attrs_verify::<S,P>(
+        let vrfy = cac_multi_verify::<S,P>(
             &ac_issuer_pub_key,
             &[&recv_pub_key1, &recv_pub_key2, &recv_pub_key3],
             &[&proof1, &proof2, &proof3],
             &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice() ],
-            &pok_attrs,
+            &cac_proof,
             reveal_bitmap);
 
         assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy);
-
-
-
     }
     pub(super) fn confidential_ac_reveal<S: Scalar, P: Pairing<S>>(reveal_bitmap: &[bool]){
         let num_attr = reveal_bitmap.len();
@@ -772,7 +866,7 @@ mod test{
             }
         }
 
-        let mut pok_attrs = pok_attrs_prove::<_, S, P>(
+        let mut cac_proof = cac_prove::<_, S, P>(
             &mut prng,
             ac_issuer_pub_key,
             &recv_enc_pub_key,
@@ -783,12 +877,12 @@ mod test{
             &proof
         ).unwrap();
 
-        let vrfy = pok_attrs_verify::<S,P>(
+        let vrfy = cac_verify::<S,P>(
             ac_issuer_pub_key,
             &recv_enc_pub_key,
             &proof,
             ctexts.as_slice(),
-            &pok_attrs,
+            &cac_proof,
             reveal_bitmap);
 
         assert_eq!(Ok(()), vrfy);
@@ -801,37 +895,37 @@ mod test{
         tampered_bitmap[0] = !(*b);
         if *b {
             ctexts.remove(0);
-            pok_attrs.agg_rands_coms_g.remove(0);
-            pok_attrs.agg_rands_coms_pk.remove(0);
-            pok_attrs.agg_attrs_coms_g.remove(0);
-            pok_attrs.attrs_resps[0].remove(0);
-            pok_attrs.rands_resps[0].remove(0);
+            cac_proof.0.agg_rands_coms_g.remove(0);
+            cac_proof.0.agg_rands_coms_pk.remove(0);
+            cac_proof.0.agg_attrs_coms_g.remove(0);
+            cac_proof.0.attrs_resps[0].remove(0);
+            cac_proof.0.rands_resps[0].remove(0);
             proof.pok.response_attrs.push(S::from_u32(0));
 
         }
         else{
             ctexts.push(elgamal_encrypt(
                 &P::G1::get_base(), &S::from_u32(0), &S::from_u32(0), &recv_enc_pub_key));
-            pok_attrs.agg_rands_coms_g.push(P::G1::get_identity());
-            pok_attrs.agg_rands_coms_pk.push(P::G1::get_identity());
-            pok_attrs.agg_attrs_coms_g.push(P::G1::get_identity());
-            if pok_attrs.attrs_resps.len() > 0{
-                pok_attrs.attrs_resps[0].push(S::from_u32(0u32));
-                pok_attrs.rands_resps[0].push(S::from_u32(0u32));
+            cac_proof.0.agg_rands_coms_g.push(P::G1::get_identity());
+            cac_proof.0.agg_rands_coms_pk.push(P::G1::get_identity());
+            cac_proof.0.agg_attrs_coms_g.push(P::G1::get_identity());
+            if cac_proof.0.attrs_resps.len() > 0{
+                cac_proof.0.attrs_resps[0].push(S::from_u32(0u32));
+                cac_proof.0.rands_resps[0].push(S::from_u32(0u32));
             }
             else{
-                pok_attrs.attrs_resps.push(vec![S::from_u32(0u32)]);
-                pok_attrs.rands_resps.push(vec![S::from_u32(0u32)]);
+                cac_proof.0.attrs_resps.push(vec![S::from_u32(0u32)]);
+                cac_proof.0.rands_resps.push(vec![S::from_u32(0u32)]);
             }
 
         }
 
-        let vrfy = pok_attrs_verify::<S,P>(
+        let vrfy = cac_verify::<S,P>(
             ac_issuer_pub_key,
             &recv_enc_pub_key,
             &proof,
             ctexts.as_slice(),
-            &pok_attrs,
+            &cac_proof,
             tampered_bitmap.as_slice());
 
         assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy, "proof should fail");
@@ -940,7 +1034,7 @@ mod test_bls12_381{
 mod test_serialization{
     use crate::algebra::bls12_381::{BLSG1, BLSG2, BLSScalar};
     use crate::algebra::groups::{Group, Scalar};
-    use super::AggPoKAttrs;
+    use super::{CACProof, AggPoKAttrs};
     use serde::{Deserialize, Serialize};
     use rmp_serde::Deserializer;
     use rand_chacha::ChaChaRng;
@@ -949,7 +1043,7 @@ mod test_serialization{
     fn to_json<G1: Group<S>, G2: Group<S>, S: Scalar>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let pokattrs = AggPoKAttrs{ //2 instances 3 attributes
+        let cac_proof = CACProof(AggPoKAttrs{ //2 instances 3 attributes
             attr_sum_com_yy2: vec![G2::get_base(), G2::get_base()],
             agg_attrs_coms_g: vec![G1::get_identity(), G1::get_identity(), G1::get_identity()],
             agg_rands_coms_g: vec![G1::get_base(), G1::get_identity(), G1::get_identity()],
@@ -962,17 +1056,17 @@ mod test_serialization{
                 vec![S::from_u32(60), S::from_u32(40), S::from_u32(20)],
                 vec![S::from_u32(70), S::from_u32(50), S::from_u32(30)],
             ],
-        };
+        });
 
-        let json_str = serde_json::to_string(&pokattrs).unwrap();
-        let pokattrs_de: AggPoKAttrs<G1, G2, S> = serde_json::from_str(&json_str).unwrap();
-        assert_eq!(pokattrs, pokattrs_de);
+        let json_str = serde_json::to_string(&cac_proof).unwrap();
+        let cac_proof_de: CACProof<G1, G2, S> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(cac_proof, cac_proof_de);
     }
 
     fn to_msg_pack<G1: Group<S>, G2: Group<S>, S: Scalar>(){
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let pokattrs = AggPoKAttrs{ //2 instances 3 attributes
+        let cac_proof = CACProof(AggPoKAttrs{ //2 instances 3 attributes
             attr_sum_com_yy2: vec![G2::get_base(), G2::get_base()],
             agg_attrs_coms_g: vec![G1::get_identity(), G1::get_identity(), G1::get_identity()],
             agg_rands_coms_g: vec![G1::get_base(), G1::get_identity(), G1::get_identity()],
@@ -985,13 +1079,13 @@ mod test_serialization{
                 vec![S::from_u32(60), S::from_u32(40), S::from_u32(20)],
                 vec![S::from_u32(70), S::from_u32(50), S::from_u32(30)],
             ],
-        };
+        });
         //keys serialization
         let mut vec = vec![];
-        pokattrs.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
+        cac_proof.serialize(&mut rmp_serde::Serializer::new(&mut vec)).unwrap();
         let mut de = Deserializer::new(&vec[..]);
-        let pokattrs_de: AggPoKAttrs<G1, G2, S> = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(pokattrs, pokattrs_de);
+        let cac_proof_de: CACProof<G1, G2, S> = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(cac_proof, cac_proof_de);
     }
 
     #[test]
