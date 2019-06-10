@@ -1,18 +1,40 @@
 ![alt text](https://github.com/eianio/zei/raw/master/zei_logo.png)
 
-**Confidential Payments for Accounts**
+**Zei: Eian Cryptographic Library**
 
-Zei is a library to help manage an account system that hides transaction amounts.
-It Implements Confidential Transactions that was first proposed by [Greg Maxwell](https://people.xiph.org/~greg/confidential_values.txt). It however utilizes [Bulletproofs by Benedikt et al.](https://eprint.iacr.org/2017/1066.pdf) for shorter Rangeproofs. Publickey encryption is utilized to reveal plaintext amounts & blinding factors to the reciever.
-This implementation uses Pedersen Commitments and is vulnerable to account poisoning. 
+Zei is a library that provide tools to create and verify public transaction 
+with confidential data. 
 
-# Internal
-View [Protocol](https://github.com/eianio/zei/blob/master/PROTOCOL.md)
-
-
-
-
-
+Support:
+ - Basic Cryptographic tools: 
+    - ElGamalEncryption in the exponent over generic groups.
+    - A Naive Multisignature (concatenation of ed25519 signatures)
+       - Future version will support BLS multisignatures
+    - Hybrid Encryption using signature key
+ - Advanced Cryptographic tools: 
+   - Anonymous Credentials based on David Pointcheval and Olivier Sanders. 
+   Short Randomizable Signatures. CT RSA 2015. https://eprint.iacr.org/2015/525.pdf.
+   It currently uses BLS12_381 as the underlying pairing
+   - Confidential Anonymous Credential Reveal: Allows to encrypt credential attributes
+   so that a verifier can check a credential signature without learning the attributes.
+   This functionality allows for identity attributes tracking over a public ledger.
+   - Chaum Pedersen proofs: Allows to prove in zero-knowledge that a set of Pedersen
+   commitments open to the same value. Used in transfers to prove that the input confidential asset
+   is the same as the output asset type.
+   - Pedersen-ElGamal Equality Proofs: Allows to prove in zero-knowledge that the 
+   decryption of an Elgamal ciphertexts correctly opens a pedersen commitment.
+   Use in transfers that allow tracking amounts and asset type without publicly
+   revealing these values.
+   - Dlog: Simple proof of knowlege of discrete logarithms over generic groups.
+ - Xfr multi-input multi-output UTXO transfers
+   - Plain: XfrNote reveal amount and asset type
+   - Confidential amount and/or asset type: XfrNote hides amount and/or asset type
+   - AssetType mixing: Allows for multiple asset types in a confidential transaction
+    Implemented via the Cloak protocol. Currently using Interstellar spacesuite prototype
+   - Tracking policies: Allow tracking of amount, asset type, and/or identity
+   of asset holders. That is, confidential Xfrs need to provide ciphertexts of
+   amount/asset_type and/or identity and prove that this are correctly formed.
+    
 
 # Benchmarks
 
@@ -32,7 +54,7 @@ Then, in your library or executable source, add:
 extern crate zei;
 ```
 
-By default, `zei` builds against `curve25519-dalek`'s `u64_backend`
+By default, several `zei`'s tools uses `curve25519-dalek`'s `u64_backend`
 feature, which uses Rust's `i128` feature to achieve roughly double the speed as
 the `u32_backend` feature.  When targetting 32-bit systems, however, you'll
 likely want to compile with
