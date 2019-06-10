@@ -1,11 +1,11 @@
+use bulletproofs::PedersenGens;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, elgamal_encrypt, ElGamalPublicKey};
-use rand::{CryptoRng, Rng};
-use bulletproofs::PedersenGens;
 use crate::errors::ZeiError;
-use crate::proofs::{compute_challenge_ref};
+use rand::{CryptoRng, Rng};
+use super::{compute_challenge_ref};
 /*
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::{Visitor, SeqAccess};
@@ -353,7 +353,7 @@ mod test{
     use serde::ser::Serialize;
     use serde::de::Deserialize;
     use rmp_serde::Deserializer;
-    use crate::proofs::pedersen_elgamal::PedersenElGamalEqProof;
+    use super::PedersenElGamalEqProof;
 
     #[test]
     fn good_proof_verify(){

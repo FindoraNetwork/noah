@@ -1,8 +1,8 @@
 use bulletproofs::{RangeProof};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use crate::proofs::chaum_pedersen::ChaumPedersenProofX;
-use crate::proofs::chaum_pedersen::ChaumPedersenProof;
+use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
+use crate::crypto::chaum_pedersen::ChaumPedersenProof;
 use crate::basic_crypto::signatures::{XfrSignature, XfrPublicKey};
 use serde::Serialize;
 use serde::Deserialize;

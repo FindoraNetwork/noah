@@ -1,8 +1,8 @@
 use bulletproofs::PedersenGens;
 use crate::basic_crypto::signatures::{XfrKeyPair, XfrMultiSig, sign_multisig, verify_multisig};
 use crate::errors::ZeiError;
-use crate::proofs::asset_mixer::{AssetMixProof, asset_mixer_proof, asset_mixer_verify};
 use crate::utils::{u8_bigendian_slice_to_u128};
+use crate::xfr::asset_mixer::{AssetMixProof, asset_mixer_proof, asset_mixer_verify};
 use crate::xfr::asset_record::build_open_asset_record;
 use crate::xfr::proofs::{asset_proof, ConfIdReveal, range_proof, verify_confidential_amount, verify_confidential_asset, verify_issuer_tracking_proof, tracking_proofs,};
 use crate::xfr::structs::*;

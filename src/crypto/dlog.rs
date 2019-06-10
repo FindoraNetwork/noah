@@ -3,7 +3,7 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;
 use rand::Rng;
-use crate::proofs::{compute_sub_challenge, compute_challenge_ref};
+use super::{compute_sub_challenge, compute_challenge_ref};
 use crate::algebra::groups::{Group, Scalar as ZeiScalar};
 
 

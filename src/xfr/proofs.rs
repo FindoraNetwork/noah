@@ -5,8 +5,8 @@ use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, elgamal_
 use crate::crypto::anon_creds::ACRevealSig;
 use crate::crypto::conf_cred_reveal::{AggPoKAttrs, pok_attrs_prove, pok_attrs_verify};
 use crate::errors::ZeiError;
-use crate::proofs::chaum_pedersen::{chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq};
-use crate::proofs::pedersen_elgamal::{pedersen_elgamal_aggregate_eq_proof, PedersenElGamalEqProof, pedersen_elgamal_eq_aggregate_verify_fast};
+use crate::crypto::chaum_pedersen::{chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq};
+use crate::crypto::pedersen_elgamal::{pedersen_elgamal_aggregate_eq_proof, PedersenElGamalEqProof, pedersen_elgamal_eq_aggregate_verify_fast};
 use crate::setup::{MAX_PARTY_NUMBER, BULLET_PROOF_RANGE, PublicParams};
 use crate::xfr::structs::{OpenAssetRecord, XfrBody, IdRevealPolicy, XfrRangeProof, BlindAssetRecord};
 use crate::utils::{u8_bigendian_slice_to_u128, u64_to_u32_pair, min_greater_equal_power_of_two};

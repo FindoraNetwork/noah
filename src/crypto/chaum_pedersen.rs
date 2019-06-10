@@ -1,10 +1,10 @@
 use bulletproofs::PedersenGens;
 use crate::errors::ZeiError;
-use crate::proofs::{compute_sub_challenge, compute_challenge_ref};
 use curve25519_dalek::ristretto::{RistrettoPoint};
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
+use super::{compute_sub_challenge, compute_challenge_ref};
 
 
 /*
