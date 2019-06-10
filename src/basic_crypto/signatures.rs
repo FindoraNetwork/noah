@@ -151,11 +151,11 @@ impl ZeiFromToBytes for XfrKeyPair {
 ///A multisignature is defined as a signature on a message that must verify against a list of public keys instead of one
 // naive implementation below
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct XfrMultiSig{
+pub struct XfrMultiSig{
     pub(crate) signatures: Vec<XfrSignature>,
 }
 
-pub(crate) fn verify_multisig(keylist: &[XfrPublicKey],
+pub fn verify_multisig(keylist: &[XfrPublicKey],
                    message: &[u8],
                    multi_signature: &XfrMultiSig) -> Result<(), ZeiError>
 {
@@ -168,7 +168,7 @@ pub(crate) fn verify_multisig(keylist: &[XfrPublicKey],
     Ok(())
 }
 
-pub(crate) fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
+pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
     let mut signatures = vec![];
     for keypair in keylist.iter(){
         let signature = keypair.sign(message);

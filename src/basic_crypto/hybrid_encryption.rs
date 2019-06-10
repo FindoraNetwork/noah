@@ -18,17 +18,17 @@ pub struct ZeiHybridCipher {
     pub(crate) encoded_rand: CompressedEdwardsY,
 }
 
-/// I encrypt a message under public key. I implement hybrid encryption where a symmetric public
-/// is dereived from the public key, and the message is encrypted under a simmetric key.
+/// I encrypt a message a under public key. I implement hybrid encryption where a symmetric public
+/// is derived from the public key, and the message is encrypted under this symmetric key.
 /// I return ZeiError::DecompressElementError if public key is not well formed.
 pub fn hybrid_encrypt<R: CryptoRng + Rng>(
     prng: &mut R,
-    public_key: &XfrPublicKey,
+    pub_key: &XfrPublicKey,
     message: &[u8]) -> Result<ZeiHybridCipher, ZeiError>
 {
     let (key, encoded_rand) = symmetric_key_from_public_key(
         prng,
-        public_key)?;
+        pub_key)?;
     let (ciphertext, nonce) = symmetric_encrypt(&key, message);
 
     Ok(ZeiHybridCipher {
@@ -41,10 +41,10 @@ pub fn hybrid_encrypt<R: CryptoRng + Rng>(
 /// I decrypt a hybrid ciphertext for a secret key.
 /// In case of success, I return vector of plain text bytes. Otherwise, I return either
 /// ZeiError::DecompressElementError or Zei::DecryptionError
-pub fn hybrid_decrypt(ctext: &ZeiHybridCipher, secret_key: &XfrSecretKey)
+pub fn hybrid_decrypt(ctext: &ZeiHybridCipher, sec_key: &XfrSecretKey)
     -> Result<Vec<u8>, ZeiError>
 {
-    let key = symmetric_key_from_secret_key(secret_key, &ctext.encoded_rand)?;
+    let key = symmetric_key_from_secret_key(sec_key, &ctext.encoded_rand)?;
     Ok(symmetric_decrypt(&key, ctext.ciphertext.as_slice(), &ctext.nonce)?)
 }
 
@@ -71,7 +71,7 @@ fn symmetric_key_from_public_key<R>(
 /// I return the byte array. In case encoded randomness cannot be decoded into a valid group
 /// element, I return ZeiError::DecompressElementError.
 fn symmetric_key_from_secret_key(
-    secret_key: &XfrSecretKey,
+    sec_key: &XfrSecretKey,
     rand: &CompressedEdwardsY) -> Result<[u8;32], ZeiError>
 {
     //let curve_key = secret_key * rand.decompress()?;
@@ -79,7 +79,7 @@ fn symmetric_key_from_secret_key(
         Some(x) => x,
         None => {return Err(ZeiError::DecompressElementError)}
     };
-    let curve_key = secret_key.
+    let curve_key = sec_key.
         as_scalar_multiply_by_curve_point(&decoded_rand);
     let mut hasher = sha2::Sha256::new();
     hasher.input(curve_key.compress().as_bytes());

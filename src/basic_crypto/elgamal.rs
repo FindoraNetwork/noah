@@ -22,10 +22,10 @@ pub fn elgamal_generate_secret_key<R:CryptoRng + Rng, S: Scalar>(prng: &mut R) -
 
 pub fn elgamal_derive_public_key<S: Scalar, G: Group<S>>(
     base: &G,
-    secret_key: &ElGamalSecretKey<S>,
+    sec_key: &ElGamalSecretKey<S>,
 ) -> ElGamalPublicKey<G>
 {
-    ElGamalPublicKey(base.mul(&secret_key.0))
+    ElGamalPublicKey(base.mul(&sec_key.0))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -263,11 +263,11 @@ pub fn elgamal_encrypt<S:Scalar, G:Group<S>>(
     base: &G,
     m: &S,
     r: &S,
-    public_key: &ElGamalPublicKey<G>
+    pub_key: &ElGamalPublicKey<G>
 ) ->ElGamalCiphertext<G>
 {
     let e1 = base.mul(r);
-    let e2 = base.mul(m).add(&(public_key.0).mul(r));
+    let e2 = base.mul(m).add(&(pub_key.0).mul(r));
 
     ElGamalCiphertext::<G>{
         e1,
@@ -280,9 +280,9 @@ pub fn elgamal_verify<S: Scalar, G:Group<S>>(
     base: &G,
     m: &S,
     ctext: &ElGamalCiphertext<G>,
-    secret_key: &ElGamalSecretKey<S>,
+    sec_key: &ElGamalSecretKey<S>,
 ) -> Result<(), ZeiError>{
-    match  base.mul(m).add(&ctext.e1.mul(&secret_key.0)) == ctext.e2 {
+    match  base.mul(m).add(&ctext.e1.mul(&sec_key.0)) == ctext.e2 {
         true => Ok(()),
         false => Err(ZeiError::ElGamalVerificationError)
     }
@@ -293,10 +293,10 @@ pub fn elgamal_verify<S: Scalar, G:Group<S>>(
 pub fn elgamal_decrypt<S:Scalar, G:Group<S>>(
     base: &G,
     ctext: &ElGamalCiphertext<G>,
-    secret_key: &ElGamalSecretKey<S>,
+    sec_key: &ElGamalSecretKey<S>,
     ) -> Result<S, ZeiError>
 {
-    elgamal_decrypt_hinted::<S,G>(base, ctext, secret_key, 0, u32::max_value())
+    elgamal_decrypt_hinted::<S,G>(base, ctext, sec_key, 0, u32::max_value())
 }
 
 /// I decrypt en el gamal ciphertext via brute force in the range [lower_bound..upper_bound]
@@ -304,12 +304,12 @@ pub fn elgamal_decrypt<S:Scalar, G:Group<S>>(
 pub fn elgamal_decrypt_hinted<S: Scalar, G: Group<S>>(
     base: &G,
     ctext: &ElGamalCiphertext<G>,
-    secret_key: &ElGamalSecretKey<S>,
+    sec_key: &ElGamalSecretKey<S>,
     lower_bound: u32,
     upper_bound: u32,
 ) -> Result<S, ZeiError>
 {
-    let encoded = &ctext.e2.sub(&ctext.e1.mul(&secret_key.0));
+    let encoded = &ctext.e2.sub(&ctext.e1.mul(&sec_key.0));
 
     brute_force::<S,G>(base, &encoded, lower_bound, upper_bound)
 }
