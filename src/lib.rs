@@ -1,6 +1,6 @@
 //! Zei: Eian's cryptographic library
 //#![feature(try_from)]
-#![feature(try_trait)]
+//#![feature(try_trait)]
 //#![feature(custom_attribute)]
 
 extern crate bulletproofs;
