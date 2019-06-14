@@ -26,7 +26,7 @@ pub(crate) fn merkle_verify_mimc<CS: ConstraintSystem>(
 
 #[cfg(test)]
 mod test{
-    use crate::crypto::accumulators::merkle_tree::{mt_build, mt_prove};
+    use crate::crypto::accumulators::merkle_tree::{mt_build, mt_prove, MiMCHash};
     use curve25519_dalek::scalar::Scalar;
     use bulletproofs_yoloproof::{PedersenGens, BulletproofGens};
     use bulletproofs_yoloproof::r1cs::{Prover, Variable, Verifier};
@@ -51,7 +51,7 @@ mod test{
             Scalar::from(7u8),
             Scalar::from(8u8),
         ];
-        let merkle_tree = mt_build(&elements).unwrap();
+        let merkle_tree = mt_build::<Scalar, MiMCHash>(&elements).unwrap();
         let (elem, path) = mt_prove(&merkle_tree, 3);
 
         let mut prover_transcript = Transcript::new(b"MerkleTreePath");

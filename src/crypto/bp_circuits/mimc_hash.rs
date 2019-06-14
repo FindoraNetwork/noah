@@ -3,7 +3,7 @@
 
 use bulletproofs_yoloproof::r1cs::*;
 use curve25519_dalek::scalar::Scalar;
-use crate::crypto::accumulators::merkle_tree::compute_mimc_constants;
+use crate::crypto::accumulators::merkle_tree::{compute_mimc_constants, MiMCHash, MTHash};
 
 
 pub(crate) fn mimc_func<CS: ConstraintSystem>(cs: &mut CS, x: LinearCombination, c: Scalar) -> Result<Variable, R1CSError>
@@ -61,6 +61,7 @@ mod test{
     use bulletproofs_yoloproof::{PedersenGens, BulletproofGens};
     use bulletproofs_yoloproof::r1cs::Verifier;
     use curve25519_dalek::scalar::Scalar;
+    use crate::crypto::accumulators::merkle_tree::MiMCHash;
 
     #[test]
     fn test_mimc_fn() {
@@ -146,7 +147,8 @@ mod test{
         let scalar_y = Scalar::from(20u8);
         let (cx, x) = prover.commit(scalar_x, Scalar::from(10u8));
         let (cy, y) = prover.commit(scalar_y, Scalar::from(11u8));
-        let real_hash = crate::crypto::accumulators::merkle_tree::mimc_hash(1,&scalar_x, &scalar_y);
+        let hasher = MiMCHash::new(1);
+        let real_hash = hasher.digest(&scalar_x, &scalar_y);
         let (ch, h) = prover.commit(real_hash, Scalar::from(12u8));
         super::hash_proof(&mut prover, x, y, h).unwrap();
 
