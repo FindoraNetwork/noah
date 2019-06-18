@@ -1,3 +1,3 @@
-mod mimc_hash;
-mod merkle_path;
-mod linear_set_inclusion;
+pub mod mimc_hash;
+pub mod merkle_path;
+pub mod linear_set_inclusion;

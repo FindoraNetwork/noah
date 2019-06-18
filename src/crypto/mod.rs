@@ -5,7 +5,7 @@ pub mod conf_cred_reveal;
 pub mod pedersen_elgamal;
 pub mod solvency;
 pub mod accumulators;
-mod bp_circuits;
+pub mod bp_circuits;
 
 use crate::utils::u32_to_bigendian_u8array;
 use sha2::Digest;

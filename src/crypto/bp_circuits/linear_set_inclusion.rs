@@ -1,6 +1,6 @@
 use bulletproofs_yoloproof::r1cs::{Variable, ConstraintSystem};
 
-pub(crate) fn membership<CS: ConstraintSystem>(
+pub fn membership<CS: ConstraintSystem>(
     cs: &mut CS,
     set: &[Variable], elem: Variable)
 {
