@@ -8,7 +8,7 @@ use spacesuit::{AllocatedValue, Value, cloak, CommittedValue, VerifierCommittabl
 
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetMixProof(pub(crate) R1CSProof);
 
 

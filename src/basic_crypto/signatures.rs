@@ -29,7 +29,7 @@ pub struct XfrKeyPair {
 }
 
 type HashFnc = sha2::Sha512;
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct XfrSignature(pub Signature);
 
 
@@ -150,7 +150,7 @@ impl ZeiFromToBytes for XfrKeyPair {
 ////Primitive for multisignatures /////
 ///A multisignature is defined as a signature on a message that must verify against a list of public keys instead of one
 // naive implementation below
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct XfrMultiSig{
     pub(crate) signatures: Vec<XfrSignature>,
 }

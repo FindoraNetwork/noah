@@ -30,7 +30,7 @@ use super::{compute_sub_challenge, compute_challenge_ref};
    (Current implementation uses equality proof above with (D,  Commit(0, 0)) commitment pair)
  */
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
     /// I represent a Chaum-Perdersen equality of commitment proof
     //#[serde(with = "serialization::zei_obj_serde")]
@@ -45,7 +45,7 @@ pub struct ChaumPedersenProof {
     pub(crate) z3: Scalar,
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProofX {
     /// I represent a Chaum-Perdersen equality of commitment proof
     pub(crate) c1_eq_c2: ChaumPedersenProof,
