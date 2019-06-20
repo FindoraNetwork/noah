@@ -18,7 +18,7 @@ use curve25519_dalek::ristretto::{RistrettoPoint, CompressedRistretto};
 pub type AssetType = [u8; 16];
 
 /// I represent a transfer note
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct XfrNote {
     pub(crate) body: XfrBody,
     pub(crate) multisig: XfrMultiSig,
@@ -31,7 +31,7 @@ impl XfrNote {
 }
 
 /// I am the body of a transfer note
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct XfrBody {
     pub(crate) inputs: Vec<BlindAssetRecord>,
     pub(crate) outputs: Vec<BlindAssetRecord>,
@@ -114,7 +114,7 @@ impl AssetRecord {
 }
 
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum AssetAmountProof{
     AssetMix(AssetMixProof), // multi-type fully confidential Xfr
     ConfAmount(XfrRangeProof), // single-type and public, confidental amount
@@ -124,13 +124,13 @@ pub enum AssetAmountProof{
 }
 
 /// I contain the proofs of a transfer note
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct XfrProofs {
     pub(crate) asset_amount_proof: AssetAmountProof,
     pub(crate) asset_tracking_proof: AssetTrackingProofs,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct XfrRangeProof {
     pub range_proof: RangeProof,
     pub xfr_diff_commitment_low: CompressedRistretto, //lower 32 bits transfer amount difference commitment
