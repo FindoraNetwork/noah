@@ -9,7 +9,7 @@ use crate::crypto::accumulators::merkle_tree::{compute_mimc_constants};
 pub(crate) fn mimc_func<CS: ConstraintSystem>(cs: &mut CS, x: LinearCombination, c: Scalar) -> Result<Variable, R1CSError>
 {
     let c_var = cs.allocate(Some(c))?;
-    let x_plus_c = x + c_var;
+    let x_plus_c = x + c;
     let (left,_,out) = cs.multiply(x_plus_c.clone(), x_plus_c);
     let (_,_,out) = cs.multiply(out.into(), out.into());
     let (_,_,out) = cs.multiply(out.into(), left.into());
@@ -85,8 +85,6 @@ mod test{
         let expected_output = crate::crypto::accumulators::merkle_tree::mimc_f(&scalar_x, &scalar_c);
         let expected = prover.allocate(Some(expected_output)).unwrap();
 
-        println!("{:?}", expected_output);
-
         prover.constrain(out - expected);
 
         let proof = prover.prove(&bp_gens).unwrap();
@@ -116,7 +114,6 @@ mod test{
         let scalar_y = Scalar::from(0u8);
         let scalar_c = [Scalar::from(0u8), Scalar::from(8u8),Scalar::from(0u8)];
         let (expected_output_x,expected_output_y) = crate::crypto::accumulators::merkle_tree::mimc_feistel(&scalar_x, &scalar_y, &scalar_c);
-        println!("{:?}", expected_output_x);
 
         let (cx, x) = prover.commit(scalar_x, Scalar::from(10u8));
         let (cy, y) = prover.commit(scalar_y, Scalar::from(11u8));

@@ -6,6 +6,7 @@ pub mod pedersen_elgamal;
 pub mod solvency;
 pub mod accumulators;
 pub mod bp_circuits;
+pub mod whitelist;
 
 use crate::utils::u32_to_bigendian_u8array;
 use sha2::Digest;

@@ -30,13 +30,22 @@ pub struct MerkleRoot<S>{
     pub size: usize,
 }
 
+impl<S: Copy> MerkleTree<S>{
+    pub fn get_root(&self) -> MerkleRoot<S>{
+        MerkleRoot{
+            value: self.root.value,
+            size: self.size,
+        }
+    }
+}
+
 pub trait MTHash<S>{
     fn new(level: usize) -> Self;
     fn digest(&self, values: &[&S]) -> S;
     fn digest_root(&self, size: usize, values: &[&S]) -> S;
 }
 
-pub fn mt_build<S,H>(elements: &[S]) -> Result<(MerkleTree<S>, MerkleRoot<S>), ZeiError>
+pub fn mt_build<S,H>(elements: &[S]) -> Result<MerkleTree<S>, ZeiError>
     where S: Copy + PartialEq + Eq + Debug, H: MTHash<S>
 {
     if ! is_power_two(elements.len()){
@@ -47,21 +56,20 @@ pub fn mt_build<S,H>(elements: &[S]) -> Result<(MerkleTree<S>, MerkleRoot<S>), Z
         root: create_merkle_node::<S,H>(elements, 0),
         size: elements.len()
     };
-    let root = MerkleRoot{
-        value: tree.root.value,
-        size:  tree.size,
-    };
-    Ok((tree, root))
+    Ok(tree)
 }
 
 
-pub fn mt_prove<S>(tree: &MerkleTree<S>, index: usize) -> (S, Vec<(PathDirection, S)>)
+pub fn mt_prove<S>(tree: &MerkleTree<S>, index: usize) -> Result<(S, Vec<(PathDirection, S)>), ZeiError>
     where S: Copy + PartialEq + Eq + Debug
 {
-    prove_node::<S>(&tree.root, index, tree.size)
+    if index >= tree.size{
+        return Err(ZeiError::ParameterError);
+    }
+    Ok(prove_node::<S>(&tree.root, index, tree.size))
 }
 
-pub fn mt_verify<S, H>(root: &MerkleRoot<S>, element: &S, path: &[(PathDirection, S)]) -> bool
+pub fn mt_verify<S, H>(root: &MerkleRoot<S>, element: &S, path: &[(PathDirection, S)]) -> Result<(), ZeiError>
     where S: Copy  + PartialEq + Eq, H: MTHash<S>
 {
     let mut prev = *element;
@@ -81,7 +89,10 @@ pub fn mt_verify<S, H>(root: &MerkleRoot<S>, element: &S, path: &[(PathDirection
         PathDirection::LEFT => hasher.digest_root(root.size, &[&prev, sibling]),
     };
 
-    computed_root == root.value
+    match computed_root == root.value {
+        true => Ok(()),
+        false => Err(ZeiError::MerkleTreeVerificationError)
+    }
 }
 
 fn create_merkle_node<S: Copy + Debug, H: MTHash<S>>(elements: &[S], level: usize) -> MerkleNode<S>{
@@ -119,7 +130,7 @@ fn prove_node<S: Copy + PartialEq + Eq + Debug>(node: &MerkleNode<S>, index: usi
         v.push((PathDirection::LEFT, node.right.as_ref().unwrap().value));
         return (elem, v);
     }
-    let (elem, mut v) = prove_node(node.right.as_ref().unwrap().as_ref() , index/2, size/2);
+    let (elem, mut v) = prove_node(node.right.as_ref().unwrap().as_ref() , index - size/2, size/2);
     v.push((PathDirection::RIGHT, node.left.as_ref().unwrap().value));
     (elem, v)
 }
@@ -202,19 +213,21 @@ mod test{
         for i in 0..size{
             elements.push(Scalar::from(i as u64));
         }
-        let (merkle_tree, mut merkle_root) = mt_build::<Scalar, MiMCHash>(&elements[..]).unwrap();
+        let merkle_tree = mt_build::<Scalar, MiMCHash>(&elements[..]).unwrap();
+
+        let mut merkle_root =merkle_tree.get_root();
 
         for i in 0..size{
-            let (e, path) = mt_prove::<Scalar>(&merkle_tree, i);
+            let (e, path) = mt_prove::<Scalar>(&merkle_tree, i).unwrap();
             let b = mt_verify::<Scalar, MiMCHash>(&merkle_root, &e, &path[..]);
-            assert_eq!(true,b);
+            assert_eq!(true,b.is_ok());
 
             let b = mt_verify::<Scalar, MiMCHash>(&merkle_root, &(e+Scalar::from(1u8)), &path[..]);
-            assert_eq!(false,b);
+            assert_eq!(false,b.is_ok());
 
             merkle_root.size = size * 2;
             let b = mt_verify::<Scalar, MiMCHash>(&merkle_root, &e, &path[..]);
-            assert_eq!(false,b);
+            assert_eq!(false,b.is_ok());
 
             merkle_root.size = size;
         }

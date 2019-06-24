@@ -25,6 +25,9 @@ pub enum ZeiError {
     IdentityRevealVerifyError,
     AssetMixerVerificationError,
     XfrNotSupported,
+    MerkleTreeVerificationError,
+    WhitelistVerificationError,
+    WhitelistProofError,
 }
 
 impl fmt::Display for ZeiError {
@@ -52,6 +55,9 @@ impl fmt::Display for ZeiError {
             ZeiError::IdentityRevealVerifyError => "Verification error for confidential identity reveal proof",
             ZeiError::AssetMixerVerificationError => "Verification error for asset mixing proof",
             ZeiError::XfrNotSupported => "Transaction type not supported",
+            ZeiError::MerkleTreeVerificationError => "Invalid proof for merkle tree inclusion",
+            ZeiError::WhitelistVerificationError => "Invalid proof for whitelist inclusion",
+            ZeiError::WhitelistProofError => "Cannot build proof for whitelist",
         })
     }
 }
@@ -81,6 +87,9 @@ impl error::Error for ZeiError {
             ZeiError::IdentityRevealVerifyError => "Verification error for confidential identity reveal proof",
             ZeiError::AssetMixerVerificationError => "Verification error for asset mixing proof",
             ZeiError::XfrNotSupported => "Transaction type not supported",
+            ZeiError::MerkleTreeVerificationError => "Invalid proof for merkle tree inclusion",
+            ZeiError::WhitelistVerificationError => "Invalid proof for whitelist inclusion",
+            ZeiError::WhitelistProofError => "Cannot build proof for whitelist",
         }
     }
 }
