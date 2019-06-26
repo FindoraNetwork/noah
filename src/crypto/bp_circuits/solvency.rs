@@ -22,8 +22,10 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     assets_vars: &[(Variable, Variable)],
     assets_values: Option<&[(Scalar, Scalar)]>,
+    public_asset_sum: Scalar,
     lia_vars: &[(Variable, Variable)],
     lia_values: Option<&[(Scalar, Scalar)]>,
+    public_liability_sum: Scalar,
     rates_table: &HashMap<[u8;32], Scalar>,
 )-> Result<(), R1CSError>
 {
@@ -34,8 +36,11 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
         rate_values.push(*v);
     }
 
-    let total_assets_var = aggregate(cs, assets_vars, assets_values, &rate_types[..], &rate_values[..])?;
-    let total_lia_var = aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?;
+    let mut total_assets_var: LinearCombination = aggregate(cs, assets_vars, assets_values, &rate_types[..], &rate_values[..])?;
+    let mut total_lia_var: LinearCombination = aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?;
+
+    total_assets_var = total_assets_var + public_asset_sum;
+    total_lia_var = total_lia_var + public_liability_sum;
 
     let diff_var = total_assets_var - total_lia_var;
     let diff_value = match assets_values {
@@ -43,12 +48,12 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
             let converted_asset: Vec<Scalar> = values.iter().map(|(a,t)|{
                 a * rates_table.get(t.as_bytes()).unwrap()
             }).collect();
-            let total_asset = converted_asset.iter().sum::<Scalar>();
+            let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
 
             let converted_lia: Vec<Scalar> = lia_values.unwrap().iter().map(|(a,t)|{
                 a * rates_table.get(t.as_bytes()).unwrap()
             }).collect();
-            let total_lia = converted_lia.iter().sum::<Scalar>();
+            let total_lia = converted_lia.iter().sum::<Scalar>() + public_liability_sum;
             Some(total_asset - total_lia)
         },
         None => None
@@ -320,7 +325,15 @@ mod test{
         let lia_com: Vec<(CompressedRistretto, CompressedRistretto)> = lia_com_vars.iter().map(|(a,t,_,_)| (*a,*t)).collect();
         let lia_var: Vec<(Variable, Variable)> = lia_com_vars.iter().map(|(_,_,a,t)| (*a,*t)).collect();
         println!("doing solvency prover");
-        super::solvency(&mut prover,&asset_var[..],Some(&assets),&lia_var[..], Some(&liabilities), &rates).unwrap();
+        super::solvency(
+            &mut prover,
+            &asset_var[..],
+            Some(&assets),
+            Scalar::zero(),
+            &lia_var[..],
+            Some(&liabilities),
+            Scalar::zero(),
+            &rates).unwrap();
         let proof = prover.prove(&bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
@@ -337,7 +350,15 @@ mod test{
             }).collect();
 
         println!("doing solvency verifier");
-        super::solvency(&mut verifier,&asset_var[..],None,&lia_var[..], None, &rates).unwrap();
+        super::solvency(
+            &mut verifier,
+            &asset_var[..],
+            None,
+            Scalar::zero(),
+            &lia_var[..],
+            None,
+            Scalar::zero(),
+            &rates).unwrap();
         assert!(verifier.verify(&proof, &pc_gens,&bp_gens).is_ok());
     }
 }
