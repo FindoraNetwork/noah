@@ -27,7 +27,9 @@ pub enum ZeiError {
     XfrNotSupported,
     MerkleTreeVerificationError,
     WhitelistVerificationError,
-    WhitelistProofError,
+    WhitelistProveError,
+    SolvencyProveError,
+    SolvencyVerificationError,
 }
 
 impl fmt::Display for ZeiError {
@@ -57,7 +59,9 @@ impl fmt::Display for ZeiError {
             ZeiError::XfrNotSupported => "Transaction type not supported",
             ZeiError::MerkleTreeVerificationError => "Invalid proof for merkle tree inclusion",
             ZeiError::WhitelistVerificationError => "Invalid proof for whitelist inclusion",
-            ZeiError::WhitelistProofError => "Cannot build proof for whitelist",
+            ZeiError::WhitelistProveError => "Cannot build proof for whitelist",
+            ZeiError::SolvencyVerificationError => "Invalid proof for solvency",
+            ZeiError::SolvencyProveError => "Cannot build proof of solvency",
         })
     }
 }
@@ -89,7 +93,9 @@ impl error::Error for ZeiError {
             ZeiError::XfrNotSupported => "Transaction type not supported",
             ZeiError::MerkleTreeVerificationError => "Invalid proof for merkle tree inclusion",
             ZeiError::WhitelistVerificationError => "Invalid proof for whitelist inclusion",
-            ZeiError::WhitelistProofError => "Cannot build proof for whitelist",
+            ZeiError::WhitelistProveError => "Cannot build proof for whitelist",
+            ZeiError::SolvencyVerificationError => "Invalid proof for solvency",
+            ZeiError::SolvencyProveError => "Cannot build proof of solvency",
         }
     }
 }

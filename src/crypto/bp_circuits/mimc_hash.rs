@@ -8,7 +8,6 @@ use crate::crypto::accumulators::merkle_tree::{compute_mimc_constants};
 
 pub(crate) fn mimc_func<CS: ConstraintSystem>(cs: &mut CS, x: LinearCombination, c: Scalar) -> Result<Variable, R1CSError>
 {
-    let c_var = cs.allocate(Some(c))?;
     let x_plus_c = x + c;
     let (left,_,out) = cs.multiply(x_plus_c.clone(), x_plus_c);
     let (_,_,out) = cs.multiply(out.into(), out.into());

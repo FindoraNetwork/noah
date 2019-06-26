@@ -54,7 +54,7 @@ pub fn prove_mt_membership<R: CryptoRng + Rng>(
         witness_commitments.push(sibling_com);
     }
     merkle_verify_mimc(&mut prover, var_elem, &var_path[..], mt.root.value, Scalar::from(mt.size as u64)).unwrap();
-    let proof = prover.prove(&bp_gens).map_err(|_| ZeiError::WhitelistProofError)?;
+    let proof = prover.prove(&bp_gens).map_err(|_| ZeiError::WhitelistProveError)?;
 
     Ok(WhitelistProof{
         witness_commitments,
@@ -75,7 +75,7 @@ pub fn prove_array_membership(
     let (com_elem, var_elem) = prover.commit(elements[index], *blind);
     assert!(com_elem == *elem);
     array_membership(&mut prover, &elements[..], var_elem);
-    let proof = prover.prove(&bp_gens).map_err(|_| ZeiError::WhitelistProofError)?;
+    let proof = prover.prove(&bp_gens).map_err(|_| ZeiError::WhitelistProveError)?;
 
     Ok(WhitelistProof{
         witness_commitments: vec![],
