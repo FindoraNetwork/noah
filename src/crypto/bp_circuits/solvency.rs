@@ -36,8 +36,17 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
         rate_values.push(*v);
     }
 
-    let mut total_assets_var: LinearCombination = aggregate(cs, assets_vars, assets_values, &rate_types[..], &rate_values[..])?;
-    let mut total_lia_var: LinearCombination = aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?;
+    let mut total_assets_var = match assets_vars.len(){
+        0 => LinearCombination::default(),
+        _ => aggregate(cs, assets_vars, assets_values, &rate_types[..], &rate_values[..])?
+    };
+    let mut total_lia_var = match lia_vars.len(){
+        0 => LinearCombination::default(),
+        _ => aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?
+    };
+
+    //let mut total_assets_var: LinearCombination = aggregate(cs, assets_vars, assets_values, &rate_types[..], &rate_values[..])?;
+    //let mut total_lia_var: LinearCombination = aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?;
 
     total_assets_var = total_assets_var + public_asset_sum;
     total_lia_var = total_lia_var + public_liability_sum;
@@ -58,9 +67,8 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
         },
         None => None
     };
-    super::gadgets::range_proof(cs, diff_var, diff_value)?;
 
-    Ok(())
+    super::gadgets::range_proof(cs, diff_var, diff_value)
 }
 
 /// I aggregate a list of values using a rate conversion version table.
@@ -131,6 +139,9 @@ fn sort(values: &[(Scalar, Scalar)], type_list: &[Scalar]) -> Vec<(Scalar, Scala
 fn add(list: &[(Scalar, Scalar)]) -> (Vec<(Scalar, Scalar)>, Vec<(Scalar, Scalar)>)
 {
     let l = list.len();
+    if l == 0{
+        return (vec![], vec![]);
+    }
     let mut agg_values = Vec::with_capacity(l);
     let mut mid_values: Vec<(Scalar, Scalar)> = Vec::with_capacity(l-1);
     let mut in1 = (list[0].0, list[0].1);
@@ -324,7 +335,7 @@ mod test{
         }).collect();
         let lia_com: Vec<(CompressedRistretto, CompressedRistretto)> = lia_com_vars.iter().map(|(a,t,_,_)| (*a,*t)).collect();
         let lia_var: Vec<(Variable, Variable)> = lia_com_vars.iter().map(|(_,_,a,t)| (*a,*t)).collect();
-        println!("doing solvency prover");
+
         super::solvency(
             &mut prover,
             &asset_var[..],
@@ -349,7 +360,6 @@ mod test{
                 (verifier.commit(*a), verifier.commit(*t))
             }).collect();
 
-        println!("doing solvency verifier");
         super::solvency(
             &mut verifier,
             &asset_var[..],
