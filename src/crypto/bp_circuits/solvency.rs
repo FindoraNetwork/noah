@@ -10,14 +10,13 @@
 
 use bulletproofs_yoloproof::r1cs::{RandomizableConstraintSystem, Variable, R1CSError, LinearCombination};
 use curve25519_dalek::scalar::Scalar;
-use std::collections::HashMap;
+use linear_map::LinearMap;
 
 /// I implement a proof of solvency bulletproof protocol
 /// The prover needs to provide asset and liabilities plaintain
 /// Input values are represented as a pair where the first coordinate
 /// corresponds to amount, and second coordinate to the type
-/// The rate table is hash map of Scalar to Scalar. The keys are
-/// represenested as 32 byte array representation of the scalar
+/// The rate table is hash map of Scalar to Scalar.
 pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     assets_vars: &[(Variable, Variable)],
@@ -26,13 +25,13 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
     lia_vars: &[(Variable, Variable)],
     lia_values: Option<&[(Scalar, Scalar)]>,
     public_liability_sum: Scalar,
-    rates_table: &HashMap<[u8;32], Scalar>,
+    rates_table: &LinearMap<Scalar, Scalar>,
 )-> Result<(), R1CSError>
 {
     let mut rate_types = vec![];
     let mut rate_values = vec![];
     for (k,v) in rates_table{
-        rate_types.push(Scalar::from_bits(*k));
+        rate_types.push(*k);
         rate_values.push(*v);
     }
 
@@ -45,24 +44,24 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
         _ => aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?
     };
 
-    //let mut total_assets_var: LinearCombination = aggregate(cs, assets_vars, assets_values, &rate_types[..], &rate_values[..])?;
-    //let mut total_lia_var: LinearCombination = aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?;
-
     total_assets_var = total_assets_var + public_asset_sum;
     total_lia_var = total_lia_var + public_liability_sum;
 
     let diff_var = total_assets_var - total_lia_var;
     let diff_value = match assets_values {
         Some(values) => {
+
             let converted_asset: Vec<Scalar> = values.iter().map(|(a,t)|{
-                a * rates_table.get(t.as_bytes()).unwrap()
+                a * rates_table.get(t).unwrap()
             }).collect();
+
             let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
 
             let converted_lia: Vec<Scalar> = lia_values.unwrap().iter().map(|(a,t)|{
-                a * rates_table.get(t.as_bytes()).unwrap()
+                a * rates_table.get(t).unwrap()
             }).collect();
             let total_lia = converted_lia.iter().sum::<Scalar>() + public_liability_sum;
+
             Some(total_asset - total_lia)
         },
         None => None
@@ -90,6 +89,7 @@ fn aggregate<CS: RandomizableConstraintSystem>(
             let sorted_values = sort(values, &rate_types[..]);
             let (mid_values, added_values) = add(&sorted_values[..]);
             let trimmed_values = trim(&added_values[..]);
+
             (allocate_vector(cs, &sorted_values),
             allocate_vector(cs, &mid_values),
             allocate_vector(cs, &added_values),
@@ -107,8 +107,11 @@ fn aggregate<CS: RandomizableConstraintSystem>(
     let mut total = LinearCombination::default();
     for i in 0..rate_values.len(){
         let value = trimmed_vars[i].0;
+        let value_type = trimmed_vars[i].1;
         let rate = rate_values[i];
+        let rate_type = rate_types[i];
         let (_,_, out) = cs.multiply(value.into(), rate.into());
+        cs.constrain(value_type - rate_type);
         total = total + out;
     }
     // prove addition of same flavor
@@ -202,9 +205,9 @@ mod test{
     use bulletproofs_yoloproof::r1cs::{Variable, Prover, Verifier};
     use bulletproofs_yoloproof::{BulletproofGens,PedersenGens};
     use curve25519_dalek::scalar::Scalar;
+    use linear_map::LinearMap;
     use merlin::Transcript;
     use curve25519_dalek::ristretto::CompressedRistretto;
-    use std::collections::HashMap;
 
     #[test]
     fn sort(){
@@ -294,10 +297,10 @@ mod test{
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(1000, 1);
 
-        let mut rates = HashMap::new();
-        rates.insert(Scalar::from(1u8).to_bytes(), Scalar::from(1u8));
-        rates.insert(Scalar::from(2u8).to_bytes(), Scalar::from(2u8));
-        rates.insert(Scalar::from(3u8).to_bytes(), Scalar::from(3u8));
+        let mut rates = LinearMap::new();
+        rates.insert(Scalar::from(1u8), Scalar::from(1u8));
+        rates.insert(Scalar::from(2u8), Scalar::from(2u8));
+        rates.insert(Scalar::from(3u8), Scalar::from(3u8));
         let assets = [
             (Scalar::from(10u8), Scalar::from(1u8)), //total 10
             (Scalar::from(10u8), Scalar::from(2u8)), //total 20

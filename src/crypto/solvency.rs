@@ -2,10 +2,11 @@ use bulletproofs_yoloproof::r1cs::{R1CSProof, Prover, Verifier, Variable};
 use bulletproofs_yoloproof::{PedersenGens, BulletproofGens};
 use crate::crypto::bp_circuits;
 use crate::errors::ZeiError;
-use curve25519_dalek::scalar::Scalar;
-use merlin::Transcript;
-use std::collections::HashMap;
 use curve25519_dalek::ristretto::CompressedRistretto;
+use curve25519_dalek::scalar::Scalar;
+use linear_map::LinearMap;
+use merlin::Transcript;
+
 
 
 /// I produce a proof of solvency for a set of assets vs liabilities for potentially different
@@ -14,10 +15,13 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 /// Values can be hidden or public to the verifier. For hidden values, prover needs to provide
 /// blinding factors for the corresponding commitments.
 /// Asset type cannot be `Scalar::zero()`
+/// If padding is set to true, the hidden liabilities and assets sets are padded with M zero
+/// amount values, one for each asset in the rates_tables keys. This option, does not leaks
+/// the number of asset types that are not present in the liabilities/assets sets.
+/// If padding is false, the proof then leaks the number of asset types that are part of the
+/// liability/asset sets.
 /// Returns proof in case of success and ZeiError::SolvencyProveError in case proof cannot be
 /// computed.
-/// The rate table has keys of type [u8;32] corresponding to the bytes value of the scalar representing
-/// the asset type.
 pub fn prove_solvency(
 	hidden_assets: &[(Scalar, Scalar)], // amount and type of hidden assets
 	assets_blinds: &[(Scalar, Scalar)], // blindings for amount and type of hidden assets
@@ -25,7 +29,8 @@ pub fn prove_solvency(
 	hidden_liabilities: &[(Scalar, Scalar)], // amount and type of hidden liabilities
 	liabilities_blinds: &[(Scalar, Scalar)], // blindings for amount and type in hidden liabilities
 	public_liabilities: &[(Scalar, Scalar)], // amount and type of public/known assets
-	rates_table: &HashMap<[u8;32], Scalar>, // exchange rates for asset types
+	rates_table: &LinearMap<Scalar, Scalar>, // exchange rates for asset types
+	full_padding: bool,
 ) -> Result<R1CSProof, ZeiError>
 {
 	let pc_gens = PedersenGens::default();
@@ -53,14 +58,14 @@ pub fn prove_solvency(
 	// compute public asset total
 	let mut public_asset_sum = Scalar::zero();
 	for (amount, asset_type) in public_assets{
-		let rate = rates_table.get(asset_type.as_bytes()).ok_or(ZeiError::SolvencyProveError)?;
+		let rate = rates_table.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
 		public_asset_sum = public_asset_sum + rate * amount;
 	}
 
 	// compute public liabilities total
 	let mut public_liability_sum = Scalar::zero();
 	for (amount, asset_type) in public_liabilities{
-		let rate = rates_table.get(asset_type.as_bytes()).ok_or(ZeiError::SolvencyProveError)?;
+		let rate = rates_table.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
 		public_liability_sum = public_liability_sum + rate * amount;
 	}
 
@@ -92,7 +97,7 @@ pub fn verify_solvency(
 	public_assets: &[(Scalar, Scalar)],
 	hidden_liabilities: &[(CompressedRistretto, CompressedRistretto)], //commitments to liabilities
 	public_liabilities: &[(Scalar, Scalar)],
-	rates_table: &HashMap<[u8;32], Scalar>, // exchange rate for asset types
+	rates_table: &LinearMap<Scalar, Scalar>, // exchange rate for asset types
 	proof: &R1CSProof
 ) -> Result<(), ZeiError>{
 	let pc_gens = PedersenGens::default();
@@ -114,13 +119,13 @@ pub fn verify_solvency(
 
 	let mut public_asset_sum = Scalar::zero();
 	for (amount, asset_type) in public_assets{
-		let rate = rates_table.get(asset_type.as_bytes()).ok_or(ZeiError::SolvencyProveError)?;
+		let rate = rates_table.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
 		public_asset_sum = public_asset_sum + rate * amount;
 	}
 
 	let mut public_liability_sum = Scalar::zero();
 	for (amount, asset_type) in public_liabilities{
-		let rate = rates_table.get(asset_type.as_bytes()).ok_or(ZeiError::SolvencyProveError)?;
+		let rate = rates_table.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
 		public_liability_sum = public_liability_sum + rate * amount;
 	}
 
@@ -140,18 +145,18 @@ pub fn verify_solvency(
 
 #[cfg(test)]
 mod test {
-	use std::collections::HashMap;
 	use curve25519_dalek::scalar::Scalar;
 	use bulletproofs_yoloproof::PedersenGens;
 	use rand_chacha::ChaChaRng;
 	use rand::SeedableRng;
+	use linear_map::LinearMap;
 
 	fn do_test_solvency(
 		hidden_assets: &[(Scalar, Scalar)],
 		public_assets: &[(Scalar, Scalar)],
 		hidden_liabilities: &[(Scalar, Scalar)],
 		public_liabilities: &[(Scalar, Scalar)],
-		rates: &HashMap<[u8; 32], Scalar>,
+		rates: &LinearMap<Scalar, Scalar>,
 		pass: bool,
 	) {
 		let pc_gens = PedersenGens::default();
@@ -173,7 +178,8 @@ mod test {
 			hidden_liabilities,
 			liabilities_blinds.as_slice(),
 			public_liabilities,
-			&rates
+			&rates,
+			false
 		).unwrap();
 
 		let mut hidden_assets_coms = vec![];
@@ -203,10 +209,10 @@ mod test {
 	}
 
 	fn create_values_and_do_test(hidden_asset: bool, hidden_lia: bool, pass: bool) {
-		let mut rates = HashMap::new();
-		rates.insert(Scalar::from(1u8).to_bytes(), Scalar::from(1u8));
-		rates.insert(Scalar::from(2u8).to_bytes(), Scalar::from(2u8));
-		rates.insert(Scalar::from(3u8).to_bytes(), Scalar::from(3u8));
+		let mut rates = LinearMap::new();
+		rates.insert(Scalar::from(1u8), Scalar::from(1u8));
+		rates.insert(Scalar::from(2u8), Scalar::from(2u8));
+		rates.insert(Scalar::from(3u8), Scalar::from(3u8));
 
 		let smaller = [
 			(Scalar::from(10u8), Scalar::from(1u8)), // 10
@@ -279,10 +285,10 @@ mod test {
 
 	#[test]
 	fn test_solvency_mixed(){
-		let mut rates = HashMap::new();
-		rates.insert(Scalar::from(1u8).to_bytes(), Scalar::from(1u8));
-		rates.insert(Scalar::from(2u8).to_bytes(), Scalar::from(2u8));
-		rates.insert(Scalar::from(3u8).to_bytes(), Scalar::from(3u8));
+		let mut rates = LinearMap::new();
+		rates.insert(Scalar::from(1u8), Scalar::from(1u8));
+		rates.insert(Scalar::from(2u8), Scalar::from(2u8));
+		rates.insert(Scalar::from(3u8), Scalar::from(3u8));
 
 		let lia_hidden = [
 			(Scalar::from(40u8), Scalar::from(1u8)), // 40
