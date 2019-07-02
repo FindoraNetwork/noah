@@ -5,15 +5,17 @@ use std::iter;
 
 /// I implement the mix gadget, proving that values in out list
 /// are the added-by-type values of the input.
+/// I return the number of left wires created
 pub(super) fn list_mix<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     input: &[(Variable, Variable)],
     mid: &[(Variable, Variable)],
-    out: &[(Variable, Variable)]) -> Result<(), R1CSError>
+    out: &[(Variable, Variable)]) -> Result<usize, R1CSError>
 {
+    let mut num_left_wires = 0;
     let l = out.len();
     if l <= 1 {
-        return Ok(());
+        return Ok(0);
     }
     let first_in = input[0].clone();
     let in1iter = iter::once(&first_in).chain(mid.iter());
@@ -23,21 +25,22 @@ pub(super) fn list_mix<CS: RandomizableConstraintSystem>(
 
     for (((in1,in2),out1), out2) in
         in1iter.zip(in2iter).zip(out1iter).zip(out2iter){
-        gate_mix(cs, *in1, *in2, *out1, *out2)?;
+        num_left_wires = num_left_wires + gate_mix(cs, *in1, *in2, *out1, *out2)?;
     }
-    Ok(())
+    Ok(num_left_wires)
 }
 
 /// I implement the mix gate gadget, proving that either
 /// in1 = out1 and in2 = out2  if in1 and in2 have different types or
 /// out1 = 0 and out2 = in1 + in2 if in1 and in2 have same type
+/// I return the number of left wires created
 pub(super) fn gate_mix<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     in1: (Variable, Variable),
     in2: (Variable, Variable),
     out1: (Variable, Variable),
     out2: (Variable, Variable)
-) -> Result<(), R1CSError>{
+) -> Result<usize, R1CSError>{
     cs.specify_randomized_constraints(move |cs|{
         let w1 = cs.challenge_scalar(b"mix challenge1");
         let w2 = cs.challenge_scalar(b"mix challenge2");
@@ -54,15 +57,17 @@ pub(super) fn gate_mix<CS: RandomizableConstraintSystem>(
         );
         cs.constrain(out.into());
         Ok(())
-    })
+    })?;
+    Ok(1usize)
 }
 
 /// I prove shuffling of a list of pairs
+/// I return the number of left wires created
 pub(super) fn pair_list_shuffle<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     input_pairs: Vec<(Variable, Variable)>,
     permuted_pairs: Vec<(Variable, Variable)>
-) -> Result<(), R1CSError>
+) -> Result<usize, R1CSError>
 {
     let l = input_pairs.len();
     if l != permuted_pairs.len() {
@@ -71,12 +76,12 @@ pub(super) fn pair_list_shuffle<CS: RandomizableConstraintSystem>(
         });
     }
     if l == 0 {
-        return Ok(());
+        return Ok(0usize);
     }
     if l == 1 {
         cs.constrain(permuted_pairs[0].0 - input_pairs[0].0);
         cs.constrain(permuted_pairs[0].1 - input_pairs[0].1);
-        return Ok(());
+        return Ok(0usize);
     }
 
     cs.specify_randomized_constraints(move |cs| {
@@ -91,15 +96,20 @@ pub(super) fn pair_list_shuffle<CS: RandomizableConstraintSystem>(
             single_perm.push(single_pe);
         }
 
-        list_shuffle(cs, &single_input[..], &single_perm[..])
-    })
+        list_shuffle(cs, &single_input[..], &single_perm[..])?;
+        Ok(())
+    })?;
+
+    // list_shuffle does 2*(l-1) multiplications
+    Ok(2*(l-1))
 }
 
 /// I prove shuffling of a list of values
+/// I return the number of left wires created
 pub(super) fn list_shuffle<CS: RandomizedConstraintSystem>(
     cs: &mut CS,
     input: &[Variable],
-    permuted: &[Variable]) -> Result<(), R1CSError>
+    permuted: &[Variable]) -> Result<usize, R1CSError>
 {
     let l = input.len();
     if l != permuted.len() {
@@ -108,11 +118,11 @@ pub(super) fn list_shuffle<CS: RandomizedConstraintSystem>(
         });
     }
     if l == 0{
-        return Ok(());
+        return Ok(0usize);
     }
     if l == 1 {
         cs.constrain(permuted[0] - input[0]);
-        return Ok(());
+        return Ok(0usize);
     }
 
     let challenge = cs.challenge_scalar(b"shuffle challenge");
@@ -138,7 +148,8 @@ pub(super) fn list_shuffle<CS: RandomizedConstraintSystem>(
     // Constrain last x mul output and last y mul output to be equal
     cs.constrain(first_mulx_out - first_muly_out);
 
-    Ok(())
+    // l-1 multiplications for input + l-1 multiplication for permuted
+    Ok(2*(l-1))
 }
 
 /// I prove that value is in [0..2^64-1]
@@ -146,7 +157,7 @@ pub fn range_proof<CS: ConstraintSystem>(
     cs: &mut CS,
     mut var: LinearCombination,
     value: Option<Scalar>,
-) -> Result<(), R1CSError> {
+) -> Result<usize, R1CSError> {
     let mut exp_2 = Scalar::one();
     let n_usize = 64usize;
     let value_bytes = value.as_ref().map(|v| v.as_bytes());
@@ -176,7 +187,8 @@ pub fn range_proof<CS: ConstraintSystem>(
     // Enforce that v = Sum(b_i * 2^i, i = 0..n-1)
     cs.constrain(var);
 
-    Ok(())
+    // one multiplication gate per bit
+    Ok(n_usize)
 }
 
 #[cfg(test)]
@@ -191,7 +203,6 @@ mod test{
     #[test]
     fn test_list_mix(){
         let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(100, 1);
 
         let sorted_values = [
             (Scalar::from(1u8), Scalar::from(10u8)),
@@ -220,7 +231,8 @@ mod test{
         let sorted = allocate_vector(&mut prover, &sorted_values.to_vec());
         let mid = allocate_vector(&mut prover, &mid_values.to_vec());
         let added = allocate_vector(&mut prover, &out_values.to_vec());
-        super::list_mix(&mut prover, &sorted[..], &mid[..], &added[..]).unwrap();
+        let num_wires = super::list_mix(&mut prover, &sorted[..], &mid[..], &added[..]).unwrap();
+        let bp_gens = BulletproofGens::new((num_wires + 2*(sorted.len() + mid.len() + added.len())).next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
 
 
@@ -229,7 +241,8 @@ mod test{
         let sorted = allocate_vector(&mut verifier, &sorted_values.to_vec());
         let mid = allocate_vector(&mut verifier, &mid_values.to_vec());
         let added = allocate_vector(&mut verifier, &out_values.to_vec());
-        super::list_mix(&mut verifier, &sorted[..], &mid[..], &added[..]).unwrap();
+        let num_wires = super::list_mix(&mut verifier, &sorted[..], &mid[..], &added[..]).unwrap();
+        let bp_gens = BulletproofGens::new((num_wires + 2*(sorted.len() + mid.len() + added.len())) .next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
 
         // test the same using commitments
@@ -244,7 +257,9 @@ mod test{
         let mid = allocate_vector(&mut prover, &mid_values.to_vec());
         let added = allocate_vector(&mut prover, &out_values.to_vec());
         let sorted_vars: Vec<(Variable, Variable)> = sorted_coms_vars.iter().map(|(_,(a_v, t_v))| (*a_v, *t_v)).collect();
-        super::list_mix(&mut prover, &sorted_vars[..], &mid[..], &added[..]).unwrap();
+        let num_wires = super::list_mix(&mut prover, &sorted_vars[..], &mid[..], &added[..]).unwrap();
+        let num_wires = num_wires + added.len() + mid.len();
+        let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
@@ -256,15 +271,15 @@ mod test{
         }).collect();
         let mid = allocate_vector(&mut verifier, &mid_values.to_vec());
         let added = allocate_vector(&mut verifier, &out_values.to_vec());
-        super::list_mix(&mut verifier, &sorted_vars[..], &mid[..], &added[..]).unwrap();
+        let num_wires = super::list_mix(&mut verifier, &sorted_vars[..], &mid[..], &added[..]).unwrap();
+        let num_wires = num_wires + added.len() + mid.len();
+        let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
     }
 
     #[test]
     fn test_shuffle(){
         let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(100, 1);
-
         let input_values = [
             (Scalar::from(10u8), Scalar::from(10u8)),
             (Scalar::from(20u8), Scalar::from(20u8)),
@@ -286,7 +301,9 @@ mod test{
         let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
         let input = allocate_vector(&mut prover, &input_values.to_vec());
         let shuffled = allocate_vector(&mut prover, &shuffled_values.to_vec());
-        super::pair_list_shuffle(&mut prover, input.to_vec(), shuffled.to_vec()).unwrap();
+        let num_wires = super::pair_list_shuffle(&mut prover, input.to_vec(), shuffled.to_vec()).unwrap();
+        let num_wires = num_wires + input.len() + shuffled.len();
+        let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
 
 
@@ -294,7 +311,9 @@ mod test{
         let mut verifier = Verifier::new(&mut verifier_transcript);
         let input = allocate_vector(&mut verifier, &input_values.to_vec());
         let shuffled = allocate_vector(&mut verifier, &shuffled_values.to_vec());
-        super::pair_list_shuffle(&mut verifier, input.to_vec(), shuffled.to_vec()).unwrap();
+        let num_wires = super::pair_list_shuffle(&mut verifier, input.to_vec(), shuffled.to_vec()).unwrap();
+        let num_wires = num_wires + input.len() + shuffled.len();
+        let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
 
         let bad_shuffle_values = [
@@ -310,7 +329,9 @@ mod test{
         let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
         let input = allocate_vector(&mut prover, &input_values.to_vec());
         let bad_shuffle = allocate_vector(&mut prover, &bad_shuffle_values.to_vec());
-        super::pair_list_shuffle(&mut prover, input.to_vec(), bad_shuffle.to_vec()).unwrap();
+        let num_wires = super::pair_list_shuffle(&mut prover, input.to_vec(), bad_shuffle.to_vec()).unwrap();
+        let num_wires = num_wires + input.len() + shuffled.len();
+        let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
 
 
@@ -318,7 +339,9 @@ mod test{
         let mut verifier = Verifier::new(&mut verifier_transcript);
         let input = allocate_vector(&mut verifier, &input_values.to_vec());
         let bad_shuffle = allocate_vector(&mut verifier, &bad_shuffle_values.to_vec());
-        super::pair_list_shuffle(&mut verifier, input.to_vec(), bad_shuffle.to_vec()).unwrap();
+        let num_wires = super::pair_list_shuffle(&mut verifier, input.to_vec(), bad_shuffle.to_vec()).unwrap();
+        let num_wires = num_wires + input.len() + shuffled.len();
+        let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_err());
     }
 }

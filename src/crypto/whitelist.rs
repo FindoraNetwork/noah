@@ -29,7 +29,6 @@ pub fn prove_mt_membership<R: CryptoRng + Rng>(
     blind: &Scalar) -> Result<WhitelistProof, ZeiError>
 {
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(10000, 1);
 
     let mut witness_commitments = vec![];
 
@@ -53,7 +52,10 @@ pub fn prove_mt_membership<R: CryptoRng + Rng>(
         witness_commitments.push(dir_com);
         witness_commitments.push(sibling_com);
     }
-    merkle_verify_mimc(&mut prover, var_elem, &var_path[..], mt.root.value, Scalar::from(mt.size as u64)).unwrap();
+
+    let num_left_wires = merkle_verify_mimc(&mut prover, var_elem, &var_path[..], mt.root.value, Scalar::from(mt.size as u64)).unwrap();
+    let num_gens = num_left_wires.next_power_of_two();
+    let bp_gens = BulletproofGens::new(num_gens, 1);
     let proof = prover.prove(&bp_gens).map_err(|_| ZeiError::WhitelistProveError)?;
 
     Ok(WhitelistProof{
@@ -69,12 +71,12 @@ pub fn prove_array_membership(
 ) -> Result<WhitelistProof, ZeiError>
 {
     let pc_gens = PedersenGens::default();
-    let bp_gens= BulletproofGens::new(8, 1);
     let mut prover_transcript = Transcript::new(b"LinearInclusionProof");
     let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
     let (com_elem, var_elem) = prover.commit(elements[index], *blind);
     assert!(com_elem == *elem);
-    array_membership(&mut prover, &elements[..], var_elem);
+    let left_wires = array_membership(&mut prover, &elements[..], var_elem);
+    let bp_gens= BulletproofGens::new(left_wires.next_power_of_two(), 1);
     let proof = prover.prove(&bp_gens).map_err(|_| ZeiError::WhitelistProveError)?;
 
     Ok(WhitelistProof{
@@ -90,7 +92,6 @@ pub fn verify_mt_membership(
 ) -> Result<(), ZeiError>
 {
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(10000, 1);
 
     let mut verifier_transcript = Transcript::new(b"MerkleTreePath");
     let mut verifier = Verifier::new(&mut verifier_transcript);
@@ -110,12 +111,15 @@ pub fn verify_mt_membership(
         }
         even = !even;
     }
-    merkle_verify_mimc(
+    let num_left_wires = merkle_verify_mimc(
         &mut verifier,
         elem_var,
         &path_var[..],
         mt_root.value,
         Scalar::from(mt_root.size as u64)).map_err(|_| ZeiError::WhitelistVerificationError)?;
+
+    let num_gens = num_left_wires.next_power_of_two();
+    let bp_gens = BulletproofGens::new(num_gens, 1);
     verifier.verify(&proof.proof, &pc_gens, &bp_gens).map_err(|_| ZeiError::WhitelistVerificationError)
 }
 pub fn verify_array_membership(
@@ -125,12 +129,12 @@ pub fn verify_array_membership(
 ) -> Result<(), ZeiError>
 {
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(8, 1);
     let mut verifier_transcript = Transcript::new(b"LinearInclusionProof");
     let mut verifier = Verifier::new(&mut verifier_transcript);
     let elem_var = verifier.commit(*elem_com);
 
-    array_membership(&mut verifier, &elements[..], elem_var);
+    let num_left_wires = array_membership(&mut verifier, &elements[..], elem_var);
+    let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
     verifier.verify(&proof.proof, &pc_gens, &bp_gens).map_err(|_| ZeiError::WhitelistVerificationError)
 }
 

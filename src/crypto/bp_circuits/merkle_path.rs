@@ -7,8 +7,9 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(
     path: &[(Variable, Variable)],
     root: Scalar,
     tree_size: Scalar,
-) -> Result<(), R1CSError>
+) -> Result<usize, R1CSError>
 {
+    let mut num_left_wires = 0;
     let mut node = element.into();
     let path_len = path.len();
     let one = Variable::One();
@@ -25,7 +26,9 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(
         //if b is 0, then path follow left direction, hence sibling is hashed on the right.
         // left child = b * sibling + (1 - b) * node
         // right child = b * node + (1 - b) * sibling
-        node = mimc_hash(cs, &[b_x_sibling + not_b_x_node, b_x_node + not_b_x_sibling], level)?;
+        let (n, num_wires) = mimc_hash(cs, &[b_x_sibling + not_b_x_node, b_x_node + not_b_x_sibling], level)?;
+        node = n;
+        num_left_wires += 4 + num_wires;
     }
 
 
@@ -36,11 +39,13 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(
 
     let (_,_,b_x_sibling) = cs.multiply(b.into(), sibling_copy.into());
     let (_,_,not_b_x_node) = cs.multiply(not_b.into(), node_copy.into());
-    node = mimc_hash(cs, &[tree_size.into(), b_x_sibling + not_b_x_node, b_x_node + not_b_x_sibling], 0)?;
+    let (node, num_wires) = mimc_hash(cs, &[tree_size.into(), b_x_sibling + not_b_x_node, b_x_node + not_b_x_sibling], 0)?;
+
+    num_left_wires += 4 + num_wires;
 
     let constrain = node - root;
     cs.constrain(constrain);
-    Ok(())
+    Ok(num_left_wires)
 }
 
 #[cfg(test)]

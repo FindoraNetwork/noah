@@ -74,7 +74,7 @@ pub fn prove_solvency(
 	padd_vars(&mut prover, &mut liabilities_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyProveError)?;
 	padd_values(&mut padded_hidden_liabilities, types.as_slice());
 
-	bp_circuits::solvency::solvency(
+	let num_left_wires = bp_circuits::solvency::solvency(
 		&mut prover,
 		&asset_vars[..],
 		Some(padded_hidden_assets.as_slice()),
@@ -85,11 +85,7 @@ pub fn prove_solvency(
 		rates_table,
 	).map_err(|_| ZeiError::SolvencyProveError)?;
 
-	let num_left_wires_assets = 13 * asset_vars.len() - 9 + types.len();
-	let num_left_wires_lia = 13 * liabilities_vars.len() - 9 + types.len();
-	let num_gens = (num_left_wires_assets + num_left_wires_lia + 64).next_power_of_two();
-
-	let bp_gens = BulletproofGens::new(num_gens, 1);
+	let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
 	prover.prove(&bp_gens).map_err(|_| ZeiError::SolvencyProveError)
 }
 
@@ -145,7 +141,7 @@ pub fn verify_solvency(
 	padd_vars(&mut verifier, &mut asset_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyVerificationError)?;
 	padd_vars(&mut verifier, &mut liabilities_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyVerificationError)?;
 
-	bp_circuits::solvency::solvency(
+	let num_left_wires = bp_circuits::solvency::solvency(
 		&mut verifier,
 		&asset_vars[..],
 		None,
@@ -156,10 +152,7 @@ pub fn verify_solvency(
 		rates_table,
 	).map_err(|_| ZeiError::SolvencyVerificationError)?;
 
-	let num_left_wires_assets = 13 * asset_vars.len() - 9 + types.len();
-	let num_left_wires_lia = 13 * liabilities_vars.len() - 9 + types.len();
-	let num_gens = (num_left_wires_assets + num_left_wires_lia + 64).next_power_of_two();
-	let bp_gens = BulletproofGens::new(num_gens, 1);
+	let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
 	verifier.verify(proof, &pc_gens, &bp_gens).map_err(|_| ZeiError::SolvencyVerificationError)
 }
 

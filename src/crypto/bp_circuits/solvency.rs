@@ -26,7 +26,7 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
     lia_values: Option<&[(Scalar, Scalar)]>,
     public_liability_sum: Scalar,
     rates_table: &LinearMap<Scalar, Scalar>,
-)-> Result<(), R1CSError>
+)-> Result<usize, R1CSError>
 {
     let mut rate_types = vec![];
     let mut rate_values = vec![];
@@ -35,12 +35,12 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
         rate_values.push(*v);
     }
 
-    let mut total_assets_var = match assets_vars.len(){
-        0 => LinearCombination::default(),
+    let (mut total_assets_var, num_gates_asset) = match assets_vars.len(){
+        0 => (LinearCombination::default(),0),
         _ => aggregate(cs, assets_vars, assets_values, &rate_types[..], &rate_values[..])?
     };
-    let mut total_lia_var = match lia_vars.len(){
-        0 => LinearCombination::default(),
+    let (mut total_lia_var, num_gates_lia) = match lia_vars.len(){
+        0 => (LinearCombination::default(),0),
         _ => aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?
     };
 
@@ -67,7 +67,11 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
         None => None
     };
 
-    super::gadgets::range_proof(cs, diff_var, diff_value)
+    let num_gates_range_proof = super::gadgets::range_proof(cs, diff_var, diff_value)?;
+
+    Ok(num_gates_asset + num_gates_lia + num_gates_range_proof)
+
+
 }
 
 /// I aggregate a list of values using a rate conversion version table.
@@ -77,9 +81,13 @@ fn aggregate<CS: RandomizableConstraintSystem>(
     values: Option<&[(Scalar, Scalar)]>,
     rate_types: &[Scalar],
     rate_values: &[Scalar])
- -> Result<LinearCombination, R1CSError>
+ -> Result<(LinearCombination, usize), R1CSError>
 {
     let l = vars.len();
+    if l <= 1{
+        return Ok((LinearCombination::default(), 0));
+    }
+
     let (sorted_vars,
         mid_vars,
         added_vars,
@@ -115,12 +123,12 @@ fn aggregate<CS: RandomizableConstraintSystem>(
         total = total + out;
     }
     // prove addition of same flavor
-    super::gadgets::list_mix(cs,&sorted_vars[..], &mid_vars[..], &added_vars[..])?;
+    let n_mix = super::gadgets::list_mix(cs,&sorted_vars[..], &mid_vars[..], &added_vars[..])?;
     // prove first shuffle
-    super::gadgets::pair_list_shuffle(cs, vars.to_vec(), sorted_vars)?;
+    let n_shuffle1 = super::gadgets::pair_list_shuffle(cs, vars.to_vec(), sorted_vars)?;
     // prove second shiffled (zeroed values places at the end of the list)
-    super::gadgets::pair_list_shuffle(cs, added_vars, trimmed_vars)?;
-    Ok(total)
+    let n_shuffle2 = super::gadgets::pair_list_shuffle(cs, added_vars, trimmed_vars)?;
+    Ok((total, 6*l + 2*(l-2) + rate_values.len() + n_mix + n_shuffle1 + n_shuffle2))
 }
 
 /// I sort the pairs in values by the order the second coordinate appears in type_list
@@ -295,8 +303,6 @@ mod test{
     #[test]
     fn test_solvency(){
         let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(1000, 1);
-
         let mut rates = LinearMap::new();
         rates.insert(Scalar::from(1u8), Scalar::from(1u8));
         rates.insert(Scalar::from(2u8), Scalar::from(2u8));
@@ -339,7 +345,7 @@ mod test{
         let lia_com: Vec<(CompressedRistretto, CompressedRistretto)> = lia_com_vars.iter().map(|(a,t,_,_)| (*a,*t)).collect();
         let lia_var: Vec<(Variable, Variable)> = lia_com_vars.iter().map(|(_,_,a,t)| (*a,*t)).collect();
 
-        super::solvency(
+        let num_left_wires = super::solvency(
             &mut prover,
             &asset_var[..],
             Some(&assets),
@@ -348,6 +354,7 @@ mod test{
             Some(&liabilities),
             Scalar::zero(),
             &rates).unwrap();
+        let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
@@ -363,7 +370,7 @@ mod test{
                 (verifier.commit(*a), verifier.commit(*t))
             }).collect();
 
-        super::solvency(
+        let num_left_wires = super::solvency(
             &mut verifier,
             &asset_var[..],
             None,
@@ -372,6 +379,7 @@ mod test{
             None,
             Scalar::zero(),
             &rates).unwrap();
+        let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens,&bp_gens).is_ok());
     }
 }
