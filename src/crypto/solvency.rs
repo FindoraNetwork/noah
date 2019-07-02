@@ -1,4 +1,4 @@
-use bulletproofs_yoloproof::r1cs::{R1CSProof, Prover, Verifier, Variable};
+use bulletproofs_yoloproof::r1cs::{R1CSProof, Prover, Verifier, Variable, ConstraintSystem, R1CSError};
 use bulletproofs_yoloproof::{PedersenGens, BulletproofGens};
 use crate::crypto::bp_circuits;
 use crate::errors::ZeiError;
@@ -8,18 +8,12 @@ use linear_map::LinearMap;
 use merlin::Transcript;
 
 
-
 /// I produce a proof of solvency for a set of assets vs liabilities for potentially different
 /// asset types using a conversion table to a common type.
 /// Values are given as pairs (amount, asset_type).
 /// Values can be hidden or public to the verifier. For hidden values, prover needs to provide
-/// blinding factors for the corresponding commitments.
+/// blinding factors for the corresponding Pedersen commitments.
 /// Asset type cannot be `Scalar::zero()`
-/// If padding is set to true, the hidden liabilities and assets sets are padded with M zero
-/// amount values, one for each asset in the rates_tables keys. This option, does not leaks
-/// the number of asset types that are not present in the liabilities/assets sets.
-/// If padding is false, the proof then leaks the number of asset types that are part of the
-/// liability/asset sets.
 /// Returns proof in case of success and ZeiError::SolvencyProveError in case proof cannot be
 /// computed.
 pub fn prove_solvency(
@@ -30,7 +24,6 @@ pub fn prove_solvency(
 	liabilities_blinds: &[(Scalar, Scalar)], // blindings for amount and type in hidden liabilities
 	public_liabilities: &[(Scalar, Scalar)], // amount and type of public/known assets
 	rates_table: &LinearMap<Scalar, Scalar>, // exchange rates for asset types
-	full_padding: bool,
 ) -> Result<R1CSProof, ZeiError>
 {
 	let pc_gens = PedersenGens::default();
@@ -69,13 +62,26 @@ pub fn prove_solvency(
 		public_liability_sum = public_liability_sum + rate * amount;
 	}
 
+	// padding:
+	let mut types = vec![];
+	for (t,_) in rates_table{
+		types.push(*t);
+
+	}
+	let mut padded_hidden_assets = hidden_assets.to_vec();
+	let mut padded_hidden_liabilities = hidden_liabilities.to_vec();
+	padd_vars(&mut prover, &mut asset_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyProveError)?;
+	padd_values(&mut padded_hidden_assets, types.as_slice());
+	padd_vars(&mut prover, &mut liabilities_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyProveError)?;
+	padd_values(&mut padded_hidden_liabilities, types.as_slice());
+
 	bp_circuits::solvency::solvency(
 		&mut prover,
 		&asset_vars[..],
-		Some(hidden_assets),
+		Some(padded_hidden_assets.as_slice()),
 		public_asset_sum,
 		&liabilities_vars[..],
-		Some(hidden_liabilities),
+		Some(padded_hidden_liabilities.as_slice()),
 		public_liability_sum,
 		rates_table,
 	).map_err(|_| ZeiError::SolvencyProveError)?;
@@ -86,12 +92,10 @@ pub fn prove_solvency(
 /// I verify a proof of solvency for a set of assets vs liabilities for potentially different
 /// asset types using a conversion table to a common type.
 /// Values are given as pairs (amount, asset_type).
-/// Values can be hidden or public. For hidden values are given as perdersen commitments.
+/// Values can be hidden or public. Hidden values are given as perdersen commitments.
 /// Returns `Ok(())` in case of success and ZeiError::SolvencyVerificationError in case proof is
 /// wrong for the given input or other error occurs in the verification process (Eg: asset type of
 /// a public value is not a key in the conversion table).
-/// The rate table has keys of type [u8;32] corresponding to the bytes value of the scalar representing
-/// the asset type.
 pub fn verify_solvency(
 	hidden_assets: &[(CompressedRistretto, CompressedRistretto)], //commitments to assets
 	public_assets: &[(Scalar, Scalar)],
@@ -106,13 +110,13 @@ pub fn verify_solvency(
 	let mut transcript = Transcript::new(b"SolvencyProof");
 	let mut verifier = Verifier::new(&mut transcript);
 
-	let asset_vars: Vec<(Variable, Variable)> = hidden_assets.iter().map(
+	let mut asset_vars: Vec<(Variable, Variable)> = hidden_assets.iter().map(
 		|(a,t)|{
 			(verifier.commit(*a), verifier.commit(*t))
 		}).collect();
 
 
-	let liabilities_vars: Vec<(Variable, Variable)> = hidden_liabilities.iter().map(
+	let mut liabilities_vars: Vec<(Variable, Variable)> = hidden_liabilities.iter().map(
 		|(a,t)|{
 			(verifier.commit(*a), verifier.commit(*t))
 		}).collect();
@@ -129,6 +133,15 @@ pub fn verify_solvency(
 		public_liability_sum = public_liability_sum + rate * amount;
 	}
 
+	// padding:
+	let mut types = vec![];
+	for (t,_) in rates_table{
+		types.push(*t);
+
+	}
+	padd_vars(&mut verifier, &mut asset_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyVerificationError)?;
+	padd_vars(&mut verifier, &mut liabilities_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyVerificationError)?;
+
 	bp_circuits::solvency::solvency(
 		&mut verifier,
 		&asset_vars[..],
@@ -141,6 +154,28 @@ pub fn verify_solvency(
 	).map_err(|_| ZeiError::SolvencyVerificationError)?;
 
 	verifier.verify(proof, &pc_gens, &bp_gens).map_err(|_| ZeiError::SolvencyVerificationError)
+}
+
+fn padd_vars<CS: ConstraintSystem>(
+	cs: &mut CS,
+	vars: &mut Vec<(Variable, Variable)>,
+	types: &[Scalar]) -> Result<(), R1CSError>
+{
+	for t in types {
+		let zero_var = cs.allocate(Some(Scalar::zero()))?;
+		let t_var = cs.allocate(Some(*t))?;
+		vars.push((zero_var, t_var));
+	}
+	Ok(())
+}
+
+fn padd_values(
+	values: &mut Vec<(Scalar, Scalar)>,
+	types: &[Scalar])
+{
+	for t in types {
+		values.push((Scalar::zero(), *t));
+	}
 }
 
 #[cfg(test)]
@@ -179,7 +214,6 @@ mod test {
 			liabilities_blinds.as_slice(),
 			public_liabilities,
 			&rates,
-			false
 		).unwrap();
 
 		let mut hidden_assets_coms = vec![];
@@ -315,6 +349,10 @@ mod test {
 
 		do_test_solvency(&asset_hidden, &smaller, &lia_hidden, &greater, &rates, false);
 		do_test_solvency(&asset_hidden, &greater, &lia_hidden, &smaller, &rates, true);
-		// TODO switch public and hidden
+
+		// test with incomplete hidden asset list
+		do_test_solvency(&smaller, &asset_hidden, &greater, &lia_hidden, &rates, false);
+		do_test_solvency(&greater, &asset_hidden, &smaller, &lia_hidden, &rates, true);
+
 	}
 }
