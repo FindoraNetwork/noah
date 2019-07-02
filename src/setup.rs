@@ -13,7 +13,6 @@ pub struct PublicParams {
 
 pub const BULLET_PROOF_RANGE: usize = 32;
 pub const MAX_PARTY_NUMBER: usize = 32;
-pub const BULLET_PROOF_CLOAK_GENS: usize = 1000;
 
 //gens_capacity ->
 //The maximum number of usable generators for each party.

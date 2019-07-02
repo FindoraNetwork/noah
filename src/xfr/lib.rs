@@ -11,7 +11,6 @@ use itertools::Itertools;
 use rand::{CryptoRng, Rng};
 use serde::ser::Serialize;
 use std::collections::HashMap;
-use crate::setup::BULLET_PROOF_CLOAK_GENS;
 
 const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 
@@ -90,8 +89,6 @@ fn gen_xfr_proofs_multi_asset(
     confidential_asset: bool,
 ) -> Result<AssetAmountProof, ZeiError>
 {
-    let pc_gens = bulletproofs_yoloproof::PedersenGens::default();
-    let bp_gens = bulletproofs_yoloproof::BulletproofGens::new(BULLET_PROOF_CLOAK_GENS, 1);
     let pow2_32 = Scalar::from(POW_2_32);
 
     let mut ins = vec![];
@@ -110,7 +107,7 @@ fn gen_xfr_proofs_multi_asset(
     }
 
     if confidential_asset && confidential_amount {
-        let mix_proof = asset_mixer_proof(&pc_gens, &bp_gens, ins.as_slice(), out.as_slice())?;
+        let mix_proof = asset_mixer_proof(ins.as_slice(), out.as_slice())?;
         return Ok(AssetAmountProof::AssetMix(mix_proof));
     }
     if !confidential_asset && !confidential_amount{
@@ -305,10 +302,7 @@ fn verify_plain_asset_mix(
 }
 
 fn verify_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord], proof: &AssetMixProof) -> Result<(), ZeiError>{
-    let pc_gens = bulletproofs_yoloproof::PedersenGens::default();
-    let bp_gens = bulletproofs_yoloproof::BulletproofGens::new(BULLET_PROOF_CLOAK_GENS, 1);
     let pow2_32 = Scalar::from(POW_2_32);
-
 
     let mut in_coms = vec![];
     for x in inputs.iter(){
@@ -327,7 +321,7 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord], p
         let com_type = x.asset_type_commitment.unwrap();
         out_coms.push((com_amount, com_type));
     }
-    asset_mixer_verify(&pc_gens, &bp_gens, in_coms.as_slice() , out_coms.as_slice(), proof )
+    asset_mixer_verify( in_coms.as_slice() , out_coms.as_slice(), proof )
 }
 
 

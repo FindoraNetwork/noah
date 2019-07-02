@@ -22,20 +22,23 @@ impl Eq for AssetMixProof {}
 
 
 pub fn asset_mixer_proof(
-    pc_gens: &bulletproofs_yoloproof::PedersenGens,
-    bp_gens: &bulletproofs_yoloproof::BulletproofGens,
     inputs: &[(u64, Scalar, Scalar, Scalar)],
     outputs: &[(u64, Scalar, Scalar, Scalar)],
 )-> Result<AssetMixProof, ZeiError>{
 
+    let pc_gens = PedersenGens::default();
     let mut prover_transcript = Transcript::new(b"TransactionTest");
-    let mut prover = Prover::new(pc_gens, &mut prover_transcript);
+    let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
 
     let in_vars = allocate_values_prover(&mut prover, inputs);
     let out_vars = allocate_values_prover(&mut prover, outputs);
+    let n = in_vars.len();
+    let m = out_vars.len();
 
     cloak(&mut prover, in_vars, out_vars).map_err(|_| ZeiError::AssetMixerVerificationError)?;
 
+    let num_gates = compute_num_wires(n,m);
+    let bp_gens = BulletproofGens::new(num_gates.next_power_of_two(), 1);
     let proof = prover.prove(&bp_gens).map_err(|_| ZeiError::AssetMixerVerificationError)?;
     Ok(AssetMixProof(proof))
 }
@@ -75,8 +78,6 @@ fn allocate_commitments_verifier(verifier: &mut Verifier, commitments: &[(Compre
 
 /// Verify
 pub fn asset_mixer_verify(
-    pc_gens: &PedersenGens,
-    bp_gens: &BulletproofGens,
     inputs: &[(CompressedRistretto, CompressedRistretto)],
     outputs: &[(CompressedRistretto, CompressedRistretto)],
     proof: &AssetMixProof,
@@ -87,24 +88,40 @@ pub fn asset_mixer_verify(
 
     let in_coms = allocate_commitments_verifier(&mut verifier, inputs);
     let out_coms = allocate_commitments_verifier(&mut verifier, outputs);
+    let n = in_coms.len();
+    let m = out_coms.len();
 
     cloak(&mut verifier, in_coms, out_coms).map_err(|_| ZeiError::AssetMixerVerificationError)?;
 
-    verifier.verify(&proof.0, pc_gens, bp_gens).map_err(|_| ZeiError::AssetMixerVerificationError)
+    let pc_gens = PedersenGens::default();
+    let num_gates = compute_num_wires(n,m);
+    let bp_gens = BulletproofGens::new(num_gates.next_power_of_two(), 1);
+    verifier.verify(&proof.0, &pc_gens, &bp_gens).map_err(|_| ZeiError::AssetMixerVerificationError)
 
 }
 
+fn compute_num_wires(n: usize, m:usize) -> usize{
+    let max = std::cmp::max(n,m);
+    let min = std::cmp::min(n,m);
+
+    // k-mix(n) + k-mix(m) + shuffle(n) + shuffle(m) + padded_shuffle(max(n,m)
+    // k-mix(l) = 4*l - 4
+    // shuffle(l) = l + 2 * (l - 1)
+    // padded_shuffle(n,m) = max(m,n) - min(m,n) + shuffle(max(m,n) = max- min - 3*max - 2
+    // range proof 64
+
+    7 * n  -6 + 7 * m - 6 + (max - min) + 3 * max -2 + 64 * m
+}
 #[cfg(test)]
 mod test{
-    use bulletproofs_yoloproof::{PedersenGens, BulletproofGens};
+    use bulletproofs_yoloproof::{PedersenGens};
     use curve25519_dalek::scalar::Scalar;
     use curve25519_dalek::ristretto::CompressedRistretto;
 
     #[test]
     fn test_asset_mixer(){
-        let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(10000,1);
 
+        let pc_gens = PedersenGens::default();
         let input = [
             (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)), //(amount, type, blind_amount, blind_type)
             (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)), //(amount, type, blind_amount, blind_type)
@@ -122,13 +139,13 @@ mod test{
         ];
 
 
-        let proof = super::asset_mixer_proof(&pc_gens, &bp_gens,&input, &output).unwrap();
+        let proof = super::asset_mixer_proof(&input, &output).unwrap();
 
         let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> = input.iter().map(|(amount, typ, blind_a, blind_typ)|
             (pc_gens.commit(Scalar::from(*amount),*blind_a).compress(), pc_gens.commit(*typ,*blind_typ).compress())).collect();
         let output_coms: Vec<(CompressedRistretto, CompressedRistretto)> = output.iter().map(|(amount, typ, blind_a, blind_typ)|
             (pc_gens.commit(Scalar::from(*amount),*blind_a).compress(), pc_gens.commit(*typ,*blind_typ).compress())).collect();
 
-        assert_eq!(Ok(()), super::asset_mixer_verify(&pc_gens, &bp_gens, &input_coms, &output_coms, &proof));
+        assert_eq!(Ok(()), super::asset_mixer_verify(&input_coms, &output_coms, &proof));
     }
 }
