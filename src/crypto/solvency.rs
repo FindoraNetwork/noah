@@ -27,7 +27,6 @@ pub fn prove_solvency(
 ) -> Result<R1CSProof, ZeiError>
 {
 	let pc_gens = PedersenGens::default();
-	let bp_gens = BulletproofGens::new(1000, 1);
 	let mut transcript = Transcript::new(b"SolvencyProof");
 	let mut prover = Prover::new(&pc_gens, &mut transcript);
 
@@ -86,6 +85,11 @@ pub fn prove_solvency(
 		rates_table,
 	).map_err(|_| ZeiError::SolvencyProveError)?;
 
+	let num_left_wires_assets = 13 * asset_vars.len() - 9 + types.len();
+	let num_left_wires_lia = 13 * liabilities_vars.len() - 9 + types.len();
+	let num_gens = (num_left_wires_assets + num_left_wires_lia + 64).next_power_of_two();
+
+	let bp_gens = BulletproofGens::new(num_gens, 1);
 	prover.prove(&bp_gens).map_err(|_| ZeiError::SolvencyProveError)
 }
 
@@ -105,7 +109,6 @@ pub fn verify_solvency(
 	proof: &R1CSProof
 ) -> Result<(), ZeiError>{
 	let pc_gens = PedersenGens::default();
-	let bp_gens = BulletproofGens::new(1000, 1);
 
 	let mut transcript = Transcript::new(b"SolvencyProof");
 	let mut verifier = Verifier::new(&mut transcript);
@@ -153,6 +156,10 @@ pub fn verify_solvency(
 		rates_table,
 	).map_err(|_| ZeiError::SolvencyVerificationError)?;
 
+	let num_left_wires_assets = 13 * asset_vars.len() - 9 + types.len();
+	let num_left_wires_lia = 13 * liabilities_vars.len() - 9 + types.len();
+	let num_gens = (num_left_wires_assets + num_left_wires_lia + 64).next_power_of_two();
+	let bp_gens = BulletproofGens::new(num_gens, 1);
 	verifier.verify(proof, &pc_gens, &bp_gens).map_err(|_| ZeiError::SolvencyVerificationError)
 }
 
