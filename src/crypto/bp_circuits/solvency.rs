@@ -19,46 +19,46 @@ use linear_map::LinearMap;
 /// The rate table is hash map of Scalar to Scalar.
 pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
-    assets_vars: &[(Variable, Variable)],
-    assets_values: Option<&[(Scalar, Scalar)]>,
+    asset_set_vars: &[(Variable, Variable)],
+    asset_set_values: Option<&[(Scalar, Scalar)]>,
     public_asset_sum: Scalar,
-    lia_vars: &[(Variable, Variable)],
-    lia_values: Option<&[(Scalar, Scalar)]>,
+    liability_set_vars: &[(Variable, Variable)],
+    liability_set_values: Option<&[(Scalar, Scalar)]>,
     public_liability_sum: Scalar,
-    rates_table: &LinearMap<Scalar, Scalar>,
+    conversion_rates: &LinearMap<Scalar, Scalar>,
 )-> Result<usize, R1CSError>
 {
     let mut rate_types = vec![];
     let mut rate_values = vec![];
-    for (k,v) in rates_table{
+    for (k,v) in conversion_rates{
         rate_types.push(*k);
         rate_values.push(*v);
     }
 
-    let (mut total_assets_var, num_gates_asset) = match assets_vars.len(){
+    let (mut total_assets_var, num_gates_asset) = match asset_set_vars.len(){
         0 => (LinearCombination::default(),0),
-        _ => aggregate(cs, assets_vars, assets_values, &rate_types[..], &rate_values[..])?
+        _ => aggregate(cs, asset_set_vars, asset_set_values, &rate_types[..], &rate_values[..])?
     };
-    let (mut total_lia_var, num_gates_lia) = match lia_vars.len(){
+    let (mut total_lia_var, num_gates_lia) = match liability_set_vars.len(){
         0 => (LinearCombination::default(),0),
-        _ => aggregate(cs, lia_vars, lia_values, &rate_types[..], &rate_values[..])?
+        _ => aggregate(cs, liability_set_vars, liability_set_values, &rate_types[..], &rate_values[..])?
     };
 
     total_assets_var = total_assets_var + public_asset_sum;
     total_lia_var = total_lia_var + public_liability_sum;
 
     let diff_var = total_assets_var - total_lia_var;
-    let diff_value = match assets_values {
+    let diff_value = match asset_set_values {
         Some(values) => {
 
             let converted_asset: Vec<Scalar> = values.iter().map(|(a,t)|{
-                a * rates_table.get(t).unwrap()
+                a * conversion_rates.get(t).unwrap()
             }).collect();
 
             let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
 
-            let converted_lia: Vec<Scalar> = lia_values.unwrap().iter().map(|(a,t)|{
-                a * rates_table.get(t).unwrap()
+            let converted_lia: Vec<Scalar> = liability_set_values.unwrap().iter().map(|(a,t)|{
+                a * conversion_rates.get(t).unwrap()
             }).collect();
             let total_lia = converted_lia.iter().sum::<Scalar>() + public_liability_sum;
 
@@ -307,7 +307,7 @@ mod test{
         rates.insert(Scalar::from(1u8), Scalar::from(1u8));
         rates.insert(Scalar::from(2u8), Scalar::from(2u8));
         rates.insert(Scalar::from(3u8), Scalar::from(3u8));
-        let assets = [
+        let asset_set = [
             (Scalar::from(10u8), Scalar::from(1u8)), //total 10
             (Scalar::from(10u8), Scalar::from(2u8)), //total 20
             (Scalar::from(10u8), Scalar::from(2u8)), //total 20
@@ -317,7 +317,7 @@ mod test{
             (Scalar::from(10u8), Scalar::from(1u8)), //total 10, total asset worth = 100
         ];
 
-        let liabilities = [
+        let liability_set = [
             (Scalar::from(2u8), Scalar::from(2u8)), // total 4
             (Scalar::from(8u8), Scalar::from(2u8)),  // total 16
             (Scalar::from(10u8), Scalar::from(1u8)), // total 10
@@ -329,7 +329,7 @@ mod test{
         let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
 
         let asset_com_vars: Vec<(CompressedRistretto,CompressedRistretto, Variable, Variable)> =
-            assets.iter().map(|(a, t)|{
+            asset_set.iter().map(|(a, t)|{
                 let (a_com, a_var) = prover.commit(*a, Scalar::from(1u8));
                 let (t_com, t_var) = prover.commit(*t, Scalar::from(2u8));
                 (a_com, t_com, a_var, t_var)
@@ -337,7 +337,7 @@ mod test{
         let asset_com: Vec<(CompressedRistretto, CompressedRistretto)> = asset_com_vars.iter().map(|(a,t,_,_)| (*a,*t)).collect();
         let asset_var: Vec<(Variable, Variable)> = asset_com_vars.iter().map(|(_,_,a,t)| (*a,*t)).collect();
 
-        let lia_com_vars: Vec<(CompressedRistretto, CompressedRistretto, Variable, Variable)> = liabilities.iter().map(|(a, t)|{
+        let lia_com_vars: Vec<(CompressedRistretto, CompressedRistretto, Variable, Variable)> = liability_set.iter().map(|(a, t)|{
             let (a_com, a_var) = prover.commit(*a, Scalar::from(3u8));
             let (t_com, t_var) = prover.commit(*t, Scalar::from(4u8));
             (a_com, t_com, a_var, t_var)
@@ -348,10 +348,10 @@ mod test{
         let num_left_wires = super::solvency(
             &mut prover,
             &asset_var[..],
-            Some(&assets),
+            Some(&asset_set),
             Scalar::zero(),
             &lia_var[..],
-            Some(&liabilities),
+            Some(&liability_set),
             Scalar::zero(),
             &rates).unwrap();
         let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);

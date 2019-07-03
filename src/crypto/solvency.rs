@@ -17,13 +17,13 @@ use merlin::Transcript;
 /// Returns proof in case of success and ZeiError::SolvencyProveError in case proof cannot be
 /// computed.
 pub fn prove_solvency(
-	hidden_assets: &[(Scalar, Scalar)], // amount and type of hidden assets
-	assets_blinds: &[(Scalar, Scalar)], // blindings for amount and type of hidden assets
-	public_assets: &[(Scalar, Scalar)], // amount and type of public/known assets
-	hidden_liabilities: &[(Scalar, Scalar)], // amount and type of hidden liabilities
-	liabilities_blinds: &[(Scalar, Scalar)], // blindings for amount and type in hidden liabilities
-	public_liabilities: &[(Scalar, Scalar)], // amount and type of public/known assets
-	rates_table: &LinearMap<Scalar, Scalar>, // exchange rates for asset types
+	hidden_asset_set: &[(Scalar, Scalar)], // amount and type of hidden assets
+	asset_set_blinds: &[(Scalar, Scalar)], // blindings for amount and type of hidden assets
+	public_asset_set: &[(Scalar, Scalar)], // amount and type of public/known assets
+	hidden_liability_set: &[(Scalar, Scalar)], // amount and type of hidden liabilities
+	liability_set_blinds: &[(Scalar, Scalar)], // blindings for amount and type in hidden liabilities
+	public_liability_set: &[(Scalar, Scalar)], // amount and type of public/known assets
+	conversion_rates: &LinearMap<Scalar, Scalar>, // exchange rates for asset types
 ) -> Result<R1CSProof, ZeiError>
 {
 	let pc_gens = PedersenGens::default();
@@ -31,16 +31,16 @@ pub fn prove_solvency(
 	let mut prover = Prover::new(&pc_gens, &mut transcript);
 
 	// compute assets circuit variables
-	let mut asset_vars = Vec::with_capacity(hidden_assets.len());
-	for (asset, blind) in hidden_assets.iter().zip(assets_blinds){
+	let mut asset_vars = Vec::with_capacity(hidden_asset_set.len());
+	for (asset, blind) in hidden_asset_set.iter().zip(asset_set_blinds){
 		let (_, asset_amount_var) = prover.commit(asset.0, blind.0); //amount
 		let (_, asset_type_var) = prover.commit(asset.1, blind.1); //asset type
 		asset_vars.push((asset_amount_var, asset_type_var));
 	}
 
 	// compute liabilities circuit variables
-	let mut liabilities_vars = Vec::with_capacity(hidden_liabilities.len());
-	for (lia, blind) in hidden_liabilities.iter().zip(liabilities_blinds){
+	let mut liabilities_vars = Vec::with_capacity(hidden_liability_set.len());
+	for (lia, blind) in hidden_liability_set.iter().zip(liability_set_blinds){
 		let (_, lia_amount_var) = prover.commit(lia.0, blind.0); //amount
 		let (_, lia_type_var) = prover.commit(lia.1, blind.1); //asset type
 
@@ -49,26 +49,26 @@ pub fn prove_solvency(
 
 	// compute public asset total
 	let mut public_asset_sum = Scalar::zero();
-	for (amount, asset_type) in public_assets{
-		let rate = rates_table.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
+	for (amount, asset_type) in public_asset_set{
+		let rate = conversion_rates.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
 		public_asset_sum = public_asset_sum + rate * amount;
 	}
 
 	// compute public liabilities total
 	let mut public_liability_sum = Scalar::zero();
-	for (amount, asset_type) in public_liabilities{
-		let rate = rates_table.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
+	for (amount, asset_type) in public_liability_set{
+		let rate = conversion_rates.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
 		public_liability_sum = public_liability_sum + rate * amount;
 	}
 
 	// padding:
 	let mut types = vec![];
-	for (t,_) in rates_table{
+	for (t,_) in conversion_rates{
 		types.push(*t);
 
 	}
-	let mut padded_hidden_assets = hidden_assets.to_vec();
-	let mut padded_hidden_liabilities = hidden_liabilities.to_vec();
+	let mut padded_hidden_assets = hidden_asset_set.to_vec();
+	let mut padded_hidden_liabilities = hidden_liability_set.to_vec();
 	padd_vars(&mut prover, &mut asset_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyProveError)?;
 	padd_values(&mut padded_hidden_assets, types.as_slice());
 	padd_vars(&mut prover, &mut liabilities_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyProveError)?;
@@ -82,7 +82,7 @@ pub fn prove_solvency(
 		&liabilities_vars[..],
 		Some(padded_hidden_liabilities.as_slice()),
 		public_liability_sum,
-		rates_table,
+		conversion_rates,
 	).map_err(|_| ZeiError::SolvencyProveError)?;
 
 	let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
@@ -97,11 +97,11 @@ pub fn prove_solvency(
 /// wrong for the given input or other error occurs in the verification process (Eg: asset type of
 /// a public value is not a key in the conversion table).
 pub fn verify_solvency(
-	hidden_assets: &[(CompressedRistretto, CompressedRistretto)], //commitments to assets
-	public_assets: &[(Scalar, Scalar)],
-	hidden_liabilities: &[(CompressedRistretto, CompressedRistretto)], //commitments to liabilities
-	public_liabilities: &[(Scalar, Scalar)],
-	rates_table: &LinearMap<Scalar, Scalar>, // exchange rate for asset types
+	hidden_asset_set: &[(CompressedRistretto, CompressedRistretto)], //commitments to assets
+	public_asset_set: &[(Scalar, Scalar)],
+	hidden_liability_set: &[(CompressedRistretto, CompressedRistretto)], //commitments to liabilities
+	public_liability_set: &[(Scalar, Scalar)],
+	conversion_rates: &LinearMap<Scalar, Scalar>, // exchange rate for asset types
 	proof: &R1CSProof
 ) -> Result<(), ZeiError>{
 	let pc_gens = PedersenGens::default();
@@ -109,32 +109,32 @@ pub fn verify_solvency(
 	let mut transcript = Transcript::new(b"SolvencyProof");
 	let mut verifier = Verifier::new(&mut transcript);
 
-	let mut asset_vars: Vec<(Variable, Variable)> = hidden_assets.iter().map(
+	let mut asset_vars: Vec<(Variable, Variable)> = hidden_asset_set.iter().map(
 		|(a,t)|{
 			(verifier.commit(*a), verifier.commit(*t))
 		}).collect();
 
 
-	let mut liabilities_vars: Vec<(Variable, Variable)> = hidden_liabilities.iter().map(
+	let mut liabilities_vars: Vec<(Variable, Variable)> = hidden_liability_set.iter().map(
 		|(a,t)|{
 			(verifier.commit(*a), verifier.commit(*t))
 		}).collect();
 
 	let mut public_asset_sum = Scalar::zero();
-	for (amount, asset_type) in public_assets{
-		let rate = rates_table.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
+	for (amount, asset_type) in public_asset_set{
+		let rate = conversion_rates.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
 		public_asset_sum = public_asset_sum + rate * amount;
 	}
 
 	let mut public_liability_sum = Scalar::zero();
-	for (amount, asset_type) in public_liabilities{
-		let rate = rates_table.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
+	for (amount, asset_type) in public_liability_set{
+		let rate = conversion_rates.get(asset_type).ok_or(ZeiError::SolvencyProveError)?;
 		public_liability_sum = public_liability_sum + rate * amount;
 	}
 
 	// padding:
 	let mut types = vec![];
-	for (t,_) in rates_table{
+	for (t,_) in conversion_rates{
 		types.push(*t);
 
 	}
@@ -149,7 +149,7 @@ pub fn verify_solvency(
 		&liabilities_vars[..],
 		None,
 		public_liability_sum,
-		rates_table,
+		conversion_rates,
 	).map_err(|_| ZeiError::SolvencyVerificationError)?;
 
 	let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
@@ -187,44 +187,44 @@ mod test {
 	use linear_map::LinearMap;
 
 	fn do_test_solvency(
-		hidden_assets: &[(Scalar, Scalar)],
-		public_assets: &[(Scalar, Scalar)],
-		hidden_liabilities: &[(Scalar, Scalar)],
-		public_liabilities: &[(Scalar, Scalar)],
-		rates: &LinearMap<Scalar, Scalar>,
+		hidden_asset_set: &[(Scalar, Scalar)],
+		public_asset_set: &[(Scalar, Scalar)],
+		hidden_liability_set: &[(Scalar, Scalar)],
+		public_liability_set: &[(Scalar, Scalar)],
+		conversion_rates: &LinearMap<Scalar, Scalar>,
 		pass: bool,
 	) {
 		let pc_gens = PedersenGens::default();
 		let mut prng = ChaChaRng::from_seed([1u8; 32]);
 		let mut assets_blinds = vec![];
-		for _ in 0..hidden_assets.len() {
+		for _ in 0..hidden_asset_set.len() {
 			assets_blinds.push((Scalar::random(&mut prng), Scalar::random(&mut prng)));
 		}
 
 		let mut liabilities_blinds = vec![];
-		for _ in 0..hidden_liabilities.len() {
+		for _ in 0..hidden_liability_set.len() {
 			liabilities_blinds.push((Scalar::random(&mut prng), Scalar::random(&mut prng)));
 		}
 
 		let proof = super::prove_solvency(
-			hidden_assets,
+			hidden_asset_set,
 			assets_blinds.as_slice(),
-			public_assets,
-			hidden_liabilities,
+			public_asset_set,
+			hidden_liability_set,
 			liabilities_blinds.as_slice(),
-			public_liabilities,
-			&rates,
+			public_liability_set,
+			&conversion_rates,
 		).unwrap();
 
 		let mut hidden_assets_coms = vec![];
-		for ((a, t), (ba, bt)) in hidden_assets.
+		for ((a, t), (ba, bt)) in hidden_asset_set.
 			iter().zip(assets_blinds.iter()) {
 			let com_a = pc_gens.commit(*a, *ba).compress();
 			let com_t = pc_gens.commit(*t, *bt).compress();
 			hidden_assets_coms.push((com_a, com_t));
 		}
 		let mut hidden_liabilities_coms = vec![];
-		for ((a, t), (ba, bt)) in hidden_liabilities.
+		for ((a, t), (ba, bt)) in hidden_liability_set.
 			iter().zip(liabilities_blinds.iter()) {
 			let com_a = pc_gens.commit(*a, *ba).compress();
 			let com_t = pc_gens.commit(*t, *bt).compress();
@@ -233,10 +233,10 @@ mod test {
 
 		let vrfy = super::verify_solvency(
 			hidden_assets_coms.as_slice(),
-			public_assets,
+			public_asset_set,
 			hidden_liabilities_coms.as_slice(),
-			public_liabilities,
-			&rates,
+			public_liability_set,
+			&conversion_rates,
 			&proof
 		);
 		assert_eq!(pass, vrfy.is_ok());
