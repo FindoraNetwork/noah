@@ -307,7 +307,7 @@ mod test {
     use crate::algebra::bls12_381::{BLSG1, BLSScalar};
     use bulletproofs::PedersenGens;
     use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
-    use crate::xfr::lib::test::create_xfr;
+    use crate::xfr::lib::tests::create_xfr;
 
     fn do_test_build_open_asset_record(confidential_amount: bool, confidential_asset: bool, asset_tracking: bool) {
         let mut prng: ChaChaRng;

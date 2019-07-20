@@ -324,10 +324,8 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord], p
     asset_mixer_verify( in_coms.as_slice() , out_coms.as_slice(), proof )
 }
 
-
-
 #[cfg(test)]
-pub(crate) mod test {
+pub(crate) mod tests {
     use super::*;
     use crate::algebra::groups::{Scalar as ScalarTrait};
     use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext};

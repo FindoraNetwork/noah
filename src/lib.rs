@@ -2,6 +2,7 @@
 //#![feature(try_from)]
 //#![feature(try_trait)]
 //#![feature(custom_attribute)]
+#![feature(test)]
 
 extern crate bulletproofs;
 extern crate curve25519_dalek;
@@ -26,6 +27,7 @@ extern crate serde_json;
 extern crate sha2;
 extern crate sodiumoxide;
 extern crate spacesuit;
+extern crate test;
 
 mod utils;
 mod algebra;

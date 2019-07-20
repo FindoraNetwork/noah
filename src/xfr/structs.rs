@@ -170,7 +170,7 @@ impl Eq for XfrRangeProof {}
 mod test{
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
-    use crate::xfr::lib::test::create_xfr;
+    use crate::xfr::lib::tests::create_xfr;
     use serde::ser::{Serialize};
     use serde::de::{Deserialize};
     use rmp_serde::{Deserializer, Serializer};
