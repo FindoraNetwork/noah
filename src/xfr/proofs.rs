@@ -1,16 +1,23 @@
-use bulletproofs::{RangeProof, PedersenGens};
-use crate::algebra::bls12_381::{BLSG1, BLSG2, BLSScalar, BLSGt};
-use crate::algebra::groups::{Scalar as ScalarTrait, Group};
-use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, elgamal_encrypt};
+use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
+use crate::algebra::groups::{Group, Scalar as ScalarTrait};
+use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalPublicKey};
 use crate::crypto::anon_creds::ACRevealSig;
-use crate::crypto::conf_cred_reveal::{AggPoKAttrs, pok_attrs_prove, pok_attrs_verify};
+use crate::crypto::chaum_pedersen::{
+    chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX,
+};
+use crate::crypto::conf_cred_reveal::{pok_attrs_prove, pok_attrs_verify, AggPoKAttrs};
+use crate::crypto::pedersen_elgamal::{
+    pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_eq_aggregate_verify_fast,
+    PedersenElGamalEqProof,
+};
 use crate::errors::ZeiError;
-use crate::crypto::chaum_pedersen::{chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX, chaum_pedersen_prove_multiple_eq};
-use crate::crypto::pedersen_elgamal::{pedersen_elgamal_aggregate_eq_proof, PedersenElGamalEqProof, pedersen_elgamal_eq_aggregate_verify_fast};
-use crate::setup::{MAX_PARTY_NUMBER, BULLET_PROOF_RANGE, PublicParams};
-use crate::xfr::structs::{OpenAssetRecord, XfrBody, IdRevealPolicy, XfrRangeProof, BlindAssetRecord};
-use crate::utils::{u8_bigendian_slice_to_u128, u64_to_u32_pair, min_greater_equal_power_of_two};
-use curve25519_dalek::ristretto::{RistrettoPoint, CompressedRistretto};
+use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
+use crate::utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
+use crate::xfr::structs::{
+    AssetIssuerPubKeys, BlindAssetRecord, IdRevealPolicy, OpenAssetRecord, XfrBody, XfrRangeProof,
+};
+use bulletproofs::{PedersenGens, RangeProof};
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
 use merlin::Transcript;
@@ -20,17 +27,16 @@ const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 
 // BLS12_381 implementation of confidential identity reveal protocol
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ConfIdReveal{
+pub struct ConfIdReveal {
     ctexts: Vec<ElGamalCiphertext<BLSG1>>,
     attr_reveal_proof: ACRevealSig<BLSG1, BLSG2, BLSScalar>,
     pok_attrs: AggPoKAttrs<BLSG1, BLSG2, BLSScalar>,
 }
 
-
 pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
     prng: &mut R,
-    outputs:&[OpenAssetRecord],
-)->Result<Option<PedersenElGamalEqProof>, ZeiError>{
+    outputs: &[OpenAssetRecord],
+) -> Result<Option<PedersenElGamalEqProof>, ZeiError> {
     //let mut v = vec![];
     let mut m = vec![]; //amounts and asset type
     let mut r = vec![]; //randomness used in commitments and encryption
@@ -38,21 +44,76 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
     let mut commitments = vec![];
     let mut public_keys = vec![];
     //let mut identity_proofs = vec![];
-    for output in outputs.iter(){
-        if output.asset_record.issuer_public_key.is_some(){
-            public_keys.push(output.asset_record.issuer_public_key.as_ref().unwrap().clone());
+    for output in outputs.iter() {
+        if output.asset_record.issuer_public_key.is_some() {
+            public_keys.push(
+                output
+                    .asset_record
+                    .issuer_public_key
+                    .as_ref()
+                    .unwrap()
+                    .clone(),
+            );
             if output.asset_record.asset_type_commitment.is_some() {
-                commitments.push(output.asset_record.asset_type_commitment.ok_or(ZeiError::InconsistentStructureError)?.decompress().unwrap());
-                ctexts.push(output.asset_record.issuer_lock_type.as_ref().ok_or(ZeiError::InconsistentStructureError)?.clone());
-                m.push(Scalar::from(u8_bigendian_slice_to_u128(&output.asset_type[..])));
+                commitments.push(
+                    output
+                        .asset_record
+                        .asset_type_commitment
+                        .ok_or(ZeiError::InconsistentStructureError)?
+                        .decompress()
+                        .unwrap(),
+                );
+                ctexts.push(
+                    output
+                        .asset_record
+                        .issuer_lock_type
+                        .as_ref()
+                        .ok_or(ZeiError::InconsistentStructureError)?
+                        .clone(),
+                );
+                m.push(Scalar::from(u8_bigendian_slice_to_u128(
+                    &output.asset_type[..],
+                )));
                 r.push(output.type_blind);
             }
             if output.asset_record.amount_commitments.is_some() {
                 let (amount_low, amount_high) = u64_to_u32_pair(output.amount);
-                commitments.push(output.asset_record.amount_commitments.ok_or(ZeiError::InconsistentStructureError)?.0.decompress().unwrap());
-                commitments.push(output.asset_record.amount_commitments.ok_or(ZeiError::InconsistentStructureError)?.1.decompress().unwrap());
-                ctexts.push(output.asset_record.issuer_lock_amount.as_ref().ok_or(ZeiError::InconsistentStructureError)?.0.clone());
-                ctexts.push(output.asset_record.issuer_lock_amount.as_ref().ok_or(ZeiError::InconsistentStructureError)?.1.clone());
+                commitments.push(
+                    output
+                        .asset_record
+                        .amount_commitments
+                        .ok_or(ZeiError::InconsistentStructureError)?
+                        .0
+                        .decompress()
+                        .unwrap(),
+                );
+                commitments.push(
+                    output
+                        .asset_record
+                        .amount_commitments
+                        .ok_or(ZeiError::InconsistentStructureError)?
+                        .1
+                        .decompress()
+                        .unwrap(),
+                );
+                ctexts.push(
+                    output
+                        .asset_record
+                        .issuer_lock_amount
+                        .as_ref()
+                        .ok_or(ZeiError::InconsistentStructureError)?
+                        .0
+                        .clone(),
+                );
+                ctexts.push(
+                    output
+                        .asset_record
+                        .issuer_lock_amount
+                        .as_ref()
+                        .ok_or(ZeiError::InconsistentStructureError)?
+                        .1
+                        .clone(),
+                );
                 m.push(Scalar::from(amount_low));
                 m.push(Scalar::from(amount_high));
                 r.push(output.amount_blinds.0);
@@ -68,9 +129,9 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
             r.as_slice(),
             &public_keys[0].eg_ristretto_pub_key,
             ctexts.as_slice(),
-            commitments.as_slice()));
-    }
-    else{
+            commitments.as_slice(),
+        ));
+    } else {
         proof = None;
     }
 
@@ -80,28 +141,80 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
 pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(
     prng: &mut R,
     xfr_body: &XfrBody,
-    attribute_reveal_policies: &[Option<IdRevealPolicy>]
-) -> Result<(), ZeiError>
-{
+    attribute_reveal_policies: &[Option<IdRevealPolicy>],
+) -> Result<(), ZeiError> {
+    fn same_key(
+        first_key: Option<&AssetIssuerPubKeys>,
+        second_key: Option<&AssetIssuerPubKeys>,
+    ) -> bool {
+        match (first_key, second_key) {
+            (Some(first_key), Some(second_key)) => return *first_key == *second_key,
+            (None, None) => return true,
+            _ => return false,
+        }
+    }
+    let issuer_public_key = xfr_body.inputs[0].issuer_public_key.as_ref();
 
-    match xfr_body.inputs[0].issuer_public_key.as_ref() {
-        None => {},
+    for input in xfr_body.inputs.iter().next() {
+        if !same_key(input.issuer_public_key.as_ref(), issuer_public_key) {
+            return Err(ZeiError::InconsistentStructureError);
+        }
+    }
+
+    for output in xfr_body.outputs.iter().next() {
+        if !same_key(output.issuer_public_key.as_ref(), issuer_public_key) {
+            return Err(ZeiError::InconsistentStructureError);
+        }
+    }
+
+    match issuer_public_key {
+        None => {}
         Some(public_key) => {
-            match xfr_body.proofs.asset_tracking_proof.aggregate_amount_asset_type_proof.as_ref() {
-                None => {},
+            match xfr_body
+                .proofs
+                .asset_tracking_proof
+                .aggregate_amount_asset_type_proof
+                .as_ref()
+            {
+                None => {
+                    return Err(ZeiError::XfrVerifyIssuerTrackingEmptyProofError);
+                }
                 Some(proof) => {
                     let mut ctexts = vec![];
                     let mut coms = vec![];
                     for output in xfr_body.outputs.iter() {
                         if output.issuer_lock_type.is_some() {
                             ctexts.push(output.issuer_lock_type.as_ref().unwrap().clone());
-                            coms.push(output.asset_type_commitment.ok_or(ZeiError::InconsistentStructureError)?.decompress().unwrap().clone());
+                            coms.push(
+                                output
+                                    .asset_type_commitment
+                                    .ok_or(ZeiError::InconsistentStructureError)?
+                                    .decompress()
+                                    .unwrap()
+                                    .clone(),
+                            );
                         }
                         if output.issuer_lock_amount.is_some() {
                             ctexts.push(output.issuer_lock_amount.as_ref().unwrap().0.clone());
                             ctexts.push(output.issuer_lock_amount.as_ref().unwrap().1.clone());
-                            coms.push(output.amount_commitments.ok_or(ZeiError::InconsistentStructureError)?.0.decompress().unwrap().clone());
-                            coms.push(output.amount_commitments.ok_or(ZeiError::InconsistentStructureError)?.1.decompress().unwrap().clone());
+                            coms.push(
+                                output
+                                    .amount_commitments
+                                    .ok_or(ZeiError::InconsistentStructureError)?
+                                    .0
+                                    .decompress()
+                                    .unwrap()
+                                    .clone(),
+                            );
+                            coms.push(
+                                output
+                                    .amount_commitments
+                                    .ok_or(ZeiError::InconsistentStructureError)?
+                                    .1
+                                    .decompress()
+                                    .unwrap()
+                                    .clone(),
+                            );
                         }
                     }
                     pedersen_elgamal_eq_aggregate_verify_fast(
@@ -109,24 +222,26 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(
                         &public_key.eg_ristretto_pub_key,
                         ctexts.as_slice(),
                         coms.as_slice(),
-                        proof).map_err(|_| ZeiError::XfrVerifyIssuerTrackingAssetAmountError)?;
+                        proof,
+                    )
+                    .map_err(|_| ZeiError::XfrVerifyIssuerTrackingAssetAmountError)?;
                 }
             };
-            for (proof, attr_reveal_policy) in
-                xfr_body.proofs.asset_tracking_proof.identity_proofs.
-                    iter().
-                    zip(attribute_reveal_policies)
-                {
-                    match attr_reveal_policy {
-                        None => {},
-                        Some(policy) => {
-                            verify_attribute_reveal_policy(
-                                &public_key.eg_blsg1_pub_key,
-                                proof,
-                                policy).map_err(|_| ZeiError::XfrVerifyIssuerTrackingIdentityError)?;
-                        }
+            for (proof, attr_reveal_policy) in xfr_body
+                .proofs
+                .asset_tracking_proof
+                .identity_proofs
+                .iter()
+                .zip(attribute_reveal_policies)
+            {
+                match attr_reveal_policy {
+                    None => {}
+                    Some(policy) => {
+                        verify_attribute_reveal_policy(&public_key.eg_blsg1_pub_key, proof, policy)
+                            .map_err(|_| ZeiError::XfrVerifyIssuerTrackingIdentityError)?;
                     }
                 }
+            }
         }
     };
 
@@ -138,16 +253,11 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(
 fn verify_attribute_reveal_policy(
     asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
     option_proof: &Option<ConfIdReveal>,
-    policy: &IdRevealPolicy) -> Result<(), ZeiError>
-{
-    match option_proof{
+    policy: &IdRevealPolicy,
+) -> Result<(), ZeiError> {
+    match option_proof {
         None => return Err(ZeiError::XfrVerifyIssuerTrackingIdentityError),
-        Some(identity_proof) => {
-            verify_conf_id_reveal(
-                &identity_proof,
-                asset_issuer_pk,
-                policy)
-        }
+        Some(identity_proof) => verify_conf_id_reveal(&identity_proof, asset_issuer_pk, policy),
     }
 }
 
@@ -157,25 +267,23 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
     policy: &IdRevealPolicy,
     attr_reveal_proof: &ACRevealSig<BLSG1, BLSG2, BLSScalar>,
     asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
-)
-    -> Result<ConfIdReveal, ZeiError>
-{
+) -> Result<ConfIdReveal, ZeiError> {
     let mut ctexts = vec![];
     let mut rands = vec![];
     let base = BLSG1::get_base();
     let mut revealed_attrs = vec![];
-    for (attr,b) in attrs.iter().zip(policy.bitmap.iter()){
+    for (attr, b) in attrs.iter().zip(policy.bitmap.iter()) {
         if *b {
             let r = BLSScalar::random_scalar(prng);
-            let ctext = elgamal_encrypt::<BLSScalar, BLSG1>(
-                &base, attr, &r, asset_issuer_public_key);
+            let ctext =
+                elgamal_encrypt::<BLSScalar, BLSG1>(&base, attr, &r, asset_issuer_public_key);
             rands.push(r);
             ctexts.push(ctext);
             revealed_attrs.push(attr.clone());
         }
     }
 
-    let pok_attrs_proof = pok_attrs_prove::<_,BLSScalar,BLSGt>(
+    let pok_attrs_proof = pok_attrs_prove::<_, BLSScalar, BLSGt>(
         prng,
         &policy.cred_issuer_pub_key,
         asset_issuer_public_key,
@@ -186,21 +294,19 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(
         attr_reveal_proof,
     )?;
 
-    Ok(ConfIdReveal{
+    Ok(ConfIdReveal {
         ctexts,
-        attr_reveal_proof:attr_reveal_proof.clone(),
+        attr_reveal_proof: attr_reveal_proof.clone(),
         pok_attrs: pok_attrs_proof,
     })
-
 }
 
 pub fn verify_conf_id_reveal(
     conf_id_reveal: &ConfIdReveal,
     asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
     attr_reveal_policy: &IdRevealPolicy,
-) -> Result<(), ZeiError>
-{
-    pok_attrs_verify::<BLSScalar,BLSGt>(
+) -> Result<(), ZeiError> {
+    pok_attrs_verify::<BLSScalar, BLSGt>(
         &attr_reveal_policy.cred_issuer_pub_key,
         asset_issuer_public_key,
         &conf_id_reveal.attr_reveal_proof,
@@ -286,7 +392,7 @@ pub(crate) fn range_proof(
         range_proof_blinds.as_slice(),
         BULLET_PROOF_RANGE,
     )
-        .map_err(|_| ZeiError::RangeProofProveError)?;
+    .map_err(|_| ZeiError::RangeProofProveError)?;
 
     let diff_com_low = coms[2 * num_output];
     let diff_com_high = coms[2 * num_output + 1];
@@ -300,9 +406,8 @@ pub(crate) fn range_proof(
 pub(crate) fn verify_confidential_amount(
     inputs: &[BlindAssetRecord],
     outputs: &[BlindAssetRecord],
-    range_proof: &XfrRangeProof
-) -> Result<(), ZeiError>
-{
+    range_proof: &XfrRangeProof,
+) -> Result<(), ZeiError> {
     let num_output = outputs.len();
     let upper_power2 = min_greater_equal_power_of_two((2 * num_output + 2) as u32) as usize;
     if upper_power2 > MAX_PARTY_NUMBER {
@@ -371,13 +476,16 @@ pub(crate) fn verify_confidential_amount(
         range_coms.push(CompressedRistretto::identity());
     }
 
-    range_proof.range_proof.verify_multiple(
-        &params.bp_gens,
-        &params.pc_gens,
-        &mut transcript,
-        range_coms.as_slice(),
-        BULLET_PROOF_RANGE).map_err(|_| ZeiError::XfrVerifyConfidentialAmountError)
-
+    range_proof
+        .range_proof
+        .verify_multiple(
+            &params.bp_gens,
+            &params.pc_gens,
+            &mut transcript,
+            range_coms.as_slice(),
+            BULLET_PROOF_RANGE,
+        )
+        .map_err(|_| ZeiError::XfrVerifyConfidentialAmountError)
 }
 
 /**** Asset Equality Proofs *****/
@@ -431,9 +539,8 @@ pub(crate) fn verify_confidential_asset<R: CryptoRng + Rng>(
     prng: &mut R,
     inputs: &[BlindAssetRecord],
     outputs: &[BlindAssetRecord],
-    asset_proof: &ChaumPedersenProofX
-) -> Result<(), ZeiError>
-{
+    asset_proof: &ChaumPedersenProofX,
+) -> Result<(), ZeiError> {
     let pc_gens = PedersenGens::default();
     let mut asset_commitments: Vec<RistrettoPoint> = inputs
         .iter()
@@ -451,7 +558,8 @@ pub(crate) fn verify_confidential_asset<R: CryptoRng + Rng>(
         prng,
         &pc_gens,
         asset_commitments.as_slice(),
-        asset_proof)? {
+        asset_proof,
+    )? {
         true => Ok(()),
         false => Err(ZeiError::XfrVerifyConfidentialAssetError),
     }
