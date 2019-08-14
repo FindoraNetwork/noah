@@ -18,7 +18,10 @@ pub enum ZeiError {
   XfrCreationAssetAmountError,
   XfrVerifyIssuerTrackingAssetAmountError,
   XfrVerifyIssuerTrackingIdentityError,
+<<<<<<< HEAD
   XfrVerifyIssuerTrackingEmptyProofError,
+=======
+>>>>>>> master
   XfrVerifyConfidentialAmountError,
   ElGamalVerificationError,
   ElGamalDecryptionError,
@@ -61,9 +64,12 @@ impl fmt::Display for ZeiError {
                   ZeiError::XfrVerifyIssuerTrackingIdentityError => {
                     "Asset Tracking error. Identity reveal proof does not hold"
                   }
+<<<<<<< HEAD
                   ZeiError::XfrVerifyIssuerTrackingEmptyProofError => {
                     "Asset Tracking error. Tracked assets must contain asset tracking proof"
                   }
+=======
+>>>>>>> master
                   ZeiError::XfrVerifyConfidentialAssetError => {
                     "Invalid asset type in non confidential asset transfer"
                   }
@@ -122,9 +128,12 @@ impl error::Error for ZeiError {
       ZeiError::XfrVerifyIssuerTrackingIdentityError => {
         "Asset Tracking error. Identity reveal proof does not hold"
       }
+<<<<<<< HEAD
       ZeiError::XfrVerifyIssuerTrackingEmptyProofError => {
         "Asset Tracking error. Tracked assets must contain asset tracking proof"
       }
+=======
+>>>>>>> master
       ZeiError::XfrVerifyConfidentialAssetError => {
         "Invalid asset type in non confidential asset transfer"
       }
