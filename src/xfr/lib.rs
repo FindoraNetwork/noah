@@ -269,10 +269,6 @@ fn verify_plain_asset(inputs: &[BlindAssetRecord],
   for x in outputs.iter() {
     list.push(x.asset_type.unwrap());
   }
-<<<<<<< HEAD
-=======
-
->>>>>>> master
   match list.iter().all_equal() {
     true => Ok(()),
     false => Err(ZeiError::XfrVerifyAssetAmountError),
@@ -357,11 +353,7 @@ pub(crate) mod tests {
   use crate::errors::ZeiError::{
     XfrCreationAssetAmountError, XfrVerifyAssetAmountError, XfrVerifyConfidentialAmountError,
     XfrVerifyConfidentialAssetError, XfrVerifyIssuerTrackingAssetAmountError,
-<<<<<<< HEAD
     XfrVerifyIssuerTrackingEmptyProofError, XfrVerifyIssuerTrackingIdentityError,
-=======
-    XfrVerifyIssuerTrackingIdentityError,
->>>>>>> master
   };
   use crate::utils::u64_to_u32_pair;
   use crate::xfr::proofs::create_conf_id_reveal;
@@ -682,7 +674,6 @@ pub(crate) mod tests {
       assert_eq!(Ok(()),
                  verify_xfr_note(&mut prng, &xfr_note, &null_policies),
                  "Transfer is ok");
-<<<<<<< HEAD
 
       // test asset tracking without proof
       let old_proof = xfr_note.body
@@ -705,8 +696,6 @@ pub(crate) mod tests {
               .asset_tracking_proof
               .aggregate_amount_asset_type_proof = old_proof;
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
-=======
->>>>>>> master
     }
     // test bad amount tracking
     if asset_tracking && confidential_amount {
@@ -729,10 +718,6 @@ pub(crate) mod tests {
   fn test_transfer_not_confidential() {
     /*! I test non confidential transfers*/
     do_transfer_tests(false, false, false);
-<<<<<<< HEAD
-=======
-    do_transfer_tests(false, false, true);
->>>>>>> master
   }
 
   #[test]
