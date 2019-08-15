@@ -269,7 +269,6 @@ fn verify_plain_asset(inputs: &[BlindAssetRecord],
   for x in outputs.iter() {
     list.push(x.asset_type.unwrap());
   }
-
   match list.iter().all_equal() {
     true => Ok(()),
     false => Err(ZeiError::XfrVerifyAssetAmountError),
@@ -354,7 +353,7 @@ pub(crate) mod tests {
   use crate::errors::ZeiError::{
     XfrCreationAssetAmountError, XfrVerifyAssetAmountError, XfrVerifyConfidentialAmountError,
     XfrVerifyConfidentialAssetError, XfrVerifyIssuerTrackingAssetAmountError,
-    XfrVerifyIssuerTrackingIdentityError,
+    XfrVerifyIssuerTrackingEmptyProofError, XfrVerifyIssuerTrackingIdentityError,
   };
   use crate::utils::u64_to_u32_pair;
   use crate::xfr::proofs::create_conf_id_reveal;
@@ -675,6 +674,28 @@ pub(crate) mod tests {
       assert_eq!(Ok(()),
                  verify_xfr_note(&mut prng, &xfr_note, &null_policies),
                  "Transfer is ok");
+
+      // test asset tracking without proof
+      let old_proof = xfr_note.body
+                              .proofs
+                              .asset_tracking_proof
+                              .aggregate_amount_asset_type_proof
+                              .clone();
+      xfr_note.body
+              .proofs
+              .asset_tracking_proof
+              .aggregate_amount_asset_type_proof = None;
+      xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
+      assert_eq!(Err(XfrVerifyIssuerTrackingEmptyProofError),
+                 verify_xfr_note(&mut prng, &xfr_note, &null_policies),
+                 "Transfer should fail without proof");
+
+      //restore
+      xfr_note.body
+              .proofs
+              .asset_tracking_proof
+              .aggregate_amount_asset_type_proof = old_proof;
+      xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
     }
     // test bad amount tracking
     if asset_tracking && confidential_amount {
@@ -697,7 +718,6 @@ pub(crate) mod tests {
   fn test_transfer_not_confidential() {
     /*! I test non confidential transfers*/
     do_transfer_tests(false, false, false);
-    do_transfer_tests(false, false, true);
   }
 
   #[test]
