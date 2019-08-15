@@ -1,24 +1,26 @@
 use super::groups::Group;
 use super::pairing::Pairing;
-use crate::algebra::groups::Scalar;
-use crate::utils::u8_bigendian_slice_to_u32;
 use bn::{Group as BNGroup, Gt};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use rand::{CryptoRng, Rng};
-use serde::de::{SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use rand::{CryptoRng, Rng, SeedableRng};
+use rand_chacha::ChaChaRng;
+use serde_json;
 use std::fmt;
 
+#[derive(Serialize, Deserialize)]
 pub struct BNScalar(pub(crate) bn::Fr);
+#[derive(Serialize, Deserialize)]
 pub struct BNG1(pub(crate) bn::G1);
+#[derive(Serialize, Deserialize)]
 pub struct BNG2(pub(crate) bn::G2);
 #[derive(Clone, PartialEq, Eq)]
 pub struct BNGt(pub(crate) bn::Gt);
 
 impl fmt::Debug for BNScalar {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "Fr:{}", rustc_serialize::json::encode(&self.0).unwrap())
+    //write!(f, "Fr:{}", rustc_serialize::json::encode(&self.0).unwrap())
+    write!(f, "Fr:{}", serde_json::to_string(&self.0).unwrap())
   }
 }
 
@@ -39,17 +41,7 @@ impl Clone for BNScalar {
 impl crate::algebra::groups::Scalar for BNScalar {
   // scalar generation
   fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> BNScalar {
-    // hack to use rand_04::Rng rather than rand::Rng
-    let mut random_bytes = [0u8; 16];
-    rng.fill_bytes(&mut random_bytes);
-    let mut seed = [0u32; 4];
-    for i in 0..4 {
-      seed[i] = u8_bigendian_slice_to_u32(&random_bytes[i * 4..(i + 1) * 4]);
-    }
-
-    use rand_04::SeedableRng;
-    let mut prng_04 = rand_04::ChaChaRng::from_seed(&seed);
-    BNScalar(bn::Fr::random(&mut prng_04))
+    BNScalar(bn::Fr::random(rng))
   }
 
   fn from_u32(value: u32) -> BNScalar {
@@ -78,12 +70,11 @@ impl crate::algebra::groups::Scalar for BNScalar {
     where D: Digest<OutputSize = U64> + Default
   {
     let result = hash.result();
-    let mut seed = [0u32; 16];
-    for i in 0..16 {
-      seed[i] = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
+    let mut seed = [0u8; 32];
+    for i in 0..32 {
+      seed[i] = result[i];
     }
-    use rand_04::SeedableRng;
-    let mut prng = rand_04::ChaChaRng::from_seed(&seed);
+    let mut prng = ChaChaRng::from_seed(seed);
     BNScalar(bn::Fr::random(&mut prng))
   }
 
@@ -97,16 +88,14 @@ impl crate::algebra::groups::Scalar for BNScalar {
 
   //scalar serialization
   fn to_bytes(&self) -> Vec<u8> {
-    let json = rustc_serialize::json::encode(&self.0).unwrap();
-    let bytes = json.into_bytes();
-    bytes
+    bincode::serialize(&self.0).unwrap()
   }
   fn from_bytes(bytes: &[u8]) -> BNScalar {
-    let json = &String::from_utf8(bytes.to_vec()).unwrap();
-    BNScalar(rustc_serialize::json::decode(json).unwrap())
+    BNScalar(bincode::deserialize(bytes).unwrap())
   }
 }
 
+/*
 impl Serialize for BNScalar {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer
@@ -118,6 +107,7 @@ impl Serialize for BNScalar {
     }
   }
 }
+
 
 impl<'de> Deserialize<'de> for BNScalar {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -160,10 +150,10 @@ impl<'de> Deserialize<'de> for BNScalar {
     }
   }
 }
-
+*/
 impl fmt::Debug for BNG1 {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "Fr:{}", rustc_serialize::json::encode(&self.0).unwrap())
+    write!(f, "Fr:{}", serde_json::to_string(&self.0).unwrap())
   }
 }
 
@@ -193,11 +183,10 @@ impl Group<BNScalar> for BNG1 {
 
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
-    rustc_serialize::json::encode(&self.0).unwrap().into_bytes()
+    bincode::serialize(&self.0).unwrap()
   }
   fn from_compressed_bytes(bytes: &[u8]) -> Option<BNG1> {
-    let json = &String::from_utf8(bytes.to_vec()).unwrap();
-    match rustc_serialize::json::decode(json) {
+    match bincode::deserialize(bytes) {
       Ok(x) => Some(BNG1(x)),
       Err(_) => None,
     }
@@ -215,6 +204,7 @@ impl Group<BNScalar> for BNG1 {
   }
 }
 
+/*
 impl Serialize for BNG1 {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer
@@ -268,10 +258,11 @@ impl<'de> Deserialize<'de> for BNG1 {
     }
   }
 }
+*/
 
 impl fmt::Debug for BNG2 {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "Fr:{}", rustc_serialize::json::encode(&self.0).unwrap())
+    write!(f, "Fr:{}", serde_json::to_string(&self.0).unwrap())
   }
 }
 
@@ -301,11 +292,10 @@ impl Group<BNScalar> for BNG2 {
 
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
-    rustc_serialize::json::encode(&self.0).unwrap().into_bytes()
+    bincode::serialize(&self.0).unwrap()
   }
   fn from_compressed_bytes(bytes: &[u8]) -> Option<BNG2> {
-    let json = &String::from_utf8(bytes.to_vec()).unwrap();
-    match rustc_serialize::json::decode(json) {
+    match bincode::deserialize(bytes) {
       Ok(x) => Some(BNG2(x)),
       Err(_) => None,
     }
@@ -323,6 +313,7 @@ impl Group<BNScalar> for BNG2 {
   }
 }
 
+/*
 impl Serialize for BNG2 {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer
@@ -376,6 +367,7 @@ impl<'de> Deserialize<'de> for BNG2 {
     }
   }
 }
+*/
 
 impl fmt::Debug for BNGt {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -475,5 +467,20 @@ mod credentials_over_bn {
   #[test]
   fn two_attributes() {
     credentials_tests::two_attributes::<super::BNScalar, super::BNGt>();
+  }
+
+  #[test]
+  fn ten_attributes() {
+    credentials_tests::ten_attributes::<super::BNScalar, super::BNGt>();
+  }
+
+  #[test]
+  fn to_json_credential_structures() {
+    credentials_tests::to_json_credential_structures::<super::BNScalar, super::BNGt>();
+  }
+
+  #[test]
+  fn to_msg_pack_credential_structures() {
+    credentials_tests::to_msg_pack_credential_structures::<super::BNScalar, super::BNGt>();
   }
 }

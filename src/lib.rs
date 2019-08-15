@@ -17,7 +17,6 @@ extern crate pairing;
 extern crate rand;
 extern crate rand_04;
 extern crate rmp_serde;
-extern crate rustc_serialize;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
