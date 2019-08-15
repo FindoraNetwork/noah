@@ -14,7 +14,7 @@ use crate::errors::ZeiError;
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
 use crate::xfr::structs::{
-  BlindAssetRecord, IdRevealPolicy, OpenAssetRecord, XfrBody, XfrRangeProof,
+  AssetIssuerPubKeys, BlindAssetRecord, IdRevealPolicy, OpenAssetRecord, XfrBody, XfrRangeProof,
 };
 use bulletproofs::{PedersenGens, RangeProof};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -117,7 +117,29 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
                                                                xfr_body: &XfrBody,
                                                                attribute_reveal_policies: &[Option<IdRevealPolicy>])
                                                                -> Result<(), ZeiError> {
-  match xfr_body.inputs[0].issuer_public_key.as_ref() {
+  fn same_key(first_key: Option<&AssetIssuerPubKeys>,
+              second_key: Option<&AssetIssuerPubKeys>)
+              -> bool {
+    match (first_key, second_key) {
+      (Some(first_key), Some(second_key)) => return *first_key == *second_key,
+      (None, None) => return true,
+      _ => return false,
+    }
+  }
+  let issuer_public_key = xfr_body.inputs[0].issuer_public_key.as_ref();
+
+  for input in xfr_body.inputs.iter().next() {
+    if !same_key(input.issuer_public_key.as_ref(), issuer_public_key) {
+      return Err(ZeiError::InconsistentStructureError);
+    }
+  }
+  for output in xfr_body.outputs.iter().next() {
+    if !same_key(output.issuer_public_key.as_ref(), issuer_public_key) {
+      return Err(ZeiError::InconsistentStructureError);
+    }
+  }
+
+  match issuer_public_key {
     None => {}
     Some(public_key) => {
       match xfr_body.proofs
@@ -125,7 +147,9 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
                     .aggregate_amount_asset_type_proof
                     .as_ref()
       {
-        None => {}
+        None => {
+          return Err(ZeiError::XfrVerifyIssuerTrackingEmptyProofError);
+        }
         Some(proof) => {
           let mut ctexts = vec![];
           let mut coms = vec![];
@@ -160,7 +184,9 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
                         &public_key.eg_ristretto_pub_key,
                         ctexts.as_slice(),
                         coms.as_slice(),
-                        proof).map_err(|_| ZeiError::XfrVerifyIssuerTrackingAssetAmountError)?;
+                        proof,
+                    )
+                    .map_err(|_| ZeiError::XfrVerifyIssuerTrackingAssetAmountError)?;
         }
       };
       for (proof, attr_reveal_policy) in xfr_body.proofs
@@ -172,10 +198,8 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
         match attr_reveal_policy {
           None => {}
           Some(policy) => {
-            verify_attribute_reveal_policy(
-                                &public_key.eg_blsg1_pub_key,
-                                proof,
-                                policy).map_err(|_| ZeiError::XfrVerifyIssuerTrackingIdentityError)?;
+            verify_attribute_reveal_policy(&public_key.eg_blsg1_pub_key, proof, policy)
+                            .map_err(|_| ZeiError::XfrVerifyIssuerTrackingIdentityError)?;
           }
         }
       }
