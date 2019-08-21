@@ -6,6 +6,8 @@ use serde::de::{Visitor, SeqAccess};
 use crate::serialization::ZeiFromToBytes;
 */
 use crate::algebra::groups::{Group, Scalar};
+use curve25519_dalek::ristretto::RistrettoPoint;
+use std::hash::{Hash, Hasher};
 //use std::marker::PhantomData;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,6 +31,12 @@ pub fn elgamal_derive_public_key<S: Scalar, G: Group<S>>(base: &G,
 pub struct ElGamalCiphertext<G> {
   pub(crate) e1: G, //r*G
   pub(crate) e2: G, //m*G + r*PK
+}
+
+impl Hash for ElGamalPublicKey<RistrettoPoint> {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    self.0.to_compressed_bytes().as_slice().hash(state);
+  }
 }
 
 /*
