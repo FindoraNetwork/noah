@@ -29,7 +29,7 @@ extern crate sodiumoxide;
 extern crate spacesuit;
 extern crate test;
 
-pub mod algebra;
+mod algebra;
 pub mod basic_crypto;
 pub mod crypto;
 pub mod errors;
