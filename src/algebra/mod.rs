@@ -1,5 +1,5 @@
 pub mod bls12_381;
-pub(crate) mod bn;
+pub mod bn;
 pub mod groups;
 pub(crate) mod pairing;
 pub(crate) mod ristretto;
