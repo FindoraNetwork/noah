@@ -38,7 +38,7 @@ pub struct XfrBody {
   pub(crate) proofs: XfrProofs,
 }
 
-type EGPubKey = ElGamalPublicKey<RistrettoPoint>;
+pub type EGPubKey = ElGamalPublicKey<RistrettoPoint>;
 type EGPubKeyId = ElGamalPublicKey<BLSG1>;
 type EGCText = ElGamalCiphertext<RistrettoPoint>;
 
@@ -53,7 +53,7 @@ pub struct AssetIssuerPubKeys {
 pub struct BlindAssetRecord {
   // amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
   // commitments and ciphertext
-  pub(crate) issuer_public_key: Option<AssetIssuerPubKeys>, //None if issuer tracking is not required
+  pub issuer_public_key: Option<AssetIssuerPubKeys>, //None if issuer tracking is not required
   pub(crate) issuer_lock_amount: Option<(EGCText, EGCText)>, //None if issuer tracking not required or amount is not confidential
   pub(crate) issuer_lock_type: Option<EGCText>,
   pub(crate) amount_commitments: Option<(CompressedRistretto, CompressedRistretto)>, //None if not confidential transfer
