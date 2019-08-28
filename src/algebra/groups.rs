@@ -34,6 +34,8 @@ pub trait Group<S>:
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8>;
   fn from_compressed_bytes(bytes: &[u8]) -> Option<Self>;
+  fn from_hash<D>(hash: D) -> Self
+    where D: Digest<OutputSize = U64> + Default;
 
   //arithmetic
   fn mul(&self, scalar: &S) -> Self;

@@ -10,6 +10,9 @@ use curve25519_dalek::scalar::Scalar;
 use ed25519_dalek::PublicKey;
 use ed25519_dalek::SecretKey;
 use ed25519_dalek::Signature;
+use crate::algebra::pairing::Pairing;
+use crate::algebra::groups::{Scalar as ScalatTrait, Group};
+use digest::Digest;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 //pub const XFR_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
@@ -165,12 +168,43 @@ pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
   XfrMultiSig { signatures }
 }
 
+pub fn bls_sign<S: ScalatTrait, P: Pairing<S>>(key: &S, message: &[u8]) -> P::G2{
+  let mut hash = HashFnc::default();
+  hash.input(message);
+  let hashed = P::G2::from_hash(hash);
+  P::g2_mul_scalar(&hashed, key)
+}
+
+
+pub fn bls_verify<S: ScalatTrait, P: Pairing<S>>(key: &P::G1, message: &[u8], signature: &P::G2) -> Result<(), ZeiError>{
+  let mut hash = HashFnc::default();
+  hash.input(message);
+  let hashed = P::G2::from_hash(hash);
+
+  let a = P::pairing(&P::G1::get_base(), signature);
+  let b = P::pairing(key, &hashed);
+
+  match a == b{
+    true => Ok(()),
+    false => Err(ZeiError::SignatureError)
+  }
+}
+
+/*
+
+pub fn bls_aggregate();
+
+pub fn bls_verify_aggregated();
+
+*/
+
 #[cfg(test)]
 mod test {
   use crate::basic_crypto::signatures::{sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey};
   use crate::errors::ZeiError::SignatureError;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use crate::algebra::bls12_381::BLSScalar;
 
   #[test]
   fn signatures() {
@@ -224,6 +258,23 @@ mod test {
       v.push(XfrKeyPair::generate(prng));
     }
     v
+  }
+
+  use crate::algebra::bls12_381::{BLSG1, BLSGt};
+  use crate::algebra::groups::{Group, Scalar as ScalarTrait};
+  #[test]
+  fn bls_signatures(){
+
+    let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
+    let sk = BLSScalar::random_scalar(&mut prng);
+    let pk = BLSG1::get_base().mul(&sk);
+
+    let message = b"this is a message";
+
+    let signature = super::bls_sign::<BLSScalar, BLSGt>(&sk, message);
+
+    assert_eq!(Ok(()), super::bls_verify::<BLSScalar, BLSGt>(&pk, message, &signature));
+    assert_eq!(Err(crate::errors::ZeiError::SignatureError), super::bls_verify::<BLSScalar, BLSGt>(&pk, b"wrong message", &signature))
   }
 
   #[test]

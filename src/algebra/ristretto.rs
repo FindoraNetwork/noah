@@ -69,6 +69,12 @@ impl Group<Scalar> for RistrettoPoint {
     CompressedRistretto::from_slice(bytes).decompress()
   }
 
+  fn from_hash<D>(hash: D) -> RistrettoPoint
+    where D: Digest<OutputSize = U64> + Default
+  {
+    RistrettoPoint::from_hash(hash)
+  }
+
   fn mul(&self, scalar: &Scalar) -> Self {
     self * scalar
   }

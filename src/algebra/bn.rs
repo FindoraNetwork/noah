@@ -192,6 +192,18 @@ impl Group<BNScalar> for BNG1 {
     }
   }
 
+  fn from_hash<D>(hash: D) -> BNG1
+    where D: Digest<OutputSize = U64> + Default
+  {
+    let result = hash.result();
+    let mut seed = [0u8; 32];
+    for i in 0..32 {
+      seed[i] = result[i];
+    }
+    let mut prng = ChaChaRng::from_seed(seed);
+    BNG1(bn::G1::random(&mut prng))
+  }
+
   //arithmetic
   fn mul(&self, scalar: &BNScalar) -> BNG1 {
     return BNG1(self.0 * scalar.0);
@@ -299,6 +311,18 @@ impl Group<BNScalar> for BNG2 {
       Ok(x) => Some(BNG2(x)),
       Err(_) => None,
     }
+  }
+
+  fn from_hash<D>(hash: D) -> BNG2
+    where D: Digest<OutputSize = U64> + Default
+  {
+    let result = hash.result();
+    let mut seed = [0u8; 32];
+    for i in 0..32 {
+      seed[i] = result[i];
+    }
+    let mut prng = ChaChaRng::from_seed(seed);
+    BNG2(bn::G2::random(&mut prng))
   }
 
   //arithmetic

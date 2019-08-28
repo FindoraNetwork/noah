@@ -188,6 +188,20 @@ impl Group<BLSScalar> for BLSG1 {
     Some(BLSG1(g1))
   }
 
+  fn from_hash<D>(hash: D) -> BLSG1
+    where D: Digest<OutputSize = U64> + Default
+  {
+    let result = hash.result();
+    let mut seed = [0u32; 16];
+    for i in 0..16 {
+      seed[i] = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
+    }
+    use rand_04::SeedableRng;
+    let mut prng = rand_04::ChaChaRng::from_seed(&seed);
+    BLSG1(G1::rand(&mut prng))
+  }
+
+
   //arithmetic
   fn mul(&self, scalar: &BLSScalar) -> BLSG1 {
     let mut m = self.0.clone();
@@ -286,6 +300,19 @@ impl Group<BLSScalar> for BLSG2 {
     let g2 = G2::from(affine);
 
     Some(BLSG2(g2))
+  }
+
+  fn from_hash<D>(hash: D) -> BLSG2
+    where D: Digest<OutputSize = U64> + Default
+  {
+    let result = hash.result();
+    let mut seed = [0u32; 16];
+    for i in 0..16 {
+      seed[i] = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
+    }
+    use rand_04::SeedableRng;
+    let mut prng = rand_04::ChaChaRng::from_seed(&seed);
+    BLSG2(G2::rand(&mut prng))
   }
 
   //arithmetic
