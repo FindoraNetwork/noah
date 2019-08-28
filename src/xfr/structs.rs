@@ -66,8 +66,7 @@ pub struct BlindAssetRecord {
   pub(crate) asset_type_commitment: Option<CompressedRistretto>, //Noe if not confidential asset
   //#[serde(with = "serialization::zei_obj_serde")]
   pub(crate) blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
-  pub(crate) lock_amount: Option<ZeiHybridCipher>, // If confidential transfer lock the amount to the pubkey in asset_record
-  pub(crate) lock_type: Option<ZeiHybridCipher>, // If confidential type lock the type to the public key in asset_record
+  pub(crate) lock: Option<ZeiHybridCipher>, // If confidential transfer or confidential type lock the amount and or type to the pubkey in asset_record
 }
 
 /// I'm a BlindAssetRecors with revealed commitment openings.
