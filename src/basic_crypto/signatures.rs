@@ -13,6 +13,7 @@ use ed25519_dalek::Signature;
 use crate::algebra::pairing::Pairing;
 use crate::algebra::groups::{Scalar as ScalatTrait, Group};
 use digest::Digest;
+use crate::utils::u64_to_bigendian_u8array;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 //pub const XFR_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
@@ -177,10 +178,7 @@ pub fn bls_sign<S: ScalatTrait, P: Pairing<S>>(key: &S, message: &[u8]) -> P::G2
 
 
 pub fn bls_verify<S: ScalatTrait, P: Pairing<S>>(key: &P::G1, message: &[u8], signature: &P::G2) -> Result<(), ZeiError>{
-  let mut hash = HashFnc::default();
-  hash.input(message);
-  let hashed = P::G2::from_hash(hash);
-
+  let hashed = bls_hash_message::<S, P>(message);
   let a = P::pairing(&P::G1::get_base(), signature);
   let b = P::pairing(key, &hashed);
 
@@ -190,13 +188,52 @@ pub fn bls_verify<S: ScalatTrait, P: Pairing<S>>(key: &P::G1, message: &[u8], si
   }
 }
 
-/*
+pub fn bls_aggregate<S: ScalatTrait, P: Pairing<S>>(keys: &[P::G1], signatures: &[P::G2]) -> P::G2
+{
+  assert!(keys.len() == signatures.len());
+  let scalars = bls_hash_pubkeys_to_scalars::<S,P>(keys);
+  let mut agg_signature = P::G2::get_identity();
+  for (t,s) in scalars.iter().zip(signatures){
+    agg_signature = agg_signature.add(&s.mul(t));
+  }
+  agg_signature
+}
 
-pub fn bls_aggregate();
+pub fn bls_verify_aggregated<S: ScalatTrait, P: Pairing<S>>(keys: &[P::G1], message: &[u8], agg_signature: &P::G2) -> Result<(), ZeiError>{
+  let scalars = bls_hash_pubkeys_to_scalars::<S,P>(keys);
+  let mut agg_pub_key = P::G1::get_identity();
+  for (t, key) in scalars.iter().zip(keys) {
+    agg_pub_key = agg_pub_key.add(&key.mul(t));
+  }
+  bls_verify::<S,P>(&agg_pub_key, message, agg_signature)
+}
 
-pub fn bls_verify_aggregated();
+pub fn bls_hash_message<S: ScalatTrait, P: Pairing<S>>(message: &[u8]) -> P::G2
+{
+  let mut hash = HashFnc::default();
+  hash.input(message);
+  P::G2::from_hash(hash)
+}
 
-*/
+pub fn bls_hash_pubkeys_to_scalars<S: ScalatTrait, P: Pairing<S>>(keys: &[P::G1]) -> Vec<S>
+{
+  let mut hasher = HashFnc::default();
+  let n = keys.len();
+  for key in keys {
+    hasher.input(key.to_compressed_bytes().as_slice());
+  }
+  let hash = hasher.result();
+
+  let mut scalars = Vec::with_capacity(n);
+  for i in 0..n {
+    hasher = HashFnc::default();
+    hasher.input(u64_to_bigendian_u8array(i as u64));
+    hasher.input(&hash[..]);
+    scalars.push(S::from_hash(hasher));
+  }
+  scalars
+}
+
 
 #[cfg(test)]
 mod test {
@@ -275,6 +312,33 @@ mod test {
 
     assert_eq!(Ok(()), super::bls_verify::<BLSScalar, BLSGt>(&pk, message, &signature));
     assert_eq!(Err(crate::errors::ZeiError::SignatureError), super::bls_verify::<BLSScalar, BLSGt>(&pk, b"wrong message", &signature))
+  }
+
+  #[test]
+  fn bls_aggregated_signatures(){
+
+    let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
+    let sk1 = BLSScalar::random_scalar(&mut prng);
+    let pk1 = BLSG1::get_base().mul(&sk1);
+
+    let sk2 = BLSScalar::random_scalar(&mut prng);
+    let pk2 = BLSG1::get_base().mul(&sk2);
+
+    let sk3 = BLSScalar::random_scalar(&mut prng);
+    let pk3 = BLSG1::get_base().mul(&sk3);
+
+    let message = b"this is a message";
+
+    let signature1 = super::bls_sign::<BLSScalar, BLSGt>(&sk1, message);
+    let signature2 = super::bls_sign::<BLSScalar, BLSGt>(&sk2, message);
+    let signature3 = super::bls_sign::<BLSScalar, BLSGt>(&sk3, message);
+
+    let keys = [pk1, pk2, pk3];
+
+    let agg_signature = super::bls_aggregate::<BLSScalar, BLSGt>(&keys, &[signature1, signature2, signature3]);
+
+    assert_eq!(Ok(()), super::bls_verify_aggregated::<BLSScalar, BLSGt>(&keys, message, &agg_signature));
+
   }
 
   #[test]
