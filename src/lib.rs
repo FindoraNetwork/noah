@@ -3,7 +3,7 @@
 //#![feature(try_trait)]
 //#![feature(custom_attribute)]
 #![feature(test)]
-
+extern crate aes_ctr;
 extern crate bulletproofs;
 extern crate curve25519_dalek;
 extern crate ed25519_dalek;
@@ -24,7 +24,6 @@ extern crate bn;
 extern crate digest;
 extern crate serde_json;
 extern crate sha2;
-extern crate sodiumoxide;
 extern crate spacesuit;
 extern crate test;
 
