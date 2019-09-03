@@ -1,4 +1,4 @@
-use crate::basic_crypto::elgamal::elgamal_encrypt;
+use crate::basic_crypto::elgamal::{elgamal_encrypt};
 use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt};
 use crate::basic_crypto::signatures::{XfrPublicKey, XfrSecretKey};
 use crate::errors::ZeiError;
@@ -12,6 +12,8 @@ use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
 use sha2::{Digest, Sha512};
+use crate::algebra::ristretto::{RistPoint, RistScalar};
+use crate::algebra::groups::Scalar as ZeiScalar;
 
 /// build complete OpenAssetRecord from AssetRecord structure
 pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
@@ -64,25 +66,30 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
   let issuer_lock_amount = match issuer_public_key {
     None => None,
     Some(issuer_pk) => match confidential_amount {
-      true => Some((elgamal_encrypt(&pc_gens.B,
-                                    &Scalar::from(amount_low),
-                                    &amount_blind_low,
-                                    &issuer_pk.eg_ristretto_pub_key),
-                    elgamal_encrypt(&pc_gens.B,
-                                    &Scalar::from(amount_high),
-                                    &amount_blind_high,
-                                    &issuer_pk.eg_ristretto_pub_key))),
+      true =>
+        Some(
+          (elgamal_encrypt(&RistPoint(pc_gens.B),
+                              &RistScalar::from_u32(amount_low),
+                              &RistScalar(amount_blind_low),
+                              &issuer_pk.eg_ristretto_pub_key),
+           elgamal_encrypt(&RistPoint(pc_gens.B),
+                              &RistScalar::from_u32(amount_high),
+                              &RistScalar(amount_blind_high),
+                              &issuer_pk.eg_ristretto_pub_key))
+        ),
       false => None,
-    },
+    } ,
   };
   //issuer asset tracking asset type
   let issuer_lock_type = match issuer_public_key {
     None => None,
     Some(issuer_pk) => match confidential_asset {
-      true => Some(elgamal_encrypt(&pc_gens.B,
-                                   &type_scalar,
-                                   &type_blind,
-                                   &issuer_pk.eg_ristretto_pub_key)),
+      true => {
+        Some(elgamal_encrypt(&RistPoint(pc_gens.B),
+                             &RistScalar(type_scalar),
+                             &RistScalar(type_blind),
+                             &issuer_pk.eg_ristretto_pub_key))
+      },
       false => None,
     },
   };
@@ -157,13 +164,13 @@ pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
   let issuer_lock_amount = match issuer_public_key {
     None => None,
     Some(issuer_pk) => match confidential_amount {
-      true => Some((elgamal_encrypt(&pc_gens.B,
-                                    &Scalar::from(amount_low),
-                                    &amount_blind_low,
+      true => Some((elgamal_encrypt(&RistPoint(pc_gens.B),
+                                    &RistScalar::from_u32(amount_low),
+                                    &RistScalar(amount_blind_low),
                                     &issuer_pk.eg_ristretto_pub_key),
-                    elgamal_encrypt(&pc_gens.B,
-                                    &Scalar::from(amount_high),
-                                    &amount_blind_high,
+                    elgamal_encrypt(&RistPoint(pc_gens.B),
+                                    &RistScalar::from_u32(amount_high),
+                                    &RistScalar(amount_blind_high),
                                     &issuer_pk.eg_ristretto_pub_key))),
       false => None,
     },
@@ -172,9 +179,9 @@ pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
   let issuer_lock_type = match issuer_public_key {
     None => None,
     Some(issuer_pk) => match confidential_asset {
-      true => Some(elgamal_encrypt(&pc_gens.B,
-                                   &type_scalar,
-                                   &type_blind,
+      true => Some(elgamal_encrypt(&RistPoint(pc_gens.B),
+                                   &RistScalar(type_scalar),
+                                   &RistScalar(type_blind),
                                    &issuer_pk.eg_ristretto_pub_key)),
       false => None,
     },
@@ -266,7 +273,7 @@ mod test {
   use super::{build_open_asset_record, open_asset_record};
   use crate::algebra::bls12_381::{BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
-  use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key};
+  use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey};
   use crate::basic_crypto::signatures::XfrKeyPair;
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::lib::tests::create_xfr;
@@ -275,6 +282,7 @@ mod test {
   use curve25519_dalek::scalar::Scalar;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use crate::algebra::ristretto::RistPoint;
 
   fn do_test_build_open_asset_record(confidential_amount: bool,
                                      confidential_asset: bool,
@@ -297,7 +305,7 @@ mod test {
         let sk = elgamal_generate_secret_key::<_, BLSScalar>(&mut prng);
         let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
-        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: xfr_pub_key,
+        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(xfr_pub_key.0)),
                                   eg_blsg1_pub_key: id_reveal_pub_key })
       }
       false => None,

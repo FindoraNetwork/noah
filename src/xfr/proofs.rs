@@ -100,10 +100,15 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
   }
   let proof;
   if m.len() > 0 {
+    let pk = ElGamalPublicKey((public_keys[0].eg_ristretto_pub_key.0).0);
+    let ctexts: Vec<ElGamalCiphertext<RistrettoPoint>> = ctexts.iter().map(|c| ElGamalCiphertext{
+      e1: c.e1.0,
+      e2: c.e2.0,
+    }).collect();
     proof = Some(pedersen_elgamal_aggregate_eq_proof(prng,
                                                      m.as_slice(),
                                                      r.as_slice(),
-                                                     &public_keys[0].eg_ristretto_pub_key,
+                                                     &pk,
                                                      ctexts.as_slice(),
                                                      commitments.as_slice()));
   } else {
@@ -179,9 +184,14 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
                               .clone());
             }
           }
+          let pk = ElGamalPublicKey((public_key.eg_ristretto_pub_key.0).0);
+          let ctexts: Vec<ElGamalCiphertext<RistrettoPoint>> = ctexts.iter().map(|c| ElGamalCiphertext{
+            e1: c.e1.0,
+            e2: c.e2.0,
+          }).collect();
           pedersen_elgamal_eq_aggregate_verify_fast(
                         prng,
-                        &public_key.eg_ristretto_pub_key,
+                        &pk,
                         ctexts.as_slice(),
                         coms.as_slice(),
                         proof,

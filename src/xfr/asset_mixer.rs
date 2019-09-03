@@ -1,4 +1,5 @@
 use crate::errors::ZeiError;
+use crate::serialization;
 use bulletproofs_yoloproof::r1cs::{Prover, R1CSProof, Verifier};
 use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
@@ -7,7 +8,10 @@ use merlin::Transcript;
 use spacesuit::{cloak, AllocatedValue, CommittedValue, Value, VerifierCommittable};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AssetMixProof(pub(crate) R1CSProof);
+pub struct AssetMixProof(
+  #[serde(with = "serialization::zei_obj_serde")]
+  pub(crate) R1CSProof
+);
 
 impl PartialEq for AssetMixProof {
   fn eq(&self, other: &AssetMixProof) -> bool {

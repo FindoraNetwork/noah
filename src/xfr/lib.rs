@@ -345,9 +345,7 @@ pub(crate) mod tests {
   use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
   use crate::algebra::groups::Scalar as ScalarTrait;
-  use crate::basic_crypto::elgamal::{
-    elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext,
-  };
+  use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext, ElGamalPublicKey};
   use crate::basic_crypto::signatures::XfrKeyPair;
   use crate::crypto::anon_creds;
   use crate::errors::ZeiError::{
@@ -363,6 +361,7 @@ pub(crate) mod tests {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
+  use crate::algebra::ristretto::RistPoint;
 
   pub(crate) fn create_xfr(
     prng: &mut ChaChaRng,
@@ -380,7 +379,7 @@ pub(crate) mod tests {
         let sk = elgamal_generate_secret_key::<_, BLSScalar>(prng);
         let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
-        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: xfr_pub_key,
+        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(xfr_pub_key.0)),
                                   eg_blsg1_pub_key: id_reveal_pub_key })
       }
       false => None,
@@ -660,9 +659,9 @@ pub(crate) mod tests {
                                             .as_ref()
                                             .unwrap()
                                             .clone();
-      let new_enc = old_enc.e2 + pc_gens.B; //adding 1 to the exponent
+      let new_enc = old_enc.e2.0 + pc_gens.B; //adding 1 to the exponent
       xfr_note.body.outputs[0].issuer_lock_type = Some(ElGamalCiphertext { e1: old_enc.e1,
-                                                                           e2: new_enc });
+                                                                           e2: RistPoint(new_enc) });
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
       assert_eq!(Err(XfrVerifyIssuerTrackingAssetAmountError),
                  verify_xfr_note(&mut prng, &xfr_note, &null_policies),
@@ -702,9 +701,9 @@ pub(crate) mod tests {
       let old_enc = xfr_note.body.outputs[0].issuer_lock_amount
                                             .as_ref()
                                             .unwrap();
-      let new_enc = old_enc.0.e2 + pc_gens.B; //adding 1 to the exponent
+      let new_enc = old_enc.0.e2.0 + pc_gens.B; //adding 1 to the exponent
       xfr_note.body.outputs[0].issuer_lock_amount = Some((ElGamalCiphertext { e1: old_enc.0.e1,
-                                                                              e2: new_enc },
+                                                                              e2: RistPoint(new_enc) },
                                                           ElGamalCiphertext { e1: old_enc.1.e1,
                                                                               e2: old_enc.1.e2 }));
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
@@ -790,7 +789,7 @@ pub(crate) mod tests {
     let asset_issuer_id_pub_key =
       elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_id_sec_key);
     let asset_issuer_public_key =
-      Some(AssetIssuerPubKeys { eg_ristretto_pub_key: asset_issuer_pub_key,
+      Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(asset_issuer_pub_key.0)),
                                 eg_blsg1_pub_key: asset_issuer_id_pub_key });
 
     let input_keypair = XfrKeyPair::generate(&mut prng);

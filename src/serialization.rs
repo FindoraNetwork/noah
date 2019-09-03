@@ -11,6 +11,7 @@ use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
+use bulletproofs_yoloproof::r1cs::R1CSProof;
 
 impl Serialize for XfrPublicKey {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -123,6 +124,15 @@ impl ZeiFromToBytes for RangeProof {
   }
 }
 
+impl ZeiFromToBytes for R1CSProof {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    self.to_bytes()
+  }
+  fn zei_from_bytes(bytes: &[u8]) -> R1CSProof {
+    R1CSProof::from_bytes(bytes).unwrap()
+  }
+}
+
 impl ZeiFromToBytes for CompressedEdwardsY {
   fn zei_to_bytes(&self) -> Vec<u8> {
     let mut v = vec![];
@@ -131,6 +141,20 @@ impl ZeiFromToBytes for CompressedEdwardsY {
   }
   fn zei_from_bytes(bytes: &[u8]) -> CompressedEdwardsY {
     CompressedEdwardsY::from_slice(bytes)
+  }
+}
+
+impl ZeiFromToBytes for (CompressedRistretto, CompressedRistretto) {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    let mut v = vec![];
+    v.extend_from_slice(&self.0.to_bytes()[..]);
+    v.extend_from_slice(&self.1.to_bytes()[..]);
+    v
+  }
+  fn zei_from_bytes(bytes: &[u8]) -> (CompressedRistretto, CompressedRistretto) {
+    let a = CompressedRistretto::from_slice(&bytes[..32]);
+    let b = CompressedRistretto::from_slice(&bytes[32..]);
+    (a,b)
   }
 }
 
@@ -344,7 +368,7 @@ pub mod option_bytes {
 
 #[cfg(test)]
 mod test {
-  use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key};
+  use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey};
   use crate::basic_crypto::signatures::{XfrKeyPair, XfrPublicKey, XfrSignature};
   use crate::xfr::structs::EGPubKey;
   use bulletproofs_yoloproof::PedersenGens;
@@ -354,6 +378,7 @@ mod test {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
+  use crate::algebra::ristretto::RistPoint;
 
   #[test]
   fn public_key_message_pack_serialization() {
@@ -422,7 +447,7 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
     let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let xfr_pub_key = elgamal_derive_public_key(&pc_gens.B, &sk);
+    let xfr_pub_key = ElGamalPublicKey(RistPoint(elgamal_derive_public_key(&pc_gens.B, &sk).0));
     let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
       res
     } else {

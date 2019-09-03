@@ -1,6 +1,7 @@
 use super::compute_challenge_ref;
 use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalPublicKey};
 use crate::errors::ZeiError;
+use crate::serialization;
 use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -35,9 +36,13 @@ pub const PEDERSEN_ELGAMAL_EQ_PROOF_LEN: usize = 96 + ELGAMAL_CTEXT_LEN;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PedersenElGamalEqProof {
+  #[serde(with = "serialization::zei_obj_serde")]
   z1: Scalar,                            // c*m + r_1
+  #[serde(with = "serialization::zei_obj_serde")]
   z2: Scalar,                            // c*r + r_2
+  #[serde(with = "serialization::zei_obj_serde")]
   e1: ElGamalCiphertext<RistrettoPoint>, // (r_2*G, r1*g + r2*PK)
+  #[serde(with = "serialization::zei_obj_serde")]
   c1: RistrettoPoint,                    // r_1*g + r_2*H
 }
 

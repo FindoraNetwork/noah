@@ -1,4 +1,5 @@
 use crate::errors::ZeiError;
+use crate::serialization::ZeiFromToBytes;
 use rand::{CryptoRng, Rng};
 /*
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
@@ -39,8 +40,8 @@ impl Hash for ElGamalPublicKey<RistrettoPoint> {
   }
 }
 
-/*
-impl<G> ZeiFromToBytes for ElGamalCiphertext<G> where G: Group<S>, S: Scalar{
+
+impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint>{
     fn zei_to_bytes(&self) -> Vec<u8>{
         let mut v  = vec![];
         v.extend_from_slice(self.e1.to_compressed_bytes().as_slice());
@@ -49,13 +50,13 @@ impl<G> ZeiFromToBytes for ElGamalCiphertext<G> where G: Group<S>, S: Scalar{
     }
     fn zei_from_bytes(bytes: &[u8]) -> Self{
         ElGamalCiphertext{
-            e1: G::from_compressed_bytes(&bytes[0..G::COMPRESSED_LEN]).unwrap(),
-            e2: G::from_compressed_bytes(&bytes[G::COMPRESSED_LEN..]).unwrap(),
+            e1: RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN]).unwrap(),
+            e2: RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..]).unwrap(),
         }
     }
 }
 
-
+/*
 impl<Sc: Scalar, G: Group<Sc>> Serialize for ElGamalPublicKey<G> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
