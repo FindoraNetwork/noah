@@ -17,11 +17,11 @@ pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 pub const KEY_BASE_POINT: CompressedEdwardsY =
   curve25519_dalek::constants::ED25519_BASEPOINT_COMPRESSED;
 
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct XfrPublicKey(pub(crate) PublicKey);
-#[derive(Default, Debug)]
+#[derive(Debug, Default)]
 pub struct XfrSecretKey(pub(crate) SecretKey);
-#[derive(Default, Debug)]
+#[derive(Debug, Default)]
 pub struct XfrKeyPair {
   public: XfrPublicKey,
   secret: XfrSecretKey,
@@ -138,9 +138,9 @@ impl ZeiFromToBytes for XfrKeyPair {
 ////Primitive for multisignatures /////
 ///A multisignature is defined as a signature on a message that must verify against a list of public keys instead of one
 // naive implementation below
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrMultiSig {
-  pub(crate) signatures: Vec<XfrSignature>,
+  pub signatures: Vec<XfrSignature>,
 }
 
 pub fn verify_multisig(keylist: &[XfrPublicKey],
