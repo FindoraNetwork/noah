@@ -85,7 +85,7 @@ impl Group<Scalar> for RistrettoPoint {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct RistScalar(pub(crate) Scalar);
+pub struct RistScalar(pub Scalar);
 
 impl RistScalar {
   pub fn get_scalar(&self) -> Scalar{
@@ -191,7 +191,7 @@ impl<'de> Deserialize<'de> for RistScalar {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct RistPoint(pub(crate) RistrettoPoint);
+pub struct RistPoint(pub RistrettoPoint);
 
 impl RistPoint {
   pub fn get_ristretto_point(&self) -> RistrettoPoint{
@@ -295,7 +295,7 @@ impl<'de> Deserialize<'de> for RistPoint {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct CompRist(pub(crate) CompressedRistretto);
+pub struct CompRist(pub CompressedRistretto);
 
 impl CompRist {
   pub fn decompress_to_ristretto(&self) -> Option<RistrettoPoint> {
