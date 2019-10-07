@@ -20,10 +20,11 @@ use crate::algebra::ristretto::{RistPoint, CompRist};
 pub type AssetType = [u8; 16];
 
 /// I represent a transfer note
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+
 pub struct XfrNote {
-  pub(crate) body: XfrBody,
-  pub(crate) multisig: XfrMultiSig,
+  pub body: XfrBody,
+  pub multisig: XfrMultiSig,
 }
 
 impl XfrNote {
@@ -33,11 +34,11 @@ impl XfrNote {
 }
 
 /// I am the body of a transfer note
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrBody {
-  pub(crate) inputs: Vec<BlindAssetRecord>,
-  pub(crate) outputs: Vec<BlindAssetRecord>,
-  pub(crate) proofs: XfrProofs,
+  pub inputs: Vec<BlindAssetRecord>,
+  pub outputs: Vec<BlindAssetRecord>,
+  pub proofs: XfrProofs,
 }
 
 pub type EGPubKey = ElGamalPublicKey<RistPoint>;
@@ -45,13 +46,13 @@ type EGPubKeyId = ElGamalPublicKey<BLSG1>;
 type EGCText = ElGamalCiphertext<RistPoint>;
 
 /// I'm a bundle of public keys for the asset issuer
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetIssuerPubKeys {
   pub eg_ristretto_pub_key: EGPubKey,
   pub eg_blsg1_pub_key: EGPubKeyId,
 }
 /// I represent an Asset Record as presented in the public ledger.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlindAssetRecord {
   // amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
   // commitments and ciphertext
@@ -69,8 +70,7 @@ pub struct BlindAssetRecord {
   pub(crate) asset_type_commitment: Option<CompRist>, //Noe if not confidential asset
   #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
-  pub(crate) lock_amount: Option<ZeiHybridCipher>, // If confidential transfer lock the amount to the pubkey in asset_record
-  pub(crate) lock_type: Option<ZeiHybridCipher>, // If confidential type lock the type to the public key in asset_record
+  pub(crate) lock: Option<ZeiHybridCipher>, // If confidential transfer or confidential type lock the amount and or type to the pubkey in asset_record
 }
 
 /// I'm a BlindAssetRecors with revealed commitment openings.
@@ -112,7 +112,7 @@ impl AssetRecord {
   }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum AssetAmountProof {
   AssetMix(AssetMixProof),        // multi-type fully confidential Xfr
   ConfAmount(XfrRangeProof),      // single-type and public, confidental amount
@@ -122,13 +122,13 @@ pub enum AssetAmountProof {
 }
 
 /// I contain the proofs of a transfer note
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrProofs {
-  pub(crate) asset_amount_proof: AssetAmountProof,
-  pub(crate) asset_tracking_proof: AssetTrackingProofs,
+  pub asset_amount_proof: AssetAmountProof,
+  pub asset_tracking_proof: AssetTrackingProofs,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct XfrRangeProof {
   #[serde(with = "serialization::zei_obj_serde")]
   pub range_proof: RangeProof,
@@ -138,20 +138,20 @@ pub struct XfrRangeProof {
   pub xfr_diff_commitment_high: CompressedRistretto, //higher 32 bits transfer amount difference commitment
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTrackingProof {
   pub(crate) amount_proof: Option<(PedersenElGamalEqProof, PedersenElGamalEqProof)>, // None if confidential amount flag is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
   pub(crate) asset_type_proof: Option<PedersenElGamalEqProof>, //None if confidential asset_type is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
   pub(crate) identity_proof: Option<ConfIdReveal>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTrackingProofs {
-  pub(crate) aggregate_amount_asset_type_proof: Option<PedersenElGamalEqProof>, // None if confidential amount and confidential asset type flag are off. Otherwise, value proves that decryption of issuer_lock_amounts and/or asset type yield the same as values committed in amount_commitments in BlindAssetRecord outputs
-  pub(crate) identity_proofs: Vec<Option<ConfIdReveal>>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+  pub aggregate_amount_asset_type_proof: Option<PedersenElGamalEqProof>, // None if confidential amount and confidential asset type flag are off. Otherwise, value proves that decryption of issuer_lock_amounts and/or asset type yield the same as values committed in amount_commitments in BlindAssetRecord outputs
+  pub identity_proofs: Vec<Option<ConfIdReveal>>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct IdRevealPolicy {
   pub cred_issuer_pub_key: ACIssuerPublicKey<BLSG1, BLSG2>,
   pub bitmap: Vec<bool>,
