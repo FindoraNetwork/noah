@@ -170,7 +170,7 @@ pub fn pedersen_elgamal_eq_verify(public_key: &ElGamalPublicKey<RistrettoPoint>,
 
   if proof.c1 + c * commitment == proof.z1 * pc_gens.B + proof.z2 * pc_gens.B_blinding {
     if proof_enc_e1 + c * ctext.e1 == proof.z2 * pc_gens.B
-       && proof_enc_e2 + c * ctext.e2 == proof.z1 * pc_gens.B + proof.z2 * public_key.0
+       && proof_enc_e2 + c * ctext.e2 == proof.z1 * pc_gens.B + proof.z2 * public_key.get_point_ref()
     {
       return Ok(());
     }
@@ -217,7 +217,7 @@ pub fn pedersen_elgamal_eq_verify_fast<R: CryptoRng + Rng>(prng: &mut R,
                                               ctext.e1,
                                               proof_enc_e2,
                                               ctext.e2,
-                                              public_key.0]);
+                                              public_key.get_point()]);
 
   if ver != RistrettoPoint::identity() {
     return Err(ZeiError::VerifyPedersenElGamalEqError);
@@ -234,7 +234,7 @@ fn compute_linear_combination_scalar_vector(commitments: &[RistrettoPoint],
   for c in commitments.iter() {
     input.push(c);
   }
-  input.push(&public_key.0);
+  input.push(public_key.get_point_ref());
   for ct in ctexts {
     input.push(&ct.e1);
     input.push(&ct.e2);
@@ -302,7 +302,7 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + Rng>(prng: &mut R,
   //5. compute challenge
   let c = compute_challenge_ref::<Scalar, RistrettoPoint>(&[&pc_gens.B,
                                                             &pc_gens.B_blinding,
-                                                            &public_key.0,
+                                                            public_key.get_point_ref(),
                                                             &enc1,
                                                             &enc2,
                                                             &com,
@@ -352,7 +352,7 @@ pub fn pedersen_elgamal_eq_aggregate_verify_fast<R: CryptoRng + Rng>(prng: &mut 
   let pc_gens = PedersenGens::default();
   let c = compute_challenge_ref::<Scalar, RistrettoPoint>(&[&pc_gens.B,
                                                             &pc_gens.B_blinding,
-                                                            &public_key.0,
+                                                            public_key.get_point_ref(),
                                                             &enc1,
                                                             &enc2,
                                                             &com,
@@ -383,7 +383,7 @@ pub fn pedersen_elgamal_eq_aggregate_verify_fast<R: CryptoRng + Rng>(prng: &mut 
                                               enc1,
                                               proof_enc_e2,
                                               enc2,
-                                              public_key.0]);
+                                              public_key.get_point()]);
 
   if ver != RistrettoPoint::identity() {
     return Err(ZeiError::VerifyPedersenElGamalEqError);

@@ -355,7 +355,7 @@ pub(crate) mod tests {
   };
   use crate::utils::u64_to_u32_pair;
   use crate::xfr::proofs::create_conf_id_reveal;
-  use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+  use curve25519_dalek::ristretto::RistrettoPoint;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::{Deserializer, Serializer};
@@ -379,7 +379,7 @@ pub(crate) mod tests {
         let sk = elgamal_generate_secret_key::<_, BLSScalar>(prng);
         let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
-        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(xfr_pub_key.0)),
+        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
                                   eg_blsg1_pub_key: id_reveal_pub_key })
       }
       false => None,
@@ -789,7 +789,7 @@ pub(crate) mod tests {
     let asset_issuer_id_pub_key =
       elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_id_sec_key);
     let asset_issuer_public_key =
-      Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(asset_issuer_pub_key.0)),
+      Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(asset_issuer_pub_key.get_point())),
                                 eg_blsg1_pub_key: asset_issuer_id_pub_key });
 
     let input_keypair = XfrKeyPair::generate(&mut prng);

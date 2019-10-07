@@ -447,7 +447,7 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
     let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let xfr_pub_key = ElGamalPublicKey(RistPoint(elgamal_derive_public_key(&pc_gens.B, &sk).0));
+    let xfr_pub_key = ElGamalPublicKey(RistPoint(elgamal_derive_public_key(&pc_gens.B, &sk).get_point()));
     let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
       res
     } else {

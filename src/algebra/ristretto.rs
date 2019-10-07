@@ -86,6 +86,13 @@ impl Group<Scalar> for RistrettoPoint {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RistScalar(pub(crate) Scalar);
+
+impl RistScalar {
+  pub fn get_scalar(&self) -> Scalar{
+    self.0
+  }
+}
+
 impl ZeiScalar for RistScalar {
   fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> RistScalar {
     RistScalar(Scalar::random(rng))
@@ -186,6 +193,12 @@ impl<'de> Deserialize<'de> for RistScalar {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RistPoint(pub(crate) RistrettoPoint);
 
+impl RistPoint {
+  pub fn get_ristretto_point(&self) -> RistrettoPoint{
+    self.0
+  }
+}
+
 impl Group<RistScalar> for RistPoint {
   const COMPRESSED_LEN: usize = 32;
   const SCALAR_BYTES_LEN: usize = 32;
@@ -282,7 +295,7 @@ impl<'de> Deserialize<'de> for RistPoint {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct CompRist(pub CompressedRistretto);
+pub struct CompRist(pub(crate) CompressedRistretto);
 
 impl CompRist {
   pub fn decompress_to_ristretto(&self) -> Option<RistrettoPoint> {

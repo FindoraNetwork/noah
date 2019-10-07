@@ -1,18 +1,21 @@
 use crate::errors::ZeiError;
 use crate::serialization::ZeiFromToBytes;
 use rand::{CryptoRng, Rng};
-/*
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use serde::de::{Visitor, SeqAccess};
-use crate::serialization::ZeiFromToBytes;
-*/
 use crate::algebra::groups::{Group, Scalar};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use std::hash::{Hash, Hasher};
-//use std::marker::PhantomData;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElGamalPublicKey<G>(pub(crate) G); //PK = sk*G
+
+impl<G: Clone> ElGamalPublicKey<G> {
+  pub fn get_point(&self) -> G{
+    self.0.clone()
+  }
+  pub fn get_point_ref(&self) -> &G{
+    &self.0
+  }
+}
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElGamalSecretKey<S>(pub(crate) S); //sk

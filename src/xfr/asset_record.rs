@@ -305,7 +305,7 @@ mod test {
         let sk = elgamal_generate_secret_key::<_, BLSScalar>(&mut prng);
         let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
-        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(xfr_pub_key.0)),
+        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
                                   eg_blsg1_pub_key: id_reveal_pub_key })
       }
       false => None,
