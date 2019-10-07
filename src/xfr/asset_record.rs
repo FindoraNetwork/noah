@@ -12,7 +12,7 @@ use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
 use sha2::{Digest, Sha512};
-use crate::algebra::ristretto::{RistPoint, RistScalar};
+use crate::algebra::ristretto::{RistPoint, RistScalar, CompRist};
 use crate::algebra::groups::Scalar as ZeiScalar;
 
 /// build complete OpenAssetRecord from AssetRecord structure
@@ -44,7 +44,7 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
       let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
 
       (None,
-       Some((amount_commitment_low.compress(), amount_commitment_high.compress())),
+       Some((CompRist(amount_commitment_low.compress()), CompRist(amount_commitment_high.compress()))),
        (amount_blind_low, amount_blind_high))
     }
     false => (Some(asset_record.amount), None, (Scalar::default(), Scalar::default())),
@@ -57,7 +57,7 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
         Some(hybrid_encrypt(prng, &asset_record.public_key, &asset_record.asset_type).unwrap());
 
       let type_commitment = pc_gens.commit(type_scalar, type_blind);
-      (None, Some(type_commitment.compress()), type_blind)
+      (None, Some(CompRist(type_commitment.compress())), type_blind)
     }
     false => (Some(asset_record.asset_type), None, Scalar::default()),
   };
@@ -143,7 +143,7 @@ pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
       let amount_commitment_low = pc_gens.commit(Scalar::from(amount_low), amount_blind_low);
       let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
 
-      (None, Some((amount_commitment_low.compress(), amount_commitment_high.compress())))
+      (None, Some((CompRist(amount_commitment_low.compress()), CompRist(amount_commitment_high.compress()))))
     }
     false => (Some(asset_record.amount), None),
   };
@@ -155,7 +155,7 @@ pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
         Some(hybrid_encrypt(prng, &asset_record.public_key, &asset_record.asset_type).unwrap());
 
       let type_commitment = pc_gens.commit(type_scalar, type_blind);
-      (None, Some(type_commitment.compress()), type_blind)
+      (None, Some(CompRist(type_commitment.compress())), type_blind)
     }
     false => (Some(asset_record.asset_type), None, Scalar::default()),
   };
@@ -282,7 +282,7 @@ mod test {
   use curve25519_dalek::scalar::Scalar;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
-  use crate::algebra::ristretto::RistPoint;
+  use crate::algebra::ristretto::{RistPoint, CompRist};
 
   fn do_test_build_open_asset_record(confidential_amount: bool,
                                      confidential_asset: bool,
@@ -335,7 +335,7 @@ mod test {
                                   .compress();
       let commitment_high = pc_gens.commit(Scalar::from(high), open_ar.amount_blinds.1)
                                    .compress();
-      expected_bar_amount_commitment = Some((commitment_low, commitment_high));
+      expected_bar_amount_commitment = Some((CompRist(commitment_low), CompRist(commitment_high)));
     } else {
       expected_bar_amount = Some(amount);
       expected_bar_lock_amount_none = true;
@@ -345,7 +345,7 @@ mod test {
       let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type[..]);
       let type_scalar = Scalar::from(type_as_u128);
       expected_bar_asset_type_commitment =
-        Some(pc_gens.commit(type_scalar, open_ar.type_blind).compress());
+        Some(CompRist(pc_gens.commit(type_scalar, open_ar.type_blind).compress()));
     } else {
       expected_bar_asset_type = Some(asset_type);
       expected_bar_lock_type_none = true;
@@ -412,16 +412,16 @@ mod test {
                                   .compress();
       let commitment_high = pc_gens.commit(Scalar::from(high), open_ar.amount_blinds.1)
                                    .compress();
-      let derived_commitment = (commitment_low, commitment_high);
+      let derived_commitment = (CompRist(commitment_low), CompRist(commitment_high));
       assert_eq!(derived_commitment,
                  open_ar.asset_record.amount_commitments.unwrap());
     }
 
     if confidential_asset {
       let derived_commitment =
-        pc_gens.commit(Scalar::from(u8_bigendian_slice_to_u128(&open_ar.asset_type[..])),
+        CompRist(pc_gens.commit(Scalar::from(u8_bigendian_slice_to_u128(&open_ar.asset_type[..])),
                        open_ar.type_blind)
-               .compress();
+               .compress());
       assert_eq!(derived_commitment,
                  open_ar.asset_record.asset_type_commitment.unwrap());
     }

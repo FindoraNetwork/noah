@@ -55,7 +55,7 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
         commitments.push(output.asset_record
                                .asset_type_commitment
                                .ok_or(ZeiError::InconsistentStructureError)?
-                               .decompress()
+                               .decompress_to_ristretto()
                                .unwrap());
         ctexts.push(output.asset_record
                           .issuer_lock_type
@@ -71,13 +71,13 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
                                .amount_commitments
                                .ok_or(ZeiError::InconsistentStructureError)?
                                .0
-                               .decompress()
+                               .decompress_to_ristretto()
                                .unwrap());
         commitments.push(output.asset_record
                                .amount_commitments
                                .ok_or(ZeiError::InconsistentStructureError)?
                                .1
-                               .decompress()
+                               .decompress_to_ristretto()
                                .unwrap());
         ctexts.push(output.asset_record
                           .issuer_lock_amount
@@ -163,7 +163,7 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
               ctexts.push(output.issuer_lock_type.as_ref().unwrap().clone());
               coms.push(output.asset_type_commitment
                               .ok_or(ZeiError::InconsistentStructureError)?
-                              .decompress()
+                              .decompress_to_ristretto()
                               .unwrap()
                               .clone());
             }
@@ -173,13 +173,13 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
               coms.push(output.amount_commitments
                               .ok_or(ZeiError::InconsistentStructureError)?
                               .0
-                              .decompress()
+                              .decompress_to_ristretto()
                               .unwrap()
                               .clone());
               coms.push(output.amount_commitments
                               .ok_or(ZeiError::InconsistentStructureError)?
                               .1
-                              .decompress()
+                              .decompress_to_ristretto()
                               .unwrap()
                               .clone());
             }
@@ -380,9 +380,9 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
     let coms = bar.amount_commitments
                   .as_ref()
                   .ok_or(ZeiError::InconsistentStructureError)?;
-    let com_low = (coms.0).decompress()
+    let com_low = coms.0.decompress_to_ristretto()
                           .ok_or(ZeiError::DecompressElementError)?;
-    let com_high = (coms.1).decompress()
+    let com_high = coms.1.decompress_to_ristretto()
                            .ok_or(ZeiError::DecompressElementError)?;
     total_input_com += com_low + com_high * pow2_32;
   }
@@ -393,14 +393,14 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
     let coms = bar.amount_commitments
                   .as_ref()
                   .ok_or(ZeiError::InconsistentStructureError)?;
-    let com_low = (coms.0).decompress()
+    let com_low = coms.0.decompress_to_ristretto()
                           .ok_or(ZeiError::DecompressElementError)?;
-    let com_high = (coms.1).decompress()
+    let com_high = coms.1.decompress_to_ristretto()
                            .ok_or(ZeiError::DecompressElementError)?;
     total_output_com += com_low + com_high * pow2_32;
 
-    range_coms.push(coms.0);
-    range_coms.push(coms.1);
+    range_coms.push(coms.0.get_compressed_ristretto());
+    range_coms.push(coms.1.get_compressed_ristretto());
     //output_com.push(com_low + com_high * Scalar::from(0xFFFFFFFF as u64 + 1));
   }
   let derived_xfr_diff_com = total_input_com - total_output_com;
@@ -452,7 +452,7 @@ pub(crate) fn asset_proof<R: CryptoRng + Rng>(prng: &mut R,
     asset_coms.push(x.asset_record
                      .asset_type_commitment
                      .unwrap()
-                     .decompress()
+                     .decompress_to_ristretto()
                      .unwrap());
     asset_blinds.push(x.type_blind);
   }
@@ -460,7 +460,7 @@ pub(crate) fn asset_proof<R: CryptoRng + Rng>(prng: &mut R,
     asset_coms.push(x.asset_record
                      .asset_type_commitment
                      .unwrap()
-                     .decompress()
+                     .decompress_to_ristretto()
                      .unwrap());
     asset_blinds.push(x.type_blind);
   }
@@ -482,12 +482,12 @@ pub(crate) fn verify_confidential_asset<R: CryptoRng + Rng>(prng: &mut R,
   let pc_gens = PedersenGens::default();
   let mut asset_commitments: Vec<RistrettoPoint> =
     inputs.iter()
-          .map(|x| x.asset_type_commitment.unwrap().decompress().unwrap())
+          .map(|x| x.asset_type_commitment.unwrap().decompress_to_ristretto().unwrap())
           .collect();
 
   let out_asset_commitments: Vec<RistrettoPoint> =
     outputs.iter()
-           .map(|x| x.asset_type_commitment.unwrap().decompress().unwrap())
+           .map(|x| x.asset_type_commitment.unwrap().decompress_to_ristretto().unwrap())
            .collect();
 
   asset_commitments.extend(out_asset_commitments.iter());

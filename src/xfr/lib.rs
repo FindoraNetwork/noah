@@ -321,19 +321,19 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord],
 
   let mut in_coms = vec![];
   for x in inputs.iter() {
-    let com_amount_low = x.amount_commitments.unwrap().0.decompress().unwrap();
-    let com_amount_high = x.amount_commitments.unwrap().1.decompress().unwrap();
+    let com_amount_low = x.amount_commitments.unwrap().0.decompress_to_ristretto().unwrap();
+    let com_amount_high = x.amount_commitments.unwrap().1.decompress_to_ristretto().unwrap();
     let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
-    let com_type = x.asset_type_commitment.unwrap();
+    let com_type = x.asset_type_commitment.unwrap().get_compressed_ristretto();
     in_coms.push((com_amount, com_type));
   }
 
   let mut out_coms = vec![];
   for x in outputs.iter() {
-    let com_amount_low = x.amount_commitments.unwrap().0.decompress().unwrap();
-    let com_amount_high = x.amount_commitments.unwrap().1.decompress().unwrap();
+    let com_amount_low = x.amount_commitments.unwrap().0.decompress_to_ristretto().unwrap();
+    let com_amount_high = x.amount_commitments.unwrap().1.decompress_to_ristretto().unwrap();
     let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
-    let com_type = x.asset_type_commitment.unwrap();
+    let com_type = x.asset_type_commitment.unwrap().get_compressed_ristretto();
     out_coms.push((com_amount, com_type));
   }
   asset_mixer_verify(in_coms.as_slice(), out_coms.as_slice(), proof)
@@ -361,7 +361,7 @@ pub(crate) mod tests {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
-  use crate::algebra::ristretto::RistPoint;
+  use crate::algebra::ristretto::{RistPoint, CompRist};
 
   pub(crate) fn create_xfr(
     prng: &mut ChaChaRng,
@@ -501,7 +501,7 @@ pub(crate) mod tests {
                                   .compress();
       let commitment_high = pc_gens.commit(Scalar::from(high), Scalar::random(&mut prng))
                                    .compress();
-      xfr_note.body.outputs[3].amount_commitments = Some((commitment_low, commitment_high));
+      xfr_note.body.outputs[3].amount_commitments = Some((CompRist(commitment_low),CompRist(commitment_high)));
       error = XfrVerifyConfidentialAmountError;
     } else {
       xfr_note.body.outputs[3].amount = Some(0xFFFFFFFFFF);
@@ -551,7 +551,7 @@ pub(crate) mod tests {
     // modify xfr_note asset on an output
     let error;
     if confidential_asset {
-      xfr_note.body.outputs[1].asset_type_commitment = Some(CompressedRistretto::default());
+      xfr_note.body.outputs[1].asset_type_commitment = Some(CompRist::default());
       error = XfrVerifyConfidentialAssetError;
     } else {
       xfr_note.body.outputs[1].asset_type = Some([1u8; 16]);
@@ -603,7 +603,7 @@ pub(crate) mod tests {
     // modify xfr_note asset on an input
     let error;
     if confidential_asset {
-      xfr_note.body.inputs[1].asset_type_commitment = Some(CompressedRistretto::default());
+      xfr_note.body.inputs[1].asset_type_commitment = Some(CompRist::default());
       error = XfrVerifyConfidentialAssetError;
     } else {
       xfr_note.body.inputs[1].asset_type = Some([1u8; 16]);

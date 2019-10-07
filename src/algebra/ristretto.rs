@@ -281,6 +281,82 @@ impl<'de> Deserialize<'de> for RistPoint {
   }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct CompRist(pub CompressedRistretto);
+
+impl CompRist {
+  pub fn decompress_to_ristretto(&self) -> Option<RistrettoPoint> {
+    self.0.decompress()
+  }
+  pub fn get_compressed_ristretto(&self) -> CompressedRistretto {
+    self.0
+  }
+}
+
+impl Default for CompRist {
+  fn default() -> CompRist {
+    CompRist(CompressedRistretto::default())
+  }
+}
+
+impl Serialize for CompRist {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+      S: Serializer
+  {
+    if serializer.is_human_readable() {
+      serializer.serialize_str(&base64::encode(self.0.as_bytes()))
+    } else {
+      serializer.serialize_bytes(self.0.as_bytes())
+    }
+  }
+}
+
+impl<'de> Deserialize<'de> for CompRist {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+      D: Deserializer<'de>
+  {
+    struct RistPointVisitor;
+
+    impl<'de> Visitor<'de> for RistPointVisitor {
+      type Value = CompRist;
+
+      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        formatter.write_str("a encoded Ristretto Point")
+      }
+
+      fn visit_bytes<E>(self, v: &[u8]) -> Result<CompRist, E>
+        where E: serde::de::Error
+      {
+        Ok(CompRist(CompressedRistretto::from_slice(v)))
+      }
+
+      fn visit_seq<V>(self, mut seq: V) -> Result<CompRist, V::Error>
+        where V: SeqAccess<'de>,
+      {
+        let mut vec: Vec<u8> = vec![];
+        while let Some(x) = seq.next_element().unwrap() {
+          vec.push(x);
+        }
+        Ok(CompRist(CompressedRistretto::from_slice(vec.as_slice())))
+
+      }
+      fn visit_str<E>(self, s: &str) -> Result<CompRist, E>
+        where E: serde::de::Error
+      {
+        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+      }
+    }
+    if deserializer.is_human_readable() {
+      deserializer.deserialize_str(RistPointVisitor)
+    } else {
+      deserializer.deserialize_bytes(RistPointVisitor)
+    }
+  }
+}
+
+
 
 #[cfg(test)]
 mod ristretto_group_test {

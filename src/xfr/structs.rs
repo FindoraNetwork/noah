@@ -15,7 +15,7 @@ use curve25519_dalek::scalar::Scalar;
 use bulletproofs::RangeProof;
 
 use curve25519_dalek::ristretto::{CompressedRistretto};
-use crate::algebra::ristretto::RistPoint;
+use crate::algebra::ristretto::{RistPoint, CompRist};
 
 pub type AssetType = [u8; 16];
 
@@ -59,14 +59,14 @@ pub struct BlindAssetRecord {
   pub(crate) issuer_lock_amount: Option<(EGCText, EGCText)>, //None if issuer tracking not required or amount is not confidential
   pub(crate) issuer_lock_type: Option<EGCText>,
   //#[serde(with = "serialization::option_bytes")]
-  pub(crate) amount_commitments: Option<(CompressedRistretto, CompressedRistretto)>, //None if not confidential transfer
+  pub(crate) amount_commitments: Option<(CompRist, CompRist)>, //None if not confidential transfer
   //pub(crate) issuer_lock_id: Option<(ElGamalCiphertext, ElGamalCiphertext)>, TODO
   pub(crate) amount: Option<u64>, // None if confidential transfers
   pub(crate) asset_type: Option<AssetType>, // None if confidential asset
   #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) public_key: XfrPublicKey, // ownership address
   //#[serde(with = "serialization::option_bytes")]
-  pub(crate) asset_type_commitment: Option<CompressedRistretto>, //Noe if not confidential asset
+  pub(crate) asset_type_commitment: Option<CompRist>, //Noe if not confidential asset
   #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
   pub(crate) lock_amount: Option<ZeiHybridCipher>, // If confidential transfer lock the amount to the pubkey in asset_record
@@ -177,8 +177,7 @@ mod test {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
-  use crate::xfr::structs::{BlindAssetRecord, AssetTrackingProof, AssetTrackingProofs, AssetAmountProof};
-  use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
+  use crate::xfr::structs::{AssetTrackingProofs, AssetAmountProof};
 
   fn do_test_serialization(confidential_amount: bool,
                            confidential_asset: bool,
@@ -210,8 +209,6 @@ mod test {
     let multisig_de: XfrMultiSig = Deserialize::deserialize(&mut de).unwrap();
     assert_eq!(xfr_note.multisig, multisig_de);
 
-    let json_str = serde_json::to_string(&xfr_note.multisig).unwrap();
-    let proofs_de: XfrMultiSig = serde_json::from_str(json_str.as_str()).unwrap();
 
     //serializing proofs
     let mut vec = vec![];
@@ -243,6 +240,14 @@ mod test {
     let body_de = XfrBody::deserialize(&mut de).unwrap();
     assert_eq!(xfr_note.body, body_de);
 
+    let json_str = serde_json::to_string(&xfr_note.body).unwrap();
+    let body_de: XfrBody = serde_json::from_str(json_str.as_str()).unwrap();
+    assert_eq!(xfr_note.body, body_de);
+
+    let bincode_vec = bincode::serialize(&xfr_note.body).unwrap();
+    let body_de: XfrBody = bincode::deserialize(bincode_vec.as_slice()).unwrap();
+    assert_eq!(xfr_note.body, body_de);
+
     //serializing whole Xfr
     let mut vec = vec![];
     assert_eq!(true,
@@ -250,6 +255,14 @@ mod test {
     let mut de = Deserializer::new(&vec[..]);
     let xfr_de = XfrNote::deserialize(&mut de).unwrap();
     assert_eq!(xfr_note, xfr_de);
+
+    let bincode_vec = bincode::serialize(&xfr_note).unwrap();
+    let note_de: XfrNote = bincode::deserialize(bincode_vec.as_slice()).unwrap();
+    assert_eq!(xfr_note, note_de);
+
+    let json_str = serde_json::to_string(&xfr_note).unwrap();
+    let note_de: XfrNote = serde_json::from_str(json_str.as_str()).unwrap();
+    assert_eq!(xfr_note, note_de);
   }
 
   #[test]
