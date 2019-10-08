@@ -76,7 +76,7 @@ impl XfrSecretKey {
     key_scalar * y
   }
 
-  fn clone(&self) -> Self {
+  pub fn clone(&self) -> Self {
     let bytes = self.zei_to_bytes();
     XfrSecretKey::zei_from_bytes(bytes.as_slice())
   }
