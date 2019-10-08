@@ -1,18 +1,19 @@
+use crate::algebra::groups::{Group, Scalar};
+use crate::algebra::ristretto::RistPoint;
 use crate::errors::ZeiError;
 use crate::serialization::ZeiFromToBytes;
-use rand::{CryptoRng, Rng};
-use crate::algebra::groups::{Group, Scalar};
 use curve25519_dalek::ristretto::RistrettoPoint;
+use rand::{CryptoRng, Rng};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElGamalPublicKey<G>(pub(crate) G); //PK = sk*G
 
 impl<G: Clone> ElGamalPublicKey<G> {
-  pub fn get_point(&self) -> G{
+  pub fn get_point(&self) -> G {
     self.0.clone()
   }
-  pub fn get_point_ref(&self) -> &G{
+  pub fn get_point_ref(&self) -> &G {
     &self.0
   }
 }
@@ -37,26 +38,25 @@ pub struct ElGamalCiphertext<G> {
   pub(crate) e2: G, //m*G + r*PK
 }
 
-impl Hash for ElGamalPublicKey<RistrettoPoint> {
+impl Hash for ElGamalPublicKey<RistPoint> {
   fn hash<H: Hasher>(&self, state: &mut H) {
     self.0.to_compressed_bytes().as_slice().hash(state);
   }
 }
 
-
-impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint>{
-    fn zei_to_bytes(&self) -> Vec<u8>{
-        let mut v  = vec![];
-        v.extend_from_slice(self.e1.to_compressed_bytes().as_slice());
-        v.extend_from_slice(self.e2.to_compressed_bytes().as_slice());
-        v
-    }
-    fn zei_from_bytes(bytes: &[u8]) -> Self{
-        ElGamalCiphertext{
+impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint> {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    let mut v = vec![];
+    v.extend_from_slice(self.e1.to_compressed_bytes().as_slice());
+    v.extend_from_slice(self.e2.to_compressed_bytes().as_slice());
+    v
+  }
+  fn zei_from_bytes(bytes: &[u8]) -> Self {
+    ElGamalCiphertext{
             e1: RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN]).unwrap(),
             e2: RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..]).unwrap(),
         }
-    }
+  }
 }
 
 /*
