@@ -1,11 +1,11 @@
-use crate::basic_crypto::signatures::{XfrPublicKey, XfrSignature};
+use crate::basic_crypto::signatures::{XfrPublicKey, XfrSignature, XfrSecretKey};
 use crate::crypto::chaum_pedersen::ChaumPedersenProof;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::PublicKey;
+use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
 use serde::Deserializer;
@@ -72,6 +72,67 @@ impl<'de> Deserialize<'de> for XfrPublicKey {
     }
   }
 }
+
+impl Serialize for XfrSecretKey {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+  {
+    if serializer.is_human_readable() {
+      serializer.serialize_str(&base64::encode(&self.zei_to_bytes()))
+    } else {
+      serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+    }
+  }
+}
+
+impl<'de> Deserialize<'de> for XfrSecretKey {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de>
+  {
+    struct XfrSecretKeyVisitor;
+
+    impl<'de> Visitor<'de> for XfrSecretKeyVisitor {
+      type Value = XfrSecretKey;
+
+      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        formatter.write_str("an array of 32 bytes")
+      }
+
+      fn visit_bytes<E>(self, v: &[u8]) -> Result<XfrSecretKey, E>
+        where E: serde::de::Error
+      {
+        if v.len() == 32 {
+          let mut bytes = [0u8; 32];
+          bytes.copy_from_slice(v);
+
+          static ERRMSG: &'static str = "Bad secret key encoding";
+
+          let sk = match SecretKey::from_bytes(&bytes[..]) {
+            Ok(sk) => sk,
+            Err(_) => {
+              return Err(serde::de::Error::invalid_value(serde::de::Unexpected::Bytes(v),
+                                                         &ERRMSG));
+            }
+          };
+          Ok(XfrSecretKey(sk))
+        } else {
+          Err(serde::de::Error::invalid_length(v.len(), &self))
+        }
+      }
+      fn visit_str<E>(self, s: &str) -> Result<XfrSecretKey, E>
+        where E: serde::de::Error
+      {
+        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+      }
+    }
+    if deserializer.is_human_readable() {
+      deserializer.deserialize_str(XfrSecretKeyVisitor)
+    } else {
+      deserializer.deserialize_bytes(XfrSecretKeyVisitor)
+    }
+  }
+}
+
 
 /// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
 pub trait ZeiFromToBytes {
@@ -369,7 +430,8 @@ pub mod option_bytes {
 #[cfg(test)]
 mod test {
   use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey};
-  use crate::basic_crypto::signatures::{XfrKeyPair, XfrPublicKey, XfrSignature};
+  use crate::basic_crypto::signatures::{XfrKeyPair, XfrPublicKey, XfrSignature, XfrSecretKey};
+  use crate::serialization::ZeiFromToBytes;
   use crate::xfr::structs::EGPubKey;
   use bulletproofs_yoloproof::PedersenGens;
   use curve25519_dalek::scalar::Scalar;
@@ -420,6 +482,12 @@ mod test {
     key: XfrPublicKey,
   }
 
+  #[derive(Serialize, Deserialize, Default)]
+  struct StructWithSecKey {
+    key: XfrSecretKey,
+  }
+
+
   #[test]
   fn serialize_and_deserialize_as_json() {
     let mut prng: ChaChaRng;
@@ -438,6 +506,22 @@ mod test {
       assert_eq!(test_struct.key, restored.key);
     } else {
       println!("Failed to deserialize XfrPublicKey from JSON");
+      assert!(false);
+    }
+
+    let sk = keypair.get_sk_ref();
+    let test_struct = StructWithSecKey { key: sk.clone() };
+    let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
+      res
+    } else {
+      println!("Failed to serialize XfrSecretKey to JSON");
+      assert!(false);
+      "{}".to_string()
+    };
+    if let Ok(restored) = serde_json::from_str::<StructWithSecKey>(&as_json) {
+      assert_eq!(test_struct.key.zei_to_bytes(), restored.key.zei_to_bytes());
+    } else {
+      println!("Failed to deserialize XfrSecretKey from JSON");
       assert!(false);
     }
   }
