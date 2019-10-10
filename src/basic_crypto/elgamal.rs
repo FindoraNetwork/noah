@@ -7,7 +7,7 @@ use rand::{CryptoRng, Rng};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ElGamalPublicKey<G>(pub(crate) G); //PK = sk*G
+pub struct ElGamalPublicKey<G>(pub G); //PK = sk*G
 
 impl<G: Clone> ElGamalPublicKey<G> {
   pub fn get_point(&self) -> G {
