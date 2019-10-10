@@ -57,20 +57,20 @@ pub struct BlindAssetRecord {
   // amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
   // commitments and ciphertext
   pub issuer_public_key: Option<AssetIssuerPubKeys>, //None if issuer tracking is not required
-  pub(crate) issuer_lock_amount: Option<(EGCText, EGCText)>, //None if issuer tracking not required or amount is not confidential
-  pub(crate) issuer_lock_type: Option<EGCText>,
+  pub issuer_lock_amount: Option<(EGCText, EGCText)>, //None if issuer tracking not required or amount is not confidential
+  pub issuer_lock_type: Option<EGCText>,
   //#[serde(with = "serialization::option_bytes")]
-  pub(crate) amount_commitments: Option<(CompRist, CompRist)>, //None if not confidential transfer
+  pub amount_commitments: Option<(CompRist, CompRist)>, //None if not confidential transfer
   //pub(crate) issuer_lock_id: Option<(ElGamalCiphertext, ElGamalCiphertext)>, TODO
-  pub(crate) amount: Option<u64>, // None if confidential transfers
-  pub(crate) asset_type: Option<AssetType>, // None if confidential asset
+  pub amount: Option<u64>, // None if confidential transfers
+  pub asset_type: Option<AssetType>, // None if confidential asset
   #[serde(with = "serialization::zei_obj_serde")]
-  pub(crate) public_key: XfrPublicKey, // ownership address
+  pub public_key: XfrPublicKey, // ownership address
   //#[serde(with = "serialization::option_bytes")]
-  pub(crate) asset_type_commitment: Option<CompRist>, //Noe if not confidential asset
+  pub asset_type_commitment: Option<CompRist>, //Noe if not confidential asset
   #[serde(with = "serialization::zei_obj_serde")]
-  pub(crate) blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
-  pub(crate) lock: Option<ZeiHybridCipher>, // If confidential transfer or confidential type lock the amount and or type to the pubkey in asset_record
+  pub blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
+  pub lock: Option<ZeiHybridCipher>, // If confidential transfer or confidential type lock the amount and or type to the pubkey in asset_record
 }
 
 /// I'm a BlindAssetRecors with revealed commitment openings.
