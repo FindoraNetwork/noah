@@ -175,6 +175,7 @@ pub struct BlsSecretKey<S: ScalarTrait>(S);
 pub struct BlsPublicKey<S: ScalarTrait, P: Pairing<S>>(P::G1);
 pub struct BlsSignature<S: ScalarTrait, P: Pairing<S>>(P::G2);
 
+/// bls key generation function
 pub fn bls_gen_keys<R: CryptoRng + Rng, S: ScalarTrait, P: Pairing<S>>(
   prng: &mut R) -> (BlsSecretKey<S>, BlsPublicKey<S,P>)
 {
@@ -183,6 +184,7 @@ pub fn bls_gen_keys<R: CryptoRng + Rng, S: ScalarTrait, P: Pairing<S>>(
   (BlsSecretKey(sec_key),BlsPublicKey(pub_key))
 }
 
+/// bls signature function
 pub fn bls_sign<S: ScalarTrait, P: Pairing<S>>(
   signing_key: &BlsSecretKey<S>,
   message: &[u8]) -> BlsSignature<S,P>
@@ -191,7 +193,7 @@ pub fn bls_sign<S: ScalarTrait, P: Pairing<S>>(
   BlsSignature(hashed.mul(&signing_key.0))
 }
 
-
+/// bls verification function
 pub fn bls_verify<S: ScalarTrait, P: Pairing<S>>(
   ver_key: &BlsPublicKey<S,P>,
   message: &[u8],
@@ -207,6 +209,7 @@ pub fn bls_verify<S: ScalarTrait, P: Pairing<S>>(
   }
 }
 
+/// aggregate signature (for a single common message)
 pub fn bls_aggregate<S: ScalarTrait, P: Pairing<S>>(
   ver_keys: &[BlsPublicKey<S,P>],
   signatures: &[BlsSignature<S,P>]) -> BlsSignature<S,P>
@@ -220,6 +223,7 @@ pub fn bls_aggregate<S: ScalarTrait, P: Pairing<S>>(
   BlsSignature(agg_signature)
 }
 
+/// Verification of an aggregated signature for a common message
 pub fn bls_verify_aggregated<S: ScalarTrait, P: Pairing<S>>(
   ver_keys: &[BlsPublicKey<S,P>],
   message: &[u8],
@@ -232,6 +236,49 @@ pub fn bls_verify_aggregated<S: ScalarTrait, P: Pairing<S>>(
   bls_verify::<S,P>(&BlsPublicKey(agg_pub_key), message, agg_signature)
 }
 
+/// Batch verification of many signatures
+pub fn bls_batch_verify<S: ScalarTrait, P: Pairing<S>>(
+  ver_keys: &[BlsPublicKey<S,P>],
+  messages: &[&[u8]],
+  signatures: &[BlsSignature<S,P>]) -> Result<(), ZeiError>
+{
+  assert!(ver_keys.len() == messages.len() && ver_keys.len() == signatures.len());
+  let sig = bls_add_signatures(signatures);
+  bls_batch_verify_added_signatures(ver_keys, messages, &sig)
+}
+
+/// signature aggregation for (possibly) different messages
+pub fn bls_add_signatures<S: ScalarTrait, P: Pairing<S>>(
+  signatures: &[BlsSignature<S,P>]) -> BlsSignature<S,P>
+{
+  let mut sig = P::G2::get_identity();
+  for s in signatures {
+    sig = sig.add(&s.0);
+  }
+  BlsSignature(sig)
+}
+
+/// verification of an aggregated signatures for different messages
+pub fn bls_batch_verify_added_signatures<S: ScalarTrait, P: Pairing<S>>(
+  ver_keys: &[BlsPublicKey<S,P>],
+  messages: &[&[u8]],
+  signature: &BlsSignature<S,P>
+) -> Result<(), ZeiError>{
+  let a = P::pairing(&P::G1::get_base(), &signature.0);
+  let mut b = P::get_identity();
+  for (pk, m) in ver_keys.iter().zip(messages) {
+    let hashed = bls_hash_message::<S,P>(*m);
+    let p = P::pairing(&pk.0, &hashed);
+    b = b.add(&p)
+  }
+
+  match a == b{
+    true => Ok(()),
+    false => Err(ZeiError::SignatureError)
+  }
+}
+
+/// hash function to G2
 pub fn bls_hash_message<S: ScalarTrait, P: Pairing<S>>(message: &[u8]) -> P::G2
 {
   let mut hash = HashFnc::default();
@@ -239,6 +286,7 @@ pub fn bls_hash_message<S: ScalarTrait, P: Pairing<S>>(message: &[u8]) -> P::G2
   P::G2::from_hash(hash)
 }
 
+/// hash function to N scalars on the pairing field
 pub fn bls_hash_pubkeys_to_scalars<S: ScalarTrait, P: Pairing<S>>(
   ver_keys: &[BlsPublicKey<S,P>]
 ) -> Vec<S>
