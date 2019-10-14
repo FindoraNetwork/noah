@@ -11,7 +11,7 @@ use ed25519_dalek::PublicKey;
 use ed25519_dalek::SecretKey;
 use ed25519_dalek::Signature;
 use crate::algebra::pairing::Pairing;
-use crate::algebra::groups::{Scalar as ScalatTrait, Group};
+use crate::algebra::groups::{Scalar as ScalarTrait, Group};
 use digest::Digest;
 use crate::utils::u64_to_bigendian_u8array;
 
@@ -171,11 +171,11 @@ pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 
 // BLS Signatures
 
-pub struct BlsSecretKey<S: ScalatTrait>(S);
-pub struct BlsPublicKey<S: ScalatTrait, P: Pairing<S>>(P::G1);
-pub struct BlsSignature<S: ScalatTrait, P: Pairing<S>>(P::G2);
+pub struct BlsSecretKey<S: ScalarTrait>(S);
+pub struct BlsPublicKey<S: ScalarTrait, P: Pairing<S>>(P::G1);
+pub struct BlsSignature<S: ScalarTrait, P: Pairing<S>>(P::G2);
 
-pub fn bls_gen_keys<R: CryptoRng + Rng, S: ScalatTrait, P: Pairing<S>>(
+pub fn bls_gen_keys<R: CryptoRng + Rng, S: ScalarTrait, P: Pairing<S>>(
   prng: &mut R) -> (BlsSecretKey<S>, BlsPublicKey<S,P>)
 {
   let sec_key = S::random_scalar(prng);
@@ -183,20 +183,20 @@ pub fn bls_gen_keys<R: CryptoRng + Rng, S: ScalatTrait, P: Pairing<S>>(
   (BlsSecretKey(sec_key),BlsPublicKey(pub_key))
 }
 
-pub fn bls_sign<S: ScalatTrait, P: Pairing<S>>(
+pub fn bls_sign<S: ScalarTrait, P: Pairing<S>>(
   signing_key: &BlsSecretKey<S>,
-  message: &[u8]) -> BlsSignature<S,P>{
-  let mut hash = HashFnc::default();
-  hash.input(message);
-  let hashed = P::G2::from_hash(hash);
+  message: &[u8]) -> BlsSignature<S,P>
+{
+  let hashed = bls_hash_message::<S, P>(message);
   BlsSignature(hashed.mul(&signing_key.0))
 }
 
 
-pub fn bls_verify<S: ScalatTrait, P: Pairing<S>>(
+pub fn bls_verify<S: ScalarTrait, P: Pairing<S>>(
   ver_key: &BlsPublicKey<S,P>,
   message: &[u8],
-  signature: &BlsSignature<S,P>) -> Result<(), ZeiError>{
+  signature: &BlsSignature<S,P>) -> Result<(), ZeiError>
+{
   let hashed = bls_hash_message::<S, P>(message);
   let a = P::pairing(&P::G1::get_base(), &signature.0);
   let b = P::pairing(&ver_key.0, &hashed);
@@ -207,7 +207,7 @@ pub fn bls_verify<S: ScalatTrait, P: Pairing<S>>(
   }
 }
 
-pub fn bls_aggregate<S: ScalatTrait, P: Pairing<S>>(
+pub fn bls_aggregate<S: ScalarTrait, P: Pairing<S>>(
   ver_keys: &[BlsPublicKey<S,P>],
   signatures: &[BlsSignature<S,P>]) -> BlsSignature<S,P>
 {
@@ -220,7 +220,7 @@ pub fn bls_aggregate<S: ScalatTrait, P: Pairing<S>>(
   BlsSignature(agg_signature)
 }
 
-pub fn bls_verify_aggregated<S: ScalatTrait, P: Pairing<S>>(
+pub fn bls_verify_aggregated<S: ScalarTrait, P: Pairing<S>>(
   ver_keys: &[BlsPublicKey<S,P>],
   message: &[u8],
   agg_signature: &BlsSignature<S,P>) -> Result<(), ZeiError>{
@@ -232,14 +232,16 @@ pub fn bls_verify_aggregated<S: ScalatTrait, P: Pairing<S>>(
   bls_verify::<S,P>(&BlsPublicKey(agg_pub_key), message, agg_signature)
 }
 
-pub fn bls_hash_message<S: ScalatTrait, P: Pairing<S>>(message: &[u8]) -> P::G2
+pub fn bls_hash_message<S: ScalarTrait, P: Pairing<S>>(message: &[u8]) -> P::G2
 {
   let mut hash = HashFnc::default();
   hash.input(message);
   P::G2::from_hash(hash)
 }
 
-pub fn bls_hash_pubkeys_to_scalars<S: ScalatTrait, P: Pairing<S>>(ver_keys: &[BlsPublicKey<S,P>]) -> Vec<S>
+pub fn bls_hash_pubkeys_to_scalars<S: ScalarTrait, P: Pairing<S>>(
+  ver_keys: &[BlsPublicKey<S,P>]
+) -> Vec<S>
 {
   let mut hasher = HashFnc::default();
   let n = ver_keys.len();
@@ -321,8 +323,7 @@ mod test {
     v
   }
 
-  use crate::algebra::bls12_381::{BLSG1, BLSGt};
-  use crate::algebra::groups::{Group, Scalar as ScalarTrait};
+  use crate::algebra::bls12_381::{BLSGt};
   #[test]
   fn bls_signatures(){
 
