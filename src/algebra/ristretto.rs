@@ -217,6 +217,12 @@ impl Group<RistScalar> for RistPoint {
     RistPoint(RISTRETTO_BASEPOINT_POINT)
   }
 
+  fn from_hash<D>(hash: D) -> Self
+    where D: Digest<OutputSize = U64> + Default
+  {
+    RistPoint(RistrettoPoint::from_hash(hash))
+  }
+
   fn to_compressed_bytes(&self) -> Vec<u8> {
     let mut v = vec![];
     v.extend_from_slice(self.0.compress().as_bytes());
