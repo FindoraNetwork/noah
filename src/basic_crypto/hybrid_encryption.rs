@@ -1,3 +1,4 @@
+
 use super::signatures::{XfrPublicKey, XfrSecretKey, KEY_BASE_POINT};
 use crate::errors::ZeiError;
 use crate::serialization;
@@ -6,13 +7,11 @@ use curve25519_dalek::scalar::Scalar;
 use rand::CryptoRng;
 use rand::Rng;
 use sha2::Digest;
-use sodiumoxide::crypto::secretbox;
-use sodiumoxide::crypto::secretbox::{Key, Nonce};
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct ZeiHybridCipher {
   pub(crate) ciphertext: Vec<u8>,
-  pub(crate) nonce: Nonce,
+  //pub(crate) nonce: Nonce,
   #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) encoded_rand: CompressedEdwardsY,
 }
@@ -25,10 +24,11 @@ pub fn hybrid_encrypt<R: CryptoRng + Rng>(prng: &mut R,
                                           message: &[u8])
                                           -> Result<ZeiHybridCipher, ZeiError> {
   let (key, encoded_rand) = symmetric_key_from_public_key(prng, pub_key)?;
-  let (ciphertext, nonce) = symmetric_encrypt(&key, message);
+  //let (ciphertext, nonce) = symmetric_encrypt(&key, message);
+  let ciphertext = symmetric_encrypt_fresh_key(&key, message);
 
   Ok(ZeiHybridCipher { ciphertext,
-                       nonce,
+                       //nonce,
                        encoded_rand })
 }
 
@@ -39,7 +39,7 @@ pub fn hybrid_decrypt(ctext: &ZeiHybridCipher,
                       sec_key: &XfrSecretKey)
                       -> Result<Vec<u8>, ZeiError> {
   let key = symmetric_key_from_secret_key(sec_key, &ctext.encoded_rand)?;
-  Ok(symmetric_decrypt(&key, ctext.ciphertext.as_slice(), &ctext.nonce)?)
+  Ok (symmetric_decrypt_fresh_key(&key, ctext.ciphertext.as_slice()))
 }
 
 /// I derive a 32 bytes symmetric key from a public key. I return the byte array together
@@ -81,31 +81,28 @@ fn symmetric_key_from_secret_key(sec_key: &XfrSecretKey,
   Ok(symmetric_key)
 }
 
-/// I build a symmetric key to be used by the symmetric cipher from [u8;32] derived key array.
-fn build_key(key: &[u8; 32]) -> Key {
-  let mut copied_key: [u8; secretbox::KEYBYTES] = Default::default();
-  copied_key.copy_from_slice(key);
-  secretbox::Key(copied_key)
+use aes_ctr::Aes256Ctr;
+use aes_ctr::stream_cipher::generic_array::GenericArray;
+use aes_ctr::stream_cipher::{
+  NewStreamCipher, SyncStreamCipher
+};
+
+fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
+  let kkey = GenericArray::from_slice(key);
+  let ctr = GenericArray::from_slice(&[0u8;16]);
+  let mut ctext_vec = plaintext.to_vec();
+  let mut cipher = Aes256Ctr::new(&kkey, ctr);
+  cipher.apply_keystream(ctext_vec.as_mut_slice());
+  ctext_vec
 }
 
-/// I symmetrically encrypt a plaintext message, ruturning ciphertext and nonce
-fn symmetric_encrypt(key: &[u8; 32], plaintext: &[u8]) -> (Vec<u8>, Nonce) {
-  let sk = build_key(key);
-  let nonce = secretbox::gen_nonce();
-  (secretbox::seal(plaintext, &nonce, &sk), nonce)
-}
-
-/// I symmetrically decrypt a ciphertext from 32 bytes key and nonce used in the encryption.
-/// I return Zei::DecryptionError in case ciphertext was tampered.
-fn symmetric_decrypt(key: &[u8; 32],
-                     ciphertext: &[u8],
-                     nonce: &Nonce)
-                     -> Result<Vec<u8>, ZeiError> {
-  let sk = build_key(key);
-  match secretbox::open(ciphertext, nonce, &sk) {
-    Ok(ciphertext) => Ok(ciphertext),
-    Err(_) => Err(ZeiError::DecryptionError),
-  }
+fn symmetric_decrypt_fresh_key(key: &[u8; 32], ciphertext: &[u8]) -> Vec<u8> {
+  let kkey = GenericArray::from_slice(key);
+  let ctr = GenericArray::from_slice(&[0u8;16]);
+  let mut plaintext_vec = ciphertext.to_vec();
+  let mut cipher = Aes256Ctr::new(&kkey, ctr);
+  cipher.apply_keystream(plaintext_vec.as_mut_slice());
+  plaintext_vec
 }
 
 #[cfg(test)]
@@ -119,9 +116,6 @@ mod test {
   fn key_derivation() {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
-    /*let sk = Scalar::random(&mut prng);
-    let pk = (&sk * &base.decompress().unwrap()).compress();
-    */
     let keypair = XfrKeyPair::generate(&mut prng);
     let (from_pk_key, encoded_rand) =
       symmetric_key_from_public_key(&mut prng, keypair.get_pk_ref()).unwrap();
@@ -129,17 +123,18 @@ mod test {
     assert_eq!(from_pk_key, from_sk_key);
   }
 
+
   #[test]
-  fn symmetric_encryption() {
+  fn symmetric_encryption_fresh_key() {
     let msg = b"this is a message";
     let key: [u8; 32] = [0u8; 32];
-    let (mut ciphertext, nonce) = symmetric_encrypt(&key, msg);
-    let decrypted = symmetric_decrypt(&key, ciphertext.as_slice(), &nonce).unwrap();
+    let mut ciphertext = symmetric_encrypt_fresh_key(&key, msg);
+    let decrypted = symmetric_decrypt_fresh_key(&key, ciphertext.as_slice());
     assert_eq!(msg, decrypted.as_slice());
 
     ciphertext[0] = 0xFF - ciphertext[0];
-    let result = symmetric_decrypt(&key, ciphertext.as_slice(), &nonce);
-    assert_eq!(Err(ZeiError::DecryptionError), result);
+    let result = symmetric_decrypt_fresh_key(&key, ciphertext.as_slice());
+    assert!(msg != result.as_slice());
   }
 
   #[test]
@@ -149,23 +144,7 @@ mod test {
     let key_pair = XfrKeyPair::generate(&mut prng);
     let msg = b"this is another message";
 
-    let mut cipherbox = hybrid_encrypt(&mut prng, key_pair.get_pk_ref(), msg).unwrap();
-    let plaintext = hybrid_decrypt(&cipherbox, key_pair.get_sk_ref()).unwrap();
-    assert_eq!(msg, plaintext.as_slice());
-
-    cipherbox.ciphertext.push(0u8);
-    let plaintext = hybrid_decrypt(&cipherbox, key_pair.get_sk_ref());
-    assert_eq!(true, plaintext.is_err());
-    assert_eq!(Err(ZeiError::DecryptionError), plaintext);
-
-    cipherbox.ciphertext.pop();
-
-    cipherbox.ciphertext[3] = 0xFF as u8 - cipherbox.ciphertext[3];
-    let plaintext = hybrid_decrypt(&cipherbox, key_pair.get_sk_ref());
-    assert_eq!(true, plaintext.is_err());
-    assert_eq!(Err(ZeiError::DecryptionError), plaintext);
-
-    cipherbox.ciphertext[3] = 0xFF as u8 - cipherbox.ciphertext[3];
+    let cipherbox = hybrid_encrypt(&mut prng, key_pair.get_pk_ref(), msg).unwrap();
     let plaintext = hybrid_decrypt(&cipherbox, key_pair.get_sk_ref()).unwrap();
     assert_eq!(msg, plaintext.as_slice());
   }

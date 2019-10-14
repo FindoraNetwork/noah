@@ -6,6 +6,7 @@ use crate::crypto::anon_creds::ACIssuerPublicKey;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use crate::crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use crate::errors::ZeiError;
+use crate::serialization;
 use crate::xfr::asset_mixer::AssetMixProof;
 use crate::xfr::proofs::ConfIdReveal;
 use curve25519_dalek::edwards::CompressedEdwardsY;
@@ -13,15 +14,17 @@ use curve25519_dalek::scalar::Scalar;
 
 use bulletproofs::RangeProof;
 
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use curve25519_dalek::ristretto::{CompressedRistretto};
+use crate::algebra::ristretto::{RistPoint, CompRist};
 
 pub type AssetType = [u8; 16];
 
 /// I represent a transfer note
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+
 pub struct XfrNote {
-  pub(crate) body: XfrBody,
-  pub(crate) multisig: XfrMultiSig,
+  pub body: XfrBody,
+  pub multisig: XfrMultiSig,
 }
 
 impl XfrNote {
@@ -31,43 +34,43 @@ impl XfrNote {
 }
 
 /// I am the body of a transfer note
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrBody {
-  pub(crate) inputs: Vec<BlindAssetRecord>,
-  pub(crate) outputs: Vec<BlindAssetRecord>,
-  pub(crate) proofs: XfrProofs,
+  pub inputs: Vec<BlindAssetRecord>,
+  pub outputs: Vec<BlindAssetRecord>,
+  pub proofs: XfrProofs,
 }
 
-pub type EGPubKey = ElGamalPublicKey<RistrettoPoint>;
+pub type EGPubKey = ElGamalPublicKey<RistPoint>;
 type EGPubKeyId = ElGamalPublicKey<BLSG1>;
-type EGCText = ElGamalCiphertext<RistrettoPoint>;
+type EGCText = ElGamalCiphertext<RistPoint>;
 
 /// I'm a bundle of public keys for the asset issuer
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetIssuerPubKeys {
   pub eg_ristretto_pub_key: EGPubKey,
   pub eg_blsg1_pub_key: EGPubKeyId,
 }
 /// I represent an Asset Record as presented in the public ledger.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlindAssetRecord {
   // amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
   // commitments and ciphertext
   pub issuer_public_key: Option<AssetIssuerPubKeys>, //None if issuer tracking is not required
-  pub(crate) issuer_lock_amount: Option<(EGCText, EGCText)>, //None if issuer tracking not required or amount is not confidential
-  pub(crate) issuer_lock_type: Option<EGCText>,
-  pub(crate) amount_commitments: Option<(CompressedRistretto, CompressedRistretto)>, //None if not confidential transfer
-  //pub(crate) issuer_lock_id: Option<(ElGamalCiphertext, ElGamalCiphertext)>, TODO
-  pub(crate) amount: Option<u64>, // None if confidential transfers
-  pub(crate) asset_type: Option<AssetType>, // None if confidential asset
-  //#[serde(with = "serialization::zei_obj_serde")]
-  pub(crate) public_key: XfrPublicKey, // ownership address
+  pub issuer_lock_amount: Option<(EGCText, EGCText)>, //None if issuer tracking not required or amount is not confidential
+  pub issuer_lock_type: Option<EGCText>,
   //#[serde(with = "serialization::option_bytes")]
-  pub(crate) asset_type_commitment: Option<CompressedRistretto>, //Noe if not confidential asset
-  //#[serde(with = "serialization::zei_obj_serde")]
-  pub(crate) blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
-  pub(crate) lock_amount: Option<ZeiHybridCipher>, // If confidential transfer lock the amount to the pubkey in asset_record
-  pub(crate) lock_type: Option<ZeiHybridCipher>, // If confidential type lock the type to the public key in asset_record
+  pub amount_commitments: Option<(CompRist, CompRist)>, //None if not confidential transfer
+  //pub(crate) issuer_lock_id: Option<(ElGamalCiphertext, ElGamalCiphertext)>, TODO
+  pub amount: Option<u64>, // None if confidential transfers
+  pub asset_type: Option<AssetType>, // None if confidential asset
+  #[serde(with = "serialization::zei_obj_serde")]
+  pub public_key: XfrPublicKey, // ownership address
+  //#[serde(with = "serialization::option_bytes")]
+  pub asset_type_commitment: Option<CompRist>, //Noe if not confidential asset
+  #[serde(with = "serialization::zei_obj_serde")]
+  pub blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
+  pub lock: Option<ZeiHybridCipher>, // If confidential transfer or confidential type lock the amount and or type to the pubkey in asset_record
 }
 
 /// I'm a BlindAssetRecors with revealed commitment openings.
@@ -109,7 +112,7 @@ impl AssetRecord {
   }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum AssetAmountProof {
   AssetMix(AssetMixProof),        // multi-type fully confidential Xfr
   ConfAmount(XfrRangeProof),      // single-type and public, confidental amount
@@ -119,33 +122,36 @@ pub enum AssetAmountProof {
 }
 
 /// I contain the proofs of a transfer note
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrProofs {
-  pub(crate) asset_amount_proof: AssetAmountProof,
-  pub(crate) asset_tracking_proof: AssetTrackingProofs,
+  pub asset_amount_proof: AssetAmountProof,
+  pub asset_tracking_proof: AssetTrackingProofs,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct XfrRangeProof {
+  #[serde(with = "serialization::zei_obj_serde")]
   pub range_proof: RangeProof,
+  #[serde(with = "serialization::zei_obj_serde")]
   pub xfr_diff_commitment_low: CompressedRistretto, //lower 32 bits transfer amount difference commitment
+  #[serde(with = "serialization::zei_obj_serde")]
   pub xfr_diff_commitment_high: CompressedRistretto, //higher 32 bits transfer amount difference commitment
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTrackingProof {
   pub(crate) amount_proof: Option<(PedersenElGamalEqProof, PedersenElGamalEqProof)>, // None if confidential amount flag is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
   pub(crate) asset_type_proof: Option<PedersenElGamalEqProof>, //None if confidential asset_type is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
   pub(crate) identity_proof: Option<ConfIdReveal>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTrackingProofs {
-  pub(crate) aggregate_amount_asset_type_proof: Option<PedersenElGamalEqProof>, // None if confidential amount and confidential asset type flag are off. Otherwise, value proves that decryption of issuer_lock_amounts and/or asset type yield the same as values committed in amount_commitments in BlindAssetRecord outputs
-  pub(crate) identity_proofs: Vec<Option<ConfIdReveal>>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+  pub aggregate_amount_asset_type_proof: Option<PedersenElGamalEqProof>, // None if confidential amount and confidential asset type flag are off. Otherwise, value proves that decryption of issuer_lock_amounts and/or asset type yield the same as values committed in amount_commitments in BlindAssetRecord outputs
+  pub identity_proofs: Vec<Option<ConfIdReveal>>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct IdRevealPolicy {
   pub cred_issuer_pub_key: ACIssuerPublicKey<BLSG1, BLSG2>,
   pub bitmap: Vec<bool>,
@@ -171,6 +177,7 @@ mod test {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
+  use crate::xfr::structs::{AssetTrackingProofs, AssetAmountProof};
 
   fn do_test_serialization(confidential_amount: bool,
                            confidential_asset: bool,
@@ -202,6 +209,7 @@ mod test {
     let multisig_de: XfrMultiSig = Deserialize::deserialize(&mut de).unwrap();
     assert_eq!(xfr_note.multisig, multisig_de);
 
+
     //serializing proofs
     let mut vec = vec![];
     assert_eq!(true,
@@ -213,6 +221,15 @@ mod test {
     let proofs_de = XfrProofs::deserialize(&mut de).unwrap();
     assert_eq!(xfr_note.body.proofs, proofs_de);
 
+    let json_str = serde_json::to_string(&xfr_note.body.proofs.asset_tracking_proof).unwrap();
+    let proofs_de: AssetTrackingProofs = serde_json::from_str(json_str.as_str()).unwrap();
+    assert_eq!(xfr_note.body.proofs.asset_tracking_proof, proofs_de);
+
+    let json_str = serde_json::to_string(&xfr_note.body.proofs.asset_amount_proof).unwrap();
+    let proofs_de: AssetAmountProof = serde_json::from_str(json_str.as_str()).unwrap();
+    assert_eq!(xfr_note.body.proofs.asset_amount_proof, proofs_de);
+
+
     //serializing body
     let mut vec = vec![];
     assert_eq!(true,
@@ -223,6 +240,14 @@ mod test {
     let body_de = XfrBody::deserialize(&mut de).unwrap();
     assert_eq!(xfr_note.body, body_de);
 
+    let json_str = serde_json::to_string(&xfr_note.body).unwrap();
+    let body_de: XfrBody = serde_json::from_str(json_str.as_str()).unwrap();
+    assert_eq!(xfr_note.body, body_de);
+
+    let bincode_vec = bincode::serialize(&xfr_note.body).unwrap();
+    let body_de: XfrBody = bincode::deserialize(bincode_vec.as_slice()).unwrap();
+    assert_eq!(xfr_note.body, body_de);
+
     //serializing whole Xfr
     let mut vec = vec![];
     assert_eq!(true,
@@ -230,6 +255,14 @@ mod test {
     let mut de = Deserializer::new(&vec[..]);
     let xfr_de = XfrNote::deserialize(&mut de).unwrap();
     assert_eq!(xfr_note, xfr_de);
+
+    let bincode_vec = bincode::serialize(&xfr_note).unwrap();
+    let note_de: XfrNote = bincode::deserialize(bincode_vec.as_slice()).unwrap();
+    assert_eq!(xfr_note, note_de);
+
+    let json_str = serde_json::to_string(&xfr_note).unwrap();
+    let note_de: XfrNote = serde_json::from_str(json_str.as_str()).unwrap();
+    assert_eq!(xfr_note, note_de);
   }
 
   #[test]

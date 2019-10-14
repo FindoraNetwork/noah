@@ -1,5 +1,6 @@
 use super::{compute_challenge_ref, compute_sub_challenge};
 use crate::errors::ZeiError;
+use crate::serialization;
 use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -32,15 +33,15 @@ use rand::{CryptoRng, Rng};
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
   /// I represent a Chaum-Perdersen equality of commitment proof
-  //#[serde(with = "serialization::zei_obj_serde")]
+  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) c3: RistrettoPoint,
-  //#[serde(with = "serialization::zei_obj_serde")]
+  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) c4: RistrettoPoint,
-  //#[serde(with = "serialization::zei_obj_serde")]
+  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) z1: Scalar,
-  //#[serde(with = "serialization::zei_obj_serde")]
+  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) z2: Scalar,
-  //#[serde(with = "serialization::zei_obj_serde")]
+  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) z3: Scalar,
 }
 

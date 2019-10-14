@@ -359,7 +359,7 @@ fn verify_ciphertext<S: Scalar, P: Pairing<S>>(challenge: &S,
             lc_scalars.iter())
     {
       let scalar_factor = rand_resp_inst[i].mul(scalar);
-      sum_pk_rand = sum_pk_rand.add(&(*pub_key).0.mul(&scalar_factor));
+      sum_pk_rand = sum_pk_rand.add(&(*pub_key).get_point_ref().mul(&scalar_factor));
 
       sum_g_rand = sum_g_rand.add(&scalar_factor);
       sum_g_attr = sum_g_attr.add(&attr_resp_inst[i].mul(scalar));
@@ -502,7 +502,7 @@ fn sample_blinds_compute_commitments<R, S, P>(
     {
       attrs_coms_g[k].push(P::G1::get_base().mul(&attr_blind));
       rands_coms_g[k].push(P::G1::get_base().mul(&rand_blind));
-      rands_coms_pk[k].push(recv_enc_pub_keys[k].0.mul(&rand_blind));
+      rands_coms_pk[k].push(recv_enc_pub_keys[k].get_point_ref().mul(&rand_blind));
     }
   }
 
