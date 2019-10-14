@@ -372,6 +372,8 @@ mod test {
   }
 
   use crate::algebra::bls12_381::{BLSGt};
+  use crate::errors::ZeiError;
+
   #[test]
   fn bls_signatures(){
 
@@ -408,6 +410,38 @@ mod test {
     assert_eq!(Ok(()), super::bls_verify_aggregated::<BLSScalar, BLSGt>(&keys, message, &agg_signature));
 
   }
+
+  #[test]
+  fn bls_batching(){
+
+    let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
+    let (sk1,pk1) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
+    let (sk2,pk2) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
+    let (sk3,pk3) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
+
+
+    let message1 = b"this is a message";
+    let message2 = b"this is another message";
+    let message3 = b"this is an additional message";
+
+    let signature1 = super::bls_sign::<BLSScalar, BLSGt>(&sk1, message1);
+    let signature2 = super::bls_sign::<BLSScalar, BLSGt>(&sk2, message2);
+    let signature3 = super::bls_sign::<BLSScalar, BLSGt>(&sk3, message3);
+
+    let keys = [pk1, pk2, pk3];
+    let messages = [&message1[..], &message2[..], &message3[..]];
+    let sigs = [signature1, signature2, signature3];
+
+    assert_eq!(Ok(()), super::bls_batch_verify::<BLSScalar, BLSGt>(&keys, &messages, &sigs));
+
+    let new_message3 = b"this message has not been signed";
+
+    let messages = [&message1[..], &message2[..], &new_message3[..]];
+
+    assert_eq!(Err(ZeiError::SignatureError), super::bls_batch_verify::<BLSScalar, BLSGt>(&keys, &messages, &sigs));
+
+  }
+
 
   #[test]
   fn multisig() {
