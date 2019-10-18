@@ -1,5 +1,5 @@
 use super::groups::Group;
-use super::pairing::Pairing;
+use super::pairing::PairingTargetGroup;
 use bn::{Group as BNGroup, Gt};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
@@ -399,7 +399,7 @@ impl fmt::Debug for BNGt {
   }
 }
 
-impl Pairing<BNScalar> for BNGt {
+impl PairingTargetGroup<BNScalar> for BNGt {
   type G1 = BNG1;
   type G2 = BNG2;
 
@@ -411,13 +411,6 @@ impl Pairing<BNScalar> for BNGt {
   }
   fn add(&self, other: &Self) -> BNGt {
     BNGt(self.0 * other.0)
-  }
-
-  fn g1_mul_scalar(a: &Self::G1, b: &BNScalar) -> Self::G1 {
-    a.mul(b)
-  }
-  fn g2_mul_scalar(a: &Self::G2, b: &BNScalar) -> Self::G2 {
-    a.mul(b)
   }
 
   fn get_identity() -> BNGt {

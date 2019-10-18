@@ -1,5 +1,5 @@
 use super::groups::{Group, Scalar};
-use super::pairing::Pairing;
+use super::pairing::PairingTargetGroup;
 use crate::utils::u8_bigendian_slice_to_u32;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
@@ -394,7 +394,7 @@ impl fmt::Debug for BLSGt {
   }
 }
 
-impl Pairing<BLSScalar> for BLSGt {
+impl PairingTargetGroup<BLSScalar> for BLSGt {
   type G1 = BLSG1;
   type G2 = BLSG2;
 
@@ -411,12 +411,6 @@ impl Pairing<BLSScalar> for BLSGt {
     BLSGt(m)
   }
 
-  fn g1_mul_scalar(a: &Self::G1, b: &BLSScalar) -> Self::G1 {
-    a.mul(b)
-  }
-  fn g2_mul_scalar(a: &Self::G2, b: &BLSScalar) -> Self::G2 {
-    a.mul(b)
-  }
   fn get_identity() -> BLSGt {
     BLSGt(Fq12::one())
   }
