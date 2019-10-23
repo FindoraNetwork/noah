@@ -277,17 +277,18 @@ pub fn open_asset_record(input: &BlindAssetRecord,
 
 #[cfg(test)]
 mod test {
-  use super::{build_open_asset_record, open_asset_record};
+  use super::{build_open_asset_record, build_blind_asset_record, open_asset_record};
   use crate::algebra::bls12_381::{BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
   use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey};
   use crate::basic_crypto::signatures::XfrKeyPair;
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::lib::tests::create_xfr;
-  use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord};
+  use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, AssetType};
   use bulletproofs::PedersenGens;
   use curve25519_dalek::scalar::Scalar;
   use rand::SeedableRng;
+  use rand::Rng;
   use rand_chacha::ChaChaRng;
   use crate::algebra::ristretto::{RistPoint, CompRist};
 
@@ -442,5 +443,37 @@ mod test {
     do_test_open_asset_record(false, true, false);
     do_test_open_asset_record(true, true, false);
     do_test_open_asset_record(true, true, true);
+  }
+
+  fn build_and_open_blind_record(confidential_amount: bool,
+      confidential_asset: bool, amt: u64, asset_type: AssetType) {
+
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let pc_gens = PedersenGens::default();
+
+    let keypair = XfrKeyPair::generate(&mut prng);
+    let (pubkey, privkey) = (keypair.get_pk_ref(), keypair.get_sk_ref());
+    let ar = AssetRecord::new(amt, asset_type, pubkey.clone()).unwrap();
+
+    let blind_rec = build_blind_asset_record(&mut prng,
+        &pc_gens, &ar, confidential_amount, confidential_asset, &None);
+
+    let open_rec = open_asset_record(&blind_rec, &privkey).unwrap();
+
+    assert!(*open_rec.get_amount() == amt);
+    assert!(*open_rec.get_asset_type() == asset_type);
+  }
+
+
+  #[test]
+  fn test_build_and_open_blind_record() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let asset_type: AssetType = prng.gen();
+    let amt: u64 = prng.gen();
+
+    build_and_open_blind_record(false,false,amt,asset_type);
+    build_and_open_blind_record(false,true, amt,asset_type);
+    build_and_open_blind_record(true ,true, amt,asset_type);
+    build_and_open_blind_record(true ,false,amt,asset_type);
   }
 }
