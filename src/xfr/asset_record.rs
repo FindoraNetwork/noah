@@ -136,7 +136,7 @@ pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
   // build amount fields
   let (bar_amount, bar_amount_commitments) = match confidential_amount {
     true => {
-      amount_type_bytes.extend_from_slice(&asset_record.asset_type);
+      amount_type_bytes.extend_from_slice(&u64_to_bigendian_u8array(asset_record.amount)[..]);
       let amount_commitment_low = pc_gens.commit(Scalar::from(amount_low), amount_blind_low);
       let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
 
