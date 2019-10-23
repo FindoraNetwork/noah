@@ -24,9 +24,15 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
                                         input_keys: &[XfrKeyPair],
                                         identity_proofs: &[Option<ConfIdReveal>])
                                         -> Result<XfrNote, ZeiError> {
-  let confidential_amount = inputs[0].asset_record.amount.is_none();
-  let confidential_asset = inputs[0].asset_record.asset_type.is_none();
-  let issuer_pk = &inputs[0].asset_record.issuer_public_key;
+  if inputs.len() == 0 {
+    return Err(ZeiError::ParameterError);
+  }
+
+  check_keys(inputs, input_keys)?;
+  let confidential_amount = check_confidential_amount(inputs)?;
+  let confidential_asset = check_confidential_asset(inputs)?;
+  let issuer_pk = get_issuer_pk(inputs)?;
+
   let pc_gens = PedersenGens::default();
 
   let single_asset = check_asset_amount(inputs, outputs)?;
@@ -79,6 +85,65 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
   let multisig = compute_transfer_multisig(&body, input_keys)?;
 
   Ok(XfrNote { body, multisig })
+}
+
+fn check_keys(inputs: &[OpenAssetRecord], input_keys:&[XfrKeyPair]) -> Result<(), ZeiError>
+{
+  if inputs.len() != input_keys.len() {
+    return Err(ZeiError::ParameterError);
+  }
+  for (input,key) in inputs.iter().zip(input_keys.iter()) {
+    let inkey = &input.asset_record.public_key;
+    if inkey!= key.get_pk_ref(){
+      return Err(ZeiError::ParameterError);
+    }
+  }
+  Ok(())
+}
+
+fn check_confidential_amount(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError>
+{
+  if inputs.len() == 0 {
+    return Err(ZeiError::ParameterError);
+  }
+
+  let is_none = inputs[0].asset_record.amount.is_none();
+  for input in inputs {
+    if input.asset_record.amount.is_none() != is_none {
+      return Err(ZeiError::ParameterError)
+    }
+  }
+  Ok(is_none)
+}
+
+fn check_confidential_asset(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError>
+{
+  if inputs.len() == 0 {
+    return Err(ZeiError::ParameterError);
+  }
+
+  let is_none = inputs[0].asset_record.asset_type.is_none();
+  for input in inputs {
+    if input.asset_record.asset_type.is_none() != is_none {
+      return Err(ZeiError::ParameterError)
+    }
+  }
+  Ok(is_none)
+}
+
+fn get_issuer_pk(inputs: &[OpenAssetRecord]) -> Result<&Option<AssetIssuerPubKeys>, ZeiError>
+{
+  if inputs.len() == 0 {
+    return Err(ZeiError::ParameterError);
+  }
+
+  let pk = &inputs[0].asset_record.issuer_public_key;
+  for input in inputs {
+    if pk != &input.asset_record.issuer_public_key {
+      return Err(ZeiError::ParameterError);
+    }
+  }
+  Ok(pk)
 }
 
 fn gen_xfr_proofs_multi_asset(//prng: &mut R,
@@ -562,6 +627,7 @@ pub(crate) mod tests {
                verify_xfr_note(&mut prng, &xfr_note, &null_policies),
                "Transfer with different asset types should fail verification");
 
+    println!("HELLOOOO");
     //test 4:  one input asset different from rest
     let ar = AssetRecord { amount: 10u64,
                            asset_type: [1u8; 16],
@@ -571,7 +637,7 @@ pub(crate) mod tests {
                                         &ar,
                                         confidential_amount,
                                         confidential_asset,
-                                        &None);
+                                        &inputs[1].asset_record.issuer_public_key);
     let xfr_note = gen_xfr_note(&mut prng,
                                 inputs.as_slice(),
                                 outputs.as_slice(),
@@ -592,7 +658,7 @@ pub(crate) mod tests {
                                         &ar,
                                         confidential_amount,
                                         confidential_asset,
-                                        &None);
+                                        &inputs[1].asset_record.issuer_public_key);
     let mut xfr_note = gen_xfr_note(&mut prng,
                                     inputs.as_slice(),
                                     outputs.as_slice(),
@@ -910,5 +976,62 @@ pub(crate) mod tests {
     assert_eq!(Err(ZeiError::XfrVerifyAssetAmountError),
                verify_xfr_note(&mut prng, &xfr_note, &null_policies),
                "Multi asset transfer non confidential");
+  }
+
+  #[test]
+  fn xfr_keys_error(){
+    let pc_gens = PedersenGens::default();
+    let amounts = [(10, [0u8;16]),(10,[0u8;16])]; //input and output
+
+    let mut inputs = vec![];
+    let mut outputs = vec![];
+
+    let mut outkeys = vec![];
+    let mut inkeys = vec![];
+    let mut in_asset_records = vec![];
+    let mut prng = ChaChaRng::from_seed([0u8;32]);
+
+    for x in amounts.iter() {
+      let keypair = XfrKeyPair::generate(&mut prng);
+      let asset_record = AssetRecord { amount: x.0,
+        asset_type: x.1,
+        public_key: keypair.get_pk_ref().clone() };
+
+      inputs.push(build_open_asset_record(&mut prng,
+                                          &pc_gens,
+                                          &asset_record,
+                                          false,
+                                          false,
+                                          &None));
+
+      in_asset_records.push(asset_record);
+      inkeys.push(keypair);
+    }
+
+    for x in amounts.iter() {
+      let keypair = XfrKeyPair::generate(&mut prng);
+
+      outputs.push(AssetRecord { amount: x.0,
+        asset_type: x.1,
+        public_key: keypair.get_pk_ref().clone() });
+      outkeys.push(keypair);
+    }
+
+    let xfr_note = gen_xfr_note(&mut prng,
+                                inputs.as_slice(),
+                                outputs.as_slice(),
+                                &[], //no keys
+                                &[]);
+    assert_eq!(Err(ZeiError::ParameterError), xfr_note);
+
+    let key1 = XfrKeyPair::generate(&mut prng);
+    let key2 = XfrKeyPair::generate(&mut prng);
+    let xfr_note = gen_xfr_note(&mut prng,
+                                inputs.as_slice(),
+                                outputs.as_slice(),
+                                &[key1, key2],
+                                &[]);
+
+    assert_eq!(Err(ZeiError::ParameterError), xfr_note);
   }
 }

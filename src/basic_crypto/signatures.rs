@@ -152,7 +152,7 @@ pub fn verify_multisig(keylist: &[XfrPublicKey],
                        multi_signature: &XfrMultiSig)
                        -> Result<(), ZeiError> {
   if multi_signature.signatures.len() != keylist.len() {
-    return Err(SignatureError); //TODO return MultiSignatureError differnet length
+    return Err(SignatureError); //TODO return MultiSignatureError different length
   }
   for (pk, signature) in keylist.iter().zip(multi_signature.signatures.iter()) {
     pk.verify(message, signature)?; //TODO return MultiSignatureError
