@@ -23,12 +23,31 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
                                         outputs: &[AssetRecord],
                                         input_keys: &[XfrKeyPair],
                                         identity_proofs: &[Option<ConfIdReveal>])
-                                        -> Result<XfrNote, ZeiError> {
+                                        -> Result<XfrNote, ZeiError>
+{
   if inputs.len() == 0 {
     return Err(ZeiError::ParameterError);
   }
 
   check_keys(inputs, input_keys)?;
+
+  let body = gen_xfr_body(prng, inputs, outputs, identity_proofs)?;
+
+  let multisig = compute_transfer_multisig(&body, input_keys)?;
+
+  Ok(XfrNote { body, multisig })
+}
+
+pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
+                                        inputs: &[OpenAssetRecord],
+                                        outputs: &[AssetRecord],
+                                        identity_proofs: &[Option<ConfIdReveal>])
+                                        -> Result<XfrBody, ZeiError>
+{
+  if inputs.len() == 0 {
+    return Err(ZeiError::ParameterError);
+  }
+
   let confidential_amount = check_confidential_amount(inputs)?;
   let confidential_asset = check_confidential_asset(inputs)?;
   let issuer_pk = get_issuer_pk(inputs)?;
@@ -38,15 +57,15 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
   let single_asset = check_asset_amount(inputs, outputs)?;
 
   let open_outputs: Vec<OpenAssetRecord> = outputs.iter()
-                                                  .map(|asset_record| {
-                                                    build_open_asset_record(prng,
-                                                                            &pc_gens,
-                                                                            asset_record,
-                                                                            confidential_amount,
-                                                                            confidential_asset,
-                                                                            issuer_pk)
-                                                  })
-                                                  .collect();
+    .map(|asset_record| {
+      build_open_asset_record(prng,
+                              &pc_gens,
+                              asset_record,
+                              confidential_amount,
+                              confidential_asset,
+                              issuer_pk)
+    })
+    .collect();
 
   let asset_amount_proof = match single_asset {
     true => gen_xfr_proofs_single_asset(prng,
@@ -61,12 +80,16 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
   };
 
   //do tracking proofs
-  let asset_tracking_proof = AssetTrackingProofs { aggregate_amount_asset_type_proof:
-                                                     tracking_proofs(prng, open_outputs.as_slice())?,
-                                                   identity_proofs: identity_proofs.to_vec() };
+  let asset_tracking_proof = AssetTrackingProofs {
+    aggregate_amount_asset_type_proof:
+    tracking_proofs(prng, open_outputs.as_slice())?,
+    identity_proofs: identity_proofs.to_vec()
+  };
 
-  let proofs = XfrProofs { asset_amount_proof,
-                           asset_tracking_proof };
+  let proofs = XfrProofs {
+    asset_amount_proof,
+    asset_tracking_proof
+  };
 
   let mut xfr_inputs = vec![];
   for x in inputs {
@@ -78,13 +101,11 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
     xfr_outputs.push(x.asset_record.clone())
   }
 
-  let body = XfrBody { inputs: xfr_inputs,
-                       outputs: xfr_outputs,
-                       proofs };
-
-  let multisig = compute_transfer_multisig(&body, input_keys)?;
-
-  Ok(XfrNote { body, multisig })
+  Ok(XfrBody {
+    inputs: xfr_inputs,
+    outputs: xfr_outputs,
+    proofs
+  })
 }
 
 fn check_keys(inputs: &[OpenAssetRecord], input_keys:&[XfrKeyPair]) -> Result<(), ZeiError>
