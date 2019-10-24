@@ -300,37 +300,47 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
   // 1. verify signature
   verify_transfer_multisig(&xfr_note)?;
 
-  // 2. verify amounts and asset types
-  match &xfr_note.body.proofs.asset_amount_proof {
+  // 2. verify body
+  verify_xfr_body(prng, &xfr_note.body, id_reveal_policies)
+}
+
+pub fn verify_xfr_body<R: CryptoRng + Rng>(
+  prng: &mut R,
+  body: &XfrBody,
+  id_reveal_policies: &[Option<IdRevealPolicy>])
+  -> Result<(), ZeiError>
+{
+  // 1. verify amounts and asset types
+  match &body.proofs.asset_amount_proof {
     AssetAmountProof::ConfAll((range_proof, asset_proof)) => {
-      verify_confidential_amount(&xfr_note.body.inputs, &xfr_note.body.outputs, range_proof)?;
+      verify_confidential_amount(&body.inputs, &body.outputs, range_proof)?;
       verify_confidential_asset(prng,
-                                &xfr_note.body.inputs,
-                                &xfr_note.body.outputs,
+                                &body.inputs,
+                                &body.outputs,
                                 asset_proof)?;
     }
     AssetAmountProof::ConfAmount(range_proof) => {
-      verify_confidential_amount(&xfr_note.body.inputs, &xfr_note.body.outputs, range_proof)?;
-      verify_plain_asset(&xfr_note.body.inputs, &xfr_note.body.outputs)?;
+      verify_confidential_amount(&body.inputs, &body.outputs, range_proof)?;
+      verify_plain_asset(&body.inputs, &body.outputs)?;
     }
     AssetAmountProof::ConfAsset(asset_proof) => {
-      verify_plain_amounts(&xfr_note.body.inputs, &xfr_note.body.outputs)?;
+      verify_plain_amounts(&body.inputs, &body.outputs)?;
       verify_confidential_asset(prng,
-                                &xfr_note.body.inputs,
-                                &xfr_note.body.outputs,
+                                &body.inputs,
+                                &body.outputs,
                                 asset_proof)?;
     }
     AssetAmountProof::NoProof => {
-      verify_plain_asset_mix(&xfr_note.body.inputs, &xfr_note.body.outputs)?;
+      verify_plain_asset_mix(&body.inputs, &body.outputs)?;
     }
     AssetAmountProof::AssetMix(asset_mix_proof) => {
-      verify_asset_mix(&xfr_note.body.inputs,
-                       &xfr_note.body.outputs,
+      verify_asset_mix(&body.inputs,
+                       &body.outputs,
                        asset_mix_proof)?;
     }
   };
-  // 3 verify tracking proofs
-  verify_issuer_tracking_proof(prng, &xfr_note.body, id_reveal_policies)
+  // 2 verify tracking proofs
+  verify_issuer_tracking_proof(prng, &body, id_reveal_policies)
 }
 
 fn verify_plain_amounts(inputs: &[BlindAssetRecord],
