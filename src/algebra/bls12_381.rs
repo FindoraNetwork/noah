@@ -201,7 +201,6 @@ impl Group<BLSScalar> for BLSG1 {
     BLSG1(G1::rand(&mut prng))
   }
 
-
   //arithmetic
   fn mul(&self, scalar: &BLSScalar) -> BLSG1 {
     let mut m = self.0.clone();

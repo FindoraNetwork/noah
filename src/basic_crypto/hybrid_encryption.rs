@@ -1,4 +1,3 @@
-
 use super::signatures::{XfrPublicKey, XfrSecretKey, KEY_BASE_POINT};
 use crate::errors::ZeiError;
 use crate::serialization;
@@ -39,7 +38,7 @@ pub fn hybrid_decrypt(ctext: &ZeiHybridCipher,
                       sec_key: &XfrSecretKey)
                       -> Result<Vec<u8>, ZeiError> {
   let key = symmetric_key_from_secret_key(sec_key, &ctext.encoded_rand)?;
-  Ok (symmetric_decrypt_fresh_key(&key, ctext.ciphertext.as_slice()))
+  Ok(symmetric_decrypt_fresh_key(&key, ctext.ciphertext.as_slice()))
 }
 
 /// I derive a 32 bytes symmetric key from a public key. I return the byte array together
@@ -81,15 +80,13 @@ fn symmetric_key_from_secret_key(sec_key: &XfrSecretKey,
   Ok(symmetric_key)
 }
 
-use aes_ctr::Aes256Ctr;
 use aes_ctr::stream_cipher::generic_array::GenericArray;
-use aes_ctr::stream_cipher::{
-  NewStreamCipher, SyncStreamCipher
-};
+use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
+use aes_ctr::Aes256Ctr;
 
 fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
   let kkey = GenericArray::from_slice(key);
-  let ctr = GenericArray::from_slice(&[0u8;16]);
+  let ctr = GenericArray::from_slice(&[0u8; 16]);
   let mut ctext_vec = plaintext.to_vec();
   let mut cipher = Aes256Ctr::new(&kkey, ctr);
   cipher.apply_keystream(ctext_vec.as_mut_slice());
@@ -98,7 +95,7 @@ fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
 
 fn symmetric_decrypt_fresh_key(key: &[u8; 32], ciphertext: &[u8]) -> Vec<u8> {
   let kkey = GenericArray::from_slice(key);
-  let ctr = GenericArray::from_slice(&[0u8;16]);
+  let ctr = GenericArray::from_slice(&[0u8; 16]);
   let mut plaintext_vec = ciphertext.to_vec();
   let mut cipher = Aes256Ctr::new(&kkey, ctr);
   cipher.apply_keystream(plaintext_vec.as_mut_slice());
@@ -122,7 +119,6 @@ mod test {
     let from_sk_key = symmetric_key_from_secret_key(keypair.get_sk_ref(), &encoded_rand).unwrap();
     assert_eq!(from_pk_key, from_sk_key);
   }
-
 
   #[test]
   fn symmetric_encryption_fresh_key() {

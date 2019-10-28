@@ -100,11 +100,14 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
   }
   let proof;
   if m.len() > 0 {
-    let pk = ElGamalPublicKey(public_keys[0].eg_ristretto_pub_key.get_point_ref().get_ristretto_point());
-    let ctexts: Vec<ElGamalCiphertext<RistrettoPoint>> = ctexts.iter().map(|c| ElGamalCiphertext{
-      e1: c.e1.get_ristretto_point(),
-      e2: c.e2.get_ristretto_point(),
-    }).collect();
+    let pk = ElGamalPublicKey(public_keys[0].eg_ristretto_pub_key
+                                            .get_point_ref()
+                                            .get_ristretto_point());
+    let ctexts: Vec<ElGamalCiphertext<RistrettoPoint>> =
+      ctexts.iter()
+            .map(|c| ElGamalCiphertext { e1: c.e1.get_ristretto_point(),
+                                         e2: c.e2.get_ristretto_point() })
+            .collect();
     proof = Some(pedersen_elgamal_aggregate_eq_proof(prng,
                                                      m.as_slice(),
                                                      r.as_slice(),
@@ -184,11 +187,14 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
                               .clone());
             }
           }
-          let pk = ElGamalPublicKey(public_key.eg_ristretto_pub_key.get_point_ref().get_ristretto_point());
-          let ctexts: Vec<ElGamalCiphertext<RistrettoPoint>> = ctexts.iter().map(|c| ElGamalCiphertext{
-            e1: c.e1.get_ristretto_point(),
-            e2: c.e2.get_ristretto_point(),
-          }).collect();
+          let pk = ElGamalPublicKey(public_key.eg_ristretto_pub_key
+                                              .get_point_ref()
+                                              .get_ristretto_point());
+          let ctexts: Vec<ElGamalCiphertext<RistrettoPoint>> =
+            ctexts.iter()
+                  .map(|c| ElGamalCiphertext { e1: c.e1.get_ristretto_point(),
+                                               e2: c.e2.get_ristretto_point() })
+                  .collect();
           pedersen_elgamal_eq_aggregate_verify_fast(
                         prng,
                         &pk,
@@ -380,10 +386,12 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
     let coms = bar.amount_commitments
                   .as_ref()
                   .ok_or(ZeiError::InconsistentStructureError)?;
-    let com_low = coms.0.decompress_to_ristretto()
-                          .ok_or(ZeiError::DecompressElementError)?;
-    let com_high = coms.1.decompress_to_ristretto()
-                           .ok_or(ZeiError::DecompressElementError)?;
+    let com_low = coms.0
+                      .decompress_to_ristretto()
+                      .ok_or(ZeiError::DecompressElementError)?;
+    let com_high = coms.1
+                       .decompress_to_ristretto()
+                       .ok_or(ZeiError::DecompressElementError)?;
     total_input_com += com_low + com_high * pow2_32;
   }
 
@@ -393,10 +401,12 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
     let coms = bar.amount_commitments
                   .as_ref()
                   .ok_or(ZeiError::InconsistentStructureError)?;
-    let com_low = coms.0.decompress_to_ristretto()
-                          .ok_or(ZeiError::DecompressElementError)?;
-    let com_high = coms.1.decompress_to_ristretto()
-                           .ok_or(ZeiError::DecompressElementError)?;
+    let com_low = coms.0
+                      .decompress_to_ristretto()
+                      .ok_or(ZeiError::DecompressElementError)?;
+    let com_high = coms.1
+                       .decompress_to_ristretto()
+                       .ok_or(ZeiError::DecompressElementError)?;
     total_output_com += com_low + com_high * pow2_32;
 
     range_coms.push(coms.0.get_compressed_ristretto());
@@ -480,15 +490,23 @@ pub(crate) fn verify_confidential_asset<R: CryptoRng + Rng>(prng: &mut R,
                                                             asset_proof: &ChaumPedersenProofX)
                                                             -> Result<(), ZeiError> {
   let pc_gens = PedersenGens::default();
-  let mut asset_commitments: Vec<RistrettoPoint> =
-    inputs.iter()
-          .map(|x| x.asset_type_commitment.unwrap().decompress_to_ristretto().unwrap())
-          .collect();
+  let mut asset_commitments: Vec<RistrettoPoint> = inputs.iter()
+                                                         .map(|x| {
+                                                           x.asset_type_commitment
+                                                            .unwrap()
+                                                            .decompress_to_ristretto()
+                                                            .unwrap()
+                                                         })
+                                                         .collect();
 
-  let out_asset_commitments: Vec<RistrettoPoint> =
-    outputs.iter()
-           .map(|x| x.asset_type_commitment.unwrap().decompress_to_ristretto().unwrap())
-           .collect();
+  let out_asset_commitments: Vec<RistrettoPoint> = outputs.iter()
+                                                          .map(|x| {
+                                                            x.asset_type_commitment
+                                                             .unwrap()
+                                                             .decompress_to_ristretto()
+                                                             .unwrap()
+                                                          })
+                                                          .collect();
 
   asset_commitments.extend(out_asset_commitments.iter());
 

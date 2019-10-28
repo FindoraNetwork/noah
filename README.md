@@ -41,6 +41,35 @@ Support:
 
 # Installation
 
+## Install RUST
+
+Run the following script and select option 1)
+```
+> curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+We need to use rust nightly
+```
+> rustup default nightly
+```
+
+## Code formatting
+
+Use the following command to install rustfmt, the tool that allows to format the code
+according to some agreed standard defined in `rustfmt.toml`.
+
+```
+> rustup component add rustfmt --toolchain nightly
+> rustup self update
+```
+
+Then to format your code run
+```
+> cargo +nightly fmt
+```
+
+# Use of zei library
+
 To install, add the following to your project's `Cargo.toml`:
 
 ```toml
@@ -62,3 +91,5 @@ likely want to compile with
 If you're building for a machine with avx2 instructions, there's also the
 experimental `avx2_backend`.  To use it, compile with
 `RUSTFLAGS="-C target_cpu=native" cargo build --no-default-features --features="avx2_backend"`
+
+

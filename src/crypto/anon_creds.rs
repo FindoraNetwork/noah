@@ -238,23 +238,22 @@ pub fn ac_reveal<R: CryptoRng + Rng, S: Scalar, P: PairingTargetGroup<S>>(
 ///     3. Sample the challenge as a hash of the commitment.
 ///     4. Compute challenge's responses  c*t + \beta1, c*sk + beta2, {c*y_i + gamma_i}
 ///     5. Return proof commitment and responses
-fn prove_pok<R: CryptoRng + Rng, S: Scalar, P: PairingTargetGroup<S>>(prng: &mut R,
-                                                                      user_sk: &ACUserSecretKey<S>,
-                                                                      issuer_pk: &ACIssuerPublicKey<P::G1,
-                                                                              P::G2>,
-                                                                      t: &S,
-                                                                      hidden_attrs: &[S],
-                                                                      bitmap: &[bool], // indicates revealed attributed
-                                                           sig: &ACSignature<P::G1>)
-                                                                      -> Result<ACPoK<P::G2, S>, ZeiError> {
+fn prove_pok<R: CryptoRng + Rng, S: Scalar, P: PairingTargetGroup<S>>(
+  prng: &mut R,
+  user_sk: &ACUserSecretKey<S>,
+  issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
+  t: &S,
+  hidden_attrs: &[S],
+  bitmap: &[bool], // indicates revealed attributed
+  sig: &ACSignature<P::G1>)
+  -> Result<ACPoK<P::G2, S>, ZeiError> {
   let beta1 = S::random_scalar(prng);
   let beta2 = S::random_scalar(prng);
   let mut gamma = vec![];
   for _ in 0..hidden_attrs.len() {
     gamma.push(S::random_scalar(prng));
   }
-  let mut commitment =
-    issuer_pk.gen2.mul(&beta1).add(&issuer_pk.zz2.mul(&beta2));
+  let mut commitment = issuer_pk.gen2.mul(&beta1).add(&issuer_pk.zz2.mul(&beta2));
   let mut gamma_iter = gamma.iter();
   for (yy2i, x) in issuer_pk.yy2.iter().zip(bitmap) {
     if !(*x) {
@@ -315,7 +314,8 @@ pub(crate) fn ac_challenge<S: Scalar, P: PairingTargetGroup<S>>(issuer_pub_key: 
 /// 2. Compute p \= -proof_commitment + c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
 ///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
 /// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
-pub fn ac_verify<S: Scalar, P: PairingTargetGroup<S>>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+pub fn ac_verify<S: Scalar, P: PairingTargetGroup<S>>(issuer_pub_key: &ACIssuerPublicKey<P::G1,
+                                                                         P::G2>,
                                                       revealed_attrs: &[S],
                                                       bitmap: &[bool],
                                                       reveal_sig: &ACRevealSig<P::G1, P::G2, S>)
@@ -370,11 +370,12 @@ pub(crate) fn ac_vrfy_hidden_terms_addition<S: Scalar, P: PairingTargetGroup<S>>
   Ok(q)
 }
 
-fn ac_vrfy_revealed_terms_addition<S: Scalar, P: PairingTargetGroup<S>>(challenge: &S,
-                                                                        revealed_attrs: &[S],
-                                                                        issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                                                        bitmap: &[bool])
-                                                                        -> Result<P::G2, ZeiError> {
+fn ac_vrfy_revealed_terms_addition<S: Scalar, P: PairingTargetGroup<S>>(
+  challenge: &S,
+  revealed_attrs: &[S],
+  issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+  bitmap: &[bool])
+  -> Result<P::G2, ZeiError> {
   let mut attr_prod_yy2 = P::G2::get_identity();
   let mut attr_iter = revealed_attrs.iter();
   for (b, yy2i) in bitmap.iter().zip(issuer_pub_key.yy2.iter()) {

@@ -3,17 +3,17 @@ use crate::serialization::ZeiFromToBytes;
 use rand::CryptoRng;
 use rand::Rng;
 
+use crate::algebra::groups::{Group, Scalar as ScalarTrait};
+use crate::algebra::pairing::PairingTargetGroup;
 use crate::errors::ZeiError::SignatureError;
+use crate::utils::u64_to_bigendian_u8array;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
+use digest::Digest;
 use ed25519_dalek::PublicKey;
 use ed25519_dalek::SecretKey;
 use ed25519_dalek::Signature;
-use crate::algebra::pairing::PairingTargetGroup;
-use crate::algebra::groups::{Scalar as ScalarTrait, Group};
-use digest::Digest;
-use crate::utils::u64_to_bigendian_u8array;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 //pub const XFR_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
@@ -177,80 +177,77 @@ pub struct BlsSignature<S: ScalarTrait, P: PairingTargetGroup<S>>(P::G2);
 
 /// bls key generation function
 pub fn bls_gen_keys<R: CryptoRng + Rng, S: ScalarTrait, P: PairingTargetGroup<S>>(
-  prng: &mut R) -> (BlsSecretKey<S>, BlsPublicKey<S,P>)
-{
+  prng: &mut R)
+  -> (BlsSecretKey<S>, BlsPublicKey<S, P>) {
   let sec_key = S::random_scalar(prng);
   let pub_key = P::G1::get_base().mul(&sec_key);
-  (BlsSecretKey(sec_key),BlsPublicKey(pub_key))
+  (BlsSecretKey(sec_key), BlsPublicKey(pub_key))
 }
 
 /// bls signature function
-pub fn bls_sign<S: ScalarTrait, P: PairingTargetGroup<S>>(
-  signing_key: &BlsSecretKey<S>,
-  message: &[u8]) -> BlsSignature<S,P>
-{
+pub fn bls_sign<S: ScalarTrait, P: PairingTargetGroup<S>>(signing_key: &BlsSecretKey<S>,
+                                                          message: &[u8])
+                                                          -> BlsSignature<S, P> {
   let hashed = bls_hash_message::<S, P>(message);
   BlsSignature(hashed.mul(&signing_key.0))
 }
 
 /// bls verification function
-pub fn bls_verify<S: ScalarTrait, P: PairingTargetGroup<S>>(
-  ver_key: &BlsPublicKey<S,P>,
-  message: &[u8],
-  signature: &BlsSignature<S,P>) -> Result<(), ZeiError>
-{
+pub fn bls_verify<S: ScalarTrait, P: PairingTargetGroup<S>>(ver_key: &BlsPublicKey<S, P>,
+                                                            message: &[u8],
+                                                            signature: &BlsSignature<S, P>)
+                                                            -> Result<(), ZeiError> {
   let hashed = bls_hash_message::<S, P>(message);
   let a = P::pairing(&P::G1::get_base(), &signature.0);
   let b = P::pairing(&ver_key.0, &hashed);
 
-  match a == b{
+  match a == b {
     true => Ok(()),
-    false => Err(ZeiError::SignatureError)
+    false => Err(ZeiError::SignatureError),
   }
 }
 
 /// aggregate signature (for a single common message)
-pub fn bls_aggregate<S: ScalarTrait, P: PairingTargetGroup<S>>(
-  ver_keys: &[BlsPublicKey<S,P>],
-  signatures: &[BlsSignature<S,P>]) -> BlsSignature<S,P>
-{
+pub fn bls_aggregate<S: ScalarTrait, P: PairingTargetGroup<S>>(ver_keys: &[BlsPublicKey<S, P>],
+                                                               signatures: &[BlsSignature<S,
+                                                                              P>])
+                                                               -> BlsSignature<S, P> {
   assert!(ver_keys.len() == signatures.len());
-  let scalars = bls_hash_pubkeys_to_scalars::<S,P>(ver_keys);
+  let scalars = bls_hash_pubkeys_to_scalars::<S, P>(ver_keys);
   let mut agg_signature = P::G2::get_identity();
-  for (t,s) in scalars.iter().zip(signatures){
+  for (t, s) in scalars.iter().zip(signatures) {
     agg_signature = agg_signature.add(&s.0.mul(t));
   }
   BlsSignature(agg_signature)
 }
 
 /// Verification of an aggregated signature for a common message
-pub fn bls_verify_aggregated<S: ScalarTrait, P: PairingTargetGroup<S>>(
-  ver_keys: &[BlsPublicKey<S,P>],
-  message: &[u8],
-  agg_signature: &BlsSignature<S,P>) -> Result<(), ZeiError>{
-  let scalars = bls_hash_pubkeys_to_scalars::<S,P>(ver_keys);
+pub fn bls_verify_aggregated<S: ScalarTrait, P: PairingTargetGroup<S>>(ver_keys: &[BlsPublicKey<S,P>],
+                                                                       message: &[u8],
+                                                                       agg_signature: &BlsSignature<S,P>)
+                                                                       -> Result<(), ZeiError> {
+  let scalars = bls_hash_pubkeys_to_scalars::<S, P>(ver_keys);
   let mut agg_pub_key = P::G1::get_identity();
   for (t, key) in scalars.iter().zip(ver_keys) {
     agg_pub_key = agg_pub_key.add(&key.0.mul(t));
   }
-  bls_verify::<S,P>(&BlsPublicKey(agg_pub_key), message, agg_signature)
+  bls_verify::<S, P>(&BlsPublicKey(agg_pub_key), message, agg_signature)
 }
 
 /// Batch verification of many signatures
-pub fn bls_batch_verify<S: ScalarTrait, P: PairingTargetGroup<S>>(
-  ver_keys: &[BlsPublicKey<S,P>],
-  messages: &[&[u8]],
-  signatures: &[BlsSignature<S,P>]) -> Result<(), ZeiError>
-{
+pub fn bls_batch_verify<S: ScalarTrait, P: PairingTargetGroup<S>>(ver_keys: &[BlsPublicKey<S,
+                                                                                 P>],
+                                                                  messages: &[&[u8]],
+                                                                  signatures: &[BlsSignature<S,P>])
+                                                                  -> Result<(), ZeiError> {
   assert!(ver_keys.len() == messages.len() && ver_keys.len() == signatures.len());
   let sig = bls_add_signatures(signatures);
   bls_batch_verify_added_signatures(ver_keys, messages, &sig)
 }
 
 /// signature aggregation for (possibly) different messages
-pub fn bls_add_signatures<S: ScalarTrait, P: PairingTargetGroup<S>>(
-  signatures: &[BlsSignature<S,P>]) -> BlsSignature<S,P>
-{
+pub fn bls_add_signatures<S: ScalarTrait, P: PairingTargetGroup<S>>(signatures: &[BlsSignature<S,P>])
+                                                                    -> BlsSignature<S, P> {
   let mut sig = P::G2::get_identity();
   for s in signatures {
     sig = sig.add(&s.0);
@@ -260,37 +257,34 @@ pub fn bls_add_signatures<S: ScalarTrait, P: PairingTargetGroup<S>>(
 
 /// verification of an aggregated signatures for different messages
 pub fn bls_batch_verify_added_signatures<S: ScalarTrait, P: PairingTargetGroup<S>>(
-  ver_keys: &[BlsPublicKey<S,P>],
+  ver_keys: &[BlsPublicKey<S, P>],
   messages: &[&[u8]],
-  signature: &BlsSignature<S,P>
-) -> Result<(), ZeiError>{
+  signature: &BlsSignature<S, P>)
+  -> Result<(), ZeiError> {
   let a = P::pairing(&P::G1::get_base(), &signature.0);
   let mut b = P::get_identity();
   for (pk, m) in ver_keys.iter().zip(messages) {
-    let hashed = bls_hash_message::<S,P>(*m);
+    let hashed = bls_hash_message::<S, P>(*m);
     let p = P::pairing(&pk.0, &hashed);
     b = b.add(&p)
   }
 
-  match a == b{
+  match a == b {
     true => Ok(()),
-    false => Err(ZeiError::SignatureError)
+    false => Err(ZeiError::SignatureError),
   }
 }
 
 /// hash function to G2
-pub fn bls_hash_message<S: ScalarTrait, P: PairingTargetGroup<S>>(message: &[u8]) -> P::G2
-{
+pub fn bls_hash_message<S: ScalarTrait, P: PairingTargetGroup<S>>(message: &[u8]) -> P::G2 {
   let mut hash = HashFnc::default();
   hash.input(message);
   P::G2::from_hash(hash)
 }
 
 /// hash function to N scalars on the pairing field
-pub fn bls_hash_pubkeys_to_scalars<S: ScalarTrait, P: PairingTargetGroup<S>>(
-  ver_keys: &[BlsPublicKey<S,P>]
-) -> Vec<S>
-{
+pub fn bls_hash_pubkeys_to_scalars<S: ScalarTrait, P: PairingTargetGroup<S>>(ver_keys: &[BlsPublicKey<S,P>])
+                                                                             -> Vec<S> {
   let mut hasher = HashFnc::default();
   let n = ver_keys.len();
   for key in ver_keys {
@@ -308,14 +302,13 @@ pub fn bls_hash_pubkeys_to_scalars<S: ScalarTrait, P: PairingTargetGroup<S>>(
   scalars
 }
 
-
 #[cfg(test)]
 mod test {
+  use crate::algebra::bls12_381::BLSScalar;
   use crate::basic_crypto::signatures::{sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey};
   use crate::errors::ZeiError::SignatureError;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
-  use crate::algebra::bls12_381::BLSScalar;
 
   #[test]
   fn signatures() {
@@ -371,31 +364,30 @@ mod test {
     v
   }
 
-  use crate::algebra::bls12_381::{BLSGt};
+  use crate::algebra::bls12_381::BLSGt;
   use crate::errors::ZeiError;
 
   #[test]
-  fn bls_signatures(){
-
+  fn bls_signatures() {
     let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
-    let (sk,pk) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
+    let (sk, pk) = super::bls_gen_keys::<_, BLSScalar, BLSGt>(&mut prng);
 
     let message = b"this is a message";
 
     let signature = super::bls_sign::<BLSScalar, BLSGt>(&sk, message);
 
-    assert_eq!(Ok(()), super::bls_verify::<BLSScalar, BLSGt>(&pk, message, &signature));
-    assert_eq!(Err(crate::errors::ZeiError::SignatureError), super::bls_verify::<BLSScalar, BLSGt>(&pk, b"wrong message", &signature))
+    assert_eq!(Ok(()),
+               super::bls_verify::<BLSScalar, BLSGt>(&pk, message, &signature));
+    assert_eq!(Err(crate::errors::ZeiError::SignatureError),
+               super::bls_verify::<BLSScalar, BLSGt>(&pk, b"wrong message", &signature))
   }
 
   #[test]
-  fn bls_aggregated_signatures(){
-
+  fn bls_aggregated_signatures() {
     let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
-    let (sk1,pk1) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
-    let (sk2,pk2) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
-    let (sk3,pk3) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
-
+    let (sk1, pk1) = super::bls_gen_keys::<_, BLSScalar, BLSGt>(&mut prng);
+    let (sk2, pk2) = super::bls_gen_keys::<_, BLSScalar, BLSGt>(&mut prng);
+    let (sk3, pk3) = super::bls_gen_keys::<_, BLSScalar, BLSGt>(&mut prng);
 
     let message = b"this is a message";
 
@@ -405,20 +397,19 @@ mod test {
 
     let keys = [pk1, pk2, pk3];
 
-    let agg_signature = super::bls_aggregate::<BLSScalar, BLSGt>(&keys, &[signature1, signature2, signature3]);
+    let agg_signature =
+      super::bls_aggregate::<BLSScalar, BLSGt>(&keys, &[signature1, signature2, signature3]);
 
-    assert_eq!(Ok(()), super::bls_verify_aggregated::<BLSScalar, BLSGt>(&keys, message, &agg_signature));
-
+    assert_eq!(Ok(()),
+               super::bls_verify_aggregated::<BLSScalar, BLSGt>(&keys, message, &agg_signature));
   }
 
   #[test]
-  fn bls_batching(){
-
+  fn bls_batching() {
     let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
-    let (sk1,pk1) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
-    let (sk2,pk2) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
-    let (sk3,pk3) = super::bls_gen_keys::<_,BLSScalar, BLSGt>(&mut prng);
-
+    let (sk1, pk1) = super::bls_gen_keys::<_, BLSScalar, BLSGt>(&mut prng);
+    let (sk2, pk2) = super::bls_gen_keys::<_, BLSScalar, BLSGt>(&mut prng);
+    let (sk3, pk3) = super::bls_gen_keys::<_, BLSScalar, BLSGt>(&mut prng);
 
     let message1 = b"this is a message";
     let message2 = b"this is another message";
@@ -432,16 +423,16 @@ mod test {
     let messages = [&message1[..], &message2[..], &message3[..]];
     let sigs = [signature1, signature2, signature3];
 
-    assert_eq!(Ok(()), super::bls_batch_verify::<BLSScalar, BLSGt>(&keys, &messages, &sigs));
+    assert_eq!(Ok(()),
+               super::bls_batch_verify::<BLSScalar, BLSGt>(&keys, &messages, &sigs));
 
     let new_message3 = b"this message has not been signed";
 
     let messages = [&message1[..], &message2[..], &new_message3[..]];
 
-    assert_eq!(Err(ZeiError::SignatureError), super::bls_batch_verify::<BLSScalar, BLSGt>(&keys, &messages, &sigs));
-
+    assert_eq!(Err(ZeiError::SignatureError),
+               super::bls_batch_verify::<BLSScalar, BLSGt>(&keys, &messages, &sigs));
   }
-
 
   #[test]
   fn multisig() {

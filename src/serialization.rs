@@ -1,7 +1,8 @@
-use crate::basic_crypto::signatures::{XfrPublicKey, XfrSignature, XfrSecretKey};
+use crate::basic_crypto::signatures::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use crate::crypto::chaum_pedersen::ChaumPedersenProof;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use bulletproofs::RangeProof;
+use bulletproofs_yoloproof::r1cs::R1CSProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -11,7 +12,6 @@ use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
-use bulletproofs_yoloproof::r1cs::R1CSProof;
 
 impl Serialize for XfrPublicKey {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -133,7 +133,6 @@ impl<'de> Deserialize<'de> for XfrSecretKey {
   }
 }
 
-
 /// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
 pub trait ZeiFromToBytes {
   fn zei_to_bytes(&self) -> Vec<u8>;
@@ -215,7 +214,7 @@ impl ZeiFromToBytes for (CompressedRistretto, CompressedRistretto) {
   fn zei_from_bytes(bytes: &[u8]) -> (CompressedRistretto, CompressedRistretto) {
     let a = CompressedRistretto::from_slice(&bytes[..32]);
     let b = CompressedRistretto::from_slice(&bytes[32..]);
-    (a,b)
+    (a, b)
   }
 }
 
@@ -429,8 +428,11 @@ pub mod option_bytes {
 
 #[cfg(test)]
 mod test {
-  use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey};
-  use crate::basic_crypto::signatures::{XfrKeyPair, XfrPublicKey, XfrSignature, XfrSecretKey};
+  use crate::algebra::ristretto::RistPoint;
+  use crate::basic_crypto::elgamal::{
+    elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey,
+  };
+  use crate::basic_crypto::signatures::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
   use crate::serialization::ZeiFromToBytes;
   use crate::xfr::structs::EGPubKey;
   use bulletproofs_yoloproof::PedersenGens;
@@ -440,7 +442,6 @@ mod test {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
-  use crate::algebra::ristretto::RistPoint;
 
   #[test]
   fn public_key_message_pack_serialization() {
@@ -487,7 +488,6 @@ mod test {
     key: XfrSecretKey,
   }
 
-
   #[test]
   fn serialize_and_deserialize_as_json() {
     let mut prng: ChaChaRng;
@@ -531,7 +531,8 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
     let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let xfr_pub_key = ElGamalPublicKey(RistPoint(elgamal_derive_public_key(&pc_gens.B, &sk).get_point()));
+    let xfr_pub_key =
+      ElGamalPublicKey(RistPoint(elgamal_derive_public_key(&pc_gens.B, &sk).get_point()));
     let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
       res
     } else {

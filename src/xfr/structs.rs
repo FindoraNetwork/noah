@@ -14,8 +14,8 @@ use curve25519_dalek::scalar::Scalar;
 
 use bulletproofs::RangeProof;
 
-use curve25519_dalek::ristretto::{CompressedRistretto};
-use crate::algebra::ristretto::{RistPoint, CompRist};
+use crate::algebra::ristretto::{CompRist, RistPoint};
+use curve25519_dalek::ristretto::CompressedRistretto;
 
 pub type AssetType = [u8; 16];
 
@@ -62,7 +62,7 @@ pub struct BlindAssetRecord {
   //#[serde(with = "serialization::option_bytes")]
   pub amount_commitments: Option<(CompRist, CompRist)>, //None if not confidential transfer
   //pub(crate) issuer_lock_id: Option<(ElGamalCiphertext, ElGamalCiphertext)>, TODO
-  pub amount: Option<u64>, // None if confidential transfers
+  pub amount: Option<u64>,           // None if confidential transfers
   pub asset_type: Option<AssetType>, // None if confidential asset
   #[serde(with = "serialization::zei_obj_serde")]
   pub public_key: XfrPublicKey, // ownership address
@@ -172,12 +172,12 @@ mod test {
   use super::{XfrBody, XfrNote, XfrProofs};
   use crate::basic_crypto::signatures::XfrMultiSig;
   use crate::xfr::lib::tests::create_xfr;
+  use crate::xfr::structs::{AssetAmountProof, AssetTrackingProofs};
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
-  use crate::xfr::structs::{AssetTrackingProofs, AssetAmountProof};
 
   fn do_test_serialization(confidential_amount: bool,
                            confidential_asset: bool,
@@ -209,7 +209,6 @@ mod test {
     let multisig_de: XfrMultiSig = Deserialize::deserialize(&mut de).unwrap();
     assert_eq!(xfr_note.multisig, multisig_de);
 
-
     //serializing proofs
     let mut vec = vec![];
     assert_eq!(true,
@@ -228,7 +227,6 @@ mod test {
     let json_str = serde_json::to_string(&xfr_note.body.proofs.asset_amount_proof).unwrap();
     let proofs_de: AssetAmountProof = serde_json::from_str(json_str.as_str()).unwrap();
     assert_eq!(xfr_note.body.proofs.asset_amount_proof, proofs_de);
-
 
     //serializing body
     let mut vec = vec![];

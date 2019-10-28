@@ -102,7 +102,9 @@ pub fn cac_multi_verify<S: Scalar, P: PairingTargetGroup<S>>(ac_issuer_pub_key: 
                                                                  P::G2,
                                                                  S>],
                                                              ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
-                                                             cac_proof: &CACProof<P::G1, P::G2, S>,
+                                                             cac_proof: &CACProof<P::G1,
+                                                                       P::G2,
+                                                                       S>,
                                                              bitmap: &[bool] // indicates which attributes should be revealed to the receiver
 ) -> Result<(), ZeiError> {
   agg_pok_attrs_verify::<S, P>(ac_issuer_pub_key,
@@ -616,11 +618,12 @@ fn compute_proof_responses<S: Scalar>(challenge: &S,
 /// rather than the plain attributes. That is:
 /// sum_{j\in Revealed} b'_{attr_j} * Y2_j - PoK.attr_sum_com_yy2
 ///  = c' * sum_{j\in Revealed} attr_j * y_j * G2
-fn ac_vrfy_zk_revealed_terms_addition<S: Scalar, P: PairingTargetGroup<S>>(ac_issuer_public_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                                                           attr_sum_com: &P::G2,
-                                                                           attr_resps: &[S],
-                                                                           bitmap: &[bool])
-                                                                           -> Result<P::G2, ZeiError> {
+fn ac_vrfy_zk_revealed_terms_addition<S: Scalar, P: PairingTargetGroup<S>>(
+  ac_issuer_public_key: &ACIssuerPublicKey<P::G1, P::G2>,
+  attr_sum_com: &P::G2,
+  attr_resps: &[S],
+  bitmap: &[bool])
+  -> Result<P::G2, ZeiError> {
   let mut addition = P::G2::get_identity();
   let mut attr_resp_iter = attr_resps.iter();
   for (bj, yy2_j) in bitmap.iter().zip(ac_issuer_public_key.yy2.iter()) {
@@ -710,7 +713,8 @@ mod test {
     (ctexts, ctexts_rands, revealed_attrs, proof, recv_pub_key)
   }
 
-  pub(super) fn confidential_reveal_agg<S: Scalar, P: PairingTargetGroup<S>>(reveal_bitmap: &[bool]) {
+  pub(super) fn confidential_reveal_agg<S: Scalar, P: PairingTargetGroup<S>>(reveal_bitmap: &[bool])
+  {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
 
@@ -792,7 +796,8 @@ mod test {
 
     assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy);
   }
-  pub(super) fn confidential_ac_reveal<S: Scalar, P: PairingTargetGroup<S>>(reveal_bitmap: &[bool]) {
+  pub(super) fn confidential_ac_reveal<S: Scalar, P: PairingTargetGroup<S>>(reveal_bitmap: &[bool])
+  {
     let num_attr = reveal_bitmap.len();
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);

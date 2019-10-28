@@ -1,4 +1,6 @@
-use crate::basic_crypto::elgamal::{elgamal_encrypt};
+use crate::algebra::groups::Scalar as ZeiScalar;
+use crate::algebra::ristretto::{CompRist, RistPoint, RistScalar};
+use crate::basic_crypto::elgamal::elgamal_encrypt;
 use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt};
 use crate::basic_crypto::signatures::{XfrPublicKey, XfrSecretKey};
 use crate::errors::ZeiError;
@@ -12,8 +14,6 @@ use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, Rng};
 use sha2::{Digest, Sha512};
-use crate::algebra::ristretto::{RistPoint, RistScalar, CompRist};
-use crate::algebra::groups::Scalar as ZeiScalar;
 
 /// build complete OpenAssetRecord from AssetRecord structure
 pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
@@ -42,7 +42,8 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
       let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
 
       (None,
-       Some((CompRist(amount_commitment_low.compress()), CompRist(amount_commitment_high.compress()))),
+       Some((CompRist(amount_commitment_low.compress()),
+             CompRist(amount_commitment_high.compress()))),
        (amount_blind_low, amount_blind_high))
     }
     false => (Some(asset_record.amount), None, (Scalar::default(), Scalar::default())),
@@ -63,37 +64,33 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
   let issuer_lock_amount = match issuer_public_key {
     None => None,
     Some(issuer_pk) => match confidential_amount {
-      true =>
-        Some(
-          (elgamal_encrypt(&RistPoint(pc_gens.B),
-                              &RistScalar::from_u32(amount_low),
-                              &RistScalar(amount_blind_low),
-                              &issuer_pk.eg_ristretto_pub_key),
-           elgamal_encrypt(&RistPoint(pc_gens.B),
-                              &RistScalar::from_u32(amount_high),
-                              &RistScalar(amount_blind_high),
-                              &issuer_pk.eg_ristretto_pub_key))
-        ),
+      true => Some((elgamal_encrypt(&RistPoint(pc_gens.B),
+                                    &RistScalar::from_u32(amount_low),
+                                    &RistScalar(amount_blind_low),
+                                    &issuer_pk.eg_ristretto_pub_key),
+                    elgamal_encrypt(&RistPoint(pc_gens.B),
+                                    &RistScalar::from_u32(amount_high),
+                                    &RistScalar(amount_blind_high),
+                                    &issuer_pk.eg_ristretto_pub_key))),
       false => None,
-    } ,
+    },
   };
   //issuer asset tracking asset type
   let issuer_lock_type = match issuer_public_key {
     None => None,
     Some(issuer_pk) => match confidential_asset {
-      true => {
-        Some(elgamal_encrypt(&RistPoint(pc_gens.B),
-                             &RistScalar(type_scalar),
-                             &RistScalar(type_blind),
-                             &issuer_pk.eg_ristretto_pub_key))
-      },
+      true => Some(elgamal_encrypt(&RistPoint(pc_gens.B),
+                                   &RistScalar(type_scalar),
+                                   &RistScalar(type_blind),
+                                   &issuer_pk.eg_ristretto_pub_key)),
       false => None,
     },
   };
   // compute lock of amount and/or type
   let mut lock = None;
   if amount_type_bytes.len() > 0 {
-    lock = Some ( hybrid_encrypt(prng, &asset_record.public_key, amount_type_bytes.as_slice()).unwrap());
+    lock =
+      Some(hybrid_encrypt(prng, &asset_record.public_key, amount_type_bytes.as_slice()).unwrap());
   }
   let blind_asset_record = BlindAssetRecord { issuer_public_key: issuer_public_key.clone(), //None if issuer tracking is not required
                                               issuer_lock_type,
@@ -104,8 +101,7 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
                                               amount_commitments: bar_amount_commitments,
                                               asset_type_commitment: bar_type_commitment,
                                               blind_share,
-                                              lock};
-
+                                              lock };
 
   let open_asset_record = OpenAssetRecord { asset_record: blind_asset_record,
                                             amount: asset_record.amount,
@@ -140,7 +136,9 @@ pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
       let amount_commitment_low = pc_gens.commit(Scalar::from(amount_low), amount_blind_low);
       let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
 
-      (None, Some((CompRist(amount_commitment_low.compress()), CompRist(amount_commitment_high.compress()))))
+      (None,
+       Some((CompRist(amount_commitment_low.compress()),
+             CompRist(amount_commitment_high.compress()))))
     }
     false => (Some(asset_record.amount), None),
   };
@@ -186,7 +184,8 @@ pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
   // compute lock for amount and type
   let mut lock = None;
   if amount_type_bytes.len() > 0 {
-    lock = Some ( hybrid_encrypt(prng, &asset_record.public_key, amount_type_bytes.as_slice()).unwrap());
+    lock =
+      Some(hybrid_encrypt(prng, &asset_record.public_key, amount_type_bytes.as_slice()).unwrap());
   }
 
   let blind_asset_record = BlindAssetRecord { issuer_public_key: issuer_public_key.clone(), //None if issuer tracking is not required
@@ -259,9 +258,7 @@ pub fn open_asset_record(input: &BlindAssetRecord,
   }
 
   if confidential_asset {
-    asset_type.copy_from_slice(
-            &amount_type[i..i+16],
-        );
+    asset_type.copy_from_slice(&amount_type[i..i + 16]);
     type_blind = compute_blind_factor(&shared_point, "asset_type");
   } else {
     asset_type = input.asset_type.unwrap();
@@ -277,20 +274,22 @@ pub fn open_asset_record(input: &BlindAssetRecord,
 
 #[cfg(test)]
 mod test {
-  use super::{build_open_asset_record, build_blind_asset_record, open_asset_record};
+  use super::{build_blind_asset_record, build_open_asset_record, open_asset_record};
   use crate::algebra::bls12_381::{BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
-  use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey};
+  use crate::algebra::ristretto::{CompRist, RistPoint};
+  use crate::basic_crypto::elgamal::{
+    elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey,
+  };
   use crate::basic_crypto::signatures::XfrKeyPair;
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::lib::tests::create_xfr;
   use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, AssetType};
   use bulletproofs::PedersenGens;
   use curve25519_dalek::scalar::Scalar;
-  use rand::SeedableRng;
   use rand::Rng;
+  use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
-  use crate::algebra::ristretto::{RistPoint, CompRist};
 
   fn do_test_build_open_asset_record(confidential_amount: bool,
                                      confidential_asset: bool,
@@ -313,7 +312,8 @@ mod test {
         let sk = elgamal_generate_secret_key::<_, BLSScalar>(&mut prng);
         let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
-        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
+        Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
+                                    ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
                                   eg_blsg1_pub_key: id_reveal_pub_key })
       }
       false => None,
@@ -360,15 +360,15 @@ mod test {
     assert_eq!(expected_bar_amount_commitment,
                open_ar.asset_record.amount_commitments);
     /*assert_eq!(expected_bar_lock_amount_none,
-               open_ar.asset_record.lock_amount.is_none());
-               */
+    open_ar.asset_record.lock_amount.is_none());
+    */
     assert_eq!(expected_bar_asset_type, open_ar.asset_record.asset_type);
     assert_eq!(expected_bar_asset_type_commitment,
                open_ar.asset_record.asset_type_commitment);
     assert_eq!(confidential_asset || confidential_amount,
                open_ar.asset_record.lock.is_some());
     /*assert_eq!(expected_bar_lock_type_none,
-               open_ar.asset_record.lock_type.is_none());*/
+    open_ar.asset_record.lock_type.is_none());*/
 
     assert_eq!(asset_tracking,
                open_ar.asset_record.issuer_public_key.is_some());
@@ -429,8 +429,8 @@ mod test {
     if confidential_asset {
       let derived_commitment =
         CompRist(pc_gens.commit(Scalar::from(u8_bigendian_slice_to_u128(&open_ar.asset_type[..])),
-                       open_ar.type_blind)
-               .compress());
+                                open_ar.type_blind)
+                        .compress());
       assert_eq!(derived_commitment,
                  open_ar.asset_record.asset_type_commitment.unwrap());
     }
@@ -446,8 +446,9 @@ mod test {
   }
 
   fn build_and_open_blind_record(confidential_amount: bool,
-      confidential_asset: bool, amt: u64, asset_type: AssetType) {
-
+                                 confidential_asset: bool,
+                                 amt: u64,
+                                 asset_type: AssetType) {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
@@ -456,7 +457,11 @@ mod test {
     let ar = AssetRecord::new(amt, asset_type, pubkey.clone()).unwrap();
 
     let blind_rec = build_blind_asset_record(&mut prng,
-        &pc_gens, &ar, confidential_amount, confidential_asset, &None);
+                                             &pc_gens,
+                                             &ar,
+                                             confidential_amount,
+                                             confidential_asset,
+                                             &None);
 
     let open_rec = open_asset_record(&blind_rec, &privkey).unwrap();
 
@@ -464,16 +469,15 @@ mod test {
     assert!(*open_rec.get_asset_type() == asset_type);
   }
 
-
   #[test]
   fn test_build_and_open_blind_record() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let asset_type: AssetType = prng.gen();
     let amt: u64 = prng.gen();
 
-    build_and_open_blind_record(false,false,amt,asset_type);
-    build_and_open_blind_record(false,true, amt,asset_type);
-    build_and_open_blind_record(true ,true, amt,asset_type);
-    build_and_open_blind_record(true ,false,amt,asset_type);
+    build_and_open_blind_record(false, false, amt, asset_type);
+    build_and_open_blind_record(false, true, amt, asset_type);
+    build_and_open_blind_record(true, true, amt, asset_type);
+    build_and_open_blind_record(true, false, amt, asset_type);
   }
 }

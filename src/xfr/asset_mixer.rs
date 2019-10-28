@@ -8,10 +8,7 @@ use merlin::Transcript;
 use spacesuit::{cloak, AllocatedValue, CommittedValue, Value, VerifierCommittable};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AssetMixProof(
-  #[serde(with = "serialization::zei_obj_serde")]
-  pub(crate) R1CSProof
-);
+pub struct AssetMixProof(#[serde(with = "serialization::zei_obj_serde")] pub(crate) R1CSProof);
 
 impl PartialEq for AssetMixProof {
   fn eq(&self, other: &AssetMixProof) -> bool {

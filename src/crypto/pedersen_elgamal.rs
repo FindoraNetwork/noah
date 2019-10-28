@@ -37,13 +37,13 @@ pub const PEDERSEN_ELGAMAL_EQ_PROOF_LEN: usize = 96 + ELGAMAL_CTEXT_LEN;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PedersenElGamalEqProof {
   #[serde(with = "serialization::zei_obj_serde")]
-  z1: Scalar,                            // c*m + r_1
+  z1: Scalar, // c*m + r_1
   #[serde(with = "serialization::zei_obj_serde")]
-  z2: Scalar,                            // c*r + r_2
+  z2: Scalar, // c*r + r_2
   #[serde(with = "serialization::zei_obj_serde")]
   e1: ElGamalCiphertext<RistrettoPoint>, // (r_2*G, r1*g + r2*PK)
   #[serde(with = "serialization::zei_obj_serde")]
-  c1: RistrettoPoint,                    // r_1*g + r_2*H
+  c1: RistrettoPoint, // r_1*g + r_2*H
 }
 
 /*
@@ -170,7 +170,8 @@ pub fn pedersen_elgamal_eq_verify(public_key: &ElGamalPublicKey<RistrettoPoint>,
 
   if proof.c1 + c * commitment == proof.z1 * pc_gens.B + proof.z2 * pc_gens.B_blinding {
     if proof_enc_e1 + c * ctext.e1 == proof.z2 * pc_gens.B
-       && proof_enc_e2 + c * ctext.e2 == proof.z1 * pc_gens.B + proof.z2 * public_key.get_point_ref()
+       && proof_enc_e2 + c * ctext.e2
+          == proof.z1 * pc_gens.B + proof.z2 * public_key.get_point_ref()
     {
       return Ok(());
     }

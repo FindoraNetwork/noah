@@ -7,8 +7,8 @@ use curve25519_dalek::traits::Identity;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand::{CryptoRng, Rng};
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use serde::de::{Visitor, SeqAccess};
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 impl ZeiScalar for Scalar {
   fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> Scalar {
@@ -94,7 +94,7 @@ impl Group<Scalar> for RistrettoPoint {
 pub struct RistScalar(pub Scalar);
 
 impl RistScalar {
-  pub fn get_scalar(&self) -> Scalar{
+  pub fn get_scalar(&self) -> Scalar {
     self.0
   }
 }
@@ -141,21 +141,19 @@ impl ZeiScalar for RistScalar {
 
 impl Serialize for RistScalar {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-      S: Serializer
+    where S: Serializer
   {
     if serializer.is_human_readable() {
       serializer.serialize_str(&base64::encode(self.to_bytes().as_slice()))
     } else {
-      serializer.serialize_bytes(self.to_bytes().as_slice() )
+      serializer.serialize_bytes(self.to_bytes().as_slice())
     }
   }
 }
 
 impl<'de> Deserialize<'de> for RistScalar {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-      D: Deserializer<'de>
+    where D: Deserializer<'de>
   {
     struct RistScalarVisitor;
 
@@ -173,14 +171,13 @@ impl<'de> Deserialize<'de> for RistScalar {
       }
 
       fn visit_seq<V>(self, mut seq: V) -> Result<RistScalar, V::Error>
-        where V: SeqAccess<'de>,
+        where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
         while let Some(x) = seq.next_element().unwrap() {
           vec.push(x);
         }
         Ok(RistScalar::from_bytes(vec.as_slice()))
-
       }
       fn visit_str<E>(self, s: &str) -> Result<RistScalar, E>
         where E: serde::de::Error
@@ -200,7 +197,7 @@ impl<'de> Deserialize<'de> for RistScalar {
 pub struct RistPoint(pub RistrettoPoint);
 
 impl RistPoint {
-  pub fn get_ristretto_point(&self) -> RistrettoPoint{
+  pub fn get_ristretto_point(&self) -> RistrettoPoint {
     self.0
   }
 }
@@ -232,7 +229,7 @@ impl Group<RistScalar> for RistPoint {
   fn from_compressed_bytes(bytes: &[u8]) -> Option<RistPoint> {
     match CompressedRistretto::from_slice(bytes).decompress() {
       None => None,
-      Some(x) => Some(RistPoint(x))
+      Some(x) => Some(RistPoint(x)),
     }
   }
 
@@ -251,21 +248,19 @@ impl Group<RistScalar> for RistPoint {
 
 impl Serialize for RistPoint {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-      S: Serializer
+    where S: Serializer
   {
     if serializer.is_human_readable() {
       serializer.serialize_str(&base64::encode(self.to_compressed_bytes().as_slice()))
     } else {
-      serializer.serialize_bytes(self.to_compressed_bytes().as_slice() )
+      serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
     }
   }
 }
 
 impl<'de> Deserialize<'de> for RistPoint {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-      D: Deserializer<'de>
+    where D: Deserializer<'de>
   {
     struct RistPointVisitor;
 
@@ -283,14 +278,13 @@ impl<'de> Deserialize<'de> for RistPoint {
       }
 
       fn visit_seq<V>(self, mut seq: V) -> Result<RistPoint, V::Error>
-        where V: SeqAccess<'de>,
+        where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
         while let Some(x) = seq.next_element().unwrap() {
           vec.push(x);
         }
         Ok(RistPoint::from_compressed_bytes(vec.as_slice()).unwrap())
-
       }
       fn visit_str<E>(self, s: &str) -> Result<RistPoint, E>
         where E: serde::de::Error
@@ -326,8 +320,7 @@ impl Default for CompRist {
 
 impl Serialize for CompRist {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-      S: Serializer
+    where S: Serializer
   {
     if serializer.is_human_readable() {
       serializer.serialize_str(&base64::encode(self.0.as_bytes()))
@@ -339,8 +332,7 @@ impl Serialize for CompRist {
 
 impl<'de> Deserialize<'de> for CompRist {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-      D: Deserializer<'de>
+    where D: Deserializer<'de>
   {
     struct RistPointVisitor;
 
@@ -358,14 +350,13 @@ impl<'de> Deserialize<'de> for CompRist {
       }
 
       fn visit_seq<V>(self, mut seq: V) -> Result<CompRist, V::Error>
-        where V: SeqAccess<'de>,
+        where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
         while let Some(x) = seq.next_element().unwrap() {
           vec.push(x);
         }
         Ok(CompRist(CompressedRistretto::from_slice(vec.as_slice())))
-
       }
       fn visit_str<E>(self, s: &str) -> Result<CompRist, E>
         where E: serde::de::Error
@@ -380,8 +371,6 @@ impl<'de> Deserialize<'de> for CompRist {
     }
   }
 }
-
-
 
 #[cfg(test)]
 mod ristretto_group_test {
@@ -400,10 +389,10 @@ mod ristretto_group_test {
 
 #[cfg(test)]
 mod elgamal_over_ristretto_tests {
+  use super::{RistPoint, RistScalar};
   use crate::basic_crypto::elgamal::elgamal_test;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
-  use super::{RistScalar, RistPoint};
 
   #[test]
   fn verification() {
@@ -418,9 +407,9 @@ mod elgamal_over_ristretto_tests {
   }
 
   #[test]
-    fn to_json(){
-      elgamal_test::to_json::<RistScalar, RistPoint>();
-    }
+  fn to_json() {
+    elgamal_test::to_json::<RistScalar, RistPoint>();
+  }
 
   #[test]
   fn to_message_pack() {

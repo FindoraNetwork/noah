@@ -23,8 +23,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
                                         outputs: &[AssetRecord],
                                         input_keys: &[XfrKeyPair],
                                         identity_proofs: &[Option<ConfIdReveal>])
-                                        -> Result<XfrNote, ZeiError>
-{
+                                        -> Result<XfrNote, ZeiError> {
   if inputs.len() == 0 {
     return Err(ZeiError::ParameterError);
   }
@@ -42,8 +41,7 @@ pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
                                         inputs: &[OpenAssetRecord],
                                         outputs: &[AssetRecord],
                                         identity_proofs: &[Option<ConfIdReveal>])
-                                        -> Result<XfrBody, ZeiError>
-{
+                                        -> Result<XfrBody, ZeiError> {
   if inputs.len() == 0 {
     return Err(ZeiError::ParameterError);
   }
@@ -57,15 +55,15 @@ pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
   let single_asset = check_asset_amount(inputs, outputs)?;
 
   let open_outputs: Vec<OpenAssetRecord> = outputs.iter()
-    .map(|asset_record| {
-      build_open_asset_record(prng,
-                              &pc_gens,
-                              asset_record,
-                              confidential_amount,
-                              confidential_asset,
-                              issuer_pk)
-    })
-    .collect();
+                                                  .map(|asset_record| {
+                                                    build_open_asset_record(prng,
+                                                                            &pc_gens,
+                                                                            asset_record,
+                                                                            confidential_amount,
+                                                                            confidential_asset,
+                                                                            issuer_pk)
+                                                  })
+                                                  .collect();
 
   let asset_amount_proof = match single_asset {
     true => gen_xfr_proofs_single_asset(prng,
@@ -80,16 +78,12 @@ pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
   };
 
   //do tracking proofs
-  let asset_tracking_proof = AssetTrackingProofs {
-    aggregate_amount_asset_type_proof:
-    tracking_proofs(prng, open_outputs.as_slice())?,
-    identity_proofs: identity_proofs.to_vec()
-  };
+  let asset_tracking_proof = AssetTrackingProofs { aggregate_amount_asset_type_proof:
+                                                     tracking_proofs(prng, open_outputs.as_slice())?,
+                                                   identity_proofs: identity_proofs.to_vec() };
 
-  let proofs = XfrProofs {
-    asset_amount_proof,
-    asset_tracking_proof
-  };
+  let proofs = XfrProofs { asset_amount_proof,
+                           asset_tracking_proof };
 
   let mut xfr_inputs = vec![];
   for x in inputs {
@@ -101,29 +95,25 @@ pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
     xfr_outputs.push(x.asset_record.clone())
   }
 
-  Ok(XfrBody {
-    inputs: xfr_inputs,
-    outputs: xfr_outputs,
-    proofs
-  })
+  Ok(XfrBody { inputs: xfr_inputs,
+               outputs: xfr_outputs,
+               proofs })
 }
 
-fn check_keys(inputs: &[OpenAssetRecord], input_keys:&[XfrKeyPair]) -> Result<(), ZeiError>
-{
+fn check_keys(inputs: &[OpenAssetRecord], input_keys: &[XfrKeyPair]) -> Result<(), ZeiError> {
   if inputs.len() != input_keys.len() {
     return Err(ZeiError::ParameterError);
   }
-  for (input,key) in inputs.iter().zip(input_keys.iter()) {
+  for (input, key) in inputs.iter().zip(input_keys.iter()) {
     let inkey = &input.asset_record.public_key;
-    if inkey!= key.get_pk_ref(){
+    if inkey != key.get_pk_ref() {
       return Err(ZeiError::ParameterError);
     }
   }
   Ok(())
 }
 
-fn check_confidential_amount(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError>
-{
+fn check_confidential_amount(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError> {
   if inputs.len() == 0 {
     return Err(ZeiError::ParameterError);
   }
@@ -131,14 +121,13 @@ fn check_confidential_amount(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiErro
   let is_none = inputs[0].asset_record.amount.is_none();
   for input in inputs {
     if input.asset_record.amount.is_none() != is_none {
-      return Err(ZeiError::ParameterError)
+      return Err(ZeiError::ParameterError);
     }
   }
   Ok(is_none)
 }
 
-fn check_confidential_asset(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError>
-{
+fn check_confidential_asset(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError> {
   if inputs.len() == 0 {
     return Err(ZeiError::ParameterError);
   }
@@ -146,14 +135,13 @@ fn check_confidential_asset(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError
   let is_none = inputs[0].asset_record.asset_type.is_none();
   for input in inputs {
     if input.asset_record.asset_type.is_none() != is_none {
-      return Err(ZeiError::ParameterError)
+      return Err(ZeiError::ParameterError);
     }
   }
   Ok(is_none)
 }
 
-fn get_issuer_pk(inputs: &[OpenAssetRecord]) -> Result<&Option<AssetIssuerPubKeys>, ZeiError>
-{
+fn get_issuer_pk(inputs: &[OpenAssetRecord]) -> Result<&Option<AssetIssuerPubKeys>, ZeiError> {
   if inputs.len() == 0 {
     return Err(ZeiError::ParameterError);
   }
@@ -304,20 +292,15 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
   verify_xfr_body(prng, &xfr_note.body, id_reveal_policies)
 }
 
-pub fn verify_xfr_body<R: CryptoRng + Rng>(
-  prng: &mut R,
-  body: &XfrBody,
-  id_reveal_policies: &[Option<IdRevealPolicy>])
-  -> Result<(), ZeiError>
-{
+pub fn verify_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
+                                           body: &XfrBody,
+                                           id_reveal_policies: &[Option<IdRevealPolicy>])
+                                           -> Result<(), ZeiError> {
   // 1. verify amounts and asset types
   match &body.proofs.asset_amount_proof {
     AssetAmountProof::ConfAll((range_proof, asset_proof)) => {
       verify_confidential_amount(&body.inputs, &body.outputs, range_proof)?;
-      verify_confidential_asset(prng,
-                                &body.inputs,
-                                &body.outputs,
-                                asset_proof)?;
+      verify_confidential_asset(prng, &body.inputs, &body.outputs, asset_proof)?;
     }
     AssetAmountProof::ConfAmount(range_proof) => {
       verify_confidential_amount(&body.inputs, &body.outputs, range_proof)?;
@@ -325,18 +308,13 @@ pub fn verify_xfr_body<R: CryptoRng + Rng>(
     }
     AssetAmountProof::ConfAsset(asset_proof) => {
       verify_plain_amounts(&body.inputs, &body.outputs)?;
-      verify_confidential_asset(prng,
-                                &body.inputs,
-                                &body.outputs,
-                                asset_proof)?;
+      verify_confidential_asset(prng, &body.inputs, &body.outputs, asset_proof)?;
     }
     AssetAmountProof::NoProof => {
       verify_plain_asset_mix(&body.inputs, &body.outputs)?;
     }
     AssetAmountProof::AssetMix(asset_mix_proof) => {
-      verify_asset_mix(&body.inputs,
-                       &body.outputs,
-                       asset_mix_proof)?;
+      verify_asset_mix(&body.inputs, &body.outputs, asset_mix_proof)?;
     }
   };
   // 2 verify tracking proofs
@@ -417,8 +395,16 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord],
 
   let mut in_coms = vec![];
   for x in inputs.iter() {
-    let com_amount_low = x.amount_commitments.unwrap().0.decompress_to_ristretto().unwrap();
-    let com_amount_high = x.amount_commitments.unwrap().1.decompress_to_ristretto().unwrap();
+    let com_amount_low = x.amount_commitments
+                          .unwrap()
+                          .0
+                          .decompress_to_ristretto()
+                          .unwrap();
+    let com_amount_high = x.amount_commitments
+                           .unwrap()
+                           .1
+                           .decompress_to_ristretto()
+                           .unwrap();
     let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
     let com_type = x.asset_type_commitment.unwrap().get_compressed_ristretto();
     in_coms.push((com_amount, com_type));
@@ -426,8 +412,16 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord],
 
   let mut out_coms = vec![];
   for x in outputs.iter() {
-    let com_amount_low = x.amount_commitments.unwrap().0.decompress_to_ristretto().unwrap();
-    let com_amount_high = x.amount_commitments.unwrap().1.decompress_to_ristretto().unwrap();
+    let com_amount_low = x.amount_commitments
+                          .unwrap()
+                          .0
+                          .decompress_to_ristretto()
+                          .unwrap();
+    let com_amount_high = x.amount_commitments
+                           .unwrap()
+                           .1
+                           .decompress_to_ristretto()
+                           .unwrap();
     let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
     let com_type = x.asset_type_commitment.unwrap().get_compressed_ristretto();
     out_coms.push((com_amount, com_type));
@@ -441,7 +435,10 @@ pub(crate) mod tests {
   use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
   use crate::algebra::groups::Scalar as ScalarTrait;
-  use crate::basic_crypto::elgamal::{elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext, ElGamalPublicKey};
+  use crate::algebra::ristretto::{CompRist, RistPoint};
+  use crate::basic_crypto::elgamal::{
+    elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext, ElGamalPublicKey,
+  };
   use crate::basic_crypto::signatures::XfrKeyPair;
   use crate::crypto::anon_creds;
   use crate::errors::ZeiError::{
@@ -457,7 +454,6 @@ pub(crate) mod tests {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
-  use crate::algebra::ristretto::{RistPoint, CompRist};
 
   pub(crate) fn create_xfr(
     prng: &mut ChaChaRng,
@@ -475,7 +471,8 @@ pub(crate) mod tests {
         let sk = elgamal_generate_secret_key::<_, BLSScalar>(prng);
         let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
 
-        Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
+        Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
+                                    ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
                                   eg_blsg1_pub_key: id_reveal_pub_key })
       }
       false => None,
@@ -597,7 +594,8 @@ pub(crate) mod tests {
                                   .compress();
       let commitment_high = pc_gens.commit(Scalar::from(high), Scalar::random(&mut prng))
                                    .compress();
-      xfr_note.body.outputs[3].amount_commitments = Some((CompRist(commitment_low),CompRist(commitment_high)));
+      xfr_note.body.outputs[3].amount_commitments =
+        Some((CompRist(commitment_low), CompRist(commitment_high)));
       error = XfrVerifyConfidentialAmountError;
     } else {
       xfr_note.body.outputs[3].amount = Some(0xFFFFFFFFFF);
@@ -758,7 +756,8 @@ pub(crate) mod tests {
                                             .clone();
       let new_enc = old_enc.e2.0 + pc_gens.B; //adding 1 to the exponent
       xfr_note.body.outputs[0].issuer_lock_type = Some(ElGamalCiphertext { e1: old_enc.e1,
-                                                                           e2: RistPoint(new_enc) });
+                                                                           e2:
+                                                                             RistPoint(new_enc) });
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
       assert_eq!(Err(XfrVerifyIssuerTrackingAssetAmountError),
                  verify_xfr_note(&mut prng, &xfr_note, &null_policies),
@@ -800,7 +799,8 @@ pub(crate) mod tests {
                                             .unwrap();
       let new_enc = old_enc.0.e2.0 + pc_gens.B; //adding 1 to the exponent
       xfr_note.body.outputs[0].issuer_lock_amount = Some((ElGamalCiphertext { e1: old_enc.0.e1,
-                                                                              e2: RistPoint(new_enc) },
+                                                                              e2:
+                                                                                RistPoint(new_enc) },
                                                           ElGamalCiphertext { e1: old_enc.1.e1,
                                                                               e2: old_enc.1.e2 }));
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
@@ -886,7 +886,8 @@ pub(crate) mod tests {
     let asset_issuer_id_pub_key =
       elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_id_sec_key);
     let asset_issuer_public_key =
-      Some(AssetIssuerPubKeys { eg_ristretto_pub_key: ElGamalPublicKey(RistPoint(asset_issuer_pub_key.get_point())),
+      Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
+                                  ElGamalPublicKey(RistPoint(asset_issuer_pub_key.get_point())),
                                 eg_blsg1_pub_key: asset_issuer_id_pub_key });
 
     let input_keypair = XfrKeyPair::generate(&mut prng);
@@ -1010,9 +1011,9 @@ pub(crate) mod tests {
   }
 
   #[test]
-  fn xfr_keys_error(){
+  fn xfr_keys_error() {
     let pc_gens = PedersenGens::default();
-    let amounts = [(10, [0u8;16]),(10,[0u8;16])]; //input and output
+    let amounts = [(10, [0u8; 16]), (10, [0u8; 16])]; //input and output
 
     let mut inputs = vec![];
     let mut outputs = vec![];
@@ -1020,20 +1021,15 @@ pub(crate) mod tests {
     let mut outkeys = vec![];
     let mut inkeys = vec![];
     let mut in_asset_records = vec![];
-    let mut prng = ChaChaRng::from_seed([0u8;32]);
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
     for x in amounts.iter() {
       let keypair = XfrKeyPair::generate(&mut prng);
       let asset_record = AssetRecord { amount: x.0,
-        asset_type: x.1,
-        public_key: keypair.get_pk_ref().clone() };
+                                       asset_type: x.1,
+                                       public_key: keypair.get_pk_ref().clone() };
 
-      inputs.push(build_open_asset_record(&mut prng,
-                                          &pc_gens,
-                                          &asset_record,
-                                          false,
-                                          false,
-                                          &None));
+      inputs.push(build_open_asset_record(&mut prng, &pc_gens, &asset_record, false, false, &None));
 
       in_asset_records.push(asset_record);
       inkeys.push(keypair);
@@ -1043,8 +1039,8 @@ pub(crate) mod tests {
       let keypair = XfrKeyPair::generate(&mut prng);
 
       outputs.push(AssetRecord { amount: x.0,
-        asset_type: x.1,
-        public_key: keypair.get_pk_ref().clone() });
+                                 asset_type: x.1,
+                                 public_key: keypair.get_pk_ref().clone() });
       outkeys.push(keypair);
     }
 
