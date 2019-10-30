@@ -909,22 +909,19 @@ pub(crate) mod tests {
                  BLSScalar::random_scalar(&mut prng),
                  BLSScalar::random_scalar(&mut prng),
                  BLSScalar::random_scalar(&mut prng)];
-    let cred_issuer_keys = anon_creds::ac_keygen_issuer::<_, BLSScalar, BLSGt>(&mut prng, 4);
-    let receiver_ac_keys =
-      anon_creds::ac_keygen_user::<_, BLSScalar, BLSGt>(&mut prng, &cred_issuer_keys.0);
+    let cred_issuer_keys = anon_creds::ac_keygen_issuer::<_, BLSGt>(&mut prng, 4);
+    let receiver_ac_keys = anon_creds::ac_keygen_user::<_, BLSGt>(&mut prng, &cred_issuer_keys.0);
 
-    let ac_signature = anon_creds::ac_sign::<_, BLSScalar, BLSGt>(&mut prng,
-                                                                  &cred_issuer_keys.1,
-                                                                  &receiver_ac_keys.0,
-                                                                  &attrs);
+    let ac_signature =
+      anon_creds::ac_sign::<_, BLSGt>(&mut prng, &cred_issuer_keys.1, &receiver_ac_keys.0, &attrs);
     let id_tracking_policy = IdRevealPolicy { cred_issuer_pub_key: cred_issuer_keys.0.clone(),
                                               bitmap: vec![false, true, false, true] };
-    let proof = anon_creds::ac_reveal::<_, BLSScalar, BLSGt>(&mut prng,
-                                                             &receiver_ac_keys.1,
-                                                             &cred_issuer_keys.0,
-                                                             &ac_signature,
-                                                             &attrs,
-                                                             &id_tracking_policy.bitmap).unwrap();
+    let proof = anon_creds::ac_reveal::<_, BLSGt>(&mut prng,
+                                                  &receiver_ac_keys.1,
+                                                  &cred_issuer_keys.0,
+                                                  &ac_signature,
+                                                  &attrs,
+                                                  &id_tracking_policy.bitmap).unwrap();
     let identity_proof =
       create_conf_id_reveal(&mut prng,
                             &attrs,
