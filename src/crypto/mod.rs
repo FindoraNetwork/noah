@@ -12,7 +12,7 @@ use crate::algebra::groups::{Group, Scalar};
 use crate::utils::u32_to_bigendian_u8array;
 use sha2::Digest;
 
-fn compute_challenge_ref<S: Scalar, G: Group<S>>(context: &[&G]) -> S {
+fn compute_challenge_ref<G: Group>(context: &[&G]) -> G::ScalarField {
   /*! I compute zk challenges for Dlog based proof. The challenge is a hash of the
   current context of the proof*/
   let mut hasher = sha2::Sha512::new();
@@ -21,7 +21,7 @@ fn compute_challenge_ref<S: Scalar, G: Group<S>>(context: &[&G]) -> S {
     hasher.input(point.to_compressed_bytes().as_slice());
   }
 
-  S::from_hash(hasher)
+  G::ScalarField::from_hash(hasher)
 }
 
 fn compute_sub_challenge<S: Scalar>(challenge: &S, i: u32) -> S {

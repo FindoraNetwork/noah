@@ -12,53 +12,53 @@ pub struct DlogProof<G, S> {
   pub response: S,
 }
 
-pub fn prove_knowledge_dlog<R: CryptoRng + Rng, S: ZeiScalar, G: Group<S>>(prng: &mut R,
+pub fn prove_knowledge_dlog<R: CryptoRng + Rng, G: Group>(prng: &mut R,
                                                                            base: &G,
                                                                            point: &G,
-                                                                           dlog: &S)
-                                                                           -> DlogProof<G, S> {
+                                                                           dlog: &G::ScalarField)
+                                                                           -> DlogProof<G, G::ScalarField> {
   /*! I compute a proof for the knowledge of dlog for point with respect to base*/
-  let u = S::random_scalar(prng);
+  let u = G::ScalarField::random_scalar(prng);
   let proof_commitment = base.mul(&u);
-  let challenge = compute_challenge_ref::<S, G>(&[base, &proof_commitment, point]);
+  let challenge = compute_challenge_ref::<G::ScalarField, G>(&[base, &proof_commitment, point]);
   let response = challenge.mul(dlog).add(&u);
 
   DlogProof { proof_commitment: proof_commitment,
               response }
 }
 
-pub fn verify_proof_of_knowledge_dlog<S: ZeiScalar, G: Group<S>>(base: &G,
+pub fn verify_proof_of_knowledge_dlog<G: Group>(base: &G,
                                                                  point: &G,
-                                                                 proof: &DlogProof<G, S>)
+                                                                 proof: &DlogProof<G, G::ScalarField>)
                                                                  -> bool {
   /*! I verify a proof of knowledge of dlog for point with respect to base*/
 
-  let challenge = compute_challenge_ref::<S, G>(&[base, &proof.proof_commitment, point]);
+  let challenge = compute_challenge_ref::<G::ScalarField, G>(&[base, &proof.proof_commitment, point]);
 
   let vrfy_ok = base.mul(&proof.response) == point.mul(&challenge).add(&proof.proof_commitment);
 
   vrfy_ok
 }
 
-pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, S: ZeiScalar, G: Group<S>>(
+pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, G: Group>(
   prng: &mut R,
   base: &G,
   points: &[G],
-  dlogs: &[S])
-  -> DlogProof<G, S> {
+  dlogs: &[G::ScalarField])
+  -> DlogProof<G, G::ScalarField> {
   /*! I compute a proof for the knowledge of dlogs for points for the base*/
 
-  let u = S::random_scalar(prng);
+  let u = G::ScalarField::random_scalar(prng);
   let proof_commitment = base.mul(&u);
   let mut context = vec![base, &proof_commitment];
   for point in points.iter() {
     context.push(point);
   }
   //context.extend_from_slice(points.iter());
-  let challenge = compute_challenge_ref::<S, G>(context.as_slice());
+  let challenge = compute_challenge_ref::<G::ScalarField, G>(context.as_slice());
   let mut response = u;
   for i in 0..dlogs.len() {
-    let challenge_i = compute_sub_challenge::<S>(&challenge, i as u32);
+    let challenge_i = compute_sub_challenge::<G::ScalarField>(&challenge, i as u32);
     response = response.add(&challenge_i.mul(&dlogs[i]));
   }
 
@@ -66,9 +66,9 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, S: ZeiScalar, G: Group<
               response }
 }
 
-pub fn verify_multiple_knowledge_dlog<S: ZeiScalar, G: Group<S>>(base: &G,
+pub fn verify_multiple_knowledge_dlog<G: Group>(base: &G,
                                                                  points: &[G],
-                                                                 proof: &DlogProof<G, S>)
+                                                                 proof: &DlogProof<G, G::ScalarField>)
                                                                  -> bool {
   /*! I verify a proof of knowledge of dlogs for points in the base*/
 
@@ -77,10 +77,10 @@ pub fn verify_multiple_knowledge_dlog<S: ZeiScalar, G: Group<S>>(base: &G,
     context.push(point);
   }
   //context.extend_from_slice(points);
-  let challenge = compute_challenge_ref::<S, G>(context.as_slice());
+  let challenge = compute_challenge_ref::<G::ScalarField, G>(context.as_slice());
   let mut check = proof.proof_commitment.clone();
   for i in 0..points.len() {
-    let challenge_i = compute_sub_challenge::<S>(&challenge, i as u32);
+    let challenge_i = compute_sub_challenge::<G::ScalarField>(&challenge, i as u32);
     check = check.add(&points[i].mul(&challenge_i));
   }
   check == base.mul(&proof.response)
