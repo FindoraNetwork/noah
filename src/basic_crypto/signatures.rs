@@ -171,15 +171,15 @@ pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 
 // BLS Signatures
 
-pub struct BlsSecretKey<S>(S);
-pub struct BlsPublicKey<G1>(G1);
-pub struct BlsSignature<G2>(G2);
+pub struct BlsSecretKey<P: PairingTargetGroup>(P::ScalarField);
+pub struct BlsPublicKey<P: PairingTargetGroup>(P::G1);
+pub struct BlsSignature<P: PairingTargetGroup>(P::G2);
 
 /// bls key generation function
 pub fn bls_gen_keys<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R)
   -> (BlsSecretKey<P>, BlsPublicKey<P>) {
-  let sec_key = P::G1::ScalarField::random_scalar(prng);
+  let sec_key = P::ScalarField::random_scalar(prng);
   let pub_key = P::G1::get_base().mul(&sec_key);
   (BlsSecretKey(sec_key), BlsPublicKey(pub_key))
 }

@@ -171,9 +171,7 @@ impl Clone for BNG1 {
   }
 }
 
-impl Group for BNG1 {
-
-  type ScalarField = BNScalar;
+impl Group<BNScalar> for BNG1 {
   const COMPRESSED_LEN: usize = 0; // TODO
   const SCALAR_BYTES_LEN: usize = 0; // TODO
   fn get_identity() -> BNG1 {
@@ -294,9 +292,7 @@ impl Clone for BNG2 {
   }
 }
 
-impl Group for BNG2 {
-
-  type ScalarField = BNScalar;
+impl Group<BNScalar> for BNG2 {
   const COMPRESSED_LEN: usize = 0; // TODO
   const SCALAR_BYTES_LEN: usize = 0; // TODO
   fn get_identity() -> BNG2 {

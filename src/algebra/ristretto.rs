@@ -49,9 +49,7 @@ impl ZeiScalar for Scalar {
     Scalar::from_bits(array)
   }
 }
-impl Group for RistrettoPoint {
-
-  type ScalarField = Scalar;
+impl Group<Scalar> for RistrettoPoint {
   const COMPRESSED_LEN: usize = 32;
   const SCALAR_BYTES_LEN: usize = 32;
 
@@ -204,9 +202,7 @@ impl RistPoint {
   }
 }
 
-impl Group for RistPoint {
-
-  type ScalarField = RistScalar;
+impl Group<RistScalar> for RistPoint {
   const COMPRESSED_LEN: usize = 32;
   const SCALAR_BYTES_LEN: usize = 32;
 

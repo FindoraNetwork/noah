@@ -160,9 +160,7 @@ impl<'de> Deserialize<'de> for BLSScalar {
   }
 }
 
-impl Group for BLSG1 {
-
-  type  ScalarField = BLSScalar;
+impl Group<BLSScalar> for BLSG1 {
   const COMPRESSED_LEN: usize = 48;
   const SCALAR_BYTES_LEN: usize = 32;
   fn get_identity() -> BLSG1 {
@@ -275,9 +273,7 @@ impl<'de> Deserialize<'de> for BLSG1 {
   }
 }
 
-impl Group for BLSG2 {
-
-  type ScalarField = BLSScalar;
+impl Group<BLSScalar> for BLSG2 {
   const COMPRESSED_LEN: usize = 96; // TODO
   const SCALAR_BYTES_LEN: usize = 32; // TODO
   fn get_identity() -> BLSG2 {
