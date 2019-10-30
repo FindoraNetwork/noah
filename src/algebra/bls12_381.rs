@@ -393,7 +393,8 @@ impl fmt::Debug for BLSGt {
   }
 }
 
-impl PairingTargetGroup<BLSScalar> for BLSGt {
+impl PairingTargetGroup for BLSGt {
+  type ScalarField = BLSScalar;
   type G1 = BLSG1;
   type G2 = BLSG2;
 
@@ -482,27 +483,27 @@ mod credentials_over_bls_12_381 {
 
   #[test]
   fn single_attribute() {
-    credentials_tests::single_attribute::<super::BLSScalar, super::BLSGt>();
+    credentials_tests::single_attribute::<super::BLSGt>();
   }
 
   #[test]
   fn two_attributes() {
-    credentials_tests::two_attributes::<super::BLSScalar, super::BLSGt>();
+    credentials_tests::two_attributes::<super::BLSGt>();
   }
 
   #[test]
   fn ten_attributes() {
-    credentials_tests::ten_attributes::<super::BLSScalar, super::BLSGt>();
+    credentials_tests::ten_attributes::<super::BLSGt>();
   }
 
   #[test]
   fn to_json_credential_structures() {
-    credentials_tests::to_json_credential_structures::<super::BLSScalar, super::BLSGt>();
+    credentials_tests::to_json_credential_structures::<super::BLSGt>();
   }
 
   #[test]
   fn to_msg_pack_credential_structures() {
-    credentials_tests::to_msg_pack_credential_structures::<super::BLSScalar, super::BLSGt>();
+    credentials_tests::to_msg_pack_credential_structures::<super::BLSGt>();
   }
 
   /*

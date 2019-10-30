@@ -259,14 +259,14 @@ pub fn create_conf_id_reveal<R: Rng + CryptoRng>(prng: &mut R,
     }
   }
 
-  let pok_attrs_proof = pok_attrs_prove::<_, BLSScalar, BLSGt>(prng,
-                                                               &policy.cred_issuer_pub_key,
-                                                               asset_issuer_public_key,
-                                                               revealed_attrs.as_slice(),
-                                                               rands.as_slice(),
-                                                               policy.bitmap.as_slice(),
-                                                               ctexts.as_slice(),
-                                                               attr_reveal_proof)?;
+  let pok_attrs_proof = pok_attrs_prove::<_, BLSGt>(prng,
+                                                    &policy.cred_issuer_pub_key,
+                                                    asset_issuer_public_key,
+                                                    revealed_attrs.as_slice(),
+                                                    rands.as_slice(),
+                                                    policy.bitmap.as_slice(),
+                                                    ctexts.as_slice(),
+                                                    attr_reveal_proof)?;
 
   Ok(ConfIdReveal { ctexts,
                     attr_reveal_proof: attr_reveal_proof.clone(),
@@ -277,12 +277,12 @@ pub fn verify_conf_id_reveal(conf_id_reveal: &ConfIdReveal,
                              asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
                              attr_reveal_policy: &IdRevealPolicy)
                              -> Result<(), ZeiError> {
-  pok_attrs_verify::<BLSScalar, BLSGt>(&attr_reveal_policy.cred_issuer_pub_key,
-                                       asset_issuer_public_key,
-                                       &conf_id_reveal.attr_reveal_proof,
-                                       &conf_id_reveal.ctexts,
-                                       &conf_id_reveal.pok_attrs,
-                                       &attr_reveal_policy.bitmap)
+  pok_attrs_verify::<BLSGt>(&attr_reveal_policy.cred_issuer_pub_key,
+                            asset_issuer_public_key,
+                            &conf_id_reveal.attr_reveal_proof,
+                            &conf_id_reveal.ctexts,
+                            &conf_id_reveal.pok_attrs,
+                            &attr_reveal_policy.bitmap)
 }
 
 /**** Range Proofs *****/
