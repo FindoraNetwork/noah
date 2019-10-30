@@ -52,6 +52,28 @@ We need to use rust nightly
 ```
 > rustup default nightly
 ```
+## Run the tests
+
+Run all the tests.
+
+```
+> cargo test
+```
+
+Run the documentation tests.
+
+
+```
+> cargo test --doc
+```
+
+## Generate the documentation
+
+```
+> cargo doc
+> cd target/doc/zei
+> firefox index.html
+```
 
 ## Code formatting
 
