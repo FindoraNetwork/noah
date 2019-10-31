@@ -1,4 +1,4 @@
-use crate::basic_crypto::signatures::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig};
+use crate::basic_crypto::signatures::signatures::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig};
 use crate::errors::ZeiError;
 use crate::utils::u8_bigendian_slice_to_u128;
 use crate::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify, AssetMixProof};
@@ -439,7 +439,7 @@ pub(crate) mod tests {
   use crate::basic_crypto::elgamal::{
     elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext, ElGamalPublicKey,
   };
-  use crate::basic_crypto::signatures::XfrKeyPair;
+  use crate::basic_crypto::signatures::signatures::XfrKeyPair;
   use crate::crypto::anon_creds;
   use crate::errors::ZeiError::{
     XfrCreationAssetAmountError, XfrVerifyAssetAmountError, XfrVerifyConfidentialAmountError,

@@ -1,4 +1,4 @@
-use super::signatures::{XfrPublicKey, XfrSecretKey, KEY_BASE_POINT};
+use super::signatures::signatures::{XfrPublicKey, XfrSecretKey, KEY_BASE_POINT};
 use crate::errors::ZeiError;
 use crate::serialization;
 use curve25519_dalek::edwards::CompressedEdwardsY;
@@ -104,7 +104,7 @@ fn symmetric_decrypt_fresh_key(key: &[u8; 32], ciphertext: &[u8]) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
-  use super::super::signatures::XfrKeyPair;
+  use super::super::signatures::signatures::XfrKeyPair;
   use super::*;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;

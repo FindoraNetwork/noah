@@ -1,4 +1,4 @@
-use crate::basic_crypto::signatures::{XfrPublicKey, XfrSecretKey, XfrSignature};
+use crate::basic_crypto::signatures::signatures::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use crate::crypto::chaum_pedersen::ChaumPedersenProof;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use bulletproofs::RangeProof;
@@ -432,7 +432,7 @@ mod test {
   use crate::basic_crypto::elgamal::{
     elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey,
   };
-  use crate::basic_crypto::signatures::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
+  use crate::basic_crypto::signatures::signatures::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
   use crate::serialization::ZeiFromToBytes;
   use crate::xfr::structs::EGPubKey;
   use bulletproofs_yoloproof::PedersenGens;
