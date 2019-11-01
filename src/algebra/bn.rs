@@ -399,7 +399,8 @@ impl fmt::Debug for BNGt {
   }
 }
 
-impl PairingTargetGroup<BNScalar> for BNGt {
+impl PairingTargetGroup for BNGt {
+  type ScalarField = BNScalar;
   type G1 = BNG1;
   type G2 = BNG2;
 
@@ -478,26 +479,26 @@ mod credentials_over_bn {
 
   #[test]
   fn single_attribute() {
-    credentials_tests::single_attribute::<super::BNScalar, super::BNGt>();
+    credentials_tests::single_attribute::<super::BNGt>();
   }
 
   #[test]
   fn two_attributes() {
-    credentials_tests::two_attributes::<super::BNScalar, super::BNGt>();
+    credentials_tests::two_attributes::<super::BNGt>();
   }
 
   #[test]
   fn ten_attributes() {
-    credentials_tests::ten_attributes::<super::BNScalar, super::BNGt>();
+    credentials_tests::ten_attributes::<super::BNGt>();
   }
 
   #[test]
   fn to_json_credential_structures() {
-    credentials_tests::to_json_credential_structures::<super::BNScalar, super::BNGt>();
+    credentials_tests::to_json_credential_structures::<super::BNGt>();
   }
 
   #[test]
   fn to_msg_pack_credential_structures() {
-    credentials_tests::to_msg_pack_credential_structures::<super::BNScalar, super::BNGt>();
+    credentials_tests::to_msg_pack_credential_structures::<super::BNGt>();
   }
 }
