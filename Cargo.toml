@@ -20,6 +20,7 @@ ed25519-dalek = "0.9.1"
 bulletproofs =  {version = "1.0.4"}
 bulletproofs_yoloproof = { version = "1.0.4",  package = "bulletproofs", git = "https://github.com/dalek-cryptography/bulletproofs", branch = "develop", features = ["yoloproofs"]}
 spacesuit = {git = "https://github.com/interstellar/slingshot", branch = "main"}
+wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 merlin = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
