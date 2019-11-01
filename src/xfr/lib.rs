@@ -1,4 +1,6 @@
-use crate::basic_crypto::signatures::signatures::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig};
+use crate::basic_crypto::signatures::signatures::{
+  sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig,
+};
 use crate::errors::ZeiError;
 use crate::utils::u8_bigendian_slice_to_u128;
 use crate::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify, AssetMixProof};
