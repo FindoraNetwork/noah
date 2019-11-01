@@ -301,7 +301,6 @@ pub fn bls_hash_pubkeys_to_scalars<P: PairingTargetGroup>(ver_keys: &[BlsPublicK
 
 #[cfg(test)]
 mod test {
-  use crate::algebra::bls12_381::BLSScalar;
   use crate::basic_crypto::signatures::signatures::{sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey};
   use crate::errors::ZeiError::SignatureError;
   use rand::SeedableRng;
