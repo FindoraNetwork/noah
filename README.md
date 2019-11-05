@@ -35,9 +35,7 @@ Support:
    of asset holders. That is, confidential Xfrs need to provide ciphertexts of
    amount/asset_type and/or identity and prove that this are correctly formed.
     
-
 # Benchmarks
-
 
 # Installation
 
@@ -48,7 +46,7 @@ Run the following script and select option 1)
 > curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-We need to use rust nightly
+We need to use rust nightly.
 ```
 > rustup default nightly
 ```
@@ -62,17 +60,71 @@ Run all the tests.
 
 Run the documentation tests.
 
-
 ```
 > cargo test --doc
 ```
 
-## Generate the documentation
+## Generate and read the documentation
+
+### Standard
 
 ```
-> cargo doc
-> cd target/doc/zei
-> firefox index.html
+> cargo doc --open
+```
+
+### Visualize dependencies
+
+#### Cargo tree
+
+This tool allows to visualizes crates' dependencies as a tree.
+
+To install:
+
+```
+> cargo install cargo-tree
+```
+
+To run:
+
+```
+> cargo tree
+  
+zei v0.0.1 (/home/philippe/repositories/findora/zei)
+├── aes-ctr v0.3.0
+│   ├── aes-soft v0.3.3
+│   │   ├── block-cipher-trait v0.6.2
+│   │   │   └── generic-array v0.12.3
+│   │   │       └── typenum v1.11.2
+│   │   ├── byteorder v1.3.2
+│   │   └── opaque-debug v0.2.3
+│   │   [dev-dependencies]
+│   │   └── block-cipher-trait v0.6.2 (*)
+│   ├── ctr v0.3.2
+...
+```
+
+#### Cargo deps
+
+This tool allows to visualizes crates' dependencies as a graph.
+
+First you need to install graphviz.
+
+For ubuntu:
+
+```
+> sudo apt install graphviz
+```
+
+Then install cargo-deps:
+
+```
+> cargo install cargo-deps
+```
+
+Generate the graph of dependencies as an image:
+
+```
+> cargo deps --no-transitive-deps | dot -Tpng > graph.png
 ```
 
 ## Code formatting
