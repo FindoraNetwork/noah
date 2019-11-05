@@ -417,6 +417,15 @@ impl PairingTargetGroup for BNGt {
   fn get_identity() -> BNGt {
     BNGt(Gt::one())
   }
+
+  fn to_bytes(&self) -> Vec<u8> {
+    assert!(false, "Not implemented");
+    vec![]
+  }
+  fn from_bytes(_bytes: &[u8]) -> Self {
+    assert!(false, "Not implemented");
+    BNGt::get_identity()
+  }
 }
 
 #[cfg(test)]

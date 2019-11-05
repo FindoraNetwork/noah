@@ -31,6 +31,7 @@ pub enum ZeiError {
   WhitelistProveError,
   SolvencyProveError,
   SolvencyVerificationError,
+  ZKProofVerificationError,
 }
 
 impl fmt::Display for ZeiError {
@@ -92,6 +93,7 @@ impl fmt::Display for ZeiError {
                   ZeiError::WhitelistProveError => "Cannot build proof for whitelist",
                   ZeiError::SolvencyVerificationError => "Invalid proof for solvency",
                   ZeiError::SolvencyProveError => "Cannot build proof of solvency",
+                  ZeiError::ZKProofVerificationError => "Invalid proof",
                 })
   }
 }
@@ -149,6 +151,7 @@ impl error::Error for ZeiError {
       ZeiError::WhitelistProveError => "Cannot build proof for whitelist",
       ZeiError::SolvencyVerificationError => "Invalid proof for solvency",
       ZeiError::SolvencyProveError => "Cannot build proof of solvency",
+      ZeiError::ZKProofVerificationError => "Invalid proof",
     }
   }
 }

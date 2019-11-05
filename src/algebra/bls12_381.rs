@@ -1,6 +1,6 @@
 use super::groups::{Group, Scalar};
 use super::pairing::PairingTargetGroup;
-use crate::utils::u8_bigendian_slice_to_u32;
+use crate::utils::{u64_to_bigendian_u8array, u8_bigendian_slice_to_u32};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use pairing::bls12_381::{Fq12, Fr, FrRepr, G1, G2};
@@ -412,6 +412,47 @@ impl PairingTargetGroup for BLSGt {
   }
 
   fn get_identity() -> BLSGt {
+    BLSGt(Fq12::one())
+  }
+
+  fn to_bytes(&self) -> Vec<u8> {
+    let c0c0c0 = self.0.c0.c0.c0.into_repr();
+    let c0c0c1 = self.0.c0.c0.c1.into_repr();
+    let c0c1c0 = self.0.c0.c1.c0.into_repr();
+    let c0c1c1 = self.0.c0.c1.c1.into_repr();
+    let c0c2c0 = self.0.c0.c2.c0.into_repr();
+    let c0c2c1 = self.0.c0.c2.c0.into_repr();
+
+    let c1c0c0 = self.0.c1.c0.c0.into_repr();
+    let c1c0c1 = self.0.c1.c0.c1.into_repr();
+    let c1c1c0 = self.0.c1.c1.c0.into_repr();
+    let c1c1c1 = self.0.c1.c1.c1.into_repr();
+    let c1c2c0 = self.0.c1.c2.c0.into_repr();
+    let c1c2c1 = self.0.c1.c2.c0.into_repr();
+
+    let mut v = vec![];
+    v.extend_from_slice(&c0c0c0.0[..]);
+    v.extend_from_slice(&c0c0c1.0[..]);
+    v.extend_from_slice(&c0c1c0.0[..]);
+    v.extend_from_slice(&c0c1c1.0[..]);
+    v.extend_from_slice(&c0c2c0.0[..]);
+    v.extend_from_slice(&c0c2c1.0[..]);
+
+    v.extend_from_slice(&c1c0c0.0[..]);
+    v.extend_from_slice(&c1c0c1.0[..]);
+    v.extend_from_slice(&c1c1c0.0[..]);
+    v.extend_from_slice(&c1c1c1.0[..]);
+    v.extend_from_slice(&c1c2c0.0[..]);
+    v.extend_from_slice(&c1c2c1.0[..]);
+
+    let mut r = vec![];
+    for vi in v {
+      r.extend_from_slice(&u64_to_bigendian_u8array(vi)[..]);
+    }
+    r
+  }
+
+  fn from_bytes(_v: &[u8]) -> Self {
     BLSGt(Fq12::one())
   }
 }

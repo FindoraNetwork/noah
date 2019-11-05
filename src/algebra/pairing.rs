@@ -9,4 +9,6 @@ pub trait PairingTargetGroup: PartialEq {
   fn scalar_mul(&self, a: &Self::ScalarField) -> Self;
   fn add(&self, other: &Self) -> Self;
   fn get_identity() -> Self;
+  fn to_bytes(&self) -> Vec<u8>;
+  fn from_bytes(bytes: &[u8]) -> Self;
 }

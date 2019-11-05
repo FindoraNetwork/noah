@@ -170,9 +170,11 @@ pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 }
 
 // BLS Signatures
-
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BlsSecretKey<P: PairingTargetGroup>(P::ScalarField);
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BlsPublicKey<P: PairingTargetGroup>(P::G1);
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BlsSignature<P: PairingTargetGroup>(P::G2);
 
 /// bls key generation function
@@ -301,7 +303,9 @@ pub fn bls_hash_pubkeys_to_scalars<P: PairingTargetGroup>(ver_keys: &[BlsPublicK
 
 #[cfg(test)]
 mod test {
-  use crate::basic_crypto::signatures::signatures::{sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey};
+  use crate::basic_crypto::signatures::signatures::{
+    sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey,
+  };
   use crate::errors::ZeiError::SignatureError;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;

@@ -27,16 +27,19 @@ use digest::Digest;
 use rand::{CryptoRng, Rng};
 use sha2::Sha512;
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PSPublicKey {
   pub(crate) xx: BLSG2,
   pub(crate) yy: BLSG2,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PSSecretKey {
   pub(crate) x: BLSScalar,
   pub(crate) y: BLSScalar,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PSSignature {
   pub(crate) s1: BLSG1,
   pub(crate) s2: BLSG1,
