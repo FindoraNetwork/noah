@@ -12,14 +12,143 @@ use digest::Digest;
 use rand::{CryptoRng, Rng};
 use sha2::Sha512;
 
+// Zero-Knowledge proofs needed
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GroupPublicKey(pub(crate) PSPublicKey);
+pub struct FPK {
+  // proof of knowledge for sigma protocols allowing pairing based statements
+  g1_elems: Vec<BLSG1>,
+  g2_elems: Vec<BLSG2>,
+  responses: Vec<BLSScalar>,
+}
+
+fn signature_of_knowledge<R: CryptoRng + Rng>(prng: &mut R, tag: &BLSScalar, message: &[u8], gpk: &GroupPublicKey) -> FPK{
+  let blind_tag = BLSScalar::random_scalar(prng);
+  let proof_commitment = gpk.get_ps_pubkey_ref().yy.mul(&blind_tag);
+  let challenge = compute_spok_challenge(&proof_commitment, gpk, message);
+  let response = challenge.mul(tag).add(&blind_tag);
+
+  FPK{
+    g1_elems: vec![],
+    g2_elems: vec![proof_commitment],
+    responses: vec![response],
+  }
+
+}
+
+fn verify_signature_of_knowledge_for_ps_signatures(fpk: &FPK, message: &[u8], gpk: &GroupPublicKey, ps_sig: &PSSignature) -> Result<(), ZeiError> {
+  let proof_commmitment = &fpk.g2_elems[0];
+  let challenge = compute_spok_challenge(&proof_commmitment, gpk, message);
+  let response = &fpk.responses[0]; //challenge response
+
+  // p = challenge*X - COMMITMENT + response*Y = challenge*(X + tag*Y)
+  let p = gpk.0
+    .xx
+    .mul(&challenge)
+    .sub(proof_commmitment)
+    .add(&gpk.0.yy.mul(response));
+  let e1 = BLSGt::pairing(&ps_sig.s1, &p);
+  let e2 = BLSGt::pairing(&ps_sig.s2.mul(&challenge), &BLSG2::get_base());
+
+  match e1 == e2 {
+    false => Err(ZeiError::ZKProofVerificationError),
+    true => Ok(()),
+  }
+}
+
+fn compute_spok_challenge(proof_commitment: &BLSG2,
+                          gpk: &GroupPublicKey,
+                          message: &[u8])
+                          -> BLSScalar {
+  let mut hasher = Sha512::new();
+  hasher.input(b"gpsig_sign");
+  hasher.input(proof_commitment.to_compressed_bytes());
+  hasher.input(gpk.0.xx.to_compressed_bytes());
+  hasher.input(gpk.0.yy.to_compressed_bytes());
+  hasher.input(message); // makingint it a signature proof of knowledge
+
+  BLSScalar::from_hash(hasher)
+}
+
+//proof of knowledge of tau st s = tau * G1 and r = tau*XX
+fn zk_prove_knowledge_tau<R: CryptoRng + Rng>(prng: &mut R, g1_base: &BLSG1, tau: &BLSScalar, gpk: &GroupPublicKey) -> FPK{
+  let blind_tau = BLSScalar::random_scalar(prng);
+  let commitment_g_tau = g1_base.mul(&blind_tau);
+  let commitment_x_tau = gpk.0.xx.mul(&blind_tau);
+  let g1_elems = vec![commitment_g_tau];
+  let g2_elems = vec![commitment_x_tau];
+
+  let challenge = compute_fpk_challenge(b"User FPK",
+                                        g1_elems.as_slice(),
+                                        &g2_elems.as_slice(),
+                                        gpk);
+
+  let z = tau.mul(&challenge).add(&blind_tau);
+
+  FPK {
+    g1_elems,
+    g2_elems,
+    responses: vec![z]
+  }
+}
+
+//verify proof of knowledge of tau st s = tau * G1 and r = tau*XX
+fn zk_verify_knowledge_tau(fpk: &FPK, s: &BLSG1, r: &BLSG2, gpk: &GroupPublicKey) -> Result<(), ZeiError>{
+  let g1_base = BLSG1::get_base();
+  let xx = &gpk.get_ps_pubkey_ref().xx;
+  let challenge = compute_fpk_challenge(b"User FPK",
+                                        &fpk.g1_elems,
+                                        &fpk.g2_elems,
+                                        gpk);
+  let response_tau = &fpk.responses[0];
+  let com_g_tau = &fpk.g1_elems[0];
+  let com_x_tau = &fpk.g2_elems[0];
+  if s.mul(&challenge) != g1_base.mul(response_tau).sub(&com_g_tau)
+    || r.mul(&challenge) != xx.mul(response_tau).sub(&com_x_tau)
+  {
+    return Err(ZeiError::ZKProofVerificationError);
+  }
+  Ok(())
+}
+
+fn compute_fpk_challenge(instance_msg: &[u8],
+                         g1_elems: &[BLSG1],
+                         g2_elems: &[BLSG2],
+                         gpk: &GroupPublicKey)
+                         -> BLSScalar {
+  let mut hasher = Sha512::new();
+  hasher.input(instance_msg);
+  for e1 in g1_elems {
+    hasher.input(&e1.to_compressed_bytes()[..]);
+  }
+  for e2 in g2_elems {
+    hasher.input(&e2.to_compressed_bytes()[..]);
+  }
+  hasher.input(&gpk.0.xx.to_compressed_bytes()[..]);
+  hasher.input(&gpk.0.yy.to_compressed_bytes()[..]);
+
+  BLSScalar::from_hash(hasher)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupPublicKey(PSPublicKey);
+
+impl GroupPublicKey {
+  fn get_ps_pubkey_ref(&self) -> &PSPublicKey{
+    &self.0
+  }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ManagerSecretKey(pub(crate) PSSecretKey);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct JoinCert(pub(crate) PSSignature);
+pub struct JoinCert(PSSignature);
+
+impl JoinCert {
+  fn get_ps_sig_ref(&self) -> &PSSignature {
+    &self.0
+  }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GUserSecretKey {
@@ -29,89 +158,12 @@ pub struct GUserSecretKey {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GroupSignature {
-  sig: JoinCert,           // randomized signature of the tag
-  pok: (BLSG2, BLSScalar), // proof commitment, proof response
+  cert: JoinCert,  // randomized signature of the tag
+  sok: FPK, // proof commitment, proof response
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tag(BLSScalar);
-
-pub fn gpsig_setup<R: Rng + CryptoRng>(prng: &mut R) -> (GroupPublicKey, ManagerSecretKey) {
-  let (pk, sk) = ps_gen_keys(prng);
-  (GroupPublicKey(pk), ManagerSecretKey(sk))
-}
-
-pub fn gpsig_sign<R: Rng + CryptoRng>(prng: &mut R,
-                                      group_pk: &GroupPublicKey,
-                                      user_sk: GUserSecretKey,
-                                      message: &[u8])
-                                      -> GroupSignature {
-  let (_, rand_sig) = randomize_ps_sig(prng, &user_sk.signature.0);
-  // signature proof of knowledge of user_sk.tag such that
-  //   verify_manager_sig(group_pk, user_sk.tag, rand_sig) = 1
-  let blind_tag = BLSScalar::random_scalar(prng);
-  let proof_commitment = group_pk.0.yy.mul(&blind_tag);
-  let challenge = compute_spok_challenge(&proof_commitment, group_pk, message);
-  let response = challenge.mul(&user_sk.tag).add(&blind_tag);
-
-  GroupSignature { sig: JoinCert(rand_sig),
-                   pok: (proof_commitment, response) }
-}
-
-pub fn gpsig_verify(gpk: &GroupPublicKey,
-                    message: &[u8],
-                    sig: &GroupSignature)
-                    -> Result<(), ZeiError> {
-  let proof_commmitment = &sig.pok.0;
-  let challenge = compute_spok_challenge(&sig.pok.0, gpk, message);
-  let response = &sig.pok.1; //challenge response
-
-  // p = challenge*X - COMMITMENT + response*Y = challenge*(X + tag*Y)
-  let p = gpk.0
-             .xx
-             .mul(&challenge)
-             .sub(proof_commmitment)
-             .add(&gpk.0.yy.mul(response));
-  let e1 = BLSGt::pairing(&sig.sig.0.s1, &p);
-  let e2 = BLSGt::pairing(&sig.sig.0.s2.mul(&challenge), &BLSG2::get_base());
-
-  match e1 == e2 {
-    false => Err(ZeiError::SignatureError),
-    true => Ok(()),
-  }
-}
-
-fn compute_spok_challenge(proof_commitment: &BLSG2,
-                          group_pk: &GroupPublicKey,
-                          message: &[u8])
-                          -> BLSScalar {
-  let mut hasher = Sha512::new();
-  hasher.input(b"gpsig_sign");
-  hasher.input(proof_commitment.to_compressed_bytes());
-  hasher.input(group_pk.0.xx.to_compressed_bytes());
-  hasher.input(group_pk.0.yy.to_compressed_bytes());
-  hasher.input(message); // makingint it a signature proof of knowledge
-
-  BLSScalar::from_hash(hasher)
-}
-
-// join protocol
-#[derive(Debug)]
-pub struct UserState<'a, 'b> {
-  gpk: &'a GroupPublicKey,
-  usk: &'b BlsSecretKey<BLSGt>,
-  t: Option<BLSScalar>,
-  tau: Option<BLSScalar>,
-}
-
-impl<'a, 'b> UserState<'a, 'b> {
-  fn new(gpk: &'a GroupPublicKey, usk: &'b BlsSecretKey<BLSGt>) -> UserState<'a, 'b> {
-    UserState::<'a, 'b> { gpk,
-                          usk,
-                          t: None,
-                          tau: None }
-  }
-}
 
 #[derive(Debug)]
 pub struct ManagerState<'a, 'b, 'c> {
@@ -127,9 +179,27 @@ impl<'a, 'b, 'c> ManagerState<'a, 'b, 'c> {
          upk: &'c BlsPublicKey<BLSGt>)
          -> ManagerState<'a,'b,'c> {
     ManagerState { gpk,
-                   msk,
-                   upk,
-                   kappa: None }
+      msk,
+      upk,
+      kappa: None }
+  }
+}
+
+// join protocol
+#[derive(Debug)]
+pub struct UserState<'a, 'b> {
+  gpk: &'a GroupPublicKey,
+  usk: &'b BlsSecretKey<BLSGt>,
+  t: Option<BLSScalar>,
+  tau: Option<BLSScalar>,
+}
+
+impl<'a, 'b> UserState<'a, 'b> {
+  fn new(gpk: &'a GroupPublicKey, usk: &'b BlsSecretKey<BLSGt>) -> UserState<'a, 'b> {
+    UserState::<'a, 'b> { gpk,
+      usk,
+      t: None,
+      tau: None }
   }
 }
 
@@ -144,6 +214,11 @@ pub struct UserMsg2 {
   r: BLSG2,                 // tau * X
   sig: BlsSignature<BLSGt>, // signature of e(G1, r)
   fpk: FPK,                 // proof of knowledge of tau
+}
+
+pub fn gpsig_setup<R: Rng + CryptoRng>(prng: &mut R) -> (GroupPublicKey, ManagerSecretKey) {
+  let (pk, sk) = ps_gen_keys(prng);
+  (GroupPublicKey(pk), ManagerSecretKey(sk))
 }
 
 pub fn gpsig_join_send_request<'a, 'b>(gpk: &'a GroupPublicKey,
@@ -167,42 +242,22 @@ pub fn gpsig_join_manager_process_request_step1<'a, 'b, 'c, R: CryptoRng + Rng>(
   (state, ManagerMsg1 { t })
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct FPK {
-  // proof of knowledge for sigma protocols for pairing based statements
-  g1_elems: Vec<BLSG1>,
-  g2_elems: Vec<BLSG2>,
-  responses: Vec<BLSScalar>,
-}
-
 pub fn gpsig_join_user_step2<R: CryptoRng + Rng>(prng: &mut R, state: &mut UserState) -> UserMsg2 {
+  let g1_base = BLSG1::get_base();
   let tau = BLSScalar::random_scalar(prng);
-  let s = BLSG1::get_base().mul(&tau);
+  let s = g1_base.mul(&tau);
   let r = state.gpk.0.xx.mul(&tau);
   let k = BLSGt::pairing(&BLSG1::get_base(), &r);
   let sig = bls_sign(state.usk, k.to_bytes().as_slice());
 
-  let blind_tau = BLSScalar::random_scalar(prng);
-  let commitment_g_tau = BLSG1::get_base().mul(&blind_tau);
-  let commitment_x_tau = state.gpk.0.xx.mul(&blind_tau);
-  let g1_elems = vec![commitment_g_tau];
-  let g2_elems = vec![commitment_x_tau];
-
-  let challenge = compute_fpk_challenge(b"User FPK",
-                                        g1_elems.as_slice(),
-                                        &g2_elems.as_slice(),
-                                        state.gpk);
-
-  let z = tau.mul(&challenge).add(&blind_tau);
+  let fpk = zk_prove_knowledge_tau(prng, &g1_base, &tau, &state.gpk);
 
   state.tau = Some(tau);
 
   UserMsg2 { s,
              r,
              sig,
-             fpk: FPK { g1_elems,
-                        g2_elems,
-                        responses: vec![z] } }
+             fpk, }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -230,19 +285,7 @@ pub fn gpsig_join_manager_msg3<R: CryptoRng + Rng>(
   let g1 = BLSG1::get_base();
   let xx = &gpk.0.xx;
   // 1 verify proof of knowledge of tau
-  let challenge = compute_fpk_challenge(b"User FPK",
-                                        &user_msg.fpk.g1_elems,
-                                        &user_msg.fpk.g2_elems,
-                                        gpk);
-  // Need to verify that c*s = response_tau*G1 - com_g_tau and c*t = response_tau*X - com_x_tau
-  let response_tau = &user_msg.fpk.responses[0];
-  let com_g_tau = &user_msg.fpk.g1_elems[0];
-  let com_x_tau = &user_msg.fpk.g2_elems[0];
-  if user_msg.s.mul(&challenge) != g1.mul(response_tau).sub(&com_g_tau)
-     || user_msg.r.mul(&challenge) != xx.mul(response_tau).sub(&com_x_tau)
-  {
-    return Err(ZeiError::ZKProofVerificationError);
-  }
+  zk_verify_knowledge_tau(&user_msg.fpk, &user_msg.s, &user_msg.r, gpk)?;
 
   // 2 verify signature
   let k = BLSGt::pairing(&g1, &user_msg.r);
@@ -341,24 +384,29 @@ pub fn gpsig_join_user_final(s: BLSG1,
   Ok((tag, JoinCert(manager_msg2.ps_sig.clone())))
 }
 
-fn compute_fpk_challenge(instance_msg: &[u8],
-                         g1_elems: &[BLSG1],
-                         g2_elems: &[BLSG2],
-                         gpk: &GroupPublicKey)
-                         -> BLSScalar {
-  let mut hasher = Sha512::new();
-  hasher.input(instance_msg);
-  for e1 in g1_elems {
-    hasher.input(&e1.to_compressed_bytes()[..]);
-  }
-  for e2 in g2_elems {
-    hasher.input(&e2.to_compressed_bytes()[..]);
-  }
-  hasher.input(&gpk.0.xx.to_compressed_bytes()[..]);
-  hasher.input(&gpk.0.yy.to_compressed_bytes()[..]);
+pub fn gpsig_sign<R: Rng + CryptoRng>(prng: &mut R,
+                                      group_pk: &GroupPublicKey,
+                                      user_sk: GUserSecretKey,
+                                      message: &[u8])
+                                      -> GroupSignature {
+  let (_, rand_sig) = randomize_ps_sig(prng, &user_sk.signature.0);
+  // signature proof of knowledge of user_sk.tag such that
+  //   verify_manager_sig(group_pk, user_sk.tag, rand_sig) = 1
+  let sok = signature_of_knowledge(prng, &user_sk.tag, message, group_pk);
 
-  BLSScalar::from_hash(hasher)
+  GroupSignature {
+    cert: JoinCert(rand_sig),
+    sok}
 }
+
+pub fn gpsig_verify(gpk: &GroupPublicKey,
+                    message: &[u8],
+                    sig: &GroupSignature)
+                    -> Result<(), ZeiError> {
+  let ps_sig = sig.cert.get_ps_sig_ref();
+  verify_signature_of_knowledge_for_ps_signatures(&sig.sok, message, gpk, ps_sig).map_err(|_| ZeiError::SignatureError)
+}
+
 /*
 pub fn gpsig_add(msk: &ManagerSecretKey, msg: &JoinReqMsg) -> (JoinCert)
 {
