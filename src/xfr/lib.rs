@@ -18,6 +18,72 @@ use std::collections::HashMap;
 const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 
 /// I Create a XfrNote from list of opened asset records inputs and asset record outputs
+/// # Example
+/// ```
+/// use rand_chacha::ChaChaRng;
+/// use rand::SeedableRng;
+/// use bulletproofs::PedersenGens;
+/// use zei::basic_crypto::signatures::XfrKeyPair;
+/// use zei::xfr::structs::AssetRecord;
+/// use zei::xfr::asset_record::build_open_asset_record;
+/// use zei::xfr::lib::gen_xfr_note;
+///
+/// let mut prng: ChaChaRng;
+/// prng = ChaChaRng::from_seed([0u8; 32]);
+/// let asset_type = [0u8; 16];
+/// let pc_gens = PedersenGens::default();
+/// let inputs_amounts = [(10u64, asset_type),
+///                       (10u64, asset_type),
+///                       (10u64, asset_type)];
+/// let outputs_amounts = [(1u64, asset_type),
+///                     (2u64, asset_type),
+///                     (3u64, asset_type),
+///                      (24u64, asset_type)];
+/// let confidential_amount = false;
+/// let confidential_asset = false;
+/// let issuer_public_key = None;
+///
+/// let mut inputs = vec![];
+/// let mut outputs = vec![];
+///
+/// let mut outkeys = vec![];
+/// let mut inkeys = vec![];
+/// let mut in_asset_records = vec![];
+///
+/// for x in inputs_amounts.iter() {
+///   let keypair = XfrKeyPair::generate(&mut prng);
+///   let asset_record = AssetRecord::new( x.0,
+///                                        x.1,
+///                                        keypair.get_pk_ref().clone()).unwrap();
+///
+///   inputs.push(build_open_asset_record(&mut prng,
+///                                        &pc_gens,
+///                                        &asset_record,
+///                                        confidential_amount,
+///                                        confidential_asset,
+///                                        &issuer_public_key));
+///
+///   in_asset_records.push(asset_record);
+///   inkeys.push(keypair);
+/// }
+///
+/// let mut identity_proofs = vec![];
+/// for x in outputs_amounts.iter() {
+///     let keypair = XfrKeyPair::generate(&mut prng);
+///
+///     let ar = AssetRecord::new(x.0, x.1, keypair.get_pk_ref().clone()).unwrap();
+///     outputs.push(ar);
+///     outkeys.push(keypair);
+///
+///     identity_proofs.push(None);
+/// }
+///
+/// let xfr_note = gen_xfr_note( &mut prng,
+///                              inputs.as_slice(),
+///                              outputs.as_slice(),
+///                              inkeys.as_slice(),
+///                              identity_proofs.as_slice()).unwrap();
+/// ```
 pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
                                         inputs: &[OpenAssetRecord],
                                         outputs: &[AssetRecord],
@@ -37,6 +103,66 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
   Ok(XfrNote { body, multisig })
 }
 
+/// I create the body of a xfr note. This body contains the data to be signed.
+/// # Example
+/// ```
+/// use rand_chacha::ChaChaRng;
+/// use rand::SeedableRng;
+/// use bulletproofs::PedersenGens;
+/// use zei::basic_crypto::signatures::XfrKeyPair;
+/// use zei::xfr::structs::AssetRecord;
+/// use zei::xfr::asset_record::build_open_asset_record;
+/// use zei::xfr::lib::gen_xfr_body;
+///
+/// let mut prng: ChaChaRng;
+/// prng = ChaChaRng::from_seed([0u8; 32]);
+/// let asset_type = [0u8; 16];
+/// let pc_gens = PedersenGens::default();
+/// let inputs_amounts = [(10u64, asset_type),
+///                       (10u64, asset_type),
+///                       (10u64, asset_type)];
+/// let outputs_amounts = [(1u64, asset_type),
+///                     (2u64, asset_type),
+///                     (3u64, asset_type),
+///                      (24u64, asset_type)];
+/// let confidential_amount = false;
+/// let confidential_asset = false;
+/// let issuer_public_key = None;
+///
+/// let mut inputs = vec![];
+/// let mut outputs = vec![];
+///
+/// let mut outkeys = vec![];
+///
+/// let mut in_asset_records = vec![];
+///
+/// for x in inputs_amounts.iter() {
+///   let keypair = XfrKeyPair::generate(&mut prng);
+///   let asset_record = AssetRecord::new( x.0,
+///                                        x.1,
+///                                        keypair.get_pk_ref().clone()).unwrap();
+///
+///   inputs.push(build_open_asset_record(&mut prng,
+///                                        &pc_gens,
+///                                        &asset_record,
+///                                        confidential_amount,
+///                                        confidential_asset,
+///                                        &issuer_public_key));
+///
+///   in_asset_records.push(asset_record);
+/// }
+/// let mut identity_proofs = vec![];
+/// for x in outputs_amounts.iter() {
+///     let keypair = XfrKeyPair::generate(&mut prng);
+///
+///     let ar = AssetRecord::new(x.0, x.1, keypair.get_pk_ref().clone()).unwrap();
+///     outputs.push(ar);
+///     outkeys.push(keypair);
+///
+///     identity_proofs.push(None);
+/// }
+/// let body = gen_xfr_body(&mut prng, &inputs, &outputs, &identity_proofs).unwrap();
+/// ```
 pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
                                         inputs: &[OpenAssetRecord],
                                         outputs: &[AssetRecord],
@@ -193,6 +319,7 @@ fn gen_xfr_proofs_multi_asset(//prng: &mut R,
   }
   Err(ZeiError::XfrCreationAssetAmountError)
 }
+
 fn gen_xfr_proofs_single_asset<R: CryptoRng + Rng>(prng: &mut R,
                                                    inputs: &[OpenAssetRecord],
                                                    outputs: &[OpenAssetRecord],
@@ -292,6 +419,78 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
   verify_xfr_body(prng, &xfr_note.body, id_reveal_policies)
 }
 
+/// I verify the consistency of an xfr body note
+///
+/// # Example
+/// ```
+/// use rand_chacha::ChaChaRng;
+/// use rand::SeedableRng;
+/// use bulletproofs::PedersenGens;
+/// use zei::basic_crypto::signatures::XfrKeyPair;
+/// use zei::xfr::structs::AssetRecord;
+/// use zei::xfr::asset_record::build_open_asset_record;
+/// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note};
+///
+/// let mut prng: ChaChaRng;
+/// prng = ChaChaRng::from_seed([0u8; 32]);
+/// let asset_type = [0u8; 16];
+/// let pc_gens = PedersenGens::default();
+/// let inputs_amounts = [(10u64, asset_type),
+///                       (10u64, asset_type),
+///                       (10u64, asset_type)];
+/// let outputs_amounts = [(1u64, asset_type),
+///                     (2u64, asset_type),
+///                     (3u64, asset_type),
+///                      (24u64, asset_type)];
+/// let confidential_amount = false;
+/// let confidential_asset = false;
+/// let issuer_public_key = None;
+///
+/// let mut inputs = vec![];
+/// let mut outputs = vec![];
+///
+/// let mut outkeys = vec![];
+/// let mut inkeys = vec![];
+/// let mut in_asset_records = vec![];
+///
+/// let mut null_policies = vec![];
+///
+/// for x in inputs_amounts.iter() {
+///   let keypair = XfrKeyPair::generate(&mut prng);
+///   let asset_record = AssetRecord::new( x.0,
+///                                        x.1,
+///                                        keypair.get_pk_ref().clone()).unwrap();
+///
+///   inputs.push(build_open_asset_record(&mut prng,
+///                                        &pc_gens,
+///                                        &asset_record,
+///                                        confidential_amount,
+///                                        confidential_asset,
+///                                        &issuer_public_key));
+///
+///   in_asset_records.push(asset_record);
+///   inkeys.push(keypair);
+///   null_policies.push(None);
+/// }
+///
+/// let mut identity_proofs = vec![];
+/// for x in outputs_amounts.iter() {
+///     let keypair = XfrKeyPair::generate(&mut prng);
+///
+///     let ar = AssetRecord::new(x.0, x.1, keypair.get_pk_ref().clone()).unwrap();
+///     outputs.push(ar);
+///     outkeys.push(keypair);
+///     identity_proofs.push(None);
+/// }
+///
+/// let xfr_note = gen_xfr_note( &mut prng,
+///                              inputs.as_slice(),
+///                              outputs.as_slice(),
+///                              inkeys.as_slice(),
+///                              identity_proofs.as_slice()).unwrap();
+///
+/// verify_xfr_note(&mut prng, &xfr_note, &null_policies).unwrap();
+/// ```
 pub fn verify_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
                                            body: &XfrBody,
                                            id_reveal_policies: &[Option<IdRevealPolicy>])
@@ -549,21 +748,17 @@ pub(crate) mod tests {
     let mut outputs = tuple.3;
     let mut null_policies = vec![];
     let mut id_proofs = vec![];
-    null_policies.push(None);
-    null_policies.push(None);
-    null_policies.push(None);
-    null_policies.push(None);
-    id_proofs.push(None);
-    id_proofs.push(None);
-    id_proofs.push(None);
-    id_proofs.push(None);
+    for _i in 1..inputs.len() {
+      null_policies.push(None);
+      id_proofs.push(None);
+    }
 
     // test 1: simple transfer
     assert_eq!(Ok(()),
                verify_xfr_note(&mut prng, &xfr_note, &null_policies),
                "Simple transaction should verify ok");
 
-    //test 2: overflow transfer
+    // test 2: overflow transfer
     outputs[3] = AssetRecord { amount: 0xFFFFFFFFFF,
                                asset_type,
                                public_key: outputs[3].public_key };
@@ -578,7 +773,7 @@ pub(crate) mod tests {
     assert_eq!(XfrCreationAssetAmountError,
                xfr_note.err().unwrap(),
                "Xfr cannot be build if output total amount is greater than input amounts");
-    //output 3 back to original
+    // output 3 back to original
     outputs[3] = AssetRecord { amount: 24,
                                asset_type,
                                public_key: outputs[3].public_key };
@@ -656,7 +851,6 @@ pub(crate) mod tests {
                verify_xfr_note(&mut prng, &xfr_note, &null_policies),
                "Transfer with different asset types should fail verification");
 
-    println!("HELLOOOO");
     //test 4:  one input asset different from rest
     let ar = AssetRecord { amount: 10u64,
                            asset_type: [1u8; 16],
@@ -977,13 +1171,10 @@ pub(crate) mod tests {
       create_xfr(&mut prng, &input_amount, &out_amount, true, true, false);
 
     let mut null_policies = vec![];
-    //let mut id_proofs = vec![];
-    null_policies.push(None);
-    null_policies.push(None);
-    null_policies.push(None);
-    null_policies.push(None);
-    null_policies.push(None);
-    null_policies.push(None);
+
+    for _i in 1..input_amount.len() {
+      null_policies.push(None);
+    }
 
     // test 1: simple transfer using confidential asset mixer
     assert_eq!(Ok(()),
