@@ -18,6 +18,30 @@ impl PartialEq for AssetMixProof {
 
 impl Eq for AssetMixProof {}
 
+/// I compute a proof that the assets were mixed correctly
+/// # Example
+/// ```
+/// use zei::xfr::asset_mixer::asset_mixer_proof;
+/// use curve25519_dalek::scalar::Scalar;
+/// let input = [
+///            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
+///            (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
+///            (10u64, Scalar::from(1u8), Scalar::from(10002u64), Scalar::from(200002u64)),
+///            (50u64, Scalar::from(2u8), Scalar::from(10003u64), Scalar::from(200003u64)),
+///            ];
+/// let output = [
+///            (40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
+///            (9u64, Scalar::from(1u8), Scalar::from(10005u64), Scalar::from(200005u64)),
+///            (1u64, Scalar::from(1u8), Scalar::from(10006u64), Scalar::from(200006u64)),
+///            (80u64, Scalar::from(2u8), Scalar::from(10007u64), Scalar::from(200007u64)),
+///            (50u64, Scalar::from(0u8), Scalar::from(10008u64), Scalar::from(200008u64)),
+///            (10u64, Scalar::from(0u8), Scalar::from(10009u64), Scalar::from(200009u64)),
+///            (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64)),
+///        ];
+///
+/// let proof = asset_mixer_proof(&input, &output).unwrap();
+///
+/// ```
 pub fn asset_mixer_proof(inputs: &[(u64, Scalar, Scalar, Scalar)],
                          outputs: &[(u64, Scalar, Scalar, Scalar)])
                          -> Result<AssetMixProof, ZeiError> {
@@ -67,7 +91,49 @@ fn allocate_commitments_verifier(verifier: &mut Verifier,
   values.commit(verifier)
 }
 
-/// Verify
+/// I verify that the assets were mixed correctly
+/// # Example
+/// ```
+/// use zei::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify};
+/// use curve25519_dalek::scalar::Scalar;
+/// use curve25519_dalek::ristretto::CompressedRistretto;
+/// use bulletproofs_yoloproof::PedersenGens;
+/// let input = [
+///            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
+///            (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
+///            (10u64, Scalar::from(1u8), Scalar::from(10002u64), Scalar::from(200002u64)),
+///            (50u64, Scalar::from(2u8), Scalar::from(10003u64), Scalar::from(200003u64)),
+///            ];
+/// let output = [
+///            (40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
+///            (9u64, Scalar::from(1u8), Scalar::from(10005u64), Scalar::from(200005u64)),
+///            (1u64, Scalar::from(1u8), Scalar::from(10006u64), Scalar::from(200006u64)),
+///            (80u64, Scalar::from(2u8), Scalar::from(10007u64), Scalar::from(200007u64)),
+///            (50u64, Scalar::from(0u8), Scalar::from(10008u64), Scalar::from(200008u64)),
+///            (10u64, Scalar::from(0u8), Scalar::from(10009u64), Scalar::from(200009u64)),
+///            (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64)),
+///        ];
+///
+/// let proof = asset_mixer_proof(&input, &output).unwrap();
+/// let pc_gens = PedersenGens::default();
+/// let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
+///      input.iter()
+///           .map(|(amount, typ, blind_a, blind_typ)| {
+///             (pc_gens.commit(Scalar::from(*amount), *blind_a).compress(),
+///              pc_gens.commit(*typ, *blind_typ).compress())
+///           })
+///           .collect();
+///    let output_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
+///      output.iter()
+///            .map(|(amount, typ, blind_a, blind_typ)| {
+///              (pc_gens.commit(Scalar::from(*amount), *blind_a).compress(),
+///               pc_gens.commit(*typ, *blind_typ).compress())
+///            })
+///            .collect();
+///
+///    assert_eq!(Ok(()),
+///               asset_mixer_verify(&input_coms, &output_coms, &proof));
+/// ```
 pub fn asset_mixer_verify(inputs: &[(CompressedRistretto, CompressedRistretto)],
                           outputs: &[(CompressedRistretto, CompressedRistretto)],
                           proof: &AssetMixProof)
@@ -110,21 +176,17 @@ mod test {
   #[test]
   fn test_asset_mixer() {
     let pc_gens = PedersenGens::default();
-    let input = [
-            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)), //(amount, type, blind_amount, blind_type)
-            (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)), //(amount, type, blind_amount, blind_type)
-            (10u64, Scalar::from(1u8), Scalar::from(10002u64), Scalar::from(200002u64)), //(amount, type, blind_amount, blind_type)
-            (50u64, Scalar::from(2u8), Scalar::from(10003u64), Scalar::from(200003u64)), //(amount, type, blind_amount, blind_type)
-            ];
-    let output = [
-            (40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)), //(amount, type, blind_amount, blind_type)
-            (9u64, Scalar::from(1u8), Scalar::from(10005u64), Scalar::from(200005u64)), //(amount, type, blind_amount, blind_type)
-            (1u64, Scalar::from(1u8), Scalar::from(10006u64), Scalar::from(200006u64)), //(amount, type, blind_amount, blind_type)
-            (80u64, Scalar::from(2u8), Scalar::from(10007u64), Scalar::from(200007u64)), //(amount, type, blind_amount, blind_type)
-            (50u64, Scalar::from(0u8), Scalar::from(10008u64), Scalar::from(200008u64)), //(amount, type, blind_amount, blind_type)
-            (10u64, Scalar::from(0u8), Scalar::from(10009u64), Scalar::from(200009u64)), //(amount, type, blind_amount, blind_type)
-            (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64)), //(amount, type, blind_amount, blind_type)
-        ];
+    let input = [(60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
+                 (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
+                 (10u64, Scalar::from(1u8), Scalar::from(10002u64), Scalar::from(200002u64)),
+                 (50u64, Scalar::from(2u8), Scalar::from(10003u64), Scalar::from(200003u64))];
+    let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
+                  (9u64, Scalar::from(1u8), Scalar::from(10005u64), Scalar::from(200005u64)),
+                  (1u64, Scalar::from(1u8), Scalar::from(10006u64), Scalar::from(200006u64)),
+                  (80u64, Scalar::from(2u8), Scalar::from(10007u64), Scalar::from(200007u64)),
+                  (50u64, Scalar::from(0u8), Scalar::from(10008u64), Scalar::from(200008u64)),
+                  (10u64, Scalar::from(0u8), Scalar::from(10009u64), Scalar::from(200009u64)),
+                  (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64))];
 
     let proof = super::asset_mixer_proof(&input, &output).unwrap();
 
