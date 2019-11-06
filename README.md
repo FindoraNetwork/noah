@@ -37,7 +37,7 @@ Support:
     
 # Benchmarks
 
-# Installation
+# Development environment setup
 
 ## Install RUST
 
@@ -50,7 +50,9 @@ We need to use rust nightly.
 ```
 > rustup default nightly
 ```
-## Run the tests
+## Tests
+
+### Run the tests
 
 Run all the tests.
 
@@ -62,6 +64,33 @@ Run the documentation tests.
 
 ```
 > cargo test --doc
+```
+
+### Test coverage
+
+[Tarpaulin](https://github.com/xd009642/tarpaulin) is a test coverage tool for Rust.
+Note that Tarpaulin only supports x86_64 processors running Linux.
+
+Install Tarpaulin:
+
+```
+> cargo install cargo-tarpaulin
+```
+
+Run Tarpaulin, using a timeout of 120 seconds.
+
+```
+> cargo tarpaulin --timeout 120
+...
+[INFO tarpaulin] Coverage Results:
+|| Tested/Total Lines:
+|| src/algebra/bls12_381.rs: 186/226
+|| src/algebra/bn.rs: 92/124
+|| src/algebra/groups.rs: 21/21
+|| src/algebra/ristretto.rs: 127/165
+|| src/algebra/utils.rs: 7/8
+|| src/basic_crypto/elgamal.rs: 112/114
+...
 ```
 
 ## Generate and read the documentation
@@ -126,6 +155,8 @@ Generate the graph of dependencies as an image:
 ```
 > cargo deps --no-transitive-deps | dot -Tpng > graph.png
 ```
+
+![graph-dependencies](doc/dependencies.png)
 
 ## Code formatting
 
