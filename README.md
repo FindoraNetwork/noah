@@ -2,17 +2,17 @@
 
 **Zei: Eian Cryptographic Library**
 
-Zei is a library that provide tools to create and verify public transaction 
-with confidential data. 
+Zei is a library that provide tools to create and verify public transaction
+with confidential data.
 
 Support:
- - Basic Cryptographic tools: 
+ - Basic Cryptographic tools:
     - ElGamalEncryption in the exponent over generic groups.
     - A Naive Multisignature (concatenation of ed25519 signatures)
        - Future version will support BLS multisignatures
     - Hybrid Encryption using signature key
- - Advanced Cryptographic tools: 
-   - Anonymous Credentials based on David Pointcheval and Olivier Sanders. 
+ - Advanced Cryptographic tools:
+   - Anonymous Credentials based on David Pointcheval and Olivier Sanders.
    Short Randomizable Signatures. CT RSA 2015. https://eprint.iacr.org/2015/525.pdf.
    It currently uses BLS12_381 as the underlying pairing
    - Confidential Anonymous Credential Reveal: Allows to encrypt credential attributes
@@ -21,7 +21,7 @@ Support:
    - Chaum Pedersen proofs: Allows to prove in zero-knowledge that a set of Pedersen
    commitments open to the same value. Used in transfers to prove that the input confidential asset
    is the same as the output asset type.
-   - Pedersen-ElGamal Equality Proofs: Allows to prove in zero-knowledge that the 
+   - Pedersen-ElGamal Equality Proofs: Allows to prove in zero-knowledge that the
    decryption of an Elgamal ciphertexts correctly opens a pedersen commitment.
    Use in transfers that allow tracking amounts and asset type without publicly
    revealing these values.
@@ -34,7 +34,7 @@ Support:
    - Tracking policies: Allow tracking of amount, asset type, and/or identity
    of asset holders. That is, confidential Xfrs need to provide ciphertexts of
    amount/asset_type and/or identity and prove that this are correctly formed.
-    
+
 # Benchmarks
 
 # Development environment setup
@@ -117,7 +117,7 @@ To run:
 
 ```
 > cargo tree
-  
+
 zei v0.0.1 (/home/philippe/repositories/findora/zei)
 ├── aes-ctr v0.3.0
 │   ├── aes-soft v0.3.3
@@ -170,7 +170,7 @@ according to some agreed standard defined in `rustfmt.toml`.
 
 Then to format your code run
 ```
-> cargo +nightly fmt
+> cargo fmt
 ```
 
 # Use of zei library
@@ -196,5 +196,3 @@ likely want to compile with
 If you're building for a machine with avx2 instructions, there's also the
 experimental `avx2_backend`.  To use it, compile with
 `RUSTFLAGS="-C target_cpu=native" cargo build --no-default-features --features="avx2_backend"`
-
-
