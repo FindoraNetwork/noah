@@ -28,6 +28,7 @@ use merlin::Transcript;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// use linear_map::LinearMap;
 /// use zei::errors::ZeiError;
+/// use curve25519_dalek::ristretto::CompressedRistretto;
 ///
 /// // asset types
 /// let type1 = Scalar::from(1u8);
@@ -64,17 +65,29 @@ use merlin::Transcript;
 ///                               liabilities_blinds.as_slice(),
 ///                               &[], // no public liabilities
 ///                               &rates);
-/// assert!(proof.is_ok());
 ///
-/// let proof = prove_solvency(   &hidden_asset_set,
-///                               assets_blinds.as_slice(),
-///                               &[], // no public asset
-///                               &hidden_liability_set,
-///                               liabilities_blinds.as_slice(),
-///                               &[(type1, Scalar::from(100000u32))], // big public liability making statement false
-///                               &rates);
-/// assert_eq!(Some(ZeiError::SolvencyProveError), proof.err());
-/// ```
+/// let hidden_assets_coms: Vec<(CompressedRistretto, CompressedRistretto)> = hidden_asset_set.
+///   iter().
+///   zip(assets_blinds.iter()).
+///   map(|((a,t),(ba, bt))| {
+///    (pc_gens.commit(*a, *ba).compress(), pc_gens.commit(*t, *bt).compress())
+///   }).collect();
+///
+/// let hidden_liabilities_coms: Vec<(CompressedRistretto, CompressedRistretto)> = hidden_liability_set.
+///   iter().
+///   zip(liabilities_blinds.iter()).
+///   map(|((a,t),(ba, bt))| {
+///    (pc_gens.commit(*a, *ba).compress(), pc_gens.commit(*t, *bt).compress())
+///   }).collect();
+///
+/// let vrfy = verify_solvency(
+///                 hidden_assets_coms.as_slice(),
+///                 &[],
+///                 hidden_liabilities_coms.as_slice(),
+///                 &[],
+///                 &rates,
+///                 &proof.unwrap());
+/// assert!(vrfy.is_ok());
 pub fn prove_solvency(hidden_asset_set: &[(Scalar, Scalar)], // amount and type of hidden assets
                       asset_set_blinds: &[(Scalar, Scalar)], // blindings for amount and type of hidden assets
                       public_asset_set: &[(Scalar, Scalar)], // amount and type of public/known assets
@@ -160,75 +173,7 @@ pub fn prove_solvency(hidden_asset_set: &[(Scalar, Scalar)], // amount and type 
 /// a public value is not a key in the conversion table).
 /// # Example
 /// ```
-/// use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
-/// use rand_chacha::ChaChaRng;
-/// use rand::SeedableRng;
-/// use curve25519_dalek::scalar::Scalar;
-/// use zei::crypto::solvency::{prove_solvency,verify_solvency};
-/// let pc_gens = PedersenGens::default();
-/// let mut prng = ChaChaRng::from_seed([0u8;32]);
-/// use linear_map::LinearMap;
-/// use zei::errors::ZeiError;
-/// use curve25519_dalek::ristretto::CompressedRistretto;
-///
-/// // asset types
-/// let type1 = Scalar::from(1u8);
-/// let type2 = Scalar::from(2u8);
-/// let type3 = Scalar::from(3u8);
-///
-///  // exchange rate table
-/// let mut rates = LinearMap::new();
-///    rates.insert(type1, Scalar::from(1u8));
-///    rates.insert(type2, Scalar::from(2u8));
-///    rates.insert(type3, Scalar::from(3u8));
-///
-/// // liabilities
-/// let hidden_liability_set = [
-///			(Scalar::from(10u8), type1), // 10
-///			(Scalar::from(20u8), type2), // 40
-///		];
-///
-/// //assets
-/// let hidden_asset_set = [
-///			(Scalar::from(10u8), type1), // 10
-///			(Scalar::from(20u8), type2), // 40
-///			(Scalar::from(30u8), type3), // 60
-///		];
-///
-/// // blinding factors
-/// let mut assets_blinds = vec![(Scalar::random(&mut prng), Scalar::random(&mut prng)); 3];
-/// let mut liabilities_blinds = vec![(Scalar::random(&mut prng), Scalar::random(&mut prng)); 2];
-///
-/// let proof = prove_solvency(   &hidden_asset_set,
-///                               assets_blinds.as_slice(),
-///                               &[], // no public asset
-///                               &hidden_liability_set,
-///                               liabilities_blinds.as_slice(),
-///                               &[], // no public liabilities
-///                               &rates);
-///
-/// let hidden_assets_coms: Vec<(CompressedRistretto, CompressedRistretto)> = hidden_asset_set.
-///   iter().
-///   zip(assets_blinds.iter()).
-///   map(|((a,t),(ba, bt))| {
-///    (pc_gens.commit(*a, *ba).compress(), pc_gens.commit(*t, *bt).compress())
-///   }).collect();
-///
-/// let hidden_liabilities_coms: Vec<(CompressedRistretto, CompressedRistretto)> = hidden_liability_set.
-///   iter().
-///   zip(liabilities_blinds.iter()).
-///   map(|((a,t),(ba, bt))| {
-///    (pc_gens.commit(*a, *ba).compress(), pc_gens.commit(*t, *bt).compress())
-///   }).collect();
-///
-/// let vrfy = verify_solvency(
-///                 hidden_assets_coms.as_slice(),
-///                 &[],
-///                 hidden_liabilities_coms.as_slice(),
-///                 &[],
-///                 &rates,
-///                 &proof.unwrap());
-/// assert!(vrfy.is_ok());
+/// // See zei::crypto::solvency::prove_solvency
 /// ```
 pub fn verify_solvency(hidden_asset_set: &[(CompressedRistretto, CompressedRistretto)], //commitments to assets
                        public_asset_set: &[(Scalar, Scalar)],
