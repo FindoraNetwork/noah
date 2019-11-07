@@ -85,7 +85,7 @@ pub fn cac_prove<R, P>(prng: &mut R,
 /// * `returns` - a single (short) proof corresponding to all the collections of ciphertexts / ac reveal signatures
 /// # Example
 /// ```
-/// use zei::crypto::conf_cred_reveal::test_helpers::{setup};
+/// use zei::crypto::conf_cred_reveal::test_helpers::setup_agg;
 /// use zei::algebra::bls12_381::BLSGt;
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaChaRng;
@@ -93,7 +93,7 @@ pub fn cac_prove<R, P>(prng: &mut R,
 /// prng = ChaChaRng::from_seed([0u8; 32]);
 /// let reveal_bitmap = [true, true, false, false];
 /// let (ac_issuer_pub_key, ac_issuer_sec_key, user_pub_key, user_sec_key) =
-///      setup::<BLSGt>(&mut prng, reveal_bitmap.len());
+///      setup_agg::<BLSGt>(&mut prng, reveal_bitmap.len());
 /// ```
 pub fn cac_multi_prove<R, P>(prng: &mut R,
                              ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,

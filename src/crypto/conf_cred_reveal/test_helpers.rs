@@ -7,7 +7,7 @@ use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::basic_crypto::elgamal::{
   elgamal_derive_public_key, elgamal_encrypt, elgamal_generate_secret_key, ElGamalCiphertext,
-  ElGamalPublicKey,
+  ElGamalPublicKey, ElGamalSecretKey,
 };
 use crate::crypto::anon_creds::{
   ac_keygen_issuer, ac_keygen_user, ac_reveal, ac_sign, ACIssuerPublicKey, ACIssuerSecretKey,
@@ -17,7 +17,7 @@ use crate::errors::ZeiError;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 
-pub fn setup<P: PairingTargetGroup>(
+pub fn setup_agg<P: PairingTargetGroup>(
   prng: &mut ChaChaRng,
   n_attr: usize)
   -> (ACIssuerPublicKey<P::G1, P::G2>,
@@ -28,7 +28,30 @@ pub fn setup<P: PairingTargetGroup>(
   let ac_issuer_pub_key = ac_issuer_keypair.0;
   let ac_issuer_sec_key = ac_issuer_keypair.1;
   let (user_pub_key, user_sec_key) = ac_keygen_user::<_, P>(prng, &ac_issuer_pub_key);
+
   (ac_issuer_pub_key, ac_issuer_sec_key, user_pub_key, user_sec_key)
+}
+
+pub fn setup_ac<P: PairingTargetGroup>(
+  prng: &mut ChaChaRng,
+  n_attr: usize)
+  -> (ACIssuerPublicKey<P::G1, P::G2>,
+      ACIssuerSecretKey<P::G1, P::ScalarField>,
+      ACUserPublicKey<P::G1>,
+      ACUserSecretKey<P::ScalarField>,
+      ElGamalPublicKey<P::G1>,
+      ElGamalSecretKey<P::ScalarField>) {
+  let ac_issuer_keypair = ac_keygen_issuer::<_, P>(prng, n_attr);
+
+  let ac_issuer_pub_key = ac_issuer_keypair.0;
+  let ac_issuer_sk = ac_issuer_keypair.1;
+
+  let recv_secret_key = elgamal_generate_secret_key::<_, P::ScalarField>(prng);
+  let recv_enc_pub_key = elgamal_derive_public_key(&P::G1::get_base(), &recv_secret_key);
+
+  let (user_pk, user_sk) = ac_keygen_user::<_, P>(prng, &ac_issuer_pub_key);
+
+  (ac_issuer_pub_key, ac_issuer_sk, user_pk, user_sk, recv_enc_pub_key, recv_secret_key)
 }
 
 pub fn gen_ac_reveal_sig<P: PairingTargetGroup>(
@@ -82,7 +105,7 @@ pub fn confidential_reveal_agg<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
   prng = ChaChaRng::from_seed([0u8; 32]);
 
   let (ac_issuer_pub_key, ac_issuer_sec_key, user_pub_key, user_sec_key) =
-    setup::<P>(&mut prng, reveal_bitmap.len());
+    setup_agg::<P>(&mut prng, reveal_bitmap.len());
 
   let (ctexts1, ctexts_rands1, revealed_attrs1, proof1, recv_pub_key1) =
     gen_ac_reveal_sig::<P>(&mut prng,
@@ -157,41 +180,40 @@ pub fn confidential_reveal_agg<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
   assert_eq!(Err(ZeiError::IdentityRevealVerifyError), vrfy);
 }
 
-pub fn confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
-  let num_attr = reveal_bitmap.len();
-  let mut prng: ChaChaRng;
-  prng = ChaChaRng::from_seed([0u8; 32]);
-  let ac_issuer_keypair = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
-
-  let ac_issuer_pub_key = &ac_issuer_keypair.0;
-  let ac_issuer_sk = &ac_issuer_keypair.1;
-
-  let recv_secret_key = elgamal_generate_secret_key::<_, P::ScalarField>(&mut prng);
-  let recv_enc_pub_key = elgamal_derive_public_key(&P::G1::get_base(), &recv_secret_key);
-
-  let (user_pk, user_sk) = ac_keygen_user::<_, P>(&mut prng, ac_issuer_pub_key);
-
+pub fn ac_gen_proofs_and_ciphertexts<P: PairingTargetGroup>(
+  prng: &mut ChaChaRng,
+  ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
+  ac_issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
+  user_pk: &ACUserPublicKey<P::G1>,
+  user_sk: &ACUserSecretKey<P::ScalarField>,
+  recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
+  reveal_bitmap: &[bool])
+  -> (Vec<P::ScalarField>,
+      Vec<ElGamalCiphertext<P::G1>>,
+      Vec<P::ScalarField>,
+      ACRevealSig<P::G1, P::G2, P::ScalarField>) {
   let mut attrs = vec![];
+  let num_attr = reveal_bitmap.len();
 
   for _ in 0..num_attr {
-    attrs.push(P::ScalarField::random_scalar(&mut prng));
+    attrs.push(P::ScalarField::random_scalar(prng));
   }
 
-  let signature = ac_sign::<_, P>(&mut prng, &ac_issuer_sk, &user_pk, attrs.as_slice());
+  let signature = ac_sign::<_, P>(prng, &ac_issuer_sk, &user_pk, attrs.as_slice());
 
-  let mut proof = ac_reveal::<_, P>(&mut prng,
-                                    &user_sk,
-                                    ac_issuer_pub_key,
-                                    &signature,
-                                    &attrs,
-                                    reveal_bitmap).unwrap();
+  let proof = ac_reveal::<_, P>(prng,
+                                &user_sk,
+                                &ac_issuer_pk,
+                                &signature,
+                                &attrs,
+                                reveal_bitmap).unwrap();
 
   let mut ctext_rands = vec![];
   let mut ctexts = vec![];
-  let mut revealed_attrs = vec![];
+  let mut revealed_attrs: Vec<P::ScalarField> = vec![];
   for (attr, reveal) in attrs.iter().zip(reveal_bitmap) {
     if *reveal {
-      let rand = P::ScalarField::random_scalar(&mut prng);
+      let rand = P::ScalarField::random_scalar(prng);
       let ctext = elgamal_encrypt(&P::G1::get_base(), attr, &rand, &recv_enc_pub_key);
 
       ctext_rands.push(rand);
@@ -200,8 +222,27 @@ pub fn confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
     }
   }
 
+  (revealed_attrs, ctexts.clone(), ctext_rands.clone(), proof)
+}
+
+pub fn confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
+  let mut prng: ChaChaRng;
+  prng = ChaChaRng::from_seed([0u8; 32]);
+
+  let (ac_issuer_pub_key, ac_issuer_sk, user_pk, user_sk, recv_enc_pub_key, _) =
+    setup_ac::<P>(&mut prng, reveal_bitmap.len());
+
+  let (revealed_attrs, mut ctexts, ctext_rands, mut proof) =
+    ac_gen_proofs_and_ciphertexts::<P>(&mut prng,
+                                       &ac_issuer_pub_key,
+                                       &ac_issuer_sk,
+                                       &user_pk,
+                                       &user_sk,
+                                       &recv_enc_pub_key,
+                                       &reveal_bitmap);
+
   let mut cac_proof = cac_prove::<_, P>(&mut prng,
-                                        ac_issuer_pub_key,
+                                        &ac_issuer_pub_key,
                                         &recv_enc_pub_key,
                                         &revealed_attrs.as_slice(),
                                         &ctext_rands.as_slice(),
@@ -209,7 +250,7 @@ pub fn confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
                                         &ctexts.as_slice(),
                                         &proof).unwrap();
 
-  let vrfy = cac_verify::<P>(ac_issuer_pub_key,
+  let vrfy = cac_verify::<P>(&ac_issuer_pub_key,
                              &recv_enc_pub_key,
                              &proof,
                              ctexts.as_slice(),
@@ -253,7 +294,7 @@ pub fn confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
     }
   }
 
-  let vrfy = cac_verify::<P>(ac_issuer_pub_key,
+  let vrfy = cac_verify::<P>(&ac_issuer_pub_key,
                              &recv_enc_pub_key,
                              &proof,
                              ctexts.as_slice(),
