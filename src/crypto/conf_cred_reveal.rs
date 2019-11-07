@@ -12,23 +12,41 @@ use sha2::{Digest, Sha512};
 
 /// Aggregated proof of knowledge of revealed attributes for an anonymous credential reveal signature
 /// that are encrypted under ElGamal
+/// # Arguments
+///
+/// * `attr_sum_com_yy2` - {sum blind_{attr_{j,k}} * Y2_j }_k for attr_{j,k} in encrypted attributes for each instance k. Cannot be aggregated
+/// * `agg_attrs_coms_g` - \sum_k x_k* blind_{a_{j,k}} * G1 for attr_{j,k} in encrypted attributes
+/// * `attrs_resps` - {{c*attr_{j,k} + blind_{attr_{j,k}} }_j}_k for each instance k, Cannot be aggregated
+/// * `agg_rands_coms_g` - {\sum_k x_k * blind_{r_{j,k}} * G}_j
+/// * `agg_rands_coms_pk` - {\sum_k x_k  * blind_{r_{j,k}} * PK_k }_j
+/// * `rands_resps` - {(c*r_{j,k} + blind_{r_{i,k}})}_j}_k, this cannot be aggregated unless public keys are all equal
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct AggPoKAttrs<G1, G2, S> {
-  pub attr_sum_com_yy2: Vec<G2>, // {sum blind_{attr_{j,k}} * Y2_j }_k for attr_{j,k} in encrypted attributes for each instance k. Cannot be aggregated
-  pub agg_attrs_coms_g: Vec<G1>, // \sum_k x_k* blind_{a_{j,k}} * G1 for attr_{j,k} in encrypted attributes
-  pub attrs_resps: Vec<Vec<S>>, // {{c*attr_{j,k} + blind_{attr_{j,k}} }_j}_k for each instance k, Cannot be aggregated
-  pub agg_rands_coms_g: Vec<G1>, // {\sum_k x_k * blind_{r_{j,k}} * G}_j
-  pub agg_rands_coms_pk: Vec<G1>, // {\sum_k x_k  * blind_{r_{j,k}} * PK_k }_j
-  pub rands_resps: Vec<Vec<S>>, //  {(c*r_{j,k} + blind_{r_{i,k}})}_j}_k, this cannot be aggregated unless public keys are all equal
+  pub attr_sum_com_yy2: Vec<G2>,
+  pub agg_attrs_coms_g: Vec<G1>,
+  pub attrs_resps: Vec<Vec<S>>,
+  pub agg_rands_coms_g: Vec<G1>,
+  pub agg_rands_coms_pk: Vec<G1>,
+  pub rands_resps: Vec<Vec<S>>,
 }
 
-/// Proof of knowlege of attributes that a) are elgamal encrypted, and b) verify an anonymous credential reveal proof.
+/// Proof of knowledge of attributes that a) are elgamal encrypted, and b) verify an anonymous credential reveal proof.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CACProof<G1, G2, S>(pub(crate) AggPoKAttrs<G1, G2, S>);
 
 /// I produce a CACProof for a single instance of a confidential anonymous reveal. Proof asserts
 /// that a list of attributes can be decrypted from a list of ciphertexts under recv_enc_pub_key,
 /// and that these attributed verify an anonymous credential reveal proof.
+/// * `prng` - randomness source
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_key` - encryption public key of the receiver
+/// * `attrs` - attributes to prove knowledge of
+/// * `ctexts_rand` - randomness used to encrypt attrs
+/// * `bitmap` - indicates position of each attribute to prove
+/// * `ctexts` - list of ciphertexts that encrypt the attributes
+/// * `ac_reveal_sig` - proof that the issuer has signed some attributes
+/// * `returns` - proof that the ciphertexts contains the attributes that have been signed by some issuer for the user.
 pub fn cac_prove<R, P>(prng: &mut R,
                        ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                        recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
@@ -51,16 +69,25 @@ pub fn cac_prove<R, P>(prng: &mut R,
                           &[ac_reveal_sig])
 }
 
-/// I produce a CACProof for a set of instance of confidential anonymous reveal proofs.
+/// I produce a CACProof for a set of instances of confidential anonymous reveal proofs.
 /// For n > 1, instances, the proof produced is shorter than n independent CAC proofs produced by
 /// cac_prove function.
+/// * `prng` - randomness source
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_keys` - list of encryption public keys of different receivers
+/// * `attrs_vecs` - collection of list of attributes
+/// * `ctexts_rand_vecs` - collection of lists containing the randomness used to encrypt the attributes
+/// * `bitmap` - indicates position of each attribute to prove. Note that the same bitmap is used for all lists of attributes.
+/// * `ctexts_vecs` - collection of lists containing ciphertexts that encrypt the attributes
+/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
+/// * `returns` - a single (short) proof corresponding to all the collections of ciphertexts / ac reveal signatures
 pub fn cac_multi_prove<R, P>(prng: &mut R,
                              ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                              recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
-                             attrs: &[&[P::ScalarField]],
-                             ctexts_rand: &[&[P::ScalarField]],
+                             attrs_vecs: &[&[P::ScalarField]],
+                             ctexts_rand_vecs: &[&[P::ScalarField]],
                              bitmap: &[bool],
-                             ctexts: &[&[ElGamalCiphertext<P::G1>]],
+                             ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
                              ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, P::ScalarField>])
                              -> Result<CACProof<P::G1, P::G2, P::ScalarField>, ZeiError>
   where R: CryptoRng + Rng,
@@ -69,30 +96,46 @@ pub fn cac_multi_prove<R, P>(prng: &mut R,
   Ok(CACProof(agg_pok_attrs_prove::<R, P>(prng,
                                           ac_issuer_pub_key,
                                           recv_enc_pub_keys,
-                                          attrs,
-                                          ctexts_rand,
+                                          attrs_vecs,
+                                          ctexts_rand_vecs,
                                           bitmap,
-                                          ctexts,
+                                          ctexts_vecs,
                                           ac_reveal_sigs)?))
 }
 
 /// I verify a CACProof.
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_key` - encryption public key of the receiver
+/// * `ac_reveal_sig` - proof that the issuer has signed some attributes
+/// * `ctexts` - list of ciphertexts that encrypt the attributes
+/// * `cac_proof` - proof that the ciphertexts contains the attributes that have been signed by some issuer for the user.
+/// * `bitmap` - indicates which attributes should be revealed to the receiver.
+/// * `returns` - nothing if the verification is successful an error otherwise.
 pub fn cac_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                          recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
-                                         reveal_sig: &ACRevealSig<P::G1, P::G2, P::ScalarField>,
+                                         ac_reveal_sig: &ACRevealSig<P::G1,
+                                                      P::G2,
+                                                      P::ScalarField>,
                                          ctexts: &[ElGamalCiphertext<P::G1>],
                                          cac_proof: &CACProof<P::G1, P::G2, P::ScalarField>,
-                                         bitmap: &[bool] // indicates which attributes should be revealed to the receiver
-) -> Result<(), ZeiError> {
+                                         bitmap: &[bool])
+                                         -> Result<(), ZeiError> {
   cac_multi_verify::<P>(ac_issuer_pub_key,
                         &[recv_enc_pub_key],
-                        &[reveal_sig],
+                        &[ac_reveal_sig],
                         &[ctexts],
                         cac_proof,
                         bitmap)
 }
 
-/// I verify a CACProof for a set of Confidential Anonumous Credental instances.
+/// I verify a CACProof for a set of Confidential Anonymous Credential instances.
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_keys` - list of encryption public keys for the receivers
+/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
+/// * `ctexts_vecs` - collection of lists containing ciphertexts that encrypt the attributes
+/// * `cac_proof` - a single (short) proof corresponding to all the collections of ciphertexts / ac reveal signatures
+/// * `bitmap` - indicates which attributes should be revealed to the receiver
+/// * `returns` -
 pub fn cac_multi_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
                                                                   P::G2>,
                                                recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
@@ -103,8 +146,8 @@ pub fn cac_multi_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPubli
                                                cac_proof: &CACProof<P::G1,
                                                          P::G2,
                                                          P::ScalarField>,
-                                               bitmap: &[bool] // indicates which attributes should be revealed to the receiver
-) -> Result<(), ZeiError> {
+                                               bitmap: &[bool])
+                                               -> Result<(), ZeiError> {
   agg_pok_attrs_verify::<P>(ac_issuer_pub_key,
                             recv_enc_pub_keys,
                             ac_reveal_sigs,
@@ -115,13 +158,22 @@ pub fn cac_multi_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPubli
 
 /// I compute a proof of knowledge of identity attributes to be verified against encryption of these
 /// and a anonymous credential reveal proof
+/// * `prng` - randomness source
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_key` - encryption public key of the receiver
+/// * `attrs` - attributes to prove knowledge of
+/// * `ctexts_rand` - randomness used to encrypt the attributes
+/// * `bitmap` - indicates position of each attribute to prove
+/// * `ctexts` - list of ciphertexts that encrypt the attributes
+/// * `ac_reveal_sig`-  proof that the issuer has signed some attributes
+/// * `returns` - proof of knowledge of the attributes and encryption randomness
 pub(crate) fn pok_attrs_prove<R, P>(
   prng: &mut R,
   ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
   recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
-  attrs: &[P::ScalarField],       // attributes to prove knowledge of
-  ctexts_rand: &[P::ScalarField], // randomness used to encrypt attrs
-  bitmap: &[bool],                // indicates position of each attribute to prove
+  attrs: &[P::ScalarField],
+  ctexts_rand: &[P::ScalarField],
+  bitmap: &[bool],
   ctexts: &[ElGamalCiphertext<P::G1>],
   ac_reveal_sig: &ACRevealSig<P::G1, P::G2, P::ScalarField>)
   -> Result<AggPoKAttrs<P::G1, P::G2, P::ScalarField>, ZeiError>
@@ -141,20 +193,27 @@ pub(crate) fn pok_attrs_prove<R, P>(
 /// I verify a proof of knowledge of attributes that
 /// a) satisfy a single anonymous credential reveal proof
 /// b) are encrypted under ctexts (ElGamal encryptions)
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_key` - encryption public key of the receiver
+/// * `ac_reveal_sig` - proof that the issuer has signed some attributes
+/// * `ctexts` - list of ciphertexts that encrypt the attributes
+/// * `pok_attrs` - proof of knowledge computed through the function pok_attrs_prove
+/// * `bitmap` - indicates which attributes should be revealed to the receiver
+/// * `returns`- nothing if the verification is successful an error otherwise.
 pub(crate) fn pok_attrs_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                                       recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
-                                                      reveal_sig: &ACRevealSig<P::G1,
+                                                      ac_reveal_sig: &ACRevealSig<P::G1,
                                                                    P::G2,
                                                                    P::ScalarField>,
                                                       ctexts: &[ElGamalCiphertext<P::G1>],
                                                       pok_attrs: &AggPoKAttrs<P::G1,
                                                                    P::G2,
                                                                    P::ScalarField>,
-                                                      bitmap: &[bool] // indicates which attributes should be revealed to the receiver
-) -> Result<(), ZeiError> {
+                                                      bitmap: &[bool])
+                                                      -> Result<(), ZeiError> {
   agg_pok_attrs_verify::<P>(ac_issuer_pub_key,
                             &[recv_enc_pub_key],
-                            &[reveal_sig],
+                            &[ac_reveal_sig],
                             &[ctexts],
                             pok_attrs,
                             bitmap)
@@ -162,23 +221,32 @@ pub(crate) fn pok_attrs_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssu
 
 /// I compute an aggregated proof of knowledge of identity attribute sets to be verified against
 /// encryption of these and a set of anonymous credential reveal proofs
+/// * `prng` - source of randomness
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_keys` - list of encryption public keys for the receivers
+/// * `attrs_vecs` - collection of list of attributes
+/// * `ctexts_rand_vecs`- collection of lists containing the randomness used to encrypt the attributes
+/// * `bitmap` - indicates which attributes should be revealed to the receiver
+/// * `ctexts_vecs` - collection of lists containing ciphertexts that encrypt the attributes
+/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
+/// * `returns` - aggregated proof of knowledge for the attributes and randomness of ciphertexts
 pub(crate) fn agg_pok_attrs_prove<R, P>(
   prng: &mut R,
   ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
   recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
-  attrs: &[&[P::ScalarField]],
-  ctexts_rand: &[&[P::ScalarField]],
+  attrs_vecs: &[&[P::ScalarField]],
+  ctexts_rand_vecs: &[&[P::ScalarField]],
   bitmap: &[bool],
-  ctexts: &[&[ElGamalCiphertext<P::G1>]],
+  ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
   ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, P::ScalarField>])
   -> Result<AggPoKAttrs<P::G1, P::G2, P::ScalarField>, ZeiError>
   where R: CryptoRng + Rng,
         P: PairingTargetGroup
 {
-  //0: santity check on vector length
-  let n_instances = attrs.len();
-  if n_instances != ctexts_rand.len()
-     || n_instances != ctexts.len()
+  // 0: sanity check on vector length
+  let n_instances = attrs_vecs.len();
+  if n_instances != ctexts_rand_vecs.len()
+     || n_instances != ctexts_vecs.len()
      || n_instances != ac_reveal_sigs.len()
   {
     return Err(ZeiError::ParameterError);
@@ -188,7 +256,7 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
     return Err(ZeiError::ParameterError);
   }
 
-  //1: sample secrets' blinds and compute proof commitments.
+  // 1: sample secrets' blinds and compute proof commitments.
   let (attr_sum_com_yy2, (attrs_coms_g, rands_coms_g, rands_coms_pk), (attrs_blinds, rands_blinds)) =
     sample_blinds_compute_commitments::<_, P>(prng,
                                               ac_issuer_pub_key,
@@ -197,10 +265,10 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
                                               n_attrs,
                                               n_instances)?;
 
-  //2: sample linear combination scalars
-  let lc_scalars = compute_linear_combination_scalars::<P>(ctexts, ac_reveal_sigs);
+  // 2: sample linear combination scalars
+  let lc_scalars = compute_linear_combination_scalars::<P>(ctexts_vecs, ac_reveal_sigs);
 
-  //3: aggregate attributes blinding commitments under G and PK
+  // 3: aggregate attributes blinding commitments under G and PK
   let agg_attrs_coms_g =
     group_linear_combination_rows(lc_scalars.as_slice(), attrs_coms_g.as_slice());
   let agg_rands_coms_g =
@@ -208,21 +276,21 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
   let agg_rands_coms_pk =
     group_linear_combination_rows(lc_scalars.as_slice(), rands_coms_pk.as_slice());
 
-  //4: Compute challenge for the proof and scalars for linear combination
+  // 4: Compute challenge for the proof and scalars for linear combination
   let challenge = cac_reveal_challenge_agg::<P>(&ac_issuer_pub_key,
                                                 recv_enc_pub_keys,
                                                 ac_reveal_sigs,
-                                                ctexts,
+                                                ctexts_vecs,
                                                 attr_sum_com_yy2.as_slice(),
                                                 agg_attrs_coms_g.as_slice(),
                                                 agg_rands_coms_g.as_slice(),
                                                 agg_rands_coms_pk.as_slice())?;
 
-  //3: compute proof responses
+  // 5: compute proof responses
   let mut attrs_resps = vec![];
   let mut rands_resps = vec![];
   for (attrs_k, rands_k, attrs_blinds_k, rands_blinds_k) in
-    izip!(attrs, ctexts_rand, attrs_blinds, rands_blinds)
+    izip!(attrs_vecs, ctexts_rand_vecs, attrs_blinds, rands_blinds)
   {
     let (attrs_resps_k, rands_resps_k) =
       compute_proof_responses::<P::ScalarField>(&challenge,
@@ -234,7 +302,7 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
     rands_resps.push(rands_resps_k);
   }
 
-  //5: build struct and return
+  // 6: build struct and return
   Ok(AggPoKAttrs { attr_sum_com_yy2,
                    agg_attrs_coms_g,
                    agg_rands_coms_g,
@@ -243,6 +311,14 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
                    rands_resps })
 }
 
+/// Verifies an aggregated proof of knowledge involving identity attributes and ciphertexts
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_keys` - list of encryption public keys for the receivers
+/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
+/// * `ctexts_vecs` - collection of lists containing ciphertexts that encrypt the attributes
+/// * `agg_pok_attrs` - aggregated proof of knowledge computed through the function agg_pok_attrs_prove
+/// * `bitmap` - indicates which attributes should be revealed to the receiver
+/// * `returns` - nothing if the verification passes, an error otherwise
 pub(crate) fn agg_pok_attrs_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                                           recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
                                                           ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, P::ScalarField>],
@@ -289,15 +365,18 @@ pub(crate) fn agg_pok_attrs_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &AC
 
 /// I hash the parameters to sample a set of scalars used to aggregate proofs,
 /// one scalar per instance. First scalar is 1.
-fn compute_linear_combination_scalars<P: PairingTargetGroup>(ctexts: &[&[ElGamalCiphertext<P::G1>]],
+/// * `ctexts_vecs` - collection of lists containing ciphertexts
+/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
+/// * `returns` - a vector of scalars
+fn compute_linear_combination_scalars<P: PairingTargetGroup>(ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
                                                              ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, P::ScalarField>])
                                                              -> Vec<P::ScalarField> {
-  if ctexts.len() == 0 {
+  if ctexts_vecs.len() == 0 {
     return vec![];
   }
 
   let mut scalars = vec![P::ScalarField::from_u32(1)];
-  if ctexts.len() == 1 {
+  if ctexts_vecs.len() == 1 {
     return scalars;
   }
 
@@ -307,14 +386,14 @@ fn compute_linear_combination_scalars<P: PairingTargetGroup>(ctexts: &[&[ElGamal
                 .unwrap();
   hash.input(ac_reveal_sig_vec.as_slice());
 
-  for ctext_vec in ctexts.iter() {
+  for ctext_vec in ctexts_vecs.iter() {
     for ctext in *ctext_vec {
       hash.input(ctext.e1.to_compressed_bytes());
       hash.input(ctext.e1.to_compressed_bytes());
     }
   }
   let mut xi = P::ScalarField::from_hash(hash);
-  for _ in 2..ctexts.len() {
+  for _ in 2..ctexts_vecs.len() {
     let mut hash = Sha512::new();
     hash.input(xi.to_bytes());
     let new_xi = P::ScalarField::from_hash(hash);
@@ -327,9 +406,19 @@ fn compute_linear_combination_scalars<P: PairingTargetGroup>(ctexts: &[&[ElGamal
 }
 
 /// I verify a proof of knowledge of a set of ElGamal encrypted messages
+/// * `challenge` - challenge value generated using Fiat-Shamir
+/// * `lc_scalars` - scalars obtained via linear combination of other scalars
+/// * `ctexts_vec`- collection of lists of ciphertexts of attributes
+/// * `attr_commitments` - commitments for the attributes
+/// * `rand_commitments_g` - random commitments related to base g //TODO what are these values about?
+/// * `rand_commitments_pk` - random commitments relative to encryption public key pk //TODO is it correct?
+/// * `attr_responses` - response to challenge for the attributes //TODO what is this exactly ?
+/// * `rand_responses` - random response //TODO what is this exactly?
+/// * `recv_enc_pub_keys`- encryption public keys of the recipients
+/// * `return` - nothing if the verification is successful, error otherwise
 fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
                                             lc_scalars: &[P::ScalarField],
-                                            ctexts: &[&[ElGamalCiphertext<P::G1>]],
+                                            ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
                                             attr_commitments: &[P::G1],
                                             rand_commitments_g: &[P::G1],
                                             rand_commitments_pk: &[P::G1],
@@ -350,13 +439,13 @@ fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
     let mut sum_g_attr = P::ScalarField::from_u32(0); // aggregate scalars first
 
     let mut sum_e1 = P::G1::get_identity(); // ElGamalCiphertext 1st coordinate
-    let mut sum_e2 = P::G1::get_identity(); // ElGamalCiphertext 1st coordinate
+    let mut sum_e2 = P::G1::get_identity(); // ElGamalCiphertext 2nd coordinate
 
     for (pub_key, rand_resp_inst, attr_resp_inst, ctexts_inst, scalar) in
       izip!(recv_enc_pub_keys.iter(),
             rand_responses.iter(),
             attr_responses.iter(),
-            ctexts.iter(),
+            ctexts_vecs.iter(),
             lc_scalars.iter())
     {
       let scalar_factor = rand_resp_inst[i].mul(scalar);
@@ -403,17 +492,24 @@ fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
   Ok(())
 }
 
-/// I verify a proof of knowledge of attributed that verify an anonymous credential reveal proof.
+/// I verify a proof of knowledge of attributes that verify an anonymous credential reveal proof.
+/// * `challenge` - challenge from the verifier
+/// * `lc_scalars` - scalars obtained via linear combination of other scalars
+/// * `ac_reveal_sigs` -  collection of proofs that the issuer has signed some attributes
+/// * `attr_sum_com_yy2` - //TODO what is this?
+/// * `attr_resps` - //TODO what is this?
+/// * `issuer_pub_key` - (signing) public key of the issuer
+/// * `bitmap` - policy, indicates which attributes needs to be revealed to the receiver
 fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
                                                 lc_scalars: &[P::ScalarField],
-                                                reveal_sigs: &[&ACRevealSig<P::G1,
+                                                ac_reveal_sigs: &[&ACRevealSig<P::G1,
                                                                P::G2,
                                                                P::ScalarField>],
                                                 attr_sum_com_yy2: &[P::G2],
                                                 attr_resps: &[Vec<P::ScalarField>],
                                                 issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                                bitmap: &[bool] //policy, indicates which attributes needs to be revealed to the receiver
-) -> Result<(), ZeiError> {
+                                                bitmap: &[bool])
+                                                -> Result<(), ZeiError> {
   // 1. For each credential instance k compute challenge c_k
   // 2. For each credential instance k compute P_k = challenge * H_k + challenges_k * R_k where
   //  A is credential proof terms for x, t, sk, Hidden attributes
@@ -424,7 +520,7 @@ fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
   let mut agg_sigma2 = P::G1::get_identity();
   let mut ck_vec = vec![];
   for (lc_scalar_k, reveal_sig_k, attr_sum_com_k, attr_resp_k) in
-    izip!(lc_scalars, reveal_sigs, attr_sum_com_yy2, attr_resps)
+    izip!(lc_scalars, ac_reveal_sigs, attr_sum_com_yy2, attr_resps)
   {
     let c_k = ac_challenge::<P>(issuer_pub_key,
                                 &reveal_sig_k.sig,
@@ -448,8 +544,8 @@ fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
 
   //4. Compute left hand side as \sum_k e(sigma1_k, P_k)
   let mut lhs = P::get_identity();
-  for (lc_scalar_k, reveal_sig_k, pp_k) in izip!(lc_scalars, reveal_sigs, pp) {
-    let lhs_i = P::pairing(&reveal_sig_k.sig.sigma1.mul(lc_scalar_k), &pp_k);
+  for (lc_scalar_k, ac_reveal_sig_k, pp_k) in izip!(lc_scalars, ac_reveal_sigs, pp) {
+    let lhs_i = P::pairing(&ac_reveal_sig_k.sig.sigma1.mul(lc_scalar_k), &pp_k);
     lhs = lhs.add(&lhs_i);
   }
 
@@ -464,6 +560,13 @@ fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
 /// a) sample a blinding scalar,
 /// b) compute proof commitments of this scalars to be used in a PoK of the secret values that
 /// verify an anonymous credential reveal proof and matched ElGamal encryptions
+/// * `prng` - randomness source
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `recv_enc_pub_keys` - list of encryption keys of the receivers
+/// * `bitmap` - policy, indicates which attributes needs to be revealed to the receiver
+/// * `n_attrs` - number of attributes
+/// * `n_instances` - number of ac instances (also equal to the number of recipients
+/// * `returns` - vector of random commitments
 fn sample_blinds_compute_commitments<R, P>(
   prng: &mut R,
   ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -504,7 +607,11 @@ fn sample_blinds_compute_commitments<R, P>(
 
   Ok((attr_sum_com_yy2, (attrs_coms_g, rands_coms_g, rands_coms_pk), (attrs_blinds, rands_blinds)))
 }
-
+/// Helper function //TODO what does it do?
+/// * `ac_issuer_pub_key` - (signing) public key of the issuer
+/// * `attr_blinds` - vector of random commitments used to hide the attributes
+/// * `bitmap` - policy, indicates which attributes needs to be revealed to the receiver
+/// * `returns`- group element in G2
 fn compute_attr_sum_yy2<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
                                                                   P::G2>,
                                                attr_blinds: &Vec<P::ScalarField>,
@@ -522,6 +629,10 @@ fn compute_attr_sum_yy2<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPubli
 }
 
 /// I sample proof blindings for every attribute and encryption randomness for every instance
+/// * `prng` - randomness source
+/// * `n_attrs` - number of attributes
+/// * `n_instances` - number of ac instances (also equal to the number of recipients
+/// * `returns` - a vector of blinded attributes and a vector of random blinding value
 fn sample_blinds<R, S>(prng: &mut R,
                        n_attrs: usize,
                        n_instances: usize)
@@ -543,7 +654,16 @@ fn sample_blinds<R, S>(prng: &mut R,
 }
 
 /// I compute a challenge for the PoK of knowledge protocol for confidential anonymous credential
-/// reveal
+/// reveal. This challenge is computed using the Fiat-Shamir transform.
+/// * `ac_issuer_pub_key` - (signing) issuer public key
+/// * `recv_pub_keys` - list of encryption public keys for the recipients
+/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
+/// * `ctexts_vecs`- collection of lists of ciphertexts of attributes
+/// * `ac_coms` - commitments from the aggregated encrypted attributes // TODO refactor? Pass the aggregated proof struct
+/// * `agg_proof_coms_attrs` - aggregated proof commitments for attributes
+/// * `agg_proof_coms_rands_g` - blinding factors in base g
+/// * `agg_proof_coms_rands_pk` - blinding factors related to the public keys
+/// * `return` - challenge which is a hash value
 fn cac_reveal_challenge_agg<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
                                                                       P::G2>,
                                                    recv_pub_keys: &[&ElGamalPublicKey<P::G1>],
@@ -588,6 +708,12 @@ fn cac_reveal_challenge_agg<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerP
 }
 
 /// Using a challenge, secret values and their blindings, I compute the proof responses of a PoK
+/// * `challenge` - challenge obtained from function cac_reveal_challenge_agg
+/// * `attrs` - list of attributes
+/// * `attr_blind` - blinding factors for attributes
+/// * `ctexts_rand` - ciphertexts randomness
+/// * `rand_blind` - //TODO what is this?
+/// * `returns` - responses to the challenge
 fn compute_proof_responses<S: Scalar>(challenge: &S,
                                       attrs: &[S],
                                       attr_blind: &[S],
@@ -613,6 +739,11 @@ fn compute_proof_responses<S: Scalar>(challenge: &S,
 /// rather than the plain attributes. That is:
 /// sum_{j\in Revealed} b'_{attr_j} * Y2_j - PoK.attr_sum_com_yy2
 ///  = c' * sum_{j\in Revealed} attr_j * y_j * G2
+/// * `ac_issuer_public_key` - (signing) public key of the issuer
+/// * `attr_sum_com` - //TODO what is this?
+/// * `attr_resps` - // TODO what is this?
+/// * `bitmap` - policy, indicates which attributes needs to be revealed to the receiver`
+/// * `return` - group element of G2
 fn ac_vrfy_zk_revealed_terms_addition<P: PairingTargetGroup>(ac_issuer_public_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                                              attr_sum_com: &P::G2,
                                                              attr_resps: &[P::ScalarField],
