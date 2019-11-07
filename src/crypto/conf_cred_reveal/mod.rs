@@ -49,12 +49,53 @@ pub struct CACProof<G1, G2, S>(pub(crate) AggPoKAttrs<G1, G2, S>);
 /// * `ctexts` - list of ciphertexts that encrypt the attributes
 /// * `ac_reveal_sig` - proof that the issuer has signed some attributes
 /// * `returns` - proof that the ciphertexts contains the attributes that have been signed by some issuer for the user.
+/// # Example
+/// ```
+/// use zei::crypto::conf_cred_reveal::test_helpers::{setup_ac, ac_gen_proofs_and_ciphertexts};
+/// use zei::crypto::conf_cred_reveal::{cac_prove, cac_verify};
+/// use zei::algebra::bls12_381::BLSGt;
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaChaRng;
+/// let mut prng: ChaChaRng;
+///
+/// let mut prng: ChaChaRng;
+/// prng = ChaChaRng::from_seed([0u8; 32]);
+/// let reveal_bitmap = [true, false, true, false, true, false, true, false, true, false];
+/// let (ac_issuer_pub_key, ac_issuer_sk, user_pk, user_sk, recv_enc_pub_key, _) =
+///    setup_ac::<BLSGt>(&mut prng, reveal_bitmap.len());
+/// let (revealed_attrs, mut ctexts, ctext_rands, mut proof) =
+///    ac_gen_proofs_and_ciphertexts::<BLSGt>(&mut prng,
+///                                       &ac_issuer_pub_key,
+///                                       &ac_issuer_sk,
+///                                       &user_pk,
+///                                       &user_sk,
+///                                       &recv_enc_pub_key,
+///                                       &reveal_bitmap);
+///
+/// let mut cac_proof = cac_prove::<_, BLSGt>(&mut prng,
+///                                        &ac_issuer_pub_key,
+///                                        &recv_enc_pub_key,
+///                                        &revealed_attrs.as_slice(),
+///                                        &ctext_rands.as_slice(),
+///                                        &reveal_bitmap,
+///                                        &ctexts.as_slice(),
+///                                        &proof).unwrap();
+///
+/// let vrfy = cac_verify::<BLSGt>(&ac_issuer_pub_key,
+///                             &recv_enc_pub_key,
+///                             &proof,
+///                             ctexts.as_slice(),
+///                             &cac_proof,
+///                             &reveal_bitmap);
+///
+///  assert_eq!(Ok(()), vrfy);
+/// ```
 pub fn cac_prove<R, P>(prng: &mut R,
                        ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                        recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
-                       attrs: &[P::ScalarField], // attributes to prove knowledge of
-                       ctexts_rand: &[P::ScalarField], // randomness used to encrypt attrs
-                       bitmap: &[bool],          // indicates position of each attribute to prove
+                       attrs: &[P::ScalarField],
+                       ctexts_rand: &[P::ScalarField],
+                       bitmap: &[bool],
                        ctexts: &[ElGamalCiphertext<P::G1>],
                        ac_reveal_sig: &ACRevealSig<P::G1, P::G2, P::ScalarField>)
                        -> Result<CACProof<P::G1, P::G2, P::ScalarField>, ZeiError>
@@ -85,15 +126,69 @@ pub fn cac_prove<R, P>(prng: &mut R,
 /// * `returns` - a single (short) proof corresponding to all the collections of ciphertexts / ac reveal signatures
 /// # Example
 /// ```
-/// use zei::crypto::conf_cred_reveal::test_helpers::setup_agg;
+/// use zei::crypto::conf_cred_reveal::test_helpers::{setup_agg, gen_ac_reveal_sig};
+/// use zei::crypto::conf_cred_reveal::{cac_multi_prove, cac_multi_verify};
 /// use zei::algebra::bls12_381::BLSGt;
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// let mut prng: ChaChaRng;
 /// prng = ChaChaRng::from_seed([0u8; 32]);
-/// let reveal_bitmap = [true, true, false, false];
+/// let reveal_bitmap = [true, false];
 /// let (ac_issuer_pub_key, ac_issuer_sec_key, user_pub_key, user_sec_key) =
 ///      setup_agg::<BLSGt>(&mut prng, reveal_bitmap.len());
+///
+/// let mut prng: ChaChaRng;
+///  prng = ChaChaRng::from_seed([0u8; 32]);
+///
+///  let (ac_issuer_pub_key, ac_issuer_sec_key, user_pub_key, user_sec_key) =
+///    setup_agg::<BLSGt>(&mut prng, reveal_bitmap.len());
+///
+///  let (ctexts1, ctexts_rands1, revealed_attrs1, proof1, recv_pub_key1) =
+///    gen_ac_reveal_sig::<BLSGt>(&mut prng,
+///                           &ac_issuer_pub_key,
+///                           &ac_issuer_sec_key,
+///                           &user_pub_key,
+///                           &user_sec_key,
+///                           &reveal_bitmap);
+///
+///  let (ctexts2, ctexts_rands2, revealed_attrs2, proof2, recv_pub_key2) =
+///    gen_ac_reveal_sig::<BLSGt>(&mut prng,
+///                           &ac_issuer_pub_key,
+///                           &ac_issuer_sec_key,
+///                           &user_pub_key,
+///                           &user_sec_key,
+///                           &reveal_bitmap);
+///
+///  let (ctexts3, ctexts_rands3, revealed_attrs3, proof3, recv_pub_key3) =
+///    gen_ac_reveal_sig::<BLSGt>(&mut prng,
+///                           &ac_issuer_pub_key,
+///                           &ac_issuer_sec_key,
+///                           &user_pub_key,
+///                           &user_sec_key,
+///                           &reveal_bitmap);
+///
+///  let mut cac_proof =
+///    cac_multi_prove::<_, BLSGt>(&mut prng,
+///                            &ac_issuer_pub_key,
+///                            &[&recv_pub_key1, &recv_pub_key2, &recv_pub_key3],
+///                            &[revealed_attrs1.as_slice(),
+///                              revealed_attrs2.as_slice(),
+///                              revealed_attrs3.as_slice()],
+///                            &[ctexts_rands1.as_slice(),
+///                              ctexts_rands2.as_slice(),
+///                              ctexts_rands3.as_slice()],
+///                            &reveal_bitmap,
+///                            &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice()],
+///                            &[&proof1, &proof2, &proof3]).unwrap();
+///
+///  let vrfy = cac_multi_verify::<BLSGt>(&ac_issuer_pub_key,
+///                                   &[&recv_pub_key1, &recv_pub_key2, &recv_pub_key3],
+///                                   &[&proof1, &proof2, &proof3],
+///                                   &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice()],
+///                                   &cac_proof,
+///                                   &reveal_bitmap);
+///
+///  assert_eq!(Ok(()), vrfy);
 /// ```
 pub fn cac_multi_prove<R, P>(prng: &mut R,
                              ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -125,6 +220,10 @@ pub fn cac_multi_prove<R, P>(prng: &mut R,
 /// * `cac_proof` - proof that the ciphertexts contains the attributes that have been signed by some issuer for the user.
 /// * `bitmap` - indicates which attributes should be revealed to the receiver.
 /// * `returns` - nothing if the verification is successful an error otherwise.
+/// # Example
+/// ```
+/// //See zei:crypto:conf_cred_reveal::cac_prove
+/// ```
 pub fn cac_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                          recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
                                          ac_reveal_sig: &ACRevealSig<P::G1,
@@ -149,7 +248,11 @@ pub fn cac_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P
 /// * `ctexts_vecs` - collection of lists containing ciphertexts that encrypt the attributes
 /// * `cac_proof` - a single (short) proof corresponding to all the collections of ciphertexts / ac reveal signatures
 /// * `bitmap` - indicates which attributes should be revealed to the receiver
-/// * `returns` -
+/// * `returns` - nothing or an error if the verification fails
+/// # Example
+/// ```
+/// //See zei::crypto::conf_cred_reveal::cac_multi_prove
+/// ```
 pub fn cac_multi_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
                                                                   P::G2>,
                                                recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
