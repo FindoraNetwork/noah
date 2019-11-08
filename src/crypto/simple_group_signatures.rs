@@ -177,14 +177,15 @@ fn verify_signature_pok(gpk: &GroupPublicKey,
   let e1 = &sig.enc.e1;
   let e2 = &sig.enc.e2;
 
-  let a = g1_base.mul(&response_tag).sub(com_g1_blind_tag);
-  let b = gpk.enc_key.0.mul(&response_r).sub(com_pk_blind_r);
-  // check e1 correctness: e1 = tag * G1 + r * PK
-  if e1.mul(&challenge) != a.add(&b) {
+  // check e1 correctness: e1 = r * G1
+  if e1.mul(&challenge) != g1_base.mul(&response_r).sub(com_g1_blind_r) {
     return Err(ZeiError::ZKProofVerificationError);
   }
-  // check e2 correctness: e2 = r * G1
-  if e2.mul(&challenge) != g1_base.mul(&response_r).sub(com_g1_blind_r) {
+
+  // check e2 correctness: e2 = tag * G1 + r * PK
+  let a = g1_base.mul(&response_tag).sub(com_g1_blind_tag);
+  let b = gpk.enc_key.0.mul(&response_r).sub(com_pk_blind_r);
+  if e2.mul(&challenge) != a.add(&b) {
     return Err(ZeiError::ZKProofVerificationError);
   }
 
