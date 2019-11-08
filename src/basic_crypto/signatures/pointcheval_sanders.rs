@@ -152,18 +152,18 @@ pub fn ps_verify_sig_scalar(pk: &PSPublicKey,
 /// #Example
 /// ```
 /// use rand::rngs::EntropyRng;
-/// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar, randomize_ps_sig};
+/// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar, ps_randomize_sig};
 /// use zei::errors::ZeiError;
 /// use zei::algebra::bls12_381::BLSScalar;
 /// use zei::algebra::groups::Scalar;
 /// let mut prng = EntropyRng::new();
 /// let (pk, sk) = ps_gen_keys(&mut prng);
 /// let sig = ps_sign_scalar(&mut prng, &sk, &BLSScalar::from_u32(100));
-/// let (_,rand_sig) = randomize_ps_sig(&mut prng, &sig);
+/// let (_,rand_sig) = ps_randomize_sig(&mut prng, &sig);
 /// assert!(ps_verify_sig_scalar(&pk, &BLSScalar::from_u32(100), &rand_sig).is_ok());
 ///
 /// ```
-pub fn randomize_ps_sig<R: Rng + CryptoRng>(prng: &mut R,
+pub fn ps_randomize_sig<R: Rng + CryptoRng>(prng: &mut R,
                                             sig: &PSSignature)
                                             -> (BLSScalar, PSSignature) {
   let rand_factor = BLSScalar::random_scalar(prng);

@@ -290,7 +290,14 @@ pub fn elgamal_verify<S: Scalar, G: Group<S>>(base: &G,
   }
 }
 
-/// I decrypt en el gamal ciphertext via brute force
+/// ElGamal decryption: Return group element
+pub fn elgamal_decrypt_elem<S: Scalar, G: Group<S>>(ctext: &ElGamalCiphertext<G>,
+                                                    sec_key: &ElGamalSecretKey<S>)
+                                                    -> G {
+  ctext.e2.sub(&ctext.e1.mul(&sec_key.0))
+}
+
+/// I decrypt en ElGamal ciphertext on the exponent via brute force
 /// Return ZeiError::ElGamalDecryptionError if value is not in the range [0..2^32-1]
 pub fn elgamal_decrypt<S: Scalar, G: Group<S>>(base: &G,
                                                ctext: &ElGamalCiphertext<G>,
@@ -299,7 +306,7 @@ pub fn elgamal_decrypt<S: Scalar, G: Group<S>>(base: &G,
   elgamal_decrypt_hinted::<S, G>(base, ctext, sec_key, 0, u32::max_value())
 }
 
-/// I decrypt en el gamal ciphertext via brute force in the range [lower_bound..upper_bound]
+/// I decrypt en ElGamal ciphertext on the exponent via brute force in the range [lower_bound..upper_bound]
 /// Return ZeiError::ElGamalDecryptionError if value is not in the range.
 pub fn elgamal_decrypt_hinted<S: Scalar, G: Group<S>>(base: &G,
                                                       ctext: &ElGamalCiphertext<G>,
@@ -307,8 +314,7 @@ pub fn elgamal_decrypt_hinted<S: Scalar, G: Group<S>>(base: &G,
                                                       lower_bound: u32,
                                                       upper_bound: u32)
                                                       -> Result<S, ZeiError> {
-  let encoded = &ctext.e2.sub(&ctext.e1.mul(&sec_key.0));
-
+  let encoded = elgamal_decrypt_elem(ctext, sec_key);
   brute_force::<S, G>(base, &encoded, lower_bound, upper_bound)
 }
 

@@ -2,7 +2,7 @@ use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::basic_crypto::signatures::pointcheval_sanders::{
-  ps_gen_keys, randomize_ps_sig, PSPublicKey, PSSecretKey, PSSignature,
+  ps_gen_keys, ps_randomize_sig, PSPublicKey, PSSecretKey, PSSignature,
 };
 use crate::basic_crypto::signatures::signatures::{
   bls_sign, bls_verify, BlsPublicKey, BlsSecretKey, BlsSignature,
@@ -473,7 +473,7 @@ pub fn gpsig_sign<R: Rng + CryptoRng>(prng: &mut R,
                                       user_sk: &GUserSecretKey,
                                       message: &[u8])
                                       -> GroupSignature {
-  let (_, rand_sig) = randomize_ps_sig(prng, &user_sk.join_cert.0);
+  let (_, rand_sig) = ps_randomize_sig(prng, &user_sk.join_cert.0);
   // signature proof of knowledge of user_sk.tag such that
   //   verify_manager_sig(group_pk, user_sk.tag, rand_sig) = 1
   let sok = signature_proof_of_knowledge(prng, &user_sk.tag, message, group_pk);
