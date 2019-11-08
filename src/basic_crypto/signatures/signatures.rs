@@ -14,6 +14,7 @@ use digest::Digest;
 use ed25519_dalek::PublicKey;
 use ed25519_dalek::SecretKey;
 use ed25519_dalek::Signature;
+use wasm_bindgen::prelude::*;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 //pub const XFR_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
@@ -25,6 +26,7 @@ pub const KEY_BASE_POINT: CompressedEdwardsY =
 pub struct XfrPublicKey(pub(crate) PublicKey);
 #[derive(Debug, Default)]
 pub struct XfrSecretKey(pub(crate) SecretKey);
+#[wasm_bindgen]
 #[derive(Debug, Default)]
 pub struct XfrKeyPair {
   public: XfrPublicKey,
