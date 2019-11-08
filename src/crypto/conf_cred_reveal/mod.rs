@@ -527,10 +527,10 @@ fn compute_linear_combination_scalars<P: PairingTargetGroup>(ctexts_vecs: &[&[El
 /// * `lc_scalars` - scalars obtained via linear combination of other scalars
 /// * `ctexts_vec`- collection of lists of ciphertexts of attributes
 /// * `attr_commitments` - commitments for the attributes
-/// * `rand_commitments_g` - random commitments related to base g //TODO what are these values about?
-/// * `rand_commitments_pk` - random commitments relative to encryption public key pk //TODO is it correct?
-/// * `attr_responses` - response to challenge for the attributes //TODO what is this exactly ?
-/// * `rand_responses` - random response //TODO what is this exactly?
+/// * `rand_commitments_g` - Encryption randomness commitments related to base g
+/// * `rand_commitments_pk` - Encryption randomness commitments relative the public key
+/// * `attr_responses` - response to challenge for the attributes
+/// * `rand_responses` - encryption random response
 /// * `recv_enc_pub_keys`- encryption public keys of the recipients
 /// * `return` - nothing if the verification is successful, error otherwise
 fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
@@ -613,8 +613,8 @@ fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
 /// * `challenge` - challenge from the verifier
 /// * `lc_scalars` - scalars obtained via linear combination of other scalars
 /// * `ac_reveal_sigs` -  collection of proofs that the issuer has signed some attributes
-/// * `attr_sum_com_yy2` - //TODO what is this?
-/// * `attr_resps` - //TODO what is this?
+/// * `attr_sum_com_yy2` - attributes commitment
+/// * `attr_resps` - attribute responses
 /// * `issuer_pub_key` - (signing) public key of the issuer
 /// * `bitmap` - policy, indicates which attributes needs to be revealed to the receiver
 fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
@@ -724,7 +724,8 @@ fn sample_blinds_compute_commitments<R, P>(
 
   Ok((attr_sum_com_yy2, (attrs_coms_g, rands_coms_g, rands_coms_pk), (attrs_blinds, rands_blinds)))
 }
-/// Helper function //TODO what does it do?
+/// Helper function
+/// Computes proof commitments
 /// * `ac_issuer_pub_key` - (signing) public key of the issuer
 /// * `attr_blinds` - vector of random commitments used to hide the attributes
 /// * `bitmap` - policy, indicates which attributes needs to be revealed to the receiver
@@ -776,7 +777,7 @@ fn sample_blinds<R, S>(prng: &mut R,
 /// * `recv_pub_keys` - list of encryption public keys for the recipients
 /// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
 /// * `ctexts_vecs`- collection of lists of ciphertexts of attributes
-/// * `ac_coms` - commitments from the aggregated encrypted attributes // TODO refactor? Pass the aggregated proof struct
+/// * `ac_coms` - commitments from the aggregated encrypted attributes
 /// * `agg_proof_coms_attrs` - aggregated proof commitments for attributes
 /// * `agg_proof_coms_rands_g` - blinding factors in base g
 /// * `agg_proof_coms_rands_pk` - blinding factors related to the public keys
@@ -829,7 +830,7 @@ fn cac_reveal_challenge_agg<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerP
 /// * `attrs` - list of attributes
 /// * `attr_blind` - blinding factors for attributes
 /// * `ctexts_rand` - ciphertexts randomness
-/// * `rand_blind` - //TODO what is this?
+/// * `rand_blind` - randomness blinding factor
 /// * `returns` - responses to the challenge
 fn compute_proof_responses<S: Scalar>(challenge: &S,
                                       attrs: &[S],
@@ -857,8 +858,8 @@ fn compute_proof_responses<S: Scalar>(challenge: &S,
 /// sum_{j\in Revealed} b'_{attr_j} * Y2_j - PoK.attr_sum_com_yy2
 ///  = c' * sum_{j\in Revealed} attr_j * y_j * G2
 /// * `ac_issuer_public_key` - (signing) public key of the issuer
-/// * `attr_sum_com` - //TODO what is this?
-/// * `attr_resps` - // TODO what is this?
+/// * `attr_sum_com` - commitment to attributed blinding
+/// * `attr_resps` - attributes responses
 /// * `bitmap` - policy, indicates which attributes needs to be revealed to the receiver`
 /// * `return` - group element of G2
 fn ac_vrfy_zk_revealed_terms_addition<P: PairingTargetGroup>(ac_issuer_public_key: &ACIssuerPublicKey<P::G1, P::G2>,
