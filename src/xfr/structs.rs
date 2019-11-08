@@ -1,7 +1,7 @@
 use crate::algebra::bls12_381::{BLSG1, BLSG2};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
-use crate::basic_crypto::signatures::signatures::{XfrMultiSig, XfrPublicKey};
+use crate::basic_crypto::signatures::naive_multisig::{XfrMultiSig, XfrPublicKey};
 use crate::crypto::anon_creds::ACIssuerPublicKey;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use crate::crypto::pedersen_elgamal::PedersenElGamalEqProof;
@@ -170,7 +170,7 @@ impl Eq for XfrRangeProof {}
 #[cfg(test)]
 mod test {
   use super::{XfrBody, XfrNote, XfrProofs};
-  use crate::basic_crypto::signatures::signatures::XfrMultiSig;
+  use crate::basic_crypto::signatures::naive_multisig::XfrMultiSig;
   use crate::xfr::lib::tests::create_xfr;
   use crate::xfr::structs::{AssetAmountProof, AssetTrackingProofs};
   use rand::SeedableRng;

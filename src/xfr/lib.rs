@@ -1,4 +1,4 @@
-use crate::basic_crypto::signatures::signatures::{
+use crate::basic_crypto::signatures::naive_multisig::{
   sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig,
 };
 use crate::errors::ZeiError;
@@ -25,7 +25,7 @@ const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 /// use rand_chacha::ChaChaRng;
 /// use rand::SeedableRng;
 /// use bulletproofs::PedersenGens;
-/// use zei::basic_crypto::signatures::signatures::XfrKeyPair;
+/// use zei::basic_crypto::signatures::naive_multisig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
 /// use zei::xfr::asset_record::build_open_asset_record;
 /// use zei::xfr::lib::gen_xfr_note;
@@ -111,7 +111,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 /// use rand_chacha::ChaChaRng;
 /// use rand::SeedableRng;
 /// use bulletproofs::PedersenGens;
-/// use zei::basic_crypto::signatures::signatures::XfrKeyPair;
+/// use zei::basic_crypto::signatures::naive_multisig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
 /// use zei::xfr::asset_record::build_open_asset_record;
 /// use zei::xfr::lib::gen_xfr_body;
@@ -428,7 +428,7 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 /// use rand_chacha::ChaChaRng;
 /// use rand::SeedableRng;
 /// use bulletproofs::PedersenGens;
-/// use zei::basic_crypto::signatures::signatures::XfrKeyPair;
+/// use zei::basic_crypto::signatures::naive_multisig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
 /// use zei::xfr::asset_record::build_open_asset_record;
 /// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note};
@@ -640,7 +640,7 @@ pub(crate) mod tests {
   use crate::basic_crypto::elgamal::{
     elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext, ElGamalPublicKey,
   };
-  use crate::basic_crypto::signatures::signatures::XfrKeyPair;
+  use crate::basic_crypto::signatures::naive_multisig::XfrKeyPair;
   use crate::crypto::anon_creds;
   use crate::errors::ZeiError::{
     XfrCreationAssetAmountError, XfrVerifyAssetAmountError, XfrVerifyConfidentialAmountError,

@@ -4,7 +4,7 @@ use crate::algebra::pairing::PairingTargetGroup;
 use crate::basic_crypto::signatures::pointcheval_sanders::{
   ps_gen_keys, ps_randomize_sig, PSPublicKey, PSSecretKey, PSSignature,
 };
-use crate::basic_crypto::signatures::signatures::{
+use crate::basic_crypto::signatures::bls::{
   bls_sign, bls_verify, BlsPublicKey, BlsSecretKey, BlsSignature,
 };
 use crate::errors::ZeiError;
@@ -282,7 +282,7 @@ pub fn gpsig_setup<R: Rng + CryptoRng>(prng: &mut R) -> (GroupPublicKey, Manager
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::crypto::group_signature::{gpsig_setup, gpsig_join_user_send_request, gpsig_join_manager_process_request, gpsig_join_user_final, gpsig_join_user_process_response, gpsig_join_manager_final};
-/// use zei::basic_crypto::signatures::signatures::bls_gen_keys;
+/// use zei::basic_crypto::signatures::bls::bls_gen_keys;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (gpk, msk) = gpsig_setup(&mut prng);
 /// let (user_sk, user_pk) = bls_gen_keys(&mut prng);
@@ -449,7 +449,7 @@ pub fn gpsig_join_user_final(state: &UserState,
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::crypto::group_signature::{gpsig_setup, gpsig_join_user_send_request, gpsig_join_manager_process_request, gpsig_join_user_final, gpsig_join_user_process_response, gpsig_join_manager_final, gpsig_sign, gpsig_verify};
-/// use zei::basic_crypto::signatures::signatures::bls_gen_keys;
+/// use zei::basic_crypto::signatures::bls::bls_gen_keys;
 /// use zei::errors::ZeiError;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (gpk, msk) = gpsig_setup(&mut prng);
@@ -496,7 +496,7 @@ pub fn gpsig_verify(gpk: &GroupPublicKey,
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::crypto::group_signature::{gpsig_setup, gpsig_join_user_send_request, gpsig_join_manager_process_request, gpsig_join_user_final, gpsig_join_user_process_response, gpsig_join_manager_final, gpsig_sign, gpsig_verify, gpsig_test_entry};
-/// use zei::basic_crypto::signatures::signatures::bls_gen_keys;
+/// use zei::basic_crypto::signatures::bls::bls_gen_keys;
 /// use zei::errors::ZeiError;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (gpk, msk) = gpsig_setup(&mut prng);

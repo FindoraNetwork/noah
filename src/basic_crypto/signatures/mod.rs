@@ -1,2 +1,3 @@
 pub mod pointcheval_sanders;
-pub mod signatures;
+pub mod naive_multisig;
+pub mod bls;

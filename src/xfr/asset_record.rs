@@ -2,7 +2,7 @@ use crate::algebra::groups::Scalar as ZeiScalar;
 use crate::algebra::ristretto::{CompRist, RistPoint, RistScalar};
 use crate::basic_crypto::elgamal::elgamal_encrypt;
 use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt};
-use crate::basic_crypto::signatures::signatures::{XfrPublicKey, XfrSecretKey};
+use crate::basic_crypto::signatures::naive_multisig::{XfrPublicKey, XfrSecretKey};
 use crate::errors::ZeiError;
 use crate::utils::{
   u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u128, u8_bigendian_slice_to_u64,
@@ -228,7 +228,7 @@ mod test {
   use crate::basic_crypto::elgamal::{
     elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey,
   };
-  use crate::basic_crypto::signatures::signatures::XfrKeyPair;
+  use crate::basic_crypto::signatures::naive_multisig::XfrKeyPair;
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::lib::tests::create_xfr;
   use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, AssetType};
