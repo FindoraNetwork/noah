@@ -36,8 +36,8 @@ pub fn gpsig_setup<R: CryptoRng + Rng>(prng: &mut R) -> (GroupPublicKey, GroupSe
 }
 
 pub struct JoinCert {
-  tag: BLSScalar,
-  sig: PSSignature,
+  pub tag: BLSScalar,
+  pub sig: PSSignature,
 }
 pub fn gpsig_join_cert<R: CryptoRng + Rng>(prng: &mut R, msk: &GroupSecretKey) -> JoinCert {
   let tag = BLSScalar::random_scalar(prng);
