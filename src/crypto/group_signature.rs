@@ -1,11 +1,11 @@
 use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
-use crate::basic_crypto::signatures::pointcheval_sanders::{
-  ps_gen_keys, ps_randomize_sig, PSPublicKey, PSSecretKey, PSSignature,
-};
 use crate::basic_crypto::signatures::bls::{
   bls_sign, bls_verify, BlsPublicKey, BlsSecretKey, BlsSignature,
+};
+use crate::basic_crypto::signatures::pointcheval_sanders::{
+  ps_gen_keys, ps_randomize_sig, PSPublicKey, PSSecretKey, PSSignature,
 };
 use crate::errors::ZeiError;
 use digest::Digest;

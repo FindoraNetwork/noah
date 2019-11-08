@@ -1,9 +1,9 @@
-use crate::algebra::groups::{Scalar, Group};
+use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
-use rand::{CryptoRng, Rng};
 use crate::errors::ZeiError;
 use crate::utils::u64_to_bigendian_u8array;
 use digest::Digest;
+use rand::{CryptoRng, Rng};
 
 type HashFnc = sha2::Sha512;
 
