@@ -50,6 +50,14 @@ We need to use rust nightly.
 ```
 > rustup default nightly
 ```
+
+## IDE
+
+We recommend using [CLion by Jetrains](https://www.jetbrains.com/clion/download/).
+During the installation choose the Rust plugin. 
+Debugging and testing Rust code should work by default.
+More information available in this [tutorial](https://blog.jetbrains.com/clion/2019/10/debugging-rust-code-in-clion/).
+
 ## Tests
 
 ### Run the tests
