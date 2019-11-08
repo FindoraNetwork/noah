@@ -32,6 +32,7 @@ pub enum ZeiError {
   SolvencyProveError,
   SolvencyVerificationError,
   ZKProofVerificationError,
+  GroupSignatureTraceError,
 }
 
 impl fmt::Display for ZeiError {
@@ -94,6 +95,7 @@ impl fmt::Display for ZeiError {
                   ZeiError::SolvencyVerificationError => "Invalid proof for solvency",
                   ZeiError::SolvencyProveError => "Cannot build proof of solvency",
                   ZeiError::ZKProofVerificationError => "Invalid proof",
+                  ZeiError::GroupSignatureTraceError => "Trace test did not match",
                 })
   }
 }
@@ -152,6 +154,7 @@ impl error::Error for ZeiError {
       ZeiError::SolvencyVerificationError => "Invalid proof for solvency",
       ZeiError::SolvencyProveError => "Cannot build proof of solvency",
       ZeiError::ZKProofVerificationError => "Invalid proof",
+      ZeiError::GroupSignatureTraceError => "Trace test did not match",
     }
   }
 }
