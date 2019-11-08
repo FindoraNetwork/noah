@@ -50,8 +50,8 @@ pub fn gpsig_setup<R: CryptoRng + Rng>(prng: &mut R) -> (GroupPublicKey, GroupSe
 /// When a user joins the group, the Group Manager sends him a certificate
 /// that will enable the user to prove he his part of the group when signing.
 pub struct JoinCert {
-  tag: BLSScalar,
-  sig: PSSignature,
+  pub tag: BLSScalar,
+  pub sig: PSSignature,
 }
 
 /// I produce a join certificate for a new user.
