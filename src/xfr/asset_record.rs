@@ -253,8 +253,7 @@ mod test {
 
     let issuer_public_key = match asset_tracking {
       true => {
-        let (_sk, xfr_pub_key) =
-          elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+        let (_sk, xfr_pub_key) = elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
         let (_sk, id_reveal_pub_key) =
           elgamal_keygen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
         Some(AssetIssuerPubKeys { eg_ristretto_pub_key:

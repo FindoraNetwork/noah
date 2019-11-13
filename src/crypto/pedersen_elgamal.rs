@@ -492,25 +492,22 @@ mod test {
                verify.err().unwrap());
   }
 
-  /*
   #[test]
-  fn to_json(){
-      let m = Scalar::from(10u8);
-      let r = Scalar::from(7657u32);
-      let mut prng = ChaChaRng::from_seed([0u8;32]);
-      let pc_gens = PedersenGens::default();
+  fn to_json() {
+    let m = Scalar::from(10u8);
+    let r = Scalar::from(7657u32);
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let pc_gens = PedersenGens::default();
 
-      let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-      let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
-      let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
-      let commitment = pc_gens.commit(m,r);
-      let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);
+    let (_sk, pk) = elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
+    let commitment = pc_gens.commit(m, r);
+    let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);
 
-      let json_str = serde_json::to_string(&proof).unwrap();
-      let proof_de = serde_json::from_str(&json_str).unwrap();
-      assert_eq!(proof, proof_de, "Deserialized proof does not match");
+    let json_str = serde_json::to_string(&proof).unwrap();
+    let proof_de = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(proof, proof_de, "Deserialized proof does not match");
   }
-  */
 
   #[test]
   fn to_message_pack() {

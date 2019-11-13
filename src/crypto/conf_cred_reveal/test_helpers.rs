@@ -6,7 +6,7 @@ use super::{cac_multi_prove, cac_multi_verify, cac_prove, cac_verify};
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::basic_crypto::elgamal::{
-    elgamal_encrypt, elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey, ElGamalSecretKey,
+  elgamal_encrypt, elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey, ElGamalSecretKey,
 };
 use crate::crypto::anon_creds::{
   ac_keygen_issuer, ac_keygen_user, ac_reveal, ac_sign, ACIssuerPublicKey, ACIssuerSecretKey,
