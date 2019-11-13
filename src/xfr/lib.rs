@@ -635,9 +635,7 @@ pub(crate) mod tests {
   use crate::algebra::groups::Group;
   use crate::algebra::groups::Scalar as ScalarTrait;
   use crate::algebra::ristretto::{CompRist, RistPoint};
-  use crate::basic_crypto::elgamal::{
-    elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext, ElGamalPublicKey,
-  };
+  use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey};
   use crate::basic_crypto::signatures::XfrKeyPair;
   use crate::crypto::anon_creds;
   use crate::errors::ZeiError::{
@@ -665,10 +663,9 @@ pub(crate) mod tests {
     let pc_gens = PedersenGens::default();
     let issuer_public_key = match asset_tracking {
       true => {
-        let sk = elgamal_generate_secret_key::<_, Scalar>(prng);
-        let xfr_pub_key = elgamal_derive_public_key(&pc_gens.B, &sk);
-        let sk = elgamal_generate_secret_key::<_, BLSScalar>(prng);
-        let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
+        let (_sk, xfr_pub_key) = elgamal_keygen::<_, Scalar, RistrettoPoint>(prng, &pc_gens.B);
+        let (_sk, id_reveal_pub_key) =
+          elgamal_keygen::<_, BLSScalar, BLSG1>(prng, &BLSG1::get_base());
 
         Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
                                     ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
@@ -1073,12 +1070,12 @@ pub(crate) mod tests {
     prng = ChaChaRng::from_seed([0u8; 32]);
 
     let pc_gens = PedersenGens::default();
-    let asset_issuer_sec_key = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let asset_issuer_pub_key =
-      elgamal_derive_public_key(&RistrettoPoint::get_base(), &asset_issuer_sec_key);
-    let asset_issuer_id_sec_key = elgamal_generate_secret_key::<_, BLSScalar>(&mut prng);
-    let asset_issuer_id_pub_key =
-      elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_id_sec_key);
+    let (_asset_issuer_sec_key, asset_issuer_pub_key) =
+      elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &RistrettoPoint::get_base());
+
+    let (_asset_issuer_id_sec_key, asset_issuer_id_pub_key) =
+      elgamal_keygen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
+
     let asset_issuer_public_key =
       Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
                                   ElGamalPublicKey(RistPoint(asset_issuer_pub_key.get_point())),

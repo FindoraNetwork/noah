@@ -225,14 +225,13 @@ mod test {
   use crate::algebra::bls12_381::{BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
   use crate::algebra::ristretto::{CompRist, RistPoint};
-  use crate::basic_crypto::elgamal::{
-    elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalPublicKey,
-  };
+  use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalPublicKey};
   use crate::basic_crypto::signatures::XfrKeyPair;
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::lib::tests::create_xfr;
   use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, AssetType};
   use bulletproofs::PedersenGens;
+  use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use rand::Rng;
   use rand::SeedableRng;
@@ -254,11 +253,10 @@ mod test {
 
     let issuer_public_key = match asset_tracking {
       true => {
-        let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-        let xfr_pub_key = elgamal_derive_public_key(&pc_gens.B, &sk);
-        let sk = elgamal_generate_secret_key::<_, BLSScalar>(&mut prng);
-        let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
-
+        let (_sk, xfr_pub_key) =
+          elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+        let (_sk, id_reveal_pub_key) =
+          elgamal_keygen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
         Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
                                     ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
                                   eg_blsg1_pub_key: id_reveal_pub_key })

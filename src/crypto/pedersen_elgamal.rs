@@ -7,11 +7,6 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use rand::{CryptoRng, Rng};
-/*
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use serde::de::{Visitor, SeqAccess};
-use crate::serialization::ZeiFromToBytes;
-*/
 use sha2::{Digest, Sha512};
 
 /*
@@ -45,87 +40,6 @@ pub struct PedersenElGamalEqProof {
   #[serde(with = "serialization::zei_obj_serde")]
   c1: RistrettoPoint, // r_1*g + r_2*H
 }
-
-/*
-impl ZeiFromToBytes for PedersenElGamalEqProof{
-    fn zei_to_bytes(&self) -> Vec<u8>{
-        let mut v = vec![];
-        v.extend_from_slice(self.z1.as_bytes());
-        v.extend_from_slice(self.z2.as_bytes());
-        let mut e1_vec = self.e1.zei_to_bytes();
-        v.append(&mut e1_vec);
-        v.extend_from_slice(self.c1.compress().as_bytes());
-        v
-    }
-    fn zei_from_bytes(bytes: &[u8]) -> Self{
-        let mut array = [0u8;32];
-        array.copy_from_slice(&bytes[..32]);
-        let z1 = Scalar::from_bits(array);
-        array.copy_from_slice(&bytes[32..64]);
-        let z2 = Scalar::from_bits(array);
-        let e1 = ElGamalCiphertext::zei_from_bytes(&bytes[64..64 + ELGAMAL_CTEXT_LEN]);
-        let c1 = CompressedRistretto::from_slice(&bytes[64 + ELGAMAL_CTEXT_LEN..]).decompress().unwrap();
-
-        PedersenElGamalEqProof{ z1,z2,e1,c1}
-    }
-}
-
-impl Serialize for PedersenElGamalEqProof {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer
-    {
-        if serializer.is_human_readable() {
-            serializer.serialize_str(&base64::encode(self.zei_to_bytes().as_slice()))
-        } else {
-            serializer.serialize_bytes(self.zei_to_bytes().as_slice())
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for PedersenElGamalEqProof {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>
-    {
-        struct ProofVisitor;
-
-        impl<'de> Visitor<'de> for ProofVisitor {
-            type Value = PedersenElGamalEqProof;
-
-            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                formatter.write_str("a encoded PedersenElGamal proof")
-            }
-
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<PedersenElGamalEqProof, E>
-                where E: serde::de::Error
-            {
-                Ok(PedersenElGamalEqProof::zei_from_bytes(v))
-            }
-
-            fn visit_seq<V>(self, mut seq: V) -> Result<PedersenElGamalEqProof, V::Error>
-                where V: SeqAccess<'de>,
-            {
-                let mut vec: Vec<u8> = vec![];
-                while let Some(x) = seq.next_element().unwrap() {
-                    vec.push(x);
-                }
-                Ok(PedersenElGamalEqProof::zei_from_bytes(vec.as_slice()))
-            }
-            fn visit_str<E>(self, s: &str) -> Result<PedersenElGamalEqProof, E>
-                where E: serde::de::Error
-            {
-                self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
-            }
-        }
-        if deserializer.is_human_readable() {
-            deserializer.deserialize_str(ProofVisitor)
-        } else {
-            deserializer.deserialize_bytes(ProofVisitor)
-        }
-    }
-}
-*/
 
 /// I compute a proof that ctext and commitment encrypts/holds m under same randomness r.
 pub fn pedersen_elgamal_eq_prove<R: CryptoRng + Rng>(prng: &mut R,
@@ -396,11 +310,10 @@ pub fn pedersen_elgamal_eq_aggregate_verify_fast<R: CryptoRng + Rng>(prng: &mut 
 #[cfg(test)]
 mod test {
   use super::PedersenElGamalEqProof;
-  use crate::basic_crypto::elgamal::{
-    elgamal_derive_public_key, elgamal_encrypt, elgamal_generate_secret_key,
-  };
+  use crate::basic_crypto::elgamal::{elgamal_encrypt, elgamal_keygen};
   use crate::errors::ZeiError;
   use bulletproofs::PedersenGens;
+  use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
@@ -415,8 +328,8 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
+    let (_sk, pk) = elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+
     let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
     let commitment = pc_gens.commit(m, r);
 
@@ -437,8 +350,8 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
+    let (_sk, pk) = elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+
     let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
     let commitment = pc_gens.commit(m2, r);
 
@@ -467,8 +380,8 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
+    let (_sk, pk) = elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+
     let ctext1 = elgamal_encrypt(&pc_gens.B, &m1, &r1, &pk);
     let commitment1 = pc_gens.commit(m1, r1);
     let ctext2 = elgamal_encrypt(&pc_gens.B, &m2, &r2, &pk);
@@ -606,8 +519,8 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let sk = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let pk = elgamal_derive_public_key(&pc_gens.B, &sk);
+    let (_sk, pk) = elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+
     let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
     let commitment = pc_gens.commit(m, r);
     let proof = super::pedersen_elgamal_eq_prove(&mut prng, &m, &r, &pk, &ctext, &commitment);

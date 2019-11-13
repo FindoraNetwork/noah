@@ -6,8 +6,7 @@ use super::{cac_multi_prove, cac_multi_verify, cac_prove, cac_verify};
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::basic_crypto::elgamal::{
-  elgamal_derive_public_key, elgamal_encrypt, elgamal_generate_secret_key, ElGamalCiphertext,
-  ElGamalPublicKey, ElGamalSecretKey,
+    elgamal_encrypt, elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey, ElGamalSecretKey,
 };
 use crate::crypto::anon_creds::{
   ac_keygen_issuer, ac_keygen_user, ac_reveal, ac_sign, ACIssuerPublicKey, ACIssuerSecretKey,
@@ -46,8 +45,8 @@ pub fn setup_ac<P: PairingTargetGroup>(
   let ac_issuer_pub_key = ac_issuer_keypair.0;
   let ac_issuer_sk = ac_issuer_keypair.1;
 
-  let recv_secret_key = elgamal_generate_secret_key::<_, P::ScalarField>(prng);
-  let recv_enc_pub_key = elgamal_derive_public_key(&P::G1::get_base(), &recv_secret_key);
+  let (recv_secret_key, recv_enc_pub_key) =
+    elgamal_keygen::<_, P::ScalarField, P::G1>(prng, &P::G1::get_base());
 
   let (user_pk, user_sk) = ac_keygen_user::<_, P>(prng, &ac_issuer_pub_key);
 
@@ -66,8 +65,7 @@ pub fn gen_ac_reveal_sig<P: PairingTargetGroup>(
       Vec<P::ScalarField>,
       ACRevealSig<P::G1, P::G2, P::ScalarField>,
       ElGamalPublicKey<P::G1>) {
-  let recv_sec_key = elgamal_generate_secret_key::<_, P::ScalarField>(prng);
-  let recv_pub_key = elgamal_derive_public_key(&P::G1::get_base(), &recv_sec_key);
+  let (_, recv_pub_key) = elgamal_keygen::<_, P::ScalarField, P::G1>(prng, &P::G1::get_base());
 
   let num_attr = reveal_bitmap.len();
   let mut attrs = vec![];
