@@ -24,7 +24,7 @@ use sha2::{Digest, Sha512};
 /// * `rands_resps` - {(c*r_{j,k} + blind_{r_{i,k}})}_j}_k, this cannot be aggregated unless public keys are all equal
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct AggPoKAttrs<G1, G2, S> {
+pub struct AggPoKAttrs<G1, G2, S> {
   pub attr_sum_com_yy2: Vec<G2>,
   pub agg_attrs_coms_g: Vec<G1>,
   pub attrs_resps: Vec<Vec<S>>,

@@ -1,8 +1,8 @@
-use crate::algebra::bls12_381::{BLSG1};
+use crate::algebra::bls12_381::BLSG1;
+use crate::api::anon_creds::ACIssuerPublicKey;
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
 use crate::basic_crypto::signatures::{XfrMultiSig, XfrPublicKey};
-use crate::api::anon_creds::ACIssuerPublicKey;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use crate::crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use crate::errors::ZeiError;
