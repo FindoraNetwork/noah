@@ -1,5 +1,5 @@
 pub mod accumulators;
-pub mod anon_creds;
+pub(crate) mod anon_creds;
 pub mod bp_circuits;
 pub mod chaum_pedersen;
 pub mod conf_cred_reveal;

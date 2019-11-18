@@ -9,6 +9,7 @@ extern crate itertools;
 extern crate serde_derive;
 
 pub mod algebra;
+pub mod api;
 pub mod basic_crypto;
 pub mod crypto;
 pub mod errors;

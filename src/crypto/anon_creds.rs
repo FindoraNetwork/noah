@@ -136,16 +136,6 @@ pub(crate) struct ACPoK<G2, S> {
 }
 
 /// I generate e key pair for a credential issuer
-/// # Example
-/// ```
-/// use rand::SeedableRng;
-/// use rand_chacha::ChaChaRng;
-/// use zei::crypto::anon_creds::ac_keygen_issuer;
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
-/// let mut prng = ChaChaRng::from_seed([0u8;32]);
-/// let num_attrs = 10;
-/// let keys = ac_keygen_issuer::<_,BLSGt>(&mut prng, num_attrs);
-/// ```
 pub fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
   num_attrs: usize)
@@ -174,17 +164,6 @@ pub fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
 }
 
 /// I generate a credential user key pair for a given credential issuer
-///
-/// ```
-/// use rand::SeedableRng;
-/// use rand_chacha::ChaChaRng;
-/// use zei::crypto::anon_creds::{ac_keygen_issuer,ac_keygen_user};
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
-/// let mut prng = ChaChaRng::from_seed([0u8;32]);
-/// let num_attrs = 10;
-/// let (issuer_pk,_) = ac_keygen_issuer::<_, BLSGt>(&mut prng, num_attrs);
-/// let user_keys = ac_keygen_user::<_,BLSGt>(&mut prng, &issuer_pk);
-/// ```
 pub fn ac_keygen_user<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>)
@@ -196,19 +175,6 @@ pub fn ac_keygen_user<R: CryptoRng + Rng, P: PairingTargetGroup>(
 
 /// I Compute a credential signature for a set of attributes. User can represent Null attributes by
 /// a fixes scalar (e.g. 0)
-/// ```
-/// use rand::SeedableRng;
-/// use rand_chacha::ChaChaRng;
-/// use zei::crypto::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
-/// use zei::algebra::groups::Scalar;
-/// let mut prng = ChaChaRng::from_seed([0u8;32]);
-/// let num_attrs = 2;
-/// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, BLSGt>(&mut prng, num_attrs);
-/// let (user_pk, _) = ac_keygen_user::<_,BLSGt>(&mut prng, &issuer_pk);
-/// let attributes = [BLSScalar::from_u32(0), BLSScalar::from_u32(1)];
-/// let signature = ac_sign::<_,BLSGt>(&mut prng, &issuer_sk, &user_pk, &attributes);
-/// ```
 pub fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
                                                           issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
                                                           user_pk: &ACUserPublicKey<P::G1>,
@@ -225,22 +191,6 @@ pub fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
 }
 
 /// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed
-/// # Example
-/// ```
-/// use rand::SeedableRng;
-/// use rand_chacha::ChaChaRng;
-/// use zei::crypto::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign, ac_reveal};
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
-/// use zei::algebra::groups::Scalar;
-/// let mut prng = ChaChaRng::from_seed([0u8;32]);
-/// let num_attrs = 2;
-/// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, BLSGt>(&mut prng, num_attrs);
-/// let (user_pk, user_sk) = ac_keygen_user::<_, BLSGt>(&mut prng, &issuer_pk);
-/// let attributes = [BLSScalar::from_u32(0), BLSScalar::from_u32(1)];
-/// let signature = ac_sign::<_,BLSGt>(&mut prng, &issuer_sk, &user_pk, &attributes);
-/// let bitmap = [true,false]; // Reveal first attribute and hide the second one
-/// let reveal_sig = ac_reveal::<_,BLSGt>(&mut prng, &user_sk, &issuer_pk, &signature, &attributes, &bitmap);
-/// ```
 pub fn ac_reveal<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
@@ -362,26 +312,6 @@ pub(crate) fn ac_challenge<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPubli
 /// 2. Compute p \= -proof_commitment + c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
 ///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
 /// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
-/// # Example
-/// ```
-/// use rand::SeedableRng;
-/// use rand_chacha::ChaChaRng;
-/// use zei::crypto::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign, ac_reveal, ac_verify};
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
-/// use zei::algebra::groups::Scalar;
-/// let mut prng = ChaChaRng::from_seed([0u8;32]);
-/// let num_attrs = 2;
-/// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_,BLSGt>(&mut prng, num_attrs);
-/// let (user_pk, user_sk) = ac_keygen_user::<_,BLSGt>(&mut prng, &issuer_pk);
-/// let attributes = [BLSScalar::from_u32(0), BLSScalar::from_u32(1)];
-/// let signature = ac_sign::<_,BLSGt>(&mut prng, &issuer_sk, &user_pk, &attributes);
-/// let bitmap = [true,false]; // Reveal first attribute and hide the second one
-/// let reveal_sig = ac_reveal::<_,BLSGt>(&mut prng, &user_sk, &issuer_pk, &signature, &attributes, &bitmap).unwrap();
-/// let result_verification_ok = ac_verify::<BLSGt>(&issuer_pk, &attributes[..1],& bitmap, &reveal_sig);
-/// assert!(result_verification_ok.is_ok());
-/// let result_verification_err = ac_verify::<BLSGt>(&issuer_pk, &attributes[1..],& bitmap, &reveal_sig);
-/// assert!(result_verification_err.is_err());
-/// ```
 pub fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                         revealed_attrs: &[P::ScalarField],
                                         bitmap: &[bool],
