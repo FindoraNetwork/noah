@@ -1,8 +1,8 @@
-use crate::algebra::bls12_381::{BLSG1, BLSG2};
+use crate::algebra::bls12_381::{BLSG1};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
 use crate::basic_crypto::signatures::{XfrMultiSig, XfrPublicKey};
-use crate::crypto::anon_creds::ACIssuerPublicKey;
+use crate::api::anon_creds::ACIssuerPublicKey;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use crate::crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use crate::errors::ZeiError;
@@ -153,7 +153,7 @@ pub struct AssetTrackingProofs {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct IdRevealPolicy {
-  pub cred_issuer_pub_key: ACIssuerPublicKey<BLSG1, BLSG2>,
+  pub cred_issuer_pub_key: ACIssuerPublicKey,
   pub bitmap: Vec<bool>,
 }
 

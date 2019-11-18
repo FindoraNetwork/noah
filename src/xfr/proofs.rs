@@ -1,7 +1,7 @@
 use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::algebra::groups::{Group, Scalar as ScalarTrait};
 use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalPublicKey};
-use crate::crypto::anon_creds::ACRevealSig;
+use crate::api::anon_creds::ACRevealSig;
 use crate::crypto::chaum_pedersen::{
   chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX,
 };
@@ -29,7 +29,7 @@ const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ConfIdReveal {
   ctexts: Vec<ElGamalCiphertext<BLSG1>>,
-  attr_reveal_proof: ACRevealSig<BLSG1, BLSG2, BLSScalar>,
+  attr_reveal_proof: ACRevealSig,
   pok_attrs: AggPoKAttrs<BLSG1, BLSG2, BLSScalar>,
 }
 
@@ -240,9 +240,7 @@ fn verify_attribute_reveal_policy(asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
 pub fn create_conf_id_reveal<R: Rng + CryptoRng>(prng: &mut R,
                                                  attrs: &[BLSScalar],
                                                  policy: &IdRevealPolicy,
-                                                 attr_reveal_proof: &ACRevealSig<BLSG1,
-                                                              BLSG2,
-                                                              BLSScalar>,
+                                                 attr_reveal_proof: &ACRevealSig,
                                                  asset_issuer_public_key: &ElGamalPublicKey<BLSG1>)
                                                  -> Result<ConfIdReveal, ZeiError> {
   let mut ctexts = vec![];
