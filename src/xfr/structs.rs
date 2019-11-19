@@ -1,5 +1,6 @@
 use crate::algebra::bls12_381::BLSG1;
 use crate::api::anon_creds::ACIssuerPublicKey;
+use crate::api::conf_cred_reveal::ConfidentialAC;
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
 use crate::basic_crypto::signatures::{XfrMultiSig, XfrPublicKey};
@@ -8,7 +9,6 @@ use crate::crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use crate::errors::ZeiError;
 use crate::serialization;
 use crate::xfr::asset_mixer::AssetMixProof;
-use crate::xfr::proofs::ConfIdReveal;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::scalar::Scalar;
 
@@ -142,13 +142,13 @@ pub struct XfrRangeProof {
 pub struct AssetTrackingProof {
   pub(crate) amount_proof: Option<(PedersenElGamalEqProof, PedersenElGamalEqProof)>, // None if confidential amount flag is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
   pub(crate) asset_type_proof: Option<PedersenElGamalEqProof>, //None if confidential asset_type is off. Otherwise, value proves that decryption of issuer_lock_amount yields the same as value committed in amount_commitment in BlindAssetRecord output
-  pub(crate) identity_proof: Option<ConfIdReveal>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+  pub(crate) identity_proof: Option<ConfidentialAC>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTrackingProofs {
   pub aggregate_amount_asset_type_proof: Option<PedersenElGamalEqProof>, // None if confidential amount and confidential asset type flag are off. Otherwise, value proves that decryption of issuer_lock_amounts and/or asset type yield the same as values committed in amount_commitments in BlindAssetRecord outputs
-  pub identity_proofs: Vec<Option<ConfIdReveal>>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+  pub identity_proofs: Vec<Option<ConfidentialAC>>, //None if asset policy does not require identity tracking. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

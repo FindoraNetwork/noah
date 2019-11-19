@@ -1,11 +1,10 @@
-use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
-use crate::algebra::groups::{Group, Scalar as ScalarTrait};
+use crate::algebra::bls12_381::BLSG1;
 use crate::api::anon_creds::ACRevealSig;
-use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalPublicKey};
+use crate::api::conf_cred_reveal::{cac_create, cac_verify, ConfidentialAC};
+use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::crypto::chaum_pedersen::{
   chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX,
 };
-use crate::crypto::conf_cred_reveal::{pok_attrs_prove, pok_attrs_verify, AggPoKAttrs};
 use crate::crypto::pedersen_elgamal::{
   pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_eq_aggregate_verify_fast,
   PedersenElGamalEqProof,
@@ -24,14 +23,6 @@ use merlin::Transcript;
 use rand::{CryptoRng, Rng};
 
 const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
-
-// BLS12_381 implementation of confidential identity reveal protocol
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ConfIdReveal {
-  ctexts: Vec<ElGamalCiphertext<BLSG1>>,
-  attr_reveal_proof: ACRevealSig,
-  pok_attrs: AggPoKAttrs<BLSG1, BLSG2, BLSScalar>,
-}
 
 pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
   prng: &mut R,
@@ -228,7 +219,7 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
 /**** Confidential Identity Attributes Reveal *****/
 
 fn verify_attribute_reveal_policy(asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
-                                  option_proof: &Option<ConfIdReveal>,
+                                  option_proof: &Option<ConfidentialAC>,
                                   policy: &IdRevealPolicy)
                                   -> Result<(), ZeiError> {
   match option_proof {
@@ -238,39 +229,30 @@ fn verify_attribute_reveal_policy(asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
 }
 
 pub fn create_conf_id_reveal<R: Rng + CryptoRng>(prng: &mut R,
-                                                 attrs: &[BLSScalar],
+                                                 attrs: &[&[u8]],
                                                  policy: &IdRevealPolicy,
                                                  attr_reveal_proof: &ACRevealSig,
                                                  asset_issuer_public_key: &ElGamalPublicKey<BLSG1>)
-                                                 -> Result<ConfIdReveal, ZeiError> {
-  let mut ctexts = vec![];
-  let mut rands = vec![];
-  let base = BLSG1::get_base();
-  let mut revealed_attrs = vec![];
-  for (attr, b) in attrs.iter().zip(policy.bitmap.iter()) {
-    if *b {
-      let r = BLSScalar::random_scalar(prng);
-      let ctext = elgamal_encrypt::<BLSScalar, BLSG1>(&base, attr, &r, asset_issuer_public_key);
-      rands.push(r);
-      ctexts.push(ctext);
-      revealed_attrs.push(attr.clone());
-    }
-  }
-
-  let pok_attrs_proof = pok_attrs_prove::<_, BLSGt>(prng,
-                                                    &policy.cred_issuer_pub_key,
-                                                    asset_issuer_public_key,
-                                                    revealed_attrs.as_slice(),
-                                                    rands.as_slice(),
-                                                    policy.bitmap.as_slice(),
-                                                    ctexts.as_slice(),
-                                                    attr_reveal_proof)?;
-
-  Ok(ConfIdReveal { ctexts,
-                    attr_reveal_proof: attr_reveal_proof.clone(),
-                    pok_attrs: pok_attrs_proof })
+                                                 -> Result<ConfidentialAC, ZeiError> {
+  cac_create(prng,
+             &policy.cred_issuer_pub_key,
+             asset_issuer_public_key,
+             attrs,
+             policy.bitmap.as_slice(),
+             attr_reveal_proof)
 }
 
+pub fn verify_conf_id_reveal(conf_id_reveal: &ConfidentialAC,
+                             asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
+                             attr_reveal_policy: &IdRevealPolicy)
+                             -> Result<(), ZeiError> {
+  cac_verify(&attr_reveal_policy.cred_issuer_pub_key,
+             asset_issuer_public_key,
+             &attr_reveal_policy.bitmap,
+             conf_id_reveal)
+}
+
+/*
 pub fn verify_conf_id_reveal(conf_id_reveal: &ConfIdReveal,
                              asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
                              attr_reveal_policy: &IdRevealPolicy)
@@ -282,7 +264,7 @@ pub fn verify_conf_id_reveal(conf_id_reveal: &ConfIdReveal,
                             &conf_id_reveal.pok_attrs,
                             &attr_reveal_policy.bitmap)
 }
-
+*/
 /**** Range Proofs *****/
 
 /// I compute a range proof for confidential amount transfers.

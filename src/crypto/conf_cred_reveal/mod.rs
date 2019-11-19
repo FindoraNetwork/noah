@@ -1,9 +1,9 @@
-pub mod test_helpers;
+//pub mod test_helpers;
 
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::algebra::utils::group_linear_combination_rows;
-use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
+use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalPublicKey};
 use crate::crypto::anon_creds::{
   ac_challenge, ac_vrfy_hidden_terms_addition, ACIssuerPublicKey, ACRevealSig,
 };
@@ -33,310 +33,63 @@ pub struct AggPoKAttrs<G1, G2, S> {
   pub rands_resps: Vec<Vec<S>>,
 }
 
-/// Proof of knowledge of attributes that a) are elgamal encrypted, and b) verify an anonymous credential reveal proof.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CACProof<G1, G2, S>(pub(crate) AggPoKAttrs<G1, G2, S>);
-
-/// I produce a CACProof for a single instance of a confidential anonymous reveal. Proof asserts
-/// that a list of attributes can be decrypted from a list of ciphertexts under recv_enc_pub_key,
-/// and that these attributed verify an anonymous credential reveal proof.
-/// * `prng` - randomness source
-/// * `ac_issuer_pub_key` - (signing) public key of the issuer
-/// * `recv_enc_pub_key` - encryption public key of the receiver
-/// * `attrs` - attributes to prove knowledge of
-/// * `ctexts_rand` - randomness used to encrypt attrs
-/// * `bitmap` - indicates position of each attribute to prove
-/// * `ctexts` - list of ciphertexts that encrypt the attributes
-/// * `ac_reveal_sig` - proof that the issuer has signed some attributes
-/// * `returns` - proof that the ciphertexts contains the attributes that have been signed by some issuer for the user.
-/// # Example
-/// ```
-/// use zei::crypto::conf_cred_reveal::test_helpers::{setup_ac, ac_gen_proofs_and_ciphertexts};
-/// use zei::crypto::conf_cred_reveal::{cac_prove, cac_verify};
-/// use zei::algebra::bls12_381::BLSGt;
-/// use rand::SeedableRng;
-/// use rand_chacha::ChaChaRng;
-/// let mut prng: ChaChaRng;
-///
-/// let mut prng: ChaChaRng;
-/// prng = ChaChaRng::from_seed([0u8; 32]);
-/// let reveal_bitmap = [true, false, true, false, true, false, true, false, true, false];
-/// let (ac_issuer_pub_key, ac_issuer_sk, user_pk, user_sk, recv_enc_pub_key, _) =
-///    setup_ac::<BLSGt>(&mut prng, reveal_bitmap.len());
-/// let (revealed_attrs, mut ctexts, ctext_rands, mut proof) =
-///    ac_gen_proofs_and_ciphertexts::<BLSGt>(&mut prng,
-///                                       &ac_issuer_pub_key,
-///                                       &ac_issuer_sk,
-///                                       &user_pk,
-///                                       &user_sk,
-///                                       &recv_enc_pub_key,
-///                                       &reveal_bitmap);
-///
-/// let mut cac_proof = cac_prove::<_, BLSGt>(&mut prng,
-///                                        &ac_issuer_pub_key,
-///                                        &recv_enc_pub_key,
-///                                        &revealed_attrs.as_slice(),
-///                                        &ctext_rands.as_slice(),
-///                                        &reveal_bitmap,
-///                                        &ctexts.as_slice(),
-///                                        &proof).unwrap();
-///
-/// let vrfy = cac_verify::<BLSGt>(&ac_issuer_pub_key,
-///                             &recv_enc_pub_key,
-///                             &proof,
-///                             ctexts.as_slice(),
-///                             &cac_proof,
-///                             &reveal_bitmap);
-///
-///  assert_eq!(Ok(()), vrfy);
-/// ```
-pub fn cac_prove<R, P>(prng: &mut R,
-                       ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                       recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
-                       attrs: &[P::ScalarField],
-                       ctexts_rand: &[P::ScalarField],
-                       bitmap: &[bool],
-                       ctexts: &[ElGamalCiphertext<P::G1>],
-                       ac_reveal_sig: &ACRevealSig<P::G1, P::G2, P::ScalarField>)
-                       -> Result<CACProof<P::G1, P::G2, P::ScalarField>, ZeiError>
-  where R: CryptoRng + Rng,
-        P: PairingTargetGroup
-{
-  cac_multi_prove::<R, P>(prng,
-                          ac_issuer_pub_key,
-                          &[&recv_enc_pub_key],
-                          &[attrs],
-                          &[ctexts_rand],
-                          bitmap,
-                          &[ctexts],
-                          &[ac_reveal_sig])
+pub struct ConfidentialAC<P: PairingTargetGroup> {
+  ctexts: Vec<ElGamalCiphertext<P::G1>>,
+  ac_reveal_sig: ACRevealSig<P::G1, P::G2, P::ScalarField>,
+  pok: AggPoKAttrs<P::G1, P::G2, P::ScalarField>,
 }
 
-/// I produce a CACProof for a set of instances of confidential anonymous reveal proofs.
-/// For n > 1, instances, the proof produced is shorter than n independent CAC proofs produced by
-/// cac_prove function.
-/// * `prng` - randomness source
-/// * `ac_issuer_pub_key` - (signing) public key of the issuer
-/// * `recv_enc_pub_keys` - list of encryption public keys of different receivers
-/// * `attrs_vecs` - collection of list of attributes
-/// * `ctexts_rand_vecs` - collection of lists containing the randomness used to encrypt the attributes
-/// * `bitmap` - indicates position of each attribute to prove. Note that the same bitmap is used for all lists of attributes.
-/// * `ctexts_vecs` - collection of lists containing ciphertexts that encrypt the attributes
-/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
-/// * `returns` - a single (short) proof corresponding to all the collections of ciphertexts / ac reveal signatures
-/// # Example
-/// ```
-/// use zei::crypto::conf_cred_reveal::test_helpers::{setup_agg, gen_ac_reveal_sig};
-/// use zei::crypto::conf_cred_reveal::{cac_multi_prove, cac_multi_verify};
-/// use zei::algebra::bls12_381::BLSGt;
-/// use rand::SeedableRng;
-/// use rand_chacha::ChaChaRng;
-/// let mut prng: ChaChaRng;
-/// prng = ChaChaRng::from_seed([0u8; 32]);
-/// let reveal_bitmap = [true, false];
-/// let (ac_issuer_pub_key, ac_issuer_sec_key, user_pub_key, user_sec_key) =
-///      setup_agg::<BLSGt>(&mut prng, reveal_bitmap.len());
-///
-/// let mut prng: ChaChaRng;
-///  prng = ChaChaRng::from_seed([0u8; 32]);
-///
-///  let (ac_issuer_pub_key, ac_issuer_sec_key, user_pub_key, user_sec_key) =
-///    setup_agg::<BLSGt>(&mut prng, reveal_bitmap.len());
-///
-///  let (ctexts1, ctexts_rands1, revealed_attrs1, proof1, recv_pub_key1) =
-///    gen_ac_reveal_sig::<BLSGt>(&mut prng,
-///                           &ac_issuer_pub_key,
-///                           &ac_issuer_sec_key,
-///                           &user_pub_key,
-///                           &user_sec_key,
-///                           &reveal_bitmap);
-///
-///  let (ctexts2, ctexts_rands2, revealed_attrs2, proof2, recv_pub_key2) =
-///    gen_ac_reveal_sig::<BLSGt>(&mut prng,
-///                           &ac_issuer_pub_key,
-///                           &ac_issuer_sec_key,
-///                           &user_pub_key,
-///                           &user_sec_key,
-///                           &reveal_bitmap);
-///
-///  let (ctexts3, ctexts_rands3, revealed_attrs3, proof3, recv_pub_key3) =
-///    gen_ac_reveal_sig::<BLSGt>(&mut prng,
-///                           &ac_issuer_pub_key,
-///                           &ac_issuer_sec_key,
-///                           &user_pub_key,
-///                           &user_sec_key,
-///                           &reveal_bitmap);
-///
-///  let mut cac_proof =
-///    cac_multi_prove::<_, BLSGt>(&mut prng,
-///                            &ac_issuer_pub_key,
-///                            &[&recv_pub_key1, &recv_pub_key2, &recv_pub_key3],
-///                            &[revealed_attrs1.as_slice(),
-///                              revealed_attrs2.as_slice(),
-///                              revealed_attrs3.as_slice()],
-///                            &[ctexts_rands1.as_slice(),
-///                              ctexts_rands2.as_slice(),
-///                              ctexts_rands3.as_slice()],
-///                            &reveal_bitmap,
-///                            &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice()],
-///                            &[&proof1, &proof2, &proof3]).unwrap();
-///
-///  let vrfy = cac_multi_verify::<BLSGt>(&ac_issuer_pub_key,
-///                                   &[&recv_pub_key1, &recv_pub_key2, &recv_pub_key3],
-///                                   &[&proof1, &proof2, &proof3],
-///                                   &[ctexts1.as_slice(), ctexts2.as_slice(), ctexts3.as_slice()],
-///                                   &cac_proof,
-///                                   &reveal_bitmap);
-///
-///  assert_eq!(Ok(()), vrfy);
-/// ```
-pub fn cac_multi_prove<R, P>(prng: &mut R,
-                             ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                             recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
-                             attrs_vecs: &[&[P::ScalarField]],
-                             ctexts_rand_vecs: &[&[P::ScalarField]],
-                             bitmap: &[bool],
-                             ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
-                             ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, P::ScalarField>])
-                             -> Result<CACProof<P::G1, P::G2, P::ScalarField>, ZeiError>
-  where R: CryptoRng + Rng,
-        P: PairingTargetGroup
-{
-  Ok(CACProof(agg_pok_attrs_prove::<R, P>(prng,
-                                          ac_issuer_pub_key,
-                                          recv_enc_pub_keys,
-                                          attrs_vecs,
-                                          ctexts_rand_vecs,
-                                          bitmap,
-                                          ctexts_vecs,
-                                          ac_reveal_sigs)?))
-}
-
-/// I verify a CACProof.
-/// * `ac_issuer_pub_key` - (signing) public key of the issuer
-/// * `recv_enc_pub_key` - encryption public key of the receiver
-/// * `ac_reveal_sig` - proof that the issuer has signed some attributes
-/// * `ctexts` - list of ciphertexts that encrypt the attributes
-/// * `cac_proof` - proof that the ciphertexts contains the attributes that have been signed by some issuer for the user.
-/// * `bitmap` - indicates which attributes should be revealed to the receiver.
-/// * `returns` - nothing if the verification is successful an error otherwise.
-/// # Example
-/// ```
-/// //See zei:crypto:conf_cred_reveal::cac_prove
-/// ```
-pub fn cac_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                         recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
-                                         ac_reveal_sig: &ACRevealSig<P::G1,
-                                                      P::G2,
-                                                      P::ScalarField>,
-                                         ctexts: &[ElGamalCiphertext<P::G1>],
-                                         cac_proof: &CACProof<P::G1, P::G2, P::ScalarField>,
-                                         bitmap: &[bool])
-                                         -> Result<(), ZeiError> {
-  cac_multi_verify::<P>(ac_issuer_pub_key,
-                        &[recv_enc_pub_key],
-                        &[ac_reveal_sig],
-                        &[ctexts],
-                        cac_proof,
-                        bitmap)
-}
-
-/// I verify a CACProof for a set of Confidential Anonymous Credential instances.
-/// * `ac_issuer_pub_key` - (signing) public key of the issuer
-/// * `recv_enc_pub_keys` - list of encryption public keys for the receivers
-/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
-/// * `ctexts_vecs` - collection of lists containing ciphertexts that encrypt the attributes
-/// * `cac_proof` - a single (short) proof corresponding to all the collections of ciphertexts / ac reveal signatures
-/// * `bitmap` - indicates which attributes should be revealed to the receiver
-/// * `returns` - nothing or an error if the verification fails
-/// # Example
-/// ```
-/// //See zei::crypto::conf_cred_reveal::cac_multi_prove
-/// ```
-pub fn cac_multi_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
-                                                                  P::G2>,
-                                               recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
-                                               ac_reveal_sigs: &[&ACRevealSig<P::G1,
-                                                              P::G2,
-                                                              P::ScalarField>],
-                                               ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
-                                               cac_proof: &CACProof<P::G1,
-                                                         P::G2,
-                                                         P::ScalarField>,
-                                               bitmap: &[bool])
-                                               -> Result<(), ZeiError> {
-  agg_pok_attrs_verify::<P>(ac_issuer_pub_key,
-                            recv_enc_pub_keys,
-                            ac_reveal_sigs,
-                            ctexts_vecs,
-                            &cac_proof.0,
-                            bitmap)
-}
-
-/// I compute a proof of knowledge of identity attributes to be verified against encryption of these
-/// and a anonymous credential reveal proof
-/// * `prng` - randomness source
-/// * `ac_issuer_pub_key` - (signing) public key of the issuer
-/// * `recv_enc_pub_key` - encryption public key of the receiver
-/// * `attrs` - attributes to prove knowledge of
-/// * `ctexts_rand` - randomness used to encrypt the attributes
-/// * `bitmap` - indicates position of each attribute to prove
-/// * `ctexts` - list of ciphertexts that encrypt the attributes
-/// * `ac_reveal_sig`-  proof that the issuer has signed some attributes
-/// * `returns` - proof of knowledge of the attributes and encryption randomness
-pub(crate) fn pok_attrs_prove<R, P>(
+pub fn cac_create<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
-  ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-  recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
+  cred_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
+  enc_key: &ElGamalPublicKey<P::G1>,
   attrs: &[P::ScalarField],
-  ctexts_rand: &[P::ScalarField],
-  bitmap: &[bool],
-  ctexts: &[ElGamalCiphertext<P::G1>],
+  reveal_map: &[bool],
   ac_reveal_sig: &ACRevealSig<P::G1, P::G2, P::ScalarField>)
-  -> Result<AggPoKAttrs<P::G1, P::G2, P::ScalarField>, ZeiError>
-  where R: CryptoRng + Rng,
-        P: PairingTargetGroup
-{
-  agg_pok_attrs_prove::<R, P>(prng,
-                              ac_issuer_pub_key,
-                              &[recv_enc_pub_key],
-                              &[attrs],
-                              &[ctexts_rand],
-                              bitmap,
-                              &[ctexts],
-                              &[ac_reveal_sig])
+  -> Result<ConfidentialAC<P>, ZeiError> {
+  let mut ctexts = vec![];
+  let mut rands = vec![];
+  let base = P::G1::get_base();
+  let mut revealed_attrs = vec![];
+  for (attr, b) in attrs.iter().zip(reveal_map.iter()) {
+    if *b {
+      let r = P::ScalarField::random_scalar(prng);
+      let ctext = elgamal_encrypt::<P::ScalarField, P::G1>(&base, attr, &r, enc_key);
+      rands.push(r);
+      ctexts.push(ctext);
+      revealed_attrs.push(attr.clone());
+    }
+  }
+
+  let pok_attrs_proof = agg_pok_attrs_prove::<_, P>(prng,
+                                                    cred_issuer_pk,
+                                                    &[enc_key],
+                                                    &[revealed_attrs.as_slice()],
+                                                    &[rands.as_slice()],
+                                                    reveal_map,
+                                                    &[ctexts.as_slice()],
+                                                    &[ac_reveal_sig])?;
+
+  Ok(ConfidentialAC { ctexts,
+                      ac_reveal_sig: ac_reveal_sig.clone(),
+                      pok: pok_attrs_proof })
 }
 
-/// I verify a proof of knowledge of attributes that
-/// a) satisfy a single anonymous credential reveal proof
-/// b) are encrypted under ctexts (ElGamal encryptions)
-/// * `ac_issuer_pub_key` - (signing) public key of the issuer
-/// * `recv_enc_pub_key` - encryption public key of the receiver
-/// * `ac_reveal_sig` - proof that the issuer has signed some attributes
-/// * `ctexts` - list of ciphertexts that encrypt the attributes
-/// * `pok_attrs` - proof of knowledge computed through the function pok_attrs_prove
-/// * `bitmap` - indicates which attributes should be revealed to the receiver
-/// * `returns`- nothing if the verification is successful an error otherwise.
-pub(crate) fn pok_attrs_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                                      recv_enc_pub_key: &ElGamalPublicKey<P::G1>,
-                                                      ac_reveal_sig: &ACRevealSig<P::G1,
-                                                                   P::G2,
-                                                                   P::ScalarField>,
-                                                      ctexts: &[ElGamalCiphertext<P::G1>],
-                                                      pok_attrs: &AggPoKAttrs<P::G1,
-                                                                   P::G2,
-                                                                   P::ScalarField>,
-                                                      bitmap: &[bool])
-                                                      -> Result<(), ZeiError> {
-  agg_pok_attrs_verify::<P>(ac_issuer_pub_key,
-                            &[recv_enc_pub_key],
-                            &[ac_reveal_sig],
-                            &[ctexts],
-                            pok_attrs,
-                            bitmap)
+pub fn cac_verify<P: PairingTargetGroup>(issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
+                                         enc_key: &ElGamalPublicKey<P::G1>,
+                                         reveal_map: &[bool],
+                                         cac: &ConfidentialAC<P>)
+                                         -> Result<(), ZeiError> {
+  agg_pok_attrs_verify::<P>(issuer_pk,
+                            &[&enc_key],
+                            &[&cac.ac_reveal_sig],
+                            &[&cac.ctexts],
+                            &cac.pok,
+                            reveal_map)
 }
 
-/// I compute an aggregated proof of knowledge of identity attribute sets to be verified against
+/// Computes an aggregated proof of knowledge of identity attribute sets to be verified against
 /// encryption of these and a set of anonymous credential reveal proofs
 /// * `prng` - source of randomness
 /// * `ac_issuer_pub_key` - (signing) public key of the issuer
@@ -879,6 +632,7 @@ fn ac_vrfy_zk_revealed_terms_addition<P: PairingTargetGroup>(ac_issuer_public_ke
   Ok(addition)
 }
 
+/*
 #[cfg(test)]
 mod test_bn {
   use super::test_helpers::confidential_ac_reveal;
@@ -929,6 +683,7 @@ mod test_bn {
     super::test_helpers::confidential_reveal_agg::<BNGt>(&[true, true, false, false]);
   }
 }
+
 
 #[cfg(test)]
 mod test_bls12_381 {
@@ -1070,3 +825,5 @@ mod test_serialization {
     to_msg_pack::<BLSG1, BLSG2, BLSScalar>();
   }
 }
+
+*/

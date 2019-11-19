@@ -194,7 +194,7 @@ pub fn ac_gen_proofs_and_ciphertexts<P: PairingTargetGroup>(
   let num_attr = reveal_bitmap.len();
 
   for _ in 0..num_attr {
-    attrs.push(P::ScalarField::random_scalar(prng));
+    attrs.push("some attr");
   }
 
   let signature = ac_sign::<_, P>(prng, &ac_issuer_sk, &user_pk, attrs.as_slice());
@@ -206,21 +206,14 @@ pub fn ac_gen_proofs_and_ciphertexts<P: PairingTargetGroup>(
                                 &attrs,
                                 reveal_bitmap).unwrap();
 
-  let mut ctext_rands = vec![];
-  let mut ctexts = vec![];
-  let mut revealed_attrs: Vec<P::ScalarField> = vec![];
+  let mut revealed_attrs = vec![];
   for (attr, reveal) in attrs.iter().zip(reveal_bitmap) {
     if *reveal {
-      let rand = P::ScalarField::random_scalar(prng);
-      let ctext = elgamal_encrypt(&P::G1::get_base(), attr, &rand, &recv_enc_pub_key);
-
-      ctext_rands.push(rand);
-      ctexts.push(ctext);
-      revealed_attrs.push(attr.clone());
+      revealed_attrs.push((*attr).clone());
     }
   }
 
-  (revealed_attrs, ctexts.clone(), ctext_rands.clone(), proof)
+  (revealed_attrs, proof)
 }
 
 pub fn confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {

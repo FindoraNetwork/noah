@@ -1,9 +1,7 @@
 use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
-use crate::algebra::groups::Scalar;
 use crate::errors::ZeiError;
-use digest::Digest;
+use crate::utils::byte_slice_to_scalar;
 use rand::{CryptoRng, Rng};
-use sha2::Sha512;
 
 pub type ACIssuerPublicKey = crate::crypto::anon_creds::ACIssuerPublicKey<BLSG1, BLSG2>;
 pub type ACIssuerSecretKey = crate::crypto::anon_creds::ACIssuerSecretKey<BLSG1, BLSScalar>;
@@ -70,7 +68,9 @@ pub fn ac_sign<R: CryptoRng + Rng>(prng: &mut R,
                                    user_pk: &ACUserPublicKey,
                                    attrs: &[&[u8]])
                                    -> ACSignature {
-  let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| byte_slice_to_scalar(*x)).collect();
+  let attrs_scalar: Vec<BLSScalar> = attrs.iter()
+                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(*x))
+                                          .collect();
   crate::crypto::anon_creds::ac_sign::<_, BLSGt>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
 }
 
@@ -98,7 +98,9 @@ pub fn ac_reveal<R: CryptoRng + Rng>(prng: &mut R,
                                      attrs: &[&[u8]],
                                      bitmap: &[bool] // indicates which attributes are revealed
 ) -> Result<ACRevealSig, ZeiError> {
-  let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| byte_slice_to_scalar(*x)).collect();
+  let attrs_scalar: Vec<BLSScalar> = attrs.iter()
+                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(*x))
+                                          .collect();
   crate::crypto::anon_creds::ac_reveal::<_, BLSGt>(prng,
                                                    user_sk,
                                                    issuer_pk,
@@ -135,17 +137,12 @@ pub fn ac_verify(issuer_pub_key: &ACIssuerPublicKey,
                  bitmap: &[bool],
                  reveal_sig: &ACRevealSig)
                  -> Result<(), ZeiError> {
-  let revealed_attrs_scalar: Vec<BLSScalar> = revealed_attrs.iter()
-                                                            .map(|x| byte_slice_to_scalar(*x))
-                                                            .collect();
+  let revealed_attrs_scalar: Vec<BLSScalar> =
+    revealed_attrs.iter()
+                  .map(|x| byte_slice_to_scalar::<BLSScalar>(*x))
+                  .collect();
   crate::crypto::anon_creds::ac_verify::<BLSGt>(issuer_pub_key,
                                                 revealed_attrs_scalar.as_slice(),
                                                 bitmap,
                                                 reveal_sig)
-}
-
-fn byte_slice_to_scalar(slice: &[u8]) -> BLSScalar {
-  let mut hasher = Sha512::new();
-  hasher.input(slice);
-  BLSScalar::from_hash(hasher)
 }
