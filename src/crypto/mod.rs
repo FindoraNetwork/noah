@@ -5,7 +5,7 @@ pub mod chaum_pedersen;
 pub(crate) mod conf_cred_reveal;
 pub mod dlog;
 pub mod pedersen_elgamal;
-pub mod simple_group_signatures;
+pub mod group_signatures;
 pub mod solvency;
 pub mod whitelist;
 
