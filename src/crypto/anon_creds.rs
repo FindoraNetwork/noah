@@ -143,7 +143,7 @@ pub(crate) fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
   let x = P::ScalarField::random_scalar(prng);
   let z = P::ScalarField::random_scalar(prng);
   //TODO check that G1 and G2 are of prime order so that every element is generator
-  let gen1 = P::G1::get_base().mul(&P::ScalarField::random_scalar(prng));
+  let gen1: P::G1 = P::G1::get_base().mul(&P::ScalarField::random_scalar(prng));
   let gen2 = P::G2::get_base().mul(&P::ScalarField::random_scalar(prng));
   let mut y = vec![];
   let mut yy2 = vec![];

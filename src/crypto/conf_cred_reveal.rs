@@ -630,198 +630,269 @@ fn ac_vrfy_zk_revealed_terms_addition<P: PairingTargetGroup>(ac_issuer_public_ke
   Ok(addition)
 }
 
-/*
+#[cfg(test)]
+pub(crate) mod test_helper {
+  use crate::algebra::groups::Group;
+  use crate::algebra::pairing::PairingTargetGroup;
+  use crate::basic_crypto::elgamal::elgamal_keygen;
+  use crate::crypto::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_reveal, ac_sign};
+  use crate::crypto::conf_cred_reveal::{cac_create, cac_verify};
+  use crate::errors::ZeiError;
+  use crate::utils::byte_slice_to_scalar;
+  use rand::SeedableRng;
+  use rand_chacha::ChaChaRng;
+
+  pub fn test_confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
+    let num_attr = reveal_bitmap.len();
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
+    let (user_pk, user_sk) = ac_keygen_user::<_, P>(&mut prng, &issuer_pk);
+    let (_, enc_key) = elgamal_keygen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+
+    let mut attrs = Vec::new();
+    for i in 0..num_attr {
+      attrs.push(byte_slice_to_scalar(format!("attr{}!", i).as_bytes()));
+    }
+
+    let ac_sig = ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]);
+    let credential = ac_reveal::<_, P>(&mut prng,
+                                       &user_sk,
+                                       &issuer_pk,
+                                       &ac_sig,
+                                       &attrs[..],
+                                       &reveal_bitmap[..]).unwrap();
+    let conf_reveal_proof = cac_create::<_, P>(&mut prng,
+                                               &issuer_pk,
+                                               &enc_key,
+                                               &attrs[..],
+                                               &reveal_bitmap[..],
+                                               &credential).unwrap();
+    assert!(cac_verify(&issuer_pk, &enc_key, &reveal_bitmap[..], &conf_reveal_proof).is_ok());
+
+    // Error cases /////////////////////////////////////////////////////////////////////////////////
+
+    // Tampered bitmap
+    let mut tampered_bitmap = vec![];
+    tampered_bitmap.extend_from_slice(reveal_bitmap);
+
+    let b = reveal_bitmap.get(0).unwrap();
+
+    tampered_bitmap[0] = !(*b);
+
+    let vrfy = cac_verify(&issuer_pk,
+                          &enc_key,
+                          &tampered_bitmap[..],
+                          &conf_reveal_proof);
+    assert_eq!(Err(ZeiError::ParameterError), vrfy, "proof should fail");
+
+    // Empty bitmap
+    let empty_bitmap = vec![];
+    let vrfy = cac_verify(&issuer_pk, &enc_key, &empty_bitmap[..], &conf_reveal_proof);
+    assert_eq!(Err(ZeiError::IdentityRevealVerifyError),
+               vrfy,
+               "proof should fail");
+
+    // Wrong issuer public key
+    let (another_issuer_pk, _) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
+    let vrfy = cac_verify(&another_issuer_pk,
+                          &enc_key,
+                          &tampered_bitmap[..],
+                          &conf_reveal_proof);
+    assert!(vrfy == Err(ZeiError::IdentityRevealVerifyError)
+            || vrfy == Err(ZeiError::ParameterError),
+            "proof should fail");
+
+    // Wrong encryption public key
+    let (_, another_enc_key) =
+      elgamal_keygen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+    let vrfy = cac_verify(&issuer_pk,
+                          &another_enc_key,
+                          &empty_bitmap[..],
+                          &conf_reveal_proof);
+    assert_eq!(Err(ZeiError::IdentityRevealVerifyError),
+               vrfy,
+               "proof should fail");
+  }
+}
+
 #[cfg(test)]
 mod test_bn {
-  use super::test_helpers::confidential_ac_reveal;
   use crate::algebra::bn::BNGt;
+  use crate::crypto::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
 
   #[test]
   fn confidential_reveal_one_attr_hidden() {
-    confidential_ac_reveal::<BNGt>(&[false]);
+    test_confidential_ac_reveal::<BNGt>(&[false, false, false]);
   }
 
   #[test]
   fn confidential_reveal_one_attr_revealed() {
-    confidential_ac_reveal::<BNGt>(&[true]);
+    test_confidential_ac_reveal::<BNGt>(&[true]);
   }
 
   #[test]
   fn confidential_reveal_two_attr_hidden_first() {
-    confidential_ac_reveal::<BNGt>(&[false, false]);
-    confidential_ac_reveal::<BNGt>(&[false, true]);
+    test_confidential_ac_reveal::<BNGt>(&[false, false]);
+    test_confidential_ac_reveal::<BNGt>(&[false, true]);
   }
 
   #[test]
   fn confidential_reveal_two_attr_revealed_first() {
-    confidential_ac_reveal::<BNGt>(&[true, false]);
-    confidential_ac_reveal::<BNGt>(&[true, true]);
+    test_confidential_ac_reveal::<BNGt>(&[true, false]);
+    test_confidential_ac_reveal::<BNGt>(&[true, true]);
   }
 
   #[test]
   fn confidential_reveal_ten_attr_all_hidden() {
-    confidential_ac_reveal::<BNGt>(&[false; 10]);
+    test_confidential_ac_reveal::<BNGt>(&[false; 10]);
   }
 
   #[test]
   fn confidential_reveal_ten_attr_all_revealed() {
-    confidential_ac_reveal::<BNGt>(&[true; 10]);
+    test_confidential_ac_reveal::<BNGt>(&[true; 10]);
   }
 
   #[test]
   fn confidential_reveal_ten_attr_half_revealed() {
-    confidential_ac_reveal::<BNGt>(&[true, false, true, false, true, false, true, false, true,
-                                     false]);
-    confidential_ac_reveal::<BNGt>(&[false, true, false, true, false, true, false, true, false,
-                                     true]);
-  }
-
-  #[test]
-  fn confidential_reveal_agg() {
-    super::test_helpers::confidential_reveal_agg::<BNGt>(&[true, true, false, false]);
+    test_confidential_ac_reveal::<BNGt>(&[true, false, true, false, true, false, true, false,
+                                          true, false]);
+    test_confidential_ac_reveal::<BNGt>(&[false, true, false, true, false, true, false, true,
+                                          false, true]);
   }
 }
-
 
 #[cfg(test)]
 mod test_bls12_381 {
-  use super::test_helpers::confidential_ac_reveal;
   use crate::algebra::bls12_381::BLSGt;
+  use crate::crypto::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
 
   #[test]
   fn confidential_reveal_one_attr_hidden() {
-    confidential_ac_reveal::<BLSGt>(&[false]);
+    test_confidential_ac_reveal::<BLSGt>(&[false]);
   }
 
   #[test]
   fn confidential_reveal_one_attr_revealed() {
-    confidential_ac_reveal::<BLSGt>(&[true]);
+    test_confidential_ac_reveal::<BLSGt>(&[true]);
   }
 
   #[test]
   fn confidential_reveal_two_attr_hidden_first() {
-    confidential_ac_reveal::<BLSGt>(&[false, false]);
-    confidential_ac_reveal::<BLSGt>(&[false, true]);
+    test_confidential_ac_reveal::<BLSGt>(&[false, false]);
+    test_confidential_ac_reveal::<BLSGt>(&[false, true]);
   }
 
   #[test]
   fn confidential_reveal_two_attr_revealed_first() {
-    confidential_ac_reveal::<BLSGt>(&[true, false]);
-    confidential_ac_reveal::<BLSGt>(&[true, true]);
+    test_confidential_ac_reveal::<BLSGt>(&[true, false]);
+    test_confidential_ac_reveal::<BLSGt>(&[true, true]);
   }
 
   #[test]
   fn confidential_reveal_ten_attr_all_hidden() {
-    confidential_ac_reveal::<BLSGt>(&[false; 10]);
+    test_confidential_ac_reveal::<BLSGt>(&[false; 10]);
   }
 
   #[test]
   fn confidential_reveal_ten_attr_all_revealed() {
-    confidential_ac_reveal::<BLSGt>(&[true; 10]);
+    test_confidential_ac_reveal::<BLSGt>(&[true; 10]);
   }
 
   #[test]
   fn confidential_reveal_ten_attr_half_revealed() {
-    confidential_ac_reveal::<BLSGt>(&[true, false, true, false, true, false, true, false, true,
-                                      false]);
-    confidential_ac_reveal::<BLSGt>(&[false, true, false, true, false, true, false, true, false,
-                                      true]);
-  }
-
-  #[test]
-  fn confidential_reveal_agg() {
-    super::test_helpers::confidential_reveal_agg::<BLSGt>(&[true, true, false, false]);
+    test_confidential_ac_reveal::<BLSGt>(&[true, false, true, false, true, false, true, false,
+                                           true, false]);
+    test_confidential_ac_reveal::<BLSGt>(&[false, true, false, true, false, true, false, true,
+                                           false, true]);
   }
 }
 
-
 #[cfg(test)]
 mod test_serialization {
-  use super::{AggPoKAttrs, CACProof};
-  use crate::algebra::bls12_381::{BLSScalar, BLSG1, BLSG2};
-  use crate::algebra::groups::{Group, Scalar};
+
+  use crate::algebra::bls12_381::BLSGt;
+  use crate::algebra::bn::BNGt;
+  use crate::algebra::groups::Group;
+  use crate::algebra::pairing::PairingTargetGroup;
+  use crate::basic_crypto::elgamal::elgamal_keygen;
+  use crate::crypto::anon_creds::ac_sign;
+  use crate::crypto::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_reveal};
+  use crate::crypto::conf_cred_reveal::cac_create;
+  use crate::crypto::conf_cred_reveal::ConfidentialAC;
+  use crate::utils::byte_slice_to_scalar;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::Deserializer;
   use serde::{Deserialize, Serialize};
 
-  fn to_json<G1: Group<S>, G2: Group<S>, S: Scalar>() {
-    let mut prng: ChaChaRng;
-    prng = ChaChaRng::from_seed([0u8; 32]);
-    let cac_proof = CACProof(AggPoKAttrs { //2 instances 3 attributes
-                                           attr_sum_com_yy2: vec![G2::get_base(),
-                                                                  G2::get_base()],
-                                           agg_attrs_coms_g: vec![G1::get_identity(),
-                                                                  G1::get_identity(),
-                                                                  G1::get_identity()],
-                                           agg_rands_coms_g: vec![G1::get_base(),
-                                                                  G1::get_identity(),
-                                                                  G1::get_identity()],
-                                           agg_rands_coms_pk: vec![G1::get_identity(),
-                                                                   G1::get_base(),
-                                                                   G1::get_identity()],
-                                           attrs_resps: vec![vec![S::from_u32(0),
-                                                                  S::random_scalar(&mut prng),
-                                                                  S::from_u32(10)],
-                                                             vec![S::from_u32(1),
-                                                                  S::random_scalar(&mut prng),
-                                                                  S::from_u32(20)],],
-                                           rands_resps: vec![vec![S::from_u32(60),
-                                                                  S::from_u32(40),
-                                                                  S::from_u32(20)],
-                                                             vec![S::from_u32(70),
-                                                                  S::from_u32(50),
-                                                                  S::from_u32(30)],] });
+  fn gen_confidential_ac<P>() -> ConfidentialAC<P>
+    where P: PairingTargetGroup + std::fmt::Debug
+  {
+    let reveal_bitmap = [true, false, true, true];
+    let num_attr = reveal_bitmap.len();
 
-    let json_str = serde_json::to_string(&cac_proof).unwrap();
-    let cac_proof_de: CACProof<G1, G2, S> = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(cac_proof, cac_proof_de);
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
+    let (user_pk, user_sk) = ac_keygen_user::<_, P>(&mut prng, &issuer_pk);
+    let (_, enc_key) = elgamal_keygen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+
+    let mut attrs = Vec::new();
+    for i in 0..num_attr {
+      attrs.push(byte_slice_to_scalar(format!("attr{}!", i).as_bytes()));
+    }
+
+    let ac_sig = ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]);
+    let credential = ac_reveal::<_, P>(&mut prng,
+                                       &user_sk,
+                                       &issuer_pk,
+                                       &ac_sig,
+                                       &attrs[..],
+                                       &reveal_bitmap[..]).unwrap();
+    let conf_reveal_proof = cac_create::<_, P>(&mut prng,
+                                               &issuer_pk,
+                                               &enc_key,
+                                               &attrs[..],
+                                               &reveal_bitmap[..],
+                                               &credential).unwrap();
+    conf_reveal_proof
   }
 
-  fn to_msg_pack<G1: Group<S>, G2: Group<S>, S: Scalar>() {
-    let mut prng: ChaChaRng;
-    prng = ChaChaRng::from_seed([0u8; 32]);
-    let cac_proof = CACProof(AggPoKAttrs { //2 instances 3 attributes
-                                           attr_sum_com_yy2: vec![G2::get_base(),
-                                                                  G2::get_base()],
-                                           agg_attrs_coms_g: vec![G1::get_identity(),
-                                                                  G1::get_identity(),
-                                                                  G1::get_identity()],
-                                           agg_rands_coms_g: vec![G1::get_base(),
-                                                                  G1::get_identity(),
-                                                                  G1::get_identity()],
-                                           agg_rands_coms_pk: vec![G1::get_identity(),
-                                                                   G1::get_base(),
-                                                                   G1::get_identity()],
-                                           attrs_resps: vec![vec![S::from_u32(0),
-                                                                  S::random_scalar(&mut prng),
-                                                                  S::from_u32(10)],
-                                                             vec![S::from_u32(1),
-                                                                  S::random_scalar(&mut prng),
-                                                                  S::from_u32(20)],],
-                                           rands_resps: vec![vec![S::from_u32(60),
-                                                                  S::from_u32(40),
-                                                                  S::from_u32(20)],
-                                                             vec![S::from_u32(70),
-                                                                  S::from_u32(50),
-                                                                  S::from_u32(30)],] });
+  fn to_json<P: PairingTargetGroup + std::fmt::Debug>() {
+    let confidential_ac = gen_confidential_ac::<P>();
+
+    let json_str = serde_json::to_string(&confidential_ac).unwrap();
+    let confidential_ac_de: ConfidentialAC<P> = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(confidential_ac, confidential_ac_de);
+  }
+
+  fn to_msg_pack<P: PairingTargetGroup + std::fmt::Debug>() {
+    let confidential_ac = gen_confidential_ac::<P>();
     //keys serialization
     let mut vec = vec![];
-    cac_proof.serialize(&mut rmp_serde::Serializer::new(&mut vec))
-             .unwrap();
+    confidential_ac.serialize(&mut rmp_serde::Serializer::new(&mut vec))
+                   .unwrap();
     let mut de = Deserializer::new(&vec[..]);
-    let cac_proof_de: CACProof<G1, G2, S> = Deserialize::deserialize(&mut de).unwrap();
-    assert_eq!(cac_proof, cac_proof_de);
+    let confidential_ac_de: ConfidentialAC<P> = Deserialize::deserialize(&mut de).unwrap();
+    assert_eq!(confidential_ac, confidential_ac_de);
   }
 
   #[test]
-  fn to_json_bls12_381() {
-    to_json::<BLSG1, BLSG2, BLSScalar>();
+  fn to_json_bls() {
+    to_json::<BLSGt>();
   }
 
   #[test]
-  fn to_msg_pack_bls12_381() {
-    to_msg_pack::<BLSG1, BLSG2, BLSScalar>();
+  fn to_json_bn() {
+    to_json::<BNGt>();
+  }
+
+  #[test]
+  fn to_msg_pack_bls() {
+    to_msg_pack::<BLSGt>();
+  }
+
+  #[test]
+  fn to_msg_pack_bn() {
+    to_msg_pack::<BNGt>();
   }
 }
-*/
