@@ -1,10 +1,7 @@
 use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
-use crate::basic_crypto::elgamal::{
-  elgamal_decrypt_elem, elgamal_derive_public_key, elgamal_encrypt, elgamal_generate_secret_key,
-  ElGamalCiphertext, ElGamalPublicKey, ElGamalSecretKey,
-};
+use crate::basic_crypto::elgamal::{elgamal_decrypt_elem, elgamal_encrypt, ElGamalPublicKey, ElGamalSecretKey, ElGamalCiphertext, elgamal_keygen};
 use crate::basic_crypto::signatures::pointcheval_sanders::{
   ps_gen_keys, ps_randomize_sig, ps_sign_scalar, PSPublicKey, PSSecretKey, PSSignature,
 };
@@ -42,8 +39,7 @@ pub struct GroupSignature {
 /// * `returns` - a group public key and a group secret key
 pub fn gpsig_setup<R: CryptoRng + Rng>(prng: &mut R) -> (GroupPublicKey, GroupSecretKey) {
   let (ver_key, sig_key) = ps_gen_keys(prng);
-  let dec_key = elgamal_generate_secret_key::<_, BLSScalar>(prng);
-  let enc_key = elgamal_derive_public_key(&BLSG1::get_base(), &dec_key);
+  let (dec_key, enc_key) = elgamal_keygen(prng, &BLSG1::get_base());
   (GroupPublicKey { ver_key, enc_key }, GroupSecretKey { sig_key, dec_key })
 }
 

@@ -1,13 +1,14 @@
 use crate::basic_crypto::signatures::naive_multisig::{
   sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig,
 };
+use crate::api::conf_cred_reveal::ConfidentialAC;
 use crate::errors::ZeiError;
 use crate::utils::u8_bigendian_slice_to_u128;
 use crate::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify, AssetMixProof};
 use crate::xfr::asset_record::build_open_asset_record;
 use crate::xfr::proofs::{
   asset_proof, range_proof, tracking_proofs, verify_confidential_amount, verify_confidential_asset,
-  verify_issuer_tracking_proof, ConfIdReveal,
+  verify_issuer_tracking_proof,
 };
 use crate::xfr::structs::*;
 use bulletproofs::PedersenGens;
@@ -90,7 +91,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
                                         inputs: &[OpenAssetRecord],
                                         outputs: &[AssetRecord],
                                         input_keys: &[XfrKeyPair],
-                                        identity_proofs: &[Option<ConfIdReveal>])
+                                        identity_proofs: &[Option<ConfidentialAC>])
                                         -> Result<XfrNote, ZeiError> {
   if inputs.len() == 0 {
     return Err(ZeiError::ParameterError);
@@ -168,7 +169,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
                                         inputs: &[OpenAssetRecord],
                                         outputs: &[AssetRecord],
-                                        identity_proofs: &[Option<ConfIdReveal>])
+                                        identity_proofs: &[Option<ConfidentialAC>])
                                         -> Result<XfrBody, ZeiError> {
   if inputs.len() == 0 {
     return Err(ZeiError::ParameterError);
@@ -633,15 +634,12 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord],
 #[cfg(test)]
 pub(crate) mod tests {
   use super::*;
-  use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
-  use crate::algebra::groups::Scalar as ScalarTrait;
   use crate::algebra::ristretto::{CompRist, RistPoint};
-  use crate::basic_crypto::elgamal::{
-    elgamal_derive_public_key, elgamal_generate_secret_key, ElGamalCiphertext, ElGamalPublicKey,
-  };
+  use crate::api::anon_creds;
+  use crate::api::conf_cred_reveal::cac_gen_encryption_keys;
+  use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey};
   use crate::basic_crypto::signatures::naive_multisig::XfrKeyPair;
-  use crate::crypto::anon_creds;
   use crate::errors::ZeiError::{
     XfrCreationAssetAmountError, XfrVerifyAssetAmountError, XfrVerifyConfidentialAmountError,
     XfrVerifyConfidentialAssetError, XfrVerifyIssuerTrackingAssetAmountError,
@@ -667,10 +665,8 @@ pub(crate) mod tests {
     let pc_gens = PedersenGens::default();
     let issuer_public_key = match asset_tracking {
       true => {
-        let sk = elgamal_generate_secret_key::<_, Scalar>(prng);
-        let xfr_pub_key = elgamal_derive_public_key(&pc_gens.B, &sk);
-        let sk = elgamal_generate_secret_key::<_, BLSScalar>(prng);
-        let id_reveal_pub_key = elgamal_derive_public_key(&BLSG1::get_base(), &sk);
+        let (_, xfr_pub_key) = elgamal_keygen(prng, &RistrettoPoint::get_base());
+        let (_, id_reveal_pub_key) = cac_gen_encryption_keys(prng);
 
         Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
                                     ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
@@ -1075,12 +1071,8 @@ pub(crate) mod tests {
     prng = ChaChaRng::from_seed([0u8; 32]);
 
     let pc_gens = PedersenGens::default();
-    let asset_issuer_sec_key = elgamal_generate_secret_key::<_, Scalar>(&mut prng);
-    let asset_issuer_pub_key =
-      elgamal_derive_public_key(&RistrettoPoint::get_base(), &asset_issuer_sec_key);
-    let asset_issuer_id_sec_key = elgamal_generate_secret_key::<_, BLSScalar>(&mut prng);
-    let asset_issuer_id_pub_key =
-      elgamal_derive_public_key(&BLSG1::get_base(), &asset_issuer_id_sec_key);
+    let (_, asset_issuer_pub_key) = elgamal_keygen(&mut prng, &RistrettoPoint::get_base());
+    let (_, asset_issuer_id_pub_key) = cac_gen_encryption_keys(&mut prng);
     let asset_issuer_public_key =
       Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
                                   ElGamalPublicKey(RistPoint(asset_issuer_pub_key.get_point())),
@@ -1101,18 +1093,15 @@ pub(crate) mod tests {
                                asset_type: [0; 16],
                                public_key: input_keypair.get_pk_ref().clone() };
 
-    let attrs = [BLSScalar::random_scalar(&mut prng),
-                 BLSScalar::random_scalar(&mut prng),
-                 BLSScalar::random_scalar(&mut prng),
-                 BLSScalar::random_scalar(&mut prng)];
-    let cred_issuer_keys = anon_creds::ac_keygen_issuer::<_, BLSGt>(&mut prng, 4);
-    let receiver_ac_keys = anon_creds::ac_keygen_user::<_, BLSGt>(&mut prng, &cred_issuer_keys.0);
+    let attrs = [b"attr1", b"attr2", b"attr3", b"attr4"];
+    let cred_issuer_keys = anon_creds::ac_keygen_issuer(&mut prng, 4);
+    let receiver_ac_keys = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_keys.0);
 
     let ac_signature =
-      anon_creds::ac_sign::<_, BLSGt>(&mut prng, &cred_issuer_keys.1, &receiver_ac_keys.0, &attrs);
+      anon_creds::ac_sign(&mut prng, &cred_issuer_keys.1, &receiver_ac_keys.0, &attrs);
     let id_tracking_policy = IdRevealPolicy { cred_issuer_pub_key: cred_issuer_keys.0.clone(),
                                               bitmap: vec![false, true, false, true] };
-    let proof = anon_creds::ac_reveal::<_, BLSGt>(&mut prng,
+    let proof = anon_creds::ac_reveal(&mut prng,
                                                   &receiver_ac_keys.1,
                                                   &cred_issuer_keys.0,
                                                   &ac_signature,

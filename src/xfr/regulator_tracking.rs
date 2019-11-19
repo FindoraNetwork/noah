@@ -5,9 +5,8 @@
   The regulator can infer the identity of the signer from the transaction signature.
   From each group signature the regulator can obtain a trace tag that it can use to search for the user identity in its DB.
 */
-use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::algebra::groups::Group;
-use crate::crypto::anon_creds::{
+use crate::api::anon_creds::{
   ac_reveal, ac_verify, ACIssuerPublicKey, ACRevealSig, ACSignature, ACUserSecretKey,
 };
 use crate::crypto::simple_group_signatures::{
@@ -16,30 +15,30 @@ use crate::crypto::simple_group_signatures::{
 };
 use crate::errors::ZeiError;
 use rand::{CryptoRng, Rng};
+use crate::algebra::bls12_381::BLSG1;
 
 /// JoinRequest message from the User to the Regulator. It contains the identity of the user.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct JoinRequest {
-  credential_proof: ACRevealSig<BLSG1, BLSG2, BLSScalar>,
-  attrs: Vec<BLSScalar>,
+pub struct JoinRequest<B: AsRef<[u8]>> {
+  credential_proof: ACRevealSig,
+  attrs: Vec<B>,
 }
 
 /// Users that register with regulators must produce a JoinRequest message using this function
 /// # Example
 /// see zei::xfr::regulator_tracking::rt_get_trace_tag;
-pub fn rt_user_gen_join_request<'a, R: CryptoRng + Rng>(prng: &mut R,
-                                                        ac_issuer_pk: &ACIssuerPublicKey<BLSG1,
-                                                                           BLSG2>,
-                                                        ac_user_sk: &ACUserSecretKey<BLSScalar>,
-                                                        credential: &ACSignature<BLSG1>,
-                                                        attrs: &'a [BLSScalar])
-                                                        -> Result<JoinRequest, ZeiError> {
+pub fn rt_user_gen_join_request<'a, R: CryptoRng + Rng, B: AsRef<[u8]> + Clone>(prng: &mut R,
+                                                        ac_issuer_pk: &ACIssuerPublicKey,
+                                                        ac_user_sk: &ACUserSecretKey,
+                                                        credential: &ACSignature,
+                                                        attrs: &'a [B])
+                                                        -> Result<JoinRequest<B>, ZeiError> {
   // all attributed are revealed to the regulator
   let mut bitmap = vec![];
   for _ in 0..attrs.len() {
     bitmap.push(true);
   }
-  let cred_proof = ac_reveal::<_, BLSGt>(prng,
+  let cred_proof = ac_reveal(prng,
                                          ac_user_sk,
                                          ac_issuer_pk,
                                          credential,
@@ -53,18 +52,17 @@ pub fn rt_user_gen_join_request<'a, R: CryptoRng + Rng>(prng: &mut R,
 /// and a trace tag to store locally.
 /// # Example
 /// see zei::xfr::regulator_tracking::rt_get_trace_tag;
-pub fn rt_process_join_request<R: CryptoRng + Rng>(prng: &mut R,
+pub fn rt_process_join_request<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
                                                    rsk: &GroupSecretKey,
-                                                   user_join_req: &JoinRequest,
-                                                   ac_issuer_pk: &ACIssuerPublicKey<BLSG1,
-                                                                      BLSG2>)
+                                                   user_join_req: &JoinRequest<B>,
+                                                   ac_issuer_pk: &ACIssuerPublicKey)
                                                    -> Result<(JoinCert, BLSG1), ZeiError> {
   // 1 check credential
   let mut bitmap = vec![];
   for _ in 0..user_join_req.attrs.len() {
     bitmap.push(true);
   }
-  ac_verify::<BLSGt>(ac_issuer_pk,
+  ac_verify(ac_issuer_pk,
                      user_join_req.attrs.as_slice(),
                      bitmap.as_slice(),
                      &user_join_req.credential_proof)?;
@@ -92,21 +90,19 @@ pub fn rt_verify_sig(rpk: &GroupPublicKey,
 /// ```
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::crypto::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
-/// use zei::algebra::groups::Scalar;
+/// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
 /// use zei::xfr::regulator_tracking::{rt_user_gen_join_request, rt_process_join_request, rt_get_trace_tag};
 /// use zei::crypto::simple_group_signatures::{gpsig_sign, gpsig_verify, gpsig_setup};
 ///  // setup user anonymous credentials
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
-/// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, BLSGt>(&mut prng, num_attrs);
-/// let (user_pk, user_sk) = ac_keygen_user::<_,BLSGt>(&mut prng, &issuer_pk);
-/// let attributes = [BLSScalar::from_u32(0), BLSScalar::from_u32(1)];
-/// let cred = ac_sign::<_,BLSGt>(&mut prng, &issuer_sk, &user_pk, &attributes);
+/// let (issuer_pk, issuer_sk) = ac_keygen_issuer(&mut prng, num_attrs);
+/// let (user_pk, user_sk) = ac_keygen_user(&mut prng, &issuer_pk);
+/// let attributes = [b"attr1", b"attr2"];
+/// let cred = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
 ///
 /// let (reg_pk, reg_sk) = gpsig_setup(&mut prng);
-/// let join_req = rt_user_gen_join_request(&mut prng, &issuer_pk, &user_sk, &cred, &attributes).unwrap();
+/// let join_req = rt_user_gen_join_request(&mut prng, &issuer_pk, &user_sk, &cred, &attributes[..]).unwrap();
 /// let (join_cert, trace_tag) = rt_process_join_request(&mut prng, &reg_sk, &join_req, &issuer_pk).unwrap();
 ///
 /// let sig = gpsig_sign(&mut prng, &reg_pk, &join_cert, b"Some message");

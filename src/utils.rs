@@ -1,5 +1,9 @@
 // Utility functions
 
+use crate::algebra::groups::Scalar;
+use digest::Digest;
+use sha2::Sha512;
+
 /// I convert a u32 into a 4 bytes array (bigendian)
 pub(crate) fn u32_to_bigendian_u8array(n: u32) -> [u8; 4] {
   let mut array = [0u8; 4];
@@ -97,6 +101,11 @@ pub(crate) fn u64_to_u32_pair(x: u64) -> (u32, u32) {
   ((x & 0xFFFFFFFF) as u32, (x >> 32) as u32)
 }
 
+pub(crate) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
+  let mut hasher = Sha512::new();
+  hasher.input(slice);
+  S::from_hash(hasher)
+}
 /*
 // **base58 translation functions**
 use num_bigint::{BigInt};
