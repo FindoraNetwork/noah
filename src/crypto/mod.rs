@@ -2,7 +2,7 @@ pub mod accumulators;
 pub(crate) mod anon_creds;
 pub mod bp_circuits;
 pub mod chaum_pedersen;
-pub mod conf_cred_reveal;
+pub(crate) mod conf_cred_reveal;
 pub mod dlog;
 pub mod pedersen_elgamal;
 pub mod solvency;

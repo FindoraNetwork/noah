@@ -136,7 +136,7 @@ pub(crate) struct ACPoK<G2, S> {
 }
 
 /// I generate e key pair for a credential issuer
-pub fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub(crate) fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
   num_attrs: usize)
   -> (ACIssuerPublicKey<P::G1, P::G2>, ACIssuerSecretKey<P::G1, P::ScalarField>) {
@@ -164,7 +164,7 @@ pub fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
 }
 
 /// I generate a credential user key pair for a given credential issuer
-pub fn ac_keygen_user<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub(crate) fn ac_keygen_user<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>)
   -> (ACUserPublicKey<P::G1>, ACUserSecretKey<P::ScalarField>) {
@@ -175,7 +175,7 @@ pub fn ac_keygen_user<R: CryptoRng + Rng, P: PairingTargetGroup>(
 
 /// I Compute a credential signature for a set of attributes. User can represent Null attributes by
 /// a fixes scalar (e.g. 0)
-pub fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
+pub(crate) fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
                                                           issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
                                                           user_pk: &ACUserPublicKey<P::G1>,
                                                           attrs: &[P::ScalarField])
@@ -191,7 +191,7 @@ pub fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
 }
 
 /// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed
-pub fn ac_reveal<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub(crate) fn ac_reveal<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -312,7 +312,7 @@ pub(crate) fn ac_challenge<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPubli
 /// 2. Compute p \= -proof_commitment + c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
 ///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
 /// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
-pub fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                         revealed_attrs: &[P::ScalarField],
                                         bitmap: &[bool],
                                         reveal_sig: &ACRevealSig<P::G1, P::G2, P::ScalarField>)
