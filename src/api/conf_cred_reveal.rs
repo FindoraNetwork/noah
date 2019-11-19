@@ -3,14 +3,16 @@ use crate::api::anon_creds::{ACIssuerPublicKey, ACRevealSig};
 use crate::errors::ZeiError;
 use crate::utils::byte_slice_to_scalar;
 use rand::{CryptoRng, Rng};
+use crate::basic_crypto::elgamal::elgamal_keygen;
+use crate::algebra::groups::Group;
 
 pub type ElGamalPublicKey = crate::basic_crypto::elgamal::ElGamalPublicKey<BLSG1>;
-pub type ElGamalCiphertext = crate::basic_crypto::elgamal::ElGamalCiphertext<BLSG1>;
 pub type ElGamalSecretKey = crate::basic_crypto::elgamal::ElGamalSecretKey<BLSScalar>;
+pub type ElGamalCiphertext = crate::basic_crypto::elgamal::ElGamalCiphertext<BLSG1>;
 
 pub type ConfidentialAC = crate::crypto::conf_cred_reveal::ConfidentialAC<BLSGt>;
 
-/// Produced a CACProof for a single instance of a confidential anonymous reveal. Proof asserts
+/// Produced a Confidential Anonymous Credential Reveal Proof for a single instance of a confidential anonymous reveal. Proof asserts
 /// that a list of attributes can be decrypted from a list of ciphertexts under recv_enc_pub_key,
 /// and that these attributed verify an anonymous credential reveal proof.
 /// * `prng` - randomness source
@@ -23,16 +25,16 @@ pub type ConfidentialAC = crate::crypto::conf_cred_reveal::ConfidentialAC<BLSGt>
 /// # Example
 /// ```
 /// use zei::api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_reveal};
+/// use zei::api::conf_cred_reveal::{cac_create, cac_verify, cac_gen_encryption_keys};
 /// use rand_chacha::ChaChaRng;
 /// use rand::SeedableRng;
-/// use zei::api::conf_cred_reveal::{cac_create, cac_verify};
 /// use zei::basic_crypto::elgamal::elgamal_keygen;
 /// use zei::algebra::bls12_381::{BLSScalar, BLSG1};
 /// use zei::algebra::groups::Group;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer(&mut prng, 3);
 /// let (user_pk, user_sk) = ac_keygen_user(&mut prng, &issuer_pk);
-/// let (_, enc_key) = elgamal_keygen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
+/// let (_, enc_key) = cac_gen_encryption_keys(&mut prng);
 /// let attr1 = b"attr1";
 /// let attr2 = b"attr2";
 /// let attr3 = b"attr3";
@@ -79,4 +81,8 @@ pub fn cac_verify(issuer_pk: &ACIssuerPublicKey,
                   cac: &ConfidentialAC)
                   -> Result<(), ZeiError> {
   crate::crypto::conf_cred_reveal::cac_verify(issuer_pk, enc_key, reveal_map, cac)
+}
+
+pub fn cac_gen_encryption_keys<R: CryptoRng + Rng>(prng: &mut R) -> (ElGamalSecretKey, ElGamalPublicKey){
+  elgamal_keygen::<_, BLSScalar, BLSG1>(prng, &BLSG1::get_base())
 }

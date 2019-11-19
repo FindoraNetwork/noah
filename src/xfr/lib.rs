@@ -632,7 +632,6 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord],
 #[cfg(test)]
 pub(crate) mod tests {
   use super::*;
-  use crate::algebra::bls12_381::{BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
   use crate::algebra::ristretto::{CompRist, RistPoint};
   use crate::api::anon_creds;
@@ -651,6 +650,7 @@ pub(crate) mod tests {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
+  use crate::api::conf_cred_reveal::cac_gen_encryption_keys;
 
   pub(crate) fn create_xfr(
     prng: &mut ChaChaRng,
@@ -664,8 +664,7 @@ pub(crate) mod tests {
     let issuer_public_key = match asset_tracking {
       true => {
         let (_sk, xfr_pub_key) = elgamal_keygen::<_, Scalar, RistrettoPoint>(prng, &pc_gens.B);
-        let (_sk, id_reveal_pub_key) =
-          elgamal_keygen::<_, BLSScalar, BLSG1>(prng, &BLSG1::get_base());
+        let (_sk, id_reveal_pub_key) =  cac_gen_encryption_keys(prng);
 
         Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
                                     ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
@@ -1073,8 +1072,7 @@ pub(crate) mod tests {
     let (_asset_issuer_sec_key, asset_issuer_pub_key) =
       elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &RistrettoPoint::get_base());
 
-    let (_asset_issuer_id_sec_key, asset_issuer_id_pub_key) =
-      elgamal_keygen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
+    let (_asset_issuer_id_sec_key, asset_issuer_id_pub_key) = cac_gen_encryption_keys(&mut prng);
 
     let asset_issuer_public_key =
       Some(AssetIssuerPubKeys { eg_ristretto_pub_key:

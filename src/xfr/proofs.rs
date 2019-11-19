@@ -252,19 +252,6 @@ pub fn verify_conf_id_reveal(conf_id_reveal: &ConfidentialAC,
              conf_id_reveal)
 }
 
-/*
-pub fn verify_conf_id_reveal(conf_id_reveal: &ConfIdReveal,
-                             asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
-                             attr_reveal_policy: &IdRevealPolicy)
-                             -> Result<(), ZeiError> {
-  pok_attrs_verify::<BLSGt>(&attr_reveal_policy.cred_issuer_pub_key,
-                            asset_issuer_public_key,
-                            &conf_id_reveal.attr_reveal_proof,
-                            &conf_id_reveal.ctexts,
-                            &conf_id_reveal.pok_attrs,
-                            &attr_reveal_policy.bitmap)
-}
-*/
 /**** Range Proofs *****/
 
 /// I compute a range proof for confidential amount transfers.
