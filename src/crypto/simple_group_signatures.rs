@@ -6,6 +6,7 @@ use crate::basic_crypto::signatures::pointcheval_sanders::{
   ps_gen_keys, ps_randomize_sig, ps_sign_scalar, PSPublicKey, PSSecretKey, PSSignature,
 };
 use crate::errors::ZeiError;
+
 use digest::Digest;
 use rand::{CryptoRng, Rng};
 use sha2::Sha512;
@@ -256,8 +257,93 @@ pub fn gpsig_verify(gpk: &GroupPublicKey,
 
 /// I recover the identity of the producer of a group signature.
 /// This algorithm is run by the Group Manager.
+/// Note that the algorithm returns a group element h = g^{tag}.
 /// * `sig` - signature
 /// * `gp_sk` - group secret key
+/// # Example
+/// ```
+/// use zei::crypto::simple_group_signatures::{gpsig_setup, gpsig_join_cert, gpsig_sign, gpsig_open};
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaChaRng;
+/// let mut prng = ChaChaRng::from_seed([0u8; 32]);
+/// let (gpk, msk) = gpsig_setup(&mut prng);
+///
+/// let join_cert = gpsig_join_cert(&mut prng, &msk);
+/// let sig = gpsig_sign(&mut prng, &gpk, &join_cert, b"Some message");
+/// let tag_group_element_recovered = gpsig_open(&sig, &msk);
+/// ```
 pub fn gpsig_open(sig: &GroupSignature, gp_sk: &GroupSecretKey) -> BLSG1 {
   elgamal_decrypt_elem(&sig.enc, &gp_sk.dec_key)
+}
+
+#[cfg(test)]
+
+mod tests {
+  use super::{gpsig_join_cert, gpsig_open, gpsig_setup, gpsig_sign, gpsig_verify};
+  use crate::algebra::bls12_381::{BLSScalar, BLSG1, BLSG2};
+  use crate::algebra::groups::Group;
+  use crate::errors::ZeiError;
+  use rand::SeedableRng;
+  use rand_chacha::ChaChaRng;
+
+  #[test]
+  fn group_manager_keys_are_consistent() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let (gpk, msk) = gpsig_setup(&mut prng);
+
+    // Check the signature keys
+    let pub_sig_key = &gpk.ver_key;
+    let priv_sig_key = &msk.sig_key;
+
+    // Signing keys
+    let g2_base = BLSG2::get_base();
+    assert_eq!(pub_sig_key.xx, g2_base.mul(&priv_sig_key.x));
+
+    // Encryption keys
+    let pub_enc_key = gpk.enc_key.0;
+    let priv_enc_key: BLSScalar = msk.dec_key.0;
+
+    let g1_base = BLSG1::get_base();
+    let recomputed_pub_enc_key = g1_base.mul(&priv_enc_key);
+
+    assert_eq!(pub_enc_key, recomputed_pub_enc_key);
+  }
+
+  #[test]
+  fn group_signatures_are_computed_correctly() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let (gpk, msk) = gpsig_setup(&mut prng);
+
+    // Correct signature
+    let join_cert = gpsig_join_cert(&mut prng, &msk);
+    let sig = gpsig_sign(&mut prng, &gpk, &join_cert, b"Some message");
+    assert!(gpsig_verify(&gpk, &sig, b"Some message").is_ok());
+
+    // Incorrect message
+    assert_eq!(Err(ZeiError::ZKProofVerificationError),
+               gpsig_verify(&gpk, &sig, b"Wrong message"));
+
+    // Use of another group public key
+    let (another_gpk, _) = gpsig_setup(&mut prng);
+    let sig = gpsig_sign(&mut prng, &gpk, &join_cert, b"Some message");
+    assert_eq!(Err(ZeiError::ZKProofVerificationError),
+               gpsig_verify(&another_gpk, &sig, b"Some message"));
+  }
+
+  #[test]
+  fn user_identity_can_be_recovered_by_group_manager() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let (gpk, msk) = gpsig_setup(&mut prng);
+
+    let join_cert = gpsig_join_cert(&mut prng, &msk);
+    let sig = gpsig_sign(&mut prng, &gpk, &join_cert, b"Some message");
+
+    // The Group Manager recovers successfully the tag of the user
+    let g1_base = BLSG1::get_base();
+
+    let tag_group_element_recovered = gpsig_open(&sig, &msk);
+    let tag_group_element = g1_base.mul(&join_cert.tag);
+
+    assert_eq!(tag_group_element_recovered, tag_group_element);
+  }
 }
