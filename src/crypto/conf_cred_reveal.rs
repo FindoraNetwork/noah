@@ -70,8 +70,8 @@ pub fn cac_create<R: CryptoRng + Rng, P: PairingTargetGroup>(
                                                     &[ac_reveal_sig])?;
 
   Ok(ConfidentialAC { ctexts,
-    ac_reveal_sig: ac_reveal_sig.clone(),
-    pok: pok_attrs_proof })
+                      ac_reveal_sig: ac_reveal_sig.clone(),
+                      pok: pok_attrs_proof })
 }
 
 pub fn cac_verify<P: PairingTargetGroup>(issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -114,8 +114,8 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
   // 0: sanity check on vector length
   let n_instances = attrs_vecs.len();
   if n_instances != ctexts_rand_vecs.len()
-    || n_instances != ctexts_vecs.len()
-    || n_instances != ac_reveal_sigs.len()
+     || n_instances != ctexts_vecs.len()
+     || n_instances != ac_reveal_sigs.len()
   {
     return Err(ZeiError::ParameterError);
   }
@@ -159,24 +159,24 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
   let mut rands_resps = vec![];
   for (attrs_k, rands_k, attrs_blinds_k, rands_blinds_k) in
     izip!(attrs_vecs, ctexts_rand_vecs, attrs_blinds, rands_blinds)
-    {
-      let (attrs_resps_k, rands_resps_k) =
-        compute_proof_responses::<P::ScalarField>(&challenge,
-                                                  *attrs_k,
-                                                  attrs_blinds_k.as_slice(),
-                                                  *rands_k,
-                                                  rands_blinds_k.as_slice());
-      attrs_resps.push(attrs_resps_k);
-      rands_resps.push(rands_resps_k);
-    }
+  {
+    let (attrs_resps_k, rands_resps_k) =
+      compute_proof_responses::<P::ScalarField>(&challenge,
+                                                *attrs_k,
+                                                attrs_blinds_k.as_slice(),
+                                                *rands_k,
+                                                rands_blinds_k.as_slice());
+    attrs_resps.push(attrs_resps_k);
+    rands_resps.push(rands_resps_k);
+  }
 
   // 6: build struct and return
   Ok(AggPoKAttrs { attr_sum_com_yy2,
-    agg_attrs_coms_g,
-    agg_rands_coms_g,
-    agg_rands_coms_pk,
-    attrs_resps,
-    rands_resps })
+                   agg_attrs_coms_g,
+                   agg_rands_coms_g,
+                   agg_rands_coms_pk,
+                   attrs_resps,
+                   rands_resps })
 }
 
 /// Verifies an aggregated proof of knowledge involving identity attributes and ciphertexts
@@ -251,7 +251,7 @@ fn compute_linear_combination_scalars<P: PairingTargetGroup>(ctexts_vecs: &[&[El
   let mut hash = Sha512::new();
   let mut ac_reveal_sig_vec = vec![];
   ac_reveal_sigs.serialize(&mut rmp_serde::Serializer::new(&mut ac_reveal_sig_vec))
-    .unwrap();
+                .unwrap();
   hash.input(ac_reveal_sig_vec.as_slice());
 
   for ctext_vec in ctexts_vecs.iter() {
@@ -315,16 +315,16 @@ fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
             attr_responses.iter(),
             ctexts_vecs.iter(),
             lc_scalars.iter())
-      {
-        let scalar_factor = rand_resp_inst[i].mul(scalar);
-        sum_pk_rand = sum_pk_rand.add(&(*pub_key).get_point_ref().mul(&scalar_factor));
+    {
+      let scalar_factor = rand_resp_inst[i].mul(scalar);
+      sum_pk_rand = sum_pk_rand.add(&(*pub_key).get_point_ref().mul(&scalar_factor));
 
-        sum_g_rand = sum_g_rand.add(&scalar_factor);
-        sum_g_attr = sum_g_attr.add(&attr_resp_inst[i].mul(scalar));
+      sum_g_rand = sum_g_rand.add(&scalar_factor);
+      sum_g_attr = sum_g_attr.add(&attr_resp_inst[i].mul(scalar));
 
-        sum_e1 = sum_e1.add(&ctexts_inst[i].e1.mul(scalar));
-        sum_e2 = sum_e2.add(&ctexts_inst[i].e2.mul(scalar));
-      }
+      sum_e1 = sum_e1.add(&ctexts_inst[i].e1.mul(scalar));
+      sum_e2 = sum_e2.add(&ctexts_inst[i].e2.mul(scalar));
+    }
     // aggregates rand responses
     agg_pk_x_rand_resp.push(sum_pk_rand);
     agg_g_x_rand_resp.push(P::G1::get_base().mul(&sum_g_rand));
@@ -334,7 +334,7 @@ fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
 
     //aggregated ciphertexs
     agg_ctexts.push(ElGamalCiphertext { e1: sum_e1,
-      e2: sum_e2 })
+                                        e2: sum_e2 })
   }
 
   //TODO Use multi-exponentiation, then aggregate
@@ -346,17 +346,17 @@ fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
           agg_g_x_attr_resp,
           agg_g_x_rand_resp,
           agg_pk_x_rand_resp)
-    {
-      let e1 = &ctext.e1;
-      let e2 = &ctext.e2;
+  {
+    let e1 = &ctext.e1;
+    let e2 = &ctext.e2;
 
-      let verify_e1 = e1.mul(challenge).add(rand_coms_g) == g_x_rand_resp;
-      let verify_e2 =
-        e2.mul(&challenge).add(rand_coms_pk).add(attr_com) == g_x_attr_resp.add(&pk_x_rand_resp);
-      if !(verify_e1 && verify_e2) {
-        return Err(ZeiError::IdentityRevealVerifyError);
-      }
+    let verify_e1 = e1.mul(challenge).add(rand_coms_g) == g_x_rand_resp;
+    let verify_e2 =
+      e2.mul(&challenge).add(rand_coms_pk).add(attr_com) == g_x_attr_resp.add(&pk_x_rand_resp);
+    if !(verify_e1 && verify_e2) {
+      return Err(ZeiError::IdentityRevealVerifyError);
     }
+  }
   Ok(())
 }
 
@@ -389,22 +389,22 @@ fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
   let mut ck_vec = vec![];
   for (lc_scalar_k, reveal_sig_k, attr_sum_com_k, attr_resp_k) in
     izip!(lc_scalars, ac_reveal_sigs, attr_sum_com_yy2, attr_resps)
-    {
-      let c_k = ac_challenge::<P>(issuer_pub_key,
-                                  &reveal_sig_k.sig,
-                                  &reveal_sig_k.pok.commitment)?;
+  {
+    let c_k = ac_challenge::<P>(issuer_pub_key,
+                                &reveal_sig_k.sig,
+                                &reveal_sig_k.pok.commitment)?;
 
-      let hidden_k = ac_vrfy_hidden_terms_addition::<P>(&c_k, reveal_sig_k, issuer_pub_key, bitmap)?;
+    let hidden_k = ac_vrfy_hidden_terms_addition::<P>(&c_k, reveal_sig_k, issuer_pub_key, bitmap)?;
 
-      let revealed_k =
-        ac_vrfy_zk_revealed_terms_addition::<P>(issuer_pub_key, attr_sum_com_k, attr_resp_k, bitmap)?;
+    let revealed_k =
+      ac_vrfy_zk_revealed_terms_addition::<P>(issuer_pub_key, attr_sum_com_k, attr_resp_k, bitmap)?;
 
-      let pp_k = hidden_k.mul(challenge).add(&revealed_k.mul(&c_k));
-      pp.push(pp_k);
-      agg_sigma2 = agg_sigma2.add(&reveal_sig_k.sig.sigma2.mul(&c_k.mul(lc_scalar_k)));
+    let pp_k = hidden_k.mul(challenge).add(&revealed_k.mul(&c_k));
+    pp.push(pp_k);
+    agg_sigma2 = agg_sigma2.add(&reveal_sig_k.sig.sigma2.mul(&c_k.mul(lc_scalar_k)));
 
-      ck_vec.push(c_k);
-    }
+    ck_vec.push(c_k);
+  }
   agg_sigma2 = agg_sigma2.mul(challenge);
 
   //3. Compute right hand side pairing: e(sigma2, G2)
@@ -445,7 +445,7 @@ fn sample_blinds_compute_commitments<R, P>(
   -> Result<(Vec<P::G2>,
              (Vec<Vec<P::G1>>, Vec<Vec<P::G1>>, Vec<Vec<P::G1>>),
              (Vec<Vec<P::ScalarField>>, Vec<Vec<P::ScalarField>>)),
-    ZeiError>
+            ZeiError>
   where R: CryptoRng + Rng,
         P: PairingTargetGroup
 {
@@ -466,11 +466,11 @@ fn sample_blinds_compute_commitments<R, P>(
     rands_coms_pk.push(Vec::with_capacity(n_attrs));
     for (attr_blind, rand_blind) in
       izip!(attrs_blinds.get(k).unwrap(), rands_blinds.get(k).unwrap())
-      {
-        attrs_coms_g[k].push(P::G1::get_base().mul(&attr_blind));
-        rands_coms_g[k].push(P::G1::get_base().mul(&rand_blind));
-        rands_coms_pk[k].push(recv_enc_pub_keys[k].get_point_ref().mul(&rand_blind));
-      }
+    {
+      attrs_coms_g[k].push(P::G1::get_base().mul(&attr_blind));
+      rands_coms_g[k].push(P::G1::get_base().mul(&rand_blind));
+      rands_coms_pk[k].push(recv_enc_pub_keys[k].get_point_ref().mul(&rand_blind));
+    }
   }
 
   Ok((attr_sum_com_yy2, (attrs_coms_g, rands_coms_g, rands_coms_pk), (attrs_blinds, rands_blinds)))
@@ -482,7 +482,7 @@ fn sample_blinds_compute_commitments<R, P>(
 /// * `bitmap` - policy, indicates which attributes needs to be revealed to the receiver
 /// * `returns`- group element in G2
 fn compute_attr_sum_yy2<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
-  P::G2>,
+                                                                  P::G2>,
                                                attr_blinds: &Vec<P::ScalarField>,
                                                bitmap: &[bool])
                                                -> Result<P::G2, ZeiError> {
@@ -534,7 +534,7 @@ fn sample_blinds<R, S>(prng: &mut R,
 /// * `agg_proof_coms_rands_pk` - blinding factors related to the public keys
 /// * `return` - challenge which is a hash value
 fn cac_reveal_challenge_agg<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
-  P::G2>,
+                                                                      P::G2>,
                                                    recv_pub_keys: &[&ElGamalPublicKey<P::G1>],
                                                    ac_reveal_sigs: &[&ACRevealSig<P::G1,
                                                      P::G2,
@@ -568,11 +568,11 @@ fn cac_reveal_challenge_agg<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerP
   for (a_g, r_g, r_pk) in izip!(agg_proof_coms_attrs,
                                 agg_proof_coms_rands_g,
                                 agg_proof_coms_rands_pk)
-    {
-      hash.input(a_g.to_compressed_bytes());
-      hash.input(r_g.to_compressed_bytes());
-      hash.input(r_pk.to_compressed_bytes());
-    }
+  {
+    hash.input(a_g.to_compressed_bytes());
+    hash.input(r_g.to_compressed_bytes());
+    hash.input(r_pk.to_compressed_bytes());
+  }
   Ok(P::ScalarField::from_hash(hash))
 }
 

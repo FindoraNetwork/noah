@@ -1,7 +1,7 @@
+use crate::api::conf_cred_reveal::ConfidentialAC;
 use crate::basic_crypto::signatures::naive_multisig::{
   sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig,
 };
-use crate::api::conf_cred_reveal::ConfidentialAC;
 use crate::errors::ZeiError;
 use crate::utils::u8_bigendian_slice_to_u128;
 use crate::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify, AssetMixProof};
@@ -1102,11 +1102,11 @@ pub(crate) mod tests {
     let id_tracking_policy = IdRevealPolicy { cred_issuer_pub_key: cred_issuer_keys.0.clone(),
                                               bitmap: vec![false, true, false, true] };
     let proof = anon_creds::ac_reveal(&mut prng,
-                                                  &receiver_ac_keys.1,
-                                                  &cred_issuer_keys.0,
-                                                  &ac_signature,
-                                                  &attrs,
-                                                  &id_tracking_policy.bitmap).unwrap();
+                                      &receiver_ac_keys.1,
+                                      &cred_issuer_keys.0,
+                                      &ac_signature,
+                                      &attrs,
+                                      &id_tracking_policy.bitmap).unwrap();
     let identity_proof =
       create_conf_id_reveal(&mut prng,
                             &attrs,

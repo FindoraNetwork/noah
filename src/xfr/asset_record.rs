@@ -225,9 +225,7 @@ mod test {
   use crate::algebra::bls12_381::{BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
   use crate::algebra::ristretto::{CompRist, RistPoint};
-  use crate::basic_crypto::elgamal::{
-    elgamal_keygen, ElGamalPublicKey,
-  };
+  use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalPublicKey};
   use crate::basic_crypto::signatures::naive_multisig::XfrKeyPair;
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::lib::tests::create_xfr;

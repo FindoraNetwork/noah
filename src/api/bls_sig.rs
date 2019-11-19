@@ -35,7 +35,9 @@ pub fn bls_verify_aggregated(ver_keys: &[BlsPublicKey],
                              message: &[u8],
                              agg_signature: &BlsSignature)
                              -> Result<(), ZeiError> {
-  crate::basic_crypto::signatures::bls::bls_verify_aggregated::<BLSGt>(ver_keys, message, agg_signature)
+  crate::basic_crypto::signatures::bls::bls_verify_aggregated::<BLSGt>(ver_keys,
+                                                                       message,
+                                                                       agg_signature)
 }
 
 /// Batch verification of many signatures
@@ -56,6 +58,7 @@ pub fn bls_batch_verify_added_signatures(ver_keys: &[BlsPublicKey],
                                          messages: &[&[u8]],
                                          signature: &BlsSignature)
                                          -> Result<(), ZeiError> {
-  crate::basic_crypto::signatures::bls::bls_batch_verify_added_signatures::<BLSGt>(ver_keys, messages,
-                                                                              signature)
+  crate::basic_crypto::signatures::bls::bls_batch_verify_added_signatures::<BLSGt>(ver_keys,
+                                                                                   messages,
+                                                                                   signature)
 }

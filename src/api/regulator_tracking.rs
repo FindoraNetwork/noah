@@ -5,6 +5,7 @@
   The regulator can infer the identity of the signer from the transaction signature.
   From each group signature the regulator can obtain a trace tag that it can use to search for the user identity in its DB.
 */
+use crate::algebra::bls12_381::{BLSScalar, BLSG1};
 use crate::algebra::groups::Group;
 use crate::api::anon_creds::{
   ac_reveal, ac_verify, ACIssuerPublicKey, ACRevealSig, ACSignature, ACUserSecretKey,
@@ -15,7 +16,6 @@ use crate::crypto::simple_group_signatures::{
 };
 use crate::errors::ZeiError;
 use rand::{CryptoRng, Rng};
-use crate::algebra::bls12_381::BLSG1;
 
 /// JoinRequest message from the User to the Regulator. It contains the identity of the user.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,26 +24,36 @@ pub struct JoinRequest<B: AsRef<[u8]>> {
   attrs: Vec<B>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TagKey(BLSG1);
+
+impl TagKey {
+  fn gen_tag_key(tag: &BLSScalar) -> Self {
+    TagKey(BLSG1::get_base().mul(tag))
+  }
+}
+
 /// Users that register with regulators must produce a JoinRequest message using this function
 /// # Example
 /// see zei::xfr::regulator_tracking::rt_get_trace_tag;
-pub fn rt_user_gen_join_request<'a, R: CryptoRng + Rng, B: AsRef<[u8]> + Clone>(prng: &mut R,
-                                                        ac_issuer_pk: &ACIssuerPublicKey,
-                                                        ac_user_sk: &ACUserSecretKey,
-                                                        credential: &ACSignature,
-                                                        attrs: &'a [B])
-                                                        -> Result<JoinRequest<B>, ZeiError> {
+pub fn rt_user_gen_join_request<'a, R: CryptoRng + Rng, B: AsRef<[u8]> + Clone>(
+  prng: &mut R,
+  ac_issuer_pk: &ACIssuerPublicKey,
+  ac_user_sk: &ACUserSecretKey,
+  credential: &ACSignature,
+  attrs: &'a [B])
+  -> Result<JoinRequest<B>, ZeiError> {
   // all attributed are revealed to the regulator
   let mut bitmap = vec![];
   for _ in 0..attrs.len() {
     bitmap.push(true);
   }
   let cred_proof = ac_reveal(prng,
-                                         ac_user_sk,
-                                         ac_issuer_pk,
-                                         credential,
-                                         attrs,
-                                         bitmap.as_slice())?;
+                             ac_user_sk,
+                             ac_issuer_pk,
+                             credential,
+                             attrs,
+                             bitmap.as_slice())?;
   Ok(JoinRequest { credential_proof: cred_proof,
                    attrs: attrs.to_vec() })
 }
@@ -52,27 +62,28 @@ pub fn rt_user_gen_join_request<'a, R: CryptoRng + Rng, B: AsRef<[u8]> + Clone>(
 /// and a trace tag to store locally.
 /// # Example
 /// see zei::xfr::regulator_tracking::rt_get_trace_tag;
-pub fn rt_process_join_request<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
-                                                   rsk: &GroupSecretKey,
-                                                   user_join_req: &JoinRequest<B>,
-                                                   ac_issuer_pk: &ACIssuerPublicKey)
-                                                   -> Result<(JoinCert, BLSG1), ZeiError> {
+pub fn rt_process_join_request<R: CryptoRng + Rng, B: AsRef<[u8]>>(
+  prng: &mut R,
+  rsk: &GroupSecretKey,
+  user_join_req: &JoinRequest<B>,
+  ac_issuer_pk: &ACIssuerPublicKey)
+  -> Result<(JoinCert, TagKey), ZeiError> {
   // 1 check credential
   let mut bitmap = vec![];
   for _ in 0..user_join_req.attrs.len() {
     bitmap.push(true);
   }
   ac_verify(ac_issuer_pk,
-                     user_join_req.attrs.as_slice(),
-                     bitmap.as_slice(),
-                     &user_join_req.credential_proof)?;
+            user_join_req.attrs.as_slice(),
+            bitmap.as_slice(),
+            &user_join_req.credential_proof)?;
 
   // 2 generate tag
   let join_cert = gpsig_join_cert(prng, rsk);
 
   // 3 compute key value for DB entry storing JoinCert
-  let key = BLSG1::get_base().mul(&join_cert.tag);
-  Ok((join_cert, key))
+  let tag_key = TagKey::gen_tag_key(&join_cert.tag);
+  Ok((join_cert, tag_key))
 }
 
 /// Group signature verification function
@@ -91,7 +102,7 @@ pub fn rt_verify_sig(rpk: &GroupPublicKey,
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
-/// use zei::xfr::regulator_tracking::{rt_user_gen_join_request, rt_process_join_request, rt_get_trace_tag};
+/// use zei::api::regulator_tracking::{rt_user_gen_join_request, rt_process_join_request, rt_get_trace_tag};
 /// use zei::crypto::simple_group_signatures::{gpsig_sign, gpsig_verify, gpsig_setup};
 ///  // setup user anonymous credentials
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -111,6 +122,6 @@ pub fn rt_verify_sig(rpk: &GroupPublicKey,
 /// let signature_trace_tag = rt_get_trace_tag(&reg_sk, &sig);
 /// assert_eq!(trace_tag, signature_trace_tag);
 /// ```
-pub fn rt_get_trace_tag(rsk: &GroupSecretKey, sig: &GroupSignature) -> BLSG1 {
-  gpsig_open(sig, rsk)
+pub fn rt_get_trace_tag(rsk: &GroupSecretKey, sig: &GroupSignature) -> TagKey {
+  TagKey(gpsig_open(sig, rsk))
 }

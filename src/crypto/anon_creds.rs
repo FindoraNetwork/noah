@@ -176,10 +176,10 @@ pub(crate) fn ac_keygen_user<R: CryptoRng + Rng, P: PairingTargetGroup>(
 /// I Compute a credential signature for a set of attributes. User can represent Null attributes by
 /// a fixes scalar (e.g. 0)
 pub(crate) fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
-                                                          issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
-                                                          user_pk: &ACUserPublicKey<P::G1>,
-                                                          attrs: &[P::ScalarField])
-                                                          -> ACSignature<P::G1> {
+                                                                 issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
+                                                                 user_pk: &ACUserPublicKey<P::G1>,
+                                                                 attrs: &[P::ScalarField])
+                                                                 -> ACSignature<P::G1> {
   let u = P::ScalarField::random_scalar(prng);
   let mut exponent = issuer_sk.x.clone();
   for (attr, yi) in attrs.iter().zip(issuer_sk.y.iter()) {
@@ -313,10 +313,12 @@ pub(crate) fn ac_challenge<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPubli
 ///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
 /// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
 pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                        revealed_attrs: &[P::ScalarField],
-                                        bitmap: &[bool],
-                                        reveal_sig: &ACRevealSig<P::G1, P::G2, P::ScalarField>)
-                                        -> Result<(), ZeiError> {
+                                               revealed_attrs: &[P::ScalarField],
+                                               bitmap: &[bool],
+                                               reveal_sig: &ACRevealSig<P::G1,
+                                                            P::G2,
+                                                            P::ScalarField>)
+                                               -> Result<(), ZeiError> {
   let challenge = ac_challenge::<P>(issuer_pub_key, &reveal_sig.sig, &reveal_sig.pok.commitment)?;
   // hidden = X_2*c - proof_commitment + &G2 * r_t + Z2 * r_sk + \sum r_attr_i * Y2_i;
   let hidden = ac_vrfy_hidden_terms_addition::<P>(&challenge, &reveal_sig, issuer_pub_key, bitmap)?;

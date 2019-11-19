@@ -429,9 +429,7 @@ pub mod option_bytes {
 #[cfg(test)]
 mod test {
   use crate::algebra::ristretto::{RistPoint, RistScalar};
-  use crate::basic_crypto::elgamal::{
-    elgamal_keygen,
-  };
+  use crate::basic_crypto::elgamal::elgamal_keygen;
   use crate::basic_crypto::signatures::naive_multisig::{
     XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature,
   };

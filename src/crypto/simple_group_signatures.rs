@@ -1,7 +1,10 @@
 use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
-use crate::basic_crypto::elgamal::{elgamal_decrypt_elem, elgamal_encrypt, ElGamalPublicKey, ElGamalSecretKey, ElGamalCiphertext, elgamal_keygen};
+use crate::basic_crypto::elgamal::{
+  elgamal_decrypt_elem, elgamal_encrypt, elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey,
+  ElGamalSecretKey,
+};
 use crate::basic_crypto::signatures::pointcheval_sanders::{
   ps_gen_keys, ps_randomize_sig, ps_sign_scalar, PSPublicKey, PSSecretKey, PSSignature,
 };
