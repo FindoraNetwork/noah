@@ -4,7 +4,6 @@ pub mod bp_circuits;
 pub mod chaum_pedersen;
 pub(crate) mod conf_cred_reveal;
 pub mod dlog;
-pub mod group_signature;
 pub mod pedersen_elgamal;
 pub mod simple_group_signatures;
 pub mod solvency;
