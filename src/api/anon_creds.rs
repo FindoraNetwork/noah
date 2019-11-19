@@ -58,18 +58,16 @@ pub fn ac_keygen_user<R: CryptoRng + Rng>(prng: &mut R,
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer(&mut prng, num_attrs);
 /// let (user_pk, _) = ac_keygen_user(&mut prng, &issuer_pk);
-/// let attr1 = b"attr1";
-/// let attr2 = b"attr2";
-/// let attributes = [attr1.as_ref(), attr2.as_ref()];
+/// let attributes = [b"attr1", b"attr2"];
 /// let signature = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
 /// ```
-pub fn ac_sign<R: CryptoRng + Rng>(prng: &mut R,
-                                   issuer_sk: &ACIssuerSecretKey,
-                                   user_pk: &ACUserPublicKey,
-                                   attrs: &[&[u8]])
-                                   -> ACSignature {
+pub fn ac_sign<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
+                                                   issuer_sk: &ACIssuerSecretKey,
+                                                   user_pk: &ACUserPublicKey,
+                                                   attrs: &[B])
+                                                   -> ACSignature {
   let attrs_scalar: Vec<BLSScalar> = attrs.iter()
-                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(*x))
+                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(x.as_ref()))
                                           .collect();
   crate::crypto::anon_creds::ac_sign::<_, BLSGt>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
 }
@@ -84,22 +82,20 @@ pub fn ac_sign<R: CryptoRng + Rng>(prng: &mut R,
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer(&mut prng, num_attrs);
 /// let (user_pk, user_sk) = ac_keygen_user(&mut prng, &issuer_pk);
-/// let attr1 = b"attr1";
-/// let attr2 = b"attr2";
-/// let attributes = [attr1.as_ref(), attr2.as_ref()];
+/// let attributes = [b"attr1", b"attr2"];
 /// let signature = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
 /// let bitmap = [true,false]; // Reveal first attribute and hide the second one
 /// let reveal_sig = ac_reveal(&mut prng, &user_sk, &issuer_pk, &signature, &attributes[..], &bitmap);
 /// ```
-pub fn ac_reveal<R: CryptoRng + Rng>(prng: &mut R,
-                                     user_sk: &ACUserSecretKey,
-                                     issuer_pk: &ACIssuerPublicKey,
-                                     sig: &ACSignature,
-                                     attrs: &[&[u8]],
-                                     bitmap: &[bool] // indicates which attributes are revealed
+pub fn ac_reveal<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
+                                                     user_sk: &ACUserSecretKey,
+                                                     issuer_pk: &ACIssuerPublicKey,
+                                                     sig: &ACSignature,
+                                                     attrs: &[B],
+                                                     bitmap: &[bool] // indicates which attributes are revealed
 ) -> Result<ACRevealSig, ZeiError> {
   let attrs_scalar: Vec<BLSScalar> = attrs.iter()
-                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(*x))
+                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(x.as_ref()))
                                           .collect();
   crate::crypto::anon_creds::ac_reveal::<_, BLSGt>(prng,
                                                    user_sk,
@@ -121,9 +117,7 @@ pub fn ac_reveal<R: CryptoRng + Rng>(prng: &mut R,
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer(&mut prng, num_attrs);
 /// let (user_pk, user_sk) = ac_keygen_user(&mut prng, &issuer_pk);
-/// let attr1 = b"attr1";
-/// let attr2 = b"attr2";
-/// let attributes = [attr1.as_ref(), attr2.as_ref()];
+/// let attributes = [b"attr1", b"attr2"];
 /// let signature = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
 /// let bitmap = [true,false]; // Reveal first attribute and hide the second one
 /// let reveal_sig = ac_reveal(&mut prng, &user_sk, &issuer_pk, &signature, &attributes[..], &bitmap).unwrap();
@@ -132,14 +126,14 @@ pub fn ac_reveal<R: CryptoRng + Rng>(prng: &mut R,
 /// let result_verification_err = ac_verify(&issuer_pk, &attributes[1..],& bitmap, &reveal_sig);
 /// assert!(result_verification_err.is_err());
 /// ```
-pub fn ac_verify(issuer_pub_key: &ACIssuerPublicKey,
-                 revealed_attrs: &[&[u8]],
-                 bitmap: &[bool],
-                 reveal_sig: &ACRevealSig)
-                 -> Result<(), ZeiError> {
+pub fn ac_verify<B: AsRef<[u8]>>(issuer_pub_key: &ACIssuerPublicKey,
+                                 revealed_attrs: &[B],
+                                 bitmap: &[bool],
+                                 reveal_sig: &ACRevealSig)
+                                 -> Result<(), ZeiError> {
   let revealed_attrs_scalar: Vec<BLSScalar> =
     revealed_attrs.iter()
-                  .map(|x| byte_slice_to_scalar::<BLSScalar>(*x))
+                  .map(|x| byte_slice_to_scalar::<BLSScalar>(x.as_ref()))
                   .collect();
   crate::crypto::anon_creds::ac_verify::<BLSGt>(issuer_pub_key,
                                                 revealed_attrs_scalar.as_slice(),

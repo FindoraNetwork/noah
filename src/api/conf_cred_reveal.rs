@@ -1,10 +1,10 @@
 use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1};
+use crate::algebra::groups::Group;
 use crate::api::anon_creds::{ACIssuerPublicKey, ACRevealSig};
+use crate::basic_crypto::elgamal::elgamal_keygen;
 use crate::errors::ZeiError;
 use crate::utils::byte_slice_to_scalar;
 use rand::{CryptoRng, Rng};
-use crate::basic_crypto::elgamal::elgamal_keygen;
-use crate::algebra::groups::Group;
 
 pub type ElGamalPublicKey = crate::basic_crypto::elgamal::ElGamalPublicKey<BLSG1>;
 pub type ElGamalSecretKey = crate::basic_crypto::elgamal::ElGamalSecretKey<BLSScalar>;
@@ -35,25 +35,22 @@ pub type ConfidentialAC = crate::crypto::conf_cred_reveal::ConfidentialAC<BLSGt>
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer(&mut prng, 3);
 /// let (user_pk, user_sk) = ac_keygen_user(&mut prng, &issuer_pk);
 /// let (_, enc_key) = cac_gen_encryption_keys(&mut prng);
-/// let attr1 = b"attr1";
-/// let attr2 = b"attr2";
-/// let attr3 = b"attr3";
-/// let attrs = [attr1.as_ref(), attr2.as_ref(), attr3.as_ref()];
+/// let attrs = [b"attr1", b"attr2", b"attr3"];
 /// let bitmap = [false, true, false];
 /// let ac_sig = ac_sign(&mut prng, &issuer_sk, &user_pk, &attrs[..]);
 /// let credential = ac_reveal(&mut prng, &user_sk, &issuer_pk, &ac_sig, &attrs[..], &bitmap[..]).unwrap();
 /// let conf_reveal_proof = cac_create(&mut prng, &issuer_pk, &enc_key, &attrs[..], &bitmap[..], &credential).unwrap();
 /// assert!(cac_verify(&issuer_pk, &enc_key, &bitmap[..], &conf_reveal_proof).is_ok())
 /// ```
-pub fn cac_create<R: CryptoRng + Rng>(prng: &mut R,
-                                      cred_issuer_pk: &ACIssuerPublicKey,
-                                      enc_key: &ElGamalPublicKey,
-                                      attrs: &[&[u8]],
-                                      reveal_map: &[bool],
-                                      ac_reveal_sig: &ACRevealSig)
-                                      -> Result<ConfidentialAC, ZeiError> {
+pub fn cac_create<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
+                                                      cred_issuer_pk: &ACIssuerPublicKey,
+                                                      enc_key: &ElGamalPublicKey,
+                                                      attrs: &[B],
+                                                      reveal_map: &[bool],
+                                                      ac_reveal_sig: &ACRevealSig)
+                                                      -> Result<ConfidentialAC, ZeiError> {
   let attrs_scalar: Vec<BLSScalar> = attrs.iter()
-                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(*x))
+                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(x.as_ref()))
                                           .collect();
   crate::crypto::conf_cred_reveal::cac_create(prng,
                                               cred_issuer_pk,
@@ -83,6 +80,7 @@ pub fn cac_verify(issuer_pk: &ACIssuerPublicKey,
   crate::crypto::conf_cred_reveal::cac_verify(issuer_pk, enc_key, reveal_map, cac)
 }
 
-pub fn cac_gen_encryption_keys<R: CryptoRng + Rng>(prng: &mut R) -> (ElGamalSecretKey, ElGamalPublicKey){
+pub fn cac_gen_encryption_keys<R: CryptoRng + Rng>(prng: &mut R)
+                                                   -> (ElGamalSecretKey, ElGamalPublicKey) {
   elgamal_keygen::<_, BLSScalar, BLSG1>(prng, &BLSG1::get_base())
 }

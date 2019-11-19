@@ -635,6 +635,7 @@ pub(crate) mod tests {
   use crate::algebra::groups::Group;
   use crate::algebra::ristretto::{CompRist, RistPoint};
   use crate::api::anon_creds;
+  use crate::api::conf_cred_reveal::cac_gen_encryption_keys;
   use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey};
   use crate::basic_crypto::signatures::XfrKeyPair;
   use crate::errors::ZeiError::{
@@ -650,7 +651,6 @@ pub(crate) mod tests {
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
-  use crate::api::conf_cred_reveal::cac_gen_encryption_keys;
 
   pub(crate) fn create_xfr(
     prng: &mut ChaChaRng,
@@ -664,7 +664,7 @@ pub(crate) mod tests {
     let issuer_public_key = match asset_tracking {
       true => {
         let (_sk, xfr_pub_key) = elgamal_keygen::<_, Scalar, RistrettoPoint>(prng, &pc_gens.B);
-        let (_sk, id_reveal_pub_key) =  cac_gen_encryption_keys(prng);
+        let (_sk, id_reveal_pub_key) = cac_gen_encryption_keys(prng);
 
         Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
                                     ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
@@ -1094,14 +1094,7 @@ pub(crate) mod tests {
                                asset_type: [0; 16],
                                public_key: input_keypair.get_pk_ref().clone() };
 
-    let attr1 = b"attr1";
-    let attr2 = b"attr2";
-    let attr3 = b"attr3";
-    let attr4 = b"attr4";
-    let attrs = [attr1.as_ref(),
-                 attr2.as_ref(),
-                 attr3.as_ref(),
-                 attr4.as_ref()];
+    let attrs = [b"attr1", b"attr2", b"attr3", b"attr4"];
     let cred_issuer_keys = anon_creds::ac_keygen_issuer(&mut prng, 4);
     let receiver_ac_keys = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_keys.0);
 

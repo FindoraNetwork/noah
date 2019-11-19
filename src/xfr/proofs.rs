@@ -228,12 +228,13 @@ fn verify_attribute_reveal_policy(asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
   }
 }
 
-pub fn create_conf_id_reveal<R: Rng + CryptoRng>(prng: &mut R,
-                                                 attrs: &[&[u8]],
-                                                 policy: &IdRevealPolicy,
-                                                 attr_reveal_proof: &ACRevealSig,
-                                                 asset_issuer_public_key: &ElGamalPublicKey<BLSG1>)
-                                                 -> Result<ConfidentialAC, ZeiError> {
+pub fn create_conf_id_reveal<R: Rng + CryptoRng, B: AsRef<[u8]>>(
+  prng: &mut R,
+  attrs: &[B],
+  policy: &IdRevealPolicy,
+  attr_reveal_proof: &ACRevealSig,
+  asset_issuer_public_key: &ElGamalPublicKey<BLSG1>)
+  -> Result<ConfidentialAC, ZeiError> {
   cac_create(prng,
              &policy.cred_issuer_pub_key,
              asset_issuer_public_key,
