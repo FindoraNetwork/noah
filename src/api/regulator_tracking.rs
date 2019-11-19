@@ -11,7 +11,7 @@ use crate::api::anon_creds::{
 };
 use crate::api::gp_sig::{
   gpsig_join_cert, gpsig_open, gpsig_verify, GroupPublicKey, GroupSecretKey, GroupSignature,
-  JoinCert, TagKey
+  JoinCert, TagKey,
 };
 use crate::errors::ZeiError;
 use rand::{CryptoRng, Rng};
@@ -70,16 +70,15 @@ pub fn rt_process_join_request<R: CryptoRng + Rng, B: AsRef<[u8]>>(
 
   // 2 generate tag
   Ok(gpsig_join_cert(prng, rsk))
-
 }
 
 /// Group signature verification function
 /// # Example
 /// see zei::api::regulator_tracking::rt_get_trace_tag;
 pub fn rt_verify_sig<B: AsRef<[u8]>>(rpk: &GroupPublicKey,
-                     sig: &GroupSignature,
-                     msg: &B)
-                     -> Result<(), ZeiError> {
+                                     sig: &GroupSignature,
+                                     msg: &B)
+                                     -> Result<(), ZeiError> {
   gpsig_verify(rpk, sig, msg)
 }
 

@@ -1,4 +1,4 @@
-use crate::algebra::groups::{Scalar, Group};
+use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::basic_crypto::elgamal::{
   elgamal_decrypt_elem, elgamal_encrypt, elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey,
@@ -40,9 +40,11 @@ pub struct GroupSignature<P: PairingTargetGroup> {
 /// I generate the private and public parameters for the Group manager.
 /// * `prng` - source of randomness
 /// * `returns` - a group public key and a group secret key
-pub fn gpsig_setup<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R) -> (GroupPublicKey<P>, GroupSecretKey<P>) {
-  let (ver_key, sig_key) = ps_gen_keys::<R,P>(prng);
-  let (dec_key, enc_key) = elgamal_keygen::<_,P::ScalarField, P::G1>(prng, &P::G1::get_base());
+pub fn gpsig_setup<R: CryptoRng + Rng, P: PairingTargetGroup>(
+  prng: &mut R)
+  -> (GroupPublicKey<P>, GroupSecretKey<P>) {
+  let (ver_key, sig_key) = ps_gen_keys::<R, P>(prng);
+  let (dec_key, enc_key) = elgamal_keygen::<_, P::ScalarField, P::G1>(prng, &P::G1::get_base());
   (GroupPublicKey { ver_key, enc_key }, GroupSecretKey { sig_key, dec_key })
 }
 
@@ -54,16 +56,19 @@ pub struct JoinCert<P: PairingTargetGroup> {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TagKey<P: PairingTargetGroup> (P::G1);
+pub struct TagKey<P: PairingTargetGroup>(P::G1);
 
 /// I produce a join certificate for a new user.
 /// This algorithm is run by the Group Manager.
 /// * `prng` - source of randomness
 /// * `msk` - group secret key
 /// * `return` join certificate for user and tag key for the manager
-pub(crate) fn gpsig_join_cert<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R, msk: &GroupSecretKey<P>) -> (JoinCert<P>, TagKey<P>) {
+pub(crate) fn gpsig_join_cert<R: CryptoRng + Rng, P: PairingTargetGroup>(
+  prng: &mut R,
+  msk: &GroupSecretKey<P>)
+  -> (JoinCert<P>, TagKey<P>) {
   let tag = P::ScalarField::random_scalar(prng);
-  let sig = ps_sign_scalar::<R,P>(prng, &msk.sig_key, &tag);
+  let sig = ps_sign_scalar::<R, P>(prng, &msk.sig_key, &tag);
   let tag_key = TagKey(P::G1::get_base().mul(&tag));
   (JoinCert { tag, sig }, tag_key)
 }
@@ -75,10 +80,10 @@ pub(crate) fn gpsig_join_cert<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &
 /// * `join_cert` - join certificate
 /// * `msg` - message to be signed
 pub(crate) fn gpsig_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
-                                      gpk: &GroupPublicKey<P>,
-                                      join_cert: &JoinCert<P>,
-                                      msg: &[u8])
-                                      -> GroupSignature<P> {
+                                                                    gpk: &GroupPublicKey<P>,
+                                                                    join_cert: &JoinCert<P>,
+                                                                    msg: &[u8])
+                                                                    -> GroupSignature<P> {
   let g1_base = P::G1::get_base();
 
   // 1. randomize signature
@@ -110,11 +115,11 @@ pub(crate) struct PoK<P: PairingTargetGroup> {
 /// * `r` - randomness of the ciphertext
 /// * `msg` - message to be signed
 fn signature_proof_of_knowledge<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
-                                                    gpk: &GroupPublicKey<P>,
-                                                    tag: &P::ScalarField,
-                                                    r: &P::ScalarField,
-                                                    msg: &[u8])
-                                                    -> PoK<P> {
+                                                                           gpk: &GroupPublicKey<P>,
+                                                                           tag: &P::ScalarField,
+                                                                           r: &P::ScalarField,
+                                                                           msg: &[u8])
+                                                                           -> PoK<P> {
   let g1_base = P::G1::get_base();
   let g2_base = P::G2::get_base();
 
@@ -155,12 +160,12 @@ fn signature_proof_of_knowledge<R: CryptoRng + Rng, P: PairingTargetGroup>(prng:
 /// * `commitments_g2` - commmitments from group G2
 /// * `msg` - message
 fn compute_signature_pok_challenge<P: PairingTargetGroup>(g1: &P::G1,
-                                   g2: &P::G2,
-                                   gpk: &GroupPublicKey<P>,
-                                   commitments_g1: &[P::G1],
-                                   commitments_g2: &[P::G2],
-                                   msg: &[u8])
-                                   -> P::ScalarField {
+                                                          g2: &P::G2,
+                                                          gpk: &GroupPublicKey<P>,
+                                                          commitments_g1: &[P::G1],
+                                                          commitments_g2: &[P::G2],
+                                                          msg: &[u8])
+                                                          -> P::ScalarField {
   let mut hasher = Sha512::new();
   hasher.input(b"spok traceable group signature");
   hasher.input(g1.to_compressed_bytes());
@@ -183,9 +188,9 @@ fn compute_signature_pok_challenge<P: PairingTargetGroup>(g1: &P::G1,
 /// * `sig` - group signature on message `msg`
 /// * `msg` - message
 fn verify_signature_pok<P: PairingTargetGroup>(gpk: &GroupPublicKey<P>,
-                        sig: &GroupSignature<P>,
-                        msg: &[u8])
-                        -> Result<(), ZeiError> {
+                                               sig: &GroupSignature<P>,
+                                               msg: &[u8])
+                                               -> Result<(), ZeiError> {
   let g1_base = P::G1::get_base();
   let g2_base = P::G2::get_base();
   let commitments_g1 = &sig.spok.commitments_g1;
@@ -240,9 +245,9 @@ fn verify_signature_pok<P: PairingTargetGroup>(gpk: &GroupPublicKey<P>,
 /// * `sig` - group signature
 /// * `msg` - message
 pub(crate) fn gpsig_verify<P: PairingTargetGroup>(gpk: &GroupPublicKey<P>,
-                    sig: &GroupSignature<P>,
-                    msg: &[u8])
-                    -> Result<(), ZeiError> {
+                                                  sig: &GroupSignature<P>,
+                                                  msg: &[u8])
+                                                  -> Result<(), ZeiError> {
   verify_signature_pok(gpk, sig, msg)
 }
 
@@ -251,7 +256,9 @@ pub(crate) fn gpsig_verify<P: PairingTargetGroup>(gpk: &GroupPublicKey<P>,
 /// * `sig` - signature
 /// * `gp_sk` - group secret key
 /// ```
-pub(crate) fn gpsig_open<P: PairingTargetGroup>(sig: &GroupSignature<P>, gp_sk: &GroupSecretKey<P>) -> TagKey<P> {
+pub(crate) fn gpsig_open<P: PairingTargetGroup>(sig: &GroupSignature<P>,
+                                                gp_sk: &GroupSecretKey<P>)
+                                                -> TagKey<P> {
   TagKey(elgamal_decrypt_elem(&sig.enc, &gp_sk.dec_key))
 }
 
@@ -259,7 +266,7 @@ pub(crate) fn gpsig_open<P: PairingTargetGroup>(sig: &GroupSignature<P>, gp_sk: 
 
 mod tests {
   use super::{gpsig_join_cert, gpsig_open, gpsig_setup, gpsig_sign, gpsig_verify};
-  use crate::algebra::bls12_381::{BLSScalar, BLSG1, BLSG2, BLSGt};
+  use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
   use crate::algebra::groups::Group;
   use crate::errors::ZeiError;
   use rand::SeedableRng;
@@ -268,7 +275,7 @@ mod tests {
   #[test]
   fn group_manager_keys_are_consistent() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let (gpk, msk) = gpsig_setup::<_,BLSGt>(&mut prng);
+    let (gpk, msk) = gpsig_setup::<_, BLSGt>(&mut prng);
 
     // Check the signature keys
     let pub_sig_key = &gpk.ver_key;

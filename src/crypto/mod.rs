@@ -4,8 +4,8 @@ pub mod bp_circuits;
 pub mod chaum_pedersen;
 pub(crate) mod conf_cred_reveal;
 pub mod dlog;
-pub mod pedersen_elgamal;
 pub mod group_signatures;
+pub mod pedersen_elgamal;
 pub mod solvency;
 pub mod whitelist;
 

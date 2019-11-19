@@ -1,18 +1,15 @@
 use crate::algebra::bls12_381::BLSGt;
-use rand::{CryptoRng, Rng};
 use crate::errors::ZeiError;
+use rand::{CryptoRng, Rng};
 
 /// The public key of the group manager
 pub type GroupPublicKey = crate::crypto::group_signatures::GroupPublicKey<BLSGt>;
-
 
 /// The secret key of the group manager
 pub type GroupSecretKey = crate::crypto::group_signatures::GroupSecretKey<BLSGt>;
 
 /// A group signature
 pub type GroupSignature = crate::crypto::group_signatures::GroupSignature<BLSGt>;
-
-
 
 /// Generates the private and public parameters for the Group manager.
 /// * `prng` - source of randomness
@@ -21,22 +18,20 @@ pub fn gpsig_setup<R: CryptoRng + Rng>(prng: &mut R) -> (GroupPublicKey, GroupSe
   crate::crypto::group_signatures::gpsig_setup::<R, BLSGt>(prng)
 }
 
-
 /// Group membership certificate
 pub type JoinCert = crate::crypto::group_signatures::JoinCert<BLSGt>;
 pub type TagKey = crate::crypto::group_signatures::TagKey<BLSGt>;
-
-
 
 /// Produces a join certificate for a new user.
 /// Run by the Group Manager.
 /// * `prng` - source of randomness
 /// * `msk` - group secret key
 /// * `return` join certificate
-pub fn gpsig_join_cert<R: CryptoRng + Rng>(prng: &mut R, msk: &GroupSecretKey) -> (JoinCert, TagKey) {
+pub fn gpsig_join_cert<R: CryptoRng + Rng>(prng: &mut R,
+                                           msk: &GroupSecretKey)
+                                           -> (JoinCert, TagKey) {
   crate::crypto::group_signatures::gpsig_join_cert(prng, msk)
 }
-
 
 /// Signature funtion run by a user to produce a group signature
 /// * `prng` - source of randomness
@@ -55,10 +50,10 @@ pub fn gpsig_join_cert<R: CryptoRng + Rng>(prng: &mut R, msk: &GroupSecretKey) -
 /// assert!(gpsig_verify(&gpk, &sig, b"Some message").is_ok());
 /// ```
 pub fn gpsig_sign<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
-                                      gpk: &GroupPublicKey,
-                                      join_cert: &JoinCert,
-                                      msg: &B)
-                                      -> GroupSignature {
+                                                      gpk: &GroupPublicKey,
+                                                      join_cert: &JoinCert,
+                                                      msg: &B)
+                                                      -> GroupSignature {
   crate::crypto::group_signatures::gpsig_sign(prng, gpk, join_cert, msg.as_ref())
 }
 
@@ -71,12 +66,11 @@ pub fn gpsig_sign<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
 /// // See zei::api::gp_sig::gpsig_sign
 /// ```
 pub fn gpsig_verify<B: AsRef<[u8]>>(gpk: &GroupPublicKey,
-                    sig: &GroupSignature,
-                    msg: &B)
-                    -> Result<(), ZeiError> {
+                                    sig: &GroupSignature,
+                                    msg: &B)
+                                    -> Result<(), ZeiError> {
   crate::crypto::group_signatures::gpsig_verify(gpk, sig, msg.as_ref())
 }
-
 
 /// Signature opening function
 /// This algorithm is run by the Group Manager to recover the identity tag corresponding to the signer
@@ -98,4 +92,3 @@ pub fn gpsig_verify<B: AsRef<[u8]>>(gpk: &GroupPublicKey,
 pub fn gpsig_open(sig: &GroupSignature, msk: &GroupSecretKey) -> TagKey {
   crate::crypto::group_signatures::gpsig_open(sig, msk)
 }
-
