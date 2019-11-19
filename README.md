@@ -184,6 +184,8 @@ version = "0.0.1"
 
 Then, in your library or executable source, add:
 
+## Import zei library
+
 ```rust
 extern crate zei;
 ```
@@ -196,3 +198,16 @@ likely want to compile with
 If you're building for a machine with avx2 instructions, there's also the
 experimental `avx2_backend`.  To use it, compile with
 `RUSTFLAGS="-C target_cpu=native" cargo build --no-default-features --features="avx2_backend"`
+
+## Point to a branch of zei
+
+If you want your project to point to a specific branch of zei do the following:
+ * Edit `Cargo.toml` and replace the line (assume the branch name is *refactor/api-module*)
+```
+zei = { git = "ssh://git@github.com/findoraorg/zei"}
+```
+
+by 
+```
+zei = { git = "ssh://git@github.com/findoraorg/zei" , branch = "refactor/api-module"}
+```
