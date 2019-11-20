@@ -9,11 +9,11 @@ type HashFnc = sha2::Sha512;
 
 // BLS Signatures
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct BlsSecretKey<P: PairingTargetGroup>(P::ScalarField);
+pub struct BlsSecretKey<P: PairingTargetGroup>(pub(crate) P::ScalarField);
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct BlsPublicKey<P: PairingTargetGroup>(P::G1);
+pub struct BlsPublicKey<P: PairingTargetGroup>(pub(crate) P::G1);
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct BlsSignature<P: PairingTargetGroup>(P::G2);
+pub struct BlsSignature<P: PairingTargetGroup>(pub(crate) P::G2);
 
 /// bls key generation function
 pub fn bls_gen_keys<R: CryptoRng + Rng, P: PairingTargetGroup>(
@@ -25,19 +25,19 @@ pub fn bls_gen_keys<R: CryptoRng + Rng, P: PairingTargetGroup>(
 }
 
 /// bls signature function
-pub fn bls_sign<P: PairingTargetGroup>(signing_key: &BlsSecretKey<P>,
-                                       message: &[u8])
-                                       -> BlsSignature<P> {
-  let hashed = bls_hash_message::<P>(message);
+pub fn bls_sign<P: PairingTargetGroup, B: AsRef<[u8]>>(signing_key: &BlsSecretKey<P>,
+                                                       message: &B)
+                                                       -> BlsSignature<P> {
+  let hashed = bls_hash_message::<P>(message.as_ref());
   BlsSignature(hashed.mul(&signing_key.0))
 }
 
 /// bls verification function
-pub fn bls_verify<P: PairingTargetGroup>(ver_key: &BlsPublicKey<P>,
-                                         message: &[u8],
-                                         signature: &BlsSignature<P>)
-                                         -> Result<(), ZeiError> {
-  let hashed = bls_hash_message::<P>(message);
+pub fn bls_verify<P: PairingTargetGroup, B: AsRef<[u8]>>(ver_key: &BlsPublicKey<P>,
+                                                         message: &B,
+                                                         signature: &BlsSignature<P>)
+                                                         -> Result<(), ZeiError> {
+  let hashed = bls_hash_message::<P>(message.as_ref());
   let a = P::pairing(&P::G1::get_base(), &signature.0);
   let b = P::pairing(&ver_key.0, &hashed);
 
@@ -48,10 +48,10 @@ pub fn bls_verify<P: PairingTargetGroup>(ver_key: &BlsPublicKey<P>,
 }
 
 /// aggregate signature (for a single common message)
-pub fn bls_aggregate<P: PairingTargetGroup>(ver_keys: &[BlsPublicKey<P>],
-                                            signatures: &[BlsSignature<P>])
+pub fn bls_aggregate<P: PairingTargetGroup>(ver_keys: &[&BlsPublicKey<P>],
+                                            signatures: &[&BlsSignature<P>])
                                             -> BlsSignature<P> {
-  assert!(ver_keys.len() == signatures.len());
+  assert_eq!(ver_keys.len(), signatures.len());
   let scalars = bls_hash_pubkeys_to_scalars::<P>(ver_keys);
   let mut agg_signature = P::G2::get_identity();
   for (t, s) in scalars.iter().zip(signatures) {
@@ -61,23 +61,23 @@ pub fn bls_aggregate<P: PairingTargetGroup>(ver_keys: &[BlsPublicKey<P>],
 }
 
 /// Verification of an aggregated signature for a common message
-pub fn bls_verify_aggregated<P: PairingTargetGroup>(ver_keys: &[BlsPublicKey<P>],
-                                                    message: &[u8],
-                                                    agg_signature: &BlsSignature<P>)
-                                                    -> Result<(), ZeiError> {
+pub fn bls_verify_aggregated<P: PairingTargetGroup, B: AsRef<[u8]>>(ver_keys: &[&BlsPublicKey<P>],
+                                                                    message: &B,
+                                                                    agg_signature: &BlsSignature<P>)
+                                                                    -> Result<(), ZeiError> {
   let scalars = bls_hash_pubkeys_to_scalars::<P>(ver_keys);
   let mut agg_pub_key = P::G1::get_identity();
   for (t, key) in scalars.iter().zip(ver_keys) {
     agg_pub_key = agg_pub_key.add(&key.0.mul(t));
   }
-  bls_verify::<P>(&BlsPublicKey(agg_pub_key), message, agg_signature)
+  bls_verify::<P, B>(&BlsPublicKey(agg_pub_key), message, agg_signature)
 }
 
 /// Batch verification of many signatures
-pub fn bls_batch_verify<P: PairingTargetGroup>(ver_keys: &[BlsPublicKey<P>],
-                                               messages: &[&[u8]],
-                                               signatures: &[BlsSignature<P>])
-                                               -> Result<(), ZeiError> {
+pub fn bls_batch_verify<P: PairingTargetGroup, B: AsRef<[u8]>>(ver_keys: &[BlsPublicKey<P>],
+                                                               messages: &[B],
+                                                               signatures: &[BlsSignature<P>])
+                                                               -> Result<(), ZeiError> {
   assert!(ver_keys.len() == messages.len() && ver_keys.len() == signatures.len());
   let sig = bls_add_signatures(signatures);
   bls_batch_verify_added_signatures(ver_keys, messages, &sig)
@@ -94,14 +94,15 @@ pub fn bls_add_signatures<P: PairingTargetGroup>(signatures: &[BlsSignature<P>])
 }
 
 /// verification of an aggregated signatures for different messages
-pub fn bls_batch_verify_added_signatures<P: PairingTargetGroup>(ver_keys: &[BlsPublicKey<P>],
-                                                                messages: &[&[u8]],
-                                                                signature: &BlsSignature<P>)
-                                                                -> Result<(), ZeiError> {
+pub fn bls_batch_verify_added_signatures<P: PairingTargetGroup, B: AsRef<[u8]>>(
+  ver_keys: &[BlsPublicKey<P>],
+  messages: &[B],
+  signature: &BlsSignature<P>)
+  -> Result<(), ZeiError> {
   let a = P::pairing(&P::G1::get_base(), &signature.0);
   let mut b = P::get_identity();
   for (pk, m) in ver_keys.iter().zip(messages) {
-    let hashed = bls_hash_message::<P>(*m);
+    let hashed = bls_hash_message::<P>(m.as_ref());
     let p = P::pairing(&pk.0, &hashed);
     b = b.add(&p)
   }
@@ -120,7 +121,7 @@ pub fn bls_hash_message<P: PairingTargetGroup>(message: &[u8]) -> P::G2 {
 }
 
 /// hash function to N scalars on the pairing field
-pub fn bls_hash_pubkeys_to_scalars<P: PairingTargetGroup>(ver_keys: &[BlsPublicKey<P>])
+pub fn bls_hash_pubkeys_to_scalars<P: PairingTargetGroup>(ver_keys: &[&BlsPublicKey<P>])
                                                           -> Vec<P::ScalarField> {
   let mut hasher = HashFnc::default();
   let n = ver_keys.len();
@@ -152,11 +153,11 @@ mod tests {
 
     let message = b"this is a message";
 
-    let signature = super::bls_sign::<BLSGt>(&sk, message);
+    let signature = super::bls_sign::<BLSGt, _>(&sk, message);
 
-    assert_eq!(Ok(()), super::bls_verify::<BLSGt>(&pk, message, &signature));
+    assert_eq!(Ok(()), super::bls_verify(&pk, message, &signature));
     assert_eq!(Err(crate::errors::ZeiError::SignatureError),
-               super::bls_verify::<BLSGt>(&pk, b"wrong message", &signature))
+               super::bls_verify(&pk, b"wrong message", &signature))
   }
 
   #[test]
@@ -168,16 +169,17 @@ mod tests {
 
     let message = b"this is a message";
 
-    let signature1 = super::bls_sign::<BLSGt>(&sk1, message);
-    let signature2 = super::bls_sign::<BLSGt>(&sk2, message);
-    let signature3 = super::bls_sign::<BLSGt>(&sk3, message);
+    let signature1 = super::bls_sign(&sk1, message);
+    let signature2 = super::bls_sign(&sk2, message);
+    let signature3 = super::bls_sign(&sk3, message);
 
-    let keys = [pk1, pk2, pk3];
+    let keys = [&pk1, &pk2, &pk3];
 
-    let agg_signature = super::bls_aggregate::<BLSGt>(&keys, &[signature1, signature2, signature3]);
+    let agg_signature =
+      super::bls_aggregate::<BLSGt>(&keys, &[&signature1, &signature2, &signature3]);
 
     assert_eq!(Ok(()),
-               super::bls_verify_aggregated::<BLSGt>(&keys, message, &agg_signature));
+               super::bls_verify_aggregated(&keys, message, &agg_signature));
   }
 
   #[test]
@@ -191,22 +193,21 @@ mod tests {
     let message2 = b"this is another message";
     let message3 = b"this is an additional message";
 
-    let signature1 = super::bls_sign::<BLSGt>(&sk1, message1);
-    let signature2 = super::bls_sign::<BLSGt>(&sk2, message2);
-    let signature3 = super::bls_sign::<BLSGt>(&sk3, message3);
+    let signature1 = super::bls_sign::<BLSGt, _>(&sk1, message1);
+    let signature2 = super::bls_sign::<BLSGt, _>(&sk2, message2);
+    let signature3 = super::bls_sign::<BLSGt, _>(&sk3, message3);
 
     let keys = [pk1, pk2, pk3];
-    let messages = [&message1[..], &message2[..], &message3[..]];
+    let messages = [message1.as_ref(), message2.as_ref(), message3.as_ref()];
     let sigs = [signature1, signature2, signature3];
 
-    assert_eq!(Ok(()),
-               super::bls_batch_verify::<BLSGt>(&keys, &messages, &sigs));
+    assert_eq!(Ok(()), super::bls_batch_verify(&keys, &messages[..], &sigs));
 
     let new_message3 = b"this message has not been signed";
 
     let messages = [&message1[..], &message2[..], &new_message3[..]];
 
     assert_eq!(Err(ZeiError::SignatureError),
-               super::bls_batch_verify::<BLSGt>(&keys, &messages, &sigs));
+               super::bls_batch_verify(&keys, &messages, &sigs));
   }
 }
