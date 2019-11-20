@@ -78,6 +78,7 @@ impl XfrSecretKey {
     key_scalar * y
   }
 
+  #[allow(clippy::should_implement_trait)]
   pub fn clone(&self) -> Self {
     let bytes = self.zei_to_bytes();
     XfrSecretKey::zei_from_bytes(bytes.as_slice())

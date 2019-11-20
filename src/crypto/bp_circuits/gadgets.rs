@@ -18,14 +18,14 @@ pub(super) fn list_mix<CS: RandomizableConstraintSystem>(cs: &mut CS,
   if l <= 1 {
     return Ok(0);
   }
-  let first_in = input[0].clone();
+  let first_in = input[0];
   let in1iter = iter::once(&first_in).chain(mid.iter());
   let in2iter = input[1..l].iter();
   let out1iter = out[0..l - 1].iter();
   let out2iter = mid.iter().chain(iter::once(&out[l - 1]));
 
   for (((in1, in2), out1), out2) in in1iter.zip(in2iter).zip(out1iter).zip(out2iter) {
-    num_left_wires = num_left_wires + gate_mix(cs, *in1, *in2, *out1, *out2)?;
+    num_left_wires += gate_mix(cs, *in1, *in2, *out1, *out2)?;
   }
   Ok(num_left_wires)
 }

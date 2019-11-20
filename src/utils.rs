@@ -98,7 +98,7 @@ pub(crate) fn min_greater_equal_power_of_two(n: u32) -> u32 {
 }
 
 pub(crate) fn u64_to_u32_pair(x: u64) -> (u32, u32) {
-  ((x & 0xFFFFFFFF) as u32, (x >> 32) as u32)
+  ((x & 0xFFFF_FFFF) as u32, (x >> 32) as u32)
 }
 
 pub(crate) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {

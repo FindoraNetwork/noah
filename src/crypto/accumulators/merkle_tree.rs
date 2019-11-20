@@ -82,7 +82,7 @@ pub fn mt_verify<S, H>(root: &MerkleRoot<S>,
       PathDirection::RIGHT => hasher.digest(&[sibling, &prev]),
       PathDirection::LEFT => hasher.digest(&[&prev, sibling]),
     };
-    level = level - 1;
+    level -= 1;
   }
   let hasher = H::new(0);
   let sibling = &path[path.len() - 1].1;
@@ -91,9 +91,10 @@ pub fn mt_verify<S, H>(root: &MerkleRoot<S>,
     PathDirection::LEFT => hasher.digest_root(root.size, &[&prev, sibling]),
   };
 
-  match computed_root == root.value {
-    true => Ok(()),
-    false => Err(ZeiError::MerkleTreeVerificationError),
+  if computed_root == root.value {
+    Ok(())
+  } else {
+    Err(ZeiError::MerkleTreeVerificationError)
   }
 }
 
@@ -157,7 +158,7 @@ impl MTHash<Scalar> for MiMCHash {
     let mut sa = Scalar::from(0u8);
     let mut sc = Scalar::from(0u8);
     for value in values.iter() {
-      let x = mimc_feistel(&(*value + &sa), &sc, &self.c[..]);
+      let x = mimc_feistel(&(*value + sa), &sc, &self.c[..]);
       sa = x.0;
       sc = x.1;
     }
@@ -176,9 +177,10 @@ impl MTHash<Scalar> for MiMCHash {
 pub(crate) fn mimc_f(s: &Scalar, c: &Scalar) -> Scalar {
   let x = s + c;
   let x2 = x * x;
-  return (x2 * x2) * x;
+  (x2 * x2) * x
 }
 
+#[allow(clippy::needless_range_loop)]
 pub(crate) fn compute_mimc_constants(level: usize) -> [Scalar; MIMC_ROUNDS] {
   let mut c = [Scalar::from(0u32); MIMC_ROUNDS];
   let mut hash = sha2::Sha256::new();
@@ -193,10 +195,10 @@ pub(crate) fn compute_mimc_constants(level: usize) -> [Scalar; MIMC_ROUNDS] {
 }
 
 pub(crate) fn mimc_feistel(left: &Scalar, right: &Scalar, c: &[Scalar]) -> (Scalar, Scalar) {
-  let mut xl = left.clone();
-  let mut xr = right.clone();
+  let mut xl = *left;
+  let mut xr = *right;
   for ci in c {
-    let aux = xl.clone();
+    let aux = xl;
     xl = xr + mimc_f(&xl, ci);
     xr = aux;
   }

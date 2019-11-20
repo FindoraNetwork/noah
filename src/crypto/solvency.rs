@@ -122,7 +122,7 @@ pub fn prove_solvency(hidden_asset_set: &[(Scalar, Scalar)], // amount and type 
   for (amount, asset_type) in public_asset_set {
     let rate = conversion_rates.get(asset_type)
                                .ok_or(ZeiError::SolvencyProveError)?;
-    public_asset_sum = public_asset_sum + rate * amount;
+    public_asset_sum += rate * amount;
   }
 
   // compute public liabilities total
@@ -130,7 +130,7 @@ pub fn prove_solvency(hidden_asset_set: &[(Scalar, Scalar)], // amount and type 
   for (amount, asset_type) in public_liability_set {
     let rate = conversion_rates.get(asset_type)
                                .ok_or(ZeiError::SolvencyProveError)?;
-    public_liability_sum = public_liability_sum + rate * amount;
+    public_liability_sum += rate * amount;
   }
 
   // padding:
@@ -201,14 +201,14 @@ pub fn verify_solvency(hidden_asset_set: &[(CompressedRistretto, CompressedRistr
   for (amount, asset_type) in public_asset_set {
     let rate = conversion_rates.get(asset_type)
                                .ok_or(ZeiError::SolvencyProveError)?;
-    public_asset_sum = public_asset_sum + rate * amount;
+    public_asset_sum += rate * amount;
   }
 
   let mut public_liability_sum = Scalar::zero();
   for (amount, asset_type) in public_liability_set {
     let rate = conversion_rates.get(asset_type)
                                .ok_or(ZeiError::SolvencyProveError)?;
-    public_liability_sum = public_liability_sum + rate * amount;
+    public_liability_sum += rate * amount;
   }
 
   // padding:

@@ -34,7 +34,7 @@ impl Eq for BNScalar {}
 
 impl Clone for BNScalar {
   fn clone(&self) -> BNScalar {
-    BNScalar(self.0.clone())
+    BNScalar(self.0)
   }
 }
 
@@ -60,7 +60,7 @@ impl crate::algebra::groups::Scalar for BNScalar {
       if v & 1 == 1u64 {
         result = result + two_pow_i;
       }
-      v = v >> 1;
+      v >>= 1;
       two_pow_i = two_pow_i * two;
     }
     BNScalar(result)
@@ -167,7 +167,7 @@ impl Eq for BNG1 {}
 
 impl Clone for BNG1 {
   fn clone(&self) -> BNG1 {
-    BNG1(self.0.clone())
+    BNG1(self.0)
   }
 }
 
@@ -206,7 +206,7 @@ impl Group<BNScalar> for BNG1 {
 
   //arithmetic
   fn mul(&self, scalar: &BNScalar) -> BNG1 {
-    return BNG1(self.0 * scalar.0);
+    BNG1(self.0 * scalar.0)
   }
   fn add(&self, other: &Self) -> BNG1 {
     BNG1(self.0 + other.0)
@@ -288,7 +288,7 @@ impl Eq for BNG2 {}
 
 impl Clone for BNG2 {
   fn clone(&self) -> BNG2 {
-    BNG2(self.0.clone())
+    BNG2(self.0)
   }
 }
 
@@ -327,7 +327,7 @@ impl Group<BNScalar> for BNG2 {
 
   //arithmetic
   fn mul(&self, scalar: &BNScalar) -> BNG2 {
-    return BNG2(self.0 * scalar.0);
+    BNG2(self.0 * scalar.0)
   }
   fn add(&self, other: &Self) -> BNG2 {
     BNG2(self.0 + other.0)
@@ -419,12 +419,10 @@ impl PairingTargetGroup for BNGt {
   }
 
   fn to_bytes(&self) -> Vec<u8> {
-    assert!(false, "Not implemented");
-    vec![]
+    panic!("Not implemented");
   }
   fn from_bytes(_bytes: &[u8]) -> Self {
-    assert!(false, "Not implemented");
-    BNGt::get_identity()
+    panic!("Not implemented");
   }
 }
 

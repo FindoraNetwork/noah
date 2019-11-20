@@ -23,10 +23,11 @@ pub fn prove_knowledge_dlog<R: CryptoRng + Rng, S: ZeiScalar, G: Group<S>>(prng:
   let challenge = compute_challenge_ref::<S, G>(&[base, &proof_commitment, point]);
   let response = challenge.mul(dlog).add(&u);
 
-  DlogProof { proof_commitment: proof_commitment,
+  DlogProof { proof_commitment,
               response }
 }
 
+#[allow(clippy::let_and_return)]
 pub fn verify_proof_of_knowledge_dlog<S: ZeiScalar, G: Group<S>>(base: &G,
                                                                  point: &G,
                                                                  proof: &DlogProof<G, S>)
@@ -57,9 +58,9 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, S: ZeiScalar, G: Group<
   //context.extend_from_slice(points.iter());
   let challenge = compute_challenge_ref::<S, G>(context.as_slice());
   let mut response = u;
-  for i in 0..dlogs.len() {
+  for (i, item) in dlogs.iter().enumerate() {
     let challenge_i = compute_sub_challenge::<S>(&challenge, i as u32);
-    response = response.add(&challenge_i.mul(&dlogs[i]));
+    response = response.add(&challenge_i.mul(&item));
   }
 
   DlogProof { proof_commitment,
@@ -79,9 +80,9 @@ pub fn verify_multiple_knowledge_dlog<S: ZeiScalar, G: Group<S>>(base: &G,
   //context.extend_from_slice(points);
   let challenge = compute_challenge_ref::<S, G>(context.as_slice());
   let mut check = proof.proof_commitment.clone();
-  for i in 0..points.len() {
+  for (i, item) in points.iter().enumerate() {
     let challenge_i = compute_sub_challenge::<S>(&challenge, i as u32);
-    check = check.add(&points[i].mul(&challenge_i));
+    check = check.add(&item.mul(&challenge_i));
   }
   check == base.mul(&proof.response)
 }

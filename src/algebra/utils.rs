@@ -4,7 +4,7 @@ use super::groups::{Group, Scalar};
 pub(crate) fn group_linear_combination_rows<S: Scalar, G: Group<S>>(lc_scalars: &[S],
                                                                     matrix: &[Vec<G>])
                                                                     -> Vec<G> {
-  if matrix.len() == 0 {
+  if matrix.is_empty() {
     return vec![];
   }
   let mut result = vec![G::get_identity(); matrix[0].len()];

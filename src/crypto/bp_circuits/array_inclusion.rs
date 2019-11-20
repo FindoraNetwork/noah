@@ -13,12 +13,12 @@ pub fn array_membership<CS: ConstraintSystem>(cs: &mut CS,
   }
 
   let (_, _, mut out) = cs.multiply(set[0] - elem, set[1] - elem);
-  for i in 2..k {
-    let (_, _, out_i) = cs.multiply(set[i] - elem, out.into());
+  for item in set.iter().take(k).skip(2) {
+    let (_, _, out_i) = cs.multiply(*item - elem, out.into());
     out = out_i;
   }
   cs.constrain(out.into());
-  return k - 1;
+  k - 1
 }
 
 #[cfg(test)]

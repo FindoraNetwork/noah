@@ -111,6 +111,8 @@ impl AssetRecord {
   }
 }
 
+// TODO is this clippy warning a problem?
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum AssetAmountProof {
   AssetMix(AssetMixProof),        // multi-type fully confidential Xfr

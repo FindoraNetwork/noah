@@ -23,7 +23,7 @@ pub const MAX_PARTY_NUMBER: usize = 32;
 //party_capacity ->
 //Number of values or parties
 //is the maximum number of parties that can produce an aggregated proof.
-
+#[allow(clippy::new_without_default)]
 impl PublicParams {
   //helper function todo public setup
   pub fn new() -> PublicParams {

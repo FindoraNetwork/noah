@@ -22,7 +22,7 @@ use curve25519_dalek::traits::Identity;
 use merlin::Transcript;
 use rand::{CryptoRng, Rng};
 
-const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
+const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
 pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
   prng: &mut R,
@@ -89,8 +89,7 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
       }
     }
   }
-  let proof;
-  if m.len() > 0 {
+  let proof = if !m.is_empty() {
     let pk = ElGamalPublicKey(public_keys[0].eg_ristretto_pub_key
                                             .get_point_ref()
                                             .get_ristretto_point());
@@ -99,19 +98,20 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
             .map(|c| ElGamalCiphertext { e1: c.e1.get_ristretto_point(),
                                          e2: c.e2.get_ristretto_point() })
             .collect();
-    proof = Some(pedersen_elgamal_aggregate_eq_proof(prng,
-                                                     m.as_slice(),
-                                                     r.as_slice(),
-                                                     &pk,
-                                                     ctexts.as_slice(),
-                                                     commitments.as_slice()));
+    Some(pedersen_elgamal_aggregate_eq_proof(prng,
+                                             m.as_slice(),
+                                             r.as_slice(),
+                                             &pk,
+                                             ctexts.as_slice(),
+                                             commitments.as_slice()))
   } else {
-    proof = None;
-  }
+    None
+  };
 
   Ok(proof)
 }
-
+#[allow(clippy::iter_next_loop)]
+// TODO what do the two "for" loops below do??
 pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
                                                                xfr_body: &XfrBody,
                                                                attribute_reveal_policies: &[Option<IdRevealPolicy>])
@@ -120,9 +120,9 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
               second_key: Option<&AssetIssuerPubKeys>)
               -> bool {
     match (first_key, second_key) {
-      (Some(first_key), Some(second_key)) => return *first_key == *second_key,
-      (None, None) => return true,
-      _ => return false,
+      (Some(first_key), Some(second_key)) => *first_key == *second_key,
+      (None, None) => true,
+      _ => false,
     }
   }
   let issuer_public_key = xfr_body.inputs[0].issuer_public_key.as_ref();
@@ -223,7 +223,7 @@ fn verify_attribute_reveal_policy(asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
                                   policy: &IdRevealPolicy)
                                   -> Result<(), ZeiError> {
   match option_proof {
-    None => return Err(ZeiError::XfrVerifyIssuerTrackingIdentityError),
+    None => Err(ZeiError::XfrVerifyIssuerTrackingIdentityError),
     Some(identity_proof) => verify_conf_id_reveal(&identity_proof, asset_issuer_pk, policy),
   }
 }
@@ -301,14 +301,14 @@ pub(crate) fn range_proof(inputs: &[OpenAssetRecord],
 
   let mut in_blind_sum = Scalar::zero();
   for (blind_low, blind_high) in in_blind_low.iter().zip(in_blind_high.iter()) {
-    in_blind_sum = in_blind_sum + (blind_low + blind_high * pow2_32); //2^32
+    in_blind_sum += blind_low + blind_high * pow2_32; //2^32
   }
   let mut range_proof_blinds = Vec::with_capacity(upper_power2);
   let mut out_blind_sum = Scalar::zero();
   for (blind_low, blind_high) in out_blind_low.iter().zip(out_blind_high.iter()) {
     range_proof_blinds.push(blind_low.clone());
     range_proof_blinds.push(blind_high.clone());
-    out_blind_sum = out_blind_sum + (blind_low + blind_high * pow2_32); //2^32
+    out_blind_sum += blind_low + blind_high * pow2_32; //2^32
   }
 
   let xfr_blind_diff = in_blind_sum - out_blind_sum;
@@ -350,10 +350,10 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
 
   // 1. verify proof commitment to transfer's input - output amounts match proof commitments
   let mut total_input_com = RistrettoPoint::identity();
-  for bar in inputs.iter() {
-    let coms = bar.amount_commitments
-                  .as_ref()
-                  .ok_or(ZeiError::InconsistentStructureError)?;
+  for input in inputs.iter() {
+    let coms = input.amount_commitments
+                    .as_ref()
+                    .ok_or(ZeiError::InconsistentStructureError)?;
     let com_low = coms.0
                       .decompress_to_ristretto()
                       .ok_or(ZeiError::DecompressElementError)?;
@@ -365,10 +365,10 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
 
   let mut total_output_com = RistrettoPoint::identity();
   let mut range_coms: Vec<CompressedRistretto> = Vec::with_capacity(2 * num_output + 2);
-  for bar in outputs.iter() {
-    let coms = bar.amount_commitments
-                  .as_ref()
-                  .ok_or(ZeiError::InconsistentStructureError)?;
+  for output in outputs.iter() {
+    let coms = output.amount_commitments
+                     .as_ref()
+                     .ok_or(ZeiError::InconsistentStructureError)?;
     let com_low = coms.0
                       .decompress_to_ristretto()
                       .ok_or(ZeiError::DecompressElementError)?;
@@ -478,12 +478,9 @@ pub(crate) fn verify_confidential_asset<R: CryptoRng + Rng>(prng: &mut R,
 
   asset_commitments.extend(out_asset_commitments.iter());
 
-  match chaum_pedersen_verify_multiple_eq(prng,
-                                          &pc_gens,
-                                          asset_commitments.as_slice(),
-                                          asset_proof)?
-  {
-    true => Ok(()),
-    false => Err(ZeiError::XfrVerifyConfidentialAssetError),
+  if chaum_pedersen_verify_multiple_eq(prng, &pc_gens, asset_commitments.as_slice(), asset_proof)? {
+    Ok(())
+  } else {
+    Err(ZeiError::XfrVerifyConfidentialAssetError)
   }
 }

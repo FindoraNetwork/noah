@@ -16,7 +16,7 @@ use rand::{CryptoRng, Rng};
 use serde::ser::Serialize;
 use std::collections::HashMap;
 
-const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
+const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
 /// I Create a XfrNote from list of opened asset records inputs and asset record outputs
 /// # Example
@@ -91,7 +91,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
                                         input_keys: &[XfrKeyPair],
                                         identity_proofs: &[Option<ConfidentialAC>])
                                         -> Result<XfrNote, ZeiError> {
-  if inputs.len() == 0 {
+  if inputs.is_empty() {
     return Err(ZeiError::ParameterError);
   }
 
@@ -169,7 +169,7 @@ pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
                                         outputs: &[AssetRecord],
                                         identity_proofs: &[Option<ConfidentialAC>])
                                         -> Result<XfrBody, ZeiError> {
-  if inputs.len() == 0 {
+  if inputs.is_empty() {
     return Err(ZeiError::ParameterError);
   }
 
@@ -192,16 +192,17 @@ pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
                                                   })
                                                   .collect();
 
-  let asset_amount_proof = match single_asset {
-    true => gen_xfr_proofs_single_asset(prng,
-                                        inputs,
-                                        open_outputs.as_slice(),
-                                        confidential_amount,
-                                        confidential_asset)?,
-    false => gen_xfr_proofs_multi_asset(inputs,
-                                        open_outputs.as_slice(),
-                                        confidential_amount,
-                                        confidential_asset)?,
+  let asset_amount_proof = if single_asset {
+    gen_xfr_proofs_single_asset(prng,
+                                inputs,
+                                open_outputs.as_slice(),
+                                confidential_amount,
+                                confidential_asset)?
+  } else {
+    gen_xfr_proofs_multi_asset(inputs,
+                               open_outputs.as_slice(),
+                               confidential_amount,
+                               confidential_asset)?
   };
 
   //do tracking proofs
@@ -241,7 +242,7 @@ fn check_keys(inputs: &[OpenAssetRecord], input_keys: &[XfrKeyPair]) -> Result<(
 }
 
 fn check_confidential_amount(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError> {
-  if inputs.len() == 0 {
+  if inputs.is_empty() {
     return Err(ZeiError::ParameterError);
   }
 
@@ -255,7 +256,7 @@ fn check_confidential_amount(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiErro
 }
 
 fn check_confidential_asset(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError> {
-  if inputs.len() == 0 {
+  if inputs.is_empty() {
     return Err(ZeiError::ParameterError);
   }
 
@@ -269,7 +270,7 @@ fn check_confidential_asset(inputs: &[OpenAssetRecord]) -> Result<bool, ZeiError
 }
 
 fn get_issuer_pk(inputs: &[OpenAssetRecord]) -> Result<&Option<AssetIssuerPubKeys>, ZeiError> {
-  if inputs.len() == 0 {
+  if inputs.is_empty() {
     return Err(ZeiError::ParameterError);
   }
 
@@ -329,14 +330,16 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + Rng>(prng: &mut R,
                                                    -> Result<AssetAmountProof, ZeiError> {
   let pc_gens = PedersenGens::default();
 
-  let xfr_range_proof = match confidential_amount {
-    true => Some(range_proof(inputs, outputs)?),
-    false => None,
+  let xfr_range_proof = if confidential_amount {
+    Some(range_proof(inputs, outputs)?)
+  } else {
+    None
   };
 
-  let xfr_asset_proof = match confidential_asset {
-    true => Some(asset_proof(prng, &pc_gens, inputs, outputs)?),
-    false => None,
+  let xfr_asset_proof = if confidential_asset {
+    Some(asset_proof(prng, &pc_gens, inputs, outputs)?)
+  } else {
+    None
   };
 
   if xfr_range_proof.is_none() && xfr_asset_proof.is_none() {
@@ -543,9 +546,10 @@ fn verify_plain_asset(inputs: &[BlindAssetRecord],
   for x in outputs.iter() {
     list.push(x.asset_type.unwrap());
   }
-  match list.iter().all_equal() {
-    true => Ok(()),
-    false => Err(ZeiError::XfrVerifyAssetAmountError),
+  if list.iter().all_equal() {
+    Ok(())
+  } else {
+    Err(ZeiError::XfrVerifyAssetAmountError)
   }
 }
 

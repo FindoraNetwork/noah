@@ -72,8 +72,8 @@ fn allocate_values_prover(prover: &mut Prover,
                         f: *atype };
     let (_, amount_var) = prover.commit(value.q.into(), *blind_amount);
     let (_, asset_var) = prover.commit(value.f, *blind_atype);
-    allocated_values.push(AllocatedValue { q: amount_var.clone(),
-                                           f: asset_var.clone(),
+    allocated_values.push(AllocatedValue { q: amount_var,
+                                           f: asset_var,
                                            assignment: Some(value) });
   }
   allocated_values

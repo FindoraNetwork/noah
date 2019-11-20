@@ -33,72 +33,78 @@ fn sample_blind_asset_record<R: CryptoRng + Rng>(
   let mut amount_type_bytes = vec![];
 
   // build amount fields
-  let (bar_amount, bar_amount_commitments, amount_blinds) = match confidential_amount {
-    true => {
-      let amount_bytes = u64_to_bigendian_u8array(asset_record.amount);
-      amount_type_bytes.extend_from_slice(&amount_bytes[..]);
+  let (bar_amount, bar_amount_commitments, amount_blinds) = if confidential_amount {
+    let amount_bytes = u64_to_bigendian_u8array(asset_record.amount);
+    amount_type_bytes.extend_from_slice(&amount_bytes[..]);
 
-      let amount_commitment_low = pc_gens.commit(Scalar::from(amount_low), amount_blind_low);
-      let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
+    let amount_commitment_low = pc_gens.commit(Scalar::from(amount_low), amount_blind_low);
+    let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
 
-      (None,
-       Some((CompRist(amount_commitment_low.compress()),
-             CompRist(amount_commitment_high.compress()))),
-       (amount_blind_low, amount_blind_high))
-    }
-    false => (Some(asset_record.amount), None, (Scalar::default(), Scalar::default())),
+    (None,
+     Some((CompRist(amount_commitment_low.compress()),
+           CompRist(amount_commitment_high.compress()))),
+     (amount_blind_low, amount_blind_high))
+  } else {
+    (Some(asset_record.amount), None, (Scalar::default(), Scalar::default()))
   };
 
   // build asset type fields
-  let (bar_type, bar_type_commitment, type_blind) = match confidential_asset {
-    true => {
-      amount_type_bytes.extend_from_slice(&asset_record.asset_type);
+  let (bar_type, bar_type_commitment, type_blind) = if confidential_asset {
+    amount_type_bytes.extend_from_slice(&asset_record.asset_type);
 
-      let type_commitment = pc_gens.commit(type_scalar, type_blind);
-      (None, Some(CompRist(type_commitment.compress())), type_blind)
-    }
-    false => (Some(asset_record.asset_type), None, Scalar::default()),
+    let type_commitment = pc_gens.commit(type_scalar, type_blind);
+    (None, Some(CompRist(type_commitment.compress())), type_blind)
+  } else {
+    (Some(asset_record.asset_type), None, Scalar::default())
   };
 
   //issuer asset tracking amount
   let issuer_lock_amount = match issuer_public_key {
     None => None,
-    Some(issuer_pk) => match confidential_amount {
-      true => Some((elgamal_encrypt(&RistPoint(pc_gens.B),
-                                    &RistScalar::from_u32(amount_low),
-                                    &RistScalar(amount_blind_low),
-                                    &issuer_pk.eg_ristretto_pub_key),
-                    elgamal_encrypt(&RistPoint(pc_gens.B),
-                                    &RistScalar::from_u32(amount_high),
-                                    &RistScalar(amount_blind_high),
-                                    &issuer_pk.eg_ristretto_pub_key))),
-      false => None,
-    },
+    Some(issuer_pk) => {
+      if confidential_amount {
+        Some((elgamal_encrypt(&RistPoint(pc_gens.B),
+                              &RistScalar::from_u32(amount_low),
+                              &RistScalar(amount_blind_low),
+                              &issuer_pk.eg_ristretto_pub_key),
+              elgamal_encrypt(&RistPoint(pc_gens.B),
+                              &RistScalar::from_u32(amount_high),
+                              &RistScalar(amount_blind_high),
+                              &issuer_pk.eg_ristretto_pub_key)))
+      } else {
+        None
+      }
+    }
   };
   //issuer asset tracking asset type
   let issuer_lock_type = match issuer_public_key {
     None => None,
-    Some(issuer_pk) => match confidential_asset {
-      true => Some(elgamal_encrypt(&RistPoint(pc_gens.B),
-                                   &RistScalar(type_scalar),
-                                   &RistScalar(type_blind),
-                                   &issuer_pk.eg_ristretto_pub_key)),
-      false => None,
-    },
+    Some(issuer_pk) => {
+      if confidential_asset {
+        Some(elgamal_encrypt(&RistPoint(pc_gens.B),
+                             &RistScalar(type_scalar),
+                             &RistScalar(type_blind),
+                             &issuer_pk.eg_ristretto_pub_key))
+      } else {
+        None
+      }
+    }
   };
   // compute lock of amount and/or type
-  let mut lock = None;
-  if amount_type_bytes.len() > 0 {
-    lock = Some(hybrid_encrypt(prng,
-                               &asset_record.public_key.0,
-                               amount_type_bytes.as_slice()).unwrap());
-  }
+  let lock = if !amount_type_bytes.is_empty() {
+    Some(hybrid_encrypt(prng,
+                        &asset_record.public_key.0,
+                        amount_type_bytes.as_slice()).unwrap())
+  } else {
+    None
+  };
+
   let blind_asset_record = BlindAssetRecord { issuer_public_key: issuer_public_key.clone(), //None if issuer tracking is not required
                                               issuer_lock_type,
                                               issuer_lock_amount,
                                               amount: bar_amount,
                                               asset_type: bar_type,
-                                              public_key: asset_record.public_key.clone(),
+                                              public_key: asset_record.public_key,
                                               amount_commitments: bar_amount_commitments,
                                               asset_type_commitment: bar_type_commitment,
                                               blind_share,
@@ -127,7 +133,7 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
                                             amount: asset_record.amount,
                                             amount_blinds,
                                             asset_type: asset_record.asset_type,
-                                            type_blind: type_blind };
+                                            type_blind };
 
   open_asset_record
 }

@@ -40,7 +40,7 @@ pub(crate) fn feistel_network<CS: ConstraintSystem>(
     let (a, b, left_wires) = feistel_round(cs, xi, yi, *ci)?;
     xi = a;
     yi = b;
-    num_left_wires = num_left_wires + left_wires;
+    num_left_wires += left_wires;
   }
   Ok((xi, yi, num_left_wires))
 }

@@ -41,9 +41,10 @@ pub fn bls_verify<P: PairingTargetGroup, B: AsRef<[u8]>>(ver_key: &BlsPublicKey<
   let a = P::pairing(&P::G1::get_base(), &signature.0);
   let b = P::pairing(&ver_key.0, &hashed);
 
-  match a == b {
-    true => Ok(()),
-    false => Err(ZeiError::SignatureError),
+  if a == b {
+    Ok(())
+  } else {
+    Err(ZeiError::SignatureError)
   }
 }
 
@@ -107,9 +108,10 @@ pub fn bls_batch_verify_added_signatures<P: PairingTargetGroup, B: AsRef<[u8]>>(
     b = b.add(&p)
   }
 
-  match a == b {
-    true => Ok(()),
-    false => Err(ZeiError::SignatureError),
+  if a == b {
+    Ok(())
+  } else {
+    Err(ZeiError::SignatureError)
   }
 }
 

@@ -19,6 +19,8 @@ use linear_map::LinearMap;
 /// Input values are represented as a pair where the first coordinate
 /// corresponds to amount, and second coordinate to the type
 /// The rate table is hash map of Scalar to Scalar.
+// TODO rewrite this function so that it has less arguments
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
                                                          asset_set_vars: &[(Variable,
                                                             Variable)],
@@ -142,6 +144,7 @@ fn aggregate<CS: RandomizableConstraintSystem>(cs: &mut CS,
 }
 
 /// I sort the pairs in values by the order the second coordinate appears in type_list
+#[allow(clippy::type_complexity)]
 fn sort(values: &[(Scalar, Scalar)], type_list: &[Scalar]) -> Vec<(Scalar, Scalar)> {
   let mut sorted = vec![];
   for key in type_list.iter() {
@@ -156,6 +159,7 @@ fn sort(values: &[(Scalar, Scalar)], type_list: &[Scalar]) -> Vec<(Scalar, Scala
 
 /// Given a sorted by type list, I add the amounts of same type pairs in the list,
 /// zeroing out values and types already aggregated into another value
+#[allow(clippy::type_complexity)]
 fn add(list: &[(Scalar, Scalar)]) -> (Vec<(Scalar, Scalar)>, Vec<(Scalar, Scalar)>) {
   let l = list.len();
   if l == 0 {
@@ -165,8 +169,8 @@ fn add(list: &[(Scalar, Scalar)]) -> (Vec<(Scalar, Scalar)>, Vec<(Scalar, Scalar
   let mut mid_values: Vec<(Scalar, Scalar)> = Vec::with_capacity(l - 1);
   let mut in1 = (list[0].0, list[0].1);
 
-  for i in 1..l {
-    let in2 = list[i];
+  for item in list.iter().take(l).skip(1) {
+    let in2 = *item;
     if in1.1 == in2.1 {
       agg_values.push((Scalar::zero(), Scalar::zero()));
       mid_values.push((in1.0 + in2.0, in1.1));
@@ -183,7 +187,7 @@ fn add(list: &[(Scalar, Scalar)]) -> (Vec<(Scalar, Scalar)>, Vec<(Scalar, Scalar
 }
 
 /// I shuffle values to that zeroed values are placed in the tail of the list
-/// while mainting the order of the non-zero type elements
+/// while maintaining the order of the non-zero type elements
 fn trim(values: &[(Scalar, Scalar)]) -> Vec<(Scalar, Scalar)> {
   let l = values.len();
   let mut trimmed = Vec::with_capacity(l);
@@ -201,7 +205,7 @@ fn trim(values: &[(Scalar, Scalar)]) -> Vec<(Scalar, Scalar)> {
 }
 
 pub(super) fn allocate_vector<CS: RandomizableConstraintSystem>(cs: &mut CS,
-                                                                list: &Vec<(Scalar, Scalar)>)
+                                                                list: &[(Scalar, Scalar)])
                                                                 -> Vec<(Variable, Variable)> {
   let mut list_var = Vec::with_capacity(list.len());
   for (amount, asset_type) in list {

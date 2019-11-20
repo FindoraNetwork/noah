@@ -45,7 +45,7 @@ impl<'de> Deserialize<'de> for XfrPublicKey {
           let mut bytes = [0u8; 32];
           bytes.copy_from_slice(v);
 
-          static ERRMSG: &'static str = "Bad public key encoding";
+          static ERRMSG: &str = "Bad public key encoding";
 
           let pk = match PublicKey::from_bytes(&bytes[..]) {
             Ok(pk) => pk,
@@ -105,7 +105,7 @@ impl<'de> Deserialize<'de> for XfrSecretKey {
           let mut bytes = [0u8; 32];
           bytes.copy_from_slice(v);
 
-          static ERRMSG: &'static str = "Bad secret key encoding";
+          static ERRMSG: &str = "Bad secret key encoding";
 
           let sk = match SecretKey::from_bytes(&bytes[..]) {
             Ok(sk) => sk,
@@ -248,10 +248,11 @@ impl ZeiFromToBytes for ChaumPedersenProofX {
   }
   fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenProofX {
     let c1_eq_c2 = ChaumPedersenProof::zei_from_bytes(&bytes[0..32 * 5]);
-    let mut zero = None;
-    if bytes.len() > 32 * 5 {
-      zero = Some(ChaumPedersenProof::zei_from_bytes(&bytes[32 * 5..]));
-    }
+    let zero = if bytes.len() > 32 * 5 {
+      Some(ChaumPedersenProof::zei_from_bytes(&bytes[32 * 5..]))
+    } else {
+      None
+    };
     ChaumPedersenProofX { c1_eq_c2, zero }
   }
 }
@@ -418,8 +419,8 @@ pub mod option_bytes {
   {
     let vec: Option<Vec<u8>> = Option::deserialize(deserializer)?;
 
-    if vec.is_some() {
-      Ok(Some(T::zei_from_bytes(vec.unwrap().as_slice())))
+    if let Some(value) = vec {
+      Ok(Some(T::zei_from_bytes(value.as_slice())))
     } else {
       Ok(None)
     }

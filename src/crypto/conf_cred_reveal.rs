@@ -98,6 +98,9 @@ pub fn cac_verify<P: PairingTargetGroup>(issuer_pk: &ACIssuerPublicKey<P::G1, P:
 /// * `ctexts_vecs` - collection of lists containing ciphertexts that encrypt the attributes
 /// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
 /// * `returns` - aggregated proof of knowledge for the attributes and randomness of ciphertexts
+// TODO rewrite this function so that it has less arguments / handles simpler types.
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
 pub(crate) fn agg_pok_attrs_prove<R, P>(
   prng: &mut R,
   ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -239,7 +242,7 @@ pub(crate) fn agg_pok_attrs_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &AC
 fn compute_linear_combination_scalars<P: PairingTargetGroup>(ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
                                                              ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, P::ScalarField>])
                                                              -> Vec<P::ScalarField> {
-  if ctexts_vecs.len() == 0 {
+  if ctexts_vecs.is_empty() {
     return vec![];
   }
 
@@ -284,6 +287,8 @@ fn compute_linear_combination_scalars<P: PairingTargetGroup>(ctexts_vecs: &[&[El
 /// * `rand_responses` - encryption random response
 /// * `recv_enc_pub_keys`- encryption public keys of the recipients
 /// * `return` - nothing if the verification is successful, error otherwise
+// TODO rewrite this function so that it has less arguments
+#[allow(clippy::too_many_arguments)]
 fn verify_ciphertext<P: PairingTargetGroup>(challenge: &P::ScalarField,
                                             lc_scalars: &[P::ScalarField],
                                             ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
@@ -418,9 +423,10 @@ fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
   }
 
   //5. return Ok if LHS = RHS
-  match lhs == rhs {
-    true => Ok(()),
-    false => Err(ZeiError::IdentityRevealVerifyError),
+  if lhs == rhs {
+    Ok(())
+  } else {
+    Err(ZeiError::IdentityRevealVerifyError)
   }
 }
 
@@ -435,6 +441,7 @@ fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
 /// * `n_attrs` - number of attributes
 /// * `n_instances` - number of ac instances (also equal to the number of recipients
 /// * `returns` - vector of random commitments
+#[allow(clippy::type_complexity)]
 fn sample_blinds_compute_commitments<R, P>(
   prng: &mut R,
   ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -483,7 +490,7 @@ fn sample_blinds_compute_commitments<R, P>(
 /// * `returns`- group element in G2
 fn compute_attr_sum_yy2<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
                                                                   P::G2>,
-                                               attr_blinds: &Vec<P::ScalarField>,
+                                               attr_blinds: &[P::ScalarField],
                                                bitmap: &[bool])
                                                -> Result<P::G2, ZeiError> {
   let mut attr_sum_com_yy2 = P::G2::get_identity();
@@ -533,6 +540,8 @@ fn sample_blinds<R, S>(prng: &mut R,
 /// * `agg_proof_coms_rands_g` - blinding factors in base g
 /// * `agg_proof_coms_rands_pk` - blinding factors related to the public keys
 /// * `return` - challenge which is a hash value
+// TODO rewrite this function so that it has less arguments.
+#[allow(clippy::too_many_arguments)]
 fn cac_reveal_challenge_agg<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
                                                                       P::G2>,
                                                    recv_pub_keys: &[&ElGamalPublicKey<P::G1>],

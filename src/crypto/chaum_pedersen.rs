@@ -176,8 +176,8 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + Rng>(
     let di = ai * (c1 - ci);
     let ri = blinding_factors.get(i).ok_or(ZeiError::IndexError)?;
     let zi = ai * (*r1 - *ri);
-    d = d + di;
-    z = z + zi;
+    d += di;
+    z += zi;
   }
 
   //TODO can we produce proof to zero commitment in a more direct way?
@@ -212,7 +212,7 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + Rng>(prng: &mut R,
     let ci = commitments.get(i).ok_or(ZeiError::IndexError)?;
     let ai = compute_sub_challenge::<Scalar>(&k, i as u32);
     let di = ai * (c1 - ci);
-    d = d + di;
+    d += di;
   }
 
   //TODO can we produce proof to zero commitment in a more direct way?

@@ -53,7 +53,7 @@ impl Scalar for BLSScalar {
         result.add_assign(&two_pow_i);
         //result = result + two_pow_i;
       }
-      v = v >> 1;
+      v >>= 1;
       two_pow_i.double(); // = two_pow_i * two;
     }
     BLSScalar(result)
@@ -64,8 +64,8 @@ impl Scalar for BLSScalar {
   {
     let result = hash.result();
     let mut seed = [0u32; 16];
-    for i in 0..16 {
-      seed[i] = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
+    for (i, item) in seed.iter_mut().enumerate() {
+      *item = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
     }
     use rand_04::SeedableRng;
     let mut prng = rand_04::ChaChaRng::from_seed(&seed);
@@ -74,12 +74,12 @@ impl Scalar for BLSScalar {
 
   // scalar arithmetic
   fn add(&self, b: &BLSScalar) -> BLSScalar {
-    let mut m = self.0.clone();
+    let mut m = self.0;
     m.add_assign(&b.0);
     BLSScalar(m)
   }
   fn mul(&self, b: &BLSScalar) -> BLSScalar {
-    let mut m = self.0.clone();
+    let mut m = self.0;
     m.mul_assign(&b.0);
     BLSScalar(m)
   }
@@ -179,9 +179,7 @@ impl Group<BLSScalar> for BLSG1 {
     let some: G1 = G1::one();
     let mut compressed = some.into_affine().into_compressed();
     let mut_bytes = compressed.as_mut();
-    for i in 0..48 {
-      mut_bytes[i] = bytes[i];
-    }
+    mut_bytes[..48].clone_from_slice(&bytes[..48]);
     let affine = compressed.into_affine().unwrap();
     let g1 = G1::from(affine);
 
@@ -193,8 +191,8 @@ impl Group<BLSScalar> for BLSG1 {
   {
     let result = hash.result();
     let mut seed = [0u32; 16];
-    for i in 0..16 {
-      seed[i] = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
+    for (i, item) in seed.iter_mut().enumerate() {
+      *item = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
     }
     use rand_04::SeedableRng;
     let mut prng = rand_04::ChaChaRng::from_seed(&seed);
@@ -203,17 +201,17 @@ impl Group<BLSScalar> for BLSG1 {
 
   //arithmetic
   fn mul(&self, scalar: &BLSScalar) -> BLSG1 {
-    let mut m = self.0.clone();
+    let mut m = self.0;
     m.mul_assign(scalar.0);
     BLSG1(m)
   }
   fn add(&self, other: &Self) -> BLSG1 {
-    let mut m = self.0.clone();
+    let mut m = self.0;
     m.add_assign(&other.0);
     BLSG1(m)
   }
   fn sub(&self, other: &Self) -> BLSG1 {
-    let mut m = self.0.clone();
+    let mut m = self.0;
     m.sub_assign(&other.0);
     BLSG1(m)
   }
@@ -288,6 +286,7 @@ impl Group<BLSScalar> for BLSG2 {
     let v = self.0.into_affine().into_compressed().as_ref().to_vec();
     v
   }
+  #[allow(clippy::manual_memcpy)]
   fn from_compressed_bytes(bytes: &[u8]) -> Option<BLSG2> {
     let some: G2 = G2::one();
     let mut compressed = some.into_affine().into_compressed();
@@ -306,8 +305,8 @@ impl Group<BLSScalar> for BLSG2 {
   {
     let result = hash.result();
     let mut seed = [0u32; 16];
-    for i in 0..16 {
-      seed[i] = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
+    for (i, item) in seed.iter_mut().enumerate() {
+      *item = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
     }
     use rand_04::SeedableRng;
     let mut prng = rand_04::ChaChaRng::from_seed(&seed);
@@ -316,18 +315,18 @@ impl Group<BLSScalar> for BLSG2 {
 
   //arithmetic
   fn mul(&self, scalar: &BLSScalar) -> BLSG2 {
-    let mut m = self.0.clone();
+    let mut m = self.0;
     m.mul_assign(scalar.0);
     BLSG2(m)
     //return BLSG2(self.0 * scalar.0)
   }
   fn add(&self, other: &Self) -> BLSG2 {
-    let mut m = self.0.clone();
+    let mut m = self.0;
     m.add_assign(&other.0);
     BLSG2(m)
   }
   fn sub(&self, other: &Self) -> BLSG2 {
-    let mut m = self.0.clone();
+    let mut m = self.0;
     m.sub_assign(&other.0);
     BLSG2(m)
   }
@@ -406,7 +405,7 @@ impl PairingTargetGroup for BLSGt {
     BLSGt(r)
   }
   fn add(&self, other: &Self) -> BLSGt {
-    let mut m = other.0.clone();
+    let mut m = other.0;
     m.mul_assign(&self.0);
     BLSGt(m)
   }

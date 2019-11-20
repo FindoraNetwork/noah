@@ -97,14 +97,11 @@ pub fn verify_mt_membership(mt_root: &MerkleRoot<Scalar>,
   let mut direction: Variable = Variable::One();
   let mut even = true;
   for e in proof.witness_commitments.iter() {
-    match even {
-      true => {
-        direction = verifier.commit(*e);
-      }
-      false => {
-        let sibling = verifier.commit(*e);
-        path_var.push((direction, sibling));
-      }
+    if even {
+      direction = verifier.commit(*e);
+    } else {
+      let sibling = verifier.commit(*e);
+      path_var.push((direction, sibling));
     }
     even = !even;
   }

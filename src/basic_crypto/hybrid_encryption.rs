@@ -47,9 +47,9 @@ fn symmetric_key_from_public_key<R>(prng: &mut R,
   where R: CryptoRng + Rng
 {
   let rand = Scalar::random(prng);
-  let encoded_rand = &rand * KEY_BASE_POINT.decompress().unwrap(); // can always be decompressed
+  let encoded_rand = rand * KEY_BASE_POINT.decompress().unwrap(); // can always be decompressed
   let pk_curve_point = CompressedEdwardsY::from_slice(public_key.as_bytes());
-  let curve_key = &rand * pk_curve_point.decompress().unwrap();
+  let curve_key = rand * pk_curve_point.decompress().unwrap();
   let mut hasher = sha2::Sha256::new();
   hasher.input(curve_key.compress().as_bytes());
   let hash = hasher.result();

@@ -75,9 +75,10 @@ pub fn elgamal_verify<S: Scalar, G: Group<S>>(base: &G,
                                               ctext: &ElGamalCiphertext<G>,
                                               sec_key: &ElGamalSecretKey<S>)
                                               -> Result<(), ZeiError> {
-  match base.mul(m).add(&ctext.e1.mul(&sec_key.0)) == ctext.e2 {
-    true => Ok(()),
-    false => Err(ZeiError::ElGamalVerificationError),
+  if base.mul(m).add(&ctext.e1.mul(&sec_key.0)) == ctext.e2 {
+    Ok(())
+  } else {
+    Err(ZeiError::ElGamalVerificationError)
   }
 }
 

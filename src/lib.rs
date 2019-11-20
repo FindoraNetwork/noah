@@ -2,6 +2,10 @@
 //#![feature(test)]
 //extern crate aes_ctr;
 
+// Skip non useful warnings from clippy
+#![allow(clippy::let_and_return)]
+#![allow(clippy::many_single_char_names)]
+
 #[macro_use]
 extern crate itertools;
 

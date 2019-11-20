@@ -82,14 +82,14 @@ pub fn pedersen_elgamal_eq_verify(public_key: &ElGamalPublicKey<RistrettoPoint>,
   let proof_enc_e1 = &proof.e1.e1;
   let proof_enc_e2 = &proof.e1.e2;
 
-  if proof.c1 + c * commitment == proof.z1 * pc_gens.B + proof.z2 * pc_gens.B_blinding {
-    if proof_enc_e1 + c * ctext.e1 == proof.z2 * pc_gens.B
-       && proof_enc_e2 + c * ctext.e2
-          == proof.z1 * pc_gens.B + proof.z2 * public_key.get_point_ref()
-    {
-      return Ok(());
-    }
+  if (proof.c1 + c * commitment == proof.z1 * pc_gens.B + proof.z2 * pc_gens.B_blinding)
+     && (proof_enc_e1 + c * ctext.e1 == proof.z2 * pc_gens.B
+         && proof_enc_e2 + c * ctext.e2
+            == proof.z1 * pc_gens.B + proof.z2 * public_key.get_point_ref())
+  {
+    return Ok(());
   }
+
   Err(ZeiError::VerifyPedersenElGamalEqError)
 }
 
@@ -195,24 +195,24 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + Rng>(prng: &mut R,
   //4. aggregate vectors
   let mut com = RistrettoPoint::identity();
   for (x_i, com_i) in x.iter().zip(commitments.iter()) {
-    com = com + com_i * x_i
+    com += com_i * x_i;
   }
   let mut enc1 = RistrettoPoint::identity();
   let mut enc2 = RistrettoPoint::identity();
   for (x_i, enc_i) in x.iter().zip(ctexts.iter()) {
-    enc1 = enc1 + enc_i.e1 * x_i;
-    enc2 = enc2 + enc_i.e2 * x_i;
+    enc1 += enc_i.e1 * x_i;
+    enc2 += enc_i.e2 * x_i;
   }
 
   let mut proof_enc1 = RistrettoPoint::identity();
   let mut proof_enc2 = RistrettoPoint::identity();
   for (x_i, enc_i) in x.iter().zip(enc_vec.iter()) {
-    proof_enc1 = proof_enc1 + enc_i.e1 * x_i;
-    proof_enc2 = proof_enc2 + enc_i.e2 * x_i;
+    proof_enc1 += enc_i.e1 * x_i;
+    proof_enc2 += enc_i.e2 * x_i;
   }
   let mut proof_com = RistrettoPoint::identity();
   for (x_i, com_i) in x.iter().zip(com_vec.iter()) {
-    proof_com = proof_com + com_i * x_i
+    proof_com += com_i * x_i
   }
   //5. compute challenge
   let c = compute_challenge_ref::<Scalar, RistrettoPoint>(&[&pc_gens.B,
@@ -228,11 +228,11 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + Rng>(prng: &mut R,
   //6. compute challenge responses
   let mut z1 = Scalar::zero();
   for ((m_i, r1_i), x_i) in m.iter().zip(r1_vec.iter()).zip(x.iter()) {
-    z1 = z1 + (m_i * c + r1_i) * x_i;
+    z1 += (m_i * c + r1_i) * x_i;
   }
   let mut z2 = Scalar::zero();
   for ((r_i, r2_i), x_i) in r.iter().zip(r2_vec.iter()).zip(x.iter()) {
-    z2 = z2 + (r_i * c + r2_i) * x_i;
+    z2 += (r_i * c + r2_i) * x_i;
   }
 
   let proof_enc = ElGamalCiphertext { e1: proof_enc1,
@@ -255,13 +255,13 @@ pub fn pedersen_elgamal_eq_aggregate_verify_fast<R: CryptoRng + Rng>(prng: &mut 
   // 2. aggragate commitments and ciphertexts
   let mut com = RistrettoPoint::identity();
   for (x_i, com_i) in x.iter().zip(commitments.iter()) {
-    com = com + com_i * x_i
+    com += com_i * x_i;
   }
   let mut enc1 = RistrettoPoint::identity();
   let mut enc2 = RistrettoPoint::identity();
   for (x_i, enc_i) in x.iter().zip(ctexts.iter()) {
-    enc1 = enc1 + enc_i.e1 * x_i;
-    enc2 = enc2 + enc_i.e2 * x_i;
+    enc1 += enc_i.e1 * x_i;
+    enc2 += enc_i.e2 * x_i;
   }
 
   let pc_gens = PedersenGens::default();

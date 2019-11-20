@@ -136,6 +136,7 @@ pub(crate) struct ACPoK<G2, S> {
 }
 
 /// I generate e key pair for a credential issuer
+#[allow(clippy::type_complexity)]
 pub(crate) fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
   num_attrs: usize)
@@ -160,7 +161,7 @@ pub(crate) fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
                        zz1,
                        zz2,
                        yy2 },
-   ACIssuerSecretKey { gen1: gen1, x, y })
+   ACIssuerSecretKey { gen1, x, y })
 }
 
 /// I generate a credential user key pair for a given credential issuer
@@ -191,6 +192,7 @@ pub(crate) fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
 }
 
 /// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed
+#[allow(clippy::type_complexity)]
 pub(crate) fn ac_reveal<R: CryptoRng + Rng, P: PairingTargetGroup>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
@@ -267,7 +269,7 @@ fn prove_pok<R: CryptoRng + Rng, P: PairingTargetGroup>(
   let mut gamma_iter = gamma.iter();
   let mut attr_iter = hidden_attrs.iter();
   for y in bitmap {
-    if (*y) == false {
+    if !(*y) {
       let gamma = gamma_iter.next().unwrap();
       let attr = attr_iter.next().unwrap();
       let resp_attr_i = challenge.mul(attr).add(gamma);
@@ -332,9 +334,10 @@ pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKe
   let lhs = P::pairing(&reveal_sig.sig.sigma1, &p);
   let rhs = P::pairing(&reveal_sig.sig.sigma2.mul(&challenge), &issuer_pub_key.gen2);
 
-  match lhs == rhs {
-    true => Ok(()),
-    false => Err(ZeiError::SignatureError),
+  if lhs == rhs {
+    Ok(())
+  } else {
+    Err(ZeiError::SignatureError)
   }
 }
 
