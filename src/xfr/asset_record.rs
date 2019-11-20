@@ -2,11 +2,11 @@ use crate::algebra::groups::Scalar as ZeiScalar;
 use crate::algebra::ristretto::{CompRist, RistPoint, RistScalar};
 use crate::basic_crypto::elgamal::elgamal_encrypt;
 use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt};
-use crate::basic_crypto::signatures::naive_multisig::{XfrPublicKey, XfrSecretKey};
 use crate::errors::ZeiError;
 use crate::utils::{
   u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u128, u8_bigendian_slice_to_u64,
 };
+use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
 use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, BlindAssetRecord, OpenAssetRecord};
 use bulletproofs::PedersenGens;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
@@ -89,8 +89,9 @@ fn sample_blind_asset_record<R: CryptoRng + Rng>(
   // compute lock of amount and/or type
   let mut lock = None;
   if amount_type_bytes.len() > 0 {
-    lock =
-      Some(hybrid_encrypt(prng, &asset_record.public_key, amount_type_bytes.as_slice()).unwrap());
+    lock = Some(hybrid_encrypt(prng,
+                               &asset_record.public_key.0,
+                               amount_type_bytes.as_slice()).unwrap());
   }
   let blind_asset_record = BlindAssetRecord { issuer_public_key: issuer_public_key.clone(), //None if issuer tracking is not required
                                               issuer_lock_type,
@@ -191,7 +192,7 @@ pub fn open_asset_record(input: &BlindAssetRecord,
   let mut i = 0;
   let amount_type = match &input.lock {
     None => vec![],
-    Some(ctext) => hybrid_decrypt(ctext, secret_key)?,
+    Some(ctext) => hybrid_decrypt(ctext, &secret_key.0)?,
   };
   if confidential_amount {
     amount = u8_bigendian_slice_to_u64(&amount_type[0..8]);
@@ -226,9 +227,9 @@ mod test {
   use crate::algebra::groups::Group;
   use crate::algebra::ristretto::{CompRist, RistPoint};
   use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalPublicKey};
-  use crate::basic_crypto::signatures::naive_multisig::XfrKeyPair;
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::lib::tests::create_xfr;
+  use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, AssetType};
   use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::RistrettoPoint;

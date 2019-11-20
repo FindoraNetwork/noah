@@ -1,6 +1,6 @@
-use crate::basic_crypto::signatures::naive_multisig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use crate::crypto::chaum_pedersen::ChaumPedersenProof;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
+use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use bulletproofs::RangeProof;
 use bulletproofs_yoloproof::r1cs::R1CSProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
@@ -430,10 +430,8 @@ pub mod option_bytes {
 mod test {
   use crate::algebra::ristretto::{RistPoint, RistScalar};
   use crate::basic_crypto::elgamal::elgamal_keygen;
-  use crate::basic_crypto::signatures::naive_multisig::{
-    XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature,
-  };
   use crate::serialization::ZeiFromToBytes;
+  use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
   use crate::xfr::structs::EGPubKey;
   use bulletproofs_yoloproof::PedersenGens;
 

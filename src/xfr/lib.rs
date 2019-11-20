@@ -1,7 +1,4 @@
 use crate::api::conf_cred_reveal::ConfidentialAC;
-use crate::basic_crypto::signatures::naive_multisig::{
-  sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig,
-};
 use crate::errors::ZeiError;
 use crate::utils::u8_bigendian_slice_to_u128;
 use crate::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify, AssetMixProof};
@@ -10,6 +7,7 @@ use crate::xfr::proofs::{
   asset_proof, range_proof, tracking_proofs, verify_confidential_amount, verify_confidential_asset,
   verify_issuer_tracking_proof,
 };
+use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig};
 use crate::xfr::structs::*;
 use bulletproofs::PedersenGens;
 use curve25519_dalek::scalar::Scalar;
@@ -26,7 +24,7 @@ const POW_2_32: u64 = 0xFFFFFFFFu64 + 1;
 /// use rand_chacha::ChaChaRng;
 /// use rand::SeedableRng;
 /// use bulletproofs::PedersenGens;
-/// use zei::basic_crypto::signatures::naive_multisig::XfrKeyPair;
+/// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
 /// use zei::xfr::asset_record::build_open_asset_record;
 /// use zei::xfr::lib::gen_xfr_note;
@@ -112,7 +110,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 /// use rand_chacha::ChaChaRng;
 /// use rand::SeedableRng;
 /// use bulletproofs::PedersenGens;
-/// use zei::basic_crypto::signatures::naive_multisig::XfrKeyPair;
+/// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
 /// use zei::xfr::asset_record::build_open_asset_record;
 /// use zei::xfr::lib::gen_xfr_body;
@@ -429,7 +427,7 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 /// use rand_chacha::ChaChaRng;
 /// use rand::SeedableRng;
 /// use bulletproofs::PedersenGens;
-/// use zei::basic_crypto::signatures::naive_multisig::XfrKeyPair;
+/// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
 /// use zei::xfr::asset_record::build_open_asset_record;
 /// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note};
@@ -639,7 +637,6 @@ pub(crate) mod tests {
   use crate::api::anon_creds;
   use crate::api::conf_cred_reveal::cac_gen_encryption_keys;
   use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey};
-  use crate::basic_crypto::signatures::naive_multisig::XfrKeyPair;
   use crate::errors::ZeiError::{
     XfrCreationAssetAmountError, XfrVerifyAssetAmountError, XfrVerifyConfidentialAmountError,
     XfrVerifyConfidentialAssetError, XfrVerifyIssuerTrackingAssetAmountError,
@@ -647,6 +644,7 @@ pub(crate) mod tests {
   };
   use crate::utils::u64_to_u32_pair;
   use crate::xfr::proofs::create_conf_id_reveal;
+  use crate::xfr::sig::XfrKeyPair;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;

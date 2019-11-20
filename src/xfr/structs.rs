@@ -2,12 +2,12 @@ use crate::api::anon_creds::ACIssuerPublicKey;
 use crate::api::conf_cred_reveal::ConfidentialAC;
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
-use crate::basic_crypto::signatures::naive_multisig::{XfrMultiSig, XfrPublicKey};
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use crate::crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use crate::errors::ZeiError;
 use crate::serialization;
 use crate::xfr::asset_mixer::AssetMixProof;
+use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::scalar::Scalar;
 
@@ -169,8 +169,8 @@ impl Eq for XfrRangeProof {}
 #[cfg(test)]
 mod test {
   use super::{XfrBody, XfrNote, XfrProofs};
-  use crate::basic_crypto::signatures::naive_multisig::XfrMultiSig;
   use crate::xfr::lib::tests::create_xfr;
+  use crate::xfr::sig::XfrMultiSig;
   use crate::xfr::structs::{AssetAmountProof, AssetTrackingProofs};
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;

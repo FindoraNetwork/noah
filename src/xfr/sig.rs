@@ -36,7 +36,7 @@ pub struct XfrSignature(pub Signature);
 impl XfrPublicKey {
   pub fn get_curve_point(&self) -> Result<EdwardsPoint, ZeiError> {
     CompressedEdwardsY::from_slice(self.zei_to_bytes().as_slice()).decompress().
-            ok_or(ZeiError::DecompressElementError)
+      ok_or(ZeiError::DecompressElementError)
   }
 
   pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), ZeiError> {
@@ -169,10 +169,8 @@ pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 
 #[cfg(test)]
 mod test {
-  use crate::basic_crypto::signatures::naive_multisig::{
-    sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey,
-  };
   use crate::errors::ZeiError::SignatureError;
+  use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey};
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
 
