@@ -9,7 +9,7 @@
 #[macro_use]
 extern crate itertools;
 
-#[macro_use] //rustc crushes if not used
+#[macro_use]
 extern crate serde_derive;
 
 pub mod algebra;
