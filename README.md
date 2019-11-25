@@ -51,6 +51,16 @@ We need to use rust nightly.
 > rustup default nightly
 ```
 
+## Git
+
+We use special hooks before commiting. To enable these hooks, copy them to the `.git`
+directory:
+
+```
+> cp hooks/pre-commit .git/hooks/
+```
+
+
 ## IDE
 
 We recommend using [CLion by Jetrains](https://www.jetbrains.com/clion/download/).
