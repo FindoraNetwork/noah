@@ -70,18 +70,33 @@ More information available in this [tutorial](https://blog.jetbrains.com/clion/2
 
 ## Tests
 
+We follow Rust convention for unit tests which are written in the same file as the source.
+We use [proptest](https://lib.rs/crates/proptest) for property testing. These tests are located in the `tests` directory.
+
 ### Run the tests
 
-Run all the tests.
+Run all the tests except property-testing tests which are slow. 
 
 ```
 > cargo test
 ```
 
-Run the documentation tests.
+Run only the unit tests.
+
+```
+> cargo test --lib
+```
+
+Run only the documentation tests.
 
 ```
 > cargo test --doc
+```
+
+Run only the property-testing tests (which are slow and thus marked as *ignored*).
+
+```
+> cargo test -- --ignored
 ```
 
 ### Test coverage
