@@ -9,6 +9,7 @@ use zei::api::gp_sig::{gpsig_join_cert, gpsig_setup, gpsig_sign, gpsig_verify};
 proptest! {
 
     #[test]
+    #[ignore]
     fn gp_sig(message in  "\\PC*"){
 
        let mut prng = ChaChaRng::from_seed([0u8;32]);

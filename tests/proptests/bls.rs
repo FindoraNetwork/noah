@@ -11,6 +11,7 @@ use zei::basic_crypto::signatures::bls::{
 proptest! {
 
     #[test]
+    #[ignore]
     fn simple_signatures(message in "\\PC*") {
 
       let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
@@ -21,6 +22,7 @@ proptest! {
     }
 
     #[test]
+    #[ignore]
     fn aggregated_signatures(message in  "\\PC*"){
 
       let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
@@ -42,6 +44,7 @@ proptest! {
   }
 
   #[test]
+  #[ignore]
   fn batching(message1 in  "\\PC*", message2 in  "\\PC*", message3 in  "\\PC*") {
 
     let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
