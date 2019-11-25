@@ -96,7 +96,7 @@ Run only the documentation tests.
 Run only the property-testing tests
 
 ```
-> cargo test --test proptest
+> cargo test --test proptests
 ```
 
 ### Test coverage
