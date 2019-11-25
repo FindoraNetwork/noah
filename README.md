@@ -75,7 +75,7 @@ We use [proptest](https://lib.rs/crates/proptest) for property testing. These te
 
 ### Run the tests
 
-Run all the tests. This includes documentation tests and also property-testing tests which may be slow. 
+Run all the tests. This includes documentation tests and also property-testing tests which are slow. 
 
 ```
 > cargo test
@@ -96,7 +96,7 @@ Run only the documentation tests.
 Run only the property-testing tests
 
 ```
-> cargo test --test proptests
+> cargo test --test prop
 ```
 
 ### Test coverage

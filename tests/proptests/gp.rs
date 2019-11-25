@@ -15,7 +15,7 @@ proptest! {
        let (gpk, msk) = gpsig_setup(&mut prng);
        let (join_cert, _) = gpsig_join_cert(&mut prng, &msk);
        let sig = gpsig_sign(&mut prng, &gpk, &join_cert, &message);
-       assert!(gpsig_verify(&gpk, &sig, b"Some message").is_ok());
+       assert!(gpsig_verify(&gpk, &sig, &message.as_bytes()).is_ok());
 
   }
 }
