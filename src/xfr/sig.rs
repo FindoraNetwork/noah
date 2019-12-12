@@ -18,6 +18,7 @@ pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 pub const KEY_BASE_POINT: CompressedEdwardsY =
   curve25519_dalek::constants::ED25519_BASEPOINT_COMPRESSED;
 
+#[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct XfrPublicKey(pub(crate) PublicKey);
 #[derive(Debug, Default)]
