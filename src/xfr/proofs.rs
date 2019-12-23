@@ -54,7 +54,7 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
                           .ok_or(ZeiError::InconsistentStructureError)?
                           .clone());
         m.push(Scalar::from(u8_bigendian_slice_to_u128(&output.asset_type[..])));
-        r.push(output.type_blind);
+        r.push(output.type_blind.0);
       }
       if output.asset_record.amount_commitments.is_some() {
         let (amount_low, amount_high) = u64_to_u32_pair(output.amount);
@@ -84,8 +84,8 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
                           .clone());
         m.push(Scalar::from(amount_low));
         m.push(Scalar::from(amount_high));
-        r.push(output.amount_blinds.0);
-        r.push(output.amount_blinds.1);
+        r.push((output.amount_blinds.0).0);
+        r.push((output.amount_blinds.1).0);
       }
     }
   }
@@ -294,10 +294,10 @@ pub(crate) fn range_proof(inputs: &[OpenAssetRecord],
   }
 
   //build blinding vectors (out blindings + blindings difference)
-  let in_blind_low: Vec<Scalar> = inputs.iter().map(|x| x.amount_blinds.0).collect();
-  let in_blind_high: Vec<Scalar> = inputs.iter().map(|x| x.amount_blinds.1).collect();
-  let out_blind_low: Vec<Scalar> = outputs.iter().map(|x| x.amount_blinds.0).collect();
-  let out_blind_high: Vec<Scalar> = outputs.iter().map(|x| x.amount_blinds.1).collect();
+  let in_blind_low: Vec<Scalar> = inputs.iter().map(|x| (x.amount_blinds.0).0).collect();
+  let in_blind_high: Vec<Scalar> = inputs.iter().map(|x| (x.amount_blinds.1).0).collect();
+  let out_blind_low: Vec<Scalar> = outputs.iter().map(|x| (x.amount_blinds.0).0).collect();
+  let out_blind_high: Vec<Scalar> = outputs.iter().map(|x| (x.amount_blinds.1).0).collect();
 
   let mut in_blind_sum = Scalar::zero();
   for (blind_low, blind_high) in in_blind_low.iter().zip(in_blind_high.iter()) {
@@ -432,7 +432,7 @@ pub(crate) fn asset_proof<R: CryptoRng + Rng>(prng: &mut R,
                      .unwrap()
                      .decompress_to_ristretto()
                      .unwrap());
-    asset_blinds.push(x.type_blind);
+    asset_blinds.push(x.type_blind.0);
   }
   for x in open_outputs.iter() {
     asset_coms.push(x.asset_record
@@ -440,7 +440,7 @@ pub(crate) fn asset_proof<R: CryptoRng + Rng>(prng: &mut R,
                      .unwrap()
                      .decompress_to_ristretto()
                      .unwrap());
-    asset_blinds.push(x.type_blind);
+    asset_blinds.push(x.type_blind.0);
   }
 
   let proof = chaum_pedersen_prove_multiple_eq(prng,
