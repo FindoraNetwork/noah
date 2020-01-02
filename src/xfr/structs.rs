@@ -9,11 +9,10 @@ use crate::serialization;
 use crate::xfr::asset_mixer::AssetMixProof;
 use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::scalar::Scalar;
 
 use bulletproofs::RangeProof;
 
-use crate::algebra::ristretto::{CompRist, RistPoint};
+use crate::algebra::ristretto::{CompRist, RistPoint, RistScalar};
 use curve25519_dalek::ristretto::CompressedRistretto;
 
 pub type AssetType = [u8; 16];
@@ -73,13 +72,13 @@ pub struct BlindAssetRecord {
 }
 
 /// I'm a BlindAssetRecors with revealed commitment openings.
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpenAssetRecord {
   pub(crate) asset_record: BlindAssetRecord, //TODO have a reference here, and lifetime parameter. We will avoid copying info unnecessarily.
   pub(crate) amount: u64,
-  pub(crate) amount_blinds: (Scalar, Scalar),
+  pub(crate) amount_blinds: (RistScalar, RistScalar),
   pub(crate) asset_type: AssetType,
-  pub(crate) type_blind: Scalar,
+  pub(crate) type_blind: RistScalar,
 }
 
 impl OpenAssetRecord {

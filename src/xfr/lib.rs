@@ -298,8 +298,8 @@ fn gen_xfr_proofs_multi_asset(//prng: &mut R,
     let type_scalar = Scalar::from(type_as_u128);
     ins.push((x.amount,
               type_scalar,
-              x.amount_blinds.0 + pow2_32 * x.amount_blinds.1,
-              x.type_blind));
+              (x.amount_blinds.0).0 + pow2_32 * (x.amount_blinds.1).0,
+              x.type_blind.0));
   }
 
   let mut out = vec![];
@@ -308,8 +308,8 @@ fn gen_xfr_proofs_multi_asset(//prng: &mut R,
     let type_scalar = Scalar::from(type_as_u128);
     out.push((x.amount,
               type_scalar,
-              x.amount_blinds.0 + pow2_32 * x.amount_blinds.1,
-              x.type_blind));
+              (x.amount_blinds.0).0 + pow2_32 * (x.amount_blinds.1).0,
+              x.type_blind.0));
   }
 
   if confidential_asset && confidential_amount {
