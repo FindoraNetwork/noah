@@ -73,6 +73,7 @@ pub struct BlindAssetRecord {
 }
 
 /// I'm a BlindAssetRecors with revealed commitment openings.
+#[derive(Deserialize, Serialize)]
 pub struct OpenAssetRecord {
   pub(crate) asset_record: BlindAssetRecord, //TODO have a reference here, and lifetime parameter. We will avoid copying info unnecessarily.
   pub(crate) amount: u64,
@@ -94,10 +95,11 @@ impl OpenAssetRecord {
 }
 
 /// I'am a plaintext asset record, used to indicate output information when creating a transfer note
+#[derive(Deserialize, Serialize)]
 pub struct AssetRecord {
-  pub(crate) amount: u64,
-  pub(crate) asset_type: AssetType,
-  pub(crate) public_key: XfrPublicKey, // ownership address
+  pub amount: u64,
+  pub asset_type: AssetType,
+  pub public_key: XfrPublicKey, // ownership address
 }
 
 impl AssetRecord {

@@ -99,6 +99,12 @@ impl ZeiFromToBytes for XfrSecretKey {
   }
 }
 
+#[wasm_bindgen]
+impl XfrKeyPair {
+  pub fn get_pk(&self) -> XfrPublicKey {
+    *self.get_pk_ref()
+  }
+}
 impl XfrKeyPair {
   pub fn generate<R: CryptoRng + Rng>(prng: &mut R) -> Self
     where R: CryptoRng + Rng

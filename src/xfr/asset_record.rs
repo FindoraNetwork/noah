@@ -7,7 +7,7 @@ use crate::utils::{
   u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u128, u8_bigendian_slice_to_u64,
 };
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
-use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, BlindAssetRecord, OpenAssetRecord};
+use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, BlindAssetRecord};
 use bulletproofs::PedersenGens;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
@@ -236,7 +236,7 @@ mod test {
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::lib::tests::create_xfr;
   use crate::xfr::sig::XfrKeyPair;
-  use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, AssetType};
+  use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, AssetType, OpenAssetRecord};
   use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
