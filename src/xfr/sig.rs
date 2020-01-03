@@ -102,7 +102,7 @@ impl ZeiFromToBytes for XfrSecretKey {
 #[wasm_bindgen]
 impl XfrKeyPair {
   pub fn get_pk(&self) -> XfrPublicKey {
-    *self.get_pk_ref()
+    self.public
   }
 }
 impl XfrKeyPair {
