@@ -12,10 +12,10 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 
-fn sample_blind_asset_record<R: CryptoRng + Rng>(
+fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   asset_record: &AssetRecord,
@@ -116,7 +116,7 @@ fn sample_blind_asset_record<R: CryptoRng + Rng>(
 }
 
 /// build complete OpenAssetRecord from AssetRecord structure
-pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
+pub fn build_open_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
                                                    pc_gens: &PedersenGens,
                                                    asset_record: &AssetRecord,
                                                    confidential_amount: bool,
@@ -141,7 +141,7 @@ pub fn build_open_asset_record<R: CryptoRng + Rng>(prng: &mut R,
 }
 
 /// build BlindAssetRecord from AssetRecord structure
-pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
+pub fn build_blind_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
                                                     pc_gens: &PedersenGens,
                                                     asset_record: &AssetRecord,
                                                     confidential_amount: bool,
@@ -158,7 +158,7 @@ pub fn build_blind_asset_record<R: CryptoRng + Rng>(prng: &mut R,
   blind_asset_record
 }
 
-fn sample_point_and_blind_share<R: CryptoRng + Rng>(prng: &mut R,
+fn sample_point_and_blind_share<R: CryptoRng + RngCore>(prng: &mut R,
                                                     public_key: &XfrPublicKey)
                                                     -> (CompressedEdwardsY, CompressedEdwardsY) {
   let blind_key = Scalar::random(prng);
@@ -243,9 +243,9 @@ mod test {
   use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
-  use rand::Rng;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand::Rng;
 
   fn do_test_build_open_asset_record(confidential_amount: bool,
                                      confidential_asset: bool,

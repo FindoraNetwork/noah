@@ -12,7 +12,7 @@ use crate::xfr::structs::*;
 use bulletproofs::PedersenGens;
 use curve25519_dalek::scalar::Scalar;
 use itertools::Itertools;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use serde::ser::Serialize;
 use std::collections::HashMap;
 
@@ -22,7 +22,7 @@ const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use bulletproofs::PedersenGens;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
@@ -85,7 +85,7 @@ const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 ///                              inkeys.as_slice(),
 ///                              identity_proofs.as_slice()).unwrap();
 /// ```
-pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
+pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
                                         inputs: &[OpenAssetRecord],
                                         outputs: &[AssetRecord],
                                         input_keys: &[XfrKeyPair],
@@ -108,7 +108,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use bulletproofs::PedersenGens;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
@@ -164,7 +164,7 @@ pub fn gen_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs, &identity_proofs).unwrap();
 /// ```
-pub fn gen_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
+pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                         inputs: &[OpenAssetRecord],
                                         outputs: &[AssetRecord],
                                         identity_proofs: &[Option<ConfidentialAC>])
@@ -322,7 +322,7 @@ fn gen_xfr_proofs_multi_asset(//prng: &mut R,
   Err(ZeiError::XfrCreationAssetAmountError)
 }
 
-fn gen_xfr_proofs_single_asset<R: CryptoRng + Rng>(prng: &mut R,
+fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(prng: &mut R,
                                                    inputs: &[OpenAssetRecord],
                                                    outputs: &[OpenAssetRecord],
                                                    confidential_amount: bool,
@@ -412,7 +412,7 @@ fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiError> {
 }
 
 /// I verify a transfer note
-pub fn verify_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
+pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
                                            xfr_note: &XfrNote,
                                            id_reveal_policies: &[Option<IdRevealPolicy>])
                                            -> Result<(), ZeiError> {
@@ -428,7 +428,7 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use bulletproofs::PedersenGens;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
@@ -495,7 +495,7 @@ pub fn verify_xfr_note<R: CryptoRng + Rng>(prng: &mut R,
 ///
 /// verify_xfr_note(&mut prng, &xfr_note, &null_policies).unwrap();
 /// ```
-pub fn verify_xfr_body<R: CryptoRng + Rng>(prng: &mut R,
+pub fn verify_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                            body: &XfrBody,
                                            id_reveal_policies: &[Option<IdRevealPolicy>])
                                            -> Result<(), ZeiError> {
@@ -650,7 +650,7 @@ pub(crate) mod tests {
   use crate::xfr::proofs::create_conf_id_reveal;
   use crate::xfr::sig::XfrKeyPair;
   use curve25519_dalek::ristretto::RistrettoPoint;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;

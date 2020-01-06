@@ -2,7 +2,7 @@
 #[cfg(test)]
 use proptest::prelude::*;
 
-use rand::SeedableRng;
+use rand_core::SeedableRng;
 use rand_chacha::ChaChaRng;
 use zei::api::gp_sig::{gpsig_join_cert, gpsig_setup, gpsig_sign, gpsig_verify};
 

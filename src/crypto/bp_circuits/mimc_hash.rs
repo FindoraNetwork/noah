@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::crypto::accumulators::merkle_tree::compute_mimc_constants;
-use bulletproofs_yoloproof::r1cs::*;
+use bulletproofs::r1cs::*;
 use curve25519_dalek::scalar::Scalar;
 
 pub(crate) fn mimc_func<CS: ConstraintSystem>(cs: &mut CS,
@@ -78,8 +78,8 @@ pub fn hash_proof<CS: ConstraintSystem>(cs: &mut CS,
 mod test {
   use super::*;
   use crate::crypto::accumulators::merkle_tree::{MTHash, MiMCHash};
-  use bulletproofs_yoloproof::r1cs::Verifier;
-  use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+  use bulletproofs::r1cs::Verifier;
+  use bulletproofs::{BulletproofGens, PedersenGens};
   use curve25519_dalek::scalar::Scalar;
   use merlin::Transcript;
 

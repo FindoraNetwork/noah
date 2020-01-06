@@ -3,7 +3,7 @@ use crate::algebra::ristretto::RistPoint;
 use crate::errors::ZeiError;
 use crate::serialization::ZeiFromToBytes;
 use curve25519_dalek::ristretto::RistrettoPoint;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ impl<G: Clone> ElGamalPublicKey<G> {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElGamalSecretKey<S>(pub(crate) S); //sk
 
-pub fn elgamal_keygen<R: CryptoRng + Rng, S: Scalar, G: Group<S>>(
+pub fn elgamal_keygen<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(
   prng: &mut R,
   base: &G)
   -> (ElGamalSecretKey<S>, ElGamalPublicKey<G>) {
@@ -130,7 +130,7 @@ pub mod elgamal_test {
   use crate::algebra::groups::{Group, Scalar};
   use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, ElGamalSecretKey};
   use crate::errors::ZeiError;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::Deserializer;
   use serde::de::Deserialize;

@@ -1,7 +1,7 @@
 use crate::errors::ZeiError;
 use curve25519_dalek::scalar::Scalar;
 use digest::Digest;
-use rand::SeedableRng;
+use rand_core::SeedableRng;
 use rand_chacha::ChaChaRng;
 use std::fmt::Debug;
 use std::string::ToString;

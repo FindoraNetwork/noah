@@ -1,7 +1,7 @@
 use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::errors::ZeiError;
 use crate::utils::byte_slice_to_scalar;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 pub type ACIssuerPublicKey = crate::crypto::anon_creds::ACIssuerPublicKey<BLSG1, BLSG2>;
 pub type ACIssuerSecretKey = crate::crypto::anon_creds::ACIssuerSecretKey<BLSG1, BLSScalar>;
@@ -17,14 +17,14 @@ pub type ACRevealSig = crate::crypto::anon_creds::ACRevealSig<BLSG1, BLSG2, BLSS
 /// Generates e key pair for a credential issuer
 /// # Example
 /// ```
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::ac_keygen_issuer;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 10;
 /// let keys = ac_keygen_issuer(&mut prng, num_attrs);
 /// ```
-pub fn ac_keygen_issuer<R: CryptoRng + Rng>(prng: &mut R,
+pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(prng: &mut R,
                                             num_attrs: usize)
                                             -> (ACIssuerPublicKey, ACIssuerSecretKey) {
   crate::crypto::anon_creds::ac_keygen_issuer::<_, BLSGt>(prng, num_attrs)
@@ -33,7 +33,7 @@ pub fn ac_keygen_issuer<R: CryptoRng + Rng>(prng: &mut R,
 /// Generates a credential user key pair for a given credential issuer
 ///
 /// ```
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -41,7 +41,7 @@ pub fn ac_keygen_issuer<R: CryptoRng + Rng>(prng: &mut R,
 /// let (issuer_pk,_) = ac_keygen_issuer(&mut prng, num_attrs);
 /// let user_keys = ac_keygen_user(&mut prng, &issuer_pk);
 /// ```
-pub fn ac_keygen_user<R: CryptoRng + Rng>(prng: &mut R,
+pub fn ac_keygen_user<R: CryptoRng + RngCore>(prng: &mut R,
                                           issuer_pk: &ACIssuerPublicKey)
                                           -> (ACUserPublicKey, ACUserSecretKey) {
   crate::crypto::anon_creds::ac_keygen_user::<_, BLSGt>(prng, issuer_pk)
@@ -49,7 +49,7 @@ pub fn ac_keygen_user<R: CryptoRng + Rng>(prng: &mut R,
 
 /// Computes a credential signature for a set of attributes.
 /// ```
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
 /// use zei::algebra::bls12_381::BLSScalar;
@@ -61,7 +61,7 @@ pub fn ac_keygen_user<R: CryptoRng + Rng>(prng: &mut R,
 /// let attributes = [b"attr1", b"attr2"];
 /// let signature = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
 /// ```
-pub fn ac_sign<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
+pub fn ac_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
                                                    issuer_sk: &ACIssuerSecretKey,
                                                    user_pk: &ACUserPublicKey,
                                                    attrs: &[B])
@@ -75,7 +75,7 @@ pub fn ac_sign<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
 /// Produces a AttrsRevealProof, bitmap indicates which attributes are revealed
 /// # Example
 /// ```
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign, ac_reveal};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -87,7 +87,7 @@ pub fn ac_sign<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
 /// let bitmap = [true,false]; // Reveal first attribute and hide the second one
 /// let reveal_sig = ac_reveal(&mut prng, &user_sk, &issuer_pk, &signature, &attributes[..], &bitmap);
 /// ```
-pub fn ac_reveal<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
+pub fn ac_reveal<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
                                                      user_sk: &ACUserSecretKey,
                                                      issuer_pk: &ACIssuerPublicKey,
                                                      sig: &ACSignature,
@@ -108,7 +108,7 @@ pub fn ac_reveal<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
 /// Verifies an anonymous credential reveal proof.
 /// # Example
 /// ```
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::algebra::groups::Scalar;
 /// use zei::algebra::bls12_381::{BLSScalar};

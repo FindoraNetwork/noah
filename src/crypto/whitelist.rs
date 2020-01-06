@@ -4,12 +4,12 @@ use crate::crypto::accumulators::merkle_tree::{
 use crate::crypto::bp_circuits::array_inclusion::array_membership;
 use crate::crypto::bp_circuits::merkle_path::merkle_verify_mimc;
 use crate::errors::ZeiError;
-use bulletproofs_yoloproof::r1cs::{Prover, R1CSProof, Variable, Verifier};
-use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+use bulletproofs::r1cs::{Prover, R1CSProof, Variable, Verifier};
+use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 pub const THRESHOLD: usize = 10;
 
@@ -22,7 +22,7 @@ pub struct WhitelistProof {
   proof: R1CSProof,
 }
 
-pub fn prove_mt_membership<R: CryptoRng + Rng>(prng: &mut R,
+pub fn prove_mt_membership<R: CryptoRng + RngCore>(prng: &mut R,
                                                mt: &MerkleTree<Scalar>,
                                                index: usize,
                                                elem: &CompressedRistretto,
@@ -139,7 +139,7 @@ mod test {
   use crate::crypto::whitelist::build_mt_whitelist;
   use bulletproofs::PedersenGens;
   use curve25519_dalek::scalar::Scalar;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   #[test]

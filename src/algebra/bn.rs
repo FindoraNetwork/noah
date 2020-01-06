@@ -3,7 +3,7 @@ use super::pairing::PairingTargetGroup;
 use bn::{Group as BNGroup, Gt};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
 use serde_json;
 use std::fmt;
@@ -40,7 +40,7 @@ impl Clone for BNScalar {
 
 impl crate::algebra::groups::Scalar for BNScalar {
   // scalar generation
-  fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> BNScalar {
+  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> BNScalar {
     BNScalar(bn::Fr::random(rng))
   }
 

@@ -2,8 +2,7 @@ use crate::errors::ZeiError;
 use crate::serialization;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::scalar::Scalar;
-use rand::CryptoRng;
-use rand::Rng;
+use rand_core::{CryptoRng, RngCore};
 use sha2::Digest;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
@@ -17,7 +16,7 @@ pub struct ZeiHybridCipher {
 /// I encrypt a message a under public key. I implement hybrid encryption where a symmetric public
 /// is derived from the public key, and the message is encrypted under this symmetric key.
 /// I return ZeiError::DecompressElementError if public key is not well formed.
-pub fn hybrid_encrypt<R: CryptoRng + Rng>(prng: &mut R,
+pub fn hybrid_encrypt<R: CryptoRng + RngCore>(prng: &mut R,
                                           pub_key: &PublicKey,
                                           message: &[u8])
                                           -> Result<ZeiHybridCipher, ZeiError> {
@@ -44,7 +43,7 @@ pub fn hybrid_decrypt(ctext: &ZeiHybridCipher, sec_key: &SecretKey) -> Result<Ve
 fn symmetric_key_from_public_key<R>(prng: &mut R,
                                     public_key: &PublicKey)
                                     -> Result<([u8; 32], CompressedEdwardsY), ZeiError>
-  where R: CryptoRng + Rng
+  where R: CryptoRng + RngCore
 {
   let rand = Scalar::random(prng);
   let encoded_rand = rand * KEY_BASE_POINT.decompress().unwrap(); // can always be decompressed
@@ -59,7 +58,7 @@ fn symmetric_key_from_public_key<R>(prng: &mut R,
 }
 
 fn sec_key_as_scalar(sk: &SecretKey) -> Scalar {
-  let expanded = sk.expand::<sha2::Sha512>();
+  let expanded: ExpandedSecretKey = sk.into();
   //expanded.key is not public, I need to extract it via serialization
   let mut key_bytes = [0u8; 32];
   key_bytes.copy_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
@@ -92,7 +91,7 @@ use crate::xfr::sig::KEY_BASE_POINT;
 use aes_ctr::stream_cipher::generic_array::GenericArray;
 use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes256Ctr;
-use ed25519_dalek::{PublicKey, SecretKey};
+use ed25519_dalek::{PublicKey, SecretKey, ExpandedSecretKey};
 
 fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
   let kkey = GenericArray::from_slice(key);
@@ -116,14 +115,14 @@ fn symmetric_decrypt_fresh_key(key: &[u8; 32], ciphertext: &[u8]) -> Vec<u8> {
 mod test {
   use super::*;
   use ed25519_dalek::Keypair;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   #[test]
   fn key_derivation() {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
-    let keypair = Keypair::generate::<sha2::Sha512, _>(&mut prng);
+    let keypair = Keypair::generate(&mut prng);
     let (from_pk_key, encoded_rand) =
       symmetric_key_from_public_key(&mut prng, &keypair.public).unwrap();
     let from_sk_key = symmetric_key_from_secret_key(&keypair.secret, &encoded_rand).unwrap();
@@ -147,7 +146,7 @@ mod test {
   fn zei_hybrid_cipher() {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
-    let key_pair = Keypair::generate::<sha2::Sha512, _>(&mut prng);
+    let key_pair = Keypair::generate(&mut prng);
     let msg = b"this is another message";
 
     let cipherbox = hybrid_encrypt(&mut prng, &key_pair.public, msg).unwrap();

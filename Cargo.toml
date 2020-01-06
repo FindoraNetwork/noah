@@ -10,18 +10,18 @@ name = "zei"
 crate-type = ["rlib"]
 
 [dependencies]
-rand_chacha = "0.1.1"
+rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
+rand = { version = "0.7", default-features = false, optional = true }
+rand_chacha = "0.2"
 num-traits = "0.2"
 num-bigint = "0.2.2"
-rand = "0.6"
 rand_04 = {package= "rand", version = "0.4"}
-curve25519-dalek = { version =  "1.2.3", features = ["serde"] }
-ed25519-dalek = "0.9.1"
-bulletproofs =  {version = "1.0.4"}
-bulletproofs_yoloproof = { version = "1.0.4",  package = "bulletproofs", git = "https://github.com/dalek-cryptography/bulletproofs", branch = "develop", features = ["yoloproofs"]}
-spacesuit = {git = "https://github.com/interstellar/slingshot", branch = "main"}
+curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
+ed25519-dalek = "1.0.0-pre.3"
+bulletproofs = { version = "1.0.4",  package = "bulletproofs", git = "https://github.com/dalek-cryptography/bulletproofs", branch = "develop", features = ["yoloproofs"]}
+spacesuit = {git = "https://github.com/findoraorg/slingshot", branch = "main"}
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
-merlin = "1.0"
+merlin = "2.0"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -29,7 +29,7 @@ sha2 = "0.8.0"
 itertools = "0.8.0"
 rmp-serde = "0.13.7"
 pairing = "0.14.2"
-bn = {git = "ssh://git@github.com/findoraorg/zcash-bn-fork"}
+bn = {git = "ssh://git@github.com/findoraorg/zcash-bn-fork", rev = "06d5bd15e358dc5a75b3d0b"}
 digest = "0.8"
 bincode = "1.1.2"
 base64 = "0.10"
@@ -38,6 +38,7 @@ aes-ctr = "0.3.0"
 
 [dev-dependencies]
 proptest = "0.9.4"
+rand = { version = "0.7", default-features = false}
 
 [features]
 default = ["std", "u64_backend"]

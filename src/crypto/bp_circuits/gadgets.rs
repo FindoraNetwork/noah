@@ -1,4 +1,4 @@
-use bulletproofs_yoloproof::r1cs::{
+use bulletproofs::r1cs::{
   ConstraintSystem, LinearCombination, R1CSError, RandomizableConstraintSystem,
   RandomizedConstraintSystem, Variable,
 };
@@ -193,8 +193,8 @@ pub fn range_proof<CS: ConstraintSystem>(cs: &mut CS,
 #[cfg(test)]
 mod test {
   use super::super::solvency::allocate_vector;
-  use bulletproofs_yoloproof::r1cs::{Prover, Variable, Verifier};
-  use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+  use bulletproofs::r1cs::{Prover, Variable, Verifier};
+  use bulletproofs::{BulletproofGens, PedersenGens};
   use curve25519_dalek::ristretto::CompressedRistretto;
   use curve25519_dalek::scalar::Scalar;
   use merlin::Transcript;

@@ -1,9 +1,9 @@
 use crate::crypto::bp_circuits;
 use crate::errors::ZeiError;
-use bulletproofs_yoloproof::r1cs::{
+use bulletproofs::r1cs::{
   ConstraintSystem, Prover, R1CSError, R1CSProof, Variable, Verifier,
 };
-use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use linear_map::LinearMap;
@@ -19,9 +19,9 @@ use merlin::Transcript;
 /// computed.
 /// # Example
 /// ```
-/// use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+/// use bulletproofs::{BulletproofGens, PedersenGens};
 /// use rand_chacha::ChaChaRng;
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use curve25519_dalek::scalar::Scalar;
 /// use zei::crypto::solvency::{prove_solvency,verify_solvency};
 /// let pc_gens = PedersenGens::default();
@@ -258,10 +258,10 @@ fn padd_values(values: &mut Vec<(Scalar, Scalar)>, types: &[Scalar]) {
 
 #[cfg(test)]
 mod test {
-  use bulletproofs_yoloproof::PedersenGens;
+  use bulletproofs::PedersenGens;
   use curve25519_dalek::scalar::Scalar;
   use linear_map::LinearMap;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   fn do_test_solvency(hidden_asset_set: &[(Scalar, Scalar)],

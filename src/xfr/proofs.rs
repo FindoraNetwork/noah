@@ -20,11 +20,11 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
 use merlin::Transcript;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
-pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
+pub(crate) fn tracking_proofs<R: CryptoRng + RngCore>(
   prng: &mut R,
   outputs: &[OpenAssetRecord])
   -> Result<Option<PedersenElGamalEqProof>, ZeiError> {
@@ -112,7 +112,7 @@ pub(crate) fn tracking_proofs<R: CryptoRng + Rng>(
 }
 #[allow(clippy::iter_next_loop)]
 // TODO what do the two "for" loops below do??
-pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + Rng>(prng: &mut R,
+pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + RngCore>(prng: &mut R,
                                                                xfr_body: &XfrBody,
                                                                attribute_reveal_policies: &[Option<IdRevealPolicy>])
                                                                -> Result<(), ZeiError> {
@@ -228,7 +228,7 @@ fn verify_attribute_reveal_policy(asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
   }
 }
 
-pub fn create_conf_id_reveal<R: Rng + CryptoRng, B: AsRef<[u8]>>(
+pub fn create_conf_id_reveal<R: RngCore + CryptoRng, B: AsRef<[u8]>>(
   prng: &mut R,
   attrs: &[B],
   policy: &IdRevealPolicy,
@@ -415,7 +415,7 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
 /**** Asset Equality Proofs *****/
 
 /// I compute asset equality proof for confidential asset transfers
-pub(crate) fn asset_proof<R: CryptoRng + Rng>(prng: &mut R,
+pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
                                               pc_gens: &PedersenGens,
                                               inputs: &[OpenAssetRecord],
                                               open_outputs: &[OpenAssetRecord])
@@ -452,7 +452,7 @@ pub(crate) fn asset_proof<R: CryptoRng + Rng>(prng: &mut R,
   Ok(proof)
 }
 
-pub(crate) fn verify_confidential_asset<R: CryptoRng + Rng>(prng: &mut R,
+pub(crate) fn verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut R,
                                                             inputs: &[BlindAssetRecord],
                                                             outputs: &[BlindAssetRecord],
                                                             asset_proof: &ChaumPedersenProofX)

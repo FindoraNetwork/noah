@@ -5,7 +5,7 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 /*
 * This file implements Chaum-Pedersen proof of equality of commitments.
@@ -53,7 +53,7 @@ pub struct ChaumPedersenProofX {
 }
 
 /// I compute a Chaum-Pedersen proof of knowledge of openings of two commitments to the same value
-pub fn chaum_pedersen_prove_eq<R: CryptoRng + Rng>(prng: &mut R,
+pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(prng: &mut R,
                                                    pedersen_gens: &PedersenGens,
                                                    value: &Scalar,
                                                    commitment1: &RistrettoPoint,
@@ -104,7 +104,7 @@ pub fn chaum_pedersen_verify_eq(pc_gens: &PedersenGens,
 /// in case of verification failure, and Err(Error::DecompressElementError) in case some
 /// CompressedRistretto can not be decompressed. I use aggregation technique and a single
 /// multi-exponentiation check
-pub fn chaum_pedersen_verify_eq_fast<R: CryptoRng + Rng>(prng: &mut R,
+pub fn chaum_pedersen_verify_eq_fast<R: CryptoRng + RngCore>(prng: &mut R,
                                                          pc_gens: &PedersenGens,
                                                          c1: &RistrettoPoint,
                                                          c2: &RistrettoPoint,
@@ -139,7 +139,7 @@ fn get_fake_zero_commitment_blinding() -> Scalar {
 }
 
 /// I produce a proof of knowledge of openings of a set of commitments to the same value.
-pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + Rng>(
+pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
   prng: &mut R,
   pedersen_gens: &PedersenGens,
   value: &Scalar,
@@ -196,7 +196,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + Rng>(
 /// I verify a proof that all commitments are to the same value.
 ///  * Return Ok(true) in case of success, Ok(false) in case of verification failure,
 ///  * and Err(Error::DecompressElementError) in case some CompressedRistretto can not be decompressed
-pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + Rng>(prng: &mut R,
+pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(prng: &mut R,
                                                              pedersen_gens: &PedersenGens,
                                                              commitments: &[RistrettoPoint],
                                                              proof: &ChaumPedersenProofX)
@@ -239,7 +239,7 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + Rng>(prng: &mut R,
 mod test {
   use super::*;
   use bulletproofs::PedersenGens;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   #[test]

@@ -10,7 +10,7 @@ use crate::basic_crypto::signatures::pointcheval_sanders::{
 use crate::errors::ZeiError;
 
 use digest::Digest;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use sha2::Sha512;
 
 /// The public key of the group manager contains a public signing key `ver_key`
@@ -40,7 +40,7 @@ pub struct GroupSignature<P: PairingTargetGroup> {
 /// I generate the private and public parameters for the Group manager.
 /// * `prng` - source of randomness
 /// * `returns` - a group public key and a group secret key
-pub fn gpsig_setup<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub fn gpsig_setup<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R)
   -> (GroupPublicKey<P>, GroupSecretKey<P>) {
   let (ver_key, sig_key) = ps_gen_keys::<R, P>(prng);
@@ -63,7 +63,7 @@ pub struct TagKey<P: PairingTargetGroup>(P::G1);
 /// * `prng` - source of randomness
 /// * `msk` - group secret key
 /// * `return` join certificate for user and tag key for the manager
-pub(crate) fn gpsig_join_cert<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub(crate) fn gpsig_join_cert<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R,
   msk: &GroupSecretKey<P>)
   -> (JoinCert<P>, TagKey<P>) {
@@ -79,7 +79,7 @@ pub(crate) fn gpsig_join_cert<R: CryptoRng + Rng, P: PairingTargetGroup>(
 /// * `gpk` - group public key
 /// * `join_cert` - join certificate
 /// * `msg` - message to be signed
-pub(crate) fn gpsig_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
+pub(crate) fn gpsig_sign<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
                                                                     gpk: &GroupPublicKey<P>,
                                                                     join_cert: &JoinCert<P>,
                                                                     msg: &[u8])
@@ -114,7 +114,7 @@ pub(crate) struct PoK<P: PairingTargetGroup> {
 /// * `tag` - identity of the user
 /// * `r` - randomness of the ciphertext
 /// * `msg` - message to be signed
-fn signature_proof_of_knowledge<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
+fn signature_proof_of_knowledge<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
                                                                            gpk: &GroupPublicKey<P>,
                                                                            tag: &P::ScalarField,
                                                                            r: &P::ScalarField,
@@ -269,7 +269,7 @@ mod tests {
   use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
   use crate::algebra::groups::Group;
   use crate::errors::ZeiError;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   #[test]

@@ -1,5 +1,5 @@
 use crate::errors::ZeiError;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 pub mod bls;
 pub mod pointcheval_sanders;
@@ -8,7 +8,7 @@ pub trait SignatureTrait {
   type PublicKey;
   type SecretKey;
   type Signature;
-  fn gen_keys<R: CryptoRng + Rng>(prng: &mut R) -> (Self::SecretKey, Self::PublicKey);
+  fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R) -> (Self::SecretKey, Self::PublicKey);
   fn sign<B: AsRef<[u8]>>(sk: &Self::SecretKey, msg: &B) -> Self::Signature;
   fn verify<B: AsRef<[u8]>>(pk: &Self::PublicKey,
                             sig: &Self::Signature,

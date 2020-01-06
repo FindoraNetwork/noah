@@ -1,13 +1,12 @@
 use crate::errors::ZeiError;
 use crate::serialization::ZeiFromToBytes;
-use rand::CryptoRng;
-use rand::Rng;
+use rand_core::{CryptoRng, RngCore};
 
 use crate::errors::ZeiError::SignatureError;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::PublicKey;
+use ed25519_dalek::{PublicKey, ExpandedSecretKey};
 use ed25519_dalek::SecretKey;
 use ed25519_dalek::Signature;
 use wasm_bindgen::prelude::*;
@@ -30,7 +29,6 @@ pub struct XfrKeyPair {
   secret: XfrSecretKey,
 }
 
-type HashFnc = sha2::Sha512;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct XfrSignature(pub Signature);
 
@@ -41,7 +39,7 @@ impl XfrPublicKey {
   }
 
   pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), ZeiError> {
-    Ok(self.0.verify::<HashFnc>(message, &signature.0)?)
+    Ok(self.0.verify(message, &signature.0)?)
   }
 
   pub fn as_bytes(&self) -> &[u8] {
@@ -64,14 +62,14 @@ impl ZeiFromToBytes for XfrPublicKey {
 
 impl XfrSecretKey {
   pub fn sign(&self, message: &[u8], public_key: &XfrPublicKey) -> XfrSignature {
-    let expanded = self.0.expand::<HashFnc>();
-    let sign = expanded.sign::<HashFnc>(message, &public_key.0);
+    let expanded: ExpandedSecretKey = (&self.0).into();
+    let sign = expanded.sign(message, &public_key.0);
 
     XfrSignature(sign)
   }
 
   pub fn as_scalar_multiply_by_curve_point(&self, y: &EdwardsPoint) -> EdwardsPoint {
-    let expanded = self.0.expand::<HashFnc>();
+    let expanded: ExpandedSecretKey = (&self.0).into();
     //expanded.key is not public, I need to extract it via serialization
     let mut key_bytes = [0u8; 32];
     key_bytes.copy_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
@@ -106,10 +104,9 @@ impl XfrKeyPair {
   }
 }
 impl XfrKeyPair {
-  pub fn generate<R: CryptoRng + Rng>(prng: &mut R) -> Self
-    where R: CryptoRng + Rng
+  pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self
   {
-    let kp = ed25519_dalek::Keypair::generate::<HashFnc, _>(prng);
+    let kp = ed25519_dalek::Keypair::generate(prng);
     XfrKeyPair { public: XfrPublicKey(kp.public),
                  secret: XfrSecretKey(kp.secret) }
   }
@@ -179,7 +176,7 @@ pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 mod test {
   use crate::errors::ZeiError::SignatureError;
   use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey};
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   #[test]

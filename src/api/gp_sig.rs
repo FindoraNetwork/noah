@@ -1,6 +1,6 @@
 use crate::algebra::bls12_381::BLSGt;
 use crate::errors::ZeiError;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 /// The public key of the group manager
 pub type GroupPublicKey = crate::crypto::group_signatures::GroupPublicKey<BLSGt>;
@@ -14,7 +14,7 @@ pub type GroupSignature = crate::crypto::group_signatures::GroupSignature<BLSGt>
 /// Generates the private and public parameters for the Group manager.
 /// * `prng` - source of randomness
 /// * `returns` - a group public key and a group secret key
-pub fn gpsig_setup<R: CryptoRng + Rng>(prng: &mut R) -> (GroupPublicKey, GroupSecretKey) {
+pub fn gpsig_setup<R: CryptoRng + RngCore>(prng: &mut R) -> (GroupPublicKey, GroupSecretKey) {
   crate::crypto::group_signatures::gpsig_setup::<R, BLSGt>(prng)
 }
 
@@ -27,7 +27,7 @@ pub type TagKey = crate::crypto::group_signatures::TagKey<BLSGt>;
 /// * `prng` - source of randomness
 /// * `msk` - group secret key
 /// * `return` join certificate
-pub fn gpsig_join_cert<R: CryptoRng + Rng>(prng: &mut R,
+pub fn gpsig_join_cert<R: CryptoRng + RngCore>(prng: &mut R,
                                            msk: &GroupSecretKey)
                                            -> (JoinCert, TagKey) {
   crate::crypto::group_signatures::gpsig_join_cert(prng, msk)
@@ -41,7 +41,7 @@ pub fn gpsig_join_cert<R: CryptoRng + Rng>(prng: &mut R,
 /// # Example
 /// ```
 /// use zei::api::gp_sig::{gpsig_setup, gpsig_join_cert, gpsig_sign, gpsig_verify};
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (gpk, msk) = gpsig_setup(&mut prng);
@@ -49,7 +49,7 @@ pub fn gpsig_join_cert<R: CryptoRng + Rng>(prng: &mut R,
 /// let sig = gpsig_sign(&mut prng, &gpk, &join_cert, b"Some message");
 /// assert!(gpsig_verify(&gpk, &sig, b"Some message").is_ok());
 /// ```
-pub fn gpsig_sign<R: CryptoRng + Rng, B: AsRef<[u8]>>(prng: &mut R,
+pub fn gpsig_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
                                                       gpk: &GroupPublicKey,
                                                       join_cert: &JoinCert,
                                                       msg: &B)
@@ -80,7 +80,7 @@ pub fn gpsig_verify<B: AsRef<[u8]>>(gpk: &GroupPublicKey,
 /// # Example
 /// ```
 /// use zei::api::gp_sig::{gpsig_setup, gpsig_join_cert, gpsig_sign, gpsig_open};
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let (gpk, msk) = gpsig_setup(&mut prng);

@@ -6,7 +6,7 @@ use digest::Digest;
 use pairing::bls12_381::{Fq12, Fr, FrRepr, G1, G2};
 use pairing::{CurveAffine, CurveProjective};
 use pairing::{EncodedPoint, Field, PrimeField};
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use rand_04::Rand;
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -23,7 +23,7 @@ pub struct BLSGt(pub(crate) Fq12);
 
 impl Scalar for BLSScalar {
   // scalar generation
-  fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> BLSScalar {
+  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> BLSScalar {
     // hack to use rand_04::Rng rather than rand::Rng
     let mut random_bytes = [0u8; 16];
     rng.fill_bytes(&mut random_bytes);

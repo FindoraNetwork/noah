@@ -3,8 +3,7 @@ use crate::algebra::groups::{Group, Scalar as ZeiScalar};
 use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
-use rand::CryptoRng;
-use rand::Rng;
+use rand_core::{CryptoRng, RngCore};
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct DlogProof<G, S> {
@@ -12,7 +11,7 @@ pub struct DlogProof<G, S> {
   pub response: S,
 }
 
-pub fn prove_knowledge_dlog<R: CryptoRng + Rng, S: ZeiScalar, G: Group<S>>(prng: &mut R,
+pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(prng: &mut R,
                                                                            base: &G,
                                                                            point: &G,
                                                                            dlog: &S)
@@ -41,7 +40,7 @@ pub fn verify_proof_of_knowledge_dlog<S: ZeiScalar, G: Group<S>>(base: &G,
   vrfy_ok
 }
 
-pub fn prove_multiple_knowledge_dlog<R: CryptoRng + Rng, S: ZeiScalar, G: Group<S>>(
+pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
   prng: &mut R,
   base: &G,
   points: &[G],
@@ -93,7 +92,7 @@ pub fn verify_multiple_knowledge_dlog<S: ZeiScalar, G: Group<S>>(base: &G,
 //cannot be assumed to be a valid pedersen commitment, then use Chaum-Pedersen
 pub type CommitmentEqProof = DlogProof<RistrettoPoint, curve25519_dalek::scalar::Scalar>;
 
-pub fn dlog_based_prove_commitment_eq<R: CryptoRng + Rng>(prng: &mut R,
+pub fn dlog_based_prove_commitment_eq<R: CryptoRng + RngCore>(prng: &mut R,
                                                           pedersen_gens: &PedersenGens,
                                                           source_asset_commitment: &RistrettoPoint,
                                                           destination_asset_commitment: &RistrettoPoint,
@@ -132,7 +131,7 @@ pub fn dlog_based_verify_commitment_eq(pedersen_gens: &PedersenGens,
 mod test {
   use super::*;
   use bulletproofs::PedersenGens;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   #[test]

@@ -6,7 +6,7 @@ use crate::crypto::anon_creds::{
   ac_challenge, ac_vrfy_hidden_terms_addition, ACIssuerPublicKey, ACRevealSig,
 };
 use crate::errors::ZeiError;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use serde::ser::Serialize;
 use sha2::{Digest, Sha512};
 
@@ -38,7 +38,7 @@ pub struct ConfidentialAC<P: PairingTargetGroup> {
   pok: AggPoKAttrs<P::G1, P::G2, P::ScalarField>,
 }
 
-pub fn cac_create<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub fn cac_create<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R,
   cred_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
   enc_key: &ElGamalPublicKey<P::G1>,
@@ -111,7 +111,7 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
   ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
   ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, P::ScalarField>])
   -> Result<AggPoKAttrs<P::G1, P::G2, P::ScalarField>, ZeiError>
-  where R: CryptoRng + Rng,
+  where R: CryptoRng + RngCore,
         P: PairingTargetGroup
 {
   // 0: sanity check on vector length
@@ -453,7 +453,7 @@ fn sample_blinds_compute_commitments<R, P>(
              (Vec<Vec<P::G1>>, Vec<Vec<P::G1>>, Vec<Vec<P::G1>>),
              (Vec<Vec<P::ScalarField>>, Vec<Vec<P::ScalarField>>)),
             ZeiError>
-  where R: CryptoRng + Rng,
+  where R: CryptoRng + RngCore,
         P: PairingTargetGroup
 {
   let mut attr_sum_com_yy2 = Vec::with_capacity(n_instances);
@@ -513,7 +513,7 @@ fn sample_blinds<R, S>(prng: &mut R,
                        n_attrs: usize,
                        n_instances: usize)
                        -> (Vec<Vec<S>>, Vec<Vec<S>>)
-  where R: CryptoRng + Rng,
+  where R: CryptoRng + RngCore,
         S: Scalar
 {
   let mut attr_blinds = vec![];
@@ -648,7 +648,7 @@ pub(crate) mod test_helper {
   use crate::crypto::conf_cred_reveal::{cac_create, cac_verify};
   use crate::errors::ZeiError;
   use crate::utils::byte_slice_to_scalar;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   pub fn test_confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
@@ -829,7 +829,7 @@ mod test_serialization {
   use crate::crypto::conf_cred_reveal::cac_create;
   use crate::crypto::conf_cred_reveal::ConfidentialAC;
   use crate::utils::byte_slice_to_scalar;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::Deserializer;
   use serde::{Deserialize, Serialize};

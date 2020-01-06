@@ -81,7 +81,7 @@ in the credentials by
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::errors::ZeiError;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 
 /// I contain Credentials' Issuer Public key fields
@@ -137,7 +137,7 @@ pub(crate) struct ACPoK<G2, S> {
 
 /// I generate e key pair for a credential issuer
 #[allow(clippy::type_complexity)]
-pub(crate) fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub(crate) fn ac_keygen_issuer<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R,
   num_attrs: usize)
   -> (ACIssuerPublicKey<P::G1, P::G2>, ACIssuerSecretKey<P::G1, P::ScalarField>) {
@@ -165,7 +165,7 @@ pub(crate) fn ac_keygen_issuer<R: CryptoRng + Rng, P: PairingTargetGroup>(
 }
 
 /// I generate a credential user key pair for a given credential issuer
-pub(crate) fn ac_keygen_user<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub(crate) fn ac_keygen_user<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>)
   -> (ACUserPublicKey<P::G1>, ACUserSecretKey<P::ScalarField>) {
@@ -176,7 +176,7 @@ pub(crate) fn ac_keygen_user<R: CryptoRng + Rng, P: PairingTargetGroup>(
 
 /// I Compute a credential signature for a set of attributes. User can represent Null attributes by
 /// a fixes scalar (e.g. 0)
-pub(crate) fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
+pub(crate) fn ac_sign<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
                                                                  issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
                                                                  user_pk: &ACUserPublicKey<P::G1>,
                                                                  attrs: &[P::ScalarField])
@@ -193,7 +193,7 @@ pub(crate) fn ac_sign<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
 
 /// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed
 #[allow(clippy::type_complexity)]
-pub(crate) fn ac_reveal<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub(crate) fn ac_reveal<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -238,7 +238,7 @@ pub(crate) fn ac_reveal<R: CryptoRng + Rng, P: PairingTargetGroup>(
 ///     3. Sample the challenge as a hash of the commitment.
 ///     4. Compute challenge's responses  c*t + \beta1, c*sk + beta2, {c*y_i + gamma_i}
 ///     5. Return proof commitment and responses
-fn prove_pok<R: CryptoRng + Rng, P: PairingTargetGroup>(
+fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -388,7 +388,7 @@ fn ac_vrfy_revealed_terms_addition<P: PairingTargetGroup>(challenge: &P::ScalarF
 #[cfg(test)]
 pub(crate) mod credentials_tests {
   use super::*;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::Deserializer;
   use serde::{Deserialize, Serialize};

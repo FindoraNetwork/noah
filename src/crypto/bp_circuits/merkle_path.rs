@@ -1,5 +1,5 @@
 use super::mimc_hash::mimc_hash;
-use bulletproofs_yoloproof::r1cs::{ConstraintSystem, R1CSError, Variable};
+use bulletproofs::r1cs::{ConstraintSystem, R1CSError, Variable};
 use curve25519_dalek::scalar::Scalar;
 
 pub fn merkle_verify_mimc<CS: ConstraintSystem>(cs: &mut CS,
@@ -55,12 +55,12 @@ mod test {
   use crate::crypto::accumulators::merkle_tree::{
     mt_build, mt_prove, mt_verify, MiMCHash, PathDirection,
   };
-  use bulletproofs_yoloproof::r1cs::{Prover, Variable, Verifier};
-  use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+  use bulletproofs::r1cs::{Prover, Variable, Verifier};
+  use bulletproofs::{BulletproofGens, PedersenGens};
   use curve25519_dalek::ristretto::CompressedRistretto;
   use curve25519_dalek::scalar::Scalar;
   use merlin::Transcript;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
 
   #[test]

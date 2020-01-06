@@ -8,7 +8,7 @@
  * 5) Apply range proof for total_asset - total_liabilities
 */
 
-use bulletproofs_yoloproof::r1cs::{
+use bulletproofs::r1cs::{
   LinearCombination, R1CSError, RandomizableConstraintSystem, Variable,
 };
 use curve25519_dalek::scalar::Scalar;
@@ -218,8 +218,8 @@ pub(super) fn allocate_vector<CS: RandomizableConstraintSystem>(cs: &mut CS,
 
 #[cfg(test)]
 mod test {
-  use bulletproofs_yoloproof::r1cs::{Prover, Variable, Verifier};
-  use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+  use bulletproofs::r1cs::{Prover, Variable, Verifier};
+  use bulletproofs::{BulletproofGens, PedersenGens};
   use curve25519_dalek::ristretto::CompressedRistretto;
   use curve25519_dalek::scalar::Scalar;
   use linear_map::LinearMap;

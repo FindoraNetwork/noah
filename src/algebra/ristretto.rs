@@ -6,12 +6,12 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 impl ZeiScalar for Scalar {
-  fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> Scalar {
+  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> Scalar {
     Scalar::random(rng)
   }
 
@@ -100,7 +100,7 @@ impl RistScalar {
 }
 
 impl ZeiScalar for RistScalar {
-  fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> RistScalar {
+  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> RistScalar {
     RistScalar(Scalar::random(rng))
   }
 

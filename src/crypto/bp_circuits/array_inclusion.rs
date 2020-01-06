@@ -1,4 +1,4 @@
-use bulletproofs_yoloproof::r1cs::{ConstraintSystem, Variable};
+use bulletproofs::r1cs::{ConstraintSystem, Variable};
 use curve25519_dalek::scalar::Scalar;
 
 pub fn array_membership<CS: ConstraintSystem>(cs: &mut CS,
@@ -24,8 +24,8 @@ pub fn array_membership<CS: ConstraintSystem>(cs: &mut CS,
 #[cfg(test)]
 mod test {
   use super::array_membership;
-  use bulletproofs_yoloproof::r1cs::{Prover, Verifier};
-  use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+  use bulletproofs::r1cs::{Prover, Verifier};
+  use bulletproofs::{BulletproofGens, PedersenGens};
   use curve25519_dalek::scalar::Scalar;
   use merlin::Transcript;
 

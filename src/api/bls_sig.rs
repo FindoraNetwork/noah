@@ -2,14 +2,14 @@
 use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1};
 use crate::basic_crypto::signatures::{AggSignatureTrait, SignatureTrait};
 use crate::errors::ZeiError;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 pub type BlsSecretKey = crate::basic_crypto::signatures::bls::BlsSecretKey<BLSGt>;
 pub type BlsPublicKey = crate::basic_crypto::signatures::bls::BlsPublicKey<BLSGt>;
 pub type BlsSignature = crate::basic_crypto::signatures::bls::BlsSignature<BLSGt>;
 
 /// bls key generation function
-pub fn bls_gen_keys<R: CryptoRng + Rng>(prng: &mut R) -> (BlsSecretKey, BlsPublicKey) {
+pub fn bls_gen_keys<R: CryptoRng + RngCore>(prng: &mut R) -> (BlsSecretKey, BlsPublicKey) {
   crate::basic_crypto::signatures::bls::bls_gen_keys::<_, BLSGt>(prng)
 }
 
@@ -70,7 +70,7 @@ impl SignatureTrait for Bls {
   type PublicKey = BlsPublicKey;
   type SecretKey = BlsSecretKey;
   type Signature = BlsSignature;
-  fn gen_keys<R: CryptoRng + Rng>(prng: &mut R) -> (BlsSecretKey, BlsPublicKey) {
+  fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R) -> (BlsSecretKey, BlsPublicKey) {
     bls_gen_keys(prng)
   }
   fn sign<B: AsRef<[u8]>>(sk: &Self::SecretKey, msg: &B) -> Self::Signature {

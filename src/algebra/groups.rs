@@ -1,6 +1,6 @@
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -8,7 +8,7 @@ pub trait Scalar:
   Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>
 {
   // generation
-  fn random_scalar<R: CryptoRng + Rng>(rng: &mut R) -> Self;
+  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
   fn from_u32(value: u32) -> Self;
   fn from_u64(value: u64) -> Self;
   fn from_hash<D>(hash: D) -> Self

@@ -1,7 +1,7 @@
 use crate::errors::ZeiError;
 use crate::serialization;
-use bulletproofs_yoloproof::r1cs::{Prover, R1CSProof, Verifier};
-use bulletproofs_yoloproof::{BulletproofGens, PedersenGens};
+use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
+use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
@@ -97,7 +97,7 @@ fn allocate_commitments_verifier(verifier: &mut Verifier,
 /// use zei::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify};
 /// use curve25519_dalek::scalar::Scalar;
 /// use curve25519_dalek::ristretto::CompressedRistretto;
-/// use bulletproofs_yoloproof::PedersenGens;
+/// use bulletproofs::PedersenGens;
 /// let input = [
 ///            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
 ///            (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
@@ -169,7 +169,7 @@ fn compute_num_wires(n: usize, m: usize) -> usize {
 }
 #[cfg(test)]
 mod test {
-  use bulletproofs_yoloproof::PedersenGens;
+  use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::CompressedRistretto;
   use curve25519_dalek::scalar::Scalar;
 

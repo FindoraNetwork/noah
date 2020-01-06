@@ -175,7 +175,7 @@ mod test {
   use crate::xfr::lib::tests::create_xfr;
   use crate::xfr::sig::XfrMultiSig;
   use crate::xfr::structs::{AssetAmountProof, AssetTrackingProofs};
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;

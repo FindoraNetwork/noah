@@ -14,7 +14,7 @@ use crate::api::gp_sig::{
   JoinCert, TagKey,
 };
 use crate::errors::ZeiError;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 /// JoinRequest message from the User to the Regulator. It contains the identity of the user.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub struct JoinRequest<B: AsRef<[u8]>> {
 /// Users that register with regulators must produce a JoinRequest message using this function
 /// # Example
 /// see zei::api::regulator_tracking::rt_get_trace_tag;
-pub fn rt_user_gen_join_request<'a, R: CryptoRng + Rng, B: AsRef<[u8]> + Clone>(
+pub fn rt_user_gen_join_request<'a, R: CryptoRng + RngCore, B: AsRef<[u8]> + Clone>(
   prng: &mut R,
   ac_issuer_pk: &ACIssuerPublicKey,
   ac_user_sk: &ACUserSecretKey,
@@ -52,7 +52,7 @@ pub fn rt_user_gen_join_request<'a, R: CryptoRng + Rng, B: AsRef<[u8]> + Clone>(
 /// and a trace tag to store locally.
 /// # Example
 /// see zei::api::regulator_tracking::rt_get_trace_tag;
-pub fn rt_process_join_request<R: CryptoRng + Rng, B: AsRef<[u8]>>(
+pub fn rt_process_join_request<R: CryptoRng + RngCore, B: AsRef<[u8]>>(
   prng: &mut R,
   rsk: &GroupSecretKey,
   user_join_req: &JoinRequest<B>,
@@ -85,7 +85,7 @@ pub fn rt_verify_sig<B: AsRef<[u8]>>(rpk: &GroupPublicKey,
 /// Regulator obtains tag from signature
 /// # Example
 /// ```
-/// use rand::SeedableRng;
+/// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
 /// use zei::api::regulator_tracking::{rt_user_gen_join_request, rt_process_join_request, rt_get_trace_tag};

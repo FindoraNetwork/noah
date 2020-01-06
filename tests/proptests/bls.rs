@@ -2,7 +2,7 @@
 #[cfg(test)]
 use proptest::prelude::*;
 
-use rand::SeedableRng;
+use rand_core::SeedableRng;
 use zei::algebra::bls12_381::BLSGt;
 use zei::basic_crypto::signatures::bls::{
   bls_aggregate, bls_batch_verify, bls_gen_keys, bls_sign, bls_verify, bls_verify_aggregated,

@@ -23,7 +23,7 @@ use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::errors::ZeiError;
 use digest::Digest;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use sha2::Sha512;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,7 +54,7 @@ pub struct PSSignature<G1> {
 /// let mut prng = EntropyRng::new();
 /// let keys = ps_gen_keys::<_,BLSGt>(&mut prng);
 /// ```
-pub fn ps_gen_keys<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub fn ps_gen_keys<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R)
   -> (PSPublicKey<P::G2>, PSSecretKey<P::ScalarField>) {
   let g2 = P::G2::get_base(); // TODO can I use the base or does it need to be a random element
@@ -77,7 +77,7 @@ pub fn ps_gen_keys<R: CryptoRng + Rng, P: PairingTargetGroup>(
 /// let (_, sk) = ps_gen_keys::<_,BLSGt>(&mut prng);
 /// let sig = ps_sign_bytes::<_, BLSGt>(&mut prng, &sk, b"this is a message");
 /// ```
-pub fn ps_sign_bytes<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
+pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
                                                                 sk: &PSSecretKey<P::ScalarField>,
                                                                 m: &[u8])
                                                                 -> PSSignature<P::G1> {
@@ -97,7 +97,7 @@ pub fn ps_sign_bytes<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
 /// let (_, sk) = ps_gen_keys::<_, BLSGt>(&mut prng);
 /// let sig = ps_sign_scalar::<_, BLSGt>(&mut prng, &sk, &BLSScalar::from_u32(100u32));
 /// ```
-pub fn ps_sign_scalar<R: CryptoRng + Rng, P: PairingTargetGroup>(prng: &mut R,
+pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
                                                                  sk: &PSSecretKey<P::ScalarField>,
                                                                  m: &P::ScalarField)
                                                                  -> PSSignature<P::G1> {
@@ -173,7 +173,7 @@ pub fn ps_verify_sig_scalar<P: PairingTargetGroup>(pk: &PSPublicKey<P::G2>,
 /// assert!(ps_verify_sig_scalar::<BLSGt>(&pk, &BLSScalar::from_u32(100), &rand_sig).is_ok());
 ///
 /// ```
-pub fn ps_randomize_sig<R: Rng + CryptoRng, P: PairingTargetGroup>(
+pub fn ps_randomize_sig<R: RngCore + CryptoRng, P: PairingTargetGroup>(
   prng: &mut R,
   sig: &PSSignature<P::G1>)
   -> (P::ScalarField, PSSignature<P::G1>) {

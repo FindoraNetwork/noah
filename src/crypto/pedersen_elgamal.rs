@@ -6,7 +6,7 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 
 /*
@@ -42,7 +42,7 @@ pub struct PedersenElGamalEqProof {
 }
 
 /// I compute a proof that ctext and commitment encrypts/holds m under same randomness r.
-pub fn pedersen_elgamal_eq_prove<R: CryptoRng + Rng>(prng: &mut R,
+pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(prng: &mut R,
                                                      m: &Scalar,
                                                      r: &Scalar,
                                                      public_key: &ElGamalPublicKey<RistrettoPoint>,
@@ -95,7 +95,7 @@ pub fn pedersen_elgamal_eq_verify(public_key: &ElGamalPublicKey<RistrettoPoint>,
 
 /// verify a pedersen/elgamal equality proof against ctext and commitment using aggregation
 /// technique and a single multiexponentiation check.
-pub fn pedersen_elgamal_eq_verify_fast<R: CryptoRng + Rng>(prng: &mut R,
+pub fn pedersen_elgamal_eq_verify_fast<R: CryptoRng + RngCore>(prng: &mut R,
                                                            public_key: &ElGamalPublicKey<RistrettoPoint>,
                                                            ctext: &ElGamalCiphertext<RistrettoPoint>,
                                                            commitment: &RistrettoPoint,
@@ -166,7 +166,7 @@ fn compute_linear_combination_scalar_vector(commitments: &[RistrettoPoint],
   x.push(xi);
   x
 }
-pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + Rng>(prng: &mut R,
+pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(prng: &mut R,
                                                                m: &[Scalar],
                                                                r: &[Scalar],
                                                                public_key: &ElGamalPublicKey<RistrettoPoint>,
@@ -243,7 +243,7 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + Rng>(prng: &mut R,
                            c1: proof_com }
 }
 
-pub fn pedersen_elgamal_eq_aggregate_verify_fast<R: CryptoRng + Rng>(prng: &mut R,
+pub fn pedersen_elgamal_eq_aggregate_verify_fast<R: CryptoRng + RngCore>(prng: &mut R,
                                                                      public_key: &ElGamalPublicKey<RistrettoPoint>,
                                                                      ctexts: &[ElGamalCiphertext<RistrettoPoint>],
                                                                      commitments: &[RistrettoPoint],
@@ -315,7 +315,7 @@ mod test {
   use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
   use rmp_serde::Deserializer;
   use serde::de::Deserialize;

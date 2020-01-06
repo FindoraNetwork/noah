@@ -3,7 +3,7 @@ use crate::algebra::pairing::PairingTargetGroup;
 use crate::errors::ZeiError;
 use crate::utils::u64_to_bigendian_u8array;
 use digest::Digest;
-use rand::{CryptoRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 
 type HashFnc = sha2::Sha512;
 
@@ -16,7 +16,7 @@ pub struct BlsPublicKey<P: PairingTargetGroup>(pub(crate) P::G1);
 pub struct BlsSignature<P: PairingTargetGroup>(pub(crate) P::G2);
 
 /// bls key generation function
-pub fn bls_gen_keys<R: CryptoRng + Rng, P: PairingTargetGroup>(
+pub fn bls_gen_keys<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R)
   -> (BlsSecretKey<P>, BlsPublicKey<P>) {
   let sec_key = P::ScalarField::random_scalar(prng);
@@ -146,7 +146,7 @@ pub fn bls_hash_pubkeys_to_scalars<P: PairingTargetGroup>(ver_keys: &[&BlsPublic
 mod tests {
   use crate::algebra::bls12_381::BLSGt;
   use crate::errors::ZeiError;
-  use rand::SeedableRng;
+  use rand_core::SeedableRng;
 
   #[test]
   fn bls_signatures() {
