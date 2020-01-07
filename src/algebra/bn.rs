@@ -3,8 +3,8 @@ use super::pairing::PairingTargetGroup;
 use bn::{Group as BNGroup, Gt};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde_json;
 use std::fmt;
 

@@ -43,12 +43,12 @@ pub struct PedersenElGamalEqProof {
 
 /// I compute a proof that ctext and commitment encrypts/holds m under same randomness r.
 pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(prng: &mut R,
-                                                     m: &Scalar,
-                                                     r: &Scalar,
-                                                     public_key: &ElGamalPublicKey<RistrettoPoint>,
-                                                     ctext: &ElGamalCiphertext<RistrettoPoint>,
-                                                     commitment: &RistrettoPoint)
-                                                     -> PedersenElGamalEqProof {
+                                                         m: &Scalar,
+                                                         r: &Scalar,
+                                                         public_key: &ElGamalPublicKey<RistrettoPoint>,
+                                                         ctext: &ElGamalCiphertext<RistrettoPoint>,
+                                                         commitment: &RistrettoPoint)
+                                                         -> PedersenElGamalEqProof {
   let r1 = Scalar::random(prng);
   let r2 = Scalar::random(prng);
   let pc_gens = PedersenGens::default();
@@ -96,11 +96,11 @@ pub fn pedersen_elgamal_eq_verify(public_key: &ElGamalPublicKey<RistrettoPoint>,
 /// verify a pedersen/elgamal equality proof against ctext and commitment using aggregation
 /// technique and a single multiexponentiation check.
 pub fn pedersen_elgamal_eq_verify_fast<R: CryptoRng + RngCore>(prng: &mut R,
-                                                           public_key: &ElGamalPublicKey<RistrettoPoint>,
-                                                           ctext: &ElGamalCiphertext<RistrettoPoint>,
-                                                           commitment: &RistrettoPoint,
-                                                           proof: &PedersenElGamalEqProof)
-                                                           -> Result<(), ZeiError> {
+                                                               public_key: &ElGamalPublicKey<RistrettoPoint>,
+                                                               ctext: &ElGamalCiphertext<RistrettoPoint>,
+                                                               commitment: &RistrettoPoint,
+                                                               proof: &PedersenElGamalEqProof)
+                                                               -> Result<(), ZeiError> {
   let pc_gens = PedersenGens::default();
   let c = compute_challenge_ref::<Scalar, RistrettoPoint>(&[&ctext.e1,
                                                             &ctext.e2,
@@ -167,12 +167,12 @@ fn compute_linear_combination_scalar_vector(commitments: &[RistrettoPoint],
   x
 }
 pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(prng: &mut R,
-                                                               m: &[Scalar],
-                                                               r: &[Scalar],
-                                                               public_key: &ElGamalPublicKey<RistrettoPoint>,
-                                                               ctexts: &[ElGamalCiphertext<RistrettoPoint>],
-                                                               commitments: &[RistrettoPoint])
-                                                               -> PedersenElGamalEqProof {
+                                                                   m: &[Scalar],
+                                                                   r: &[Scalar],
+                                                                   public_key: &ElGamalPublicKey<RistrettoPoint>,
+                                                                   ctexts: &[ElGamalCiphertext<RistrettoPoint>],
+                                                                   commitments: &[RistrettoPoint])
+                                                                   -> PedersenElGamalEqProof {
   let pc_gens = PedersenGens::default();
 
   // 1. compute x vector
@@ -243,12 +243,13 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(prng: &mut R,
                            c1: proof_com }
 }
 
-pub fn pedersen_elgamal_eq_aggregate_verify_fast<R: CryptoRng + RngCore>(prng: &mut R,
-                                                                     public_key: &ElGamalPublicKey<RistrettoPoint>,
-                                                                     ctexts: &[ElGamalCiphertext<RistrettoPoint>],
-                                                                     commitments: &[RistrettoPoint],
-                                                                     proof: &PedersenElGamalEqProof)
-                                                                     -> Result<(), ZeiError> {
+pub fn pedersen_elgamal_eq_aggregate_verify_fast<R: CryptoRng + RngCore>(
+  prng: &mut R,
+  public_key: &ElGamalPublicKey<RistrettoPoint>,
+  ctexts: &[ElGamalCiphertext<RistrettoPoint>],
+  commitments: &[RistrettoPoint],
+  proof: &PedersenElGamalEqProof)
+  -> Result<(), ZeiError> {
   // 1. compute x vector
   let x = compute_linear_combination_scalar_vector(commitments, ctexts, public_key);
 
@@ -315,8 +316,8 @@ mod test {
   use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
   use serde::de::Deserialize;
   use serde::ser::Serialize;

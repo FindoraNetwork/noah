@@ -78,9 +78,9 @@ pub fn ps_gen_keys<R: CryptoRng + RngCore, P: PairingTargetGroup>(
 /// let sig = ps_sign_bytes::<_, BLSGt>(&mut prng, &sk, b"this is a message");
 /// ```
 pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
-                                                                sk: &PSSecretKey<P::ScalarField>,
-                                                                m: &[u8])
-                                                                -> PSSignature<P::G1> {
+                                                                    sk: &PSSecretKey<P::ScalarField>,
+                                                                    m: &[u8])
+                                                                    -> PSSignature<P::G1> {
   let m_scalar = hash_message::<P::ScalarField>(m);
   ps_sign_scalar::<_, P>(prng, sk, &m_scalar)
 }
@@ -98,9 +98,9 @@ pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R
 /// let sig = ps_sign_scalar::<_, BLSGt>(&mut prng, &sk, &BLSScalar::from_u32(100u32));
 /// ```
 pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
-                                                                 sk: &PSSecretKey<P::ScalarField>,
-                                                                 m: &P::ScalarField)
-                                                                 -> PSSignature<P::G1> {
+                                                                     sk: &PSSecretKey<P::ScalarField>,
+                                                                     m: &P::ScalarField)
+                                                                     -> PSSignature<P::G1> {
   let a = P::ScalarField::random_scalar(prng);
   let s1 = P::G1::get_base().mul(&a);
 

@@ -60,8 +60,8 @@ mod test {
   use curve25519_dalek::ristretto::CompressedRistretto;
   use curve25519_dalek::scalar::Scalar;
   use merlin::Transcript;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   #[test]
   fn test_bp_merkle_inclusion() {

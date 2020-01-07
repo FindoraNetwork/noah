@@ -117,11 +117,11 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 
 /// build complete OpenAssetRecord from AssetRecord structure
 pub fn build_open_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
-                                                   pc_gens: &PedersenGens,
-                                                   asset_record: &AssetRecord,
-                                                   confidential_amount: bool,
-                                                   confidential_asset: bool,
-                                                   issuer_public_key: &Option<AssetIssuerPubKeys> //none if no tracking is required
+                                                       pc_gens: &PedersenGens,
+                                                       asset_record: &AssetRecord,
+                                                       confidential_amount: bool,
+                                                       confidential_asset: bool,
+                                                       issuer_public_key: &Option<AssetIssuerPubKeys> //none if no tracking is required
 ) -> OpenAssetRecord {
   let (blind_asset_record, amount_blinds, type_blind) =
     sample_blind_asset_record(prng,
@@ -142,11 +142,11 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
 
 /// build BlindAssetRecord from AssetRecord structure
 pub fn build_blind_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
-                                                    pc_gens: &PedersenGens,
-                                                    asset_record: &AssetRecord,
-                                                    confidential_amount: bool,
-                                                    confidential_asset: bool,
-                                                    issuer_public_key: &Option<AssetIssuerPubKeys> //none if no tracking is required
+                                                        pc_gens: &PedersenGens,
+                                                        asset_record: &AssetRecord,
+                                                        confidential_amount: bool,
+                                                        confidential_asset: bool,
+                                                        issuer_public_key: &Option<AssetIssuerPubKeys> //none if no tracking is required
 ) -> BlindAssetRecord {
   let (blind_asset_record, _, _) = sample_blind_asset_record(prng,
                                                              pc_gens,
@@ -158,9 +158,10 @@ pub fn build_blind_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
   blind_asset_record
 }
 
-fn sample_point_and_blind_share<R: CryptoRng + RngCore>(prng: &mut R,
-                                                    public_key: &XfrPublicKey)
-                                                    -> (CompressedEdwardsY, CompressedEdwardsY) {
+fn sample_point_and_blind_share<R: CryptoRng + RngCore>(
+  prng: &mut R,
+  public_key: &XfrPublicKey)
+  -> (CompressedEdwardsY, CompressedEdwardsY) {
   let blind_key = Scalar::random(prng);
   let pk_point = public_key.get_curve_point().unwrap();
   let derived_point: EdwardsPoint = blind_key * pk_point;
@@ -243,9 +244,9 @@ mod test {
   use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
-  use rand_core::SeedableRng;
-  use rand_chacha::ChaChaRng;
   use rand::Rng;
+  use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   fn do_test_build_open_asset_record(confidential_amount: bool,
                                      confidential_asset: bool,

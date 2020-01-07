@@ -1,9 +1,9 @@
 [package]
 name = "zei"
 version = "0.0.1"
-authors = ["efe"]
+authors = ["fernando@findora.org, philippe@findora.org"]
 edition = "2018"
-description = "Zei: Confidential Payments for Accounts"
+description = "Zei: Findora's Cryptographic Library"
 
 [lib]
 name = "zei"

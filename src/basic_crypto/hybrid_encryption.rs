@@ -17,9 +17,9 @@ pub struct ZeiHybridCipher {
 /// is derived from the public key, and the message is encrypted under this symmetric key.
 /// I return ZeiError::DecompressElementError if public key is not well formed.
 pub fn hybrid_encrypt<R: CryptoRng + RngCore>(prng: &mut R,
-                                          pub_key: &PublicKey,
-                                          message: &[u8])
-                                          -> Result<ZeiHybridCipher, ZeiError> {
+                                              pub_key: &PublicKey,
+                                              message: &[u8])
+                                              -> Result<ZeiHybridCipher, ZeiError> {
   let (key, encoded_rand) = symmetric_key_from_public_key(prng, pub_key)?;
   //let (ciphertext, nonce) = symmetric_encrypt(&key, message);
   let ciphertext = symmetric_encrypt_fresh_key(&key, message);
@@ -91,7 +91,7 @@ use crate::xfr::sig::KEY_BASE_POINT;
 use aes_ctr::stream_cipher::generic_array::GenericArray;
 use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes256Ctr;
-use ed25519_dalek::{PublicKey, SecretKey, ExpandedSecretKey};
+use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 
 fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
   let kkey = GenericArray::from_slice(key);
@@ -115,8 +115,8 @@ fn symmetric_decrypt_fresh_key(key: &[u8; 32], ciphertext: &[u8]) -> Vec<u8> {
 mod test {
   use super::*;
   use ed25519_dalek::Keypair;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   #[test]
   fn key_derivation() {

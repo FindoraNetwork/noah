@@ -648,8 +648,8 @@ pub(crate) mod test_helper {
   use crate::crypto::conf_cred_reveal::{cac_create, cac_verify};
   use crate::errors::ZeiError;
   use crate::utils::byte_slice_to_scalar;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   pub fn test_confidential_ac_reveal<P: PairingTargetGroup>(reveal_bitmap: &[bool]) {
     let num_attr = reveal_bitmap.len();
@@ -829,8 +829,8 @@ mod test_serialization {
   use crate::crypto::conf_cred_reveal::cac_create;
   use crate::crypto::conf_cred_reveal::ConfidentialAC;
   use crate::utils::byte_slice_to_scalar;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
   use serde::{Deserialize, Serialize};
 

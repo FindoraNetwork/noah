@@ -177,10 +177,10 @@ pub(crate) fn ac_keygen_user<R: CryptoRng + RngCore, P: PairingTargetGroup>(
 /// I Compute a credential signature for a set of attributes. User can represent Null attributes by
 /// a fixes scalar (e.g. 0)
 pub(crate) fn ac_sign<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
-                                                                 issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
-                                                                 user_pk: &ACUserPublicKey<P::G1>,
-                                                                 attrs: &[P::ScalarField])
-                                                                 -> ACSignature<P::G1> {
+                                                                     issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
+                                                                     user_pk: &ACUserPublicKey<P::G1>,
+                                                                     attrs: &[P::ScalarField])
+                                                                     -> ACSignature<P::G1> {
   let u = P::ScalarField::random_scalar(prng);
   let mut exponent = issuer_sk.x.clone();
   for (attr, yi) in attrs.iter().zip(issuer_sk.y.iter()) {
@@ -388,8 +388,8 @@ fn ac_vrfy_revealed_terms_addition<P: PairingTargetGroup>(challenge: &P::ScalarF
 #[cfg(test)]
 pub(crate) mod credentials_tests {
   use super::*;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
   use serde::{Deserialize, Serialize};
 

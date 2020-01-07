@@ -8,9 +8,7 @@
  * 5) Apply range proof for total_asset - total_liabilities
 */
 
-use bulletproofs::r1cs::{
-  LinearCombination, R1CSError, RandomizableConstraintSystem, Variable,
-};
+use bulletproofs::r1cs::{LinearCombination, R1CSError, RandomizableConstraintSystem, Variable};
 use curve25519_dalek::scalar::Scalar;
 use linear_map::LinearMap;
 

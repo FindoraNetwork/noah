@@ -6,9 +6,9 @@ use crate::errors::ZeiError::SignatureError;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::{PublicKey, ExpandedSecretKey};
 use ed25519_dalek::SecretKey;
 use ed25519_dalek::Signature;
+use ed25519_dalek::{ExpandedSecretKey, PublicKey};
 use wasm_bindgen::prelude::*;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
@@ -104,8 +104,7 @@ impl XfrKeyPair {
   }
 }
 impl XfrKeyPair {
-  pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self
-  {
+  pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
     let kp = ed25519_dalek::Keypair::generate(prng);
     XfrKeyPair { public: XfrPublicKey(kp.public),
                  secret: XfrSecretKey(kp.secret) }
@@ -176,8 +175,8 @@ pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 mod test {
   use crate::errors::ZeiError::SignatureError;
   use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey};
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   #[test]
   fn signatures() {

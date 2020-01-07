@@ -1,8 +1,6 @@
 use crate::crypto::bp_circuits;
 use crate::errors::ZeiError;
-use bulletproofs::r1cs::{
-  ConstraintSystem, Prover, R1CSError, R1CSProof, Variable, Verifier,
-};
+use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSError, R1CSProof, Variable, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
@@ -261,8 +259,8 @@ mod test {
   use bulletproofs::PedersenGens;
   use curve25519_dalek::scalar::Scalar;
   use linear_map::LinearMap;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   fn do_test_solvency(hidden_asset_set: &[(Scalar, Scalar)],
                       public_asset_set: &[(Scalar, Scalar)],

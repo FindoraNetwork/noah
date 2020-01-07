@@ -86,11 +86,11 @@ const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 ///                              identity_proofs.as_slice()).unwrap();
 /// ```
 pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
-                                        inputs: &[OpenAssetRecord],
-                                        outputs: &[AssetRecord],
-                                        input_keys: &[XfrKeyPair],
-                                        identity_proofs: &[Option<ConfidentialAC>])
-                                        -> Result<XfrNote, ZeiError> {
+                                            inputs: &[OpenAssetRecord],
+                                            outputs: &[AssetRecord],
+                                            input_keys: &[XfrKeyPair],
+                                            identity_proofs: &[Option<ConfidentialAC>])
+                                            -> Result<XfrNote, ZeiError> {
   if inputs.is_empty() {
     return Err(ZeiError::ParameterError);
   }
@@ -165,10 +165,10 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs, &identity_proofs).unwrap();
 /// ```
 pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
-                                        inputs: &[OpenAssetRecord],
-                                        outputs: &[AssetRecord],
-                                        identity_proofs: &[Option<ConfidentialAC>])
-                                        -> Result<XfrBody, ZeiError> {
+                                            inputs: &[OpenAssetRecord],
+                                            outputs: &[AssetRecord],
+                                            identity_proofs: &[Option<ConfidentialAC>])
+                                            -> Result<XfrBody, ZeiError> {
   if inputs.is_empty() {
     return Err(ZeiError::ParameterError);
   }
@@ -323,11 +323,11 @@ fn gen_xfr_proofs_multi_asset(//prng: &mut R,
 }
 
 fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(prng: &mut R,
-                                                   inputs: &[OpenAssetRecord],
-                                                   outputs: &[OpenAssetRecord],
-                                                   confidential_amount: bool,
-                                                   confidential_asset: bool)
-                                                   -> Result<AssetAmountProof, ZeiError> {
+                                                       inputs: &[OpenAssetRecord],
+                                                       outputs: &[OpenAssetRecord],
+                                                       confidential_amount: bool,
+                                                       confidential_asset: bool)
+                                                       -> Result<AssetAmountProof, ZeiError> {
   let pc_gens = PedersenGens::default();
 
   let xfr_range_proof = if confidential_amount {
@@ -413,9 +413,9 @@ fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiError> {
 
 /// I verify a transfer note
 pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
-                                           xfr_note: &XfrNote,
-                                           id_reveal_policies: &[Option<IdRevealPolicy>])
-                                           -> Result<(), ZeiError> {
+                                               xfr_note: &XfrNote,
+                                               id_reveal_policies: &[Option<IdRevealPolicy>])
+                                               -> Result<(), ZeiError> {
   // 1. verify signature
   verify_transfer_multisig(&xfr_note)?;
 
@@ -496,9 +496,9 @@ pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// verify_xfr_note(&mut prng, &xfr_note, &null_policies).unwrap();
 /// ```
 pub fn verify_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
-                                           body: &XfrBody,
-                                           id_reveal_policies: &[Option<IdRevealPolicy>])
-                                           -> Result<(), ZeiError> {
+                                               body: &XfrBody,
+                                               id_reveal_policies: &[Option<IdRevealPolicy>])
+                                               -> Result<(), ZeiError> {
   // 1. verify amounts and asset types
   match &body.proofs.asset_amount_proof {
     AssetAmountProof::ConfAll((range_proof, asset_proof)) => {
@@ -650,8 +650,8 @@ pub(crate) mod tests {
   use crate::xfr::proofs::create_conf_id_reveal;
   use crate::xfr::sig::XfrKeyPair;
   use curve25519_dalek::ristretto::RistrettoPoint;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;

@@ -130,8 +130,8 @@ pub mod elgamal_test {
   use crate::algebra::groups::{Group, Scalar};
   use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey, ElGamalSecretKey};
   use crate::errors::ZeiError;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
   use serde::de::Deserialize;
   use serde::ser::Serialize;

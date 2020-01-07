@@ -1,8 +1,8 @@
 use crate::crypto::chaum_pedersen::ChaumPedersenProof;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
-use bulletproofs::RangeProof;
 use bulletproofs::r1cs::R1CSProof;
+use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -436,8 +436,8 @@ mod test {
   use crate::xfr::structs::EGPubKey;
   use bulletproofs::PedersenGens;
 
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;

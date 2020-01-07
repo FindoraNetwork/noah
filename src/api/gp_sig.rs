@@ -28,8 +28,8 @@ pub type TagKey = crate::crypto::group_signatures::TagKey<BLSGt>;
 /// * `msk` - group secret key
 /// * `return` join certificate
 pub fn gpsig_join_cert<R: CryptoRng + RngCore>(prng: &mut R,
-                                           msk: &GroupSecretKey)
-                                           -> (JoinCert, TagKey) {
+                                               msk: &GroupSecretKey)
+                                               -> (JoinCert, TagKey) {
   crate::crypto::group_signatures::gpsig_join_cert(prng, msk)
 }
 
@@ -50,10 +50,10 @@ pub fn gpsig_join_cert<R: CryptoRng + RngCore>(prng: &mut R,
 /// assert!(gpsig_verify(&gpk, &sig, b"Some message").is_ok());
 /// ```
 pub fn gpsig_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
-                                                      gpk: &GroupPublicKey,
-                                                      join_cert: &JoinCert,
-                                                      msg: &B)
-                                                      -> GroupSignature {
+                                                          gpk: &GroupPublicKey,
+                                                          join_cert: &JoinCert,
+                                                          msg: &B)
+                                                          -> GroupSignature {
   crate::crypto::group_signatures::gpsig_sign(prng, gpk, join_cert, msg.as_ref())
 }
 

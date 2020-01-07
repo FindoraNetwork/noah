@@ -80,10 +80,10 @@ pub(crate) fn gpsig_join_cert<R: CryptoRng + RngCore, P: PairingTargetGroup>(
 /// * `join_cert` - join certificate
 /// * `msg` - message to be signed
 pub(crate) fn gpsig_sign<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
-                                                                    gpk: &GroupPublicKey<P>,
-                                                                    join_cert: &JoinCert<P>,
-                                                                    msg: &[u8])
-                                                                    -> GroupSignature<P> {
+                                                                        gpk: &GroupPublicKey<P>,
+                                                                        join_cert: &JoinCert<P>,
+                                                                        msg: &[u8])
+                                                                        -> GroupSignature<P> {
   let g1_base = P::G1::get_base();
 
   // 1. randomize signature
@@ -115,11 +115,11 @@ pub(crate) struct PoK<P: PairingTargetGroup> {
 /// * `r` - randomness of the ciphertext
 /// * `msg` - message to be signed
 fn signature_proof_of_knowledge<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
-                                                                           gpk: &GroupPublicKey<P>,
-                                                                           tag: &P::ScalarField,
-                                                                           r: &P::ScalarField,
-                                                                           msg: &[u8])
-                                                                           -> PoK<P> {
+                                                                               gpk: &GroupPublicKey<P>,
+                                                                               tag: &P::ScalarField,
+                                                                               r: &P::ScalarField,
+                                                                               msg: &[u8])
+                                                                               -> PoK<P> {
   let g1_base = P::G1::get_base();
   let g2_base = P::G2::get_base();
 
@@ -269,8 +269,8 @@ mod tests {
   use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
   use crate::algebra::groups::Group;
   use crate::errors::ZeiError;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   #[test]
   fn group_manager_keys_are_consistent() {

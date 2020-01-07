@@ -54,13 +54,13 @@ pub struct ChaumPedersenProofX {
 
 /// I compute a Chaum-Pedersen proof of knowledge of openings of two commitments to the same value
 pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(prng: &mut R,
-                                                   pedersen_gens: &PedersenGens,
-                                                   value: &Scalar,
-                                                   commitment1: &RistrettoPoint,
-                                                   commitment2: &RistrettoPoint,
-                                                   blinding_factor1: &Scalar,
-                                                   blinding_factor2: &Scalar)
-                                                   -> ChaumPedersenProof {
+                                                       pedersen_gens: &PedersenGens,
+                                                       value: &Scalar,
+                                                       commitment1: &RistrettoPoint,
+                                                       commitment2: &RistrettoPoint,
+                                                       blinding_factor1: &Scalar,
+                                                       blinding_factor2: &Scalar)
+                                                       -> ChaumPedersenProof {
   let r1 = blinding_factor1;
   let r2 = blinding_factor2;
   let r3 = Scalar::random(prng);
@@ -105,11 +105,11 @@ pub fn chaum_pedersen_verify_eq(pc_gens: &PedersenGens,
 /// CompressedRistretto can not be decompressed. I use aggregation technique and a single
 /// multi-exponentiation check
 pub fn chaum_pedersen_verify_eq_fast<R: CryptoRng + RngCore>(prng: &mut R,
-                                                         pc_gens: &PedersenGens,
-                                                         c1: &RistrettoPoint,
-                                                         c2: &RistrettoPoint,
-                                                         proof: &ChaumPedersenProof)
-                                                         -> Result<bool, ZeiError> {
+                                                             pc_gens: &PedersenGens,
+                                                             c1: &RistrettoPoint,
+                                                             c2: &RistrettoPoint,
+                                                             proof: &ChaumPedersenProof)
+                                                             -> Result<bool, ZeiError> {
   let z1 = proof.z1;
   let z2 = proof.z2;
   let z3 = proof.z3;
@@ -197,10 +197,10 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
 ///  * Return Ok(true) in case of success, Ok(false) in case of verification failure,
 ///  * and Err(Error::DecompressElementError) in case some CompressedRistretto can not be decompressed
 pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(prng: &mut R,
-                                                             pedersen_gens: &PedersenGens,
-                                                             commitments: &[RistrettoPoint],
-                                                             proof: &ChaumPedersenProofX)
-                                                             -> Result<bool, ZeiError> {
+                                                                 pedersen_gens: &PedersenGens,
+                                                                 commitments: &[RistrettoPoint],
+                                                                 proof: &ChaumPedersenProofX)
+                                                                 -> Result<bool, ZeiError> {
   let mut points_refs = vec![];
   for com in commitments {
     points_refs.push(com);
@@ -239,8 +239,8 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(prng: &mut R,
 mod test {
   use super::*;
   use bulletproofs::PedersenGens;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   #[test]
   pub fn test_chaum_pedersen_equality_commitment() {

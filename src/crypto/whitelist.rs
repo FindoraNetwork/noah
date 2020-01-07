@@ -23,11 +23,11 @@ pub struct WhitelistProof {
 }
 
 pub fn prove_mt_membership<R: CryptoRng + RngCore>(prng: &mut R,
-                                               mt: &MerkleTree<Scalar>,
-                                               index: usize,
-                                               elem: &CompressedRistretto,
-                                               blind: &Scalar)
-                                               -> Result<WhitelistProof, ZeiError> {
+                                                   mt: &MerkleTree<Scalar>,
+                                                   index: usize,
+                                                   elem: &CompressedRistretto,
+                                                   blind: &Scalar)
+                                                   -> Result<WhitelistProof, ZeiError> {
   let pc_gens = PedersenGens::default();
 
   let mut witness_commitments = vec![];
@@ -139,8 +139,8 @@ mod test {
   use crate::crypto::whitelist::build_mt_whitelist;
   use bulletproofs::PedersenGens;
   use curve25519_dalek::scalar::Scalar;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   #[test]
   fn test_mt_membership() {

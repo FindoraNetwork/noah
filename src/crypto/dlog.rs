@@ -11,11 +11,12 @@ pub struct DlogProof<G, S> {
   pub response: S,
 }
 
-pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(prng: &mut R,
-                                                                           base: &G,
-                                                                           point: &G,
-                                                                           dlog: &S)
-                                                                           -> DlogProof<G, S> {
+pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
+  prng: &mut R,
+  base: &G,
+  point: &G,
+  dlog: &S)
+  -> DlogProof<G, S> {
   /*! I compute a proof for the knowledge of dlog for point with respect to base*/
   let u = S::random_scalar(prng);
   let proof_commitment = base.mul(&u);
@@ -93,12 +94,12 @@ pub fn verify_multiple_knowledge_dlog<S: ZeiScalar, G: Group<S>>(base: &G,
 pub type CommitmentEqProof = DlogProof<RistrettoPoint, curve25519_dalek::scalar::Scalar>;
 
 pub fn dlog_based_prove_commitment_eq<R: CryptoRng + RngCore>(prng: &mut R,
-                                                          pedersen_gens: &PedersenGens,
-                                                          source_asset_commitment: &RistrettoPoint,
-                                                          destination_asset_commitment: &RistrettoPoint,
-                                                          source_blinding_factor: &Scalar,
-                                                          destination_blinding_factor: &Scalar)
-                                                          -> CommitmentEqProof {
+                                                              pedersen_gens: &PedersenGens,
+                                                              source_asset_commitment: &RistrettoPoint,
+                                                              destination_asset_commitment: &RistrettoPoint,
+                                                              source_blinding_factor: &Scalar,
+                                                              destination_blinding_factor: &Scalar)
+                                                              -> CommitmentEqProof {
   /*! Assuming source_asset_commitment is a pedersen commitment, I compute a Dlog-equality-based
    * proof that source and destination_asset_commitments commit to the same value, using source
    * and destination blinding factors respectively. Returns a DLog proof proof.
@@ -131,8 +132,8 @@ pub fn dlog_based_verify_commitment_eq(pedersen_gens: &PedersenGens,
 mod test {
   use super::*;
   use bulletproofs::PedersenGens;
-  use rand_core::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   #[test]
   fn test_pok_dlog() {
