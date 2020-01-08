@@ -1,5 +1,7 @@
 use crate::algebra::groups::{Group, Scalar};
+use crate::errors::ZeiError;
 use merlin::Transcript;
+use rand_core::{CryptoRng, RngCore};
 
 pub trait SigmaTranscript {
   fn init_sigma<S: Scalar, G: Group<S>>(&mut self,
@@ -32,5 +34,222 @@ impl SigmaTranscript for Transcript {
     let mut buffer = vec![0u8; 32]; // TODO(fernando) get number of bytes needed from S and remove the number 32
     self.challenge_bytes(b"Sigma challenge", &mut buffer);
     S::from_bytes(buffer.as_slice())
+  }
+}
+
+fn init_sigma_protocol<S: Scalar, G: Group<S>>(transcript: &mut Transcript, elems: &[G]) {
+  let public_elems: Vec<&G> = elems.iter().map(|x| x).collect();
+  transcript.init_sigma(b"New Sigma Protocol", &[], public_elems.as_slice());
+}
+
+fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R, n: usize) -> Vec<S> {
+  let mut r = vec![];
+  for _ in 0..n {
+    r.push(S::random_scalar(prng));
+  }
+  r
+}
+
+fn compute_proof_commitments<S: Scalar, G: Group<S>>(transcript: &mut Transcript,
+                                                     blindings: &[S],
+                                                     lhs_matrix: &[&[&G]])
+                                                     -> Vec<G> {
+  let mut pf_commitments = vec![];
+
+  for row in lhs_matrix.iter() {
+    let mut pf_commitment = G::get_identity();
+    assert_eq!(row.len(), blindings.len());
+    for (elem, blind) in (*row).iter().zip(blindings) {
+      pf_commitment = pf_commitment.add(&elem.mul(blind));
+    }
+    transcript.append_proof_commitment(&pf_commitment);
+    pf_commitments.push(pf_commitment);
+  }
+  pf_commitments
+}
+
+pub struct SigmaProof<S, G> {
+  pub(crate) commitments: Vec<G>,
+  pub(crate) responses: Vec<S>,
+}
+
+/// Simple Sigma protocol for the statement `lhs_matrix` * `secrets_scalars` = `rhs_vec`
+/// Elements in `lhs_matrix` and `rhs_vec` must be in `elems` slice
+#[allow(dead_code)]
+fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
+                                                               prng: &mut R,
+                                                               elems: &[G], // public elements of the proofs
+                                                               lhs_matrix: &[&[&G]], // each row defines a lhs of a constraint
+                                                               secret_scalars: &[S])
+                                                               -> SigmaProof<S, G> {
+  init_sigma_protocol(transcript, elems);
+  let blindings = sample_blindings::<_, S>(prng, secret_scalars.len());
+  let proof_commitments =
+    compute_proof_commitments::<S, G>(transcript, blindings.as_slice(), lhs_matrix);
+
+  let challenge = transcript.get_challenge::<S>();
+
+  let mut responses = vec![];
+
+  for (secret, blind) in secret_scalars.iter().zip(blindings.iter()) {
+    responses.push(secret.mul(&challenge).add(blind))
+  }
+  SigmaProof { commitments: proof_commitments,
+               responses }
+}
+
+#[allow(dead_code)]
+fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
+                                                                _prng: &mut R, //use of for linear combination multiexp
+                                                                elems: &[G],
+                                                                lhs_matrix: &[&[&G]],
+                                                                rhs_vec: &[&G],
+                                                                proof: &SigmaProof<S, G>)
+                                                                -> Result<(), ZeiError> {
+  init_sigma_protocol(transcript, elems);
+  for c in proof.commitments.iter() {
+    transcript.append_proof_commitment(c);
+  }
+  let challenge = transcript.get_challenge::<S>();
+  //TODO do it via multiexponentiation
+  assert_eq!(lhs_matrix.len(), rhs_vec.len());
+  assert_eq!(rhs_vec.len(), proof.commitments.len());
+  for (row, rhs, com) in izip!(lhs_matrix.iter(), rhs_vec.iter(), proof.commitments.iter()) {
+    let mut lhs = G::get_identity();
+    assert_eq!(row.len(), proof.responses.len());
+    for (elem, resp) in (*row).iter().zip(proof.responses.iter()) {
+      lhs = lhs.add(&elem.mul(resp));
+    }
+    let final_rhs = rhs.mul(&challenge).add(com);
+    if lhs != final_rhs {
+      return Err(ZeiError::ZKProofVerificationError);
+    }
+  }
+  Ok(())
+}
+#[cfg(test)]
+mod tests {
+  use crate::algebra::groups::Group;
+  use curve25519_dalek::ristretto::RistrettoPoint;
+  use curve25519_dalek::scalar::Scalar;
+  use curve25519_dalek::traits::Identity;
+  use merlin::Transcript;
+  use rand_core::SeedableRng;
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_sigma() {
+    let G = RistrettoPoint::get_base();
+    let secret = Scalar::from(10u8);
+    let H = G * secret;
+
+    let mut prover_transcript = Transcript::new(b"Test");
+    let mut verifier_transcript = Transcript::new(b"Test");
+    let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
+
+    //test 1 simple dlog
+    let matrix: &[&[&RistrettoPoint]] = &[&[&G]];
+    let dlog_proof = super::sigma_prove(&mut prover_transcript,
+                                        &mut prng,
+                                        &[G, H],
+                                        matrix,
+                                        &[secret]);
+    assert!(super::sigma_verify(&mut verifier_transcript,
+                                &mut prng,
+                                &[G, H],
+                                matrix,
+                                &[&H],
+                                &dlog_proof).is_ok());
+
+    let bad_matrix: &[&[&RistrettoPoint]] = &[&[&H]];
+    let dlog_proof = super::sigma_prove(&mut prover_transcript,
+                                        &mut prng,
+                                        &[G, H],
+                                        bad_matrix,
+                                        &[secret]);
+    assert!(super::sigma_verify(&mut verifier_transcript,
+                                &mut prng,
+                                &[G, H],
+                                bad_matrix,
+                                &[&H],
+                                &dlog_proof).is_err());
+
+    // test2: two contrains, two secrets
+    let secret2 = Scalar::from(20u8);
+    let H2 = G * secret2;
+    let zero = RistrettoPoint::identity();
+    let matrix: &[&[&RistrettoPoint]] = &[&[&G, &zero], &[&zero, &G]];
+    let dlog_proof = super::sigma_prove(&mut prover_transcript,
+                                        &mut prng,
+                                        &[G, H, H2],
+                                        matrix,
+                                        &[secret, secret2]);
+    assert!(super::sigma_verify(&mut verifier_transcript,
+                                &mut prng,
+                                &[G, H, H2],
+                                matrix,
+                                &[&H, &H2],
+                                &dlog_proof).is_ok());
+
+    let matrix: &[&[&RistrettoPoint]] = &[&[&G, &G], &[&zero, &G]]; // bad row 1
+    let dlog_proof = super::sigma_prove(&mut prover_transcript,
+                                        &mut prng,
+                                        &[G, H, H2],
+                                        matrix,
+                                        &[secret, secret2]);
+    assert!(super::sigma_verify(&mut verifier_transcript,
+                                &mut prng,
+                                &[G, H, H2],
+                                matrix,
+                                &[&H, &H2],
+                                &dlog_proof).is_err());
+
+    let matrix: &[&[&RistrettoPoint]] = &[&[&G, &zero], &[&zero, &zero]]; // bad row 2
+    let dlog_proof = super::sigma_prove(&mut prover_transcript,
+                                        &mut prng,
+                                        &[G, H, H2],
+                                        matrix,
+                                        &[secret, secret2]);
+    assert!(super::sigma_verify(&mut verifier_transcript,
+                                &mut prng,
+                                &[G, H, H2],
+                                matrix,
+                                &[&H, &H2],
+                                &dlog_proof).is_err());
+
+    // test3: two constarains, 5 secrets
+    let secret3 = Scalar::from(30u8);
+    let secret4 = Scalar::from(40u8);
+    let secret5 = Scalar::from(50u8);
+    let Z1 = G * secret + H * secret2;
+    let Z2 = G * secret3 + H * secret4 + H2 * secret5;
+
+    let matrix: &[&[&RistrettoPoint]] =
+      &[&[&G, &H, &zero, &zero, &zero], &[&zero, &zero, &G, &H, &H2]];
+    let secrets: &[Scalar] = &[secret, secret2, secret3, secret4, secret5];
+    let dlog_proof = super::sigma_prove(&mut prover_transcript,
+                                        &mut prng,
+                                        &[G, H, H2, Z1, Z2],
+                                        matrix,
+                                        secrets);
+    assert!(super::sigma_verify(&mut verifier_transcript,
+                                &mut prng,
+                                &[G, H, H2, Z1, Z2],
+                                matrix,
+                                &[&Z1, &Z2],
+                                &dlog_proof).is_ok());
+
+    let secrets: &[Scalar] = &[secret, secret2, secret3, secret4, Scalar::zero()]; // bad secrets
+    let dlog_proof = super::sigma_prove(&mut prover_transcript,
+                                        &mut prng,
+                                        &[G, H, H2, Z1, Z2],
+                                        matrix,
+                                        secrets);
+    assert!(super::sigma_verify(&mut verifier_transcript,
+                                &mut prng,
+                                &[G, H, H2, Z1, Z2],
+                                matrix,
+                                &[&Z1, &Z2],
+                                &dlog_proof).is_err());
   }
 }
