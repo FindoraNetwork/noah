@@ -1,11 +1,11 @@
-use crate::crypto::sigma::SigmaTranscript;
+use crate::crypto::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
 use crate::errors::ZeiError;
 use crate::errors::ZeiError::ZKProofVerificationError;
 use crate::serialization;
 use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{Identity, MultiscalarMul};
+use curve25519_dalek::traits::Identity;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 /*
@@ -53,6 +53,7 @@ pub struct ChaumPedersenProofX {
   pub(crate) zero: Option<ChaumPedersenProof>,
 }
 
+/*
 fn init_chaum_pedersen(transcript: &mut Transcript,
                        pc_gens: &PedersenGens,
                        commitment1: &RistrettoPoint,
@@ -64,6 +65,8 @@ fn init_chaum_pedersen(transcript: &mut Transcript,
   public_elems.push(&commitment2);
   transcript.init_sigma(b"ChaumPedersen", &[], public_elems.as_slice())
 }
+
+*/
 
 fn init_chaum_pedersen_multiple(transcript: &mut Transcript,
                                 pc_gens: &PedersenGens,
@@ -87,27 +90,24 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(transcript: &mut Transcri
                                                        blinding_factor1: &Scalar,
                                                        blinding_factor2: &Scalar)
                                                        -> ChaumPedersenProof {
-  init_chaum_pedersen(transcript, pc_gens, c1, c2);
+  let mut elems = vec![];
+  elems.push(&pc_gens.B);
+  elems.push(&pc_gens.B_blinding);
+  elems.push(c1);
+  elems.push(c2);
+  let secrets: &[&Scalar] = &[value, blinding_factor1, blinding_factor2];
+  let zero = RistrettoPoint::identity();
+  let matrix: &[&[&RistrettoPoint]] = &[
+    &[&pc_gens.B, &pc_gens.B_blinding, &zero], // value * B + blinding1 * B_blinding + 0
+    &[&pc_gens.B, &zero, &pc_gens.B_blinding], // value * B + 0 + blinding2 * B_blinding
+  ];
+  let proof = sigma_prove(transcript, prng, elems.as_slice(), matrix, secrets);
 
-  let r1 = blinding_factor1;
-  let r2 = blinding_factor2;
-  let r3 = Scalar::random(prng);
-  let r4 = Scalar::random(prng);
-  let r5 = Scalar::random(prng);
-
-  let c3 = pc_gens.commit(r3, r4);
-  let c4 = pc_gens.commit(r3, r5);
-
-  transcript.append_proof_commitment(&c3);
-  transcript.append_proof_commitment(&c4);
-
-  let c = transcript.get_challenge::<Scalar>();
-
-  let z1 = c * value + r3;
-  let z2 = c * r1 + r4;
-  let z3 = c * r2 + r5;
-
-  ChaumPedersenProof { c3, c4, z1, z2, z3 }
+  ChaumPedersenProof { c3: proof.commitments[0],
+                       c4: proof.commitments[1],
+                       z1: proof.responses[0],
+                       z2: proof.responses[1],
+                       z3: proof.responses[2] }
 }
 
 /// Verify a Chaum-Pedersen equality proof. Return Ok() in case of success,
@@ -121,29 +121,24 @@ pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(transcript: &mut Transcr
                                                         c2: &RistrettoPoint,
                                                         proof: &ChaumPedersenProof)
                                                         -> Result<(), ZeiError> {
-  //TODO return Ok() or Err(ZeiError)
-  init_chaum_pedersen(transcript, pc_gens, c1, c2);
-  transcript.append_proof_commitment(&proof.c3);
-  transcript.append_proof_commitment(&proof.c4);
+  let mut elems = vec![];
+  elems.push(&pc_gens.B);
+  elems.push(&pc_gens.B_blinding);
+  elems.push(c1);
+  elems.push(c2);
+  let zero = RistrettoPoint::identity();
+  let matrix: &[&[&RistrettoPoint]] = &[&[&pc_gens.B, &pc_gens.B_blinding, &zero],
+                                        &[&pc_gens.B, &zero, &pc_gens.B_blinding]];
 
-  let c = transcript.get_challenge::<Scalar>();
+  let sigma_proof = SigmaProof { commitments: vec![proof.c3, proof.c4],
+                                 responses: vec![proof.z1, proof.z2, proof.z3] };
 
-  let z1 = proof.z1;
-  let z2 = proof.z2;
-  let z3 = proof.z3;
-  let g = pc_gens.B;
-  let h = pc_gens.B_blinding;
-
-  let a = Scalar::random(prng);
-
-  let verify =
-    RistrettoPoint::multiscalar_mul(&[-a, -c * a, a * z1 + z1, a * z2 + z3, -Scalar::one(), -c],
-                                    &[proof.c3, *c1, g, h, proof.c4, *c2]);
-
-  match verify == RistrettoPoint::identity() {
-    true => Ok(()),
-    false => Err(ZeiError::ZKProofVerificationError),
-  }
+  sigma_verify::<_, Scalar, RistrettoPoint>(transcript,
+                                            prng,
+                                            elems.as_slice(),
+                                            matrix,
+                                            &[c1, c2],
+                                            &sigma_proof)
 }
 
 // Helper functions for the proof of multiple commitments equality below

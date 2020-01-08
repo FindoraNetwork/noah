@@ -37,9 +37,8 @@ impl SigmaTranscript for Transcript {
   }
 }
 
-fn init_sigma_protocol<S: Scalar, G: Group<S>>(transcript: &mut Transcript, elems: &[G]) {
-  let public_elems: Vec<&G> = elems.iter().map(|x| x).collect();
-  transcript.init_sigma(b"New Sigma Protocol", &[], public_elems.as_slice());
+fn init_sigma_protocol<S: Scalar, G: Group<S>>(transcript: &mut Transcript, elems: &[&G]) {
+  transcript.init_sigma(b"New Sigma Protocol", &[], elems);
 }
 
 fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R, n: usize) -> Vec<S> {
@@ -73,16 +72,15 @@ pub struct SigmaProof<S, G> {
   pub(crate) responses: Vec<S>,
 }
 
-/// Simple Sigma protocol for the statement `lhs_matrix` * `secrets_scalars` = `rhs_vec`
+/// Simple Sigma protocol PoK for the statement `lhs_matrix` * `secrets_scalars` = `rhs_vec`
 /// Elements in `lhs_matrix` and `rhs_vec` must be in `elems` slice
-#[allow(dead_code)]
-fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
-                                                               prng: &mut R,
-                                                               elems: &[G], // public elements of the proofs
-                                                               lhs_matrix: &[&[&G]], // each row defines a lhs of a constraint
-                                                               secret_scalars: &[S])
-                                                               -> SigmaProof<S, G> {
-  init_sigma_protocol(transcript, elems);
+pub fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
+                                                                   prng: &mut R,
+                                                                   elems: &[&G], // public elements of the proofs
+                                                                   lhs_matrix: &[&[&G]], // each row defines a lhs of a constraint
+                                                                   secret_scalars: &[&S])
+                                                                   -> SigmaProof<S, G> {
+  init_sigma_protocol::<S, G>(transcript, elems);
   let blindings = sample_blindings::<_, S>(prng, secret_scalars.len());
   let proof_commitments =
     compute_proof_commitments::<S, G>(transcript, blindings.as_slice(), lhs_matrix);
@@ -98,15 +96,16 @@ fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut 
                responses }
 }
 
-#[allow(dead_code)]
-fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
-                                                                _prng: &mut R, //use of for linear combination multiexp
-                                                                elems: &[G],
-                                                                lhs_matrix: &[&[&G]],
-                                                                rhs_vec: &[&G],
-                                                                proof: &SigmaProof<S, G>)
-                                                                -> Result<(), ZeiError> {
-  init_sigma_protocol(transcript, elems);
+/// Simple Sigma protocol PoK verification for the statement `lhs_matrix` * `secrets_scalars` = `rhs_vec`
+/// Elements in `lhs_matrix` and `rhs_vec` must be in `elems` slice
+pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
+                                                                    _prng: &mut R, //use of for linear combination multiexp
+                                                                    elems: &[&G],
+                                                                    lhs_matrix: &[&[&G]],
+                                                                    rhs_vec: &[&G],
+                                                                    proof: &SigmaProof<S, G>)
+                                                                    -> Result<(), ZeiError> {
+  init_sigma_protocol::<S, G>(transcript, elems);
   for c in proof.commitments.iter() {
     transcript.append_proof_commitment(c);
   }
@@ -151,12 +150,12 @@ mod tests {
     let matrix: &[&[&RistrettoPoint]] = &[&[&G]];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[G, H],
+                                        &[&G, &H],
                                         matrix,
-                                        &[secret]);
+                                        &[&secret]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[G, H],
+                                &[&G, &H],
                                 matrix,
                                 &[&H],
                                 &dlog_proof).is_ok());
@@ -164,12 +163,12 @@ mod tests {
     let bad_matrix: &[&[&RistrettoPoint]] = &[&[&H]];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[G, H],
+                                        &[&G, &H],
                                         bad_matrix,
-                                        &[secret]);
+                                        &[&secret]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[G, H],
+                                &[&G, &H],
                                 bad_matrix,
                                 &[&H],
                                 &dlog_proof).is_err());
@@ -181,12 +180,12 @@ mod tests {
     let matrix: &[&[&RistrettoPoint]] = &[&[&G, &zero], &[&zero, &G]];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[G, H, H2],
+                                        &[&G, &H, &H2],
                                         matrix,
-                                        &[secret, secret2]);
+                                        &[&secret, &secret2]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[G, H, H2],
+                                &[&G, &H, &H2],
                                 matrix,
                                 &[&H, &H2],
                                 &dlog_proof).is_ok());
@@ -194,12 +193,12 @@ mod tests {
     let matrix: &[&[&RistrettoPoint]] = &[&[&G, &G], &[&zero, &G]]; // bad row 1
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[G, H, H2],
+                                        &[&G, &H, &H2],
                                         matrix,
-                                        &[secret, secret2]);
+                                        &[&secret, &secret2]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[G, H, H2],
+                                &[&G, &H, &H2],
                                 matrix,
                                 &[&H, &H2],
                                 &dlog_proof).is_err());
@@ -207,12 +206,12 @@ mod tests {
     let matrix: &[&[&RistrettoPoint]] = &[&[&G, &zero], &[&zero, &zero]]; // bad row 2
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[G, H, H2],
+                                        &[&G, &H, &H2],
                                         matrix,
-                                        &[secret, secret2]);
+                                        &[&secret, &secret2]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[G, H, H2],
+                                &[&G, &H, &H2],
                                 matrix,
                                 &[&H, &H2],
                                 &dlog_proof).is_err());
@@ -226,28 +225,28 @@ mod tests {
 
     let matrix: &[&[&RistrettoPoint]] =
       &[&[&G, &H, &zero, &zero, &zero], &[&zero, &zero, &G, &H, &H2]];
-    let secrets: &[Scalar] = &[secret, secret2, secret3, secret4, secret5];
+    let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &secret5];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[G, H, H2, Z1, Z2],
+                                        &[&G, &H, &H2, &Z1, &Z2],
                                         matrix,
                                         secrets);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[G, H, H2, Z1, Z2],
+                                &[&G, &H, &H2, &Z1, &Z2],
                                 matrix,
                                 &[&Z1, &Z2],
                                 &dlog_proof).is_ok());
 
-    let secrets: &[Scalar] = &[secret, secret2, secret3, secret4, Scalar::zero()]; // bad secrets
+    let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::zero()]; // bad secrets
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[G, H, H2, Z1, Z2],
+                                        &[&G, &H, &H2, &Z1, &Z2],
                                         matrix,
                                         secrets);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[G, H, H2, Z1, Z2],
+                                &[&G, &H, &H2, &Z1, &Z2],
                                 matrix,
                                 &[&Z1, &Z2],
                                 &dlog_proof).is_err());
