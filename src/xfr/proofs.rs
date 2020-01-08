@@ -6,8 +6,7 @@ use crate::crypto::chaum_pedersen::{
   chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX,
 };
 use crate::crypto::pedersen_elgamal::{
-  pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
-  PedersenElGamalEqProof,
+  pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify, PedersenElGamalEqProof,
 };
 use crate::errors::ZeiError;
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
@@ -446,8 +445,9 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
                      .unwrap());
     asset_blinds.push(x.type_blind.0);
   }
-
-  let proof = chaum_pedersen_prove_multiple_eq(prng,
+  let mut transcript = Transcript::new(b"AssetEquality");
+  let proof = chaum_pedersen_prove_multiple_eq(&mut transcript,
+                                               prng,
                                                pc_gens,
                                                &asset_scalar,
                                                asset_coms.as_slice(),
@@ -482,9 +482,12 @@ pub(crate) fn verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut R,
 
   asset_commitments.extend(out_asset_commitments.iter());
 
-  if chaum_pedersen_verify_multiple_eq(prng, &pc_gens, asset_commitments.as_slice(), asset_proof)? {
-    Ok(())
-  } else {
-    Err(ZeiError::XfrVerifyConfidentialAssetError)
-  }
+  let mut transcript = Transcript::new(b"AssetEquality");
+  chaum_pedersen_verify_multiple_eq(&mut transcript,
+                                    prng,
+                                    &pc_gens,
+                                    asset_commitments.as_slice(),
+                                    asset_proof).map_err(|_| {
+                                                  ZeiError::XfrVerifyConfidentialAssetError
+                                                })
 }

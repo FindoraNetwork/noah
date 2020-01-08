@@ -5,6 +5,7 @@ use digest::Digest;
 use sha2::Sha512;
 
 /// I convert a u32 into a 4 bytes array (bigendian)
+#[allow(dead_code)]
 pub(crate) fn u32_to_bigendian_u8array(n: u32) -> [u8; 4] {
   let mut array = [0u8; 4];
   array[0] = ((n >> 24) & 0xFF) as u8;

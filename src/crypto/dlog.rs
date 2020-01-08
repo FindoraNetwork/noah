@@ -1,6 +1,6 @@
 use crate::algebra::groups::{Group, Scalar as ZeiScalar};
-use merlin::Transcript;
 use crate::crypto::sigma::SigmaTranscript;
+use merlin::Transcript;
 //use bulletproofs::PedersenGens;
 //use curve25519_dalek::ristretto::RistrettoPoint;
 //use curve25519_dalek::scalar::Scalar;
@@ -23,7 +23,7 @@ pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
   transcript.init_sigma(b"PoK Dlog", &[], &[base, point]);
   let u = S::random_scalar(prng);
   let proof_commitment = base.mul(&u);
-  transcript.append_proof_commitment( &proof_commitment);
+  transcript.append_proof_commitment(&proof_commitment);
   let challenge = transcript.get_challenge::<S>();
   let response = challenge.mul(dlog).add(&u);
 
@@ -42,8 +42,6 @@ pub fn verify_proof_of_knowledge_dlog<S: ZeiScalar, G: Group<S>>(transcript: &mu
   let challenge = transcript.get_challenge::<S>();
   base.mul(&proof.response) == point.mul(&challenge).add(&proof.proof_commitment)
 }
-
-
 
 pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
   transcript: &mut Transcript,
@@ -101,10 +99,10 @@ mod test {
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   //use bulletproofs::PedersenGens;
+  use crate::crypto::dlog::{prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog};
+  use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use merlin::Transcript;
-  use crate::crypto::dlog::{prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog};
 
   #[test]
   fn test_pok_dlog() {
@@ -119,10 +117,12 @@ mod test {
     let point = scalar * base;
 
     let proof = prove_knowledge_dlog(&mut prover_transcript, &mut csprng, &base, &point, &scalar);
-    assert_eq!(true, verify_proof_of_knowledge_dlog(&mut verifier_transcript, &base, &point, &proof));
+    assert_eq!(true,
+               verify_proof_of_knowledge_dlog(&mut verifier_transcript, &base, &point, &proof));
 
     let proof = prove_knowledge_dlog(&mut prover_transcript, &mut csprng, &base, &point, &scalar2);
-    assert_eq!(false, verify_proof_of_knowledge_dlog(&mut verifier_transcript, &base, &point, &proof))
+    assert_eq!(false,
+               verify_proof_of_knowledge_dlog(&mut verifier_transcript, &base, &point, &proof))
   }
 
   #[test]
