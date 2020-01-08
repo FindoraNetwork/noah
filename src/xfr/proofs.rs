@@ -6,7 +6,7 @@ use crate::crypto::chaum_pedersen::{
   chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX,
 };
 use crate::crypto::pedersen_elgamal::{
-  pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_eq_aggregate_verify_fast,
+  pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
   PedersenElGamalEqProof,
 };
 use crate::errors::ZeiError;
@@ -98,7 +98,9 @@ pub(crate) fn tracking_proofs<R: CryptoRng + RngCore>(
             .map(|c| ElGamalCiphertext { e1: c.e1.get_ristretto_point(),
                                          e2: c.e2.get_ristretto_point() })
             .collect();
-    Some(pedersen_elgamal_aggregate_eq_proof(prng,
+    let mut transcript = Transcript::new(b"AssetTrackingProofs");
+    Some(pedersen_elgamal_aggregate_eq_proof(&mut transcript,
+                                             prng,
                                              m.as_slice(),
                                              r.as_slice(),
                                              &pk,
@@ -186,7 +188,9 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + RngCore>(prng: &mut R,
                   .map(|c| ElGamalCiphertext { e1: c.e1.get_ristretto_point(),
                                                e2: c.e2.get_ristretto_point() })
                   .collect();
-          pedersen_elgamal_eq_aggregate_verify_fast(
+          let mut transcript = Transcript::new(b"AssetTrackingProofs");
+          pedersen_elgamal_aggregate_eq_verify(
+            &mut transcript,
                         prng,
                         &pk,
                         ctexts.as_slice(),

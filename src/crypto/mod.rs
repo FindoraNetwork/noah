@@ -8,6 +8,7 @@ pub mod group_signatures;
 pub mod pedersen_elgamal;
 pub mod solvency;
 pub mod whitelist;
+pub mod sigma;
 
 use crate::algebra::groups::{Group, Scalar};
 use crate::utils::u32_to_bigendian_u8array;
