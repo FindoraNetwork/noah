@@ -17,6 +17,7 @@ pub trait Scalar:
   //arithmetic
   fn add(&self, b: &Self) -> Self;
   fn mul(&self, b: &Self) -> Self;
+  fn sub(&self, b: &Self) -> Self;
 
   // serialization
   fn to_bytes(&self) -> Vec<u8>;
@@ -41,6 +42,9 @@ pub trait Group<S>:
   fn mul(&self, scalar: &S) -> Self;
   fn add(&self, other: &Self) -> Self;
   fn sub(&self, other: &Self) -> Self;
+
+  fn multi_exp(scalars: &[S], points:&[Self]) -> Self;
+  fn vartime_multi_exp(scalars: &[S], points:&[Self]) -> Self;
 }
 
 #[cfg(test)]

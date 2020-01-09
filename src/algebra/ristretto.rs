@@ -3,7 +3,7 @@ use crate::algebra::groups::Scalar as ZeiScalar;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::Identity;
+use curve25519_dalek::traits::{Identity, MultiscalarMul, VartimeMultiscalarMul};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
@@ -35,6 +35,10 @@ impl ZeiScalar for Scalar {
 
   fn mul(&self, b: &Scalar) -> Scalar {
     self * b
+  }
+
+  fn sub(&self, b: &Scalar) -> Scalar{
+    self - b
   }
 
   fn to_bytes(&self) -> Vec<u8> {
@@ -88,6 +92,13 @@ impl Group<Scalar> for RistrettoPoint {
   fn sub(&self, other: &RistrettoPoint) -> RistrettoPoint {
     self - other
   }
+
+  fn multi_exp(scalars: &[Scalar], points:&[Self]) -> Self{
+    RistrettoPoint::multiscalar_mul(scalars, points)
+  }
+  fn vartime_multi_exp(scalars: &[Scalar], points:&[Self]) -> Self{
+    RistrettoPoint::vartime_multiscalar_mul(scalars,points)
+  }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -124,6 +135,10 @@ impl ZeiScalar for RistScalar {
 
   fn mul(&self, b: &RistScalar) -> RistScalar {
     RistScalar(self.0 * b.0)
+  }
+
+  fn sub(&self, b: &RistScalar) -> RistScalar{
+    RistScalar(self.0 - b.0)
   }
 
   fn to_bytes(&self) -> Vec<u8> {
@@ -243,6 +258,17 @@ impl Group<RistScalar> for RistPoint {
 
   fn sub(&self, other: &RistPoint) -> RistPoint {
     RistPoint(self.0 - other.0)
+  }
+
+  fn multi_exp(scalars: &[RistScalar], points:&[Self]) -> Self{
+    let s: Vec<Scalar> = scalars.iter().map(|x| x.0).collect();
+    let p: Vec<RistrettoPoint> = points.iter().map(|x| x.0).collect();
+    RistPoint(RistrettoPoint::multiscalar_mul(s, p))
+  }
+  fn vartime_multi_exp(scalars: &[RistScalar], points:&[Self]) -> Self{
+    let s: Vec<Scalar> = scalars.iter().map(|x| x.0).collect();
+    let p: Vec<RistrettoPoint> = points.iter().map(|x| x.0).collect();
+    RistPoint(RistrettoPoint::vartime_multiscalar_mul(s,p))
   }
 }
 

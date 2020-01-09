@@ -85,6 +85,9 @@ impl crate::algebra::groups::Scalar for BNScalar {
   fn mul(&self, b: &BNScalar) -> BNScalar {
     BNScalar(self.0 * b.0)
   }
+  fn sub(&self, b: &BNScalar) -> BNScalar {
+    BNScalar(self.0 - b.0)
+  }
 
   //scalar serialization
   fn to_bytes(&self) -> Vec<u8> {
@@ -214,6 +217,24 @@ impl Group<BNScalar> for BNG1 {
   fn sub(&self, other: &Self) -> BNG1 {
     BNG1(self.0 - other.0)
   }
+  fn multi_exp(scalars: &[BNScalar], points:&[Self]) -> Self{
+    //TODO
+    assert_eq!(scalars.len(), points.len());
+    let mut r = Self::get_identity();
+    for (s,p) in scalars.iter().zip(points.iter()){
+      r = r.add(&p.mul(s))
+    }
+    r
+  }
+  fn vartime_multi_exp(scalars: &[BNScalar], points:&[Self]) -> Self{
+    //TODO
+    assert_eq!(scalars.len(), points.len());
+    let mut r = Self::get_identity();
+    for (s,p) in scalars.iter().zip(points.iter()){
+      r = r.add(&p.mul(s))
+    }
+    r
+  }
 }
 
 /*
@@ -334,6 +355,24 @@ impl Group<BNScalar> for BNG2 {
   }
   fn sub(&self, other: &Self) -> BNG2 {
     BNG2(self.0 - other.0)
+  }
+  fn multi_exp(scalars: &[BNScalar], points:&[Self]) -> Self{
+    //TODO
+    assert_eq!(scalars.len(), points.len());
+    let mut r = Self::get_identity();
+    for (s,p) in scalars.iter().zip(points.iter()){
+      r = r.add(&p.mul(s))
+    }
+    r
+  }
+  fn vartime_multi_exp(scalars: &[BNScalar], points:&[Self]) -> Self{
+    //TODO
+    assert_eq!(scalars.len(), points.len());
+    let mut r = Self::get_identity();
+    for (s,p) in scalars.iter().zip(points.iter()){
+      r = r.add(&p.mul(s))
+    }
+    r
   }
 }
 

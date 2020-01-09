@@ -84,6 +84,12 @@ impl Scalar for BLSScalar {
     BLSScalar(m)
   }
 
+  fn sub(&self, b: &BLSScalar) -> BLSScalar {
+    let mut m = self.0;
+    m.sub_assign(&b.0);
+    BLSScalar(m)
+  }
+
   //scalar serialization
   fn to_bytes(&self) -> Vec<u8> {
     let repr = FrRepr::from(self.0);
@@ -215,6 +221,26 @@ impl Group<BLSScalar> for BLSG1 {
     m.sub_assign(&other.0);
     BLSG1(m)
   }
+
+  fn multi_exp(scalars: &[BLSScalar], points:&[Self]) -> Self{
+    //TODO
+    assert_eq!(scalars.len(), points.len());
+    let mut r = Self::get_identity();
+    for (s,p) in scalars.iter().zip(points.iter()){
+      r = r.add(&p.mul(s))
+    }
+    r
+  }
+  fn vartime_multi_exp(scalars: &[BLSScalar], points:&[Self]) -> Self{
+    //TODO
+    assert_eq!(scalars.len(), points.len());
+    let mut r = Self::get_identity();
+    for (s,p) in scalars.iter().zip(points.iter()){
+      r = r.add(&p.mul(s))
+    }
+    r
+  }
+
 }
 
 impl Serialize for BLSG1 {
@@ -329,6 +355,25 @@ impl Group<BLSScalar> for BLSG2 {
     let mut m = self.0;
     m.sub_assign(&other.0);
     BLSG2(m)
+  }
+
+  fn multi_exp(scalars: &[BLSScalar], points:&[Self]) -> Self{
+    //TODO
+    assert_eq!(scalars.len(), points.len());
+    let mut r = Self::get_identity();
+    for (s,p) in scalars.iter().zip(points.iter()){
+      r = r.add(&p.mul(s))
+    }
+    r
+  }
+  fn vartime_multi_exp(scalars: &[BLSScalar], points:&[Self]) -> Self{
+    //TODO
+    assert_eq!(scalars.len(), points.len());
+    let mut r = Self::get_identity();
+    for (s,p) in scalars.iter().zip(points.iter()){
+      r = r.add(&p.mul(s))
+    }
+    r
   }
 }
 
