@@ -97,26 +97,25 @@ pub fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &
 }
 
 #[allow(non_snake_case)]
-fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(
-  prng: &mut R,
-  elems: &[&G], // all public group elements
-  matrix: &[&[&G]], // matrix defining LHS of constrains
-  rhs: &[&G], // RHS of constrant
-  responses: &[S], // proof challenge responses
-  challenge: &S, // challenge
-) -> Vec<S>{
+fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(prng: &mut R,
+                                                                             elems: &[&G], // all public group elements
+                                                                             matrix: &[&[&G]], // matrix defining LHS of constrains
+                                                                             rhs: &[&G], // RHS of constrant
+                                                                             responses: &[S], // proof challenge responses
+                                                                             challenge: &S // challenge
+) -> Vec<S> {
   // verifier needs to check that matrix * responses = challenge * rhs + proof_commitment
   // rows are merges using a random linear combination
   // this functions collects the scalars factors for each element in order to apply a single
   // multiexponentiation to verify all equations
   let n = elems.len();
   let mut s = vec![S::from_u32(0); n + rhs.len()]; // n elements + m proof commitments
-  let mut  alphas = vec![]; // linear combination scalars
-  // find in the matrix each element and multiply corresponding response by alpha
-  for (j, row) in matrix.iter().enumerate(){
+  let mut alphas = vec![]; // linear combination scalars
+                           // find in the matrix each element and multiply corresponding response by alpha
+  for (j, row) in matrix.iter().enumerate() {
     let alpha = S::random_scalar(prng);
-    for (i,E) in elems.iter().enumerate(){
-      for (M,r) in row.iter().zip(responses){
+    for (i, E) in elems.iter().enumerate() {
+      for (M, r) in row.iter().zip(responses) {
         if E == M {
           s[i] = s[i].add(&alpha.mul(r))
         }
@@ -125,12 +124,11 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(
     s[n + j] = s[n + j].sub(&alpha);
     alphas.push(alpha);
   }
-  for (R, alpha) in rhs.iter().zip(alphas.iter()){
-    for (i,E) in elems.iter().enumerate(){
-      if E == R{
+  for (R, alpha) in rhs.iter().zip(alphas.iter()) {
+    for (i, E) in elems.iter().enumerate() {
+      if E == R {
         s[i] = s[i].sub(&alpha.mul(challenge));
       }
-
     }
   }
   s
@@ -153,7 +151,12 @@ pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: 
     transcript.append_proof_commitment(c);
   }
   let challenge = transcript.get_challenge::<S>();
-  let me_scalars = collect_multi_exp_scalars(prng, elems, lhs_matrix, rhs_vec, &proof.responses, &challenge);
+  let me_scalars = collect_multi_exp_scalars(prng,
+                                             elems,
+                                             lhs_matrix,
+                                             rhs_vec,
+                                             &proof.responses,
+                                             &challenge);
   let mut me_elems = vec![];
   for e in elems {
     me_elems.push((*e).clone());
@@ -162,9 +165,9 @@ pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: 
     me_elems.push(e.clone());
   }
   let result = G::vartime_multi_exp(me_scalars.as_slice(), me_elems.as_slice());
-  match result != G::get_identity(){
+  match result != G::get_identity() {
     true => Err(ZeiError::ZKProofVerificationError),
-    false => Ok(())
+    false => Ok(()),
   }
 }
 

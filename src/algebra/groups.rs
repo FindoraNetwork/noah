@@ -43,8 +43,8 @@ pub trait Group<S>:
   fn add(&self, other: &Self) -> Self;
   fn sub(&self, other: &Self) -> Self;
 
-  fn multi_exp(scalars: &[S], points:&[Self]) -> Self;
-  fn vartime_multi_exp(scalars: &[S], points:&[Self]) -> Self;
+  fn multi_exp(scalars: &[S], points: &[Self]) -> Self;
+  fn vartime_multi_exp(scalars: &[S], points: &[Self]) -> Self;
 }
 
 #[cfg(test)]

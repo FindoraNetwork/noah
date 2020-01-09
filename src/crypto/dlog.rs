@@ -1,16 +1,8 @@
 use crate::algebra::groups::{Group, Scalar as ZeiScalar};
-use crate::crypto::sigma::SigmaTranscript;
+use crate::crypto::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
+use crate::errors::ZeiError;
 use merlin::Transcript;
-//use bulletproofs::PedersenGens;
-//use curve25519_dalek::ristretto::RistrettoPoint;
-//use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
-
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct DlogProof<G, S> {
-  pub proof_commitment: G,
-  pub response: S,
-}
 
 pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
   transcript: &mut Transcript,
@@ -18,29 +10,24 @@ pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
   base: &G,
   point: &G,
   dlog: &S)
-  -> DlogProof<G, S> {
+  -> SigmaProof<S, G> {
   /*! I compute a proof for the knowledge of dlog for point with respect to base*/
-  transcript.init_sigma(b"PoK Dlog", &[], &[base, point]);
-  let u = S::random_scalar(prng);
-  let proof_commitment = base.mul(&u);
-  transcript.append_proof_commitment(&proof_commitment);
-  let challenge = transcript.get_challenge::<S>();
-  let response = challenge.mul(dlog).add(&u);
-
-  DlogProof { proof_commitment,
-              response }
+  transcript.append_message(b"new_domain", b"Dlog proof");
+  let matrix: &[&[&G]] = &[&[base]];
+  sigma_prove::<R, S, G>(transcript, prng, &[base, point], matrix, &[dlog])
 }
 
-pub fn verify_proof_of_knowledge_dlog<S: ZeiScalar, G: Group<S>>(transcript: &mut Transcript,
-                                                                 base: &G,
-                                                                 point: &G,
-                                                                 proof: &DlogProof<G, S>)
-                                                                 -> bool {
+pub fn verify_proof_of_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
+  transcript: &mut Transcript,
+  prng: &mut R,
+  base: &G,
+  point: &G,
+  proof: &SigmaProof<S, G>)
+  -> Result<(), ZeiError> {
   /*! I verify a proof of knowledge of dlog for point with respect to base*/
-  transcript.init_sigma(b"PoK Dlog", &[], &[base, point]);
-  transcript.append_proof_commitment(&proof.proof_commitment);
-  let challenge = transcript.get_challenge::<S>();
-  base.mul(&proof.response) == point.mul(&challenge).add(&proof.proof_commitment)
+  transcript.append_message(b"new_domain", b"Dlog proof");
+  let matrix: &[&[&G]] = &[&[base]];
+  sigma_verify(transcript, prng, &[base, point], matrix, &[point], proof)
 }
 
 pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
@@ -49,13 +36,26 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Gr
   base: &G,
   points: &[G],
   dlogs: &[S])
-  -> DlogProof<G, S> {
+  -> SigmaProof<S, G> {
   /*! I compute a proof for the knowledge of dlogs for points for the base*/
   let mut public_elems = vec![base];
   let mut ref_points: Vec<&G> = points.iter().map(|x| x).collect();
   public_elems.append(&mut ref_points);
   transcript.init_sigma(b"PoK Dlog Multiple", &[], public_elems.as_slice());
 
+  let x: Vec<S> = points.iter()
+                        .map(|_| transcript.get_challenge::<S>())
+                        .collect();
+  let lc_point: G = points.iter()
+                          .zip(x.iter())
+                          .fold(G::get_identity(), |lc, (point, x)| lc.add(&point.mul(x)));
+  let lc_secret: S = dlogs.iter()
+                          .zip(x.iter())
+                          .fold(S::from_u32(0), |lc, (s, x)| lc.add(&s.mul(x)));
+
+  prove_knowledge_dlog(transcript, prng, base, &lc_point, &lc_secret)
+
+  /*
   let u = S::random_scalar(prng);
   let proof_commitment = base.mul(&u);
   transcript.append_proof_commitment(&proof_commitment);
@@ -67,39 +67,62 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Gr
     response = response.add(&challenge_i.mul(item));
   }
 
-  DlogProof { proof_commitment,
-              response }
+  SigmaProof { commitments: vec![proof_commitment],
+              responses: vec![response] }
+  */
 }
 
-pub fn verify_multiple_knowledge_dlog<S: ZeiScalar, G: Group<S>>(transcript: &mut Transcript,
-                                                                 base: &G,
-                                                                 points: &[G],
-                                                                 proof: &DlogProof<G, S>)
-                                                                 -> bool {
+pub fn verify_multiple_knowledge_dlog<R: CryptoRng + RngCore, S: ZeiScalar, G: Group<S>>(
+  transcript: &mut Transcript,
+  prng: &mut R,
+  base: &G,
+  points: &[G],
+  proof: &SigmaProof<S, G>)
+  -> Result<(), ZeiError> {
   /*! I verify a proof of knowledge of dlogs for points in the base*/
+
+  let mut public_elems = vec![base];
+  let mut ref_points: Vec<&G> = points.iter().map(|x| x).collect();
+  public_elems.append(&mut ref_points);
+  transcript.init_sigma(b"PoK Dlog Multiple", &[], public_elems.as_slice());
+
+  let x: Vec<S> = points.iter()
+                        .map(|_| transcript.get_challenge::<S>())
+                        .collect();
+  let lc_point: G = points.iter()
+                          .zip(x.iter())
+                          .fold(G::get_identity(), |lc, (point, x)| lc.add(&point.mul(x)));
+
+  verify_proof_of_knowledge_dlog(transcript, prng, base, &lc_point, proof)
+  /*
   let mut pub_elems = vec![base];
   for point in points {
     pub_elems.push(point);
   }
   transcript.init_sigma(b"PoK Dlog Multiple", &[], pub_elems.as_slice());
-  transcript.append_proof_commitment(&proof.proof_commitment);
-  let mut check = proof.proof_commitment.clone();
+  transcript.append_proof_commitment(&proof.commitments[0]);
+  let mut check = proof.commitments[0].clone();
   for point in points {
     let challenge_i = transcript.get_challenge::<S>();
     check = check.add(&point.mul(&challenge_i));
   }
 
-  check == base.mul(&proof.response)
+  match check == base.mul(&proof.responses[0]){
+    true => Ok(()),
+    false => Err(ZeiError::ZKProofVerificationError)
+  }
+  */
 }
 
 #[cfg(test)]
 mod test {
-  //use bulletproofs::PedersenGens;
-  use super::{prove_knowledge_dlog, verify_proof_of_knowledge_dlog};
+  use super::{
+    prove_knowledge_dlog, prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog,
+    verify_proof_of_knowledge_dlog,
+  };
+  use crate::algebra::groups::Group;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
-  //use bulletproofs::PedersenGens;
-  use crate::crypto::dlog::{prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog};
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -117,12 +140,18 @@ mod test {
     let point = scalar * base;
 
     let proof = prove_knowledge_dlog(&mut prover_transcript, &mut csprng, &base, &point, &scalar);
-    assert_eq!(true,
-               verify_proof_of_knowledge_dlog(&mut verifier_transcript, &base, &point, &proof));
+    assert!(verify_proof_of_knowledge_dlog(&mut verifier_transcript,
+                                           &mut csprng,
+                                           &base,
+                                           &point,
+                                           &proof).is_ok());
 
     let proof = prove_knowledge_dlog(&mut prover_transcript, &mut csprng, &base, &point, &scalar2);
-    assert_eq!(false,
-               verify_proof_of_knowledge_dlog(&mut verifier_transcript, &base, &point, &proof))
+    assert!(verify_proof_of_knowledge_dlog(&mut verifier_transcript,
+                                           &mut csprng,
+                                           &base,
+                                           &point,
+                                           &proof).is_err())
   }
 
   #[test]
@@ -158,11 +187,32 @@ mod test {
                                               &[scalar1, scalar2, scalar3, scalar4, scalar5,
                                                 scalar6, scalar7]);
 
-    assert_eq!(true,
-               verify_multiple_knowledge_dlog(&mut verifier_transcript,
+    assert!(verify_multiple_knowledge_dlog(&mut verifier_transcript,
+                                           &mut csprng,
+                                           &base,
+                                           &[point1, point2, point3, point4, point5, point6,
+                                             point7],
+                                           &proof).is_ok());
+
+    let proof = prove_multiple_knowledge_dlog(&mut prover_transcript,
+                                              &mut csprng,
                                               &base,
                                               &[point1, point2, point3, point4, point5, point6,
                                                 point7],
-                                              &proof));
+                                              &[scalar1, scalar2, scalar3, scalar4, scalar5,
+                                                scalar6, scalar7]);
+
+    //bad elements
+    assert!(verify_multiple_knowledge_dlog(&mut verifier_transcript,
+                                           &mut csprng,
+                                           &base,
+                                           &[RistrettoPoint::get_identity(),
+                                             point2,
+                                             point3,
+                                             point4,
+                                             point5,
+                                             point6,
+                                             point7],
+                                           &proof).is_err());
   }
 }

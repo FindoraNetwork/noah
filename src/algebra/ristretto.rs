@@ -37,7 +37,7 @@ impl ZeiScalar for Scalar {
     self * b
   }
 
-  fn sub(&self, b: &Scalar) -> Scalar{
+  fn sub(&self, b: &Scalar) -> Scalar {
     self - b
   }
 
@@ -93,11 +93,11 @@ impl Group<Scalar> for RistrettoPoint {
     self - other
   }
 
-  fn multi_exp(scalars: &[Scalar], points:&[Self]) -> Self{
+  fn multi_exp(scalars: &[Scalar], points: &[Self]) -> Self {
     RistrettoPoint::multiscalar_mul(scalars, points)
   }
-  fn vartime_multi_exp(scalars: &[Scalar], points:&[Self]) -> Self{
-    RistrettoPoint::vartime_multiscalar_mul(scalars,points)
+  fn vartime_multi_exp(scalars: &[Scalar], points: &[Self]) -> Self {
+    RistrettoPoint::vartime_multiscalar_mul(scalars, points)
   }
 }
 
@@ -137,7 +137,7 @@ impl ZeiScalar for RistScalar {
     RistScalar(self.0 * b.0)
   }
 
-  fn sub(&self, b: &RistScalar) -> RistScalar{
+  fn sub(&self, b: &RistScalar) -> RistScalar {
     RistScalar(self.0 - b.0)
   }
 
@@ -260,15 +260,15 @@ impl Group<RistScalar> for RistPoint {
     RistPoint(self.0 - other.0)
   }
 
-  fn multi_exp(scalars: &[RistScalar], points:&[Self]) -> Self{
+  fn multi_exp(scalars: &[RistScalar], points: &[Self]) -> Self {
     let s: Vec<Scalar> = scalars.iter().map(|x| x.0).collect();
     let p: Vec<RistrettoPoint> = points.iter().map(|x| x.0).collect();
     RistPoint(RistrettoPoint::multiscalar_mul(s, p))
   }
-  fn vartime_multi_exp(scalars: &[RistScalar], points:&[Self]) -> Self{
+  fn vartime_multi_exp(scalars: &[RistScalar], points: &[Self]) -> Self {
     let s: Vec<Scalar> = scalars.iter().map(|x| x.0).collect();
     let p: Vec<RistrettoPoint> = points.iter().map(|x| x.0).collect();
-    RistPoint(RistrettoPoint::vartime_multiscalar_mul(s,p))
+    RistPoint(RistrettoPoint::vartime_multiscalar_mul(s, p))
   }
 }
 
