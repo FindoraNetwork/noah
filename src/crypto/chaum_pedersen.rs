@@ -1,3 +1,4 @@
+use crate::algebra::groups::Group;
 use crate::crypto::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
 use crate::errors::ZeiError;
 use crate::errors::ZeiError::ZKProofVerificationError;
@@ -8,7 +9,6 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use crate::algebra::groups::Group;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
@@ -34,7 +34,7 @@ pub struct ChaumPedersenProofX {
 
 fn init_chaum_pedersen_multiple(transcript: &mut Transcript,
                                 pc_gens: &PedersenGens,
-                                commitments: &[RistrettoPoint]){
+                                commitments: &[RistrettoPoint]) {
   let mut public_elems = vec![&pc_gens.B, &pc_gens.B_blinding];
   for c in commitments.iter() {
     public_elems.push(c);
@@ -46,12 +46,12 @@ fn init_chaum_pedersen<'a>(transcript: &mut Transcript,
                            identity: &'a RistrettoPoint,
                            pc_gens: &'a PedersenGens,
                            c1: &'a RistrettoPoint,
-                           c2: &'a RistrettoPoint
-) -> (Vec<&'a RistrettoPoint>, Vec<Vec<usize>>, Vec<usize>){
+                           c2: &'a RistrettoPoint)
+                           -> (Vec<&'a RistrettoPoint>, Vec<Vec<usize>>, Vec<usize>) {
   transcript.append_message(b"new_domain", b"Chaum Pedersen");
   let elems = vec![identity, &pc_gens.B, &pc_gens.B_blinding, c1, c2];
-  let lhs_matrix = vec![vec![1,2,0], vec![1,0,2]];
-  let rhs_vec = vec![3,4];
+  let lhs_matrix = vec![vec![1, 2, 0], vec![1, 0, 2]];
+  let rhs_vec = vec![3, 4];
   (elems, lhs_matrix, rhs_vec)
 }
 
@@ -68,7 +68,11 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(transcript: &mut Transcri
   let identity = RistrettoPoint::get_identity();
   let (elems, lhs_matrix, _) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
   let secrets = [value, blinding_factor1, blinding_factor2];
-  let proof = sigma_prove(transcript, prng, elems.as_slice(), lhs_matrix.as_slice(), &secrets[..]);
+  let proof = sigma_prove(transcript,
+                          prng,
+                          elems.as_slice(),
+                          lhs_matrix.as_slice(),
+                          &secrets[..]);
 
   ChaumPedersenProof { c3: proof.commitments[0],
                        c4: proof.commitments[1],

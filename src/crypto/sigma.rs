@@ -209,7 +209,6 @@ mod tests {
                                 rhs_vec.as_slice(),
                                 &dlog_proof).is_ok());
 
-
     let bad_matrix = vec![vec![1]];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
@@ -223,7 +222,6 @@ mod tests {
                                 rhs_vec.as_slice(),
                                 &dlog_proof).is_err());
 
-
     // test2: two contrains, two secrets
     // 1) H = secret * G, 2) H2 = secret2 * G
     let secret2 = Scalar::from(20u8);
@@ -231,7 +229,7 @@ mod tests {
     let zero = RistrettoPoint::identity();
     let elems: &[&RistrettoPoint] = &[&zero, &G, &H, &H2];
     let lhs_matrix: &[Vec<usize>] = &[vec![1, 0], vec![0, 1]];
-    let rhs_vec: &[usize] = &[2,3];
+    let rhs_vec: &[usize] = &[2, 3];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
                                         elems,
@@ -243,7 +241,6 @@ mod tests {
                                 lhs_matrix,
                                 rhs_vec,
                                 &dlog_proof).is_ok());
-
 
     let lhs_matrix: &[Vec<usize>] = &[vec![1, 1], vec![0, 1]]; // bad row 1
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
@@ -279,15 +276,10 @@ mod tests {
     let Z2 = G * secret3 + H * secret4 + H2 * secret5;
 
     let elems = &[&zero, &G, &H, &H2, &Z1, &Z2];
-    let matrix: &[Vec<usize>] =
-      &[vec![1, 2, 0, 0, 0], vec![0, 0, 1, 2, 3]];
-    let rhs_vec = &[4,5];
+    let matrix: &[Vec<usize>] = &[vec![1, 2, 0, 0, 0], vec![0, 0, 1, 2, 3]];
+    let rhs_vec = &[4, 5];
     let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &secret5];
-    let proof = super::sigma_prove(&mut prover_transcript,
-                                   &mut prng,
-                                   elems,
-                                   matrix,
-                                   secrets);
+    let proof = super::sigma_prove(&mut prover_transcript, &mut prng, elems, matrix, secrets);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
                                 elems,
@@ -296,11 +288,7 @@ mod tests {
                                 &proof).is_ok());
 
     let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::zero()]; // bad secrets
-    let proof = super::sigma_prove(&mut prover_transcript,
-                                   &mut prng,
-                                   elems,
-                                   matrix,
-                                   secrets);
+    let proof = super::sigma_prove(&mut prover_transcript, &mut prng, elems, matrix, secrets);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
                                 elems,
