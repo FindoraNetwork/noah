@@ -8,28 +8,7 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-/*
-* This file implements Chaum-Pedersen proof of equality of commitments.
-* Proof algorithm:
-  a) Let C1 = pedersen(a, r1) = C2 = pedersen(a, r2), (G,H) pedersen base points
-  b) Sample random scalars r3, r4 and r5
-  c) Compute new commitments on C3 = pedersen(r3,r4) and C4 = (r3,r5)
-  d) Compute challenge c = HASH(C1,C2,C3,C4)
-  e) Compute response z1 = cm + r3, z2 = cr1 + r4, z3 = cr2 + r5
-  f) Output proof = C1,C2,z1,z2,z3
-
-* Verify algorithm:
-  a) Compute challenge c = HASH(C1,C2,C3,C4)
-  b) Output true iff c3 + c*c1 = z1*G + z2*H AND c4 + c*c2 == z1*G + z3*H
-
-* Proof equality for multiple commitments
-  a) {challenge_i = HASH(C1,...,Cn, i)}
-  b) {di = challenge_i * (C1 - Ci)}
-  c) {zi = challenge_i * (r1 - ri)}
-  d) Ouput Chaum-Pedersen Zero-Knowledge proof that D = \sum di commits to 0
-     (using blinding z = sum zi}
-  (Current implementation uses equality proof above with (D,  Commit(0, 0)) commitment pair)
-*/
+use crate::algebra::groups::Group;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
@@ -53,31 +32,27 @@ pub struct ChaumPedersenProofX {
   pub(crate) zero: Option<ChaumPedersenProof>,
 }
 
-/*
-fn init_chaum_pedersen(transcript: &mut Transcript,
-                       pc_gens: &PedersenGens,
-                       commitment1: &RistrettoPoint,
-                       commitment2: &RistrettoPoint) {
-  let mut public_elems = vec![];
-  public_elems.push(&pc_gens.B);
-  public_elems.push(&pc_gens.B_blinding);
-  public_elems.push(&commitment1);
-  public_elems.push(&commitment2);
-  transcript.init_sigma(b"ChaumPedersen", &[], public_elems.as_slice())
-}
-
-*/
-
 fn init_chaum_pedersen_multiple(transcript: &mut Transcript,
                                 pc_gens: &PedersenGens,
-                                commitments: &[RistrettoPoint]) {
-  let mut public_elems = vec![];
-  public_elems.push(&pc_gens.B);
-  public_elems.push(&pc_gens.B_blinding);
+                                commitments: &[RistrettoPoint]){
+  let mut public_elems = vec![&pc_gens.B, &pc_gens.B_blinding];
   for c in commitments.iter() {
     public_elems.push(c);
   }
   transcript.init_sigma(b"ChaumPedersenMultiple", &[], public_elems.as_slice())
+}
+
+fn init_chaum_pedersen<'a>(transcript: &mut Transcript,
+                           identity: &'a RistrettoPoint,
+                           pc_gens: &'a PedersenGens,
+                           c1: &'a RistrettoPoint,
+                           c2: &'a RistrettoPoint
+) -> (Vec<&'a RistrettoPoint>, Vec<Vec<usize>>, Vec<usize>){
+  transcript.append_message(b"new_domain", b"Chaum Pedersen");
+  let elems = vec![identity, &pc_gens.B, &pc_gens.B_blinding, c1, c2];
+  let lhs_matrix = vec![vec![1,2,0], vec![1,0,2]];
+  let rhs_vec = vec![3,4];
+  (elems, lhs_matrix, rhs_vec)
 }
 
 /// Computes a Chaum-Pedersen proof of knowledge of openings of two commitments to the same value
@@ -90,18 +65,10 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(transcript: &mut Transcri
                                                        blinding_factor1: &Scalar,
                                                        blinding_factor2: &Scalar)
                                                        -> ChaumPedersenProof {
-  let mut elems = vec![];
-  elems.push(&pc_gens.B);
-  elems.push(&pc_gens.B_blinding);
-  elems.push(c1);
-  elems.push(c2);
-  let secrets: &[&Scalar] = &[value, blinding_factor1, blinding_factor2];
-  let zero = RistrettoPoint::identity();
-  let matrix: &[&[&RistrettoPoint]] = &[
-    &[&pc_gens.B, &pc_gens.B_blinding, &zero], // value * B + blinding1 * B_blinding + 0
-    &[&pc_gens.B, &zero, &pc_gens.B_blinding], // value * B + 0 + blinding2 * B_blinding
-  ];
-  let proof = sigma_prove(transcript, prng, elems.as_slice(), matrix, secrets);
+  let identity = RistrettoPoint::get_identity();
+  let (elems, lhs_matrix, _) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
+  let secrets = [value, blinding_factor1, blinding_factor2];
+  let proof = sigma_prove(transcript, prng, elems.as_slice(), lhs_matrix.as_slice(), &secrets[..]);
 
   ChaumPedersenProof { c3: proof.commitments[0],
                        c4: proof.commitments[1],
@@ -121,14 +88,8 @@ pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(transcript: &mut Transcr
                                                         c2: &RistrettoPoint,
                                                         proof: &ChaumPedersenProof)
                                                         -> Result<(), ZeiError> {
-  let mut elems = vec![];
-  elems.push(&pc_gens.B);
-  elems.push(&pc_gens.B_blinding);
-  elems.push(c1);
-  elems.push(c2);
-  let zero = RistrettoPoint::identity();
-  let matrix: &[&[&RistrettoPoint]] = &[&[&pc_gens.B, &pc_gens.B_blinding, &zero],
-                                        &[&pc_gens.B, &zero, &pc_gens.B_blinding]];
+  let identity = RistrettoPoint::get_identity();
+  let (elems, lhs_matrix, rhs_vec) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
 
   let sigma_proof = SigmaProof { commitments: vec![proof.c3, proof.c4],
                                  responses: vec![proof.z1, proof.z2, proof.z3] };
@@ -136,8 +97,8 @@ pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(transcript: &mut Transcr
   sigma_verify::<_, Scalar, RistrettoPoint>(transcript,
                                             prng,
                                             elems.as_slice(),
-                                            matrix,
-                                            &[c1, c2],
+                                            lhs_matrix.as_slice(),
+                                            rhs_vec.as_slice(),
                                             &sigma_proof)
 }
 

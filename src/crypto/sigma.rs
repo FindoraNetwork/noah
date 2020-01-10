@@ -51,15 +51,16 @@ fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R, n: usize) -
 
 fn compute_proof_commitments<S: Scalar, G: Group<S>>(transcript: &mut Transcript,
                                                      blindings: &[S],
-                                                     lhs_matrix: &[&[&G]])
+                                                     elems: &[&G],
+                                                     lhs_matrix: &[Vec<usize>])
                                                      -> Vec<G> {
   let mut pf_commitments = vec![];
 
   for row in lhs_matrix.iter() {
     let mut pf_commitment = G::get_identity();
     assert_eq!(row.len(), blindings.len());
-    for (elem, blind) in (*row).iter().zip(blindings) {
-      pf_commitment = pf_commitment.add(&elem.mul(blind));
+    for (elem_index, blind) in (*row).iter().zip(blindings) {
+      pf_commitment = pf_commitment.add(&elems[*elem_index].mul(blind));
     }
     transcript.append_proof_commitment(&pf_commitment);
     pf_commitments.push(pf_commitment);
@@ -67,6 +68,7 @@ fn compute_proof_commitments<S: Scalar, G: Group<S>>(transcript: &mut Transcript
   pf_commitments
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SigmaProof<S, G> {
   pub(crate) commitments: Vec<G>,
   pub(crate) responses: Vec<S>,
@@ -77,13 +79,13 @@ pub struct SigmaProof<S, G> {
 pub fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
                                                                    prng: &mut R,
                                                                    elems: &[&G], // public elements of the proofs
-                                                                   lhs_matrix: &[&[&G]], // each row defines a lhs of a constraint
+                                                                   lhs_matrix: &[Vec<usize>], // each row defines a lhs of a constraint
                                                                    secret_scalars: &[&S])
                                                                    -> SigmaProof<S, G> {
   init_sigma_protocol::<S, G>(transcript, elems);
   let blindings = sample_blindings::<_, S>(prng, secret_scalars.len());
   let proof_commitments =
-    compute_proof_commitments::<S, G>(transcript, blindings.as_slice(), lhs_matrix);
+    compute_proof_commitments::<S, G>(transcript, blindings.as_slice(), elems, lhs_matrix);
 
   let challenge = transcript.get_challenge::<S>();
 
@@ -99,8 +101,8 @@ pub fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &
 #[allow(non_snake_case)]
 fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(prng: &mut R,
                                                                              elems: &[&G], // all public group elements
-                                                                             matrix: &[&[&G]], // matrix defining LHS of constrains
-                                                                             rhs: &[&G], // RHS of constrant
+                                                                             matrix: &[Vec<usize>], // matrix defining LHS of constrains
+                                                                             rhs: &[usize], // RHS of constrant
                                                                              responses: &[S], // proof challenge responses
                                                                              challenge: &S // challenge
 ) -> Vec<S> {
@@ -114,9 +116,9 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(prn
                            // find in the matrix each element and multiply corresponding response by alpha
   for (j, row) in matrix.iter().enumerate() {
     let alpha = S::random_scalar(prng);
-    for (i, E) in elems.iter().enumerate() {
-      for (M, r) in row.iter().zip(responses) {
-        if E == M {
+    for i in 0..elems.len() {
+      for (elem_index, r) in row.iter().zip(responses) {
+        if i == *elem_index {
           s[i] = s[i].add(&alpha.mul(r))
         }
       }
@@ -124,9 +126,9 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(prn
     s[n + j] = s[n + j].sub(&alpha);
     alphas.push(alpha);
   }
-  for (R, alpha) in rhs.iter().zip(alphas.iter()) {
-    for (i, E) in elems.iter().enumerate() {
-      if E == R {
+  for (elem_index, alpha) in rhs.iter().zip(alphas.iter()) {
+    for i in 0..elems.len() {
+      if i == *elem_index {
         s[i] = s[i].sub(&alpha.mul(challenge));
       }
     }
@@ -139,8 +141,8 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(prn
 pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
                                                                     prng: &mut R, //use of for linear combination multiexp
                                                                     elems: &[&G],
-                                                                    lhs_matrix: &[&[&G]],
-                                                                    rhs_vec: &[&G],
+                                                                    lhs_matrix: &[Vec<usize>],
+                                                                    rhs_vec: &[usize],
                                                                     proof: &SigmaProof<S, G>)
                                                                     -> Result<(), ZeiError> {
   assert_eq!(lhs_matrix.len(), rhs_vec.len());
@@ -192,73 +194,81 @@ mod tests {
     let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
 
     //test 1 simple dlog
-    let matrix: &[&[&RistrettoPoint]] = &[&[&G]];
+    let elems: &[&RistrettoPoint] = &[&G, &H];
+    let lhs_matrix = vec![vec![0]];
+    let rhs_vec = vec![1];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[&G, &H],
-                                        matrix,
+                                        elems,
+                                        lhs_matrix.as_slice(),
                                         &[&secret]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[&G, &H],
-                                matrix,
-                                &[&H],
+                                elems,
+                                lhs_matrix.as_slice(),
+                                rhs_vec.as_slice(),
                                 &dlog_proof).is_ok());
 
-    let bad_matrix: &[&[&RistrettoPoint]] = &[&[&H]];
+
+    let bad_matrix = vec![vec![1]];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[&G, &H],
-                                        bad_matrix,
+                                        elems,
+                                        bad_matrix.as_slice(),
                                         &[&secret]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[&G, &H],
-                                bad_matrix,
-                                &[&H],
+                                elems,
+                                bad_matrix.as_slice(),
+                                rhs_vec.as_slice(),
                                 &dlog_proof).is_err());
 
+
     // test2: two contrains, two secrets
+    // 1) H = secret * G, 2) H2 = secret2 * G
     let secret2 = Scalar::from(20u8);
     let H2 = G * secret2;
     let zero = RistrettoPoint::identity();
-    let matrix: &[&[&RistrettoPoint]] = &[&[&G, &zero], &[&zero, &G]];
+    let elems: &[&RistrettoPoint] = &[&zero, &G, &H, &H2];
+    let lhs_matrix: &[Vec<usize>] = &[vec![1, 0], vec![0, 1]];
+    let rhs_vec: &[usize] = &[2,3];
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[&G, &H, &H2],
-                                        matrix,
+                                        elems,
+                                        lhs_matrix,
                                         &[&secret, &secret2]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[&G, &H, &H2],
-                                matrix,
-                                &[&H, &H2],
+                                elems,
+                                lhs_matrix,
+                                rhs_vec,
                                 &dlog_proof).is_ok());
 
-    let matrix: &[&[&RistrettoPoint]] = &[&[&G, &G], &[&zero, &G]]; // bad row 1
+
+    let lhs_matrix: &[Vec<usize>] = &[vec![1, 1], vec![0, 1]]; // bad row 1
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[&G, &H, &H2],
-                                        matrix,
+                                        elems,
+                                        lhs_matrix,
                                         &[&secret, &secret2]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[&G, &H, &H2],
-                                matrix,
-                                &[&H, &H2],
+                                elems,
+                                lhs_matrix,
+                                rhs_vec,
                                 &dlog_proof).is_err());
 
-    let matrix: &[&[&RistrettoPoint]] = &[&[&G, &zero], &[&zero, &zero]]; // bad row 2
+    let lhs_matrix: &[Vec<usize>] = &[vec![1, 0], vec![0, 0]]; // bad row 2
     let dlog_proof = super::sigma_prove(&mut prover_transcript,
                                         &mut prng,
-                                        &[&G, &H, &H2],
-                                        matrix,
+                                        elems,
+                                        lhs_matrix,
                                         &[&secret, &secret2]);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[&G, &H, &H2],
-                                matrix,
-                                &[&H, &H2],
+                                elems,
+                                lhs_matrix,
+                                rhs_vec,
                                 &dlog_proof).is_err());
 
     // test3: two constarains, 5 secrets
@@ -268,32 +278,34 @@ mod tests {
     let Z1 = G * secret + H * secret2;
     let Z2 = G * secret3 + H * secret4 + H2 * secret5;
 
-    let matrix: &[&[&RistrettoPoint]] =
-      &[&[&G, &H, &zero, &zero, &zero], &[&zero, &zero, &G, &H, &H2]];
+    let elems = &[&zero, &G, &H, &H2, &Z1, &Z2];
+    let matrix: &[Vec<usize>] =
+      &[vec![1, 2, 0, 0, 0], vec![0, 0, 1, 2, 3]];
+    let rhs_vec = &[4,5];
     let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &secret5];
-    let dlog_proof = super::sigma_prove(&mut prover_transcript,
-                                        &mut prng,
-                                        &[&G, &H, &H2, &Z1, &Z2],
-                                        matrix,
-                                        secrets);
+    let proof = super::sigma_prove(&mut prover_transcript,
+                                   &mut prng,
+                                   elems,
+                                   matrix,
+                                   secrets);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[&G, &H, &H2, &Z1, &Z2],
+                                elems,
                                 matrix,
-                                &[&Z1, &Z2],
-                                &dlog_proof).is_ok());
+                                rhs_vec,
+                                &proof).is_ok());
 
     let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::zero()]; // bad secrets
-    let dlog_proof = super::sigma_prove(&mut prover_transcript,
-                                        &mut prng,
-                                        &[&G, &H, &H2, &Z1, &Z2],
-                                        matrix,
-                                        secrets);
+    let proof = super::sigma_prove(&mut prover_transcript,
+                                   &mut prng,
+                                   elems,
+                                   matrix,
+                                   secrets);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,
-                                &[&G, &H, &H2, &Z1, &Z2],
+                                elems,
                                 matrix,
-                                &[&Z1, &Z2],
-                                &dlog_proof).is_err());
+                                rhs_vec,
+                                &proof).is_err());
   }
 }

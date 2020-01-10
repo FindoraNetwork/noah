@@ -22,7 +22,6 @@ pub enum ZeiError {
   XfrVerifyConfidentialAmountError,
   ElGamalVerificationError,
   ElGamalDecryptionError,
-  VerifyPedersenElGamalEqError,
   IdentityRevealVerifyError,
   AssetMixerVerificationError,
   XfrNotSupported,
@@ -76,9 +75,6 @@ impl fmt::Display for ZeiError {
                     "ElGamal Ciphertext not valid for proposed scalar message"
                   }
                   ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
-                  ZeiError::VerifyPedersenElGamalEqError => {
-                    "Wrong proof for Pedersen Commitment ElGamal equality proof"
-                  }
                   ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
                   ZeiError::IdentityRevealVerifyError => {
                     "Verification error for confidential identity reveal proof"
@@ -139,9 +135,6 @@ impl error::Error for ZeiError {
         "ElGamal Ciphertext not valid for proposed scalar message"
       }
       ZeiError::ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
-      ZeiError::VerifyPedersenElGamalEqError => {
-        "Wrong proof for Pedersen Commitment ElGamal equality proof"
-      }
       ZeiError::InconsistentStructureError => "Zei Structure is inconsistent",
       ZeiError::IdentityRevealVerifyError => {
         "Verification error for confidential identity reveal proof"
