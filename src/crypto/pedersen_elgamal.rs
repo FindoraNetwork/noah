@@ -160,11 +160,11 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(transcript: &
                                         ctexts.iter(),
                                         commitments.iter())
   {
-    lc_m = lc_m + xi * mi;
-    lc_r = lc_r + xi * ri;
-    lc_e1 = lc_e1 + xi * ctext.e1;
-    lc_e2 = lc_e2 + xi * ctext.e2;
-    lc_c = lc_c + xi * com;
+    lc_m += xi * mi;
+    lc_r += xi * ri;
+    lc_e1 += xi * ctext.e1;
+    lc_e2 += xi * ctext.e2;
+    lc_c += xi * com;
   }
   let lc_ctext = ElGamalCiphertext { e1: lc_e1,
                                      e2: lc_e2 };
@@ -192,9 +192,9 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(transcript: 
   let mut lc_e2 = RistrettoPoint::identity();
   let mut lc_c = RistrettoPoint::identity();
   for (xi, ei, ci) in izip!(x.iter(), ctexts.iter(), commitments.iter()) {
-    lc_e1 = lc_e1 + xi * ei.e1;
-    lc_e2 = lc_e2 + xi * ei.e2;
-    lc_c = lc_c + xi * ci;
+    lc_e1 += xi * ei.e1;
+    lc_e2 += xi * ei.e2;
+    lc_c += xi * ci;
   }
   let lc_e = ElGamalCiphertext { e1: lc_e1,
                                  e2: lc_e2 };

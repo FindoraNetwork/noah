@@ -60,11 +60,13 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(transcript: &mut Transcri
                                                        prng: &mut R,
                                                        pc_gens: &PedersenGens,
                                                        value: &Scalar,
-                                                       c1: &RistrettoPoint,
-                                                       c2: &RistrettoPoint,
-                                                       blinding_factor1: &Scalar,
-                                                       blinding_factor2: &Scalar)
-                                                       -> ChaumPedersenProof {
+                                                       com1: (&RistrettoPoint, &Scalar), // commitment and blinding
+                                                       com2: (&RistrettoPoint, &Scalar) // commitment and blinding
+) -> ChaumPedersenProof {
+  let c1 = com1.0;
+  let c2 = com2.0;
+  let blinding_factor1 = com1.1;
+  let blinding_factor2 = com2.1;
   let identity = RistrettoPoint::get_identity();
   let (elems, lhs_matrix, _) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
   let secrets = [value, blinding_factor1, blinding_factor2];
@@ -148,10 +150,8 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
                                             prng,
                                             pc_gens,
                                             value,
-                                            &commitments[0],
-                                            &commitments[1],
-                                            &blinding_factors[0],
-                                            &blinding_factors[1]);
+                                            (&commitments[0], &blinding_factors[0]),
+                                            (&commitments[1], &blinding_factors[1]));
 
   if commitments.len() == 2 {
     return Ok(ChaumPedersenProofX { c1_eq_c2: proof_c0_c1,
@@ -179,10 +179,9 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
                                            prng,
                                            pc_gens,
                                            &Scalar::from(0u8),
-                                           &d,
-                                           &get_fake_zero_commitment(),
-                                           &z,
-                                           &get_fake_zero_commitment_blinding());
+                                           (&d, &z),
+                                           (&get_fake_zero_commitment(),
+                                            &get_fake_zero_commitment_blinding()));
   Ok(ChaumPedersenProofX { c1_eq_c2: proof_c0_c1,
                            zero: Some(proof_zero) })
 }
@@ -262,10 +261,8 @@ mod test {
                                         &mut csprng,
                                         &pc_gens,
                                         &value1,
-                                        &c1,
-                                        &c2,
-                                        &bf1,
-                                        &bf2);
+                                        (&c1, &bf1),
+                                        (&c2, &bf2));
 
     let mut verifier_transcript = Transcript::new(b"test");
     assert_eq!(Err(ZeiError::ZKProofVerificationError),
@@ -281,10 +278,8 @@ mod test {
                                         &mut csprng,
                                         &pc_gens,
                                         &value2,
-                                        &c1,
-                                        &c2,
-                                        &bf1,
-                                        &bf2);
+                                        (&c1, &bf2),
+                                        (&c2, &bf2));
     let mut verifier_transcript = Transcript::new(b"test");
     assert_eq!(Err(ZeiError::ZKProofVerificationError),
                chaum_pedersen_verify_eq(&mut verifier_transcript,
@@ -300,10 +295,8 @@ mod test {
                                         &mut csprng,
                                         &pc_gens,
                                         &value1,
-                                        &c1,
-                                        &c3,
-                                        &bf1,
-                                        &bf2);
+                                        (&c1, &bf1),
+                                        (&c3, &bf2));
     let mut verifier_transcript = Transcript::new(b"test");
     assert!(chaum_pedersen_verify_eq(&mut verifier_transcript,
                                      &mut csprng,

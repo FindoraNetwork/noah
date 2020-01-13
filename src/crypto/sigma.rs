@@ -99,6 +99,7 @@ pub fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &
 }
 
 #[allow(non_snake_case)]
+#[allow(clippy::needless_range_loop)]
 fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(prng: &mut R,
                                                                              elems: &[&G], // all public group elements
                                                                              matrix: &[Vec<usize>], // matrix defining LHS of constrains
@@ -167,9 +168,10 @@ pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: 
     me_elems.push(e.clone());
   }
   let result = G::vartime_multi_exp(me_scalars.as_slice(), me_elems.as_slice());
-  match result != G::get_identity() {
-    true => Err(ZeiError::ZKProofVerificationError),
-    false => Ok(()),
+  if result != G::get_identity() {
+    Err(ZeiError::ZKProofVerificationError)
+  } else {
+    Ok(())
   }
 }
 
