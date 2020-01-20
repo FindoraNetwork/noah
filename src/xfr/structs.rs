@@ -173,6 +173,7 @@ impl Eq for XfrRangeProof {}
 mod test {
   use super::{XfrBody, XfrNote, XfrProofs};
   use crate::xfr::lib::tests::create_xfr;
+  use crate::xfr::lib::XfrType;
   use crate::xfr::sig::XfrMultiSig;
   use crate::xfr::structs::{AssetAmountProof, AssetTrackingProofs};
   use rand_chacha::ChaChaRng;
@@ -181,9 +182,7 @@ mod test {
   use serde::de::Deserialize;
   use serde::ser::Serialize;
 
-  fn do_test_serialization(confidential_amount: bool,
-                           confidential_asset: bool,
-                           asset_tracking: bool) {
+  fn do_test_serialization(xfr_type: XfrType, asset_tracking: bool) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
     let asset_type = [0u8; 16];
@@ -197,8 +196,7 @@ mod test {
     let (xfr_note, _, _, _, _) = create_xfr(&mut prng,
                                             &input_amount,
                                             &out_amount,
-                                            confidential_amount,
-                                            confidential_asset,
+                                            xfr_type,
                                             asset_tracking);
 
     //serializing signatures
@@ -267,11 +265,17 @@ mod test {
 
   #[test]
   fn test_serialization() {
-    do_test_serialization(false, false, false);
-    do_test_serialization(false, true, false);
-    do_test_serialization(true, false, false);
-    do_test_serialization(true, true, false);
-    do_test_serialization(true, false, true);
-    do_test_serialization(true, true, true);
+    do_test_serialization(XfrType::PublicAmount_PublicAssetType_SingleAsset, false);
+    do_test_serialization(XfrType::PublicAmount_ConfidentialAssetType_SingleAsset,
+                          false);
+    do_test_serialization(XfrType::ConfidentialAmount_PublicAssetType_SingleAsset,
+                          false);
+    do_test_serialization(XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+                          false);
+
+    do_test_serialization(XfrType::ConfidentialAmount_PublicAssetType_SingleAsset,
+                          true);
+    do_test_serialization(XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+                          true);
   }
 }

@@ -2,7 +2,7 @@ use crate::api::conf_cred_reveal::ConfidentialAC;
 use crate::errors::ZeiError;
 use crate::utils::u8_bigendian_slice_to_u128;
 use crate::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify, AssetMixProof};
-use crate::xfr::asset_record::build_open_asset_record;
+use crate::xfr::asset_record::{build_open_asset_record, AssetRecordType};
 use crate::xfr::proofs::{
   asset_proof, range_proof, tracking_proofs, verify_confidential_amount, verify_confidential_asset,
   verify_issuer_tracking_proof,
@@ -18,6 +18,52 @@ use std::collections::HashMap;
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
+#[derive(Clone, Copy)]
+#[allow(non_camel_case_types)]
+pub enum XfrType {
+  PublicAmount_PublicAssetType_SingleAsset,
+  ConfidentialAmount_PublicAssetType_SingleAsset,
+  PublicAmount_ConfidentialAssetType_SingleAsset,
+  ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+  ConfidentialAmount_ConfidentialAssetType_MultiAsset,
+  PublicAmount_PublicAssetType_MultiAsset,
+}
+
+impl From<AssetRecordType> for XfrType {
+  fn from(record: AssetRecordType) -> XfrType {
+    match record {
+      AssetRecordType::PublicAmount_PublicAssetType => {
+        XfrType::PublicAmount_PublicAssetType_SingleAsset
+      }
+      AssetRecordType::PublicAmount_ConfidentialAssetType => {
+        XfrType::PublicAmount_ConfidentialAssetType_SingleAsset
+      }
+      AssetRecordType::ConfidentialAmount_PublicAssetType => {
+        XfrType::ConfidentialAmount_PublicAssetType_SingleAsset
+      }
+      AssetRecordType::ConfidentialAmount_ConfidentialAssetType => {
+        XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset
+      }
+    }
+  }
+}
+
+impl XfrType {
+  /// Return (true,_) if amount is confidential,
+  /// Return (_,false) if type is confidential,
+  pub fn get_booleans(self) -> (bool, bool) {
+    // confidential amount, confidential asset
+    match self {
+      XfrType::PublicAmount_PublicAssetType_SingleAsset => (false, false),
+      XfrType::ConfidentialAmount_PublicAssetType_SingleAsset => (true, false),
+      XfrType::PublicAmount_ConfidentialAssetType_SingleAsset => (false, true),
+      XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset => (true, true),
+      XfrType::PublicAmount_PublicAssetType_MultiAsset => (false, false),
+      XfrType::ConfidentialAmount_ConfidentialAssetType_MultiAsset => (true, true),
+    }
+  }
+}
+
 /// I Create a XfrNote from list of opened asset records inputs and asset record outputs
 /// # Example
 /// ```
@@ -26,7 +72,7 @@ const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 /// use bulletproofs::PedersenGens;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
-/// use zei::xfr::asset_record::build_open_asset_record;
+/// use zei::xfr::asset_record::{build_open_asset_record, AssetRecordType};
 /// use zei::xfr::lib::gen_xfr_note;
 ///
 /// let mut prng: ChaChaRng;
@@ -40,8 +86,6 @@ const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 ///                     (2u64, asset_type),
 ///                     (3u64, asset_type),
 ///                      (24u64, asset_type)];
-/// let confidential_amount = false;
-/// let confidential_asset = false;
 /// let issuer_public_key = None;
 ///
 /// let mut inputs = vec![];
@@ -60,8 +104,7 @@ const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 ///   inputs.push(build_open_asset_record(&mut prng,
 ///                                        &pc_gens,
 ///                                        &asset_record,
-///                                        confidential_amount,
-///                                        confidential_asset,
+///                                        AssetRecordType::PublicAmount_PublicAssetType,
 ///                                        &issuer_public_key));
 ///
 ///   in_asset_records.push(asset_record);
@@ -112,7 +155,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// use bulletproofs::PedersenGens;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
-/// use zei::xfr::asset_record::build_open_asset_record;
+/// use zei::xfr::asset_record::{build_open_asset_record, AssetRecordType};
 /// use zei::xfr::lib::gen_xfr_body;
 ///
 /// let mut prng: ChaChaRng;
@@ -126,8 +169,6 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 ///                     (2u64, asset_type),
 ///                     (3u64, asset_type),
 ///                      (24u64, asset_type)];
-/// let confidential_amount = false;
-/// let confidential_asset = false;
 /// let issuer_public_key = None;
 ///
 /// let mut inputs = vec![];
@@ -146,8 +187,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 ///   inputs.push(build_open_asset_record(&mut prng,
 ///                                        &pc_gens,
 ///                                        &asset_record,
-///                                        confidential_amount,
-///                                        confidential_asset,
+///                                        AssetRecordType::PublicAmount_PublicAssetType,
 ///                                        &issuer_public_key));
 ///
 ///   in_asset_records.push(asset_record);
@@ -181,28 +221,32 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
 
   let single_asset = check_asset_amount(inputs, outputs)?;
 
+  let xfr_type = match (confidential_amount, confidential_asset, single_asset) {
+    (true, true, true) => XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+    (true, false, true) => XfrType::ConfidentialAmount_PublicAssetType_SingleAsset,
+    (false, true, true) => XfrType::PublicAmount_ConfidentialAssetType_SingleAsset,
+    (false, false, true) => XfrType::PublicAmount_PublicAssetType_SingleAsset,
+    (true, true, false) => XfrType::ConfidentialAmount_ConfidentialAssetType_MultiAsset,
+    (false, false, false) => XfrType::PublicAmount_PublicAssetType_MultiAsset,
+    _ => {
+      return Err(ZeiError::ParameterError);
+    } // xfr cannot be multi asset and non confidential
+  };
+
   let open_outputs: Vec<OpenAssetRecord> = outputs.iter()
                                                   .map(|asset_record| {
                                                     build_open_asset_record(prng,
-                                                                            &pc_gens,
-                                                                            asset_record,
-                                                                            confidential_amount,
-                                                                            confidential_asset,
-                                                                            issuer_pk)
+                                     &pc_gens,
+                                     asset_record,
+                                     AssetRecordType::from(xfr_type),
+                                     issuer_pk)
                                                   })
                                                   .collect();
 
   let asset_amount_proof = if single_asset {
-    gen_xfr_proofs_single_asset(prng,
-                                inputs,
-                                open_outputs.as_slice(),
-                                confidential_amount,
-                                confidential_asset)?
+    gen_xfr_proofs_single_asset(prng, inputs, open_outputs.as_slice(), xfr_type)?
   } else {
-    gen_xfr_proofs_multi_asset(inputs,
-                               open_outputs.as_slice(),
-                               confidential_amount,
-                               confidential_asset)?
+    gen_xfr_proofs_multi_asset(inputs, open_outputs.as_slice(), xfr_type)?
   };
 
   //do tracking proofs
@@ -286,8 +330,7 @@ fn get_issuer_pk(inputs: &[OpenAssetRecord]) -> Result<&Option<AssetIssuerPubKey
 fn gen_xfr_proofs_multi_asset(//prng: &mut R,
                               inputs: &[OpenAssetRecord],
                               outputs: &[OpenAssetRecord],
-                              confidential_amount: bool,
-                              confidential_asset: bool)
+                              xfr_type: XfrType)
                               -> Result<AssetAmountProof, ZeiError> {
   let pow2_32 = Scalar::from(POW_2_32);
 
@@ -312,47 +355,37 @@ fn gen_xfr_proofs_multi_asset(//prng: &mut R,
               x.type_blind.0));
   }
 
-  if confidential_asset && confidential_amount {
-    let mix_proof = asset_mixer_proof(ins.as_slice(), out.as_slice())?;
-    return Ok(AssetAmountProof::AssetMix(mix_proof));
+  match xfr_type {
+    XfrType::ConfidentialAmount_ConfidentialAssetType_MultiAsset => {
+      let mix_proof = asset_mixer_proof(ins.as_slice(), out.as_slice())?;
+      Ok(AssetAmountProof::AssetMix(mix_proof))
+    }
+    XfrType::PublicAmount_PublicAssetType_MultiAsset => Ok(AssetAmountProof::NoProof),
+    _ => Err(ZeiError::XfrCreationAssetAmountError),
   }
-  if !confidential_asset && !confidential_amount {
-    return Ok(AssetAmountProof::NoProof);
-  }
-  Err(ZeiError::XfrCreationAssetAmountError)
 }
 
 fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(prng: &mut R,
                                                        inputs: &[OpenAssetRecord],
                                                        outputs: &[OpenAssetRecord],
-                                                       confidential_amount: bool,
-                                                       confidential_asset: bool)
+                                                       xfr_type: XfrType)
                                                        -> Result<AssetAmountProof, ZeiError> {
   let pc_gens = PedersenGens::default();
 
-  let xfr_range_proof = if confidential_amount {
-    Some(range_proof(inputs, outputs)?)
-  } else {
-    None
-  };
-
-  let xfr_asset_proof = if confidential_asset {
-    Some(asset_proof(prng, &pc_gens, inputs, outputs)?)
-  } else {
-    None
-  };
-
-  if xfr_range_proof.is_none() && xfr_asset_proof.is_none() {
-    return Ok(AssetAmountProof::NoProof);
+  match xfr_type {
+    XfrType::PublicAmount_PublicAssetType_SingleAsset => Ok(AssetAmountProof::NoProof),
+    XfrType::ConfidentialAmount_PublicAssetType_SingleAsset => {
+      Ok(AssetAmountProof::ConfAmount(range_proof(inputs, outputs)?))
+    }
+    XfrType::PublicAmount_ConfidentialAssetType_SingleAsset => {
+      Ok(AssetAmountProof::ConfAsset(asset_proof(prng, &pc_gens, inputs, outputs)?))
+    }
+    XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset => {
+      Ok(AssetAmountProof::ConfAll((range_proof(inputs, outputs)?,
+                                    asset_proof(prng, &pc_gens, inputs, outputs)?)))
+    }
+    _ => Err(ZeiError::XfrCreationAssetAmountError), // Type cannot be multi asset
   }
-  if xfr_range_proof.is_none() {
-    return Ok(AssetAmountProof::ConfAsset(xfr_asset_proof.unwrap()));
-  }
-  if xfr_asset_proof.is_none() {
-    return Ok(AssetAmountProof::ConfAmount(xfr_range_proof.unwrap()));
-  }
-
-  Ok(AssetAmountProof::ConfAll((xfr_range_proof.unwrap(), xfr_asset_proof.unwrap())))
 }
 
 fn check_asset_amount(inputs: &[OpenAssetRecord],
@@ -432,7 +465,7 @@ pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// use bulletproofs::PedersenGens;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::AssetRecord;
-/// use zei::xfr::asset_record::build_open_asset_record;
+/// use zei::xfr::asset_record::{build_open_asset_record, AssetRecordType};
 /// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note};
 ///
 /// let mut prng: ChaChaRng;
@@ -468,8 +501,7 @@ pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 ///   inputs.push(build_open_asset_record(&mut prng,
 ///                                        &pc_gens,
 ///                                        &asset_record,
-///                                        confidential_amount,
-///                                        confidential_asset,
+///                                        AssetRecordType::PublicAmount_PublicAssetType,
 ///                                        &issuer_public_key));
 ///
 ///   in_asset_records.push(asset_record);
@@ -660,8 +692,7 @@ pub(crate) mod tests {
     prng: &mut ChaChaRng,
     input_amounts: &[(u64, AssetType)],
     output_amounts: &[(u64, AssetType)],
-    confidential_amount: bool,
-    confidential_asset: bool,
+    xfr_type: XfrType,
     asset_tracking: bool)
     -> (XfrNote, Vec<XfrKeyPair>, Vec<OpenAssetRecord>, Vec<AssetRecord>, Vec<XfrKeyPair>) {
     let pc_gens = PedersenGens::default();
@@ -693,8 +724,7 @@ pub(crate) mod tests {
       inputs.push(build_open_asset_record(prng,
                                           &pc_gens,
                                           &asset_record,
-                                          confidential_amount,
-                                          confidential_asset,
+                                          AssetRecordType::from(xfr_type),
                                           &issuer_public_key));
 
       in_asset_records.push(asset_record);
@@ -722,7 +752,7 @@ pub(crate) mod tests {
     (xfr_note, inkeys, inputs, outputs, outkeys)
   }
 
-  fn do_transfer_tests(confidential_amount: bool, confidential_asset: bool, asset_tracking: bool) {
+  fn do_transfer_tests(xfr_type: XfrType, asset_tracking: bool) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
     let asset_type = [0u8; 16];
@@ -738,8 +768,7 @@ pub(crate) mod tests {
     let tuple = create_xfr(&mut prng,
                            &input_amount,
                            &out_amount,
-                           confidential_amount,
-                           confidential_asset,
+                           xfr_type,
                            asset_tracking);
 
     let xfr_note = tuple.0;
@@ -752,6 +781,9 @@ pub(crate) mod tests {
       null_policies.push(None);
       id_proofs.push(None);
     }
+
+    let (confidential_amount, confidential_asset) = xfr_type.get_booleans();
+    let record_type = AssetRecordType::from(xfr_type);
 
     // test 1: simple transfer
     assert_eq!(Ok(()),
@@ -858,8 +890,7 @@ pub(crate) mod tests {
     inputs[1] = build_open_asset_record(&mut prng,
                                         &pc_gens,
                                         &ar,
-                                        confidential_amount,
-                                        confidential_asset,
+                                        record_type,
                                         &inputs[1].asset_record.issuer_public_key);
     let xfr_note = gen_xfr_note(&mut prng,
                                 inputs.as_slice(),
@@ -879,8 +910,7 @@ pub(crate) mod tests {
     inputs[1] = build_open_asset_record(&mut prng,
                                         &pc_gens,
                                         &ar,
-                                        confidential_amount,
-                                        confidential_asset,
+                                        record_type,
                                         &inputs[1].asset_record.issuer_public_key);
     let mut xfr_note = gen_xfr_note(&mut prng,
                                     inputs.as_slice(),
@@ -1007,33 +1037,37 @@ pub(crate) mod tests {
   #[test]
   fn test_transfer_not_confidential() {
     /*! I test non confidential transfers*/
-    do_transfer_tests(false, false, false);
+    do_transfer_tests(XfrType::PublicAmount_PublicAssetType_SingleAsset, false);
   }
 
   #[test]
   fn test_transfer_confidential_amount_plain_asset() {
     /*! I test confidential amount transfers*/
-    do_transfer_tests(true, false, false);
-    do_transfer_tests(true, false, true);
+    do_transfer_tests(XfrType::ConfidentialAmount_PublicAssetType_SingleAsset,
+                      false);
+    do_transfer_tests(XfrType::ConfidentialAmount_PublicAssetType_SingleAsset,
+                      true);
   }
 
   #[test]
   fn test_transfer_confidential_asset_plain_amount() {
     /*! I test confidential asset transfers*/
-    do_transfer_tests(false, true, false);
-    do_transfer_tests(false, true, true);
+    do_transfer_tests(XfrType::PublicAmount_ConfidentialAssetType_SingleAsset,
+                      false);
+    do_transfer_tests(XfrType::PublicAmount_ConfidentialAssetType_SingleAsset,
+                      true);
   }
 
   #[test]
   fn test_transfer_confidential() {
     /*! I test confidential amount and confidential asset transfers*/
-    do_transfer_tests(true, true, false);
-    do_transfer_tests(true, true, true);
+    do_transfer_tests(XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+                      false);
+    do_transfer_tests(XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+                      true);
   }
 
-  fn do_test_transfer_multisig(confidential_amount: bool,
-                               confidential_asset: bool,
-                               asset_tracking: bool) {
+  fn do_test_transfer_multisig(xfr_type: XfrType, asset_tracking: bool) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
 
@@ -1049,22 +1083,27 @@ pub(crate) mod tests {
     let (xfr_note, _, _, _, _) = create_xfr(&mut prng,
                                             &input_amount,
                                             &out_amount,
-                                            confidential_amount,
-                                            confidential_asset,
+                                            xfr_type,
                                             asset_tracking);
     assert_eq!(Ok(()), verify_transfer_multisig(&xfr_note));
   }
 
   #[test]
   fn test_transfer_multisig() {
-    do_test_transfer_multisig(false, false, false);
-    do_test_transfer_multisig(false, true, false);
-    do_test_transfer_multisig(true, false, false);
-    do_test_transfer_multisig(true, true, false);
-    do_test_transfer_multisig(false, false, true);
-    do_test_transfer_multisig(false, true, true);
-    do_test_transfer_multisig(true, false, true);
-    do_test_transfer_multisig(true, true, true);
+    do_test_transfer_multisig(XfrType::PublicAmount_PublicAssetType_SingleAsset, false);
+    do_test_transfer_multisig(XfrType::PublicAmount_ConfidentialAssetType_SingleAsset,
+                              false);
+    do_test_transfer_multisig(XfrType::ConfidentialAmount_PublicAssetType_SingleAsset,
+                              false);
+    do_test_transfer_multisig(XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+                              false);
+    do_test_transfer_multisig(XfrType::PublicAmount_PublicAssetType_SingleAsset, true);
+    do_test_transfer_multisig(XfrType::PublicAmount_ConfidentialAssetType_SingleAsset,
+                              true);
+    do_test_transfer_multisig(XfrType::ConfidentialAmount_PublicAssetType_SingleAsset,
+                              true);
+    do_test_transfer_multisig(XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+                              true);
   }
 
   #[test]
@@ -1087,8 +1126,7 @@ pub(crate) mod tests {
     let input = build_open_asset_record(&mut prng,
                                         &pc_gens,
                                         &asset_record,
-                                        true,
-                                        true,
+                                        AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
                                         &asset_issuer_public_key);
 
     let output = AssetRecord { amount: 10,
@@ -1161,7 +1199,11 @@ pub(crate) mod tests {
                       (20u64, asset_type0)];
 
     let (xfr_note, _, _, _, _) =
-      create_xfr(&mut prng, &input_amount, &out_amount, true, true, false);
+      create_xfr(&mut prng,
+                 &input_amount,
+                 &out_amount,
+                 XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset,
+                 false);
 
     let mut null_policies = vec![];
 
@@ -1176,7 +1218,11 @@ pub(crate) mod tests {
 
     //test 2: non confidential
     let (mut xfr_note, inkeys, _, _, _) =
-      create_xfr(&mut prng, &input_amount, &out_amount, false, false, false);
+      create_xfr(&mut prng,
+                 &input_amount,
+                 &out_amount,
+                 XfrType::PublicAmount_PublicAssetType_SingleAsset,
+                 false);
 
     assert_eq!(Ok(()),
                verify_xfr_note(&mut prng, &xfr_note, &null_policies),
@@ -1210,7 +1256,11 @@ pub(crate) mod tests {
                                        asset_type: x.1,
                                        public_key: keypair.get_pk_ref().clone() };
 
-      inputs.push(build_open_asset_record(&mut prng, &pc_gens, &asset_record, false, false, &None));
+      inputs.push(build_open_asset_record(&mut prng,
+                                          &pc_gens,
+                                          &asset_record,
+                                          AssetRecordType::PublicAmount_PublicAssetType,
+                                          &None));
 
       in_asset_records.push(asset_record);
       inkeys.push(keypair);

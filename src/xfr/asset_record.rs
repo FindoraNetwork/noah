@@ -6,6 +6,7 @@ use crate::errors::ZeiError;
 use crate::utils::{
   u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u128, u8_bigendian_slice_to_u64,
 };
+use crate::xfr::lib::XfrType;
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
 use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, BlindAssetRecord, OpenAssetRecord};
 use bulletproofs::PedersenGens;
@@ -15,12 +16,59 @@ use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 
+#[derive(Clone, Copy)]
+#[allow(non_camel_case_types)]
+pub enum AssetRecordType {
+  PublicAmount_ConfidentialAssetType,
+  ConfidentialAmount_PublicAssetType,
+  ConfidentialAmount_ConfidentialAssetType,
+  PublicAmount_PublicAssetType,
+}
+
+impl From<XfrType> for AssetRecordType {
+  fn from(record: XfrType) -> AssetRecordType {
+    match record {
+      XfrType::PublicAmount_PublicAssetType_SingleAsset => {
+        AssetRecordType::PublicAmount_PublicAssetType
+      }
+      XfrType::PublicAmount_ConfidentialAssetType_SingleAsset => {
+        AssetRecordType::PublicAmount_ConfidentialAssetType
+      }
+      XfrType::ConfidentialAmount_PublicAssetType_SingleAsset => {
+        AssetRecordType::ConfidentialAmount_PublicAssetType
+      }
+      XfrType::ConfidentialAmount_ConfidentialAssetType_SingleAsset => {
+        AssetRecordType::ConfidentialAmount_ConfidentialAssetType
+      }
+      XfrType::ConfidentialAmount_ConfidentialAssetType_MultiAsset => {
+        AssetRecordType::ConfidentialAmount_ConfidentialAssetType
+      }
+      XfrType::PublicAmount_PublicAssetType_MultiAsset => {
+        AssetRecordType::PublicAmount_PublicAssetType
+      }
+    }
+  }
+}
+
+impl AssetRecordType {
+  /// Return (true,_) if amount is confidential,
+  /// Return (_,false) if type is confidential,
+  pub fn get_booleans(self) -> (bool, bool) {
+    // confidential amount, confidential asset
+    match self {
+      AssetRecordType::PublicAmount_PublicAssetType => (false, false),
+      AssetRecordType::ConfidentialAmount_PublicAssetType => (true, false),
+      AssetRecordType::PublicAmount_ConfidentialAssetType => (false, true),
+      AssetRecordType::ConfidentialAmount_ConfidentialAssetType => (true, true),
+    }
+  }
+}
+
 fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   asset_record: &AssetRecord,
-  confidential_amount: bool,
-  confidential_asset: bool,
+  record_type: AssetRecordType,
   issuer_public_key: &Option<AssetIssuerPubKeys>)
   -> (BlindAssetRecord, (RistScalar, RistScalar), RistScalar) {
   let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type[..]);
@@ -31,6 +79,13 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   let amount_blind_high = compute_blind_factor(&derived_point, "amount_high");
   let (amount_low, amount_high) = u64_to_u32_pair(asset_record.amount);
   let mut amount_type_bytes = vec![];
+
+  let (confidential_amount, confidential_asset) = match record_type {
+    AssetRecordType::PublicAmount_PublicAssetType => (false, false),
+    AssetRecordType::ConfidentialAmount_PublicAssetType => (true, false),
+    AssetRecordType::PublicAmount_ConfidentialAssetType => (false, true),
+    AssetRecordType::ConfidentialAmount_ConfidentialAssetType => (true, true),
+  };
 
   // build amount fields
   let (bar_amount, bar_amount_commitments, amount_blinds) = if confidential_amount {
@@ -119,17 +174,11 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 pub fn build_open_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
                                                        pc_gens: &PedersenGens,
                                                        asset_record: &AssetRecord,
-                                                       confidential_amount: bool,
-                                                       confidential_asset: bool,
+                                                       record_type: AssetRecordType,
                                                        issuer_public_key: &Option<AssetIssuerPubKeys> //none if no tracking is required
 ) -> OpenAssetRecord {
   let (blind_asset_record, amount_blinds, type_blind) =
-    sample_blind_asset_record(prng,
-                              pc_gens,
-                              asset_record,
-                              confidential_amount,
-                              confidential_asset,
-                              issuer_public_key);
+    sample_blind_asset_record(prng, pc_gens, asset_record, record_type, issuer_public_key);
 
   let open_asset_record = OpenAssetRecord { asset_record: blind_asset_record,
                                             amount: asset_record.amount,
@@ -144,16 +193,11 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
 pub fn build_blind_asset_record<R: CryptoRng + RngCore>(prng: &mut R,
                                                         pc_gens: &PedersenGens,
                                                         asset_record: &AssetRecord,
-                                                        confidential_amount: bool,
-                                                        confidential_asset: bool,
+                                                        record_type: AssetRecordType,
                                                         issuer_public_key: &Option<AssetIssuerPubKeys> //none if no tracking is required
 ) -> BlindAssetRecord {
-  let (blind_asset_record, _, _) = sample_blind_asset_record(prng,
-                                                             pc_gens,
-                                                             asset_record,
-                                                             confidential_amount,
-                                                             confidential_asset,
-                                                             issuer_public_key);
+  let (blind_asset_record, _, _) =
+    sample_blind_asset_record(prng, pc_gens, asset_record, record_type, issuer_public_key);
 
   blind_asset_record
 }
@@ -238,7 +282,9 @@ mod test {
   use crate::algebra::ristretto::{CompRist, RistPoint};
   use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalPublicKey};
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
+  use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::lib::tests::create_xfr;
+  use crate::xfr::lib::XfrType;
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{AssetIssuerPubKeys, AssetRecord, AssetType, OpenAssetRecord};
   use bulletproofs::PedersenGens;
@@ -248,9 +294,7 @@ mod test {
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
-  fn do_test_build_open_asset_record(confidential_amount: bool,
-                                     confidential_asset: bool,
-                                     asset_tracking: bool) {
+  fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracking: bool) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
@@ -277,8 +321,7 @@ mod test {
     let open_ar = build_open_asset_record(&mut prng,
                                           &pc_gens,
                                           &asset_record,
-                                          confidential_amount,
-                                          confidential_asset,
+                                          record_type,
                                           &issuer_public_key);
 
     assert_eq!(amount, open_ar.amount);
@@ -290,6 +333,7 @@ mod test {
     let mut expected_bar_amount_commitment = None;
     let mut expected_bar_asset_type_commitment = None;
 
+    let (confidential_amount, confidential_asset) = record_type.get_booleans();
     if confidential_amount {
       let (low, high) = u64_to_u32_pair(amount);
       let commitment_low = pc_gens.commit(Scalar::from(low), (open_ar.amount_blinds.0).0)
@@ -335,19 +379,19 @@ mod test {
 
   #[test]
   fn test_build_open_asset_record() {
-    do_test_build_open_asset_record(false, false, false);
-    do_test_build_open_asset_record(false, true, false);
-    do_test_build_open_asset_record(true, false, false);
-    do_test_build_open_asset_record(true, true, false);
-    do_test_build_open_asset_record(false, false, true);
-    do_test_build_open_asset_record(false, true, true);
-    do_test_build_open_asset_record(true, false, true);
-    do_test_build_open_asset_record(true, true, true);
+    do_test_build_open_asset_record(AssetRecordType::PublicAmount_PublicAssetType, false);
+    do_test_build_open_asset_record(AssetRecordType::PublicAmount_PublicAssetType, true);
+    do_test_build_open_asset_record(AssetRecordType::PublicAmount_ConfidentialAssetType, false);
+    do_test_build_open_asset_record(AssetRecordType::PublicAmount_ConfidentialAssetType, true);
+    do_test_build_open_asset_record(AssetRecordType::ConfidentialAmount_PublicAssetType, false);
+    do_test_build_open_asset_record(AssetRecordType::ConfidentialAmount_PublicAssetType, true);
+    do_test_build_open_asset_record(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+                                    false);
+    do_test_build_open_asset_record(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+                                    true);
   }
 
-  fn do_test_open_asset_record(confidential_amount: bool,
-                               confidential_asset: bool,
-                               asset_tracking: bool) {
+  fn do_test_open_asset_record(record_type: AssetRecordType, asset_tracking: bool) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
@@ -359,8 +403,7 @@ mod test {
     let (xfr_note, _, _, _, outkeys) = create_xfr(&mut prng,
                                                   &input_amount,
                                                   &out_amount,
-                                                  confidential_amount,
-                                                  confidential_asset,
+                                                  XfrType::from(record_type),
                                                   asset_tracking);
 
     let secret_key = outkeys.get(0).unwrap().get_sk_ref();
@@ -369,6 +412,8 @@ mod test {
     assert_eq!(&open_ar.asset_record, &xfr_note.body.outputs[0]);
     assert_eq!(open_ar.amount, 30u64);
     assert_eq!(open_ar.asset_type, [1u8; 16]);
+
+    let (confidential_amount, confidential_asset) = record_type.get_booleans();
 
     if confidential_amount {
       let (low, high) = u64_to_u32_pair(open_ar.amount);
@@ -393,17 +438,16 @@ mod test {
 
   #[test]
   fn test_open_asset_record() {
-    do_test_open_asset_record(false, false, false);
-    do_test_open_asset_record(true, false, false);
-    do_test_open_asset_record(false, true, false);
-    do_test_open_asset_record(true, true, false);
-    do_test_open_asset_record(true, true, true);
+    do_test_open_asset_record(AssetRecordType::PublicAmount_PublicAssetType, false);
+    do_test_open_asset_record(AssetRecordType::PublicAmount_ConfidentialAssetType, false);
+    do_test_open_asset_record(AssetRecordType::ConfidentialAmount_PublicAssetType, false);
+    do_test_open_asset_record(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+                              false);
+    do_test_open_asset_record(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+                              true);
   }
 
-  fn build_and_open_blind_record(confidential_amount: bool,
-                                 confidential_asset: bool,
-                                 amt: u64,
-                                 asset_type: AssetType) {
+  fn build_and_open_blind_record(record_type: AssetRecordType, amt: u64, asset_type: AssetType) {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
@@ -411,12 +455,7 @@ mod test {
     let (pubkey, privkey) = (keypair.get_pk_ref(), keypair.get_sk_ref());
     let ar = AssetRecord::new(amt, asset_type, pubkey.clone()).unwrap();
 
-    let blind_rec = build_blind_asset_record(&mut prng,
-                                             &pc_gens,
-                                             &ar,
-                                             confidential_amount,
-                                             confidential_asset,
-                                             &None);
+    let blind_rec = build_blind_asset_record(&mut prng, &pc_gens, &ar, record_type, &None);
 
     let open_rec = open_asset_record(&blind_rec, &privkey).unwrap();
 
@@ -434,9 +473,17 @@ mod test {
     let asset_type: AssetType = prng.gen();
     let amt: u64 = prng.gen();
 
-    build_and_open_blind_record(false, false, amt, asset_type);
-    build_and_open_blind_record(false, true, amt, asset_type);
-    build_and_open_blind_record(true, true, amt, asset_type);
-    build_and_open_blind_record(true, false, amt, asset_type);
+    build_and_open_blind_record(AssetRecordType::PublicAmount_PublicAssetType,
+                                amt,
+                                asset_type);
+    build_and_open_blind_record(AssetRecordType::PublicAmount_ConfidentialAssetType,
+                                amt,
+                                asset_type);
+    build_and_open_blind_record(AssetRecordType::ConfidentialAmount_PublicAssetType,
+                                amt,
+                                asset_type);
+    build_and_open_blind_record(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+                                amt,
+                                asset_type);
   }
 }
