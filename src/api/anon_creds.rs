@@ -72,6 +72,21 @@ pub fn ac_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
   crate::crypto::anon_creds::ac_sign::<_, BLSGt>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
 }
 
+/// Produces a AttrsRevealProof, as with ac_reveal, but the randomization is supplied by the caller
+/// # Example
+/// ```
+/// use rand_core::SeedableRng;
+/// use rand_chacha::ChaChaRng;
+/// use crate::zei::algebra::groups::Scalar;
+/// use zei::algebra::bls12_381::BLSScalar;
+/// use zei::api::anon_creds::{ac_sample_random_factors, ac_reveal_with_rand};
+/// let mut prng = ChaChaRng::from_seed([0u8;32]);
+/// let pair = ac_sample_random_factors(&mut prng);
+/// ```
+pub fn ac_sample_random_factors<R: CryptoRng + RngCore>(prng: &mut R) -> (BLSScalar, BLSScalar) {
+  crate::crypto::anon_creds::ac_sample_random_factors::<_, BLSGt>(prng)
+}
+
 /// Produces a AttrsRevealProof, bitmap indicates which attributes are revealed
 /// # Example
 /// ```
@@ -103,6 +118,45 @@ pub fn ac_reveal<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
                                                    sig,
                                                    attrs_scalar.as_slice(),
                                                    bitmap)
+}
+
+/// Produces a AttrsRevealProof, as with ac_reveal, but the randomization is supplied by the caller
+/// # Example
+/// ```
+/// use rand_core::SeedableRng;
+/// use rand_chacha::ChaChaRng;
+/// use crate::zei::algebra::groups::Scalar;
+/// use zei::algebra::bls12_381::BLSScalar;
+/// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign, ac_sample_random_factors, ac_reveal_with_rand};
+/// let mut prng = ChaChaRng::from_seed([0u8;32]);
+/// let num_attrs = 2;
+/// let (issuer_pk, issuer_sk) = ac_keygen_issuer(&mut prng, num_attrs);
+/// let (user_pk, user_sk) = ac_keygen_user(&mut prng, &issuer_pk);
+/// let attributes = [b"attr1", b"attr2"];
+/// let signature = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
+/// let bitmap = [true,false]; // Reveal first attribute and hide the second one
+/// let pair = ac_sample_random_factors(&mut prng);
+/// let reveal_sig = ac_reveal_with_rand(&mut prng, &user_sk, &issuer_pk, &signature, &attributes[..], &bitmap, pair);
+/// ```
+pub fn ac_reveal_with_rand<R: CryptoRng + RngCore, B: AsRef<[u8]>>(
+  prng: &mut R,
+  user_sk: &ACUserSecretKey,
+  issuer_pk: &ACIssuerPublicKey,
+  sig: &ACSignature,
+  attrs: &[B],
+  bitmap: &[bool],
+  random_factors: (BLSScalar, BLSScalar))
+  -> Result<ACRevealSig, ZeiError> {
+  let attrs_scalar: Vec<BLSScalar> = attrs.iter()
+                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(x.as_ref()))
+                                          .collect();
+  crate::crypto::anon_creds::ac_reveal_with_rand::<_, BLSGt>(prng,
+                                                             user_sk,
+                                                             issuer_pk,
+                                                             sig,
+                                                             attrs_scalar.as_slice(),
+                                                             bitmap,
+                                                             random_factors)
 }
 
 /// Verifies an anonymous credential reveal proof.

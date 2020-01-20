@@ -191,7 +191,13 @@ pub(crate) fn ac_sign<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut 
                          sigma2: user_pk.0.add(&cc).mul(&u) }
 }
 
-/// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed
+pub(crate) fn ac_sample_random_factors<R: CryptoRng + RngCore, P: PairingTargetGroup>(
+  prng: &mut R)
+  -> (P::ScalarField, P::ScalarField) {
+  (P::ScalarField::random_scalar(prng), P::ScalarField::random_scalar(prng))
+}
+
+/// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed.
 #[allow(clippy::type_complexity)]
 pub(crate) fn ac_reveal<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R,
@@ -201,12 +207,26 @@ pub(crate) fn ac_reveal<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   attrs: &[P::ScalarField],
   bitmap: &[bool] // indicates which attributes are revealed
 ) -> Result<ACRevealSig<P::G1, P::G2, P::ScalarField>, ZeiError> {
-  let r = P::ScalarField::random_scalar(prng);
-  let t = P::ScalarField::random_scalar(prng);
-  let sigma1_r = sig.sigma1.mul(&r);
-  let sigma1_t = sig.sigma1.mul(&t);
+  let randomization = ac_sample_random_factors::<_, P>(prng);
+  ac_reveal_with_rand::<_, P>(prng, user_sk, issuer_pk, sig, attrs, bitmap, randomization)
+}
+
+/// Produce an AttrsRevealProof with randomness supplied by caller via a random_pair
+#[allow(clippy::type_complexity)]
+pub(crate) fn ac_reveal_with_rand<R: CryptoRng + RngCore, P: PairingTargetGroup>(
+  prng: &mut R,
+  user_sk: &ACUserSecretKey<P::ScalarField>,
+  issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
+  sig: &ACSignature<P::G1>,
+  attrs: &[P::ScalarField],
+  bitmap: &[bool],
+  random_pair: (P::ScalarField, P::ScalarField))
+  -> Result<ACRevealSig<P::G1, P::G2, P::ScalarField>, ZeiError> {
+  let (r1, r2) = random_pair;
+  let sigma1_r = sig.sigma1.mul(&r1);
+  let sigma1_t = sig.sigma1.mul(&r2);
   let sigma2_aux = sig.sigma2.add(&sigma1_t);
-  let sigma2_r = sigma2_aux.mul(&r);
+  let sigma2_r = sigma2_aux.mul(&r1);
   let rand_sig = ACSignature::<P::G1>{
         sigma1: sigma1_r,
         sigma2: sigma2_r, //sigma2: r*(sigma2 + t*sigma1)
@@ -221,7 +241,7 @@ pub(crate) fn ac_reveal<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   let proof = prove_pok::<_, P>(prng,
                                 user_sk,
                                 issuer_pk,
-                                &t,
+                                &r2,
                                 hidden_attrs.as_slice(),
                                 bitmap,
                                 &rand_sig)?;
