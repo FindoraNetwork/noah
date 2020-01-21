@@ -53,12 +53,21 @@ impl AssetRecordType {
   /// Return (true,_) if amount is confidential,
   /// Return (_,false) if type is confidential,
   pub fn get_booleans(self) -> (bool, bool) {
-    // confidential amount, confidential asset
+    // confidential amount, confidential asset type
     match self {
       AssetRecordType::PublicAmount_PublicAssetType => (false, false),
       AssetRecordType::ConfidentialAmount_PublicAssetType => (true, false),
       AssetRecordType::PublicAmount_ConfidentialAssetType => (false, true),
       AssetRecordType::ConfidentialAmount_ConfidentialAssetType => (true, true),
+    }
+  }
+
+  pub fn from_booleans(conf_amt: bool, conf_type: bool) -> Self {
+    match (conf_amt, conf_type) {
+      (false, false) => AssetRecordType::PublicAmount_PublicAssetType,
+      (true, false) => AssetRecordType::ConfidentialAmount_PublicAssetType,
+      (false, true) => AssetRecordType::PublicAmount_ConfidentialAssetType,
+      (true, true) => AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
     }
   }
 }
