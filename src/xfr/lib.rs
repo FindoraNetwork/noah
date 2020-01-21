@@ -341,8 +341,8 @@ fn gen_xfr_proofs_multi_asset(//prng: &mut R,
     let type_scalar = Scalar::from(type_as_u128);
     ins.push((x.amount,
               type_scalar,
-              (x.amount_blinds.0).0 + pow2_32 * (x.amount_blinds.1).0,
-              x.type_blind.0));
+              x.amount_blinds.0 + pow2_32 * x.amount_blinds.1,
+              x.type_blind));
   }
 
   let mut out = vec![];
@@ -351,8 +351,8 @@ fn gen_xfr_proofs_multi_asset(//prng: &mut R,
     let type_scalar = Scalar::from(type_as_u128);
     out.push((x.amount,
               type_scalar,
-              (x.amount_blinds.0).0 + pow2_32 * (x.amount_blinds.1).0,
-              x.type_blind.0));
+              x.amount_blinds.0 + pow2_32 * x.amount_blinds.1,
+              x.type_blind));
   }
 
   match xfr_type {
@@ -631,35 +631,19 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord],
 
   let mut in_coms = vec![];
   for x in inputs.iter() {
-    let com_amount_low = x.amount_commitments
-                          .unwrap()
-                          .0
-                          .decompress_to_ristretto()
-                          .unwrap();
-    let com_amount_high = x.amount_commitments
-                           .unwrap()
-                           .1
-                           .decompress_to_ristretto()
-                           .unwrap();
+    let com_amount_low = x.amount_commitments.unwrap().0.decompress().unwrap();
+    let com_amount_high = x.amount_commitments.unwrap().1.decompress().unwrap();
     let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
-    let com_type = x.asset_type_commitment.unwrap().get_compressed_ristretto();
+    let com_type = x.asset_type_commitment.unwrap();
     in_coms.push((com_amount, com_type));
   }
 
   let mut out_coms = vec![];
   for x in outputs.iter() {
-    let com_amount_low = x.amount_commitments
-                          .unwrap()
-                          .0
-                          .decompress_to_ristretto()
-                          .unwrap();
-    let com_amount_high = x.amount_commitments
-                           .unwrap()
-                           .1
-                           .decompress_to_ristretto()
-                           .unwrap();
+    let com_amount_low = x.amount_commitments.unwrap().0.decompress().unwrap();
+    let com_amount_high = x.amount_commitments.unwrap().1.decompress().unwrap();
     let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
-    let com_type = x.asset_type_commitment.unwrap().get_compressed_ristretto();
+    let com_type = x.asset_type_commitment.unwrap();
     out_coms.push((com_amount, com_type));
   }
   asset_mixer_verify(in_coms.as_slice(), out_coms.as_slice(), proof)
@@ -669,7 +653,6 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord],
 pub(crate) mod tests {
   use super::*;
   use crate::algebra::groups::Group;
-  use crate::algebra::ristretto::{CompRist, RistPoint};
   use crate::api::anon_creds;
   use crate::api::conf_cred_reveal::cac_gen_encryption_keys;
   use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey};
@@ -681,7 +664,7 @@ pub(crate) mod tests {
   use crate::utils::u64_to_u32_pair;
   use crate::xfr::proofs::create_conf_id_reveal;
   use crate::xfr::sig::XfrKeyPair;
-  use curve25519_dalek::ristretto::RistrettoPoint;
+  use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
@@ -702,7 +685,7 @@ pub(crate) mod tests {
         let (_, id_reveal_pub_key) = cac_gen_encryption_keys(prng);
 
         Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
-                                    ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
+                                    ElGamalPublicKey(xfr_pub_key.get_point()),
                                   eg_blsg1_pub_key: id_reveal_pub_key })
       }
       false => None,
@@ -821,8 +804,7 @@ pub(crate) mod tests {
                                   .compress();
       let commitment_high = pc_gens.commit(Scalar::from(high), Scalar::random(&mut prng))
                                    .compress();
-      xfr_note.body.outputs[3].amount_commitments =
-        Some((CompRist(commitment_low), CompRist(commitment_high)));
+      xfr_note.body.outputs[3].amount_commitments = Some((commitment_low, commitment_high));
       error = XfrVerifyConfidentialAmountError;
     } else {
       xfr_note.body.outputs[3].amount = Some(0xFFFFFFFFFF);
@@ -872,7 +854,7 @@ pub(crate) mod tests {
     // modify xfr_note asset on an output
     let error;
     if confidential_asset {
-      xfr_note.body.outputs[1].asset_type_commitment = Some(CompRist::default());
+      xfr_note.body.outputs[1].asset_type_commitment = Some(CompressedRistretto::default());
       error = XfrVerifyConfidentialAssetError;
     } else {
       xfr_note.body.outputs[1].asset_type = Some([1u8; 16]);
@@ -922,7 +904,7 @@ pub(crate) mod tests {
     // modify xfr_note asset on an input
     let error;
     if confidential_asset {
-      xfr_note.body.inputs[1].asset_type_commitment = Some(CompRist::default());
+      xfr_note.body.inputs[1].asset_type_commitment = Some(CompressedRistretto::default());
       error = XfrVerifyConfidentialAssetError;
     } else {
       xfr_note.body.inputs[1].asset_type = Some([1u8; 16]);
@@ -978,10 +960,9 @@ pub(crate) mod tests {
                                             .as_ref()
                                             .unwrap()
                                             .clone();
-      let new_enc = old_enc.e2.0 + pc_gens.B; //adding 1 to the exponent
+      let new_enc = old_enc.e2 + pc_gens.B; //adding 1 to the exponent
       xfr_note.body.outputs[0].issuer_lock_type = Some(ElGamalCiphertext { e1: old_enc.e1,
-                                                                           e2:
-                                                                             RistPoint(new_enc) });
+                                                                           e2: new_enc });
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
       assert_eq!(Err(XfrVerifyIssuerTrackingAssetAmountError),
                  verify_xfr_note(&mut prng, &xfr_note, &null_policies),
@@ -1021,10 +1002,9 @@ pub(crate) mod tests {
       let old_enc = xfr_note.body.outputs[0].issuer_lock_amount
                                             .as_ref()
                                             .unwrap();
-      let new_enc = old_enc.0.e2.0 + pc_gens.B; //adding 1 to the exponent
+      let new_enc = old_enc.0.e2 + pc_gens.B; //adding 1 to the exponent
       xfr_note.body.outputs[0].issuer_lock_amount = Some((ElGamalCiphertext { e1: old_enc.0.e1,
-                                                                              e2:
-                                                                                RistPoint(new_enc) },
+                                                                              e2: new_enc },
                                                           ElGamalCiphertext { e1: old_enc.1.e1,
                                                                               e2: old_enc.1.e2 }));
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys.as_slice()).unwrap();
@@ -1116,7 +1096,7 @@ pub(crate) mod tests {
     let (_, asset_issuer_id_pub_key) = cac_gen_encryption_keys(&mut prng);
     let asset_issuer_public_key =
       Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
-                                  ElGamalPublicKey(RistPoint(asset_issuer_pub_key.get_point())),
+                                  ElGamalPublicKey(asset_issuer_pub_key.get_point()),
                                 eg_blsg1_pub_key: asset_issuer_id_pub_key });
 
     let input_keypair = XfrKeyPair::generate(&mut prng);

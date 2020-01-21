@@ -1,17 +1,16 @@
-use crate::crypto::chaum_pedersen::ChaumPedersenProof;
-use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
-use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
+use crate::xfr::sig::{XfrSignature, XfrPublicKey, XfrSecretKey};
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::{PublicKey, SecretKey};
+//use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
+use ed25519_dalek::{PublicKey, SecretKey};
 
 impl Serialize for XfrPublicKey {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -204,59 +203,6 @@ impl ZeiFromToBytes for CompressedEdwardsY {
   }
 }
 
-impl ZeiFromToBytes for (CompressedRistretto, CompressedRistretto) {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    let mut v = vec![];
-    v.extend_from_slice(&self.0.to_bytes()[..]);
-    v.extend_from_slice(&self.1.to_bytes()[..]);
-    v
-  }
-  fn zei_from_bytes(bytes: &[u8]) -> (CompressedRistretto, CompressedRistretto) {
-    let a = CompressedRistretto::from_slice(&bytes[..32]);
-    let b = CompressedRistretto::from_slice(&bytes[32..]);
-    (a, b)
-  }
-}
-
-impl ZeiFromToBytes for ChaumPedersenProof {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    let mut v = vec![];
-    v.extend_from_slice(&self.c3.zei_to_bytes());
-    v.extend_from_slice(&self.c4.zei_to_bytes());
-    v.extend_from_slice(&self.z1.zei_to_bytes());
-    v.extend_from_slice(&self.z2.zei_to_bytes());
-    v.extend_from_slice(&self.z3.zei_to_bytes());
-    v
-  }
-  fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenProof {
-    ChaumPedersenProof { c3: RistrettoPoint::zei_from_bytes(&bytes[0..32]),
-                         c4: RistrettoPoint::zei_from_bytes(&bytes[32..64]),
-                         z1: Scalar::zei_from_bytes(&bytes[64..96]),
-                         z2: Scalar::zei_from_bytes(&bytes[96..128]),
-                         z3: Scalar::zei_from_bytes(&bytes[128..160]) }
-  }
-}
-
-impl ZeiFromToBytes for ChaumPedersenProofX {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    let mut v = vec![];
-    v.extend_from_slice(&self.c1_eq_c2.zei_to_bytes());
-    if self.zero.is_some() {
-      v.extend_from_slice(&self.zero.as_ref().unwrap().zei_to_bytes());
-    }
-    v
-  }
-  fn zei_from_bytes(bytes: &[u8]) -> ChaumPedersenProofX {
-    let c1_eq_c2 = ChaumPedersenProof::zei_from_bytes(&bytes[0..32 * 5]);
-    let zero = if bytes.len() > 32 * 5 {
-      Some(ChaumPedersenProof::zei_from_bytes(&bytes[32 * 5..]))
-    } else {
-      None
-    };
-    ChaumPedersenProofX { c1_eq_c2, zero }
-  }
-}
-
 impl ZeiFromToBytes for XfrSignature {
   fn zei_to_bytes(&self) -> Vec<u8> {
     let bytes = self.0.to_bytes();
@@ -392,6 +338,9 @@ pub mod zei_obj_serde {
   }
 }
 
+/*
+// XXX keep this for future reference
+// use with #[serde(with = "serialization::option_bytes")]
 pub mod option_bytes {
   use crate::serialization::ZeiFromToBytes;
   use serde::{self, Deserialize, Deserializer, Serializer};
@@ -426,16 +375,18 @@ pub mod option_bytes {
     }
   }
 }
+*/
 
 #[cfg(test)]
 mod test {
-  use crate::algebra::ristretto::{RistPoint, RistScalar};
   use crate::basic_crypto::elgamal::elgamal_keygen;
   use crate::serialization::ZeiFromToBytes;
   use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
   use crate::xfr::structs::EGPubKey;
   use bulletproofs::PedersenGens;
 
+  use curve25519_dalek::ristretto::RistrettoPoint;
+  use curve25519_dalek::scalar::Scalar;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
@@ -529,8 +480,7 @@ mod test {
   fn serialize_and_deserialize_elgamal() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
-    let (_sk, xfr_pub_key) =
-      elgamal_keygen::<_, RistScalar, RistPoint>(&mut prng, &RistPoint(pc_gens.B));
+    let (_sk, xfr_pub_key) = elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
     let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
       res
     } else {

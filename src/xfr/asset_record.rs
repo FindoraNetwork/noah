@@ -1,5 +1,4 @@
 use crate::algebra::groups::Scalar as ZeiScalar;
-use crate::algebra::ristretto::{CompRist, RistPoint, RistScalar};
 use crate::basic_crypto::elgamal::elgamal_encrypt;
 use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt};
 use crate::errors::ZeiError;
@@ -70,7 +69,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   asset_record: &AssetRecord,
   record_type: AssetRecordType,
   issuer_public_key: &Option<AssetIssuerPubKeys>)
-  -> (BlindAssetRecord, (RistScalar, RistScalar), RistScalar) {
+  -> (BlindAssetRecord, (Scalar, Scalar), Scalar) {
   let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type[..]);
   let type_scalar = Scalar::from(type_as_u128);
   let (derived_point, blind_share) = sample_point_and_blind_share(prng, &asset_record.public_key);
@@ -96,13 +95,10 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
 
     (None,
-     Some((CompRist(amount_commitment_low.compress()),
-           CompRist(amount_commitment_high.compress()))),
-     (RistScalar(amount_blind_low), RistScalar(amount_blind_high)))
+     Some((amount_commitment_low.compress(), amount_commitment_high.compress())),
+     (amount_blind_low, amount_blind_high))
   } else {
-    (Some(asset_record.amount),
-     None,
-     (RistScalar(Scalar::default()), RistScalar(Scalar::default())))
+    (Some(asset_record.amount), None, (Scalar::default(), Scalar::default()))
   };
 
   // build asset type fields
@@ -110,9 +106,9 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     amount_type_bytes.extend_from_slice(&asset_record.asset_type);
 
     let type_commitment = pc_gens.commit(type_scalar, type_blind);
-    (None, Some(CompRist(type_commitment.compress())), RistScalar(type_blind))
+    (None, Some(type_commitment.compress()), type_blind)
   } else {
-    (Some(asset_record.asset_type), None, RistScalar(Scalar::default()))
+    (Some(asset_record.asset_type), None, Scalar::default())
   };
 
   //issuer asset tracking amount
@@ -120,13 +116,13 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     None => None,
     Some(issuer_pk) => {
       if confidential_amount {
-        Some((elgamal_encrypt(&RistPoint(pc_gens.B),
-                              &RistScalar::from_u32(amount_low),
-                              &RistScalar(amount_blind_low),
+        Some((elgamal_encrypt(&pc_gens.B,
+                              &Scalar::from_u32(amount_low),
+                              &amount_blind_low,
                               &issuer_pk.eg_ristretto_pub_key),
-              elgamal_encrypt(&RistPoint(pc_gens.B),
-                              &RistScalar::from_u32(amount_high),
-                              &RistScalar(amount_blind_high),
+              elgamal_encrypt(&pc_gens.B,
+                              &Scalar::from_u32(amount_high),
+                              &amount_blind_high,
                               &issuer_pk.eg_ristretto_pub_key)))
       } else {
         None
@@ -138,8 +134,8 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     None => None,
     Some(issuer_pk) => {
       if confidential_asset {
-        Some(elgamal_encrypt(&RistPoint(pc_gens.B),
-                             &RistScalar(type_scalar),
+        Some(elgamal_encrypt(&pc_gens.B,
+                             &type_scalar,
                              &type_blind,
                              &issuer_pk.eg_ristretto_pub_key))
       } else {
@@ -269,9 +265,8 @@ pub fn open_asset_record(input: &BlindAssetRecord,
   Ok(OpenAssetRecord { asset_type,
                        amount,
                        asset_record: input.clone(),
-                       amount_blinds: (RistScalar(amount_blind_low),
-                                       RistScalar(amount_blind_high)),
-                       type_blind: RistScalar(type_blind) })
+                       amount_blinds: (amount_blind_low, amount_blind_high),
+                       type_blind })
 }
 
 #[cfg(test)]
@@ -279,7 +274,6 @@ mod test {
   use super::{build_blind_asset_record, build_open_asset_record, open_asset_record};
   use crate::algebra::bls12_381::{BLSScalar, BLSG1};
   use crate::algebra::groups::Group;
-  use crate::algebra::ristretto::{CompRist, RistPoint};
   use crate::basic_crypto::elgamal::{elgamal_keygen, ElGamalPublicKey};
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::asset_record::AssetRecordType;
@@ -312,7 +306,7 @@ mod test {
         let (_sk, id_reveal_pub_key) =
           elgamal_keygen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
         Some(AssetIssuerPubKeys { eg_ristretto_pub_key:
-                                    ElGamalPublicKey(RistPoint(xfr_pub_key.get_point())),
+                                    ElGamalPublicKey(xfr_pub_key.get_point()),
                                   eg_blsg1_pub_key: id_reveal_pub_key })
       }
       false => None,
@@ -336,11 +330,11 @@ mod test {
     let (confidential_amount, confidential_asset) = record_type.get_booleans();
     if confidential_amount {
       let (low, high) = u64_to_u32_pair(amount);
-      let commitment_low = pc_gens.commit(Scalar::from(low), (open_ar.amount_blinds.0).0)
+      let commitment_low = pc_gens.commit(Scalar::from(low), open_ar.amount_blinds.0)
                                   .compress();
-      let commitment_high = pc_gens.commit(Scalar::from(high), (open_ar.amount_blinds.1).0)
+      let commitment_high = pc_gens.commit(Scalar::from(high), open_ar.amount_blinds.1)
                                    .compress();
-      expected_bar_amount_commitment = Some((CompRist(commitment_low), CompRist(commitment_high)));
+      expected_bar_amount_commitment = Some((commitment_low, commitment_high));
     } else {
       expected_bar_amount = Some(amount);
       //expected_bar_lock_amount_none = true;
@@ -350,7 +344,7 @@ mod test {
       let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type[..]);
       let type_scalar = Scalar::from(type_as_u128);
       expected_bar_asset_type_commitment =
-        Some(CompRist(pc_gens.commit(type_scalar, open_ar.type_blind.0).compress()));
+        Some(pc_gens.commit(type_scalar, open_ar.type_blind).compress());
     } else {
       expected_bar_asset_type = Some(asset_type);
       //expected_bar_lock_type_none = true;
@@ -417,20 +411,20 @@ mod test {
 
     if confidential_amount {
       let (low, high) = u64_to_u32_pair(open_ar.amount);
-      let commitment_low = pc_gens.commit(Scalar::from(low), (open_ar.amount_blinds.0).0)
+      let commitment_low = pc_gens.commit(Scalar::from(low), open_ar.amount_blinds.0)
                                   .compress();
-      let commitment_high = pc_gens.commit(Scalar::from(high), (open_ar.amount_blinds.1).0)
+      let commitment_high = pc_gens.commit(Scalar::from(high), open_ar.amount_blinds.1)
                                    .compress();
-      let derived_commitment = (CompRist(commitment_low), CompRist(commitment_high));
+      let derived_commitment = (commitment_low, commitment_high);
       assert_eq!(derived_commitment,
                  open_ar.asset_record.amount_commitments.unwrap());
     }
 
     if confidential_asset {
       let derived_commitment =
-        CompRist(pc_gens.commit(Scalar::from(u8_bigendian_slice_to_u128(&open_ar.asset_type[..])),
-                                open_ar.type_blind.0)
-                        .compress());
+        pc_gens.commit(Scalar::from(u8_bigendian_slice_to_u128(&open_ar.asset_type[..])),
+                       open_ar.type_blind)
+               .compress();
       assert_eq!(derived_commitment,
                  open_ar.asset_record.asset_type_commitment.unwrap());
     }

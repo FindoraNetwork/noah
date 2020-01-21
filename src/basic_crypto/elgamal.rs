@@ -1,5 +1,4 @@
 use crate::algebra::groups::{Group, Scalar};
-use crate::algebra::ristretto::RistPoint;
 use crate::errors::ZeiError;
 use crate::serialization::ZeiFromToBytes;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -36,7 +35,7 @@ pub struct ElGamalCiphertext<G> {
   pub(crate) e2: G, //m*G + r*PK
 }
 
-impl Hash for ElGamalPublicKey<RistPoint> {
+impl Hash for ElGamalPublicKey<RistrettoPoint> {
   fn hash<H: Hasher>(&self, state: &mut H) {
     self.0.to_compressed_bytes().as_slice().hash(state);
   }

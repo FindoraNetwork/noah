@@ -45,7 +45,7 @@ pub(crate) fn tracking_proofs<R: CryptoRng + RngCore>(
         commitments.push(output.asset_record
                                .asset_type_commitment
                                .ok_or(ZeiError::InconsistentStructureError)?
-                               .decompress_to_ristretto()
+                               .decompress()
                                .unwrap());
         ctexts.push(output.asset_record
                           .issuer_lock_type
@@ -53,7 +53,7 @@ pub(crate) fn tracking_proofs<R: CryptoRng + RngCore>(
                           .ok_or(ZeiError::InconsistentStructureError)?
                           .clone());
         m.push(Scalar::from(u8_bigendian_slice_to_u128(&output.asset_type[..])));
-        r.push(output.type_blind.0);
+        r.push(output.type_blind);
       }
       if output.asset_record.amount_commitments.is_some() {
         let (amount_low, amount_high) = u64_to_u32_pair(output.amount);
@@ -61,13 +61,13 @@ pub(crate) fn tracking_proofs<R: CryptoRng + RngCore>(
                                .amount_commitments
                                .ok_or(ZeiError::InconsistentStructureError)?
                                .0
-                               .decompress_to_ristretto()
+                               .decompress()
                                .unwrap());
         commitments.push(output.asset_record
                                .amount_commitments
                                .ok_or(ZeiError::InconsistentStructureError)?
                                .1
-                               .decompress_to_ristretto()
+                               .decompress()
                                .unwrap());
         ctexts.push(output.asset_record
                           .issuer_lock_amount
@@ -83,19 +83,16 @@ pub(crate) fn tracking_proofs<R: CryptoRng + RngCore>(
                           .clone());
         m.push(Scalar::from(amount_low));
         m.push(Scalar::from(amount_high));
-        r.push((output.amount_blinds.0).0);
-        r.push((output.amount_blinds.1).0);
+        r.push(output.amount_blinds.0);
+        r.push(output.amount_blinds.1);
       }
     }
   }
   let proof = if !m.is_empty() {
-    let pk = ElGamalPublicKey(public_keys[0].eg_ristretto_pub_key
-                                            .get_point_ref()
-                                            .get_ristretto_point());
+    let pk = ElGamalPublicKey(public_keys[0].eg_ristretto_pub_key.get_point());
     let ctexts: Vec<ElGamalCiphertext<RistrettoPoint>> =
       ctexts.iter()
-            .map(|c| ElGamalCiphertext { e1: c.e1.get_ristretto_point(),
-                                         e2: c.e2.get_ristretto_point() })
+            .map(|c| ElGamalCiphertext { e1: c.e1, e2: c.e2 })
             .collect();
     let mut transcript = Transcript::new(b"AssetTrackingProofs");
     Some(pedersen_elgamal_aggregate_eq_proof(&mut transcript,
@@ -158,7 +155,7 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + RngCore>(prng: &mut R,
               ctexts.push(output.issuer_lock_type.as_ref().unwrap().clone());
               coms.push(output.asset_type_commitment
                               .ok_or(ZeiError::InconsistentStructureError)?
-                              .decompress_to_ristretto()
+                              .decompress()
                               .unwrap()
                               .clone());
             }
@@ -168,24 +165,21 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + RngCore>(prng: &mut R,
               coms.push(output.amount_commitments
                               .ok_or(ZeiError::InconsistentStructureError)?
                               .0
-                              .decompress_to_ristretto()
+                              .decompress()
                               .unwrap()
                               .clone());
               coms.push(output.amount_commitments
                               .ok_or(ZeiError::InconsistentStructureError)?
                               .1
-                              .decompress_to_ristretto()
+                              .decompress()
                               .unwrap()
                               .clone());
             }
           }
-          let pk = ElGamalPublicKey(public_key.eg_ristretto_pub_key
-                                              .get_point_ref()
-                                              .get_ristretto_point());
+          let pk = ElGamalPublicKey(public_key.eg_ristretto_pub_key.get_point());
           let ctexts: Vec<ElGamalCiphertext<RistrettoPoint>> =
             ctexts.iter()
-                  .map(|c| ElGamalCiphertext { e1: c.e1.get_ristretto_point(),
-                                               e2: c.e2.get_ristretto_point() })
+                  .map(|c| ElGamalCiphertext { e1: c.e1, e2: c.e2 })
                   .collect();
           let mut transcript = Transcript::new(b"AssetTrackingProofs");
           pedersen_elgamal_aggregate_eq_verify(
@@ -297,10 +291,10 @@ pub(crate) fn range_proof(inputs: &[OpenAssetRecord],
   }
 
   //build blinding vectors (out blindings + blindings difference)
-  let in_blind_low: Vec<Scalar> = inputs.iter().map(|x| (x.amount_blinds.0).0).collect();
-  let in_blind_high: Vec<Scalar> = inputs.iter().map(|x| (x.amount_blinds.1).0).collect();
-  let out_blind_low: Vec<Scalar> = outputs.iter().map(|x| (x.amount_blinds.0).0).collect();
-  let out_blind_high: Vec<Scalar> = outputs.iter().map(|x| (x.amount_blinds.1).0).collect();
+  let in_blind_low: Vec<Scalar> = inputs.iter().map(|x| x.amount_blinds.0).collect();
+  let in_blind_high: Vec<Scalar> = inputs.iter().map(|x| x.amount_blinds.1).collect();
+  let out_blind_low: Vec<Scalar> = outputs.iter().map(|x| x.amount_blinds.0).collect();
+  let out_blind_high: Vec<Scalar> = outputs.iter().map(|x| x.amount_blinds.1).collect();
 
   let mut in_blind_sum = Scalar::zero();
   for (blind_low, blind_high) in in_blind_low.iter().zip(in_blind_high.iter()) {
@@ -358,10 +352,10 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
                     .as_ref()
                     .ok_or(ZeiError::InconsistentStructureError)?;
     let com_low = coms.0
-                      .decompress_to_ristretto()
+                      .decompress()
                       .ok_or(ZeiError::DecompressElementError)?;
     let com_high = coms.1
-                       .decompress_to_ristretto()
+                       .decompress()
                        .ok_or(ZeiError::DecompressElementError)?;
     total_input_com += com_low + com_high * pow2_32;
   }
@@ -373,15 +367,15 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
                      .as_ref()
                      .ok_or(ZeiError::InconsistentStructureError)?;
     let com_low = coms.0
-                      .decompress_to_ristretto()
+                      .decompress()
                       .ok_or(ZeiError::DecompressElementError)?;
     let com_high = coms.1
-                       .decompress_to_ristretto()
+                       .decompress()
                        .ok_or(ZeiError::DecompressElementError)?;
     total_output_com += com_low + com_high * pow2_32;
 
-    range_coms.push(coms.0.get_compressed_ristretto());
-    range_coms.push(coms.1.get_compressed_ristretto());
+    range_coms.push(coms.0);
+    range_coms.push(coms.1);
     //output_com.push(com_low + com_high * Scalar::from(0xFFFFFFFF as u64 + 1));
   }
   let derived_xfr_diff_com = total_input_com - total_output_com;
@@ -433,17 +427,17 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
     asset_coms.push(x.asset_record
                      .asset_type_commitment
                      .unwrap()
-                     .decompress_to_ristretto()
+                     .decompress()
                      .unwrap());
-    asset_blinds.push(x.type_blind.0);
+    asset_blinds.push(x.type_blind);
   }
   for x in open_outputs.iter() {
     asset_coms.push(x.asset_record
                      .asset_type_commitment
                      .unwrap()
-                     .decompress_to_ristretto()
+                     .decompress()
                      .unwrap());
-    asset_blinds.push(x.type_blind.0);
+    asset_blinds.push(x.type_blind);
   }
   let mut transcript = Transcript::new(b"AssetEquality");
   let proof = chaum_pedersen_prove_multiple_eq(&mut transcript,
@@ -462,23 +456,15 @@ pub(crate) fn verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut R,
                                                                 asset_proof: &ChaumPedersenProofX)
                                                                 -> Result<(), ZeiError> {
   let pc_gens = PedersenGens::default();
-  let mut asset_commitments: Vec<RistrettoPoint> = inputs.iter()
-                                                         .map(|x| {
-                                                           x.asset_type_commitment
-                                                            .unwrap()
-                                                            .decompress_to_ristretto()
-                                                            .unwrap()
-                                                         })
-                                                         .collect();
+  let mut asset_commitments: Vec<RistrettoPoint> =
+    inputs.iter()
+          .map(|x| x.asset_type_commitment.unwrap().decompress().unwrap())
+          .collect();
 
-  let out_asset_commitments: Vec<RistrettoPoint> = outputs.iter()
-                                                          .map(|x| {
-                                                            x.asset_type_commitment
-                                                             .unwrap()
-                                                             .decompress_to_ristretto()
-                                                             .unwrap()
-                                                          })
-                                                          .collect();
+  let out_asset_commitments: Vec<RistrettoPoint> =
+    outputs.iter()
+           .map(|x| x.asset_type_commitment.unwrap().decompress().unwrap())
+           .collect();
 
   asset_commitments.extend(out_asset_commitments.iter());
 

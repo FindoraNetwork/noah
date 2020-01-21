@@ -11,9 +11,8 @@ use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 
 use bulletproofs::RangeProof;
-
-use crate::algebra::ristretto::{CompRist, RistPoint, RistScalar};
-use curve25519_dalek::ristretto::CompressedRistretto;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use curve25519_dalek::scalar::Scalar;
 
 pub type AssetType = [u8; 16];
 
@@ -39,9 +38,9 @@ pub struct XfrBody {
   pub proofs: XfrProofs,
 }
 
-pub type EGPubKey = ElGamalPublicKey<RistPoint>;
+pub type EGPubKey = ElGamalPublicKey<RistrettoPoint>;
 type EGPubKeyId = crate::api::conf_cred_reveal::ElGamalPublicKey;
-type EGCText = ElGamalCiphertext<RistPoint>;
+type EGCText = ElGamalCiphertext<RistrettoPoint>;
 
 /// I'm a bundle of public keys for the asset issuer
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -57,16 +56,12 @@ pub struct BlindAssetRecord {
   pub issuer_public_key: Option<AssetIssuerPubKeys>, //None if issuer tracking is not required
   pub issuer_lock_amount: Option<(EGCText, EGCText)>, //None if issuer tracking not required or amount is not confidential
   pub issuer_lock_type: Option<EGCText>,
-  //#[serde(with = "serialization::option_bytes")]
-  pub amount_commitments: Option<(CompRist, CompRist)>, //None if not confidential transfer
+  pub amount_commitments: Option<(CompressedRistretto, CompressedRistretto)>, //None if not confidential transfer
   //pub(crate) issuer_lock_id: Option<(ElGamalCiphertext, ElGamalCiphertext)>, TODO
   pub amount: Option<u64>,           // None if confidential transfers
   pub asset_type: Option<AssetType>, // None if confidential asset
-  #[serde(with = "serialization::zei_obj_serde")]
   pub public_key: XfrPublicKey, // ownership address
-  //#[serde(with = "serialization::option_bytes")]
-  pub asset_type_commitment: Option<CompRist>, //Noe if not confidential asset
-  #[serde(with = "serialization::zei_obj_serde")]
+  pub asset_type_commitment: Option<CompressedRistretto>, //Noe if not confidential asset
   pub blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
   pub lock: Option<ZeiHybridCipher>, // If confidential transfer or confidential type lock the amount and or type to the pubkey in asset_record
 }
@@ -76,9 +71,9 @@ pub struct BlindAssetRecord {
 pub struct OpenAssetRecord {
   pub(crate) asset_record: BlindAssetRecord, //TODO have a reference here, and lifetime parameter. We will avoid copying info unnecessarily.
   pub(crate) amount: u64,
-  pub(crate) amount_blinds: (RistScalar, RistScalar),
+  pub(crate) amount_blinds: (Scalar, Scalar),
   pub(crate) asset_type: AssetType,
-  pub(crate) type_blind: RistScalar,
+  pub(crate) type_blind: Scalar,
 }
 
 impl OpenAssetRecord {
@@ -134,9 +129,7 @@ pub struct XfrProofs {
 pub struct XfrRangeProof {
   #[serde(with = "serialization::zei_obj_serde")]
   pub range_proof: RangeProof,
-  #[serde(with = "serialization::zei_obj_serde")]
   pub xfr_diff_commitment_low: CompressedRistretto, //lower 32 bits transfer amount difference commitment
-  #[serde(with = "serialization::zei_obj_serde")]
   pub xfr_diff_commitment_high: CompressedRistretto, //higher 32 bits transfer amount difference commitment
 }
 

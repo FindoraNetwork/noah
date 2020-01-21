@@ -23,7 +23,7 @@ pub struct XfrPublicKey(pub(crate) PublicKey);
 #[derive(Debug, Default)]
 pub struct XfrSecretKey(pub(crate) SecretKey);
 #[wasm_bindgen]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct XfrKeyPair {
   public: XfrPublicKey,
   secret: XfrSecretKey,
