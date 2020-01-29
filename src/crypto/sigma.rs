@@ -1,5 +1,7 @@
 use crate::algebra::groups::{Group, Scalar};
+use crate::algebra::pairing::PairingTargetGroup;
 use crate::errors::ZeiError;
+use digest::Digest;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 
@@ -8,8 +10,19 @@ pub trait SigmaTranscript {
                                         instance_name: &'static [u8],
                                         public_scalars: &[&S],
                                         public_elems: &[&G]);
+  fn append_group_element<S: Scalar, G: Group<S>>(&mut self, label: &'static [u8], elem: &G);
+  fn append_field_element<S: Scalar>(&mut self, label: &'static [u8], scalar: &S);
   fn append_proof_commitment<S: Scalar, G: Group<S>>(&mut self, elem: &G);
   fn get_challenge<S: Scalar>(&mut self) -> S;
+}
+
+pub trait SigmaTranscriptPairing: SigmaTranscript {
+  fn init_sigma_pairing<P: PairingTargetGroup>(&mut self,
+                                               instance_name: &'static [u8],
+                                               public_scalars: &[&P::ScalarField],
+                                               public_elems_g1: &[&P::G1],
+                                               public_elems_g2: &[&P::G2],
+                                               public_elems_gt: &[&P]);
 }
 
 impl SigmaTranscript for Transcript {
@@ -27,13 +40,46 @@ impl SigmaTranscript for Transcript {
       self.append_message(b"public elem", elem.to_compressed_bytes().as_slice())
     }
   }
+  fn append_group_element<S: Scalar, G: Group<S>>(&mut self, label: &'static [u8], elem: &G) {
+    self.append_message(label, elem.to_compressed_bytes().as_slice());
+  }
+  fn append_field_element<S: Scalar>(&mut self, label: &'static [u8], scalar: &S) {
+    self.append_message(label, scalar.to_bytes().as_slice());
+  }
   fn append_proof_commitment<S: Scalar, G: Group<S>>(&mut self, elem: &G) {
-    self.append_message(b"proof_commitment", elem.to_compressed_bytes().as_slice());
+    self.append_group_element(b"proof_commitment", elem);
   }
   fn get_challenge<S: Scalar>(&mut self) -> S {
-    let mut buffer = vec![0u8; 32]; // TODO(fernando) get number of bytes needed from S and remove the number 32
-    self.challenge_bytes(b"Sigma challenge", &mut buffer);
-    S::from_bytes(buffer.as_slice())
+    let mut buffer = vec![0u8; 32];
+    self.challenge_bytes(b"Sigma challenge", &mut buffer); // cannot use buffer directly (S::from_bytes(buffer.as_slice())) as it may not represent a valid Scalar
+    let mut hash = sha2::Sha512::new();
+    hash.input(&buffer[..]);
+    S::from_hash(hash)
+  }
+}
+
+impl SigmaTranscriptPairing for Transcript {
+  fn init_sigma_pairing<P: PairingTargetGroup>(&mut self,
+                                               instance_name: &'static [u8],
+                                               public_scalars: &[&P::ScalarField],
+                                               public_elems_g1: &[&P::G1],
+                                               public_elems_g2: &[&P::G2],
+                                               public_elems_gt: &[&P]) {
+    self.append_message(b"Sigma Protocol domain",
+                        b"Sigma protocol with pairings elements");
+    self.append_message(b"Sigma Protocol instance", instance_name);
+    for scalar in public_scalars {
+      self.append_message(b"public scalar", scalar.to_bytes().as_slice())
+    }
+    for elem in public_elems_g1 {
+      self.append_message(b"public elem g1", elem.to_compressed_bytes().as_slice())
+    }
+    for elem in public_elems_g2 {
+      self.append_message(b"public elem g2", elem.to_compressed_bytes().as_slice())
+    }
+    for elem in public_elems_gt {
+      self.append_message(b"public elem gt", elem.to_bytes().as_slice())
+    }
   }
 }
 

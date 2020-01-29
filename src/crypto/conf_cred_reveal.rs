@@ -3,13 +3,92 @@ use crate::algebra::pairing::PairingTargetGroup;
 use crate::algebra::utils::group_linear_combination_rows;
 use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalPublicKey};
 use crate::crypto::anon_creds::{
-  ac_challenge, ac_vrfy_hidden_terms_addition, ACIssuerPublicKey, ACRevealSig,
+  ac_vrfy_hidden_terms_addition, ACIssuerPublicKey, ACRevealSig,
+  AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE,
 };
+use crate::crypto::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use crate::errors::ZeiError;
+use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use serde::ser::Serialize;
 use sha2::{Digest, Sha512};
 
+const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
+const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"Confidential AC Reveal PoK New Instance";
+
+trait CACTranscript: SigmaTranscriptPairing {
+  fn cac_init<P: PairingTargetGroup>(&mut self,
+                                     ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
+                                     recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
+                                     ac_reveal_sigs: &[&ACRevealSig<P::G1,
+                                                    P::G2,
+                                                    P::ScalarField>],
+                                     ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]]);
+  fn append_issuer_pk<P: PairingTargetGroup>(&mut self,
+                                             ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>);
+  fn append_encryption_key<P: PairingTargetGroup>(&mut self, key: &ElGamalPublicKey<P::G1>);
+  fn append_ciphertext<P: PairingTargetGroup>(&mut self, ctext: &ElGamalCiphertext<P::G1>);
+  fn append_ac_reveal_sig<P: PairingTargetGroup>(&mut self,
+                                                 ac_reveal_sig: &ACRevealSig<P::G1,
+                                                              P::G2,
+                                                              P::ScalarField>);
+}
+
+impl CACTranscript for Transcript {
+  fn cac_init<P: PairingTargetGroup>(&mut self,
+                                     ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
+                                     recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
+                                     ac_reveal_sigs: &[&ACRevealSig<P::G1,
+                                                    P::G2,
+                                                    P::ScalarField>],
+                                     ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]]) {
+    self.append_message(b"New Domain", CAC_REVEAL_PROOF_DOMAIN);
+    self.append_group_element(b"G1", &P::G1::get_base());
+    self.append_group_element(b"G2", &P::G2::get_base());
+    self.append_issuer_pk::<P>(ac_issuer_pk);
+    for key in recv_enc_pub_keys.iter() {
+      self.append_encryption_key::<P>(key);
+    }
+    for sig in ac_reveal_sigs.iter() {
+      self.append_ac_reveal_sig::<P>(sig);
+    }
+    for ctexts in ctexts_vecs.iter() {
+      for ctext in ctexts.iter() {
+        self.append_ciphertext::<P>(ctext);
+      }
+    }
+  }
+  fn append_issuer_pk<P: PairingTargetGroup>(&mut self,
+                                             ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>) {
+    self.append_group_element(b"issuer_pk.G2", &ac_issuer_pk.gen2);
+    self.append_group_element(b"issuer_pk.Z1", &ac_issuer_pk.zz1);
+    self.append_group_element(b"issuer_pk.Z2", &ac_issuer_pk.zz2);
+    self.append_group_element(b"issuer_pk.X2", &ac_issuer_pk.xx2);
+    for y2 in ac_issuer_pk.yy2.iter() {
+      self.append_group_element(b"issuer_pk.Y2", y2);
+    }
+  }
+  fn append_encryption_key<P: PairingTargetGroup>(&mut self, key: &ElGamalPublicKey<P::G1>) {
+    self.append_group_element(b"encription key", key.get_point_ref());
+  }
+  fn append_ciphertext<P: PairingTargetGroup>(&mut self, ctext: &ElGamalCiphertext<P::G1>) {
+    self.append_group_element(b"ctext.e1", &ctext.e1);
+    self.append_group_element(b"ctext.e2", &ctext.e2);
+  }
+  fn append_ac_reveal_sig<P: PairingTargetGroup>(&mut self,
+                                                 ac_reveal_sig: &ACRevealSig<P::G1,
+                                                              P::G2,
+                                                              P::ScalarField>) {
+    self.append_group_element(b"sigma1", &ac_reveal_sig.sig.sigma1);
+    self.append_group_element(b"sigma2", &ac_reveal_sig.sig.sigma2);
+    self.append_group_element(b"pok.com", &ac_reveal_sig.pok.commitment);
+    self.append_field_element(b"pok.response_t", &ac_reveal_sig.pok.response_t);
+    self.append_field_element(b"pok.response_sk", &ac_reveal_sig.pok.response_sk);
+    for response_attr in ac_reveal_sig.pok.response_attrs.iter() {
+      self.append_field_element(b"pok.response_attr", response_attr);
+    }
+  }
+}
 /// Aggregated proof of knowledge of revealed attributes for an anonymous credential reveal signature
 /// that are encrypted under ElGamal
 /// # Arguments
@@ -59,8 +138,9 @@ pub fn cac_create<R: CryptoRng + RngCore, P: PairingTargetGroup>(
       revealed_attrs.push(attr.clone());
     }
   }
-
-  let pok_attrs_proof = agg_pok_attrs_prove::<_, P>(prng,
+  let mut transcript = Transcript::new(CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+  let pok_attrs_proof = agg_pok_attrs_prove::<_, P>(&mut transcript,
+                                                    prng,
                                                     cred_issuer_pk,
                                                     &[enc_key],
                                                     &[revealed_attrs.as_slice()],
@@ -79,7 +159,9 @@ pub fn cac_verify<P: PairingTargetGroup>(issuer_pk: &ACIssuerPublicKey<P::G1, P:
                                          reveal_map: &[bool],
                                          cac: &ConfidentialAC<P>)
                                          -> Result<(), ZeiError> {
-  agg_pok_attrs_verify::<P>(issuer_pk,
+  let mut transcript = Transcript::new(CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+  agg_pok_attrs_verify::<P>(&mut transcript,
+                            issuer_pk,
                             &[&enc_key],
                             &[&cac.ac_reveal_sig],
                             &[&cac.ctexts],
@@ -102,6 +184,7 @@ pub fn cac_verify<P: PairingTargetGroup>(issuer_pk: &ACIssuerPublicKey<P::G1, P:
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
 pub(crate) fn agg_pok_attrs_prove<R, P>(
+  transcript: &mut Transcript,
   prng: &mut R,
   ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
   recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
@@ -127,6 +210,10 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
     return Err(ZeiError::ParameterError);
   }
 
+  transcript.cac_init::<P>(ac_issuer_pub_key,
+                           recv_enc_pub_keys,
+                           ac_reveal_sigs,
+                           ctexts_vecs);
   // 1: sample secrets' blinds and compute proof commitments.
   let (attr_sum_com_yy2, (attrs_coms_g, rands_coms_g, rands_coms_pk), (attrs_blinds, rands_blinds)) =
     sample_blinds_compute_commitments::<_, P>(prng,
@@ -148,14 +235,20 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
     group_linear_combination_rows(lc_scalars.as_slice(), rands_coms_pk.as_slice());
 
   // 4: Compute challenge for the proof and scalars for linear combination
-  let challenge = cac_reveal_challenge_agg::<P>(&ac_issuer_pub_key,
-                                                recv_enc_pub_keys,
-                                                ac_reveal_sigs,
-                                                ctexts_vecs,
-                                                attr_sum_com_yy2.as_slice(),
-                                                agg_attrs_coms_g.as_slice(),
-                                                agg_rands_coms_g.as_slice(),
-                                                agg_rands_coms_pk.as_slice())?;
+  for e in attr_sum_com_yy2.iter() {
+    transcript.append_proof_commitment::<P::ScalarField, P::G2>(e);
+  }
+  for e in agg_attrs_coms_g.iter() {
+    transcript.append_proof_commitment::<P::ScalarField, P::G1>(e);
+  }
+  for e in agg_rands_coms_g.iter() {
+    transcript.append_proof_commitment::<P::ScalarField, P::G1>(e);
+  }
+  for e in agg_rands_coms_pk.iter() {
+    transcript.append_proof_commitment::<P::ScalarField, P::G1>(e);
+  }
+
+  let challenge = transcript.get_challenge::<P::ScalarField>();
 
   // 5: compute proof responses
   let mut attrs_resps = vec![];
@@ -190,7 +283,8 @@ pub(crate) fn agg_pok_attrs_prove<R, P>(
 /// * `agg_pok_attrs` - aggregated proof of knowledge computed through the function agg_pok_attrs_prove
 /// * `bitmap` - indicates which attributes should be revealed to the receiver
 /// * `returns` - nothing if the verification passes, an error otherwise
-pub(crate) fn agg_pok_attrs_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+pub(crate) fn agg_pok_attrs_verify<P: PairingTargetGroup>(transcript: &mut Transcript,
+                                                          ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                                           recv_enc_pub_keys: &[&ElGamalPublicKey<P::G1>],
                                                           ac_reveal_sigs: &[&ACRevealSig<P::G1, P::G2, P::ScalarField>],
                                                           ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
@@ -199,18 +293,28 @@ pub(crate) fn agg_pok_attrs_verify<P: PairingTargetGroup>(ac_issuer_pub_key: &AC
                                                             P::ScalarField>,
                                                           bitmap: &[bool] // indicates which attributes should be revealed to the receiver
 ) -> Result<(), ZeiError> {
+  transcript.cac_init::<P>(ac_issuer_pub_key,
+                           recv_enc_pub_keys,
+                           ac_reveal_sigs,
+                           ctexts_vecs);
   // 1. compute linear combination scalars
   let lc_scalars = compute_linear_combination_scalars::<P>(ctexts_vecs, ac_reveal_sigs);
 
   // 2. compute challenge
-  let challenge = cac_reveal_challenge_agg::<P>(ac_issuer_pub_key,
-                                                recv_enc_pub_keys,
-                                                ac_reveal_sigs,
-                                                ctexts_vecs,
-                                                agg_pok_attrs.attr_sum_com_yy2.as_slice(),
-                                                agg_pok_attrs.agg_attrs_coms_g.as_slice(),
-                                                agg_pok_attrs.agg_rands_coms_g.as_slice(),
-                                                agg_pok_attrs.agg_rands_coms_pk.as_slice())?;
+  for e in agg_pok_attrs.attr_sum_com_yy2.iter() {
+    transcript.append_proof_commitment::<P::ScalarField, P::G2>(e);
+  }
+  for e in agg_pok_attrs.agg_attrs_coms_g.iter() {
+    transcript.append_proof_commitment::<P::ScalarField, P::G1>(e);
+  }
+  for e in agg_pok_attrs.agg_rands_coms_g.iter() {
+    transcript.append_proof_commitment::<P::ScalarField, P::G1>(e);
+  }
+  for e in agg_pok_attrs.agg_rands_coms_pk.iter() {
+    transcript.append_proof_commitment::<P::ScalarField, P::G1>(e);
+  }
+
+  let challenge = transcript.get_challenge::<P::ScalarField>();
 
   // 3. verify ciphertexts
   verify_ciphertext::<P>(&challenge,
@@ -395,9 +499,12 @@ fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
   for (lc_scalar_k, reveal_sig_k, attr_sum_com_k, attr_resp_k) in
     izip!(lc_scalars, ac_reveal_sigs, attr_sum_com_yy2, attr_resps)
   {
-    let c_k = ac_challenge::<P>(issuer_pub_key,
-                                &reveal_sig_k.sig,
-                                &reveal_sig_k.pok.commitment)?;
+    let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+    crate::crypto::anon_creds::init_transcript::<P>(&mut transcript,
+                                                    issuer_pub_key,
+                                                    &reveal_sig_k.sig);
+    transcript.append_proof_commitment(&reveal_sig_k.pok.commitment);
+    let c_k = transcript.get_challenge::<P::ScalarField>();
 
     let hidden_k = ac_vrfy_hidden_terms_addition::<P>(&c_k, reveal_sig_k, issuer_pub_key, bitmap)?;
 
@@ -527,62 +634,6 @@ fn sample_blinds<R, S>(prng: &mut R,
     }
   }
   (attr_blinds, rand_blinds)
-}
-
-/// I compute a challenge for the PoK of knowledge protocol for confidential anonymous credential
-/// reveal. This challenge is computed using the Fiat-Shamir transform.
-/// * `ac_issuer_pub_key` - (signing) issuer public key
-/// * `recv_pub_keys` - list of encryption public keys for the recipients
-/// * `ac_reveal_sigs` - collection of proofs that the issuer has signed some attributes
-/// * `ctexts_vecs`- collection of lists of ciphertexts of attributes
-/// * `ac_coms` - commitments from the aggregated encrypted attributes
-/// * `agg_proof_coms_attrs` - aggregated proof commitments for attributes
-/// * `agg_proof_coms_rands_g` - blinding factors in base g
-/// * `agg_proof_coms_rands_pk` - blinding factors related to the public keys
-/// * `return` - challenge which is a hash value
-// TODO rewrite this function so that it has less arguments.
-#[allow(clippy::too_many_arguments)]
-fn cac_reveal_challenge_agg<P: PairingTargetGroup>(ac_issuer_pub_key: &ACIssuerPublicKey<P::G1,
-                                                                      P::G2>,
-                                                   recv_pub_keys: &[&ElGamalPublicKey<P::G1>],
-                                                   ac_reveal_sigs: &[&ACRevealSig<P::G1,
-                                                     P::G2,
-                                                     P::ScalarField>],
-                                                   ctexts_vecs: &[&[ElGamalCiphertext<P::G1>]],
-                                                   ac_coms: &[P::G2],
-                                                   agg_proof_coms_attrs: &[P::G1],
-                                                   agg_proof_coms_rands_g: &[P::G1],
-                                                   agg_proof_coms_rands_pk: &[P::G1])
-                                                   -> Result<P::ScalarField, ZeiError> {
-  let encoded_ac_pub_key =
-    bincode::serialize(ac_issuer_pub_key).map_err(|_| ZeiError::SerializationError)?;
-
-  let encoded_recv_pub_keys =
-    bincode::serialize(recv_pub_keys).map_err(|_| ZeiError::SerializationError)?;
-
-  let encoded_sigs = bincode::serialize(ac_reveal_sigs).map_err(|_| ZeiError::SerializationError)?;
-
-  let encoded_ctexts = bincode::serialize(ctexts_vecs).map_err(|_| ZeiError::SerializationError)?;
-
-  let mut hash = Sha512::new();
-  hash.input("Zei CACReveal");
-  hash.input(&encoded_ac_pub_key[..]);
-  hash.input(&encoded_recv_pub_keys[..]);
-  hash.input(&encoded_sigs[..]);
-  hash.input(&encoded_ctexts[..]);
-
-  for ac_com in ac_coms {
-    hash.input(ac_com.to_compressed_bytes());
-  }
-  for (a_g, r_g, r_pk) in izip!(agg_proof_coms_attrs,
-                                agg_proof_coms_rands_g,
-                                agg_proof_coms_rands_pk)
-  {
-    hash.input(a_g.to_compressed_bytes());
-    hash.input(r_g.to_compressed_bytes());
-    hash.input(r_pk.to_compressed_bytes());
-  }
-  Ok(P::ScalarField::from_hash(hash))
 }
 
 /// Using a challenge, secret values and their blindings, I compute the proof responses of a PoK

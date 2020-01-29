@@ -80,9 +80,13 @@ in the credentials by
 
 use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
+use crate::crypto::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use crate::errors::ZeiError;
+use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use sha2::{Digest, Sha512};
+
+pub(crate) const AC_REVEAL_PROOF_DOMAIN: &[u8] = b"AC Reveal PoK";
+pub(crate) const AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Reveal PoK Instance";
 
 /// I contain Credentials' Issuer Public key fields
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -238,7 +242,9 @@ pub(crate) fn ac_reveal_with_rand<R: CryptoRng + RngCore, P: PairingTargetGroup>
       hidden_attrs.push(attr.clone());
     }
   }
-  let proof = prove_pok::<_, P>(prng,
+  let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+  let proof = prove_pok::<_, P>(&mut transcript,
+                                prng,
                                 user_sk,
                                 issuer_pk,
                                 &r2,
@@ -250,6 +256,22 @@ pub(crate) fn ac_reveal_with_rand<R: CryptoRng + RngCore, P: PairingTargetGroup>
                    pok: proof })
 }
 
+pub(super) fn init_transcript<P: PairingTargetGroup>(transcript: &mut Transcript,
+                                                     issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
+                                                     signature: &ACSignature<P::G1>) {
+  let g1 = P::G1::get_base();
+  let g2 = P::G2::get_base();
+  let g1_elems = vec![&g1, &issuer_pk.zz1, &signature.sigma1, &signature.sigma2];
+  let mut g2_elems = vec![&g2, &issuer_pk.gen2, &issuer_pk.xx2, &issuer_pk.zz2];
+  for e in issuer_pk.yy2.iter() {
+    g2_elems.push(e);
+  }
+  transcript.init_sigma_pairing::<P>(AC_REVEAL_PROOF_DOMAIN,
+                                     &[],
+                                     &g1_elems[..],
+                                     g2_elems.as_slice(),
+                                     &[]);
+}
 /// I produce selective attribute disclose proof of knowledge
 /// Algorithm:
 ///     1. Sample beta1, beta2 and {gamma_j} (One for each hidden attribute)
@@ -258,7 +280,9 @@ pub(crate) fn ac_reveal_with_rand<R: CryptoRng + RngCore, P: PairingTargetGroup>
 ///     3. Sample the challenge as a hash of the commitment.
 ///     4. Compute challenge's responses  c*t + \beta1, c*sk + beta2, {c*y_i + gamma_i}
 ///     5. Return proof commitment and responses
+#[allow(clippy::too_many_arguments)]
 fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
+  transcript: &mut Transcript,
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -267,6 +291,8 @@ fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   bitmap: &[bool], // indicates revealed attributed
   sig: &ACSignature<P::G1>)
   -> Result<ACPoK<P::G2, P::ScalarField>, ZeiError> {
+  init_transcript::<P>(transcript, issuer_pk, sig);
+
   let beta1 = P::ScalarField::random_scalar(prng);
   let beta2 = P::ScalarField::random_scalar(prng);
   let mut gamma = vec![];
@@ -282,7 +308,8 @@ fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
       commitment = commitment.add(&elem);
     }
   }
-  let challenge = ac_challenge::<P>(issuer_pk, sig, &commitment)?;
+  transcript.append_proof_commitment(&commitment);
+  let challenge = transcript.get_challenge::<P::ScalarField>();
   let response_t = challenge.mul(t).add(&beta1); // challente*t + beta1
   let response_sk = challenge.mul(&user_sk.0).add(&beta2);
   let mut response_attrs = vec![];
@@ -300,25 +327,6 @@ fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
              response_t,
              response_sk,
              response_attrs })
-}
-
-/// I compute proof of knowledge challenge for selective attribute disclosure proof
-pub(crate) fn ac_challenge<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1,
-                                                                     P::G2>,
-                                                  sig: &ACSignature<P::G1>,
-                                                  commitment: &P::G2)
-                                                  -> Result<P::ScalarField, ZeiError> {
-  let c = commitment.to_compressed_bytes();
-  let mut hasher = Sha512::new();
-  let encoded_key = bincode::serialize(&issuer_pub_key).map_err(|_| ZeiError::SerializationError)?;
-  let encoded_sig = bincode::serialize(&sig).map_err(|_| ZeiError::SerializationError)?;
-
-  hasher.input("ZeiACReveal");
-  hasher.input(encoded_key.as_slice());
-  hasher.input(encoded_sig.as_slice());
-  hasher.input(c.as_slice());
-
-  Ok(P::ScalarField::from_hash(hasher))
 }
 
 /// Given a list of revealed attributes_{k}, and a credential structure composed by a signature
@@ -341,7 +349,10 @@ pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKe
                                                             P::G2,
                                                             P::ScalarField>)
                                                -> Result<(), ZeiError> {
-  let challenge = ac_challenge::<P>(issuer_pub_key, &reveal_sig.sig, &reveal_sig.pok.commitment)?;
+  let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+  init_transcript::<P>(&mut transcript, issuer_pub_key, &reveal_sig.sig);
+  transcript.append_proof_commitment(&reveal_sig.pok.commitment);
+  let challenge = transcript.get_challenge::<P::ScalarField>();
   // hidden = X_2*c - proof_commitment + &G2 * r_t + Z2 * r_sk + \sum r_attr_i * Y2_i;
   let hidden = ac_vrfy_hidden_terms_addition::<P>(&challenge, &reveal_sig, issuer_pub_key, bitmap)?;
   // revealed = c * \sum attr_j * Y2_j;
