@@ -107,6 +107,14 @@ pub(crate) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
   hasher.input(slice);
   S::from_hash(hasher)
 }
+
+pub(crate) fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
+  base64::encode_config(input, base64::URL_SAFE)
+}
+pub(crate) fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>, base64::DecodeError> {
+  base64::decode_config(input, base64::URL_SAFE)
+}
+
 /*
 // **base58 translation functions**
 use num_bigint::{BigInt};

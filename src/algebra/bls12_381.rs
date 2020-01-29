@@ -1,5 +1,6 @@
 use super::groups::{Group, Scalar};
 use super::pairing::PairingTargetGroup;
+use crate::utils::{b64dec, b64enc};
 use crate::utils::{u64_to_bigendian_u8array, u8_bigendian_slice_to_u32};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
@@ -117,7 +118,7 @@ impl Serialize for BLSScalar {
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(self.to_bytes().as_slice()))
+      serializer.serialize_str(&b64enc(self.to_bytes().as_slice()))
     } else {
       serializer.serialize_bytes(self.to_bytes().as_slice())
     }
@@ -155,7 +156,7 @@ impl<'de> Deserialize<'de> for BLSScalar {
       fn visit_str<E>(self, s: &str) -> Result<BLSScalar, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {
@@ -247,7 +248,7 @@ impl Serialize for BLSG1 {
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(self.to_compressed_bytes().as_slice()))
+      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
     } else {
       serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
     }
@@ -285,7 +286,7 @@ impl<'de> Deserialize<'de> for BLSG1 {
       fn visit_str<E>(self, s: &str) -> Result<BLSG1, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {
@@ -381,7 +382,7 @@ impl Serialize for BLSG2 {
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(self.to_compressed_bytes().as_slice()))
+      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
     } else {
       serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
     }
@@ -419,7 +420,7 @@ impl<'de> Deserialize<'de> for BLSG2 {
       fn visit_str<E>(self, s: &str) -> Result<BLSG2, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {

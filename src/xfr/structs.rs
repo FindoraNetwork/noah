@@ -60,7 +60,7 @@ pub struct BlindAssetRecord {
   //pub(crate) issuer_lock_id: Option<(ElGamalCiphertext, ElGamalCiphertext)>, TODO
   pub amount: Option<u64>,           // None if confidential transfers
   pub asset_type: Option<AssetType>, // None if confidential asset
-  pub public_key: XfrPublicKey, // ownership address
+  pub public_key: XfrPublicKey,      // ownership address
   pub asset_type_commitment: Option<CompressedRistretto>, //Noe if not confidential asset
   pub blind_share: CompressedEdwardsY, // Used by pukey holder to derive blinding factors
   pub lock: Option<ZeiHybridCipher>, // If confidential transfer or confidential type lock the amount and or type to the pubkey in asset_record

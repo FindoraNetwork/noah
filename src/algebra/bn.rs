@@ -104,7 +104,7 @@ impl Serialize for BNScalar {
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(self.to_bytes().as_slice()))
+      serializer.serialize_str(&b64enc(self.to_bytes().as_slice()))
     } else {
       serializer.serialize_bytes(self.to_bytes().as_slice())
     }
@@ -143,7 +143,7 @@ impl<'de> Deserialize<'de> for BNScalar {
       fn visit_str<E>(self, s: &str) -> Result<BNScalar, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {
@@ -243,7 +243,7 @@ impl Serialize for BNG1 {
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(self.to_compressed_bytes().as_slice()))
+      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
     } else {
       serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
     }
@@ -281,7 +281,7 @@ impl<'de> Deserialize<'de> for BNG1 {
       fn visit_str<E>(self, s: &str) -> Result<BNG1, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {
@@ -382,7 +382,7 @@ impl Serialize for BNG2 {
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(self.to_compressed_bytes().as_slice()))
+      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
     } else {
       serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
     }
@@ -420,7 +420,7 @@ impl<'de> Deserialize<'de> for BNG2 {
       fn visit_str<E>(self, s: &str) -> Result<BNG2, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {

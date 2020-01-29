@@ -1,23 +1,24 @@
-use crate::xfr::sig::{XfrSignature, XfrPublicKey, XfrSecretKey};
+use crate::utils::{b64dec, b64enc};
+use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 //use ed25519_dalek::{PublicKey, SecretKey};
+use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
-use ed25519_dalek::{PublicKey, SecretKey};
 
 impl Serialize for XfrPublicKey {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(&self.as_bytes()))
+      serializer.serialize_str(&b64enc(&self.as_bytes()))
     } else {
       serializer.serialize_bytes(self.as_bytes())
     }
@@ -61,7 +62,7 @@ impl<'de> Deserialize<'de> for XfrPublicKey {
       fn visit_str<E>(self, s: &str) -> Result<XfrPublicKey, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {
@@ -77,7 +78,7 @@ impl Serialize for XfrSecretKey {
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(&self.zei_to_bytes()))
+      serializer.serialize_str(&b64enc(&self.zei_to_bytes()))
     } else {
       serializer.serialize_bytes(self.zei_to_bytes().as_slice())
     }
@@ -121,7 +122,7 @@ impl<'de> Deserialize<'de> for XfrSecretKey {
       fn visit_str<E>(self, s: &str) -> Result<XfrSecretKey, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {
@@ -221,7 +222,7 @@ impl Serialize for XfrSignature {
     where S: Serializer
   {
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(self.zei_to_bytes().as_slice()))
+      serializer.serialize_str(&b64enc(self.zei_to_bytes().as_slice()))
     } else {
       serializer.serialize_bytes(self.zei_to_bytes().as_slice())
     }
@@ -259,7 +260,7 @@ impl<'de> Deserialize<'de> for XfrSignature {
       fn visit_str<E>(self, s: &str) -> Result<XfrSignature, E>
         where E: serde::de::Error
       {
-        self.visit_bytes(&base64::decode(s).map_err(serde::de::Error::custom)?)
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
 
@@ -275,6 +276,7 @@ impl<'de> Deserialize<'de> for XfrSignature {
 
 pub mod zei_obj_serde {
   use crate::serialization::ZeiFromToBytes;
+  use crate::utils::{b64dec, b64enc};
   use serde::de::SeqAccess;
   use serde::de::Visitor;
   use serde::Deserializer;
@@ -308,7 +310,7 @@ pub mod zei_obj_serde {
     fn visit_str<E>(self, v: &str) -> Result<Vec<u8>, E>
       where E: serde::de::Error
     {
-      base64::decode(v).map_err(serde::de::Error::custom)
+      b64dec(v).map_err(serde::de::Error::custom)
     }
   }
 
@@ -318,7 +320,7 @@ pub mod zei_obj_serde {
   {
     let bytes = obj.zei_to_bytes();
     if serializer.is_human_readable() {
-      serializer.serialize_str(&base64::encode(&bytes))
+      serializer.serialize_str(&b64enc(&bytes))
     } else {
       serializer.serialize_bytes(&bytes[..])
     }
@@ -355,7 +357,7 @@ pub mod option_bytes {
       let bytes = object.as_ref().unwrap().zei_to_bytes();
       //let encoded = hex::encode(&bytes[..]);
       if serializer.is_human_readable() {
-        serializer.serialize_str(&base64::encode(bytes.as_slice()))
+        serializer.serialize_str(&b64enc(bytes.as_slice()))
       } else {
         serializer.serialize_bytes(bytes.as_slice())
       }
