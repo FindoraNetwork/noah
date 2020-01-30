@@ -126,6 +126,7 @@ pub struct ACUserSecretKey<S>(pub(crate) S);
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ACRevealSig<G1, G2, S> {
   pub(crate) sig: ACSignature<G1>,
+  pub(crate) rnd: (S, S),
   pub(crate) pok: ACPoK<G2, S>,
 }
 
@@ -253,6 +254,7 @@ pub(crate) fn ac_reveal_with_rand<R: CryptoRng + RngCore, P: PairingTargetGroup>
                                 &rand_sig)?;
 
   Ok(ACRevealSig { sig: rand_sig,
+                   rnd: (r1, r2),
                    pok: proof })
 }
 
