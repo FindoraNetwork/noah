@@ -74,7 +74,7 @@ pub fn ac_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
   crate::crypto::anon_creds::ac_sign::<_, BLSGt>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
 }
 
-/// Produces a AttrsRevealProof, as with ac_reveal, but the randomization is supplied by the caller
+/// Produces randomization suitable for use with ac_reveal_with_rand
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
