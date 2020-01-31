@@ -66,7 +66,8 @@ pub fn rt_process_join_request<R: CryptoRng + RngCore, B: AsRef<[u8]>>(
   ac_verify(ac_issuer_pk,
             user_join_req.attrs.as_slice(),
             bitmap.as_slice(),
-            &user_join_req.credential_proof)?;
+            &user_join_req.credential_proof.sig,
+            &user_join_req.credential_proof.pok)?;
 
   // 2 generate tag
   Ok(gpsig_join_cert(prng, rsk))
