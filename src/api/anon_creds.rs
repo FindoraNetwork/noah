@@ -14,6 +14,8 @@ pub type ACUserSecretKey = crate::crypto::anon_creds::ACUserSecretKey<BLSScalar>
 
 pub type ACRevealSig = crate::crypto::anon_creds::ACRevealSig<BLSG1, BLSG2, BLSScalar>;
 
+pub type ACPoK = crate::crypto::anon_creds::ACPoK<BLSG2, BLSScalar>;
+
 /// Generates e key pair for a credential issuer
 /// # Example
 /// ```
@@ -72,7 +74,7 @@ pub fn ac_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
   crate::crypto::anon_creds::ac_sign::<_, BLSGt>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
 }
 
-/// Produces a AttrsRevealProof, as with ac_reveal, but the randomization is supplied by the caller
+/// Produces randomization suitable for use with ac_reveal_with_rand
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
@@ -175,15 +177,16 @@ pub fn ac_reveal_with_rand<R: CryptoRng + RngCore, B: AsRef<[u8]>>(
 /// let signature = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
 /// let bitmap = [true,false]; // Reveal first attribute and hide the second one
 /// let reveal_sig = ac_reveal(&mut prng, &user_sk, &issuer_pk, &signature, &attributes[..], &bitmap).unwrap();
-/// let result_verification_ok = ac_verify(&issuer_pk, &attributes[..1],& bitmap, &reveal_sig);
+/// let result_verification_ok = ac_verify(&issuer_pk, &attributes[..1],& bitmap, &reveal_sig.sig, &reveal_sig.pok);
 /// assert!(result_verification_ok.is_ok());
-/// let result_verification_err = ac_verify(&issuer_pk, &attributes[1..],& bitmap, &reveal_sig);
+/// let result_verification_err = ac_verify(&issuer_pk, &attributes[1..],& bitmap, &reveal_sig.sig, &reveal_sig.pok);
 /// assert!(result_verification_err.is_err());
 /// ```
 pub fn ac_verify<B: AsRef<[u8]>>(issuer_pub_key: &ACIssuerPublicKey,
                                  revealed_attrs: &[B],
                                  bitmap: &[bool],
-                                 reveal_sig: &ACRevealSig)
+                                 ac_sig: &ACSignature,
+                                 reveal_sig_pok: &ACPoK)
                                  -> Result<(), ZeiError> {
   let revealed_attrs_scalar: Vec<BLSScalar> =
     revealed_attrs.iter()
@@ -192,5 +195,6 @@ pub fn ac_verify<B: AsRef<[u8]>>(issuer_pub_key: &ACIssuerPublicKey,
   crate::crypto::anon_creds::ac_verify::<BLSGt>(issuer_pub_key,
                                                 revealed_attrs_scalar.as_slice(),
                                                 bitmap,
-                                                reveal_sig)
+                                                &ac_sig,
+                                                &reveal_sig_pok)
 }

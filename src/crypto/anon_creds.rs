@@ -125,14 +125,15 @@ pub struct ACUserSecretKey<S>(pub(crate) S);
 /// attributes for the corresponding UserPublicKey
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ACRevealSig<G1, G2, S> {
-  pub(crate) sig: ACSignature<G1>,
-  pub(crate) pok: ACPoK<G2, S>,
+  pub sig: ACSignature<G1>,
+  pub rnd: (S, S),
+  pub pok: ACPoK<G2, S>,
 }
 
 /// I'm a proof of knowledge for t, sk (UserSecretKey), and hidden attributes that satisfy a
 /// certain relation.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct ACPoK<G2, S> {
+pub struct ACPoK<G2, S> {
   pub(crate) commitment: G2, // r_t*G2 + r_sk*Z2 + sum_{a_i in hidden attrs} r_{a_i}*Y2_i
   pub(crate) response_t: S,  // c*t + r_t
   pub(crate) response_sk: S, // c*sk + r_sk
@@ -253,6 +254,7 @@ pub(crate) fn ac_reveal_with_rand<R: CryptoRng + RngCore, P: PairingTargetGroup>
                                 &rand_sig)?;
 
   Ok(ACRevealSig { sig: rand_sig,
+                   rnd: (r1, r2),
                    pok: proof })
 }
 
@@ -345,16 +347,16 @@ fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
 pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                                revealed_attrs: &[P::ScalarField],
                                                bitmap: &[bool],
-                                               reveal_sig: &ACRevealSig<P::G1,
-                                                            P::G2,
-                                                            P::ScalarField>)
+                                               ac_sig: &ACSignature<P::G1>,
+                                               reveal_sig_pok: &ACPoK<P::G2, P::ScalarField>)
                                                -> Result<(), ZeiError> {
   let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
-  init_transcript::<P>(&mut transcript, issuer_pub_key, &reveal_sig.sig);
-  transcript.append_proof_commitment(&reveal_sig.pok.commitment);
+  init_transcript::<P>(&mut transcript, issuer_pub_key, &ac_sig);
+  transcript.append_proof_commitment(&reveal_sig_pok.commitment);
   let challenge = transcript.get_challenge::<P::ScalarField>();
   // hidden = X_2*c - proof_commitment + &G2 * r_t + Z2 * r_sk + \sum r_attr_i * Y2_i;
-  let hidden = ac_vrfy_hidden_terms_addition::<P>(&challenge, &reveal_sig, issuer_pub_key, bitmap)?;
+  let hidden =
+    ac_vrfy_hidden_terms_addition::<P>(&challenge, &reveal_sig_pok, issuer_pub_key, bitmap)?;
   // revealed = c * \sum attr_j * Y2_j;
   let revealed =
     ac_vrfy_revealed_terms_addition::<P>(&challenge, revealed_attrs, issuer_pub_key, bitmap)?;
@@ -362,8 +364,8 @@ pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKe
   // p = c * (X2 + t*G2 + sk * Z2 \sum attr_i Y2_i)
   let p = hidden.add(&revealed);
 
-  let lhs = P::pairing(&reveal_sig.sig.sigma1, &p);
-  let rhs = P::pairing(&reveal_sig.sig.sigma2.mul(&challenge), &issuer_pub_key.gen2);
+  let lhs = P::pairing(&ac_sig.sigma1, &p);
+  let rhs = P::pairing(&ac_sig.sigma2.mul(&challenge), &issuer_pub_key.gen2);
 
   if lhs == rhs {
     Ok(())
@@ -377,7 +379,7 @@ pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKe
 /// c * X2 + b_t * G1  + b_sk * Z2 + sum_{i\in Hidden} b_{attr_i} * Y2_i - reveal_sig.COM
 /// = c( x + t + sk * z + sum_{i\in Hidden} attr_i * y2_i) * G2
 pub(crate) fn ac_vrfy_hidden_terms_addition<P: PairingTargetGroup>(challenge: &P::ScalarField,
-                                                                   reveal_sig: &ACRevealSig<P::G1, P::G2, P::ScalarField>,
+                                                                   reveal_sig_pok: &ACPoK<P::G2, P::ScalarField>,
                                                                    issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
                                                                    bitmap: &[bool])
                                                                    -> Result<P::G2, ZeiError> {
@@ -385,12 +387,12 @@ pub(crate) fn ac_vrfy_hidden_terms_addition<P: PairingTargetGroup>(challenge: &P
   // sum PK.Y2_i * response_attr_i
   let mut q = issuer_pub_key.xx2
                             .mul(&challenge)
-                            .sub(&reveal_sig.pok.commitment); //X_2*challenge - proof.commitment
+                            .sub(&reveal_sig_pok.commitment); //X_2*challenge - proof.commitment
 
-  q = q.add(&issuer_pub_key.gen2.mul(&reveal_sig.pok.response_t));
-  q = q.add(&issuer_pub_key.zz2.mul(&reveal_sig.pok.response_sk));
+  q = q.add(&issuer_pub_key.gen2.mul(&reveal_sig_pok.response_t));
+  q = q.add(&issuer_pub_key.zz2.mul(&reveal_sig_pok.response_sk));
 
-  let mut resp_attr_iter = reveal_sig.pok.response_attrs.iter();
+  let mut resp_attr_iter = reveal_sig_pok.response_attrs.iter();
   for (b, yy2i) in bitmap.iter().zip(issuer_pub_key.yy2.iter()) {
     if !b {
       let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
@@ -457,7 +459,11 @@ pub(crate) mod credentials_tests {
     }
 
     assert_eq!(true,
-               ac_verify::<P>(&issuer_pk, revealed_attrs.as_slice(), bitmap, &reveal_sig,).is_ok())
+               ac_verify::<P>(&issuer_pk,
+                              revealed_attrs.as_slice(),
+                              bitmap,
+                              &reveal_sig.sig,
+                              &reveal_sig.pok).is_ok())
   }
 
   pub fn single_attribute<P: PairingTargetGroup>() {

@@ -506,7 +506,8 @@ fn verify_credential_agg<P: PairingTargetGroup>(challenge: &P::ScalarField,
     transcript.append_proof_commitment(&reveal_sig_k.pok.commitment);
     let c_k = transcript.get_challenge::<P::ScalarField>();
 
-    let hidden_k = ac_vrfy_hidden_terms_addition::<P>(&c_k, reveal_sig_k, issuer_pub_key, bitmap)?;
+    let hidden_k =
+      ac_vrfy_hidden_terms_addition::<P>(&c_k, &reveal_sig_k.pok, issuer_pub_key, bitmap)?;
 
     let revealed_k =
       ac_vrfy_zk_revealed_terms_addition::<P>(issuer_pub_key, attr_sum_com_k, attr_resp_k, bitmap)?;
