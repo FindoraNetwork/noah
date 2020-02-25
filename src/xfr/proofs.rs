@@ -1,6 +1,8 @@
 use crate::algebra::bls12_381::BLSG1;
-use crate::api::anon_creds::ACRevealSig;
-use crate::api::conf_cred_reveal::{cac_create, cac_verify, ConfidentialAC};
+use crate::api::anon_creds::{
+  ac_confidential_open_commitment, ac_confidential_verify, ConfidentialAC,
+};
+use crate::api::anon_creds::{ACCommitment, ACCommitmentKey, ACUserSecretKey, Credential};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::crypto::chaum_pedersen::{
   chaum_pedersen_prove_multiple_eq, chaum_pedersen_verify_multiple_eq, ChaumPedersenProofX,
@@ -112,7 +114,9 @@ pub(crate) fn tracking_proofs<R: CryptoRng + RngCore>(
 // TODO what do the two "for" loops below do??
 pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + RngCore>(prng: &mut R,
                                                                    xfr_body: &XfrBody,
-                                                                   attribute_reveal_policies: &[Option<IdRevealPolicy>])
+                                                                   attribute_reveal_policies: &[Option<IdRevealPolicy>],
+                                                                   sig_commitments: &[Option<&ACCommitment>],
+                                                                   msg: &[u8])
                                                                    -> Result<(), ZeiError> {
   fn same_key(first_key: Option<&AssetIssuerPubKeys>,
               second_key: Option<&AssetIssuerPubKeys>)
@@ -193,18 +197,21 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + RngCore>(prng: &mut R,
                     .map_err(|_| ZeiError::XfrVerifyIssuerTrackingAssetAmountError)?;
         }
       };
-      for (proof, attr_reveal_policy) in xfr_body.proofs
-                                                 .asset_tracking_proof
-                                                 .identity_proofs
-                                                 .iter()
-                                                 .zip(attribute_reveal_policies)
+      for (proof, attr_reveal_policy, sig_commitment) in
+        izip!(xfr_body.proofs.asset_tracking_proof.identity_proofs.iter(),
+              attribute_reveal_policies.iter(),
+              sig_commitments.iter())
       {
-        match attr_reveal_policy {
-          None => {}
-          Some(policy) => {
-            verify_attribute_reveal_policy(&public_key.eg_blsg1_pub_key, proof, policy)
-                            .map_err(|_| ZeiError::XfrVerifyIssuerTrackingIdentityError)?;
-          }
+        if let (Some(policy), Some(sig_commitment), Some(pf)) =
+          (attr_reveal_policy, sig_commitment, proof)
+        {
+          verify_attribute_reveal_policy(&public_key.eg_blsg1_pub_key,
+                                         pf,
+                                         sig_commitment,
+                                         policy,
+                                         msg).map_err(|_| {
+                                               ZeiError::XfrVerifyIssuerTrackingIdentityError
+                                             })?;
         }
       }
     }
@@ -216,38 +223,56 @@ pub(crate) fn verify_issuer_tracking_proof<R: CryptoRng + RngCore>(prng: &mut R,
 /**** Confidential Identity Attributes Reveal *****/
 
 fn verify_attribute_reveal_policy(asset_issuer_pk: &ElGamalPublicKey<BLSG1>,
-                                  option_proof: &Option<ConfidentialAC>,
-                                  policy: &IdRevealPolicy)
+                                  cac_proof: &ConfidentialAC,
+                                  sig_commitment: &ACCommitment,
+                                  policy: &IdRevealPolicy,
+                                  msg: &[u8])
                                   -> Result<(), ZeiError> {
-  match option_proof {
+  /*match option_proof {
     None => Err(ZeiError::XfrVerifyIssuerTrackingIdentityError),
-    Some(identity_proof) => verify_conf_id_reveal(&identity_proof, asset_issuer_pk, policy),
+    Some((identity_proof, sig_commitment)) => verify_conf_id_reveal(
+      &identity_proof,
+      asset_issuer_pk,
+      policy,
+      sig_commitment
+    ),
   }
+  */
+  verify_conf_id_reveal(cac_proof, asset_issuer_pk, policy, sig_commitment, msg)
 }
 
 pub fn create_conf_id_reveal<R: RngCore + CryptoRng, B: AsRef<[u8]>>(
   prng: &mut R,
-  attrs: &[B],
+  user_sk: &ACUserSecretKey,
+  credential: &Credential<B>,
+  key: &ACCommitmentKey,
   policy: &IdRevealPolicy,
-  attr_reveal_proof: &ACRevealSig,
   asset_issuer_public_key: &ElGamalPublicKey<BLSG1>)
   -> Result<ConfidentialAC, ZeiError> {
-  cac_create(prng,
-             &policy.cred_issuer_pub_key,
-             asset_issuer_public_key,
-             attrs,
-             policy.bitmap.as_slice(),
-             attr_reveal_proof)
+  if credential.issuer_pk != policy.cred_issuer_pub_key {
+    return Err(ZeiError::ParameterError);
+  }
+  ac_confidential_open_commitment(prng,
+                                  user_sk,
+                                  credential,
+                                  key,
+                                  asset_issuer_public_key,
+                                  policy.bitmap.as_slice(),
+                                  &[])
 }
 
 pub fn verify_conf_id_reveal(conf_id_reveal: &ConfidentialAC,
                              asset_issuer_public_key: &ElGamalPublicKey<BLSG1>,
-                             attr_reveal_policy: &IdRevealPolicy)
+                             attr_reveal_policy: &IdRevealPolicy,
+                             sig_commitment: &ACCommitment,
+                             msg: &[u8])
                              -> Result<(), ZeiError> {
-  cac_verify(&attr_reveal_policy.cred_issuer_pub_key,
-             asset_issuer_public_key,
-             &attr_reveal_policy.bitmap,
-             conf_id_reveal)
+  ac_confidential_verify(&attr_reveal_policy.cred_issuer_pub_key,
+                         asset_issuer_public_key,
+                         &attr_reveal_policy.bitmap,
+                         sig_commitment,
+                         conf_id_reveal,
+                         msg)
 }
 
 /**** Range Proofs *****/

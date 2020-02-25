@@ -1,5 +1,4 @@
-use crate::api::anon_creds::ACIssuerPublicKey;
-use crate::api::conf_cred_reveal::ConfidentialAC;
+use crate::api::anon_creds::{ACIssuerPublicKey, ConfidentialAC};
 use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalPublicKey};
 use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
@@ -39,7 +38,7 @@ pub struct XfrBody {
 }
 
 pub type EGPubKey = ElGamalPublicKey<RistrettoPoint>;
-type EGPubKeyId = crate::api::conf_cred_reveal::ElGamalPublicKey;
+type EGPubKeyId = crate::api::anon_creds::ElGamalPublicKey;
 type EGCText = ElGamalCiphertext<RistrettoPoint>;
 
 /// I'm a bundle of public keys for the asset issuer

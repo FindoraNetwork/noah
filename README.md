@@ -1,19 +1,19 @@
 ![alt text](https://github.com/eianio/zei/raw/master/zei_logo.png)
 
-**Zei: Eian Cryptographic Library**
+**Zei: Findora's Cryptographic Library**
 
 Zei is a library that provide tools to create and verify public transaction
 with confidential data.
 
 Support:
  - Basic Cryptographic tools:
-    - ElGamalEncryption in the exponent over generic groups.
+    - ElGamal Encryption in the exponent over generic groups.
     - A Naive Multisignature (concatenation of ed25519 signatures)
-       - Future version will support BLS multisignatures
+    - BLS multisignatures (not currently integrated with Xfr creation)
     - Hybrid Encryption using signature key
  - Advanced Cryptographic tools:
    - Anonymous Credentials based on David Pointcheval and Olivier Sanders.
-   Short Randomizable Signatures. CT RSA 2015. https://eprint.iacr.org/2015/525.pdf.
+    Short Randomizable Signatures. CT RSA 2015. https://eprint.iacr.org/2015/525.pdf.
    It currently uses BLS12_381 as the underlying pairing
    - Confidential Anonymous Credential Reveal: Allows to encrypt credential attributes
    so that a verifier can check a credential signature without learning the attributes.

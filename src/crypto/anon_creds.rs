@@ -82,11 +82,14 @@ use crate::algebra::groups::{Group, Scalar};
 use crate::algebra::pairing::PairingTargetGroup;
 use crate::crypto::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use crate::errors::ZeiError;
+use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 
 pub(crate) const AC_REVEAL_PROOF_DOMAIN: &[u8] = b"AC Reveal PoK";
 pub(crate) const AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Reveal PoK Instance";
+pub(crate) const AC_COMMIT_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Commit SoK Instance";
+pub(crate) const SOK_LABEL: &[u8] = b"Signature Message";
 
 /// I contain Credentials' Issuer Public key fields
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,6 +101,11 @@ pub struct ACIssuerPublicKey<G1, G2> {
   pub(crate) yy2: Vec<G2>, //gen2^{y_i}, y_i in CredIssuerSecretKey
 }
 
+impl<G1, G2> ACIssuerPublicKey<G1, G2> {
+  pub fn num_attrs(&self) -> usize {
+    self.yy2.len()
+  }
+}
 /// I contain the Credentials' Issuer Secret key fields
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ACIssuerSecretKey<G1, S> {
@@ -113,6 +121,15 @@ pub struct ACSignature<G1> {
   pub(crate) sigma2: G1,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Credential<G1, G2, B> {
+  pub signature: ACSignature<G1>, // original signature from Issuer
+  pub attributes: Vec<B>,         // set of attributes in credential
+  pub issuer_pk: ACIssuerPublicKey<G1, G2>,
+}
+
+pub type ACCommitment<G1> = ACSignature<G1>;
+
 ///I'm a user public key used to request a signature for a set of attributes (credential)
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ACUserPublicKey<G1>(pub(crate) G1);
@@ -125,12 +142,14 @@ pub struct ACUserSecretKey<S>(pub(crate) S);
 /// attributes for the corresponding UserPublicKey
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ACRevealSig<G1, G2, S> {
-  pub sig: ACSignature<G1>,
-  pub rnd: (S, S),
-  pub pok: ACPoK<G2, S>,
+  pub sig_commitment: ACCommitment<G1>,
+  pub pok: ACRevealProof<G2, S>,
 }
 
-/// I'm a proof of knowledge for t, sk (UserSecretKey), and hidden attributes that satisfy a
+/// Proof that revealed attributes verify a credential commitment signature
+pub type ACRevealProof<G2, S> = ACPoK<G2, S>;
+
+/// Proof of knowledge for t, sk (UserSecretKey), and hidden attributes that satisfy a
 /// certain relation.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ACPoK<G2, S> {
@@ -138,6 +157,20 @@ pub struct ACPoK<G2, S> {
   pub(crate) response_t: S,  // c*t + r_t
   pub(crate) response_sk: S, // c*sk + r_sk
   pub(crate) response_attrs: Vec<S>, // {c*a_i + r_{a_i}; a_i in hidden}
+}
+
+#[derive(Clone)]
+pub(crate) enum Attribute<S> {
+  Revealed(S),
+  Hidden(Option<S>),
+}
+
+/// Secret AC Commitment opening parameters. Used to create ac reveal proofs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ACKey<S> {
+  // a credential signature (s1,s2) is committed as (r*s1, r*(s2 + t*s1))
+  pub r: S,
+  pub t: S,
 }
 
 /// I generate e key pair for a credential issuer
@@ -196,74 +229,222 @@ pub(crate) fn ac_sign<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut 
                          sigma2: user_pk.0.add(&cc).mul(&u) }
 }
 
-pub(crate) fn ac_sample_random_factors<R: CryptoRng + RngCore, P: PairingTargetGroup>(
+/// Sample an  AC commitment key
+pub(crate) fn ac_gen_key<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R)
-  -> (P::ScalarField, P::ScalarField) {
-  (P::ScalarField::random_scalar(prng), P::ScalarField::random_scalar(prng))
+  -> ACKey<P::ScalarField> {
+  ACKey { r: P::ScalarField::random_scalar(prng),
+          t: P::ScalarField::random_scalar(prng) }
 }
 
-/// I produce a AttrsRevealProof, bitmap indicates which attributes are revealed.
+/// Credential commitment to a message
+#[allow(clippy::type_complexity)] //TODO simplify it
+pub(crate) fn ac_commit<R: CryptoRng + RngCore, P: PairingTargetGroup>(
+  prng: &mut R,
+  user_sk: &ACUserSecretKey<P::ScalarField>,
+  credential: &Credential<P::G1, P::G2, P::ScalarField>,
+  msg: &[u8])
+  -> Result<(ACCommitment<P::G1>, ACPoK<P::G2, P::ScalarField>, ACKey<P::ScalarField>), ZeiError> {
+  let key = ac_gen_key::<_, P>(prng);
+  let (commitment, sok) = ac_commit_with_key::<_, P>(prng, user_sk, credential, &key, msg)?;
+  Ok((commitment, sok, key))
+}
+
+#[allow(clippy::type_complexity)] //TODO simplify it
+pub(crate) fn ac_commit_with_key<R: CryptoRng + RngCore, P: PairingTargetGroup>(
+  prng: &mut R,
+  user_sk: &ACUserSecretKey<P::ScalarField>,
+  credential: &Credential<P::G1, P::G2, P::ScalarField>,
+  key: &ACKey<P::ScalarField>,
+  msg: &[u8])
+  -> Result<(ACCommitment<P::G1>, ACPoK<P::G2, P::ScalarField>), ZeiError> {
+  let hidden_attrs = credential.attributes
+                               .iter()
+                               .map(|attr| Attribute::Hidden(Some(attr)))
+                               .collect_vec(); // all hidden
+
+  let sig_commitment = ac_randomize::<P>(&credential.signature, key); // compute commitment
+  let mut transcript = Transcript::new(AC_COMMIT_NEW_TRANSCRIPT_INSTANCE);
+  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pk, &sig_commitment); // public parameters
+  transcript.append_message(SOK_LABEL, msg); // SoK on message msg
+  let sok = prove_pok::<_, P>(&mut transcript,
+                              prng,
+                              user_sk,
+                              &credential.issuer_pk,
+                              &key.t,
+                              hidden_attrs.as_slice())?;
+
+  Ok((sig_commitment, sok))
+}
+
+/// Produces a credential commitment by randomizing the credential signature
+pub(crate) fn ac_randomize<P: PairingTargetGroup>(sig: &ACSignature<P::G1>,
+                                                  key: &ACKey<P::ScalarField>)
+                                                  -> ACCommitment<P::G1> {
+  let sigma1_r = sig.sigma1.mul(&key.r);
+  let sigma1_t = sig.sigma1.mul(&key.t);
+  let sigma2_aux = sig.sigma2.add(&sigma1_t);
+  let sigma2_r = sigma2_aux.mul(&key.r);
+  let commitment = ACSignature::<P::G1>{
+    sigma1: sigma1_r,
+    sigma2: sigma2_r, //sigma2: r*(sigma2 + t*sigma1)
+  };
+  commitment
+}
+
+pub(crate) fn ac_verify_commitment<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+                                                          sig_commitment: &ACCommitment<P::G1>,
+                                                          sok: &ACPoK<P::G2, P::ScalarField>,
+                                                          msg: &[u8])
+                                                          -> Result<(), ZeiError> {
+  let mut transcript = Transcript::new(AC_COMMIT_NEW_TRANSCRIPT_INSTANCE);
+  ac_init_transcript::<P>(&mut transcript, issuer_pub_key, &sig_commitment); // public parameters
+  transcript.append_message(SOK_LABEL, msg); // SoK proof on message msg
+
+  let attributes: Vec<Attribute<P::ScalarField>> =
+    vec![Attribute::Hidden(None); issuer_pub_key.num_attrs()];
+
+  pok_verify::<P>(&mut transcript,
+                  issuer_pub_key,
+                  sig_commitment,
+                  sok,
+                  attributes.as_slice())
+}
+
+pub(crate) fn pok_verify<P: PairingTargetGroup>(transcript: &mut Transcript,
+                                                issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+                                                sig_commitment: &ACCommitment<P::G1>,
+                                                sok: &ACPoK<P::G2, P::ScalarField>,
+                                                attributes: &[Attribute<P::ScalarField>])
+                                                -> Result<(), ZeiError> {
+  transcript.append_proof_commitment(&sok.commitment); // proof object
+  let challenge = transcript.get_challenge::<P::ScalarField>();
+  ac_do_challenge_check_commitment::<P>(issuer_pub_key, sig_commitment, sok, attributes, &challenge)
+  // do checkings
+}
+
+pub(crate) fn ac_do_challenge_check_commitment<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+                                                                      sig_commitment: &ACCommitment<P::G1>,
+                                                                      pok: &ACPoK<P::G2, P::ScalarField>,
+                                                                      attributes: &[Attribute<P::ScalarField>],
+                                                                      challenge: &P::ScalarField)
+                                                                      -> Result<(), ZeiError> {
+  // p = X_2*c - proof_commitment + &G2 * r_t + Z2 * r_sk + \sum r_attr_i * Y2_i;
+  let hidden = ac_vrfy_hidden_terms_addition::<P>(&challenge, &pok, issuer_pub_key, attributes)?;
+  let revealed = ac_vrfy_revealed_terms_addition::<P>(&challenge, attributes, issuer_pub_key)?;
+  ac_verify_final_check::<P>(sig_commitment,
+                             &challenge,
+                             &issuer_pub_key.gen2,
+                             &hidden.add(&revealed))
+}
+/// Produce a AttrsRevealProof, attributes that are not Revealed(attr) and secret parameters
+/// are proved in ZeroKnowledge.
+#[allow(clippy::type_complexity)]
+pub(crate) fn ac_open_commitment<R: CryptoRng + RngCore, P: PairingTargetGroup>(
+  prng: &mut R,
+  user_sk: &ACUserSecretKey<P::ScalarField>,
+  credential: &Credential<P::G1, P::G2, P::ScalarField>,
+  key: &ACKey<P::ScalarField>,
+  reveal_map: &[bool])
+  -> Result<ACRevealProof<P::G2, P::ScalarField>, ZeiError> {
+  let sig_commitment = ac_randomize::<P>(&credential.signature, key);
+  let revealed_attributes = credential.attributes
+                                      .iter()
+                                      .zip(reveal_map.iter())
+                                      .map(|(attr, b)| {
+                                        if *b {
+                                          Attribute::Revealed(attr)
+                                        } else {
+                                          Attribute::Hidden(Some(attr))
+                                        }
+                                      })
+                                      .collect_vec();
+  let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pk, &sig_commitment); // public parameters
+  let pok = prove_pok::<_, P>(&mut transcript,
+                              prng,
+                              user_sk,
+                              &credential.issuer_pk,
+                              &key.t,
+                              revealed_attributes.as_slice())?;
+
+  Ok(pok)
+}
+
+/// Produce a AttrsRevealProof, attributes that are not Revealed(attr) and secret parameters
+/// are proved in ZeroKnowledge.
 #[allow(clippy::type_complexity)]
 pub(crate) fn ac_reveal<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
-  issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
-  sig: &ACSignature<P::G1>,
-  attrs: &[P::ScalarField],
-  bitmap: &[bool] // indicates which attributes are revealed
-) -> Result<ACRevealSig<P::G1, P::G2, P::ScalarField>, ZeiError> {
-  let randomization = ac_sample_random_factors::<_, P>(prng);
-  ac_reveal_with_rand::<_, P>(prng, user_sk, issuer_pk, sig, attrs, bitmap, randomization)
-}
-
-/// Produce an AttrsRevealProof with randomness supplied by caller via a random_pair
-#[allow(clippy::type_complexity)]
-pub(crate) fn ac_reveal_with_rand<R: CryptoRng + RngCore, P: PairingTargetGroup>(
-  prng: &mut R,
-  user_sk: &ACUserSecretKey<P::ScalarField>,
-  issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
-  sig: &ACSignature<P::G1>,
-  attrs: &[P::ScalarField],
-  bitmap: &[bool],
-  random_pair: (P::ScalarField, P::ScalarField))
+  credential: &Credential<P::G1, P::G2, P::ScalarField>,
+  reveal_bitmap: &[bool])
   -> Result<ACRevealSig<P::G1, P::G2, P::ScalarField>, ZeiError> {
-  let (r1, r2) = random_pair;
-  let sigma1_r = sig.sigma1.mul(&r1);
-  let sigma1_t = sig.sigma1.mul(&r2);
-  let sigma2_aux = sig.sigma2.add(&sigma1_t);
-  let sigma2_r = sigma2_aux.mul(&r1);
-  let rand_sig = ACSignature::<P::G1>{
-        sigma1: sigma1_r,
-        sigma2: sigma2_r, //sigma2: r*(sigma2 + t*sigma1)
-    };
-
-  let mut hidden_attrs = vec![];
-  for (attr, revealed) in attrs.iter().zip(bitmap) {
-    if !(*revealed) {
-      hidden_attrs.push(attr.clone());
-    }
+  if credential.attributes.len() != reveal_bitmap.len() {
+    return Err(ZeiError::ParameterError);
   }
-  let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
-  let proof = prove_pok::<_, P>(&mut transcript,
-                                prng,
-                                user_sk,
-                                issuer_pk,
-                                &r2,
-                                hidden_attrs.as_slice(),
-                                bitmap,
-                                &rand_sig)?;
+  let attributes = credential.attributes
+                             .iter()
+                             .zip(reveal_bitmap.iter())
+                             .map(|(attr, b)| {
+                               if *b {
+                                 Attribute::Revealed(attr)
+                               } else {
+                                 Attribute::Hidden(Some(attr))
+                               }
+                             })
+                             .collect_vec();
 
-  Ok(ACRevealSig { sig: rand_sig,
-                   rnd: (r1, r2),
-                   pok: proof })
+  let key = ac_gen_key::<_, P>(prng);
+  let sig_commitment = ac_randomize::<P>(&credential.signature, &key);
+  let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pk, &sig_commitment);
+  let pok = prove_pok::<_, P>(&mut transcript,
+                              prng,
+                              user_sk,
+                              &credential.issuer_pk,
+                              &key.t,
+                              attributes.as_slice())?;
+
+  Ok(ACRevealSig { sig_commitment,
+                   pok })
 }
 
-pub(super) fn init_transcript<P: PairingTargetGroup>(transcript: &mut Transcript,
-                                                     issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
-                                                     signature: &ACSignature<P::G1>) {
+/// Given a list of revealed attributes_{k}, and a credential structure composed by a signature
+/// (sigma1,sigma2) and a proof of
+/// knowledge of t, sk and some hidden attributes, I verify that
+/// e(sigma1,X2) + e(sigma1, g_2^t) + e(sigma1, Z2^sk) + e(sigma1, \\sum Y2_i^attr_i)
+/// equals e(sigma2, g_2)
+/// Revealed attributes attr corresponds to the positions where the bitmap is true
+/// I return Ok() in case signatures and proofs are correct.
+/// Otherwise, I return Err(ZeiError:SignatureError)
+/// Algorithm:
+/// 1. Compute challenge c as hash of proof_commitment
+/// 2. Compute p \= -proof_commitment + c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
+///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
+/// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
+pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
+                                               attrs: &[Attribute<P::ScalarField>],
+                                               sig_commitment: &ACCommitment<P::G1>,
+                                               reveal_proof: &ACRevealProof<P::G2,
+                                                              P::ScalarField>)
+                                               -> Result<(), ZeiError> {
+  let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+  ac_init_transcript::<P>(&mut transcript, issuer_pub_key, &sig_commitment);
+  pok_verify::<P>(&mut transcript,
+                  issuer_pub_key,
+                  sig_commitment,
+                  reveal_proof,
+                  attrs)
+}
+
+pub(super) fn ac_init_transcript<P: PairingTargetGroup>(transcript: &mut Transcript,
+                                                        issuer_pk: &ACIssuerPublicKey<P::G1,
+                                                                           P::G2>,
+                                                        commitment: &ACCommitment<P::G1>) {
   let g1 = P::G1::get_base();
   let g2 = P::G2::get_base();
-  let g1_elems = vec![&g1, &issuer_pk.zz1, &signature.sigma1, &signature.sigma2];
+  let g1_elems = vec![&g1, &issuer_pk.zz1, &commitment.sigma1, &commitment.sigma2];
   let mut g2_elems = vec![&g2, &issuer_pk.gen2, &issuer_pk.xx2, &issuer_pk.zz2];
   for e in issuer_pk.yy2.iter() {
     g2_elems.push(e);
@@ -289,25 +470,24 @@ fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   user_sk: &ACUserSecretKey<P::ScalarField>,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
   t: &P::ScalarField,
-  hidden_attrs: &[P::ScalarField],
-  bitmap: &[bool], // indicates revealed attributed
-  sig: &ACSignature<P::G1>)
+  attrs: &[Attribute<&P::ScalarField>])
   -> Result<ACPoK<P::G2, P::ScalarField>, ZeiError> {
-  init_transcript::<P>(transcript, issuer_pk, sig);
-
   let beta1 = P::ScalarField::random_scalar(prng);
   let beta2 = P::ScalarField::random_scalar(prng);
   let mut gamma = vec![];
-  for _ in 0..hidden_attrs.len() {
-    gamma.push(P::ScalarField::random_scalar(prng));
-  }
   let mut commitment = issuer_pk.gen2.mul(&beta1).add(&issuer_pk.zz2.mul(&beta2));
-  let mut gamma_iter = gamma.iter();
-  for (yy2i, x) in issuer_pk.yy2.iter().zip(bitmap) {
-    if !(*x) {
-      let gammai = gamma_iter.next().unwrap();
-      let elem = yy2i.mul(gammai);
-      commitment = commitment.add(&elem);
+  for (yy2i, attr) in issuer_pk.yy2.iter().zip(attrs) {
+    match attr {
+      Attribute::Hidden(Some(_)) => {
+        let gamma_i = P::ScalarField::random_scalar(prng);
+        let elem = yy2i.mul(&gamma_i);
+        commitment = commitment.add(&elem);
+        gamma.push(gamma_i);
+      }
+      Attribute::Hidden(None) => {
+        return Err(ZeiError::ParameterError);
+      }
+      _ => {}
     }
   }
   transcript.append_proof_commitment(&commitment);
@@ -316,11 +496,9 @@ fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
   let response_sk = challenge.mul(&user_sk.0).add(&beta2);
   let mut response_attrs = vec![];
   let mut gamma_iter = gamma.iter();
-  let mut attr_iter = hidden_attrs.iter();
-  for y in bitmap {
-    if !(*y) {
+  for attr_enum in attrs {
+    if let Attribute::Hidden(Some(attr)) = attr_enum {
       let gamma = gamma_iter.next().unwrap();
-      let attr = attr_iter.next().unwrap();
       let resp_attr_i = challenge.mul(attr).add(gamma);
       response_attrs.push(resp_attr_i);
     }
@@ -331,70 +509,26 @@ fn prove_pok<R: CryptoRng + RngCore, P: PairingTargetGroup>(
              response_attrs })
 }
 
-/// Given a list of revealed attributes_{k}, and a credential structure composed by a signature
-/// (sigma1,sigma2) and a proof of
-/// knowledge of t, sk and some hidden attributes, I verify that
-/// e(sigma1,X2) + e(sigma1, g_2^t) + e(sigma1, Z2^sk) + e(sigma1, \\sum Y2_i^attr_i)
-/// equals e(sigma2, g_2)
-/// Revealed attributes attr corresponds to the positions where the bitmap is true
-/// I return Ok() in case signatures and proofs are correct.
-/// Otherwise, I return Err(ZeiError:SignatureError)
-/// Algorithm:
-/// 1. Compute challenge c as hash of proof_commitment
-/// 2. Compute p \= -proof_commitment + c*X2 + proof_response\_t*g\_2 + proof\_response\_sk*Z2 +
-///  sum_{i\in hidden} proof_response_attr_i * Y2_i + sum_{i\in revealed} c*attr_i * Y2_i
-/// 3. Compare e(sigma1, p) against e(sigma2, c*g2)
-pub(crate) fn ac_verify<P: PairingTargetGroup>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                               revealed_attrs: &[P::ScalarField],
-                                               bitmap: &[bool],
-                                               ac_sig: &ACSignature<P::G1>,
-                                               reveal_sig_pok: &ACPoK<P::G2, P::ScalarField>)
-                                               -> Result<(), ZeiError> {
-  let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
-  init_transcript::<P>(&mut transcript, issuer_pub_key, &ac_sig);
-  transcript.append_proof_commitment(&reveal_sig_pok.commitment);
-  let challenge = transcript.get_challenge::<P::ScalarField>();
-  // hidden = X_2*c - proof_commitment + &G2 * r_t + Z2 * r_sk + \sum r_attr_i * Y2_i;
-  let hidden =
-    ac_vrfy_hidden_terms_addition::<P>(&challenge, &reveal_sig_pok, issuer_pub_key, bitmap)?;
-  // revealed = c * \sum attr_j * Y2_j;
-  let revealed =
-    ac_vrfy_revealed_terms_addition::<P>(&challenge, revealed_attrs, issuer_pub_key, bitmap)?;
-
-  // p = c * (X2 + t*G2 + sk * Z2 \sum attr_i Y2_i)
-  let p = hidden.add(&revealed);
-
-  let lhs = P::pairing(&ac_sig.sigma1, &p);
-  let rhs = P::pairing(&ac_sig.sigma2.mul(&challenge), &issuer_pub_key.gen2);
-
-  if lhs == rhs {
-    Ok(())
-  } else {
-    Err(ZeiError::SignatureError)
-  }
-}
-
 /// Helper function that compute the term of an anonymous credential verification
 /// that do not include the revealed attributes. That is:
 /// c * X2 + b_t * G1  + b_sk * Z2 + sum_{i\in Hidden} b_{attr_i} * Y2_i - reveal_sig.COM
 /// = c( x + t + sk * z + sum_{i\in Hidden} attr_i * y2_i) * G2
 pub(crate) fn ac_vrfy_hidden_terms_addition<P: PairingTargetGroup>(challenge: &P::ScalarField,
-                                                                   reveal_sig_pok: &ACPoK<P::G2, P::ScalarField>,
+                                                                   pok: &ACPoK<P::G2,
+                                                                          P::ScalarField>,
                                                                    issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                                                   bitmap: &[bool])
+                                                                   attrs: &[Attribute<P::ScalarField>])
                                                                    -> Result<P::G2, ZeiError> {
   //compute X_2 * challenge - commitment + G2 * &response_t + PK.Z2 * response_sk +
   // sum PK.Y2_i * response_attr_i
-  let mut q = issuer_pub_key.xx2
-                            .mul(&challenge)
-                            .sub(&reveal_sig_pok.commitment); //X_2*challenge - proof.commitment
+  let mut q = issuer_pub_key.xx2.mul(&challenge).sub(&pok.commitment); //X_2*challenge - proof.commitment
 
-  q = q.add(&issuer_pub_key.gen2.mul(&reveal_sig_pok.response_t));
-  q = q.add(&issuer_pub_key.zz2.mul(&reveal_sig_pok.response_sk));
+  q = q.add(&issuer_pub_key.gen2.mul(&pok.response_t));
+  q = q.add(&issuer_pub_key.zz2.mul(&pok.response_sk));
 
-  let mut resp_attr_iter = reveal_sig_pok.response_attrs.iter();
-  for (b, yy2i) in bitmap.iter().zip(issuer_pub_key.yy2.iter()) {
-    if !b {
+  let mut resp_attr_iter = pok.response_attrs.iter();
+  for (attr, yy2i) in attrs.iter().zip(issuer_pub_key.yy2.iter()) {
+    if let Attribute::Hidden(_) = attr {
       let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
       q = q.add(&yy2i.mul(response));
     }
@@ -403,19 +537,32 @@ pub(crate) fn ac_vrfy_hidden_terms_addition<P: PairingTargetGroup>(challenge: &P
 }
 
 fn ac_vrfy_revealed_terms_addition<P: PairingTargetGroup>(challenge: &P::ScalarField,
-                                                          revealed_attrs: &[P::ScalarField],
-                                                          issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                                          bitmap: &[bool])
+                                                          attrs: &[Attribute<P::ScalarField>],
+                                                          issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>)
                                                           -> Result<P::G2, ZeiError> {
   let mut attr_prod_yy2 = P::G2::get_identity();
-  let mut attr_iter = revealed_attrs.iter();
-  for (b, yy2i) in bitmap.iter().zip(issuer_pub_key.yy2.iter()) {
-    if *b {
-      let attr = attr_iter.next().ok_or(ZeiError::ParameterError)?;
-      attr_prod_yy2 = attr_prod_yy2.add(&yy2i.mul(attr));
+  for (yy2i, attr_enum) in izip!(issuer_pub_key.yy2.iter(), attrs.iter()) {
+    if let Attribute::Revealed(attr) = attr_enum {
+      attr_prod_yy2 = attr_prod_yy2.add(&yy2i.mul(&attr))
     }
   }
   Ok(attr_prod_yy2.mul(challenge))
+}
+
+#[allow(non_snake_case)]
+fn ac_verify_final_check<P: PairingTargetGroup>(signature: &ACSignature<P::G1>,
+                                                challenge: &P::ScalarField,
+                                                G2: &P::G2,
+                                                p: &P::G2)
+                                                -> Result<(), ZeiError> {
+  let lhs = P::pairing(&signature.sigma1, p);
+  let rhs = P::pairing(&signature.sigma2.mul(challenge), G2);
+
+  if lhs == rhs {
+    Ok(())
+  } else {
+    Err(ZeiError::IdentityRevealVerifyError)
+  }
 }
 
 #[cfg(test)]
@@ -437,32 +584,33 @@ pub(crate) mod credentials_tests {
 
     let mut attrs = vec![];
 
-    for _ in bitmap {
+    for _ in bitmap.iter() {
       attrs.push(P::ScalarField::random_scalar(&mut prng));
     }
 
     let sig = super::ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, attrs.as_slice());
 
-    let reveal_sig = super::ac_reveal::<_, P>(&mut prng,
-                                              &user_sk,
-                                              issuer_pk,
-                                              &sig,
-                                              attrs.as_slice(),
-                                              bitmap).unwrap();
+    let credential = Credential { signature: sig,
+                                  attributes: attrs,
+                                  issuer_pk: issuer_pk.clone() };
 
-    let mut revealed_attrs = vec![];
+    let reveal_sig = super::ac_reveal::<_, P>(&mut prng, &user_sk, &credential, bitmap).unwrap();
 
-    for (attr, b) in attrs.iter().zip(bitmap) {
-      if *b {
-        revealed_attrs.push(attr.clone());
-      }
-    }
-
+    let revealed_attributes = credential.attributes
+                                        .iter()
+                                        .zip(bitmap.iter())
+                                        .map(|(a, b)| {
+                                          if *b {
+                                            Attribute::Revealed(a.clone())
+                                          } else {
+                                            Attribute::Hidden(None)
+                                          }
+                                        })
+                                        .collect_vec();
     assert_eq!(true,
                ac_verify::<P>(&issuer_pk,
-                              revealed_attrs.as_slice(),
-                              bitmap,
-                              &reveal_sig.sig,
+                              revealed_attributes.as_slice(),
+                              &reveal_sig.sig_commitment,
                               &reveal_sig.pok).is_ok())
   }
 
@@ -511,14 +659,13 @@ pub(crate) mod credentials_tests {
     assert_eq!(user_keys.1, user_sec_key_de);
 
     // reveal proof containing signature and pok
-    let attrs = [P::ScalarField::from_u32(10), P::ScalarField::from_u32(10)];
-    let credential = super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, &attrs);
-    let reveal_sig = super::ac_reveal::<_, P>(&mut prng,
-                                              &user_keys.1,
-                                              &issuer_keys.0,
-                                              &credential,
-                                              &attrs,
-                                              &[true, false]).unwrap();
+    let attrs = vec![P::ScalarField::from_u32(10), P::ScalarField::from_u32(10)];
+    let sig = super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, attrs.as_slice());
+    let credential = Credential { signature: sig,
+                                  attributes: attrs,
+                                  issuer_pk: issuer_keys.0 };
+    let reveal_sig =
+      super::ac_reveal::<_, P>(&mut prng, &user_keys.1, &credential, &[true, false]).unwrap();
     let json_str = serde_json::to_string(&reveal_sig).unwrap();
     let reveal_sig_de: ACRevealSig<P::G1, P::G2, P::ScalarField> =
       serde_json::from_str(&json_str).unwrap();
@@ -568,14 +715,13 @@ pub(crate) mod credentials_tests {
     assert_eq!(user_keys.1, user_priv_key_de);
 
     // reveal proof containing signature and pok
-    let attrs = [P::ScalarField::from_u32(10), P::ScalarField::from_u32(10)];
-    let credential = super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, &attrs);
-    let reveal_sig = super::ac_reveal::<_, P>(&mut prng,
-                                              &user_keys.1,
-                                              &issuer_keys.0,
-                                              &credential,
-                                              &attrs,
-                                              &[true, false]).unwrap();
+    let attrs = vec![P::ScalarField::from_u32(10), P::ScalarField::from_u32(10)];
+    let sig = super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, attrs.as_slice());
+    let credential = Credential { signature: sig,
+                                  attributes: attrs,
+                                  issuer_pk: issuer_keys.0 };
+    let reveal_sig =
+      super::ac_reveal::<_, P>(&mut prng, &user_keys.1, &credential, &[true, false]).unwrap();
 
     let mut vec = vec![];
     reveal_sig.serialize(&mut rmp_serde::Serializer::new(&mut vec))
