@@ -1,9 +1,10 @@
-use crate::algebra::groups::Group;
 use crate::algebra::groups::Scalar as ZeiScalar;
+use crate::algebra::groups::{Group, GroupArithmetic};
+use byteorder::ByteOrder;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{Identity, MultiscalarMul, VartimeMultiscalarMul};
+use curve25519_dalek::traits::Identity;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
@@ -37,6 +38,16 @@ impl ZeiScalar for Scalar {
 
   fn sub(&self, b: &Scalar) -> Scalar {
     self - b
+  }
+
+  fn inv(&self) -> Scalar {
+    self.invert()
+  }
+
+  fn get_little_endian_u64(&self) -> Vec<u64> {
+    let mut r = vec![0u64; 4];
+    byteorder::LittleEndian::read_u64_into(self.as_bytes(), &mut r[0..4]);
+    r
   }
 
   fn to_bytes(&self) -> Vec<u8> {
@@ -78,7 +89,9 @@ impl Group<Scalar> for RistrettoPoint {
   {
     RistrettoPoint::from_hash(hash)
   }
+}
 
+impl GroupArithmetic<Scalar> for RistrettoPoint {
   fn mul(&self, scalar: &Scalar) -> Self {
     self * scalar
   }
@@ -90,18 +103,12 @@ impl Group<Scalar> for RistrettoPoint {
   fn sub(&self, other: &RistrettoPoint) -> RistrettoPoint {
     self - other
   }
-
-  fn multi_exp(scalars: &[Scalar], points: &[Self]) -> Self {
-    RistrettoPoint::multiscalar_mul(scalars, points)
-  }
-  fn vartime_multi_exp(scalars: &[Scalar], points: &[Self]) -> Self {
-    RistrettoPoint::vartime_multiscalar_mul(scalars, points)
-  }
 }
 
 #[cfg(test)]
 mod ristretto_group_test {
   use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
+
   #[test]
   fn scalar_ops() {
     test_scalar_operations::<super::Scalar>();
@@ -109,6 +116,10 @@ mod ristretto_group_test {
   #[test]
   fn scalar_serialization() {
     test_scalar_serialization::<super::Scalar>();
+  }
+  #[test]
+  fn scalar_to_radix() {
+    crate::algebra::groups::group_tests::test_to_radix::<super::Scalar>();
   }
 }
 

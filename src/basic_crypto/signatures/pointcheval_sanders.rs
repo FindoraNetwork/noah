@@ -19,8 +19,8 @@ key is a tuple of elements rather than a single element in G2. A tuple of messag
 Given the above properties, Pointcheval-Sanders signatures are suitable for anonymous credentials and group signatures.
 */
 
-use crate::algebra::groups::{Group, Scalar};
-use crate::algebra::pairing::PairingTargetGroup;
+use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
+use crate::algebra::pairing::Pairing;
 use crate::errors::ZeiError;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
@@ -50,11 +50,11 @@ pub struct PSSignature<G1> {
 ///
 /// use rand::rngs::{EntropyRng};
 /// use zei::basic_crypto::signatures::pointcheval_sanders::ps_gen_keys;
-/// use zei::algebra::bls12_381::BLSGt;
+/// use zei::algebra::bls12_381::Bls12381;
 /// let mut prng = EntropyRng::new();
-/// let keys = ps_gen_keys::<_,BLSGt>(&mut prng);
+/// let keys = ps_gen_keys::<_,Bls12381>(&mut prng);
 /// ```
-pub fn ps_gen_keys<R: CryptoRng + RngCore, P: PairingTargetGroup>(
+pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R)
   -> (PSPublicKey<P::G2>, PSSecretKey<P::ScalarField>) {
   let g2 = P::G2::get_base(); // TODO can I use the base or does it need to be a random element
@@ -72,15 +72,15 @@ pub fn ps_gen_keys<R: CryptoRng + RngCore, P: PairingTargetGroup>(
 ///
 /// use rand::rngs::{EntropyRng};
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_bytes};
-/// use zei::algebra::bls12_381::BLSGt;
+/// use zei::algebra::bls12_381::Bls12381;
 /// let mut prng = EntropyRng::new();
-/// let (_, sk) = ps_gen_keys::<_,BLSGt>(&mut prng);
-/// let sig = ps_sign_bytes::<_, BLSGt>(&mut prng, &sk, b"this is a message");
+/// let (_, sk) = ps_gen_keys::<_,Bls12381>(&mut prng);
+/// let sig = ps_sign_bytes::<_, Bls12381>(&mut prng, &sk, b"this is a message");
 /// ```
-pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
-                                                                    sk: &PSSecretKey<P::ScalarField>,
-                                                                    m: &[u8])
-                                                                    -> PSSignature<P::G1> {
+pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
+                                                         sk: &PSSecretKey<P::ScalarField>,
+                                                         m: &[u8])
+                                                         -> PSSignature<P::G1> {
   let m_scalar = hash_message::<P::ScalarField>(m);
   ps_sign_scalar::<_, P>(prng, sk, &m_scalar)
 }
@@ -90,17 +90,17 @@ pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R
 /// ```
 ///
 /// use rand::rngs::{EntropyRng};
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
+/// use zei::algebra::bls12_381::{BLSScalar, Bls12381};
 /// use zei::algebra::groups::Scalar;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar};
 /// let mut prng = EntropyRng::new();
-/// let (_, sk) = ps_gen_keys::<_, BLSGt>(&mut prng);
-/// let sig = ps_sign_scalar::<_, BLSGt>(&mut prng, &sk, &BLSScalar::from_u32(100u32));
+/// let (_, sk) = ps_gen_keys::<_, Bls12381>(&mut prng);
+/// let sig = ps_sign_scalar::<_, Bls12381>(&mut prng, &sk, &BLSScalar::from_u32(100u32));
 /// ```
-pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut R,
-                                                                     sk: &PSSecretKey<P::ScalarField>,
-                                                                     m: &P::ScalarField)
-                                                                     -> PSSignature<P::G1> {
+pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
+                                                          sk: &PSSecretKey<P::ScalarField>,
+                                                          m: &P::ScalarField)
+                                                          -> PSSignature<P::G1> {
   let a = P::ScalarField::random_scalar(prng);
   let s1 = P::G1::get_base().mul(&a);
 
@@ -115,17 +115,17 @@ pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: PairingTargetGroup>(prng: &mut 
 /// use rand::rngs::EntropyRng;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_bytes, ps_verify_sig_bytes};
 /// use zei::errors::ZeiError;
-/// use zei::algebra::bls12_381::BLSGt;
+/// use zei::algebra::bls12_381::Bls12381;
 /// let mut prng = EntropyRng::new();
-/// let (pk, sk) = ps_gen_keys::<_, BLSGt>(&mut prng);
-/// let sig = ps_sign_bytes::<_, BLSGt>(&mut prng, &sk, b"this is a message");
-/// assert!(ps_verify_sig_bytes::<BLSGt>(&pk, b"this is a message", &sig).is_ok());
-/// assert_eq!(Some(ZeiError::SignatureError), ps_verify_sig_bytes::<BLSGt>(&pk, b"this is ANOTHER message", &sig).err());
+/// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut prng);
+/// let sig = ps_sign_bytes::<_, Bls12381>(&mut prng, &sk, b"this is a message");
+/// assert!(ps_verify_sig_bytes::<Bls12381>(&pk, b"this is a message", &sig).is_ok());
+/// assert_eq!(Some(ZeiError::SignatureError), ps_verify_sig_bytes::<Bls12381>(&pk, b"this is ANOTHER message", &sig).err());
 /// ```
-pub fn ps_verify_sig_bytes<P: PairingTargetGroup>(pk: &PSPublicKey<P::G2>,
-                                                  m: &[u8],
-                                                  sig: &PSSignature<P::G1>)
-                                                  -> Result<(), ZeiError> {
+pub fn ps_verify_sig_bytes<P: Pairing>(pk: &PSPublicKey<P::G2>,
+                                       m: &[u8],
+                                       sig: &PSSignature<P::G1>)
+                                       -> Result<(), ZeiError> {
   let m_scalar = hash_message::<P::ScalarField>(m);
   ps_verify_sig_scalar::<P>(pk, &m_scalar, sig)
 }
@@ -137,18 +137,18 @@ pub fn ps_verify_sig_bytes<P: PairingTargetGroup>(pk: &PSPublicKey<P::G2>,
 /// use rand::rngs::EntropyRng;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar};
 /// use zei::errors::ZeiError;
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
+/// use zei::algebra::bls12_381::{BLSScalar, Bls12381};
 /// use zei::algebra::groups::Scalar;
 /// let mut prng = EntropyRng::new();
-/// let (pk, sk) = ps_gen_keys::<_, BLSGt>(&mut prng);
-/// let sig = ps_sign_scalar::<_, BLSGt>(&mut prng, &sk, &BLSScalar::from_u32(100));
-/// assert!(ps_verify_sig_scalar::<BLSGt>(&pk, &BLSScalar::from_u32(100), &sig).is_ok());
-/// assert_eq!(Some(ZeiError::SignatureError), ps_verify_sig_scalar::<BLSGt>(&pk, &BLSScalar::from_u32(333), &sig).err());
+/// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut prng);
+/// let sig = ps_sign_scalar::<_, Bls12381>(&mut prng, &sk, &BLSScalar::from_u32(100));
+/// assert!(ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(100), &sig).is_ok());
+/// assert_eq!(Some(ZeiError::SignatureError), ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(333), &sig).err());
 /// ```
-pub fn ps_verify_sig_scalar<P: PairingTargetGroup>(pk: &PSPublicKey<P::G2>,
-                                                   m: &P::ScalarField,
-                                                   sig: &PSSignature<P::G1>)
-                                                   -> Result<(), ZeiError> {
+pub fn ps_verify_sig_scalar<P: Pairing>(pk: &PSPublicKey<P::G2>,
+                                        m: &P::ScalarField,
+                                        sig: &PSSignature<P::G1>)
+                                        -> Result<(), ZeiError> {
   let a = pk.xx.add(&pk.yy.mul(&m));
   let e1 = P::pairing(&sig.s1, &a);
   let e2 = P::pairing(&sig.s2, &P::G2::get_base());
@@ -164,16 +164,16 @@ pub fn ps_verify_sig_scalar<P: PairingTargetGroup>(pk: &PSPublicKey<P::G2>,
 /// use rand::rngs::EntropyRng;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar, ps_randomize_sig};
 /// use zei::errors::ZeiError;
-/// use zei::algebra::bls12_381::{BLSScalar, BLSGt};
+/// use zei::algebra::bls12_381::{BLSScalar, Bls12381};
 /// use zei::algebra::groups::Scalar;
 /// let mut prng = EntropyRng::new();
-/// let (pk, sk) = ps_gen_keys::<_, BLSGt>(&mut prng);
-/// let sig = ps_sign_scalar::<_, BLSGt>(&mut prng, &sk, &BLSScalar::from_u32(100));
-/// let (_,rand_sig) = ps_randomize_sig::<_, BLSGt>(&mut prng, &sig);
-/// assert!(ps_verify_sig_scalar::<BLSGt>(&pk, &BLSScalar::from_u32(100), &rand_sig).is_ok());
+/// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut prng);
+/// let sig = ps_sign_scalar::<_, Bls12381>(&mut prng, &sk, &BLSScalar::from_u32(100));
+/// let (_,rand_sig) = ps_randomize_sig::<_, Bls12381>(&mut prng, &sig);
+/// assert!(ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(100), &rand_sig).is_ok());
 ///
 /// ```
-pub fn ps_randomize_sig<R: RngCore + CryptoRng, P: PairingTargetGroup>(
+pub fn ps_randomize_sig<R: RngCore + CryptoRng, P: Pairing>(
   prng: &mut R,
   sig: &PSSignature<P::G1>)
   -> (P::ScalarField, PSSignature<P::G1>) {

@@ -1,10 +1,14 @@
 use super::groups::Group;
-use super::pairing::PairingTargetGroup;
+use super::pairing::Pairing;
+use crate::algebra::groups::GroupArithmetic;
+use crate::utils::{b64dec, b64enc};
 use bn::{Group as BNGroup, Gt};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json;
 use std::fmt;
 
@@ -88,6 +92,13 @@ impl crate::algebra::groups::Scalar for BNScalar {
   fn sub(&self, b: &BNScalar) -> BNScalar {
     BNScalar(self.0 - b.0)
   }
+  fn inv(&self) -> Self {
+    BNScalar((self.0).inverse().unwrap())
+  }
+
+  fn get_little_endian_u64(&self) -> Vec<u64> {
+    panic!("get_little_endian_u64 not implemented for BNScalar")
+  }
 
   //scalar serialization
   fn to_bytes(&self) -> Vec<u8> {
@@ -98,62 +109,6 @@ impl crate::algebra::groups::Scalar for BNScalar {
   }
 }
 
-/*
-impl Serialize for BNScalar {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.to_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.to_bytes().as_slice())
-    }
-  }
-}
-
-
-impl<'de> Deserialize<'de> for BNScalar {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct ScalarVisitor;
-
-    impl<'de> Visitor<'de> for ScalarVisitor {
-      type Value = BNScalar;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded BLSG2 element")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<BNScalar, E>
-        where E: serde::de::Error
-      {
-        Ok(BNScalar::from_bytes(v))
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<BNScalar, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().unwrap() {
-          vec.push(x);
-        }
-        Ok(BNScalar::from_bytes(vec.as_slice()))
-      }
-      fn visit_str<E>(self, s: &str) -> Result<BNScalar, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(ScalarVisitor)
-    } else {
-      deserializer.deserialize_bytes(ScalarVisitor)
-    }
-  }
-}
-*/
 impl fmt::Debug for BNG1 {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "Fr:{}", serde_json::to_string(&self.0).unwrap())
@@ -206,7 +161,9 @@ impl Group<BNScalar> for BNG1 {
     let mut prng = ChaChaRng::from_seed(seed);
     BNG1(bn::G1::random(&mut prng))
   }
+}
 
+impl GroupArithmetic<BNScalar> for BNG1 {
   //arithmetic
   fn mul(&self, scalar: &BNScalar) -> BNG1 {
     BNG1(self.0 * scalar.0)
@@ -217,81 +174,7 @@ impl Group<BNScalar> for BNG1 {
   fn sub(&self, other: &Self) -> BNG1 {
     BNG1(self.0 - other.0)
   }
-  fn multi_exp(scalars: &[BNScalar], points: &[Self]) -> Self {
-    //TODO
-    assert_eq!(scalars.len(), points.len());
-    let mut r = Self::get_identity();
-    for (s, p) in scalars.iter().zip(points.iter()) {
-      r = r.add(&p.mul(s))
-    }
-    r
-  }
-  fn vartime_multi_exp(scalars: &[BNScalar], points: &[Self]) -> Self {
-    //TODO
-    assert_eq!(scalars.len(), points.len());
-    let mut r = Self::get_identity();
-    for (s, p) in scalars.iter().zip(points.iter()) {
-      r = r.add(&p.mul(s))
-    }
-    r
-  }
 }
-
-/*
-impl Serialize for BNG1 {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for BNG1 {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct G1Visitor;
-
-    impl<'de> Visitor<'de> for G1Visitor {
-      type Value = BNG1;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded BLSG2 element")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<BNG1, E>
-        where E: serde::de::Error
-      {
-        Ok(BNG1::from_compressed_bytes(v).unwrap()) //TODO handle error
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<BNG1, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().unwrap() {
-          vec.push(x);
-        }
-        Ok(BNG1::from_compressed_bytes(vec.as_slice()).unwrap())
-      }
-      fn visit_str<E>(self, s: &str) -> Result<BNG1, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(G1Visitor)
-    } else {
-      deserializer.deserialize_bytes(G1Visitor)
-    }
-  }
-}
-*/
 
 impl fmt::Debug for BNG2 {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -345,7 +228,9 @@ impl Group<BNScalar> for BNG2 {
     let mut prng = ChaChaRng::from_seed(seed);
     BNG2(bn::G2::random(&mut prng))
   }
+}
 
+impl GroupArithmetic<BNScalar> for BNG2 {
   //arithmetic
   fn mul(&self, scalar: &BNScalar) -> BNG2 {
     BNG2(self.0 * scalar.0)
@@ -356,28 +241,69 @@ impl Group<BNScalar> for BNG2 {
   fn sub(&self, other: &Self) -> BNG2 {
     BNG2(self.0 - other.0)
   }
-  fn multi_exp(scalars: &[BNScalar], points: &[Self]) -> Self {
-    //TODO
-    assert_eq!(scalars.len(), points.len());
-    let mut r = Self::get_identity();
-    for (s, p) in scalars.iter().zip(points.iter()) {
-      r = r.add(&p.mul(s))
-    }
-    r
-  }
-  fn vartime_multi_exp(scalars: &[BNScalar], points: &[Self]) -> Self {
-    //TODO
-    assert_eq!(scalars.len(), points.len());
-    let mut r = Self::get_identity();
-    for (s, p) in scalars.iter().zip(points.iter()) {
-      r = r.add(&p.mul(s))
-    }
-    r
+}
+
+impl fmt::Debug for BNGt {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "Fr: Some Gt Element")
   }
 }
 
-/*
-impl Serialize for BNG2 {
+impl GroupArithmetic<BNScalar> for BNGt {
+  fn mul(&self, a: &BNScalar) -> BNGt {
+    BNGt(self.0.pow(a.0))
+  }
+  fn add(&self, other: &Self) -> BNGt {
+    BNGt(self.0 * other.0)
+  }
+  fn sub(&self, other: &Self) -> BNGt {
+    BNGt(self.0 * other.0.inverse())
+  }
+}
+
+impl Group<BNScalar> for BNGt {
+  const COMPRESSED_LEN: usize = 384; //U256*4*2*3*2
+  const SCALAR_BYTES_LEN: usize = 32; //U256
+  fn get_identity() -> BNGt {
+    BNGt(Gt::one())
+  }
+  fn get_base() -> Self {
+    bn_pairing(&BNG1::get_base(), &BNG2::get_base()) // TODO hardcode this
+  }
+
+  // compression/serialization helpers
+  fn to_compressed_bytes(&self) -> Vec<u8> {
+    panic!("to_compressed_bytes not implemented for BNGt")
+  }
+  fn from_compressed_bytes(_bytes: &[u8]) -> Option<BNGt> {
+    panic!("to_compressed_bytes not implemented for BNGt")
+  }
+  fn from_hash<D>(hash: D) -> Self
+    where D: Digest<OutputSize = U64> + Default
+  {
+    let g1 = BNG1::from_hash(hash);
+    let g2 = BNG2::get_base();
+    bn_pairing(&g1, &g2)
+  }
+}
+
+fn bn_pairing(a: &BNG1, b: &BNG2) -> BNGt {
+  BNGt(bn::pairing(a.0, b.0))
+}
+pub struct BN;
+
+impl Pairing for BN {
+  type ScalarField = BNScalar;
+  type G1 = BNG1;
+  type G2 = BNG2;
+  type Gt = BNGt;
+
+  fn pairing(a: &Self::G1, b: &Self::G2) -> BNGt {
+    bn_pairing(a, b)
+  }
+}
+
+impl Serialize for BNGt {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer
   {
@@ -389,79 +315,45 @@ impl Serialize for BNG2 {
   }
 }
 
-impl<'de> Deserialize<'de> for BNG2 {
+impl<'de> Deserialize<'de> for BNGt {
   fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where D: Deserializer<'de>
   {
-    struct G2Visitor;
+    struct GtVisitor;
 
-    impl<'de> Visitor<'de> for G2Visitor {
-      type Value = BNG2;
+    impl<'de> Visitor<'de> for GtVisitor {
+      type Value = BNGt;
 
       fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded BLSG2 element")
+        formatter.write_str("a encoded BNGt element")
       }
 
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<BNG2, E>
+      fn visit_bytes<E>(self, v: &[u8]) -> Result<BNGt, E>
         where E: serde::de::Error
       {
-        Ok(BNG2::from_compressed_bytes(v).unwrap()) //TODO handle error
+        Ok(BNGt::from_compressed_bytes(v).unwrap()) //TODO handle error
       }
 
-      fn visit_seq<V>(self, mut seq: V) -> Result<BNG2, V::Error>
+      fn visit_seq<V>(self, mut seq: V) -> Result<BNGt, V::Error>
         where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
         while let Some(x) = seq.next_element().unwrap() {
           vec.push(x);
         }
-        Ok(BNG2::from_compressed_bytes(vec.as_slice()).unwrap())
+        Ok(BNGt::from_compressed_bytes(vec.as_slice()).unwrap())
       }
-      fn visit_str<E>(self, s: &str) -> Result<BNG2, E>
+      fn visit_str<E>(self, s: &str) -> Result<BNGt, E>
         where E: serde::de::Error
       {
         self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
       }
     }
     if deserializer.is_human_readable() {
-      deserializer.deserialize_str(G2Visitor)
+      deserializer.deserialize_str(GtVisitor)
     } else {
-      deserializer.deserialize_bytes(G2Visitor)
+      deserializer.deserialize_bytes(GtVisitor)
     }
-  }
-}
-*/
-
-impl fmt::Debug for BNGt {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "Fr: Some Gt Element")
-  }
-}
-
-impl PairingTargetGroup for BNGt {
-  type ScalarField = BNScalar;
-  type G1 = BNG1;
-  type G2 = BNG2;
-
-  fn pairing(a: &Self::G1, b: &Self::G2) -> BNGt {
-    BNGt(bn::pairing(a.0, b.0))
-  }
-  fn scalar_mul(&self, a: &BNScalar) -> BNGt {
-    BNGt(self.0.pow(a.0))
-  }
-  fn add(&self, other: &Self) -> BNGt {
-    BNGt(self.0 * other.0)
-  }
-
-  fn get_identity() -> BNGt {
-    BNGt(Gt::one())
-  }
-
-  fn to_bytes(&self) -> Vec<u8> {
-    panic!("Not implemented");
-  }
-  fn from_bytes(_bytes: &[u8]) -> Self {
-    panic!("Not implemented");
   }
 }
 
@@ -525,26 +417,26 @@ mod credentials_over_bn {
 
   #[test]
   fn single_attribute() {
-    credentials_tests::single_attribute::<super::BNGt>();
+    credentials_tests::single_attribute::<super::BN>();
   }
 
   #[test]
   fn two_attributes() {
-    credentials_tests::two_attributes::<super::BNGt>();
+    credentials_tests::two_attributes::<super::BN>();
   }
 
   #[test]
   fn ten_attributes() {
-    credentials_tests::ten_attributes::<super::BNGt>();
+    credentials_tests::ten_attributes::<super::BN>();
   }
 
   #[test]
   fn to_json_credential_structures() {
-    credentials_tests::to_json_credential_structures::<super::BNGt>();
+    credentials_tests::to_json_credential_structures::<super::BN>();
   }
 
   #[test]
   fn to_msg_pack_credential_structures() {
-    credentials_tests::to_msg_pack_credential_structures::<super::BNGt>();
+    credentials_tests::to_msg_pack_credential_structures::<super::BN>();
   }
 }

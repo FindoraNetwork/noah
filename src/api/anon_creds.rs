@@ -1,4 +1,4 @@
-use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
+use crate::algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
 use crate::algebra::groups::Group;
 use crate::basic_crypto::elgamal::elgamal_keygen;
 use crate::crypto::anon_creds::Attribute;
@@ -9,7 +9,6 @@ use rand_core::{CryptoRng, RngCore};
 
 type G1 = BLSG1;
 type G2 = BLSG2;
-type Gt = BLSGt;
 type S = BLSScalar;
 pub type ACIssuerPublicKey = crate::crypto::anon_creds::ACIssuerPublicKey<G1, G2>;
 pub type ACIssuerSecretKey = crate::crypto::anon_creds::ACIssuerSecretKey<G1, S>;
@@ -45,7 +44,7 @@ pub type ACRevealProof = crate::crypto::anon_creds::ACRevealProof<G2, S>;
 pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(prng: &mut R,
                                                 num_attrs: usize)
                                                 -> (ACIssuerPublicKey, ACIssuerSecretKey) {
-  crate::crypto::anon_creds::ac_keygen_issuer::<_, Gt>(prng, num_attrs)
+  crate::crypto::anon_creds::ac_keygen_issuer::<_, Bls12381>(prng, num_attrs)
 }
 
 /// Generates a credential user key pair for a given credential issuer
@@ -62,7 +61,7 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(prng: &mut R,
 pub fn ac_keygen_user<R: CryptoRng + RngCore>(prng: &mut R,
                                               issuer_pk: &ACIssuerPublicKey)
                                               -> (ACUserPublicKey, ACUserSecretKey) {
-  crate::crypto::anon_creds::ac_keygen_user::<_, Gt>(prng, issuer_pk)
+  crate::crypto::anon_creds::ac_keygen_user::<_, Bls12381>(prng, issuer_pk)
 }
 
 /// Computes a credential signature for a set of attributes.
@@ -86,10 +85,13 @@ pub fn ac_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
                                                        user_pk: &ACUserPublicKey,
                                                        attrs: &[B])
                                                        -> ACSignature {
-  let attrs_scalar: Vec<S> = attrs.iter()
-                                  .map(|x| byte_slice_to_scalar::<S>(x.as_ref()))
-                                  .collect();
-  crate::crypto::anon_creds::ac_sign::<_, BLSGt>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
+  let attrs_scalar: Vec<BLSScalar> = attrs.iter()
+                                          .map(|x| byte_slice_to_scalar::<BLSScalar>(x.as_ref()))
+                                          .collect();
+  crate::crypto::anon_creds::ac_sign::<_, Bls12381>(prng,
+                                                    issuer_sk,
+                                                    user_pk,
+                                                    attrs_scalar.as_slice())
 }
 
 /// Produces opening key for credential commitment creation and attribute opening
@@ -102,7 +104,7 @@ pub fn ac_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
 /// let com_key = ac_keygen_commitment::<ChaChaRng>(&mut prng);
 /// ```
 pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmentKey {
-  crate::crypto::anon_creds::ac_gen_key::<_, BLSGt>(prng)
+  crate::crypto::anon_creds::ac_gen_key::<_, Bls12381>(prng)
 }
 
 /// Compute a commitment to a credential signature with a binding message, returning the opening key.
@@ -140,10 +142,10 @@ pub fn ac_commit<R: CryptoRng + RngCore, A: AsRef<[u8]>>(
                                              .map(|x| byte_slice_to_scalar(x.as_ref()))
                                              .collect_vec(),
                        issuer_pk: credential.issuer_pk.clone() };
-  crate::crypto::anon_creds::ac_commit::<_, BLSGt>(prng, user_sk, &c, msg)
+  crate::crypto::anon_creds::ac_commit::<_, Bls12381>(prng, user_sk, &c, msg)
 }
 
-/// Computes a commitment to a credential signature using an opening key and a binding message
+/// Produces a AttrsRevealProof, bitmap indicates which attributes are revealed
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
@@ -181,7 +183,7 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore, A: AsRef<[u8]>>(
                                              .map(|x| byte_slice_to_scalar(x.as_ref()))
                                              .collect_vec(),
                        issuer_pk: credential.issuer_pk.clone() };
-  crate::crypto::anon_creds::ac_commit_with_key::<_, BLSGt>(prng, user_sk, &c, key, msg)
+  crate::crypto::anon_creds::ac_commit_with_key::<_, Bls12381>(prng, user_sk, &c, key, msg)
 }
 
 /// Verifies that the underlying credential is valid and that the commitment was issued using the
@@ -191,7 +193,10 @@ pub fn ac_verify_commitment(issuer_pub_key: &ACIssuerPublicKey,
                             sok: &ACPoK,
                             msg: &[u8])
                             -> Result<(), ZeiError> {
-  crate::crypto::anon_creds::ac_verify_commitment::<BLSGt>(issuer_pub_key, sig_commitment, sok, msg)
+  crate::crypto::anon_creds::ac_verify_commitment::<Bls12381>(issuer_pub_key,
+                                                              sig_commitment,
+                                                              sok,
+                                                              msg)
 }
 
 /// Produces a AttrsRevealProof for a committed credential produced using key. bitmap indicates which attributes are revealed
@@ -231,7 +236,7 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore, A: AsRef<[u8]> + Clone>(
                                              .map(|a| byte_slice_to_scalar(a.as_ref()))
                                              .collect_vec(),
                        issuer_pk: credential.issuer_pk.clone() };
-  crate::crypto::anon_creds::ac_open_commitment::<_, BLSGt>(prng, user_sk, &c, key, reveal_map)
+  crate::crypto::anon_creds::ac_open_commitment::<_, Bls12381>(prng, user_sk, &c, key, reveal_map)
 }
 
 /// Produces a ACRevealSig for a credential. ACRevealSig includes new commitment to the credential,
@@ -249,7 +254,7 @@ pub fn ac_reveal<R: CryptoRng + RngCore, A: AsRef<[u8]>>(prng: &mut R,
                                              .map(|a| byte_slice_to_scalar(a.as_ref()))
                                              .collect_vec(),
                        issuer_pk: credential.issuer_pk.clone() };
-  crate::crypto::anon_creds::ac_reveal::<_, BLSGt>(prng, user_sk, &c, reveal_bitmap)
+  crate::crypto::anon_creds::ac_reveal::<_, Bls12381>(prng, user_sk, &c, reveal_bitmap)
 }
 /// Verifies an anonymous credential reveal proof.
 /// # Example
@@ -294,17 +299,17 @@ pub fn ac_verify<B: AsRef<[u8]> + Clone>(issuer_pub_key: &ACIssuerPublicKey,
          })
          .collect();
 
-  crate::crypto::anon_creds::ac_verify::<BLSGt>(issuer_pub_key,
-                                                attrs_scalar.as_slice(),
-                                                &ac_sig,
-                                                &reveal_proof)
+  crate::crypto::anon_creds::ac_verify::<Bls12381>(issuer_pub_key,
+                                                   attrs_scalar.as_slice(),
+                                                   &ac_sig,
+                                                   &reveal_proof)
 }
 
 pub type ElGamalPublicKey = crate::basic_crypto::elgamal::ElGamalPublicKey<G1>;
 pub type ElGamalSecretKey = crate::basic_crypto::elgamal::ElGamalSecretKey<S>;
 pub type ElGamalCiphertext = crate::basic_crypto::elgamal::ElGamalCiphertext<G1>;
 
-pub type ConfidentialAC = crate::crypto::conf_cred_reveal::ConfidentialAC<Gt>;
+pub type ConfidentialAC = crate::crypto::conf_cred_reveal::ConfidentialAC<G1, G2, S>;
 
 /// Produced a Confidential Anonymous Credential Reveal Proof for a single instance of a confidential anonymous reveal. Proof asserts
 /// that a list of attributes can be decrypted from a list of ciphertexts under recv_enc_pub_key,
@@ -360,8 +365,10 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, B: AsRef<[u8]>>(
   let c = Credential { signature: credential.signature.clone(),
                        attributes: attrs_scalar,
                        issuer_pk: credential.issuer_pk.clone() };
-  crate::crypto::conf_cred_reveal::ac_confidential_open_commitment(prng, user_sk, &c, key,
-                                                                   reveal_map, enc_key, msg)
+  crate::crypto::conf_cred_reveal::ac_confidential_open_commitment::<R, Bls12381>(prng, user_sk,
+                                                                                  &c, key,
+                                                                                  reveal_map,
+                                                                                  enc_key, msg)
 }
 
 /// Verifies a Confidential Anonymous Credential reveal proof. Proof asserts
@@ -383,12 +390,12 @@ pub fn ac_confidential_verify(issuer_pk: &ACIssuerPublicKey,
                               cac: &ConfidentialAC,
                               msg: &[u8])
                               -> Result<(), ZeiError> {
-  crate::crypto::conf_cred_reveal::ac_confidential_open_verify(issuer_pk,
-                                                               enc_key,
-                                                               reveal_map,
-                                                               sig_commitment,
-                                                               cac,
-                                                               msg)
+  crate::crypto::conf_cred_reveal::ac_confidential_open_verify::<Bls12381>(issuer_pk,
+                                                                           enc_key,
+                                                                           reveal_map,
+                                                                           sig_commitment,
+                                                                           cac,
+                                                                           msg)
 }
 
 pub fn ac_confidential_gen_encryption_keys<R: CryptoRng + RngCore>(

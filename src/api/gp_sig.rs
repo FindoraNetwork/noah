@@ -1,26 +1,26 @@
-use crate::algebra::bls12_381::BLSGt;
+use crate::algebra::bls12_381::{Bls12381, BLSG1};
 use crate::errors::ZeiError;
 use rand_core::{CryptoRng, RngCore};
 
 /// The public key of the group manager
-pub type GroupPublicKey = crate::crypto::group_signatures::GroupPublicKey<BLSGt>;
+pub type GroupPublicKey = crate::crypto::group_signatures::GroupPublicKey<Bls12381>;
 
 /// The secret key of the group manager
-pub type GroupSecretKey = crate::crypto::group_signatures::GroupSecretKey<BLSGt>;
+pub type GroupSecretKey = crate::crypto::group_signatures::GroupSecretKey<Bls12381>;
 
 /// A group signature
-pub type GroupSignature = crate::crypto::group_signatures::GroupSignature<BLSGt>;
+pub type GroupSignature = crate::crypto::group_signatures::GroupSignature<Bls12381>;
 
 /// Generates the private and public parameters for the Group manager.
 /// * `prng` - source of randomness
 /// * `returns` - a group public key and a group secret key
 pub fn gpsig_setup<R: CryptoRng + RngCore>(prng: &mut R) -> (GroupPublicKey, GroupSecretKey) {
-  crate::crypto::group_signatures::gpsig_setup::<R, BLSGt>(prng)
+  crate::crypto::group_signatures::gpsig_setup::<R, Bls12381>(prng)
 }
 
 /// Group membership certificate
-pub type JoinCert = crate::crypto::group_signatures::JoinCert<BLSGt>;
-pub type TagKey = crate::crypto::group_signatures::TagKey<BLSGt>;
+pub type JoinCert = crate::crypto::group_signatures::JoinCert<Bls12381>;
+pub type TagKey = crate::crypto::group_signatures::TagKey<BLSG1>;
 
 /// Produces a join certificate for a new user.
 /// Run by the Group Manager.

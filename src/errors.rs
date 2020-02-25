@@ -3,6 +3,7 @@ use std::{error, fmt};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ZeiError {
+  ArgumentVerificationError,
   DecompressElementError,
   RangeProofProveError,
   RangeProofVerifyError,
@@ -37,6 +38,7 @@ pub enum ZeiError {
 impl fmt::Display for ZeiError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     f.write_str(match self {
+                  ZeiError::ArgumentVerificationError => "Proof(argument) not valid for statement",
                   ZeiError::DecompressElementError => "Could not decompress group Element",
                   ZeiError::RangeProofProveError => {
                     "Could not create range proof due to incorrect input or parameters"
@@ -99,6 +101,7 @@ impl fmt::Display for ZeiError {
 impl error::Error for ZeiError {
   fn description(&self) -> &str {
     match self {
+      ZeiError::ArgumentVerificationError => "Proof(argument) not valid for statement",
       ZeiError::DecompressElementError => "Could not decompress group Element",
       ZeiError::RangeProofProveError => {
         "Could not create range proof due to incorrect input or parameters"

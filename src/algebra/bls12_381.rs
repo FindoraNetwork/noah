@@ -1,10 +1,11 @@
 use super::groups::{Group, Scalar};
-use super::pairing::PairingTargetGroup;
-use crate::utils::{b64dec, b64enc};
+use super::pairing::Pairing;
+use crate::algebra::groups::GroupArithmetic;
+use crate::utils::{b64dec, b64enc, u8_bigendian_slice_to_u64};
 use crate::utils::{u64_to_bigendian_u8array, u8_bigendian_slice_to_u32};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use pairing::bls12_381::{Fq12, Fr, FrRepr, G1, G2};
+use pairing::bls12_381::{Fq, Fq12, Fq2, Fq6, FqRepr, Fr, FrRepr, G1, G2};
 use pairing::{CurveAffine, CurveProjective};
 use pairing::{EncodedPoint, Field, PrimeField};
 use rand_04::Rand;
@@ -91,6 +92,13 @@ impl Scalar for BLSScalar {
     BLSScalar(m)
   }
 
+  fn inv(&self) -> BLSScalar {
+    BLSScalar((self.0).inverse().unwrap())
+  }
+
+  fn get_little_endian_u64(&self) -> Vec<u64> {
+    (self.0).into_repr().0.to_vec()
+  }
   //scalar serialization
   fn to_bytes(&self) -> Vec<u8> {
     let repr = FrRepr::from(self.0);
@@ -205,7 +213,9 @@ impl Group<BLSScalar> for BLSG1 {
     let mut prng = rand_04::ChaChaRng::from_seed(&seed);
     BLSG1(G1::rand(&mut prng))
   }
+}
 
+impl GroupArithmetic<BLSScalar> for BLSG1 {
   //arithmetic
   fn mul(&self, scalar: &BLSScalar) -> BLSG1 {
     let mut m = self.0;
@@ -221,25 +231,6 @@ impl Group<BLSScalar> for BLSG1 {
     let mut m = self.0;
     m.sub_assign(&other.0);
     BLSG1(m)
-  }
-
-  fn multi_exp(scalars: &[BLSScalar], points: &[Self]) -> Self {
-    //TODO
-    assert_eq!(scalars.len(), points.len());
-    let mut r = Self::get_identity();
-    for (s, p) in scalars.iter().zip(points.iter()) {
-      r = r.add(&p.mul(s))
-    }
-    r
-  }
-  fn vartime_multi_exp(scalars: &[BLSScalar], points: &[Self]) -> Self {
-    //TODO
-    assert_eq!(scalars.len(), points.len());
-    let mut r = Self::get_identity();
-    for (s, p) in scalars.iter().zip(points.iter()) {
-      r = r.add(&p.mul(s))
-    }
-    r
   }
 }
 
@@ -338,13 +329,14 @@ impl Group<BLSScalar> for BLSG2 {
     let mut prng = rand_04::ChaChaRng::from_seed(&seed);
     BLSG2(G2::rand(&mut prng))
   }
+}
 
+impl GroupArithmetic<BLSScalar> for BLSG2 {
   //arithmetic
   fn mul(&self, scalar: &BLSScalar) -> BLSG2 {
     let mut m = self.0;
     m.mul_assign(scalar.0);
     BLSG2(m)
-    //return BLSG2(self.0 * scalar.0)
   }
   fn add(&self, other: &Self) -> BLSG2 {
     let mut m = self.0;
@@ -355,25 +347,6 @@ impl Group<BLSScalar> for BLSG2 {
     let mut m = self.0;
     m.sub_assign(&other.0);
     BLSG2(m)
-  }
-
-  fn multi_exp(scalars: &[BLSScalar], points: &[Self]) -> Self {
-    //TODO
-    assert_eq!(scalars.len(), points.len());
-    let mut r = Self::get_identity();
-    for (s, p) in scalars.iter().zip(points.iter()) {
-      r = r.add(&p.mul(s))
-    }
-    r
-  }
-  fn vartime_multi_exp(scalars: &[BLSScalar], points: &[Self]) -> Self {
-    //TODO
-    assert_eq!(scalars.len(), points.len());
-    let mut r = Self::get_identity();
-    for (s, p) in scalars.iter().zip(points.iter()) {
-      r = r.add(&p.mul(s))
-    }
-    r
   }
 }
 
@@ -437,42 +410,66 @@ impl fmt::Debug for BLSGt {
   }
 }
 
-impl PairingTargetGroup for BLSGt {
+pub struct Bls12381;
+
+fn bls_pairing(a: &BLSG1, b: &BLSG2) -> BLSGt {
+  BLSGt(a.0.into_affine().pairing_with(&b.0.into_affine()))
+}
+
+impl Pairing for Bls12381 {
   type ScalarField = BLSScalar;
   type G1 = BLSG1;
   type G2 = BLSG2;
+  type Gt = BLSGt;
 
-  fn pairing(a: &Self::G1, b: &Self::G2) -> Self {
-    BLSGt(a.0.into_affine().pairing_with(&b.0.into_affine()))
+  fn pairing(a: &Self::G1, b: &Self::G2) -> Self::Gt {
+    bls_pairing(a, b)
   }
-  fn scalar_mul(&self, a: &BLSScalar) -> BLSGt {
-    let r = self.0.pow(a.0.into_repr().as_ref());
+}
+
+impl GroupArithmetic<BLSScalar> for BLSGt {
+  fn mul(&self, scalar: &BLSScalar) -> Self {
+    let r = self.0.pow(scalar.0.into_repr().as_ref());
     BLSGt(r)
   }
-  fn add(&self, other: &Self) -> BLSGt {
+  fn add(&self, other: &Self) -> Self {
     let mut m = other.0;
     m.mul_assign(&self.0);
     BLSGt(m)
   }
+  fn sub(&self, other: &Self) -> Self {
+    let mut result = other.0.inverse().unwrap();
+    result.mul_assign(&self.0);
+    BLSGt(result)
+  }
+}
 
+impl Group<BLSScalar> for BLSGt {
+  const COMPRESSED_LEN: usize = 576;
+  const SCALAR_BYTES_LEN: usize = 32; // TODO
   fn get_identity() -> BLSGt {
     BLSGt(Fq12::one())
   }
 
-  fn to_bytes(&self) -> Vec<u8> {
+  fn get_base() -> Self {
+    bls_pairing(&BLSG1::get_base(), &BLSG2::get_base()) //TODO hardcode this
+  }
+
+  // compression/serialization helpers
+  fn to_compressed_bytes(&self) -> Vec<u8> {
     let c0c0c0 = self.0.c0.c0.c0.into_repr();
     let c0c0c1 = self.0.c0.c0.c1.into_repr();
     let c0c1c0 = self.0.c0.c1.c0.into_repr();
     let c0c1c1 = self.0.c0.c1.c1.into_repr();
     let c0c2c0 = self.0.c0.c2.c0.into_repr();
-    let c0c2c1 = self.0.c0.c2.c0.into_repr();
+    let c0c2c1 = self.0.c0.c2.c1.into_repr();
 
     let c1c0c0 = self.0.c1.c0.c0.into_repr();
     let c1c0c1 = self.0.c1.c0.c1.into_repr();
     let c1c1c0 = self.0.c1.c1.c0.into_repr();
     let c1c1c1 = self.0.c1.c1.c1.into_repr();
     let c1c2c0 = self.0.c1.c2.c0.into_repr();
-    let c1c2c1 = self.0.c1.c2.c0.into_repr();
+    let c1c2c1 = self.0.c1.c2.c1.into_repr();
 
     let mut v = vec![];
     v.extend_from_slice(&c0c0c0.0[..]);
@@ -496,8 +493,101 @@ impl PairingTargetGroup for BLSGt {
     r
   }
 
-  fn from_bytes(_v: &[u8]) -> Self {
-    BLSGt(Fq12::one())
+  fn from_compressed_bytes(v: &[u8]) -> Option<Self> {
+    Some(BLSGt(Fq12 { c0: build_fq6(&v[..v.len() / 2])?,
+                      c1: build_fq6(&v[v.len() / 2..])? }))
+  }
+
+  fn from_hash<D>(hash: D) -> Self
+    where D: Digest<OutputSize = U64> + Default
+  {
+    let result = hash.result();
+    let mut seed = [0u32; 16];
+    for (i, item) in seed.iter_mut().enumerate() {
+      *item = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
+    }
+    use rand_04::SeedableRng;
+    let mut prng = rand_04::ChaChaRng::from_seed(&seed);
+    BLSGt(Fq12::rand(&mut prng))
+  }
+}
+
+fn build_fq6(v: &[u8]) -> Option<Fq6> {
+  let n = v.len() / 3;
+  Some(Fq6 { c0: build_fq2(&v[..n])?,
+             c1: build_fq2(&v[n..2 * n])?,
+             c2: build_fq2(&v[2 * n..])? })
+}
+
+fn build_fq2(v: &[u8]) -> Option<Fq2> {
+  let n = v.len() / 2;
+  Some(Fq2 { c0: build_fq(&v[..n])?,
+             c1: build_fq(&v[n..])? })
+}
+
+fn build_fq(v: &[u8]) -> Option<Fq> {
+  if v.len() != 48 {
+    return None;
+  }
+  let a1 = u8_bigendian_slice_to_u64(&v[0..8]);
+  let a2 = u8_bigendian_slice_to_u64(&v[8..16]);
+  let a3 = u8_bigendian_slice_to_u64(&v[16..24]);
+  let a4 = u8_bigendian_slice_to_u64(&v[24..32]);
+  let a5 = u8_bigendian_slice_to_u64(&v[32..40]);
+  let a6 = u8_bigendian_slice_to_u64(&v[40..]);
+  Some(Fq::from_repr(FqRepr([a1, a2, a3, a4, a5, a6])).ok()?)
+}
+impl Serialize for BLSGt {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+  {
+    if serializer.is_human_readable() {
+      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
+    } else {
+      serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
+    }
+  }
+}
+
+impl<'de> Deserialize<'de> for BLSGt {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de>
+  {
+    struct GtVisitor;
+
+    impl<'de> Visitor<'de> for GtVisitor {
+      type Value = BLSGt;
+
+      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        formatter.write_str("a encoded BLSGt element")
+      }
+
+      fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSGt, E>
+        where E: serde::de::Error
+      {
+        Ok(BLSGt::from_compressed_bytes(v).unwrap()) //TODO handle error
+      }
+
+      fn visit_seq<V>(self, mut seq: V) -> Result<BLSGt, V::Error>
+        where V: SeqAccess<'de>
+      {
+        let mut vec: Vec<u8> = vec![];
+        while let Some(x) = seq.next_element().unwrap() {
+          vec.push(x);
+        }
+        Ok(BLSGt::from_compressed_bytes(vec.as_slice()).unwrap())
+      }
+      fn visit_str<E>(self, s: &str) -> Result<BLSGt, E>
+        where E: serde::de::Error
+      {
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
+      }
+    }
+    if deserializer.is_human_readable() {
+      deserializer.deserialize_str(GtVisitor)
+    } else {
+      deserializer.deserialize_bytes(GtVisitor)
+    }
   }
 }
 
@@ -542,7 +632,7 @@ mod elgamal_over_bls_groups {
 
   #[test]
   fn verification_g2() {
-    elgamal_test::verification::<super::BLSScalar, super::BLSG1>();
+    elgamal_test::verification::<super::BLSScalar, super::BLSG2>();
   }
 
   #[test]
@@ -559,6 +649,26 @@ mod elgamal_over_bls_groups {
   fn to_message_pack_g2() {
     elgamal_test::to_message_pack::<super::BLSScalar, super::BLSG2>();
   }
+
+  #[test]
+  fn verification_gt() {
+    elgamal_test::verification::<super::BLSScalar, super::BLSGt>();
+  }
+
+  #[test]
+  fn decryption_gt() {
+    elgamal_test::decryption::<super::BLSScalar, super::BLSGt>();
+  }
+
+  #[test]
+  fn to_json_gt() {
+    elgamal_test::to_json::<super::BLSScalar, super::BLSGt>();
+  }
+
+  #[test]
+  fn to_message_pack_gt() {
+    elgamal_test::to_message_pack::<super::BLSScalar, super::BLSGt>();
+  }
 }
 
 #[cfg(test)]
@@ -568,27 +678,27 @@ mod credentials_over_bls_12_381 {
 
   #[test]
   fn single_attribute() {
-    credentials_tests::single_attribute::<super::BLSGt>();
+    credentials_tests::single_attribute::<super::Bls12381>();
   }
 
   #[test]
   fn two_attributes() {
-    credentials_tests::two_attributes::<super::BLSGt>();
+    credentials_tests::two_attributes::<super::Bls12381>();
   }
 
   #[test]
   fn ten_attributes() {
-    credentials_tests::ten_attributes::<super::BLSGt>();
+    credentials_tests::ten_attributes::<super::Bls12381>();
   }
 
   #[test]
   fn to_json_credential_structures() {
-    credentials_tests::to_json_credential_structures::<super::BLSGt>();
+    credentials_tests::to_json_credential_structures::<super::Bls12381>();
   }
 
   #[test]
   fn to_msg_pack_credential_structures() {
-    credentials_tests::to_msg_pack_credential_structures::<super::BLSGt>();
+    credentials_tests::to_msg_pack_credential_structures::<super::Bls12381>();
   }
 
   /*

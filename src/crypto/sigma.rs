@@ -1,5 +1,6 @@
 use crate::algebra::groups::{Group, Scalar};
-use crate::algebra::pairing::PairingTargetGroup;
+use crate::algebra::multi_exp::MultiExp;
+use crate::algebra::pairing::Pairing;
 use crate::errors::ZeiError;
 use digest::Digest;
 use merlin::Transcript;
@@ -17,12 +18,12 @@ pub trait SigmaTranscript {
 }
 
 pub trait SigmaTranscriptPairing: SigmaTranscript {
-  fn init_sigma_pairing<P: PairingTargetGroup>(&mut self,
-                                               instance_name: &'static [u8],
-                                               public_scalars: &[&P::ScalarField],
-                                               public_elems_g1: &[&P::G1],
-                                               public_elems_g2: &[&P::G2],
-                                               public_elems_gt: &[&P]);
+  fn init_sigma_pairing<P: Pairing>(&mut self,
+                                    instance_name: &'static [u8],
+                                    public_scalars: &[&P::ScalarField],
+                                    public_elems_g1: &[&P::G1],
+                                    public_elems_g2: &[&P::G2],
+                                    public_elems_gt: &[&P::Gt]);
 }
 
 impl SigmaTranscript for Transcript {
@@ -59,12 +60,12 @@ impl SigmaTranscript for Transcript {
 }
 
 impl SigmaTranscriptPairing for Transcript {
-  fn init_sigma_pairing<P: PairingTargetGroup>(&mut self,
-                                               instance_name: &'static [u8],
-                                               public_scalars: &[&P::ScalarField],
-                                               public_elems_g1: &[&P::G1],
-                                               public_elems_g2: &[&P::G2],
-                                               public_elems_gt: &[&P]) {
+  fn init_sigma_pairing<P: Pairing>(&mut self,
+                                    instance_name: &'static [u8],
+                                    public_scalars: &[&P::ScalarField],
+                                    public_elems_g1: &[&P::G1],
+                                    public_elems_g2: &[&P::G2],
+                                    public_elems_gt: &[&P::Gt]) {
     self.append_message(b"Sigma Protocol domain",
                         b"Sigma protocol with pairings elements");
     self.append_message(b"Sigma Protocol instance", instance_name);
@@ -78,7 +79,7 @@ impl SigmaTranscriptPairing for Transcript {
       self.append_message(b"public elem g2", elem.to_compressed_bytes().as_slice())
     }
     for elem in public_elems_gt {
-      self.append_message(b"public elem gt", elem.to_bytes().as_slice())
+      self.append_message(b"public elem gt", elem.to_compressed_bytes().as_slice())
     }
   }
 }
