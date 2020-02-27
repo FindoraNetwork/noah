@@ -60,7 +60,7 @@ use merlin::Transcript;
 ///                               assets_blinds.as_slice(),
 ///                               &[], // no public asset
 ///                               &hidden_liability_set,
-///                               liabilities_blinds.as_slice()hilipp,
+///                               liabilities_blinds.as_slice(),
 ///                               &[], // no public liabilities
 ///                               &rates);
 ///

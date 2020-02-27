@@ -93,7 +93,6 @@ pub(crate) fn u8_bigendian_slice_to_u32(array: &[u8]) -> u32 {
 }
 
 /// I compute the minimum power of two that is greater or equal to the input
-#[inline]
 pub(crate) fn min_greater_equal_power_of_two(n: u32) -> u32 {
   2.0f64.powi((n as f64).log2().ceil() as i32) as u32
 }
