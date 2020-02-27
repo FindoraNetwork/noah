@@ -288,7 +288,7 @@ pub fn ac_reveal<R: CryptoRng + RngCore, A: AsRef<[u8]>>(prng: &mut R,
 /// ```
 pub fn ac_verify<B: AsRef<[u8]> + Clone>(issuer_pub_key: &ACIssuerPublicKey,
                                          attrs: &[Option<B>],
-                                         ac_sig: &ACSignature,
+                                         sig_commitment: &ACCommitment,
                                          reveal_proof: &ACRevealProof)
                                          -> Result<(), ZeiError> {
   let attrs_scalar: Vec<Attribute<S>> =
@@ -301,7 +301,7 @@ pub fn ac_verify<B: AsRef<[u8]> + Clone>(issuer_pub_key: &ACIssuerPublicKey,
 
   crate::crypto::anon_creds::ac_verify::<Bls12381>(issuer_pub_key,
                                                    attrs_scalar.as_slice(),
-                                                   &ac_sig,
+                                                   &sig_commitment,
                                                    &reveal_proof)
 }
 

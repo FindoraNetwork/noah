@@ -58,8 +58,8 @@ impl CACTranscript for Transcript {
     self.append_group_element(b"ctext.e2", &ctext.e2);
   }
   fn append_ac_sig_commitment<P: Pairing>(&mut self, sig_commitment: &ACCommitment<P::G1>) {
-    self.append_group_element(b"sigma1", &sig_commitment.sigma1);
-    self.append_group_element(b"sigma2", &sig_commitment.sigma2);
+    self.append_group_element(b"sigma1", &sig_commitment.0.sigma1);
+    self.append_group_element(b"sigma2", &sig_commitment.0.sigma2);
   }
 }
 

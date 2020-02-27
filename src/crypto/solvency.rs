@@ -35,22 +35,22 @@ use merlin::Transcript;
 ///
 ///  // exchange rate table
 /// let mut rates = LinearMap::new();
-///    rates.insert(type1, Scalar::from(1u8));
-///    rates.insert(type2, Scalar::from(2u8));
-///    rates.insert(type3, Scalar::from(3u8));
+///   rates.insert(type1, Scalar::from(1u8));
+///   rates.insert(type2, Scalar::from(2u8));
+///   rates.insert(type3, Scalar::from(3u8));
 ///
 /// // liabilities
 /// let hidden_liability_set = [
-///			(Scalar::from(10u8), type1), // 10
-///			(Scalar::from(20u8), type2), // 40
-///		];
+///   (Scalar::from(10u8), type1), // 10
+///   (Scalar::from(20u8), type2), // 40
+/// ];
 ///
 /// //assets
 /// let hidden_asset_set = [
-///			(Scalar::from(10u8), type1), // 10
-///			(Scalar::from(20u8), type2), // 40
-///			(Scalar::from(30u8), type3), // 60
-///		];
+///   (Scalar::from(10u8), type1), // 10
+///   (Scalar::from(20u8), type2), // 40
+///   (Scalar::from(30u8), type3), // 60
+/// ];
 ///
 /// // blinding factors
 /// let mut assets_blinds = vec![(Scalar::random(&mut prng), Scalar::random(&mut prng)); 3];
@@ -60,7 +60,7 @@ use merlin::Transcript;
 ///                               assets_blinds.as_slice(),
 ///                               &[], // no public asset
 ///                               &hidden_liability_set,
-///                               liabilities_blinds.as_slice(),
+///                               liabilities_blinds.as_slice()hilipp,
 ///                               &[], // no public liabilities
 ///                               &rates);
 ///

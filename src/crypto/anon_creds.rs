@@ -128,7 +128,8 @@ pub struct Credential<G1, G2, B> {
   pub issuer_pk: ACIssuerPublicKey<G1, G2>,
 }
 
-pub type ACCommitment<G1> = ACSignature<G1>;
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ACCommitment<G1>(pub(crate) ACSignature<G1>);
 
 ///I'm a user public key used to request a signature for a set of attributes (credential)
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -288,7 +289,7 @@ pub(crate) fn ac_randomize<P: Pairing>(sig: &ACSignature<P::G1>,
     sigma1: sigma1_r,
     sigma2: sigma2_r, //sigma2: r*(sigma2 + t*sigma1)
   };
-  commitment
+  ACCommitment(commitment)
 }
 
 pub(crate) fn ac_verify_commitment<P: Pairing>(issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -441,7 +442,10 @@ pub(super) fn ac_init_transcript<P: Pairing>(transcript: &mut Transcript,
                                              commitment: &ACCommitment<P::G1>) {
   let g1 = P::G1::get_base();
   let g2 = P::G2::get_base();
-  let g1_elems = vec![&g1, &issuer_pk.zz1, &commitment.sigma1, &commitment.sigma2];
+  let g1_elems = vec![&g1,
+                      &issuer_pk.zz1,
+                      &commitment.0.sigma1,
+                      &commitment.0.sigma2];
   let mut g2_elems = vec![&g2, &issuer_pk.gen2, &issuer_pk.xx2, &issuer_pk.zz2];
   for e in issuer_pk.yy2.iter() {
     g2_elems.push(e);
@@ -546,13 +550,13 @@ fn ac_vrfy_revealed_terms_addition<P: Pairing>(challenge: &P::ScalarField,
 }
 
 #[allow(non_snake_case)]
-fn ac_verify_final_check<P: Pairing>(signature: &ACSignature<P::G1>,
+fn ac_verify_final_check<P: Pairing>(sig_commitment: &ACCommitment<P::G1>,
                                      challenge: &P::ScalarField,
                                      G2: &P::G2,
                                      p: &P::G2)
                                      -> Result<(), ZeiError> {
-  let lhs = P::pairing(&signature.sigma1, p);
-  let rhs = P::pairing(&signature.sigma2.mul(challenge), G2);
+  let lhs = P::pairing(&sig_commitment.0.sigma1, p);
+  let rhs = P::pairing(&sig_commitment.0.sigma2.mul(challenge), G2);
 
   if lhs == rhs {
     Ok(())

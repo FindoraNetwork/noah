@@ -9,7 +9,6 @@ use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_json;
 use std::fmt;
 
 #[derive(Serialize, Deserialize)]
