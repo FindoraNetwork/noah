@@ -1,0 +1,11 @@
+--- Cargo.toml	2020-03-04 08:50:28.154136236 -0700
++++ Cargo.toml.1	2020-03-04 08:50:11.793274857 -0700
+@@ -30,7 +30,7 @@
+ itertools = "0.8.0"
+ rmp-serde = "0.13.7"
+ pairing = "0.14.2"
+-bn = {git = "ssh://git@github.com/findoraorg/zcash-bn-fork", rev = "06d5bd15e358dc5a75b3d0b"}
++bn = {path = "/src/zcash-bn-fork"}
+ digest = "0.8"
+ bincode = "1.1.2"
+ base64 = "0.10"
