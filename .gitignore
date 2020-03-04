@@ -2,8 +2,10 @@
 .idea
 
 # Build files
-
 /target
 **/*.rs.bk
 Cargo.lock
 .*.sw*
+
+#Possible Embedded Repos
+zcash-bn-fork
