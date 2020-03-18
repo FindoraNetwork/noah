@@ -1,8 +1,8 @@
 use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
 use crate::algebra::pairing::Pairing;
 use crate::basic_crypto::elgamal::{
-  elgamal_decrypt_elem, elgamal_encrypt, elgamal_keygen, ElGamalCiphertext, ElGamalPublicKey,
-  ElGamalSecretKey,
+  elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalDecKey,
+  ElGamalEncKey,
 };
 use crate::basic_crypto::signatures::pointcheval_sanders::{
   ps_gen_keys, ps_randomize_sig, ps_sign_scalar, PSPublicKey, PSSecretKey, PSSignature,
@@ -17,14 +17,14 @@ use sha2::Sha512;
 /// and an Elgamal encryption public key `enc_key`.
 pub struct GroupPublicKey<P: Pairing> {
   ver_key: PSPublicKey<P::G2>,
-  enc_key: ElGamalPublicKey<P::G1>,
+  enc_key: ElGamalEncKey<P::G1>,
 }
 
 /// The secret key of the group manager contains a private signing key `sig_key`
 /// and a private Elgamal encryption key `dec_key`.
 pub struct GroupSecretKey<P: Pairing> {
   sig_key: PSSecretKey<P::ScalarField>,
-  dec_key: ElGamalSecretKey<P::ScalarField>,
+  dec_key: ElGamalDecKey<P::ScalarField>,
 }
 
 /// A group signature contains a Pointcheval-Sanders signature `cert`,
@@ -44,7 +44,7 @@ pub fn gpsig_setup<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R)
   -> (GroupPublicKey<P>, GroupSecretKey<P>) {
   let (ver_key, sig_key) = ps_gen_keys::<R, P>(prng);
-  let (dec_key, enc_key) = elgamal_keygen::<_, P::ScalarField, P::G1>(prng, &P::G1::get_base());
+  let (dec_key, enc_key) = elgamal_key_gen::<_, P::ScalarField, P::G1>(prng, &P::G1::get_base());
   (GroupPublicKey { ver_key, enc_key }, GroupSecretKey { sig_key, dec_key })
 }
 

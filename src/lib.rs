@@ -20,5 +20,5 @@ pub mod crypto;
 pub mod errors;
 pub mod serialization;
 pub mod setup;
-mod utils;
+pub mod utils;
 pub mod xfr;

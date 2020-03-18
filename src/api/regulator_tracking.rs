@@ -19,24 +19,23 @@ use rand_core::{CryptoRng, RngCore};
 
 /// JoinRequest message from the User to the Regulator. It contains the identity of the user.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct JoinRequest<B: AsRef<[u8]>> {
+pub struct JoinRequest {
   credential_proof: ACRevealSig,
-  attrs: Vec<B>,
+  attrs: Vec<u32>,
 }
 
 /// Users that register with regulators must produce a JoinRequest message using this function
 /// # Example
 /// see zei::api::regulator_tracking::rt_get_trace_tag;
-pub fn rt_user_gen_join_request<R: CryptoRng + RngCore, B: AsRef<[u8]> + Clone>(
-  prng: &mut R,
-  ac_user_sk: &ACUserSecretKey,
-  credential: &Credential<B>)
-  -> Result<JoinRequest<B>, ZeiError> {
+pub fn rt_user_gen_join_request<R: CryptoRng + RngCore>(prng: &mut R,
+                                                        ac_user_sk: &ACUserSecretKey,
+                                                        credential: &Credential)
+                                                        -> Result<JoinRequest, ZeiError> {
   // all attributed are revealed to the regulator
   let cred_proof = ac_reveal(prng,
                              ac_user_sk,
                              credential,
-                             credential.issuer_pk
+                             credential.issuer_pub_key
                                        .yy2
                                        .iter()
                                        .map(|_| true)
@@ -50,18 +49,17 @@ pub fn rt_user_gen_join_request<R: CryptoRng + RngCore, B: AsRef<[u8]> + Clone>(
 /// and a trace tag to store locally.
 /// # Example
 /// see zei::api::regulator_tracking::rt_get_trace_tag;
-pub fn rt_process_join_request<R: CryptoRng + RngCore, B: AsRef<[u8]> + Clone>(
-  prng: &mut R,
-  rsk: &GroupSecretKey,
-  user_join_req: &JoinRequest<B>,
-  ac_issuer_pk: &ACIssuerPublicKey)
-  -> Result<(JoinCert, TagKey), ZeiError> {
+pub fn rt_process_join_request<R: CryptoRng + RngCore>(prng: &mut R,
+                                                       rsk: &GroupSecretKey,
+                                                       user_join_req: &JoinRequest,
+                                                       ac_issuer_pk: &ACIssuerPublicKey)
+                                                       -> Result<(JoinCert, TagKey), ZeiError> {
   // 1 check credential
-  let attrs_as_option: Vec<Option<B>> = user_join_req.attrs
-                                                     .as_slice()
-                                                     .iter()
-                                                     .map(|x| Some((*x).clone()))
-                                                     .collect();
+  let attrs_as_option: Vec<Option<u32>> = user_join_req.attrs
+                                                       .as_slice()
+                                                       .iter()
+                                                       .map(|x| Some(*x))
+                                                       .collect();
   ac_verify(ac_issuer_pk,
             attrs_as_option.as_slice(),
             &user_join_req.credential_proof.sig_commitment,
@@ -94,12 +92,12 @@ pub fn rt_verify_sig<B: AsRef<[u8]>>(rpk: &GroupPublicKey,
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer(&mut prng, num_attrs);
 /// let (user_pk, user_sk) = ac_keygen_user(&mut prng, &issuer_pk);
-/// let attributes = [b"attr1", b"attr2"];
-/// let cred = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
+/// let attributes = [10, 20];
+/// let cred = ac_sign(&mut prng, &issuer_sk, &user_pk, &attributes[..]).unwrap();
 /// let credential = Credential{
 ///   signature: cred,
 ///   attributes: attributes.to_vec(),
-///   issuer_pk: issuer_pk.clone()
+///   issuer_pub_key: issuer_pk.clone()
 /// };
 ///
 /// let (reg_pk, reg_sk) = gpsig_setup(&mut prng);

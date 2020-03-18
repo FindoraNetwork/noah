@@ -1,6 +1,6 @@
 use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
 use crate::algebra::pairing::Pairing;
-use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalPublicKey};
+use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::crypto::anon_creds::{
   ac_do_challenge_check_commitment, ac_randomize, ACCommitment, ACIssuerPublicKey, ACKey, ACPoK,
   ACUserSecretKey, Attribute, Credential, SOK_LABEL,
@@ -16,11 +16,11 @@ const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"Confidential AC Reveal
 trait CACTranscript: SigmaTranscriptPairing {
   fn cac_init<P: Pairing>(&mut self,
                           ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
-                          enc_key: &ElGamalPublicKey<P::G1>,
+                          enc_key: &ElGamalEncKey<P::G1>,
                           sig_commitment: &ACCommitment<P::G1>,
                           ctexts: &[ElGamalCiphertext<P::G1>]);
   fn append_issuer_pk<P: Pairing>(&mut self, ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>);
-  fn append_encryption_key<P: Pairing>(&mut self, key: &ElGamalPublicKey<P::G1>);
+  fn append_encryption_key<P: Pairing>(&mut self, key: &ElGamalEncKey<P::G1>);
   fn append_ciphertext<P: Pairing>(&mut self, ctext: &ElGamalCiphertext<P::G1>);
   fn append_ac_sig_commitment<P: Pairing>(&mut self, ac_sig_commitment: &ACCommitment<P::G1>);
 }
@@ -28,7 +28,7 @@ trait CACTranscript: SigmaTranscriptPairing {
 impl CACTranscript for Transcript {
   fn cac_init<P: Pairing>(&mut self,
                           ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
-                          enc_key: &ElGamalPublicKey<P::G1>,
+                          enc_key: &ElGamalEncKey<P::G1>,
                           sig_commitment: &ACCommitment<P::G1>,
                           ctexts: &[ElGamalCiphertext<P::G1>]) {
     self.append_message(b"New Domain", CAC_REVEAL_PROOF_DOMAIN);
@@ -50,7 +50,7 @@ impl CACTranscript for Transcript {
       self.append_group_element(b"issuer_pk.Y2", y2);
     }
   }
-  fn append_encryption_key<P: Pairing>(&mut self, key: &ElGamalPublicKey<P::G1>) {
+  fn append_encryption_key<P: Pairing>(&mut self, key: &ElGamalEncKey<P::G1>) {
     self.append_group_element(b"encription key", key.get_point_ref());
   }
   fn append_ciphertext<P: Pairing>(&mut self, ctext: &ElGamalCiphertext<P::G1>) {
@@ -73,8 +73,14 @@ pub struct CACPoK<G1, G2, S> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfidentialAC<G1, G2, S> {
-  ctexts: Vec<ElGamalCiphertext<G1>>,
-  pok: CACPoK<G1, G2, S>,
+  pub ctexts: Vec<ElGamalCiphertext<G1>>,
+  pub pok: CACPoK<G1, G2, S>,
+}
+
+impl<G1, G2, S> ConfidentialAC<G1, G2, S> {
+  pub fn get_fields(self) -> (Vec<ElGamalCiphertext<G1>>, CACPoK<G1, G2, S>) {
+    (self.ctexts, self.pok)
+  }
 }
 
 #[allow(clippy::type_complexity)]
@@ -84,7 +90,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
   credential: &Credential<P::G1, P::G2, P::ScalarField>,
   key: &ACKey<P::ScalarField>,
   reveal_map: &[bool],
-  enc_key: &ElGamalPublicKey<P::G1>,
+  enc_key: &ElGamalEncKey<P::G1>,
   msg: &[u8])
   -> Result<ConfidentialAC<P::G1, P::G2, P::ScalarField>, ZeiError> {
   // 1. create ciphertext for all revealed attributes
@@ -119,7 +125,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
   let pok_attrs = ac_confidential_sok_prove::<_, P>(&mut transcript,
                                                     prng,
                                                     user_sk,
-                                                    &credential.issuer_pk,
+                                                    &credential.issuer_pub_key,
                                                     &key.t,
                                                     attributes.as_slice(),
                                                     &sig_commitment,
@@ -133,18 +139,14 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
 }
 
 pub fn ac_confidential_open_verify<P: Pairing>(issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
-                                               enc_key: &ElGamalPublicKey<P::G1>,
+                                               enc_key: &ElGamalEncKey<P::G1>,
                                                reveal_map: &[bool],
                                                sig_commitment: &ACCommitment<P::G1>,
-                                               cac: &ConfidentialAC<P::G1,
-                                                               P::G2,
-                                                               P::ScalarField>,
+                                               ctexts: &[ElGamalCiphertext<P::G1>],
+                                               cac_pok: &CACPoK<P::G1, P::G2, P::ScalarField>,
                                                msg: &[u8])
                                                -> Result<(), ZeiError> {
   // 1. error checking
-
-  let ctexts = cac.ctexts.as_slice();
-  let cac_pok = &cac.pok;
   let n = ctexts.len();
   let revealed_count = reveal_map.iter()
                                  .fold(0, |sum, b| if *b { sum + 1 } else { sum });
@@ -164,7 +166,8 @@ pub fn ac_confidential_open_verify<P: Pairing>(issuer_pk: &ACIssuerPublicKey<P::
                                   issuer_pk,
                                   enc_key,
                                   sig_commitment,
-                                  cac,
+                                  ctexts,
+                                  cac_pok,
                                   reveal_map,
                                   msg)?;
 
@@ -181,7 +184,7 @@ pub(crate) fn ac_confidential_sok_prove<R: CryptoRng + RngCore, P: Pairing>(
   t: &P::ScalarField,
   attrs: &[Attribute<&P::ScalarField>],
   sig_commitment: &ACCommitment<P::G1>,
-  enc_key: &ElGamalPublicKey<P::G1>,
+  enc_key: &ElGamalEncKey<P::G1>,
   ctexts: &[ElGamalCiphertext<P::G1>],
   rands: &[P::ScalarField],
   msg: &[u8])
@@ -239,17 +242,16 @@ pub(crate) fn ac_confidential_sok_prove<R: CryptoRng + RngCore, P: Pairing>(
            response_rands }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ac_confidential_sok_verify<P: Pairing>(transcript: &mut Transcript,
                                           ac_issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                          enc_key: &ElGamalPublicKey<P::G1>,
+                                          enc_key: &ElGamalEncKey<P::G1>,
                                           sig_commitment: &ACCommitment<P::G1>,
-                                          cac: &ConfidentialAC<P::G1, P::G2, P::ScalarField>,
+                                          ctexts: &[ElGamalCiphertext<P::G1>],
+                                          cac_pok: &CACPoK<P::G1, P::G2, P::ScalarField>,
                                           bitmap: &[bool], // indicates which hidden attributes are encrypted under enc_key
                                           msg: &[u8])
                                           -> Result<(), ZeiError> {
-  let ctexts = cac.ctexts.as_slice();
-  let cac_pok = &cac.pok;
-
   transcript.cac_init::<P>(ac_issuer_pub_key, enc_key, &sig_commitment, ctexts);
   transcript.append_message(SOK_LABEL, msg); // SoK
                                              // 1. compute challenge
@@ -290,7 +292,7 @@ fn verify_ciphertext<P: Pairing>(challenge: &P::ScalarField,
                                  ctexts_coms: &[ElGamalCiphertext<P::G1>],
                                  attrs_resp: &[&P::ScalarField],
                                  rands_resps: &[P::ScalarField],
-                                 enc_key: &ElGamalPublicKey<P::G1>)
+                                 enc_key: &ElGamalEncKey<P::G1>)
                                  -> Result<(), ZeiError> {
   for (ctext, ctext_com, attr_resp, rand_resp) in izip!(ctexts.iter(),
                                                         ctexts_coms.iter(),
@@ -312,9 +314,9 @@ fn verify_ciphertext<P: Pairing>(challenge: &P::ScalarField,
 pub(crate) mod test_helper {
   use crate::algebra::groups::Group;
   use crate::algebra::pairing::Pairing;
-  use crate::basic_crypto::elgamal::elgamal_keygen;
+  use crate::basic_crypto::elgamal::elgamal_key_gen;
   use crate::crypto::anon_creds::{
-    ac_commit, ac_keygen_issuer, ac_keygen_user, ac_sign, ac_verify_commitment, Credential,
+    ac_commit, ac_keygen_issuer, ac_sign, ac_user_key_gen, ac_verify_commitment, Credential,
   };
   use crate::crypto::conf_cred_reveal::{
     ac_confidential_open_commitment, ac_confidential_open_verify,
@@ -330,18 +332,18 @@ pub(crate) mod test_helper {
     let num_attr = reveal_bitmap.len();
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
-    let (user_pk, user_sk) = ac_keygen_user::<_, P>(&mut prng, &issuer_pk);
-    let (_, enc_key) = elgamal_keygen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+    let (user_pk, user_sk) = ac_user_key_gen::<_, P>(&mut prng, &issuer_pk);
+    let (_, enc_key) = elgamal_key_gen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
 
     let mut attrs = Vec::new();
     for i in 0..num_attr {
       attrs.push(byte_slice_to_scalar(format!("attr{}!", i).as_bytes()));
     }
 
-    let ac_sig = ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]);
+    let ac_sig = ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]).unwrap();
     let credential = Credential { signature: ac_sig,
                                   attributes: attrs,
-                                  issuer_pk: issuer_pk.clone() };
+                                  issuer_pub_key: issuer_pk.clone() };
     let (sig_commitment, sok, key) =
       ac_commit::<_, P>(&mut prng, &user_sk, &credential, credential_addr).unwrap();
 
@@ -354,11 +356,12 @@ pub(crate) mod test_helper {
                                                                     reveal_bitmap,
                                                                     &enc_key,
                                                                     proof_message).unwrap();
-    assert!(ac_confidential_open_verify::<P>(&credential.issuer_pk,
+    assert!(ac_confidential_open_verify::<P>(&credential.issuer_pub_key,
                                              &enc_key,
                                              reveal_bitmap,
                                              &sig_commitment,
-                                             &conf_reveal_proof,
+                                             &conf_reveal_proof.ctexts,
+                                             &conf_reveal_proof.pok,
                                              proof_message,).is_ok());
 
     // Error cases /////////////////////////////////////////////////////////////////////////////////
@@ -375,7 +378,8 @@ pub(crate) mod test_helper {
                                                 &enc_key,
                                                 &tampered_bitmap[..],
                                                 &sig_commitment,
-                                                &conf_reveal_proof,
+                                                &conf_reveal_proof.ctexts,
+                                                &conf_reveal_proof.pok,
                                                 proof_message);
     assert_eq!(Err(ZeiError::IdentityRevealVerifyError),
                vrfy,
@@ -387,7 +391,8 @@ pub(crate) mod test_helper {
                                                 &enc_key,
                                                 &empty_bitmap[..],
                                                 &sig_commitment,
-                                                &conf_reveal_proof,
+                                                &conf_reveal_proof.ctexts,
+                                                &conf_reveal_proof.pok,
                                                 proof_message);
     assert_eq!(Err(ZeiError::ParameterError),
                vrfy,
@@ -399,7 +404,8 @@ pub(crate) mod test_helper {
                                                 &enc_key,
                                                 &reveal_bitmap,
                                                 &sig_commitment,
-                                                &conf_reveal_proof,
+                                                &conf_reveal_proof.ctexts,
+                                                &conf_reveal_proof.pok,
                                                 proof_message);
     assert_eq!(vrfy,
                Err(ZeiError::IdentityRevealVerifyError),
@@ -407,12 +413,13 @@ pub(crate) mod test_helper {
 
     // Wrong encryption public key
     let (_, another_enc_key) =
-      elgamal_keygen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+      elgamal_key_gen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
     let vrfy = ac_confidential_open_verify::<P>(&issuer_pk,
                                                 &another_enc_key,
                                                 &reveal_bitmap,
                                                 &sig_commitment,
-                                                &conf_reveal_proof,
+                                                &conf_reveal_proof.ctexts,
+                                                &conf_reveal_proof.pok,
                                                 proof_message);
     assert_eq!(Err(ZeiError::IdentityRevealVerifyError),
                vrfy,
@@ -424,7 +431,8 @@ pub(crate) mod test_helper {
                                                 &enc_key,
                                                 &reveal_bitmap,
                                                 &sig_commitment,
-                                                &conf_reveal_proof,
+                                                &conf_reveal_proof.ctexts,
+                                                &conf_reveal_proof.pok,
                                                 wrong_message);
     assert_eq!(Err(ZeiError::IdentityRevealVerifyError),
                vrfy,
@@ -531,9 +539,9 @@ mod test_serialization {
   use crate::algebra::bn::BN;
   use crate::algebra::groups::Group;
   use crate::algebra::pairing::Pairing;
-  use crate::basic_crypto::elgamal::elgamal_keygen;
+  use crate::basic_crypto::elgamal::elgamal_key_gen;
   use crate::crypto::anon_creds::{ac_commit, ac_sign};
-  use crate::crypto::anon_creds::{ac_keygen_issuer, ac_keygen_user, Credential};
+  use crate::crypto::anon_creds::{ac_keygen_issuer, ac_user_key_gen, Credential};
   use crate::crypto::conf_cred_reveal::ac_confidential_open_commitment;
   use crate::crypto::conf_cred_reveal::ConfidentialAC;
   use crate::utils::byte_slice_to_scalar;
@@ -550,18 +558,18 @@ mod test_serialization {
 
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
-    let (user_pk, user_sk) = ac_keygen_user::<_, P>(&mut prng, &issuer_pk);
-    let (_, enc_key) = elgamal_keygen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+    let (user_pk, user_sk) = ac_user_key_gen::<_, P>(&mut prng, &issuer_pk);
+    let (_, enc_key) = elgamal_key_gen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
 
     let mut attrs = Vec::new();
     for i in 0..num_attr {
       attrs.push(byte_slice_to_scalar(format!("attr{}!", i).as_bytes()));
     }
 
-    let ac_sig = ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]);
+    let ac_sig = ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]).unwrap();
     let credential = Credential { signature: ac_sig,
                                   attributes: attrs,
-                                  issuer_pk };
+                                  issuer_pub_key: issuer_pk };
 
     let (_, _, key) = ac_commit::<_, P>(&mut prng, &user_sk, &credential, b"an address").unwrap();
     let conf_reveal_proof = ac_confidential_open_commitment::<_, P>(&mut prng,

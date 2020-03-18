@@ -125,7 +125,7 @@ pub struct ACSignature<G1> {
 pub struct Credential<G1, G2, B> {
   pub signature: ACSignature<G1>, // original signature from Issuer
   pub attributes: Vec<B>,         // set of attributes in credential
-  pub issuer_pk: ACIssuerPublicKey<G1, G2>,
+  pub issuer_pub_key: ACIssuerPublicKey<G1, G2>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -204,7 +204,7 @@ pub(crate) fn ac_keygen_issuer<R: CryptoRng + RngCore, P: Pairing>(
 }
 
 /// I generate a credential user key pair for a given credential issuer
-pub(crate) fn ac_keygen_user<R: CryptoRng + RngCore, P: Pairing>(
+pub(crate) fn ac_user_key_gen<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>)
   -> (ACUserPublicKey<P::G1>, ACUserSecretKey<P::ScalarField>) {
@@ -215,24 +215,32 @@ pub(crate) fn ac_keygen_user<R: CryptoRng + RngCore, P: Pairing>(
 
 /// I Compute a credential signature for a set of attributes. User can represent Null attributes by
 /// a fixes scalar (e.g. 0)
-pub(crate) fn ac_sign<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
-                                                          issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
-                                                          user_pk: &ACUserPublicKey<P::G1>,
-                                                          attrs: &[P::ScalarField])
-                                                          -> ACSignature<P::G1> {
+pub(crate) fn ac_sign<R: CryptoRng + RngCore, P: Pairing>(
+  prng: &mut R,
+  issuer_sk: &ACIssuerSecretKey<P::G1, P::ScalarField>,
+  user_pk: &ACUserPublicKey<P::G1>,
+  attrs: &[P::ScalarField])
+  -> Result<ACSignature<P::G1>, ZeiError> {
+  let number_attributes_from_issuer_sk = issuer_sk.y.len();
+  let n = attrs.len();
+  if number_attributes_from_issuer_sk != n {
+    return Err(ZeiError::AnonymousCredentialSignError);
+  }
+
   let u = P::ScalarField::random_scalar(prng);
   let mut exponent = issuer_sk.x.clone();
   for (attr, yi) in attrs.iter().zip(issuer_sk.y.iter()) {
     exponent = exponent.add(&attr.mul(yi));
   }
   let cc = issuer_sk.gen1.mul(&exponent);
-  ACSignature::<P::G1> { sigma1: issuer_sk.gen1.mul(&u),
-                         sigma2: user_pk.0.add(&cc).mul(&u) }
+  Ok(ACSignature::<P::G1> { sigma1: issuer_sk.gen1.mul(&u),
+                            sigma2: user_pk.0.add(&cc).mul(&u) })
 }
 
 /// Sample an  AC commitment key
-pub(crate) fn ac_gen_key<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R)
-                                                             -> ACKey<P::ScalarField> {
+pub(crate) fn ac_commitment_key_gen<R: CryptoRng + RngCore, P: Pairing>(
+  prng: &mut R)
+  -> ACKey<P::ScalarField> {
   ACKey { r: P::ScalarField::random_scalar(prng),
           t: P::ScalarField::random_scalar(prng) }
 }
@@ -245,7 +253,7 @@ pub(crate) fn ac_commit<R: CryptoRng + RngCore, P: Pairing>(
   credential: &Credential<P::G1, P::G2, P::ScalarField>,
   msg: &[u8])
   -> Result<(ACCommitment<P::G1>, ACPoK<P::G2, P::ScalarField>, ACKey<P::ScalarField>), ZeiError> {
-  let key = ac_gen_key::<_, P>(prng);
+  let key = ac_commitment_key_gen::<_, P>(prng);
   let (commitment, sok) = ac_commit_with_key::<_, P>(prng, user_sk, credential, &key, msg)?;
   Ok((commitment, sok, key))
 }
@@ -265,12 +273,12 @@ pub(crate) fn ac_commit_with_key<R: CryptoRng + RngCore, P: Pairing>(
 
   let sig_commitment = ac_randomize::<P>(&credential.signature, key); // compute commitment
   let mut transcript = Transcript::new(AC_COMMIT_NEW_TRANSCRIPT_INSTANCE);
-  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pk, &sig_commitment); // public parameters
+  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pub_key, &sig_commitment); // public parameters
   transcript.append_message(SOK_LABEL, msg); // SoK on message msg
   let sok = prove_pok::<_, P>(&mut transcript,
                               prng,
                               user_sk,
-                              &credential.issuer_pk,
+                              &credential.issuer_pub_key,
                               &key.t,
                               hidden_attrs.as_slice())?;
 
@@ -360,11 +368,11 @@ pub(crate) fn ac_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
                                       })
                                       .collect_vec();
   let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
-  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pk, &sig_commitment); // public parameters
+  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pub_key, &sig_commitment); // public parameters
   let pok = prove_pok::<_, P>(&mut transcript,
                               prng,
                               user_sk,
-                              &credential.issuer_pk,
+                              &credential.issuer_pub_key,
                               &key.t,
                               revealed_attributes.as_slice())?;
 
@@ -395,14 +403,14 @@ pub(crate) fn ac_reveal<R: CryptoRng + RngCore, P: Pairing>(
                              })
                              .collect_vec();
 
-  let key = ac_gen_key::<_, P>(prng);
+  let key = ac_commitment_key_gen::<_, P>(prng);
   let sig_commitment = ac_randomize::<P>(&credential.signature, &key);
   let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
-  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pk, &sig_commitment);
+  ac_init_transcript::<P>(&mut transcript, &credential.issuer_pub_key, &sig_commitment);
   let pok = prove_pok::<_, P>(&mut transcript,
                               prng,
                               user_sk,
-                              &credential.issuer_pk,
+                              &credential.issuer_pub_key,
                               &key.t,
                               attributes.as_slice())?;
 
@@ -568,10 +576,64 @@ fn ac_verify_final_check<P: Pairing>(sig_commitment: &ACCommitment<P::G1>,
 #[cfg(test)]
 pub(crate) mod credentials_tests {
   use super::*;
+  use crate::algebra::bls12_381::Bls12381;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
   use serde::{Deserialize, Serialize};
+  extern crate typenum;
+  use typenum::U8;
+
+  fn check_ac_sign<P: Pairing>(bitmap: &[bool]) {
+    let n = bitmap.len();
+    let mut prng: ChaChaRng;
+    prng = ChaChaRng::from_seed([0u8; 32]);
+    let issuer_keypair = super::ac_keygen_issuer::<_, P>(&mut prng, n);
+    let issuer_pk = &issuer_keypair.0;
+    let issuer_sk = &issuer_keypair.1;
+    let (user_pk, _user_sk) = super::ac_user_key_gen::<_, P>(&mut prng, issuer_pk);
+
+    let mut attrs = vec![];
+
+    for _ in bitmap.iter() {
+      attrs.push(P::ScalarField::random_scalar(&mut prng));
+    }
+
+    let sig = super::ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs);
+    assert!(sig.is_ok());
+
+    if n > 1 {
+      let sig_error = super::ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[0..0]);
+      assert!(sig_error.is_err());
+    }
+  }
+
+  fn do_test_keygen_issuer<P: Pairing>() {
+    let mut prng: ChaChaRng;
+    prng = ChaChaRng::from_seed([0u8; 32]);
+
+    let _ = super::ac_keygen_issuer::<_, P>(&mut prng, 5);
+    let _ = super::ac_keygen_issuer::<_, P>(&mut prng, 0);
+  }
+
+  #[test]
+  fn test_key_gen_issuer() {
+    do_test_keygen_issuer::<Bls12381>();
+  }
+
+  #[test]
+  fn test_ac_sign() {
+    for i in 0..16i32 {
+      let bit_array = bit_array::BitArray::<u32, U8>::from_bytes(&i.to_be_bytes());
+
+      let mut bool_vector = vec![];
+      for i in 0..bit_array.len() {
+        bool_vector.push(bit_array.get(i).unwrap());
+      }
+
+      check_ac_sign::<Bls12381>(bool_vector.as_slice());
+    }
+  }
 
   fn reveal<P: Pairing>(bitmap: &[bool]) {
     let n = bitmap.len();
@@ -580,7 +642,7 @@ pub(crate) mod credentials_tests {
     let issuer_keypair = super::ac_keygen_issuer::<_, P>(&mut prng, n);
     let issuer_pk = &issuer_keypair.0;
     let issuer_sk = &issuer_keypair.1;
-    let (user_pk, user_sk) = super::ac_keygen_user::<_, P>(&mut prng, issuer_pk);
+    let (user_pk, user_sk) = super::ac_user_key_gen::<_, P>(&mut prng, issuer_pk);
 
     let mut attrs = vec![];
 
@@ -588,11 +650,11 @@ pub(crate) mod credentials_tests {
       attrs.push(P::ScalarField::random_scalar(&mut prng));
     }
 
-    let sig = super::ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, attrs.as_slice());
+    let sig = super::ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, attrs.as_slice()).unwrap();
 
     let credential = Credential { signature: sig,
                                   attributes: attrs,
-                                  issuer_pk: issuer_pk.clone() };
+                                  issuer_pub_key: issuer_pk.clone() };
 
     let reveal_sig = super::ac_reveal::<_, P>(&mut prng, &user_sk, &credential, bitmap).unwrap();
 
@@ -614,6 +676,10 @@ pub(crate) mod credentials_tests {
                               &reveal_sig.pok).is_ok())
   }
 
+  pub fn no_attributes<P: Pairing>() {
+    reveal::<P>(&[]);
+  }
+
   pub fn single_attribute<P: Pairing>() {
     reveal::<P>(&[false]);
     reveal::<P>(&[true]);
@@ -633,11 +699,22 @@ pub(crate) mod credentials_tests {
     reveal::<P>(&[true; 10]);
   }
 
+  #[test]
+  pub fn test_attributes() {
+    no_attributes::<Bls12381>();
+    single_attribute::<Bls12381>();
+    two_attributes::<Bls12381>();
+    ten_attributes::<Bls12381>();
+  }
+
   pub fn to_json_credential_structures<P: Pairing>() {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
+
+    let num_attributes = 10;
+
     //issuer keys
-    let issuer_keys = ac_keygen_issuer::<_, P>(&mut prng, 10);
+    let issuer_keys = ac_keygen_issuer::<_, P>(&mut prng, num_attributes);
     let json_str = serde_json::to_string(&issuer_keys.0).unwrap();
     let issuer_pub_key_de: ACIssuerPublicKey<P::G1, P::G2> =
       serde_json::from_str(&json_str).unwrap();
@@ -649,7 +726,7 @@ pub(crate) mod credentials_tests {
     assert_eq!(issuer_keys.1, issuer_sec_key_de);
 
     //user keys
-    let user_keys = super::ac_keygen_user::<_, P>(&mut prng, &issuer_keys.0);
+    let user_keys = super::ac_user_key_gen::<_, P>(&mut prng, &issuer_keys.0);
     let json_str = serde_json::to_string(&user_keys.0).unwrap();
     let user_pub_key_de: ACUserPublicKey<P::G1> = serde_json::from_str(&json_str).unwrap();
     assert_eq!(user_keys.0, user_pub_key_de);
@@ -659,24 +736,35 @@ pub(crate) mod credentials_tests {
     assert_eq!(user_keys.1, user_sec_key_de);
 
     // reveal proof containing signature and pok
-    let attrs = vec![P::ScalarField::from_u32(10), P::ScalarField::from_u32(10)];
-    let sig = super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, attrs.as_slice());
+    let attrs = vec![P::ScalarField::from_u32(10); num_attributes];
+    let sig =
+      super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, attrs.as_slice()).unwrap();
     let credential = Credential { signature: sig,
                                   attributes: attrs,
-                                  issuer_pk: issuer_keys.0 };
-    let reveal_sig =
-      super::ac_reveal::<_, P>(&mut prng, &user_keys.1, &credential, &[true, false]).unwrap();
+                                  issuer_pub_key: issuer_keys.0 };
+    let reveal_sig = super::ac_reveal::<_, P>(&mut prng,
+                                              &user_keys.1,
+                                              &credential,
+                                              &[true, false, true, false, true, false, true,
+                                                false, true, false]).unwrap();
     let json_str = serde_json::to_string(&reveal_sig).unwrap();
     let reveal_sig_de: ACRevealSig<P::G1, P::G2, P::ScalarField> =
       serde_json::from_str(&json_str).unwrap();
     assert_eq!(reveal_sig, reveal_sig_de);
   }
 
+  #[test]
+  fn test_to_json_credential_structures() {
+    to_json_credential_structures::<Bls12381>();
+  }
+
   pub fn to_msg_pack_credential_structures<P: Pairing>() {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
+
+    let num_attributes = 10;
     //issuer keys
-    let issuer_keys = ac_keygen_issuer::<_, P>(&mut prng, 10);
+    let issuer_keys = ac_keygen_issuer::<_, P>(&mut prng, num_attributes);
     let mut vec = vec![];
     issuer_keys.0
                .serialize(&mut rmp_serde::Serializer::new(&mut vec))
@@ -696,7 +784,7 @@ pub(crate) mod credentials_tests {
     assert_eq!(issuer_keys.1, issuer_priv_key_de);
 
     //user keys
-    let user_keys = super::ac_keygen_user::<_, P>(&mut prng, &issuer_keys.0);
+    let user_keys = super::ac_user_key_gen::<_, P>(&mut prng, &issuer_keys.0);
     let mut vec = vec![];
     user_keys.0
              .serialize(&mut rmp_serde::Serializer::new(&mut vec))
@@ -715,13 +803,17 @@ pub(crate) mod credentials_tests {
     assert_eq!(user_keys.1, user_priv_key_de);
 
     // reveal proof containing signature and pok
-    let attrs = vec![P::ScalarField::from_u32(10), P::ScalarField::from_u32(10)];
-    let sig = super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, attrs.as_slice());
+    let attrs = vec![P::ScalarField::from_u32(10); num_attributes];
+    let sig =
+      super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, attrs.as_slice()).unwrap();
     let credential = Credential { signature: sig,
                                   attributes: attrs,
-                                  issuer_pk: issuer_keys.0 };
-    let reveal_sig =
-      super::ac_reveal::<_, P>(&mut prng, &user_keys.1, &credential, &[true, false]).unwrap();
+                                  issuer_pub_key: issuer_keys.0 };
+    let reveal_sig = super::ac_reveal::<_, P>(&mut prng,
+                                              &user_keys.1,
+                                              &credential,
+                                              &[true, false, true, false, true, false, true,
+                                                false, true, false]).unwrap();
 
     let mut vec = vec![];
     reveal_sig.serialize(&mut rmp_serde::Serializer::new(&mut vec))
@@ -730,5 +822,10 @@ pub(crate) mod credentials_tests {
     let reveal_sig_de: ACRevealSig<P::G1, P::G2, P::ScalarField> =
       Deserialize::deserialize(&mut de).unwrap();
     assert_eq!(reveal_sig, reveal_sig_de);
+  }
+
+  #[test]
+  fn test_to_msg_pack_credential_structures() {
+    to_msg_pack_credential_structures::<Bls12381>();
   }
 }

@@ -17,9 +17,9 @@ pub enum ZeiError {
   XfrVerifyAssetAmountError,
   XfrVerifyConfidentialAssetError,
   XfrCreationAssetAmountError,
-  XfrVerifyIssuerTrackingAssetAmountError,
-  XfrVerifyIssuerTrackingIdentityError,
-  XfrVerifyIssuerTrackingEmptyProofError,
+  XfrVerifyAssetTracingAssetAmountError,
+  XfrVerifyAssetTracingIdentityError,
+  XfrVerifyAssetTracingEmptyProofError,
   XfrVerifyConfidentialAmountError,
   ElGamalVerificationError,
   ElGamalDecryptionError,
@@ -33,6 +33,9 @@ pub enum ZeiError {
   SolvencyVerificationError,
   ZKProofVerificationError,
   GroupSignatureTraceError,
+  AssetTracingExtractionError,
+  IdentityTracingExtractionError,
+  AnonymousCredentialSignError,
 }
 
 impl fmt::Display for ZeiError {
@@ -58,13 +61,13 @@ impl fmt::Display for ZeiError {
                   ZeiError::XfrVerifyConfidentialAmountError => {
                     "Invalid asset type in non confidential asset transfer"
                   }
-                  ZeiError::XfrVerifyIssuerTrackingAssetAmountError => {
+                  ZeiError::XfrVerifyAssetTracingAssetAmountError => {
                     "Asset Tracking error. Asset commitment and asset ciphertext do not match."
                   }
-                  ZeiError::XfrVerifyIssuerTrackingIdentityError => {
+                  ZeiError::XfrVerifyAssetTracingIdentityError => {
                     "Asset Tracking error. Identity reveal proof does not hold"
                   }
-                  ZeiError::XfrVerifyIssuerTrackingEmptyProofError => {
+                  ZeiError::XfrVerifyAssetTracingEmptyProofError => {
                     "Asset Tracking error. Tracked assets must contain asset tracking proof"
                   }
                   ZeiError::XfrVerifyConfidentialAssetError => {
@@ -94,6 +97,13 @@ impl fmt::Display for ZeiError {
                   ZeiError::SolvencyProveError => "Cannot build proof of solvency",
                   ZeiError::ZKProofVerificationError => "Invalid proof",
                   ZeiError::GroupSignatureTraceError => "Trace test did not match",
+                  ZeiError::AssetTracingExtractionError => {
+                    "Cannot extract correct data from tracing ciphertext"
+                  }
+                  ZeiError::IdentityTracingExtractionError => {
+                    "Cannot extract identity attributes from tracing ciphertext"
+                  }
+                  ZeiError::AnonymousCredentialSignError =>{"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."}
                 })
   }
 }
@@ -119,13 +129,13 @@ impl error::Error for ZeiError {
       ZeiError::XfrVerifyConfidentialAmountError => {
         "Invalid asset type in non confidential asset transfer"
       }
-      ZeiError::XfrVerifyIssuerTrackingAssetAmountError => {
+      ZeiError::XfrVerifyAssetTracingAssetAmountError => {
         "Asset Tracking error. Asset commitment and asset ciphertext do not match."
       }
-      ZeiError::XfrVerifyIssuerTrackingIdentityError => {
+      ZeiError::XfrVerifyAssetTracingIdentityError => {
         "Asset Tracking error. Identity reveal proof does not hold"
       }
-      ZeiError::XfrVerifyIssuerTrackingEmptyProofError => {
+      ZeiError::XfrVerifyAssetTracingEmptyProofError => {
         "Asset Tracking error. Tracked assets must contain asset tracking proof"
       }
       ZeiError::XfrVerifyConfidentialAssetError => {
@@ -151,6 +161,13 @@ impl error::Error for ZeiError {
       ZeiError::SolvencyProveError => "Cannot build proof of solvency",
       ZeiError::ZKProofVerificationError => "Invalid proof",
       ZeiError::GroupSignatureTraceError => "Trace test did not match",
+      ZeiError::AssetTracingExtractionError => {
+        "Cannot extract correct data from tracing ciphertext"
+      },
+      ZeiError::IdentityTracingExtractionError => {
+        "Cannot extract identity attributes from tracing ciphertext"
+      },
+      ZeiError::AnonymousCredentialSignError => {"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."},
     }
   }
 }

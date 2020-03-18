@@ -25,8 +25,8 @@ pub struct XfrSecretKey(pub(crate) SecretKey);
 #[wasm_bindgen]
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct XfrKeyPair {
-  public: XfrPublicKey,
-  secret: XfrSecretKey,
+  pub_key: XfrPublicKey,
+  sec_key: XfrSecretKey,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -100,44 +100,44 @@ impl ZeiFromToBytes for XfrSecretKey {
 #[wasm_bindgen]
 impl XfrKeyPair {
   pub fn get_pk(&self) -> XfrPublicKey {
-    self.public
+    self.pub_key
   }
 }
 impl XfrKeyPair {
   pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
     let kp = ed25519_dalek::Keypair::generate(prng);
-    XfrKeyPair { public: XfrPublicKey(kp.public),
-                 secret: XfrSecretKey(kp.secret) }
+    XfrKeyPair { pub_key: XfrPublicKey(kp.public),
+                 sec_key: XfrSecretKey(kp.secret) }
   }
 
   pub fn get_pk_ref(&self) -> &XfrPublicKey {
-    &self.public
+    &self.pub_key
   }
 
   pub fn get_sk_ref(&self) -> &XfrSecretKey {
-    &self.secret
+    &self.sec_key
   }
 
   pub fn get_sk(&self) -> XfrSecretKey {
-    self.secret.clone()
+    self.sec_key.clone()
   }
 
   pub fn sign(&self, msg: &[u8]) -> XfrSignature {
-    self.secret.sign(msg, &self.public)
+    self.sec_key.sign(msg, &self.pub_key)
   }
 }
 
 impl ZeiFromToBytes for XfrKeyPair {
   fn zei_to_bytes(&self) -> Vec<u8> {
     let mut vec = vec![];
-    vec.extend_from_slice(self.secret.zei_to_bytes().as_slice());
-    vec.extend_from_slice(self.public.zei_to_bytes().as_slice());
+    vec.extend_from_slice(self.sec_key.zei_to_bytes().as_slice());
+    vec.extend_from_slice(self.pub_key.zei_to_bytes().as_slice());
     vec
   }
 
   fn zei_from_bytes(bytes: &[u8]) -> Self {
-    XfrKeyPair { secret: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH]),
-                 public: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..]) }
+    XfrKeyPair { sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH]),
+                 pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..]) }
   }
 }
 
@@ -162,7 +162,7 @@ pub fn verify_multisig(keylist: &[XfrPublicKey],
   Ok(())
 }
 
-pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
+pub fn sign_multisig(keylist: &[&XfrKeyPair], message: &[u8]) -> XfrMultiSig {
   let mut signatures = vec![];
   for keypair in keylist.iter() {
     let signature = keypair.sign(message);
@@ -174,7 +174,8 @@ pub fn sign_multisig(keylist: &[XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 #[cfg(test)]
 mod test {
   use crate::errors::ZeiError::SignatureError;
-  use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrPublicKey};
+  use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair};
+  use itertools::Itertools;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
@@ -238,7 +239,7 @@ mod test {
     // test with one key
     let keypairs = generate_keys(&mut prng, 1);
     let pk = keypairs.get(0).unwrap().get_pk_ref();
-    let msig = sign_multisig(keypairs.as_slice(), "HELLO".as_bytes());
+    let msig = sign_multisig(&[&keypairs[0]], "HELLO".as_bytes());
     assert_eq!(Ok(()),
                verify_multisig(&[pk.clone()], "HELLO".as_bytes(), &msig),
                "Multisignature should have verify correctly");
@@ -254,7 +255,7 @@ mod test {
     let keypairs = generate_keys(&mut prng, 2);
     let pk0 = keypairs.get(0).unwrap().get_pk_ref();
     let pk1 = keypairs.get(1).unwrap().get_pk_ref();
-    let msig = sign_multisig(keypairs.as_slice(), "HELLO".as_bytes());
+    let msig = sign_multisig(&[&keypairs[0], &keypairs[1]], "HELLO".as_bytes());
     assert_eq!(Ok(()),
                verify_multisig(&[pk0.clone(), pk1.clone()], "HELLO".as_bytes(), &msig),
                "Multisignature should have verify correctly");
@@ -272,8 +273,11 @@ mod test {
 
     // test with 20 keys
     let keypairs = generate_keys(&mut prng, 20);
-    let pks: Vec<XfrPublicKey> = keypairs.iter().map(|x| x.get_pk_ref().clone()).collect();
-    let msig = sign_multisig(keypairs.as_slice(), "HELLO".as_bytes());
+    let pks = keypairs.iter()
+                      .map(|x| x.get_pk_ref().clone())
+                      .collect_vec();
+    let keypairsref = keypairs.iter().map(|x| x).collect_vec();
+    let msig = sign_multisig(keypairsref.as_slice(), "HELLO".as_bytes());
     assert_eq!(Ok(()),
                verify_multisig(pks.as_slice(), "HELLO".as_bytes(), &msig),
                "Multisignature should have verify correctly");

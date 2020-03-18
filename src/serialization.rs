@@ -380,12 +380,12 @@ pub mod option_bytes {
 
 #[cfg(test)]
 mod test {
-  use crate::basic_crypto::elgamal::elgamal_keygen;
+  use crate::basic_crypto::elgamal::elgamal_key_gen;
   use crate::serialization::ZeiFromToBytes;
   use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
-  use crate::xfr::structs::EGPubKey;
   use bulletproofs::PedersenGens;
 
+  use crate::xfr::asset_tracer::RecordDataEncKey;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use rand_chacha::ChaChaRng;
@@ -481,7 +481,7 @@ mod test {
   fn serialize_and_deserialize_elgamal() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
-    let (_sk, xfr_pub_key) = elgamal_keygen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let (_sk, xfr_pub_key) = elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
     let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
       res
     } else {
@@ -489,7 +489,7 @@ mod test {
       assert!(false);
       "{}".to_string()
     };
-    if let Ok(restored) = serde_json::from_str::<EGPubKey>(&serialized) {
+    if let Ok(restored) = serde_json::from_str::<RecordDataEncKey>(&serialized) {
       assert_eq!(xfr_pub_key, restored);
     } else {
       println!("Failed to deserialize XfrPublicKey from JSON");

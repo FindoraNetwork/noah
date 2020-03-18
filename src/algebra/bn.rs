@@ -409,33 +409,3 @@ mod elgamal_over_bn_groups {
   }
   */
 }
-
-#[cfg(test)]
-mod credentials_over_bn {
-  use crate::crypto::anon_creds::credentials_tests;
-
-  #[test]
-  fn single_attribute() {
-    credentials_tests::single_attribute::<super::BN>();
-  }
-
-  #[test]
-  fn two_attributes() {
-    credentials_tests::two_attributes::<super::BN>();
-  }
-
-  #[test]
-  fn ten_attributes() {
-    credentials_tests::ten_attributes::<super::BN>();
-  }
-
-  #[test]
-  fn to_json_credential_structures() {
-    credentials_tests::to_json_credential_structures::<super::BN>();
-  }
-
-  #[test]
-  fn to_msg_pack_credential_structures() {
-    credentials_tests::to_msg_pack_credential_structures::<super::BN>();
-  }
-}

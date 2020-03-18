@@ -86,6 +86,7 @@ use merlin::Transcript;
 ///                 &rates,
 ///                 &proof.unwrap());
 /// assert!(vrfy.is_ok());
+/// ```
 pub fn prove_solvency(hidden_asset_set: &[(Scalar, Scalar)], // amount and type of hidden assets
                       asset_set_blinds: &[(Scalar, Scalar)], // blindings for amount and type of hidden assets
                       public_asset_set: &[(Scalar, Scalar)], // amount and type of public/known assets

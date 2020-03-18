@@ -15,6 +15,17 @@ pub(crate) fn u32_to_bigendian_u8array(n: u32) -> [u8; 4] {
   array
 }
 
+#[allow(dead_code)]
+/// I convert a u32 into a 4 bytes array (littleendian)
+pub(crate) fn u32_to_littleendian_u8array(n: u32) -> [u8; 4] {
+  let mut array = [0u8; 4];
+  array[3] = ((n >> 24) & 0xFF) as u8;
+  array[2] = ((n >> 16) & 0xFF) as u8;
+  array[1] = ((n >> 8) & 0xFF) as u8;
+  array[0] = (n & 0xFF) as u8;
+  array
+}
+
 /// I convert a u64 into a 8 bytes array (bigendian)
 pub(crate) fn u64_to_bigendian_u8array(n: u64) -> [u8; 8] {
   let mut array = [0u8; 8];
@@ -92,15 +103,25 @@ pub(crate) fn u8_bigendian_slice_to_u32(array: &[u8]) -> u32 {
   | u32::from(array[3])
 }
 
+#[allow(dead_code)]
+/// I convert a 4 byte array into a u32 (littleendian)
+pub(crate) fn u8_littleendian_slice_to_u32(array: &[u8]) -> u32 {
+  u32::from(array[3]) << 24
+  | u32::from(array[2]) << 16
+  | u32::from(array[1]) << 8
+  | u32::from(array[0])
+}
+
 /// I compute the minimum power of two that is greater or equal to the input
 pub(crate) fn min_greater_equal_power_of_two(n: u32) -> u32 {
   2.0f64.powi((n as f64).log2().ceil() as i32) as u32
 }
 
-pub(crate) fn u64_to_u32_pair(x: u64) -> (u32, u32) {
+pub fn u64_to_u32_pair(x: u64) -> (u32, u32) {
   ((x & 0xFFFF_FFFF) as u32, (x >> 32) as u32)
 }
 
+#[allow(dead_code)]
 pub(crate) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
   let mut hasher = Sha512::new();
   hasher.input(slice);
