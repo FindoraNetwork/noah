@@ -93,12 +93,6 @@ Run only the documentation tests.
 > cargo test --doc
 ```
 
-Run only the property-testing tests (which are slow and thus marked as *ignored*).
-
-```
-> cargo test -- --ignored
-```
-
 ### Test coverage
 
 [Tarpaulin](https://github.com/xd009642/tarpaulin) is a test coverage tool for Rust.
