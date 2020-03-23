@@ -58,7 +58,7 @@ impl AssetRecordType {
       _ => true,
     }
   }
-  pub fn is_confidential_amount_and_type(self) -> bool {
+  pub fn is_confidential_amount_and_asset_type(self) -> bool {
     match self {
       AssetRecordType::ConfidentialAmount_ConfidentialAssetType => true,
       _ => false,
