@@ -317,18 +317,16 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
                           outputs: &[&OpenAssetRecord])
                           -> Result<XfrRangeProof, ZeiError> {
   let num_output = outputs.len();
-  let upper_power2 = min_greater_equal_power_of_two((2 * num_output + 2) as u32) as usize;
+  let upper_power2 = min_greater_equal_power_of_two((2 * (num_output + 1)) as u32) as usize;
   if upper_power2 > MAX_PARTY_NUMBER {
     return Err(ZeiError::RangeProofProveError);
   }
 
-  let pow2_32 = Scalar::from(POW_2_32);
   let mut params = PublicParams::new();
 
   //build values vector (out amounts + amount difference)
-  let in_amounts: Vec<u64> = inputs.iter().map(|x| x.amount).collect();
+  let in_total = inputs.iter().fold(0u64, |accum, x| accum + x.amount);
   let out_amounts: Vec<u64> = outputs.iter().map(|x| x.amount).collect();
-  let in_total = in_amounts.iter().sum::<u64>();
   let out_total = out_amounts.iter().sum::<u64>();
   let xfr_diff = if in_total >= out_total {
     in_total - out_total
@@ -349,26 +347,17 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
   }
 
   //build blinding vectors (out blindings + blindings difference)
-  let in_blind_low: Vec<Scalar> = inputs.iter().map(|x| x.amount_blinds.0).collect();
-  let in_blind_high: Vec<Scalar> = inputs.iter().map(|x| x.amount_blinds.1).collect();
-  let out_blind_low: Vec<Scalar> = outputs.iter().map(|x| x.amount_blinds.0).collect();
-  let out_blind_high: Vec<Scalar> = outputs.iter().map(|x| x.amount_blinds.1).collect();
+  let (total_blind_input_low, total_blind_input_high) = add_blindings(inputs);
+  let (total_blind_output_low, total_blind_output_high) = add_blindings(outputs);
 
-  let mut in_blind_sum = Scalar::zero();
-  for (blind_low, blind_high) in in_blind_low.iter().zip(in_blind_high.iter()) {
-    in_blind_sum += blind_low + blind_high * pow2_32; //2^32
-  }
+  let xfr_blind_diff_low = total_blind_input_low - total_blind_output_low;
+  let xfr_blind_diff_high = total_blind_input_high - total_blind_output_high;
+
   let mut range_proof_blinds = Vec::with_capacity(upper_power2);
-  let mut out_blind_sum = Scalar::zero();
-  for (blind_low, blind_high) in out_blind_low.iter().zip(out_blind_high.iter()) {
-    range_proof_blinds.push(blind_low.clone());
-    range_proof_blinds.push(blind_high.clone());
-    out_blind_sum += blind_low + blind_high * pow2_32; //2^32
+  for output in outputs.iter() {
+    range_proof_blinds.push(output.amount_blinds.0); // low
+    range_proof_blinds.push(output.amount_blinds.1); // high
   }
-
-  let xfr_blind_diff = in_blind_sum - out_blind_sum;
-  let xfr_blind_diff_high = xfr_blind_diff * pow2_32.invert();
-  let xfr_blind_diff_low = xfr_blind_diff - xfr_blind_diff_high * pow2_32;
   range_proof_blinds.push(xfr_blind_diff_low);
   range_proof_blinds.push(xfr_blind_diff_high);
   for _ in range_proof_blinds.len()..upper_power2 {
@@ -388,6 +377,12 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
   Ok(XfrRangeProof { range_proof,
                      xfr_diff_commitment_low: diff_com_low,
                      xfr_diff_commitment_high: diff_com_high })
+}
+fn add_blindings(oar: &[&OpenAssetRecord]) -> (Scalar, Scalar) {
+  oar.iter()
+     .fold((Scalar::from(0u8), Scalar::from(0u8)), |(low, high), x| {
+       (low + x.amount_blinds.0, high + x.amount_blinds.1)
+     })
 }
 
 pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
