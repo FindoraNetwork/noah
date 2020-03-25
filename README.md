@@ -37,6 +37,14 @@ Support:
 
 # Benchmarks
 
+Benchmarks are available for XfrNote operations. To produce them:
+
+```
+> cargo bench
+```
+
+The report is available at `target/criterion/report/ndex.html`.
+
 # Development environment setup
 
 ## Install RUST

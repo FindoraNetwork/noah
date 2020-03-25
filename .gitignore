@@ -7,5 +7,7 @@
 Cargo.lock
 .*.sw*
 
+utilities/target
+
 #Possible Embedded Repos
 zcash-bn-fork

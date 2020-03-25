@@ -1,69 +1,27 @@
 #![deny(warnings)]
 #[cfg(test)]
-pub mod examples {
+pub(crate) mod examples {
 
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
-
-  use zei::api::anon_creds;
-  use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Attr, Credential};
-
-  use bulletproofs::PedersenGens;
   use wasm_bindgen::__rt::std::collections::HashMap;
-  use zei::xfr::asset_record::{
-    build_blind_asset_record, open_blind_asset_record, AssetRecordType,
-  };
+  use zei::api::anon_creds;
+  use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Credential};
+  use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
   use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
   use zei::xfr::lib::gen_xfr_note;
-  use zei::xfr::lib::{trace_assets, verify_xfr_note, verify_xfr_note_no_policies, RecordData};
-  use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
+  use zei::xfr::lib::{trace_assets, verify_xfr_note, verify_xfr_note_no_policies};
+  use zei::xfr::sig::XfrKeyPair;
   use zei::xfr::structs::{
-    AssetRecord, AssetRecordTemplate, AssetTracingPolicy, AssetType, BlindAssetRecord,
-    IdentityRevealPolicy, OwnerMemo, XfrAmount, XfrAssetType,
+    AssetRecord, AssetRecordTemplate, AssetTracingPolicy, AssetType, IdentityRevealPolicy,
+  };
+  use zei_utilities::examples::{
+    check_record_data, conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
   };
 
-  const ASSET1_TYPE: AssetType = [0u8; 16];
-  const ASSET2_TYPE: AssetType = [1u8; 16];
-  const ASSET3_TYPE: AssetType = [2u8; 16];
-
-  // Simulate getting a BlindAssetRecord from Ledger
-  fn non_conf_blind_asset_record_from_ledger(key: &XfrPublicKey,
-                                             amount: u64,
-                                             asset_type: AssetType)
-                                             -> BlindAssetRecord {
-    BlindAssetRecord { amount: XfrAmount::NonConfidential(amount),
-                       asset_type: XfrAssetType::NonConfidential(asset_type),
-                       public_key: key.clone() }
-  }
-
-  // Simulate getting a BlindAssetRecord from Ledger
-  fn conf_blind_asset_record_from_ledger(key: &XfrPublicKey,
-                                         amount: u64,
-                                         asset_type: AssetType)
-                                         -> (BlindAssetRecord, OwnerMemo) {
-    let mut prng = ChaChaRng::from_seed([1u8; 32]);
-    let template = AssetRecordTemplate { amount,
-                                         asset_type,
-                                         public_key: key.clone(),
-                                         asset_record_type:
-                                           AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                                         asset_tracking: None };
-    let (bar, _, owner) =
-      build_blind_asset_record(&mut prng, &PedersenGens::default(), &template, None);
-
-    (bar, owner.unwrap())
-  }
-
-  fn check_record_data(record_data: &RecordData,
-                       expected_amount: u64,
-                       expected_asset_type: AssetType,
-                       expected_ids: Vec<Attr>,
-                       expected_pk: &XfrPublicKey) {
-    assert_eq!(record_data.0, expected_amount);
-    assert_eq!(record_data.1, expected_asset_type);
-    assert_eq!(record_data.2, expected_ids);
-    assert_eq!(record_data.3, *expected_pk);
-  }
+  pub const ASSET1_TYPE: AssetType = [0u8; 16];
+  pub const ASSET2_TYPE: AssetType = [1u8; 16];
+  pub const ASSET3_TYPE: AssetType = [2u8; 16];
 
   #[test]
   fn xfr_note_non_confidential_one_input_one_output() {
@@ -858,7 +816,7 @@ pub mod examples {
     };
 
     // 2. Prepare inputs
-    // 2.1 get "from letget" blind asset records
+    // 2.1 get "from ledger" blind asset records
     let (bar_user1_addr1, memo1) =
       conf_blind_asset_record_from_ledger(user1_key_pair1.get_pk_ref(),
                                           amount_asset1_in1,

@@ -42,7 +42,9 @@ aes-ctr = "0.3.0"
 rand = { version = "0.7", default-features = false}
 bit-array = "0.4.3"
 typenum = "1.11.2"
-
+criterion = "0.3.1"
+criterion-cycles-per-byte = "0.1.1"
+zei_utilities = { path = "utilities" }
 
 [features]
 default = ["std", "u64_backend"]
@@ -52,5 +54,21 @@ nightly = ["curve25519-dalek/nightly", "rand/nightly"]
 u64_backend = ["curve25519-dalek/u64_backend"]
 u32_backend = ["curve25519-dalek/u32_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
+
+[[bench]]
+name = "xfr_note_time"
+harness = false
+
+[[bench]]
+name = "xfr_note_cycles"
+harness = false
+
+[[bench]]
+name = "xfr_body_time"
+harness = false
+
+[[bench]]
+name = "xfr_body_cycles"
+harness = false
 
 
