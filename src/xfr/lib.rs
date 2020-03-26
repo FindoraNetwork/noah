@@ -267,11 +267,11 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
   let asset_tracking_proof =
     AssetTrackingProofs { asset_type_and_amount_proofs: asset_type_amount_tracking_proof,
                           inputs_identity_proofs: inputs.iter()
-                                                        .map(|input| input.identity_proof.clone())
+                                                        .map(|input| input.identity_proofs.clone())
                                                         .collect_vec(),
                           outputs_identity_proofs:
                             outputs.iter()
-                                   .map(|output| output.identity_proof.clone())
+                                   .map(|output| output.identity_proofs.clone())
                                    .collect_vec() };
 
   let proofs = XfrProofs { asset_type_and_amount_proof: asset_amount_proof,
@@ -290,7 +290,7 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
   let tracer_memos = inputs.iter()
                            .chain(outputs)
                            .map(|record_input| {
-                             record_input.asset_tracer_memo.clone() // Can I avoid this clone?
+                             record_input.asset_tracers_memos.clone() // Can I avoid this clone?
                            })
                            .collect_vec();
   let owner_memos = outputs.iter()
@@ -462,9 +462,9 @@ pub fn verify_xfr_note_no_policies<R: CryptoRng + RngCore>(prng: &mut R,
 /// * `inputs_sig_commitments`-
 pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
                                                xfr_note: &XfrNote,
-                                               inputs_tracking_policies: &[Option<&AssetTracingPolicy>],
+                                               inputs_tracking_policies: &[&AssetTracingPolicies],
                                                inputs_sig_commitments: &[Option<&ACCommitment>],
-                                               outputs_tracking_policies: &[Option<&AssetTracingPolicy>],
+                                               outputs_tracking_policies: &[&AssetTracingPolicies],
                                                outputs_sig_commitments: &[Option<&ACCommitment>])
                                                -> Result<(), ZeiError> {
   // 1. verify signature
@@ -513,9 +513,9 @@ pub fn verify_xfr_body_no_policies<R: CryptoRng + RngCore>(prng: &mut R,
 /// * `returns` - () or an error
 pub fn verify_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                                body: &XfrBody,
-                                               inputs_tracking_policies: &[Option<&AssetTracingPolicy>],
+                                               inputs_tracking_policies: &[&AssetTracingPolicies],
                                                inputs_sig_commitments: &[Option<&ACCommitment>],
-                                               outputs_tracking_policies: &[Option<&AssetTracingPolicy>],
+                                               outputs_tracking_policies: &[&AssetTracingPolicies],
                                                outputs_sig_commitments: &[Option<&ACCommitment>])
                                                -> Result<(), ZeiError> {
   // 1. verify amounts and asset types
@@ -527,8 +527,7 @@ pub fn verify_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                inputs_tracking_policies,
                                inputs_sig_commitments,
                                outputs_tracking_policies,
-                               outputs_sig_commitments,
-                               &[]) //TODO figure out msg, maybe an XfrNonce
+                               outputs_sig_commitments)
 }
 
 fn verify_plain_amounts(inputs: &[BlindAssetRecord],
@@ -670,13 +669,13 @@ pub fn find_tracing_memos<'a>(
   {
     return Err(ZeiError::InconsistentStructureError);
   }
-  for (blind_asset_record, memo_option) in xfr_note.body
-                                                   .inputs
-                                                   .iter()
-                                                   .chain(&xfr_note.body.outputs)
-                                                   .zip(&xfr_note.body.asset_tracing_memos)
+  for (blind_asset_record, bar_memos) in xfr_note.body
+                                                 .inputs
+                                                 .iter()
+                                                 .chain(&xfr_note.body.outputs)
+                                                 .zip(&xfr_note.body.asset_tracing_memos)
   {
-    if let Some(memo) = memo_option.as_ref() {
+    for memo in bar_memos {
       if memo.enc_key == *pub_key {
         result.push((blind_asset_record, memo));
       }

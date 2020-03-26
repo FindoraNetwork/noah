@@ -15,8 +15,8 @@ use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
 use zei::xfr::lib::{gen_xfr_body, gen_xfr_note, verify_xfr_body, verify_xfr_note};
 use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
 use zei::xfr::structs::{
-  AssetRecord, AssetRecordTemplate, AssetTracingPolicy, AssetType, IdentityRevealPolicy, XfrBody,
-  XfrNote,
+  AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
+  IdentityRevealPolicy, XfrBody, XfrNote,
 };
 
 pub const ASSET_TYPE: AssetType = [0u8; 16];
@@ -38,9 +38,9 @@ fn multiple_key_gen(n: usize) -> (Vec<XfrKeyPair>, XfrPublicKey) {
 }
 
 fn run_verify_xfr_note(xfr_note: &XfrNote,
-                       inputs_tracking_policies: &[Option<&AssetTracingPolicy>],
+                       inputs_tracking_policies: &[&AssetTracingPolicies],
                        inputs_sig_commitments: &[Option<&ACCommitment>],
-                       outputs_tracking_policies: &[Option<&AssetTracingPolicy>],
+                       outputs_tracking_policies: &[&AssetTracingPolicies],
                        outputs_sig_commitments: &[Option<&ACCommitment>]) {
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
   assert!(verify_xfr_note(&mut prng,
@@ -52,9 +52,9 @@ fn run_verify_xfr_note(xfr_note: &XfrNote,
 }
 
 fn run_verify_xfr_body(xfr_body: &XfrBody,
-                       inputs_tracking_policies: &[Option<&AssetTracingPolicy>],
+                       inputs_tracking_policies: &[&AssetTracingPolicies],
                        inputs_sig_commitments: &[Option<&ACCommitment>],
-                       outputs_tracking_policies: &[Option<&AssetTracingPolicy>],
+                       outputs_tracking_policies: &[&AssetTracingPolicies],
                        outputs_sig_commitments: &[Option<&ACCommitment>]) {
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
   assert!(verify_xfr_body(&mut prng,
@@ -91,10 +91,14 @@ fn prepare_inputs_and_outputs(sender_key_pairs: &[&XfrKeyPair],
 
     let user_ac_sk = user_ac_sks[i].clone();
     let ac_commitment_key = ac_commitment_keys[i].clone();
-    let ar_in = AssetRecord::from_open_asset_record_with_identity_tracking(&mut prng,
-                                                                           oar_user_addr,
-                                                                           asset_tracing_policy_asset_input.clone(),
-                                                                           &user_ac_sk,&credential_user, &ac_commitment_key).unwrap();
+    let policies = AssetTracingPolicies::from_policy(asset_tracing_policy_asset_input.clone());
+    let ar_in =
+      AssetRecord::from_open_asset_record_with_identity_tracking(&mut prng,
+                                                                 oar_user_addr,
+                                                                 policies,
+                                                                 &user_ac_sk,
+                                                                 &credential_user,
+                                                                 &ac_commitment_key).unwrap();
 
     ar_ins.push(ar_in);
   }
@@ -285,9 +289,11 @@ pub fn run_benchmark_verify_complex_xfr_note<B: Measurement>(benchmark_group: &m
                                              n);
 
   let inputs_sig_commitments = ac_commitments.iter().map(Some).collect_vec();
-  let outputs_tracking_policies = vec![None; n];
+  let no_policies = AssetTracingPolicies::new();
+  let outputs_tracking_policies = vec![&no_policies; n];
   let outputs_sig_commitments = vec![None; n];
-  let inputs_asset_tracking_array = vec![Some(&asset_tracing_policy_asset_input); n];
+  let policies = AssetTracingPolicies::from_policy(asset_tracing_policy_asset_input);
+  let inputs_asset_tracking_array = vec![&policies; n];
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| {
@@ -319,9 +325,11 @@ pub fn run_benchmark_verify_complex_xfr_body<B: Measurement>(benchmark_group: &m
                                              asset_tracing_policy_asset_input.clone(),
                                              n);
   let inputs_sig_commitments = ac_commitments.iter().map(Some).collect_vec();
-  let outputs_tracking_policies = vec![None; n];
+  let no_policies = AssetTracingPolicies::new();
+  let outputs_tracking_policies = vec![&no_policies; n];
   let outputs_sig_commitments = vec![None; n];
-  let inputs_asset_tracking_array = vec![Some(&asset_tracing_policy_asset_input); n];
+  let policies = AssetTracingPolicies::from_policy(asset_tracing_policy_asset_input);
+  let inputs_asset_tracking_array = vec![&policies; n];
 
   benchmark_group.bench_function(title, |b| {
                    b.iter(|| {

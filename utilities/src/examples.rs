@@ -34,9 +34,9 @@ pub fn conf_blind_asset_record_from_ledger(key: &XfrPublicKey,
                                        public_key: key.clone(),
                                        asset_record_type:
                                          AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                                       asset_tracking: None };
+                                       asset_tracing_policies: Default::default() };
   let (bar, _, owner) =
-    build_blind_asset_record(&mut prng, &PedersenGens::default(), &template, None);
+    build_blind_asset_record(&mut prng, &PedersenGens::default(), &template, vec![]);
 
   (bar, owner.unwrap())
 }

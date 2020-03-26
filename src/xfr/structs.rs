@@ -44,7 +44,7 @@ pub struct XfrBody {
   pub inputs: Vec<BlindAssetRecord>,
   pub outputs: Vec<BlindAssetRecord>,
   pub proofs: XfrProofs,
-  pub asset_tracing_memos: Vec<Option<AssetTracerMemo>>,
+  pub asset_tracing_memos: Vec<Vec<AssetTracerMemo>>, // each input or output can have a set of tracing memos
   pub owners_memos: Vec<Option<OwnerMemo>>, // If confidential amount or asset type, lock the amount and/or asset type to the public key in asset_record
 }
 
@@ -217,6 +217,34 @@ pub struct AssetTracerKeyPair {
   pub dec_key: AssetTracerDecKeys,
 }
 
+/// An asset and identity tracking policies for an asset record
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct AssetTracingPolicies(pub Vec<AssetTracingPolicy>);
+
+impl AssetTracingPolicies {
+  pub fn new() -> AssetTracingPolicies {
+    AssetTracingPolicies(vec![])
+  }
+  pub fn from_policy(policy: AssetTracingPolicy) -> AssetTracingPolicies {
+    AssetTracingPolicies(vec![policy])
+  }
+  pub fn add(&mut self, policy: AssetTracingPolicy) {
+    self.0.push(policy);
+  }
+  pub fn get_policy(&self, index: usize) -> Option<&AssetTracingPolicy> {
+    self.0.get(index)
+  }
+  pub fn get_policies(&self) -> &[AssetTracingPolicy] {
+    self.0.as_slice()
+  }
+  pub fn len(&self) -> usize {
+    self.0.len()
+  }
+  pub fn is_empty(&self) -> bool {
+    self.0.is_empty()
+  }
+}
+
 /// An asset and identity tracking policy for an asset record
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AssetTracingPolicy {
@@ -283,9 +311,9 @@ impl OpenAssetRecord {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetRecord {
   pub open_asset_record: OpenAssetRecord,
-  pub tracking_policy: Option<AssetTracingPolicy>,
-  pub identity_proof: Option<ACConfidentialRevealProof>,
-  pub asset_tracer_memo: Option<AssetTracerMemo>,
+  pub tracking_policies: AssetTracingPolicies,
+  pub identity_proofs: Vec<Option<ACConfidentialRevealProof>>,
+  pub asset_tracers_memos: Vec<AssetTracerMemo>,
   pub owner_memo: Option<OwnerMemo>,
 }
 
@@ -296,7 +324,7 @@ pub struct AssetRecordTemplate {
   pub asset_type: AssetType,
   pub public_key: XfrPublicKey, // ownership address
   pub asset_record_type: AssetRecordType,
-  pub asset_tracking: Option<AssetTracingPolicy>,
+  pub asset_tracing_policies: AssetTracingPolicies,
 }
 
 // PROOFS STRUCTURES
@@ -330,9 +358,9 @@ pub struct XfrRangeProof {
 /// Proof of records' data and identity tracking
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTrackingProofs {
-  pub asset_type_and_amount_proofs: Vec<PedersenElGamalEqProof>, // None if confidential amount and confidential asset type flag are off. Otherwise, value proves that decryption of lock_amounts and/or asset type yield the same as values committed in amount_commitments in BlindAssetRecord outputs
-  pub inputs_identity_proofs: Vec<Option<ACConfidentialRevealProof>>, //None if asset policy does not require identity tracking for input. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
-  pub outputs_identity_proofs: Vec<Option<ACConfidentialRevealProof>>, //None if asset policy does not require identity tracking for output. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+  pub asset_type_and_amount_proofs: Vec<PedersenElGamalEqProof>, // One proof for each tracing key
+  pub inputs_identity_proofs: Vec<Vec<Option<ACConfidentialRevealProof>>>, // None if asset policy does not require identity tracking for input. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+  pub outputs_identity_proofs: Vec<Vec<Option<ACConfidentialRevealProof>>>, // None if asset policy does not require identity tracking for output. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
 impl PartialEq for XfrRangeProof {
@@ -344,118 +372,3 @@ impl PartialEq for XfrRangeProof {
 }
 
 impl Eq for XfrRangeProof {}
-
-#[cfg(test)]
-
-// TODO remove or uncomment the section below
-
-mod test {
-  /*
-  use crate::xfr::sig::XfrMultiSig;
-  use crate::xfr::structs::{AssetTrackingProofs, AssetTypeAndAmountProof};
-  use crate::xfr::tests::tests::create_xfr;
-  use rand_chacha::ChaChaRng;
-  use rand_core::SeedableRng;
-  use rmp_serde::{Deserializer, Serializer};
-  use serde::de::Deserialize;
-  use serde::ser::Serialize;
-
-
-  fn do_test_serialization(xfr_type: XfrType, asset_tracking: bool) {
-    let mut prng: ChaChaRng;
-    prng = ChaChaRng::from_seed([0u8; 32]);
-    let asset_type = [0u8; 16];
-    let input_amount = [(10u64, asset_type), (20u64, asset_type)];
-    let out_amount = [(1u64, asset_type),
-                      (2u64, asset_type),
-                      (1u64, asset_type),
-                      (10u64, asset_type),
-                      (16u64, asset_type)];
-
-    let (xfr_note, _, _, _, _) = create_xfr(&mut prng,
-                                            &input_amount,
-                                            &out_amount,
-                                            );
-
-    //serializing signatures
-    let mut vec = vec![];
-    assert_eq!(true,
-               xfr_note.multisig
-                       .serialize(&mut Serializer::new(&mut vec))
-                       .is_ok());
-    let mut de = Deserializer::new(&vec[..]);
-    let multisig_de: XfrMultiSig = Deserialize::deserialize(&mut de).unwrap();
-    assert_eq!(xfr_note.multisig, multisig_de);
-
-    //serializing proofs
-    let mut vec = vec![];
-    assert_eq!(true,
-               xfr_note.body
-                       .proofs
-                       .serialize(&mut Serializer::new(&mut vec))
-                       .is_ok());
-    let mut de = Deserializer::new(&vec[..]);
-    let proofs_de = XfrProofs::deserialize(&mut de).unwrap();
-    assert_eq!(xfr_note.body.proofs, proofs_de);
-
-    let json_str = serde_json::to_string(&xfr_note.body.proofs.asset_tracking_proof).unwrap();
-    let proofs_de: AssetTrackingProofs = serde_json::from_str(json_str.as_str()).unwrap();
-    assert_eq!(xfr_note.body.proofs.asset_tracking_proof, proofs_de);
-
-    let json_str =
-      serde_json::to_string(&xfr_note.body.proofs.asset_type_and_amount_proof).unwrap();
-    let proofs_de: AssetTypeAndAmountProof = serde_json::from_str(json_str.as_str()).unwrap();
-    assert_eq!(xfr_note.body.proofs.asset_type_and_amount_proof, proofs_de);
-
-    //serializing body
-    let mut vec = vec![];
-    assert_eq!(true,
-               xfr_note.body
-                       .serialize(&mut Serializer::new(&mut vec))
-                       .is_ok());
-    let mut de = Deserializer::new(&vec[..]);
-    let body_de = XfrBody::deserialize(&mut de).unwrap();
-    assert_eq!(xfr_note.body, body_de);
-
-    let json_str = serde_json::to_string(&xfr_note.body).unwrap();
-    let body_de: XfrBody = serde_json::from_str(json_str.as_str()).unwrap();
-    assert_eq!(xfr_note.body, body_de);
-
-    let bincode_vec = bincode::serialize(&xfr_note.body).unwrap();
-    let body_de: XfrBody = bincode::deserialize(bincode_vec.as_slice()).unwrap();
-    assert_eq!(xfr_note.body, body_de);
-
-    //serializing whole Xfr
-    let mut vec = vec![];
-    assert_eq!(true,
-               xfr_note.serialize(&mut Serializer::new(&mut vec)).is_ok());
-    let mut de = Deserializer::new(&vec[..]);
-    let xfr_de = XfrNote::deserialize(&mut de).unwrap();
-    assert_eq!(xfr_note, xfr_de);
-
-    let bincode_vec = bincode::serialize(&xfr_note).unwrap();
-    let note_de: XfrNote = bincode::deserialize(bincode_vec.as_slice()).unwrap();
-    assert_eq!(xfr_note, note_de);
-
-    let json_str = serde_json::to_string(&xfr_note).unwrap();
-    let note_de: XfrNote = serde_json::from_str(json_str.as_str()).unwrap();
-    assert_eq!(xfr_note, note_de);
-  }
-
-
-  #[test]
-  fn test_serialization() {
-    do_test_serialization(XfrType::NonConfidential_SingleAsset, false);
-    do_test_serialization(XfrType::NonConfidentialAmount_ConfidentialAssetType_SingleAsset,
-                          false);
-    do_test_serialization(XfrType::ConfidentialAmount_NonConfidentialAssetType_SingleAsset,
-                          false);
-    do_test_serialization(XfrType::Confidential_SingleAsset, false);
-
-    do_test_serialization(XfrType::ConfidentialAmount_NonConfidentialAssetType_SingleAsset,
-                          true);
-    do_test_serialization(XfrType::Confidential_SingleAsset, true);
-  }
-
-  */
-}
