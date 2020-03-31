@@ -225,11 +225,22 @@ fn verify_identity_proofs(reveal_policies: &[&AssetTracingPolicies],
                           proofs: &[Vec<Option<ACConfidentialRevealProof>>],
                           sig_commitments: &[Option<&ACCommitment>])
                           -> Result<(), ZeiError> {
-  // for each entry (with potentially many policies
+  // 1. check for errors
   let n = reveal_policies.len();
-  if n != memos.len() || n != proofs.len() || n != sig_commitments.len() {
+  if memos.len() != proofs.len() || n != sig_commitments.len() {
     return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
   }
+  // if no policies, memos and proofs should be empty
+  if n == 0 {
+    // all memos must be empty
+    if !memos.iter().all(|vec| vec.is_empty()) || !proofs.iter().all(|vec| vec.is_empty()) {
+      return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
+    }
+  } else if n != memos.len() {
+    return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
+  }
+
+  // 2. check proofs
   for (policies, (memos, (proofs, sig_commitment))) in
     reveal_policies.iter()
                    .zip(memos.iter().zip(proofs.iter().zip(sig_commitments.iter())))
@@ -540,4 +551,82 @@ pub(crate) fn verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut R,
                                     asset_proof).map_err(|_| {
                                                   ZeiError::XfrVerifyConfidentialAssetError
                                                 })
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::algebra::bls12_381::BLSG1;
+  use crate::algebra::groups::Group;
+  use crate::api::anon_creds::ACSignature;
+  use crate::errors::ZeiError;
+  use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
+  use crate::xfr::proofs::verify_identity_proofs;
+  use crate::xfr::structs::{AssetTracerMemo, AssetTracingPolicies, AssetTracingPolicy};
+  use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
+
+  #[test]
+  fn verify_identity_proofs_structure() {
+    let mut prng: ChaChaRng;
+    prng = ChaChaRng::from_seed([0u8; 32]);
+
+    // Case where the number of asset tracing policies is 0
+    let reveal_policies = vec![];
+    let memos = vec![];
+    let proofs = vec![];
+    let sig_commitments = vec![];
+
+    // 1. no policies => correct verification
+    let res = verify_identity_proofs(reveal_policies.as_slice(),
+                                     memos.as_slice(),
+                                     proofs.as_slice(),
+                                     sig_commitments.as_slice());
+    assert_eq!(res, Ok(()));
+
+    // fake sig commitment
+    let sig_commitment =
+      crate::api::anon_creds::ACCommitment { 0: ACSignature { sigma1: BLSG1::get_identity(),
+                                                              sigma2: BLSG1::get_identity() } };
+
+    // 2. sig commitments length doesn't match memos length
+    let sig_commitments = vec![Some(&sig_commitment)];
+    let res = verify_identity_proofs(reveal_policies.as_slice(),
+                                     memos.as_slice(),
+                                     proofs.as_slice(),
+                                     sig_commitments.as_slice());
+
+    assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
+
+    // 2. if policy, then there must be memos and proofs
+    let policy = AssetTracingPolicy{
+      enc_keys: gen_asset_tracer_keypair(&mut prng).enc_key,
+      asset_tracking: true, // do asset tracing
+      identity_tracking: None // do not trace identity
+    };
+
+    let asset_tracing_policies = AssetTracingPolicies(vec![policy]);
+    let reveal_policies = vec![&asset_tracing_policies];
+
+    let res = verify_identity_proofs(reveal_policies.as_slice(),
+                                     memos.as_slice(),
+                                     proofs.as_slice(),
+                                     sig_commitments.as_slice());
+
+    assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
+
+    // fake memo
+    let memos = vec![vec![AssetTracerMemo { enc_key:
+                                              gen_asset_tracer_keypair(&mut prng).enc_key,
+                                            lock_amount: None,
+                                            lock_asset_type: None,
+                                            lock_attributes: None }]];
+    let reveal_policies = vec![&asset_tracing_policies];
+
+    let res = verify_identity_proofs(reveal_policies.as_slice(),
+                                     memos.as_slice(),
+                                     proofs.as_slice(),
+                                     sig_commitments.as_slice());
+
+    assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
+  }
 }

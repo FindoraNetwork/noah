@@ -14,8 +14,8 @@ pub(crate) mod tests {
   use crate::utils::u64_to_u32_pair;
   use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::lib::{
-    compute_transfer_multisig, gen_xfr_note, verify_xfr_body, verify_xfr_body_no_policies,
-    verify_xfr_note, verify_xfr_note_no_policies,
+    compute_transfer_multisig, gen_xfr_note, verify_xfr_body, verify_xfr_body_asset_records,
+    verify_xfr_note,
   };
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
@@ -111,7 +111,7 @@ pub(crate) mod tests {
 
     // test 1: simple transfer
     assert_eq!(Ok(()),
-               verify_xfr_note_no_policies(&mut prng, &xfr_note),
+               verify_xfr_note(&mut prng, &xfr_note, &Default::default()),
                "Simple transaction should verify ok");
 
     // test 2: overflow transfer
@@ -155,7 +155,7 @@ pub(crate) mod tests {
       }
     }
 
-    assert!(verify_xfr_body_no_policies(&mut prng, &xfr_note.body).is_err(),
+    assert!(verify_xfr_body_asset_records(&mut prng, &xfr_note.body).is_err(),
             "Confidential transfer with invalid amounts should fail verification");
 
     //test 3: one output asset type different from rest
@@ -184,7 +184,7 @@ pub(crate) mod tests {
                                     inkeys_ref.as_slice()).unwrap();
 
     // check state is clean
-    assert!(verify_xfr_body_no_policies(&mut prng, &xfr_note.body).is_ok());
+    assert!(verify_xfr_body_asset_records(&mut prng, &xfr_note.body).is_ok());
     // modify xfr_note asset on an output
 
     let old_output1 = outputs[1].clone();
@@ -199,7 +199,7 @@ pub(crate) mod tests {
                                              .compress()),
     };
     xfr_note.body.outputs[1] = out1;
-    assert!(verify_xfr_body_no_policies(&mut prng, &xfr_note.body).is_err(),
+    assert!(verify_xfr_body_asset_records(&mut prng, &xfr_note.body).is_err(),
             "Transfer with different asset types should fail verification");
 
     //test 4:  one input asset different from rest
@@ -241,7 +241,7 @@ pub(crate) mod tests {
                                              .compress()),
     };
     xfr_note.body.inputs[1] = in1;
-    assert!(verify_xfr_body_no_policies(&mut prng, &xfr_note.body).is_err(),
+    assert!(verify_xfr_body_asset_records(&mut prng, &xfr_note.body).is_err(),
             "Confidential transfer with different asset types should fail verification ok");
   }
 
@@ -433,7 +433,7 @@ pub(crate) mod tests {
 
       // test 1: simple transfer using confidential asset mixer
       assert_eq!(Ok(()),
-                 verify_xfr_note_no_policies(&mut prng, &xfr_note),
+                 verify_xfr_note(&mut prng, &xfr_note, &Default::default()),
                  "Multi asset transfer confidential");
 
       let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
@@ -474,7 +474,7 @@ pub(crate) mod tests {
                                             inkeys_ref.as_slice());
 
       assert_eq!(Ok(()),
-                 verify_xfr_note_no_policies(&mut prng, &xfr_note),
+                 verify_xfr_note(&mut prng, &xfr_note, &Default::default()),
                  "Multi asset transfer non confidential");
 
       xfr_note.body.inputs[0].amount = XfrAmount::NonConfidential(8u64);
@@ -482,7 +482,7 @@ pub(crate) mod tests {
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys_ref.as_slice()).unwrap();
 
       assert_eq!(Err(ZeiError::XfrVerifyAssetAmountError),
-                 verify_xfr_note_no_policies(&mut prng, &xfr_note),
+                 verify_xfr_note(&mut prng, &xfr_note, &Default::default()),
                  "Multi asset transfer non confidential");
     }
   }
@@ -554,6 +554,7 @@ pub(crate) mod tests {
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
+    use crate::xfr::lib::XfrNotePolicies;
     use crate::xfr::structs::AssetTracingPolicies;
 
     #[test]
@@ -618,23 +619,19 @@ pub(crate) mod tests {
 
       let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
 
-      let null_policies_input = [&AssetTracingPolicies::new()];
-      let null_sig_commitments_inputs = vec![None; 1];
+      let null_policies_input = &AssetTracingPolicies::new();
 
-      assert_eq!(verify_xfr_note(&mut prng,
-                                 &xfr_note,
-                                 &null_policies_input,
-                                 &null_sig_commitments_inputs,
-                                 &[&tracking_policy],
-                                 &[Some(&sig_commitment)]),
-                 Ok(()));
+      let policies = XfrNotePolicies::new(vec![null_policies_input],
+                                          vec![None; 1],
+                                          vec![&tracking_policy],
+                                          vec![Some(&sig_commitment)]);
 
-      assert_eq!(verify_xfr_note(&mut prng,
-                                 &xfr_note,
-                                 &[&tracking_policy.clone()],
-                                 &[Some(&sig_commitment)],
-                                 &null_policies_input,
-                                 &null_sig_commitments_inputs),
+      assert_eq!(verify_xfr_note(&mut prng, &xfr_note, &policies), Ok(()));
+      let policies = XfrNotePolicies::new(vec![&tracking_policy],
+                                          vec![Some(&sig_commitment)],
+                                          vec![null_policies_input],
+                                          vec![None; 1]);
+      assert_eq!(verify_xfr_note(&mut prng, &xfr_note, &policies),
                  Err(XfrVerifyAssetTracingIdentityError),);
 
       //test serialization
@@ -657,7 +654,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::basic_crypto::elgamal::ElGamalCiphertext;
     use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
-    use crate::xfr::lib::trace_assets;
+    use crate::xfr::lib::{trace_assets, XfrNotePolicies};
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
 
     const GOLD_ASSET: AssetType = [0; 16];
@@ -750,13 +747,13 @@ pub(crate) mod tests {
       let input_sig_commitment: Vec<Option<&ACCommitment>> = vec![None; inputs.len()];
       let output_sig_commitment: Vec<Option<&ACCommitment>> = vec![None; outputs.len()];
 
+      let policies = XfrNotePolicies::new(input_policies.clone(),
+                                          input_sig_commitment.clone(),
+                                          output_policies.clone(),
+                                          output_sig_commitment.clone());
+
       // test 1: the verification is successful
-      assert_eq!(verify_xfr_body(&mut prng,
-                                 &xfr_body.clone(),
-                                 input_policies.as_slice(),
-                                 &input_sig_commitment,
-                                 output_policies.as_slice(),
-                                 &output_sig_commitment,),
+      assert_eq!(verify_xfr_body(&mut prng, &xfr_body.clone(), &policies),
                  Ok(()),
                  "Simple transaction should verify ok");
 
@@ -800,24 +797,19 @@ pub(crate) mod tests {
                             lock_attributes: None };
         new_xfr_body.asset_tracing_memos[0] = vec![tracer_memo];
 
-        assert_eq!(verify_xfr_body(&mut prng,
-                                   &new_xfr_body,
-                                   input_policies.as_slice(),
-                                   &input_sig_commitment,
-                                   &output_policies,
-                                   &output_sig_commitment,),
+        let policies = XfrNotePolicies::new(input_policies.clone(),
+                                            input_sig_commitment.clone(),
+                                            output_policies.clone(),
+                                            output_sig_commitment.clone());
+
+        assert_eq!(verify_xfr_body(&mut prng, &new_xfr_body, &policies),
                    Err(XfrVerifyAssetTracingAssetAmountError),
                    "Asset tracking verification fails as the ciphertext has been altered.");
       }
 
       // Restore body
       let mut new_xfr_body: XfrBody = xfr_body.clone();
-      assert_eq!(verify_xfr_body(&mut prng,
-                                 &new_xfr_body.clone(),
-                                 &input_policies.clone().as_slice(),
-                                 &input_sig_commitment,
-                                 &output_policies,
-                                 &output_sig_commitment,),
+      assert_eq!(verify_xfr_body(&mut prng, &new_xfr_body.clone(), &policies),
                  Ok(()),
                  "Everything back to normal.");
 
@@ -826,12 +818,7 @@ pub(crate) mod tests {
                   .asset_tracking_proof
                   .asset_type_and_amount_proofs = vec![];
 
-      let check = verify_xfr_body(&mut prng,
-                                  &new_xfr_body.clone(),
-                                  &input_policies.clone().as_slice(),
-                                  &input_sig_commitment,
-                                  &output_policies,
-                                  &output_sig_commitment);
+      let check = verify_xfr_body(&mut prng, &new_xfr_body.clone(), &policies);
 
       assert_eq!(check,
                  Err(XfrVerifyAssetTracingAssetAmountError),
@@ -841,12 +828,7 @@ pub(crate) mod tests {
 
       // Restore body
       let mut new_xfr_body: XfrBody = xfr_body.clone();
-      assert_eq!(verify_xfr_body(&mut prng,
-                                 &new_xfr_body.clone(),
-                                 &input_policies.clone().as_slice(),
-                                 &input_sig_commitment,
-                                 &output_policies,
-                                 &output_sig_commitment,),
+      assert_eq!(verify_xfr_body(&mut prng, &new_xfr_body.clone(), &policies),
                  Ok(()),
                  "Everything back to normal.");
 
@@ -857,12 +839,7 @@ pub(crate) mod tests {
                   .asset_tracking_proof
                   .asset_type_and_amount_proofs[0] = wrong_proof;
 
-      let check = verify_xfr_body(&mut prng,
-                                  &new_xfr_body.clone(),
-                                  &input_policies.clone().as_slice(),
-                                  &input_sig_commitment,
-                                  &output_policies,
-                                  &output_sig_commitment);
+      let check = verify_xfr_body(&mut prng, &new_xfr_body.clone(), &policies);
 
       assert_eq!(check,
                  Err(XfrVerifyAssetTracingAssetAmountError),
@@ -1241,16 +1218,15 @@ pub(crate) mod tests {
                                             .map(|(_, _, tracking_policy, _, _)| *tracking_policy)
                                             .collect_vec();
 
-      let input_sig_commitment: Vec<Option<&ACCommitment>> = vec![None; inputs.len()];
-      let output_sig_commitment: Vec<Option<&ACCommitment>> = vec![None; outputs.len()];
+      let input_sig_commitment = vec![None; inputs.len()];
+      let output_sig_commitment = vec![None; outputs.len()];
 
+      let policies = XfrNotePolicies::new(input_policies,
+                                          input_sig_commitment,
+                                          output_policies,
+                                          output_sig_commitment);
       // test 1: the verification is successful
-      assert_eq!(verify_xfr_body(&mut prng,
-                                 &xfr_body.clone(),
-                                 input_policies.as_slice(),
-                                 &input_sig_commitment,
-                                 output_policies.as_slice(),
-                                 &output_sig_commitment,),
+      assert_eq!(verify_xfr_body(&mut prng, &xfr_body.clone(), &policies),
                  Ok(()),
                  "Simple transaction should verify ok");
       let candidate_assets = [BITCOIN_ASSET, GOLD_ASSET];

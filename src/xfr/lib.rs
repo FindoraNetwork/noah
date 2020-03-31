@@ -112,8 +112,8 @@ impl XfrType {
 /// use rand_core::SeedableRng;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord};
-/// use zei::xfr::asset_record::{AssetRecordType};
-/// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note_no_policies};
+/// use zei::xfr::asset_record::AssetRecordType;
+/// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note};
 /// use itertools::Itertools;
 ///
 /// let mut prng: ChaChaRng;
@@ -161,7 +161,7 @@ impl XfrType {
 ///                              outputs.as_slice(),
 ///                              inkeys.iter().map(|x| x).collect_vec().as_slice()
 ///                ).unwrap();
-/// assert_eq!(verify_xfr_note_no_policies(&mut prng, &xfr_note), Ok(()));
+/// assert_eq!(verify_xfr_note(&mut prng, &xfr_note, &Default::default()), Ok(()));
 /// ```
 
 pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
@@ -193,8 +193,8 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// use rand_core::SeedableRng;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord};
-/// use zei::xfr::asset_record::{AssetRecordType};
-/// use zei::xfr::lib::{gen_xfr_body,verify_xfr_body, verify_xfr_body_no_policies};
+/// use zei::xfr::asset_record::AssetRecordType;
+/// use zei::xfr::lib::{gen_xfr_body,verify_xfr_body};
 ///
 /// let mut prng: ChaChaRng;
 /// prng = ChaChaRng::from_seed([0u8; 32]);
@@ -229,7 +229,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 ///     outputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap());
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();
-/// assert_eq!(verify_xfr_body_no_policies(&mut prng, &body), Ok(()));
+/// assert_eq!(verify_xfr_body(&mut prng, &body, &Default::default()), Ok(()));
 /// ```
 pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                             inputs: &[AssetRecord],
@@ -441,20 +441,6 @@ pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiErro
   verify_multisig(public_keys.as_slice(), vec.as_slice(), &xfr_note.multisig)
 }
 
-/// XfrNote verification with no associated policies
-/// * `prng` - pseudo-random number generator
-/// * `xfr_note` - XfrNote struct to be verifieed
-/// * `returns` - () if the XfrNote is valid, an error otherwise
-pub fn verify_xfr_note_no_policies<R: CryptoRng + RngCore>(prng: &mut R,
-                                                           xfr_note: &XfrNote)
-                                                           -> Result<(), ZeiError> {
-  // 1. verify signature
-  verify_transfer_multisig(&xfr_note)?;
-
-  // 2. verify body
-  verify_xfr_body_no_policies(prng, &xfr_note.body)
-}
-
 /// XfrNote verification
 /// * `prng` - pseudo-random number generator
 /// * `xfr_note` - XfrNote struct to be verified
@@ -462,27 +448,18 @@ pub fn verify_xfr_note_no_policies<R: CryptoRng + RngCore>(prng: &mut R,
 /// * `inputs_sig_commitments`-
 pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
                                                xfr_note: &XfrNote,
-                                               inputs_tracking_policies: &[&AssetTracingPolicies],
-                                               inputs_sig_commitments: &[Option<&ACCommitment>],
-                                               outputs_tracking_policies: &[&AssetTracingPolicies],
-                                               outputs_sig_commitments: &[Option<&ACCommitment>])
+                                               policies: &XfrNotePolicies)
                                                -> Result<(), ZeiError> {
   // 1. verify signature
-  verify_transfer_multisig(&xfr_note)?;
+  verify_transfer_multisig(xfr_note)?;
 
   // 2. verify body
-  verify_xfr_body(prng,
-                  &xfr_note.body,
-                  inputs_tracking_policies,
-                  inputs_sig_commitments,
-                  outputs_tracking_policies,
-                  outputs_sig_commitments)
+  verify_xfr_body(prng, &xfr_note.body, policies)
 }
 
-/// XfrBody verification where no policies are involved
-pub fn verify_xfr_body_no_policies<R: CryptoRng + RngCore>(prng: &mut R,
-                                                           body: &XfrBody)
-                                                           -> Result<(), ZeiError> {
+pub(crate) fn verify_xfr_body_asset_records<R: CryptoRng + RngCore>(prng: &mut R,
+                                                                    body: &XfrBody)
+                                                                    -> Result<(), ZeiError> {
   match &body.proofs.asset_type_and_amount_proof {
     AssetTypeAndAmountProof::ConfAll((range_proof, asset_proof)) => {
       verify_confidential_amount(&body.inputs, &body.outputs, range_proof)?;
@@ -503,6 +480,27 @@ pub fn verify_xfr_body_no_policies<R: CryptoRng + RngCore>(prng: &mut R,
   }
 }
 
+#[derive(Default)]
+pub struct XfrNotePolicies<'b> {
+  inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+  inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
+  outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+  outputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
+}
+
+impl<'b> XfrNotePolicies<'b> {
+  pub fn new(inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+             inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
+             outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+             outputs_sig_commitments: Vec<Option<&'b ACCommitment>>)
+             -> XfrNotePolicies<'b> {
+    XfrNotePolicies { inputs_tracking_policies,
+                      inputs_sig_commitments,
+                      outputs_tracking_policies,
+                      outputs_sig_commitments }
+  }
+}
+
 /// XfrBody verification with tracking policies
 /// * `prng` - pseudo-random number generator. Needed for verifying proofs.
 /// * `body` - XfrBody structure to be verified
@@ -513,21 +511,18 @@ pub fn verify_xfr_body_no_policies<R: CryptoRng + RngCore>(prng: &mut R,
 /// * `returns` - () or an error
 pub fn verify_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                                body: &XfrBody,
-                                               inputs_tracking_policies: &[&AssetTracingPolicies],
-                                               inputs_sig_commitments: &[Option<&ACCommitment>],
-                                               outputs_tracking_policies: &[&AssetTracingPolicies],
-                                               outputs_sig_commitments: &[Option<&ACCommitment>])
+                                               policies: &XfrNotePolicies)
                                                -> Result<(), ZeiError> {
   // 1. verify amounts and asset types
-  verify_xfr_body_no_policies(prng, body)?;
+  verify_xfr_body_asset_records(prng, body)?;
 
   // 2 verify tracking proofs
   verify_tracer_tracking_proof(prng,
-                               &body,
-                               inputs_tracking_policies,
-                               inputs_sig_commitments,
-                               outputs_tracking_policies,
-                               outputs_sig_commitments)
+                               body,
+                               &policies.inputs_tracking_policies,
+                               &policies.inputs_sig_commitments,
+                               &policies.outputs_tracking_policies,
+                               &policies.outputs_sig_commitments)
 }
 
 fn verify_plain_amounts(inputs: &[BlindAssetRecord],

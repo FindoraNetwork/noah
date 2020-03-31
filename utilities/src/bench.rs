@@ -12,7 +12,9 @@ use zei::api::anon_creds::{
 };
 use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
 use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
-use zei::xfr::lib::{gen_xfr_body, gen_xfr_note, verify_xfr_body, verify_xfr_note};
+use zei::xfr::lib::{
+  gen_xfr_body, gen_xfr_note, verify_xfr_body, verify_xfr_note, XfrNotePolicies,
+};
 use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
 use zei::xfr::structs::{
   AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
@@ -37,32 +39,14 @@ fn multiple_key_gen(n: usize) -> (Vec<XfrKeyPair>, XfrPublicKey) {
   (sender_key_pairs, recv_pub_key)
 }
 
-fn run_verify_xfr_note(xfr_note: &XfrNote,
-                       inputs_tracking_policies: &[&AssetTracingPolicies],
-                       inputs_sig_commitments: &[Option<&ACCommitment>],
-                       outputs_tracking_policies: &[&AssetTracingPolicies],
-                       outputs_sig_commitments: &[Option<&ACCommitment>]) {
+fn run_verify_xfr_note(xfr_note: &XfrNote, policies: &XfrNotePolicies) {
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
-  assert!(verify_xfr_note(&mut prng,
-                          &xfr_note,
-                          inputs_tracking_policies,
-                          inputs_sig_commitments,
-                          outputs_tracking_policies,
-                          outputs_sig_commitments).is_ok());
+  assert!(verify_xfr_note(&mut prng, xfr_note, policies).is_ok());
 }
 
-fn run_verify_xfr_body(xfr_body: &XfrBody,
-                       inputs_tracking_policies: &[&AssetTracingPolicies],
-                       inputs_sig_commitments: &[Option<&ACCommitment>],
-                       outputs_tracking_policies: &[&AssetTracingPolicies],
-                       outputs_sig_commitments: &[Option<&ACCommitment>]) {
+fn run_verify_xfr_body(xfr_body: &XfrBody, policies: &XfrNotePolicies) {
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
-  assert!(verify_xfr_body(&mut prng,
-                          &xfr_body,
-                          inputs_tracking_policies,
-                          inputs_sig_commitments,
-                          outputs_tracking_policies,
-                          outputs_sig_commitments).is_ok());
+  assert!(verify_xfr_body(&mut prng, xfr_body, policies).is_ok());
 }
 
 fn prepare_inputs_and_outputs(sender_key_pairs: &[&XfrKeyPair],
@@ -293,16 +277,15 @@ pub fn run_benchmark_verify_complex_xfr_note<B: Measurement>(benchmark_group: &m
   let outputs_tracking_policies = vec![&no_policies; n];
   let outputs_sig_commitments = vec![None; n];
   let policies = AssetTracingPolicies::from_policy(asset_tracing_policy_asset_input);
-  let inputs_asset_tracking_array = vec![&policies; n];
+  let inputs_tracking_policies = vec![&policies; n];
+
+  let policies = XfrNotePolicies::new(inputs_tracking_policies,
+                                      inputs_sig_commitments,
+                                      outputs_tracking_policies,
+                                      outputs_sig_commitments);
 
   benchmark_group.bench_function(title, move |b| {
-                   b.iter(|| {
-                      run_verify_xfr_note(&xfr_note,
-                                          inputs_asset_tracking_array.as_slice(),
-                                          inputs_sig_commitments.as_slice(),
-                                          outputs_tracking_policies.as_slice(),
-                                          outputs_sig_commitments.as_slice())
-                    })
+                   b.iter(|| run_verify_xfr_note(&xfr_note, &policies))
                  });
 }
 
@@ -324,21 +307,16 @@ pub fn run_benchmark_verify_complex_xfr_body<B: Measurement>(benchmark_group: &m
                                              ac_commitment_keys,
                                              asset_tracing_policy_asset_input.clone(),
                                              n);
-  let inputs_sig_commitments = ac_commitments.iter().map(Some).collect_vec();
   let no_policies = AssetTracingPolicies::new();
-  let outputs_tracking_policies = vec![&no_policies; n];
-  let outputs_sig_commitments = vec![None; n];
   let policies = AssetTracingPolicies::from_policy(asset_tracing_policy_asset_input);
-  let inputs_asset_tracking_array = vec![&policies; n];
+
+  let policies = XfrNotePolicies::new(vec![&policies; n],
+                                      ac_commitments.iter().map(Some).collect_vec(),
+                                      vec![&no_policies; n],
+                                      vec![None; n]);
 
   benchmark_group.bench_function(title, |b| {
-                   b.iter(|| {
-                      run_verify_xfr_body(&xfr_body,
-                                          inputs_asset_tracking_array.as_slice(),
-                                          inputs_sig_commitments.as_slice(),
-                                          outputs_tracking_policies.as_slice(),
-                                          outputs_sig_commitments.as_slice())
-                    })
+                   b.iter(|| run_verify_xfr_body(&xfr_body, &policies))
                  });
 }
 

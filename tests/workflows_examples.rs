@@ -9,8 +9,8 @@ pub(crate) mod examples {
   use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Credential};
   use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
   use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
-  use zei::xfr::lib::gen_xfr_note;
-  use zei::xfr::lib::{trace_assets, verify_xfr_note, verify_xfr_note_no_policies};
+  use zei::xfr::lib::{gen_xfr_note, XfrNotePolicies};
+  use zei::xfr::lib::{trace_assets, verify_xfr_note};
   use zei::xfr::sig::XfrKeyPair;
   use zei::xfr::structs::{
     AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
@@ -61,7 +61,7 @@ pub(crate) mod examples {
                                 &[&sender_keypair]).unwrap(); // sender secret key
 
     // 5. Validator verifies xfr_note
-    assert!(verify_xfr_note_no_policies(&mut prng, &xfr_note).is_ok()); // there are no policies associated with this xfr note
+    assert!(verify_xfr_note(&mut prng, &xfr_note, &Default::default()).is_ok()); // there are no policies associated with this xfr note
 
     //6. receiver retrieves his BlindAssetRecord and opens it
     let recv_bar = &xfr_note.body.outputs[0];
@@ -111,7 +111,7 @@ pub(crate) mod examples {
                                 &[&sender_keypair]).unwrap(); // sender secret key
 
     // 5. Validator verifies xfr_note
-    assert!(verify_xfr_note_no_policies(&mut prng, &xfr_note).is_ok()); // there are no policies associated with this xfr note
+    assert!(verify_xfr_note(&mut prng, &xfr_note, &Default::default()).is_ok()); // there are no policies associated with this xfr note
 
     //6. receiver retrieves his BlindAssetRecord and opens it
     let recv_bar = &xfr_note.body.outputs[0];
@@ -192,14 +192,13 @@ pub(crate) mod examples {
                                 &[ar_in1, ar_in2],   // one input
                                 &[ar_out1, ar_out2], // one output
                                 &[&sender1_keypair, &sender2_keypair]).unwrap(); // sender secret key
+    let policies = XfrNotePolicies::new(vec![&policies; 2],
+                                        vec![None; 2],
+                                        vec![&no_policy; 2],
+                                        vec![None; 2]);
 
     // 5. Validator verifies xfr_note
-    assert!(verify_xfr_note(&mut prng,
-                            &xfr_note,
-                            [&policies, &policies].as_ref(),
-                            &[None, None],
-                            [&no_policy, &no_policy].as_ref(),
-                            &[None, None],).is_ok()); // there are no policies associated with this xfr note
+    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok()); // there are no policies associated with this xfr note
 
     //6. receives retrieves his BlindAssetRecord and opens it
     let recv_bar1 = &xfr_note.body.outputs[0];
@@ -313,14 +312,13 @@ pub(crate) mod examples {
                                 &[input_asset_record],
                                 &[output_asset_record1, output_asset_record2],
                                 &[&sender1_keypair]).unwrap();
+    let policies = XfrNotePolicies::new(vec![&no_policy],
+                                        vec![None],
+                                        vec![&policies; 2],
+                                        vec![None; 2]);
 
     // 5. validator verify xfr_note
-    assert!(verify_xfr_note(&mut prng,
-                            &xfr_note,
-                            &[&no_policy],
-                            &[None],
-                            &[&policies, &policies],
-                            &[None, None]).is_ok());
+    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok());
 
     //6. receiver retrieved his BlindAssetRecord
     //6. receives retrieves his BlindAssetRecord and opens it
@@ -481,14 +479,15 @@ pub(crate) mod examples {
                                 &[output_asset_record],
                                 &[&user1_keypair, &user2_keypair]).unwrap();
 
+    let policies =
+      XfrNotePolicies::new(vec![&policies, &policies],
+                           vec![Some(&AIR[xfr_note.body.inputs[0].public_key.as_bytes()]),
+                                Some(&AIR[xfr_note.body.inputs[1].public_key.as_bytes()])],
+                           vec![&no_policies],
+                           vec![None]);
+
     // 5. validator verify xfr_note
-    assert!(verify_xfr_note(&mut prng,
-                            &xfr_note,
-                            &[&policies, &policies],
-                            &[Some(&AIR[xfr_note.body.inputs[0].public_key.as_bytes()]),
-                              Some(&AIR[xfr_note.body.inputs[1].public_key.as_bytes()])],
-                            &[&no_policies],
-                            &[None]).is_ok());
+    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok());
 
     //6. receiver retrieved his BlindAssetRecord
     let recv_bar1 = &xfr_note.body.outputs[0];
@@ -647,14 +646,15 @@ pub(crate) mod examples {
                                 &[output_asset_record_1, output_asset_record_2],
                                 &[&sender_user_keypair]).unwrap();
 
+    let policies =
+      XfrNotePolicies::new(vec![&no_policy],
+                           vec![None],
+                           vec![&policies, &policies],
+                           vec![Some(&AIR[xfr_note.body.outputs[0].public_key.as_bytes()]),
+                                Some(&AIR[xfr_note.body.outputs[1].public_key.as_bytes()])]);
+
     // 5. validator verify xfr_note
-    assert!(verify_xfr_note(&mut prng,
-                            &xfr_note,
-                            &[&no_policy],
-                            &[None],
-                            &[&policies, &policies],
-                            &[Some(&AIR[xfr_note.body.outputs[0].public_key.as_bytes()]),
-                              Some(&AIR[xfr_note.body.outputs[1].public_key.as_bytes()])]).is_ok());
+    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok());
 
     //6. receiver retrieved his BlindAssetRecord
     let recv_bar1 = &xfr_note.body.outputs[0];
@@ -925,21 +925,21 @@ pub(crate) mod examples {
     // 5. Verify xfr_note
     let no_policy = AssetTracingPolicies::new();
     let input1_credential_commitment = &AIR[xfr_note.body.inputs[0].public_key.as_bytes()];
-    let input_policies = [&asset_tracing_policy_asset1_input, &no_policy, &no_policy];
-    let inputs_sig_commitments = [Some(input1_credential_commitment), None, None];
+    let input_policies = vec![&asset_tracing_policy_asset1_input, &no_policy, &no_policy];
+    let inputs_sig_commitments = vec![Some(input1_credential_commitment), None, None];
 
     let output3_credential_commitment = &AIR[xfr_note.body.outputs[2].public_key.as_bytes()];
-    let output_policies = [&no_policy,
-                           &no_policy,
-                           &asset_tracing_policy_asset2_output.clone(),
-                           &no_policy];
-    let output_sig_commitments = [None, None, Some(output3_credential_commitment), None];
-    assert!(verify_xfr_note(&mut prng,
-                            &xfr_note,
-                            &input_policies,
-                            &inputs_sig_commitments,
-                            &output_policies,
-                            &output_sig_commitments).is_ok());
+    let output_policies = vec![&no_policy,
+                               &no_policy,
+                               &asset_tracing_policy_asset2_output,
+                               &no_policy];
+    let output_sig_commitments = vec![None, None, Some(output3_credential_commitment), None];
+
+    let policies = XfrNotePolicies::new(input_policies,
+                                        inputs_sig_commitments,
+                                        output_policies,
+                                        output_sig_commitments);
+    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok());
 
     // 5. check tracing
     // 5.1 tracer 1
