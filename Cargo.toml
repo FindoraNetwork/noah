@@ -20,8 +20,8 @@ num-bigint = "0.2.2"
 rand_04 = {package= "rand", version = "0.4"}
 curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
 ed25519-dalek = "1.0.0-pre.3"
-bulletproofs = { version = "2.0.0",  package = "bulletproofs", git = "https://github.com/dalek-cryptography/bulletproofs", branch = "develop", features = ["yoloproofs"]}
-spacesuit = {git = "https://github.com/findoraorg/slingshot", rev = "85f89bbfb7b84d32ba66e8725dd279c0458f2ade" }
+bulletproofs = { version = "2.0.0",  package = "bulletproofs", git = "https://github.com/dalek-cryptography/bulletproofs", rev = "91218d4066af5d582631319c5ff0266402b9fff2", features = ["yoloproofs"]}
+spacesuit = {git = "https://github.com/findoraorg/slingshot", rev = "f35dd6fdcb524a61a94941333e14a9db191a8b05" }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 merlin = "2.0"
 serde = "1.0"
