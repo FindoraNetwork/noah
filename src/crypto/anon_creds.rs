@@ -79,12 +79,14 @@ in the credentials by
 */
 
 use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
+use crate::algebra::multi_exp::MultiExp;
 use crate::algebra::pairing::Pairing;
 use crate::crypto::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use crate::errors::ZeiError;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use std::iter;
 
 pub(crate) const AC_REVEAL_PROOF_DOMAIN: &[u8] = b"AC Reveal PoK";
 pub(crate) const AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Reveal PoK Instance";
@@ -338,12 +340,38 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(issuer_pub_key: &ACIs
                                                            challenge: &P::ScalarField)
                                                            -> Result<(), ZeiError> {
   // p = X_2*c - proof_commitment + &G2 * r_t + Z2 * r_sk + \sum r_attr_i * Y2_i;
-  let hidden = ac_vrfy_hidden_terms_addition::<P>(&challenge, &pok, issuer_pub_key, attributes)?;
-  let revealed = ac_vrfy_revealed_terms_addition::<P>(&challenge, attributes, issuer_pub_key)?;
-  ac_verify_final_check::<P>(sig_commitment,
-                             &challenge,
-                             &issuer_pub_key.gen2,
-                             &hidden.add(&revealed))
+
+  let minus_one: P::ScalarField = P::ScalarField::from_u32(1).neg();
+  let mut scalars = vec![];
+  scalars.push(pok.response_t.clone()); // G2
+  scalars.push(challenge.clone()); //X2
+  scalars.push(pok.response_sk.clone()); //Z2
+  scalars.push(minus_one); //Commitment
+
+  let mut resp_attr_iter = pok.response_attrs.iter();
+
+  for attr in attributes {
+    match attr {
+      Attribute::Revealed(attr) => {
+        let a = attr.mul(challenge);
+        scalars.push(a);
+      }
+      Attribute::Hidden(_) => {
+        let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
+        scalars.push(response.clone());
+      }
+    }
+  }
+
+  let p = P::G2::vartime_multi_exp(
+    scalars,
+    iter::once(&issuer_pub_key.gen2)
+      .chain(iter::once(&issuer_pub_key.xx2))
+      .chain(iter::once(&issuer_pub_key.zz2))
+      .chain(iter::once(&pok.commitment))
+      .chain(issuer_pub_key.yy2.iter())
+  );
+  ac_verify_final_check::<P>(sig_commitment, &challenge, &issuer_pub_key.gen2, &p)
 }
 /// Produce a AttrsRevealProof, attributes that are not Revealed(attr) and secret parameters
 /// are proved in ZeroKnowledge.
@@ -516,45 +544,6 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
              response_t,
              response_sk,
              response_attrs })
-}
-
-/// Helper function that compute the term of an anonymous credential verification
-/// that do not include the revealed attributes. That is:
-/// c * X2 + b_t * G1  + b_sk * Z2 + sum_{i\in Hidden} b_{attr_i} * Y2_i - reveal_sig.COM
-/// = c( x + t + sk * z + sum_{i\in Hidden} attr_i * y2_i) * G2
-pub(crate) fn ac_vrfy_hidden_terms_addition<P: Pairing>(challenge: &P::ScalarField,
-                                                        pok: &ACPoK<P::G2, P::ScalarField>,
-                                                        issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>,
-                                                        attrs: &[Attribute<P::ScalarField>])
-                                                        -> Result<P::G2, ZeiError> {
-  //compute X_2 * challenge - commitment + G2 * &response_t + PK.Z2 * response_sk +
-  // sum PK.Y2_i * response_attr_i
-  let mut q = issuer_pub_key.xx2.mul(&challenge).sub(&pok.commitment); //X_2*challenge - proof.commitment
-
-  q = q.add(&issuer_pub_key.gen2.mul(&pok.response_t));
-  q = q.add(&issuer_pub_key.zz2.mul(&pok.response_sk));
-
-  let mut resp_attr_iter = pok.response_attrs.iter();
-  for (attr, yy2i) in attrs.iter().zip(issuer_pub_key.yy2.iter()) {
-    if let Attribute::Hidden(_) = attr {
-      let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
-      q = q.add(&yy2i.mul(response));
-    }
-  }
-  Ok(q)
-}
-
-fn ac_vrfy_revealed_terms_addition<P: Pairing>(challenge: &P::ScalarField,
-                                               attrs: &[Attribute<P::ScalarField>],
-                                               issuer_pub_key: &ACIssuerPublicKey<P::G1, P::G2>)
-                                               -> Result<P::G2, ZeiError> {
-  let mut attr_prod_yy2 = P::G2::get_identity();
-  for (yy2i, attr_enum) in izip!(issuer_pub_key.yy2.iter(), attrs.iter()) {
-    if let Attribute::Revealed(attr) = attr_enum {
-      attr_prod_yy2 = attr_prod_yy2.add(&yy2i.mul(&attr))
-    }
-  }
-  Ok(attr_prod_yy2.mul(challenge))
 }
 
 #[allow(non_snake_case)]
