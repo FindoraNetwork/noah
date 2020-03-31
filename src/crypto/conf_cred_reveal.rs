@@ -441,52 +441,6 @@ pub(crate) mod test_helper {
 }
 
 #[cfg(test)]
-mod test_bn {
-  use crate::algebra::bn::BN;
-  use crate::crypto::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
-
-  #[test]
-  fn confidential_reveal_one_attr_hidden() {
-    test_confidential_ac_reveal::<BN>(&[false, false, false]);
-  }
-
-  #[test]
-  fn confidential_reveal_one_attr_revealed() {
-    test_confidential_ac_reveal::<BN>(&[true]);
-  }
-
-  #[test]
-  fn confidential_reveal_two_attr_hidden_first() {
-    test_confidential_ac_reveal::<BN>(&[false, false]);
-    test_confidential_ac_reveal::<BN>(&[false, true]);
-  }
-
-  #[test]
-  fn confidential_reveal_two_attr_revealed_first() {
-    test_confidential_ac_reveal::<BN>(&[true, false]);
-    test_confidential_ac_reveal::<BN>(&[true, true]);
-  }
-
-  #[test]
-  fn confidential_reveal_ten_attr_all_hidden() {
-    test_confidential_ac_reveal::<BN>(&[false; 10]);
-  }
-
-  #[test]
-  fn confidential_reveal_ten_attr_all_revealed() {
-    test_confidential_ac_reveal::<BN>(&[true; 10]);
-  }
-
-  #[test]
-  fn confidential_reveal_ten_attr_half_revealed() {
-    test_confidential_ac_reveal::<BN>(&[true, false, true, false, true, false, true, false, true,
-                                        false]);
-    test_confidential_ac_reveal::<BN>(&[false, true, false, true, false, true, false, true,
-                                        false, true]);
-  }
-}
-
-#[cfg(test)]
 mod test_bls12_381 {
   use crate::algebra::bls12_381::Bls12381;
   use crate::crypto::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
@@ -536,7 +490,6 @@ mod test_bls12_381 {
 mod test_serialization {
 
   use crate::algebra::bls12_381::Bls12381;
-  use crate::algebra::bn::BN;
   use crate::algebra::groups::Group;
   use crate::algebra::pairing::Pairing;
   use crate::basic_crypto::elgamal::elgamal_key_gen;
@@ -609,17 +562,7 @@ mod test_serialization {
   }
 
   #[test]
-  fn to_json_bn() {
-    to_json::<BN>();
-  }
-
-  #[test]
   fn to_msg_pack_bls() {
     to_msg_pack::<Bls12381>();
-  }
-
-  #[test]
-  fn to_msg_pack_bn() {
-    to_msg_pack::<BN>();
   }
 }

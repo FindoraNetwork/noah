@@ -31,7 +31,6 @@ sha2 = "0.8.0"
 itertools = "0.8.0"
 rmp-serde = "0.13.7"
 pairing = "0.14.2"
-bn = {git = "ssh://git@github.com/findoraorg/zcash-bn-fork", rev = "06d5bd15e358dc5a75b3d0b"}
 digest = "0.8"
 bincode = "1.1.2"
 base64 = "0.10"
