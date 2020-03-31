@@ -77,6 +77,7 @@ fn pippenger<I, H, S, G>(elems: H, scalars: I) -> G
   let two_power_w: usize = 1 << w;
   let digits_vec: Vec<Vec<i8>> = scalars.map(|s| scalar_to_radix_2_power_w::<S>(s.borrow(), w))
                                         .collect();
+  // TODO (fernando) remove this clone
   let elems = elems.into_iter().map(|p| p.borrow().clone()).collect_vec();
   let mut digits_count = 0;
   for digits in digits_vec.iter() {

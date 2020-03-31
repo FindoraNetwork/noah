@@ -354,7 +354,7 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(issuer_pub_key: &ACIs
     match attr {
       Attribute::Revealed(attr) => {
         let a = attr.mul(challenge);
-        scalars.push(a); //Commitment
+        scalars.push(a);
       }
       Attribute::Hidden(_) => {
         let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
