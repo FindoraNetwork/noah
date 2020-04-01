@@ -86,7 +86,6 @@ use crate::errors::ZeiError;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use std::iter;
 
 pub(crate) const AC_REVEAL_PROOF_DOMAIN: &[u8] = b"AC Reveal PoK";
 pub(crate) const AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Reveal PoK Instance";
@@ -343,34 +342,39 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(issuer_pub_key: &ACIs
 
   let minus_one: P::ScalarField = P::ScalarField::from_u32(1).neg();
   let mut scalars = vec![];
-  scalars.push(pok.response_t.clone()); // G2
-  scalars.push(challenge.clone()); //X2
-  scalars.push(pok.response_sk.clone()); //Z2
-  scalars.push(minus_one); //Commitment
+  scalars.push(&pok.response_t); // G2
+  scalars.push(challenge); //X2
+  scalars.push(&pok.response_sk); //Z2
+  scalars.push(&minus_one); //Commitment
 
   let mut resp_attr_iter = pok.response_attrs.iter();
 
-  for attr in attributes {
+  let attributes = attributes.iter()
+                             .map(|attr| match attr {
+                               Attribute::Revealed(attr) => Some(attr.mul(challenge)),
+                               _ => None,
+                             })
+                             .collect_vec();
+  for attr in attributes.iter() {
     match attr {
-      Attribute::Revealed(attr) => {
-        let a = attr.mul(challenge);
+      Some(a) => {
         scalars.push(a);
       }
-      Attribute::Hidden(_) => {
+      None => {
         let response = resp_attr_iter.next().ok_or(ZeiError::ParameterError)?;
-        scalars.push(response.clone());
+        scalars.push(response);
       }
     }
   }
+  let mut elems = vec![&issuer_pub_key.gen2,
+                       &issuer_pub_key.xx2,
+                       &issuer_pub_key.zz2,
+                       &pok.commitment];
 
-  let p = P::G2::vartime_multi_exp(
-    scalars,
-    iter::once(&issuer_pub_key.gen2)
-      .chain(iter::once(&issuer_pub_key.xx2))
-      .chain(iter::once(&issuer_pub_key.zz2))
-      .chain(iter::once(&pok.commitment))
-      .chain(issuer_pub_key.yy2.iter())
-  );
+  for y in issuer_pub_key.yy2.iter() {
+    elems.push(y);
+  }
+  let p = P::G2::vartime_multi_exp(scalars.as_slice(), elems.as_slice());
   ac_verify_final_check::<P>(sig_commitment, &challenge, &issuer_pub_key.gen2, &p)
 }
 /// Produce a AttrsRevealProof, attributes that are not Revealed(attr) and secret parameters

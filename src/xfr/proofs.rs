@@ -413,11 +413,15 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
   let mut transcript = Transcript::new(b"Zei Range Proof");
 
   // 1. verify proof commitment to transfer's input - output amounts match proof commitments
-  let mut total_input_com = RistrettoPoint::identity();
+  let mut total_input_com_low = RistrettoPoint::identity();
+  let mut total_input_com_high = RistrettoPoint::identity();
   for input in inputs.iter() {
     let (com_low, com_high) = match input.amount {
       XfrAmount::Confidential((com_low, com_high)) => {
-        (com_low.decompress().unwrap(), com_high.decompress().unwrap())
+        (com_low.decompress()
+                .ok_or(ZeiError::XfrVerifyConfidentialAmountError)?,
+         com_high.decompress()
+                 .ok_or(ZeiError::XfrVerifyConfidentialAmountError)?)
       }
       XfrAmount::NonConfidential(amount) => {
         let (low, high) = u64_to_u32_pair(amount);
@@ -426,10 +430,11 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
         (com_low, com_high)
       }
     };
-    total_input_com += com_low + com_high * pow2_32;
+    total_input_com_low += com_low;
+    total_input_com_high += com_high;
   }
-
-  let mut total_output_com = RistrettoPoint::identity();
+  let mut total_output_com_low = RistrettoPoint::identity();
+  let mut total_output_com_high = RistrettoPoint::identity();
   let mut range_coms: Vec<CompressedRistretto> = Vec::with_capacity(2 * num_output + 2);
   for output in outputs.iter() {
     let (com_low, com_high) = match output.amount {
@@ -443,13 +448,14 @@ pub(crate) fn verify_confidential_amount(inputs: &[BlindAssetRecord],
         (com_low, com_high)
       }
     };
-    total_output_com += com_low + com_high * pow2_32;
+    total_output_com_low += com_low;
+    total_output_com_high += com_high;
 
     range_coms.push(com_low.compress());
     range_coms.push(com_high.compress());
-    //output_com.push(com_low + com_high * Scalar::from(0xFFFFFFFF as u64 + 1));
   }
-  let derived_xfr_diff_com = total_input_com - total_output_com;
+  let derived_xfr_diff_com = total_input_com_low - total_output_com_low
+                             + (total_input_com_high - total_output_com_high) * pow2_32;
 
   let proof_xfr_com_low = range_proof.xfr_diff_commitment_low
                                      .decompress()

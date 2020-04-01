@@ -3,6 +3,7 @@ use crate::algebra::multi_exp::MultiExp;
 use crate::algebra::pairing::Pairing;
 use crate::errors::ZeiError;
 use digest::Digest;
+use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 
@@ -207,14 +208,15 @@ pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: 
                                              rhs_vec,
                                              &proof.responses,
                                              &challenge);
+  let scalars_as_ref = me_scalars.iter().map(|s| s).collect_vec();
   let mut me_elems = vec![];
   for e in elems {
-    me_elems.push((*e).clone());
+    me_elems.push(*e);
   }
   for e in proof.commitments.iter() {
-    me_elems.push(e.clone());
+    me_elems.push(e);
   }
-  let result = G::vartime_multi_exp(me_scalars.as_slice(), me_elems.as_slice());
+  let result = G::vartime_multi_exp(scalars_as_ref.as_slice(), me_elems.as_slice());
   if result != G::get_identity() {
     Err(ZeiError::ZKProofVerificationError)
   } else {
