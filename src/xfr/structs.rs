@@ -218,7 +218,7 @@ pub struct AssetTracerKeyPair {
 }
 
 /// An asset and identity tracking policy for an asset record
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTracingPolicy {
   pub enc_keys: AssetTracerEncKeys,
   pub asset_tracking: bool, // track amount and asset type
