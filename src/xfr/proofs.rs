@@ -336,7 +336,7 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
     return Err(ZeiError::RangeProofProveError);
   }
 
-  let mut params = PublicParams::new();
+  let params = PublicParams::new();
 
   //build values vector (out amounts + amount difference)
   let in_total = inputs.iter().fold(0u64, |accum, x| accum + x.amount);
@@ -378,10 +378,11 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
     range_proof_blinds.push(Scalar::default());
   }
 
+  let mut transcript = Transcript::new(b"Zei Range Proof");
   let (range_proof, coms) =
     RangeProof::prove_multiple(&params.bp_gens,
                                &params.pc_gens,
-                               &mut params.transcript,
+                               &mut transcript,
                                values.as_slice(),
                                range_proof_blinds.as_slice(),
                                BULLET_PROOF_RANGE).map_err(|_| ZeiError::RangeProofProveError)?;

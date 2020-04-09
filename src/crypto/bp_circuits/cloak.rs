@@ -39,17 +39,16 @@ match on each list. On each product the elements are shifted by a random challen
   - The last intermediate value is appended to the output list.
 */
 
-use crate::crypto::bp_circuits::gadgets::gate_mix;
 use crate::errors::ZeiError;
 use bulletproofs::r1cs::{
   ConstraintSystem, Prover, R1CSError, RandomizableConstraintSystem, Variable, Verifier,
 };
-use core::iter;
+use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
-use itertools::Itertools;
 
-#[derive(Clone, Copy, Debug, Default)]
+/// Represent AssetRecord amount and asset type
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CloakValue {
   pub amount: Scalar,
   pub asset_type: Scalar,
@@ -62,45 +61,51 @@ impl CloakValue {
 }
 
 impl CloakValue {
-  pub fn commit(&self,
-                prover: &mut Prover,
-                amount_blind: Scalar,
-                asset_type_blind: Scalar)
-                -> (CloakCommitment, CloakVariable) {
-    let (amount_com, amount_var) = prover.commit(self.amount, amount_blind);
-    let (asset_type_com, asset_type_var) = prover.commit(self.asset_type, asset_type_blind);
+  /// Prover commits to amount and asset type using user provided blinding factors
+  /// Returns commitments and circuit variables
+  pub fn commit_prover(&self,
+                       prover: &mut Prover,
+                       blinds: &CloakValue)
+                       -> (CloakCommitment, CloakVariable) {
+    let (amount_com, amount_var) = prover.commit(self.amount, blinds.amount);
+    let (asset_type_com, asset_type_var) = prover.commit(self.asset_type, blinds.asset_type);
     (CloakCommitment { amount: amount_com,
                        asset_type: asset_type_com },
      CloakVariable { amount: amount_var,
                      asset_type: asset_type_var })
   }
+  pub fn commit(&self, pc_gens: &PedersenGens, blinds: &CloakValue) -> CloakCommitment {
+    CloakCommitment { amount: pc_gens.commit(self.amount, blinds.amount).compress(),
+                      asset_type: pc_gens.commit(self.asset_type, blinds.asset_type)
+                                         .compress() }
+  }
 }
 
+/// Represent a CloakValue variable in the circuit
 #[derive(Clone, Copy, Debug)]
 pub struct CloakVariable {
   pub amount: Variable,
   pub asset_type: Variable,
 }
 
+/// Represent a commitment Cloak value.
 #[derive(Clone, Copy)]
 pub struct CloakCommitment {
-  amount: CompressedRistretto,
-  asset_type: CompressedRistretto,
+  pub amount: CompressedRistretto,
+  pub asset_type: CompressedRistretto,
 }
 
 impl CloakCommitment {
-  pub fn commit(&self, verifier: &mut Verifier) -> CloakVariable {
+  /// Verifier produce circuit variables corresponding to this commitment
+  pub fn commit_verifier(&self, verifier: &mut Verifier) -> CloakVariable {
     CloakVariable { amount: verifier.commit(self.amount),
                     asset_type: verifier.commit(self.asset_type) }
   }
 }
 
-impl CloakVariable {
-  // TODO remove this function
-  fn to_var_pair(&self) -> (Variable, Variable) {
-    (self.amount, self.asset_type)
-  }
-}
+/// Implement the Cloak protocol, run by prover and verifier to prove that
+/// 1) output values in [0..2^64(
+/// 2) Once amounts are aggregated by asset type, input and output matches.
 pub fn cloak<CS: RandomizableConstraintSystem>(cs: &mut CS,
                                                input_vars: &[CloakVariable],
                                                input_values: Option<&[CloakValue]>,
@@ -133,7 +138,7 @@ pub fn cloak<CS: RandomizableConstraintSystem>(cs: &mut CS,
 
   // do a proof of shuffle
   n_gates +=
-    cloak_shuffle_gadget(cs, &merged_input_vars, &merged_output_vars).map_err(|_| {
+    super::gadgets::cloak_shuffle_gadget(cs, merged_input_vars, merged_output_vars).map_err(|_| {
                                                                        ZeiError::R1CSProofError
                                                                      })?;
 
@@ -149,6 +154,7 @@ pub fn cloak<CS: RandomizableConstraintSystem>(cs: &mut CS,
   Ok(n_gates)
 }
 
+// Pad list with with value to expected len
 fn pad<CS: ConstraintSystem>(cs: &mut CS,
                              expected_len: usize,
                              list: &mut Vec<CloakVariable>,
@@ -160,7 +166,64 @@ fn pad<CS: ConstraintSystem>(cs: &mut CS,
   }
   Ok(())
 }
-fn sort_and_merge<CS: RandomizableConstraintSystem>(
+
+// sorts the input list by asset_type, in order of appearance in the list
+fn sort(input: &[CloakValue]) -> Vec<CloakValue> {
+  let mut sorted_values = input.to_vec();
+  let mut i = 0;
+  while i < input.len() {
+    let asset_type = input[i].asset_type;
+    let mut swap_index = input.len() - 1;
+    let mut j = i + 1;
+    while j < swap_index {
+      if asset_type == sorted_values[j].asset_type {
+        j += 1;
+      } else {
+        sorted_values.swap(j, swap_index);
+        swap_index -= 1;
+      }
+    }
+    i = j;
+  }
+  sorted_values
+}
+
+// Aggregate amounts of consecutive CloakValues if asset_types match
+// Return vec 0 correspond to intermediate values storing the result
+// of each current pair. That is, intermediate[i] = Merge(intermediate[i-1], input[i])[1]
+// Where intermediate[0] = input[0]
+// Return vec 1 is the final aggregated values. That is output[i] = Merge(intermediate[i-1], input[i])[0]
+// Where output[l-1] = intermediate[l-1];
+// Intermediate list is of length (l-2) ( all intermediate produced except last)
+// Output list is of length l (all outputs plus last intermediate)
+pub(super) fn merge(sorted: &[CloakValue]) -> (Vec<CloakValue>, Vec<CloakValue>) {
+  let mut intermediate = vec![];
+  let mut merged = vec![];
+  let mut prev = sorted[0];
+  let len = sorted.len();
+  if len == 0 {
+    return (intermediate, merged);
+  }
+  if len == 1 {
+    return (intermediate, sorted.to_vec());
+  }
+  for value in sorted[1..].iter() {
+    if value.asset_type == prev.asset_type {
+      merged.push(CloakValue::new(Scalar::zero(), Scalar::zero()));
+      intermediate.push(CloakValue::new(prev.amount + value.amount, value.asset_type));
+      prev.amount += value.amount;
+    } else {
+      merged.push(prev);
+      intermediate.push(*value);
+      prev = *value;
+    }
+  }
+  merged.push(intermediate.pop().unwrap());
+  (intermediate, merged)
+}
+
+// Implements the sort and merge steps of the Cloak protocol
+pub(super) fn sort_and_merge<CS: RandomizableConstraintSystem>(
   cs: &mut CS,
   vars: &[CloakVariable],
   values: Option<&[CloakValue]>)
@@ -187,114 +250,20 @@ fn sort_and_merge<CS: RandomizableConstraintSystem>(
     allocate_cloak_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len)?;
 
   n_gates +=
-    cloak_shuffle_gadget(cs, vars, sorted_vars.as_slice()).map_err(|_| ZeiError::R1CSProofError)?;
+    super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone()).map_err(|_| ZeiError::R1CSProofError)?;
   n_gates +=
-    cloak_merge_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars).map_err(|_| {
-                                                                            ZeiError::R1CSProofError
-                                                                          })?;
+    super::gadgets::cloak_merge_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars).map_err(|_| {
+      ZeiError::R1CSProofError
+    })?;
 
   Ok((n_gates, merged_vars))
 }
 
-fn sort(input: &[CloakValue]) -> Vec<CloakValue> {
-  let mut sorted_values = input.to_vec();
-  let mut i = 0;
-  while i < input.len() {
-    let asset_type = input[i].asset_type;
-    let mut swap_index = input.len() - 1;
-    let mut j = i + 1;
-    while j < swap_index {
-      if asset_type == sorted_values[j].asset_type {
-        j += 1;
-      } else {
-        sorted_values.swap(j, swap_index);
-        swap_index -= 1;
-      }
-    }
-    i = j;
-  }
-  sorted_values
-}
-
-// Implements a merge check circuit where inputs are either copied to output
-// or same asset types entries are added
-fn merge(sorted: &[CloakValue]) -> (Vec<CloakValue>, Vec<CloakValue>) {
-  let mut intermediate = vec![];
-  let mut merged = vec![];
-  let mut prev = sorted[0];
-  let len = sorted.len();
-  if len == 0 {
-    return (intermediate, merged);
-  }
-  if len == 1 {
-    return (intermediate, sorted.to_vec());
-  }
-  for value in sorted[1..].iter() {
-    if value.asset_type == prev.asset_type {
-      merged.push(CloakValue::new(Scalar::zero(), Scalar::zero()));
-      intermediate.push(CloakValue::new(prev.amount + value.amount, value.asset_type));
-      prev.amount += value.amount;
-    } else {
-      merged.push(prev);
-      intermediate.push(*value);
-      prev = *value;
-    }
-  }
-  merged.push(intermediate.pop().unwrap());
-  (intermediate, merged)
-}
-
-// Implements a permutation check circuit
-fn cloak_shuffle_gadget<CS: RandomizableConstraintSystem>(cs: &mut CS,
-                                                          list: &[CloakVariable],
-                                                          permuted: &[CloakVariable])
-                                                          -> Result<usize, R1CSError> {
-  let list_as_pairs = list.iter().map(|v| v.to_var_pair()).collect_vec();
-  let permuted_as_pairs = permuted.iter().map(|v| v.to_var_pair()).collect_vec();
-  super::gadgets::pair_list_shuffle(cs, list_as_pairs, permuted_as_pairs)
-}
-
-fn cloak_merge_gadget<CS: RandomizableConstraintSystem>(cs: &mut CS,
-                                                        sorted: &[CloakVariable],
-                                                        intermediate: &[CloakVariable],
-                                                        merged: &[CloakVariable])
-                                                        -> Result<usize, R1CSError> {
-  let in1 = sorted[0];
-  let out1 = merged[0];
-  let mut n_gates = 0;
-  let l = sorted.len();
-  if l == 0 {
-    return Ok(0);
-  }
-  if l == 1 {
-    // sorted and merges should be the same
-    cs.constrain(in1.amount - out1.amount);
-    cs.constrain(in1.asset_type - out1.asset_type);
-    return Ok(0);
-  }
-  assert_eq!(l, merged.len());
-  assert_eq!(l, intermediate.len() + 2);
-  let first_in = sorted[0];
-  let in1iter = iter::once(&first_in).chain(intermediate.iter());
-  let in2iter = sorted[1..l].iter();
-  let out1iter = merged[0..l - 1].iter();
-  let out2iter = intermediate.iter().chain(iter::once(&merged[l - 1]));
-
-  for (((in1, in2), out1), out2) in in1iter.zip(in2iter).zip(out1iter).zip(out2iter) {
-    n_gates += gate_mix(cs,
-                        (in1.amount, in1.asset_type),
-                        (in2.amount, in2.asset_type),
-                        (out1.amount, out1.asset_type),
-                        (out2.amount, out2.asset_type))?;
-  }
-
-  Ok(n_gates)
-}
-
-fn allocate_cloak_vector<CS: ConstraintSystem>(cs: &mut CS,
-                                               list: Option<&Vec<CloakValue>>,
-                                               len: usize)
-                                               -> Result<Vec<CloakVariable>, ZeiError> {
+pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
+  cs: &mut CS,
+  list: Option<&Vec<CloakValue>>,
+  len: usize)
+  -> Result<Vec<CloakVariable>, ZeiError> {
   Ok(match list {
        None => {
          let mut v = vec![];
@@ -318,6 +287,7 @@ fn allocate_cloak_vector<CS: ConstraintSystem>(cs: &mut CS,
        }
      })
 }
+
 #[cfg(test)]
 mod tests {
   use crate::crypto::bp_circuits::cloak::{CloakCommitment, CloakValue};
@@ -328,6 +298,28 @@ mod tests {
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
+
+  #[test]
+  fn merge() {
+    let values = vec![CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
+                      CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
+                      CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
+                      CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
+                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
+                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
+                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8))];
+
+    let (_, added) = super::merge(&values);
+    let expected = vec![CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                        CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                        CloakValue::new(Scalar::from(90u8), Scalar::from(3u8)),
+                        CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
+                        CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                        CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                        CloakValue::new(Scalar::from(30u8), Scalar::from(1u8))];
+
+    assert_eq!(&added[..], &expected[..]);
+  }
 
   fn test_cloak(inputs: &[CloakValue],
                 outputs: &[CloakValue],
@@ -345,9 +337,9 @@ mod tests {
       let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
       let in_com_and_vars = inputs.iter()
                                   .map(|input| {
-                                    input.commit(&mut prover,
-                                                 Scalar::random(&mut prng),
-                                                 Scalar::random(&mut prng))
+                                    input.commit_prover(&mut prover,
+                                                        &CloakValue::new(Scalar::random(&mut prng),
+                                                                         Scalar::random(&mut prng)))
                                   })
                                   .collect_vec();
       input_coms = in_com_and_vars.iter().map(|(com, _)| *com).collect_vec();
@@ -355,9 +347,9 @@ mod tests {
 
       let out_com_and_vars = outputs.iter()
                                     .map(|output| {
-                                      output.commit(&mut prover,
-                                                    Scalar::random(&mut prng),
-                                                    Scalar::random(&mut prng))
+                                      output.commit_prover(&mut prover,
+                                      &CloakValue::new(Scalar::random(&mut prng),
+                                                       Scalar::random(&mut prng)))
                                     })
                                     .collect_vec();
       output_coms = out_com_and_vars.iter().map(|(com, _)| *com).collect_vec();
@@ -380,11 +372,11 @@ mod tests {
       let mut verifier_transcript = Transcript::new(b"test");
       let mut verifier = Verifier::new(&mut verifier_transcript);
       let in_vars = input_coms.iter()
-                              .map(|input| input.commit(&mut verifier))
+                              .map(|input| input.commit_verifier(&mut verifier))
                               .collect_vec();
 
       let out_vars = output_coms.iter()
-                                .map(|output| output.commit(&mut verifier))
+                                .map(|output| output.commit_verifier(&mut verifier))
                                 .collect_vec();
 
       super::cloak(&mut verifier, &in_vars, None, &out_vars, None).unwrap();

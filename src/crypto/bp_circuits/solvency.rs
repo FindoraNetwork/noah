@@ -8,7 +8,9 @@
  * 5) Apply range proof for total_asset - total_liabilities
 */
 
-use bulletproofs::r1cs::{LinearCombination, R1CSError, RandomizableConstraintSystem, Variable};
+use crate::crypto::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable};
+use crate::errors::ZeiError;
+use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
 use curve25519_dalek::scalar::Scalar;
 use linear_map::LinearMap;
 
@@ -20,18 +22,15 @@ use linear_map::LinearMap;
 // TODO rewrite this function so that it has less arguments
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
-                                                         asset_set_vars: &[(Variable,
-                                                            Variable)],
-                                                         asset_set_values: Option<&[(Scalar,
-                                                                   Scalar)]>,
+                                                         asset_set_vars: &[CloakVariable],
+                                                         asset_set_values: Option<&[CloakValue]>,
                                                          public_asset_sum: Scalar,
-                                                         liability_set_vars: &[(Variable,
-                                                            Variable)],
-                                                         liability_set_values: Option<&[(Scalar, Scalar)]>,
+                                                         liability_set_vars: &[CloakVariable],
+                                                         liability_set_values: Option<&[CloakValue]>,
                                                          public_liability_sum: Scalar,
                                                          conversion_rates: &LinearMap<Scalar,
                                                                     Scalar>)
-                                                         -> Result<usize, R1CSError> {
+                                                         -> Result<usize, ZeiError> {
   let mut rate_types = vec![];
   let mut rate_values = vec![];
   for (k, v) in conversion_rates {
@@ -62,16 +61,17 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
   let diff_var = total_assets_var - total_lia_var;
   let diff_value = match asset_set_values {
     Some(values) => {
-      let converted_asset: Vec<Scalar> = values.iter()
-                                               .map(|(a, t)| a * conversion_rates.get(t).unwrap())
-                                               .collect();
+      let converted_asset: Vec<Scalar> =
+        values.iter()
+              .map(|v| v.amount * conversion_rates.get(&v.asset_type).unwrap())
+              .collect();
 
       let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
 
       let converted_lia: Vec<Scalar> =
         liability_set_values.unwrap()
                             .iter()
-                            .map(|(a, t)| a * conversion_rates.get(t).unwrap())
+                            .map(|v| v.amount * conversion_rates.get(&v.asset_type).unwrap())
                             .collect();
       let total_lia = converted_lia.iter().sum::<Scalar>() + public_liability_sum;
 
@@ -80,18 +80,19 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
     None => None,
   };
 
-  let num_gates_range_proof = super::gadgets::range_proof_64(cs, diff_var, diff_value)?;
+  let num_gates_range_proof =
+    super::gadgets::range_proof_64(cs, diff_var, diff_value).map_err(|_| ZeiError::R1CSProofError)?;
 
   Ok(num_gates_asset + num_gates_lia + num_gates_range_proof)
 }
 
 /// I aggregate a list of values using a rate conversion version table.
 fn aggregate<CS: RandomizableConstraintSystem>(cs: &mut CS,
-                                               vars: &[(Variable, Variable)],
-                                               values: Option<&[(Scalar, Scalar)]>,
+                                               vars: &[CloakVariable],
+                                               values: Option<&[CloakValue]>,
                                                rate_types: &[Scalar],
                                                rate_values: &[Scalar])
-                                               -> Result<(LinearCombination, usize), R1CSError> {
+                                               -> Result<(LinearCombination, usize), ZeiError> {
   let l = vars.len();
   if l <= 1 {
     return Ok((LinearCombination::default(), 0));
@@ -100,32 +101,25 @@ fn aggregate<CS: RandomizableConstraintSystem>(cs: &mut CS,
   let (sorted_vars, mid_vars, added_vars, trimmed_vars) = match values {
     Some(values) => {
       //prover allocate variables
-      let sorted_values = sort(values, &rate_types[..]);
-      let (mid_values, added_values) = add(&sorted_values[..]);
+      let sorted_values = sort_by_rate_type(values, &rate_types[..]);
+      let (mid_values, added_values) = super::cloak::merge(&sorted_values[..]);
       let trimmed_values = trim(&added_values[..]);
 
-      (allocate_vector(cs, &sorted_values),
-       allocate_vector(cs, &mid_values),
-       allocate_vector(cs, &added_values),
-       allocate_vector(cs, &trimmed_values))
+      (allocate_cloak_vector(cs, Some(&sorted_values), l)?,
+       allocate_cloak_vector(cs, Some(&mid_values), l - 2)?,
+       allocate_cloak_vector(cs, Some(&added_values), l)?,
+       allocate_cloak_vector(cs, Some(&trimmed_values), l)?)
     }
-    None => {
-      //verifier creates variables
-      ((0..l).map(|_| (cs.allocate(None).unwrap(), cs.allocate(None).unwrap()))
-             .collect(),
-       (0..l - 2).map(|_| (cs.allocate(None).unwrap(), cs.allocate(None).unwrap()))
-                 .collect(),
-       (0..l).map(|_| (cs.allocate(None).unwrap(), cs.allocate(None).unwrap()))
-             .collect(),
-       (0..l).map(|_| (cs.allocate(None).unwrap(), cs.allocate(None).unwrap()))
-             .collect())
-    }
+    None => (allocate_cloak_vector(cs, None, l)?,
+             allocate_cloak_vector(cs, None, l - 2)?,
+             allocate_cloak_vector(cs, None, l)?,
+             allocate_cloak_vector(cs, None, l)?),
   };
 
   let mut total = LinearCombination::default();
   for i in 0..rate_values.len() {
-    let value = trimmed_vars[i].0;
-    let value_type = trimmed_vars[i].1;
+    let value = trimmed_vars[i].amount;
+    let value_type = trimmed_vars[i].asset_type;
     let rate = rate_values[i];
     let rate_type = rate_types[i];
     let (_, _, out) = cs.multiply(value.into(), rate.into());
@@ -133,32 +127,43 @@ fn aggregate<CS: RandomizableConstraintSystem>(cs: &mut CS,
     total = total + out;
   }
   // prove addition of same flavor
-  let n_mix = super::gadgets::list_mix(cs, &sorted_vars[..], &mid_vars[..], &added_vars[..])?;
+  let n_mix = super::gadgets::cloak_merge_gadget(cs,
+                                                 &sorted_vars[..],
+                                                 &mid_vars[..],
+                                                 &added_vars[..]).map_err(|_| {
+                                                                   ZeiError::R1CSProofError
+                                                                 })?;
   // prove first shuffle
-  let n_shuffle1 = super::gadgets::pair_list_shuffle(cs, vars.to_vec(), sorted_vars)?;
+  let n_shuffle1 =
+    super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars).map_err(|_| {
+                                                                          ZeiError::R1CSProofError
+                                                                        })?;
   // prove second shiffled (zeroed values places at the end of the list)
-  let n_shuffle2 = super::gadgets::pair_list_shuffle(cs, added_vars, trimmed_vars)?;
+  let n_shuffle2 =
+    super::gadgets::cloak_shuffle_gadget(cs, added_vars, trimmed_vars).map_err(|_| {
+                                                                        ZeiError::R1CSProofError
+                                                                      })?;
   Ok((total, 6 * l + 2 * (l - 2) + rate_values.len() + n_mix + n_shuffle1 + n_shuffle2))
 }
 
-/// I sort the pairs in values by the order the second coordinate appears in type_list
-#[allow(clippy::type_complexity)]
-fn sort(values: &[(Scalar, Scalar)], type_list: &[Scalar]) -> Vec<(Scalar, Scalar)> {
+/// Sort the pairs in values by the order asset_type appears in type_list
+fn sort_by_rate_type(values: &[CloakValue], type_list: &[Scalar]) -> Vec<CloakValue> {
   let mut sorted = vec![];
   for key in type_list.iter() {
-    for (a, t) in values {
-      if t == key {
-        sorted.push((*a, *t));
+    for value in values {
+      if &value.asset_type == key {
+        sorted.push(*value);
       }
     }
   }
   sorted
 }
 
+/*
 /// Given a sorted by type list, I add the amounts of same type pairs in the list,
 /// zeroing out values and types already aggregated into another value
 #[allow(clippy::type_complexity)]
-fn add(list: &[(Scalar, Scalar)]) -> (Vec<(Scalar, Scalar)>, Vec<(Scalar, Scalar)>) {
+fn add(list: &[CloakValue]) -> (Vec<CloakValue>, Vec<CloakValue>) {
   let l = list.len();
   if l == 0 {
     return (vec![], vec![]);
@@ -183,109 +188,76 @@ fn add(list: &[(Scalar, Scalar)]) -> (Vec<(Scalar, Scalar)>, Vec<(Scalar, Scalar
   agg_values.push(mid_values.pop().unwrap()); // last mid value is actually an output
   (mid_values, agg_values)
 }
+*/
 
-/// I shuffle values to that zeroed values are placed in the tail of the list
+/// Shuffle values to that zeroed values are placed in the tail of the list
 /// while maintaining the order of the non-zero type elements
-fn trim(values: &[(Scalar, Scalar)]) -> Vec<(Scalar, Scalar)> {
+fn trim(values: &[CloakValue]) -> Vec<CloakValue> {
   let l = values.len();
   let mut trimmed = Vec::with_capacity(l);
   let mut rest = vec![];
 
-  for (amount, asset_type) in &values[0..l] {
-    if *asset_type != Scalar::zero() {
-      trimmed.push((*amount, *asset_type));
+  for value in &values[0..l] {
+    if value.asset_type != Scalar::zero() {
+      trimmed.push(*value);
     } else {
-      rest.push((Scalar::zero(), Scalar::zero()));
+      rest.push(CloakValue::default());
     }
   }
   trimmed.append(&mut rest);
   trimmed
 }
 
-pub(super) fn allocate_vector<CS: RandomizableConstraintSystem>(cs: &mut CS,
-                                                                list: &[(Scalar, Scalar)])
-                                                                -> Vec<(Variable, Variable)> {
-  let mut list_var = Vec::with_capacity(list.len());
-  for (amount, asset_type) in list {
-    let amount_var = cs.allocate(Some(*amount)).unwrap();
-    let asset_var = cs.allocate(Some(*asset_type)).unwrap();
-    list_var.push((amount_var, asset_var));
-  }
-  list_var
-}
-
 #[cfg(test)]
 mod test {
-  use bulletproofs::r1cs::{Prover, Variable, Verifier};
+  use crate::crypto::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
+  use bulletproofs::r1cs::{Prover, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
-  use curve25519_dalek::ristretto::CompressedRistretto;
   use curve25519_dalek::scalar::Scalar;
   use linear_map::LinearMap;
   use merlin::Transcript;
 
   #[test]
   fn sort() {
-    let values = [(Scalar::from(30u8), Scalar::from(3u8)),
-                  (Scalar::from(10u8), Scalar::from(1u8)),
-                  (Scalar::from(20u8), Scalar::from(2u8)),
-                  (Scalar::from(10u8), Scalar::from(1u8)),
-                  (Scalar::from(10u8), Scalar::from(1u8)),
-                  (Scalar::from(30u8), Scalar::from(3u8)),
-                  (Scalar::from(30u8), Scalar::from(3u8))];
+    let values = vec![CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
+                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
+                      CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
+                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
+                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
+                      CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
+                      CloakValue::new(Scalar::from(30u8), Scalar::from(3u8))];
 
     let t = [Scalar::from(3u8), Scalar::from(2u8), Scalar::from(1u8)];
 
-    let sorted = super::sort(&values, &t);
-    let expected = [(Scalar::from(30u8), Scalar::from(3u8)),
-                    (Scalar::from(30u8), Scalar::from(3u8)),
-                    (Scalar::from(30u8), Scalar::from(3u8)),
-                    (Scalar::from(20u8), Scalar::from(2u8)),
-                    (Scalar::from(10u8), Scalar::from(1u8)),
-                    (Scalar::from(10u8), Scalar::from(1u8)),
-                    (Scalar::from(10u8), Scalar::from(1u8))];
+    let sorted = super::sort_by_rate_type(&values, &t);
+    let expected = vec![CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
+                        CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
+                        CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
+                        CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
+                        CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
+                        CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
+                        CloakValue::new(Scalar::from(10u8), Scalar::from(1u8))];
     assert_eq!(&sorted[..], &expected[..]);
   }
 
   #[test]
-  fn add() {
-    let values = [(Scalar::from(30u8), Scalar::from(3u8)),
-                  (Scalar::from(30u8), Scalar::from(3u8)),
-                  (Scalar::from(30u8), Scalar::from(3u8)),
-                  (Scalar::from(20u8), Scalar::from(2u8)),
-                  (Scalar::from(10u8), Scalar::from(1u8)),
-                  (Scalar::from(10u8), Scalar::from(1u8)),
-                  (Scalar::from(10u8), Scalar::from(1u8))];
-
-    let (_, added) = super::add(&values);
-    let expected = [(Scalar::from(0u8), Scalar::from(0u8)),
-                    (Scalar::from(0u8), Scalar::from(0u8)),
-                    (Scalar::from(90u8), Scalar::from(3u8)),
-                    (Scalar::from(20u8), Scalar::from(2u8)),
-                    (Scalar::from(0u8), Scalar::from(0u8)),
-                    (Scalar::from(0u8), Scalar::from(0u8)),
-                    (Scalar::from(30u8), Scalar::from(1u8))];
-
-    assert_eq!(&added[..], &expected[..]);
-  }
-
-  #[test]
   fn trim() {
-    let values = [(Scalar::from(0u8), Scalar::from(0u8)),
-                  (Scalar::from(0u8), Scalar::from(0u8)),
-                  (Scalar::from(90u8), Scalar::from(3u8)),
-                  (Scalar::from(20u8), Scalar::from(2u8)),
-                  (Scalar::from(0u8), Scalar::from(0u8)),
-                  (Scalar::from(0u8), Scalar::from(0u8)),
-                  (Scalar::from(30u8), Scalar::from(1u8))];
+    let values = [CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                  CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                  CloakValue::new(Scalar::from(90u8), Scalar::from(3u8)),
+                  CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
+                  CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                  CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                  CloakValue::new(Scalar::from(30u8), Scalar::from(1u8))];
 
     let trimmed = super::trim(&values);
-    let expected = [(Scalar::from(90u8), Scalar::from(3u8)),
-                    (Scalar::from(20u8), Scalar::from(2u8)),
-                    (Scalar::from(30u8), Scalar::from(1u8)),
-                    (Scalar::from(0u8), Scalar::from(0u8)),
-                    (Scalar::from(0u8), Scalar::from(0u8)),
-                    (Scalar::from(0u8), Scalar::from(0u8)),
-                    (Scalar::from(0u8), Scalar::from(0u8))];
+    let expected = [CloakValue::new(Scalar::from(90u8), Scalar::from(3u8)),
+                    CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
+                    CloakValue::new(Scalar::from(30u8), Scalar::from(1u8)),
+                    CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                    CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                    CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
+                    CloakValue::new(Scalar::from(0u8), Scalar::from(0u8))];
 
     assert_eq!(&trimmed[..], &expected[..]);
   }
@@ -297,52 +269,45 @@ mod test {
     rates.insert(Scalar::from(1u8), Scalar::from(1u8));
     rates.insert(Scalar::from(2u8), Scalar::from(2u8));
     rates.insert(Scalar::from(3u8), Scalar::from(3u8));
-    let asset_set = [
-            (Scalar::from(10u8), Scalar::from(1u8)), //total 10
-            (Scalar::from(10u8), Scalar::from(2u8)), //total 20
-            (Scalar::from(10u8), Scalar::from(2u8)), //total 20
-            (Scalar::from(10u8), Scalar::from(1u8)), //total 10
-            (Scalar::from(10u8), Scalar::from(3u8)), //total 30
-            (Scalar::from(10u8), Scalar::from(1u8)), //total 10
-            (Scalar::from(10u8), Scalar::from(1u8)), //total 10, total asset worth = 100
+    let asset_set = vec![
+      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), //total 10
+      CloakValue::new(Scalar::from(10u8), Scalar::from(2u8)), //total 20
+      CloakValue::new(Scalar::from(10u8), Scalar::from(2u8)), //total 20
+      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), //total 10
+      CloakValue::new(Scalar::from(10u8), Scalar::from(3u8)), //total 30
+      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), //total 10
+      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), //total 10, total asset worth = 100
         ];
 
-    let liability_set = [
-            (Scalar::from(2u8), Scalar::from(2u8)), // total 4
-            (Scalar::from(8u8), Scalar::from(2u8)),  // total 16
-            (Scalar::from(10u8), Scalar::from(1u8)), // total 10
-            (Scalar::from(20u8), Scalar::from(3u8)), // total 60
-            (Scalar::from(10u8), Scalar::from(1u8)), // total 10
+    let liability_set = vec![
+      CloakValue::new(Scalar::from(2u8), Scalar::from(2u8)), // total 4
+      CloakValue::new(Scalar::from(8u8), Scalar::from(2u8)),  // total 16
+      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), // total 10
+      CloakValue::new(Scalar::from(20u8), Scalar::from(3u8)), // total 60
+      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), // total 10
         ];
-
     let mut prover_transcript = Transcript::new(b"test");
     let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
 
-    let asset_com_vars: Vec<(CompressedRistretto, CompressedRistretto, Variable, Variable)> =
+    let asset_com_vars: Vec<(CloakCommitment, CloakVariable)> =
       asset_set.iter()
-               .map(|(a, t)| {
-                 let (a_com, a_var) = prover.commit(*a, Scalar::from(1u8));
-                 let (t_com, t_var) = prover.commit(*t, Scalar::from(2u8));
-                 (a_com, t_com, a_var, t_var)
+               .map(|value| {
+                 value.commit_prover(&mut prover,
+                                     &CloakValue::new(Scalar::from(1u8), Scalar::from(2u8)))
                })
                .collect();
-    let asset_com: Vec<(CompressedRistretto, CompressedRistretto)> =
-      asset_com_vars.iter().map(|(a, t, _, _)| (*a, *t)).collect();
-    let asset_var: Vec<(Variable, Variable)> =
-      asset_com_vars.iter().map(|(_, _, a, t)| (*a, *t)).collect();
+    let asset_com: Vec<CloakCommitment> = asset_com_vars.iter().map(|(com, _)| *com).collect();
+    let asset_var: Vec<CloakVariable> = asset_com_vars.iter().map(|(_, var)| *var).collect();
 
-    let lia_com_vars: Vec<(CompressedRistretto, CompressedRistretto, Variable, Variable)> =
+    let lia_com_vars: Vec<(CloakCommitment, CloakVariable)> =
       liability_set.iter()
-                   .map(|(a, t)| {
-                     let (a_com, a_var) = prover.commit(*a, Scalar::from(3u8));
-                     let (t_com, t_var) = prover.commit(*t, Scalar::from(4u8));
-                     (a_com, t_com, a_var, t_var)
+                   .map(|value| {
+                     value.commit_prover(&mut prover,
+                                         &CloakValue::new(Scalar::from(3u8), Scalar::from(4u8)))
                    })
                    .collect();
-    let lia_com: Vec<(CompressedRistretto, CompressedRistretto)> =
-      lia_com_vars.iter().map(|(a, t, _, _)| (*a, *t)).collect();
-    let lia_var: Vec<(Variable, Variable)> =
-      lia_com_vars.iter().map(|(_, _, a, t)| (*a, *t)).collect();
+    let lia_com: Vec<CloakCommitment> = lia_com_vars.iter().map(|(com, _)| *com).collect();
+    let lia_var: Vec<CloakVariable> = lia_com_vars.iter().map(|(_, var)| *var).collect();
 
     let num_left_wires = super::solvency(&mut prover,
                                          &asset_var[..],
@@ -358,25 +323,22 @@ mod test {
     let mut verifier_transcript = Transcript::new(b"test");
     let mut verifier = Verifier::new(&mut verifier_transcript);
 
-    let asset_var: Vec<(Variable, Variable)> =
-      asset_com.iter()
-               .map(|(a, t)| (verifier.commit(*a), verifier.commit(*t)))
-               .collect();
+    let asset_var: Vec<CloakVariable> = asset_com.iter()
+                                                 .map(|var| var.commit_verifier(&mut verifier))
+                                                 .collect();
 
-    let lia_var: Vec<(Variable, Variable)> =
-      lia_com.iter()
-             .map(|(a, t)| (verifier.commit(*a), verifier.commit(*t)))
-             .collect();
+    let lia_var: Vec<CloakVariable> = lia_com.iter()
+                                             .map(|var| var.commit_verifier(&mut verifier))
+                                             .collect();
 
-    let num_left_wires = super::solvency(&mut verifier,
-                                         &asset_var[..],
-                                         None,
-                                         Scalar::zero(),
-                                         &lia_var[..],
-                                         None,
-                                         Scalar::zero(),
-                                         &rates).unwrap();
-    let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
+    super::solvency(&mut verifier,
+                    &asset_var[..],
+                    None,
+                    Scalar::zero(),
+                    &lia_var[..],
+                    None,
+                    Scalar::zero(),
+                    &rates).unwrap();
     assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
   }
 }
