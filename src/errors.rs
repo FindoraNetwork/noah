@@ -36,6 +36,7 @@ pub enum ZeiError {
   AssetTracingExtractionError,
   IdentityTracingExtractionError,
   AnonymousCredentialSignError,
+  R1CSProofError,
 }
 
 impl fmt::Display for ZeiError {
@@ -104,6 +105,7 @@ impl fmt::Display for ZeiError {
                     "Cannot extract identity attributes from tracing ciphertext"
                   }
                   ZeiError::AnonymousCredentialSignError =>{"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."}
+                  ZeiError::R1CSProofError => { "Could not create R1CSProof" }
                 })
   }
 }
@@ -168,6 +170,7 @@ impl error::Error for ZeiError {
         "Cannot extract identity attributes from tracing ciphertext"
       },
       ZeiError::AnonymousCredentialSignError => {"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."},
+      ZeiError::R1CSProofError =>{"Could not create R1CSProof"}
     }
   }
 }

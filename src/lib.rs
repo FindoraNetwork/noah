@@ -1,6 +1,4 @@
-//! Zei: Eian's cryptographic library
-//#![feature(test)]
-//extern crate aes_ctr;
+//! Zei: Findora's cryptographic library
 
 #![deny(warnings)]
 // Skip non useful warnings from clippy

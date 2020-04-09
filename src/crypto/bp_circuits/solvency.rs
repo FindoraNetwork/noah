@@ -80,7 +80,7 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
     None => None,
   };
 
-  let num_gates_range_proof = super::gadgets::range_proof(cs, diff_var, diff_value)?;
+  let num_gates_range_proof = super::gadgets::range_proof_64(cs, diff_var, diff_value)?;
 
   Ok(num_gates_asset + num_gates_lia + num_gates_range_proof)
 }

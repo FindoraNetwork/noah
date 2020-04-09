@@ -153,10 +153,10 @@ pub(super) fn list_shuffle<CS: RandomizedConstraintSystem>(cs: &mut CS,
 }
 
 /// I prove that value is in [0..2^64-1]
-pub fn range_proof<CS: ConstraintSystem>(cs: &mut CS,
-                                         mut var: LinearCombination,
-                                         value: Option<Scalar>)
-                                         -> Result<usize, R1CSError> {
+pub fn range_proof_64<CS: ConstraintSystem>(cs: &mut CS,
+                                            mut var: LinearCombination,
+                                            value: Option<Scalar>)
+                                            -> Result<usize, R1CSError> {
   let mut exp_2 = Scalar::one();
   let n_usize = 64usize;
   let value_bytes = value.as_ref().map(|v| v.as_bytes());
