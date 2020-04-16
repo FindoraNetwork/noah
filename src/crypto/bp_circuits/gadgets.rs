@@ -110,7 +110,7 @@ pub(super) fn cloak_shuffle_gadget<CS: RandomizableConstraintSystem>(
     })?;
 
   // list_shuffle does 2*(l-1) multiplications
-  Ok(2 * (l - 1))
+  Ok(l + 2 * (l - 1))
 }
 
 /// Prove shuffling of a list of values

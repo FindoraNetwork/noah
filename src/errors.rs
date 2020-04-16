@@ -32,6 +32,7 @@ pub enum ZeiError {
   SolvencyProveError,
   SolvencyVerificationError,
   ZKProofVerificationError,
+  ZKProofBatchVerificationError,
   GroupSignatureTraceError,
   AssetTracingExtractionError,
   IdentityTracingExtractionError,
@@ -97,6 +98,7 @@ impl fmt::Display for ZeiError {
                   ZeiError::SolvencyVerificationError => "Invalid proof for solvency",
                   ZeiError::SolvencyProveError => "Cannot build proof of solvency",
                   ZeiError::ZKProofVerificationError => "Invalid proof",
+                  ZeiError::ZKProofBatchVerificationError => "Batch proof instance contains an error",
                   ZeiError::GroupSignatureTraceError => "Trace test did not match",
                   ZeiError::AssetTracingExtractionError => {
                     "Cannot extract correct data from tracing ciphertext"
@@ -162,6 +164,7 @@ impl error::Error for ZeiError {
       ZeiError::SolvencyVerificationError => "Invalid proof for solvency",
       ZeiError::SolvencyProveError => "Cannot build proof of solvency",
       ZeiError::ZKProofVerificationError => "Invalid proof",
+      ZeiError::ZKProofBatchVerificationError => "Batch proof instance contains an error",
       ZeiError::GroupSignatureTraceError => "Trace test did not match",
       ZeiError::AssetTracingExtractionError => {
         "Cannot extract correct data from tracing ciphertext"

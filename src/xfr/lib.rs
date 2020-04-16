@@ -1,14 +1,18 @@
 use crate::api::anon_creds::ACCommitment;
 use crate::errors::ZeiError;
+use crate::setup::PublicParams;
 use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
-use crate::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify, AssetMixProof};
+use crate::xfr::asset_mixer::{
+  batch_verify_asset_mixing, prove_asset_mixing, AssetMixProof, AssetMixingInstance,
+};
 use crate::xfr::proofs::{
-  asset_amount_tracking_proofs, asset_proof, range_proof, verify_confidential_amount,
-  verify_confidential_asset, verify_tracer_tracking_proof,
+  asset_amount_tracking_proofs, asset_proof, batch_verify_confidential_amount,
+  batch_verify_confidential_asset, batch_verify_tracer_tracking_proof, range_proof,
 };
 use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use crate::xfr::structs::*;
 use bulletproofs::PedersenGens;
+use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
@@ -115,9 +119,10 @@ impl XfrType {
 /// use zei::xfr::asset_record::AssetRecordType;
 /// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note};
 /// use itertools::Itertools;
+/// use zei::setup::PublicParams;
 ///
-/// let mut prng: ChaChaRng;
-/// prng = ChaChaRng::from_seed([0u8; 32]);
+/// let mut prng = ChaChaRng::from_seed([0u8; 32]);
+/// let mut params = PublicParams::new();
 /// let asset_type = [0u8; 16];
 /// let inputs_amounts = [(10u64, asset_type),
 ///                       (10u64, asset_type),
@@ -161,7 +166,7 @@ impl XfrType {
 ///                              outputs.as_slice(),
 ///                              inkeys.iter().map(|x| x).collect_vec().as_slice()
 ///                ).unwrap();
-/// assert_eq!(verify_xfr_note(&mut prng, &xfr_note, &Default::default()), Ok(()));
+/// assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()), Ok(()));
 /// ```
 
 pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
@@ -195,9 +200,10 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord};
 /// use zei::xfr::asset_record::AssetRecordType;
 /// use zei::xfr::lib::{gen_xfr_body,verify_xfr_body};
+/// use zei::setup::PublicParams;
 ///
-/// let mut prng: ChaChaRng;
-/// prng = ChaChaRng::from_seed([0u8; 32]);
+/// let mut prng = ChaChaRng::from_seed([0u8; 32]);
+/// let mut params = PublicParams::new();
 /// let asset_type = [0u8; 16];
 /// let inputs_amounts = [(10u64, asset_type),
 ///                       (10u64, asset_type),
@@ -229,7 +235,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 ///     outputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap());
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();
-/// assert_eq!(verify_xfr_body(&mut prng, &body, &Default::default()), Ok(()));
+/// assert_eq!(verify_xfr_body(&mut prng, &mut params, &body, &Default::default()), Ok(()));
 /// ```
 pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                             inputs: &[AssetRecord],
@@ -347,7 +353,7 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
 
   match xfr_type {
     XfrType::Confidential_MultiAsset => {
-      let mix_proof = asset_mixer_proof(ins.as_slice(), out.as_slice())?;
+      let mix_proof = prove_asset_mixing(ins.as_slice(), out.as_slice())?;
       Ok(AssetTypeAndAmountProof::AssetMix(mix_proof))
     }
     XfrType::NonConfidential_MultiAsset => Ok(AssetTypeAndAmountProof::NoProof),
@@ -444,48 +450,89 @@ pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiErro
 /// XfrNote verification
 /// * `prng` - pseudo-random number generator
 /// * `xfr_note` - XfrNote struct to be verified
-/// * `inputs_tracking_policies` - list of asset tracing policies corresponding to the inputs of the XfrNote.
-/// * `inputs_sig_commitments`-
+/// * `policies` - list of set of policies and associated information corresponding to each xfr_note-
+/// * `returns` - () or an ZeiError in case of verification error
 pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
+                                               params: &mut PublicParams,
                                                xfr_note: &XfrNote,
                                                policies: &XfrNotePolicies)
                                                -> Result<(), ZeiError> {
-  // 1. verify signature
-  verify_transfer_multisig(xfr_note)?;
-
-  // 2. verify body
-  verify_xfr_body(prng, &xfr_note.body, policies)
+  batch_verify_xfr_notes(prng, params, &[&xfr_note], &[&policies])
 }
 
-pub(crate) fn verify_xfr_body_asset_records<R: CryptoRng + RngCore>(prng: &mut R,
-                                                                    body: &XfrBody)
-                                                                    -> Result<(), ZeiError> {
-  match &body.proofs.asset_type_and_amount_proof {
-    AssetTypeAndAmountProof::ConfAll((range_proof, asset_proof)) => {
-      verify_confidential_amount(&body.inputs, &body.outputs, range_proof)?;
-      verify_confidential_asset(prng, &body.inputs, &body.outputs, asset_proof)
-    }
-    AssetTypeAndAmountProof::ConfAmount(range_proof) => {
-      verify_confidential_amount(&body.inputs, &body.outputs, range_proof)?;
-      verify_plain_asset(&body.inputs, &body.outputs)
-    }
-    AssetTypeAndAmountProof::ConfAsset(asset_proof) => {
-      verify_plain_amounts(&body.inputs, &body.outputs)?;
-      verify_confidential_asset(prng, &body.inputs, &body.outputs, asset_proof)
-    }
-    AssetTypeAndAmountProof::NoProof => verify_plain_asset_mix(&body.inputs, &body.outputs),
-    AssetTypeAndAmountProof::AssetMix(asset_mix_proof) => {
-      verify_asset_mix(&body.inputs, &body.outputs, asset_mix_proof)
+/// XfrNote Batch verification
+/// * `prng` - pseudo-random number generator
+/// * `xfr_notes` - XfrNote structs to be verified
+/// * `policies` - list of set of policies and associated information corresponding to each xfr_note
+/// * `returns` - () or an ZeiError in case of verification error
+pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(prng: &mut R,
+                                                      params: &mut PublicParams,
+                                                      notes: &[&XfrNote],
+                                                      policies: &[&XfrNotePolicies])
+                                                      -> Result<(), ZeiError> {
+  // 1. verify signature
+  for xfr_note in notes {
+    verify_transfer_multisig(xfr_note)?;
+  }
+
+  let bodies = notes.iter().map(|note| &note.body).collect_vec();
+  batch_verify_xfr_bodies(prng, params, &bodies, policies)
+}
+
+pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
+  prng: &mut R,
+  params: &mut PublicParams,
+  bodies: &[&XfrBody])
+  -> Result<(), ZeiError> {
+  let mut conf_amount_records = vec![];
+  let mut conf_asset_type_records = vec![];
+  let mut conf_asset_mix_bodies = vec![];
+
+  for body in bodies {
+    match &body.proofs.asset_type_and_amount_proof {
+      AssetTypeAndAmountProof::ConfAll((range_proof, asset_proof)) => {
+        conf_amount_records.push((&body.inputs, &body.outputs, range_proof)); // save for batching
+        conf_asset_type_records.push((&body.inputs, &body.outputs, asset_proof));
+        // save for batching
+      }
+      AssetTypeAndAmountProof::ConfAmount(range_proof) => {
+        conf_amount_records.push((&body.inputs, &body.outputs, range_proof)); // save for batching
+        verify_plain_asset(body.inputs.as_slice(), body.outputs.as_slice())?; // no batching
+      }
+      AssetTypeAndAmountProof::ConfAsset(asset_proof) => {
+        verify_plain_amounts(body.inputs.as_slice(), body.outputs.as_slice())?; // no batching
+        conf_asset_type_records.push((&body.inputs, &body.outputs, asset_proof));
+        // save for batch proof
+      }
+      AssetTypeAndAmountProof::NoProof => {
+        verify_plain_asset_mix(body.inputs.as_slice(), body.outputs.as_slice())?;
+        // no batching
+      }
+      AssetTypeAndAmountProof::AssetMix(asset_mix_proof) => {
+        conf_asset_mix_bodies.push((body.inputs.as_slice(),
+                                    body.outputs.as_slice(),
+                                    asset_mix_proof));
+        // save for batch proof
+      }
     }
   }
+
+  // 1. verify confidential amounts
+  batch_verify_confidential_amount(prng, params, conf_amount_records.as_slice())?;
+
+  // 2. verify confidential asset_types
+  batch_verify_confidential_asset(prng, &params.pc_gens, &conf_asset_type_records)?;
+
+  // 3. verify confidential asset mix proofs
+  batch_verify_asset_mix(prng, params, conf_asset_mix_bodies.as_slice())
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct XfrNotePolicies<'b> {
-  inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
-  inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
-  outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
-  outputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
+  pub(crate) inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+  pub(crate) inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
+  pub(crate) outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+  pub(crate) outputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
 }
 
 impl<'b> XfrNotePolicies<'b> {
@@ -501,28 +548,78 @@ impl<'b> XfrNotePolicies<'b> {
   }
 }
 
+pub(crate) fn if_some_closure(x: &Option<ACCommitment>) -> Option<&ACCommitment> {
+  if (*x).is_some() {
+    Some(x.as_ref().unwrap())
+  } else {
+    None
+  }
+}
+
+impl<'a> XfrNotePolicies<'a> {
+  pub fn from_policies_no_ref(p: &'a XfrNotePoliciesNoRef) -> XfrNotePolicies<'a> {
+    XfrNotePolicies::new(p.inputs_tracking_policies.iter().map(|x| x).collect_vec(),
+                         p.inputs_sig_commitments
+                          .iter()
+                          .map(|x| if_some_closure(x))
+                          .collect_vec(),
+                         p.outputs_tracking_policies.iter().map(|x| x).collect_vec(),
+                         p.outputs_sig_commitments
+                          .iter()
+                          .map(|x| if_some_closure(x))
+                          .collect_vec())
+  }
+}
+
+#[derive(Default, Clone)]
+pub struct XfrNotePoliciesNoRef {
+  pub inputs_tracking_policies: Vec<AssetTracingPolicies>,
+  pub inputs_sig_commitments: Vec<Option<ACCommitment>>,
+  pub outputs_tracking_policies: Vec<AssetTracingPolicies>,
+  pub outputs_sig_commitments: Vec<Option<ACCommitment>>,
+}
+
+impl XfrNotePoliciesNoRef {
+  pub fn new(inputs_tracking_policies: Vec<AssetTracingPolicies>,
+             inputs_sig_commitments: Vec<Option<ACCommitment>>,
+             outputs_tracking_policies: Vec<AssetTracingPolicies>,
+             outputs_sig_commitments: Vec<Option<ACCommitment>>)
+             -> XfrNotePoliciesNoRef {
+    XfrNotePoliciesNoRef { inputs_tracking_policies,
+                           inputs_sig_commitments,
+                           outputs_tracking_policies,
+                           outputs_sig_commitments }
+  }
+}
+
 /// XfrBody verification with tracking policies
-/// * `prng` - pseudo-random number generator. Needed for verifying proofs.
+/// * `prng` - pseudo-random number generator. Needed for verifying proofs in batch.
 /// * `body` - XfrBody structure to be verified
-/// * `inputs_tracking_policies` - list of policies for tracing assets. One policy for each input of the XfrBody
-/// * `inputs_sig_commitments` - anonymous credential: contains the signed attributes of the user signing the input. The signature is computed by the identity issuer.
-/// * `outputs_tracking_policies` - list of policies for tracing assets. One policy for each output of the XfrBody
-/// * `outputs_sig_commitments` - anonymous credential: contains the signed attributes of the receiver. The signature is computed by the identity issuer.
-/// * `returns` - () or an error
+/// * `policies` - list of set of policies and associated information corresponding to each xfr_note
+/// * `returns` - () or an ZeiError in case of verification error
 pub fn verify_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
+                                               params: &mut PublicParams,
                                                body: &XfrBody,
                                                policies: &XfrNotePolicies)
                                                -> Result<(), ZeiError> {
-  // 1. verify amounts and asset types
-  verify_xfr_body_asset_records(prng, body)?;
+  batch_verify_xfr_bodies(prng, params, &[body], &[policies])
+}
 
-  // 2 verify tracking proofs
-  verify_tracer_tracking_proof(prng,
-                               body,
-                               &policies.inputs_tracking_policies,
-                               &policies.inputs_sig_commitments,
-                               &policies.outputs_tracking_policies,
-                               &policies.outputs_sig_commitments)
+/// XfrBodys batch verification
+/// * `prng` - pseudo-random number generator. Needed for verifying proofs in batch.
+/// * `bodies` - XfrBody structures to be verified
+/// * `policies` - list of set of policies and associated information corresponding to each xfr_note
+/// * `returns` - () or an ZeiError in case of verification error
+pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(prng: &mut R,
+                                                       params: &mut PublicParams,
+                                                       bodies: &[&XfrBody],
+                                                       policies: &[&XfrNotePolicies])
+                                                       -> Result<(), ZeiError> {
+  // 1. verify amounts and asset types
+  batch_verify_xfr_body_asset_records(prng, params, bodies)?;
+
+  // 2. verify tracing proofs
+  batch_verify_tracer_tracking_proof(prng, &params.pc_gens, bodies, policies)
 }
 
 fn verify_plain_amounts(inputs: &[BlindAssetRecord],
@@ -596,10 +693,60 @@ fn verify_plain_asset_mix(inputs: &[BlindAssetRecord],
   Ok(())
 }
 
-fn verify_asset_mix(inputs: &[BlindAssetRecord],
-                    outputs: &[BlindAssetRecord],
-                    proof: &AssetMixProof)
-                    -> Result<(), ZeiError> {
+fn batch_verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
+                                                  params: &mut PublicParams,
+                                                  bars_instances: &[(&[BlindAssetRecord],
+                                                     &[BlindAssetRecord],
+                                                     &AssetMixProof)])
+                                                  -> Result<(), ZeiError> {
+  fn process_bars(bars: &[BlindAssetRecord]) -> Vec<(CompressedRistretto, CompressedRistretto)> {
+    let pow2_32 = Scalar::from(POW_2_32);
+    bars.iter()
+        .map(|x| {
+          let (com_amount_low, com_amount_high) = match x.amount {
+            XfrAmount::Confidential((c1, c2)) => {
+              (c1.decompress().unwrap(), c2.decompress().unwrap())
+            }
+            XfrAmount::NonConfidential(amount) => {
+              let pc_gens = PedersenGens::default();
+              let (low, high) = u64_to_u32_pair(amount);
+              (pc_gens.commit(Scalar::from(low), Scalar::zero()),
+               pc_gens.commit(Scalar::from(high), Scalar::zero()))
+            }
+          };
+          let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
+
+          let com_type = match x.asset_type {
+            XfrAssetType::Confidential(c) => c,
+            XfrAssetType::NonConfidential(asset_type) => {
+              let scalar = asset_type_to_scalar(&asset_type);
+              let pc_gens = PedersenGens::default();
+              pc_gens.commit(scalar, Scalar::zero()).compress()
+            }
+          };
+          (com_amount, com_type)
+        })
+        .collect_vec()
+  }
+
+  let mut asset_mix_instances = vec![];
+  for instance in bars_instances {
+    let in_coms = process_bars(instance.0);
+    let out_coms = process_bars(instance.1);
+    asset_mix_instances.push(AssetMixingInstance { inputs: in_coms,
+                                                   outputs: out_coms,
+                                                   proof: instance.2 });
+  }
+  batch_verify_asset_mixing(prng, params, &asset_mix_instances)
+}
+
+/*
+fn verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
+                                            params: &PublicParams,
+                                            inputs: &[BlindAssetRecord],
+                                            outputs: &[BlindAssetRecord],
+                                            proof: &AssetMixProof)
+                                            -> Result<(), ZeiError> {
   let pow2_32 = Scalar::from(POW_2_32);
 
   let mut in_coms = vec![];
@@ -650,8 +797,12 @@ fn verify_asset_mix(inputs: &[BlindAssetRecord],
     };
     out_coms.push((com_amount, com_type));
   }
-  asset_mixer_verify(in_coms.as_slice(), out_coms.as_slice(), proof)
+  let instance = AssetMixingIntance { inputs: &in_coms,
+                                      outputs: &out_coms,
+                                      proof };
+  batch_verify_asset_mixing(prng, params, &[instance])
 }
+*/
 
 // ASSET TRACKING
 pub fn find_tracing_memos<'a>(

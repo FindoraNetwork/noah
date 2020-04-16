@@ -338,6 +338,7 @@ mod tests {
   }
 
   #[allow(non_snake_case)]
+  #[allow(clippy::many_single_char_names)]
   fn test_outsource_pairing_computation<P: Pairing>() {
     let mut A = vec![];
     let mut B = vec![];

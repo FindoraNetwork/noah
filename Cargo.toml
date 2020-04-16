@@ -15,13 +15,10 @@ byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] 
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
 rand = { version = "0.7", default-features = false, optional = true }
 rand_chacha = "0.2"
-num-traits = "0.2"
-num-bigint = "0.2.2"
 rand_04 = {package= "rand", version = "0.4"}
 curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
 ed25519-dalek = "1.0.0-pre.3"
-bulletproofs = { version = "2.0.0",  package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "develop", features = ["yoloproofs"]}
-spacesuit = {git = "ssh://git@github.com/findoraorg/slingshot", rev = "fdee78eacc5a8e4dfa2cc85c14ddd8bac7ed6c50"}
+bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 merlin = "2.0"
 serde = "1.0"
@@ -36,6 +33,7 @@ bincode = "1.1.2"
 base64 = "0.10"
 linear-map = "1.2.0"
 aes-ctr = "0.3.0"
+lazy_static = "1.4.0"
 
 [dev-dependencies]
 rand = { version = "0.7", default-features = false}
@@ -55,19 +53,52 @@ u32_backend = ["curve25519-dalek/u32_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 
 [[bench]]
-name = "xfr_note_time"
+name = "xfr_note_idtracking_assettracking_singleasset_time"
 harness = false
 
 [[bench]]
-name = "xfr_note_cycles"
+name = "xfr_note_idtracking_assettracking_singleasset_cycles"
 harness = false
 
 [[bench]]
-name = "xfr_body_time"
+name = "xfr_note_idtracking_assettracking_multiasset_time"
 harness = false
 
 [[bench]]
-name = "xfr_body_cycles"
+name = "xfr_note_idtracking_assettracking_multiasset_cycles"
 harness = false
+
+[[bench]]
+name = "xfr_note_noidtracking_noassettracking_singleasset_time"
+harness = false
+
+[[bench]]
+name = "xfr_note_noidtracking_noassettracking_singleasset_cycles"
+harness = false
+
+[[bench]]
+name = "xfr_body_idtracking_assettracking_singleasset_time"
+harness = false
+
+[[bench]]
+name = "xfr_body_idtracking_assettracking_singleasset_cycles"
+harness = false
+
+[[bench]]
+name = "xfr_note_batch_cycles"
+harness = false
+
+[[bench]]
+name = "xfr_note_batch_time"
+harness = false
+
+[[bench]]
+name = "xfr_note_idtracking_noassettracking_singleasset_time"
+harness = false
+
+[[bench]]
+name = "xfr_note_idtracking_noassettracking_singleasset_cycles"
+harness = false
+
 
 

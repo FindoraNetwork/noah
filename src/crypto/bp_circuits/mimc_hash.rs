@@ -27,6 +27,7 @@ fn feistel_round<CS: ConstraintSystem>(
   Ok((new_x, new_y, num_left_wires))
 }
 
+#[allow(clippy::many_single_char_names)]
 pub(crate) fn feistel_network<CS: ConstraintSystem>(
   cs: &mut CS,
   x: LinearCombination,

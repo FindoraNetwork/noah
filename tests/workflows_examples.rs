@@ -6,27 +6,40 @@ pub(crate) mod examples {
   use rand_chacha::ChaChaRng;
   use wasm_bindgen::__rt::std::collections::HashMap;
   use zei::api::anon_creds;
-  use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Credential};
+  use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Attr, Credential};
+  use zei::setup::PublicParams;
   use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
   use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
-  use zei::xfr::lib::{gen_xfr_note, XfrNotePolicies};
+  use zei::xfr::lib::{gen_xfr_note, RecordData, XfrNotePolicies};
   use zei::xfr::lib::{trace_assets, verify_xfr_note};
-  use zei::xfr::sig::XfrKeyPair;
+  use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
   use zei::xfr::structs::{
     AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
     IdentityRevealPolicy,
   };
-  use zei_utilities::examples::{
-    check_record_data, conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
+  use zei_utilities::xfr_building_utilities::{
+    conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
   };
 
   pub const ASSET1_TYPE: AssetType = [0u8; 16];
   pub const ASSET2_TYPE: AssetType = [1u8; 16];
   pub const ASSET3_TYPE: AssetType = [2u8; 16];
 
+  pub fn check_record_data(record_data: &RecordData,
+                           expected_amount: u64,
+                           expected_asset_type: AssetType,
+                           expected_ids: Vec<Attr>,
+                           expected_pk: &XfrPublicKey) {
+    assert_eq!(record_data.0, expected_amount);
+    assert_eq!(record_data.1, expected_asset_type);
+    assert_eq!(record_data.2, expected_ids);
+    assert_eq!(record_data.3, *expected_pk);
+  }
+
   #[test]
   fn xfr_note_non_confidential_one_input_one_output() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut params = PublicParams::new();
     let amount = 100u64;
     // 1. setup
     // 1.1 user keys
@@ -61,7 +74,7 @@ pub(crate) mod examples {
                                 &[&sender_keypair]).unwrap(); // sender secret key
 
     // 5. Validator verifies xfr_note
-    assert!(verify_xfr_note(&mut prng, &xfr_note, &Default::default()).is_ok()); // there are no policies associated with this xfr note
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()).is_ok()); // there are no policies associated with this xfr note
 
     //6. receiver retrieves his BlindAssetRecord and opens it
     let recv_bar = &xfr_note.body.outputs[0];
@@ -77,6 +90,7 @@ pub(crate) mod examples {
   #[test]
   fn xfr_note_confidential_amount_one_input_one_output() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut params = PublicParams::new();
     let amount = 100u64;
     // 1. setup
     // 1.1 user keys
@@ -111,7 +125,7 @@ pub(crate) mod examples {
                                 &[&sender_keypair]).unwrap(); // sender secret key
 
     // 5. Validator verifies xfr_note
-    assert!(verify_xfr_note(&mut prng, &xfr_note, &Default::default()).is_ok()); // there are no policies associated with this xfr note
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()).is_ok()); // there are no policies associated with this xfr note
 
     //6. receiver retrieves his BlindAssetRecord and opens it
     let recv_bar = &xfr_note.body.outputs[0];
@@ -129,6 +143,7 @@ pub(crate) mod examples {
   #[test]
   fn xfr_note_confidential_two_inputs_two_outputs_asset_tracking_on_inputs() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut params = PublicParams::new();
     let amount_in1 = 50u64;
     let amount_in2 = 75u64;
     let amount_out1 = 100u64;
@@ -198,7 +213,7 @@ pub(crate) mod examples {
                                         vec![None; 2]);
 
     // 5. Validator verifies xfr_note
-    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok()); // there are no policies associated with this xfr note
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok()); // there are no policies associated with this xfr note
 
     //6. receives retrieves his BlindAssetRecord and opens it
     let recv_bar1 = &xfr_note.body.outputs[0];
@@ -250,6 +265,7 @@ pub(crate) mod examples {
   #[test]
   fn xfr_note_confidential_one_input_two_outputs_asset_tracking_on_outputs() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut params = PublicParams::new();
     let amount_in1 = 50u64;
     let amount_out1 = 30u64;
     let amount_out2 = 20u64;
@@ -318,7 +334,7 @@ pub(crate) mod examples {
                                         vec![None; 2]);
 
     // 5. validator verify xfr_note
-    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok());
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
 
     //6. receiver retrieved his BlindAssetRecord
     //6. receives retrieves his BlindAssetRecord and opens it
@@ -370,6 +386,7 @@ pub(crate) mod examples {
   #[allow(non_snake_case)]
   fn xfr_note_confidential_two_inputs_one_output_asset_tracking_and_identity_tracking_on_inputs() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut params = PublicParams::new();
     let mut AIR: HashMap<&[u8], _> = HashMap::new();
     let amount_in1 = 50u64;
     let amount_in2 = 75u64;
@@ -487,7 +504,7 @@ pub(crate) mod examples {
                            vec![None]);
 
     // 5. validator verify xfr_note
-    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok());
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
 
     //6. receiver retrieved his BlindAssetRecord
     let recv_bar1 = &xfr_note.body.outputs[0];
@@ -528,6 +545,7 @@ pub(crate) mod examples {
   fn xfr_note_confidential_one_input_two_outputs_asset_tracking_and_identity_tracking_on_outputs(
     ) {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut params = PublicParams::new();
     let mut AIR: HashMap<&[u8], _> = HashMap::new();
     let amount_in1 = 100u64;
     let amount_out1 = 75u64;
@@ -654,7 +672,7 @@ pub(crate) mod examples {
                                 Some(&AIR[xfr_note.body.outputs[1].public_key.as_bytes()])]);
 
     // 5. validator verify xfr_note
-    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok());
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
 
     //6. receiver retrieved his BlindAssetRecord
     let recv_bar1 = &xfr_note.body.outputs[0];
@@ -719,6 +737,7 @@ pub(crate) mod examples {
     // 3 asset types, 2 different tracing policies and one with no policy
 
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut params = PublicParams::new();
     let mut AIR: HashMap<&[u8], _> = HashMap::new();
     let amount_asset1_in1 = 25;
     let amount_asset2_in2 = 50;
@@ -939,7 +958,7 @@ pub(crate) mod examples {
                                         inputs_sig_commitments,
                                         output_policies,
                                         output_sig_commitments);
-    assert!(verify_xfr_note(&mut prng, &xfr_note, &policies).is_ok());
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
 
     // 5. check tracing
     // 5.1 tracer 1

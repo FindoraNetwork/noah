@@ -1,11 +1,14 @@
+use crate::crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
 use crate::errors::ZeiError;
 use crate::serialization;
-use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
+use crate::setup::PublicParams;
+use bulletproofs::r1cs::{batch_verify, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
+use itertools::Itertools;
 use merlin::Transcript;
-use spacesuit::{cloak, AllocatedValue, CommittedValue, Value, VerifierCommittable};
+use rand_core::{CryptoRng, RngCore};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetMixProof(#[serde(with = "serialization::zei_obj_serde")] pub(crate) R1CSProof);
@@ -21,7 +24,7 @@ impl Eq for AssetMixProof {}
 /// I compute a proof that the assets were mixed correctly
 /// # Example
 /// ```
-/// use zei::xfr::asset_mixer::asset_mixer_proof;
+/// use zei::xfr::asset_mixer::prove_asset_mixing;
 /// use curve25519_dalek::scalar::Scalar;
 /// let input = [
 ///            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
@@ -39,65 +42,71 @@ impl Eq for AssetMixProof {}
 ///            (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64)),
 ///        ];
 ///
-/// let proof = asset_mixer_proof(&input, &output).unwrap();
+/// let proof = prove_asset_mixing(&input, &output).unwrap();
 ///
 /// ```
-pub fn asset_mixer_proof(inputs: &[(u64, Scalar, Scalar, Scalar)],
-                         outputs: &[(u64, Scalar, Scalar, Scalar)])
-                         -> Result<AssetMixProof, ZeiError> {
+pub fn prove_asset_mixing(inputs: &[(u64, Scalar, Scalar, Scalar)],
+                          outputs: &[(u64, Scalar, Scalar, Scalar)])
+                          -> Result<AssetMixProof, ZeiError> {
   let pc_gens = PedersenGens::default();
-  let mut prover_transcript = Transcript::new(b"TransactionTest");
+  let mut prover_transcript = Transcript::new(b"AssetMixingProof");
   let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
+  fn extract_values_and_blinds(list: &[(u64, Scalar, Scalar, Scalar)])
+                               -> (Vec<CloakValue>, Vec<CloakValue>) {
+    let values = list.iter()
+                     .map(|(amount, asset_type, _, _)| CloakValue { amount: Scalar::from(*amount),
+                                                                    asset_type: *asset_type })
+                     .collect();
+    let blinds =
+      list.iter()
+          .map(|(_, _, blind_amount, blind_asset_type)| CloakValue { amount: *blind_amount,
+                                                                     asset_type:
+                                                                       *blind_asset_type })
+          .collect();
+    (values, blinds)
+  }
+  let (in_values, in_blinds) = extract_values_and_blinds(inputs);
+  let (out_values, out_blinds) = extract_values_and_blinds(outputs);
 
-  let in_vars = allocate_values_prover(&mut prover, inputs);
-  let out_vars = allocate_values_prover(&mut prover, outputs);
+  let in_vars = in_values.iter()
+                         .zip(in_blinds.iter())
+                         .map(|(v, b)| v.commit_prover(&mut prover, b).1)
+                         .collect_vec();
+  let out_vars = out_values.iter()
+                           .zip(out_blinds.iter())
+                           .map(|(v, b)| v.commit_prover(&mut prover, b).1)
+                           .collect_vec();
   let n = in_vars.len();
   let m = out_vars.len();
 
-  cloak(&mut prover, in_vars, out_vars).map_err(|_| ZeiError::AssetMixerVerificationError)?;
+  cloak(&mut prover,
+        &in_vars,
+        Some(&in_values),
+        &out_vars,
+        Some(&out_values)).map_err(|_| ZeiError::AssetMixerVerificationError)?;
 
-  let num_gates = compute_num_wires(n, m);
+  let num_gates = asset_mix_num_generators(n, m);
   let bp_gens = BulletproofGens::new(num_gates.next_power_of_two(), 1);
   let proof = prover.prove(&bp_gens)
                     .map_err(|_| ZeiError::AssetMixerVerificationError)?;
   Ok(AssetMixProof(proof))
 }
 
-fn allocate_values_prover(prover: &mut Prover,
-                          data: &[(u64, Scalar, Scalar, Scalar)])
-                          -> Vec<AllocatedValue> {
-  let mut allocated_values = vec![];
-  for (amount, atype, blind_amount, blind_atype) in data.iter() {
-    let value = Value { q: (*amount).into(),
-                        f: *atype };
-    let (_, amount_var) = prover.commit(value.q.into(), *blind_amount);
-    let (_, asset_var) = prover.commit(value.f, *blind_atype);
-    allocated_values.push(AllocatedValue { q: amount_var,
-                                           f: asset_var,
-                                           assignment: Some(value) });
-  }
-  allocated_values
-}
-
-fn allocate_commitments_verifier(verifier: &mut Verifier,
-                                 commitments: &[(CompressedRistretto, CompressedRistretto)])
-                                 -> Vec<AllocatedValue> {
-  let mut values = vec![];
-  for (amount_com, type_com) in commitments.iter() {
-    let value = CommittedValue { q: *amount_com,
-                                 f: *type_com };
-    values.push(value);
-  }
-  values.commit(verifier)
+pub struct AssetMixingInstance<'a> {
+  pub inputs: Vec<(CompressedRistretto, CompressedRistretto)>,
+  pub outputs: Vec<(CompressedRistretto, CompressedRistretto)>,
+  pub proof: &'a AssetMixProof,
 }
 
 /// I verify that the assets were mixed correctly
 /// # Example
 /// ```
-/// use zei::xfr::asset_mixer::{asset_mixer_proof, asset_mixer_verify};
+/// use zei::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use curve25519_dalek::scalar::Scalar;
 /// use curve25519_dalek::ristretto::CompressedRistretto;
 /// use bulletproofs::PedersenGens;
+/// use rand::thread_rng;
+/// use zei::setup::PublicParams;
 /// let input = [
 ///            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
 ///            (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
@@ -114,7 +123,7 @@ fn allocate_commitments_verifier(verifier: &mut Verifier,
 ///            (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64)),
 ///        ];
 ///
-/// let proof = asset_mixer_proof(&input, &output).unwrap();
+/// let proof = prove_asset_mixing(&input, &output).unwrap();
 /// let pc_gens = PedersenGens::default();
 /// let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
 ///      input.iter()
@@ -130,48 +139,112 @@ fn allocate_commitments_verifier(verifier: &mut Verifier,
 ///               pc_gens.commit(*typ, *blind_typ).compress())
 ///            })
 ///            .collect();
-///
+///    let instance = AssetMixingInstance{
+///        inputs: input_coms,
+///        outputs: output_coms,
+///        proof: &proof
+///    };
+///    let mut prng = thread_rng();
+///    let mut params = PublicParams::new();
 ///    assert_eq!(Ok(()),
-///               asset_mixer_verify(&input_coms, &output_coms, &proof));
+///               batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
 /// ```
-pub fn asset_mixer_verify(inputs: &[(CompressedRistretto, CompressedRistretto)],
-                          outputs: &[(CompressedRistretto, CompressedRistretto)],
-                          proof: &AssetMixProof)
-                          -> Result<(), ZeiError> {
-  let mut verifier_transcript = Transcript::new(b"TransactionTest");
-  let mut verifier = Verifier::new(&mut verifier_transcript);
+pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(prng: &mut R,
+                                                         params: &mut PublicParams,
+                                                         instances: &[AssetMixingInstance])
+                                                         -> Result<(), ZeiError> {
+  let mut max_circuit_size = 0;
+  let mut transcripts = Vec::with_capacity(instances.len());
+  let mut verifiers = Vec::with_capacity(instances.len());
+  for _ in 0..instances.len() {
+    transcripts.push(Transcript::new(b"AssetMixingProof"));
+  }
+  for (instance, transcript) in instances.iter().zip(transcripts.iter_mut()) {
+    let mut verifier = Verifier::new(transcript);
+    prepare_asset_mixer_verifier(&mut verifier, instance)?;
+    let circuit_size = asset_mix_num_generators(instance.inputs.len(), instance.outputs.len());
+    if circuit_size > max_circuit_size {
+      max_circuit_size = circuit_size;
+    }
+    verifiers.push((verifier, &instance.proof.0));
+  }
 
-  let in_coms = allocate_commitments_verifier(&mut verifier, inputs);
-  let out_coms = allocate_commitments_verifier(&mut verifier, outputs);
-  let n = in_coms.len();
-  let m = out_coms.len();
-
-  cloak(&mut verifier, in_coms, out_coms).map_err(|_| ZeiError::AssetMixerVerificationError)?;
-
-  let pc_gens = PedersenGens::default();
-  let num_gates = compute_num_wires(n, m);
-  let bp_gens = BulletproofGens::new(num_gates.next_power_of_two(), 1);
-  verifier.verify(&proof.0, &pc_gens, &bp_gens)
-          .map_err(|_| ZeiError::AssetMixerVerificationError)
+  max_circuit_size = max_circuit_size.next_power_of_two();
+  if params.bp_circuit_gens.gens_capacity < max_circuit_size {
+    // info(format!("Zei: Increasing bulletproofs gens {} before batch verify asset mixing proofs", max_circuit_size));
+    params.increase_circuit_gens(max_circuit_size);
+    // info!("Zei: Bulletproof gens increased");
+  }
+  batch_verify(prng, verifiers, &params.pc_gens, &params.bp_circuit_gens).map_err(|_| {
+                                                            ZeiError::AssetMixerVerificationError
+                                                          })
 }
 
-fn compute_num_wires(n: usize, m: usize) -> usize {
-  let max = std::cmp::max(n, m);
-  let min = std::cmp::min(n, m);
+pub(crate) fn prepare_asset_mixer_verifier(verifier: &mut Verifier<&mut Transcript>,
+                                           instance: &AssetMixingInstance)
+                                           -> Result<usize, ZeiError> {
+  let in_cloak = instance.inputs
+                         .iter()
+                         .map(|(amount, asset_type)| CloakCommitment { amount: *amount,
+                                                                       asset_type: *asset_type })
+                         .collect_vec();
 
-  // k-mix(n) + k-mix(m) + shuffle(n) + shuffle(m) + padded_shuffle(max(n,m)
-  // k-mix(l) = 4*l - 4
-  // shuffle(l) = l + 2 * (l - 1)
-  // padded_shuffle(n,m) = max(m,n) - min(m,n) + shuffle(max(m,n) = max- min - 3*max - 2
-  // range proof 64
+  let out_cloak = instance.outputs
+                          .iter()
+                          .map(|(amount, asset_type)| CloakCommitment { amount: *amount,
+                                                                        asset_type: *asset_type })
+                          .collect_vec();
 
-  7 * n - 6 + 7 * m - 6 + (max - min) + 3 * max - 2 + 64 * m
+  let in_vars = in_cloak.iter()
+                        .map(|com| com.commit_verifier(verifier))
+                        .collect_vec();
+  let out_vars = out_cloak.iter()
+                          .map(|com| com.commit_verifier(verifier))
+                          .collect_vec();
+
+  crate::crypto::bp_circuits::cloak::cloak(
+    verifier,
+    &in_vars,
+    None,
+    &out_vars,
+    None).map_err(|_| ZeiError::AssetMixerVerificationError)
+}
+
+fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
+  let max = std::cmp::max(n_input, n_output);
+  let min = std::cmp::min(n_input, n_output);
+
+  let input_wires = n_input + n_output;
+  let pad = max - min; // extra wires needed for padding merged input or merged output length
+  let shuffle_input = 3 * n_input - 2; // n_input to bind amount and asset to same variable (2*n_inputs-2)  mult gates
+  let shuffle_output = 3 * n_output - 2; // n_outputs to bind amount and asset to same variable (2*n_outputs-2)  mult gates
+  let shuffle_mid = 3 * max - 2; // max to bind amount and asset to same variable (2*max-2)  mult gates
+  let merge_input_mid_wires = n_input - 2; // merge require n_input - 2 additional wires
+  let merge_output_mid_wires = n_output - 2; // merge require n_input - 2 additional wires
+  let merge_input = 2 * n_input - 1; // n_input additional wires n_input - 1 mult gates // TODO (fernando) why do we need additional wires here
+  let merge_output = 2 * n_output - 1; // n_output additional wires n_output - 1 mult gates
+  let range_proof = 64 * n_output; // 64 gates per output
+
+  input_wires
+  + pad
+  + merge_input_mid_wires
+  + merge_output_mid_wires
+  + shuffle_input
+  + shuffle_output
+  + shuffle_mid
+  + range_proof
+  + merge_input
+  + merge_output
 }
 #[cfg(test)]
 mod test {
+  use crate::setup::PublicParams;
+  use crate::xfr::asset_mixer::AssetMixingInstance;
   use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::CompressedRistretto;
   use curve25519_dalek::scalar::Scalar;
+  use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   #[test]
   fn test_asset_mixer() {
@@ -188,7 +261,7 @@ mod test {
                   (10u64, Scalar::from(0u8), Scalar::from(10009u64), Scalar::from(200009u64)),
                   (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64))];
 
-    let proof = super::asset_mixer_proof(&input, &output).unwrap();
+    let proof = super::prove_asset_mixing(&input, &output).unwrap();
 
     let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
       input.iter()
@@ -205,7 +278,12 @@ mod test {
             })
             .collect();
 
+    let instance = AssetMixingInstance { inputs: input_coms,
+                                         outputs: output_coms,
+                                         proof: &proof };
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut params = PublicParams::new();
     assert_eq!(Ok(()),
-               super::asset_mixer_verify(&input_coms, &output_coms, &proof));
+               super::batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
   }
 }

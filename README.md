@@ -37,13 +37,41 @@ Support:
 
 # Benchmarks
 
-Benchmarks are available for XfrNote operations. To produce them:
+## Use the benchmarks
+
+Benchmarks are available for XfrNote operations. To run them all:
 
 ```
 > cargo bench
 ```
 
 The report is available at `target/criterion/report/ndex.html`.
+
+
+To run a specific benchmark:
+```
+> cargo bench --bench {xfr_batch | xfr_{note|body}_{noidtracking|idtracking}_{assettracking|noassettracking}_{singleasset|multiasset}}_{time|cycles}
+```
+
+For example to run the benchmark for xfr notes with identity tracking, and no asset tracking for a single asset, run:
+```
+> cargo bench --bench xfr_note_idtracking_noassettracking_singleasset_time
+```
+
+The benchmarks involving batch verification can be run with:
+```
+> cargo bench --bench xfr_note_batch_time
+```
+
+Note that not all the combinations are implemented yet. So far the benchmarks available are 
+(replace `time`by `cycles` if you want the # of cpu cycles instead of seconds):
+
+* `xfr_note_noidtracking_noassettracking_singleasset_time`
+* `xfr_note_idtracking_noassettracking_singleasset_time`
+* `xfr_note_idtracking_assettracking_multiasset_time`
+* `xfr_note_idtracking_assettracking_singleasset_time`
+* `xfr_body_idtracking_assettracking_singleasset_time`
+* `xfr_note_batch_time`
 
 # Development environment setup
 

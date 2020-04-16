@@ -46,6 +46,7 @@ use bulletproofs::r1cs::{
 use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
+use merlin::Transcript;
 
 /// Represent AssetRecord amount and asset type
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -64,7 +65,7 @@ impl CloakValue {
   /// Prover commits to amount and asset type using user provided blinding factors
   /// Returns commitments and circuit variables
   pub fn commit_prover(&self,
-                       prover: &mut Prover,
+                       prover: &mut Prover<&mut Transcript>,
                        blinds: &CloakValue)
                        -> (CloakCommitment, CloakVariable) {
     let (amount_com, amount_var) = prover.commit(self.amount, blinds.amount);
@@ -97,7 +98,7 @@ pub struct CloakCommitment {
 
 impl CloakCommitment {
   /// Verifier produce circuit variables corresponding to this commitment
-  pub fn commit_verifier(&self, verifier: &mut Verifier) -> CloakVariable {
+  pub fn commit_verifier(&self, verifier: &mut Verifier<&mut Transcript>) -> CloakVariable {
     CloakVariable { amount: verifier.commit(self.amount),
                     asset_type: verifier.commit(self.asset_type) }
   }
@@ -144,7 +145,7 @@ pub fn cloak<CS: RandomizableConstraintSystem>(cs: &mut CS,
 
   // final range proof:
   for (i, out) in output_vars.iter().enumerate() {
-    super::gadgets::range_proof_64(
+    n_gates += super::gadgets::range_proof_64(
       cs,
       out.amount.into(),
       output_values.map(|out_values| out_values[i].amount))
@@ -167,12 +168,12 @@ fn pad<CS: ConstraintSystem>(cs: &mut CS,
   Ok(())
 }
 
-// sorts the input list by asset_type, in order of appearance in the list
+// sorts the input list by asset_type
 fn sort(input: &[CloakValue]) -> Vec<CloakValue> {
   let mut sorted_values = input.to_vec();
   let mut i = 0;
   while i < input.len() {
-    let asset_type = input[i].asset_type;
+    let asset_type = sorted_values[i].asset_type;
     let mut swap_index = input.len() - 1;
     let mut j = i + 1;
     while j < swap_index {
@@ -289,8 +290,9 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
   use crate::crypto::bp_circuits::cloak::{CloakCommitment, CloakValue};
+  use ::lazy_static::lazy_static;
   use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
   use curve25519_dalek::scalar::Scalar;
@@ -298,6 +300,31 @@ mod tests {
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
+
+  // Taken from https://github.com/stellar/slingshot/tree/main/cloak
+  fn yuan(q: u64) -> CloakValue {
+    CloakValue { amount: q.into(),
+                 asset_type: 888u64.into() }
+  }
+
+  fn peso(q: u64) -> CloakValue {
+    CloakValue { amount: q.into(),
+                 asset_type: 666u64.into() }
+  }
+
+  fn euro(q: u64) -> CloakValue {
+    CloakValue { amount: q.into(),
+                 asset_type: 444u64.into() }
+  }
+
+  fn zero() -> CloakValue {
+    CloakValue { amount: Scalar::zero(),
+                 asset_type: Scalar::zero() }
+  }
+
+  lazy_static! {
+    static ref BP_GENS: BulletproofGens = BulletproofGens::new(2048, 1);
+  }
 
   #[test]
   fn merge() {
@@ -321,10 +348,7 @@ mod tests {
     assert_eq!(&added[..], &expected[..]);
   }
 
-  fn test_cloak(inputs: &[CloakValue],
-                outputs: &[CloakValue],
-                pass: bool,
-                bp_gens: &BulletproofGens) {
+  pub(crate) fn test_cloak(inputs: &[CloakValue], outputs: &[CloakValue], pass: bool) {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let input_coms: Vec<CloakCommitment>;
     let output_coms: Vec<CloakCommitment>;
@@ -332,7 +356,6 @@ mod tests {
     let proof: R1CSProof;
     {
       // prover scope
-
       let mut prover_transcript = Transcript::new(b"test");
       let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
       let in_com_and_vars = inputs.iter()
@@ -348,8 +371,8 @@ mod tests {
       let out_com_and_vars = outputs.iter()
                                     .map(|output| {
                                       output.commit_prover(&mut prover,
-                                      &CloakValue::new(Scalar::random(&mut prng),
-                                                       Scalar::random(&mut prng)))
+                               &CloakValue::new(Scalar::random(&mut prng),
+                                                Scalar::random(&mut prng)))
                                     })
                                     .collect_vec();
       output_coms = out_com_and_vars.iter().map(|(com, _)| *com).collect_vec();
@@ -361,11 +384,11 @@ mod tests {
                                  &output_vars,
                                  Some(outputs)).unwrap();
 
-      assert!(n_gates <= bp_gens.gens_capacity,
+      assert!(n_gates <= BP_GENS.gens_capacity,
               format!("Increase number of bp generators to {}",
                       n_gates.next_power_of_two()));
 
-      proof = prover.prove(&bp_gens).unwrap();
+      proof = prover.prove(&BP_GENS).unwrap();
     }
     {
       // verifier scope
@@ -381,45 +404,195 @@ mod tests {
 
       super::cloak(&mut verifier, &in_vars, None, &out_vars, None).unwrap();
 
-      assert_eq!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok(), pass);
+      assert_eq!(verifier.verify(&proof, &pc_gens, &BP_GENS).is_ok(), pass);
     }
   }
-  #[test]
-  fn cloak() {
-    let bp_gens = BulletproofGens::new(10000, 1);
-    test_cloak(&[], &[], true, &bp_gens);
 
+  fn test_range_proof(in1: Scalar, in2: Scalar, pass: bool) {
     let asset_type0 = Scalar::from(0u8);
-    let v_10_0 = CloakValue::new(Scalar::from(10u8), asset_type0);
-    test_cloak(&[v_10_0], &[v_10_0], true, &bp_gens);
-    let v_20_0 = CloakValue::new(Scalar::from(20u8), asset_type0);
-    test_cloak(&[v_20_0], &[v_10_0, v_10_0], true, &bp_gens);
-    test_cloak(&[v_10_0, v_10_0], &[v_20_0], true, &bp_gens);
-    test_cloak(&[v_10_0, v_10_0, v_20_0], &[v_20_0, v_20_0], true, &bp_gens);
-    test_cloak(&[v_10_0, v_20_0], &[v_20_0, v_20_0], false, &bp_gens);
 
-    let asset_type1 = Scalar::from(1u8);
-    let v_10_1 = CloakValue::new(Scalar::from(10u8), asset_type1);
-    test_cloak(&[v_10_1], &[v_10_1], true, &bp_gens);
-    test_cloak(&[v_10_1, v_20_0], &[v_10_1, v_20_0], true, &bp_gens);
-    test_cloak(&[v_10_1, v_20_0, v_10_1, v_20_0],
-               &[v_10_1, v_20_0, v_10_1, v_20_0],
-               true,
-               &bp_gens);
-    let v_0_1 = CloakValue::new(Scalar::from(0u8), asset_type1);
-    let v_0_0 = CloakValue::new(Scalar::from(0u8), asset_type0);
-    test_cloak(&[v_0_1, v_0_1, v_10_1, v_20_0, v_10_1, v_20_0],
-               &[v_10_1, v_20_0, v_10_1, v_0_0, v_20_0],
-               true,
-               &bp_gens);
+    let v_in_1 = CloakValue::new(in1, asset_type0);
+    let v_in_2 = CloakValue::new(in2, asset_type0);
 
-    // make range proof fail
-    let v_1_0 = CloakValue::new(Scalar::from(1u8), asset_type0);
-    let amount_2_63 = Scalar::from(1u64 << 63);
-    let amount_2_63_minus1: Scalar = amount_2_63 - Scalar::one();
-    let v_out_pos = CloakValue::new(amount_2_63, asset_type0);
-    let v_out_neg = CloakValue::new(-amount_2_63_minus1, asset_type0);
-    assert_eq!(amount_2_63 - amount_2_63_minus1, Scalar::one());
-    test_cloak(&[v_1_0], &[v_out_pos, v_out_neg], false, &bp_gens);
+    let out = in1 + in2;
+    let v_out = CloakValue::new(out, asset_type0);
+
+    assert_eq!(in1 + in2, out);
+    test_cloak(&[v_in_1, v_in_2], &[v_out], pass);
+  }
+
+  #[test]
+  fn range_proofs() {
+    // Range proof verifies
+    test_range_proof(Scalar::from(u64::MAX - 1), Scalar::one(), true);
+
+    // Range proof does not verifies due to overflow in output
+    test_range_proof(Scalar::from(u64::MAX), Scalar::one(), false);
+  }
+
+  #[test]
+  fn cloak_misc() {
+    test_cloak(&[], &[], true);
+    test_cloak(&[yuan(10)], &[yuan(10)], true);
+    test_cloak(&[yuan(20)], &[yuan(10), yuan(10)], true);
+    test_cloak(&[yuan(10), yuan(10)], &[yuan(20)], true);
+    test_cloak(&[yuan(10), yuan(10), yuan(20)], &[yuan(20), yuan(20)], true);
+    test_cloak(&[yuan(10), yuan(20)], &[yuan(20), yuan(20)], false);
+    test_cloak(&[peso(10)], &[peso(10)], true);
+    test_cloak(&[peso(10), yuan(20)], &[peso(10), yuan(20)], true);
+    test_cloak(&[peso(10), yuan(20), peso(10), yuan(20)],
+               &[peso(10), yuan(20), peso(10), yuan(20)],
+               true);
+    test_cloak(&[peso(0), peso(0), peso(10), yuan(20), peso(10), yuan(20)],
+               &[peso(10), yuan(20), peso(10), yuan(0), yuan(20)],
+               true);
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////
+  // Port of https://github.com/stellar/slingshot/blob/main/cloak/tests/cloak.rs        //
+  ////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // m=1, n=1
+  #[test]
+  fn cloak_1_1() {
+    test_cloak(&[yuan(1)], &[yuan(1)], true);
+    test_cloak(&[peso(4)], &[peso(4)], true);
+    test_cloak(&[yuan(1)], &[peso(4)], false);
+  }
+
+  // max(m, n) = 2
+  #[test]
+  fn cloak_uneven_2() {
+    test_cloak(&[yuan(3)], &[yuan(1), yuan(2)], true);
+    test_cloak(&[yuan(1), yuan(2)], &[yuan(3)], true);
+  }
+
+  // m=2, n=2
+  #[test]
+  fn cloak_2_2() {
+    // Only shuffle (all different flavors)
+    test_cloak(&[yuan(1), peso(4)], &[yuan(1), peso(4)], true);
+    test_cloak(&[yuan(1), peso(4)], &[peso(4), yuan(1)], true);
+
+    // Middle shuffle & merge & split (has multiple inputs or outputs of same flavor)
+    test_cloak(&[peso(4), peso(4)], &[peso(4), peso(4)], true);
+    test_cloak(&[peso(5), peso(3)], &[peso(5), peso(3)], true);
+    test_cloak(&[peso(5), peso(3)], &[peso(1), peso(7)], true);
+    test_cloak(&[peso(1), peso(8)], &[peso(0), peso(9)], true);
+    test_cloak(&[yuan(1), yuan(1)], &[peso(4), yuan(1)], false);
+  }
+
+  // m=3, n=3
+  #[test]
+  fn cloak_3_3() {
+    // Only shuffle
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[yuan(1), peso(4), euro(8)],
+               true);
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[yuan(1), euro(8), peso(4)],
+               true);
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[peso(4), yuan(1), euro(8)],
+               true);
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[peso(4), euro(8), yuan(1)],
+               true);
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[euro(8), yuan(1), peso(4)],
+               true);
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[euro(8), peso(4), yuan(1)],
+               true);
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[yuan(2), peso(4), euro(8)],
+               false);
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[yuan(1), euro(4), euro(8)],
+               false);
+    test_cloak(&[yuan(1), peso(4), euro(8)],
+               &[yuan(1), peso(4), euro(9)],
+               false);
+
+    // Middle shuffle & merge & split
+    test_cloak(&[yuan(1), yuan(1), peso(4)],
+               &[yuan(1), yuan(1), peso(4)],
+               true);
+    test_cloak(&[yuan(4), yuan(3), peso(4)],
+               &[yuan(2), yuan(5), peso(4)],
+               true);
+    test_cloak(&[yuan(4), yuan(3), peso(4)],
+               &[peso(4), yuan(2), yuan(5)],
+               true);
+    test_cloak(&[yuan(1), yuan(2), yuan(5)],
+               &[yuan(4), yuan(3), yuan(1)],
+               true);
+    test_cloak(&[yuan(1), yuan(2), yuan(5)],
+               &[yuan(4), yuan(3), yuan(10)],
+               false);
+
+    // End shuffles & merge & split & middle shuffle
+    // (multiple asset types that need to be grouped and merged or split)
+    test_cloak(&[yuan(1), peso(4), yuan(1)],
+               &[yuan(1), yuan(1), peso(4)],
+               true);
+    test_cloak(&[yuan(4), peso(4), yuan(3)],
+               &[peso(3), yuan(7), peso(1)],
+               true);
+  }
+
+  // max(m, n) = 3
+  #[test]
+  fn cloak_uneven_3() {
+    test_cloak(&[yuan(4), yuan(4), yuan(3)], &[yuan(11)], true);
+    test_cloak(&[yuan(11)], &[yuan(4), yuan(4), yuan(3)], true);
+    test_cloak(&[yuan(11), peso(4)], &[yuan(4), yuan(7), peso(4)], true);
+    test_cloak(&[yuan(4), yuan(7), peso(4)], &[yuan(11), peso(4)], true);
+    test_cloak(&[yuan(5), yuan(6)], &[yuan(4), yuan(4), yuan(3)], true);
+    test_cloak(&[yuan(4), yuan(4), yuan(3)], &[yuan(5), yuan(6)], true);
+  }
+
+  // m=4, n=4
+  #[test]
+  fn cloak_4_4() {
+    // Only shuffle
+    test_cloak(&[yuan(1), peso(4), euro(7), euro(10)],
+               &[yuan(1), peso(4), euro(7), euro(10)],
+               true);
+
+    test_cloak(&[yuan(1), peso(4), euro(7), euro(10)],
+               &[euro(7), yuan(1), euro(10), peso(4)],
+               true);
+
+    // Middle shuffle & merge & split
+    test_cloak(&[yuan(1), yuan(1), peso(4), peso(4)],
+               &[yuan(1), yuan(1), peso(4), peso(4)],
+               true);
+    test_cloak(&[yuan(4), yuan(3), peso(4), peso(4)],
+               &[yuan(2), yuan(5), peso(1), peso(7)],
+               true);
+    test_cloak(&[yuan(4), yuan(3), peso(4), peso(4)],
+               &[peso(1), peso(7), yuan(2), yuan(5)],
+               true);
+    test_cloak(&[yuan(1), yuan(1), yuan(5), yuan(2)],
+               &[yuan(1), yuan(1), yuan(5), yuan(2)],
+               true);
+    test_cloak(&[yuan(1), yuan(2), yuan(5), yuan(2)],
+               &[yuan(4), yuan(3), yuan(3), zero()],
+               true);
+    test_cloak(&[yuan(1), yuan(2), yuan(5), yuan(2)],
+               &[yuan(4), yuan(3), yuan(3), yuan(20)],
+               false);
+
+    // End shuffles & merge & split & middle shuffle
+    test_cloak(&[yuan(1), peso(4), yuan(1), peso(4)],
+               &[peso(4), yuan(1), yuan(1), peso(4)],
+               true);
+    test_cloak(&[yuan(4), peso(4), peso(4), yuan(3)],
+               &[peso(1), yuan(2), yuan(5), peso(7)],
+               true);
+    test_cloak(&[yuan(10), peso(1), peso(2), peso(3)],
+               &[yuan(5), yuan(4), yuan(1), peso(6)],
+               true);
   }
 }

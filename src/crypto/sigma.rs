@@ -147,42 +147,67 @@ pub fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &
 }
 
 #[allow(non_snake_case)]
-#[allow(clippy::needless_range_loop)]
-fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(prng: &mut R,
-                                                                             elems: &[&G], // all public group elements
-                                                                             matrix: &[Vec<usize>], // matrix defining LHS of constrains
-                                                                             rhs: &[usize], // RHS of constrant
-                                                                             responses: &[S], // proof challenge responses
-                                                                             challenge: &S // challenge
+fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R,
+                                                                n_elems: usize, // all public group elements
+                                                                matrix: &[Vec<usize>], // matrix defining LHS of constrains
+                                                                rhs: &[usize], // RHS of constrant
+                                                                responses: &[S], // proof challenge responses
+                                                                challenge: &S    // challenge
 ) -> Vec<S> {
   // verifier needs to check that matrix * responses = challenge * rhs + proof_commitment
-  // rows are merges using a random linear combination
+  // rows are merged using a random linear combination
   // this functions collects the scalars factors for each element in order to apply a single
   // multiexponentiation to verify all equations
-  let n = elems.len();
-  let mut s = vec![S::from_u32(0); n + rhs.len()]; // n elements + m proof commitments
+  let mut s = vec![S::from_u32(0); n_elems + rhs.len()]; // n elements + m proof commitments
   let mut alphas = vec![]; // linear combination scalars
                            // find in the matrix each element and multiply corresponding response by alpha
   for (j, row) in matrix.iter().enumerate() {
     let alpha = S::random_scalar(prng);
-    for i in 0..elems.len() {
+    for (i, s_i) in s[0..n_elems].iter_mut().enumerate() {
       for (elem_index, r) in row.iter().zip(responses) {
         if i == *elem_index {
-          s[i] = s[i].add(&alpha.mul(r))
+          *s_i = s_i.add(&alpha.mul(r))
         }
       }
     }
-    s[n + j] = s[n + j].sub(&alpha);
+    s[n_elems + j] = s[n_elems + j].sub(&alpha);
     alphas.push(alpha);
   }
   for (elem_index, alpha) in rhs.iter().zip(alphas.iter()) {
-    for i in 0..elems.len() {
+    for (i, s_i) in s[0..n_elems].iter_mut().enumerate() {
       if i == *elem_index {
-        s[i] = s[i].sub(&alpha.mul(challenge));
+        *s_i = s_i.sub(&alpha.mul(challenge));
       }
     }
   }
   s
+}
+
+/// Returns a scalar vector for a sigma protocol proof verification. The scalars can then be used
+/// in a single multi-exponentiation to verify the proof. The associated elements are elems
+/// concatenated wit proof.commitments.
+pub fn sigma_verify_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
+                                                                            prng: &mut R, //use of for linear combination multiexp
+                                                                            elems: &[&G],
+                                                                            lhs_matrix: &[Vec<usize>],
+                                                                            rhs_vec: &[usize],
+                                                                            proof: &SigmaProof<S,
+                                                                                     G>)
+                                                                            -> Vec<S> {
+  assert_eq!(lhs_matrix.len(), rhs_vec.len());
+  assert_eq!(rhs_vec.len(), proof.commitments.len());
+
+  init_sigma_protocol::<S, G>(transcript, elems);
+  for c in proof.commitments.iter() {
+    transcript.append_proof_commitment(c);
+  }
+  let challenge = transcript.get_challenge::<S>();
+  collect_multi_exp_scalars(prng,
+                            elems.len(),
+                            lhs_matrix,
+                            rhs_vec,
+                            &proof.responses,
+                            &challenge)
 }
 
 /// Simple Sigma protocol PoK verification for the statement `lhs_matrix` * `secrets_scalars` = `rhs_vec`
@@ -194,21 +219,9 @@ pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: 
                                                                     rhs_vec: &[usize],
                                                                     proof: &SigmaProof<S, G>)
                                                                     -> Result<(), ZeiError> {
-  assert_eq!(lhs_matrix.len(), rhs_vec.len());
-  assert_eq!(rhs_vec.len(), proof.commitments.len());
+  let multi_exp_scalars = sigma_verify_scalars(transcript, prng, elems, lhs_matrix, rhs_vec, proof);
 
-  init_sigma_protocol::<S, G>(transcript, elems);
-  for c in proof.commitments.iter() {
-    transcript.append_proof_commitment(c);
-  }
-  let challenge = transcript.get_challenge::<S>();
-  let me_scalars = collect_multi_exp_scalars(prng,
-                                             elems,
-                                             lhs_matrix,
-                                             rhs_vec,
-                                             &proof.responses,
-                                             &challenge);
-  let scalars_as_ref = me_scalars.iter().map(|s| s).collect_vec();
+  let scalars_as_ref = multi_exp_scalars.iter().map(|s| s).collect_vec();
   let mut me_elems = vec![];
   for e in elems {
     me_elems.push(*e);

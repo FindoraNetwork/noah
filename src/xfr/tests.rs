@@ -11,11 +11,12 @@ pub(crate) mod tests {
   use crate::errors::ZeiError::{
     XfrVerifyAssetTracingAssetAmountError, XfrVerifyAssetTracingIdentityError,
   };
+  use crate::setup::PublicParams;
   use crate::utils::u64_to_u32_pair;
   use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::lib::{
-    compute_transfer_multisig, gen_xfr_note, verify_xfr_body, verify_xfr_body_asset_records,
-    verify_xfr_note,
+    batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
+    gen_xfr_note, verify_xfr_body, verify_xfr_note,
   };
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
@@ -63,7 +64,8 @@ pub(crate) mod tests {
     keys
   }
 
-  fn do_transfer_tests_single_asset(inputs_template: &[AssetRecordType],
+  fn do_transfer_tests_single_asset(params: &mut PublicParams,
+                                    inputs_template: &[AssetRecordType],
                                     outputs_template: &[AssetRecordType]) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
@@ -111,8 +113,16 @@ pub(crate) mod tests {
 
     // test 1: simple transfer
     assert_eq!(Ok(()),
-               verify_xfr_note(&mut prng, &xfr_note, &Default::default()),
+               verify_xfr_note(&mut prng, params, &xfr_note, &Default::default()),
                "Simple transaction should verify ok");
+
+    // 1.1 test batching
+    assert_eq!(Ok(()),
+               batch_verify_xfr_notes(&mut prng,
+                                      params,
+                                      &[&xfr_note, &xfr_note, &xfr_note],
+                                      &[&Default::default(); 3]),
+               "batch verify");
 
     // test 2: overflow transfer
     let old_output3: AssetRecord = outputs[3].clone();
@@ -155,7 +165,7 @@ pub(crate) mod tests {
       }
     }
 
-    assert!(verify_xfr_body_asset_records(&mut prng, &xfr_note.body).is_err(),
+    assert!(batch_verify_xfr_body_asset_records(&mut prng, params, &[&xfr_note.body]).is_err(),
             "Confidential transfer with invalid amounts should fail verification");
 
     //test 3: one output asset type different from rest
@@ -184,7 +194,7 @@ pub(crate) mod tests {
                                     inkeys_ref.as_slice()).unwrap();
 
     // check state is clean
-    assert!(verify_xfr_body_asset_records(&mut prng, &xfr_note.body).is_ok());
+    assert!(batch_verify_xfr_body_asset_records(&mut prng, params, &[&xfr_note.body]).is_ok());
     // modify xfr_note asset on an output
 
     let old_output1 = outputs[1].clone();
@@ -199,7 +209,7 @@ pub(crate) mod tests {
                                              .compress()),
     };
     xfr_note.body.outputs[1] = out1;
-    assert!(verify_xfr_body_asset_records(&mut prng, &xfr_note.body).is_err(),
+    assert!(batch_verify_xfr_body_asset_records(&mut prng, params, &[&xfr_note.body]).is_err(),
             "Transfer with different asset types should fail verification");
 
     //test 4:  one input asset different from rest
@@ -241,143 +251,155 @@ pub(crate) mod tests {
                                              .compress()),
     };
     xfr_note.body.inputs[1] = in1;
-    assert!(verify_xfr_body_asset_records(&mut prng, &xfr_note.body).is_err(),
+    assert!(batch_verify_xfr_body_asset_records(&mut prng, params, &[&xfr_note.body]).is_err(),
             "Confidential transfer with different asset types should fail verification ok");
   }
 
   mod single_asset_no_tracking {
 
     use super::*;
+    use crate::setup::PublicParams;
 
     #[test]
     fn test_transfer_not_confidential() {
       /*! Test non confidential transfers*/
-
+      let mut params = PublicParams::new();
       let inputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 4];
       let outputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_confidential_amount_plain_asset() {
-      /*! Test confidential amount in all inputs and all outputstransfers*/
+      /*! Test confidential amount in all inputs and all outputs transfers*/
+      let mut params = PublicParams::new();
       let inputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType; 4];
       let outputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_confidential_asset_plain_amount() {
       /*! Test confidential asset types in all inputs and all outputs transfers*/
+      let mut params = PublicParams::new();
       let inputs_template = [AssetRecordType::NonConfidentialAmount_ConfidentialAssetType; 4];
       let outputs_template = [AssetRecordType::NonConfidentialAmount_ConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_confidential() {
       /*! Test confidential amount and confidential asset in all inputs and outputs*/
+      let mut params = PublicParams::new();
       let inputs_template = [AssetRecordType::ConfidentialAmount_ConfidentialAssetType; 4];
       let outputs_template = vec![AssetRecordType::ConfidentialAmount_ConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_input_some_amount_confidential_output_non_confidential() {
       /*! Test confidential amount in some inputs transfers*/
+      let mut params = PublicParams::new();
       let inputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
                              AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType];
 
       let outputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_inputs_some_asset_confidential_output_non_confidential() {
       /*! Test confidential asset_types in some inputs transfers*/
+      let mut params = PublicParams::new();
       let inputs_template = [AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType];
 
       let outputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_input_some_confidential_amount_and_asset_type_output_non_confidential() {
       /*! Test confidential amount and asset type in some input AssetRecords transfers*/
+      let mut params = PublicParams::new();
       let inputs_template = [AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
                              AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType];
 
       let outputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_input_some_confidential_amount_other_confidential_asset_type_output_non_confidential(
       ) {
       /*! Test confidential amount in some input and confidential asset type in other input AssetRecords transfers*/
+      let mut params = PublicParams::new();
       let inputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                              AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType];
 
       let outputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_output_some_amount_confidential_input_non_confidential() {
       /*! Test confidential amount in some outputs transfers*/
+      let mut params = PublicParams::new();
       let outputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
                               AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType];
 
       let inputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_output_some_asset_confidential_input_non_confidential() {
       /*! Test some confidential asset types in the output transfers*/
+      let mut params = PublicParams::new();
       let outputs_template = [AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType];
 
       let inputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_output_some_confidential_amount_and_asset_type_input_non_confidential() {
       /*! I test confidential amount and asset type in some output AssetRecords transfers*/
+      let mut params = PublicParams::new();
       let outputs_template = [AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
                               AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType];
 
       let inputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
 
     #[test]
     fn test_transfer_output_some_confidential_amount_other_confidential_asset_type_input_non_confidential(
       ) {
       /*! I test confidential amount in some output and confidential asset type in other output AssetRecords transfers*/
+      let mut params = PublicParams::new();
       let outputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType];
 
       let inputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
-      do_transfer_tests_single_asset(&inputs_template, &outputs_template);
+      do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
     }
   }
 
@@ -388,6 +410,7 @@ pub(crate) mod tests {
     #[test]
     fn do_multiasset_transfer_tests() {
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_type0 = [0u8; 16];
       let asset_type1 = [1u8; 16];
@@ -433,7 +456,7 @@ pub(crate) mod tests {
 
       // test 1: simple transfer using confidential asset mixer
       assert_eq!(Ok(()),
-                 verify_xfr_note(&mut prng, &xfr_note, &Default::default()),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()),
                  "Multi asset transfer confidential");
 
       let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
@@ -474,7 +497,7 @@ pub(crate) mod tests {
                                             inkeys_ref.as_slice());
 
       assert_eq!(Ok(()),
-                 verify_xfr_note(&mut prng, &xfr_note, &Default::default()),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()),
                  "Multi asset transfer non confidential");
 
       xfr_note.body.inputs[0].amount = XfrAmount::NonConfidential(8u64);
@@ -482,7 +505,7 @@ pub(crate) mod tests {
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys_ref.as_slice()).unwrap();
 
       assert_eq!(Err(ZeiError::XfrVerifyAssetAmountError),
-                 verify_xfr_note(&mut prng, &xfr_note, &Default::default()),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()),
                  "Multi asset transfer non confidential");
     }
   }
@@ -560,6 +583,7 @@ pub(crate) mod tests {
     #[test]
     fn test_identity_tracking() {
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let addr = b"0x7789654"; // receiver address
 
@@ -626,12 +650,13 @@ pub(crate) mod tests {
                                           vec![&tracking_policy],
                                           vec![Some(&sig_commitment)]);
 
-      assert_eq!(verify_xfr_note(&mut prng, &xfr_note, &policies), Ok(()));
+      assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
+                 Ok(()));
       let policies = XfrNotePolicies::new(vec![&tracking_policy],
                                           vec![Some(&sig_commitment)],
                                           vec![null_policies_input],
                                           vec![None; 1]);
-      assert_eq!(verify_xfr_note(&mut prng, &xfr_note, &policies),
+      assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
                  Err(XfrVerifyAssetTracingIdentityError),);
 
       //test serialization
@@ -683,7 +708,8 @@ pub(crate) mod tests {
       proof
     }
 
-    fn do_test_asset_tracking(input_templates: &[(AssetRecordType,
+    fn do_test_asset_tracking(params: &mut PublicParams,
+                              input_templates: &[(AssetRecordType,
                                  &AssetTracingPolicies,
                                  &AssetTracerKeyPair,
                                  AssetType)],
@@ -753,7 +779,7 @@ pub(crate) mod tests {
                                           output_sig_commitment.clone());
 
       // test 1: the verification is successful
-      assert_eq!(verify_xfr_body(&mut prng, &xfr_body.clone(), &policies),
+      assert_eq!(verify_xfr_body(&mut prng, params, &xfr_body.clone(), &policies),
                  Ok(()),
                  "Simple transaction should verify ok");
 
@@ -802,14 +828,14 @@ pub(crate) mod tests {
                                             output_policies.clone(),
                                             output_sig_commitment.clone());
 
-        assert_eq!(verify_xfr_body(&mut prng, &new_xfr_body, &policies),
+        assert_eq!(verify_xfr_body(&mut prng, params, &new_xfr_body, &policies),
                    Err(XfrVerifyAssetTracingAssetAmountError),
                    "Asset tracking verification fails as the ciphertext has been altered.");
       }
 
       // Restore body
       let mut new_xfr_body: XfrBody = xfr_body.clone();
-      assert_eq!(verify_xfr_body(&mut prng, &new_xfr_body.clone(), &policies),
+      assert_eq!(verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies),
                  Ok(()),
                  "Everything back to normal.");
 
@@ -818,7 +844,7 @@ pub(crate) mod tests {
                   .asset_tracking_proof
                   .asset_type_and_amount_proofs = vec![];
 
-      let check = verify_xfr_body(&mut prng, &new_xfr_body.clone(), &policies);
+      let check = verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies);
 
       assert_eq!(check,
                  Err(XfrVerifyAssetTracingAssetAmountError),
@@ -828,7 +854,7 @@ pub(crate) mod tests {
 
       // Restore body
       let mut new_xfr_body: XfrBody = xfr_body.clone();
-      assert_eq!(verify_xfr_body(&mut prng, &new_xfr_body.clone(), &policies),
+      assert_eq!(verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies),
                  Ok(()),
                  "Everything back to normal.");
 
@@ -839,7 +865,7 @@ pub(crate) mod tests {
                   .asset_tracking_proof
                   .asset_type_and_amount_proofs[0] = wrong_proof;
 
-      let check = verify_xfr_body(&mut prng, &new_xfr_body.clone(), &policies);
+      let check = verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies);
 
       assert_eq!(check,
                  Err(XfrVerifyAssetTracingAssetAmountError),
@@ -849,6 +875,7 @@ pub(crate) mod tests {
     #[test]
     fn test_one_input_one_output_all_confidential() {
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
       let tracking_policy =
@@ -867,7 +894,7 @@ pub(crate) mod tests {
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&input_templates, &output_templates);
+      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
 
       // Both input and output with asset tracking
       let input_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
@@ -880,12 +907,13 @@ pub(crate) mod tests {
                                    &asset_tracer_keypair,
                                    BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&input_templates, output_templates.as_slice());
+      do_test_asset_tracking(&mut params, &input_templates, output_templates.as_slice());
     }
 
     #[test]
     fn test_one_input_one_output_amount_confidential() {
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
@@ -907,13 +935,13 @@ pub(crate) mod tests {
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&input_templates, &output_templates);
+      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
     }
 
     #[test]
     fn test_one_input_one_output_asset_confidential() {
-      let mut prng: ChaChaRng;
-      prng = ChaChaRng::from_seed([0u8; 32]);
+      let mut prng = ChaChaRng::from_seed([0u8; 32]);
+      let mut params = PublicParams::new();
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
       let tracking_policy =
@@ -934,12 +962,15 @@ pub(crate) mod tests {
                                    &no_policy, // no policy
                                    &asset_tracer_keypair, BITCOIN_ASSET)];
 
-      do_test_asset_tracking(input_templates.as_slice(), output_templates.as_slice());
+      do_test_asset_tracking(&mut params,
+                             input_templates.as_slice(),
+                             output_templates.as_slice());
     }
 
     #[test]
     fn test_two_inputs_two_outputs_all_confidential_tracking_on_inputs() {
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
@@ -968,12 +999,13 @@ pub(crate) mod tests {
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&input_templates, &output_templates);
+      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
     }
 
     #[test]
     fn test_two_inputs_two_outputs_all_confidential_tracking_on_inputs_and_outputs() {
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
@@ -1002,12 +1034,13 @@ pub(crate) mod tests {
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&input_templates, &output_templates);
+      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
     }
 
     #[test]
     fn test_single_asset_first_input_asset_tracking() {
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
@@ -1044,13 +1077,14 @@ pub(crate) mod tests {
                                &no_policies,
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
-      do_test_asset_tracking(&input_templates, &output_templates);
+      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
     }
 
     #[test]
     fn test_single_asset_two_first_input_asset_tracking() {
       // The first two inputs have asset tracking policies
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
@@ -1086,7 +1120,7 @@ pub(crate) mod tests {
                                &no_policies,
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
-      do_test_asset_tracking(&input_templates, &output_templates);
+      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
     }
 
     fn gen_asset_tracking_policy(public_keys: &AssetTracerEncKeys) -> AssetTracingPolicy {
@@ -1102,6 +1136,7 @@ pub(crate) mod tests {
       // Mix of asset_tracking policies for inputs / outputs
       // Mix of asset record type for inputs /outputs
       let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
 
       let tracer1_keypair = gen_asset_tracer_keypair(&mut prng);
@@ -1226,7 +1261,7 @@ pub(crate) mod tests {
                                           output_policies,
                                           output_sig_commitment);
       // test 1: the verification is successful
-      assert_eq!(verify_xfr_body(&mut prng, &xfr_body.clone(), &policies),
+      assert_eq!(verify_xfr_body(&mut prng, &mut params, &xfr_body.clone(), &policies),
                  Ok(()),
                  "Simple transaction should verify ok");
       let candidate_assets = [BITCOIN_ASSET, GOLD_ASSET];

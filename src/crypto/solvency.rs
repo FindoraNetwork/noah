@@ -332,7 +332,7 @@ mod test {
       CloakValue::new(Scalar::from(70u8), Scalar::from(3u8)), // 210, total 630
 		];
     let mut params = PublicParams::new();
-    params.set_circuit_gens(512);
+    params.increase_circuit_gens(512); // enough for the circuit size
     match (hidden_asset, hidden_lia, pass) {
       (false, false, false) => {
         do_test_solvency(&params, &[], &smaller, &[], &greater, &rates, pass)
