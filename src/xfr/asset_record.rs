@@ -197,7 +197,10 @@ impl AssetRecord {
         return Err(ZeiError::ParameterError);
       }
     }
-    build_record_input_from_template(prng, &template, None)
+    match build_record_input_from_template(prng, &template, None) {
+      Ok((asset_record, _)) => Ok(asset_record),
+      Err(e) => Err(e),
+    }
   }
 
   pub fn from_template_with_identity_tracking<R: CryptoRng + RngCore>(
@@ -220,8 +223,50 @@ impl AssetRecord {
                                                           &policy.enc_keys.attrs_enc_key,
                                                           &reveal_policy.reveal_map,
                                                           &[])?;
-            build_record_input_from_template(prng, &template, Some(conf_ac))
+            match build_record_input_from_template(prng, &template, Some(conf_ac)) {
+              Ok((asset_record, _)) => Ok(asset_record),
+              Err(e) => Err(e),
+            }
           }
+        }
+      }
+    }
+  }
+}
+
+pub fn build_record_no_identity_tracking_and_get_blind<R: CryptoRng + RngCore>(
+  prng: &mut R,
+  template: &AssetRecordTemplate)
+  -> Result<(AssetRecord, Scalar), ZeiError> {
+  if let Some(policy) = &template.asset_tracking {
+    if policy.identity_tracking.is_some() {
+      return Err(ZeiError::ParameterError);
+    }
+  }
+  build_record_input_from_template(prng, &template, None)
+}
+
+pub fn build_record_with_identity_tracking_and_get_blind<R: CryptoRng + RngCore>(
+  prng: &mut R,
+  template: &AssetRecordTemplate,
+  credential_user_sec_key: &ACUserSecretKey,
+  credential: &Credential,
+  credential_key: &ACCommitmentKey)
+  -> Result<(AssetRecord, Scalar), ZeiError> {
+  match &template.asset_tracking {
+    None => Err(ZeiError::ParameterError), // identity tracking must have asset_tracking policy
+    Some(policy) => {
+      match &policy.identity_tracking {
+        None => Err(ZeiError::ParameterError), // policy must have a identity tracking policy
+        Some(reveal_policy) => {
+          let conf_ac = ac_confidential_open_commitment(prng,
+                                                        credential_user_sec_key,
+                                                        credential,
+                                                        credential_key,
+                                                        &policy.enc_keys.attrs_enc_key,
+                                                        &reveal_policy.reveal_map,
+                                                        &[])?;
+          build_record_input_from_template(prng, &template, Some(conf_ac))
         }
       }
     }
@@ -387,7 +432,7 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(
   pc_gens: &PedersenGens,
   asset_record: &AssetRecordTemplate,
   identity_ctexts: Option<Vec<AttributeCiphertext>>)
-  -> (OpenAssetRecord, Option<AssetTracerMemo>, Option<OwnerMemo>) {
+  -> (OpenAssetRecord, Scalar, Option<AssetTracerMemo>, Option<OwnerMemo>) {
   let (blind_asset_record, amount_blinds, type_blind, asset_tracing_memo, owner_memo) =
     sample_blind_asset_record(prng, pc_gens, asset_record, identity_ctexts);
 
@@ -397,7 +442,7 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(
                                             asset_type: asset_record.asset_type,
                                             type_blind };
 
-  (open_asset_record, asset_tracing_memo, owner_memo)
+  (open_asset_record, type_blind, asset_tracing_memo, owner_memo)
 }
 
 /// Build BlindAssetRecord and associated memos  from an Asset Record Template
@@ -506,10 +551,11 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
 /// Generates an RecordInput from an asset_record using identity proof of identity tracking
 /// and corresponding ciphertexts.
 /// This function is used to generate an output for gen_xfr_note/body
-fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
-                                                            asset_record: &AssetRecordTemplate,
-                                                            identity_proof: Option<ConfidentialAC>)
-                                                            -> Result<AssetRecord, ZeiError> {
+fn build_record_input_from_template<R: CryptoRng + RngCore>(
+  prng: &mut R,
+  asset_record: &AssetRecordTemplate,
+  identity_proof: Option<ConfidentialAC>)
+  -> Result<(AssetRecord, Scalar), ZeiError> {
   // Check input consistency:
   // - if no policy, then no identity proof needed
   // - if policy and identity tracking, then identity proof is needed
@@ -543,16 +589,17 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
   };
 
   // 2. Use record template and ciphertexts to build open asset record
-  let (open_asset_record, asset_tracing_memo, owner_memo) =
+  let (open_asset_record, type_blind, asset_tracing_memo, owner_memo) =
     build_open_asset_record(prng, &pc_gens, asset_record, attr_ctext);
 
   // 3. Return record input containing open asset record, tracking policy, identity reveal proof,
   //    asset_tracer_memo, and owner_memo
-  Ok(AssetRecord { open_asset_record,
-                   tracking_policy: asset_record.asset_tracking.clone(),
-                   identity_proof: reveal_proof,
-                   asset_tracer_memo: asset_tracing_memo,
-                   owner_memo })
+  Ok((AssetRecord { open_asset_record,
+                    tracking_policy: asset_record.asset_tracking.clone(),
+                    identity_proof: reveal_proof,
+                    asset_tracer_memo: asset_tracing_memo,
+                    owner_memo },
+      type_blind))
 }
 
 #[cfg(test)]
@@ -613,7 +660,7 @@ mod test {
       AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, record_type, keypair.get_pk())
     };
 
-    let (open_ar, asset_tracer_memo, owner_memo) =
+    let (open_ar, _, asset_tracer_memo, owner_memo) =
       build_open_asset_record(&mut prng, &pc_gens, &asset_record, None);
 
     assert_eq!(amount, open_ar.amount);
