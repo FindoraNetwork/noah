@@ -173,7 +173,7 @@ impl error::Error for ZeiError {
         "Cannot extract identity attributes from tracing ciphertext"
       },
       ZeiError::AnonymousCredentialSignError => {"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."},
-      ZeiError::R1CSProofError =>{"Could not create R1CSProof"}
+      ZeiError::R1CSProofError =>{"Could not create R1CSProof"},
     }
   }
 }

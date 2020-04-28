@@ -680,6 +680,7 @@ pub(crate) mod tests {
     use crate::basic_crypto::elgamal::ElGamalCiphertext;
     use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
     use crate::xfr::lib::{trace_assets, XfrNotePolicies};
+    use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
 
     const GOLD_ASSET: AssetType = [0; 16];
@@ -1296,6 +1297,63 @@ pub(crate) mod tests {
       assert_eq!(records_data[2].1, GOLD_ASSET); // third output asset type
       assert_eq!(records_data[2].2, ids); // third output no id tracking
       assert_eq!(records_data[2].3, out_keys[1].get_pk()); // third output no id tracking
+    }
+
+    fn do_integer_overflow(asset_record_type: AssetRecordType) {
+      let mut prng: ChaChaRng;
+      prng = ChaChaRng::from_seed([0u8; 32]);
+      let mut params = PublicParams::new();
+
+      let asset_type = [0u8; 16];
+
+      let inkeys = gen_key_pair_vec(1, &mut prng);
+      let inkeys_ref = inkeys.iter().map(|x| x).collect_vec();
+
+      let outkeys = gen_key_pair_vec(2, &mut prng);
+
+      let input_amount = 10u64;
+      let output_amount_1 = 5_u64;
+      let output_amount_2 = 5_u64;
+
+      let inputs = vec![AssetRecordTemplate::with_no_asset_tracking(input_amount,
+                                                                    asset_type,
+                                                                    asset_record_type,
+                                                                    inkeys[0].get_pk()),];
+
+      let outputs = vec![AssetRecordTemplate::with_no_asset_tracking(output_amount_1,
+                                                                     asset_type,
+                                                                     asset_record_type,
+                                                                     outkeys[0].get_pk()),
+                         AssetRecordTemplate::with_no_asset_tracking(output_amount_2,
+                                                                     asset_type,
+                                                                     asset_record_type,
+                                                                     outkeys[1].get_pk())];
+
+      let (xfr_note, _, _) = create_xfr(&mut prng,
+                                        inputs.as_slice(),
+                                        outputs.as_slice(),
+                                        &inkeys_ref);
+
+      assert_eq!(Ok(()),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()),
+                 "Verification is successful");
+
+      // Modify the input so that we trigger an integer overflow
+      let mut xfr_body_new = xfr_note.body.clone();
+
+      xfr_body_new.inputs[0].amount = NonConfidential(0_u64);
+      xfr_body_new.outputs[0].amount = NonConfidential(1_u64);
+      xfr_body_new.outputs[1].amount = NonConfidential(u64::max_value());
+
+      assert_eq!(Err(ZeiError::XfrVerifyAssetAmountError),
+                 verify_xfr_body(&mut prng, &mut params, &xfr_body_new, &Default::default()),
+                 "An integer overflow error must be raised");
+    }
+
+    #[test]
+    fn test_integer_overflow() {
+      do_integer_overflow(AssetRecordType::NonConfidentialAmount_ConfidentialAssetType);
+      do_integer_overflow(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType);
     }
   }
 }

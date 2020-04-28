@@ -622,6 +622,12 @@ pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(prng: &mut R,
   batch_verify_tracer_tracking_proof(prng, &params.pc_gens, bodies, policies)
 }
 
+/// Takes a vector of u64, converts each element to u128 and compute the sum of the new elements.
+/// The goal is to avoid integer overflow when adding several u64 elements together.
+fn safe_sum_u64(terms: &[u64]) -> u128 {
+  terms.iter().map(|x| u128::from(*x)).sum()
+}
+
 fn verify_plain_amounts(inputs: &[BlindAssetRecord],
                         outputs: &[BlindAssetRecord])
                         -> Result<(), ZeiError> {
@@ -631,7 +637,11 @@ fn verify_plain_amounts(inputs: &[BlindAssetRecord],
   let out_amount: Vec<u64> = outputs.iter()
                                     .map(|x| x.amount.get_amount().unwrap())
                                     .collect();
-  if in_amount.into_iter().sum::<u64>() < out_amount.into_iter().sum::<u64>() {
+
+  let sum_inputs = safe_sum_u64(in_amount.as_slice());
+  let sum_outputs = safe_sum_u64(out_amount.as_slice());
+
+  if sum_inputs < sum_outputs {
     return Err(ZeiError::XfrVerifyAssetAmountError);
   }
 
