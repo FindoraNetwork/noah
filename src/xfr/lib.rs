@@ -816,20 +816,17 @@ fn verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
 
 // ASSET TRACKING
 pub fn find_tracing_memos<'a>(
-  xfr_note: &'a XfrNote,
+  xfr_body: &'a XfrBody,
   pub_key: &AssetTracerEncKeys)
   -> Result<Vec<(&'a BlindAssetRecord, &'a AssetTracerMemo)>, ZeiError> {
   let mut result = vec![];
-  if xfr_note.body.inputs.len() + xfr_note.body.outputs.len()
-     != xfr_note.body.asset_tracing_memos.len()
-  {
+  if xfr_body.inputs.len() + xfr_body.outputs.len() != xfr_body.asset_tracing_memos.len() {
     return Err(ZeiError::InconsistentStructureError);
   }
-  for (blind_asset_record, bar_memos) in xfr_note.body
-                                                 .inputs
+  for (blind_asset_record, bar_memos) in xfr_body.inputs
                                                  .iter()
-                                                 .chain(&xfr_note.body.outputs)
-                                                 .zip(&xfr_note.body.asset_tracing_memos)
+                                                 .chain(&xfr_body.outputs)
+                                                 .zip(&xfr_body.asset_tracing_memos)
   {
     for memo in bar_memos {
       if memo.enc_key == *pub_key {
@@ -874,11 +871,11 @@ pub fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
   Ok(result)
 }
 
-pub fn trace_assets(xfr_note: &XfrNote,
+pub fn trace_assets(xfr_body: &XfrBody,
                     tracer_keypair: &AssetTracerKeyPair,
                     candidate_assets: &[AssetType])
                     -> Result<Vec<RecordData>, ZeiError> {
-  let bars_memos = find_tracing_memos(xfr_note, &tracer_keypair.enc_key)?;
+  let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
   extract_tracking_info(bars_memos.as_slice(),
                         &tracer_keypair.dec_key,
                         candidate_assets)
@@ -930,11 +927,11 @@ pub fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
   Ok(())
 }
 
-pub fn verify_tracing_ctexts(xfr_note: &XfrNote,
+pub fn verify_tracing_ctexts(xfr_body: &XfrBody,
                              tracer_keypair: &AssetTracerKeyPair,
                              expected_data: &[RecordData])
                              -> Result<(), ZeiError> {
-  let bars_memos = find_tracing_memos(xfr_note, &tracer_keypair.enc_key)?;
+  let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
   verify_tracing_memos(bars_memos.as_slice(),
                        &tracer_keypair.dec_key,
                        expected_data)

@@ -246,7 +246,7 @@ pub(crate) mod examples {
     assert_eq!(xfr_note.body.asset_tracing_memos[1].len(), 1);
     assert_eq!(xfr_note.body.asset_tracing_memos[2].len(), 0);
     assert_eq!(xfr_note.body.asset_tracing_memos[3].len(), 0);
-    let records_data = trace_assets(&xfr_note,
+    let records_data = trace_assets(&xfr_note.body,
                                     &tracer_keys,
                                     &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE]).unwrap();
 
@@ -367,7 +367,7 @@ pub(crate) mod examples {
     assert_eq!(xfr_note.body.asset_tracing_memos[0].len(), 0);
     assert_eq!(xfr_note.body.asset_tracing_memos[1].len(), 1);
     assert_eq!(xfr_note.body.asset_tracing_memos[2].len(), 1);
-    let records_data = trace_assets(&xfr_note,
+    let records_data = trace_assets(&xfr_note.body,
                                     &asset_tracing_key_pair,
                                     &[ASSET1_TYPE, ASSET2_TYPE]).unwrap();
     check_record_data(&records_data[0],
@@ -524,7 +524,7 @@ pub(crate) mod examples {
     assert_eq!(xfr_note.body.asset_tracing_memos[0].len(), 1);
     assert_eq!(xfr_note.body.asset_tracing_memos[1].len(), 1);
     assert_eq!(xfr_note.body.asset_tracing_memos[2].len(), 0);
-    let records_data = trace_assets(&xfr_note,
+    let records_data = trace_assets(&xfr_note.body,
                                     &tracer_keys,
                                     &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE]).unwrap();
     assert_eq!(records_data.len(), 2);
@@ -706,7 +706,7 @@ pub(crate) mod examples {
     assert_eq!(xfr_note.body.asset_tracing_memos[0].len(), 0);
     assert_eq!(xfr_note.body.asset_tracing_memos[1].len(), 1);
     assert_eq!(xfr_note.body.asset_tracing_memos[2].len(), 1);
-    let records_data = trace_assets(&xfr_note,
+    let records_data = trace_assets(&xfr_note.body,
                                     &tracer_keys,
                                     &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE]).unwrap();
     assert_eq!(records_data.len(), 2);
@@ -962,7 +962,7 @@ pub(crate) mod examples {
 
     // 5. check tracing
     // 5.1 tracer 1
-    let records_data = trace_assets(&xfr_note,
+    let records_data = trace_assets(&xfr_note.body,
                                     &asset1_tracing_key,
                                     &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE]).unwrap();
     assert_eq!(records_data.len(), 1);
@@ -972,7 +972,7 @@ pub(crate) mod examples {
                       vec![1, 3], // expect second and last attribute
                       user1_key_pair1.get_pk_ref());
 
-    let records_data = trace_assets(&xfr_note,
+    let records_data = trace_assets(&xfr_note.body,
                                     &asset2_tracing_key,
                                     &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE]).unwrap();
     assert_eq!(records_data.len(), 1);
