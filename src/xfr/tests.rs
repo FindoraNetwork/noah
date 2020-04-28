@@ -789,7 +789,8 @@ pub(crate) mod tests {
                                             .chain(output_templates)
                                             .map(|x| x.3)
                                             .collect_vec();
-      let records_data = trace_assets(&xfr_note, &input_templates[0].2, &candidate_assets).unwrap();
+      let records_data =
+        trace_assets(&xfr_note.body, &input_templates[0].2, &candidate_assets).unwrap();
       if input_templates[0].1.len() == 1 {
         assert_eq!(records_data[0].0, input_amount);
         assert_eq!(records_data[0].1, input_templates[0].3);
@@ -1266,7 +1267,7 @@ pub(crate) mod tests {
                  Ok(()),
                  "Simple transaction should verify ok");
       let candidate_assets = [BITCOIN_ASSET, GOLD_ASSET];
-      let records_data = trace_assets(&xfr_note, &tracer1_keypair, &candidate_assets).unwrap();
+      let records_data = trace_assets(&xfr_note.body, &tracer1_keypair, &candidate_assets).unwrap();
       let ids: Vec<u32> = vec![];
       assert_eq!(records_data.len(), 3);
       assert_eq!(records_data[0].0, 10); // first input amount
@@ -1282,7 +1283,7 @@ pub(crate) mod tests {
       assert_eq!(records_data[2].2, ids); // third output no id tracking
       assert_eq!(records_data[2].3, out_keys[2].get_pk()); // third output no id tracking
 
-      let records_data = trace_assets(&xfr_note, &tracer2_keypair, &candidate_assets).unwrap();
+      let records_data = trace_assets(&xfr_note.body, &tracer2_keypair, &candidate_assets).unwrap();
       let ids: Vec<u32> = vec![];
       assert_eq!(records_data.len(), 3);
       assert_eq!(records_data[0].0, 20); // third input amount
