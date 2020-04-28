@@ -49,7 +49,7 @@ use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
 /// Represent AssetRecord amount and asset type
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CloakValue {
   pub amount: Scalar,
   pub asset_type: Scalar,
@@ -90,7 +90,7 @@ pub struct CloakVariable {
 }
 
 /// Represent a commitment Cloak value.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct CloakCommitment {
   pub amount: CompressedRistretto,
   pub asset_type: CompressedRistretto,
