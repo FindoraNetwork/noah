@@ -90,7 +90,7 @@ pub struct CloakVariable {
 }
 
 /// Represent a commitment Cloak value.
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct CloakCommitment {
   pub amount: CompressedRistretto,
   pub asset_type: CompressedRistretto,
