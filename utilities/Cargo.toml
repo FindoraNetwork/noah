@@ -1,6 +1,6 @@
 [package]
 name = "zei_utilities"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["fernando@findora.org, philippe@findora.org"]
 edition = "2018"
 description = "Utilities for Zei tests and benchmarks"
