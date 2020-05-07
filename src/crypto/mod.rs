@@ -1,6 +1,7 @@
 pub mod accumulators;
 pub(crate) mod anon_creds;
 pub mod bp_circuits;
+pub mod bp_range_proofs;
 pub mod chaum_pedersen;
 pub(crate) mod conf_cred_reveal;
 pub mod dlog;

@@ -10,6 +10,7 @@ use crate::crypto::pedersen_elgamal::{
 use crate::errors::ZeiError;
 
 use crate::basic_crypto::elgamal::ElGamalCiphertext;
+use crate::crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
 use crate::xfr::asset_record::AssetRecordType;
@@ -433,12 +434,11 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
 
   let mut transcript = Transcript::new(b"Zei Range Proof");
   let (range_proof, coms) =
-    RangeProof::prove_multiple(&params.bp_gens,
-                               &params.pc_gens,
-                               &mut transcript,
-                               values.as_slice(),
-                               range_proof_blinds.as_slice(),
-                               BULLET_PROOF_RANGE).map_err(|_| ZeiError::RangeProofProveError)?;
+    prove_ranges(&params,
+                 &mut transcript,
+                 values.as_slice(),
+                 range_proof_blinds.as_slice(),
+                 BULLET_PROOF_RANGE).map_err(|_| ZeiError::RangeProofProveError)?;
 
   let diff_com_low = coms[2 * num_output];
   let diff_com_high = coms[2 * num_output + 1];
@@ -464,13 +464,12 @@ pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(prng: &mu
     commitments.push(extract_value_commitments(input.as_slice(), output.as_slice(), proof)?);
   }
   let value_commitments = commitments.iter().map(|c| c.as_slice()).collect_vec();
-  RangeProof::batch_verify(prng,
-                           proofs.as_slice(),
-                           &mut transcripts,
-                           &value_commitments,
-                           &params.bp_gens,
-                           &params.pc_gens,
-                           32usize).map_err(|_| ZeiError::XfrVerifyConfidentialAmountError)
+  batch_verify_ranges(prng,
+                      params,
+                      proofs.as_slice(),
+                      &mut transcripts,
+                      &value_commitments,
+                      BULLET_PROOF_RANGE).map_err(|_| ZeiError::XfrVerifyConfidentialAmountError)
 }
 
 fn extract_value_commitments(inputs: &[BlindAssetRecord],
