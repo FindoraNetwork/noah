@@ -1,5 +1,4 @@
 // Utility functions
-
 use crate::algebra::groups::Scalar;
 use digest::Digest;
 use sha2::Sha512;
@@ -39,29 +38,6 @@ pub(crate) fn u64_to_bigendian_u8array(n: u64) -> [u8; 8] {
   array[7] = (n & 0xFF) as u8;
   array
 }
-
-/*
-pub fn u128_to_bigendian_u8array(n: u128) -> [u8;16]{
-    let mut array = [0u8;16];
-    array[0] = ((n>>120)&0xFF) as u8;
-    array[1] = ((n>>112)&0xFF) as u8;
-    array[2] = ((n>>104)&0xFF) as u8;
-    array[3] = ((n>>96)&0xFF) as u8;
-    array[4] = ((n>>88)&0xFF) as u8;
-    array[5] = ((n>>80)&0xFF) as u8;
-    array[6] = ((n>>72)&0xFF) as u8;
-    array[7] = ((n>>64)&0xFF) as u8;
-    array[8] = ((n>>56)&0xFF) as u8;
-    array[9] = ((n>>48)&0xFF) as u8;
-    array[10] = ((n>>40)&0xFF) as u8;
-    array[11] = ((n>>32)&0xFF) as u8;
-    array[12] = ((n>>24)&0xFF) as u8;
-    array[13] = ((n>>16)&0xFF) as u8;
-    array[14] = ((n>>8)&0xFF) as u8;
-    array[15] = (n & 0xFF) as u8;
-    array
-}
-*/
 
 /// I convert a 16 byte array into a u128 (bigendian)
 pub(crate) fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128 {

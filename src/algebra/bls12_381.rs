@@ -3,6 +3,7 @@ use super::pairing::Pairing;
 use crate::algebra::groups::GroupArithmetic;
 use crate::utils::{b64dec, b64enc, u8_bigendian_slice_to_u64};
 use crate::utils::{u64_to_bigendian_u8array, u8_bigendian_slice_to_u32};
+use byteorder::{ByteOrder, LittleEndian};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use pairing::bls12_381::{Fq, Fq12, Fq2, Fq6, FqRepr, Fr, FrRepr, G1, G2};
@@ -99,12 +100,14 @@ impl Scalar for BLSScalar {
   fn get_little_endian_u64(&self) -> Vec<u64> {
     (self.0).into_repr().0.to_vec()
   }
+
   //scalar serialization
   fn to_bytes(&self) -> Vec<u8> {
     let repr = FrRepr::from(self.0);
     let mut v = vec![];
     for a in &repr.0 {
-      let array = crate::utils::u64_to_bigendian_u8array(*a);
+      let mut array = [0_u8; 8];
+      LittleEndian::write_u64(&mut array, *a);
       v.extend_from_slice(&array[..])
     }
     v
@@ -114,7 +117,7 @@ impl Scalar for BLSScalar {
     let mut repr_array = [0u64; 4];
     for i in 0..4 {
       let slice = &bytes[i * 8..i * 8 + 8];
-      repr_array[i] = crate::utils::u8_bigendian_slice_to_u64(slice);
+      repr_array[i] = LittleEndian::read_u64(slice);
     }
     let fr_repr = FrRepr(repr_array);
     BLSScalar(Fr::from_repr(fr_repr).unwrap())
@@ -593,7 +596,9 @@ impl<'de> Deserialize<'de> for BLSGt {
 
 #[cfg(test)]
 mod bls12_381_groups_test {
+  use crate::algebra::bls12_381::BLSScalar;
   use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
+  use crate::algebra::groups::Scalar;
 
   #[test]
   fn test_scalar_ops() {
@@ -603,6 +608,18 @@ mod bls12_381_groups_test {
   #[test]
   fn scalar_deser() {
     test_scalar_serialization::<super::BLSScalar>();
+  }
+
+  #[test]
+  fn scalar_from_to_bytes() {
+    let small_value = BLSScalar::from_u32(165747);
+    let small_value_bytes = small_value.to_bytes();
+    let expected_small_value_bytes: [u8; 32] = [115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    assert_eq!(small_value_bytes, expected_small_value_bytes);
+
+    let small_value_from_bytes = BLSScalar::from_bytes(&small_value_bytes);
+    assert_eq!(small_value_from_bytes, small_value);
   }
 }
 
