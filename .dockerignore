@@ -2,6 +2,7 @@
 .DS_Store
 .git
 .gitignore
+Cargo.lock
 target
 Dockerfile
 Jenkinsfile
