@@ -571,7 +571,7 @@ impl<'a> XfrNotePolicies<'a> {
   }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct XfrNotePoliciesNoRef {
   pub inputs_tracking_policies: Vec<AssetTracingPolicies>,
   pub inputs_sig_commitments: Vec<Option<ACCommitment>>,
