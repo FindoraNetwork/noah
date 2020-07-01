@@ -137,6 +137,13 @@ fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarM
                                       memos: &'a [Vec<AssetTracerMemo>])
                                       -> Result<(), ZeiError> {
   for (i, tracing_policies_i) in reveal_policies.iter().enumerate() {
+    let bar_elem = &bars[i];
+
+    // If the bar is non confidential then there is no need for collecting it for further verification.
+    if bar_elem.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
+    {
+      continue;
+    }
     let memos_i = memos.get(i).ok_or(ZeiError::ParameterError)?;
     let tracing_policies_i = tracing_policies_i.get_policies();
     for (j, policy_i_j) in tracing_policies_i.iter().enumerate() {
@@ -146,7 +153,7 @@ fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarM
 
         map.entry(key)
            .or_insert(Default::default())
-           .push(&bars[i], memo_i_j); // insert ith record with j-th memo
+           .push(bar_elem, memo_i_j); // insert ith record with j-th memo
       }
     }
   }

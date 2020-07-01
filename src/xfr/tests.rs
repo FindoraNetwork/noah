@@ -1395,7 +1395,7 @@ pub(crate) mod tests {
         AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
                                                                  asset_tracer_public_keys.clone(),
                                                                asset_tracking: true,
-                                                               identity_tracking: None }); //Some(id_tracking_policy.clone()) });
+                                                               identity_tracking: None });
 
       let input_keypair = XfrKeyPair::generate(&mut prng);
       let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
