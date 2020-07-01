@@ -581,7 +581,7 @@ pub(crate) mod tests {
     use crate::xfr::structs::AssetTracingPolicies;
 
     #[test]
-    fn test_identity_tracking() {
+    fn test_identity_tracking_for_conf_assets() {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
@@ -1355,6 +1355,78 @@ pub(crate) mod tests {
     fn test_integer_overflow() {
       do_integer_overflow(AssetRecordType::NonConfidentialAmount_ConfidentialAssetType);
       do_integer_overflow(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType);
+    }
+  }
+
+  mod identity_and_asset_tracking {
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+    ////    Tests with a mix of asset and identity tracking                                        ///
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+
+    use crate::algebra::groups::Group;
+    use crate::api::anon_creds::ac_confidential_gen_encryption_keys;
+    use crate::basic_crypto::elgamal::elgamal_key_gen;
+    use crate::setup::PublicParams;
+    use crate::xfr::asset_record::AssetRecordType;
+    use crate::xfr::lib::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
+    use crate::xfr::sig::XfrKeyPair;
+    use crate::xfr::structs::{
+      AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracingPolicies,
+      AssetTracingPolicy,
+    };
+    use curve25519_dalek::ristretto::RistrettoPoint;
+    use rand_chacha::ChaChaRng;
+    use rand_core::SeedableRng;
+
+    #[test]
+    fn asset_tracking_for_non_conf_assets_should_work() {
+      let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
+      prng = ChaChaRng::from_seed([0u8; 32]);
+
+      let (_, asset_tracer_pub_key) = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
+      let (_, asset_tracer_id_pub_key) = ac_confidential_gen_encryption_keys(&mut prng);
+      let asset_tracer_public_keys = AssetTracerEncKeys { record_data_enc_key:
+                                                            asset_tracer_pub_key,
+                                                          attrs_enc_key: asset_tracer_id_pub_key };
+
+      let tracking_policy =
+        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
+                                                                 asset_tracer_public_keys.clone(),
+                                                               asset_tracking: true,
+                                                               identity_tracking: None }); //Some(id_tracking_policy.clone()) });
+
+      let input_keypair = XfrKeyPair::generate(&mut prng);
+      let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
+      let input_asset_record = AssetRecordTemplate::with_no_asset_tracking(10,
+                                                                           [0; 16],
+                                                                           asset_record_type,
+                                                                           input_keypair.get_pk());
+
+      let input =
+        AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
+
+      let output_asset_record = AssetRecordTemplate::with_asset_tracking(10,
+                                                                         [0; 16],
+                                                                         asset_record_type,
+                                                                         input_keypair.get_pk(),
+                                                                         tracking_policy.clone());
+
+      let outputs =
+        [AssetRecord::from_template_no_identity_tracking(&mut prng, &output_asset_record).unwrap()];
+
+      let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
+
+      let null_policies_input = &AssetTracingPolicies::new();
+
+      let policies = XfrNotePolicies::new(vec![null_policies_input],
+                                          vec![None; 1],
+                                          vec![&tracking_policy],
+                                          vec![None; 1]);
+
+      assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
+                 Ok(()));
     }
   }
 }

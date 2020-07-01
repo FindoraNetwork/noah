@@ -203,7 +203,7 @@ fn batch_verify_asset_tracking_proofs<R: CryptoRng + RngCore>(prng: &mut R,
                                                               input_reveal_policies: &[&[&AssetTracingPolicies]],
                                                               output_reveal_policies: &[&[&AssetTracingPolicies]])
                                                               -> Result<(), ZeiError> {
-  // Idea: collect all instances of perders_elgamal_equality proofs and call a single
+  // Idea: collect all instances of perdersen_elgamal_equality proofs and call a single
   // batch verification for all of them.
 
   // Each asset record can be associated with several tracing policies.
@@ -213,7 +213,7 @@ fn batch_verify_asset_tracking_proofs<R: CryptoRng + RngCore>(prng: &mut R,
   // Strategy:
   // 1. For each XfrBody collect a mapping of tracing key <-> Vec<BlindAssetRecords, Memos>, and all the associated proofs.
   // 2. On each XfrBody: for each (key, Vec<BlindAssetRecord, Memo>, proof) tuple, build an instance of a pedersen_elgamal_aggregated verify proof
-  // 3. Call a single batch verfication proof for all the tuples collected in 2.
+  // 3. Call a single batch verification proof for all the tuples collected in 2.
   let mut instances = vec![];
   let mut all_records_map = Vec::with_capacity(xfr_bodies.len());
   let mut all_proofs = Vec::with_capacity(xfr_bodies.len());
