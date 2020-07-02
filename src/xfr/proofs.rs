@@ -296,6 +296,7 @@ fn verify_identity_proofs(reveal_policies: &[&AssetTracingPolicies],
                           -> Result<(), ZeiError> {
   // 1. check for errors
   let n = reveal_policies.len();
+
   if memos.len() != proofs.len() || n != sig_commitments.len() {
     return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
   }

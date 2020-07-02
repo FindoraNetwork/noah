@@ -1399,10 +1399,11 @@ pub(crate) mod tests {
 
       let input_keypair = XfrKeyPair::generate(&mut prng);
       let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
-      let input_asset_record = AssetRecordTemplate::with_no_asset_tracking(10,
-                                                                           [0; 16],
-                                                                           asset_record_type,
-                                                                           input_keypair.get_pk());
+      let input_asset_record = AssetRecordTemplate::with_asset_tracking(10,
+                                                                        [0; 16],
+                                                                        asset_record_type,
+                                                                        input_keypair.get_pk(),
+                                                                        tracking_policy.clone());
 
       let input =
         AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
