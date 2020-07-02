@@ -16,7 +16,7 @@ pub(crate) mod tests {
   use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::lib::{
     batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
-    gen_xfr_note, verify_xfr_body, verify_xfr_note, XfrNotePolicies, XfrNotePoliciesRef,
+    gen_xfr_note, verify_xfr_body, verify_xfr_note, XfrNotePolicies,
   };
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
@@ -112,10 +112,9 @@ pub(crate) mod tests {
     let mut outputs = tuple.2;
 
     let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
-    let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
     // test 1: simple transfer
     assert_eq!(Ok(()),
-               verify_xfr_note(&mut prng, params, &xfr_note, &policies_ref),
+               verify_xfr_note(&mut prng, params, &xfr_note, &policies.to_ref()),
                "Simple transaction should verify ok");
 
     // 1.1 test batching
@@ -123,7 +122,7 @@ pub(crate) mod tests {
                batch_verify_xfr_notes(&mut prng,
                                       params,
                                       &[&xfr_note, &xfr_note, &xfr_note],
-                                      &[&policies_ref; 3]),
+                                      &[&policies.to_ref(); 3]),
                "batch verify");
 
     // test 2: overflow transfer
@@ -408,7 +407,7 @@ pub(crate) mod tests {
   mod multi_asset_no_tracking {
 
     use super::*;
-    use crate::xfr::lib::{XfrNotePolicies, XfrNotePoliciesRef};
+    use crate::xfr::lib::XfrNotePolicies;
 
     #[test]
     fn do_multiasset_transfer_tests() {
@@ -458,11 +457,10 @@ pub(crate) mod tests {
       let (xfr_note, _, _) = create_xfr(&mut prng, &input_record, &output_record, &inkeys_ref);
 
       let policies = XfrNotePolicies::empty_policies(input_record.len(), output_record.len());
-      let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
 
       // test 1: simple transfer using confidential asset mixer
       assert_eq!(Ok(()),
-                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()),
                  "Multi asset transfer confidential");
 
       let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
@@ -503,10 +501,9 @@ pub(crate) mod tests {
                                             inkeys_ref.as_slice());
 
       let policies = XfrNotePolicies::empty_policies(input_record.len(), output_record.len());
-      let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
 
       assert_eq!(Ok(()),
-                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()),
                  "Multi asset transfer non confidential");
 
       xfr_note.body.inputs[0].amount = XfrAmount::NonConfidential(8u64);
@@ -514,7 +511,7 @@ pub(crate) mod tests {
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys_ref.as_slice()).unwrap();
 
       assert_eq!(Err(ZeiError::XfrVerifyAssetAmountError),
-                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()),
                  "Multi asset transfer non confidential");
     }
   }
@@ -1399,7 +1396,7 @@ pub(crate) mod tests {
                                                                      outkeys[1].get_pk())];
 
       let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
-      let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
+      let policies_ref = policies.to_ref();
       let (xfr_note, _, _) = create_xfr(&mut prng,
                                         inputs.as_slice(),
                                         outputs.as_slice(),

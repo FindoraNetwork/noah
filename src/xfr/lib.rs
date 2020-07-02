@@ -117,7 +117,7 @@ impl XfrType {
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord};
 /// use zei::xfr::asset_record::AssetRecordType;
-/// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note, XfrNotePolicies, XfrNotePoliciesRef};
+/// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
 /// use itertools::Itertools;
 /// use zei::setup::PublicParams;
 ///
@@ -167,8 +167,7 @@ impl XfrType {
 ///                              inkeys.iter().map(|x| x).collect_vec().as_slice()
 ///                ).unwrap();
 /// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
-/// let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
-/// assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref), Ok(()));
+/// assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()), Ok(()));
 /// ```
 
 pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
@@ -238,8 +237,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();
 /// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
-/// let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
-/// assert_eq!(verify_xfr_body(&mut prng, &mut params, &body, &policies_ref), Ok(()));
+/// assert_eq!(verify_xfr_body(&mut prng, &mut params, &body, &policies.to_ref()), Ok(()));
 /// ```
 pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                             inputs: &[AssetRecord],
@@ -560,21 +558,6 @@ pub(crate) fn if_some_closure(x: &Option<ACCommitment>) -> Option<&ACCommitment>
   }
 }
 
-impl<'a> XfrNotePoliciesRef<'a> {
-  pub fn from_policies(p: &'a XfrNotePolicies) -> XfrNotePoliciesRef<'a> {
-    XfrNotePoliciesRef::new(p.inputs_tracking_policies.iter().map(|x| x).collect_vec(),
-                            p.inputs_sig_commitments
-                             .iter()
-                             .map(|x| if_some_closure(x))
-                             .collect_vec(),
-                            p.outputs_tracking_policies.iter().map(|x| x).collect_vec(),
-                            p.outputs_sig_commitments
-                             .iter()
-                             .map(|x| if_some_closure(x))
-                             .collect_vec())
-  }
-}
-
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct XfrNotePolicies {
   pub inputs_tracking_policies: Vec<AssetTracingPolicies>,
@@ -599,6 +582,25 @@ impl XfrNotePolicies {
                       inputs_sig_commitments: vec![None; num_inputs],
                       outputs_tracking_policies: vec![Default::default(); num_outputs],
                       outputs_sig_commitments: vec![None; num_outputs] }
+  }
+
+  pub fn to_ref(&self) -> XfrNotePoliciesRef {
+    XfrNotePoliciesRef::new(self.inputs_tracking_policies
+                                .iter()
+                                .map(|x| x)
+                                .collect_vec(),
+                            self.inputs_sig_commitments
+                                .iter()
+                                .map(|x| if_some_closure(x))
+                                .collect_vec(),
+                            self.outputs_tracking_policies
+                                .iter()
+                                .map(|x| x)
+                                .collect_vec(),
+                            self.outputs_sig_commitments
+                                .iter()
+                                .map(|x| if_some_closure(x))
+                                .collect_vec())
   }
 }
 

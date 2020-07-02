@@ -74,7 +74,7 @@ pub(crate) mod examples {
                                 &[&sender_keypair]).unwrap(); // sender secret key
 
     let policies = XfrNotePolicies::empty_policies(1, 1);
-    let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
+    let policies_ref = policies.to_ref();
     // 5. Validator verifies xfr_note
     assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).is_ok()); // there are no policies associated with this xfr note
 
@@ -126,7 +126,7 @@ pub(crate) mod examples {
                                 &[recv_asset_record],   // one output
                                 &[&sender_keypair]).unwrap(); // sender secret key
     let policies = XfrNotePolicies::empty_policies(1, 1);
-    let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
+    let policies_ref = policies.to_ref();
     // 5. Validator verifies xfr_note
     assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).is_ok()); // there are no policies associated with this xfr note
 
