@@ -580,8 +580,7 @@ pub(crate) mod tests {
     use crate::xfr::lib::XfrNotePolicies;
     use crate::xfr::structs::AssetTracingPolicies;
 
-    #[test]
-    fn test_identity_tracking_for_conf_assets() {
+    fn check_identity_tracking_for_asset_type(asset_record_type: AssetRecordType) {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
@@ -620,7 +619,6 @@ pub(crate) mod tests {
                                                                  Some(id_tracking_policy.clone()) });
 
       let input_keypair = XfrKeyPair::generate(&mut prng);
-      let asset_record_type = AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
 
       let input_asset_record = AssetRecordTemplate::with_no_asset_tracking(10,
                                                                            [0; 16],
@@ -668,6 +666,16 @@ pub(crate) mod tests {
       let mut de = Deserializer::new(&vec[..]);
       let xfr_de = XfrNote::deserialize(&mut de).unwrap();
       assert_eq!(xfr_note, xfr_de);
+    }
+
+    #[test]
+    fn test_identity_tracking_for_conf_assets() {
+      check_identity_tracking_for_asset_type(AssetRecordType::ConfidentialAmount_ConfidentialAssetType);
+    }
+
+    #[test]
+    fn test_identity_tracking_for_non_conf_assets() {
+      check_identity_tracking_for_asset_type(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType);
     }
   }
 
@@ -873,6 +881,56 @@ pub(crate) mod tests {
       assert_eq!(check,
                  Err(XfrVerifyAssetTracingAssetAmountError),
                  "Transfer should fail as the proof is not correctly computed.");
+    }
+
+    #[test]
+    fn asset_tracking_for_non_conf_assets_should_work() {
+      let mut prng: ChaChaRng;
+      let mut params = PublicParams::new();
+      prng = ChaChaRng::from_seed([0u8; 32]);
+      let asset_type = [0; 16];
+
+      let (_, asset_tracer_pub_key) = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
+      let (_, asset_tracer_id_pub_key) = ac_confidential_gen_encryption_keys(&mut prng);
+      let asset_tracer_public_keys = AssetTracerEncKeys { record_data_enc_key:
+                                                            asset_tracer_pub_key,
+                                                          attrs_enc_key: asset_tracer_id_pub_key };
+
+      let tracking_policy =
+        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
+                                                                 asset_tracer_public_keys.clone(),
+                                                               asset_tracking: true,
+                                                               identity_tracking: None });
+
+      let input_keypair = XfrKeyPair::generate(&mut prng);
+      let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
+      let input_asset_record = AssetRecordTemplate::with_asset_tracking(10,
+                                                                        asset_type,
+                                                                        asset_record_type,
+                                                                        input_keypair.get_pk(),
+                                                                        tracking_policy.clone());
+
+      let input =
+        AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
+
+      let output_asset_record = AssetRecordTemplate::with_asset_tracking(10,
+                                                                         asset_type,
+                                                                         asset_record_type,
+                                                                         input_keypair.get_pk(),
+                                                                         tracking_policy.clone());
+
+      let outputs =
+        [AssetRecord::from_template_no_identity_tracking(&mut prng, &output_asset_record).unwrap()];
+
+      let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
+
+      let policies = XfrNotePolicies::new(vec![&tracking_policy],
+                                          vec![None; 1],
+                                          vec![&tracking_policy],
+                                          vec![None; 1]);
+
+      assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
+                 Ok(()));
     }
 
     #[test]
@@ -1356,154 +1414,6 @@ pub(crate) mod tests {
     fn test_integer_overflow() {
       do_integer_overflow(AssetRecordType::NonConfidentialAmount_ConfidentialAssetType);
       do_integer_overflow(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType);
-    }
-  }
-
-  mod identity_and_asset_tracking {
-
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-    ////    Tests with a mix of asset and identity tracking                                        ///
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-
-    use crate::algebra::groups::Group;
-    use crate::api::anon_creds;
-    use crate::api::anon_creds::{ac_commit, ac_confidential_gen_encryption_keys, Credential};
-    use crate::basic_crypto::elgamal::elgamal_key_gen;
-    use crate::setup::PublicParams;
-    use crate::xfr::asset_record::AssetRecordType;
-    use crate::xfr::lib::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
-    use crate::xfr::sig::XfrKeyPair;
-    use crate::xfr::structs::{
-      AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracingPolicies,
-      AssetTracingPolicy, IdentityRevealPolicy,
-    };
-    use curve25519_dalek::ristretto::RistrettoPoint;
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-
-    #[test]
-    fn asset_tracking_for_non_conf_assets_should_work() {
-      let mut prng: ChaChaRng;
-      let mut params = PublicParams::new();
-      prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_type = [0; 16];
-
-      let (_, asset_tracer_pub_key) = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
-      let (_, asset_tracer_id_pub_key) = ac_confidential_gen_encryption_keys(&mut prng);
-      let asset_tracer_public_keys = AssetTracerEncKeys { record_data_enc_key:
-                                                            asset_tracer_pub_key,
-                                                          attrs_enc_key: asset_tracer_id_pub_key };
-
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_public_keys.clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
-
-      let input_keypair = XfrKeyPair::generate(&mut prng);
-      let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
-      let input_asset_record = AssetRecordTemplate::with_asset_tracking(10,
-                                                                        asset_type,
-                                                                        asset_record_type,
-                                                                        input_keypair.get_pk(),
-                                                                        tracking_policy.clone());
-
-      let input =
-        AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
-
-      let output_asset_record = AssetRecordTemplate::with_asset_tracking(10,
-                                                                         asset_type,
-                                                                         asset_record_type,
-                                                                         input_keypair.get_pk(),
-                                                                         tracking_policy.clone());
-
-      let outputs =
-        [AssetRecord::from_template_no_identity_tracking(&mut prng, &output_asset_record).unwrap()];
-
-      let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
-
-      let policies = XfrNotePolicies::new(vec![&tracking_policy],
-                                          vec![None; 1],
-                                          vec![&tracking_policy],
-                                          vec![None; 1]);
-
-      assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
-                 Ok(()));
-    }
-
-    #[test]
-    fn identity_tracking_for_non_conf_assets_should_work() {
-      let mut prng: ChaChaRng;
-      let mut params = PublicParams::new();
-      prng = ChaChaRng::from_seed([0u8; 32]);
-      let addr = b"0x7789654"; // receiver address
-
-      let (_, asset_tracer_pub_key) = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
-      let (_, asset_tracer_id_pub_key) = ac_confidential_gen_encryption_keys(&mut prng);
-      let asset_tracer_public_keys = AssetTracerEncKeys { record_data_enc_key:
-                                                            asset_tracer_pub_key,
-                                                          attrs_enc_key: asset_tracer_id_pub_key };
-
-      let attrs = vec![1u32, 2, 3, 4];
-      let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
-      let (receiver_ac_pk, receiver_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-      let ac_signature = anon_creds::ac_sign(&mut prng,
-                                             &cred_issuer_sk,
-                                             &receiver_ac_pk,
-                                             attrs.as_slice()).unwrap();
-
-      let credential = Credential { signature: ac_signature,
-                                    attributes: attrs,
-                                    issuer_pub_key: cred_issuer_pk.clone() };
-
-      let (sig_commitment, _, key) =
-        ac_commit(&mut prng, &receiver_ac_sk, &credential, addr).unwrap();
-
-      let id_tracking_policy = IdentityRevealPolicy { cred_issuer_pub_key:
-                                                        cred_issuer_pk.clone(),
-                                                      reveal_map: vec![false, true, false, true] }; // revealing attr2 and attr4
-
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_public_keys.clone(),
-                                                               asset_tracking: false,
-                                                               identity_tracking:
-                                                                 Some(id_tracking_policy.clone()) });
-
-      let input_keypair = XfrKeyPair::generate(&mut prng);
-      let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
-
-      let input_asset_record = AssetRecordTemplate::with_no_asset_tracking(10,
-                                                                           [0; 16],
-                                                                           asset_record_type,
-                                                                           input_keypair.get_pk());
-
-      let input =
-        AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
-
-      let output_asset_record = AssetRecordTemplate::with_asset_tracking(10,
-                                                                         [0; 16],
-                                                                         asset_record_type,
-                                                                         input_keypair.get_pk(),
-                                                                         tracking_policy.clone());
-
-      let outputs = [AssetRecord::from_template_with_identity_tracking(&mut prng,
-                                                                       &output_asset_record,
-                                                                       &receiver_ac_sk,
-                                                                       &credential,
-                                                                       &key).unwrap()];
-
-      let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
-
-      let null_policies_input = &AssetTracingPolicies::new();
-
-      let policies = XfrNotePolicies::new(vec![null_policies_input],
-                                          vec![None; 1],
-                                          vec![&tracking_policy],
-                                          vec![Some(&sig_commitment)]);
-
-      assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
-                 Ok(()));
     }
   }
 }
