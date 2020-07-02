@@ -1384,6 +1384,7 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
+      let asset_type = [0; 16];
 
       let (_, asset_tracer_pub_key) = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
       let (_, asset_tracer_id_pub_key) = ac_confidential_gen_encryption_keys(&mut prng);
@@ -1400,7 +1401,7 @@ pub(crate) mod tests {
       let input_keypair = XfrKeyPair::generate(&mut prng);
       let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
       let input_asset_record = AssetRecordTemplate::with_asset_tracking(10,
-                                                                        [0; 16],
+                                                                        asset_type,
                                                                         asset_record_type,
                                                                         input_keypair.get_pk(),
                                                                         tracking_policy.clone());
@@ -1409,7 +1410,7 @@ pub(crate) mod tests {
         AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
 
       let output_asset_record = AssetRecordTemplate::with_asset_tracking(10,
-                                                                         [0; 16],
+                                                                         asset_type,
                                                                          asset_record_type,
                                                                          input_keypair.get_pk(),
                                                                          tracking_policy.clone());
@@ -1419,9 +1420,7 @@ pub(crate) mod tests {
 
       let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
 
-      let null_policies_input = &AssetTracingPolicies::new();
-
-      let policies = XfrNotePolicies::new(vec![null_policies_input],
+      let policies = XfrNotePolicies::new(vec![&tracking_policy],
                                           vec![None; 1],
                                           vec![&tracking_policy],
                                           vec![None; 1]);
