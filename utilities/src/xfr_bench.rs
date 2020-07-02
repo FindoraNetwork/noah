@@ -9,8 +9,8 @@ use criterion::{BenchmarkGroup, Criterion};
 use zei::api::anon_creds::{ACCommitmentKey, ACUserSecretKey, Credential};
 use zei::setup::PublicParams;
 use zei::xfr::lib::{
-  batch_verify_xfr_notes, gen_xfr_body, gen_xfr_note, verify_xfr_note, XfrNotePolicies,
-  XfrNotePoliciesNoRef,
+  batch_verify_xfr_notes, gen_xfr_body, gen_xfr_note, verify_xfr_note, XfrNotePoliciesRef,
+  XfrNotePolicies,
 };
 use zei::xfr::sig::XfrKeyPair;
 use zei::xfr::structs::{AssetTracingPolicy, XfrBody, XfrNote};
@@ -104,16 +104,16 @@ pub fn run_complex_xfr_note_multiple_assets_create(sender_key_pairs: &[&XfrKeyPa
                sender_key_pairs).unwrap()
 }
 
-fn run_simple_xfr_note_verify(xfr_note: XfrNote, policies: XfrNotePoliciesNoRef) {
+fn run_simple_xfr_note_verify(xfr_note: XfrNote, policies: XfrNotePolicies) {
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
   let mut params = PublicParams::new();
 
-  let policies_with_ref: XfrNotePolicies = XfrNotePolicies::from_policies_no_ref(&policies);
+  let policies_with_ref: XfrNotePoliciesRef = XfrNotePoliciesRef::from_policies(&policies);
   let res = verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_with_ref);
   assert!(res.is_ok());
 }
 
-fn run_batch_xfr_note_verify(xfr_notes: &[XfrNote], xfr_notes_policies: &[XfrNotePoliciesNoRef]) {
+fn run_batch_xfr_note_verify(xfr_notes: &[XfrNote], xfr_notes_policies: &[XfrNotePolicies]) {
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
   let mut params = PublicParams::new();
 
@@ -122,7 +122,7 @@ fn run_batch_xfr_note_verify(xfr_notes: &[XfrNote], xfr_notes_policies: &[XfrNot
 
   let mut xfr_notes_policies_ref = vec![];
   for policies in xfr_notes_policies {
-    let policies_with_ref: XfrNotePolicies = XfrNotePolicies::from_policies_no_ref(policies);
+    let policies_with_ref: XfrNotePoliciesRef = XfrNotePoliciesRef::from_policies(policies);
 
     xfr_notes_policies_ref.push(policies_with_ref);
   }
@@ -335,7 +335,7 @@ pub fn run_benchmark_verify_complex_xfr_note<B: Measurement>(benchmark_group: &m
 
   let policies_no_ref =
     gen_policies_with_id_tracking(ac_commitments.as_slice(), asset_tracing_policy_input, n);
-  let policies = XfrNotePolicies::from_policies_no_ref(&policies_no_ref);
+  let policies = XfrNotePoliciesRef::from_policies(&policies_no_ref);
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| run_verify_xfr_note(&xfr_note, &policies))
@@ -363,7 +363,7 @@ pub fn run_benchmark_verify_xfr_note_identity_tracking<B: Measurement>(benchmark
 
   let policies_no_ref =
     gen_policies_with_id_tracking(ac_commitments.as_slice(), asset_tracing_policy_input, n);
-  let policies = XfrNotePolicies::from_policies_no_ref(&policies_no_ref);
+  let policies = XfrNotePoliciesRef::from_policies(&policies_no_ref);
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| run_verify_xfr_note(&xfr_note, &policies))
@@ -391,7 +391,7 @@ pub fn run_benchmark_verify_complex_xfr_note_many_assets<B: Measurement>(benchma
 
   let policies_no_ref =
     gen_policies_with_id_tracking(ac_commitments.as_slice(), asset_tracing_policy_input, n);
-  let policies = XfrNotePolicies::from_policies_no_ref(&policies_no_ref);
+  let policies = XfrNotePoliciesRef::from_policies(&policies_no_ref);
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| run_verify_xfr_note(&xfr_note, &policies))
@@ -419,7 +419,7 @@ pub fn run_benchmark_verify_complex_xfr_body<B: Measurement>(benchmark_group: &m
 
   let policies_no_ref =
     gen_policies_with_id_tracking(ac_commitments.as_slice(), asset_tracing_policy_input, n);
-  let policies = XfrNotePolicies::from_policies_no_ref(&policies_no_ref);
+  let policies = XfrNotePoliciesRef::from_policies(&policies_no_ref);
 
   benchmark_group.bench_function(title, |b| {
                    b.iter(|| run_verify_xfr_body(&xfr_body, &policies))

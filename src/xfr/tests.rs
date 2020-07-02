@@ -16,7 +16,7 @@ pub(crate) mod tests {
   use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::lib::{
     batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
-    gen_xfr_note, verify_xfr_body, verify_xfr_note,
+    gen_xfr_note, verify_xfr_body, verify_xfr_note, XfrNotePolicies, XfrNotePoliciesRef,
   };
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
@@ -111,9 +111,11 @@ pub(crate) mod tests {
     let mut inputs = tuple.1;
     let mut outputs = tuple.2;
 
+    let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
+    let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
     // test 1: simple transfer
     assert_eq!(Ok(()),
-               verify_xfr_note(&mut prng, params, &xfr_note, &Default::default()),
+               verify_xfr_note(&mut prng, params, &xfr_note, &policies_ref),
                "Simple transaction should verify ok");
 
     // 1.1 test batching
@@ -121,7 +123,7 @@ pub(crate) mod tests {
                batch_verify_xfr_notes(&mut prng,
                                       params,
                                       &[&xfr_note, &xfr_note, &xfr_note],
-                                      &[&Default::default(); 3]),
+                                      &[&policies_ref; 3]),
                "batch verify");
 
     // test 2: overflow transfer
@@ -406,6 +408,7 @@ pub(crate) mod tests {
   mod multi_asset_no_tracking {
 
     use super::*;
+    use crate::xfr::lib::{XfrNotePolicies, XfrNotePoliciesRef};
 
     #[test]
     fn do_multiasset_transfer_tests() {
@@ -454,9 +457,12 @@ pub(crate) mod tests {
 
       let (xfr_note, _, _) = create_xfr(&mut prng, &input_record, &output_record, &inkeys_ref);
 
+      let policies = XfrNotePolicies::empty_policies(input_record.len(), output_record.len());
+      let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
+
       // test 1: simple transfer using confidential asset mixer
       assert_eq!(Ok(()),
-                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref),
                  "Multi asset transfer confidential");
 
       let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
@@ -496,8 +502,11 @@ pub(crate) mod tests {
                                             &output_record,
                                             inkeys_ref.as_slice());
 
+      let policies = XfrNotePolicies::empty_policies(input_record.len(), output_record.len());
+      let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
+
       assert_eq!(Ok(()),
-                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref),
                  "Multi asset transfer non confidential");
 
       xfr_note.body.inputs[0].amount = XfrAmount::NonConfidential(8u64);
@@ -505,7 +514,7 @@ pub(crate) mod tests {
       xfr_note.multisig = compute_transfer_multisig(&xfr_note.body, inkeys_ref.as_slice()).unwrap();
 
       assert_eq!(Err(ZeiError::XfrVerifyAssetAmountError),
-                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref),
                  "Multi asset transfer non confidential");
     }
   }
@@ -577,7 +586,7 @@ pub(crate) mod tests {
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
-    use crate::xfr::lib::XfrNotePolicies;
+    use crate::xfr::lib::XfrNotePoliciesRef;
     use crate::xfr::structs::AssetTracingPolicies;
 
     fn check_identity_tracking_for_asset_type(asset_record_type: AssetRecordType) {
@@ -644,17 +653,17 @@ pub(crate) mod tests {
 
       let null_policies_input = &AssetTracingPolicies::new();
 
-      let policies = XfrNotePolicies::new(vec![null_policies_input],
-                                          vec![None; 1],
-                                          vec![&tracking_policy],
-                                          vec![Some(&sig_commitment)]);
+      let policies = XfrNotePoliciesRef::new(vec![null_policies_input],
+                                             vec![None; 1],
+                                             vec![&tracking_policy],
+                                             vec![Some(&sig_commitment)]);
 
       assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
                  Ok(()));
-      let policies = XfrNotePolicies::new(vec![&tracking_policy],
-                                          vec![Some(&sig_commitment)],
-                                          vec![null_policies_input],
-                                          vec![None; 1]);
+      let policies = XfrNotePoliciesRef::new(vec![&tracking_policy],
+                                             vec![Some(&sig_commitment)],
+                                             vec![null_policies_input],
+                                             vec![None; 1]);
       assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
                  Err(XfrVerifyAssetTracingIdentityError),);
 
@@ -688,7 +697,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::basic_crypto::elgamal::ElGamalCiphertext;
     use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
-    use crate::xfr::lib::{trace_assets, XfrNotePolicies};
+    use crate::xfr::lib::{trace_assets, XfrNotePolicies, XfrNotePoliciesRef};
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
 
@@ -783,10 +792,10 @@ pub(crate) mod tests {
       let input_sig_commitment: Vec<Option<&ACCommitment>> = vec![None; inputs.len()];
       let output_sig_commitment: Vec<Option<&ACCommitment>> = vec![None; outputs.len()];
 
-      let policies = XfrNotePolicies::new(input_policies.clone(),
-                                          input_sig_commitment.clone(),
-                                          output_policies.clone(),
-                                          output_sig_commitment.clone());
+      let policies = XfrNotePoliciesRef::new(input_policies.clone(),
+                                             input_sig_commitment.clone(),
+                                             output_policies.clone(),
+                                             output_sig_commitment.clone());
 
       // test 1: the verification is successful
       assert_eq!(verify_xfr_body(&mut prng, params, &xfr_body.clone(), &policies),
@@ -834,10 +843,10 @@ pub(crate) mod tests {
                             lock_attributes: None };
         new_xfr_body.asset_tracing_memos[0] = vec![tracer_memo];
 
-        let policies = XfrNotePolicies::new(input_policies.clone(),
-                                            input_sig_commitment.clone(),
-                                            output_policies.clone(),
-                                            output_sig_commitment.clone());
+        let policies = XfrNotePoliciesRef::new(input_policies.clone(),
+                                               input_sig_commitment.clone(),
+                                               output_policies.clone(),
+                                               output_sig_commitment.clone());
 
         assert_eq!(verify_xfr_body(&mut prng, params, &new_xfr_body, &policies),
                    Err(XfrVerifyAssetTracingAssetAmountError),
@@ -924,10 +933,10 @@ pub(crate) mod tests {
 
       let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
 
-      let policies = XfrNotePolicies::new(vec![&tracking_policy],
-                                          vec![None; 1],
-                                          vec![&tracking_policy],
-                                          vec![None; 1]);
+      let policies = XfrNotePoliciesRef::new(vec![&tracking_policy],
+                                             vec![None; 1],
+                                             vec![&tracking_policy],
+                                             vec![None; 1]);
 
       assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
                  Ok(()));
@@ -1317,10 +1326,10 @@ pub(crate) mod tests {
       let input_sig_commitment = vec![None; inputs.len()];
       let output_sig_commitment = vec![None; outputs.len()];
 
-      let policies = XfrNotePolicies::new(input_policies,
-                                          input_sig_commitment,
-                                          output_policies,
-                                          output_sig_commitment);
+      let policies = XfrNotePoliciesRef::new(input_policies,
+                                             input_sig_commitment,
+                                             output_policies,
+                                             output_sig_commitment);
       // test 1: the verification is successful
       assert_eq!(verify_xfr_body(&mut prng, &mut params, &xfr_body.clone(), &policies),
                  Ok(()),
@@ -1389,13 +1398,15 @@ pub(crate) mod tests {
                                                                      asset_record_type,
                                                                      outkeys[1].get_pk())];
 
+      let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
+      let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
       let (xfr_note, _, _) = create_xfr(&mut prng,
                                         inputs.as_slice(),
                                         outputs.as_slice(),
                                         &inkeys_ref);
 
       assert_eq!(Ok(()),
-                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()),
+                 verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref),
                  "Verification is successful");
 
       // Modify the input so that we trigger an integer overflow
@@ -1406,7 +1417,7 @@ pub(crate) mod tests {
       xfr_body_new.outputs[1].amount = NonConfidential(u64::max_value());
 
       assert_eq!(Err(ZeiError::XfrVerifyAssetAmountError),
-                 verify_xfr_body(&mut prng, &mut params, &xfr_body_new, &Default::default()),
+                 verify_xfr_body(&mut prng, &mut params, &xfr_body_new, &policies_ref),
                  "An integer overflow error must be raised");
     }
 

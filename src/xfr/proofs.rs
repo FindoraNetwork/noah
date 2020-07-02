@@ -15,7 +15,7 @@ use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::RecordDataEncKey;
-use crate::xfr::lib::XfrNotePolicies;
+use crate::xfr::lib::XfrNotePoliciesRef;
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetRecord, AssetTracerMemo, AssetTracingPolicies, BlindAssetRecord,
   OpenAssetRecord, XfrAmount, XfrAssetType, XfrBody, XfrRangeProof,
@@ -136,24 +136,26 @@ fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarM
                                       bars: &'a [BlindAssetRecord],
                                       memos: &'a [Vec<AssetTracerMemo>])
                                       -> Result<(), ZeiError> {
-  for (i, tracing_policies_i) in reveal_policies.iter().enumerate() {
-    let bar_elem = &bars[i];
-
-    // If the bar is non confidential then there is no need for collecting it for further verification.
-    if bar_elem.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
-    {
+  if reveal_policies.len() != bars.len() || bars.len() != memos.len() {
+    // TODO avoid this if and below zip by having a single structure for bar, policies and memo
+    return Err(ZeiError::ParameterError);
+  }
+  for ((tracing_policies_i, bar_i), memos_i) in reveal_policies.iter().zip(bars.iter()).zip(memos) {
+    // If the bar is non confidential skip memo and bar, since there is no tracing proof
+    if bar_i.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
       continue;
     }
-    let memos_i = memos.get(i).ok_or(ZeiError::ParameterError)?;
+
     let tracing_policies_i = tracing_policies_i.get_policies();
     for (j, policy_i_j) in tracing_policies_i.iter().enumerate() {
+      // TODO avoid indexing by j
       if policy_i_j.asset_tracking {
         let key = policy_i_j.enc_keys.record_data_enc_key.clone();
         let memo_i_j = memos_i.get(j).ok_or(ZeiError::ParameterError)?;
 
         map.entry(key)
            .or_insert(Default::default())
-           .push(bar_elem, memo_i_j); // insert ith record with j-th memo
+           .push(bar_i, memo_i_j); // insert ith record with j-th memo
       }
     }
   }
@@ -164,7 +166,7 @@ pub(crate) fn batch_verify_tracer_tracking_proof<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   xfr_bodies: &[&XfrBody],
-  instances_policies: &[&XfrNotePolicies])
+  instances_policies: &[&XfrNotePoliciesRef])
   -> Result<(), ZeiError> {
   if xfr_bodies.len() != instances_policies.len() {
     return Err(ZeiError::ParameterError);

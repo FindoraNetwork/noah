@@ -117,7 +117,7 @@ impl XfrType {
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord};
 /// use zei::xfr::asset_record::AssetRecordType;
-/// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note};
+/// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note, XfrNotePolicies, XfrNotePoliciesRef};
 /// use itertools::Itertools;
 /// use zei::setup::PublicParams;
 ///
@@ -166,7 +166,9 @@ impl XfrType {
 ///                              outputs.as_slice(),
 ///                              inkeys.iter().map(|x| x).collect_vec().as_slice()
 ///                ).unwrap();
-/// assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()), Ok(()));
+/// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
+/// let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
+/// assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref), Ok(()));
 /// ```
 
 pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
@@ -199,7 +201,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord};
 /// use zei::xfr::asset_record::AssetRecordType;
-/// use zei::xfr::lib::{gen_xfr_body,verify_xfr_body};
+/// use zei::xfr::lib::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
 /// use zei::setup::PublicParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -235,7 +237,9 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 ///     outputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap());
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();
-/// assert_eq!(verify_xfr_body(&mut prng, &mut params, &body, &Default::default()), Ok(()));
+/// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
+/// let policies_ref = XfrNotePoliciesRef::from_policies(&policies);
+/// assert_eq!(verify_xfr_body(&mut prng, &mut params, &body, &policies_ref), Ok(()));
 /// ```
 pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                             inputs: &[AssetRecord],
@@ -455,7 +459,7 @@ pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiErro
 pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
                                                params: &mut PublicParams,
                                                xfr_note: &XfrNote,
-                                               policies: &XfrNotePolicies)
+                                               policies: &XfrNotePoliciesRef)
                                                -> Result<(), ZeiError> {
   batch_verify_xfr_notes(prng, params, &[&xfr_note], &[&policies])
 }
@@ -468,7 +472,7 @@ pub fn verify_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(prng: &mut R,
                                                       params: &mut PublicParams,
                                                       notes: &[&XfrNote],
-                                                      policies: &[&XfrNotePolicies])
+                                                      policies: &[&XfrNotePoliciesRef])
                                                       -> Result<(), ZeiError> {
   // 1. verify signature
   for xfr_note in notes {
@@ -527,24 +531,24 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
   batch_verify_asset_mix(prng, params, conf_asset_mix_bodies.as_slice())
 }
 
-#[derive(Default, Clone)]
-pub struct XfrNotePolicies<'b> {
+#[derive(Clone)]
+pub struct XfrNotePoliciesRef<'b> {
   pub(crate) inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
   pub(crate) inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
   pub(crate) outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
   pub(crate) outputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
 }
 
-impl<'b> XfrNotePolicies<'b> {
+impl<'b> XfrNotePoliciesRef<'b> {
   pub fn new(inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
              inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
              outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
              outputs_sig_commitments: Vec<Option<&'b ACCommitment>>)
-             -> XfrNotePolicies<'b> {
-    XfrNotePolicies { inputs_tracking_policies,
-                      inputs_sig_commitments,
-                      outputs_tracking_policies,
-                      outputs_sig_commitments }
+             -> XfrNotePoliciesRef<'b> {
+    XfrNotePoliciesRef { inputs_tracking_policies,
+                         inputs_sig_commitments,
+                         outputs_tracking_policies,
+                         outputs_sig_commitments }
   }
 }
 
@@ -556,39 +560,45 @@ pub(crate) fn if_some_closure(x: &Option<ACCommitment>) -> Option<&ACCommitment>
   }
 }
 
-impl<'a> XfrNotePolicies<'a> {
-  pub fn from_policies_no_ref(p: &'a XfrNotePoliciesNoRef) -> XfrNotePolicies<'a> {
-    XfrNotePolicies::new(p.inputs_tracking_policies.iter().map(|x| x).collect_vec(),
-                         p.inputs_sig_commitments
-                          .iter()
-                          .map(|x| if_some_closure(x))
-                          .collect_vec(),
-                         p.outputs_tracking_policies.iter().map(|x| x).collect_vec(),
-                         p.outputs_sig_commitments
-                          .iter()
-                          .map(|x| if_some_closure(x))
-                          .collect_vec())
+impl<'a> XfrNotePoliciesRef<'a> {
+  pub fn from_policies(p: &'a XfrNotePolicies) -> XfrNotePoliciesRef<'a> {
+    XfrNotePoliciesRef::new(p.inputs_tracking_policies.iter().map(|x| x).collect_vec(),
+                            p.inputs_sig_commitments
+                             .iter()
+                             .map(|x| if_some_closure(x))
+                             .collect_vec(),
+                            p.outputs_tracking_policies.iter().map(|x| x).collect_vec(),
+                            p.outputs_sig_commitments
+                             .iter()
+                             .map(|x| if_some_closure(x))
+                             .collect_vec())
   }
 }
 
-#[derive(Default, Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
-pub struct XfrNotePoliciesNoRef {
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct XfrNotePolicies {
   pub inputs_tracking_policies: Vec<AssetTracingPolicies>,
   pub inputs_sig_commitments: Vec<Option<ACCommitment>>,
   pub outputs_tracking_policies: Vec<AssetTracingPolicies>,
   pub outputs_sig_commitments: Vec<Option<ACCommitment>>,
 }
 
-impl XfrNotePoliciesNoRef {
+impl XfrNotePolicies {
   pub fn new(inputs_tracking_policies: Vec<AssetTracingPolicies>,
              inputs_sig_commitments: Vec<Option<ACCommitment>>,
              outputs_tracking_policies: Vec<AssetTracingPolicies>,
              outputs_sig_commitments: Vec<Option<ACCommitment>>)
-             -> XfrNotePoliciesNoRef {
-    XfrNotePoliciesNoRef { inputs_tracking_policies,
-                           inputs_sig_commitments,
-                           outputs_tracking_policies,
-                           outputs_sig_commitments }
+             -> XfrNotePolicies {
+    XfrNotePolicies { inputs_tracking_policies,
+                      inputs_sig_commitments,
+                      outputs_tracking_policies,
+                      outputs_sig_commitments }
+  }
+  pub fn empty_policies(num_inputs: usize, num_outputs: usize) -> XfrNotePolicies {
+    XfrNotePolicies { inputs_tracking_policies: vec![Default::default(); num_inputs],
+                      inputs_sig_commitments: vec![None; num_inputs],
+                      outputs_tracking_policies: vec![Default::default(); num_outputs],
+                      outputs_sig_commitments: vec![None; num_outputs] }
   }
 }
 
@@ -600,7 +610,7 @@ impl XfrNotePoliciesNoRef {
 pub fn verify_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
                                                params: &mut PublicParams,
                                                body: &XfrBody,
-                                               policies: &XfrNotePolicies)
+                                               policies: &XfrNotePoliciesRef)
                                                -> Result<(), ZeiError> {
   batch_verify_xfr_bodies(prng, params, &[body], &[policies])
 }
@@ -613,7 +623,7 @@ pub fn verify_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
 pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(prng: &mut R,
                                                        params: &mut PublicParams,
                                                        bodies: &[&XfrBody],
-                                                       policies: &[&XfrNotePolicies])
+                                                       policies: &[&XfrNotePoliciesRef])
                                                        -> Result<(), ZeiError> {
   // 1. verify amounts and asset types
   batch_verify_xfr_body_asset_records(prng, params, bodies)?;
