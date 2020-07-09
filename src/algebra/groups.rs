@@ -1,3 +1,4 @@
+use crate::errors::ZeiError;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
@@ -24,7 +25,7 @@ pub trait Scalar:
   fn add(&self, b: &Self) -> Self;
   fn mul(&self, b: &Self) -> Self;
   fn sub(&self, b: &Self) -> Self;
-  fn inv(&self) -> Self;
+  fn inv(&self) -> Result<Self, ZeiError>;
   fn neg(&self) -> Self {
     Self::from_u32(0).sub(self)
   }
@@ -32,7 +33,7 @@ pub trait Scalar:
   fn get_little_endian_u64(&self) -> Vec<u64>;
   // serialization
   fn to_bytes(&self) -> Vec<u8>;
-  fn from_bytes(bytes: &[u8]) -> Self;
+  fn from_bytes(bytes: &[u8]) -> Result<Self, ZeiError>;
 }
 
 pub trait Group<S>:
@@ -45,7 +46,7 @@ pub trait Group<S>:
 
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8>;
-  fn from_compressed_bytes(bytes: &[u8]) -> Option<Self>;
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<Self, ZeiError>;
   fn from_hash<D>(hash: D) -> Self
     where D: Digest<OutputSize = U64> + Default;
 }
@@ -93,6 +94,7 @@ pub(crate) fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<
   }
 
   while digits.len() > 1 && *digits.last().unwrap() == 0i8 {
+    // save unwrap
     digits.pop();
   }
   digits
@@ -125,7 +127,7 @@ pub(crate) mod group_tests {
   pub(crate) fn test_scalar_serialization<S: Scalar>() {
     let a = S::from_u32(100);
     let bytes = a.to_bytes();
-    let b = S::from_bytes(bytes.as_slice());
+    let b = S::from_bytes(bytes.as_slice()).unwrap();
     assert_eq!(a, b);
   }
 

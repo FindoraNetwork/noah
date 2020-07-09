@@ -6,6 +6,7 @@ use rand_core::SeedableRng;
 use std::fmt::Debug;
 use std::string::ToString;
 
+// TODO remove unwraps in this file
 pub enum PathDirection {
   LEFT,
   RIGHT,

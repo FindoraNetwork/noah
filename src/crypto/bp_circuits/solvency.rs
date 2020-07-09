@@ -61,17 +61,16 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
   let diff_var = total_assets_var - total_lia_var;
   let diff_value = match asset_set_values {
     Some(values) => {
-      let converted_asset: Vec<Scalar> =
-        values.iter()
-              .map(|v| v.amount * conversion_rates.get(&v.asset_type).unwrap())
-              .collect();
+      let converted_asset: Vec<Scalar> = values.iter()
+                                               .map(|v| v.amount * conversion_rates.get(&v.asset_type).unwrap()) // TODO remove this unwrap
+                                               .collect();
 
       let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
 
       let converted_lia: Vec<Scalar> =
-        liability_set_values.unwrap()
+        liability_set_values.unwrap() // safe unwrap
                             .iter()
-                            .map(|v| v.amount * conversion_rates.get(&v.asset_type).unwrap())
+                            .map(|v| v.amount * conversion_rates.get(&v.asset_type).unwrap()) // TODO remove this unwrap
                             .collect();
       let total_lia = converted_lia.iter().sum::<Scalar>() + public_liability_sum;
 

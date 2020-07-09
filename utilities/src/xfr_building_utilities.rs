@@ -28,7 +28,7 @@ pub fn non_conf_blind_asset_record_from_ledger(key: &XfrPublicKey,
                      public_key: key.clone() }
 }
 
-// Simulate getting a BlindAssetRecord from Ledger
+/// Simulate getting a BlindAssetRecord from Ledger
 #[allow(clippy::clone_on_copy)]
 #[allow(clippy::blacklisted_name)]
 pub fn conf_blind_asset_record_from_ledger(key: &XfrPublicKey,
