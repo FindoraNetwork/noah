@@ -7,6 +7,7 @@ pub(crate) mod conf_cred_reveal;
 pub mod dlog;
 pub mod group_signatures;
 pub mod pedersen_elgamal;
+pub mod rescue;
 pub mod sigma;
 pub mod solvency;
 pub mod whitelist;

@@ -28,6 +28,7 @@ pub trait Scalar:
   fn neg(&self) -> Self {
     Self::from_u32(0).sub(self)
   }
+  fn pow(&self) -> Self;
 
   fn get_little_endian_u64(&self) -> Vec<u64>;
   // serialization
