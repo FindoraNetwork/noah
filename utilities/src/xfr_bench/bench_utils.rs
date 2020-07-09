@@ -1,5 +1,5 @@
 use zei::setup::PublicParams;
-use zei::xfr::lib::{verify_xfr_body, verify_xfr_note, XfrNotePolicies};
+use zei::xfr::lib::{verify_xfr_body, verify_xfr_note, XfrNotePoliciesRef};
 use zei::xfr::structs::{AssetType, XfrBody, XfrNote};
 
 use criterion::measurement::Measurement;
@@ -11,13 +11,13 @@ pub const ASSET_TYPE_2: AssetType = [1u8; 16];
 
 pub const XFR_NOTE_SIZES: [usize; 3] = [1, 4, 16];
 
-pub(crate) fn run_verify_xfr_note(xfr_note: &XfrNote, policies: &XfrNotePolicies) {
+pub(crate) fn run_verify_xfr_note(xfr_note: &XfrNote, policies: &XfrNotePoliciesRef) {
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
   let mut params = PublicParams::new();
   assert!(verify_xfr_note(&mut prng, &mut params, xfr_note, policies).is_ok());
 }
 
-pub(crate) fn run_verify_xfr_body(xfr_body: &XfrBody, policies: &XfrNotePolicies) {
+pub(crate) fn run_verify_xfr_body(xfr_body: &XfrBody, policies: &XfrNotePoliciesRef) {
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
   let mut params = PublicParams::new();
   assert!(verify_xfr_body(&mut prng, &mut params, xfr_body, policies).is_ok());

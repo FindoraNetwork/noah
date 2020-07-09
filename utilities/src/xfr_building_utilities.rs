@@ -10,7 +10,7 @@ use zei::api::anon_creds::{
 };
 use zei::xfr::asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType};
 use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
-use zei::xfr::lib::XfrNotePoliciesNoRef;
+use zei::xfr::lib::XfrNotePolicies;
 use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
 use zei::xfr::structs::{
   AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
@@ -281,27 +281,27 @@ pub(crate) fn prepare_inputs_and_outputs_with_policies_multiple_assets(
 pub(crate) fn gen_policies_with_id_tracking(ac_commitments: &[ACCommitment],
                                             asset_tracing_policy_input: AssetTracingPolicy,
                                             n: usize)
-                                            -> XfrNotePoliciesNoRef {
+                                            -> XfrNotePolicies {
   let inputs_sig_commitments = ac_commitments.iter().map(|x| Some(x.clone())).collect_vec();
   let outputs_tracking_policies = vec![AssetTracingPolicies::new(); n];
   let outputs_sig_commitments = vec![None; n];
   let policies = AssetTracingPolicies::from_policy(asset_tracing_policy_input);
   let inputs_tracking_policies = vec![policies; n];
 
-  XfrNotePoliciesNoRef::new(inputs_tracking_policies,
-                            inputs_sig_commitments,
-                            outputs_tracking_policies,
-                            outputs_sig_commitments)
+  XfrNotePolicies::new(inputs_tracking_policies,
+                       inputs_sig_commitments,
+                       outputs_tracking_policies,
+                       outputs_sig_commitments)
 }
 
-pub(crate) fn gen_policies_no_id_tracking(n: usize) -> XfrNotePoliciesNoRef {
+pub(crate) fn gen_policies_no_id_tracking(n: usize) -> XfrNotePolicies {
   let inputs_sig_commitments = vec![None; n];
   let outputs_tracking_policies = vec![AssetTracingPolicies::new(); n];
   let outputs_sig_commitments = vec![None; n];
   let inputs_tracking_policies = vec![AssetTracingPolicies::new(); n];
 
-  XfrNotePoliciesNoRef::new(inputs_tracking_policies,
-                            inputs_sig_commitments,
-                            outputs_tracking_policies,
-                            outputs_sig_commitments)
+  XfrNotePolicies::new(inputs_tracking_policies,
+                       inputs_sig_commitments,
+                       outputs_tracking_policies,
+                       outputs_sig_commitments)
 }

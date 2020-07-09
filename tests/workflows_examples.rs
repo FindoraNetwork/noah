@@ -10,7 +10,7 @@ pub(crate) mod examples {
   use zei::setup::PublicParams;
   use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
   use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
-  use zei::xfr::lib::{gen_xfr_note, RecordData, XfrNotePolicies};
+  use zei::xfr::lib::{gen_xfr_note, RecordData, XfrNotePolicies, XfrNotePoliciesRef};
   use zei::xfr::lib::{trace_assets, verify_xfr_note};
   use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
   use zei::xfr::structs::{
@@ -73,8 +73,10 @@ pub(crate) mod examples {
                                 &[recv_asset_record],   // one output
                                 &[&sender_keypair]).unwrap(); // sender secret key
 
+    let policies = XfrNotePolicies::empty_policies(1, 1);
+    let policies_ref = policies.to_ref();
     // 5. Validator verifies xfr_note
-    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()).is_ok()); // there are no policies associated with this xfr note
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).is_ok()); // there are no policies associated with this xfr note
 
     //6. receiver retrieves his BlindAssetRecord and opens it
     let recv_bar = &xfr_note.body.outputs[0];
@@ -123,9 +125,10 @@ pub(crate) mod examples {
                                 &[sender_asset_record], // one input
                                 &[recv_asset_record],   // one output
                                 &[&sender_keypair]).unwrap(); // sender secret key
-
+    let policies = XfrNotePolicies::empty_policies(1, 1);
+    let policies_ref = policies.to_ref();
     // 5. Validator verifies xfr_note
-    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &Default::default()).is_ok()); // there are no policies associated with this xfr note
+    assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).is_ok()); // there are no policies associated with this xfr note
 
     //6. receiver retrieves his BlindAssetRecord and opens it
     let recv_bar = &xfr_note.body.outputs[0];
@@ -207,10 +210,10 @@ pub(crate) mod examples {
                                 &[ar_in1, ar_in2],   // one input
                                 &[ar_out1, ar_out2], // one output
                                 &[&sender1_keypair, &sender2_keypair]).unwrap(); // sender secret key
-    let policies = XfrNotePolicies::new(vec![&policies; 2],
-                                        vec![None; 2],
-                                        vec![&no_policy; 2],
-                                        vec![None; 2]);
+    let policies = XfrNotePoliciesRef::new(vec![&policies; 2],
+                                           vec![None; 2],
+                                           vec![&no_policy; 2],
+                                           vec![None; 2]);
 
     // 5. Validator verifies xfr_note
     assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok()); // there are no policies associated with this xfr note
@@ -328,10 +331,10 @@ pub(crate) mod examples {
                                 &[input_asset_record],
                                 &[output_asset_record1, output_asset_record2],
                                 &[&sender1_keypair]).unwrap();
-    let policies = XfrNotePolicies::new(vec![&no_policy],
-                                        vec![None],
-                                        vec![&policies; 2],
-                                        vec![None; 2]);
+    let policies = XfrNotePoliciesRef::new(vec![&no_policy],
+                                           vec![None],
+                                           vec![&policies; 2],
+                                           vec![None; 2]);
 
     // 5. validator verify xfr_note
     assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
@@ -497,11 +500,11 @@ pub(crate) mod examples {
                                 &[&user1_keypair, &user2_keypair]).unwrap();
 
     let policies =
-      XfrNotePolicies::new(vec![&policies, &policies],
-                           vec![Some(&AIR[xfr_note.body.inputs[0].public_key.as_bytes()]),
-                                Some(&AIR[xfr_note.body.inputs[1].public_key.as_bytes()])],
-                           vec![&no_policies],
-                           vec![None]);
+      XfrNotePoliciesRef::new(vec![&policies, &policies],
+                              vec![Some(&AIR[xfr_note.body.inputs[0].public_key.as_bytes()]),
+                                   Some(&AIR[xfr_note.body.inputs[1].public_key.as_bytes()])],
+                              vec![&no_policies],
+                              vec![None]);
 
     // 5. validator verify xfr_note
     assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
@@ -665,11 +668,11 @@ pub(crate) mod examples {
                                 &[&sender_user_keypair]).unwrap();
 
     let policies =
-      XfrNotePolicies::new(vec![&no_policy],
-                           vec![None],
-                           vec![&policies, &policies],
-                           vec![Some(&AIR[xfr_note.body.outputs[0].public_key.as_bytes()]),
-                                Some(&AIR[xfr_note.body.outputs[1].public_key.as_bytes()])]);
+      XfrNotePoliciesRef::new(vec![&no_policy],
+                              vec![None],
+                              vec![&policies, &policies],
+                              vec![Some(&AIR[xfr_note.body.outputs[0].public_key.as_bytes()]),
+                                   Some(&AIR[xfr_note.body.outputs[1].public_key.as_bytes()])]);
 
     // 5. validator verify xfr_note
     assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
@@ -954,10 +957,10 @@ pub(crate) mod examples {
                                &no_policy];
     let output_sig_commitments = vec![None, None, Some(output3_credential_commitment), None];
 
-    let policies = XfrNotePolicies::new(input_policies,
-                                        inputs_sig_commitments,
-                                        output_policies,
-                                        output_sig_commitments);
+    let policies = XfrNotePoliciesRef::new(input_policies,
+                                           inputs_sig_commitments,
+                                           output_policies,
+                                           output_sig_commitments);
     assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
 
     // 5. check tracing
