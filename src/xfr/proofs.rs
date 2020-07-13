@@ -570,7 +570,7 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
                                                   open_outputs: &[&OpenAssetRecord])
                                                   -> Result<ChaumPedersenProofX, ZeiError> {
   let asset = open_inputs[0].asset_type;
-  let asset_scalar = Scalar::from(u8_bigendian_slice_to_u128(&asset[..]));
+  let asset_scalar = Scalar::from(u8_bigendian_slice_to_u128(&asset.0[..]));
 
   let mut asset_coms = vec![];
   let mut asset_blinds = vec![];

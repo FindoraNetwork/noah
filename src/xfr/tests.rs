@@ -21,7 +21,7 @@ pub(crate) mod tests {
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
     AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerMemo, AssetTracingPolicy,
-    AssetType, IdentityRevealPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote,
+    AssetType, IdentityRevealPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH,
   };
   use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::RistrettoPoint;
@@ -69,7 +69,7 @@ pub(crate) mod tests {
                                     outputs_template: &[AssetRecordType]) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
-    let asset_type = [0u8; 16];
+    let asset_type = AssetType::from_identical_byte(0u8);
 
     let input_amount = 100u64;
     let total_amount = input_amount * inputs_template.len() as u64;
@@ -173,7 +173,7 @@ pub(crate) mod tests {
     let old_output3 = outputs[3].clone();
     let asset_record =
       AssetRecordTemplate::with_no_asset_tracking(old_output3.open_asset_record.amount,
-                                                  [1u8; 16],
+                                                  AssetType::from_identical_byte(1u8),
                                                   outputs[3].open_asset_record.get_record_type(),
                                                   old_output3.open_asset_record
                                                              .blind_asset_record
@@ -203,7 +203,7 @@ pub(crate) mod tests {
     out1.asset_type = match old_output1.open_asset_record.get_record_type() {
       AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
       | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
-        XfrAssetType::NonConfidential([1u8; 16])
+        XfrAssetType::NonConfidential(AssetType::from_identical_byte(1u8))
       }
       _ => XfrAssetType::Confidential(pc_gens.commit(Scalar::from(10u32),
                                                      old_output1.open_asset_record.type_blind)
@@ -217,12 +217,13 @@ pub(crate) mod tests {
     outputs[1] = old_output1;
     let old_input1 = inputs[1].clone();
 
-    let ar_template = AssetRecordTemplate::with_no_asset_tracking(input_amount,
-                                                                  [1u8; 16],
-                                                                  inputs_template[1],
-                                                                  inputs[1].open_asset_record
-                                                                           .blind_asset_record
-                                                                           .public_key);
+    let ar_template =
+      AssetRecordTemplate::with_no_asset_tracking(input_amount,
+                                                  AssetType::from_identical_byte(1u8),
+                                                  inputs_template[1],
+                                                  inputs[1].open_asset_record
+                                                           .blind_asset_record
+                                                           .public_key);
     inputs[1] = AssetRecord::from_template_no_identity_tracking(&mut prng, &ar_template).unwrap();
     let xfr_note = gen_xfr_note(&mut prng,
                                 inputs.as_slice(),
@@ -245,7 +246,7 @@ pub(crate) mod tests {
     in1.asset_type = match old_input1.open_asset_record.get_record_type() {
       AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
       | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
-        XfrAssetType::NonConfidential([1u8; 16])
+        XfrAssetType::NonConfidential(AssetType::from_identical_byte(1u8))
       }
       _ => XfrAssetType::Confidential(pc_gens.commit(Scalar::from(10u32),
                                                      old_input1.open_asset_record.type_blind)
@@ -414,9 +415,9 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_type0 = [0u8; 16];
-      let asset_type1 = [1u8; 16];
-      let asset_type2 = [2u8; 16];
+      let asset_type0 = AssetType::from_identical_byte(0u8);
+      let asset_type1 = AssetType::from_identical_byte(1u8);
+      let asset_type2 = AssetType::from_identical_byte(2u8);
       let asset_record_type = AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
 
       let inkeys = gen_key_pair_vec(6, &mut prng);
@@ -522,7 +523,8 @@ pub(crate) mod tests {
 
     #[test]
     fn xfr_keys_error() {
-      let amounts = [(10, [0u8; 16]), (10, [0u8; 16])]; //input and output
+      let amounts = [(10, AssetType::from_identical_byte(0u8)),
+                     (10, AssetType::from_identical_byte(1u8))]; //input and output
 
       let mut inputs = vec![];
       let mut outputs = vec![];
@@ -627,18 +629,19 @@ pub(crate) mod tests {
       let input_keypair = XfrKeyPair::generate(&mut prng);
 
       let input_asset_record = AssetRecordTemplate::with_no_asset_tracking(10,
-                                                                           [0; 16],
+                                                                           AssetType::from_identical_byte(0u8),
                                                                            asset_record_type,
                                                                            input_keypair.get_pk());
 
       let input =
         AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
 
-      let output_asset_record = AssetRecordTemplate::with_asset_tracking(10,
-                                                                         [0; 16],
-                                                                         asset_record_type,
-                                                                         input_keypair.get_pk(),
-                                                                         tracking_policy.clone());
+      let output_asset_record =
+        AssetRecordTemplate::with_asset_tracking(10,
+                                                 AssetType::from_identical_byte(0u8),
+                                                 asset_record_type,
+                                                 input_keypair.get_pk(),
+                                                 tracking_policy.clone());
 
       let outputs = [AssetRecord::from_template_with_identity_tracking(&mut prng,
                                                                        &output_asset_record,
@@ -698,8 +701,8 @@ pub(crate) mod tests {
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
 
-    const GOLD_ASSET: AssetType = [0; 16];
-    const BITCOIN_ASSET: AssetType = [1; 16];
+    const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
+    const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
 
     fn create_wrong_proof() -> PedersenElGamalEqProof {
       let m = Scalar::from(10u8);
@@ -894,7 +897,7 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::new();
       prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_type = [0; 16];
+      let asset_type = AssetType::from_identical_byte(0u8);
 
       let (_, asset_tracer_pub_key) = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
       let (_, asset_tracer_id_pub_key) = ac_confidential_gen_encryption_keys(&mut prng);
@@ -1370,7 +1373,7 @@ pub(crate) mod tests {
       prng = ChaChaRng::from_seed([0u8; 32]);
       let mut params = PublicParams::new();
 
-      let asset_type = [0u8; 16];
+      let asset_type = AssetType::from_identical_byte(0u8);
 
       let inkeys = gen_key_pair_vec(1, &mut prng);
       let inkeys_ref = inkeys.iter().map(|x| x).collect_vec();

@@ -115,7 +115,7 @@ impl XfrType {
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
 /// use zei::xfr::sig::XfrKeyPair;
-/// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord};
+/// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use zei::xfr::asset_record::AssetRecordType;
 /// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
 /// use itertools::Itertools;
@@ -123,7 +123,7 @@ impl XfrType {
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = PublicParams::new();
-/// let asset_type = [0u8; 16];
+/// let asset_type = AssetType::from_identical_byte(0u8);
 /// let inputs_amounts = [(10u64, asset_type),
 ///                       (10u64, asset_type),
 ///                       (10u64, asset_type)];
@@ -198,14 +198,14 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
 /// use zei::xfr::sig::XfrKeyPair;
-/// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord};
+/// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use zei::xfr::asset_record::AssetRecordType;
 /// use zei::xfr::lib::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
 /// use zei::setup::PublicParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = PublicParams::new();
-/// let asset_type = [0u8; 16];
+/// let asset_type = AssetType::from_identical_byte(0u8);
 /// let inputs_amounts = [(10u64, asset_type),
 ///                       (10u64, asset_type),
 ///                       (10u64, asset_type)];
@@ -335,7 +335,7 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
   let mut ins = vec![];
 
   for x in inputs.iter() {
-    let type_as_u128 = u8_bigendian_slice_to_u128(&x.asset_type[..]);
+    let type_as_u128 = u8_bigendian_slice_to_u128(&x.asset_type.0[..]);
     let type_scalar = Scalar::from(type_as_u128);
     ins.push((x.amount,
               type_scalar,
@@ -345,7 +345,7 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
 
   let mut out = vec![];
   for x in outputs.iter() {
-    let type_as_u128 = u8_bigendian_slice_to_u128(&x.asset_type[..]);
+    let type_as_u128 = u8_bigendian_slice_to_u128(&x.asset_type.0[..]);
     let type_scalar = Scalar::from(type_as_u128);
     out.push((x.amount,
               type_scalar,
@@ -395,7 +395,7 @@ fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result
   let mut amounts = HashMap::new();
 
   for record in inputs.iter() {
-    match amounts.get_mut(&record.open_asset_record.asset_type) {
+    match amounts.get_mut(&(record.open_asset_record.asset_type)) {
       None => {
         amounts.insert(record.open_asset_record.asset_type,
                        vec![i128::from(record.open_asset_record.amount)]);

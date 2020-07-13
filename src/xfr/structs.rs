@@ -18,10 +18,18 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
 /// Asset Type identifier
-pub type AssetType = [u8; 16];
+pub const ASSET_TYPE_LENGTH: usize = 32;
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct AssetType(pub [u8; ASSET_TYPE_LENGTH]);
+impl AssetType {
+  /// Helper function to generate an asset type with identical value in each byte
+  pub fn from_identical_byte(byte: u8) -> Self {
+    Self([byte; ASSET_TYPE_LENGTH])
+  }
+}
 
 pub fn asset_type_to_scalar(asset_type: &AssetType) -> Scalar {
-  let type_as_u128 = u8_bigendian_slice_to_u128(&asset_type[..]);
+  let type_as_u128 = u8_bigendian_slice_to_u128(&asset_type.0[..]);
   Scalar::from(type_as_u128)
 }
 
@@ -143,11 +151,11 @@ impl XfrAssetType {
   /// Returns true only if amount is confidential
   /// # Example:
   /// ```
-  /// use zei::xfr::structs::XfrAssetType;
+  /// use zei::xfr::structs::{AssetType, XfrAssetType};
   /// use curve25519_dalek::ristretto::CompressedRistretto;
   /// let xfr_asset_type = XfrAssetType::Confidential(CompressedRistretto::default());
   /// assert!(xfr_asset_type.is_confidential());
-  /// let xfr_asset_type = XfrAssetType::NonConfidential([0u8;16]);
+  /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
   /// assert!(!xfr_asset_type.is_confidential());
   /// ```
   pub fn is_confidential(&self) -> bool {
@@ -160,10 +168,10 @@ impl XfrAssetType {
   /// Return Some(asset_type) if asset_type is non-confidential. Otherwise, return None
   /// # Example:
   /// ```
-  /// use zei::xfr::structs::XfrAssetType;
+  /// use zei::xfr::structs::{AssetType, XfrAssetType};
   /// use curve25519_dalek::ristretto::CompressedRistretto;
-  /// let xfr_asset_type = XfrAssetType::NonConfidential([0u8;16]);
-  /// assert_eq!(xfr_asset_type.get_asset_type().unwrap(), [0u8;16]);
+  /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
+  /// assert_eq!(xfr_asset_type.get_asset_type().unwrap(), AssetType::from_identical_byte(0u8));
   /// let xfr_asset_type = XfrAssetType::Confidential(CompressedRistretto::default());
   /// assert!(xfr_asset_type.get_asset_type().is_none());
   /// ```
@@ -178,9 +186,9 @@ impl XfrAssetType {
   /// if asset_type is confidential. Otherwise, return None
   /// # Example:
   /// ```
-  /// use zei::xfr::structs::XfrAssetType;
+  /// use zei::xfr::structs::{AssetType, XfrAssetType};
   /// use curve25519_dalek::ristretto::CompressedRistretto;
-  /// let xfr_asset_type = XfrAssetType::NonConfidential([0u8;16]);
+  /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
   /// assert!(xfr_asset_type.get_commitment().is_none());
   /// let xfr_amount = XfrAssetType::Confidential(CompressedRistretto::default());
   /// assert_eq!(xfr_amount.get_commitment().unwrap(), CompressedRistretto::default());

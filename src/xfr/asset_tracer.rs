@@ -144,8 +144,7 @@ impl AssetTracerMemo {
 mod tests {
   use crate::algebra::groups::{Group, Scalar as ZeiScalar};
   use crate::basic_crypto::elgamal::{elgamal_encrypt, elgamal_key_gen};
-  use crate::xfr::structs::AssetTracerEncKeys;
-  use crate::xfr::structs::{asset_type_to_scalar, AssetTracerMemo};
+  use crate::xfr::structs::{asset_type_to_scalar, AssetTracerEncKeys, AssetTracerMemo, AssetType};
   use curve25519_dalek::ristretto::RistrettoPoint;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -205,7 +204,7 @@ mod tests {
                                  lock_attributes: None };
     assert!(memo.extract_asset_type(&ristretto_keypair.0, &[]).is_err());
 
-    let asset_type = [2u8; 16];
+    let asset_type = AssetType::from_identical_byte(2u8);
     let base = RistrettoPoint::get_base();
     let memo =
       AssetTracerMemo { enc_key: asset_tracer_pub_key.clone(),
@@ -218,15 +217,27 @@ mod tests {
                         lock_attributes: None };
     assert_eq!(memo.extract_asset_type(&ristretto_keypair.0, &[]),
                Err(ZeiError::ParameterError));
-    assert_eq!(memo.extract_asset_type(&ristretto_keypair.0, &[[0u8; 16]]),
+    assert_eq!(memo.extract_asset_type(&ristretto_keypair.0,
+                                       &[AssetType::from_identical_byte(0u8)]),
                Err(ZeiError::AssetTracingExtractionError));
-    assert_eq!(memo.extract_asset_type(&ristretto_keypair.0, &[[0u8; 16], [1u8; 16]]),
+    assert_eq!(memo.extract_asset_type(&ristretto_keypair.0,
+                                       &[AssetType::from_identical_byte(0u8),
+                                         AssetType::from_identical_byte(1u8)]),
                Err(ZeiError::AssetTracingExtractionError));
-    assert!(memo.extract_asset_type(&ristretto_keypair.0, &[[0u8; 16], [1u8; 16], asset_type])
+    assert!(memo.extract_asset_type(&ristretto_keypair.0,
+                                    &[AssetType::from_identical_byte(0u8),
+                                      AssetType::from_identical_byte(1u8),
+                                      asset_type])
                 .is_ok());
-    assert!(memo.extract_asset_type(&ristretto_keypair.0, &[asset_type, [0u8; 16], [1u8; 16]])
+    assert!(memo.extract_asset_type(&ristretto_keypair.0,
+                                    &[asset_type,
+                                      AssetType::from_identical_byte(0u8),
+                                      AssetType::from_identical_byte(1u8)])
                 .is_ok());
-    assert!(memo.extract_asset_type(&ristretto_keypair.0, &[[0u8; 16], asset_type, [1u8; 16]])
+    assert!(memo.extract_asset_type(&ristretto_keypair.0,
+                                    &[AssetType::from_identical_byte(0u8),
+                                      asset_type,
+                                      AssetType::from_identical_byte(1u8)])
                 .is_ok());
   }
 

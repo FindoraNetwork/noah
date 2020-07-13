@@ -1,13 +1,13 @@
 use zei::setup::PublicParams;
 use zei::xfr::lib::{verify_xfr_body, verify_xfr_note, XfrNotePoliciesRef};
-use zei::xfr::structs::{AssetType, XfrBody, XfrNote};
+use zei::xfr::structs::{AssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH};
 
 use criterion::measurement::Measurement;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 
-pub const ASSET_TYPE_1: AssetType = [0u8; 16];
-pub const ASSET_TYPE_2: AssetType = [1u8; 16];
+pub const ASSET_TYPE_1: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
+pub const ASSET_TYPE_2: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
 
 pub const XFR_NOTE_SIZES: [usize; 3] = [1, 4, 16];
 

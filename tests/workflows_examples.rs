@@ -15,15 +15,15 @@ pub(crate) mod examples {
   use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
   use zei::xfr::structs::{
     AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
-    IdentityRevealPolicy,
+    IdentityRevealPolicy, ASSET_TYPE_LENGTH,
   };
   use zei_utilities::xfr_building_utilities::{
     conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
   };
 
-  pub const ASSET1_TYPE: AssetType = [0u8; 16];
-  pub const ASSET2_TYPE: AssetType = [1u8; 16];
-  pub const ASSET3_TYPE: AssetType = [2u8; 16];
+  pub const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
+  pub const ASSET2_TYPE: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
+  pub const ASSET3_TYPE: AssetType = AssetType([2u8; ASSET_TYPE_LENGTH]);
 
   pub fn check_record_data(record_data: &RecordData,
                            expected_amount: u64,

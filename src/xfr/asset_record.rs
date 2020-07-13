@@ -11,7 +11,7 @@ use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerMemo,
   AssetTracingPolicies, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount,
-  XfrAssetType,
+  XfrAssetType, ASSET_TYPE_LENGTH,
 };
 use boolinator::Boolinator;
 use bulletproofs::PedersenGens;
@@ -313,7 +313,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 
   // build asset type fields
   let (xfr_asset_type, type_blind) = if confidential_asset {
-    amount_type_bytes.extend_from_slice(&asset_record.asset_type);
+    amount_type_bytes.extend_from_slice(&asset_record.asset_type.0);
     let xfr_asset_type =
       XfrAssetType::Confidential(pc_gens.commit(type_scalar, type_blind).compress());
     (xfr_asset_type, type_blind)
@@ -468,7 +468,7 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
                                secret_key: &XfrSecretKey)
                                -> Result<OpenAssetRecord, ZeiError> {
   let amount;
-  let mut asset_type = [0u8; 16];
+  let mut asset_type = AssetType::from_identical_byte(0u8);
   let amount_blind_low;
   let amount_blind_high;
   let type_blind;
@@ -499,7 +499,8 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
 
   match input.asset_type {
     XfrAssetType::Confidential(_) => {
-      asset_type.copy_from_slice(&amount_type[i..i + 16]);
+      asset_type.0
+                .copy_from_slice(&amount_type[i..i + ASSET_TYPE_LENGTH]);
       type_blind = compute_blind_factor(&shared_point, b"asset_type");
     }
     XfrAssetType::NonConfidential(a) => {
@@ -583,7 +584,7 @@ mod test {
     let pc_gens = PedersenGens::default();
 
     let amount = 100u64;
-    let asset_type = [0u8; 16];
+    let asset_type = AssetType::from_identical_byte(0u8);
     let keypair = XfrKeyPair::generate(&mut prng);
     let tracing_policy = match asset_tracking {
       true => {
@@ -637,7 +638,7 @@ mod test {
     }
 
     if confidential_asset {
-      let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type[..]);
+      let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type.0[..]);
       let type_scalar = Scalar::from(type_as_u128);
       expected_bar_asset_type =
         XfrAssetType::Confidential(pc_gens.commit(type_scalar, open_ar.type_blind).compress());
@@ -689,7 +690,7 @@ mod test {
     prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let asset_type = [1u8; 16];
+    let asset_type = AssetType::from_identical_byte(1u8);
 
     let inkeys = gen_key_pair_vec(2, &mut prng);
     let outkeys = gen_key_pair_vec(1, &mut prng);
@@ -720,7 +721,7 @@ mod test {
 
     assert_eq!(&open_ar.blind_asset_record, &xfr_note.body.outputs[0]);
     assert_eq!(open_ar.amount, 30u64);
-    assert_eq!(open_ar.asset_type, [1u8; 16]);
+    assert_eq!(open_ar.asset_type, AssetType::from_identical_byte(1u8));
 
     let (confidential_amount, confidential_asset) = record_type.get_booleans();
 
@@ -737,7 +738,7 @@ mod test {
 
     if confidential_asset {
       let derived_commitment =
-        pc_gens.commit(Scalar::from(u8_bigendian_slice_to_u128(&open_ar.asset_type[..])),
+        pc_gens.commit(Scalar::from(u8_bigendian_slice_to_u128(&open_ar.asset_type.0[..])),
                        open_ar.type_blind)
                .compress();
       assert_eq!(derived_commitment,
@@ -782,7 +783,7 @@ mod test {
   #[test]
   fn test_build_and_open_blind_record() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let asset_type: AssetType = prng.gen();
+    let asset_type: AssetType = AssetType(prng.gen());
     let amt: u64 = prng.gen();
 
     build_and_open_blind_record(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
