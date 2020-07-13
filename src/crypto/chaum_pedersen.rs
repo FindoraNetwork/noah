@@ -270,7 +270,7 @@ pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
                                                     pc_gens,
                                                     &d,
                                                     &get_fake_zero_commitment(),
-                                                    proof.zero.as_ref().unwrap());
+                                                    proof.zero.as_ref().unwrap()); //safe unwrap
 
   let alpha = Scalar::random(prng);
 
@@ -331,7 +331,7 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(transcript: &mu
                            pc_gens,
                            &d,
                            &get_fake_zero_commitment(),
-                           proof.zero.as_ref().unwrap())
+                           proof.zero.as_ref().unwrap()) // save unwrap
 }
 
 /// Batch verification of chaum pedersen equality of commitment proofs
@@ -375,8 +375,8 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(transcrip
       all_scalars.push(instance_scalars[7] * alpha);
       all_scalars.push(instance_scalars[8] * alpha);
       all_elems.push(commitments_combination);
-      all_elems.push(proof.zero.as_ref().unwrap().c3);
-      all_elems.push(proof.zero.as_ref().unwrap().c4);
+      all_elems.push(proof.zero.as_ref().unwrap().c3); // safe unwrap
+      all_elems.push(proof.zero.as_ref().unwrap().c4); // safe unwrap
     }
   }
 

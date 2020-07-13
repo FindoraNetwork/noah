@@ -19,14 +19,14 @@ pub struct ZeiHybridCipher {
 pub fn hybrid_encrypt<R: CryptoRng + RngCore>(prng: &mut R,
                                               pub_key: &PublicKey,
                                               message: &[u8])
-                                              -> Result<ZeiHybridCipher, ZeiError> {
-  let (key, encoded_rand) = symmetric_key_from_public_key(prng, pub_key)?;
+                                              -> ZeiHybridCipher {
+  let (key, encoded_rand) = symmetric_key_from_public_key(prng, pub_key);
   //let (ciphertext, nonce) = symmetric_encrypt(&key, message);
   let ciphertext = symmetric_encrypt_fresh_key(&key, message);
 
-  Ok(ZeiHybridCipher { ciphertext,
-                       //nonce,
-                       encoded_rand })
+  ZeiHybridCipher { ciphertext,
+                    //nonce,
+                    encoded_rand }
 }
 
 /// I decrypt a hybrid ciphertext for a secret key.
@@ -42,19 +42,23 @@ pub fn hybrid_decrypt(ctext: &ZeiHybridCipher, sec_key: &SecretKey) -> Result<Ve
 /// valid group element, I return ZeiError::DecompressElementError.
 fn symmetric_key_from_public_key<R>(prng: &mut R,
                                     public_key: &PublicKey)
-                                    -> Result<([u8; 32], CompressedEdwardsY), ZeiError>
+                                    -> ([u8; 32], CompressedEdwardsY)
   where R: CryptoRng + RngCore
 {
   let rand = Scalar::random(prng);
-  let encoded_rand = rand * KEY_BASE_POINT.decompress().unwrap(); // can always be decompressed
+  let encoded_rand = rand
+                     * KEY_BASE_POINT.decompress()
+                                     .expect("This should always decompress correctly");
   let pk_curve_point = CompressedEdwardsY::from_slice(public_key.as_bytes());
-  let curve_key = rand * pk_curve_point.decompress().unwrap();
+  let curve_key = rand
+                  * pk_curve_point.decompress()
+                                  .expect("This should always decompress correctly");
   let mut hasher = sha2::Sha256::new();
   hasher.input(curve_key.compress().as_bytes());
   let hash = hasher.result();
   let mut symmetric_key = [0u8; 32];
   symmetric_key.copy_from_slice(hash.as_slice());
-  Ok((symmetric_key, encoded_rand.compress()))
+  (symmetric_key, encoded_rand.compress())
 }
 
 fn sec_key_as_scalar(sk: &SecretKey) -> Scalar {
@@ -123,8 +127,7 @@ mod test {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
     let keypair = Keypair::generate(&mut prng);
-    let (from_pk_key, encoded_rand) =
-      symmetric_key_from_public_key(&mut prng, &keypair.public).unwrap();
+    let (from_pk_key, encoded_rand) = symmetric_key_from_public_key(&mut prng, &keypair.public);
     let from_sk_key = symmetric_key_from_secret_key(&keypair.secret, &encoded_rand).unwrap();
     assert_eq!(from_pk_key, from_sk_key);
   }
@@ -149,7 +152,7 @@ mod test {
     let key_pair = Keypair::generate(&mut prng);
     let msg = b"this is another message";
 
-    let cipherbox = hybrid_encrypt(&mut prng, &key_pair.public, msg).unwrap();
+    let cipherbox = hybrid_encrypt(&mut prng, &key_pair.public, msg);
     let plaintext = hybrid_decrypt(&cipherbox, &key_pair.secret).unwrap();
     assert_eq!(msg, plaintext.as_slice());
   }

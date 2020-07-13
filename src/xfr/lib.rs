@@ -552,7 +552,7 @@ impl<'b> XfrNotePoliciesRef<'b> {
 
 pub(crate) fn if_some_closure(x: &Option<ACCommitment>) -> Option<&ACCommitment> {
   if (*x).is_some() {
-    Some(x.as_ref().unwrap())
+    Some(x.as_ref().unwrap()) // safe unwrap()
   } else {
     None
   }
@@ -643,15 +643,17 @@ fn safe_sum_u64(terms: &[u64]) -> u128 {
 fn verify_plain_amounts(inputs: &[BlindAssetRecord],
                         outputs: &[BlindAssetRecord])
                         -> Result<(), ZeiError> {
-  let in_amount: Vec<u64> = inputs.iter()
-                                  .map(|x| x.amount.get_amount().unwrap())
-                                  .collect();
-  let out_amount: Vec<u64> = outputs.iter()
-                                    .map(|x| x.amount.get_amount().unwrap())
-                                    .collect();
+  let in_amount: Result<Vec<u64>, ZeiError> =
+    inputs.iter()
+          .map(|x| x.amount.get_amount().ok_or(ZeiError::ParameterError))
+          .collect();
+  let out_amount: Result<Vec<u64>, ZeiError> =
+    outputs.iter()
+           .map(|x| x.amount.get_amount().ok_or(ZeiError::ParameterError))
+           .collect();
 
-  let sum_inputs = safe_sum_u64(in_amount.as_slice());
-  let sum_outputs = safe_sum_u64(out_amount.as_slice());
+  let sum_inputs = safe_sum_u64(in_amount?.as_slice());
+  let sum_outputs = safe_sum_u64(out_amount?.as_slice());
 
   if sum_inputs < sum_outputs {
     return Err(ZeiError::XfrVerifyAssetAmountError);
@@ -665,10 +667,14 @@ fn verify_plain_asset(inputs: &[BlindAssetRecord],
                       -> Result<(), ZeiError> {
   let mut list = vec![];
   for x in inputs.iter() {
-    list.push(x.asset_type.get_asset_type().unwrap());
+    list.push(x.asset_type
+               .get_asset_type()
+               .ok_or(ZeiError::ParameterError)?);
   }
   for x in outputs.iter() {
-    list.push(x.asset_type.get_asset_type().unwrap());
+    list.push(x.asset_type
+               .get_asset_type()
+               .ok_or(ZeiError::ParameterError)?);
   }
   if list.iter().all_equal() {
     Ok(())
@@ -683,25 +689,39 @@ fn verify_plain_asset_mix(inputs: &[BlindAssetRecord],
   let mut amounts = HashMap::new();
 
   for record in inputs.iter() {
-    match amounts.get_mut(&record.asset_type.get_asset_type().unwrap()) {
+    match amounts.get_mut(&record.asset_type
+                                 .get_asset_type()
+                                 .ok_or(ZeiError::ParameterError)?)
+    {
       None => {
-        amounts.insert(record.asset_type.get_asset_type().unwrap(),
-                       vec![i128::from(record.amount.get_amount().unwrap())]);
+        amounts.insert(record.asset_type
+                             .get_asset_type()
+                             .ok_or(ZeiError::ParameterError)?,
+                       vec![i128::from(record.amount
+                                             .get_amount()
+                                             .ok_or(ZeiError::ParameterError)?)]);
       }
       Some(vec) => {
-        vec.push(i128::from(record.amount.get_amount().unwrap()));
+        vec.push(i128::from(record.amount.get_amount().ok_or(ZeiError::ParameterError)?));
       }
     };
   }
 
   for record in outputs.iter() {
-    match amounts.get_mut(&record.asset_type.get_asset_type().unwrap()) {
+    match amounts.get_mut(&record.asset_type
+                                 .get_asset_type()
+                                 .ok_or(ZeiError::ParameterError)?)
+    {
       None => {
-        amounts.insert(record.asset_type.get_asset_type().unwrap(),
-                       vec![-i128::from(record.amount.get_amount().unwrap())]);
+        amounts.insert(record.asset_type
+                             .get_asset_type()
+                             .ok_or(ZeiError::ParameterError)?,
+                       vec![-i128::from(record.amount
+                                              .get_amount()
+                                              .ok_or(ZeiError::ParameterError)?)]);
       }
       Some(vec) => {
-        vec.push(-i128::from(record.amount.get_amount().unwrap()));
+        vec.push(-i128::from(record.amount.get_amount().ok_or(ZeiError::ParameterError)?));
       }
     };
   }
@@ -721,40 +741,47 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
                                                      &[BlindAssetRecord],
                                                      &AssetMixProof)])
                                                   -> Result<(), ZeiError> {
-  fn process_bars(bars: &[BlindAssetRecord]) -> Vec<(CompressedRistretto, CompressedRistretto)> {
+  fn process_bars(bars: &[BlindAssetRecord])
+                  -> Result<Vec<(CompressedRistretto, CompressedRistretto)>, ZeiError> {
     let pow2_32 = Scalar::from(POW_2_32);
     bars.iter()
         .map(|x| {
           let (com_amount_low, com_amount_high) = match x.amount {
             XfrAmount::Confidential((c1, c2)) => {
-              (c1.decompress().unwrap(), c2.decompress().unwrap())
+              (c1.decompress().ok_or(ZeiError::DecompressElementError),
+               c2.decompress().ok_or(ZeiError::DecompressElementError))
             }
             XfrAmount::NonConfidential(amount) => {
               let pc_gens = PedersenGens::default();
               let (low, high) = u64_to_u32_pair(amount);
-              (pc_gens.commit(Scalar::from(low), Scalar::zero()),
-               pc_gens.commit(Scalar::from(high), Scalar::zero()))
+              (Ok(pc_gens.commit(Scalar::from(low), Scalar::zero())),
+               Ok(pc_gens.commit(Scalar::from(high), Scalar::zero())))
             }
           };
-          let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
+          match (com_amount_low, com_amount_high) {
+            (Ok(com_amount_low), Ok(com_amount_high)) => {
+              let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
 
-          let com_type = match x.asset_type {
-            XfrAssetType::Confidential(c) => c,
-            XfrAssetType::NonConfidential(asset_type) => {
-              let scalar = asset_type_to_scalar(&asset_type);
-              let pc_gens = PedersenGens::default();
-              pc_gens.commit(scalar, Scalar::zero()).compress()
+              let com_type = match x.asset_type {
+                XfrAssetType::Confidential(c) => c,
+                XfrAssetType::NonConfidential(asset_type) => {
+                  let scalar = asset_type_to_scalar(&asset_type);
+                  let pc_gens = PedersenGens::default();
+                  pc_gens.commit(scalar, Scalar::zero()).compress()
+                }
+              };
+              Ok((com_amount, com_type))
             }
-          };
-          (com_amount, com_type)
+            _ => Err(ZeiError::ParameterError),
+          }
         })
-        .collect_vec()
+        .collect()
   }
 
   let mut asset_mix_instances = vec![];
   for instance in bars_instances {
-    let in_coms = process_bars(instance.0);
-    let out_coms = process_bars(instance.1);
+    let in_coms = process_bars(instance.0)?;
+    let out_coms = process_bars(instance.1)?;
     asset_mix_instances.push(AssetMixingInstance { inputs: in_coms,
                                                    outputs: out_coms,
                                                    proof: instance.2 });

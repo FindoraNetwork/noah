@@ -48,11 +48,10 @@ impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint> {
     v.extend_from_slice(self.e2.to_compressed_bytes().as_slice());
     v
   }
-  fn zei_from_bytes(bytes: &[u8]) -> Self {
-    ElGamalCiphertext{
-            e1: RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN]).unwrap(),
-            e2: RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..]).unwrap(),
-        }
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    let e1 = RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN])?;
+    let e2 = RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..])?;
+    Ok(ElGamalCiphertext { e1, e2 })
   }
 }
 

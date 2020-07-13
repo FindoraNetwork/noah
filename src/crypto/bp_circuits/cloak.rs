@@ -219,7 +219,7 @@ pub(super) fn merge(sorted: &[CloakValue]) -> (Vec<CloakValue>, Vec<CloakValue>)
       prev = *value;
     }
   }
-  merged.push(intermediate.pop().unwrap());
+  merged.push(intermediate.pop().unwrap()); // safe unwrap
   (intermediate, merged)
 }
 

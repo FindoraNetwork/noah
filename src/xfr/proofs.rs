@@ -517,7 +517,8 @@ fn extract_value_commitments(inputs: &[BlindAssetRecord],
   for output in outputs.iter() {
     let (com_low, com_high) = match output.amount {
       XfrAmount::Confidential((com_low, com_high)) => {
-        (com_low.decompress().unwrap(), com_high.decompress().unwrap())
+        (com_low.decompress().ok_or(ZeiError::ParameterError)?,
+         com_high.decompress().ok_or(ZeiError::ParameterError)?)
       }
       XfrAmount::NonConfidential(amount) => {
         let (low, high) = u64_to_u32_pair(amount);
@@ -576,7 +577,7 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
 
   for x in open_inputs.iter().chain(open_outputs) {
     let commitment = match x.blind_asset_record.asset_type {
-      XfrAssetType::Confidential(com) => com.decompress().unwrap(),
+      XfrAssetType::Confidential(com) => com.decompress().ok_or(ZeiError::ParameterError)?,
       XfrAssetType::NonConfidential(asset_type) => {
         pc_gens.commit(asset_type_to_scalar(&asset_type), x.type_blind)
       }
@@ -602,17 +603,17 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut
   let mut transcript = Transcript::new(b"AssetEquality");
   let mut proof_instances = Vec::with_capacity(instances.len());
   for (inputs, outputs, proof) in instances {
-    let instance_commitments: Vec<RistrettoPoint> =
+    let instance_commitments: Result<Vec<RistrettoPoint>, ZeiError> =
       inputs.iter()
             .chain(outputs.iter())
             .map(|x| match x.asset_type {
-              XfrAssetType::Confidential(com) => com.decompress().unwrap(),
+              XfrAssetType::Confidential(com) => com.decompress().ok_or(ZeiError::ParameterError),
               XfrAssetType::NonConfidential(asset_type) => {
-                pc_gens.commit(asset_type_to_scalar(&asset_type), Scalar::zero())
+                Ok(pc_gens.commit(asset_type_to_scalar(&asset_type), Scalar::zero()))
               }
             })
             .collect();
-    proof_instances.push((instance_commitments, *proof));
+    proof_instances.push((instance_commitments?, *proof));
   }
   chaum_pedersen_batch_verify_multiple_eq(&mut transcript, prng, &pc_gens, &proof_instances)
     .map_err(|_| ZeiError::XfrVerifyConfidentialAssetError)

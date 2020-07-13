@@ -344,7 +344,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   let owner_memo = if confidential_asset || confidential_amount {
     let lock = hybrid_encrypt(prng,
                               &asset_record.public_key.0,
-                              amount_type_bytes.as_slice()).unwrap();
+                              amount_type_bytes.as_slice());
     Some(OwnerMemo { blind_share, lock })
   } else {
     None
@@ -437,7 +437,7 @@ fn sample_point_and_blind_share<R: CryptoRng + RngCore>(
   public_key: &XfrPublicKey)
   -> (CompressedEdwardsY, CompressedEdwardsY) {
   let blind_key = Scalar::random(prng);
-  let pk_point = public_key.get_curve_point().unwrap();
+  let pk_point = public_key.get_curve_point();
   let derived_point: EdwardsPoint = blind_key * pk_point;
   let blind_share = blind_key * ED25519_BASEPOINT_POINT;
   (derived_point.compress(), blind_share.compress())
