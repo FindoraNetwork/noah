@@ -173,20 +173,32 @@ pub(crate) fn batch_verify_tracer_tracking_proof<R: CryptoRng + RngCore>(
   }
 
   // 1. batch asset_type and amount tracking
-  let input_reveal_policies =
+  let input_reveal_policies: Result<Vec<&[&AssetTracingPolicies]>, ZeiError> =
     instances_policies.iter()
-                      .map(|policies| policies.inputs_tracking_policies.as_slice())
-                      .collect_vec();
-  let output_reveal_policies =
+                      .map(|policies| {
+                        if policies.valid {
+                          Ok(policies.inputs_tracking_policies.as_slice())
+                        } else {
+                          Err(ZeiError::ParameterError)
+                        }
+                      })
+                      .collect();
+  let output_reveal_policies: Result<Vec<&[&AssetTracingPolicies]>, ZeiError> =
     instances_policies.iter()
-                      .map(|policies| policies.outputs_tracking_policies.as_slice())
-                      .collect_vec();
+                      .map(|policies| {
+                        if policies.valid {
+                          Ok(policies.outputs_tracking_policies.as_slice())
+                        } else {
+                          Err(ZeiError::ParameterError)
+                        }
+                      })
+                      .collect();
   batch_verify_asset_tracking_proofs(
     prng,
     pc_gens,
     xfr_bodies,
-    &input_reveal_policies,
-    &output_reveal_policies,
+    &input_reveal_policies.unwrap(),
+    &output_reveal_policies.unwrap(),
   ).map_err(|_| ZeiError::XfrVerifyAssetTracingAssetAmountError)?;
 
   // Identity proofs can be batched(?)

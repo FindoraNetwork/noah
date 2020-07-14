@@ -628,10 +628,11 @@ pub(crate) mod tests {
 
       let input_keypair = XfrKeyPair::generate(&mut prng);
 
-      let input_asset_record = AssetRecordTemplate::with_no_asset_tracking(10,
-                                                                           AssetType::from_identical_byte(0u8),
-                                                                           asset_record_type,
-                                                                           input_keypair.get_pk());
+      let input_asset_record =
+        AssetRecordTemplate::with_no_asset_tracking(10,
+                                                    AssetType::from_identical_byte(0u8),
+                                                    asset_record_type,
+                                                    input_keypair.get_pk());
 
       let input =
         AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
