@@ -529,8 +529,9 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
   batch_verify_asset_mix(prng, params, conf_asset_mix_bodies.as_slice())
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct XfrNotePoliciesRef<'b> {
+  pub(crate) valid: bool,
   pub(crate) inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
   pub(crate) inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
   pub(crate) outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
@@ -543,7 +544,8 @@ impl<'b> XfrNotePoliciesRef<'b> {
              outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
              outputs_sig_commitments: Vec<Option<&'b ACCommitment>>)
              -> XfrNotePoliciesRef<'b> {
-    XfrNotePoliciesRef { inputs_tracking_policies,
+    XfrNotePoliciesRef { valid: true,
+                         inputs_tracking_policies,
                          inputs_sig_commitments,
                          outputs_tracking_policies,
                          outputs_sig_commitments }
@@ -558,8 +560,9 @@ pub(crate) fn if_some_closure(x: &Option<ACCommitment>) -> Option<&ACCommitment>
   }
 }
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct XfrNotePolicies {
+  pub valid: bool, // allows to implement Default, if false (as after Default), then use empty_policies to create a "valid" XfrNotePolicies struct with empty policies
   pub inputs_tracking_policies: Vec<AssetTracingPolicies>,
   pub inputs_sig_commitments: Vec<Option<ACCommitment>>,
   pub outputs_tracking_policies: Vec<AssetTracingPolicies>,
@@ -572,35 +575,41 @@ impl XfrNotePolicies {
              outputs_tracking_policies: Vec<AssetTracingPolicies>,
              outputs_sig_commitments: Vec<Option<ACCommitment>>)
              -> XfrNotePolicies {
-    XfrNotePolicies { inputs_tracking_policies,
+    XfrNotePolicies { valid: true,
+                      inputs_tracking_policies,
                       inputs_sig_commitments,
                       outputs_tracking_policies,
                       outputs_sig_commitments }
   }
   pub fn empty_policies(num_inputs: usize, num_outputs: usize) -> XfrNotePolicies {
-    XfrNotePolicies { inputs_tracking_policies: vec![Default::default(); num_inputs],
+    XfrNotePolicies { valid: true,
+                      inputs_tracking_policies: vec![Default::default(); num_inputs],
                       inputs_sig_commitments: vec![None; num_inputs],
                       outputs_tracking_policies: vec![Default::default(); num_outputs],
                       outputs_sig_commitments: vec![None; num_outputs] }
   }
 
   pub fn to_ref(&self) -> XfrNotePoliciesRef {
-    XfrNotePoliciesRef::new(self.inputs_tracking_policies
-                                .iter()
-                                .map(|x| x)
-                                .collect_vec(),
-                            self.inputs_sig_commitments
-                                .iter()
-                                .map(|x| if_some_closure(x))
-                                .collect_vec(),
-                            self.outputs_tracking_policies
-                                .iter()
-                                .map(|x| x)
-                                .collect_vec(),
-                            self.outputs_sig_commitments
-                                .iter()
-                                .map(|x| if_some_closure(x))
-                                .collect_vec())
+    if self.valid {
+      XfrNotePoliciesRef::new(self.inputs_tracking_policies
+                                  .iter()
+                                  .map(|x| x)
+                                  .collect_vec(),
+                              self.inputs_sig_commitments
+                                  .iter()
+                                  .map(|x| if_some_closure(x))
+                                  .collect_vec(),
+                              self.outputs_tracking_policies
+                                  .iter()
+                                  .map(|x| x)
+                                  .collect_vec(),
+                              self.outputs_sig_commitments
+                                  .iter()
+                                  .map(|x| if_some_closure(x))
+                                  .collect_vec())
+    } else {
+      XfrNotePoliciesRef::default()
+    }
   }
 }
 

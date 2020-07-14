@@ -19,7 +19,7 @@ use curve25519_dalek::scalar::Scalar;
 
 /// Asset Type identifier
 pub const ASSET_TYPE_LENGTH: usize = 32;
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct AssetType(pub [u8; ASSET_TYPE_LENGTH]);
 impl AssetType {
   /// Helper function to generate an asset type with identical value in each byte
