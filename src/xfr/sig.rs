@@ -6,9 +6,9 @@ use crate::errors::ZeiError::SignatureError;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::SecretKey;
 use ed25519_dalek::Signature;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey};
+use ed25519_dalek::{SecretKey, Verifier};
 use wasm_bindgen::prelude::*;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
@@ -20,10 +20,10 @@ pub const KEY_BASE_POINT: CompressedEdwardsY =
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct XfrPublicKey(pub(crate) PublicKey);
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct XfrSecretKey(pub(crate) SecretKey);
 #[wasm_bindgen]
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct XfrKeyPair {
   pub_key: XfrPublicKey,
   sec_key: XfrSecretKey,

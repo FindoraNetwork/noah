@@ -6,6 +6,7 @@ use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
+use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
@@ -439,7 +440,7 @@ mod test {
     key: XfrPublicKey,
   }
 
-  #[derive(Serialize, Deserialize, Default)]
+  #[derive(Serialize, Deserialize)]
   struct StructWithSecKey {
     key: XfrSecretKey,
   }
