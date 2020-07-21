@@ -485,6 +485,9 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
 
   match input.amount {
     XfrAmount::Confidential(_) => {
+      if amount_type.len() < 8 {
+        return Err(ZeiError::ParameterError);
+      }
       amount = u8_bigendian_slice_to_u64(&amount_type[0..8]);
       amount_blind_low = compute_blind_factor(&shared_point, b"amount_low");
       amount_blind_high = compute_blind_factor(&shared_point, b"amount_high");
@@ -499,6 +502,9 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
 
   match input.asset_type {
     XfrAssetType::Confidential(_) => {
+      if amount_type.len() < i + ASSET_TYPE_LENGTH {
+        return Err(ZeiError::ParameterError);
+      }
       asset_type.0
                 .copy_from_slice(&amount_type[i..i + ASSET_TYPE_LENGTH]);
       type_blind = compute_blind_factor(&shared_point, b"asset_type");
@@ -798,5 +804,47 @@ mod test {
     build_and_open_blind_record(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
                                 amt,
                                 asset_type);
+  }
+
+  #[test]
+  fn open_blind_asset_record_error() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let pc_gens = PedersenGens::default();
+
+    let keypair = XfrKeyPair::generate(&mut prng);
+    let (pubkey, privkey) = (keypair.get_pk_ref(), keypair.get_sk_ref());
+    let asset_type: AssetType = AssetType(prng.gen());
+    let amount = 10u64;
+    let ar =
+      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, pubkey.clone());
+    let (blind_rec, _asset_tracer_memo, owner_memo) =
+      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+
+    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
+    assert!(open_rec.is_ok(), "Open a just created asset record");
+    let open_rec = open_blind_asset_record(&blind_rec, &None, &privkey);
+    assert!(open_rec.is_err(), "Expect error as amount is confidential");
+
+    let ar =
+      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::NonConfidentialAmount_ConfidentialAssetType, pubkey.clone());
+    let (blind_rec, _asset_tracer_memo, owner_memo) =
+      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+
+    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
+    assert!(open_rec.is_ok(), "Open a just created asset record");
+    let open_rec = open_blind_asset_record(&blind_rec, &None, &privkey);
+    assert!(open_rec.is_err(),
+            "Expect error as asset type is confidential");
+
+    let ar =
+      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::ConfidentialAmount_ConfidentialAssetType, pubkey.clone());
+    let (blind_rec, _asset_tracer_memo, owner_memo) =
+      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+
+    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
+    assert!(open_rec.is_ok(), "Open a just created asset record");
+    let open_rec = open_blind_asset_record(&blind_rec, &None, &privkey);
+    assert!(open_rec.is_err(),
+            "Expect error as asset type and amount are confidential");
   }
 }
