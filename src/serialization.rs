@@ -1,3 +1,4 @@
+use crate::errors::ZeiError;
 use crate::utils::{b64dec, b64enc};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use bulletproofs::r1cs::R1CSProof;
@@ -5,6 +6,7 @@ use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
+use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
@@ -133,9 +135,9 @@ impl<'de> Deserialize<'de> for XfrSecretKey {
 }
 
 /// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
-pub trait ZeiFromToBytes {
+pub trait ZeiFromToBytes: Sized {
   fn zei_to_bytes(&self) -> Vec<u8>;
-  fn zei_from_bytes(bytes: &[u8]) -> Self;
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError>;
 }
 
 impl ZeiFromToBytes for Scalar {
@@ -144,10 +146,10 @@ impl ZeiFromToBytes for Scalar {
     v.extend_from_slice(&self.to_bytes()[..]);
     v
   }
-  fn zei_from_bytes(bytes: &[u8]) -> Scalar {
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Scalar, ZeiError> {
     let mut bits = [0u8; 32];
     bits.copy_from_slice(bytes);
-    Scalar::from_bits(bits)
+    Ok(Scalar::from_bits(bits))
   }
 }
 
@@ -155,9 +157,12 @@ impl ZeiFromToBytes for RistrettoPoint {
   fn zei_to_bytes(&self) -> Vec<u8> {
     self.compress().zei_to_bytes()
   }
-  fn zei_from_bytes(bytes: &[u8]) -> RistrettoPoint {
+  fn zei_from_bytes(bytes: &[u8]) -> Result<RistrettoPoint, ZeiError> {
     let compressed = CompressedRistretto::from_slice(bytes);
-    compressed.decompress().unwrap() //TODO handle error
+    match compressed.decompress() {
+      Some(x) => Ok(x),
+      None => Err(ZeiError::DecompressElementError),
+    }
   }
 }
 
@@ -167,8 +172,8 @@ impl ZeiFromToBytes for CompressedRistretto {
     v.extend_from_slice(&self.to_bytes()[..]);
     v
   }
-  fn zei_from_bytes(bytes: &[u8]) -> CompressedRistretto {
-    CompressedRistretto::from_slice(bytes)
+  fn zei_from_bytes(bytes: &[u8]) -> Result<CompressedRistretto, ZeiError> {
+    Ok(CompressedRistretto::from_slice(bytes))
   }
 }
 
@@ -178,8 +183,8 @@ impl ZeiFromToBytes for RangeProof {
     v.extend_from_slice(&self.to_bytes()[..]);
     v
   }
-  fn zei_from_bytes(bytes: &[u8]) -> RangeProof {
-    RangeProof::from_bytes(bytes).unwrap()
+  fn zei_from_bytes(bytes: &[u8]) -> Result<RangeProof, ZeiError> {
+    RangeProof::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError) // TODO import error message
   }
 }
 
@@ -187,8 +192,8 @@ impl ZeiFromToBytes for R1CSProof {
   fn zei_to_bytes(&self) -> Vec<u8> {
     self.to_bytes()
   }
-  fn zei_from_bytes(bytes: &[u8]) -> R1CSProof {
-    R1CSProof::from_bytes(bytes).unwrap()
+  fn zei_from_bytes(bytes: &[u8]) -> Result<R1CSProof, ZeiError> {
+    R1CSProof::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError) // TODO import error message
   }
 }
 
@@ -198,8 +203,8 @@ impl ZeiFromToBytes for CompressedEdwardsY {
     v.extend_from_slice(&self.to_bytes()[..]);
     v
   }
-  fn zei_from_bytes(bytes: &[u8]) -> CompressedEdwardsY {
-    CompressedEdwardsY::from_slice(bytes)
+  fn zei_from_bytes(bytes: &[u8]) -> Result<CompressedEdwardsY, ZeiError> {
+    Ok(CompressedEdwardsY::from_slice(bytes))
   }
 }
 
@@ -211,8 +216,11 @@ impl ZeiFromToBytes for XfrSignature {
     vec
   }
 
-  fn zei_from_bytes(bytes: &[u8]) -> Self {
-    XfrSignature(ed25519_dalek::Signature::from_bytes(bytes).unwrap())
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    match ed25519_dalek::Signature::from_bytes(bytes) {
+      Ok(e) => Ok(XfrSignature(e)),
+      Err(_) => Err(ZeiError::DeserializationError),
+    }
   }
 }
 
@@ -244,17 +252,17 @@ impl<'de> Deserialize<'de> for XfrSignature {
       fn visit_bytes<E>(self, v: &[u8]) -> Result<XfrSignature, E>
         where E: serde::de::Error
       {
-        Ok(XfrSignature::zei_from_bytes(v))
+        XfrSignature::zei_from_bytes(v).map_err(serde::de::Error::custom)
       }
 
       fn visit_seq<V>(self, mut seq: V) -> Result<XfrSignature, V::Error>
         where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().unwrap() {
+        while let Some(x) = seq.next_element().map_err(serde::de::Error::custom)? {
           vec.push(x);
         }
-        Ok(XfrSignature::zei_from_bytes(vec.as_slice()))
+        XfrSignature::zei_from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
       }
       fn visit_str<E>(self, s: &str) -> Result<XfrSignature, E>
         where E: serde::de::Error
@@ -263,8 +271,6 @@ impl<'de> Deserialize<'de> for XfrSignature {
       }
     }
 
-    //let v = deserializer.deserialize_bytes(zei_obj_serde::BytesVisitor).unwrap();
-    //Ok(XfrSignature::zei_from_bytes(v.as_slice()))
     if deserializer.is_human_readable() {
       deserializer.deserialize_str(XfrSignatureVisitor)
     } else {
@@ -294,7 +300,7 @@ pub mod zei_obj_serde {
       where V: SeqAccess<'de>
     {
       let mut vec: Vec<u8> = vec![];
-      while let Some(x) = seq.next_element().unwrap() {
+      while let Some(x) = seq.next_element().map_err(serde::de::Error::custom)? {
         vec.push(x);
       }
       Ok(vec)
@@ -331,10 +337,10 @@ pub mod zei_obj_serde {
   {
     if deserializer.is_human_readable() {
       let bytes = deserializer.deserialize_str(BytesVisitor)?;
-      Ok(T::zei_from_bytes(bytes.as_slice()))
+      T::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
     } else {
       let v = deserializer.deserialize_bytes(BytesVisitor)?;
-      Ok(T::zei_from_bytes(v.as_slice()))
+      T::zei_from_bytes(v.as_slice()).map_err(serde::de::Error::custom)
     }
   }
 }
@@ -434,7 +440,7 @@ mod test {
     key: XfrPublicKey,
   }
 
-  #[derive(Serialize, Deserialize, Default)]
+  #[derive(Serialize, Deserialize)]
   struct StructWithSecKey {
     key: XfrSecretKey,
   }

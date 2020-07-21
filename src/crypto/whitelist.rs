@@ -52,11 +52,12 @@ pub fn prove_mt_membership<R: CryptoRng + RngCore>(prng: &mut R,
     witness_commitments.push(sibling_com);
   }
 
-  let num_left_wires = merkle_verify_mimc(&mut prover,
-                                          var_elem,
-                                          &var_path[..],
-                                          mt.root.value,
-                                          Scalar::from(mt.size as u64)).unwrap();
+  let num_left_wires =
+    merkle_verify_mimc(&mut prover,
+                       var_elem,
+                       &var_path[..],
+                       mt.root.value,
+                       Scalar::from(mt.size as u64)).map_err(|_| ZeiError::WhitelistProveError)?;
   let num_gens = num_left_wires.next_power_of_two();
   let bp_gens = BulletproofGens::new(num_gens, 1);
   let proof = prover.prove(&bp_gens)

@@ -101,7 +101,7 @@ fn pippenger<S: Scalar, G: Group<S>>(scalars: &[&S], elems: &[&G]) -> G {
                                         });
 
   let two_power_w_int = Scalar::from_u64(two_power_w as u64);
-  let hi_col = cols.next().unwrap();
+  let hi_col = cols.next().unwrap(); // TODO check if unwrap is safe in all cases
   cols.fold(hi_col, |total, p| total.mul(&two_power_w_int).add(&p))
 }
 

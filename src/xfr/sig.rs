@@ -6,9 +6,9 @@ use crate::errors::ZeiError::SignatureError;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::SecretKey;
 use ed25519_dalek::Signature;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey};
+use ed25519_dalek::{SecretKey, Verifier};
 use wasm_bindgen::prelude::*;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
@@ -20,10 +20,10 @@ pub const KEY_BASE_POINT: CompressedEdwardsY =
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct XfrPublicKey(pub(crate) PublicKey);
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct XfrSecretKey(pub(crate) SecretKey);
 #[wasm_bindgen]
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct XfrKeyPair {
   pub_key: XfrPublicKey,
   sec_key: XfrSecretKey,
@@ -33,9 +33,10 @@ pub struct XfrKeyPair {
 pub struct XfrSignature(pub Signature);
 
 impl XfrPublicKey {
-  pub fn get_curve_point(&self) -> Result<EdwardsPoint, ZeiError> {
-    CompressedEdwardsY::from_slice(self.zei_to_bytes().as_slice()).decompress().
-      ok_or(ZeiError::DecompressElementError)
+  pub fn get_curve_point(&self) -> EdwardsPoint {
+    CompressedEdwardsY::from_slice(self.0.as_bytes())
+      .decompress()
+      .expect("Get curve point from public should not fail as public key is an Edward point")
   }
 
   pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), ZeiError> {
@@ -55,8 +56,8 @@ impl ZeiFromToBytes for XfrPublicKey {
     vec
   }
 
-  fn zei_from_bytes(bytes: &[u8]) -> Self {
-    XfrPublicKey(PublicKey::from_bytes(bytes).unwrap())
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    Ok(XfrPublicKey(PublicKey::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError)?))
   }
 }
 
@@ -80,7 +81,7 @@ impl XfrSecretKey {
   #[allow(clippy::should_implement_trait)]
   pub fn clone(&self) -> Self {
     let bytes = self.zei_to_bytes();
-    XfrSecretKey::zei_from_bytes(bytes.as_slice())
+    XfrSecretKey::zei_from_bytes(bytes.as_slice()).unwrap() // This shouldn't fail
   }
 }
 
@@ -92,8 +93,8 @@ impl ZeiFromToBytes for XfrSecretKey {
     vec
   }
 
-  fn zei_from_bytes(bytes: &[u8]) -> Self {
-    XfrSecretKey(SecretKey::from_bytes(bytes).unwrap())
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    Ok(XfrSecretKey(SecretKey::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError)?))
   }
 }
 
@@ -135,9 +136,9 @@ impl ZeiFromToBytes for XfrKeyPair {
     vec
   }
 
-  fn zei_from_bytes(bytes: &[u8]) -> Self {
-    XfrKeyPair { sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH]),
-                 pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..]) }
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    Ok(XfrKeyPair { sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH])?,
+                    pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..])? })
   }
 }
 

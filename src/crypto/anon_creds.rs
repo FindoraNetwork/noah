@@ -539,7 +539,7 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
   let mut gamma_iter = gamma.iter();
   for attr_enum in attrs {
     if let Attribute::Hidden(Some(attr)) = attr_enum {
-      let gamma = gamma_iter.next().unwrap();
+      let gamma = gamma_iter.next().unwrap(); // safe unwrap()
       let resp_attr_i = challenge.mul(attr).add(gamma);
       response_attrs.push(resp_attr_i);
     }

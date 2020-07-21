@@ -245,7 +245,7 @@ fn compute_next_round_input<P: Pairing>(challenge: &P::ScalarField,
                                         ZR: &P::Gt)
                                         -> (Vec<P::G1>, Vec<P::G2>, P::Gt) {
   let m = A.len();
-  let challenge_inv = challenge.inv();
+  let challenge_inv = challenge.inv().unwrap(); // TODO remove this unwrap()
   let newZ = ZL.mul(&challenge).add(&Z).add(&ZR.mul(&challenge_inv));
 
   let A_to_x = vec_exp(&A[m / 2..], &challenge);
@@ -362,7 +362,7 @@ mod tests {
       let b = P::ScalarField::random_scalar(&mut prng);
       let v = &a.mul(&b);
       let w = P::ScalarField::random_scalar(&mut prng);
-      let inv_w = &w.inv();
+      let inv_w = &w.inv().unwrap();
 
       let c = &v.mul(&inv_w);
       let d = w;

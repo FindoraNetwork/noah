@@ -1,6 +1,7 @@
 use super::groups::{Group, Scalar};
 use super::pairing::Pairing;
 use crate::algebra::groups::GroupArithmetic;
+use crate::errors::ZeiError;
 use crate::utils::{b64dec, b64enc, u8_bigendian_slice_to_u64};
 use crate::utils::{u64_to_bigendian_u8array, u8_bigendian_slice_to_u32};
 use byteorder::{ByteOrder, LittleEndian};
@@ -93,8 +94,11 @@ impl Scalar for BLSScalar {
     BLSScalar(m)
   }
 
-  fn inv(&self) -> BLSScalar {
-    BLSScalar((self.0).inverse().unwrap())
+  fn inv(&self) -> Result<BLSScalar, ZeiError> {
+    match (self.0).inverse() {
+      Some(x) => Ok(BLSScalar(x)),
+      None => Err(ZeiError::GroupInversionError),
+    }
   }
 
   fn get_little_endian_u64(&self) -> Vec<u64> {
@@ -113,14 +117,17 @@ impl Scalar for BLSScalar {
     v
   }
 
-  fn from_bytes(bytes: &[u8]) -> BLSScalar {
+  fn from_bytes(bytes: &[u8]) -> Result<BLSScalar, ZeiError> {
     let mut repr_array = [0u64; 4];
     for i in 0..4 {
       let slice = &bytes[i * 8..i * 8 + 8];
       repr_array[i] = LittleEndian::read_u64(slice);
     }
     let fr_repr = FrRepr(repr_array);
-    BLSScalar(Fr::from_repr(fr_repr).unwrap())
+    match Fr::from_repr(fr_repr) {
+      Ok(x) => Ok(BLSScalar(x)),
+      Err(_) => Err(ZeiError::DeserializationError),
+    }
   }
 }
 
@@ -152,17 +159,17 @@ impl<'de> Deserialize<'de> for BLSScalar {
       fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSScalar, E>
         where E: serde::de::Error
       {
-        Ok(BLSScalar::from_bytes(v))
+        BLSScalar::from_bytes(v).map_err(serde::de::Error::custom)
       }
 
       fn visit_seq<V>(self, mut seq: V) -> Result<BLSScalar, V::Error>
         where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().unwrap() {
+        while let Some(x) = seq.next_element().map_err(serde::de::Error::custom)? {
           vec.push(x);
         }
-        Ok(BLSScalar::from_bytes(vec.as_slice()))
+        BLSScalar::from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
       }
       fn visit_str<E>(self, s: &str) -> Result<BLSScalar, E>
         where E: serde::de::Error
@@ -193,15 +200,15 @@ impl Group<BLSScalar> for BLSG1 {
     let v = self.0.into_affine().into_compressed().as_ref().to_vec();
     v
   }
-  fn from_compressed_bytes(bytes: &[u8]) -> Option<BLSG1> {
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG1, ZeiError> {
     let some: G1 = G1::one();
     let mut compressed = some.into_affine().into_compressed();
     let mut_bytes = compressed.as_mut();
     mut_bytes[..48].clone_from_slice(&bytes[..48]);
-    let affine = compressed.into_affine().unwrap();
+    let affine = compressed.into_affine()
+                           .map_err(|_| ZeiError::DecompressElementError)?;
     let g1 = G1::from(affine);
-
-    Some(BLSG1(g1))
+    Ok(BLSG1(g1))
   }
 
   fn from_hash<D>(hash: D) -> BLSG1
@@ -265,17 +272,17 @@ impl<'de> Deserialize<'de> for BLSG1 {
       fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSG1, E>
         where E: serde::de::Error
       {
-        Ok(BLSG1::from_compressed_bytes(v).unwrap()) //TODO handle error
+        BLSG1::from_compressed_bytes(v).map_err(serde::de::Error::custom)
       }
 
       fn visit_seq<V>(self, mut seq: V) -> Result<BLSG1, V::Error>
         where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().unwrap() {
+        while let Some(x) = seq.next_element()? {
           vec.push(x);
         }
-        Ok(BLSG1::from_compressed_bytes(vec.as_slice()).unwrap())
+        BLSG1::from_compressed_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
       }
       fn visit_str<E>(self, s: &str) -> Result<BLSG1, E>
         where E: serde::de::Error
@@ -307,17 +314,18 @@ impl Group<BLSScalar> for BLSG2 {
     v
   }
   #[allow(clippy::manual_memcpy)]
-  fn from_compressed_bytes(bytes: &[u8]) -> Option<BLSG2> {
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG2, ZeiError> {
     let some: G2 = G2::one();
     let mut compressed = some.into_affine().into_compressed();
     let mut_bytes = compressed.as_mut();
     for i in 0..96 {
       mut_bytes[i] = bytes[i];
     }
-    let affine = compressed.into_affine().unwrap();
+    let affine = compressed.into_affine()
+                           .map_err(|_| ZeiError::DecompressElementError)?;
     let g2 = G2::from(affine);
 
-    Some(BLSG2(g2))
+    Ok(BLSG2(g2))
   }
 
   fn from_hash<D>(hash: D) -> BLSG2
@@ -381,17 +389,17 @@ impl<'de> Deserialize<'de> for BLSG2 {
       fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSG2, E>
         where E: serde::de::Error
       {
-        Ok(BLSG2::from_compressed_bytes(v).unwrap()) //TODO handle error
+        BLSG2::from_compressed_bytes(v).map_err(serde::de::Error::custom)
       }
 
       fn visit_seq<V>(self, mut seq: V) -> Result<BLSG2, V::Error>
         where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().unwrap() {
+        while let Some(x) = seq.next_element()? {
           vec.push(x);
         }
-        Ok(BLSG2::from_compressed_bytes(vec.as_slice()).unwrap())
+        BLSG2::from_compressed_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
       }
       fn visit_str<E>(self, s: &str) -> Result<BLSG2, E>
         where E: serde::de::Error
@@ -441,7 +449,12 @@ impl GroupArithmetic<BLSScalar> for BLSGt {
     BLSGt(m)
   }
   fn sub(&self, other: &Self) -> Self {
-    let mut result = other.0.inverse().unwrap();
+    let mut result = match other.0.inverse() {
+      Some(e) => e,
+      None => {
+        panic!("attempting to subtract a non-group element");
+      }
+    };
     result.mul_assign(&self.0);
     BLSGt(result)
   }
@@ -496,9 +509,9 @@ impl Group<BLSScalar> for BLSGt {
     r
   }
 
-  fn from_compressed_bytes(v: &[u8]) -> Option<Self> {
-    Some(BLSGt(Fq12 { c0: build_fq6(&v[..v.len() / 2])?,
-                      c1: build_fq6(&v[v.len() / 2..])? }))
+  fn from_compressed_bytes(v: &[u8]) -> Result<Self, ZeiError> {
+    Ok(BLSGt(Fq12 { c0: build_fq6(&v[..v.len() / 2]).ok_or(ZeiError::DecompressElementError)?,
+                    c1: build_fq6(&v[v.len() / 2..]).ok_or(ZeiError::DecompressElementError)? }))
   }
 
   fn from_hash<D>(hash: D) -> Self
@@ -568,17 +581,17 @@ impl<'de> Deserialize<'de> for BLSGt {
       fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSGt, E>
         where E: serde::de::Error
       {
-        Ok(BLSGt::from_compressed_bytes(v).unwrap()) //TODO handle error
+        BLSGt::from_compressed_bytes(v).map_err(serde::de::Error::custom)
       }
 
       fn visit_seq<V>(self, mut seq: V) -> Result<BLSGt, V::Error>
         where V: SeqAccess<'de>
       {
         let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().unwrap() {
+        while let Some(x) = seq.next_element()? {
           vec.push(x);
         }
-        Ok(BLSGt::from_compressed_bytes(vec.as_slice()).unwrap())
+        BLSGt::from_compressed_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
       }
       fn visit_str<E>(self, s: &str) -> Result<BLSGt, E>
         where E: serde::de::Error
@@ -618,7 +631,7 @@ mod bls12_381_groups_test {
                                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     assert_eq!(small_value_bytes, expected_small_value_bytes);
 
-    let small_value_from_bytes = BLSScalar::from_bytes(&small_value_bytes);
+    let small_value_from_bytes = BLSScalar::from_bytes(&small_value_bytes).unwrap();
     assert_eq!(small_value_from_bytes, small_value);
   }
 }

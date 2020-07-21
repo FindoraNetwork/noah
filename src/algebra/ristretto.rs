@@ -1,5 +1,6 @@
 use crate::algebra::groups::Scalar as ZeiScalar;
 use crate::algebra::groups::{Group, GroupArithmetic};
+use crate::errors::ZeiError;
 use byteorder::ByteOrder;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -40,8 +41,8 @@ impl ZeiScalar for Scalar {
     self - b
   }
 
-  fn inv(&self) -> Scalar {
-    self.invert()
+  fn inv(&self) -> Result<Scalar, ZeiError> {
+    Ok(self.invert())
   }
 
   fn get_little_endian_u64(&self) -> Vec<u64> {
@@ -56,10 +57,10 @@ impl ZeiScalar for Scalar {
     v
   }
 
-  fn from_bytes(bytes: &[u8]) -> Scalar {
+  fn from_bytes(bytes: &[u8]) -> Result<Scalar, ZeiError> {
     let mut array = [0u8; 32];
     array.copy_from_slice(bytes);
-    Scalar::from_bits(array)
+    Ok(Scalar::from_bits(array))
   }
 }
 impl Group<Scalar> for RistrettoPoint {
@@ -80,8 +81,9 @@ impl Group<Scalar> for RistrettoPoint {
     v
   }
 
-  fn from_compressed_bytes(bytes: &[u8]) -> Option<RistrettoPoint> {
-    CompressedRistretto::from_slice(bytes).decompress()
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<RistrettoPoint, ZeiError> {
+    Ok(CompressedRistretto::from_slice(bytes).decompress()
+                                             .ok_or(ZeiError::DecompressElementError)?)
   }
 
   fn from_hash<D>(hash: D) -> RistrettoPoint
