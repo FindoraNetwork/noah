@@ -21,6 +21,8 @@ use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 
+const U64_BYTE_LEN: usize = 8;
+
 /// AssetRecrod confidentiality flags. Indicated if amount and/or assettype should be confidential
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
@@ -485,13 +487,13 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
 
   match input.amount {
     XfrAmount::Confidential(_) => {
-      if amount_type.len() < 8 {
+      if amount_type.len() < U64_BYTE_LEN {
         return Err(ZeiError::ParameterError);
       }
-      amount = u8_bigendian_slice_to_u64(&amount_type[0..8]);
+      amount = u8_bigendian_slice_to_u64(&amount_type[0..U64_BYTE_LEN]);
       amount_blind_low = compute_blind_factor(&shared_point, b"amount_low");
       amount_blind_high = compute_blind_factor(&shared_point, b"amount_high");
-      i += 8;
+      i += U64_BYTE_LEN;
     }
     XfrAmount::NonConfidential(a) => {
       amount = a;
