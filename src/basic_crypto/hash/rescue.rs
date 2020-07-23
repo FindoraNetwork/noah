@@ -1,7 +1,7 @@
 // This files implements the rescue block cipher and hash function
 // It provides a generic algorithm for any parameters and also a specific instance
 // for the BLS12_381 scalar field for a sponge construction parameters rate: 3 and capacity: 1.
-// Instances parameters are objtained from https://github.com/KULeuven-COSIC/Marvellous
+// Instances parameters are obtained from https://github.com/KULeuven-COSIC/Marvellous
 // instance = Rescue(s,q,m,alpha), where s is the security parameter (eg s = 128,
 // q is the prime field size, m is the sponge state size = rate + capacity, and alpha is the *desired*
 // S-box exponent for rescue construction.
@@ -9,23 +9,24 @@
 // Rescue algorithm:
 // 1. pad the input with `capacity` 0s
 // 2. Set the state as padded input + instance.initial_constants + key.
-// 3. Call key scheduling algorithm to derive rounds keys K_r' and K_r. tThis can be done on each round too.
+// 3. Call key scheduling algorithm to derive rounds keys K_r' and K_r. This can be done on each round too.
 // 4. Execute N rounds of the form
 //   - state_r' = instance.M * S-box-inv(state_{r-1}) + K_r', first step of round r
-//   - state_r = instance.M * S-box(state_{r-1}') + K_r, second step of round r
+//   - state_r = instance.M * S-box(state_r') + K_r, second step of round r
 //   where S-box(x_1,...,x_m) = (x_1^\alpha, ..., x_m^\alpha) and
 //        S-box-inv(x_1,...,x_m) = (x_1^{1/\alpha}, ..., x_m^{1/\alpha})
 // 5. return state_N
 
 // Key scheduling: The round keys are computed as:
 // 1. Derive key injection keys:
-// - set key_injection = C, the
-// - key_injection_r = instance.K * S-box(key_injection_{r-1}) + instance.C, where K (m x m matrix) and C (m-size vector)
+// - set key_injection_0 = C, the
 // 2. Use Rescue rounds to compute the round keys.
 // - Set the key as input, and key_injection as the round keys.
 // - do:
-//   - K_r'= instance.K * S-box(key_{r-1}) + key_injection_r, used in first step of round r
-//   - K_r = instance.K * S-box(key_r') + key_injection_r, used in second step of round r
+//   - key_injection_r' = instance.K * key_injection_{r-1} + instance.C, where K (m x m matrix) and C (m-size vector)
+//   - K_r'= instance.M * S-box-inv(K_{r-1}) + key_injection_r'
+//   - key_injection_r = instance.K * key_injection_r' + instance.C
+//   - K_r = instance.M * S-box(K_r') + key_injection_r, used in second step of round r
 use crate::algebra::groups::Scalar;
 use itertools::Itertools;
 
