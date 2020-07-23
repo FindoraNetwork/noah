@@ -6,12 +6,12 @@ use crate::errors::ZeiError::SignatureError;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::Signature;
-use ed25519_dalek::{ExpandedSecretKey, PublicKey};
-use ed25519_dalek::{SecretKey, Verifier};
+use ed25519_dalek_new::Signature;
+use ed25519_dalek_new::{ExpandedSecretKey, PublicKey};
+use ed25519_dalek_new::{SecretKey, Verifier};
 use wasm_bindgen::prelude::*;
 
-pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
+pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek_new::SECRET_KEY_LENGTH;
 //pub const XFR_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
 
 pub const KEY_BASE_POINT: CompressedEdwardsY =
@@ -106,7 +106,7 @@ impl XfrKeyPair {
 }
 impl XfrKeyPair {
   pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-    let kp = ed25519_dalek::Keypair::generate(prng);
+    let kp = ed25519_dalek_new::Keypair::generate(prng);
     XfrKeyPair { pub_key: XfrPublicKey(kp.public),
                  sec_key: XfrSecretKey(kp.secret) }
   }

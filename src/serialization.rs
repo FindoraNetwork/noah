@@ -6,8 +6,8 @@ use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::ed25519::signature::Signature;
-use ed25519_dalek::{PublicKey, SecretKey};
+use ed25519_dalek_new::ed25519::signature::Signature;
+use ed25519_dalek_new::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
 use serde::Deserializer;
@@ -217,7 +217,7 @@ impl ZeiFromToBytes for XfrSignature {
   }
 
   fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
-    match ed25519_dalek::Signature::from_bytes(bytes) {
+    match ed25519_dalek_new::Signature::from_bytes(bytes) {
       Ok(e) => Ok(XfrSignature(e)),
       Err(_) => Err(ZeiError::DeserializationError),
     }

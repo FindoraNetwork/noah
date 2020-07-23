@@ -11,7 +11,7 @@ extern crate itertools;
 #[macro_use]
 extern crate serde_derive;
 
-extern crate ed25519_dalek_new as ed25519_dalek;
+extern crate ed25519_dalek_new;
 
 pub mod algebra;
 pub mod api;

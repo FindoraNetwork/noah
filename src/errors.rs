@@ -1,4 +1,4 @@
-use ed25519_dalek::SignatureError;
+use ed25519_dalek_new::SignatureError;
 use std::{error, fmt};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

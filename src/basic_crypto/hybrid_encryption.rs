@@ -95,7 +95,7 @@ use crate::xfr::sig::KEY_BASE_POINT;
 use aes_ctr::stream_cipher::generic_array::GenericArray;
 use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes256Ctr;
-use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
+use ed25519_dalek_new::{ExpandedSecretKey, PublicKey, SecretKey};
 
 fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
   let kkey = GenericArray::from_slice(key);
