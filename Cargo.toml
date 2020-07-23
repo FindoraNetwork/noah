@@ -17,7 +17,7 @@ rand = { version = "0.7", default-features = false, optional = true }
 rand_chacha = "0.2"
 rand_04 = {package= "rand", version = "0.4"}
 curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
-ed25519-dalek = "1.0.0-pre.3"
+ed25519-dalek = "1.0.0-pre.4"
 bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 merlin = "2.0"
