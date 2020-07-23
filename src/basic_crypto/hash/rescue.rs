@@ -19,7 +19,7 @@
 
 // Key scheduling: The round keys are computed as:
 // 1. Derive key injection keys:
-// - set key_injection_0 = C, the
+// - set key_injection_0 = C
 // 2. Use Rescue rounds to compute the round keys.
 // - Set the key as input, and key_injection as the round keys.
 // - do:
@@ -153,7 +153,7 @@ impl<S: Scalar> RescueInstance<S> {
     state
   }
 
-  // Compute a rescue round samplign the round keys online
+  // Compute a rescue round, sampling the round keys online
   fn rescue_round(&self,
                   state: &mut [S],
                   key_state: &mut [S],
