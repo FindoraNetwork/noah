@@ -6,9 +6,10 @@ use crate::errors::ZeiError::SignatureError;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
+use ed25519_dalek::SecretKey; // remove when v1.0.0-pre.4 is ready in platform dependencies
 use ed25519_dalek::Signature;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey};
-use ed25519_dalek::{SecretKey, Verifier};
+// use ed25519_dalek::{SecretKey, Verifier}; for use in version v1.0.0-pre.4
 use wasm_bindgen::prelude::*;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;

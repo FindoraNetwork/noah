@@ -6,7 +6,7 @@ use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::ed25519::signature::Signature;
+// use ed25519_dalek::ed25519::signature::Signature; // uncomment when v1.0.0.pre4 is updated in our dependencies
 use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
