@@ -90,8 +90,8 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(transcript: &mut Transcri
 /// The order of the returned scalars is
 ///  - 0: scalar associated with pc_gens.B
 ///  - 1: scalar associated with pc_gens.B_blinding
-///  - 2: scalar associated with commitments[0]
-///  - 3: scalar associated with commitments[1]
+///  - 2: scalar associated with commitments\[0\]
+///  - 3: scalar associated with commitments\[1\]
 ///  - 4: scalar associated with proof.c1_eq_c2.c3
 ///  - 5: scalar associated with proof.c1_eq_c2.c4
 pub fn chaum_pedersen_verify_eq_scalars<R: CryptoRng + RngCore>(transcript: &mut Transcript,
@@ -224,8 +224,8 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
 /// The order of the returned scalars is
 ///  - 0: scalar associated with pc_gens.B
 ///  - 1: scalar associated with pc_gens.B_blinding
-///  - 2: scalar associated with commitments[0]
-///  - 3: scalar associated with commitments[1]
+///  - 2: scalar associated with commitments\[0\]
+///  - 3: scalar associated with commitments\[1\]
 ///  - 4: scalar associated with proof.c1_eq_c2.c3
 ///  - 5: scalar associated with proof.c1_eq_c2.c4
 /// If commitments.len() > 2, then proof returns scalars and an element D and scalars is complemented with
