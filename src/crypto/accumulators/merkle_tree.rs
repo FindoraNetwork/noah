@@ -47,6 +47,7 @@ pub fn mt_build<S, H>(elements: &[S]) -> Result<MerkleTree<S>, ZeiError>
   Ok(tree)
 }
 
+// TODO Refactor with k_ary_merkle_tree
 pub fn mt_prove<S>(tree: &MerkleTree<S>,
                    index: usize)
                    -> Result<(S, Vec<(PathDirection, S)>), ZeiError>
