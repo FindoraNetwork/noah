@@ -1,17 +1,15 @@
-use crate::algebra::groups::Scalar as ZeiScalar;
 use crate::api::anon_creds::{
   ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, AttributeCiphertext,
   ConfidentialAC, Credential,
 };
-use crate::basic_crypto::elgamal::elgamal_encrypt;
 use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt_with_sign_key};
 use crate::errors::ZeiError;
 use crate::utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
 use crate::xfr::structs::{
-  asset_type_to_scalar, AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerMemo,
-  AssetTracingPolicies, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount,
-  XfrAssetType, ASSET_TYPE_LENGTH,
+  asset_type_to_scalar, AssetRecord, AssetRecordTemplate, AssetTracerMemo, AssetTracingPolicies,
+  AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
+  ASSET_TYPE_LENGTH,
 };
 use boolinator::Boolinator;
 use bulletproofs::PedersenGens;
@@ -122,10 +120,10 @@ impl AssetRecord {
       } else {
         (None, None)
       };
-      let asset_tracer_memo = compute_tracer_memo(&asset_tracking_policy.enc_keys,
-                                                  amount_info,
-                                                  asset_type_info,
-                                                  None);
+      let asset_tracer_memo = AssetTracerMemo::new(&asset_tracking_policy.enc_keys,
+                                                   amount_info,
+                                                   asset_type_info,
+                                                   None);
       memos.push(asset_tracer_memo);
       identity_proofs.push(None);
     }
@@ -190,10 +188,10 @@ impl AssetRecord {
         }
         None => (None, None),
       };
-      let asset_tracer_memo = compute_tracer_memo(&asset_tracking_policy.enc_keys,
-                                                  amount_info,
-                                                  asset_type_info,
-                                                  attrs);
+      let asset_tracer_memo = AssetTracerMemo::new(&asset_tracking_policy.enc_keys,
+                                                   amount_info,
+                                                   asset_type_info,
+                                                   attrs);
       identity_proofs.push(proof);
       memos.push(asset_tracer_memo);
     }
@@ -336,10 +334,10 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     } else {
       (None, None)
     };
-    let memo = compute_tracer_memo(&tracing_policy.enc_keys,
-                                   amount_info,
-                                   asset_type_info,
-                                   ctexts);
+    let memo = AssetTracerMemo::new(&tracing_policy.enc_keys,
+                                    amount_info,
+                                    asset_type_info,
+                                    ctexts);
     tracers_memos.push(memo);
   }
 
@@ -356,38 +354,6 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
                                               asset_type: xfr_asset_type };
 
   (blind_asset_record, amount_blinds, type_blind, tracers_memos, owner_memo)
-}
-
-fn compute_tracer_memo(tracer_enc_key: &AssetTracerEncKeys,
-                       amount_info: Option<(u32, u32, &Scalar, &Scalar)>, //amount low and high and blindings
-                       asset_type_info: Option<(Scalar, &Scalar)>,
-                       attributes: Option<Vec<AttributeCiphertext>>)
-                       -> AssetTracerMemo {
-  let pc_gens = PedersenGens::default();
-  let lock_amount =
-    amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
-                 let ctext_amount_low = elgamal_encrypt(&pc_gens.B,
-                                                        &Scalar::from_u32(amount_low),
-                                                        blind_low,
-                                                        &tracer_enc_key.record_data_enc_key);
-                 let ctext_amount_high = elgamal_encrypt(&pc_gens.B,
-                                                         &Scalar::from_u32(amount_high),
-                                                         blind_high,
-                                                         &tracer_enc_key.record_data_enc_key);
-                 (ctext_amount_low, ctext_amount_high)
-               });
-
-  let lock_asset_type = asset_type_info.map(|(type_scalar, blind)| {
-                                         elgamal_encrypt(&pc_gens.B,
-                                                         &type_scalar,
-                                                         blind,
-                                                         &tracer_enc_key.record_data_enc_key)
-                                       });
-
-  AssetTracerMemo { enc_key: tracer_enc_key.clone(),
-                    lock_amount,
-                    lock_asset_type,
-                    lock_attributes: attributes }
 }
 
 /// Build OpenAssetRecord and associated memos from an Asset Record Template

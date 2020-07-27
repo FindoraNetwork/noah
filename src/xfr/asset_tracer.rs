@@ -1,8 +1,9 @@
 use crate::algebra::bls12_381::{BLSScalar, BLSG1};
 use crate::algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
+use crate::api::anon_creds::AttributeCiphertext;
 use crate::basic_crypto::elgamal::{
-  elgamal_decrypt, elgamal_decrypt_elem, elgamal_key_gen, ElGamalCiphertext, ElGamalDecKey,
-  ElGamalEncKey,
+  elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
+  ElGamalDecKey, ElGamalEncKey,
 };
 use crate::errors::ZeiError;
 use crate::utils::u64_to_u32_pair;
@@ -10,6 +11,7 @@ use crate::xfr::structs::AssetType;
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetTracerDecKeys, AssetTracerEncKeys, AssetTracerKeyPair, AssetTracerMemo,
 };
+use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
@@ -29,6 +31,39 @@ pub fn gen_asset_tracer_keypair<R: CryptoRng + RngCore>(prng: &mut R) -> AssetTr
 }
 
 impl AssetTracerMemo {
+  /// Sample a new AssetTracerMemo
+  pub fn new(tracer_enc_key: &AssetTracerEncKeys,
+             amount_info: Option<(u32, u32, &Scalar, &Scalar)>, //amount low and high and blindings
+             asset_type_info: Option<(Scalar, &Scalar)>,
+             attributes: Option<Vec<AttributeCiphertext>>)
+             -> AssetTracerMemo {
+    let pc_gens = PedersenGens::default();
+    let lock_amount =
+      amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
+                   let ctext_amount_low = elgamal_encrypt(&pc_gens.B,
+                                                          &Scalar::from_u32(amount_low),
+                                                          blind_low,
+                                                          &tracer_enc_key.record_data_enc_key);
+                   let ctext_amount_high = elgamal_encrypt(&pc_gens.B,
+                                                           &Scalar::from_u32(amount_high),
+                                                           blind_high,
+                                                           &tracer_enc_key.record_data_enc_key);
+                   (ctext_amount_low, ctext_amount_high)
+                 });
+
+    let lock_asset_type = asset_type_info.map(|(type_scalar, blind)| {
+                                           elgamal_encrypt(&pc_gens.B,
+                                                           &type_scalar,
+                                                           blind,
+                                                           &tracer_enc_key.record_data_enc_key)
+                                         });
+
+    AssetTracerMemo { enc_key: tracer_enc_key.clone(),
+                      lock_amount,
+                      lock_asset_type,
+                      lock_attributes: attributes }
+  }
+
   /// Check is the amount encrypted in self.lock_amount is expected_amount
   /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
   /// Otherwise, if decrypted amount is not expected amount, return Err(ZeiError::AssetTracingExtractionError), else Ok(())
