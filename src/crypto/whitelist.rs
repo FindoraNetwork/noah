@@ -1,5 +1,6 @@
+use crate::basic_crypto::hash_functions::mimc::MiMCHash;
 use crate::crypto::accumulators::merkle_tree::{
-  mt_build, mt_prove, MerkleRoot, MerkleTree, MiMCHash, PathDirection,
+  mt_build, mt_prove, MerkleRoot, MerkleTree, PathDirection,
 };
 use crate::crypto::bp_circuits::array_inclusion::array_membership;
 use crate::crypto::bp_circuits::merkle_path::merkle_verify_mimc;

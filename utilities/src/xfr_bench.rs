@@ -9,8 +9,7 @@ use criterion::{BenchmarkGroup, Criterion};
 use zei::api::anon_creds::{ACCommitmentKey, ACUserSecretKey, Credential};
 use zei::setup::PublicParams;
 use zei::xfr::lib::{
-  batch_verify_xfr_notes, gen_xfr_body, gen_xfr_note, verify_xfr_note,
-  XfrNotePolicies,
+  batch_verify_xfr_notes, gen_xfr_body, gen_xfr_note, verify_xfr_note, XfrNotePolicies,
 };
 use zei::xfr::sig::XfrKeyPair;
 use zei::xfr::structs::{AssetTracingPolicy, XfrBody, XfrNote};
