@@ -4,7 +4,7 @@ use crate::api::anon_creds::{
   ConfidentialAC, Credential,
 };
 use crate::basic_crypto::elgamal::elgamal_encrypt;
-use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt};
+use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt_with_sign_key};
 use crate::errors::ZeiError;
 use crate::utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
@@ -344,9 +344,9 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   }
 
   let owner_memo = if confidential_asset || confidential_amount {
-    let lock = hybrid_encrypt(prng,
-                              &asset_record.public_key.0,
-                              amount_type_bytes.as_slice());
+    let lock = hybrid_encrypt_with_sign_key(prng,
+                                            &asset_record.public_key.0,
+                                            amount_type_bytes.as_slice()).unwrap(); // safe unwrap()
     Some(OwnerMemo { blind_share, lock })
   } else {
     None
