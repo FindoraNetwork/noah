@@ -123,7 +123,7 @@ impl AssetRecord {
       let asset_tracer_memo = AssetTracerMemo::new(&asset_tracking_policy.enc_keys,
                                                    amount_info,
                                                    asset_type_info,
-                                                   None);
+                                                   vec![]);
       memos.push(asset_tracer_memo);
       identity_proofs.push(None);
     }
@@ -184,9 +184,9 @@ impl AssetRecord {
                                             &asset_tracking_policy.enc_keys.attrs_enc_eg_key,
                                             id_policy.reveal_map.as_slice(),
                                             &[])?.get_fields();
-          (Some(attrs), Some(proof))
+          (attrs, Some(proof))
         }
-        None => (None, None),
+        None => (vec![], None),
       };
       let asset_tracer_memo = AssetTracerMemo::new(&asset_tracking_policy.enc_keys,
                                                    amount_info,
@@ -270,7 +270,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   asset_record: &AssetRecordTemplate,
-  identity_ctexts: Vec<Option<Vec<AttributeCiphertext>>>)
+  identity_ctexts: Vec<Vec<AttributeCiphertext>>)
   -> (BlindAssetRecord, (Scalar, Scalar), Scalar, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
   let type_scalar = asset_type_to_scalar(&asset_record.asset_type);
 
@@ -367,7 +367,7 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   asset_record: &AssetRecordTemplate,
-  identity_ctexts: Vec<Option<Vec<AttributeCiphertext>>>)
+  identity_ctexts: Vec<Vec<AttributeCiphertext>>)
   -> (OpenAssetRecord, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
   let (blind_asset_record, amount_blinds, type_blind, asset_tracing_memos, owner_memo) =
     sample_blind_asset_record(prng, pc_gens, asset_record, identity_ctexts);
@@ -392,7 +392,7 @@ pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   asset_record: &AssetRecordTemplate,
-  identity_ctexts: Vec<Option<Vec<AttributeCiphertext>>>)
+  identity_ctexts: Vec<Vec<AttributeCiphertext>>)
   -> (BlindAssetRecord, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
   let (blind_asset_record, _, _, asset_tracing_memos, owner_memo) =
     sample_blind_asset_record(prng, pc_gens, asset_record, identity_ctexts);
@@ -510,10 +510,10 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
       return Err(ZeiError::ParameterError);
     }
     let (attr_ctext, reveal_proof) = match id_proof {
-      None => (None, None),
+      None => (vec![], None),
       Some(conf_ac) => {
         let (c, p) = conf_ac.clone().get_fields();
-        (Some(c), Some(p))
+        (c, Some(p))
       }
     };
     attrs_ctexts.push(attr_ctext);
@@ -563,18 +563,6 @@ mod test {
     let tracing_policy = match asset_tracking {
       true => {
         let tracer_keys = gen_asset_tracer_keypair(&mut prng);
-        /*
-        let (_sk, xfr_pub_key) =
-          elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
-        let (_sk, id_reveal_pub_key) =
-          elgamal_key_gen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
-        let x_secret_key = XSecretKey{key: x}
-        let tracer_enc_key = AssetTracerEncKeys { record_data_eg_enc_key:
-                                                    ElGamalEncKey(xfr_pub_key.get_point()),
-                                                  attrs_enc_eg_key: id_reveal_pub_key,
-          zei_cipher_enc_key: XPublicKey{}
-        };
-        */
         let tracing_policies =
           AssetTracingPolicies::from_policy(AssetTracingPolicy { //enc_keys: tracer_enc_key,
                                                                  enc_keys: tracer_keys.enc_key,
@@ -596,7 +584,7 @@ mod test {
     };
 
     let (open_ar, asset_tracer_memo, owner_memo) =
-      build_open_asset_record(&mut prng, &pc_gens, &asset_record, vec![None]);
+      build_open_asset_record(&mut prng, &pc_gens, &asset_record, vec![vec![]]);
 
     assert_eq!(amount, open_ar.amount);
     assert_eq!(asset_type, open_ar.asset_type);

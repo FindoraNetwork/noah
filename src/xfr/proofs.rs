@@ -337,18 +337,18 @@ fn verify_identity_proofs(reveal_policies: &[&AssetTracingPolicies],
     let policies = policies.get_policies();
     for (policy, (memo, proof)) in policies.iter().zip(memos.iter().zip(proofs)) {
       let enc_keys = &policy.enc_keys.attrs_enc_eg_key;
-      match (&policy.identity_tracking, &memo.lock_attributes, proof) {
-        (Some(policy), Some(attributes), Some(proof)) => {
+      match (&policy.identity_tracking, proof) {
+        (Some(policy), Some(proof)) => {
           let sig_com = sig_commitment.ok_or(ZeiError::XfrVerifyAssetTracingIdentityError)?;
           ac_confidential_verify(&policy.cred_issuer_pub_key,
                                  enc_keys,
                                  &policy.reveal_map.as_slice(),
                                  sig_com,
-                                 &attributes[..],
+                                 &memo.lock_attributes[..],
                                  proof,
                                  &[]).map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?
         }
-        (None, None, None) => {}
+        (None, None) => {}
         _ => {
           return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
         }
@@ -697,7 +697,7 @@ mod tests {
                                               gen_asset_tracer_keypair(&mut prng).enc_key,
                                             lock_amount: None,
                                             lock_asset_type: None,
-                                            lock_attributes: None }]];
+                                            lock_attributes: vec![] }]];
     let reveal_policies = vec![&asset_tracing_policies];
 
     let res = verify_identity_proofs(reveal_policies.as_slice(),

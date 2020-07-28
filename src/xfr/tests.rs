@@ -835,7 +835,7 @@ pub(crate) mod tests {
                                                                             .unwrap()
                                                                             .enc_key
                                                                             .clone(),
-                            lock_attributes: None };
+                            lock_attributes: vec![] };
         new_xfr_body.asset_tracing_memos[0] = vec![tracer_memo];
 
         let policies = XfrNotePoliciesRef::new(input_policies.clone(),

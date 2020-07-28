@@ -910,10 +910,8 @@ pub fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
       Some(_) => memo.extract_asset_type(&dec_key.record_data_eg_dec_key, candidate_asset_types)?,
     };
 
-    let attributes = match memo.lock_attributes {
-      None => vec![],
-      _ => memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?,
-    };
+    let attributes = memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?;
+
     result.push((amount, asset_type, attributes, blind_asset_record.public_key));
   }
   Ok(result)
@@ -964,13 +962,11 @@ pub fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
         memo.extract_asset_type(&dec_key.record_data_eg_dec_key, &[expected.1])?;
       }
     };
-    if memo.lock_attributes.is_some() {
-      let result =
-        memo.verify_identity_attributes(&dec_key.attrs_dec_key, (expected.2).as_slice())?;
-      if !result.iter().all(|current| *current) {
-        return Err(ZeiError::IdentityTracingExtractionError);
-      }
-    };
+
+    let result = memo.verify_identity_attributes(&dec_key.attrs_dec_key, (expected.2).as_slice())?;
+    if !result.iter().all(|current| *current) {
+      return Err(ZeiError::IdentityTracingExtractionError);
+    }
   }
   Ok(())
 }

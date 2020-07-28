@@ -279,7 +279,7 @@ pub struct AssetTracerMemo {
   // amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
   pub lock_amount: Option<(RecordDataCiphertext, RecordDataCiphertext)>, //None if amount is not confidential
   pub lock_asset_type: Option<RecordDataCiphertext>, // None asset_type is not confidential
-  pub lock_attributes: Option<Vec<AttributeCiphertext>>,
+  pub lock_attributes: Vec<AttributeCiphertext>,
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
