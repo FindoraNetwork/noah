@@ -183,7 +183,7 @@ pub fn kmt_verify<S, H>(root: &KMerkleRoot<S>,
 mod test {
   use super::*;
   use crate::basic_crypto::hash_functions::mimc::MiMCHash;
-  use crate::crypto::accumulators::merkle_tree::mt_build;
+  use crate::crypto::merkle_tree::binary_merkle_tree::mt_build;
   use curve25519_dalek::scalar::Scalar;
 
   #[test]

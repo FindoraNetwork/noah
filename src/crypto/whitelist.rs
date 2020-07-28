@@ -1,9 +1,9 @@
 use crate::basic_crypto::hash_functions::mimc::MiMCHash;
-use crate::crypto::accumulators::merkle_tree::{
-  mt_build, mt_prove, MerkleRoot, MerkleTree, PathDirection,
-};
 use crate::crypto::bp_circuits::array_inclusion::array_membership;
 use crate::crypto::bp_circuits::merkle_path::merkle_verify_mimc;
+use crate::crypto::merkle_tree::binary_merkle_tree::{
+  mt_build, mt_prove, MerkleRoot, MerkleTree, PathDirection,
+};
 use crate::errors::ZeiError;
 use bulletproofs::r1cs::{Prover, R1CSProof, Variable, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};

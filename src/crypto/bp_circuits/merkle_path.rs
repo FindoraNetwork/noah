@@ -53,7 +53,9 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(cs: &mut CS,
 #[cfg(test)]
 mod test {
   use crate::basic_crypto::hash_functions::mimc::MiMCHash;
-  use crate::crypto::accumulators::merkle_tree::{mt_build, mt_prove, mt_verify, PathDirection};
+  use crate::crypto::merkle_tree::binary_merkle_tree::{
+    mt_build, mt_prove, mt_verify, PathDirection,
+  };
   use bulletproofs::r1cs::{Prover, Variable, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
   use curve25519_dalek::ristretto::CompressedRistretto;
