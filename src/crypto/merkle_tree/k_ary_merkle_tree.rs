@@ -101,13 +101,13 @@ fn create_k_merkle_node<S: Copy + Debug, H: MTHash<S>>(elements: &[S],
                 k }
 }
 
-type KMTProof<S> = Vec<(PathPosition, Vec<S>)>;
+type KMTPath<S> = Vec<(PathPosition, Vec<S>)>;
 
-/// Computes a proof (merkle path) for a leaf of the tree
+/// Computes a merkle path for a leaf of the tree
 /// * `tree` - merkle tree data structure
 /// * `index` - location of the leaf, 0 being the index of the most left one
-/// * `returns` - the value of the root node and the proof
-pub fn kmt_prove<S>(tree: &KMerkleTree<S>, index: usize) -> Result<(S, KMTProof<S>), ZeiError>
+/// * `returns` - the value of the root node and the path
+pub fn kmt_prove<S>(tree: &KMerkleTree<S>, index: usize) -> Result<(S, KMTPath<S>), ZeiError>
   where S: Copy + PartialEq + Eq + Debug
 {
   if index >= tree.size {
@@ -119,7 +119,7 @@ pub fn kmt_prove<S>(tree: &KMerkleTree<S>, index: usize) -> Result<(S, KMTProof<
 fn prove_node<S: Copy + PartialEq + Eq + Debug>(node: &KMerkleNode<S>,
                                                 index: usize,
                                                 size: usize)
-                                                -> (S, KMTProof<S>) {
+                                                -> (S, KMTPath<S>) {
   if node.children.is_empty() {
     return (node.value, vec![]);
   }
@@ -144,21 +144,21 @@ fn prove_node<S: Copy + PartialEq + Eq + Debug>(node: &KMerkleNode<S>,
 }
 
 #[allow(clippy::ptr_arg)]
-/// Verifies a merkle proof for an element against a merkle root
+/// Verifies a merkle path for an element against a merkle root
 /// `root` - hash value of the root of some merkle tree
 /// `element` - element to be tested
-/// `proof` - proof that the element is a leaf of the merkle tree defined by its root.
+/// `path` - elements from the leaf to the root and their location at each level
 /// `returns` Ok() if the verification is successful, an error otherwise
 pub fn kmt_verify<S, H>(root: &KMerkleRoot<S>,
                         element: &S,
-                        proof: &KMTProof<S>)
+                        path: &KMTPath<S>)
                         -> Result<(), ZeiError>
   where S: Copy + PartialEq + Eq,
         H: MTHash<S>
 {
   let mut prev = *element;
-  let mut level = proof.len();
-  for (pos, siblings) in proof[..proof.len() - 1].iter() {
+  let mut level = path.len();
+  for (pos, siblings) in path[..path.len() - 1].iter() {
     let hasher = H::new(level - 1);
 
     let mut v_to_hash = vec![];
@@ -173,8 +173,8 @@ pub fn kmt_verify<S, H>(root: &KMerkleRoot<S>,
     level -= 1;
   }
   let hasher = H::new(0);
-  let pos = &proof[proof.len() - 1].0;
-  let siblings = &proof[proof.len() - 1].1;
+  let pos = &path[path.len() - 1].0;
+  let siblings = &path[path.len() - 1].1;
 
   let mut v_to_hash = vec![];
   let mut siblings_left = siblings[0..*pos].to_vec();
@@ -248,16 +248,16 @@ mod test {
     let mut k_merkle_root = k_merkle_tree.get_root();
 
     for i in 0..size {
-      let (e, proof) = kmt_prove::<Scalar>(&k_merkle_tree, i).unwrap();
+      let (e, path) = kmt_prove::<Scalar>(&k_merkle_tree, i).unwrap();
 
-      let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &e, &proof);
+      let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &e, &path);
       assert_eq!(true, b.is_ok());
 
-      let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &(e + Scalar::from(1u8)), &proof);
+      let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &(e + Scalar::from(1u8)), &path);
       assert_eq!(false, b.is_ok());
 
       k_merkle_root.size = size * 2;
-      let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &e, &proof);
+      let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &e, &path);
       assert_eq!(false, b.is_ok());
 
       k_merkle_root.size = size;
