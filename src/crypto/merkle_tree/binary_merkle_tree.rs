@@ -34,6 +34,9 @@ impl<S: Copy> MerkleTree<S> {
   }
 }
 
+/// Builds a binary Merkle tree from a set of elements
+/// * `elements` - elements to be placed at the leaves of the tree. The number of elements must be a power of 2.
+/// * `returns` Merkle tree data structure or an error
 pub fn mt_build<S, H>(elements: &[S]) -> Result<MerkleTree<S>, ZeiError>
   where S: Copy + PartialEq + Eq + Debug,
         H: MTHash<S>
@@ -47,7 +50,10 @@ pub fn mt_build<S, H>(elements: &[S]) -> Result<MerkleTree<S>, ZeiError>
   Ok(tree)
 }
 
-// TODO Refactor with k_ary_merkle_tree
+/// Computes a proof (merkle path) for a leaf of the tree
+/// * `tree` - merkle tree data structure
+/// * `index` - location of the leaf, 0 being the index of the most left one
+/// * `returns` - the value of the root node and the proof
 pub fn mt_prove<S>(tree: &MerkleTree<S>,
                    index: usize)
                    -> Result<(S, Vec<(PathDirection, S)>), ZeiError>
@@ -59,6 +65,11 @@ pub fn mt_prove<S>(tree: &MerkleTree<S>,
   Ok(prove_node::<S>(&tree.root, index, tree.size))
 }
 
+/// Verifies a merkle proof for an element against a merkle root
+/// `root` - hash value of the root of some merkle tree
+/// `element` - element to be tested
+/// `proof` - proof that the element is a leaf of the merkle tree defined by its root.
+/// `returns` Ok() if the verification is successful, an error otherwise
 pub fn mt_verify<S, H>(root: &MerkleRoot<S>,
                        element: &S,
                        path: &[(PathDirection, S)])

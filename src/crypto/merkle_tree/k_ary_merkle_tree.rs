@@ -7,7 +7,7 @@ use std::fmt::Debug;
 pub struct KMerkleNode<S> {
   pub(crate) value: S,
   children: Vec<KMerkleNode<S>>,
-  pub k: usize,
+  pub k: usize, // Arity of the Merkle tree
 }
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl<S: Copy> KMerkleTree<S> {
 
 type PathPosition = usize;
 
-/// Returns true is n is a power of k
+/// Returns true if n is a power of k, false otherwise
 fn is_power_of_k(k: usize, n: usize) -> bool {
   if k == 1 {
     return n == 1;
@@ -44,6 +44,10 @@ fn is_power_of_k(k: usize, n: usize) -> bool {
   pow == n
 }
 
+/// Builds a k-ary Merkle tree from a set of elements
+/// * `elements` - elements to be placed at the leaves of the tree. The number of elements must be a power of k.
+/// * `k` - number of children of each node
+/// * `returns` Merkle tree data structure or an error
 pub fn k_mt_build<S, H>(elements: &[S], k: usize) -> Result<KMerkleTree<S>, ZeiError>
   where S: Copy + PartialEq + Eq + Debug,
         H: MTHash<S>
@@ -99,6 +103,10 @@ fn create_k_merkle_node<S: Copy + Debug, H: MTHash<S>>(elements: &[S],
 
 type KMTProof<S> = Vec<(PathPosition, Vec<S>)>;
 
+/// Computes a proof (merkle path) for a leaf of the tree
+/// * `tree` - merkle tree data structure
+/// * `index` - location of the leaf, 0 being the index of the most left one
+/// * `returns` - the value of the root node and the proof
 pub fn kmt_prove<S>(tree: &KMerkleTree<S>, index: usize) -> Result<(S, KMTProof<S>), ZeiError>
   where S: Copy + PartialEq + Eq + Debug
 {
@@ -136,6 +144,11 @@ fn prove_node<S: Copy + PartialEq + Eq + Debug>(node: &KMerkleNode<S>,
 }
 
 #[allow(clippy::ptr_arg)]
+/// Verifies a merkle proof for an element against a merkle root
+/// `root` - hash value of the root of some merkle tree
+/// `element` - element to be tested
+/// `proof` - proof that the element is a leaf of the merkle tree defined by its root.
+/// `returns` Ok() if the verification is successful, an error otherwise
 pub fn kmt_verify<S, H>(root: &KMerkleRoot<S>,
                         element: &S,
                         proof: &KMTProof<S>)
