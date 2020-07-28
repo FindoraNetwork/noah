@@ -5,13 +5,16 @@ use crate::basic_crypto::elgamal::{
   elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
   ElGamalDecKey, ElGamalEncKey,
 };
-use crate::basic_crypto::hybrid_encryption::{XPublicKey, XSecretKey};
+use crate::basic_crypto::hybrid_encryption::{
+  hybrid_decrypt_with_x25519_secret_key,
+  hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
+};
 use crate::errors::ZeiError;
-use crate::utils::u64_to_u32_pair;
-use crate::xfr::structs::AssetType;
+use crate::utils::{u32_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u32};
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetTracerDecKeys, AssetTracerEncKeys, AssetTracerKeyPair, AssetTracerMemo,
 };
+use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -21,6 +24,7 @@ pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
 pub type RecordDataDecKey = ElGamalDecKey<Scalar>;
 pub type RecordDataCiphertext = ElGamalCiphertext<RistrettoPoint>;
 
+/// Generate asset tracing encryption/decryption key pair
 pub fn gen_asset_tracer_keypair<R: CryptoRng + RngCore>(prng: &mut R) -> AssetTracerKeyPair {
   let (record_data_dec_key, record_data_enc_key) =
     elgamal_key_gen(prng, &RistrettoPoint::get_base());
@@ -39,14 +43,18 @@ pub fn gen_asset_tracer_keypair<R: CryptoRng + RngCore>(prng: &mut R) -> AssetTr
 
 impl AssetTracerMemo {
   /// Sample a new AssetTracerMemo
-  pub fn new(tracer_enc_key: &AssetTracerEncKeys,
+  pub fn new<R: CryptoRng + RngCore>( prng: &mut R,
+    tracer_enc_key: &AssetTracerEncKeys,
              amount_info: Option<(u32, u32, &Scalar, &Scalar)>, //amount low and high and blindings
-             asset_type_info: Option<(Scalar, &Scalar)>,
+             asset_type_info: Option<(AssetType, &Scalar)>,
              attributes: Vec<AttributeCiphertext>)
              -> AssetTracerMemo {
+    let mut plaintext = vec![];
     let pc_gens = PedersenGens::default();
     let lock_amount =
       amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
+                   plaintext.extend_from_slice(&u32_to_bigendian_u8array(amount_low));
+                   plaintext.extend_from_slice(&u32_to_bigendian_u8array(amount_high));
                    let ctext_amount_low = elgamal_encrypt(&pc_gens.B,
                                                           &Scalar::from_u32(amount_low),
                                                           blind_low,
@@ -58,19 +66,56 @@ impl AssetTracerMemo {
                    (ctext_amount_low, ctext_amount_high)
                  });
 
-    let lock_asset_type = asset_type_info.map(|(type_scalar, blind)| {
+    let lock_asset_type = asset_type_info.map(|(asset_type, blind)| {
+                                           plaintext.extend_from_slice(&asset_type.0);
                                            elgamal_encrypt(&pc_gens.B,
-                                                           &type_scalar,
+                                                           &asset_type_to_scalar(&asset_type),
                                                            blind,
                                                            &tracer_enc_key.record_data_eg_enc_key)
                                          });
 
+    let ctext =
+      hybrid_encrypt_with_x25519_key(prng, &tracer_enc_key.zei_cipher_enc_key, &plaintext);
     AssetTracerMemo { enc_key: tracer_enc_key.clone(),
                       lock_amount,
                       lock_asset_type,
-                      lock_attributes: attributes }
+                      lock_attributes: attributes,
+                      lock_info: ctext }
   }
 
+  /// Decrypts the asset tracer memo:
+  /// Returns ZeiError:BogusAssetTracerMemo in case decrypted values are inconsistents
+  pub fn decrypt(&self,
+                 dec_key: &AssetTracerDecKeys)
+                 -> Result<(Option<u64>, Option<AssetType>), ZeiError> {
+    let plaintext = hybrid_decrypt_with_x25519_secret_key(&self.lock_info, &dec_key.zei_cipher_dec_key);
+    let mut index = 0;
+    let amount = if self.lock_amount.is_some() {
+      let low_bytes = &plaintext[0..4];
+      let high_bytes = &plaintext[4..8];
+      let amount_low = u8_bigendian_slice_to_u32(low_bytes);
+      let amount_high = u8_bigendian_slice_to_u32(high_bytes);
+      let amount = (amount_low as u64) + ((amount_high as u64) << 32);
+      self.verify_amount(&dec_key.record_data_eg_dec_key, amount).map_err(|_| ZeiError::BogusAssetTracerMemo)?;
+      index = 8;
+      Some(amount)
+    } else {
+      None
+    };
+    let asset_type = if self.lock_asset_type.is_some() {
+      let mut asset_type = [0u8; ASSET_TYPE_LENGTH];
+      asset_type.copy_from_slice(&plaintext[index..index + ASSET_TYPE_LENGTH]);
+      let asset_type = AssetType(asset_type);
+
+      self.extract_asset_type(&dec_key.record_data_eg_dec_key, &[asset_type]).map_err(|_|ZeiError::BogusAssetTracerMemo)?;
+      // index += ASSET_TYPE_LENGTH;
+      Some(asset_type)
+    } else {
+      None
+    };
+
+    Ok((amount, asset_type))
+  }
   /// Check is the amount encrypted in self.lock_amount is expected_amount
   /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
   /// Otherwise, if decrypted amount is not expected amount, return Err(ZeiError::AssetTracingExtractionError), else Ok(())
@@ -178,7 +223,7 @@ impl AssetTracerMemo {
 mod tests {
   use crate::algebra::groups::{Group, Scalar as ZeiScalar};
   use crate::basic_crypto::elgamal::elgamal_encrypt;
-  use crate::xfr::structs::{asset_type_to_scalar, AssetTracerMemo, AssetType};
+  use crate::xfr::structs::{AssetTracerMemo, AssetType};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
@@ -193,17 +238,18 @@ mod tests {
   fn extract_amount_from_tracer_memo() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let tracer_keys = gen_asset_tracer_keypair(&mut prng);
-    let memo = AssetTracerMemo { enc_key: tracer_keys.enc_key.clone(),
-                                 lock_amount: None,
-                                 lock_asset_type: None,
-                                 lock_attributes: vec![] };
+    let memo = AssetTracerMemo::new(&mut prng,
+                                    &tracer_keys.enc_key,
+                                 None,
+                                 None,
+                                 vec![]);
     assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_eg_dec_key, 10)
                 .is_err());
 
     let amount = (1u64 << 40) + 500; // low and high are small u32 numbers
     let (low, high) = u64_to_u32_pair(amount);
     let memo =
-      AssetTracerMemo::new(&tracer_keys.enc_key,
+      AssetTracerMemo::new(&mut prng, &tracer_keys.enc_key,
                            Some((low, high, &Scalar::from(191919u32), &Scalar::from(2222u32))),
                            None,
                            vec![]);
@@ -218,15 +264,14 @@ mod tests {
   fn extract_asset_type_from_tracer_memo() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let tracer_keys = gen_asset_tracer_keypair(&mut prng);
-    let memo = AssetTracerMemo::new(&tracer_keys.enc_key, None, None, vec![]);
+    let memo = AssetTracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, vec![]);
     assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key, &[])
                 .is_err());
 
     let asset_type = AssetType::from_identical_byte(2u8);
-    let memo = AssetTracerMemo::new(&tracer_keys.enc_key,
+    let memo = AssetTracerMemo::new(&mut prng, &tracer_keys.enc_key,
                                     None,
-                                    Some((asset_type_to_scalar(&asset_type),
-                                          &Scalar::from(191919u32))),
+                                    Some((asset_type, &Scalar::from(191919u32))),
                                     vec![]);
 
     assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key, &[]),
@@ -274,7 +319,7 @@ mod tests {
                       })
                       .collect_vec();
 
-    let memo = AssetTracerMemo::new(&tracer_keys.enc_key, None, None, ctexts);
+    let memo = AssetTracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, ctexts);
 
     assert_eq!(memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32]),
                Err(ZeiError::ParameterError));

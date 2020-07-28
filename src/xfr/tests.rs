@@ -692,7 +692,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::basic_crypto::elgamal::ElGamalCiphertext;
     use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
-    use crate::xfr::lib::{trace_assets, XfrNotePolicies, XfrNotePoliciesRef};
+    use crate::xfr::lib::{trace_assets, XfrNotePolicies, XfrNotePoliciesRef, trace_assets_brute_force};
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
 
@@ -802,8 +802,11 @@ pub(crate) mod tests {
                                             .chain(output_templates)
                                             .map(|x| x.3)
                                             .collect_vec();
+      let records_data_brute_force =
+        trace_assets_brute_force(&xfr_note.body, &input_templates[0].2, &candidate_assets).unwrap();
       let records_data =
-        trace_assets(&xfr_note.body, &input_templates[0].2, &candidate_assets).unwrap();
+        trace_assets(&xfr_note.body, &input_templates[0].2).unwrap();
+      assert_eq!(records_data, records_data_brute_force);
       if input_templates[0].1.len() == 1 {
         assert_eq!(records_data[0].0, input_amount);
         assert_eq!(records_data[0].1, input_templates[0].3);
@@ -835,7 +838,10 @@ pub(crate) mod tests {
                                                                             .unwrap()
                                                                             .enc_key
                                                                             .clone(),
-                            lock_attributes: vec![] };
+                            lock_attributes: vec![],
+
+            lock_info: xfr_body.clone().asset_tracing_memos[0].get(0).unwrap().lock_info.clone(),
+          };
         new_xfr_body.asset_tracing_memos[0] = vec![tracer_memo];
 
         let policies = XfrNotePoliciesRef::new(input_policies.clone(),
@@ -1327,7 +1333,9 @@ pub(crate) mod tests {
                  Ok(()),
                  "Simple transaction should verify ok");
       let candidate_assets = [BITCOIN_ASSET, GOLD_ASSET];
-      let records_data = trace_assets(&xfr_note.body, &tracer1_keypair, &candidate_assets).unwrap();
+      let records_data_brute_force = trace_assets_brute_force(&xfr_note.body, &tracer1_keypair, &candidate_assets).unwrap();
+      let records_data = trace_assets(&xfr_note.body, &tracer1_keypair).unwrap();
+      assert_eq!(records_data, records_data_brute_force);
       let ids: Vec<u32> = vec![];
       assert_eq!(records_data.len(), 3);
       assert_eq!(records_data[0].0, 10); // first input amount
@@ -1343,7 +1351,9 @@ pub(crate) mod tests {
       assert_eq!(records_data[2].2, ids); // third output no id tracking
       assert_eq!(records_data[2].3, out_keys[2].get_pk()); // third output no id tracking
 
-      let records_data = trace_assets(&xfr_note.body, &tracer2_keypair, &candidate_assets).unwrap();
+      let records_data_brute_force = trace_assets_brute_force(&xfr_note.body, &tracer2_keypair, &candidate_assets).unwrap();
+      let records_data = trace_assets(&xfr_note.body, &tracer2_keypair).unwrap();
+      assert_eq!(records_data, records_data_brute_force);
       let ids: Vec<u32> = vec![];
       assert_eq!(records_data.len(), 3);
       assert_eq!(records_data[0].0, 20); // third input amount

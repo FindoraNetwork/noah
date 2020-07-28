@@ -52,7 +52,19 @@ pub struct ZeiHybridCipher {
   pub(crate) ephemeral_public_key: XPublicKey,
 }
 
-/// I encrypt a message a under public key. I implement hybrid encryption where a symmetric public
+/// I encrypt a message a under X25519 DH public key. I implement hybrid encryption where a symmetric public
+/// is derived from the public key, and the message is encrypted under this symmetric key.
+pub fn hybrid_encrypt_with_x25519_key<R: CryptoRng + RngCore>(prng: &mut R,
+                                                              pub_key: &XPublicKey,
+                                                              message: &[u8])
+                                                              -> ZeiHybridCipher {
+  let (key, ephemeral_key) = symmetric_key_from_x25519_public_key(prng, &pub_key.key);
+  let ciphertext = symmetric_encrypt_fresh_key(&key, message);
+  ZeiHybridCipher { ciphertext,
+                    ephemeral_public_key: XPublicKey { key: ephemeral_key } }
+}
+
+/// I encrypt a message a under Ed25519 signature public key. I implement hybrid encryption where a symmetric public
 /// is derived from the public key, and the message is encrypted under this symmetric key.
 /// I return ZeiError::DecompressElementError if public key is not well formed.
 pub fn hybrid_encrypt_with_sign_key<R: CryptoRng + RngCore>(
@@ -61,7 +73,6 @@ pub fn hybrid_encrypt_with_sign_key<R: CryptoRng + RngCore>(
   message: &[u8])
   -> Result<ZeiHybridCipher, ZeiError> {
   let (key, ephemeral_key) = symmetric_key_from_ed25519_public_key(prng, pub_key)?;
-  //let (ciphertext, nonce) = symmetric_encrypt(&key, message);
   let ciphertext = symmetric_encrypt_fresh_key(&key, message);
 
   Ok(ZeiHybridCipher { ciphertext,
@@ -72,9 +83,21 @@ pub fn hybrid_encrypt_with_sign_key<R: CryptoRng + RngCore>(
 /// I decrypt a hybrid ciphertext for a secret key.
 /// In case of success, I return vector of plain text bytes. Otherwise, I return either
 /// ZeiError::DecompressElementError or Zei::DecryptionError
-pub fn hybrid_decrypt(ctext: &ZeiHybridCipher, sec_key: &SecretKey) -> Result<Vec<u8>, ZeiError> {
-  let key = symmetric_key_from_secret_key(sec_key, &ctext.ephemeral_public_key.key)?;
-  Ok(symmetric_decrypt_fresh_key(&key, ctext.ciphertext.as_slice()))
+pub fn hybrid_decrypt_with_x25519_secret_key(ctext: &ZeiHybridCipher,
+                                             sec_key: &XSecretKey)
+                                             -> Vec<u8> {
+  let key = symmetric_key_from_x25519_secret_key(&sec_key.key, &ctext.ephemeral_public_key.key);
+  symmetric_decrypt_fresh_key(&key, ctext.ciphertext.as_slice())
+}
+
+/// I decrypt a hybrid ciphertext for a secret key.
+/// In case of success, I return vector of plain text bytes. Otherwise, I return either
+/// ZeiError::DecompressElementError or Zei::DecryptionError
+pub fn hybrid_decrypt_with_ed25519_secret_key(ctext: &ZeiHybridCipher,
+                                              sec_key: &SecretKey)
+                                              -> Vec<u8> {
+  let key = symmetric_key_from_secret_key(sec_key, &ctext.ephemeral_public_key.key);
+  symmetric_decrypt_fresh_key(&key, ctext.ciphertext.as_slice())
 }
 
 fn shared_key_to_32_bytes(shared_key: &x25519_dalek::SharedSecret) -> [u8; 32] {
@@ -127,18 +150,22 @@ fn sec_key_as_scalar(sk: &SecretKey) -> Scalar {
   Scalar::from_bits(key_bytes)
 }
 
+fn symmetric_key_from_x25519_secret_key(sec_key: &x25519_dalek::StaticSecret,
+                                        ephemeral_public_key: &x25519_dalek::PublicKey)
+                                        -> [u8; 32] {
+  let shared_key = sec_key.diffie_hellman(ephemeral_public_key);
+  shared_key_to_32_bytes(&shared_key)
+}
+
 /// I derive a 32 bytes symmetric key from a secret key and encoded randomness in the public key
 /// I return the byte array. In case encoded randomness cannot be decoded into a valid group
 /// element, I return ZeiError::DecompressElementError.
 fn symmetric_key_from_secret_key(sec_key: &SecretKey,
                                  ephemeral_public_key: &x25519_dalek::PublicKey)
-                                 -> Result<[u8; 32], ZeiError> {
+                                 -> [u8; 32] {
   let scalar_sec_key = sec_key_as_scalar(sec_key);
   let x_secret = x25519_dalek::StaticSecret::from(scalar_sec_key.to_bytes());
-  let shared_key = x_secret.diffie_hellman(ephemeral_public_key);
-
-  let symmetric_key = shared_key_to_32_bytes(&shared_key);
-  Ok(symmetric_key)
+  symmetric_key_from_x25519_secret_key(&x_secret, ephemeral_public_key)
 }
 
 use aes_ctr::stream_cipher::generic_array::GenericArray;
@@ -178,7 +205,7 @@ mod test {
     let keypair = Keypair::generate(&mut prng);
     let (from_pk_key, encoded_rand) =
       symmetric_key_from_ed25519_public_key(&mut prng, &keypair.public).unwrap();
-    let from_sk_key = symmetric_key_from_secret_key(&keypair.secret, &encoded_rand).unwrap();
+    let from_sk_key = symmetric_key_from_secret_key(&keypair.secret, &encoded_rand);
     assert_eq!(from_pk_key, from_sk_key);
   }
 
@@ -203,7 +230,7 @@ mod test {
     let msg = b"this is another message";
 
     let cipherbox = hybrid_encrypt_with_sign_key(&mut prng, &key_pair.public, msg).unwrap();
-    let plaintext = hybrid_decrypt(&cipherbox, &key_pair.secret).unwrap();
+    let plaintext = hybrid_decrypt_with_ed25519_secret_key(&cipherbox, &key_pair.secret);
     assert_eq!(msg, plaintext.as_slice());
   }
 }

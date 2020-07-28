@@ -2,7 +2,9 @@ use crate::api::anon_creds::{
   ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, AttributeCiphertext,
   ConfidentialAC, Credential,
 };
-use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt_with_sign_key};
+use crate::basic_crypto::hybrid_encryption::{
+  hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
+};
 use crate::errors::ZeiError;
 use crate::utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
@@ -90,7 +92,8 @@ impl AssetRecord {
   /// Build a record input from OpenAssetRecord with an associated policy that has no identity tracking
   /// Important: It assumes that RecordInput will be used as an input to xfr_note_gen and not as an output
   /// since OpenAsset record was recovered from a BlindAsset record. This means owner_memo field is be None.
-  pub fn from_open_asset_record_with_asset_tracking_but_no_identity(
+  pub fn from_open_asset_record_with_asset_tracking_but_no_identity<R: CryptoRng + RngCore>(
+    prng: &mut R,
     oar: OpenAssetRecord,
     asset_tracking_policies: AssetTracingPolicies)
     -> Result<AssetRecord, ZeiError> {
@@ -114,13 +117,14 @@ impl AssetRecord {
         let asset_type_info = match oar.get_record_type() {
           AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
           | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
-          _ => Some((asset_type_to_scalar(&oar.asset_type), &oar.type_blind)),
+          _ => Some((oar.asset_type, &oar.type_blind)),
         };
         (amount_info, asset_type_info)
       } else {
         (None, None)
       };
-      let asset_tracer_memo = AssetTracerMemo::new(&asset_tracking_policy.enc_keys,
+      let asset_tracer_memo = AssetTracerMemo::new(prng,
+                                                   &asset_tracking_policy.enc_keys,
                                                    amount_info,
                                                    asset_type_info,
                                                    vec![]);
@@ -163,7 +167,7 @@ impl AssetRecord {
         let asset_type_info = match oar.get_record_type() {
           AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
           | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
-          _ => Some((asset_type_to_scalar(&oar.asset_type), &oar.type_blind)),
+          _ => Some((oar.asset_type, &oar.type_blind)),
         };
         (amount_info, asset_type_info)
       } else {
@@ -188,7 +192,8 @@ impl AssetRecord {
         }
         None => (vec![], None),
       };
-      let asset_tracer_memo = AssetTracerMemo::new(&asset_tracking_policy.enc_keys,
+      let asset_tracer_memo = AssetTracerMemo::new(prng,
+                                                   &asset_tracking_policy.enc_keys,
                                                    amount_info,
                                                    asset_type_info,
                                                    attrs);
@@ -330,11 +335,12 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
                                     amount_high,
                                     &amount_blind_low,
                                     &amount_blind_high)),
-       confidential_asset.as_some((type_scalar, &type_blind)))
+       confidential_asset.as_some((asset_record.asset_type, &type_blind)))
     } else {
       (None, None)
     };
-    let memo = AssetTracerMemo::new(&tracing_policy.enc_keys,
+    let memo = AssetTracerMemo::new(prng,
+                                    &tracing_policy.enc_keys,
                                     amount_info,
                                     asset_type_info,
                                     ctexts);
@@ -447,7 +453,7 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
     None => vec![],
     Some(memo) => {
       shared_point = derive_point_from_blind_share(&memo.blind_share, secret_key)?;
-      hybrid_decrypt(&memo.lock, &secret_key.0)?
+      hybrid_decrypt_with_ed25519_secret_key(&memo.lock, &secret_key.0)
     }
   };
 

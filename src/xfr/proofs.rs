@@ -693,11 +693,11 @@ mod tests {
     assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
 
     // fake memo
-    let memos = vec![vec![AssetTracerMemo { enc_key:
-                                              gen_asset_tracer_keypair(&mut prng).enc_key,
-                                            lock_amount: None,
-                                            lock_asset_type: None,
-                                            lock_attributes: vec![] }]];
+    let tracer_key = gen_asset_tracer_keypair(&mut prng).enc_key;
+    let memos = vec![vec![AssetTracerMemo::new(&mut prng, &tracer_key,
+                                            None,
+                                            None,
+                                            vec![])]];
     let reveal_policies = vec![&asset_tracing_policies];
 
     let res = verify_identity_proofs(reveal_policies.as_slice(),

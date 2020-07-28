@@ -280,6 +280,7 @@ pub struct AssetTracerMemo {
   pub lock_amount: Option<(RecordDataCiphertext, RecordDataCiphertext)>, //None if amount is not confidential
   pub lock_asset_type: Option<RecordDataCiphertext>, // None asset_type is not confidential
   pub lock_attributes: Vec<AttributeCiphertext>,
+  pub lock_info: ZeiHybridCipher, // hybrid encryption of amount, asset type and attributes encrypted above
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
