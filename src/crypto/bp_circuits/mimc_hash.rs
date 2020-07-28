@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
-
-use crate::crypto::accumulators::merkle_tree::compute_mimc_constants;
+use crate::basic_crypto::hash_functions::mimc::compute_mimc_constants;
 use bulletproofs::r1cs::*;
 use curve25519_dalek::scalar::Scalar;
 
@@ -78,7 +77,9 @@ pub fn hash_proof<CS: ConstraintSystem>(cs: &mut CS,
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::crypto::accumulators::merkle_tree::{MTHash, MiMCHash};
+  use crate::basic_crypto::hash_functions::mimc::MiMCHash;
+  use crate::basic_crypto::hash_functions::mimc::{mimc_f, mimc_feistel};
+  use crate::basic_crypto::hash_functions::MTHash;
   use bulletproofs::r1cs::Verifier;
   use bulletproofs::{BulletproofGens, PedersenGens};
   use curve25519_dalek::scalar::Scalar;
@@ -95,7 +96,7 @@ mod test {
     let (cx, x) = prover.commit(scalar_x, Scalar::from(10u8));
     let (out, num_left_wires) = super::mimc_func(&mut prover, x.into(), scalar_c).unwrap();
 
-    let expected_output = crate::crypto::accumulators::merkle_tree::mimc_f(&scalar_x, &scalar_c);
+    let expected_output = mimc_f(&scalar_x, &scalar_c);
     let expected = prover.allocate(Some(expected_output)).unwrap();
 
     prover.constrain(out - expected);
@@ -124,8 +125,7 @@ mod test {
     let scalar_x = Scalar::from(2u8);
     let scalar_y = Scalar::from(0u8);
     let scalar_c = [Scalar::from(0u8), Scalar::from(8u8), Scalar::from(0u8)];
-    let (expected_output_x, expected_output_y) =
-      crate::crypto::accumulators::merkle_tree::mimc_feistel(&scalar_x, &scalar_y, &scalar_c);
+    let (expected_output_x, expected_output_y) = mimc_feistel(&scalar_x, &scalar_y, &scalar_c);
 
     let (cx, x) = prover.commit(scalar_x, Scalar::from(10u8));
     let (cy, y) = prover.commit(scalar_y, Scalar::from(11u8));
