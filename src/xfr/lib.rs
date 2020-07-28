@@ -929,7 +929,7 @@ pub(crate) fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMem
   for bar_memo in memos {
     let blind_asset_record = bar_memo.0;
     let memo = bar_memo.1;
-    let (amount_option, asset_type_option) = memo.decrypt(dec_key)?; // return BogusAssetTracerMemo in case of error.
+    let (amount_option, asset_type_option, attributes) = memo.decrypt(dec_key)?; // return BogusAssetTracerMemo in case of error.
     let amount = match memo.lock_amount {
       None => blind_asset_record.amount
                                 .get_amount()
@@ -953,8 +953,6 @@ pub(crate) fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMem
         Some(asset_type) => asset_type,
       },
     };
-
-    let attributes = memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?;
 
     result.push((amount, asset_type, attributes, blind_asset_record.public_key));
   }
