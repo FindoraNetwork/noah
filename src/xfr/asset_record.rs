@@ -181,7 +181,7 @@ impl AssetRecord {
                                             credential_sec_key,
                                             credential,
                                             credential_commitment_key,
-                                            &asset_tracking_policy.enc_keys.attrs_enc_key,
+                                            &asset_tracking_policy.enc_keys.attrs_enc_eg_key,
                                             id_policy.reveal_map.as_slice(),
                                             &[])?.get_fields();
           (Some(attrs), Some(proof))
@@ -229,7 +229,7 @@ impl AssetRecord {
                                              credential_user_sec_key,
                                              credential,
                                              credential_key,
-                                             &policy.enc_keys.attrs_enc_key,
+                                             &policy.enc_keys.attrs_enc_eg_key,
                                              &reveal_policy.reveal_map,
                                              &[])?)
       } else {
@@ -532,20 +532,20 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
 #[cfg(test)]
 mod test {
   use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
-  use crate::algebra::bls12_381::{BLSScalar, BLSG1};
-  use crate::algebra::groups::Group;
-  use crate::basic_crypto::elgamal::{elgamal_key_gen, ElGamalEncKey};
+  //use crate::algebra::bls12_381::{BLSScalar, BLSG1};
+  //use crate::algebra::groups::Group;
+  //use crate::basic_crypto::elgamal::{elgamal_key_gen, ElGamalEncKey};
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::asset_record::AssetRecordType;
   // use crate::xfr::lib::XfrType;
+  use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
-    AssetRecordTemplate, AssetTracerEncKeys, AssetTracingPolicies, AssetTracingPolicy, AssetType,
-    OpenAssetRecord, XfrAmount, XfrAssetType,
+    AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType, OpenAssetRecord,
+    XfrAmount, XfrAssetType,
   };
   use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
   use bulletproofs::PedersenGens;
-  use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
   use rand::Rng;
@@ -562,15 +562,22 @@ mod test {
     let keypair = XfrKeyPair::generate(&mut prng);
     let tracing_policy = match asset_tracking {
       true => {
+        let tracer_keys = gen_asset_tracer_keypair(&mut prng);
+        /*
         let (_sk, xfr_pub_key) =
           elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
         let (_sk, id_reveal_pub_key) =
           elgamal_key_gen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
-        let tracer_enc_key = AssetTracerEncKeys { record_data_enc_key:
+        let x_secret_key = XSecretKey{key: x}
+        let tracer_enc_key = AssetTracerEncKeys { record_data_eg_enc_key:
                                                     ElGamalEncKey(xfr_pub_key.get_point()),
-                                                  attrs_enc_key: id_reveal_pub_key };
+                                                  attrs_enc_eg_key: id_reveal_pub_key,
+          zei_cipher_enc_key: XPublicKey{}
+        };
+        */
         let tracing_policies =
-          AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys: tracer_enc_key,
+          AssetTracingPolicies::from_policy(AssetTracingPolicy { //enc_keys: tracer_enc_key,
+                                                                 enc_keys: tracer_keys.enc_key,
                                                                  asset_tracking: true,
                                                                  identity_tracking: None });
         Some(tracing_policies)

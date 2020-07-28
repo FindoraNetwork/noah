@@ -7,7 +7,6 @@ use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 // use ed25519_dalek::ed25519::signature::Signature; // uncomment when v1.0.0.pre4 is updated in our dependencies
-use crate::basic_crypto::hybrid_encryption::XPublicKey;
 use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
@@ -209,22 +208,39 @@ impl ZeiFromToBytes for CompressedEdwardsY {
   }
 }
 
-impl ZeiFromToBytes for XPublicKey {
+impl ZeiFromToBytes for x25519_dalek::PublicKey {
   fn zei_to_bytes(&self) -> Vec<u8> {
     let mut v = vec![];
-    v.extend_from_slice(self.key.as_bytes());
+    v.extend_from_slice(self.as_bytes());
     v
   }
-  fn zei_from_bytes(bytes: &[u8]) -> Result<XPublicKey, ZeiError> {
+  fn zei_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::PublicKey, ZeiError> {
     if bytes.len() < 32 {
       return Err(ZeiError::SerializationError);
     }
     let mut array = [0u8; 32];
     array.copy_from_slice(&bytes[0..32]);
-    Ok(XPublicKey { key: x25519_dalek::PublicKey::from(array) })
+    Ok(x25519_dalek::PublicKey::from(array))
   }
 }
 
+impl ZeiFromToBytes for x25519_dalek::StaticSecret {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    let mut v = vec![];
+    v.extend_from_slice(&self.to_bytes()[..]);
+    v
+  }
+  fn zei_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::StaticSecret, ZeiError> {
+    if bytes.len() < 32 {
+      return Err(ZeiError::SerializationError);
+    }
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&bytes[0..32]);
+    Ok(x25519_dalek::StaticSecret::from(array))
+  }
+}
+
+/*
 impl Serialize for XPublicKey {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer
@@ -279,6 +295,7 @@ impl<'de> Deserialize<'de> for XPublicKey {
     }
   }
 }
+*/
 
 impl ZeiFromToBytes for XfrSignature {
   fn zei_to_bytes(&self) -> Vec<u8> {

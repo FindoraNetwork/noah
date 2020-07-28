@@ -5,9 +5,16 @@ use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
 use sha2::Digest;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XPublicKey {
+  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) key: x25519_dalek::PublicKey,
+}
+
+impl XPublicKey {
+  pub fn from(sk: &XSecretKey) -> XPublicKey {
+    XPublicKey { key: x25519_dalek::PublicKey::from(&sk.key) }
+  }
 }
 
 impl PartialEq for XPublicKey {
@@ -18,11 +25,30 @@ impl PartialEq for XPublicKey {
 
 impl Eq for XPublicKey {}
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct XSecretKey {
+  #[serde(with = "serialization::zei_obj_serde")]
+  pub(crate) key: x25519_dalek::StaticSecret,
+}
+
+impl XSecretKey {
+  pub fn new<R: CryptoRng + RngCore>(prng: &mut R) -> XSecretKey {
+    XSecretKey { key: x25519_dalek::StaticSecret::new(prng) }
+  }
+}
+
+impl PartialEq for XSecretKey {
+  fn eq(&self, other: &Self) -> bool {
+    self.key.to_bytes() == other.key.to_bytes()
+  }
+}
+
+impl Eq for XSecretKey {}
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct ZeiHybridCipher {
   pub(crate) ciphertext: Vec<u8>,
   //pub(crate) nonce: Nonce,
-  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) ephemeral_public_key: XPublicKey,
 }
 

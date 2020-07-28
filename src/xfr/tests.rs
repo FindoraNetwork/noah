@@ -1,10 +1,7 @@
 #[cfg(test)]
 pub(crate) mod tests {
-  use crate::algebra::groups::Group;
   use crate::api::anon_creds;
-  use crate::api::anon_creds::{
-    ac_commit, ac_confidential_gen_encryption_keys, ACCommitment, Credential,
-  };
+  use crate::api::anon_creds::{ac_commit, ACCommitment, Credential};
   use crate::basic_crypto::elgamal::{elgamal_encrypt, elgamal_key_gen};
   use crate::crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
   use crate::errors::ZeiError;
@@ -585,6 +582,7 @@ pub(crate) mod tests {
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
+    use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
     use crate::xfr::lib::XfrNotePoliciesRef;
     use crate::xfr::structs::AssetTracingPolicies;
 
@@ -594,11 +592,7 @@ pub(crate) mod tests {
       prng = ChaChaRng::from_seed([0u8; 32]);
       let addr = b"0x7789654"; // receiver address
 
-      let (_, asset_tracer_pub_key) = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
-      let (_, asset_tracer_id_pub_key) = ac_confidential_gen_encryption_keys(&mut prng);
-      let asset_tracer_public_keys = AssetTracerEncKeys { record_data_enc_key:
-                                                            asset_tracer_pub_key,
-                                                          attrs_enc_key: asset_tracer_id_pub_key };
+      let tracer_keys = gen_asset_tracer_keypair(&mut prng);
 
       let attrs = vec![1u32, 2, 3, 4];
       let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
@@ -620,8 +614,8 @@ pub(crate) mod tests {
                                                       reveal_map: vec![false, true, false, true] }; // revealing attr2 and attr4
 
       let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_public_keys.clone(),
+        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys: tracer_keys.enc_key
+                                                                                    .clone(),
                                                                asset_tracking: false,
                                                                identity_tracking:
                                                                  Some(id_tracking_policy.clone()) });
@@ -900,15 +894,12 @@ pub(crate) mod tests {
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_type = AssetType::from_identical_byte(0u8);
 
-      let (_, asset_tracer_pub_key) = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
-      let (_, asset_tracer_id_pub_key) = ac_confidential_gen_encryption_keys(&mut prng);
-      let asset_tracer_public_keys = AssetTracerEncKeys { record_data_enc_key:
-                                                            asset_tracer_pub_key,
-                                                          attrs_enc_key: asset_tracer_id_pub_key };
+      let asset_tracer_public_keys = gen_asset_tracer_keypair(&mut prng);
 
       let tracking_policy =
         AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_public_keys.clone(),
+                                                                 asset_tracer_public_keys.enc_key
+                                                                                         .clone(),
                                                                asset_tracking: true,
                                                                identity_tracking: None });
 

@@ -5,6 +5,7 @@ use crate::basic_crypto::elgamal::{
   elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
   ElGamalDecKey, ElGamalEncKey,
 };
+use crate::basic_crypto::hybrid_encryption::{XPublicKey, XSecretKey};
 use crate::errors::ZeiError;
 use crate::utils::u64_to_u32_pair;
 use crate::xfr::structs::AssetType;
@@ -24,10 +25,16 @@ pub fn gen_asset_tracer_keypair<R: CryptoRng + RngCore>(prng: &mut R) -> AssetTr
   let (record_data_dec_key, record_data_enc_key) =
     elgamal_key_gen(prng, &RistrettoPoint::get_base());
   let (attrs_dec_key, attrs_enc_key) = elgamal_key_gen(prng, &BLSG1::get_base());
-  AssetTracerKeyPair { enc_key: AssetTracerEncKeys { record_data_enc_key,
-                                                     attrs_enc_key },
-                       dec_key: AssetTracerDecKeys { record_data_dec_key,
-                                                     attrs_dec_key } }
+  let zei_cipher_dec_key = XSecretKey::new(prng);
+  let zei_cipher_enc_key = XPublicKey::from(&zei_cipher_dec_key);
+  AssetTracerKeyPair { enc_key: AssetTracerEncKeys { record_data_eg_enc_key:
+                                                       record_data_enc_key,
+                                                     attrs_enc_eg_key: attrs_enc_key,
+                                                     zei_cipher_enc_key },
+                       dec_key: AssetTracerDecKeys { record_data_eg_dec_key:
+                                                       record_data_dec_key,
+                                                     attrs_dec_key,
+                                                     zei_cipher_dec_key } }
 }
 
 impl AssetTracerMemo {
@@ -43,11 +50,11 @@ impl AssetTracerMemo {
                    let ctext_amount_low = elgamal_encrypt(&pc_gens.B,
                                                           &Scalar::from_u32(amount_low),
                                                           blind_low,
-                                                          &tracer_enc_key.record_data_enc_key);
+                                                          &tracer_enc_key.record_data_eg_enc_key);
                    let ctext_amount_high = elgamal_encrypt(&pc_gens.B,
                                                            &Scalar::from_u32(amount_high),
                                                            blind_high,
-                                                           &tracer_enc_key.record_data_enc_key);
+                                                           &tracer_enc_key.record_data_eg_enc_key);
                    (ctext_amount_low, ctext_amount_high)
                  });
 
@@ -55,7 +62,7 @@ impl AssetTracerMemo {
                                            elgamal_encrypt(&pc_gens.B,
                                                            &type_scalar,
                                                            blind,
-                                                           &tracer_enc_key.record_data_enc_key)
+                                                           &tracer_enc_key.record_data_eg_enc_key)
                                          });
 
     AssetTracerMemo { enc_key: tracer_enc_key.clone(),
@@ -178,98 +185,78 @@ impl AssetTracerMemo {
 #[cfg(test)]
 mod tests {
   use crate::algebra::groups::{Group, Scalar as ZeiScalar};
-  use crate::basic_crypto::elgamal::{elgamal_encrypt, elgamal_key_gen};
-  use crate::xfr::structs::{asset_type_to_scalar, AssetTracerEncKeys, AssetTracerMemo, AssetType};
-  use curve25519_dalek::ristretto::RistrettoPoint;
+  use crate::basic_crypto::elgamal::elgamal_encrypt;
+  use crate::xfr::structs::{asset_type_to_scalar, AssetTracerMemo, AssetType};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
   use crate::algebra::bls12_381::{BLSScalar, BLSG1};
-  use crate::api::anon_creds::ac_confidential_gen_encryption_keys;
   use crate::errors::ZeiError;
   use crate::utils::u64_to_u32_pair;
+  use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
 
   #[test]
   fn extract_amount_from_tracer_memo() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let ristretto_keypair = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
-    let blsg1_keypair = ac_confidential_gen_encryption_keys(&mut prng);
-    let asset_tracer_pub_key = AssetTracerEncKeys { record_data_enc_key: ristretto_keypair.1,
-                                                    attrs_enc_key: blsg1_keypair.1 };
-    let memo = AssetTracerMemo { enc_key: asset_tracer_pub_key.clone(),
+    let tracer_keys = gen_asset_tracer_keypair(&mut prng);
+    let memo = AssetTracerMemo { enc_key: tracer_keys.enc_key.clone(),
                                  lock_amount: None,
                                  lock_asset_type: None,
                                  lock_attributes: None };
-    assert!(memo.verify_amount(&ristretto_keypair.0, 10).is_err());
+    assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_eg_dec_key, 10)
+                .is_err());
 
     let amount = (1u64 << 40) + 500; // low and high are small u32 numbers
     let (low, high) = u64_to_u32_pair(amount);
-    let base = RistrettoPoint::get_base();
     let memo =
-      AssetTracerMemo { enc_key: asset_tracer_pub_key.clone(),
-                        lock_amount:
-                          Some((elgamal_encrypt(&base,
-                                                &Scalar::from(low),
-                                                &Scalar::from(191919u32),
-                                                &asset_tracer_pub_key.record_data_enc_key),
-                                elgamal_encrypt(&base,
-                                                &Scalar::from(high),
-                                                &Scalar::from(2222u32),
-                                                &asset_tracer_pub_key.record_data_enc_key))),
-                        lock_asset_type: None,
-                        lock_attributes: None };
-    assert!(memo.verify_amount(&ristretto_keypair.0, amount).is_ok());
+      AssetTracerMemo::new(&tracer_keys.enc_key,
+                           Some((low, high, &Scalar::from(191919u32), &Scalar::from(2222u32))),
+                           None,
+                           None);
+    assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_eg_dec_key, amount)
+                .is_ok());
 
-    assert!(memo.extract_amount_brute_force(&ristretto_keypair.0)
+    assert!(memo.extract_amount_brute_force(&tracer_keys.dec_key.record_data_eg_dec_key)
                 .is_ok());
   }
 
   #[test]
   fn extract_asset_type_from_tracer_memo() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let ristretto_keypair = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
-    let blsg1_keypair = ac_confidential_gen_encryption_keys(&mut prng);
-    let asset_tracer_pub_key = AssetTracerEncKeys { record_data_enc_key: ristretto_keypair.1,
-                                                    attrs_enc_key: blsg1_keypair.1 };
-    let memo = AssetTracerMemo { enc_key: asset_tracer_pub_key.clone(),
-                                 lock_amount: None,
-                                 lock_asset_type: None,
-                                 lock_attributes: None };
-    assert!(memo.extract_asset_type(&ristretto_keypair.0, &[]).is_err());
+    let tracer_keys = gen_asset_tracer_keypair(&mut prng);
+    let memo = AssetTracerMemo::new(&tracer_keys.enc_key, None, None, None);
+    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key, &[])
+                .is_err());
 
     let asset_type = AssetType::from_identical_byte(2u8);
-    let base = RistrettoPoint::get_base();
-    let memo =
-      AssetTracerMemo { enc_key: asset_tracer_pub_key.clone(),
-                        lock_amount: None,
-                        lock_asset_type:
-                          Some(elgamal_encrypt(&base,
-                                               &Scalar::from(asset_type_to_scalar(&asset_type)),
-                                               &Scalar::from(191919u32),
-                                               &asset_tracer_pub_key.record_data_enc_key)),
-                        lock_attributes: None };
-    assert_eq!(memo.extract_asset_type(&ristretto_keypair.0, &[]),
+    let memo = AssetTracerMemo::new(&tracer_keys.enc_key,
+                                    None,
+                                    Some((asset_type_to_scalar(&asset_type),
+                                          &Scalar::from(191919u32))),
+                                    None);
+
+    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key, &[]),
                Err(ZeiError::ParameterError));
-    assert_eq!(memo.extract_asset_type(&ristretto_keypair.0,
+    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
                                        &[AssetType::from_identical_byte(0u8)]),
                Err(ZeiError::AssetTracingExtractionError));
-    assert_eq!(memo.extract_asset_type(&ristretto_keypair.0,
+    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
                                        &[AssetType::from_identical_byte(0u8),
                                          AssetType::from_identical_byte(1u8)]),
                Err(ZeiError::AssetTracingExtractionError));
-    assert!(memo.extract_asset_type(&ristretto_keypair.0,
+    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
                                     &[AssetType::from_identical_byte(0u8),
                                       AssetType::from_identical_byte(1u8),
                                       asset_type])
                 .is_ok());
-    assert!(memo.extract_asset_type(&ristretto_keypair.0,
+    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
                                     &[asset_type,
                                       AssetType::from_identical_byte(0u8),
                                       AssetType::from_identical_byte(1u8)])
                 .is_ok());
-    assert!(memo.extract_asset_type(&ristretto_keypair.0,
+    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
                                     &[AssetType::from_identical_byte(0u8),
                                       asset_type,
                                       AssetType::from_identical_byte(1u8)])
@@ -279,10 +266,7 @@ mod tests {
   #[test]
   fn extract_identity_attributed_from_tracer_memo() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let ristretto_keypair = elgamal_key_gen(&mut prng, &RistrettoPoint::get_base());
-    let blsg1_keypair = ac_confidential_gen_encryption_keys(&mut prng);
-    let asset_tracer_pub_key = AssetTracerEncKeys { record_data_enc_key: ristretto_keypair.1,
-                                                    attrs_enc_key: blsg1_keypair.1 };
+    let tracer_keys = gen_asset_tracer_keypair(&mut prng);
 
     let base = BLSG1::get_base();
 
@@ -294,28 +278,27 @@ mod tests {
                         elgamal_encrypt(&base,
                                         &scalar,
                                         &BLSScalar::from_u32(1000u32),
-                                        &asset_tracer_pub_key.attrs_enc_key)
+                                        &tracer_keys.enc_key.attrs_enc_eg_key)
                       })
                       .collect_vec();
 
-    let memo = AssetTracerMemo { enc_key: asset_tracer_pub_key.clone(),
-                                 lock_amount: None,
-                                 lock_asset_type: None,
-                                 lock_attributes: Some(ctexts) };
-    assert_eq!(memo.verify_identity_attributes(&blsg1_keypair.0, &[1u32]),
+    let memo = AssetTracerMemo::new(&tracer_keys.enc_key, None, None, Some(ctexts));
+
+    assert_eq!(memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32]),
                Err(ZeiError::ParameterError));
-    assert_eq!(memo.verify_identity_attributes(&blsg1_keypair.0, &[1u32, 2, 3, 4]),
+    assert_eq!(memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key,
+                                               &[1u32, 2, 3, 4]),
                Err(ZeiError::ParameterError));
-    assert_eq!(memo.verify_identity_attributes(&blsg1_keypair.0, &[1u32, 2, 4]),
+    assert_eq!(memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32, 2, 4]),
                Ok(vec![true, true, false]));
-    assert_eq!(memo.verify_identity_attributes(&blsg1_keypair.0, &[4u32, 2, 3]),
+    assert_eq!(memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[4u32, 2, 3]),
                Ok(vec![false, true, true]));
-    assert_eq!(memo.verify_identity_attributes(&blsg1_keypair.0, &[1u32, 2, 3]),
+    assert_eq!(memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32, 2, 3]),
                Ok(vec![true, true, true]));
-    assert_eq!(memo.verify_identity_attributes(&blsg1_keypair.0, &[3u32, 1, 2]),
+    assert_eq!(memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[3u32, 1, 2]),
                Ok(vec![false, false, false]));
 
-    let attrs = memo.extract_identity_attributes_brute_force(&blsg1_keypair.0)
+    let attrs = memo.extract_identity_attributes_brute_force(&tracer_keys.dec_key.attrs_dec_key)
                     .unwrap();
     assert_eq!(attrs, vec![1u32, 2, 3]);
   }
