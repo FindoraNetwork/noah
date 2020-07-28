@@ -896,8 +896,7 @@ pub fn trace_assets(xfr_body: &XfrBody,
                     tracer_keypair: &AssetTracerKeyPair)
                     -> Result<Vec<RecordData>, ZeiError> {
   let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
-  extract_tracking_info(bars_memos.as_slice(),
-                        &tracer_keypair.dec_key)
+  extract_tracking_info(bars_memos.as_slice(), &tracer_keypair.dec_key)
 }
 
 /// Scan XfrBody transfers involving asset tracing memos intended for `tracer_keypair`.
@@ -908,15 +907,12 @@ pub fn trace_assets(xfr_body: &XfrBody,
 /// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
 pub fn trace_assets_brute_force(xfr_body: &XfrBody,
                                 tracer_keypair: &AssetTracerKeyPair,
-                                candidate_asset_types: &[AssetType]
-)
+                                candidate_asset_types: &[AssetType])
                                 -> Result<Vec<RecordData>, ZeiError> {
   let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
-  extract_tracking_info_brute_force(
-    bars_memos.as_slice(),
-    &tracer_keypair.dec_key,
-    candidate_asset_types
-  )
+  extract_tracking_info_brute_force(bars_memos.as_slice(),
+                                    &tracer_keypair.dec_key,
+                                    candidate_asset_types)
 }
 
 /// Scan list of (BlindAssetRecord, AssetTracerMemo) retrieved by find_tracing_memos
@@ -927,8 +923,8 @@ pub fn trace_assets_brute_force(xfr_body: &XfrBody,
 /// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
 /// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
 pub(crate) fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
-                             dec_key: &AssetTracerDecKeys)
-                             -> Result<Vec<RecordData>, ZeiError> {
+                                    dec_key: &AssetTracerDecKeys)
+                                    -> Result<Vec<RecordData>, ZeiError> {
   let mut result = vec![];
   for bar_memo in memos {
     let blind_asset_record = bar_memo.0;
@@ -938,30 +934,24 @@ pub(crate) fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMem
       None => blind_asset_record.amount
                                 .get_amount()
                                 .ok_or(ZeiError::InconsistentStructureError)?,
-      Some(_) => {
-        match amount_option {
-          None => {
-            return Err(ZeiError::InconsistentStructureError);
-          }
-          Some(amt) => {
-            amt
-          }
+      Some(_) => match amount_option {
+        None => {
+          return Err(ZeiError::InconsistentStructureError);
         }
-      }
+        Some(amt) => amt,
+      },
     };
 
     let asset_type = match memo.lock_asset_type {
       None => blind_asset_record.asset_type
-        .get_asset_type()
-        .ok_or(ZeiError::InconsistentStructureError)?,
-      Some(_) => {
-        match asset_type_option {
-          None => {
-            return Err(ZeiError::InconsistentStructureError);
-          }
-          Some(asset_type) => asset_type
+                                .get_asset_type()
+                                .ok_or(ZeiError::InconsistentStructureError)?,
+      Some(_) => match asset_type_option {
+        None => {
+          return Err(ZeiError::InconsistentStructureError);
         }
-      }
+        Some(asset_type) => asset_type,
+      },
     };
 
     let attributes = memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?;
@@ -978,32 +968,27 @@ pub(crate) fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMem
 /// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
 /// Return Error in case data cannot be retrieved due to inconsistent structure.
 /// Eg. amount is not in a BlindAssetRecord nor in the corresponding AssetTracerMemo
-pub(crate) fn extract_tracking_info_brute_force(
-  memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
-  dec_key: &AssetTracerDecKeys,
-  candidate_asset_types: &[AssetType]
-)
-                             -> Result<Vec<RecordData>, ZeiError> {
+pub(crate) fn extract_tracking_info_brute_force(memos: &[(&BlindAssetRecord,
+                                                   &AssetTracerMemo)],
+                                                dec_key: &AssetTracerDecKeys,
+                                                candidate_asset_types: &[AssetType])
+                                                -> Result<Vec<RecordData>, ZeiError> {
   let mut result = vec![];
   for bar_memo in memos {
     let blind_asset_record = bar_memo.0;
     let memo = bar_memo.1;
     let amount = match memo.lock_amount {
       None => blind_asset_record.amount
-        .get_amount()
-        .ok_or(ZeiError::InconsistentStructureError)?,
-      Some(_) => {
-        memo.extract_amount_brute_force(&dec_key.record_data_eg_dec_key)?
-      }
+                                .get_amount()
+                                .ok_or(ZeiError::InconsistentStructureError)?,
+      Some(_) => memo.extract_amount_brute_force(&dec_key.record_data_eg_dec_key)?,
     };
 
     let asset_type = match memo.lock_asset_type {
       None => blind_asset_record.asset_type
-        .get_asset_type()
-        .ok_or(ZeiError::InconsistentStructureError)?,
-      Some(_) => {
-        memo.extract_asset_type(&dec_key.record_data_eg_dec_key, candidate_asset_types)?
-      }
+                                .get_asset_type()
+                                .ok_or(ZeiError::InconsistentStructureError)?,
+      Some(_) => memo.extract_asset_type(&dec_key.record_data_eg_dec_key, candidate_asset_types)?,
     };
 
     let attributes = memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?;

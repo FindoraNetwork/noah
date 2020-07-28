@@ -6,8 +6,7 @@ use crate::basic_crypto::elgamal::{
   ElGamalDecKey, ElGamalEncKey,
 };
 use crate::basic_crypto::hybrid_encryption::{
-  hybrid_decrypt_with_x25519_secret_key,
-  hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
+  hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
 };
 use crate::errors::ZeiError;
 use crate::utils::{u32_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u32};
@@ -43,12 +42,12 @@ pub fn gen_asset_tracer_keypair<R: CryptoRng + RngCore>(prng: &mut R) -> AssetTr
 
 impl AssetTracerMemo {
   /// Sample a new AssetTracerMemo
-  pub fn new<R: CryptoRng + RngCore>( prng: &mut R,
-    tracer_enc_key: &AssetTracerEncKeys,
-             amount_info: Option<(u32, u32, &Scalar, &Scalar)>, //amount low and high and blindings
-             asset_type_info: Option<(AssetType, &Scalar)>,
-             attributes: Vec<AttributeCiphertext>)
-             -> AssetTracerMemo {
+  pub fn new<R: CryptoRng + RngCore>(prng: &mut R,
+                                     tracer_enc_key: &AssetTracerEncKeys,
+                                     amount_info: Option<(u32, u32, &Scalar, &Scalar)>, //amount low and high and blindings
+                                     asset_type_info: Option<(AssetType, &Scalar)>,
+                                     attributes: Vec<AttributeCiphertext>)
+                                     -> AssetTracerMemo {
     let mut plaintext = vec![];
     let pc_gens = PedersenGens::default();
     let lock_amount =
@@ -88,7 +87,8 @@ impl AssetTracerMemo {
   pub fn decrypt(&self,
                  dec_key: &AssetTracerDecKeys)
                  -> Result<(Option<u64>, Option<AssetType>), ZeiError> {
-    let plaintext = hybrid_decrypt_with_x25519_secret_key(&self.lock_info, &dec_key.zei_cipher_dec_key);
+    let plaintext =
+      hybrid_decrypt_with_x25519_secret_key(&self.lock_info, &dec_key.zei_cipher_dec_key);
     let mut index = 0;
     let amount = if self.lock_amount.is_some() {
       let low_bytes = &plaintext[0..4];
@@ -96,7 +96,8 @@ impl AssetTracerMemo {
       let amount_low = u8_bigendian_slice_to_u32(low_bytes);
       let amount_high = u8_bigendian_slice_to_u32(high_bytes);
       let amount = (amount_low as u64) + ((amount_high as u64) << 32);
-      self.verify_amount(&dec_key.record_data_eg_dec_key, amount).map_err(|_| ZeiError::BogusAssetTracerMemo)?;
+      self.verify_amount(&dec_key.record_data_eg_dec_key, amount)
+          .map_err(|_| ZeiError::BogusAssetTracerMemo)?;
       index = 8;
       Some(amount)
     } else {
@@ -107,7 +108,8 @@ impl AssetTracerMemo {
       asset_type.copy_from_slice(&plaintext[index..index + ASSET_TYPE_LENGTH]);
       let asset_type = AssetType(asset_type);
 
-      self.extract_asset_type(&dec_key.record_data_eg_dec_key, &[asset_type]).map_err(|_|ZeiError::BogusAssetTracerMemo)?;
+      self.extract_asset_type(&dec_key.record_data_eg_dec_key, &[asset_type])
+          .map_err(|_| ZeiError::BogusAssetTracerMemo)?;
       // index += ASSET_TYPE_LENGTH;
       Some(asset_type)
     } else {
@@ -238,18 +240,15 @@ mod tests {
   fn extract_amount_from_tracer_memo() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let tracer_keys = gen_asset_tracer_keypair(&mut prng);
-    let memo = AssetTracerMemo::new(&mut prng,
-                                    &tracer_keys.enc_key,
-                                 None,
-                                 None,
-                                 vec![]);
+    let memo = AssetTracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, vec![]);
     assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_eg_dec_key, 10)
                 .is_err());
 
     let amount = (1u64 << 40) + 500; // low and high are small u32 numbers
     let (low, high) = u64_to_u32_pair(amount);
     let memo =
-      AssetTracerMemo::new(&mut prng, &tracer_keys.enc_key,
+      AssetTracerMemo::new(&mut prng,
+                           &tracer_keys.enc_key,
                            Some((low, high, &Scalar::from(191919u32), &Scalar::from(2222u32))),
                            None,
                            vec![]);
@@ -269,7 +268,8 @@ mod tests {
                 .is_err());
 
     let asset_type = AssetType::from_identical_byte(2u8);
-    let memo = AssetTracerMemo::new(&mut prng, &tracer_keys.enc_key,
+    let memo = AssetTracerMemo::new(&mut prng,
+                                    &tracer_keys.enc_key,
                                     None,
                                     Some((asset_type, &Scalar::from(191919u32))),
                                     vec![]);

@@ -39,7 +39,7 @@ pub enum ZeiError {
   AnonymousCredentialSignError,
   R1CSProofError,
   GroupInversionError,
-  BogusAssetTracerMemo
+  BogusAssetTracerMemo,
 }
 
 impl fmt::Display for ZeiError {

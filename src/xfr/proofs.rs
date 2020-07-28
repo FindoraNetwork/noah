@@ -694,10 +694,7 @@ mod tests {
 
     // fake memo
     let tracer_key = gen_asset_tracer_keypair(&mut prng).enc_key;
-    let memos = vec![vec![AssetTracerMemo::new(&mut prng, &tracer_key,
-                                            None,
-                                            None,
-                                            vec![])]];
+    let memos = vec![vec![AssetTracerMemo::new(&mut prng, &tracer_key, None, None, vec![])]];
     let reveal_policies = vec![&asset_tracing_policies];
 
     let res = verify_identity_proofs(reveal_policies.as_slice(),
