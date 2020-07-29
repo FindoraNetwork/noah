@@ -10,7 +10,7 @@ use zei::api::anon_creds::{
 };
 use zei::xfr::asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType};
 use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
-use zei::xfr::lib::{XfrNotePolicies};
+use zei::xfr::lib::XfrNotePolicies;
 use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
 use zei::xfr::structs::{
   AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
@@ -43,7 +43,7 @@ pub fn conf_blind_asset_record_from_ledger(key: &XfrPublicKey,
                                          AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
                                        asset_tracing_policies: Default::default() };
   let (bar, _, owner) =
-    build_blind_asset_record(&mut prng, &PedersenGens::default(), &template, vec![]);
+    build_blind_asset_record(&mut prng, &PedersenGens::default(), &template, vec![], vec![]);
 
   (bar, owner.unwrap())
 }

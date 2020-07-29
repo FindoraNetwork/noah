@@ -2,7 +2,7 @@ use crate::api::anon_creds::{
   ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
   AttributeEncKey,
 };
-use crate::basic_crypto::hybrid_encryption::ZeiHybridCipher;
+use crate::basic_crypto::hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCipher};
 use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use crate::crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use crate::serialization;
@@ -206,20 +206,22 @@ impl XfrAssetType {
 /// Amount and Asset Type encrypted with keys.record_data_enc_key
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTracerEncKeys {
-  pub record_data_enc_key: RecordDataEncKey,
-  pub attrs_enc_key: AttributeEncKey,
+  pub record_data_eg_enc_key: RecordDataEncKey,
+  pub attrs_enc_eg_key: AttributeEncKey,
+  pub zei_cipher_enc_key: XPublicKey,
 }
 
 /// Secret Asset Tracer Decryption keys
 /// Identity attributed are encrypted with keys.attrs_enc_key
 /// Amount and Asset Type encrypted with keys.record_data_enc_key
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTracerDecKeys {
-  pub record_data_dec_key: RecordDataDecKey,
+  pub record_data_eg_dec_key: RecordDataDecKey,
   pub attrs_dec_key: AttributeDecKey,
+  pub zei_cipher_dec_key: XSecretKey,
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTracerKeyPair {
   pub enc_key: AssetTracerEncKeys,
   pub dec_key: AssetTracerDecKeys,
@@ -277,7 +279,8 @@ pub struct AssetTracerMemo {
   // amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
   pub lock_amount: Option<(RecordDataCiphertext, RecordDataCiphertext)>, //None if amount is not confidential
   pub lock_asset_type: Option<RecordDataCiphertext>, // None asset_type is not confidential
-  pub lock_attributes: Option<Vec<AttributeCiphertext>>,
+  pub lock_attributes: Vec<AttributeCiphertext>,
+  pub lock_info: ZeiHybridCipher, // hybrid encryption of amount, asset type and attributes encrypted above
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord

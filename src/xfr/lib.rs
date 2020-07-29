@@ -888,10 +888,89 @@ pub fn find_tracing_memos<'a>(
 /// amount, asset type, identity attribute, public key
 pub type RecordData = (u64, AssetType, Vec<u32>, XfrPublicKey);
 
-pub fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
-                             dec_key: &AssetTracerDecKeys,
-                             candidate_asset_types: &[AssetType])
-                             -> Result<Vec<RecordData>, ZeiError> {
+/// Scan XfrBody transfers involving asset tracing for `tracer_keypair`
+/// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
+/// Returning ZeiError::BogusAssetTracerMemo in case a TracerMemo decrypts inconsistent information, and
+/// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
+pub fn trace_assets(xfr_body: &XfrBody,
+                    tracer_keypair: &AssetTracerKeyPair)
+                    -> Result<Vec<RecordData>, ZeiError> {
+  let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
+  extract_tracking_info(bars_memos.as_slice(), &tracer_keypair.dec_key)
+}
+
+/// Scan XfrBody transfers involving asset tracing memos intended for `tracer_keypair`.
+/// It takes each AssetTracer memo, decrypt the ElGamalEncryption
+/// and brute-force Dlog computation to retrieve amount and identity attributed.
+/// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
+/// Returning ZeiError::BogusAssetTracerMemo in case a TracerMemo decrypts inconsistent information, and
+/// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
+pub fn trace_assets_brute_force(xfr_body: &XfrBody,
+                                tracer_keypair: &AssetTracerKeyPair,
+                                candidate_asset_types: &[AssetType])
+                                -> Result<Vec<RecordData>, ZeiError> {
+  let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
+  extract_tracking_info_brute_force(bars_memos.as_slice(),
+                                    &tracer_keypair.dec_key,
+                                    candidate_asset_types)
+}
+
+/// Scan list of (BlindAssetRecord, AssetTracerMemo) retrieved by find_tracing_memos
+/// (e.i. intended for the same asset tracer). It takes each AssetTracer memo,
+/// decrypts its lock_info field to retrieve amount, asset type and identity attributed.
+/// ElGamal ciphertext are decrypted and verified agains the retrieved data from `memo.lock_info`
+/// Returning ZeiError::BogusAssetTracerMemo in case a TracerMemo decrypts inconsistent information, and
+/// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
+/// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
+pub(crate) fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
+                                    dec_key: &AssetTracerDecKeys)
+                                    -> Result<Vec<RecordData>, ZeiError> {
+  let mut result = vec![];
+  for bar_memo in memos {
+    let blind_asset_record = bar_memo.0;
+    let memo = bar_memo.1;
+    let (amount_option, asset_type_option, attributes) = memo.decrypt(dec_key)?; // return BogusAssetTracerMemo in case of error.
+    let amount = match memo.lock_amount {
+      None => blind_asset_record.amount
+                                .get_amount()
+                                .ok_or(ZeiError::InconsistentStructureError)?,
+      Some(_) => match amount_option {
+        None => {
+          return Err(ZeiError::InconsistentStructureError);
+        }
+        Some(amt) => amt,
+      },
+    };
+
+    let asset_type = match memo.lock_asset_type {
+      None => blind_asset_record.asset_type
+                                .get_asset_type()
+                                .ok_or(ZeiError::InconsistentStructureError)?,
+      Some(_) => match asset_type_option {
+        None => {
+          return Err(ZeiError::InconsistentStructureError);
+        }
+        Some(asset_type) => asset_type,
+      },
+    };
+
+    result.push((amount, asset_type, attributes, blind_asset_record.public_key));
+  }
+  Ok(result)
+}
+
+/// Scan list of (BlindAssetRecord, AssetTracerMemo) retrieved by find_tracing_memos
+/// (e.i. intended for the same asset tracer). It takes each AssetTracer memo, decrypt the ElGamalEncryption
+/// and brute-force Dlog computation to retrieve amount and identity attributed.
+/// The asset type is verified agains a known list of possible asset types `candidate_asset_types`
+/// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
+/// Return Error in case data cannot be retrieved due to inconsistent structure.
+/// Eg. amount is not in a BlindAssetRecord nor in the corresponding AssetTracerMemo
+pub(crate) fn extract_tracking_info_brute_force(memos: &[(&BlindAssetRecord,
+                                                   &AssetTracerMemo)],
+                                                dec_key: &AssetTracerDecKeys,
+                                                candidate_asset_types: &[AssetType])
+                                                -> Result<Vec<RecordData>, ZeiError> {
   let mut result = vec![];
   for bar_memo in memos {
     let blind_asset_record = bar_memo.0;
@@ -900,36 +979,25 @@ pub fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
       None => blind_asset_record.amount
                                 .get_amount()
                                 .ok_or(ZeiError::InconsistentStructureError)?,
-      Some(_) => memo.extract_amount_brute_force(&dec_key.record_data_dec_key)?,
+      Some(_) => memo.extract_amount_brute_force(&dec_key.record_data_eg_dec_key)?,
     };
 
     let asset_type = match memo.lock_asset_type {
       None => blind_asset_record.asset_type
                                 .get_asset_type()
                                 .ok_or(ZeiError::InconsistentStructureError)?,
-      Some(_) => memo.extract_asset_type(&dec_key.record_data_dec_key, candidate_asset_types)?,
+      Some(_) => memo.extract_asset_type(&dec_key.record_data_eg_dec_key, candidate_asset_types)?,
     };
 
-    let attributes = match memo.lock_attributes {
-      None => vec![],
-      _ => memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?,
-    };
+    let attributes = memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?;
+
     result.push((amount, asset_type, attributes, blind_asset_record.public_key));
   }
   Ok(result)
 }
 
-pub fn trace_assets(xfr_body: &XfrBody,
-                    tracer_keypair: &AssetTracerKeyPair,
-                    candidate_assets: &[AssetType])
-                    -> Result<Vec<RecordData>, ZeiError> {
-  let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
-  extract_tracking_info(bars_memos.as_slice(),
-                        &tracer_keypair.dec_key,
-                        candidate_assets)
-}
-
-pub fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
+/*
+pub(crate) fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
                             dec_key: &AssetTracerDecKeys,
                             expected_data: &[RecordData])
                             -> Result<(), ZeiError> {
@@ -948,7 +1016,7 @@ pub fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
           return Err(ZeiError::AssetTracingExtractionError);
         }
       }
-      Some(_) => memo.verify_amount(&dec_key.record_data_dec_key, expected.0)?,
+      Some(_) => memo.verify_amount(&dec_key.record_data_eg_dec_key, expected.0)?,
     };
 
     match memo.lock_asset_type {
@@ -961,16 +1029,14 @@ pub fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
         }
       }
       Some(_) => {
-        memo.extract_asset_type(&dec_key.record_data_dec_key, &[expected.1])?;
+        memo.extract_asset_type(&dec_key.record_data_eg_dec_key, &[expected.1])?;
       }
     };
-    if memo.lock_attributes.is_some() {
-      let result =
-        memo.verify_identity_attributes(&dec_key.attrs_dec_key, (expected.2).as_slice())?;
-      if !result.iter().all(|current| *current) {
-        return Err(ZeiError::IdentityTracingExtractionError);
-      }
-    };
+
+    let result = memo.verify_identity_attributes(&dec_key.attrs_dec_key, (expected.2).as_slice())?;
+    if !result.iter().all(|current| *current) {
+      return Err(ZeiError::IdentityTracingExtractionError);
+    }
   }
   Ok(())
 }
@@ -984,3 +1050,4 @@ pub fn verify_tracing_ctexts(xfr_body: &XfrBody,
                        &tracer_keypair.dec_key,
                        expected_data)
 }
+*/
