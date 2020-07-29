@@ -21,11 +21,9 @@ pub fn hybrid_encrypt<R: CryptoRng + RngCore>(prng: &mut R,
                                               message: &[u8])
                                               -> ZeiHybridCipher {
   let (key, encoded_rand) = symmetric_key_from_public_key(prng, pub_key);
-  //let (ciphertext, nonce) = symmetric_encrypt(&key, message);
   let ciphertext = symmetric_encrypt_fresh_key(&key, message);
 
   ZeiHybridCipher { ciphertext,
-                    //nonce,
                     encoded_rand }
 }
 
@@ -99,7 +97,7 @@ use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 
 fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
   let kkey = GenericArray::from_slice(key);
-  let ctr = GenericArray::from_slice(&[0u8; 16]);
+  let ctr = GenericArray::from_slice(&[0u8; 16]); // counter can be zero because key is fresh
   let mut ctext_vec = plaintext.to_vec();
   let mut cipher = Aes256Ctr::new(&kkey, ctr);
   cipher.apply_keystream(ctext_vec.as_mut_slice());
