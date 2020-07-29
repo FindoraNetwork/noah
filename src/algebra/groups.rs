@@ -30,6 +30,24 @@ pub trait Scalar:
     Self::from_u32(0).sub(self)
   }
 
+  /// exponent form: least significant limb first, with u64 limbs
+  fn pow(&self, exponent: &[u64]) -> Self {
+    let mut base = self.clone();
+    let mut result = Self::from_u32(1);
+    for exp_u64 in exponent {
+      let mut e = *exp_u64;
+      // we have to square the base for 64 times.
+      for _ in 0..64 {
+        if e % 2 == 1 {
+          result = result.mul(&base);
+        }
+        base = base.mul(&base);
+        e >>= 1;
+      }
+    }
+    result
+  }
+
   fn get_little_endian_u64(&self) -> Vec<u64>;
   // serialization
   fn to_bytes(&self) -> Vec<u8>;
@@ -121,6 +139,12 @@ pub(crate) mod group_tests {
     let b = S::from_u32(1);
     let c = a.add(&b);
     let d = S::from_u64(0x100000000);
+    assert_eq!(c, d);
+
+    let a = S::from_u32(3);
+    let b = vec![20];
+    let c = a.pow(&b[..]);
+    let d = S::from_u64(3486784401);
     assert_eq!(c, d);
   }
 
