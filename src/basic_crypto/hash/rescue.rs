@@ -71,7 +71,7 @@ impl<S: Scalar> RescueInstance<S> {
                                   .zip(key_injection.iter())
                                   .map(|(a, b)| a.add(b))
                                   .collect();
-    let mut keys = vec![];
+    let mut keys = vec![prev_key.clone()];
     for i in 0..2 * self.num_rounds() {
       if i % 2 == 0 {
         Self::pow_vector(prev_key.as_mut_slice(), &self.alpha_inv);
@@ -98,11 +98,11 @@ impl<S: Scalar> RescueInstance<S> {
     assert_eq!(input.len(), self.state_size());
     let padded_input = self.pad_input_to_state_size(input);
     let mut state = padded_input.iter()
-                                .zip(self.IC.iter())
+                                .zip(round_keys[0].iter())
                                 .map(|(input, k0i)| input.add(k0i))
                                 .collect_vec();
 
-    for (i, round_key) in round_keys.iter().enumerate() {
+    for (i, round_key) in round_keys.iter().skip(1).enumerate() {
       if i % 2 == 0 {
         Self::pow_vector(state.as_mut_slice(), &self.alpha_inv);
       } else {
@@ -128,11 +128,6 @@ impl<S: Scalar> RescueInstance<S> {
   /// Compute RESCUE permutation sampling the rounds' keys online
   pub fn rescue(&self, input: &[S], key: &[S]) -> RescueState<S> {
     assert_eq!(input.len(), self.state_size());
-    let padded_input = self.pad_input_to_state_size(input);
-    let mut state = padded_input.iter()
-                                .zip(self.IC.iter())
-                                .map(|(input, k0i)| input.add(k0i))
-                                .collect_vec();
 
     // key_state = key + initial constants
     let mut key_state: Vec<S> = self.IC
@@ -143,6 +138,12 @@ impl<S: Scalar> RescueInstance<S> {
     // key_injection = initial constants
     let mut key_injection = self.IC.clone();
 
+    let padded_input = self.pad_input_to_state_size(input);
+    // state = state + key_state
+    let mut state = padded_input.iter()
+                                .zip(key_state.iter())
+                                .map(|(input, k0i)| input.add(k0i))
+                                .collect_vec();
     // N rounds divided in two parts forward S-box (even step) and backward S-box (forward step)
     for round in 0..2 * self.num_rounds {
       self.rescue_round(state.as_mut_slice(),
@@ -178,7 +179,7 @@ impl<S: Scalar> RescueInstance<S> {
     // multiply matrix agains mul assign vector, result in aux_vec
     for (m_i, aux_i) in matrix.iter().zip(aux_vec.iter_mut()) {
       for (m_ij, v_j) in m_i.iter().zip(mul_assign_vector.iter()) {
-        *aux_i = aux_i.add(&m_ij.add(v_j));
+        *aux_i = aux_i.add(&m_ij.mul(v_j));
       }
     }
     for (assign_i, aux_elem) in mul_assign_vector.iter_mut().zip(aux_vec) {
