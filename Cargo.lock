@@ -1104,6 +1104,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
+name = "x25519-dalek"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "637ff90c9540fa3073bb577e65033069e4bae7c79d49d74aa3ffdf5342a53217"
+dependencies = [
+ "curve25519-dalek",
+ "rand_core 0.5.1",
+ "zeroize",
+]
+
+[[package]]
 name = "zei"
 version = "0.0.3"
 dependencies = [
@@ -1135,6 +1146,7 @@ dependencies = [
  "sha2",
  "typenum",
  "wasm-bindgen",
+ "x25519-dalek",
  "zei_utilities",
 ]
 

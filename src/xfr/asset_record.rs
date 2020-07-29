@@ -1,23 +1,24 @@
-use crate::algebra::groups::Scalar as ZeiScalar;
 use crate::api::anon_creds::{
   ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, AttributeCiphertext,
   ConfidentialAC, Credential,
 };
-use crate::basic_crypto::elgamal::elgamal_encrypt;
-use crate::basic_crypto::hybrid_encryption::{hybrid_decrypt, hybrid_encrypt};
+use crate::basic_crypto::hybrid_encryption::{
+  hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
+};
 use crate::errors::ZeiError;
 use crate::utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
 use crate::xfr::structs::{
-  asset_type_to_scalar, AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerMemo,
-  AssetTracingPolicies, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount,
-  XfrAssetType, ASSET_TYPE_LENGTH,
+  asset_type_to_scalar, AssetRecord, AssetRecordTemplate, AssetTracerMemo, AssetTracingPolicies,
+  AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
+  ASSET_TYPE_LENGTH,
 };
 use boolinator::Boolinator;
 use bulletproofs::PedersenGens;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
+use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 
@@ -92,7 +93,8 @@ impl AssetRecord {
   /// Build a record input from OpenAssetRecord with an associated policy that has no identity tracking
   /// Important: It assumes that RecordInput will be used as an input to xfr_note_gen and not as an output
   /// since OpenAsset record was recovered from a BlindAsset record. This means owner_memo field is be None.
-  pub fn from_open_asset_record_with_asset_tracking_but_no_identity(
+  pub fn from_open_asset_record_with_asset_tracking_but_no_identity<R: CryptoRng + RngCore>(
+    prng: &mut R,
     oar: OpenAssetRecord,
     asset_tracking_policies: AssetTracingPolicies)
     -> Result<AssetRecord, ZeiError> {
@@ -116,16 +118,18 @@ impl AssetRecord {
         let asset_type_info = match oar.get_record_type() {
           AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
           | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
-          _ => Some((asset_type_to_scalar(&oar.asset_type), &oar.type_blind)),
+          _ => Some((oar.asset_type, &oar.type_blind)),
         };
         (amount_info, asset_type_info)
       } else {
         (None, None)
       };
-      let asset_tracer_memo = compute_tracer_memo(&asset_tracking_policy.enc_keys,
-                                                  amount_info,
-                                                  asset_type_info,
-                                                  None);
+      let asset_tracer_memo = AssetTracerMemo::new(prng,
+                                                   &asset_tracking_policy.enc_keys,
+                                                   amount_info,
+                                                   asset_type_info,
+                                                   vec![],
+                                                   vec![]);
       memos.push(asset_tracer_memo);
       identity_proofs.push(None);
     }
@@ -165,35 +169,43 @@ impl AssetRecord {
         let asset_type_info = match oar.get_record_type() {
           AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
           | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
-          _ => Some((asset_type_to_scalar(&oar.asset_type), &oar.type_blind)),
+          _ => Some((oar.asset_type, &oar.type_blind)),
         };
         (amount_info, asset_type_info)
       } else {
         (None, None)
       };
 
-      let (attrs, proof) = match asset_tracking_policy.identity_tracking.as_ref() {
+      let (attrs, attrs_ctext, proof) = match asset_tracking_policy.identity_tracking.as_ref() {
         Some(id_policy) => {
           // 1. check for inconsistency errors
           if credential.issuer_pub_key != id_policy.cred_issuer_pub_key {
             return Err(ZeiError::ParameterError);
           }
-          let (attrs, proof) =
+          let (attrs_ctext, proof) =
             ac_confidential_open_commitment(prng,
                                             credential_sec_key,
                                             credential,
                                             credential_commitment_key,
-                                            &asset_tracking_policy.enc_keys.attrs_enc_key,
+                                            &asset_tracking_policy.enc_keys.attrs_enc_eg_key,
                                             id_policy.reveal_map.as_slice(),
                                             &[])?.get_fields();
-          (Some(attrs), Some(proof))
+          let attrs: Vec<u32> = credential.attributes
+                                          .iter()
+                                          .zip(id_policy.reveal_map.iter())
+                                          .filter(|(_, bool)| *(*bool))
+                                          .map(|(attr, _)| *attr)
+                                          .collect();
+          (attrs, attrs_ctext, Some(proof))
         }
-        None => (None, None),
+        None => (vec![], vec![], None),
       };
-      let asset_tracer_memo = compute_tracer_memo(&asset_tracking_policy.enc_keys,
-                                                  amount_info,
-                                                  asset_type_info,
-                                                  attrs);
+      let asset_tracer_memo = AssetTracerMemo::new(prng,
+                                                   &asset_tracking_policy.enc_keys,
+                                                   amount_info,
+                                                   asset_type_info,
+                                                   attrs_ctext,
+                                                   attrs);
       identity_proofs.push(proof);
       memos.push(asset_tracer_memo);
     }
@@ -214,7 +226,7 @@ impl AssetRecord {
         return Err(ZeiError::ParameterError);
       }
     }
-    build_record_input_from_template(prng, &template, id_proofs.as_slice())
+    build_record_input_from_template(prng, &template, id_proofs.as_slice(), vec![vec![]])
   }
 
   pub fn from_template_with_identity_tracking<R: CryptoRng + RngCore>(
@@ -225,21 +237,29 @@ impl AssetRecord {
     credential_key: &ACCommitmentKey)
     -> Result<AssetRecord, ZeiError> {
     let mut conf_ids = Vec::with_capacity(template.asset_tracing_policies.len());
+    let mut attrs_vec = vec![];
     for policy in template.asset_tracing_policies.get_policies().iter() {
-      let conf_id = if let Some(reveal_policy) = policy.identity_tracking.as_ref() {
-        Some(ac_confidential_open_commitment(prng,
-                                             credential_user_sec_key,
-                                             credential,
-                                             credential_key,
-                                             &policy.enc_keys.attrs_enc_key,
-                                             &reveal_policy.reveal_map,
-                                             &[])?)
+      let (attrs, conf_id) = if let Some(reveal_policy) = policy.identity_tracking.as_ref() {
+        (credential.attributes
+                   .iter()
+                   .zip(reveal_policy.reveal_map.iter())
+                   .filter(|(_, b)| *(*b))
+                   .map(|(attr, _)| *attr)
+                   .collect_vec(),
+         Some(ac_confidential_open_commitment(prng,
+                                              credential_user_sec_key,
+                                              credential,
+                                              credential_key,
+                                              &policy.enc_keys.attrs_enc_eg_key,
+                                              &reveal_policy.reveal_map,
+                                              &[])?))
       } else {
-        None
+        (vec![], None)
       };
+      attrs_vec.push(attrs);
       conf_ids.push(conf_id);
     }
-    build_record_input_from_template(prng, &template, conf_ids.as_slice())
+    build_record_input_from_template(prng, &template, conf_ids.as_slice(), attrs_vec)
   }
 }
 
@@ -272,7 +292,8 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   asset_record: &AssetRecordTemplate,
-  identity_ctexts: Vec<Option<Vec<AttributeCiphertext>>>)
+  identity_ctexts: Vec<Vec<AttributeCiphertext>>,
+  identity_attrs: Vec<Vec<u32>>)
   -> (BlindAssetRecord, (Scalar, Scalar), Scalar, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
   let type_scalar = asset_type_to_scalar(&asset_record.asset_type);
 
@@ -326,27 +347,32 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   // asset tracing amount
   let mut tracers_memos = vec![];
   let tracing_policies = asset_record.asset_tracing_policies.get_policies();
-  for (tracing_policy, ctexts) in tracing_policies.iter().zip(identity_ctexts) {
+  for ((tracing_policy, ctexts), attrs) in tracing_policies.iter()
+                                                           .zip(identity_ctexts)
+                                                           .zip(identity_attrs)
+  {
     let (amount_info, asset_type_info) = if tracing_policy.asset_tracking {
       (confidential_amount.as_some((amount_low,
                                     amount_high,
                                     &amount_blind_low,
                                     &amount_blind_high)),
-       confidential_asset.as_some((type_scalar, &type_blind)))
+       confidential_asset.as_some((asset_record.asset_type, &type_blind)))
     } else {
       (None, None)
     };
-    let memo = compute_tracer_memo(&tracing_policy.enc_keys,
-                                   amount_info,
-                                   asset_type_info,
-                                   ctexts);
+    let memo = AssetTracerMemo::new(prng,
+                                    &tracing_policy.enc_keys,
+                                    amount_info,
+                                    asset_type_info,
+                                    ctexts,
+                                    attrs);
     tracers_memos.push(memo);
   }
 
   let owner_memo = if confidential_asset || confidential_amount {
-    let lock = hybrid_encrypt(prng,
-                              &asset_record.public_key.0,
-                              amount_type_bytes.as_slice());
+    let lock = hybrid_encrypt_with_sign_key(prng,
+                                            &asset_record.public_key.0,
+                                            amount_type_bytes.as_slice()).unwrap(); // safe unwrap()
     Some(OwnerMemo { blind_share, lock })
   } else {
     None
@@ -356,38 +382,6 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
                                               asset_type: xfr_asset_type };
 
   (blind_asset_record, amount_blinds, type_blind, tracers_memos, owner_memo)
-}
-
-fn compute_tracer_memo(tracer_enc_key: &AssetTracerEncKeys,
-                       amount_info: Option<(u32, u32, &Scalar, &Scalar)>, //amount low and high and blindings
-                       asset_type_info: Option<(Scalar, &Scalar)>,
-                       attributes: Option<Vec<AttributeCiphertext>>)
-                       -> AssetTracerMemo {
-  let pc_gens = PedersenGens::default();
-  let lock_amount =
-    amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
-                 let ctext_amount_low = elgamal_encrypt(&pc_gens.B,
-                                                        &Scalar::from_u32(amount_low),
-                                                        blind_low,
-                                                        &tracer_enc_key.record_data_enc_key);
-                 let ctext_amount_high = elgamal_encrypt(&pc_gens.B,
-                                                         &Scalar::from_u32(amount_high),
-                                                         blind_high,
-                                                         &tracer_enc_key.record_data_enc_key);
-                 (ctext_amount_low, ctext_amount_high)
-               });
-
-  let lock_asset_type = asset_type_info.map(|(type_scalar, blind)| {
-                                         elgamal_encrypt(&pc_gens.B,
-                                                         &type_scalar,
-                                                         blind,
-                                                         &tracer_enc_key.record_data_enc_key)
-                                       });
-
-  AssetTracerMemo { enc_key: tracer_enc_key.clone(),
-                    lock_amount,
-                    lock_asset_type,
-                    lock_attributes: attributes }
 }
 
 /// Build OpenAssetRecord and associated memos from an Asset Record Template
@@ -401,10 +395,11 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   asset_record: &AssetRecordTemplate,
-  identity_ctexts: Vec<Option<Vec<AttributeCiphertext>>>)
+  identity_ctexts: Vec<Vec<AttributeCiphertext>>,
+  identity_attrs: Vec<Vec<u32>>)
   -> (OpenAssetRecord, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
   let (blind_asset_record, amount_blinds, type_blind, asset_tracing_memos, owner_memo) =
-    sample_blind_asset_record(prng, pc_gens, asset_record, identity_ctexts);
+    sample_blind_asset_record(prng, pc_gens, asset_record, identity_ctexts, identity_attrs);
 
   let open_asset_record = OpenAssetRecord { blind_asset_record,
                                             amount: asset_record.amount,
@@ -426,10 +421,11 @@ pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
   pc_gens: &PedersenGens,
   asset_record: &AssetRecordTemplate,
-  identity_ctexts: Vec<Option<Vec<AttributeCiphertext>>>)
+  identity_ctexts: Vec<Vec<AttributeCiphertext>>,
+  identity_attrs: Vec<Vec<u32>>)
   -> (BlindAssetRecord, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
   let (blind_asset_record, _, _, asset_tracing_memos, owner_memo) =
-    sample_blind_asset_record(prng, pc_gens, asset_record, identity_ctexts);
+    sample_blind_asset_record(prng, pc_gens, asset_record, identity_ctexts, identity_attrs);
 
   (blind_asset_record, asset_tracing_memos, owner_memo)
 }
@@ -481,7 +477,7 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
     None => vec![],
     Some(memo) => {
       shared_point = derive_point_from_blind_share(&memo.blind_share, secret_key)?;
-      hybrid_decrypt(&memo.lock, &secret_key.0)?
+      hybrid_decrypt_with_ed25519_secret_key(&memo.lock, &secret_key.0)
     }
   };
 
@@ -530,7 +526,8 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
 /// This function is used to generate an output for gen_xfr_note/body
 fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
                                                             asset_record: &AssetRecordTemplate,
-                                                            identity_proofs: &[Option<ConfidentialAC>])
+                                                            identity_proofs: &[Option<ConfidentialAC>],
+                                                            identity_attrs: Vec<Vec<u32>>)
                                                             -> Result<AssetRecord, ZeiError> {
   if asset_record.asset_tracing_policies.len() != identity_proofs.len() {
     return Err(ZeiError::ParameterError);
@@ -544,17 +541,17 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
       return Err(ZeiError::ParameterError);
     }
     let (attr_ctext, reveal_proof) = match id_proof {
-      None => (None, None),
+      None => (vec![], None),
       Some(conf_ac) => {
         let (c, p) = conf_ac.clone().get_fields();
-        (Some(c), Some(p))
+        (c, Some(p))
       }
     };
     attrs_ctexts.push(attr_ctext);
     reveal_proofs.push(reveal_proof);
   }
   let (open_asset_record, asset_tracing_memos, owner_memo) =
-    build_open_asset_record(prng, &pc_gens, asset_record, attrs_ctexts);
+    build_open_asset_record(prng, &pc_gens, asset_record, attrs_ctexts, identity_attrs);
 
   Ok(AssetRecord { open_asset_record,
                    tracking_policies: asset_record.asset_tracing_policies.clone(),
@@ -566,20 +563,20 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
 #[cfg(test)]
 mod test {
   use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
-  use crate::algebra::bls12_381::{BLSScalar, BLSG1};
-  use crate::algebra::groups::Group;
-  use crate::basic_crypto::elgamal::{elgamal_key_gen, ElGamalEncKey};
+  //use crate::algebra::bls12_381::{BLSScalar, BLSG1};
+  //use crate::algebra::groups::Group;
+  //use crate::basic_crypto::elgamal::{elgamal_key_gen, ElGamalEncKey};
   use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::asset_record::AssetRecordType;
   // use crate::xfr::lib::XfrType;
+  use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
-    AssetRecordTemplate, AssetTracerEncKeys, AssetTracingPolicies, AssetTracingPolicy, AssetType,
-    OpenAssetRecord, XfrAmount, XfrAssetType,
+    AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType, OpenAssetRecord,
+    XfrAmount, XfrAssetType,
   };
   use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
   use bulletproofs::PedersenGens;
-  use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
   use rand::Rng;
@@ -596,15 +593,9 @@ mod test {
     let keypair = XfrKeyPair::generate(&mut prng);
     let tracing_policy = match asset_tracking {
       true => {
-        let (_sk, xfr_pub_key) =
-          elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
-        let (_sk, id_reveal_pub_key) =
-          elgamal_key_gen::<_, BLSScalar, BLSG1>(&mut prng, &BLSG1::get_base());
-        let tracer_enc_key = AssetTracerEncKeys { record_data_enc_key:
-                                                    ElGamalEncKey(xfr_pub_key.get_point()),
-                                                  attrs_enc_key: id_reveal_pub_key };
+        let tracer_keys = gen_asset_tracer_keypair(&mut prng);
         let tracing_policies =
-          AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys: tracer_enc_key,
+          AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys: tracer_keys.enc_key,
                                                                  asset_tracking: true,
                                                                  identity_tracking: None });
         Some(tracing_policies)
@@ -622,8 +613,11 @@ mod test {
       AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, record_type, keypair.get_pk())
     };
 
-    let (open_ar, asset_tracer_memo, owner_memo) =
-      build_open_asset_record(&mut prng, &pc_gens, &asset_record, vec![None]);
+    let (open_ar, asset_tracer_memo, owner_memo) = build_open_asset_record(&mut prng,
+                                                                           &pc_gens,
+                                                                           &asset_record,
+                                                                           vec![vec![]],
+                                                                           vec![vec![]]);
 
     assert_eq!(amount, open_ar.amount);
     assert_eq!(asset_type, open_ar.asset_type);
@@ -776,7 +770,7 @@ mod test {
       AssetRecordTemplate::with_no_asset_tracking(amt, asset_type, record_type, pubkey.clone());
 
     let (blind_rec, _asset_tracer_memo, owner_memo) =
-      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![], vec![]);
 
     let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey).unwrap();
 
@@ -820,7 +814,7 @@ mod test {
     let ar =
       AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, pubkey.clone());
     let (blind_rec, _asset_tracer_memo, owner_memo) =
-      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![], vec![]);
 
     let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
     assert!(open_rec.is_ok(), "Open a just created asset record");
@@ -830,7 +824,7 @@ mod test {
     let ar =
       AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::NonConfidentialAmount_ConfidentialAssetType, pubkey.clone());
     let (blind_rec, _asset_tracer_memo, owner_memo) =
-      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![], vec![]);
 
     let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
     assert!(open_rec.is_ok(), "Open a just created asset record");
@@ -841,7 +835,7 @@ mod test {
     let ar =
       AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::ConfidentialAmount_ConfidentialAssetType, pubkey.clone());
     let (blind_rec, _asset_tracer_memo, owner_memo) =
-      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+      build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![], vec![]);
 
     let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
     assert!(open_rec.is_ok(), "Open a just created asset record");

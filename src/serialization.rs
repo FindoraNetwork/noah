@@ -208,6 +208,95 @@ impl ZeiFromToBytes for CompressedEdwardsY {
   }
 }
 
+impl ZeiFromToBytes for x25519_dalek::PublicKey {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    let mut v = vec![];
+    v.extend_from_slice(self.as_bytes());
+    v
+  }
+  fn zei_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::PublicKey, ZeiError> {
+    if bytes.len() < 32 {
+      return Err(ZeiError::SerializationError);
+    }
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&bytes[0..32]);
+    Ok(x25519_dalek::PublicKey::from(array))
+  }
+}
+
+impl ZeiFromToBytes for x25519_dalek::StaticSecret {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    let mut v = vec![];
+    v.extend_from_slice(&self.to_bytes()[..]);
+    v
+  }
+  fn zei_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::StaticSecret, ZeiError> {
+    if bytes.len() < 32 {
+      return Err(ZeiError::SerializationError);
+    }
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&bytes[0..32]);
+    Ok(x25519_dalek::StaticSecret::from(array))
+  }
+}
+
+/*
+impl Serialize for XPublicKey {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+  {
+    if serializer.is_human_readable() {
+      serializer.serialize_str(&b64enc(self.zei_to_bytes().as_slice()))
+    } else {
+      serializer.serialize_bytes(self.zei_to_bytes().as_slice())
+    }
+  }
+}
+
+impl<'de> Deserialize<'de> for XPublicKey {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de>
+  {
+    struct XPublicKeyVisitor;
+
+    impl<'de> Visitor<'de> for XPublicKeyVisitor {
+      type Value = XPublicKey;
+
+      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        formatter.write_str("a encoded XPublicKey")
+      }
+
+      fn visit_bytes<E>(self, v: &[u8]) -> Result<XPublicKey, E>
+        where E: serde::de::Error
+      {
+        XPublicKey::zei_from_bytes(v).map_err(serde::de::Error::custom)
+      }
+
+      fn visit_seq<V>(self, mut seq: V) -> Result<XPublicKey, V::Error>
+        where V: SeqAccess<'de>
+      {
+        let mut vec: Vec<u8> = vec![];
+        while let Some(x) = seq.next_element().map_err(serde::de::Error::custom)? {
+          vec.push(x);
+        }
+        XPublicKey::zei_from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
+      }
+      fn visit_str<E>(self, s: &str) -> Result<XPublicKey, E>
+        where E: serde::de::Error
+      {
+        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
+      }
+    }
+
+    if deserializer.is_human_readable() {
+      deserializer.deserialize_str(XPublicKeyVisitor)
+    } else {
+      deserializer.deserialize_bytes(XPublicKeyVisitor)
+    }
+  }
+}
+*/
+
 impl ZeiFromToBytes for XfrSignature {
   fn zei_to_bytes(&self) -> Vec<u8> {
     let bytes = self.0.to_bytes();
@@ -391,6 +480,7 @@ mod test {
   use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
   use bulletproofs::PedersenGens;
 
+  use crate::basic_crypto::hybrid_encryption::XPublicKey;
   use crate::xfr::asset_tracer::RecordDataEncKey;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
@@ -414,6 +504,22 @@ mod test {
     let pk2: XfrPublicKey = Deserialize::deserialize(&mut de).unwrap();
 
     assert_eq!(pk, &pk2);
+  }
+
+  #[test]
+  fn x25519_public_key_message_pack_serialization() {
+    let mut prng: ChaChaRng;
+    prng = ChaChaRng::from_seed([0u8; 32]);
+    let sk = x25519_dalek::EphemeralSecret::new(&mut prng);
+    let pk = XPublicKey { key: x25519_dalek::PublicKey::from(&sk) };
+
+    let mut pk_mp_vec = vec![];
+    assert_eq!(true,
+               pk.serialize(&mut Serializer::new(&mut pk_mp_vec)).is_ok());
+    let mut de = Deserializer::new(&pk_mp_vec[..]);
+    let pk2: XPublicKey = Deserialize::deserialize(&mut de).unwrap();
+
+    assert_eq!(&pk, &pk2);
   }
 
   #[test]
