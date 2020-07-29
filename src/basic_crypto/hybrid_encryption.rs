@@ -51,7 +51,7 @@ pub struct ZeiHybridCipher {
   pub(crate) ephemeral_public_key: XPublicKey,
 }
 
-/// I encrypt a message a under X25519 DH public key. I implement hybrid encryption where a symmetric public
+/// I encrypt a message under a X25519 DH public key. I implement hybrid encryption where a symmetric key
 /// is derived from the public key, and the message is encrypted under this symmetric key.
 pub fn hybrid_encrypt_with_x25519_key<R: CryptoRng + RngCore>(prng: &mut R,
                                                               pub_key: &XPublicKey,
@@ -63,7 +63,7 @@ pub fn hybrid_encrypt_with_x25519_key<R: CryptoRng + RngCore>(prng: &mut R,
                     ephemeral_public_key: XPublicKey { key: ephemeral_key } }
 }
 
-/// I encrypt a message a under Ed25519 signature public key. I implement hybrid encryption where a symmetric public
+/// I encrypt a message under a Ed25519 signature public key. I implement hybrid encryption where a symmetric key
 /// is derived from the public key, and the message is encrypted under this symmetric key.
 /// I return ZeiError::DecompressElementError if public key is not well formed.
 pub fn hybrid_encrypt_with_sign_key<R: CryptoRng + RngCore>(
