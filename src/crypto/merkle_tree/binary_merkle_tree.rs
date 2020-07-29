@@ -1,10 +1,6 @@
+use crate::basic_crypto::hash_functions::MTHash;
 use crate::errors::ZeiError;
-use curve25519_dalek::scalar::Scalar;
-use digest::Digest;
-use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
 use std::fmt::Debug;
-use std::string::ToString;
 
 // TODO remove unwraps in this file
 pub enum PathDirection {
@@ -38,12 +34,9 @@ impl<S: Copy> MerkleTree<S> {
   }
 }
 
-pub trait MTHash<S> {
-  fn new(level: usize) -> Self;
-  fn digest(&self, values: &[&S]) -> S;
-  fn digest_root(&self, size: usize, values: &[&S]) -> S;
-}
-
+/// Builds a binary Merkle tree from a set of elements
+/// * `elements` - elements to be placed at the leaves of the tree. The number of elements must be a power of 2.
+/// * `returns` Merkle tree data structure or an error
 pub fn mt_build<S, H>(elements: &[S]) -> Result<MerkleTree<S>, ZeiError>
   where S: Copy + PartialEq + Eq + Debug,
         H: MTHash<S>
@@ -57,6 +50,10 @@ pub fn mt_build<S, H>(elements: &[S]) -> Result<MerkleTree<S>, ZeiError>
   Ok(tree)
 }
 
+/// Computes a proof (merkle path) for a leaf of the tree
+/// * `tree` - merkle tree data structure
+/// * `index` - location of the leaf, 0 being the index of the most left one
+/// * `returns` - the value of the root node and the proof
 pub fn mt_prove<S>(tree: &MerkleTree<S>,
                    index: usize)
                    -> Result<(S, Vec<(PathDirection, S)>), ZeiError>
@@ -68,6 +65,11 @@ pub fn mt_prove<S>(tree: &MerkleTree<S>,
   Ok(prove_node::<S>(&tree.root, index, tree.size))
 }
 
+/// Verifies a merkle proof for an element against a merkle root
+/// `root` - hash value of the root of some merkle tree
+/// `element` - element to be tested
+/// `proof` - proof that the element is a leaf of the merkle tree defined by its root.
+/// `returns` Ok() if the verification is successful, an error otherwise
 pub fn mt_verify<S, H>(root: &MerkleRoot<S>,
                        element: &S,
                        path: &[(PathDirection, S)])
@@ -146,69 +148,11 @@ fn is_power_two(n: usize) -> bool {
   (n != 0) && ((n & (n - 1)) == 0)
 }
 
-pub struct MiMCHash {
-  c: [Scalar; MIMC_ROUNDS],
-}
-const MIMC_ROUNDS: usize = 159;
-
-impl MTHash<Scalar> for MiMCHash {
-  fn new(level: usize) -> MiMCHash {
-    MiMCHash { c: compute_mimc_constants(level) }
-  }
-  fn digest(&self, values: &[&Scalar]) -> Scalar {
-    let mut sa = Scalar::from(0u8);
-    let mut sc = Scalar::from(0u8);
-    for value in values.iter() {
-      let x = mimc_feistel(&(*value + sa), &sc, &self.c[..]);
-      sa = x.0;
-      sc = x.1;
-    }
-    sa
-  }
-
-  fn digest_root(&self, size: usize, values: &[&Scalar]) -> Scalar {
-    let x = Scalar::from(size as u64);
-    let mut vec = Vec::with_capacity(values.len() + 1);
-    vec.push(&x);
-    vec.extend_from_slice(values);
-    self.digest(&vec[..])
-  }
-}
-
-pub(crate) fn mimc_f(s: &Scalar, c: &Scalar) -> Scalar {
-  let x = s + c;
-  let x2 = x * x;
-  (x2 * x2) * x
-}
-
-#[allow(clippy::needless_range_loop)]
-pub(crate) fn compute_mimc_constants(level: usize) -> [Scalar; MIMC_ROUNDS] {
-  let mut c = [Scalar::from(0u32); MIMC_ROUNDS];
-  let mut hash = sha2::Sha256::new();
-  hash.input(level.to_string());
-  let mut seed = [0u8; 32];
-  seed.copy_from_slice(&hash.result()[..]);
-  let mut prng = ChaChaRng::from_seed(seed);
-  for i in 1..MIMC_ROUNDS - 1 {
-    c[i] = Scalar::random(&mut prng);
-  }
-  c
-}
-
-pub(crate) fn mimc_feistel(left: &Scalar, right: &Scalar, c: &[Scalar]) -> (Scalar, Scalar) {
-  let mut xl = *left;
-  let mut xr = *right;
-  for ci in c {
-    let aux = xl;
-    xl = xr + mimc_f(&xl, ci);
-    xr = aux;
-  }
-  (xl, xr)
-}
-
 #[cfg(test)]
 mod test {
   use super::*;
+  use crate::basic_crypto::hash_functions::mimc::MiMCHash;
+  use curve25519_dalek::scalar::Scalar;
 
   #[test]
   fn test_mt() {
