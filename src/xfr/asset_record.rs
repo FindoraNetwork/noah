@@ -595,8 +595,7 @@ mod test {
       true => {
         let tracer_keys = gen_asset_tracer_keypair(&mut prng);
         let tracing_policies =
-          AssetTracingPolicies::from_policy(AssetTracingPolicy { //enc_keys: tracer_enc_key,
-                                                                 enc_keys: tracer_keys.enc_key,
+          AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys: tracer_keys.enc_key,
                                                                  asset_tracking: true,
                                                                  identity_tracking: None });
         Some(tracing_policies)
