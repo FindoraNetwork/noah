@@ -48,7 +48,6 @@ impl Eq for XSecretKey {}
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct ZeiHybridCipher {
   pub(crate) ciphertext: Vec<u8>,
-  //pub(crate) nonce: Nonce,
   pub(crate) ephemeral_public_key: XPublicKey,
 }
 
@@ -76,7 +75,6 @@ pub fn hybrid_encrypt_with_sign_key<R: CryptoRng + RngCore>(
   let ciphertext = symmetric_encrypt_fresh_key(&key, message);
 
   Ok(ZeiHybridCipher { ciphertext,
-                       //nonce,
                        ephemeral_public_key: XPublicKey { key: ephemeral_key } })
 }
 
@@ -175,7 +173,7 @@ use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 
 fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
   let kkey = GenericArray::from_slice(key);
-  let ctr = GenericArray::from_slice(&[0u8; 16]);
+  let ctr = GenericArray::from_slice(&[0u8; 16]); // counter can be zero because key is fresh
   let mut ctext_vec = plaintext.to_vec();
   let mut cipher = Aes256Ctr::new(&kkey, ctr);
   cipher.apply_keystream(ctext_vec.as_mut_slice());
