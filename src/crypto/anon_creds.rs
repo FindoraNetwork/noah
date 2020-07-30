@@ -129,6 +129,20 @@ pub struct Credential<G1, G2, B> {
   pub issuer_pub_key: ACIssuerPublicKey<G1, G2>,
 }
 
+impl<G1, G2, B: Copy> Credential<G1, G2, B> {
+  pub fn get_revealed_attributes(&self, bitmap_policy: &[bool]) -> Result<Vec<B>, ZeiError> {
+    if bitmap_policy.len() != self.attributes.len() {
+      return Err(ZeiError::ParameterError);
+    }
+    Ok(self.attributes
+           .iter()
+           .zip(bitmap_policy)
+           .filter(|(_, b)| *(*b))
+           .map(|(a, _)| *a)
+           .collect())
+  }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ACCommitment<G1>(pub(crate) ACSignature<G1>);
 
