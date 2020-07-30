@@ -231,23 +231,25 @@ impl AssetRecord {
     credential: &Credential,
     credential_key: &ACCommitmentKey)
     -> Result<AssetRecord, ZeiError> {
-    let mut conf_ids = Vec::with_capacity(template.asset_tracing_policies.len());
+    let mut id_proofs_and_attrs = Vec::with_capacity(template.asset_tracing_policies.len());
     for policy in template.asset_tracing_policies.get_policies().iter() {
-      let (attrs, conf_id) = if let Some(reveal_policy) = policy.identity_tracking.as_ref() {
-        (credential.get_revealed_attributes(reveal_policy.reveal_map.as_slice())?,
-         Some(ac_confidential_open_commitment(prng,
+      let (conf_id, attrs) = if let Some(reveal_policy) = policy.identity_tracking.as_ref() {
+        (
+          Some(ac_confidential_open_commitment(prng,
                                               credential_user_sec_key,
                                               credential,
                                               credential_key,
                                               &policy.enc_keys.attrs_enc_eg_key,
                                               &reveal_policy.reveal_map,
-                                              &[])?))
+                                              &[])?),
+          credential.get_revealed_attributes(reveal_policy.reveal_map.as_slice())?
+        )
       } else {
-        (vec![], None)
+        (None, vec![])
       };
-      conf_ids.push((conf_id, attrs));
+      id_proofs_and_attrs.push((conf_id, attrs));
     }
-    build_record_input_from_template(prng, &template, conf_ids.as_slice())
+    build_record_input_from_template(prng, &template, id_proofs_and_attrs.as_slice())
   }
 }
 
