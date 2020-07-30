@@ -1,4 +1,4 @@
-use crate::api::anon_creds::ACCommitment;
+use crate::api::anon_creds::{ACCommitment, Attr};
 use crate::errors::ZeiError;
 use crate::setup::PublicParams;
 use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
@@ -886,7 +886,7 @@ pub fn find_tracing_memos<'a>(
 }
 
 /// amount, asset type, identity attribute, public key
-pub type RecordData = (u64, AssetType, Vec<u32>, XfrPublicKey);
+pub type RecordData = (u64, AssetType, Vec<Attr>, XfrPublicKey);
 
 /// Scan XfrBody transfers involving asset tracing for `tracer_keypair`
 /// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)

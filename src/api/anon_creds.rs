@@ -26,7 +26,7 @@ pub type ACCommitmentKey = crate::crypto::anon_creds::ACKey<S>;
 
 pub type ACCommitment = crate::crypto::anon_creds::ACCommitment<G1>;
 
-pub type Credential = crate::crypto::anon_creds::Credential<G1, G2, u32>;
+pub type Credential = crate::crypto::anon_creds::Credential<G1, G2, Attr>;
 
 pub type ACRevealProof = crate::crypto::anon_creds::ACRevealProof<G2, S>;
 
