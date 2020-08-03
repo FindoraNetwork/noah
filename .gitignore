@@ -4,7 +4,6 @@
 # Build files
 /target
 **/*.rs.bk
-#Cargo.lock
 .*.sw*
 
 utilities/target
