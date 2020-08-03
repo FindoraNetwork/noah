@@ -9,6 +9,7 @@ use curve25519_dalek::scalar::Scalar;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use wasm_bindgen::__rt::std::collections::HashSet;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetMixProof(#[serde(with = "serialization::zei_obj_serde")] pub(crate) R1CSProof);
@@ -67,6 +68,19 @@ pub fn prove_asset_mixing(inputs: &[(u64, Scalar, Scalar, Scalar)],
   }
   let (in_values, in_blinds) = extract_values_and_blinds(inputs);
   let (out_values, out_blinds) = extract_values_and_blinds(outputs);
+
+  let mut in_set = HashSet::new();
+  for in_value in in_values.iter() {
+    in_set.insert(in_value.asset_type);
+  }
+
+  let mut out_set: HashSet<Scalar> = HashSet::new();
+  for out_value in out_values.iter() {
+    out_set.insert(out_value.asset_type);
+  }
+  if in_set != out_set {
+    return Err(ZeiError::ParameterError);
+  }
 
   let in_vars = in_values.iter()
                          .zip(in_blinds.iter())
@@ -249,6 +263,21 @@ mod test {
   #[test]
   fn test_asset_mixer() {
     let pc_gens = PedersenGens::default();
+
+    // asset type set to not match errors
+    let input = [(60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
+      (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64))];
+    let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
+      (10u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64))
+      ];
+    let proof_result = super::prove_asset_mixing(&input, &output);
+    assert!(proof_result.is_err());
+
+    let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
+    ];
+    let proof_result = super::prove_asset_mixing(&input, &output);
+    assert!(proof_result.is_err());
+
     let input = [(60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
                  (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
                  (10u64, Scalar::from(1u8), Scalar::from(10002u64), Scalar::from(200002u64)),
