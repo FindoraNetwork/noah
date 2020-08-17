@@ -15,7 +15,6 @@ byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] 
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
 rand = { version = "0.7", default-features = false, optional = true }
 rand_chacha = "0.2"
-rand_04 = {package= "rand", version = "0.4"}
 curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
 ed25519-dalek = "1.0.0-pre.3"
 bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
@@ -27,7 +26,9 @@ serde_json = "1.0"
 sha2 = "0.8.0"
 itertools = "0.8.0"
 rmp-serde = "0.13.7"
-pairing = "0.14.2"
+group = "0.6.0"
+ff = "0.6.0"
+pairing = "0.16.0"
 digest = "0.8"
 bincode = "1.1.2"
 base64 = "0.10"

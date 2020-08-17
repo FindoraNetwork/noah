@@ -2,16 +2,16 @@ use super::groups::{Group, Scalar};
 use super::pairing::Pairing;
 use crate::algebra::groups::GroupArithmetic;
 use crate::errors::ZeiError;
+use crate::utils::u64_to_bigendian_u8array;
 use crate::utils::{b64dec, b64enc, u8_bigendian_slice_to_u64};
-use crate::utils::{u64_to_bigendian_u8array, u8_bigendian_slice_to_u32};
 use byteorder::{ByteOrder, LittleEndian};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
+use ff::{Field, PrimeField};
+use group::{CurveAffine, CurveProjective, EncodedPoint};
 use pairing::bls12_381::{Fq, Fq12, Fq2, Fq6, FqRepr, Fr, FrRepr, G1, G2};
-use pairing::{CurveAffine, CurveProjective};
-use pairing::{EncodedPoint, Field, PrimeField};
-use rand_04::Rand;
-use rand_core::{CryptoRng, RngCore};
+use pairing::PairingCurveAffine;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
@@ -28,17 +28,7 @@ pub struct BLSGt(pub(crate) Fq12);
 impl Scalar for BLSScalar {
   // scalar generation
   fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> BLSScalar {
-    // hack to use rand_04::Rng rather than rand::Rng
-    let mut random_bytes = [0u8; 16];
-    rng.fill_bytes(&mut random_bytes);
-    let mut seed = [0u32; 4];
-    for i in 0..4 {
-      seed[i] = u8_bigendian_slice_to_u32(&random_bytes[i * 4..(i + 1) * 4]);
-    }
-
-    use rand_04::SeedableRng;
-    let mut prng_04 = rand_04::ChaChaRng::from_seed(&seed);
-    BLSScalar(Fr::rand(&mut prng_04))
+    BLSScalar(Fr::random(rng))
   }
 
   fn from_u32(value: u32) -> BLSScalar {
@@ -67,13 +57,10 @@ impl Scalar for BLSScalar {
     where D: Digest<OutputSize = U64> + Default
   {
     let result = hash.result();
-    let mut seed = [0u32; 16];
-    for (i, item) in seed.iter_mut().enumerate() {
-      *item = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
-    }
-    use rand_04::SeedableRng;
-    let mut prng = rand_04::ChaChaRng::from_seed(&seed);
-    BLSScalar(Fr::rand(&mut prng))
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&result[0..32]);
+    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    BLSScalar(Fr::random(&mut prng))
   }
 
   // scalar arithmetic
@@ -215,13 +202,10 @@ impl Group<BLSScalar> for BLSG1 {
     where D: Digest<OutputSize = U64> + Default
   {
     let result = hash.result();
-    let mut seed = [0u32; 16];
-    for (i, item) in seed.iter_mut().enumerate() {
-      *item = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
-    }
-    use rand_04::SeedableRng;
-    let mut prng = rand_04::ChaChaRng::from_seed(&seed);
-    BLSG1(G1::rand(&mut prng))
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&result[0..32]);
+    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    BLSG1(G1::random(&mut prng))
   }
 }
 
@@ -332,13 +316,10 @@ impl Group<BLSScalar> for BLSG2 {
     where D: Digest<OutputSize = U64> + Default
   {
     let result = hash.result();
-    let mut seed = [0u32; 16];
-    for (i, item) in seed.iter_mut().enumerate() {
-      *item = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
-    }
-    use rand_04::SeedableRng;
-    let mut prng = rand_04::ChaChaRng::from_seed(&seed);
-    BLSG2(G2::rand(&mut prng))
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&result[0..32]);
+    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    BLSG2(G2::random(&mut prng))
   }
 }
 
@@ -518,13 +499,10 @@ impl Group<BLSScalar> for BLSGt {
     where D: Digest<OutputSize = U64> + Default
   {
     let result = hash.result();
-    let mut seed = [0u32; 16];
-    for (i, item) in seed.iter_mut().enumerate() {
-      *item = u8_bigendian_slice_to_u32(&result.as_slice()[i * 4..(i + 1) * 4]);
-    }
-    use rand_04::SeedableRng;
-    let mut prng = rand_04::ChaChaRng::from_seed(&seed);
-    BLSGt(Fq12::rand(&mut prng))
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&result[0..32]);
+    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    BLSGt(Fq12::random(&mut prng))
   }
 }
 
