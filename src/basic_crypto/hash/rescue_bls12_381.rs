@@ -1,7 +1,7 @@
 use crate::algebra::bls12_381::BLSScalar;
 use crate::basic_crypto::hash::rescue::RescueInstance;
+use ff::PrimeField;
 use pairing::bls12_381::Fr;
-use pairing::PrimeField;
 
 // # of rounds
 const NR: usize = 12;
@@ -129,8 +129,8 @@ mod test {
   use crate::algebra::bls12_381::BLSScalar;
   use crate::algebra::groups::Scalar;
   use crate::basic_crypto::hash::rescue::RescueInstance;
+  use ff::PrimeField;
   use pairing::bls12_381::Fr;
-  use pairing::PrimeField;
 
   // Hash output on zero inputs
   const H0: &str = "52184923318241479436224725218017640784400243367974222506608059144773855444730";

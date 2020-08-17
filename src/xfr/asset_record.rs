@@ -234,16 +234,14 @@ impl AssetRecord {
     let mut id_proofs_and_attrs = Vec::with_capacity(template.asset_tracing_policies.len());
     for policy in template.asset_tracing_policies.get_policies().iter() {
       let (conf_id, attrs) = if let Some(reveal_policy) = policy.identity_tracking.as_ref() {
-        (
-          Some(ac_confidential_open_commitment(prng,
+        (Some(ac_confidential_open_commitment(prng,
                                               credential_user_sec_key,
                                               credential,
                                               credential_key,
                                               &policy.enc_keys.attrs_enc_eg_key,
                                               &reveal_policy.reveal_map,
                                               &[])?),
-          credential.get_revealed_attributes(reveal_policy.reveal_map.as_slice())?
-        )
+         credential.get_revealed_attributes(reveal_policy.reveal_map.as_slice())?)
       } else {
         (None, vec![])
       };
@@ -528,7 +526,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
       (None, _) => (vec![], None),
       (Some(conf_ac), attrs) => {
         let (c, p) = conf_ac.clone().get_fields();
-        let attrs_and_ctexts = attrs.into_iter().zip(c).map(|(a, c)| (*a, c)).collect();
+        let attrs_and_ctexts = attrs.iter().zip(c).map(|(a, c)| (*a, c)).collect();
         (attrs_and_ctexts, Some(p))
       }
     };

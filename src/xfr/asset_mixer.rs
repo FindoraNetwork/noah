@@ -266,15 +266,13 @@ mod test {
 
     // asset type set to not match errors
     let input = [(60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
-      (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64))];
+                 (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64))];
     let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
-      (10u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64))
-      ];
+                  (10u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64))];
     let proof_result = super::prove_asset_mixing(&input, &output);
     assert!(proof_result.is_err());
 
-    let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
-    ];
+    let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64))];
     let proof_result = super::prove_asset_mixing(&input, &output);
     assert!(proof_result.is_err());
 
