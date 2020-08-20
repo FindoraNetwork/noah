@@ -127,7 +127,8 @@ impl AssetRecord {
                                                    &asset_tracking_policy.enc_keys,
                                                    amount_info,
                                                    asset_type_info,
-                                                   vec![]);
+                                                   vec![],
+                                                   true);
       memos.push(asset_tracer_memo);
       identity_proofs.push(None);
     }
@@ -200,7 +201,8 @@ impl AssetRecord {
                                                    &asset_tracking_policy.enc_keys,
                                                    amount_info,
                                                    asset_type_info,
-                                                   attrs_and_ctexts);
+                                                   attrs_and_ctexts,
+                                                   true);
       identity_proofs.push(proof);
       memos.push(asset_tracer_memo);
     }
@@ -348,7 +350,8 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
                                     &tracing_policy.enc_keys,
                                     amount_info,
                                     asset_type_info,
-                                    attr_ctext_vec);
+                                    attr_ctext_vec,
+                                    true);
     tracers_memos.push(memo);
   }
 
