@@ -4,6 +4,8 @@ use std::{error, fmt};
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ZeiError {
   ArgumentVerificationError,
+  CommitmentInputError,
+  CommitmentVerificationError,
   DecompressElementError,
   RangeProofProveError,
   RangeProofVerifyError,
@@ -46,6 +48,8 @@ impl fmt::Display for ZeiError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     f.write_str(match self {
                   ZeiError::ArgumentVerificationError => "Proof(argument) not valid for statement",
+                  ZeiError::CommitmentInputError => "The number of messages to be committed is invalid",
+                  ZeiError::CommitmentVerificationError => "Commitment verification failed",
                   ZeiError::DecompressElementError => "Could not decompress group Element",
                   ZeiError::RangeProofProveError => {
                     "Could not create range proof due to incorrect input or parameters"
@@ -120,6 +124,8 @@ impl error::Error for ZeiError {
   fn description(&self) -> &str {
     match self {
       ZeiError::ArgumentVerificationError => "Proof(argument) not valid for statement",
+      ZeiError::CommitmentInputError => "The number of messages to be committed is invalid",
+      ZeiError::CommitmentVerificationError => "Commitment verification failed",
       ZeiError::DecompressElementError => "Could not decompress group Element",
       ZeiError::RangeProofProveError => {
         "Could not create range proof due to incorrect input or parameters"
