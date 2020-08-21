@@ -117,7 +117,7 @@ impl fmt::Display for ZeiError {
                   ZeiError::R1CSProofError => { "Could not create R1CSProof" }
                   ZeiError::GroupInversionError => { "Group Element not invertible" }
                   ZeiError::NoMemoInAssetTracerMemo => { "Cannot decrypt asset tracer memo, try brute force decoding" }
-                  ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data" }
+                  ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data, try brute force decoding" }
                 })
   }
 }
