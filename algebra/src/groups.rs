@@ -1,4 +1,4 @@
-use crate::errors::ZeiError;
+use crate::errors::AlgebraError;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
@@ -25,7 +25,7 @@ pub trait Scalar:
   fn add(&self, b: &Self) -> Self;
   fn mul(&self, b: &Self) -> Self;
   fn sub(&self, b: &Self) -> Self;
-  fn inv(&self) -> Result<Self, ZeiError>;
+  fn inv(&self) -> Result<Self, AlgebraError>;
   fn neg(&self) -> Self {
     Self::from_u32(0).sub(self)
   }
@@ -51,7 +51,7 @@ pub trait Scalar:
   fn get_little_endian_u64(&self) -> Vec<u64>;
   // serialization
   fn to_bytes(&self) -> Vec<u8>;
-  fn from_bytes(bytes: &[u8]) -> Result<Self, ZeiError>;
+  fn from_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
 }
 
 pub trait Group<S>:
@@ -64,12 +64,12 @@ pub trait Group<S>:
 
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8>;
-  fn from_compressed_bytes(bytes: &[u8]) -> Result<Self, ZeiError>;
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
   fn from_hash<D>(hash: D) -> Self
     where D: Digest<OutputSize = U64> + Default;
 }
 
-pub(crate) fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
+pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
   if *scalar == S::from_u32(0) {
     return vec![0i8];
   }
@@ -120,7 +120,7 @@ pub(crate) fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<
 
 #[cfg(test)]
 pub(crate) mod group_tests {
-  use crate::algebra::groups::{scalar_to_radix_2_power_w, Scalar};
+  use crate::groups::{scalar_to_radix_2_power_w, Scalar};
 
   pub(crate) fn test_scalar_operations<S: Scalar>() {
     let a = S::from_u32(40);

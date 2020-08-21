@@ -1,5 +1,5 @@
 // BLS Signatures
-use crate::algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
+use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
 use crate::basic_crypto::signatures::{AggSignatureTrait, SignatureTrait};
 use crate::errors::ZeiError;
 use rand_core::{CryptoRng, RngCore};

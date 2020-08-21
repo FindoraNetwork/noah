@@ -1,7 +1,7 @@
 use super::groups::Group;
 use super::pairing::Pairing;
-use crate::algebra::groups::GroupArithmetic;
-use crate::utils::{b64dec, b64enc};
+use algebra::groups::GroupArithmetic;
+use utils::{b64dec, b64enc};
 use bn::{Group as BNGroup, Gt};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
@@ -41,7 +41,7 @@ impl Clone for BNScalar {
   }
 }
 
-impl crate::algebra::groups::Scalar for BNScalar {
+impl algebra::groups::Scalar for BNScalar {
   // scalar generation
   fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> BNScalar {
     BNScalar(bn::Fr::random(rng))
@@ -358,7 +358,7 @@ impl<'de> Deserialize<'de> for BNGt {
 
 #[cfg(test)]
 mod bn_groups_test {
-  use crate::algebra::groups::group_tests::test_scalar_operations;
+  use algebra::groups::group_tests::test_scalar_operations;
 
   #[test]
   fn scalar_ops() {

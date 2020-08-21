@@ -6,7 +6,6 @@ use crate::basic_crypto::hybrid_encryption::{
   hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
 };
 use crate::errors::ZeiError;
-use crate::utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetRecord, AssetRecordTemplate, AssetTracerMemo, AssetTracingPolicies,
@@ -20,6 +19,7 @@ use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
+use utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
 
 const U64_BYTE_LEN: usize = 8;
 
@@ -546,12 +546,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
 #[cfg(test)]
 mod test {
   use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
-  //use crate::algebra::bls12_381::{BLSScalar, BLSG1};
-  //use crate::algebra::groups::Group;
-  //use crate::basic_crypto::elgamal::{elgamal_key_gen, ElGamalEncKey};
-  use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
   use crate::xfr::asset_record::AssetRecordType;
-  // use crate::xfr::lib::XfrType;
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
@@ -565,6 +560,7 @@ mod test {
   use rand::Rng;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
+  use utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
 
   fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracking: bool) {
     let mut prng: ChaChaRng;

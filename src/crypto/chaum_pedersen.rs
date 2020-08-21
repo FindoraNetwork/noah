@@ -1,4 +1,4 @@
-use crate::algebra::groups::Group;
+use algebra::groups::Group;
 use crate::crypto::sigma::{
   sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
 };

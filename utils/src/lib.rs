@@ -1,11 +1,6 @@
-// Utility functions
-use crate::algebra::groups::Scalar;
-use digest::Digest;
-use sha2::Sha512;
-
 /// I convert a u32 into a 4 bytes array (bigendian)
 #[allow(dead_code)]
-pub(crate) fn u32_to_bigendian_u8array(n: u32) -> [u8; 4] {
+pub fn u32_to_bigendian_u8array(n: u32) -> [u8; 4] {
   let mut array = [0u8; 4];
   array[0] = ((n >> 24) & 0xFF) as u8;
   array[1] = ((n >> 16) & 0xFF) as u8;
@@ -16,7 +11,7 @@ pub(crate) fn u32_to_bigendian_u8array(n: u32) -> [u8; 4] {
 
 #[allow(dead_code)]
 /// I convert a u32 into a 4 bytes array (littleendian)
-pub(crate) fn u32_to_littleendian_u8array(n: u32) -> [u8; 4] {
+pub fn u32_to_littleendian_u8array(n: u32) -> [u8; 4] {
   let mut array = [0u8; 4];
   array[3] = ((n >> 24) & 0xFF) as u8;
   array[2] = ((n >> 16) & 0xFF) as u8;
@@ -26,7 +21,7 @@ pub(crate) fn u32_to_littleendian_u8array(n: u32) -> [u8; 4] {
 }
 
 /// I convert a u64 into a 8 bytes array (bigendian)
-pub(crate) fn u64_to_bigendian_u8array(n: u64) -> [u8; 8] {
+pub fn u64_to_bigendian_u8array(n: u64) -> [u8; 8] {
   let mut array = [0u8; 8];
   array[0] = ((n >> 56) & 0xFF) as u8;
   array[1] = ((n >> 48) & 0xFF) as u8;
@@ -40,56 +35,56 @@ pub(crate) fn u64_to_bigendian_u8array(n: u64) -> [u8; 8] {
 }
 
 /// I convert a 16 byte array into a u128 (bigendian)
-pub(crate) fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128 {
+pub fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128 {
   u128::from(array[0]) << 120
-  | u128::from(array[1]) << 112
-  | u128::from(array[2]) << 104
-  | u128::from(array[3]) << 96
-  | u128::from(array[4]) << 88
-  | u128::from(array[5]) << 80
-  | u128::from(array[6]) << 72
-  | u128::from(array[7]) << 64
-  | u128::from(array[8]) << 56
-  | u128::from(array[9]) << 48
-  | u128::from(array[10]) << 40
-  | u128::from(array[11]) << 32
-  | u128::from(array[12]) << 24
-  | u128::from(array[13]) << 16
-  | u128::from(array[14]) << 8
-  | u128::from(array[15])
+    | u128::from(array[1]) << 112
+    | u128::from(array[2]) << 104
+    | u128::from(array[3]) << 96
+    | u128::from(array[4]) << 88
+    | u128::from(array[5]) << 80
+    | u128::from(array[6]) << 72
+    | u128::from(array[7]) << 64
+    | u128::from(array[8]) << 56
+    | u128::from(array[9]) << 48
+    | u128::from(array[10]) << 40
+    | u128::from(array[11]) << 32
+    | u128::from(array[12]) << 24
+    | u128::from(array[13]) << 16
+    | u128::from(array[14]) << 8
+    | u128::from(array[15])
 }
 
 /// I convert a 8 byte array into a u64 (bigendian)
-pub(crate) fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64 {
+pub fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64 {
   u64::from(array[0]) << 56
-  | u64::from(array[1]) << 48
-  | u64::from(array[2]) << 40
-  | u64::from(array[3]) << 32
-  | u64::from(array[4]) << 24
-  | u64::from(array[5]) << 16
-  | u64::from(array[6]) << 8
-  | u64::from(array[7])
+    | u64::from(array[1]) << 48
+    | u64::from(array[2]) << 40
+    | u64::from(array[3]) << 32
+    | u64::from(array[4]) << 24
+    | u64::from(array[5]) << 16
+    | u64::from(array[6]) << 8
+    | u64::from(array[7])
 }
 
 /// I convert a 4 byte array into a u32 (bigendian)
-pub(crate) fn u8_bigendian_slice_to_u32(array: &[u8]) -> u32 {
+pub fn u8_bigendian_slice_to_u32(array: &[u8]) -> u32 {
   u32::from(array[0]) << 24
-  | u32::from(array[1]) << 16
-  | u32::from(array[2]) << 8
-  | u32::from(array[3])
+    | u32::from(array[1]) << 16
+    | u32::from(array[2]) << 8
+    | u32::from(array[3])
 }
 
 #[allow(dead_code)]
 /// I convert a 4 byte array into a u32 (littleendian)
-pub(crate) fn u8_littleendian_slice_to_u32(array: &[u8]) -> u32 {
+pub fn u8_littleendian_slice_to_u32(array: &[u8]) -> u32 {
   u32::from(array[3]) << 24
-  | u32::from(array[2]) << 16
-  | u32::from(array[1]) << 8
-  | u32::from(array[0])
+    | u32::from(array[2]) << 16
+    | u32::from(array[1]) << 8
+    | u32::from(array[0])
 }
 
 /// I compute the minimum power of two that is greater or equal to the input
-pub(crate) fn min_greater_equal_power_of_two(n: u32) -> u32 {
+pub fn min_greater_equal_power_of_two(n: u32) -> u32 {
   2.0f64.powi((n as f64).log2().ceil() as i32) as u32
 }
 
@@ -97,17 +92,10 @@ pub fn u64_to_u32_pair(x: u64) -> (u32, u32) {
   ((x & 0xFFFF_FFFF) as u32, (x >> 32) as u32)
 }
 
-#[allow(dead_code)]
-pub(crate) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
-  let mut hasher = Sha512::new();
-  hasher.input(slice);
-  S::from_hash(hasher)
-}
-
-pub(crate) fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
+pub fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
   base64::encode_config(input, base64::URL_SAFE)
 }
-pub(crate) fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>, base64::DecodeError> {
+pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>, base64::DecodeError> {
   base64::decode_config(input, base64::URL_SAFE)
 }
 

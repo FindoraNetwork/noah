@@ -5,6 +5,7 @@ pub mod chaum_pedersen;
 pub(crate) mod conf_cred_reveal;
 pub mod dlog;
 pub mod group_signatures;
+pub mod inner_product_pairing;
 pub mod merkle_tree;
 pub mod pedersen_elgamal;
 pub mod sigma;

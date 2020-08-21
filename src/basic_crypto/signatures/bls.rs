@@ -1,9 +1,9 @@
-use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
-use crate::algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::pairing::Pairing;
 use crate::errors::ZeiError;
-use crate::utils::u64_to_bigendian_u8array;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
+use utils::u64_to_bigendian_u8array;
 
 type HashFnc = sha2::Sha512;
 
@@ -141,7 +141,7 @@ pub fn bls_hash_pubkeys_to_scalars<P: Pairing>(ver_keys: &[&BlsPublicKey<P>])
 
 #[cfg(test)]
 mod tests {
-  use crate::algebra::bls12_381::Bls12381;
+  use algebra::bls12_381::Bls12381;
   use crate::errors::ZeiError;
   use rand_core::SeedableRng;
 

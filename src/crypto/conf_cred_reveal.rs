@@ -1,5 +1,5 @@
-use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
-use crate::algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::pairing::Pairing;
 use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::crypto::anon_creds::{
   ac_do_challenge_check_commitment, ac_randomize, ACCommitment, ACIssuerPublicKey, ACKey, ACPoK,
@@ -312,8 +312,8 @@ fn verify_ciphertext<P: Pairing>(challenge: &P::ScalarField,
 
 #[cfg(test)]
 pub(crate) mod test_helper {
-  use crate::algebra::groups::Group;
-  use crate::algebra::pairing::Pairing;
+  use algebra::groups::{Group, Scalar};
+  use algebra::pairing::Pairing;
   use crate::basic_crypto::elgamal::elgamal_key_gen;
   use crate::crypto::anon_creds::{
     ac_commit, ac_keygen_issuer, ac_sign, ac_user_key_gen, ac_verify_commitment, Credential,
@@ -322,9 +322,16 @@ pub(crate) mod test_helper {
     ac_confidential_open_commitment, ac_confidential_open_verify,
   };
   use crate::errors::ZeiError;
-  use crate::utils::byte_slice_to_scalar;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
+
+  pub(super) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
+    use digest::Digest;
+    use sha2::Sha512;
+    let mut hasher = Sha512::new();
+    hasher.input(slice);
+    S::from_hash(hasher)
+  }
 
   pub fn test_confidential_ac_reveal<P: Pairing>(reveal_bitmap: &[bool]) {
     let proof_message = b"Some message";
@@ -442,7 +449,7 @@ pub(crate) mod test_helper {
 
 #[cfg(test)]
 mod test_bls12_381 {
-  use crate::algebra::bls12_381::Bls12381;
+  use algebra::bls12_381::Bls12381;
   use crate::crypto::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
 
   #[test]
@@ -489,19 +496,21 @@ mod test_bls12_381 {
 #[cfg(test)]
 mod test_serialization {
 
-  use crate::algebra::bls12_381::Bls12381;
-  use crate::algebra::groups::Group;
-  use crate::algebra::pairing::Pairing;
+  use algebra::bls12_381::Bls12381;
+  use algebra::groups::Group;
+  use algebra::pairing::Pairing;
+
   use crate::basic_crypto::elgamal::elgamal_key_gen;
   use crate::crypto::anon_creds::{ac_commit, ac_sign};
   use crate::crypto::anon_creds::{ac_keygen_issuer, ac_user_key_gen, Credential};
   use crate::crypto::conf_cred_reveal::ac_confidential_open_commitment;
   use crate::crypto::conf_cred_reveal::ConfidentialAC;
-  use crate::utils::byte_slice_to_scalar;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
   use serde::{Deserialize, Serialize};
+  use super::test_helper::byte_slice_to_scalar;
+
 
   fn gen_confidential_ac<P>() -> ConfidentialAC<P::G1, P::G2, P::ScalarField>
     where P: Pairing

@@ -1,5 +1,5 @@
 use crate::errors::ZeiError;
-use crate::utils::{b64dec, b64enc};
+use utils::{b64dec, b64enc};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::RangeProof;
@@ -370,7 +370,7 @@ impl<'de> Deserialize<'de> for XfrSignature {
 
 pub mod zei_obj_serde {
   use crate::serialization::ZeiFromToBytes;
-  use crate::utils::{b64dec, b64enc};
+  use utils::{b64dec, b64enc};
   use serde::de::SeqAccess;
   use serde::de::Visitor;
   use serde::Deserializer;
