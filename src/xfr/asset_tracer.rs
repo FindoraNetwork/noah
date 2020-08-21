@@ -1,5 +1,5 @@
-use crate::algebra::bls12_381::{BLSScalar, BLSG1};
-use crate::algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
+use algebra::bls12_381::{BLSScalar, BLSG1};
+use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
 use crate::api::anon_creds::{Attr, AttributeCiphertext};
 use crate::basic_crypto::elgamal::{
   elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
@@ -9,7 +9,6 @@ use crate::basic_crypto::hybrid_encryption::{
   hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
 };
 use crate::errors::ZeiError;
-use crate::utils::{u32_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u32};
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetTracerDecKeys, AssetTracerEncKeys, AssetTracerKeyPair, AssetTracerMemo,
 };
@@ -18,6 +17,7 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
+use utils::{u32_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u32};
 
 pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
 pub type RecordDataDecKey = ElGamalDecKey<Scalar>;
@@ -257,18 +257,19 @@ impl AssetTracerMemo {
 
 #[cfg(test)]
 mod tests {
-  use crate::algebra::groups::{Group, Scalar as ZeiScalar};
+  use algebra::bls12_381::{BLSScalar, BLSG1};
+  use algebra::groups::{Group, Scalar as ZeiScalar};
   use crate::basic_crypto::elgamal::elgamal_encrypt;
   use crate::xfr::structs::{AssetTracerMemo, AssetType};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
-  use crate::algebra::bls12_381::{BLSScalar, BLSG1};
+
   use crate::errors::ZeiError;
-  use crate::utils::u64_to_u32_pair;
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
+  use utils::u64_to_u32_pair;
 
   #[test]
   fn extract_amount_from_tracer_memo() {

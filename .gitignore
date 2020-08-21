@@ -2,11 +2,12 @@
 .idea
 
 # Build files
+/release
 /target
+**/target
+**/release
 **/*.rs.bk
 .*.sw*
 
 utilities/target
 
-#Possible Embedded Repos
-zcash-bn-fork

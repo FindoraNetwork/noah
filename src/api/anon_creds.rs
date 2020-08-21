@@ -1,5 +1,5 @@
-use crate::algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
-use crate::algebra::groups::{Group, Scalar};
+use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
+use algebra::groups::{Group, Scalar};
 use crate::basic_crypto::elgamal::elgamal_key_gen;
 use crate::crypto::anon_creds::Attribute;
 use crate::errors::ZeiError;
@@ -72,8 +72,8 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(prng: &mut R,
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
-/// use zei::algebra::bls12_381::BLSScalar;
-/// use zei::algebra::groups::Scalar;
+/// use algebra::bls12_381::BLSScalar;
+/// use algebra::groups::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -112,8 +112,8 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, Credential};
-/// use zei::algebra::bls12_381::BLSScalar;
-/// use zei::algebra::groups::Scalar;
+/// use algebra::bls12_381::BLSScalar;
+/// use algebra::groups::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -151,8 +151,8 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, ac_keygen_commitment, ac_commit_with_key, Credential};
-/// use zei::algebra::bls12_381::BLSScalar;
-/// use zei::algebra::groups::Scalar;
+/// use algebra::bls12_381::BLSScalar;
+/// use algebra::groups::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -258,8 +258,8 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(prng: &mut R,
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::algebra::groups::Scalar;
-/// use zei::algebra::bls12_381::BLSScalar;
+/// use algebra::groups::Scalar;
+/// use algebra::bls12_381::BLSScalar;
 /// use zei::api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_verify, ac_reveal, Credential};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -322,8 +322,8 @@ pub type ConfidentialAC = crate::crypto::conf_cred_reveal::ConfidentialAC<G1, G2
 /// use zei::api::anon_creds::{ac_confidential_open_commitment, ac_confidential_verify, ac_confidential_gen_encryption_keys};
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
-/// use zei::algebra::bls12_381::{BLSScalar, BLSG1};
-/// use zei::algebra::groups::Group;
+/// use algebra::bls12_381::{BLSScalar, BLSG1};
+/// use algebra::groups::Group;
 /// use zei::api::anon_creds::Credential;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, 3);

@@ -4,3 +4,4 @@ pub mod jubjub;
 pub mod multi_exp;
 pub mod pairing;
 pub mod ristretto;
+pub mod errors;

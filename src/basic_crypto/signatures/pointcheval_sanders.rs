@@ -19,8 +19,8 @@ key is a tuple of elements rather than a single element in G2. A tuple of messag
 Given the above properties, Pointcheval-Sanders signatures are suitable for anonymous credentials and group signatures.
 */
 
-use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
-use crate::algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::pairing::Pairing;
 use crate::errors::ZeiError;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
@@ -48,11 +48,10 @@ pub struct PSSignature<G1> {
 /// #Example
 /// ```
 ///
-/// use rand::rngs::{EntropyRng};
+/// use algebra::bls12_381::Bls12381;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::ps_gen_keys;
-/// use zei::algebra::bls12_381::Bls12381;
-/// let mut prng = EntropyRng::new();
-/// let keys = ps_gen_keys::<_,Bls12381>(&mut prng);
+/// use rand::thread_rng;
+/// let keys = ps_gen_keys::<_,Bls12381>(&mut thread_rng());
 /// ```
 pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R)
@@ -70,12 +69,11 @@ pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
 /// #Example
 /// ```
 ///
-/// use rand::rngs::{EntropyRng};
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_bytes};
-/// use zei::algebra::bls12_381::Bls12381;
-/// let mut prng = EntropyRng::new();
-/// let (_, sk) = ps_gen_keys::<_,Bls12381>(&mut prng);
-/// let sig = ps_sign_bytes::<_, Bls12381>(&mut prng, &sk, b"this is a message");
+/// use algebra::bls12_381::Bls12381;
+/// use rand::thread_rng;
+/// let (_, sk) = ps_gen_keys::<_,Bls12381>(&mut thread_rng());
+/// let sig = ps_sign_bytes::<_, Bls12381>(&mut thread_rng(), &sk, b"this is a message");
 /// ```
 pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
                                                          sk: &PSSecretKey<P::ScalarField>,
@@ -90,8 +88,8 @@ pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
 /// ```
 ///
 /// use rand::rngs::{EntropyRng};
-/// use zei::algebra::bls12_381::{BLSScalar, Bls12381};
-/// use zei::algebra::groups::Scalar;
+/// use algebra::bls12_381::{BLSScalar, Bls12381};
+/// use algebra::groups::Scalar;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar};
 /// let mut prng = EntropyRng::new();
 /// let (_, sk) = ps_gen_keys::<_, Bls12381>(&mut prng);
@@ -115,7 +113,7 @@ pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
 /// use rand::rngs::EntropyRng;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_bytes, ps_verify_sig_bytes};
 /// use zei::errors::ZeiError;
-/// use zei::algebra::bls12_381::Bls12381;
+/// use algebra::bls12_381::Bls12381;
 /// let mut prng = EntropyRng::new();
 /// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut prng);
 /// let sig = ps_sign_bytes::<_, Bls12381>(&mut prng, &sk, b"this is a message");
@@ -137,8 +135,8 @@ pub fn ps_verify_sig_bytes<P: Pairing>(pk: &PSPublicKey<P::G2>,
 /// use rand::rngs::EntropyRng;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar};
 /// use zei::errors::ZeiError;
-/// use zei::algebra::bls12_381::{BLSScalar, Bls12381};
-/// use zei::algebra::groups::Scalar;
+/// use algebra::bls12_381::{BLSScalar, Bls12381};
+/// use algebra::groups::Scalar;
 /// let mut prng = EntropyRng::new();
 /// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut prng);
 /// let sig = ps_sign_scalar::<_, Bls12381>(&mut prng, &sk, &BLSScalar::from_u32(100));
@@ -164,8 +162,8 @@ pub fn ps_verify_sig_scalar<P: Pairing>(pk: &PSPublicKey<P::G2>,
 /// use rand::rngs::EntropyRng;
 /// use zei::basic_crypto::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar, ps_randomize_sig};
 /// use zei::errors::ZeiError;
-/// use zei::algebra::bls12_381::{BLSScalar, Bls12381};
-/// use zei::algebra::groups::Scalar;
+/// use algebra::bls12_381::{BLSScalar, Bls12381};
+/// use algebra::groups::Scalar;
 /// let mut prng = EntropyRng::new();
 /// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut prng);
 /// let sig = ps_sign_scalar::<_, Bls12381>(&mut prng, &sk, &BLSScalar::from_u32(100));

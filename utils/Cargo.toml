@@ -1,0 +1,13 @@
+[package]
+name = "utils"
+version = "0.1.0"
+authors = ["fernando@findora.org, philippe@findora.org"]
+edition = "2018"
+description = "Zei utils"
+
+[lib]
+name = "utils"
+crate-type = ["rlib"]
+
+[dependencies]
+base64 = "0.10"

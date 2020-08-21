@@ -1,16 +1,8 @@
-use super::groups::{Group, GroupArithmetic};
-use crate::algebra::groups::Scalar;
+use algebra::pairing::Pairing;
 use crate::crypto::sigma::SigmaTranscript;
-use crate::errors::ZeiError;
 use merlin::Transcript;
-
-pub trait Pairing {
-  type ScalarField: Scalar;
-  type G1: Group<Self::ScalarField>;
-  type G2: Group<Self::ScalarField>;
-  type Gt: Group<Self::ScalarField>;
-  fn pairing(a: &Self::G1, b: &Self::G2) -> Self::Gt;
-}
+use algebra::groups::{Group, Scalar, GroupArithmetic};
+use crate::errors::ZeiError;
 
 /// The purpose of the code below is to implement the inner product pairing proof system
 /// described in https://eprint.iacr.org/2019/1177.pdf
@@ -257,12 +249,13 @@ fn compute_next_round_input<P: Pairing>(challenge: &P::ScalarField,
 
 #[cfg(test)]
 mod tests {
-  use crate::algebra::bls12_381::Bls12381;
-  use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
-  use crate::algebra::pairing::Pairing;
+  use algebra::bls12_381::Bls12381;
+  use algebra::groups::{Group, GroupArithmetic, Scalar};
+  use algebra::pairing::Pairing;
   use crate::errors::ZeiError;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
+
 
   #[allow(non_snake_case)]
   fn test_outsource_inner_product_pairing<P: Pairing>() {

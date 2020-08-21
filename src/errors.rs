@@ -193,20 +193,8 @@ impl error::Error for ZeiError {
   }
 }
 
-impl From<serde_json::Error> for ZeiError {
-  fn from(_error: serde_json::Error) -> Self {
-    ZeiError::DeserializationError
-  }
-}
-
 impl From<SignatureError> for ZeiError {
   fn from(_error: SignatureError) -> Self {
     ZeiError::SignatureError
-  }
-}
-
-impl From<rmp_serde::encode::Error> for ZeiError {
-  fn from(_error: rmp_serde::encode::Error) -> Self {
-    ZeiError::SerializationError
   }
 }

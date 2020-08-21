@@ -1,7 +1,6 @@
 use crate::api::anon_creds::{ACCommitment, Attr};
 use crate::errors::ZeiError;
 use crate::setup::PublicParams;
-use crate::utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
 use crate::xfr::asset_mixer::{
   batch_verify_asset_mixing, prove_asset_mixing, AssetMixProof, AssetMixingInstance,
 };
@@ -18,6 +17,7 @@ use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use serde::ser::Serialize;
 use std::collections::HashMap;
+use utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
@@ -433,7 +433,7 @@ pub(crate) fn compute_transfer_multisig(body: &XfrBody,
                                         keys: &[&XfrKeyPair])
                                         -> Result<XfrMultiSig, ZeiError> {
   let mut vec = vec![];
-  body.serialize(&mut rmp_serde::Serializer::new(&mut vec))?;
+  body.serialize(&mut rmp_serde::Serializer::new(&mut vec)).map_err(|_| ZeiError::SerializationError)?;
   Ok(sign_multisig(keys, vec.as_slice()))
 }
 
@@ -441,7 +441,7 @@ pub(crate) fn compute_transfer_multisig(body: &XfrBody,
 pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiError> {
   let mut vec = vec![];
   xfr_note.body
-          .serialize(&mut rmp_serde::Serializer::new(&mut vec))?;
+          .serialize(&mut rmp_serde::Serializer::new(&mut vec)).map_err(|_| ZeiError::SerializationError)?;
   let mut public_keys = vec![];
   for x in xfr_note.body.inputs.iter() {
     public_keys.push(x.public_key)

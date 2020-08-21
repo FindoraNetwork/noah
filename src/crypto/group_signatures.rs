@@ -1,5 +1,5 @@
-use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
-use crate::algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::pairing::Pairing;
 use crate::basic_crypto::elgamal::{
   elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalDecKey,
   ElGamalEncKey,
@@ -266,8 +266,8 @@ pub(crate) fn gpsig_open<P: Pairing>(sig: &GroupSignature<P>,
 
 mod tests {
   use super::{gpsig_join_cert, gpsig_open, gpsig_setup, gpsig_sign, gpsig_verify};
-  use crate::algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
-  use crate::algebra::groups::{Group, GroupArithmetic};
+  use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
+  use algebra::groups::{Group, GroupArithmetic};
   use crate::errors::ZeiError;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;

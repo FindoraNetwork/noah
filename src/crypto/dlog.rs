@@ -1,4 +1,4 @@
-use crate::algebra::groups::{Group, Scalar as ZeiScalar};
+use algebra::groups::{Group, Scalar as ZeiScalar};
 use crate::crypto::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
 use crate::errors::ZeiError;
 use merlin::Transcript;
@@ -104,7 +104,7 @@ mod test {
     prove_knowledge_dlog, prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog,
     verify_proof_of_knowledge_dlog,
   };
-  use crate::algebra::groups::Group;
+  use algebra::groups::Group;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use merlin::Transcript;

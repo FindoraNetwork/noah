@@ -12,7 +12,6 @@ use crate::errors::ZeiError;
 use crate::basic_crypto::elgamal::ElGamalCiphertext;
 use crate::crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
-use crate::utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::RecordDataEncKey;
 use crate::xfr::lib::XfrNotePoliciesRef;
@@ -28,6 +27,7 @@ use itertools::Itertools;
 use linear_map::LinearMap;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
@@ -633,8 +633,8 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut
 
 #[cfg(test)]
 mod tests {
-  use crate::algebra::bls12_381::BLSG1;
-  use crate::algebra::groups::Group;
+  use algebra::bls12_381::BLSG1;
+  use algebra::groups::Group;
   use crate::api::anon_creds::ACSignature;
   use crate::errors::ZeiError;
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
