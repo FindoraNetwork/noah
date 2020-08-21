@@ -20,7 +20,7 @@ ed25519-dalek = "1.0.0-pre.3"
 bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 merlin = "2.0"
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 serde_json = "1.0"
 sha2 = "0.8.0"
