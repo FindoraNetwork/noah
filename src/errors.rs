@@ -40,7 +40,6 @@ pub enum ZeiError {
   IdentityTracingExtractionError,
   AnonymousCredentialSignError,
   R1CSProofError,
-  GroupInversionError,
   BogusAssetTracerMemo,
 }
 
@@ -114,7 +113,6 @@ impl fmt::Display for ZeiError {
                   }
                   ZeiError::AnonymousCredentialSignError =>{"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."}
                   ZeiError::R1CSProofError => { "Could not create R1CSProof" }
-                  ZeiError::GroupInversionError => { "Group Element not invertible" }
                   ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data" }
                 })
   }
@@ -184,7 +182,6 @@ impl error::Error for ZeiError {
       },
       ZeiError::AnonymousCredentialSignError => {"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."},
       ZeiError::R1CSProofError =>{"Could not create R1CSProof"},
-      ZeiError::GroupInversionError => { "Group Element not invertible" }
       ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data" }
     }
   }
