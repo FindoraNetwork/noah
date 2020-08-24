@@ -8,6 +8,7 @@ COPY ./Cargo* /app/
 COPY ./rustfmt.toml /app/
 COPY ./tests /app/tests
 COPY ./src /app/src
+COPY ./algebra /app/algebra
 COPY ./utilities /app/utilities
 COPY ./benches /app/benches
 RUN cargo audit
