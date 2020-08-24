@@ -104,7 +104,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
   for (attr, b) in credential.attributes.iter().zip(reveal_map.iter()) {
     if *b {
       let r = P::ScalarField::random_scalar(prng);
-      let ctext = elgamal_encrypt::<P::ScalarField, P::G1>(&base, attr, &r, enc_key);
+      let ctext = elgamal_encrypt::<P::G1>(&base, attr, &r, enc_key);
       rands.push(r);
       ctexts.push(ctext);
       revealed_attrs.push(attr.clone());
@@ -340,7 +340,7 @@ pub(crate) mod test_helper {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
     let (user_pk, user_sk) = ac_user_key_gen::<_, P>(&mut prng, &issuer_pk);
-    let (_, enc_key) = elgamal_key_gen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+    let (_, enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng, &P::G1::get_base());
 
     let mut attrs = Vec::new();
     for i in 0..num_attr {
@@ -420,7 +420,7 @@ pub(crate) mod test_helper {
 
     // Wrong encryption public key
     let (_, another_enc_key) =
-      elgamal_key_gen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+      elgamal_key_gen::<_, P::G1>(&mut prng, &P::G1::get_base());
     let vrfy = ac_confidential_open_verify::<P>(&issuer_pk,
                                                 &another_enc_key,
                                                 &reveal_bitmap,
@@ -521,7 +521,7 @@ mod test_serialization {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
     let (user_pk, user_sk) = ac_user_key_gen::<_, P>(&mut prng, &issuer_pk);
-    let (_, enc_key) = elgamal_key_gen::<_, P::ScalarField, P::G1>(&mut prng, &P::G1::get_base());
+    let (_, enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng, &P::G1::get_base());
 
     let mut attrs = Vec::new();
     for i in 0..num_attr {

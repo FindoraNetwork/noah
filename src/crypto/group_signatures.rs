@@ -44,7 +44,7 @@ pub fn gpsig_setup<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R)
   -> (GroupPublicKey<P>, GroupSecretKey<P>) {
   let (ver_key, sig_key) = ps_gen_keys::<R, P>(prng);
-  let (dec_key, enc_key) = elgamal_key_gen::<_, P::ScalarField, P::G1>(prng, &P::G1::get_base());
+  let (dec_key, enc_key) = elgamal_key_gen::<_, P::G1>(prng, &P::G1::get_base());
   (GroupPublicKey { ver_key, enc_key }, GroupSecretKey { sig_key, dec_key })
 }
 

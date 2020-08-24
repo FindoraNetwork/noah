@@ -6,7 +6,6 @@ use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-// use ed25519_dalek::ed25519::signature::Signature; // uncomment when v1.0.0.pre4 is updated in our dependencies
 use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
 use serde::Deserialize;
@@ -483,7 +482,6 @@ mod test {
   use crate::basic_crypto::hybrid_encryption::XPublicKey;
   use crate::xfr::asset_tracer::RecordDataEncKey;
   use curve25519_dalek::ristretto::RistrettoPoint;
-  use curve25519_dalek::scalar::Scalar;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
@@ -593,7 +591,7 @@ mod test {
   fn serialize_and_deserialize_elgamal() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
-    let (_sk, xfr_pub_key) = elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let (_sk, xfr_pub_key) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
     let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
       res
     } else {

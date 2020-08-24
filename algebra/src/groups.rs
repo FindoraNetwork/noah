@@ -5,8 +5,9 @@ use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-pub trait GroupArithmetic<S> {
-  fn mul(&self, scalar: &S) -> Self;
+pub trait GroupArithmetic {
+  type S: Scalar;
+  fn mul(&self, scalar: &Self::S) -> Self;
   fn add(&self, other: &Self) -> Self;
   fn sub(&self, other: &Self) -> Self;
 }
@@ -54,8 +55,8 @@ pub trait Scalar:
   fn from_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
 }
 
-pub trait Group<S>:
-  Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de> + GroupArithmetic<S>
+pub trait Group:
+  Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de> + GroupArithmetic
 {
   const COMPRESSED_LEN: usize;
   const SCALAR_BYTES_LEN: usize;

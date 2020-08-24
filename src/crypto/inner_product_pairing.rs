@@ -210,7 +210,7 @@ pub fn inner_pairing_product<P: Pairing>(A: &[P::G1], B: &[P::G2]) -> P::Gt {
 }
 
 #[allow(non_snake_case)]
-pub fn dot_product<S: Scalar, G: Group<S>>(A: &[G], B: &[G]) -> Vec<G> {
+pub fn dot_product<G: Group>(A: &[G], B: &[G]) -> Vec<G> {
   assert_eq!(A.len(), B.len());
   let mut result = vec![];
   for (a, b) in A.iter().zip(B.iter()) {
@@ -220,7 +220,7 @@ pub fn dot_product<S: Scalar, G: Group<S>>(A: &[G], B: &[G]) -> Vec<G> {
 }
 
 #[allow(non_snake_case)]
-pub fn vec_exp<S: Scalar, G: Group<S>>(A: &[G], exp: &S) -> Vec<G> {
+pub fn vec_exp<G: Group>(A: &[G], exp: &G::S) -> Vec<G> {
   let mut result = vec![];
   for a in A.iter() {
     result.push(a.mul(exp));

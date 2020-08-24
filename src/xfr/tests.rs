@@ -707,7 +707,7 @@ pub(crate) mod tests {
       let mut prng = ChaChaRng::from_seed([0u8; 32]);
       let pc_gens = PedersenGens::default();
 
-      let (_sk, pk) = elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+      let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
       let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
       let commitment = pc_gens.commit(m, r);

@@ -326,7 +326,7 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let (_sk, pk) = elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
     let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
     let commitment = pc_gens.commit(m, r);
@@ -359,7 +359,7 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let (_sk, pk) = elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
     let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
     let commitment = pc_gens.commit(m2, r);
@@ -397,7 +397,7 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let (_sk, pk) = elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
     let ctext1 = elgamal_encrypt(&pc_gens.B, &m1, &r1, &pk);
     let commitment1 = pc_gens.commit(m1, r1);
@@ -549,7 +549,7 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let (_sk, pk) = elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
     let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
     let commitment = pc_gens.commit(m, r);
     let mut transcript = Transcript::new(b"test");
@@ -573,7 +573,7 @@ mod test {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = PedersenGens::default();
 
-    let (_sk, pk) = elgamal_key_gen::<_, Scalar, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
     let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
     let commitment = pc_gens.commit(m, r);
