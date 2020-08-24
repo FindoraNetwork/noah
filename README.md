@@ -114,7 +114,7 @@ We use [proptest](https://lib.rs/crates/proptest) for property testing. These te
 Run all the tests except property-testing tests which are slow. 
 
 ```
-> cargo test
+> cargo test --all
 ```
 
 Run only the unit tests.
