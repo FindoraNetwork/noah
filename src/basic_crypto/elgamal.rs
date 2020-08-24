@@ -1,6 +1,6 @@
-use algebra::groups::{Group, Scalar};
 use crate::errors::ZeiError;
 use crate::serialization::ZeiFromToBytes;
+use algebra::groups::{Group, Scalar};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use rand_core::{CryptoRng, RngCore};
 use std::hash::{Hash, Hasher};
@@ -134,9 +134,9 @@ fn brute_force<S: Scalar, G: Group<S>>(base: &G,
 
 #[cfg(test)]
 pub mod elgamal_test {
-  use algebra::groups::{Group, Scalar};
   use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey};
   use crate::errors::ZeiError;
+  use algebra::groups::{Group, Scalar};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
@@ -264,9 +264,9 @@ pub mod elgamal_test {
 #[cfg(test)]
 mod elgamal_over_groups_tests {
   use crate::basic_crypto::elgamal::elgamal_test;
+  use algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
-  use algebra::bls12_381::{BLSScalar, BLSG1, BLSG2, BLSGt};
 
   #[test]
   fn verification() {

@@ -1,7 +1,7 @@
+use crate::errors::ZeiError;
 use algebra::groups::{Group, Scalar};
 use algebra::multi_exp::MultiExp;
 use algebra::pairing::Pairing;
-use crate::errors::ZeiError;
 use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;

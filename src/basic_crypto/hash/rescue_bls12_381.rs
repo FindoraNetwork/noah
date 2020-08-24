@@ -1,5 +1,5 @@
-use algebra::bls12_381::BLSScalar;
 use crate::basic_crypto::hash::rescue::RescueInstance;
+use algebra::bls12_381::BLSScalar;
 use ff::PrimeField;
 use pairing::bls12_381::Fr;
 
@@ -126,9 +126,9 @@ impl RescueInstance<BLSScalar> {
 
 #[cfg(test)]
 mod test {
+  use crate::basic_crypto::hash::rescue::RescueInstance;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::Scalar;
-  use crate::basic_crypto::hash::rescue::RescueInstance;
   use ff::PrimeField;
   use pairing::bls12_381::Fr;
 

@@ -18,8 +18,12 @@ pub enum AlgebraError {
 impl fmt::Display for AlgebraError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     f.write_str(match self {
-                  AlgebraError::ArgumentVerificationError => "Proof(argument) not valid for statement",
-                  AlgebraError::CommitmentInputError => "The number of messages to be committed is invalid",
+                  AlgebraError::ArgumentVerificationError => {
+                    "Proof(argument) not valid for statement"
+                  }
+                  AlgebraError::CommitmentInputError => {
+                    "The number of messages to be committed is invalid"
+                  }
                   AlgebraError::CommitmentVerificationError => "Commitment verification failed",
                   AlgebraError::DecompressElementError => "Could not decompress group Element",
                   AlgebraError::DeserializationError => "Could not deserialize object",
@@ -28,7 +32,7 @@ impl fmt::Display for AlgebraError {
                   AlgebraError::ParameterError => "Unexpected parameter for method or function",
                   AlgebraError::SignatureError => "Signature verification failed",
                   AlgebraError::InconsistentStructureError => "Zei Structure is inconsistent",
-                  AlgebraError::GroupInversionError => { "Group Element not invertible" }
+                  AlgebraError::GroupInversionError => "Group Element not invertible",
                 })
   }
 }
@@ -46,7 +50,7 @@ impl error::Error for AlgebraError {
       AlgebraError::ParameterError => "Unexpected parameter for method or function",
       AlgebraError::SignatureError => "Signature verification failed",
       AlgebraError::InconsistentStructureError => "Zei Structure is inconsistent",
-      AlgebraError::GroupInversionError => { "Group Element not invertible" }
+      AlgebraError::GroupInversionError => "Group Element not invertible",
     }
   }
 }

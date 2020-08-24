@@ -1,11 +1,11 @@
 use crate::errors::ZeiError;
-use utils::{b64dec, b64enc};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
+use utils::{b64dec, b64enc};
 // use ed25519_dalek::ed25519::signature::Signature; // uncomment when v1.0.0.pre4 is updated in our dependencies
 use ed25519_dalek::{PublicKey, SecretKey};
 use serde::de::{SeqAccess, Visitor};
@@ -370,11 +370,11 @@ impl<'de> Deserialize<'de> for XfrSignature {
 
 pub mod zei_obj_serde {
   use crate::serialization::ZeiFromToBytes;
-  use utils::{b64dec, b64enc};
   use serde::de::SeqAccess;
   use serde::de::Visitor;
   use serde::Deserializer;
   use serde::Serializer;
+  use utils::{b64dec, b64enc};
 
   pub struct BytesVisitor;
 

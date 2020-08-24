@@ -633,13 +633,13 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut
 
 #[cfg(test)]
 mod tests {
-  use algebra::bls12_381::BLSG1;
-  use algebra::groups::Group;
   use crate::api::anon_creds::ACSignature;
   use crate::errors::ZeiError;
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::proofs::verify_identity_proofs;
   use crate::xfr::structs::{AssetTracerMemo, AssetTracingPolicies, AssetTracingPolicy};
+  use algebra::bls12_381::BLSG1;
+  use algebra::groups::Group;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 

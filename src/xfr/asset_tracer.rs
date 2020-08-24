@@ -1,5 +1,3 @@
-use algebra::bls12_381::{BLSScalar, BLSG1};
-use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
 use crate::api::anon_creds::{Attr, AttributeCiphertext};
 use crate::basic_crypto::elgamal::{
   elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
@@ -13,6 +11,8 @@ use crate::xfr::structs::{
   asset_type_to_scalar, AssetTracerDecKeys, AssetTracerEncKeys, AssetTracerKeyPair, AssetTracerMemo,
 };
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
+use algebra::bls12_381::{BLSScalar, BLSG1};
+use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
 use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -257,13 +257,12 @@ impl AssetTracerMemo {
 
 #[cfg(test)]
 mod tests {
-  use algebra::bls12_381::{BLSScalar, BLSG1};
-  use algebra::groups::{Group, Scalar as ZeiScalar};
   use crate::basic_crypto::elgamal::elgamal_encrypt;
   use crate::xfr::structs::{AssetTracerMemo, AssetType};
+  use algebra::bls12_381::{BLSScalar, BLSG1};
+  use algebra::groups::{Group, Scalar as ZeiScalar};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-
 
   use crate::errors::ZeiError;
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;

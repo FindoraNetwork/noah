@@ -32,7 +32,6 @@ sha2 = "0.8.0"
 utils = { path = "utils" }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 x25519-dalek = "0.6"
-jubjub = "0.3.0"
 
 [dev-dependencies]
 bit-array = "0.4.3"

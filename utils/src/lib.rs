@@ -37,50 +37,50 @@ pub fn u64_to_bigendian_u8array(n: u64) -> [u8; 8] {
 /// I convert a 16 byte array into a u128 (bigendian)
 pub fn u8_bigendian_slice_to_u128(array: &[u8]) -> u128 {
   u128::from(array[0]) << 120
-    | u128::from(array[1]) << 112
-    | u128::from(array[2]) << 104
-    | u128::from(array[3]) << 96
-    | u128::from(array[4]) << 88
-    | u128::from(array[5]) << 80
-    | u128::from(array[6]) << 72
-    | u128::from(array[7]) << 64
-    | u128::from(array[8]) << 56
-    | u128::from(array[9]) << 48
-    | u128::from(array[10]) << 40
-    | u128::from(array[11]) << 32
-    | u128::from(array[12]) << 24
-    | u128::from(array[13]) << 16
-    | u128::from(array[14]) << 8
-    | u128::from(array[15])
+  | u128::from(array[1]) << 112
+  | u128::from(array[2]) << 104
+  | u128::from(array[3]) << 96
+  | u128::from(array[4]) << 88
+  | u128::from(array[5]) << 80
+  | u128::from(array[6]) << 72
+  | u128::from(array[7]) << 64
+  | u128::from(array[8]) << 56
+  | u128::from(array[9]) << 48
+  | u128::from(array[10]) << 40
+  | u128::from(array[11]) << 32
+  | u128::from(array[12]) << 24
+  | u128::from(array[13]) << 16
+  | u128::from(array[14]) << 8
+  | u128::from(array[15])
 }
 
 /// I convert a 8 byte array into a u64 (bigendian)
 pub fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64 {
   u64::from(array[0]) << 56
-    | u64::from(array[1]) << 48
-    | u64::from(array[2]) << 40
-    | u64::from(array[3]) << 32
-    | u64::from(array[4]) << 24
-    | u64::from(array[5]) << 16
-    | u64::from(array[6]) << 8
-    | u64::from(array[7])
+  | u64::from(array[1]) << 48
+  | u64::from(array[2]) << 40
+  | u64::from(array[3]) << 32
+  | u64::from(array[4]) << 24
+  | u64::from(array[5]) << 16
+  | u64::from(array[6]) << 8
+  | u64::from(array[7])
 }
 
 /// I convert a 4 byte array into a u32 (bigendian)
 pub fn u8_bigendian_slice_to_u32(array: &[u8]) -> u32 {
   u32::from(array[0]) << 24
-    | u32::from(array[1]) << 16
-    | u32::from(array[2]) << 8
-    | u32::from(array[3])
+  | u32::from(array[1]) << 16
+  | u32::from(array[2]) << 8
+  | u32::from(array[3])
 }
 
 #[allow(dead_code)]
 /// I convert a 4 byte array into a u32 (littleendian)
 pub fn u8_littleendian_slice_to_u32(array: &[u8]) -> u32 {
   u32::from(array[3]) << 24
-    | u32::from(array[2]) << 16
-    | u32::from(array[1]) << 8
-    | u32::from(array[0])
+  | u32::from(array[2]) << 16
+  | u32::from(array[1]) << 8
+  | u32::from(array[0])
 }
 
 /// I compute the minimum power of two that is greater or equal to the input

@@ -1,6 +1,6 @@
-use algebra::groups::{Group, Scalar as ZeiScalar};
 use crate::crypto::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
 use crate::errors::ZeiError;
+use algebra::groups::{Group, Scalar as ZeiScalar};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 

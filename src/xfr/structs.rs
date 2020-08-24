@@ -1,4 +1,3 @@
-use bulletproofs::RangeProof;
 use crate::api::anon_creds::{
   ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
   AttributeEncKey,
@@ -8,9 +7,10 @@ use crate::crypto::chaum_pedersen::ChaumPedersenProofX;
 use crate::crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use crate::serialization;
 use crate::xfr::asset_mixer::AssetMixProof;
-use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
+use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
+use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;

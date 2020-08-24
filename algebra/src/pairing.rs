@@ -1,4 +1,4 @@
-use crate::groups::{Group /*GroupArithmetic*/ };
+use crate::groups::Group;
 use crate::groups::Scalar;
 //use crate::crypto::sigma::SigmaTranscript;
 //use crate::errors::AlgebraError;

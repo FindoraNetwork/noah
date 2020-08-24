@@ -1,5 +1,3 @@
-use algebra::groups::{Group, GroupArithmetic, Scalar};
-use algebra::pairing::Pairing;
 use crate::basic_crypto::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::crypto::anon_creds::{
   ac_do_challenge_check_commitment, ac_randomize, ACCommitment, ACIssuerPublicKey, ACKey, ACPoK,
@@ -7,6 +5,8 @@ use crate::crypto::anon_creds::{
 };
 use crate::crypto::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use crate::errors::ZeiError;
+use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::pairing::Pairing;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 
@@ -312,8 +312,6 @@ fn verify_ciphertext<P: Pairing>(challenge: &P::ScalarField,
 
 #[cfg(test)]
 pub(crate) mod test_helper {
-  use algebra::groups::{Group, Scalar};
-  use algebra::pairing::Pairing;
   use crate::basic_crypto::elgamal::elgamal_key_gen;
   use crate::crypto::anon_creds::{
     ac_commit, ac_keygen_issuer, ac_sign, ac_user_key_gen, ac_verify_commitment, Credential,
@@ -322,6 +320,8 @@ pub(crate) mod test_helper {
     ac_confidential_open_commitment, ac_confidential_open_verify,
   };
   use crate::errors::ZeiError;
+  use algebra::groups::{Group, Scalar};
+  use algebra::pairing::Pairing;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
@@ -449,8 +449,8 @@ pub(crate) mod test_helper {
 
 #[cfg(test)]
 mod test_bls12_381 {
-  use algebra::bls12_381::Bls12381;
   use crate::crypto::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
+  use algebra::bls12_381::Bls12381;
 
   #[test]
   fn confidential_reveal_one_attr_hidden() {
@@ -500,6 +500,7 @@ mod test_serialization {
   use algebra::groups::Group;
   use algebra::pairing::Pairing;
 
+  use super::test_helper::byte_slice_to_scalar;
   use crate::basic_crypto::elgamal::elgamal_key_gen;
   use crate::crypto::anon_creds::{ac_commit, ac_sign};
   use crate::crypto::anon_creds::{ac_keygen_issuer, ac_user_key_gen, Credential};
@@ -509,8 +510,6 @@ mod test_serialization {
   use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
   use serde::{Deserialize, Serialize};
-  use super::test_helper::byte_slice_to_scalar;
-
 
   fn gen_confidential_ac<P>() -> ConfidentialAC<P::G1, P::G2, P::ScalarField>
     where P: Pairing
