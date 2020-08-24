@@ -254,18 +254,18 @@ impl<'de> Deserialize<'de> for JubjubGroup {
 // TODO: Add tests for Schnorr signatures
 #[cfg(test)]
 mod jubjub_groups_test {
-  use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
-  use crate::algebra::groups::Scalar;
-  use crate::algebra::jubjub::JubjubScalar;
+  use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
+  use crate::groups::Scalar;
+  use crate::jubjub::JubjubScalar;
 
   #[test]
   fn test_scalar_ops() {
-    test_scalar_operations::<super::JubjubScalar>();
+    test_scalar_operations::<JubjubScalar>();
   }
 
   #[test]
   fn scalar_deser() {
-    test_scalar_serialization::<super::JubjubScalar>();
+    test_scalar_serialization::<JubjubScalar>();
   }
 
   #[test]
@@ -278,30 +278,5 @@ mod jubjub_groups_test {
 
     let small_value_from_bytes = JubjubScalar::from_bytes(&small_value_bytes).unwrap();
     assert_eq!(small_value_from_bytes, small_value);
-  }
-}
-
-#[cfg(test)]
-mod elgamal_over_jubjub_groups {
-  use crate::basic_crypto::elgamal::elgamal_test;
-
-  #[test]
-  fn verification_jubjub_group() {
-    elgamal_test::verification::<super::JubjubScalar, super::JubjubGroup>();
-  }
-
-  #[test]
-  fn decryption_jubjub_group() {
-    elgamal_test::decryption::<super::JubjubScalar, super::JubjubGroup>();
-  }
-
-  #[test]
-  fn to_json_jubjub_group() {
-    elgamal_test::to_json::<super::JubjubScalar, super::JubjubGroup>();
-  }
-
-  #[test]
-  fn to_message_pack_jubjub_group() {
-    elgamal_test::to_message_pack::<super::JubjubScalar, super::JubjubGroup>();
   }
 }

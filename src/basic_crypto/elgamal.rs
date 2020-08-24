@@ -300,3 +300,29 @@ mod elgamal_over_groups_tests {
     elgamal_test::to_message_pack::<BLSScalar, BLSGt>();
   }
 }
+
+#[cfg(test)]
+mod elgamal_over_jubjub_groups {
+  use crate::basic_crypto::elgamal::elgamal_test;
+  use algebra::jubjub::{JubjubGroup, JubjubScalar};
+
+  #[test]
+  fn verification_jubjub_group() {
+    elgamal_test::verification::<JubjubScalar, JubjubGroup>();
+  }
+
+  #[test]
+  fn decryption_jubjub_group() {
+    elgamal_test::decryption::<JubjubScalar, JubjubGroup>();
+  }
+
+  #[test]
+  fn to_json_jubjub_group() {
+    elgamal_test::to_json::<JubjubScalar, JubjubGroup>();
+  }
+
+  #[test]
+  fn to_message_pack_jubjub_group() {
+    elgamal_test::to_message_pack::<JubjubScalar, JubjubGroup>();
+  }
+}
