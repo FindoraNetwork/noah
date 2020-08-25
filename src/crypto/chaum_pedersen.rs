@@ -1,10 +1,10 @@
-use algebra::groups::Group;
 use crate::crypto::sigma::{
   sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
 };
 use crate::errors::ZeiError;
 use crate::errors::ZeiError::ZKProofVerificationError;
 use crate::serialization;
+use algebra::groups::Group;
 use bulletproofs::PedersenGens;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -133,11 +133,11 @@ pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(transcript: &mut Transcr
                                  responses: vec![proof.z1, proof.z2, proof.z3] };
 
   sigma_verify::<_, RistrettoPoint>(transcript,
-                                            prng,
-                                            elems.as_slice(),
-                                            lhs_matrix.as_slice(),
-                                            rhs_vec.as_slice(),
-                                            &sigma_proof)
+                                    prng,
+                                    elems.as_slice(),
+                                    lhs_matrix.as_slice(),
+                                    rhs_vec.as_slice(),
+                                    &sigma_proof)
 }
 
 // Helper functions for the proof of multiple commitments equality below

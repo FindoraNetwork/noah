@@ -44,6 +44,7 @@ dependencies = [
  "ed25519-dalek",
  "ff",
  "group",
+ "jubjub",
  "pairing",
  "rand",
  "rand_chacha",
@@ -130,6 +131,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa79dedbb091f449f1f39e53edf88d5dbe95f895dae6135a8d7b881fb5af73f5"
 dependencies = [
  "byte-tools",
+]
+
+[[package]]
+name = "bls12_381"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20c116dad307b68138cc2e2f3a699c16f52faa47c65f98fc6de1dea9a097ee1e"
+dependencies = [
+ "subtle",
 ]
 
 [[package]]
@@ -513,6 +523,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52732a3d3ad72c58ad2dc70624f9c17b46ecd0943b9a4f1ee37c4c18c5d983e2"
 dependencies = [
  "wasm-bindgen",
+]
+
+[[package]]
+name = "jubjub"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaacc6b2b5fa79a5bd49de8439534b1f98886f06b88da02afeb968d60678b978"
+dependencies = [
+ "bls12_381",
+ "subtle",
 ]
 
 [[package]]

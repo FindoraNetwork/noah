@@ -1,8 +1,8 @@
-use algebra::pairing::Pairing;
 use crate::crypto::sigma::SigmaTranscript;
-use merlin::Transcript;
-use algebra::groups::{Group, Scalar, GroupArithmetic};
 use crate::errors::ZeiError;
+use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::pairing::Pairing;
+use merlin::Transcript;
 
 /// The purpose of the code below is to implement the inner product pairing proof system
 /// described in https://eprint.iacr.org/2019/1177.pdf
@@ -249,13 +249,12 @@ fn compute_next_round_input<P: Pairing>(challenge: &P::ScalarField,
 
 #[cfg(test)]
 mod tests {
+  use crate::errors::ZeiError;
   use algebra::bls12_381::Bls12381;
   use algebra::groups::{Group, GroupArithmetic, Scalar};
   use algebra::pairing::Pairing;
-  use crate::errors::ZeiError;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-
 
   #[allow(non_snake_case)]
   fn test_outsource_inner_product_pairing<P: Pairing>() {

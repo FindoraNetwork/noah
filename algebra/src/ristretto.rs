@@ -1,6 +1,6 @@
+use crate::errors::AlgebraError;
 use crate::groups::Scalar as ZeiScalar;
 use crate::groups::{Group, GroupArithmetic};
-use crate::errors::AlgebraError;
 use byteorder::ByteOrder;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};

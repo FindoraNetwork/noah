@@ -1,13 +1,13 @@
-use algebra::groups::{Group, Scalar as ZeiScalar};
 use crate::crypto::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
 use crate::errors::ZeiError;
+use algebra::groups::{Group, Scalar as ZeiScalar};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 
 fn init_pok_dlog<'a, G: Group>(transcript: &mut Transcript,
-                                                base: &'a G,
-                                                point: &'a G)
-                                                -> (Vec<&'a G>, Vec<Vec<usize>>, Vec<usize>) {
+                               base: &'a G,
+                               point: &'a G)
+                               -> (Vec<&'a G>, Vec<Vec<usize>>, Vec<usize>) {
   transcript.append_message(b"new_domain", b"Dlog proof");
   let elems = vec![base, point];
   let lhs_matrix = vec![vec![0]];
@@ -16,30 +16,29 @@ fn init_pok_dlog<'a, G: Group>(transcript: &mut Transcript,
 }
 
 /// Proof of knowledge of Discrete Logarithm
-pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
-  transcript: &mut Transcript,
-  prng: &mut R,
-  base: &G,
-  point: &G,
-  dlog: &G::S)
-  -> SigmaProof<G::S, G> {
+pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcript,
+                                                              prng: &mut R,
+                                                              base: &G,
+                                                              point: &G,
+                                                              dlog: &G::S)
+                                                              -> SigmaProof<G::S, G> {
   /*! I compute a proof for the knowledge of dlog for point with respect to base*/
   let (elems, lhs_matrix, _) = init_pok_dlog::<G>(transcript, base, point);
   sigma_prove::<R, G>(transcript,
-                         prng,
-                         elems.as_slice(),
-                         lhs_matrix.as_slice(),
-                         &[dlog])
+                      prng,
+                      elems.as_slice(),
+                      lhs_matrix.as_slice(),
+                      &[dlog])
 }
 
 /// Verification of Proof of knowledge of Discrete Logarithm
-pub fn verify_proof_of_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
-  transcript: &mut Transcript,
-  prng: &mut R,
-  base: &G,
-  point: &G,
-  proof: &SigmaProof<G::S, G>)
-  -> Result<(), ZeiError> {
+pub fn verify_proof_of_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcript,
+                                                                        prng: &mut R,
+                                                                        base: &G,
+                                                                        point: &G,
+                                                                        proof: &SigmaProof<G::S,
+                                                                                    G>)
+                                                                        -> Result<(), ZeiError> {
   let (elems, lhs_matrix, rhs_vec) = init_pok_dlog::<G>(transcript, base, point);
   sigma_verify(transcript,
                prng,
@@ -50,47 +49,46 @@ pub fn verify_proof_of_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
 }
 
 /// Proof of knowledge of Discrete Logarithm for a set of statements
-pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
-  transcript: &mut Transcript,
-  prng: &mut R,
-  base: &G,
-  points: &[G],
-  dlogs: &[G::S])
-  -> SigmaProof<G::S, G> {
+pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcript,
+                                                                       prng: &mut R,
+                                                                       base: &G,
+                                                                       points: &[G],
+                                                                       dlogs: &[G::S])
+                                                                       -> SigmaProof<G::S, G> {
   let mut public_elems = vec![base];
   let mut ref_points: Vec<&G> = points.iter().map(|x| x).collect();
   public_elems.append(&mut ref_points);
   transcript.init_sigma(b"PoK Dlog Multiple", &[], public_elems.as_slice());
 
   let x: Vec<G::S> = points.iter()
-                        .map(|_| transcript.get_challenge::<G::S>())
-                        .collect();
+                           .map(|_| transcript.get_challenge::<G::S>())
+                           .collect();
   let lc_point: G = points.iter()
                           .zip(x.iter())
                           .fold(G::get_identity(), |lc, (point, x)| lc.add(&point.mul(x)));
   let lc_secret: G::S = dlogs.iter()
-                          .zip(x.iter())
-                          .fold(G::S::from_u32(0), |lc, (s, x)| lc.add(&s.mul(x)));
+                             .zip(x.iter())
+                             .fold(G::S::from_u32(0), |lc, (s, x)| lc.add(&s.mul(x)));
 
   prove_knowledge_dlog(transcript, prng, base, &lc_point, &lc_secret)
 }
 
 /// Verification of Proof of knowledge of Discrete Logarithm for a set of statements
-pub fn verify_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
-  transcript: &mut Transcript,
-  prng: &mut R,
-  base: &G,
-  points: &[G],
-  proof: &SigmaProof<G::S, G>)
-  -> Result<(), ZeiError> {
+pub fn verify_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcript,
+                                                                        prng: &mut R,
+                                                                        base: &G,
+                                                                        points: &[G],
+                                                                        proof: &SigmaProof<G::S,
+                                                                                    G>)
+                                                                        -> Result<(), ZeiError> {
   let mut public_elems = vec![base];
   let mut ref_points: Vec<&G> = points.iter().map(|x| x).collect();
   public_elems.append(&mut ref_points);
   transcript.init_sigma(b"PoK Dlog Multiple", &[], public_elems.as_slice());
 
   let x: Vec<G::S> = points.iter()
-                        .map(|_| transcript.get_challenge::<G::S>())
-                        .collect();
+                           .map(|_| transcript.get_challenge::<G::S>())
+                           .collect();
   let lc_point: G = points.iter()
                           .zip(x.iter())
                           .fold(G::get_identity(), |lc, (point, x)| lc.add(&point.mul(x)));

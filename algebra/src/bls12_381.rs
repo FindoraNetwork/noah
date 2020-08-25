@@ -1,8 +1,7 @@
+use crate::errors::AlgebraError;
+use crate::groups::GroupArithmetic;
 use crate::groups::{Group, Scalar};
 use crate::pairing::Pairing;
-use crate::groups::GroupArithmetic;
-use crate::errors::AlgebraError;
-use utils::{u64_to_bigendian_u8array, b64dec, b64enc, u8_bigendian_slice_to_u64};
 use byteorder::{ByteOrder, LittleEndian};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
@@ -14,6 +13,7 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
+use utils::{b64dec, b64enc, u64_to_bigendian_u8array, u8_bigendian_slice_to_u64};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSScalar(pub Fr);
@@ -493,8 +493,10 @@ impl Group for BLSGt {
   }
 
   fn from_compressed_bytes(v: &[u8]) -> Result<Self, AlgebraError> {
-    Ok(BLSGt(Fq12 { c0: build_fq6(&v[..v.len() / 2]).ok_or(AlgebraError::DecompressElementError)?,
-                    c1: build_fq6(&v[v.len() / 2..]).ok_or(AlgebraError::DecompressElementError)? }))
+    Ok(BLSGt(Fq12 { c0:
+                      build_fq6(&v[..v.len() / 2]).ok_or(AlgebraError::DecompressElementError)?,
+                    c1:
+                      build_fq6(&v[v.len() / 2..]).ok_or(AlgebraError::DecompressElementError)? }))
   }
 
   fn from_hash<D>(hash: D) -> Self

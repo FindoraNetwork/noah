@@ -1,8 +1,8 @@
-use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
-use algebra::groups::{Group, Scalar};
 use crate::basic_crypto::elgamal::elgamal_key_gen;
 use crate::crypto::anon_creds::Attribute;
 use crate::errors::ZeiError;
+use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
+use algebra::groups::{Group, Scalar};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 

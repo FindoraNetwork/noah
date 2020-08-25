@@ -1,6 +1,6 @@
+use crate::errors::ZeiError;
 use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::pairing::Pairing;
-use crate::errors::ZeiError;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use utils::u64_to_bigendian_u8array;
@@ -141,8 +141,8 @@ pub fn bls_hash_pubkeys_to_scalars<P: Pairing>(ver_keys: &[&BlsPublicKey<P>])
 
 #[cfg(test)]
 mod tests {
-  use algebra::bls12_381::Bls12381;
   use crate::errors::ZeiError;
+  use algebra::bls12_381::Bls12381;
   use rand_core::SeedableRng;
 
   #[test]

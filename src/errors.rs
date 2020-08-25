@@ -40,6 +40,7 @@ pub enum ZeiError {
   IdentityTracingExtractionError,
   AnonymousCredentialSignError,
   R1CSProofError,
+  NoMemoInAssetTracerMemo,
   BogusAssetTracerMemo,
 }
 
@@ -113,7 +114,8 @@ impl fmt::Display for ZeiError {
                   }
                   ZeiError::AnonymousCredentialSignError =>{"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."}
                   ZeiError::R1CSProofError => { "Could not create R1CSProof" }
-                  ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data" }
+                  ZeiError::NoMemoInAssetTracerMemo => { "Cannot decrypt asset tracer memo, try brute force decoding" }
+                  ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data, try brute force decoding" }
                 })
   }
 }
@@ -182,7 +184,8 @@ impl error::Error for ZeiError {
       },
       ZeiError::AnonymousCredentialSignError => {"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."},
       ZeiError::R1CSProofError =>{"Could not create R1CSProof"},
-      ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data" }
+      ZeiError::NoMemoInAssetTracerMemo => { "Cannot decrypt asset tracer memo, try brute force decoding" }
+      ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data, try brute force decoding" }
     }
   }
 }

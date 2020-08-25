@@ -78,11 +78,11 @@ in the credentials by
          e(sigma2', c * G2) = e(G1,G2) * r * c * u * (x + \sum attr_i * y_i + t + sk * x)
 */
 
+use crate::crypto::sigma::{SigmaTranscript, SigmaTranscriptPairing};
+use crate::errors::ZeiError;
 use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::multi_exp::MultiExp;
 use algebra::pairing::Pairing;
-use crate::crypto::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use crate::errors::ZeiError;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};

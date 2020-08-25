@@ -1,6 +1,6 @@
-use algebra::groups::{Group, Scalar};
 use crate::errors::ZeiError;
 use crate::serialization::ZeiFromToBytes;
+use algebra::groups::{Group, Scalar};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use rand_core::{CryptoRng, RngCore};
 use std::hash::{Hash, Hasher};
@@ -57,10 +57,10 @@ impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint> {
 
 /// I return an ElGamal ciphertext pair as (r*G, m*g + r*PK), where G is a curve base point
 pub fn elgamal_encrypt<G: Group>(base: &G,
-                                               m: &G::S,
-                                               r: &G::S,
-                                               pub_key: &ElGamalEncKey<G>)
-                                               -> ElGamalCiphertext<G> {
+                                 m: &G::S,
+                                 r: &G::S,
+                                 pub_key: &ElGamalEncKey<G>)
+                                 -> ElGamalCiphertext<G> {
   let e1 = base.mul(r);
   let e2 = base.mul(m).add(&(pub_key.0).mul(r));
 
@@ -69,10 +69,10 @@ pub fn elgamal_encrypt<G: Group>(base: &G,
 
 /// I verify that ctext encrypts m (ctext.e2 - ctext.e1 * sk = m* G)
 pub fn elgamal_verify<G: Group>(base: &G,
-                                              m: &G::S,
-                                              ctext: &ElGamalCiphertext<G>,
-                                              sec_key: &ElGamalDecKey<G::S>)
-                                              -> Result<(), ZeiError> {
+                                m: &G::S,
+                                ctext: &ElGamalCiphertext<G>,
+                                sec_key: &ElGamalDecKey<G::S>)
+                                -> Result<(), ZeiError> {
   if base.mul(m).add(&ctext.e1.mul(&sec_key.0)) == ctext.e2 {
     Ok(())
   } else {
@@ -82,46 +82,46 @@ pub fn elgamal_verify<G: Group>(base: &G,
 
 /// ElGamal decryption: Return group element
 pub fn elgamal_decrypt_elem<G: Group>(ctext: &ElGamalCiphertext<G>,
-                                                    sec_key: &ElGamalDecKey<G::S>)
-                                                    -> G {
+                                      sec_key: &ElGamalDecKey<G::S>)
+                                      -> G {
   ctext.e2.sub(&ctext.e1.mul(&sec_key.0))
 }
 
 /// I decrypt en ElGamal ciphertext on the exponent via brute force
 /// Return ZeiError::ElGamalDecryptionError if value is not in the range [0..2^32-1]
 pub fn elgamal_decrypt<G: Group>(base: &G,
-                                               ctext: &ElGamalCiphertext<G>,
-                                               sec_key: &ElGamalDecKey<G::S>)
-                                               -> Result<u64, ZeiError> {
+                                 ctext: &ElGamalCiphertext<G>,
+                                 sec_key: &ElGamalDecKey<G::S>)
+                                 -> Result<u64, ZeiError> {
   elgamal_decrypt_hinted::<G>(base, ctext, sec_key, 0, (u32::max_value() as u64) + 1)
 }
 
 /// I decrypt en ElGamal ciphertext on the exponent via brute force
 /// Return ZeiError::ElGamalDecryptionError if value is not in the range [0..2^32-1]
 pub fn elgamal_decrypt_as_scalar<G: Group>(base: &G,
-                                                         ctext: &ElGamalCiphertext<G>,
-                                                         sec_key: &ElGamalDecKey<G::S>)
-                                                         -> Result<G::S, ZeiError> {
+                                           ctext: &ElGamalCiphertext<G>,
+                                           sec_key: &ElGamalDecKey<G::S>)
+                                           -> Result<G::S, ZeiError> {
   Ok(G::S::from_u64(elgamal_decrypt(base, ctext, sec_key)?))
 }
 
 /// I decrypt en ElGamal ciphertext on the exponent via brute force in the range [lower_bound..upper_bound]
 /// Return ZeiError::ElGamalDecryptionError if value is not in the range.
 pub fn elgamal_decrypt_hinted<G: Group>(base: &G,
-                                                      ctext: &ElGamalCiphertext<G>,
-                                                      sec_key: &ElGamalDecKey<G::S>,
-                                                      lower_bound: u64,
-                                                      upper_bound: u64)
-                                                      -> Result<u64, ZeiError> {
+                                        ctext: &ElGamalCiphertext<G>,
+                                        sec_key: &ElGamalDecKey<G::S>,
+                                        lower_bound: u64,
+                                        upper_bound: u64)
+                                        -> Result<u64, ZeiError> {
   let encoded = elgamal_decrypt_elem(ctext, sec_key);
   brute_force::<G>(base, &encoded, lower_bound, upper_bound)
 }
 
 fn brute_force<G: Group>(base: &G,
-                                       encoded: &G,
-                                       lower_bound: u64,
-                                       upper_bound: u64)
-                                       -> Result<u64, ZeiError> {
+                         encoded: &G,
+                         lower_bound: u64,
+                         upper_bound: u64)
+                         -> Result<u64, ZeiError> {
   let mut b = base.mul(&G::S::from_u64(lower_bound));
   for i in lower_bound..upper_bound {
     if b == *encoded {
@@ -134,9 +134,9 @@ fn brute_force<G: Group>(base: &G,
 
 #[cfg(test)]
 pub mod elgamal_test {
-  use algebra::groups::{Group, Scalar};
   use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey};
   use crate::errors::ZeiError;
+  use algebra::groups::{Group, Scalar};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
@@ -264,8 +264,9 @@ pub mod elgamal_test {
 #[cfg(test)]
 mod elgamal_over_groups_tests {
   use crate::basic_crypto::elgamal::elgamal_test;
+  use algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
+  use algebra::jubjub::JubjubGroup;
   use curve25519_dalek::ristretto::RistrettoPoint;
-  use algebra::bls12_381::{BLSG1, BLSG2, BLSGt};
 
   #[test]
   fn verification() {
@@ -273,6 +274,7 @@ mod elgamal_over_groups_tests {
     elgamal_test::verification::<BLSG1>();
     elgamal_test::verification::<BLSG2>();
     elgamal_test::verification::<BLSGt>();
+    elgamal_test::verification::<JubjubGroup>();
   }
 
   #[test]
@@ -281,6 +283,7 @@ mod elgamal_over_groups_tests {
     elgamal_test::decryption::<BLSG1>();
     elgamal_test::decryption::<BLSG2>();
     elgamal_test::decryption::<BLSGt>();
+    elgamal_test::decryption::<JubjubGroup>();
   }
 
   #[test]
@@ -289,6 +292,7 @@ mod elgamal_over_groups_tests {
     elgamal_test::to_json::<BLSG1>();
     elgamal_test::to_json::<BLSG2>();
     elgamal_test::to_json::<BLSGt>();
+    elgamal_test::to_json::<JubjubGroup>();
   }
 
   #[test]
@@ -297,5 +301,6 @@ mod elgamal_over_groups_tests {
     elgamal_test::to_message_pack::<BLSG1>();
     elgamal_test::to_message_pack::<BLSG2>();
     elgamal_test::to_message_pack::<BLSGt>();
+    elgamal_test::to_message_pack::<JubjubGroup>();
   }
 }

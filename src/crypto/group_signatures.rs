@@ -1,5 +1,3 @@
-use algebra::groups::{Group, GroupArithmetic, Scalar};
-use algebra::pairing::Pairing;
 use crate::basic_crypto::elgamal::{
   elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalDecKey,
   ElGamalEncKey,
@@ -8,6 +6,8 @@ use crate::basic_crypto::signatures::pointcheval_sanders::{
   ps_gen_keys, ps_randomize_sig, ps_sign_scalar, PSPublicKey, PSSecretKey, PSSignature,
 };
 use crate::errors::ZeiError;
+use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::pairing::Pairing;
 
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
@@ -266,9 +266,9 @@ pub(crate) fn gpsig_open<P: Pairing>(sig: &GroupSignature<P>,
 
 mod tests {
   use super::{gpsig_join_cert, gpsig_open, gpsig_setup, gpsig_sign, gpsig_verify};
+  use crate::errors::ZeiError;
   use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
   use algebra::groups::{Group, GroupArithmetic};
-  use crate::errors::ZeiError;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 

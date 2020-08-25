@@ -1,6 +1,5 @@
 #[cfg(test)]
 pub(crate) mod tests {
-  use bulletproofs::PedersenGens;
   use crate::api::anon_creds;
   use crate::api::anon_creds::{ac_commit, ACCommitment, Credential};
   use crate::basic_crypto::elgamal::{elgamal_encrypt, elgamal_key_gen};
@@ -20,6 +19,7 @@ pub(crate) mod tests {
     AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerMemo, AssetTracingPolicy,
     AssetType, IdentityRevealPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH,
   };
+  use bulletproofs::PedersenGens;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
