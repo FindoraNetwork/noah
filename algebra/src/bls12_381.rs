@@ -171,7 +171,7 @@ impl<'de> Deserialize<'de> for BLSScalar {
   }
 }
 
-impl Group<BLSScalar> for BLSG1 {
+impl Group for BLSG1 {
   const COMPRESSED_LEN: usize = 48;
   const SCALAR_BYTES_LEN: usize = 32;
   fn get_identity() -> BLSG1 {
@@ -208,7 +208,8 @@ impl Group<BLSScalar> for BLSG1 {
   }
 }
 
-impl GroupArithmetic<BLSScalar> for BLSG1 {
+impl GroupArithmetic for BLSG1 {
+  type S = BLSScalar;
   //arithmetic
   fn mul(&self, scalar: &BLSScalar) -> BLSG1 {
     let mut m = self.0;
@@ -281,7 +282,7 @@ impl<'de> Deserialize<'de> for BLSG1 {
   }
 }
 
-impl Group<BLSScalar> for BLSG2 {
+impl Group for BLSG2 {
   const COMPRESSED_LEN: usize = 96; // TODO
   const SCALAR_BYTES_LEN: usize = 32; // TODO
   fn get_identity() -> BLSG2 {
@@ -322,7 +323,8 @@ impl Group<BLSScalar> for BLSG2 {
   }
 }
 
-impl GroupArithmetic<BLSScalar> for BLSG2 {
+impl GroupArithmetic for BLSG2 {
+  type S = BLSScalar;
   //arithmetic
   fn mul(&self, scalar: &BLSScalar) -> BLSG2 {
     let mut m = self.0;
@@ -418,7 +420,8 @@ impl Pairing for Bls12381 {
   }
 }
 
-impl GroupArithmetic<BLSScalar> for BLSGt {
+impl GroupArithmetic for BLSGt {
+  type S = BLSScalar;
   fn mul(&self, scalar: &BLSScalar) -> Self {
     let r = self.0.pow(scalar.0.into_repr().as_ref());
     BLSGt(r)
@@ -440,7 +443,7 @@ impl GroupArithmetic<BLSScalar> for BLSGt {
   }
 }
 
-impl Group<BLSScalar> for BLSGt {
+impl Group for BLSGt {
   const COMPRESSED_LEN: usize = 576;
   const SCALAR_BYTES_LEN: usize = 32; // TODO
   fn get_identity() -> BLSGt {

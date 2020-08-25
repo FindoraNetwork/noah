@@ -63,7 +63,7 @@ impl ZeiScalar for Scalar {
     Ok(Scalar::from_bits(array))
   }
 }
-impl Group<Scalar> for RistrettoPoint {
+impl Group for RistrettoPoint {
   const COMPRESSED_LEN: usize = 32;
   const SCALAR_BYTES_LEN: usize = 32;
 
@@ -93,7 +93,8 @@ impl Group<Scalar> for RistrettoPoint {
   }
 }
 
-impl GroupArithmetic<Scalar> for RistrettoPoint {
+impl GroupArithmetic for RistrettoPoint {
+  type S = Scalar;
   fn mul(&self, scalar: &Scalar) -> Self {
     self * scalar
   }

@@ -132,12 +132,12 @@ pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(transcript: &mut Transcr
   let sigma_proof = SigmaProof { commitments: vec![proof.c3, proof.c4],
                                  responses: vec![proof.z1, proof.z2, proof.z3] };
 
-  sigma_verify::<_, Scalar, RistrettoPoint>(transcript,
-                                            prng,
-                                            elems.as_slice(),
-                                            lhs_matrix.as_slice(),
-                                            rhs_vec.as_slice(),
-                                            &sigma_proof)
+  sigma_verify::<_, RistrettoPoint>(transcript,
+                                    prng,
+                                    elems.as_slice(),
+                                    lhs_matrix.as_slice(),
+                                    rhs_vec.as_slice(),
+                                    &sigma_proof)
 }
 
 // Helper functions for the proof of multiple commitments equality below
