@@ -1,8 +1,5 @@
 use crate::groups::Group;
 use crate::groups::Scalar;
-//use crate::crypto::sigma::SigmaTranscript;
-//use crate::errors::AlgebraError;
-//use merlin::Transcript;
 
 pub trait Pairing {
   type ScalarField: Scalar;
