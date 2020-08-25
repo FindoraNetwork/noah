@@ -151,7 +151,7 @@ impl<'de> Deserialize<'de> for JubjubScalar {
 
 impl Eq for JubjubGroup {}
 
-impl Group<JubjubScalar> for JubjubGroup {
+impl Group for JubjubGroup {
   const COMPRESSED_LEN: usize = 32;
   const SCALAR_BYTES_LEN: usize = 32;
 
@@ -184,7 +184,8 @@ impl Group<JubjubScalar> for JubjubGroup {
   }
 }
 
-impl GroupArithmetic<JubjubScalar> for JubjubGroup {
+impl GroupArithmetic for JubjubGroup {
+  type S = JubjubScalar;
   //arithmetic
   fn mul(&self, scalar: &JubjubScalar) -> JubjubGroup {
     JubjubGroup(self.0 * scalar.0)

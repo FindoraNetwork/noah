@@ -4,24 +4,24 @@
 use crate::groups::{scalar_to_radix_2_power_w, Group, Scalar};
 use std::borrow::Borrow;
 
-pub trait MultiExp<S>: Group<S> {
+pub trait MultiExp: Group {
   fn naive_multi_exp<I, H>(scalars: I, points: H) -> Self
     where I: IntoIterator,
-          I::Item: Borrow<S>,
+          I::Item: Borrow<Self::S>,
           H: IntoIterator,
           H::Item: Borrow<Self>;
   fn multi_exp<I, H>(scalars: I, points: H) -> Self
     where I: IntoIterator,
-          I::Item: Borrow<S>,
+          I::Item: Borrow<Self::S>,
           H: IntoIterator,
           H::Item: Borrow<Self>;
-  fn vartime_multi_exp(scalars: &[&S], points: &[&Self]) -> Self;
+  fn vartime_multi_exp(scalars: &[&Self::S], points: &[&Self]) -> Self;
 }
 
-impl<S: Scalar, G: Group<S>> MultiExp<S> for G {
+impl<G: Group> MultiExp for G {
   fn naive_multi_exp<I, H>(scalars: I, points: H) -> Self
     where I: IntoIterator,
-          I::Item: Borrow<S>,
+          I::Item: Borrow<Self::S>,
           H: IntoIterator,
           H::Item: Borrow<Self>
   {
@@ -34,18 +34,18 @@ impl<S: Scalar, G: Group<S>> MultiExp<S> for G {
 
   fn multi_exp<I, H>(scalars: I, points: H) -> Self
     where I: IntoIterator,
-          I::Item: Borrow<S>,
+          I::Item: Borrow<Self::S>,
           H: IntoIterator,
           H::Item: Borrow<Self>
   {
     Self::naive_multi_exp(scalars, points)
   }
-  fn vartime_multi_exp(scalars: &[&S], points: &[&G]) -> Self {
-    pippenger::<S, G>(scalars, points)
+  fn vartime_multi_exp(scalars: &[&G::S], points: &[&G]) -> Self {
+    pippenger::<G>(scalars, points)
   }
 }
 
-fn pippenger<S: Scalar, G: Group<S>>(scalars: &[&S], elems: &[&G]) -> G {
+fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> G {
   let size = scalars.len();
 
   let w = if size < 500 {
@@ -58,7 +58,7 @@ fn pippenger<S: Scalar, G: Group<S>>(scalars: &[&S], elems: &[&G]) -> G {
 
   let two_power_w: usize = 1 << w;
   let digits_vec: Vec<Vec<i8>> = scalars.iter()
-                                        .map(|s| scalar_to_radix_2_power_w::<S>(s, w))
+                                        .map(|s| scalar_to_radix_2_power_w::<G::S>(s, w))
                                         .collect();
   // TODO (fernando) remove this clone
   let mut digits_count = 0;
@@ -107,31 +107,30 @@ fn pippenger<S: Scalar, G: Group<S>>(scalars: &[&S], elems: &[&G]) -> G {
 
 #[cfg(test)]
 mod tests {
-  use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
+  use crate::bls12_381::{BLSGt, BLSG1, BLSG2};
   use crate::groups::{Group, Scalar};
   use crate::multi_exp::MultiExp;
 
   #[test]
   fn test_multiexp_ristretto() {
-    run_multiexp_test::<curve25519_dalek::scalar::Scalar,
-                      curve25519_dalek::ristretto::RistrettoPoint>();
+    run_multiexp_test::<curve25519_dalek::ristretto::RistrettoPoint>();
   }
   #[test]
   fn test_multiexp_blsg1() {
-    run_multiexp_test::<BLSScalar, BLSG1>();
+    run_multiexp_test::<BLSG1>();
   }
   #[test]
   fn test_multiexp_blsg2() {
-    run_multiexp_test::<BLSScalar, BLSG2>();
+    run_multiexp_test::<BLSG2>();
   }
   #[test]
   fn test_multiexp_blsgt() {
-    run_multiexp_test::<BLSScalar, BLSGt>();
+    run_multiexp_test::<BLSGt>();
   }
 
-  fn run_multiexp_test<S: Scalar, G: Group<S>>() {
+  fn run_multiexp_test<G: Group>() {
     let g1 = G::get_base();
-    let zero = S::from_u32(0);
+    let zero = G::S::from_u32(0);
     let g = G::vartime_multi_exp(&[&zero], &[&g1]);
     assert_eq!(g, G::get_identity());
 
@@ -150,7 +149,7 @@ mod tests {
     let g1 = G::get_base();
     let g2 = g1.add(&g1);
     let g3 = g1.mul(&Scalar::from_u32(500));
-    let thousand = Scalar::from_u32(1000);
+    let thousand = G::S::from_u32(1000);
     let two = Scalar::from_u32(2);
     let three = Scalar::from_u32(3);
     let g = G::vartime_multi_exp(&[&thousand, &two, &three], &[&g1, &g2, &g3]);

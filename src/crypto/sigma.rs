@@ -8,13 +8,13 @@ use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 
 pub trait SigmaTranscript {
-  fn init_sigma<S: Scalar, G: Group<S>>(&mut self,
-                                        instance_name: &'static [u8],
-                                        public_scalars: &[&S],
-                                        public_elems: &[&G]);
-  fn append_group_element<S: Scalar, G: Group<S>>(&mut self, label: &'static [u8], elem: &G);
+  fn init_sigma<G: Group>(&mut self,
+                          instance_name: &'static [u8],
+                          public_scalars: &[&G::S],
+                          public_elems: &[&G]);
+  fn append_group_element<G: Group>(&mut self, label: &'static [u8], elem: &G);
   fn append_field_element<S: Scalar>(&mut self, label: &'static [u8], scalar: &S);
-  fn append_proof_commitment<S: Scalar, G: Group<S>>(&mut self, elem: &G);
+  fn append_proof_commitment<G: Group>(&mut self, elem: &G);
   fn get_challenge<S: Scalar>(&mut self) -> S;
 }
 
@@ -28,10 +28,10 @@ pub trait SigmaTranscriptPairing: SigmaTranscript {
 }
 
 impl SigmaTranscript for Transcript {
-  fn init_sigma<S: Scalar, G: Group<S>>(&mut self,
-                                        instance_name: &'static [u8],
-                                        public_scalars: &[&S],
-                                        public_elems: &[&G]) {
+  fn init_sigma<G: Group>(&mut self,
+                          instance_name: &'static [u8],
+                          public_scalars: &[&G::S],
+                          public_elems: &[&G]) {
     self.append_message(b"Sigma Protocol domain",
                         b"Sigma protocol single group v.0.1");
     self.append_message(b"Sigma Protocol instance", instance_name);
@@ -42,13 +42,13 @@ impl SigmaTranscript for Transcript {
       self.append_message(b"public elem", elem.to_compressed_bytes().as_slice())
     }
   }
-  fn append_group_element<S: Scalar, G: Group<S>>(&mut self, label: &'static [u8], elem: &G) {
+  fn append_group_element<G: Group>(&mut self, label: &'static [u8], elem: &G) {
     self.append_message(label, elem.to_compressed_bytes().as_slice());
   }
   fn append_field_element<S: Scalar>(&mut self, label: &'static [u8], scalar: &S) {
     self.append_message(label, scalar.to_bytes().as_slice());
   }
-  fn append_proof_commitment<S: Scalar, G: Group<S>>(&mut self, elem: &G) {
+  fn append_proof_commitment<G: Group>(&mut self, elem: &G) {
     self.append_group_element(b"proof_commitment", elem);
   }
   fn get_challenge<S: Scalar>(&mut self) -> S {
@@ -85,7 +85,7 @@ impl SigmaTranscriptPairing for Transcript {
   }
 }
 
-fn init_sigma_protocol<S: Scalar, G: Group<S>>(transcript: &mut Transcript, elems: &[&G]) {
+fn init_sigma_protocol<G: Group>(transcript: &mut Transcript, elems: &[&G]) {
   transcript.init_sigma(b"New Sigma Protocol", &[], elems);
 }
 
@@ -97,11 +97,11 @@ fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R, n: usize) -
   r
 }
 
-fn compute_proof_commitments<S: Scalar, G: Group<S>>(transcript: &mut Transcript,
-                                                     blindings: &[S],
-                                                     elems: &[&G],
-                                                     lhs_matrix: &[Vec<usize>])
-                                                     -> Vec<G> {
+fn compute_proof_commitments<G: Group>(transcript: &mut Transcript,
+                                       blindings: &[G::S],
+                                       elems: &[&G],
+                                       lhs_matrix: &[Vec<usize>])
+                                       -> Vec<G> {
   let mut pf_commitments = vec![];
 
   for row in lhs_matrix.iter() {
@@ -124,18 +124,18 @@ pub struct SigmaProof<S, G> {
 
 /// Simple Sigma protocol PoK for the statement `lhs_matrix` * `secrets_scalars` = `rhs_vec`
 /// Elements in `lhs_matrix` and `rhs_vec` must be in `elems` slice
-pub fn sigma_prove<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
-                                                                   prng: &mut R,
-                                                                   elems: &[&G], // public elements of the proofs
-                                                                   lhs_matrix: &[Vec<usize>], // each row defines a lhs of a constraint
-                                                                   secret_scalars: &[&S])
-                                                                   -> SigmaProof<S, G> {
-  init_sigma_protocol::<S, G>(transcript, elems);
-  let blindings = sample_blindings::<_, S>(prng, secret_scalars.len());
+pub fn sigma_prove<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcript,
+                                                     prng: &mut R,
+                                                     elems: &[&G], // public elements of the proofs
+                                                     lhs_matrix: &[Vec<usize>], // each row defines a lhs of a constraint
+                                                     secret_scalars: &[&G::S])
+                                                     -> SigmaProof<G::S, G> {
+  init_sigma_protocol::<G>(transcript, elems);
+  let blindings = sample_blindings::<_, G::S>(prng, secret_scalars.len());
   let proof_commitments =
-    compute_proof_commitments::<S, G>(transcript, blindings.as_slice(), elems, lhs_matrix);
+    compute_proof_commitments::<G>(transcript, blindings.as_slice(), elems, lhs_matrix);
 
-  let challenge = transcript.get_challenge::<S>();
+  let challenge = transcript.get_challenge::<G::S>();
 
   let mut responses = vec![];
 
@@ -186,22 +186,21 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R,
 /// Returns a scalar vector for a sigma protocol proof verification. The scalars can then be used
 /// in a single multi-exponentiation to verify the proof. The associated elements are elems
 /// concatenated wit proof.commitments.
-pub fn sigma_verify_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
-                                                                            prng: &mut R, //use of for linear combination multiexp
-                                                                            elems: &[&G],
-                                                                            lhs_matrix: &[Vec<usize>],
-                                                                            rhs_vec: &[usize],
-                                                                            proof: &SigmaProof<S,
-                                                                                     G>)
-                                                                            -> Vec<S> {
+pub fn sigma_verify_scalars<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcript,
+                                                              prng: &mut R, //use of for linear combination multiexp
+                                                              elems: &[&G],
+                                                              lhs_matrix: &[Vec<usize>],
+                                                              rhs_vec: &[usize],
+                                                              proof: &SigmaProof<G::S, G>)
+                                                              -> Vec<G::S> {
   assert_eq!(lhs_matrix.len(), rhs_vec.len());
   assert_eq!(rhs_vec.len(), proof.commitments.len());
 
-  init_sigma_protocol::<S, G>(transcript, elems);
+  init_sigma_protocol::<G>(transcript, elems);
   for c in proof.commitments.iter() {
     transcript.append_proof_commitment(c);
   }
-  let challenge = transcript.get_challenge::<S>();
+  let challenge = transcript.get_challenge::<G::S>();
   collect_multi_exp_scalars(prng,
                             elems.len(),
                             lhs_matrix,
@@ -212,13 +211,13 @@ pub fn sigma_verify_scalars<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(tran
 
 /// Simple Sigma protocol PoK verification for the statement `lhs_matrix` * `secrets_scalars` = `rhs_vec`
 /// Elements in `lhs_matrix` and `rhs_vec` must be in `elems` slice
-pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: &mut Transcript,
-                                                                    prng: &mut R, //use of for linear combination multiexp
-                                                                    elems: &[&G],
-                                                                    lhs_matrix: &[Vec<usize>],
-                                                                    rhs_vec: &[usize],
-                                                                    proof: &SigmaProof<S, G>)
-                                                                    -> Result<(), ZeiError> {
+pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcript,
+                                                      prng: &mut R, //use of for linear combination multiexp
+                                                      elems: &[&G],
+                                                      lhs_matrix: &[Vec<usize>],
+                                                      rhs_vec: &[usize],
+                                                      proof: &SigmaProof<G::S, G>)
+                                                      -> Result<(), ZeiError> {
   let multi_exp_scalars = sigma_verify_scalars(transcript, prng, elems, lhs_matrix, rhs_vec, proof);
 
   let scalars_as_ref = multi_exp_scalars.iter().map(|s| s).collect_vec();
