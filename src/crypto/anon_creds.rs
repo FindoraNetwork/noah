@@ -78,11 +78,11 @@ in the credentials by
          e(sigma2', c * G2) = e(G1,G2) * r * c * u * (x + \sum attr_i * y_i + t + sk * x)
 */
 
-use crate::algebra::groups::{Group, GroupArithmetic, Scalar};
-use crate::algebra::multi_exp::MultiExp;
-use crate::algebra::pairing::Pairing;
 use crate::crypto::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use crate::errors::ZeiError;
+use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::multi_exp::MultiExp;
+use algebra::pairing::Pairing;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
@@ -583,7 +583,7 @@ fn ac_verify_final_check<P: Pairing>(sig_commitment: &ACCommitment<P::G1>,
 #[cfg(test)]
 pub(crate) mod credentials_tests {
   use super::*;
-  use crate::algebra::bls12_381::Bls12381;
+  use algebra::bls12_381::Bls12381;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::Deserializer;

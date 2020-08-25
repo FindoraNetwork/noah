@@ -1,7 +1,7 @@
 // BLS Signatures
-use crate::algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
 use crate::basic_crypto::signatures::{AggSignatureTrait, SignatureTrait};
 use crate::errors::ZeiError;
+use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
 use rand_core::{CryptoRng, RngCore};
 
 pub type BlsSecretKey = crate::basic_crypto::signatures::bls::BlsSecretKey<Bls12381>;

@@ -1,5 +1,5 @@
-use crate::algebra::bls12_381::{Bls12381, BLSG1};
 use crate::errors::ZeiError;
+use algebra::bls12_381::{Bls12381, BLSG1};
 use rand_core::{CryptoRng, RngCore};
 
 /// The public key of the group manager

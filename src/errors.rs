@@ -40,7 +40,6 @@ pub enum ZeiError {
   IdentityTracingExtractionError,
   AnonymousCredentialSignError,
   R1CSProofError,
-  GroupInversionError,
   NoMemoInAssetTracerMemo,
   BogusAssetTracerMemo,
 }
@@ -115,7 +114,6 @@ impl fmt::Display for ZeiError {
                   }
                   ZeiError::AnonymousCredentialSignError =>{"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."}
                   ZeiError::R1CSProofError => { "Could not create R1CSProof" }
-                  ZeiError::GroupInversionError => { "Group Element not invertible" }
                   ZeiError::NoMemoInAssetTracerMemo => { "Cannot decrypt asset tracer memo, try brute force decoding" }
                   ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data, try brute force decoding" }
                 })
@@ -186,27 +184,14 @@ impl error::Error for ZeiError {
       },
       ZeiError::AnonymousCredentialSignError => {"The number of attributes passed as parameter differs from the number of attributes of the AC issuer public key."},
       ZeiError::R1CSProofError =>{"Could not create R1CSProof"},
-      ZeiError::GroupInversionError => { "Group Element not invertible" }
       ZeiError::NoMemoInAssetTracerMemo => { "Cannot decrypt asset tracer memo, try brute force decoding" }
       ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data, try brute force decoding" }
     }
   }
 }
 
-impl From<serde_json::Error> for ZeiError {
-  fn from(_error: serde_json::Error) -> Self {
-    ZeiError::DeserializationError
-  }
-}
-
 impl From<SignatureError> for ZeiError {
   fn from(_error: SignatureError) -> Self {
     ZeiError::SignatureError
-  }
-}
-
-impl From<rmp_serde::encode::Error> for ZeiError {
-  fn from(_error: rmp_serde::encode::Error) -> Self {
-    ZeiError::SerializationError
   }
 }

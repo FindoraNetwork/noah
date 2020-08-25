@@ -1,7 +1,7 @@
-use crate::algebra::groups::{Group, Scalar};
-use crate::algebra::multi_exp::MultiExp;
-use crate::algebra::pairing::Pairing;
 use crate::errors::ZeiError;
+use algebra::groups::{Group, Scalar};
+use algebra::multi_exp::MultiExp;
+use algebra::pairing::Pairing;
 use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;
@@ -239,7 +239,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, S: Scalar, G: Group<S>>(transcript: 
 
 #[cfg(test)]
 mod tests {
-  use crate::algebra::groups::Group;
+  use algebra::groups::Group;
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use curve25519_dalek::traits::Identity;

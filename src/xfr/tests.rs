@@ -9,7 +9,6 @@ pub(crate) mod tests {
     XfrVerifyAssetTracingAssetAmountError, XfrVerifyAssetTracingIdentityError,
   };
   use crate::setup::PublicParams;
-  use crate::utils::u64_to_u32_pair;
   use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::lib::{
     batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
@@ -29,6 +28,7 @@ pub(crate) mod tests {
   use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::{Deserialize, Serialize};
+  use utils::u64_to_u32_pair;
 
   pub(crate) fn create_xfr(prng: &mut ChaChaRng,
                            input_templates: &[AssetRecordTemplate],

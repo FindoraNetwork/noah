@@ -9,9 +9,9 @@
 //      2.1 Inject the messages into the state: s := s + (m_{i*w}||...||m_{i*w+w-1})
 //      2.2 Permute the state: s := p(s)
 // 3. Return s_0.
-use crate::algebra::bls12_381::BLSScalar;
-use crate::algebra::groups::Scalar;
 use crate::basic_crypto::hash::rescue::RescueInstance;
+use algebra::bls12_381::BLSScalar;
+use algebra::groups::Scalar;
 
 pub struct PRF<S>(RescueInstance<S>);
 
@@ -52,10 +52,10 @@ impl PRF<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-  use crate::algebra::bls12_381::BLSScalar;
-  use crate::algebra::groups::Scalar;
   use crate::basic_crypto::hash::rescue::RescueInstance;
   use crate::basic_crypto::prf::PRF;
+  use algebra::bls12_381::BLSScalar;
+  use algebra::groups::Scalar;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 

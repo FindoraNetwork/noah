@@ -10,40 +10,37 @@ name = "zei"
 crate-type = ["rlib"]
 
 [dependencies]
-boolinator = "2.4.0"
-byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] }
-rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
-rand = { version = "0.7", default-features = false, optional = true }
-rand_chacha = "0.2"
-curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
-ed25519-dalek = "1.0.0-pre.3"
-bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
-wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
-merlin = "2.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_derive = "1.0"
-serde_json = "1.0"
-sha2 = "0.8.0"
-itertools = "0.8.0"
-rmp-serde = "0.13.7"
-group = "0.6.0"
-ff = "0.6.0"
-pairing = "0.16.0"
-digest = "0.8"
-bincode = "1.1.2"
-base64 = "0.10"
-linear-map = "1.2.0"
 aes-ctr = "0.3.0"
-lazy_static = "1.4.0"
+algebra = { path = "algebra" }
+boolinator = "2.4.0"
+bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
+curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
+digest = "0.8"
+ed25519-dalek = "1.0.0-pre.3"
+ff = "0.6.0"
+itertools = "0.8.0"
+linear-map = "1.2.0"
+merlin = "2.0"
+pairing = "0.16.0"
+rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
+rand_chacha = "0.2"
+rmp-serde = "0.13.7"
+serde = "1.0"
+
+serde_derive = "1.0"
+sha2 = "0.8.0"
+utils = { path = "utils" }
+wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 x25519-dalek = "0.6"
-jubjub = "0.3.0"
 
 [dev-dependencies]
-rand = { version = "0.7", default-features = false}
 bit-array = "0.4.3"
-typenum = "1.11.2"
 criterion = "0.3.1"
 criterion-cycles-per-byte = "0.1.1"
+lazy_static = "1.4.0"
+rand = { version = "0.7", default-features = false }
+serde_json = "1.0"
+typenum = "1.11.2"
 zei_utilities = { path = "utilities" }
 
 [features]
@@ -103,5 +100,9 @@ harness = false
 name = "xfr_note_idtracking_noassettracking_singleasset_cycles"
 harness = false
 
-
+[workspace]
+members = [
+ "algebra",
+ "utils"
+]
 

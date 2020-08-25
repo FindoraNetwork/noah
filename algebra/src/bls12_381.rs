@@ -1,9 +1,7 @@
-use super::groups::{Group, Scalar};
-use super::pairing::Pairing;
-use crate::algebra::groups::GroupArithmetic;
-use crate::errors::ZeiError;
-use crate::utils::u64_to_bigendian_u8array;
-use crate::utils::{b64dec, b64enc, u8_bigendian_slice_to_u64};
+use crate::errors::AlgebraError;
+use crate::groups::GroupArithmetic;
+use crate::groups::{Group, Scalar};
+use crate::pairing::Pairing;
 use byteorder::{ByteOrder, LittleEndian};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
@@ -15,9 +13,10 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
+use utils::{b64dec, b64enc, u64_to_bigendian_u8array, u8_bigendian_slice_to_u64};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct BLSScalar(pub(crate) Fr);
+pub struct BLSScalar(pub Fr);
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSG1(pub(crate) G1);
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -81,10 +80,10 @@ impl Scalar for BLSScalar {
     BLSScalar(m)
   }
 
-  fn inv(&self) -> Result<BLSScalar, ZeiError> {
+  fn inv(&self) -> Result<BLSScalar, AlgebraError> {
     match (self.0).inverse() {
       Some(x) => Ok(BLSScalar(x)),
-      None => Err(ZeiError::GroupInversionError),
+      None => Err(AlgebraError::GroupInversionError),
     }
   }
 
@@ -104,7 +103,7 @@ impl Scalar for BLSScalar {
     v
   }
 
-  fn from_bytes(bytes: &[u8]) -> Result<BLSScalar, ZeiError> {
+  fn from_bytes(bytes: &[u8]) -> Result<BLSScalar, AlgebraError> {
     let mut repr_array = [0u64; 4];
     for i in 0..4 {
       let slice = &bytes[i * 8..i * 8 + 8];
@@ -113,7 +112,7 @@ impl Scalar for BLSScalar {
     let fr_repr = FrRepr(repr_array);
     match Fr::from_repr(fr_repr) {
       Ok(x) => Ok(BLSScalar(x)),
-      Err(_) => Err(ZeiError::DeserializationError),
+      Err(_) => Err(AlgebraError::DeserializationError),
     }
   }
 }
@@ -187,13 +186,13 @@ impl Group<BLSScalar> for BLSG1 {
     let v = self.0.into_affine().into_compressed().as_ref().to_vec();
     v
   }
-  fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG1, ZeiError> {
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG1, AlgebraError> {
     let some: G1 = G1::one();
     let mut compressed = some.into_affine().into_compressed();
     let mut_bytes = compressed.as_mut();
     mut_bytes[..48].clone_from_slice(&bytes[..48]);
     let affine = compressed.into_affine()
-                           .map_err(|_| ZeiError::DecompressElementError)?;
+                           .map_err(|_| AlgebraError::DecompressElementError)?;
     let g1 = G1::from(affine);
     Ok(BLSG1(g1))
   }
@@ -298,7 +297,7 @@ impl Group<BLSScalar> for BLSG2 {
     v
   }
   #[allow(clippy::manual_memcpy)]
-  fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG2, ZeiError> {
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG2, AlgebraError> {
     let some: G2 = G2::one();
     let mut compressed = some.into_affine().into_compressed();
     let mut_bytes = compressed.as_mut();
@@ -306,7 +305,7 @@ impl Group<BLSScalar> for BLSG2 {
       mut_bytes[i] = bytes[i];
     }
     let affine = compressed.into_affine()
-                           .map_err(|_| ZeiError::DecompressElementError)?;
+                           .map_err(|_| AlgebraError::DecompressElementError)?;
     let g2 = G2::from(affine);
 
     Ok(BLSG2(g2))
@@ -490,9 +489,11 @@ impl Group<BLSScalar> for BLSGt {
     r
   }
 
-  fn from_compressed_bytes(v: &[u8]) -> Result<Self, ZeiError> {
-    Ok(BLSGt(Fq12 { c0: build_fq6(&v[..v.len() / 2]).ok_or(ZeiError::DecompressElementError)?,
-                    c1: build_fq6(&v[v.len() / 2..]).ok_or(ZeiError::DecompressElementError)? }))
+  fn from_compressed_bytes(v: &[u8]) -> Result<Self, AlgebraError> {
+    Ok(BLSGt(Fq12 { c0:
+                      build_fq6(&v[..v.len() / 2]).ok_or(AlgebraError::DecompressElementError)?,
+                    c1:
+                      build_fq6(&v[v.len() / 2..]).ok_or(AlgebraError::DecompressElementError)? }))
   }
 
   fn from_hash<D>(hash: D) -> Self
@@ -587,9 +588,9 @@ impl<'de> Deserialize<'de> for BLSGt {
 
 #[cfg(test)]
 mod bls12_381_groups_test {
-  use crate::algebra::bls12_381::BLSScalar;
-  use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
-  use crate::algebra::groups::Scalar;
+  use crate::bls12_381::BLSScalar;
+  use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
+  use crate::groups::Scalar;
 
   #[test]
   fn test_scalar_ops() {
@@ -611,70 +612,5 @@ mod bls12_381_groups_test {
 
     let small_value_from_bytes = BLSScalar::from_bytes(&small_value_bytes).unwrap();
     assert_eq!(small_value_from_bytes, small_value);
-  }
-}
-
-#[cfg(test)]
-mod elgamal_over_bls_groups {
-  use crate::basic_crypto::elgamal::elgamal_test;
-
-  #[test]
-  fn verification_g1() {
-    elgamal_test::verification::<super::BLSScalar, super::BLSG1>();
-  }
-
-  #[test]
-  fn decryption_g1() {
-    elgamal_test::decryption::<super::BLSScalar, super::BLSG1>();
-  }
-
-  #[test]
-  fn to_json_g1() {
-    elgamal_test::to_json::<super::BLSScalar, super::BLSG1>();
-  }
-
-  #[test]
-  fn to_message_pack_g1() {
-    elgamal_test::to_message_pack::<super::BLSScalar, super::BLSG1>();
-  }
-
-  #[test]
-  fn verification_g2() {
-    elgamal_test::verification::<super::BLSScalar, super::BLSG2>();
-  }
-
-  #[test]
-  fn decryption_g2() {
-    elgamal_test::decryption::<super::BLSScalar, super::BLSG2>();
-  }
-
-  #[test]
-  fn to_json_g2() {
-    elgamal_test::to_json::<super::BLSScalar, super::BLSG2>();
-  }
-
-  #[test]
-  fn to_message_pack_g2() {
-    elgamal_test::to_message_pack::<super::BLSScalar, super::BLSG2>();
-  }
-
-  #[test]
-  fn verification_gt() {
-    elgamal_test::verification::<super::BLSScalar, super::BLSGt>();
-  }
-
-  #[test]
-  fn decryption_gt() {
-    elgamal_test::decryption::<super::BLSScalar, super::BLSGt>();
-  }
-
-  #[test]
-  fn to_json_gt() {
-    elgamal_test::to_json::<super::BLSScalar, super::BLSGt>();
-  }
-
-  #[test]
-  fn to_message_pack_gt() {
-    elgamal_test::to_message_pack::<super::BLSScalar, super::BLSGt>();
   }
 }

@@ -1,7 +1,6 @@
-use super::groups::{Group, Scalar};
-use crate::algebra::groups::GroupArithmetic;
-use crate::errors::ZeiError;
-use crate::utils::{b64dec, b64enc};
+use crate::errors::AlgebraError;
+use crate::groups::GroupArithmetic;
+use crate::groups::{Group, Scalar};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use jubjub::{AffinePoint, ExtendedPoint, Fq, Fr};
@@ -10,6 +9,7 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
+use utils::{b64dec, b64enc};
 
 const GENERATOR: AffinePoint =
   AffinePoint::from_raw_unchecked(Fq::from_raw([0xe4b3_d35d_f1a7_adfe,
@@ -66,12 +66,12 @@ impl Scalar for JubjubScalar {
     JubjubScalar(self.0 - b.0)
   }
 
-  fn inv(&self) -> Result<JubjubScalar, ZeiError> {
+  fn inv(&self) -> Result<JubjubScalar, AlgebraError> {
     let inv = (self.0).invert();
     if inv.is_some().into() {
       Ok(JubjubScalar(inv.unwrap())) // safe unwrap
     } else {
-      Err(ZeiError::GroupInversionError)
+      Err(AlgebraError::GroupInversionError)
     }
   }
 
@@ -84,13 +84,13 @@ impl Scalar for JubjubScalar {
     (self.0).to_bytes().to_vec()
   }
 
-  fn from_bytes(bytes: &[u8]) -> Result<JubjubScalar, ZeiError> {
+  fn from_bytes(bytes: &[u8]) -> Result<JubjubScalar, AlgebraError> {
     let res = Fr::from_bytes(&bytes[..32].try_into()
-                                         .map_err(|_| ZeiError::DeserializationError)?);
+                                         .map_err(|_| AlgebraError::DeserializationError)?);
     if res.is_some().into() {
       Ok(JubjubScalar(res.unwrap()))
     } else {
-      Err(ZeiError::DeserializationError)
+      Err(AlgebraError::DeserializationError)
     }
   }
 }
@@ -168,12 +168,12 @@ impl Group<JubjubScalar> for JubjubGroup {
     AffinePoint::from(&self.0).to_bytes().to_vec()
   }
 
-  fn from_compressed_bytes(bytes: &[u8]) -> Result<JubjubGroup, ZeiError> {
-    let affine = AffinePoint::from_bytes(bytes[..Self::COMPRESSED_LEN].try_into().map_err(|_| ZeiError::DecompressElementError)?);
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<JubjubGroup, AlgebraError> {
+    let affine = AffinePoint::from_bytes(bytes[..Self::COMPRESSED_LEN].try_into().map_err(|_| AlgebraError::DecompressElementError)?);
     if affine.is_some().into() {
       Ok(JubjubGroup(ExtendedPoint::from(affine.unwrap()))) // safe unwrap
     } else {
-      Err(ZeiError::DecompressElementError)
+      Err(AlgebraError::DecompressElementError)
     }
   }
 
@@ -254,18 +254,18 @@ impl<'de> Deserialize<'de> for JubjubGroup {
 // TODO: Add tests for Schnorr signatures
 #[cfg(test)]
 mod jubjub_groups_test {
-  use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
-  use crate::algebra::groups::Scalar;
-  use crate::algebra::jubjub::JubjubScalar;
+  use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
+  use crate::groups::Scalar;
+  use crate::jubjub::JubjubScalar;
 
   #[test]
   fn test_scalar_ops() {
-    test_scalar_operations::<super::JubjubScalar>();
+    test_scalar_operations::<JubjubScalar>();
   }
 
   #[test]
   fn scalar_deser() {
-    test_scalar_serialization::<super::JubjubScalar>();
+    test_scalar_serialization::<JubjubScalar>();
   }
 
   #[test]
@@ -278,30 +278,5 @@ mod jubjub_groups_test {
 
     let small_value_from_bytes = JubjubScalar::from_bytes(&small_value_bytes).unwrap();
     assert_eq!(small_value_from_bytes, small_value);
-  }
-}
-
-#[cfg(test)]
-mod elgamal_over_jubjub_groups {
-  use crate::basic_crypto::elgamal::elgamal_test;
-
-  #[test]
-  fn verification_jubjub_group() {
-    elgamal_test::verification::<super::JubjubScalar, super::JubjubGroup>();
-  }
-
-  #[test]
-  fn decryption_jubjub_group() {
-    elgamal_test::decryption::<super::JubjubScalar, super::JubjubGroup>();
-  }
-
-  #[test]
-  fn to_json_jubjub_group() {
-    elgamal_test::to_json::<super::JubjubScalar, super::JubjubGroup>();
-  }
-
-  #[test]
-  fn to_message_pack_jubjub_group() {
-    elgamal_test::to_message_pack::<super::JubjubScalar, super::JubjubGroup>();
   }
 }

@@ -1,7 +1,7 @@
 /*
  * Based on dalek-cryptography/curve25519-dalek implementation of Pippenger algorithm for multi-exponentiations
  */
-use crate::algebra::groups::{scalar_to_radix_2_power_w, Group, Scalar};
+use crate::groups::{scalar_to_radix_2_power_w, Group, Scalar};
 use std::borrow::Borrow;
 
 pub trait MultiExp<S>: Group<S> {
@@ -107,9 +107,9 @@ fn pippenger<S: Scalar, G: Group<S>>(scalars: &[&S], elems: &[&G]) -> G {
 
 #[cfg(test)]
 mod tests {
-  use crate::algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
-  use crate::algebra::groups::{Group, Scalar};
-  use crate::algebra::multi_exp::MultiExp;
+  use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
+  use crate::groups::{Group, Scalar};
+  use crate::multi_exp::MultiExp;
 
   #[test]
   fn test_multiexp_ristretto() {

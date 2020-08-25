@@ -1,6 +1,6 @@
-use crate::algebra::groups::Scalar as ZeiScalar;
-use crate::algebra::groups::{Group, GroupArithmetic};
-use crate::errors::ZeiError;
+use crate::errors::AlgebraError;
+use crate::groups::Scalar as ZeiScalar;
+use crate::groups::{Group, GroupArithmetic};
 use byteorder::ByteOrder;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -41,7 +41,7 @@ impl ZeiScalar for Scalar {
     self - b
   }
 
-  fn inv(&self) -> Result<Scalar, ZeiError> {
+  fn inv(&self) -> Result<Scalar, AlgebraError> {
     Ok(self.invert())
   }
 
@@ -57,7 +57,7 @@ impl ZeiScalar for Scalar {
     v
   }
 
-  fn from_bytes(bytes: &[u8]) -> Result<Scalar, ZeiError> {
+  fn from_bytes(bytes: &[u8]) -> Result<Scalar, AlgebraError> {
     let mut array = [0u8; 32];
     array.copy_from_slice(bytes);
     Ok(Scalar::from_bits(array))
@@ -81,9 +81,9 @@ impl Group<Scalar> for RistrettoPoint {
     v
   }
 
-  fn from_compressed_bytes(bytes: &[u8]) -> Result<RistrettoPoint, ZeiError> {
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<RistrettoPoint, AlgebraError> {
     Ok(CompressedRistretto::from_slice(bytes).decompress()
-                                             .ok_or(ZeiError::DecompressElementError)?)
+                                             .ok_or(AlgebraError::DecompressElementError)?)
   }
 
   fn from_hash<D>(hash: D) -> RistrettoPoint
@@ -109,7 +109,7 @@ impl GroupArithmetic<Scalar> for RistrettoPoint {
 
 #[cfg(test)]
 mod ristretto_group_test {
-  use crate::algebra::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
+  use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
 
   #[test]
   fn scalar_ops() {
@@ -121,33 +121,6 @@ mod ristretto_group_test {
   }
   #[test]
   fn scalar_to_radix() {
-    crate::algebra::groups::group_tests::test_to_radix::<super::Scalar>();
-  }
-}
-
-#[cfg(test)]
-mod elgamal_over_ristretto_tests {
-  use crate::basic_crypto::elgamal::elgamal_test;
-  use curve25519_dalek::ristretto::RistrettoPoint;
-  use curve25519_dalek::scalar::Scalar;
-
-  #[test]
-  fn verification() {
-    elgamal_test::verification::<Scalar, RistrettoPoint>();
-  }
-
-  #[test]
-  fn decrypt() {
-    elgamal_test::decryption::<Scalar, RistrettoPoint>();
-  }
-
-  #[test]
-  fn to_json() {
-    elgamal_test::to_json::<Scalar, RistrettoPoint>();
-  }
-
-  #[test]
-  fn to_message_pack() {
-    elgamal_test::to_message_pack::<Scalar, RistrettoPoint>();
+    crate::groups::group_tests::test_to_radix::<super::Scalar>();
   }
 }

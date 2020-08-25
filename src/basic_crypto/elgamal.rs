@@ -1,6 +1,6 @@
-use crate::algebra::groups::{Group, Scalar};
 use crate::errors::ZeiError;
 use crate::serialization::ZeiFromToBytes;
+use algebra::groups::{Group, Scalar};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use rand_core::{CryptoRng, RngCore};
 use std::hash::{Hash, Hasher};
@@ -49,8 +49,8 @@ impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint> {
     v
   }
   fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
-    let e1 = RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN])?;
-    let e2 = RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..])?;
+    let e1 = RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN]).map_err(|_| ZeiError::DeserializationError)?;
+    let e2 = RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..]).map_err(|_| ZeiError::DeserializationError)?;
     Ok(ElGamalCiphertext { e1, e2 })
   }
 }
@@ -132,10 +132,11 @@ fn brute_force<S: Scalar, G: Group<S>>(base: &G,
   Err(ZeiError::ElGamalDecryptionError)
 }
 
+#[cfg(test)]
 pub mod elgamal_test {
-  use crate::algebra::groups::{Group, Scalar};
   use crate::basic_crypto::elgamal::{ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey};
   use crate::errors::ZeiError;
+  use algebra::groups::{Group, Scalar};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::Deserializer;
@@ -257,5 +258,71 @@ pub mod elgamal_test {
     let mut de = Deserializer::new(&vec[..]);
     let ctext_de: ElGamalCiphertext<G> = Deserialize::deserialize(&mut de).unwrap();
     assert_eq!(ctext, ctext_de);
+  }
+}
+
+#[cfg(test)]
+mod elgamal_over_groups_tests {
+  use crate::basic_crypto::elgamal::elgamal_test;
+  use algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
+  use curve25519_dalek::ristretto::RistrettoPoint;
+  use curve25519_dalek::scalar::Scalar;
+
+  #[test]
+  fn verification() {
+    elgamal_test::verification::<Scalar, RistrettoPoint>();
+    elgamal_test::verification::<BLSScalar, BLSG1>();
+    elgamal_test::verification::<BLSScalar, BLSG2>();
+    elgamal_test::verification::<BLSScalar, BLSGt>();
+  }
+
+  #[test]
+  fn decrypt() {
+    elgamal_test::decryption::<Scalar, RistrettoPoint>();
+    elgamal_test::decryption::<BLSScalar, BLSG1>();
+    elgamal_test::decryption::<BLSScalar, BLSG2>();
+    elgamal_test::decryption::<BLSScalar, BLSGt>();
+  }
+
+  #[test]
+  fn to_json() {
+    elgamal_test::to_json::<Scalar, RistrettoPoint>();
+    elgamal_test::to_json::<BLSScalar, BLSG1>();
+    elgamal_test::to_json::<BLSScalar, BLSG2>();
+    elgamal_test::to_json::<BLSScalar, BLSGt>();
+  }
+
+  #[test]
+  fn to_message_pack() {
+    elgamal_test::to_message_pack::<Scalar, RistrettoPoint>();
+    elgamal_test::to_message_pack::<BLSScalar, BLSG1>();
+    elgamal_test::to_message_pack::<BLSScalar, BLSG2>();
+    elgamal_test::to_message_pack::<BLSScalar, BLSGt>();
+  }
+}
+
+#[cfg(test)]
+mod elgamal_over_jubjub_groups {
+  use crate::basic_crypto::elgamal::elgamal_test;
+  use algebra::jubjub::{JubjubGroup, JubjubScalar};
+
+  #[test]
+  fn verification_jubjub_group() {
+    elgamal_test::verification::<JubjubScalar, JubjubGroup>();
+  }
+
+  #[test]
+  fn decryption_jubjub_group() {
+    elgamal_test::decryption::<JubjubScalar, JubjubGroup>();
+  }
+
+  #[test]
+  fn to_json_jubjub_group() {
+    elgamal_test::to_json::<JubjubScalar, JubjubGroup>();
+  }
+
+  #[test]
+  fn to_message_pack_jubjub_group() {
+    elgamal_test::to_message_pack::<JubjubScalar, JubjubGroup>();
   }
 }
