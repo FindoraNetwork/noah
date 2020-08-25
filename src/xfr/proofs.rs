@@ -1,16 +1,5 @@
 use crate::api::anon_creds::ACCommitment;
 use crate::api::anon_creds::{ac_confidential_verify, ACConfidentialRevealProof};
-use crate::crypto::chaum_pedersen::{
-  chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq, ChaumPedersenProofX,
-};
-use crate::crypto::pedersen_elgamal::{
-  pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
-  PedersenElGamalEqProof, PedersenElGamalProofInstance,
-};
-use crate::errors::ZeiError;
-
-use crate::basic_crypto::elgamal::ElGamalCiphertext;
-use crate::crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::RecordDataEncKey;
@@ -20,6 +9,15 @@ use crate::xfr::structs::{
   OpenAssetRecord, XfrAmount, XfrAssetType, XfrBody, XfrRangeProof,
 };
 use bulletproofs::{PedersenGens, RangeProof};
+use crypto::basics::elgamal::ElGamalCiphertext;
+use crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
+use crypto::chaum_pedersen::{
+  chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq, ChaumPedersenProofX,
+};
+use crypto::pedersen_elgamal::{
+  pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
+  PedersenElGamalEqProof, PedersenElGamalProofInstance,
+};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
@@ -27,6 +25,7 @@ use itertools::Itertools;
 use linear_map::LinearMap;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use utils::errors::ZeiError;
 use utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
@@ -456,7 +455,8 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
 
   let mut transcript = Transcript::new(b"Zei Range Proof");
   let (range_proof, coms) =
-    prove_ranges(&params,
+    prove_ranges(&params.bp_gens,
+                 &params.pc_gens,
                  &mut transcript,
                  values.as_slice(),
                  range_proof_blinds.as_slice(),
@@ -487,7 +487,8 @@ pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(prng: &mu
   }
   let value_commitments = commitments.iter().map(|c| c.as_slice()).collect_vec();
   batch_verify_ranges(prng,
-                      params,
+                      &params.bp_gens,
+                      &params.pc_gens,
                       proofs.as_slice(),
                       &mut transcripts,
                       &value_commitments,
@@ -633,15 +634,12 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut
 
 #[cfg(test)]
 mod tests {
-  use crate::api::anon_creds::ACSignature;
-  use crate::errors::ZeiError;
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::proofs::verify_identity_proofs;
   use crate::xfr::structs::{AssetTracerMemo, AssetTracingPolicies, AssetTracingPolicy};
-  use algebra::bls12_381::BLSG1;
-  use algebra::groups::Group;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
+  use utils::errors::ZeiError;
 
   #[test]
   fn verify_identity_proofs_structure() {
@@ -662,9 +660,8 @@ mod tests {
     assert_eq!(res, Ok(()));
 
     // fake sig commitment
-    let sig_commitment =
-      crate::api::anon_creds::ACCommitment { 0: ACSignature { sigma1: BLSG1::get_identity(),
-                                                              sigma2: BLSG1::get_identity() } };
+    let sig_commitment = crate::api::anon_creds::ACCommitment::default(); // { 0: ACSignature { sigma1: BLSG1::get_identity(),
+                                                                          //sigma2: BLSG1::get_identity() } };
 
     // 2. sig commitments length doesn't match memos length
     let sig_commitments = vec![Some(&sig_commitment)];

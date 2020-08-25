@@ -1,3 +1,6 @@
+pub mod errors;
+pub mod serialization;
+
 /// I convert a u32 into a 4 bytes array (bigendian)
 #[allow(dead_code)]
 pub fn u32_to_bigendian_u8array(n: u32) -> [u8; 4] {

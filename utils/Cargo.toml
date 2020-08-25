@@ -11,3 +11,8 @@ crate-type = ["rlib"]
 
 [dependencies]
 base64 = "0.10"
+bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
+curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
+ed25519-dalek = "1.0.0-pre.3"
+x25519-dalek = "0.6"
+serde = "1.0"
