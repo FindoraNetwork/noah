@@ -60,6 +60,7 @@ pub trait Group:
 //+ GroupArithmetic + ZeiFromToBytes
 {
   const COMPRESSED_LEN: usize;
+
   fn get_identity() -> Self;
   fn get_base() -> Self;
 
