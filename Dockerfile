@@ -13,7 +13,7 @@ COPY ./utils /app/utils
 COPY ./utilities /app/utilities
 COPY ./benches /app/benches
 RUN cargo audit
-RUN cargo test --all
+RUN cargo test --workspace
 RUN rm -rf /app/target
 FROM debian:buster
 COPY --from=builder /app /app
