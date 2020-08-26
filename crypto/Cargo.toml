@@ -13,14 +13,11 @@ crate-type = ["rlib"]
 aes-ctr = "0.3.0"
 algebra = {path = "../algebra" }
 bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
-byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] }
 curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
 digest = "0.8"
 ed25519-dalek = "1.0.0-pre.3"
 ff = "0.6.0"
-group = "0.6.0"
 itertools = "0.8.0"
-jubjub = "0.3.0"
 linear-map = "1.2.0"
 merlin = "2.0"
 pairing = "0.16.0"
