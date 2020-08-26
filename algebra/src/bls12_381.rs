@@ -6,18 +6,18 @@ use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt, Sca
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use ff::{Field, PrimeField};
+use std::str::FromStr;
 
 use group::Group as _;
 
 use pairing::bls12_381::{Fq, Fq12, Fq2, Fq6, FqRepr, Fr, FrRepr, G1, G2};
 use pairing::PairingCurveAffine;
+
 use rand_core::{CryptoRng, RngCore};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt;
-use utils::{
-  b64dec, b64enc, compute_prng_from_hash, u64_to_bigendian_u8array, u8_bigendian_slice_to_u64,
-};
+use utils::{b64dec, b64enc, compute_prng_from_hash, u8_littleendian_slice_to_u64};
+use std::ops::{Add, Mul, Sub};
 
 pub type Bls12381field = Scalar;
 
@@ -261,9 +261,10 @@ impl Group for BLSGt {
 
 #[cfg(test)]
 mod bls12_381_groups_test {
-  use crate::bls12_381::{bls_pairing, BLSGt, BLSScalar, BLSG1, BLSG2};
+  use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2, Bls12381};
   use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
   use crate::groups::{Group, Scalar};
+  use crate::pairing::Pairing;
 
   #[test]
   fn test_scalar_ops() {
@@ -291,7 +292,7 @@ mod bls12_381_groups_test {
   fn hard_coded_group_elements() {
     // BLSGt
     let base_bls_gt = BLSGt::get_base();
-    let expected_base = bls_pairing(&BLSG1::get_base(), &BLSG2::get_base());
+    let expected_base = Bls12381::pairing(&BLSG1::get_base(), &BLSG2::get_base());
     assert_eq!(base_bls_gt, expected_base);
   }
 }
