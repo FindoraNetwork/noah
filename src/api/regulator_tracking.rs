@@ -13,9 +13,9 @@ use crate::api::gp_sig::{
   gpsig_join_cert, gpsig_open, gpsig_verify, GroupPublicKey, GroupSecretKey, GroupSignature,
   JoinCert, TagKey,
 };
-use crate::errors::ZeiError;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
+use utils::errors::ZeiError;
 
 /// JoinRequest message from the User to the Regulator. It contains the identity of the user.
 #[derive(Clone, Debug, Serialize, Deserialize)]

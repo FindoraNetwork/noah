@@ -1,15 +1,12 @@
-use crate::errors::ZeiError;
-use crate::serialization::ZeiFromToBytes;
-use rand_core::{CryptoRng, RngCore};
-
-use crate::errors::ZeiError::SignatureError;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use ed25519_dalek::SecretKey; // remove when v1.0.0-pre.4 is ready in platform dependencies
 use ed25519_dalek::Signature;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey};
-// use ed25519_dalek::{SecretKey, Verifier}; for use in version v1.0.0-pre.4
+use rand_core::{CryptoRng, RngCore};
+use utils::errors::ZeiError;
+use utils::serialization::ZeiFromToBytes;
 use wasm_bindgen::prelude::*;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
@@ -41,7 +38,9 @@ impl XfrPublicKey {
   }
 
   pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), ZeiError> {
-    Ok(self.0.verify(message, &signature.0)?)
+    Ok(self.0
+           .verify(message, &signature.0)
+           .map_err(|_| ZeiError::SignatureError)?)
   }
 
   pub fn as_bytes(&self) -> &[u8] {
@@ -156,7 +155,7 @@ pub fn verify_multisig(keylist: &[XfrPublicKey],
                        multi_signature: &XfrMultiSig)
                        -> Result<(), ZeiError> {
   if multi_signature.signatures.len() != keylist.len() {
-    return Err(SignatureError); //TODO return MultiSignatureError different length
+    return Err(ZeiError::SignatureError); //TODO return MultiSignatureError different length
   }
   for (pk, signature) in keylist.iter().zip(multi_signature.signatures.iter()) {
     pk.verify(message, signature)?; //TODO return MultiSignatureError
@@ -175,11 +174,11 @@ pub fn sign_multisig(keylist: &[&XfrKeyPair], message: &[u8]) -> XfrMultiSig {
 
 #[cfg(test)]
 mod test {
-  use crate::errors::ZeiError::SignatureError;
   use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair};
   use itertools::Itertools;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
+  use utils::errors::ZeiError::SignatureError;
 
   #[test]
   fn signatures() {

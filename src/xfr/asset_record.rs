@@ -2,10 +2,6 @@ use crate::api::anon_creds::{
   ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
   ConfidentialAC, Credential,
 };
-use crate::basic_crypto::hybrid_encryption::{
-  hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
-};
-use crate::errors::ZeiError;
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetRecord, AssetRecordTemplate, AssetTracerMemo, AssetTracingPolicies,
@@ -14,11 +10,15 @@ use crate::xfr::structs::{
 };
 use boolinator::Boolinator;
 use bulletproofs::PedersenGens;
+use crypto::basics::hybrid_encryption::{
+  hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
+};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
+use utils::errors::ZeiError;
 use utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
 
 const U64_BYTE_LEN: usize = 8;

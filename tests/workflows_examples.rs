@@ -4,10 +4,10 @@ pub(crate) mod examples {
 
   use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
+  use utils::errors::ZeiError;
   use wasm_bindgen::__rt::std::collections::HashMap;
   use zei::api::anon_creds;
   use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Attr, Credential};
-  use zei::errors::ZeiError;
   use zei::setup::PublicParams;
   use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
   use zei::xfr::asset_tracer::gen_asset_tracer_keypair;

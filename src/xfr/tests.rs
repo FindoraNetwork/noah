@@ -2,12 +2,6 @@
 pub(crate) mod tests {
   use crate::api::anon_creds;
   use crate::api::anon_creds::{ac_commit, ACCommitment, Credential};
-  use crate::basic_crypto::elgamal::{elgamal_encrypt, elgamal_key_gen};
-  use crate::crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
-  use crate::errors::ZeiError;
-  use crate::errors::ZeiError::{
-    XfrVerifyAssetTracingAssetAmountError, XfrVerifyAssetTracingIdentityError,
-  };
   use crate::setup::PublicParams;
   use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::lib::{
@@ -20,6 +14,9 @@ pub(crate) mod tests {
     AssetType, IdentityRevealPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH,
   };
   use bulletproofs::PedersenGens;
+  use crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
+  use crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
+
   use curve25519_dalek::ristretto::RistrettoPoint;
   use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
@@ -28,6 +25,10 @@ pub(crate) mod tests {
   use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::{Deserialize, Serialize};
+  use utils::errors::ZeiError;
+  use utils::errors::ZeiError::{
+    XfrVerifyAssetTracingAssetAmountError, XfrVerifyAssetTracingIdentityError,
+  };
   use utils::u64_to_u32_pair;
 
   pub(crate) fn create_xfr(prng: &mut ChaChaRng,
@@ -690,13 +691,13 @@ pub(crate) mod tests {
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
-    use crate::basic_crypto::elgamal::ElGamalCiphertext;
     use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
     use crate::xfr::lib::{
       trace_assets, trace_assets_brute_force, XfrNotePolicies, XfrNotePoliciesRef,
     };
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
+    use crypto::basics::elgamal::ElGamalCiphertext;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);

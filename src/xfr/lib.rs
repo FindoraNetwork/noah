@@ -1,5 +1,4 @@
 use crate::api::anon_creds::{ACCommitment, Attr};
-use crate::errors::ZeiError;
 use crate::setup::PublicParams;
 use crate::xfr::asset_mixer::{
   batch_verify_asset_mixing, prove_asset_mixing, AssetMixProof, AssetMixingInstance,
@@ -17,6 +16,7 @@ use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use serde::ser::Serialize;
 use std::collections::HashMap;
+use utils::errors::ZeiError;
 use utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;

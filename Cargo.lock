@@ -332,6 +332,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto"
+version = "0.1.0"
+dependencies = [
+ "aes-ctr",
+ "algebra",
+ "bit-array",
+ "bulletproofs",
+ "byteorder",
+ "curve25519-dalek",
+ "digest",
+ "ed25519-dalek",
+ "ff",
+ "group",
+ "itertools 0.8.2",
+ "jubjub",
+ "lazy_static",
+ "linear-map",
+ "merlin",
+ "pairing",
+ "rand",
+ "rand_chacha",
+ "rand_core",
+ "rmp-serde",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2",
+ "typenum",
+ "utils",
+ "x25519-dalek",
+]
+
+[[package]]
 name = "csv"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1048,6 +1081,11 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "bulletproofs",
+ "curve25519-dalek",
+ "ed25519-dalek",
+ "serde",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -1179,13 +1217,13 @@ dependencies = [
 name = "zei"
 version = "0.0.3"
 dependencies = [
- "aes-ctr",
  "algebra",
  "bit-array",
  "boolinator",
  "bulletproofs",
  "criterion",
  "criterion-cycles-per-byte",
+ "crypto",
  "curve25519-dalek",
  "digest",
  "ed25519-dalek",
@@ -1206,7 +1244,6 @@ dependencies = [
  "typenum",
  "utils",
  "wasm-bindgen",
- "x25519-dalek",
  "zei_utilities",
 ]
 

@@ -1,18 +1,18 @@
-use crate::crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
-use crate::errors::ZeiError;
-use crate::serialization;
 use crate::setup::PublicParams;
 use bulletproofs::r1cs::{batch_verify, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
+use crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use utils::errors::ZeiError;
+use utils::serialization::zei_obj_serde;
 use wasm_bindgen::__rt::std::collections::HashSet;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AssetMixProof(#[serde(with = "serialization::zei_obj_serde")] pub(crate) R1CSProof);
+pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
 
 impl PartialEq for AssetMixProof {
   fn eq(&self, other: &AssetMixProof) -> bool {
@@ -216,7 +216,7 @@ pub(crate) fn prepare_asset_mixer_verifier(verifier: &mut Verifier<&mut Transcri
                           .map(|com| com.commit_verifier(verifier))
                           .collect_vec();
 
-  crate::crypto::bp_circuits::cloak::cloak(
+  crypto::bp_circuits::cloak::cloak(
     verifier,
     &in_vars,
     None,
