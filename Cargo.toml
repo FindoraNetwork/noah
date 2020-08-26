@@ -1,107 +1,107 @@
-[package]
-name = "zei"
-version = "0.0.3"
-authors = ["fernando@findora.org, philippe@findora.org"]
-edition = "2018"
-description = "Zei: Findora's Cryptographic Library"
-
-[lib]
-name = "zei"
-crate-type = ["rlib"]
-
-[dependencies]
-algebra = { path = "algebra" }
-boolinator = "2.4.0"
-bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
-crypto = { path = "crypto" }
-curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
-digest = "0.8"
-ed25519-dalek = "1.0.0-pre.3"
-ff = "0.6.0"
-itertools = "0.8.0"
-linear-map = "1.2.0"
-merlin = "2.0"
-pairing = "0.16.0"
-rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
-rand_chacha = "0.2"
-rmp-serde = "0.13.7"
-serde = "1.0"
-serde_derive = "1.0"
-sha2 = "0.8.0"
-utils = { path = "utils" }
-wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
-
-[dev-dependencies]
-bit-array = "0.4.3"
-criterion = "0.3.1"
-criterion-cycles-per-byte = "0.1.1"
-lazy_static = "1.4.0"
-rand = { version = "0.7", default-features = false }
-serde_json = "1.0"
-typenum = "1.11.2"
-zei_utilities = { path = "utilities" }
-
-[features]
-default = ["std", "u64_backend"]
-std = ["curve25519-dalek/std"]
-alloc = ["curve25519-dalek/alloc"]
-nightly = ["curve25519-dalek/nightly", "rand/nightly"]
-u64_backend = ["curve25519-dalek/u64_backend"]
-u32_backend = ["curve25519-dalek/u32_backend"]
-avx2_backend = ["curve25519-dalek/avx2_backend"]
-
-[[bench]]
-name = "xfr_note_idtracking_assettracking_singleasset_time"
-harness = false
-
-[[bench]]
-name = "xfr_note_idtracking_assettracking_singleasset_cycles"
-harness = false
-
-[[bench]]
-name = "xfr_note_idtracking_assettracking_multiasset_time"
-harness = false
-
-[[bench]]
-name = "xfr_note_idtracking_assettracking_multiasset_cycles"
-harness = false
-
-[[bench]]
-name = "xfr_note_noidtracking_noassettracking_singleasset_time"
-harness = false
-
-[[bench]]
-name = "xfr_note_noidtracking_noassettracking_singleasset_cycles"
-harness = false
-
-[[bench]]
-name = "xfr_body_idtracking_assettracking_singleasset_time"
-harness = false
-
-[[bench]]
-name = "xfr_body_idtracking_assettracking_singleasset_cycles"
-harness = false
-
-[[bench]]
-name = "xfr_note_batch_cycles"
-harness = false
-
-[[bench]]
-name = "xfr_note_batch_time"
-harness = false
-
-[[bench]]
-name = "xfr_note_idtracking_noassettracking_singleasset_time"
-harness = false
-
-[[bench]]
-name = "xfr_note_idtracking_noassettracking_singleasset_cycles"
-harness = false
+#[package]
+#name = "zei"
+#version = "0.0.3"
+#authors = ["fernando@findora.org, philippe@findora.org"]
+#edition = "2018"
+#description = "Zei: Findora's Cryptographic Library"
 
 [workspace]
 members = [
  "algebra",
  "crypto",
+ "zei_api",
  "utils",
 ]
 
+#[lib]
+#name = "zei"
+#crate-type = ["rlib"]
+
+#[dependencies]
+#algebra = { path = "algebra" }
+#boolinator = "2.4.0"
+#bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
+#crypto = { path = "crypto" }
+#curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
+#digest = "0.8"
+#ed25519-dalek = "1.0.0-pre.3"
+#ff = "0.6.0"
+#itertools = "0.8.0"
+#linear-map = "1.2.0"
+#merlin = "2.0"
+#pairing = "0.16.0"
+#rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
+#rand_chacha = "0.2"
+#rmp-serde = "0.13.7"
+#serde = "1.0"
+#serde_derive = "1.0"
+#sha2 = "0.8.0"
+#utils = { path = "utils" }
+#wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
+#
+#[dev-dependencies]
+#bit-array = "0.4.3"
+#criterion = "0.3.1"
+#criterion-cycles-per-byte = "0.1.1"
+#lazy_static = "1.4.0"
+#rand = { version = "0.7", default-features = false }
+#serde_json = "1.0"
+#typenum = "1.11.2"
+#zei_utilities = { path = "utilities" }
+
+#[features]
+#default = ["std", "u64_backend"]
+#std = ["curve25519-dalek/std"]
+#alloc = ["curve25519-dalek/alloc"]
+#nightly = ["curve25519-dalek/nightly", "rand/nightly"]
+#u64_backend = ["curve25519-dalek/u64_backend"]
+#u32_backend = ["curve25519-dalek/u32_backend"]
+#avx2_backend = ["curve25519-dalek/avx2_backend"]
+
+#[[bench]]
+#name = "xfr_note_idtracking_assettracking_singleasset_time"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_idtracking_assettracking_singleasset_cycles"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_idtracking_assettracking_multiasset_time"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_idtracking_assettracking_multiasset_cycles"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_noidtracking_noassettracking_singleasset_time"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_noidtracking_noassettracking_singleasset_cycles"
+#harness = false
+
+#[[bench]]
+#name = "xfr_body_idtracking_assettracking_singleasset_time"
+#harness = false
+
+#[[bench]]
+#name = "xfr_body_idtracking_assettracking_singleasset_cycles"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_batch_cycles"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_batch_time"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_idtracking_noassettracking_singleasset_time"
+#harness = false
+
+#[[bench]]
+#name = "xfr_note_idtracking_noassettracking_singleasset_cycles"
+#harness = false
