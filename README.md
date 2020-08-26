@@ -247,7 +247,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.zei]
-version = "0.0.1"
+version = "0.0.3"
 ```
 
 Then, in your library or executable source, add:
