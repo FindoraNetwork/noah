@@ -6,11 +6,18 @@ use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt, Sca
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use ff::{Field, PrimeField};
+
 use group::Group as _;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use std::ops::{Add, Mul, Sub};
-use std::str::FromStr;
-use utils::u8_littleendian_slice_to_u64;
+
+use pairing::bls12_381::{Fq, Fq12, Fq2, Fq6, FqRepr, Fr, FrRepr, G1, G2};
+use pairing::PairingCurveAffine;
+use rand_core::{CryptoRng, RngCore};
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
+use utils::{
+  b64dec, b64enc, compute_prng_from_hash, u64_to_bigendian_u8array, u8_bigendian_slice_to_u64,
+};
 
 pub type Bls12381field = Scalar;
 
@@ -53,11 +60,8 @@ impl ZeiScalar for BLSScalar {
   fn from_hash<D>(hash: D) -> BLSScalar
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&result[0..32]);
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-    Self::random(&mut prng)
+    let mut prng = compute_prng_from_hash(hash);
+    Self::random_scalar(&mut prng)
   }
 
   // scalar arithmetic
@@ -134,11 +138,7 @@ impl Group for BLSG1 {
   fn from_hash<D>(hash: D) -> BLSG1
     where D: Digest<OutputSize = U64> + Default
   {
-    const SEED_SIZE: usize = 32;
-    let result = hash.result();
-    let mut seed = [0u8; SEED_SIZE];
-    seed.copy_from_slice(&result[0..SEED_SIZE]);
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    let mut prng = compute_prng_from_hash(hash);
     BLSG1(bls12_381::G1Projective::random(&mut prng))
   }
 }
@@ -158,7 +158,7 @@ impl GroupArithmetic for BLSG1 {
 }
 
 impl Group for BLSG2 {
-  const COMPRESSED_LEN: usize = 96; // TODO
+  const COMPRESSED_LEN: usize = 96;
 
   fn get_identity() -> BLSG2 {
     BLSG2(G2Projective::identity())
@@ -185,10 +185,7 @@ impl Group for BLSG2 {
   fn from_hash<D>(hash: D) -> BLSG2
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&result[0..32]);
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    let mut prng = compute_prng_from_hash(hash);
     BLSG2(G2Projective::random(&mut prng))
   }
 }
@@ -257,10 +254,7 @@ impl Group for BLSGt {
   fn from_hash<D>(hash: D) -> Self
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&result[0..32]);
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    let mut prng = compute_prng_from_hash(hash);
     BLSGt(Gt::random(&mut prng))
   }
 }

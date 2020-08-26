@@ -4,9 +4,12 @@ use crate::groups::{Group, Scalar};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use jubjub::{AffinePoint, ExtendedPoint, Fq, Fr};
-use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use rand_core::{CryptoRng, RngCore};
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
+use utils::{b64dec, b64enc, compute_prng_from_hash};
+
 
 const GENERATOR: AffinePoint =
   AffinePoint::from_raw_unchecked(Fq::from_raw([0xe4b3_d35d_f1a7_adfe,
@@ -39,12 +42,7 @@ impl Scalar for JubjubScalar {
   fn from_hash<D>(hash: D) -> JubjubScalar
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    for i in 0..32 {
-      seed[i] = result[i];
-    }
-    let mut prng = ChaChaRng::from_seed(seed);
+    let mut prng = compute_prng_from_hash(hash);
     let mut bytes = [0u8; 64];
     prng.fill_bytes(&mut bytes);
     JubjubScalar(Fr::from_bytes_wide(&bytes))

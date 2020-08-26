@@ -1,5 +1,10 @@
 pub mod errors;
 pub mod serialization;
+use digest::generic_array::typenum::U64;
+use digest::Digest;
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
+
 #[macro_export]
 macro_rules! serialize_deserialize {
   ($t:ident) => {
@@ -141,6 +146,23 @@ pub fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
 }
 pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>, base64::DecodeError> {
   base64::decode_config(input, base64::URL_SAFE)
+}
+
+pub const SEED_SIZE: usize = 32;
+pub fn compute_seed_from_hash<D>(hash: D, seed: &mut [u8; SEED_SIZE])
+  where D: Digest<OutputSize = U64> + Default
+{
+  let result = hash.result();
+  seed.copy_from_slice(&result[0..SEED_SIZE]);
+}
+
+pub fn compute_prng_from_hash<D>(hash: D) -> ChaCha20Rng
+  where D: Digest<OutputSize = U64> + Default
+{
+  let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
+  compute_seed_from_hash(hash, &mut seed);
+  let prng = rand_chacha::ChaChaRng::from_seed(seed);
+  prng
 }
 
 #[cfg(test)]
