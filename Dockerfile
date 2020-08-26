@@ -6,13 +6,11 @@ WORKDIR /app/
 COPY --from=BP /app /src/bulletproofs
 COPY ./Cargo* /app/
 COPY ./rustfmt.toml /app/
-COPY ./tests /app/tests
-COPY ./src /app/src
 COPY ./algebra /app/algebra
 COPY ./crypto /app/crypto
 COPY ./utils /app/utils
 COPY ./utilities /app/utilities
-COPY ./benches /app/benches
+COPY ./zei_api /app/zei_api
 RUN cargo audit
 RUN cargo test --workspace
 RUN rm -rf /app/target

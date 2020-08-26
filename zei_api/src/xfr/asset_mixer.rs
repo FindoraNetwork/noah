@@ -25,8 +25,8 @@ impl Eq for AssetMixProof {}
 /// I compute a proof that the assets were mixed correctly
 /// # Example
 /// ```
-/// use zei::xfr::asset_mixer::prove_asset_mixing;
 /// use curve25519_dalek::scalar::Scalar;
+/// use zei::xfr::asset_mixer::prove_asset_mixing;
 /// let input = [
 ///            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
 ///            (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
