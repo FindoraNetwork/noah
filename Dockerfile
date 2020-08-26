@@ -6,7 +6,6 @@ WORKDIR /app/
 COPY --from=BP /app /src/bulletproofs
 COPY ./Cargo* /app/
 COPY ./rustfmt.toml /app/
-COPY ./src /app/src
 COPY ./algebra /app/algebra
 COPY ./crypto /app/crypto
 COPY ./utils /app/utils
