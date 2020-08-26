@@ -134,9 +134,10 @@ impl Group for BLSG1 {
   fn from_hash<D>(hash: D) -> BLSG1
     where D: Digest<OutputSize = U64> + Default
   {
+    const SEED_SIZE: usize = 32;
     let result = hash.result();
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&result[0..32]);
+    let mut seed = [0u8; SEED_SIZE];
+    seed.copy_from_slice(&result[0..SEED_SIZE]);
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
     BLSG1(bls12_381::G1Projective::random(&mut prng))
   }
@@ -266,9 +267,9 @@ impl Group for BLSGt {
 
 #[cfg(test)]
 mod bls12_381_groups_test {
-  use crate::bls12_381::BLSScalar;
+  use crate::bls12_381::{bls_pairing, BLSGt, BLSScalar, BLSG1, BLSG2};
   use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
-  use crate::groups::Scalar;
+  use crate::groups::{Group, Scalar};
 
   #[test]
   fn test_scalar_ops() {
@@ -290,5 +291,13 @@ mod bls12_381_groups_test {
 
     let small_value_from_bytes = BLSScalar::from_bytes(&small_value_bytes).unwrap();
     assert_eq!(small_value_from_bytes, small_value);
+  }
+
+  #[test]
+  fn hard_coded_group_elements() {
+    // BLSGt
+    let base_bls_gt = BLSGt::get_base();
+    let expected_base = bls_pairing(&BLSG1::get_base(), &BLSG2::get_base());
+    assert_eq!(base_bls_gt, expected_base);
   }
 }
