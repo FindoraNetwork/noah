@@ -69,6 +69,18 @@ pub fn u8_bigendian_slice_to_u64(array: &[u8]) -> u64 {
   | u64::from(array[7])
 }
 
+/// I convert a 8 byte array into a u64 (bigendian)
+pub fn u8_littleendian_slice_to_u64(array: &[u8]) -> u64 {
+  u64::from(array[7]) << 56
+  | u64::from(array[6]) << 48
+  | u64::from(array[5]) << 40
+  | u64::from(array[4]) << 32
+  | u64::from(array[3]) << 24
+  | u64::from(array[2]) << 16
+  | u64::from(array[1]) << 8
+  | u64::from(array[0])
+}
+
 /// I convert a 4 byte array into a u32 (bigendian)
 pub fn u8_bigendian_slice_to_u32(array: &[u8]) -> u32 {
   u32::from(array[0]) << 24

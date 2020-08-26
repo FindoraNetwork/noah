@@ -59,7 +59,6 @@ pub trait Group:
   Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de> + GroupArithmetic
 {
   const COMPRESSED_LEN: usize;
-  const SCALAR_BYTES_LEN: usize;
   fn get_identity() -> Self;
   fn get_base() -> Self;
 

@@ -1,7 +1,6 @@
 use super::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
-use ff::PrimeField;
-use pairing::bls12_381::Fr;
+use std::str::FromStr;
 
 // # of rounds
 const NR: usize = 12;
@@ -76,46 +75,46 @@ impl Default for RescueInstance<BLSScalar> {
 
 impl RescueInstance<BLSScalar> {
   pub fn new() -> Self {
-    Self { MDS: vec![vec![BLSScalar(Fr::from_str(M00).unwrap()),
-                          BLSScalar(Fr::from_str(M01).unwrap()),
-                          BLSScalar(Fr::from_str(M02).unwrap()),
-                          BLSScalar(Fr::from_str(M03).unwrap()),],
-                     vec![BLSScalar(Fr::from_str(M10).unwrap()),
-                          BLSScalar(Fr::from_str(M11).unwrap()),
-                          BLSScalar(Fr::from_str(M12).unwrap()),
-                          BLSScalar(Fr::from_str(M13).unwrap()),],
-                     vec![BLSScalar(Fr::from_str(M20).unwrap()),
-                          BLSScalar(Fr::from_str(M21).unwrap()),
-                          BLSScalar(Fr::from_str(M22).unwrap()),
-                          BLSScalar(Fr::from_str(M23).unwrap()),],
-                     vec![BLSScalar(Fr::from_str(M30).unwrap()),
-                          BLSScalar(Fr::from_str(M31).unwrap()),
-                          BLSScalar(Fr::from_str(M32).unwrap()),
-                          BLSScalar(Fr::from_str(M33).unwrap()),]],
-           IC: vec![BLSScalar(Fr::from_str(IC0).unwrap()),
-                    BLSScalar(Fr::from_str(IC1).unwrap()),
-                    BLSScalar(Fr::from_str(IC2).unwrap()),
-                    BLSScalar(Fr::from_str(IC3).unwrap())],
-           C: vec![BLSScalar(Fr::from_str(C0).unwrap()),
-                   BLSScalar(Fr::from_str(C1).unwrap()),
-                   BLSScalar(Fr::from_str(C2).unwrap()),
-                   BLSScalar(Fr::from_str(C3).unwrap())],
-           K: vec![vec![BLSScalar(Fr::from_str(K00).unwrap()),
-                        BLSScalar(Fr::from_str(K01).unwrap()),
-                        BLSScalar(Fr::from_str(K02).unwrap()),
-                        BLSScalar(Fr::from_str(K03).unwrap()),],
-                   vec![BLSScalar(Fr::from_str(K10).unwrap()),
-                        BLSScalar(Fr::from_str(K11).unwrap()),
-                        BLSScalar(Fr::from_str(K12).unwrap()),
-                        BLSScalar(Fr::from_str(K13).unwrap()),],
-                   vec![BLSScalar(Fr::from_str(K20).unwrap()),
-                        BLSScalar(Fr::from_str(K21).unwrap()),
-                        BLSScalar(Fr::from_str(K22).unwrap()),
-                        BLSScalar(Fr::from_str(K23).unwrap()),],
-                   vec![BLSScalar(Fr::from_str(K30).unwrap()),
-                        BLSScalar(Fr::from_str(K31).unwrap()),
-                        BLSScalar(Fr::from_str(K32).unwrap()),
-                        BLSScalar(Fr::from_str(K33).unwrap()),]],
+    Self { MDS: vec![vec![BLSScalar::from_str(M00).unwrap(),
+                          BLSScalar::from_str(M01).unwrap(),
+                          BLSScalar::from_str(M02).unwrap(),
+                          BLSScalar::from_str(M03).unwrap(),],
+                     vec![BLSScalar::from_str(M10).unwrap(),
+                          BLSScalar::from_str(M11).unwrap(),
+                          BLSScalar::from_str(M12).unwrap(),
+                          BLSScalar::from_str(M13).unwrap(),],
+                     vec![BLSScalar::from_str(M20).unwrap(),
+                          BLSScalar::from_str(M21).unwrap(),
+                          BLSScalar::from_str(M22).unwrap(),
+                          BLSScalar::from_str(M23).unwrap(),],
+                     vec![BLSScalar::from_str(M30).unwrap(),
+                          BLSScalar::from_str(M31).unwrap(),
+                          BLSScalar::from_str(M32).unwrap(),
+                          BLSScalar::from_str(M33).unwrap(),]],
+           IC: vec![BLSScalar::from_str(IC0).unwrap(),
+                    BLSScalar::from_str(IC1).unwrap(),
+                    BLSScalar::from_str(IC2).unwrap(),
+                    BLSScalar::from_str(IC3).unwrap()],
+           C: vec![BLSScalar::from_str(C0).unwrap(),
+                   BLSScalar::from_str(C1).unwrap(),
+                   BLSScalar::from_str(C2).unwrap(),
+                   BLSScalar::from_str(C3).unwrap()],
+           K: vec![vec![BLSScalar::from_str(K00).unwrap(),
+                        BLSScalar::from_str(K01).unwrap(),
+                        BLSScalar::from_str(K02).unwrap(),
+                        BLSScalar::from_str(K03).unwrap(),],
+                   vec![BLSScalar::from_str(K10).unwrap(),
+                        BLSScalar::from_str(K11).unwrap(),
+                        BLSScalar::from_str(K12).unwrap(),
+                        BLSScalar::from_str(K13).unwrap(),],
+                   vec![BLSScalar::from_str(K20).unwrap(),
+                        BLSScalar::from_str(K21).unwrap(),
+                        BLSScalar::from_str(K22).unwrap(),
+                        BLSScalar::from_str(K23).unwrap(),],
+                   vec![BLSScalar::from_str(K30).unwrap(),
+                        BLSScalar::from_str(K31).unwrap(),
+                        BLSScalar::from_str(K32).unwrap(),
+                        BLSScalar::from_str(K33).unwrap(),]],
            rate: 3,
            capacity: 1,
            alpha: ALPHA,
@@ -129,8 +128,7 @@ mod test {
   use crate::basics::hash::rescue::RescueInstance;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::Scalar;
-  use ff::PrimeField;
-  use pairing::bls12_381::Fr;
+  use std::str::FromStr;
 
   // Hash output on zero inputs
   const H0: &str = "52184923318241479436224725218017640784400243367974222506608059144773855444730";
@@ -193,10 +191,10 @@ mod test {
                     BLSScalar::from_u32(0),
                     BLSScalar::from_u32(0),
                     BLSScalar::from_u32(0)];
-    let expected_output = vec![BLSScalar(Fr::from_str(H0).unwrap()),
-                               BLSScalar(Fr::from_str(H1).unwrap()),
-                               BLSScalar(Fr::from_str(H2).unwrap()),
-                               BLSScalar(Fr::from_str(H3).unwrap())];
+    let expected_output = vec![BLSScalar::from_str(H0).unwrap(),
+                               BLSScalar::from_str(H1).unwrap(),
+                               BLSScalar::from_str(H2).unwrap(),
+                               BLSScalar::from_str(H3).unwrap()];
     let keys = hash.key_scheduling(&zero_vec);
     let hash_state = hash.rescue_with_round_keys(&zero_vec, &keys);
     let hash_state2 = hash.rescue_hash(&zero_vec);
@@ -204,14 +202,14 @@ mod test {
     assert_eq!(hash_state2, expected_output);
 
     // Use a random input
-    let input_vec = [BLSScalar(Fr::from_str(IN0).unwrap()),
-                     BLSScalar(Fr::from_str(IN1).unwrap()),
-                     BLSScalar(Fr::from_str(IN2).unwrap()),
+    let input_vec = [BLSScalar::from_str(IN0).unwrap(),
+                     BLSScalar::from_str(IN1).unwrap(),
+                     BLSScalar::from_str(IN2).unwrap(),
                      BLSScalar::from_u32(0)];
-    let expected_output = vec![BLSScalar(Fr::from_str(OUT0).unwrap()),
-                               BLSScalar(Fr::from_str(OUT1).unwrap()),
-                               BLSScalar(Fr::from_str(OUT2).unwrap()),
-                               BLSScalar(Fr::from_str(OUT3).unwrap()),];
+    let expected_output = vec![BLSScalar::from_str(OUT0).unwrap(),
+                               BLSScalar::from_str(OUT1).unwrap(),
+                               BLSScalar::from_str(OUT2).unwrap(),
+                               BLSScalar::from_str(OUT3).unwrap(),];
     let keys = hash.key_scheduling(&zero_vec);
     let hash_state = hash.rescue_with_round_keys(&input_vec, &keys);
     let hash_state2 = hash.rescue_hash(&input_vec);

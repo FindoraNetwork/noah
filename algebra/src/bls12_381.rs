@@ -1,33 +1,47 @@
 use crate::errors::AlgebraError;
 use crate::groups::GroupArithmetic;
-use crate::groups::{Group, Scalar};
+use crate::groups::{Group, Scalar as ZeiScalar};
 use crate::pairing::Pairing;
-use byteorder::{ByteOrder, LittleEndian};
+use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt, Scalar};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use ff::{Field, PrimeField};
-use group::{CurveAffine, CurveProjective, EncodedPoint};
-use pairing::bls12_381::{Fq, Fq12, Fq2, Fq6, FqRepr, Fr, FrRepr, G1, G2};
-use pairing::PairingCurveAffine;
+use group::Group as _;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt;
-use utils::{b64dec, b64enc, u64_to_bigendian_u8array, u8_bigendian_slice_to_u64};
+use std::ops::{Add, Mul, Sub};
+use utils::{b64dec, b64enc, u8_littleendian_slice_to_u64};
+use std::str::FromStr;
+
+pub type Bls12381field = Scalar;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct BLSScalar(pub Fr);
+pub struct BLSScalar(Bls12381field);
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct BLSG1(pub(crate) G1);
+pub struct BLSG1(pub(crate) G1Projective);
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct BLSG2(pub(crate) G2);
-#[derive(Clone, PartialEq, Eq)]
-pub struct BLSGt(pub(crate) Fq12);
+pub struct BLSG2(pub(crate) G2Projective);
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct BLSGt(pub(crate) Gt);
 
-impl Scalar for BLSScalar {
+impl FromStr for BLSScalar {
+  type Err = AlgebraError;
+
+  fn from_str(string: &str) -> Result<BLSScalar, AlgebraError> {
+    Ok(BLSScalar(Scalar::from_str(string).ok_or(AlgebraError::DeserializationError)?))
+  }
+}
+impl BLSScalar {
+  pub fn get_scalar(&self) -> Scalar {
+    self.0
+  }
+}
+
+impl ZeiScalar for BLSScalar {
   // scalar generation
   fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> BLSScalar {
-    BLSScalar(Fr::random(rng))
+    BLSScalar(Scalar::random(rng))
   }
 
   fn from_u32(value: u32) -> BLSScalar {
@@ -35,21 +49,7 @@ impl Scalar for BLSScalar {
   }
 
   fn from_u64(value: u64) -> BLSScalar {
-    let mut v = value;
-    let mut result = Fr::zero();
-    let mut two_pow_i = Fr::one();
-    for _ in 0..64 {
-      if v == 0 {
-        break;
-      }
-      if v & 1 == 1u64 {
-        result.add_assign(&two_pow_i);
-        //result = result + two_pow_i;
-      }
-      v >>= 1;
-      two_pow_i.double(); // = two_pow_i * two;
-    }
-    BLSScalar(result)
+    BLSScalar(bls12_381::Scalar::from(value))
   }
 
   fn from_hash<D>(hash: D) -> BLSScalar
@@ -59,61 +59,51 @@ impl Scalar for BLSScalar {
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&result[0..32]);
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-    BLSScalar(Fr::random(&mut prng))
+    Self::random_scalar(&mut prng)
   }
 
   // scalar arithmetic
   fn add(&self, b: &BLSScalar) -> BLSScalar {
-    let mut m = self.0;
-    m.add_assign(&b.0);
-    BLSScalar(m)
+    BLSScalar(self.0.add(&b.0))
   }
   fn mul(&self, b: &BLSScalar) -> BLSScalar {
-    let mut m = self.0;
-    m.mul_assign(&b.0);
-    BLSScalar(m)
+    BLSScalar(self.0.mul(&b.0))
   }
 
   fn sub(&self, b: &BLSScalar) -> BLSScalar {
-    let mut m = self.0;
-    m.sub_assign(&b.0);
-    BLSScalar(m)
+    BLSScalar(self.0.sub(&b.0))
   }
 
   fn inv(&self) -> Result<BLSScalar, AlgebraError> {
-    match (self.0).inverse() {
-      Some(x) => Ok(BLSScalar(x)),
-      None => Err(AlgebraError::GroupInversionError),
+    let a = self.0.invert();
+    if bool::from(a.is_none()) {
+      return Err(AlgebraError::GroupInversionError);
     }
+    Ok(BLSScalar(a.unwrap()))
   }
 
   fn get_little_endian_u64(&self) -> Vec<u64> {
-    (self.0).into_repr().0.to_vec()
+    let a = self.0.to_bytes();
+    let a1 = u8_littleendian_slice_to_u64(&a[0..8]);
+    let a2 = u8_littleendian_slice_to_u64(&a[8..16]);
+    let a3 = u8_littleendian_slice_to_u64(&a[16..24]);
+    let a4 = u8_littleendian_slice_to_u64(&a[24..]);
+    vec![a1, a2, a3, a4]
   }
 
   //scalar serialization
   fn to_bytes(&self) -> Vec<u8> {
-    let repr = FrRepr::from(self.0);
-    let mut v = vec![];
-    for a in &repr.0 {
-      let mut array = [0_u8; 8];
-      LittleEndian::write_u64(&mut array, *a);
-      v.extend_from_slice(&array[..])
-    }
-    v
+    self.0.to_bytes().to_vec()
   }
 
   fn from_bytes(bytes: &[u8]) -> Result<BLSScalar, AlgebraError> {
-    let mut repr_array = [0u64; 4];
-    for i in 0..4 {
-      let slice = &bytes[i * 8..i * 8 + 8];
-      repr_array[i] = LittleEndian::read_u64(slice);
+    let mut array = [0u8; 32];
+    array.copy_from_slice(bytes);
+    let scalar = bls12_381::Scalar::from_bytes(&array);
+    if bool::from(scalar.is_none()) {
+      return Err(AlgebraError::SerializationError);
     }
-    let fr_repr = FrRepr(repr_array);
-    match Fr::from_repr(fr_repr) {
-      Ok(x) => Ok(BLSScalar(x)),
-      Err(_) => Err(AlgebraError::DeserializationError),
-    }
+    Ok(BLSScalar(scalar.unwrap()))
   }
 }
 
@@ -173,28 +163,28 @@ impl<'de> Deserialize<'de> for BLSScalar {
 
 impl Group for BLSG1 {
   const COMPRESSED_LEN: usize = 48;
-  const SCALAR_BYTES_LEN: usize = 32;
+
   fn get_identity() -> BLSG1 {
-    BLSG1(G1::zero())
+    BLSG1(bls12_381::G1Projective::identity())
   }
   fn get_base() -> BLSG1 {
-    BLSG1(G1::one())
+    BLSG1(bls12_381::G1Projective::generator())
   }
 
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
-    let v = self.0.into_affine().into_compressed().as_ref().to_vec();
-    v
+    let affine = G1Affine::from(&self.0);
+    affine.to_compressed().to_vec()
   }
   fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG1, AlgebraError> {
-    let some: G1 = G1::one();
-    let mut compressed = some.into_affine().into_compressed();
-    let mut_bytes = compressed.as_mut();
-    mut_bytes[..48].clone_from_slice(&bytes[..48]);
-    let affine = compressed.into_affine()
-                           .map_err(|_| AlgebraError::DecompressElementError)?;
-    let g1 = G1::from(affine);
-    Ok(BLSG1(g1))
+    let mut array = [0u8; Self::COMPRESSED_LEN];
+    array.copy_from_slice(bytes);
+    let affine = bls12_381::G1Affine::from_compressed(&array);
+    if bool::from(affine.is_none()) {
+      return Err(AlgebraError::DeserializationError);
+    }
+    let projective = G1Projective::from(affine.unwrap());
+    Ok(BLSG1(projective))
   }
 
   fn from_hash<D>(hash: D) -> BLSG1
@@ -204,27 +194,21 @@ impl Group for BLSG1 {
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&result[0..32]);
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-    BLSG1(G1::random(&mut prng))
+    BLSG1(bls12_381::G1Projective::random(&mut prng))
   }
 }
 
 impl GroupArithmetic for BLSG1 {
   type S = BLSScalar;
   //arithmetic
-  fn mul(&self, scalar: &BLSScalar) -> BLSG1 {
-    let mut m = self.0;
-    m.mul_assign(scalar.0);
-    BLSG1(m)
+  fn mul(&self, other: &BLSScalar) -> BLSG1 {
+    BLSG1(self.0.mul(&other.0))
   }
   fn add(&self, other: &Self) -> BLSG1 {
-    let mut m = self.0;
-    m.add_assign(&other.0);
-    BLSG1(m)
+    BLSG1(self.0.add(&other.0))
   }
   fn sub(&self, other: &Self) -> BLSG1 {
-    let mut m = self.0;
-    m.sub_assign(&other.0);
-    BLSG1(m)
+    BLSG1(self.0.sub(&other.0))
   }
 }
 
@@ -284,32 +268,29 @@ impl<'de> Deserialize<'de> for BLSG1 {
 
 impl Group for BLSG2 {
   const COMPRESSED_LEN: usize = 96; // TODO
-  const SCALAR_BYTES_LEN: usize = 32; // TODO
+
   fn get_identity() -> BLSG2 {
-    BLSG2(G2::zero())
+    BLSG2(G2Projective::identity())
   }
   fn get_base() -> BLSG2 {
-    BLSG2(G2::one())
+    BLSG2(G2Projective::generator())
   }
 
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
-    let v = self.0.into_affine().into_compressed().as_ref().to_vec();
-    v
+    let affine = G2Affine::from(&self.0);
+    affine.to_compressed().to_vec()
   }
   #[allow(clippy::manual_memcpy)]
   fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG2, AlgebraError> {
-    let some: G2 = G2::one();
-    let mut compressed = some.into_affine().into_compressed();
-    let mut_bytes = compressed.as_mut();
-    for i in 0..96 {
-      mut_bytes[i] = bytes[i];
+    let mut array = [0u8; Self::COMPRESSED_LEN];
+    array.copy_from_slice(bytes);
+    let affine = G2Affine::from_compressed(&array);
+    if bool::from(affine.is_none()) {
+      return Err(AlgebraError::DeserializationError);
     }
-    let affine = compressed.into_affine()
-                           .map_err(|_| AlgebraError::DecompressElementError)?;
-    let g2 = G2::from(affine);
-
-    Ok(BLSG2(g2))
+    let projective = G2Projective::from(affine.unwrap());
+    Ok(BLSG2(projective))
   }
 
   fn from_hash<D>(hash: D) -> BLSG2
@@ -319,27 +300,21 @@ impl Group for BLSG2 {
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&result[0..32]);
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-    BLSG2(G2::random(&mut prng))
+    BLSG2(G2Projective::random(&mut prng))
   }
 }
 
 impl GroupArithmetic for BLSG2 {
   type S = BLSScalar;
   //arithmetic
-  fn mul(&self, scalar: &BLSScalar) -> BLSG2 {
-    let mut m = self.0;
-    m.mul_assign(scalar.0);
-    BLSG2(m)
+  fn mul(&self, other: &BLSScalar) -> BLSG2 {
+    BLSG2(self.0.mul(&other.0))
   }
   fn add(&self, other: &Self) -> BLSG2 {
-    let mut m = self.0;
-    m.add_assign(&other.0);
-    BLSG2(m)
+    BLSG2(self.0.add(&other.0))
   }
   fn sub(&self, other: &Self) -> BLSG2 {
-    let mut m = self.0;
-    m.sub_assign(&other.0);
-    BLSG2(m)
+    BLSG2(self.0.sub(&other.0))
   }
 }
 
@@ -397,17 +372,7 @@ impl<'de> Deserialize<'de> for BLSG2 {
   }
 }
 
-impl fmt::Debug for BLSGt {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "Fr: Some Gt Element")
-  }
-}
-
 pub struct Bls12381;
-
-fn bls_pairing(a: &BLSG1, b: &BLSG2) -> BLSGt {
-  BLSGt(a.0.into_affine().pairing_with(&b.0.into_affine()))
-}
 
 impl Pairing for Bls12381 {
   type ScalarField = BLSScalar;
@@ -416,87 +381,43 @@ impl Pairing for Bls12381 {
   type Gt = BLSGt;
 
   fn pairing(a: &Self::G1, b: &Self::G2) -> Self::Gt {
-    bls_pairing(a, b)
+    BLSGt(pairing(&G1Affine::from(a.0), &G2Affine::from(b.0)))
   }
 }
 
 impl GroupArithmetic for BLSGt {
   type S = BLSScalar;
   fn mul(&self, scalar: &BLSScalar) -> Self {
-    let r = self.0.pow(scalar.0.into_repr().as_ref());
+    let r = self.0.mul(scalar.0);
     BLSGt(r)
   }
   fn add(&self, other: &Self) -> Self {
-    let mut m = other.0;
-    m.mul_assign(&self.0);
-    BLSGt(m)
+    let r = self.0.add(other.0);
+    BLSGt(r)
   }
   fn sub(&self, other: &Self) -> Self {
-    let mut result = match other.0.inverse() {
-      Some(e) => e,
-      None => {
-        panic!("attempting to subtract a non-group element");
-      }
-    };
-    result.mul_assign(&self.0);
-    BLSGt(result)
+    BLSGt(self.0.sub(&other.0))
   }
 }
 
 impl Group for BLSGt {
   const COMPRESSED_LEN: usize = 576;
-  const SCALAR_BYTES_LEN: usize = 32; // TODO
+
   fn get_identity() -> BLSGt {
-    BLSGt(Fq12::one())
+    BLSGt(Gt::identity())
   }
 
   fn get_base() -> Self {
-    bls_pairing(&BLSG1::get_base(), &BLSG2::get_base()) //TODO hardcode this
+    BLSGt(Gt::generator())
   }
 
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
-    let c0c0c0 = self.0.c0.c0.c0.into_repr();
-    let c0c0c1 = self.0.c0.c0.c1.into_repr();
-    let c0c1c0 = self.0.c0.c1.c0.into_repr();
-    let c0c1c1 = self.0.c0.c1.c1.into_repr();
-    let c0c2c0 = self.0.c0.c2.c0.into_repr();
-    let c0c2c1 = self.0.c0.c2.c1.into_repr();
-
-    let c1c0c0 = self.0.c1.c0.c0.into_repr();
-    let c1c0c1 = self.0.c1.c0.c1.into_repr();
-    let c1c1c0 = self.0.c1.c1.c0.into_repr();
-    let c1c1c1 = self.0.c1.c1.c1.into_repr();
-    let c1c2c0 = self.0.c1.c2.c0.into_repr();
-    let c1c2c1 = self.0.c1.c2.c1.into_repr();
-
-    let mut v = vec![];
-    v.extend_from_slice(&c0c0c0.0[..]);
-    v.extend_from_slice(&c0c0c1.0[..]);
-    v.extend_from_slice(&c0c1c0.0[..]);
-    v.extend_from_slice(&c0c1c1.0[..]);
-    v.extend_from_slice(&c0c2c0.0[..]);
-    v.extend_from_slice(&c0c2c1.0[..]);
-
-    v.extend_from_slice(&c1c0c0.0[..]);
-    v.extend_from_slice(&c1c0c1.0[..]);
-    v.extend_from_slice(&c1c1c0.0[..]);
-    v.extend_from_slice(&c1c1c1.0[..]);
-    v.extend_from_slice(&c1c2c0.0[..]);
-    v.extend_from_slice(&c1c2c1.0[..]);
-
-    let mut r = vec![];
-    for vi in v {
-      r.extend_from_slice(&u64_to_bigendian_u8array(vi)[..]);
-    }
-    r
+    unimplemented!()
   }
 
-  fn from_compressed_bytes(v: &[u8]) -> Result<Self, AlgebraError> {
-    Ok(BLSGt(Fq12 { c0:
-                      build_fq6(&v[..v.len() / 2]).ok_or(AlgebraError::DecompressElementError)?,
-                    c1:
-                      build_fq6(&v[v.len() / 2..]).ok_or(AlgebraError::DecompressElementError)? }))
+  fn from_compressed_bytes(_: &[u8]) -> Result<Self, AlgebraError> {
+    unimplemented!()
   }
 
   fn from_hash<D>(hash: D) -> Self
@@ -506,35 +427,10 @@ impl Group for BLSGt {
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&result[0..32]);
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-    BLSGt(Fq12::random(&mut prng))
+    BLSGt(Gt::random(&mut prng))
   }
 }
 
-fn build_fq6(v: &[u8]) -> Option<Fq6> {
-  let n = v.len() / 3;
-  Some(Fq6 { c0: build_fq2(&v[..n])?,
-             c1: build_fq2(&v[n..2 * n])?,
-             c2: build_fq2(&v[2 * n..])? })
-}
-
-fn build_fq2(v: &[u8]) -> Option<Fq2> {
-  let n = v.len() / 2;
-  Some(Fq2 { c0: build_fq(&v[..n])?,
-             c1: build_fq(&v[n..])? })
-}
-
-fn build_fq(v: &[u8]) -> Option<Fq> {
-  if v.len() != 48 {
-    return None;
-  }
-  let a1 = u8_bigendian_slice_to_u64(&v[0..8]);
-  let a2 = u8_bigendian_slice_to_u64(&v[8..16]);
-  let a3 = u8_bigendian_slice_to_u64(&v[16..24]);
-  let a4 = u8_bigendian_slice_to_u64(&v[24..32]);
-  let a5 = u8_bigendian_slice_to_u64(&v[32..40]);
-  let a6 = u8_bigendian_slice_to_u64(&v[40..]);
-  Some(Fq::from_repr(FqRepr([a1, a2, a3, a4, a5, a6])).ok()?)
-}
 impl Serialize for BLSGt {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer

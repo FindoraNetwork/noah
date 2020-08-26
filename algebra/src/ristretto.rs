@@ -65,7 +65,6 @@ impl ZeiScalar for Scalar {
 }
 impl Group for RistrettoPoint {
   const COMPRESSED_LEN: usize = 32;
-  const SCALAR_BYTES_LEN: usize = 32;
 
   fn get_identity() -> RistrettoPoint {
     RistrettoPoint::identity()

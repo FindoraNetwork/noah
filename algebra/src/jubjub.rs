@@ -153,7 +153,6 @@ impl Eq for JubjubGroup {}
 
 impl Group for JubjubGroup {
   const COMPRESSED_LEN: usize = 32;
-  const SCALAR_BYTES_LEN: usize = 32;
 
   fn get_identity() -> JubjubGroup {
     JubjubGroup(ExtendedPoint::identity())

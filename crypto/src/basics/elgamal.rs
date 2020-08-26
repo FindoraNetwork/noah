@@ -286,7 +286,7 @@ mod elgamal_test {
     serialize_to_json::<RistrettoPoint>();
     serialize_to_json::<BLSG1>();
     serialize_to_json::<BLSG2>();
-    serialize_to_json::<BLSGt>();
+    // serialize_to_json::<BLSGt>(); TODO BLSGt is not serializable yet
     serialize_to_json::<JubjubGroup>();
   }
 
@@ -295,7 +295,7 @@ mod elgamal_test {
     serialize_to_message_pack::<RistrettoPoint>();
     serialize_to_message_pack::<BLSG1>();
     serialize_to_message_pack::<BLSG2>();
-    serialize_to_message_pack::<BLSGt>();
+    // serialize_to_message_pack::<BLSGt>(); TODO BLSGt is not serializable yet
     serialize_to_message_pack::<JubjubGroup>();
   }
 }
