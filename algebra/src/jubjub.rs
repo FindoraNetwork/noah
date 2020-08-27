@@ -3,13 +3,13 @@ use crate::groups::GroupArithmetic;
 use crate::groups::{Group, Scalar};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use jubjub::{AffinePoint, ExtendedPoint, Fq, Fr};
+use ff::Field;
+use group::Group as _;
+use jubjub::{AffinePoint, ExtendedPoint, Fr};
 use rand_core::{CryptoRng, RngCore};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
-use utils::{b64dec, b64enc, compute_prng_from_hash};
-
 
 const GENERATOR: AffinePoint =
   AffinePoint::from_raw_unchecked(Fq::from_raw([0xe4b3_d35d_f1a7_adfe,
@@ -18,6 +18,8 @@ const GENERATOR: AffinePoint =
                                                 0x62ed_cbb8_bf37_87c8]),
                                   Fq::from_raw([0xb, 0x0, 0x0, 0x0]));
 
+use utils::{b64dec, b64enc, compute_prng_from_hash, u8_littleendian_slice_to_u64};
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
 #[derive(Clone, PartialEq, Debug)]
@@ -25,10 +27,8 @@ pub struct JubjubGroup(pub(crate) ExtendedPoint);
 
 impl Scalar for JubjubScalar {
   // scalar generation
-  fn random<R: CryptoRng + RngCore>(rng: &mut R) -> JubjubScalar {
-    let mut bytes = [0u8; 64];
-    rng.fill_bytes(&mut bytes);
-    JubjubScalar(Fr::from_bytes_wide(&bytes))
+  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> JubjubScalar {
+    JubjubScalar(Fr::random(rng))
   }
 
   fn from_u32(value: u32) -> JubjubScalar {
@@ -43,9 +43,7 @@ impl Scalar for JubjubScalar {
     where D: Digest<OutputSize = U64> + Default
   {
     let mut prng = compute_prng_from_hash(hash);
-    let mut bytes = [0u8; 64];
-    prng.fill_bytes(&mut bytes);
-    JubjubScalar(Fr::from_bytes_wide(&bytes))
+    Self::random_scalar(&mut prng)
   }
 
   // scalar arithmetic
@@ -71,7 +69,12 @@ impl Scalar for JubjubScalar {
   }
 
   fn get_little_endian_u64(&self) -> Vec<u64> {
-    panic!("get_little_endian_u64 not implemented for JubjubScalar")
+    let a = self.0.to_bytes();
+    let a1 = u8_littleendian_slice_to_u64(&a[0..8]);
+    let a2 = u8_littleendian_slice_to_u64(&a[8..16]);
+    let a3 = u8_littleendian_slice_to_u64(&a[16..24]);
+    let a4 = u8_littleendian_slice_to_u64(&a[24..]);
+    vec![a1, a2, a3, a4]
   }
 
   //scalar serialization
@@ -80,13 +83,13 @@ impl Scalar for JubjubScalar {
   }
 
   fn from_bytes(bytes: &[u8]) -> Result<JubjubScalar, AlgebraError> {
-    let res = Fr::from_bytes(&bytes[..32].try_into()
-                                         .map_err(|_| AlgebraError::DeserializationError)?);
-    if res.is_some().into() {
-      Ok(JubjubScalar(res.unwrap()))
-    } else {
-      Err(AlgebraError::DeserializationError)
+    let mut array = [0u8; 32];
+    array.copy_from_slice(bytes);
+    let scalar = Fr::from_bytes(&array);
+    if bool::from(scalar.is_none()) {
+      return Err(AlgebraError::SerializationError);
     }
+    Ok(JubjubScalar(scalar.unwrap()))
   }
 }
 
@@ -100,7 +103,7 @@ impl Group for JubjubGroup {
   }
 
   fn get_base() -> JubjubGroup {
-    JubjubGroup(ExtendedPoint::from(GENERATOR))
+    JubjubGroup(ExtendedPoint::generator())
   }
 
   fn to_compressed_bytes(&self) -> Vec<u8> {
@@ -116,10 +119,11 @@ impl Group for JubjubGroup {
     }
   }
 
-  fn from_hash<D>(_hash: D) -> JubjubGroup
+  fn from_hash<D>(hash: D) -> JubjubGroup
     where D: Digest<OutputSize = U64> + Default
   {
-    panic!("from_hash not implemented for JubjubGroup")
+    let mut prng = compute_prng_from_hash(hash);
+    JubjubGroup(ExtendedPoint::random(&mut prng))
   }
 }
 
