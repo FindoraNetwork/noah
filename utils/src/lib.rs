@@ -161,8 +161,7 @@ pub fn compute_prng_from_hash<D>(hash: D) -> ChaCha20Rng
 {
   let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
   compute_seed_from_hash(hash, &mut seed);
-  let prng = rand_chacha::ChaChaRng::from_seed(seed);
-  prng
+  rand_chacha::ChaChaRng::from_seed(seed)
 }
 
 #[cfg(test)]

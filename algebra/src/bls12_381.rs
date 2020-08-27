@@ -16,8 +16,8 @@ use pairing::PairingCurveAffine;
 use rand_core::{CryptoRng, RngCore};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use utils::{b64dec, b64enc, compute_prng_from_hash, u8_littleendian_slice_to_u64};
 use std::ops::{Add, Mul, Sub};
+use utils::{b64dec, b64enc, compute_prng_from_hash, u8_littleendian_slice_to_u64};
 
 pub type Bls12381field = Scalar;
 
@@ -261,7 +261,7 @@ impl Group for BLSGt {
 
 #[cfg(test)]
 mod bls12_381_groups_test {
-  use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2, Bls12381};
+  use crate::bls12_381::{BLSGt, BLSScalar, Bls12381, BLSG1, BLSG2};
   use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
   use crate::groups::{Group, Scalar};
   use crate::pairing::Pairing;

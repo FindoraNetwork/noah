@@ -137,12 +137,12 @@ impl GroupArithmetic for JubjubGroup {
   }
 }
 
-// TODO: Add tests for Schnorr signatures
 #[cfg(test)]
 mod jubjub_groups_test {
   use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
-  use crate::groups::Scalar;
-  use crate::jubjub::JubjubScalar;
+  use crate::groups::{Group, GroupArithmetic, Scalar};
+  use crate::jubjub::{JubjubGroup, JubjubScalar};
+  use rand_core::SeedableRng;
 
   #[test]
   fn test_scalar_ops() {
@@ -164,5 +164,40 @@ mod jubjub_groups_test {
 
     let small_value_from_bytes = JubjubScalar::from_bytes(&small_value_bytes).unwrap();
     assert_eq!(small_value_from_bytes, small_value);
+  }
+
+  #[test]
+  // TODO: Add tests for Schnorr signatures
+
+  fn schnorr_signature() {
+    // PRNG
+    let seed = [0_u8; 32];
+    let mut _rng = rand_chacha::ChaChaRng::from_seed(seed);
+
+    // Private key
+    // let alpha = JubjubScalar::random_scalar(&mut rng);
+    let alpha = JubjubScalar::from_u64(1_64);
+
+    // Public key
+    let base = JubjubGroup::get_base();
+    let u = base.mul(&alpha);
+
+    // Verifier challenge
+    // let c = JubjubScalar::random_scalar(&mut rng);  // TODO compute from message (signature)
+    let c = JubjubScalar::from_u64(3_64);
+
+    // Prover commitment
+    //let alpha_t = JubjubScalar::random_scalar(&mut rng);
+    let alpha_t = JubjubScalar::from_u64(2_64);
+    let u_t = base.mul(&alpha_t);
+
+    // Prover response
+    let alpha_z = alpha_t.add(&c.mul(&alpha));
+
+    // Proof verification
+    let left = base.mul(&alpha_z);
+    let right = u_t.add(&u.mul(&c));
+
+    assert_eq!(left, right);
   }
 }
