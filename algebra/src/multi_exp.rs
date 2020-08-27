@@ -60,7 +60,7 @@ fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> G {
   let digits_vec: Vec<Vec<i8>> = scalars.iter()
                                         .map(|s| scalar_to_radix_2_power_w::<G::S>(s, w))
                                         .collect();
-  // TODO (fernando) remove this clone
+
   let mut digits_count = 0;
   for digits in digits_vec.iter() {
     if digits.len() > digits_count {
