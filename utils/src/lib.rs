@@ -1,7 +1,37 @@
 pub mod errors;
 pub mod serialization;
+#[macro_export]
+macro_rules! serialize_deserialize {
+  ($t:ident) => {
+    impl serde::Serialize for $t {
+      fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+      where S: Serializer
+      {
+        if serializer.is_human_readable() {
+          serializer.serialize_str(&utils::b64enc(&self.zei_to_bytes()))
+        } else {
+          serializer.serialize_bytes(&self.zei_to_bytes())
+        }
+      }
+    }
 
-/// I convert a u32 into a 4 bytes array (bigendian)
+    impl<'de> serde::Deserialize<'de> for $t {
+      fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: serde::Deserializer<'de>
+      {
+        let bytes = if deserializer.is_human_readable() {
+          deserializer.deserialize_str(utils::serialization::zei_obj_serde::BytesVisitor)?
+        } else {
+          deserializer.deserialize_bytes(utils::serialization::zei_obj_serde::BytesVisitor)?
+        };
+        $t::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
+      }
+    }
+
+  };
+}
+
+///   I convert a u32 into a 4 bytes array (bigendian)
 #[allow(dead_code)]
 pub fn u32_to_bigendian_u8array(n: u32) -> [u8; 4] {
   let mut array = [0u8; 4];
