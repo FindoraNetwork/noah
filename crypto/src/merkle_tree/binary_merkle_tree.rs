@@ -2,7 +2,6 @@ use crate::basics::hash_functions::MTHash;
 use std::fmt::Debug;
 use utils::errors::ZeiError;
 
-// TODO remove unwraps in this file
 pub enum PathDirection {
   LEFT,
   RIGHT,
@@ -125,6 +124,11 @@ fn create_merkle_node<S: Copy + Debug, H: MTHash<S = S>>(elements: &[S],
                value }
 }
 
+/// Computes the authentication path for a  node corresponding to an index
+/// Note: we assume the tree is complete
+/// * `node` - root node corresponding to the whole tree
+/// * `index` - index of the leaf for which we want to compute the authentication path (from left to right)
+/// * size - number of leaves of the whole tree
 fn prove_node<S: Copy + PartialEq + Eq + Debug>(node: &MerkleNode<S>,
                                                 index: usize,
                                                 size: usize)
@@ -132,6 +136,8 @@ fn prove_node<S: Copy + PartialEq + Eq + Debug>(node: &MerkleNode<S>,
   if node.left.is_none() {
     return (node.value, vec![]);
   }
+
+  // From now one the unwrap are safe as we assume the tree is complete.
   if index < size / 2 {
     let (elem, mut v) = prove_node(node.left.as_ref().unwrap().as_ref(), index, size / 2);
     v.push((PathDirection::LEFT, node.right.as_ref().unwrap().value));
