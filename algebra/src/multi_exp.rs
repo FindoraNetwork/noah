@@ -1,6 +1,7 @@
 /*
  * Based on dalek-cryptography/curve25519-dalek implementation of Pippenger algorithm for multi-exponentiations
  */
+use crate::errors::AlgebraError;
 use crate::groups::{scalar_to_radix_2_power_w, Group, Scalar};
 use std::borrow::Borrow;
 
@@ -40,13 +41,22 @@ impl<G: Group> MultiExp for G {
   {
     Self::naive_multi_exp(scalars, points)
   }
+
   fn vartime_multi_exp(scalars: &[&G::S], points: &[&G]) -> Self {
-    pippenger::<G>(scalars, points)
+    if scalars.is_empty() {
+      Self::get_identity()
+    } else {
+      pippenger::<G>(scalars, points).unwrap()
+    }
   }
 }
 
-fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> G {
+fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G, AlgebraError> {
   let size = scalars.len();
+
+  if size == 0 {
+    return Err(AlgebraError::ParameterError);
+  }
 
   let w = if size < 500 {
     6
@@ -101,8 +111,10 @@ fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> G {
                                         });
 
   let two_power_w_int = Scalar::from_u64(two_power_w as u64);
-  let hi_col = cols.next().unwrap(); // TODO check if unwrap is safe in all cases
-  cols.fold(hi_col, |total, p| total.mul(&two_power_w_int).add(&p))
+  // This unwrap is safe as the list of scalars is non empty at this point.
+  let hi_col = cols.next().unwrap();
+  let res = cols.fold(hi_col, |total, p| total.mul(&two_power_w_int).add(&p));
+  Ok(res)
 }
 
 #[cfg(test)]
@@ -130,6 +142,10 @@ mod tests {
   }
 
   fn run_multiexp_test<G: Group>() {
+    // Empty list of scalars
+    let g = G::vartime_multi_exp(&[], &[]);
+    assert_eq!(g, G::get_identity());
+
     let g1 = G::get_base();
     let zero = G::S::from_u32(0);
     let g = G::vartime_multi_exp(&[&zero], &[&g1]);
