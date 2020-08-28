@@ -110,10 +110,11 @@ mod tests {
   use crate::bls12_381::{BLSGt, BLSG1, BLSG2};
   use crate::groups::{Group, Scalar};
   use crate::multi_exp::MultiExp;
+  use crate::ristretto::RistrettoPoint;
 
   #[test]
   fn test_multiexp_ristretto() {
-    run_multiexp_test::<curve25519_dalek::ristretto::RistrettoPoint>();
+    run_multiexp_test::<RistrettoPoint>();
   }
   #[test]
   fn test_multiexp_blsg1() {

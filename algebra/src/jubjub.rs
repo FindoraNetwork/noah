@@ -6,10 +6,7 @@ use digest::Digest;
 use jubjub::{AffinePoint, ExtendedPoint, Fq, Fr};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
-use serde::de::{SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
-use utils::{b64dec, b64enc};
 
 const GENERATOR: AffinePoint =
   AffinePoint::from_raw_unchecked(Fq::from_raw([0xe4b3_d35d_f1a7_adfe,
@@ -95,60 +92,6 @@ impl Scalar for JubjubScalar {
   }
 }
 
-impl Serialize for JubjubScalar {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.to_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.to_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for JubjubScalar {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct ScalarVisitor;
-
-    impl<'de> Visitor<'de> for ScalarVisitor {
-      type Value = JubjubScalar;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("an encoded Jubjub scalar")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<JubjubScalar, E>
-        where E: serde::de::Error
-      {
-        JubjubScalar::from_bytes(v).map_err(serde::de::Error::custom)
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<JubjubScalar, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().map_err(serde::de::Error::custom)? {
-          vec.push(x);
-        }
-        JubjubScalar::from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
-      }
-      fn visit_str<E>(self, s: &str) -> Result<JubjubScalar, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(ScalarVisitor)
-    } else {
-      deserializer.deserialize_bytes(ScalarVisitor)
-    }
-  }
-}
-
 impl Eq for JubjubGroup {}
 
 impl Group for JubjubGroup {
@@ -162,12 +105,11 @@ impl Group for JubjubGroup {
     JubjubGroup(ExtendedPoint::from(GENERATOR))
   }
 
-  // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
     AffinePoint::from(&self.0).to_bytes().to_vec()
   }
 
-  fn from_compressed_bytes(bytes: &[u8]) -> Result<JubjubGroup, AlgebraError> {
+  fn from_compressed_bytes(bytes: &[u8]) -> Result<Self, AlgebraError> {
     let affine = AffinePoint::from_bytes(bytes[..Self::COMPRESSED_LEN].try_into().map_err(|_| AlgebraError::DecompressElementError)?);
     if affine.is_some().into() {
       Ok(JubjubGroup(ExtendedPoint::from(affine.unwrap()))) // safe unwrap
@@ -194,60 +136,6 @@ impl GroupArithmetic for JubjubGroup {
   }
   fn sub(&self, other: &Self) -> JubjubGroup {
     JubjubGroup(self.0 - other.0)
-  }
-}
-
-impl Serialize for JubjubGroup {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for JubjubGroup {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct G1Visitor;
-
-    impl<'de> Visitor<'de> for G1Visitor {
-      type Value = JubjubGroup;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("an encoded ElGamal ciphertext or Schnorr signature")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<JubjubGroup, E>
-        where E: serde::de::Error
-      {
-        JubjubGroup::from_compressed_bytes(v).map_err(serde::de::Error::custom)
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<JubjubGroup, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element()? {
-          vec.push(x);
-        }
-        JubjubGroup::from_compressed_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
-      }
-      fn visit_str<E>(self, s: &str) -> Result<JubjubGroup, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(G1Visitor)
-    } else {
-      deserializer.deserialize_bytes(G1Visitor)
-    }
   }
 }
 

@@ -8,10 +8,8 @@ use digest::Digest;
 use ff::{Field, PrimeField};
 use group::Group as _;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
-use serde::de::{SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::ops::{Add, Mul, Sub};
-use utils::{b64dec, b64enc, u8_littleendian_slice_to_u64};
+use utils::{u8_littleendian_slice_to_u64};
 use std::str::FromStr;
 
 pub type Bls12381field = Scalar;
@@ -107,60 +105,6 @@ impl ZeiScalar for BLSScalar {
   }
 }
 
-impl Serialize for BLSScalar {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.to_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.to_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for BLSScalar {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct ScalarVisitor;
-
-    impl<'de> Visitor<'de> for ScalarVisitor {
-      type Value = BLSScalar;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded BLSG2 element")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSScalar, E>
-        where E: serde::de::Error
-      {
-        BLSScalar::from_bytes(v).map_err(serde::de::Error::custom)
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<BLSScalar, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().map_err(serde::de::Error::custom)? {
-          vec.push(x);
-        }
-        BLSScalar::from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
-      }
-      fn visit_str<E>(self, s: &str) -> Result<BLSScalar, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(ScalarVisitor)
-    } else {
-      deserializer.deserialize_bytes(ScalarVisitor)
-    }
-  }
-}
-
 impl Group for BLSG1 {
   const COMPRESSED_LEN: usize = 48;
 
@@ -212,60 +156,6 @@ impl GroupArithmetic for BLSG1 {
   }
 }
 
-impl Serialize for BLSG1 {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for BLSG1 {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct G1Visitor;
-
-    impl<'de> Visitor<'de> for G1Visitor {
-      type Value = BLSG1;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded ElGamal Ciphertext")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSG1, E>
-        where E: serde::de::Error
-      {
-        BLSG1::from_compressed_bytes(v).map_err(serde::de::Error::custom)
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<BLSG1, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element()? {
-          vec.push(x);
-        }
-        BLSG1::from_compressed_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
-      }
-      fn visit_str<E>(self, s: &str) -> Result<BLSG1, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(G1Visitor)
-    } else {
-      deserializer.deserialize_bytes(G1Visitor)
-    }
-  }
-}
-
 impl Group for BLSG2 {
   const COMPRESSED_LEN: usize = 96; // TODO
 
@@ -276,23 +166,21 @@ impl Group for BLSG2 {
     BLSG2(G2Projective::generator())
   }
 
-  // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
     let affine = G2Affine::from(&self.0);
     affine.to_compressed().to_vec()
   }
-  #[allow(clippy::manual_memcpy)]
+
   fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG2, AlgebraError> {
     let mut array = [0u8; Self::COMPRESSED_LEN];
     array.copy_from_slice(bytes);
-    let affine = G2Affine::from_compressed(&array);
+    let affine = bls12_381::G2Affine::from_compressed(&array);
     if bool::from(affine.is_none()) {
       return Err(AlgebraError::DeserializationError);
     }
     let projective = G2Projective::from(affine.unwrap());
     Ok(BLSG2(projective))
   }
-
   fn from_hash<D>(hash: D) -> BLSG2
     where D: Digest<OutputSize = U64> + Default
   {
@@ -302,6 +190,7 @@ impl Group for BLSG2 {
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
     BLSG2(G2Projective::random(&mut prng))
   }
+
 }
 
 impl GroupArithmetic for BLSG2 {
@@ -315,60 +204,6 @@ impl GroupArithmetic for BLSG2 {
   }
   fn sub(&self, other: &Self) -> BLSG2 {
     BLSG2(self.0.sub(&other.0))
-  }
-}
-
-impl Serialize for BLSG2 {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for BLSG2 {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct G2Visitor;
-
-    impl<'de> Visitor<'de> for G2Visitor {
-      type Value = BLSG2;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded BLSG2 element")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSG2, E>
-        where E: serde::de::Error
-      {
-        BLSG2::from_compressed_bytes(v).map_err(serde::de::Error::custom)
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<BLSG2, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element()? {
-          vec.push(x);
-        }
-        BLSG2::from_compressed_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
-      }
-      fn visit_str<E>(self, s: &str) -> Result<BLSG2, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(G2Visitor)
-    } else {
-      deserializer.deserialize_bytes(G2Visitor)
-    }
   }
 }
 
@@ -411,12 +246,11 @@ impl Group for BLSGt {
     BLSGt(Gt::generator())
   }
 
-  // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
     unimplemented!()
   }
 
-  fn from_compressed_bytes(_: &[u8]) -> Result<Self, AlgebraError> {
+  fn from_compressed_bytes(_bytes: &[u8]) -> Result<Self, AlgebraError> {
     unimplemented!()
   }
 
@@ -428,60 +262,6 @@ impl Group for BLSGt {
     seed.copy_from_slice(&result[0..32]);
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
     BLSGt(Gt::random(&mut prng))
-  }
-}
-
-impl Serialize for BLSGt {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.to_compressed_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.to_compressed_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for BLSGt {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct GtVisitor;
-
-    impl<'de> Visitor<'de> for GtVisitor {
-      type Value = BLSGt;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded BLSGt element")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<BLSGt, E>
-        where E: serde::de::Error
-      {
-        BLSGt::from_compressed_bytes(v).map_err(serde::de::Error::custom)
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<BLSGt, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element()? {
-          vec.push(x);
-        }
-        BLSGt::from_compressed_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
-      }
-      fn visit_str<E>(self, s: &str) -> Result<BLSGt, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(GtVisitor)
-    } else {
-      deserializer.deserialize_bytes(GtVisitor)
-    }
   }
 }
 
