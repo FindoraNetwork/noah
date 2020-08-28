@@ -171,9 +171,7 @@ mod jubjub_groups_test {
   }
 
   #[test]
-  // TODO: Add tests for Schnorr signatures
-
-  fn schnorr_signature() {
+  fn schnorr_identification_protocol() {
     // PRNG
     let seed = [0_u8; 32];
     let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
@@ -186,7 +184,7 @@ mod jubjub_groups_test {
     let u = base.mul(&alpha);
 
     // Verifier challenge
-    let c = JubjubScalar::random_scalar(&mut rng); // TODO compute from message (signature)
+    let c = JubjubScalar::random_scalar(&mut rng);
 
     // Prover commitment
     let alpha_t = JubjubScalar::random_scalar(&mut rng);
