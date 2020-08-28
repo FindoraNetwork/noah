@@ -103,7 +103,7 @@ impl Group for JubjubGroup {
   }
 
   fn get_base() -> JubjubGroup {
-    JubjubGroup(ExtendedPoint::generator())
+    JubjubGroup(ExtendedPoint::generator().mul_by_cofactor())
   }
 
   fn to_compressed_bytes(&self) -> Vec<u8> {
@@ -176,23 +176,20 @@ mod jubjub_groups_test {
   fn schnorr_signature() {
     // PRNG
     let seed = [0_u8; 32];
-    let mut _rng = rand_chacha::ChaChaRng::from_seed(seed);
+    let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
 
     // Private key
-    // let alpha = JubjubScalar::random_scalar(&mut rng);
-    let alpha = JubjubScalar::from_u64(1_64);
+    let alpha = JubjubScalar::random_scalar(&mut rng);
 
     // Public key
     let base = JubjubGroup::get_base();
     let u = base.mul(&alpha);
 
     // Verifier challenge
-    // let c = JubjubScalar::random_scalar(&mut rng);  // TODO compute from message (signature)
-    let c = JubjubScalar::from_u64(3_64);
+    let c = JubjubScalar::random_scalar(&mut rng); // TODO compute from message (signature)
 
     // Prover commitment
-    //let alpha_t = JubjubScalar::random_scalar(&mut rng);
-    let alpha_t = JubjubScalar::from_u64(2_64);
+    let alpha_t = JubjubScalar::random_scalar(&mut rng);
     let u_t = base.mul(&alpha_t);
 
     // Prover response
