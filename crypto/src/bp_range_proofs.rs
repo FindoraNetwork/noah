@@ -1,9 +1,10 @@
+use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::ristretto::CompressedRistretto;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
+use itertools::Itertools;
 
 /// Gives a bulletproof range proof that values committed using  `blindings`
 /// are within [0..2^{`log_range_upper_bound`}-1].
@@ -14,12 +15,15 @@ pub fn prove_ranges(bp_gens: &BulletproofGens,
                     blindings: &[Scalar],
                     log_range_upper_bound: usize)
                     -> Result<(RangeProof, Vec<CompressedRistretto>), ZeiError> {
-  RangeProof::prove_multiple(bp_gens,
+  let blindings = blindings.iter().map(|s| s.0).collect_vec();
+  let (proof, coms) = RangeProof::prove_multiple(bp_gens,
                              pc_gens,
                              transcript,
                              values,
-                             blindings,
-                             log_range_upper_bound).map_err(|_| ZeiError::RangeProofProveError)
+                             &blindings,
+                             log_range_upper_bound).map_err(|_| ZeiError::RangeProofProveError)?;
+  let commitments = coms.iter().map(|x| CompressedRistretto(*x)).collect_vec();
+  Ok((proof, commitments))
 }
 
 /// Verify a bulletproof range proof that a set of committed values
@@ -33,10 +37,11 @@ pub fn verify_ranges<R: CryptoRng + RngCore>(prng: &mut R,
                                              commitments: &[CompressedRistretto],
                                              log_range_upper_bound: usize)
                                              -> Result<(), ZeiError> {
+  let commitments = commitments.iter().map(|x| x.0).collect_vec();
   proof.verify_multiple_with_rng(bp_gens,
                                  pc_gens,
                                  transcript,
-                                 commitments,
+                                 &commitments,
                                  log_range_upper_bound,
                                  prng)
        .map_err(|_| ZeiError::RangeProofVerifyError)
@@ -52,10 +57,20 @@ pub fn batch_verify_ranges<R: CryptoRng + RngCore>(prng: &mut R,
                                                    commitments: &[&[CompressedRistretto]],
                                                    log_range_upper_bound: usize)
                                                    -> Result<(), ZeiError> {
+  let mut comms = vec![];
+  for slice in commitments {
+    let v = slice.iter().map(|x| x.0).collect_vec();
+    comms.push(v);
+  }
+  let mut slices: Vec<&[curve25519_dalek::ristretto::CompressedRistretto]> = vec![];
+  for v in comms.iter() {
+    slices.push(v.as_slice());
+  }
+
   RangeProof::batch_verify(prng,
                            proofs,
                            transcripts,
-                           commitments,
+                           slices.as_slice(),
                            bp_gens,
                            pc_gens,
                            log_range_upper_bound).map_err(|_| ZeiError::RangeProofVerifyError)

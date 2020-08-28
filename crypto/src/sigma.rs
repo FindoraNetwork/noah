@@ -238,10 +238,8 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcrip
 
 #[cfg(test)]
 mod tests {
-  use algebra::groups::Group;
-  use curve25519_dalek::ristretto::RistrettoPoint;
-  use curve25519_dalek::scalar::Scalar;
-  use curve25519_dalek::traits::Identity;
+  use algebra::groups::{Group, Scalar as _, GroupArithmetic};
+  use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
   use merlin::Transcript;
   use rand_core::SeedableRng;
 
@@ -249,8 +247,8 @@ mod tests {
   #[allow(non_snake_case)]
   fn test_sigma() {
     let G = RistrettoPoint::get_base();
-    let secret = Scalar::from(10u8);
-    let H = G * secret;
+    let secret = Scalar::from_u32(10);
+    let H = G.mul(&secret);
 
     let mut prover_transcript = Transcript::new(b"Test");
     let mut verifier_transcript = Transcript::new(b"Test");
@@ -287,9 +285,9 @@ mod tests {
 
     // test2: two contrains, two secrets
     // 1) H = secret * G, 2) H2 = secret2 * G
-    let secret2 = Scalar::from(20u8);
-    let H2 = G * secret2;
-    let zero = RistrettoPoint::identity();
+    let secret2 = Scalar::from_u32(20);
+    let H2 = G.mul(&secret2);
+    let zero = RistrettoPoint::get_identity();
     let elems: &[&RistrettoPoint] = &[&zero, &G, &H, &H2];
     let lhs_matrix: &[Vec<usize>] = &[vec![1, 0], vec![0, 1]];
     let rhs_vec: &[usize] = &[2, 3];
@@ -332,11 +330,11 @@ mod tests {
                                 &dlog_proof).is_err());
 
     // test3: two constarains, 5 secrets
-    let secret3 = Scalar::from(30u8);
-    let secret4 = Scalar::from(40u8);
-    let secret5 = Scalar::from(50u8);
-    let Z1 = G * secret + H * secret2;
-    let Z2 = G * secret3 + H * secret4 + H2 * secret5;
+    let secret3 = Scalar::from_u32(30);
+    let secret4 = Scalar::from_u32(40);
+    let secret5 = Scalar::from_u32(50);
+    let Z1 = G.mul(&secret).add(&H.mul(&secret2));
+    let Z2 = G.mul(&secret3).add(&H.mul(&secret4)).add(&H2.mul(&secret5));
 
     let elems = &[&zero, &G, &H, &H2, &Z1, &Z2];
     let matrix: &[Vec<usize>] = &[vec![1, 2, 0, 0, 0], vec![0, 0, 1, 2, 3]];
@@ -350,7 +348,7 @@ mod tests {
                                 rhs_vec,
                                 &proof).is_ok());
 
-    let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::zero()]; // bad secrets
+    let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::from_u32(0)]; // bad secrets
     let proof = super::sigma_prove(&mut prover_transcript, &mut prng, elems, matrix, secrets);
     assert!(super::sigma_verify(&mut verifier_transcript,
                                 &mut prng,

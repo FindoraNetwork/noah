@@ -8,11 +8,13 @@
  * 5) Apply range proof for total_asset - total_liabilities
 */
 
+use algebra::groups::Scalar as _;
+use algebra::ristretto::RistrettoScalar as Scalar;
 use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable};
 use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
-use curve25519_dalek::scalar::Scalar;
 use linear_map::LinearMap;
 use utils::errors::ZeiError;
+
 
 /// I implement a proof of solvency bulletproof protocol
 /// The prover needs to provide asset and liabilities plaintain
@@ -55,26 +57,34 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
                    &rate_values[..])?,
   };
 
-  total_assets_var = total_assets_var + public_asset_sum;
-  total_lia_var = total_lia_var + public_liability_sum;
+  total_assets_var = total_assets_var + public_asset_sum.0;
+  total_lia_var = total_lia_var + public_liability_sum.0;
 
   let diff_var = total_assets_var - total_lia_var;
   let diff_value = match asset_set_values {
     Some(values) => {
       let converted_asset: Vec<Scalar> = values.iter()
-                                               .map(|v| v.amount * conversion_rates.get(&v.asset_type).unwrap()) // TODO remove this unwrap
+                                               .map(|v| v.amount.mul(conversion_rates.get(&v.asset_type).unwrap())) // TODO remove this unwrap
                                                .collect();
 
-      let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
+      //let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
+      let total_asset = converted_asset
+        .iter()
+        .fold(Scalar::from_u32(0), |acc, b| acc.add(b))
+        .add(&public_asset_sum);
 
       let converted_lia: Vec<Scalar> =
         liability_set_values.unwrap() // safe unwrap
                             .iter()
-                            .map(|v| v.amount * conversion_rates.get(&v.asset_type).unwrap()) // TODO remove this unwrap
+                            .map(|v| v.amount.mul(conversion_rates.get(&v.asset_type).unwrap())) // TODO remove this unwrap
                             .collect();
-      let total_lia = converted_lia.iter().sum::<Scalar>() + public_liability_sum;
+      //let total_lia = converted_lia.iter().sum::<Scalar>().add(&public_liability_sum);
+      let total_lia = converted_lia
+        .iter()
+        .fold(Scalar::from_u32(0), |acc, b| acc.add(b))
+        .add(&public_liability_sum);
 
-      Some(total_asset - total_lia)
+      Some(total_asset.sub(&total_lia))
     }
     None => None,
   };
@@ -121,8 +131,8 @@ fn aggregate<CS: RandomizableConstraintSystem>(cs: &mut CS,
     let value_type = trimmed_vars[i].asset_type;
     let rate = rate_values[i];
     let rate_type = rate_types[i];
-    let (_, _, out) = cs.multiply(value.into(), rate.into());
-    cs.constrain(value_type - rate_type);
+    let (_, _, out) = cs.multiply(value.into(), rate.0.into());
+    cs.constrain(value_type - rate_type.0);
     total = total + out;
   }
   // prove addition of same flavor
@@ -197,7 +207,7 @@ fn trim(values: &[CloakValue]) -> Vec<CloakValue> {
   let mut rest = vec![];
 
   for value in &values[0..l] {
-    if value.asset_type != Scalar::zero() {
+    if value.asset_type != Scalar::from_u32(0) {
       trimmed.push(*value);
     } else {
       rest.push(CloakValue::default());
@@ -209,54 +219,55 @@ fn trim(values: &[CloakValue]) -> Vec<CloakValue> {
 
 #[cfg(test)]
 mod test {
+  use algebra::ristretto::{RistrettoScalar};
   use crate::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
   use bulletproofs::r1cs::{Prover, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
-  use curve25519_dalek::scalar::Scalar;
   use linear_map::LinearMap;
   use merlin::Transcript;
+  use algebra::groups::Scalar;
 
   #[test]
   fn sort() {
-    let values = vec![CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
-                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
-                      CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
-                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
-                      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
-                      CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
-                      CloakValue::new(Scalar::from(30u8), Scalar::from(3u8))];
+    let values = vec![CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
+                      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
+                      CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
+                      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
+                      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
+                      CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
+                      CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3))];
 
-    let t = [Scalar::from(3u8), Scalar::from(2u8), Scalar::from(1u8)];
+    let t = [RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(1)];
 
     let sorted = super::sort_by_rate_type(&values, &t);
-    let expected = vec![CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
-                        CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
-                        CloakValue::new(Scalar::from(30u8), Scalar::from(3u8)),
-                        CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
-                        CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
-                        CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)),
-                        CloakValue::new(Scalar::from(10u8), Scalar::from(1u8))];
+    let expected = vec![CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
+                        CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
+                        CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
+                        CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
+                        CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
+                        CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
+                        CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1))];
     assert_eq!(&sorted[..], &expected[..]);
   }
 
   #[test]
   fn trim() {
-    let values = [CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
-                  CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
-                  CloakValue::new(Scalar::from(90u8), Scalar::from(3u8)),
-                  CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
-                  CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
-                  CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
-                  CloakValue::new(Scalar::from(30u8), Scalar::from(1u8))];
+    let values = [CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+                  CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+                  CloakValue::new(RistrettoScalar::from_u32(90), RistrettoScalar::from_u32(3)),
+                  CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
+                  CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+                  CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+                  CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(1))];
 
     let trimmed = super::trim(&values);
-    let expected = [CloakValue::new(Scalar::from(90u8), Scalar::from(3u8)),
-                    CloakValue::new(Scalar::from(20u8), Scalar::from(2u8)),
-                    CloakValue::new(Scalar::from(30u8), Scalar::from(1u8)),
-                    CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
-                    CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
-                    CloakValue::new(Scalar::from(0u8), Scalar::from(0u8)),
-                    CloakValue::new(Scalar::from(0u8), Scalar::from(0u8))];
+    let expected = [CloakValue::new(RistrettoScalar::from_u32(90), RistrettoScalar::from_u32(3)),
+                    CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
+                    CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(1)),
+                    CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+                    CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+                    CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+                    CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0))];
 
     assert_eq!(&trimmed[..], &expected[..]);
   }
@@ -265,25 +276,25 @@ mod test {
   fn test_solvency() {
     let pc_gens = PedersenGens::default();
     let mut rates = LinearMap::new();
-    rates.insert(Scalar::from(1u8), Scalar::from(1u8));
-    rates.insert(Scalar::from(2u8), Scalar::from(2u8));
-    rates.insert(Scalar::from(3u8), Scalar::from(3u8));
+    rates.insert(RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1));
+    rates.insert(RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2));
+    rates.insert(RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3));
     let asset_set = vec![
-      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), //total 10
-      CloakValue::new(Scalar::from(10u8), Scalar::from(2u8)), //total 20
-      CloakValue::new(Scalar::from(10u8), Scalar::from(2u8)), //total 20
-      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), //total 10
-      CloakValue::new(Scalar::from(10u8), Scalar::from(3u8)), //total 30
-      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), //total 10
-      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), //total 10, total asset worth = 100
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), //total 10
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(2)), //total 20
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(2)), //total 20
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), //total 10
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(3)), //total 30
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), //total 10
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), //total 10, total asset worth = 100
         ];
 
     let liability_set = vec![
-      CloakValue::new(Scalar::from(2u8), Scalar::from(2u8)), // total 4
-      CloakValue::new(Scalar::from(8u8), Scalar::from(2u8)),  // total 16
-      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), // total 10
-      CloakValue::new(Scalar::from(20u8), Scalar::from(3u8)), // total 60
-      CloakValue::new(Scalar::from(10u8), Scalar::from(1u8)), // total 10
+      CloakValue::new(RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)), // total 4
+      CloakValue::new(RistrettoScalar::from_u32(8), RistrettoScalar::from_u32(2)),  // total 16
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // total 10
+      CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(3)), // total 60
+      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // total 10
         ];
     let mut prover_transcript = Transcript::new(b"test");
     let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
@@ -292,7 +303,7 @@ mod test {
       asset_set.iter()
                .map(|value| {
                  value.commit_prover(&mut prover,
-                                     &CloakValue::new(Scalar::from(1u8), Scalar::from(2u8)))
+                                     &CloakValue::new(RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(2)))
                })
                .collect();
     let asset_com: Vec<CloakCommitment> = asset_com_vars.iter().map(|(com, _)| *com).collect();
@@ -302,7 +313,7 @@ mod test {
       liability_set.iter()
                    .map(|value| {
                      value.commit_prover(&mut prover,
-                                         &CloakValue::new(Scalar::from(3u8), Scalar::from(4u8)))
+                                         &CloakValue::new(RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(4)))
                    })
                    .collect();
     let lia_com: Vec<CloakCommitment> = lia_com_vars.iter().map(|(com, _)| *com).collect();
@@ -311,10 +322,10 @@ mod test {
     let num_left_wires = super::solvency(&mut prover,
                                          &asset_var[..],
                                          Some(&asset_set),
-                                         Scalar::zero(),
+                                         Scalar::from_u64(0),
                                          &lia_var[..],
                                          Some(&liability_set),
-                                         Scalar::zero(),
+                                         Scalar::from_u64(0),
                                          &rates).unwrap();
     let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
     let proof = prover.prove(&bp_gens).unwrap();
@@ -333,10 +344,10 @@ mod test {
     super::solvency(&mut verifier,
                     &asset_var[..],
                     None,
-                    Scalar::zero(),
+                    RistrettoScalar::from_u64(0),
                     &lia_var[..],
                     None,
-                    Scalar::zero(),
+                    RistrettoScalar::from_u64(0),
                     &rates).unwrap();
     assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
   }

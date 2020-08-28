@@ -1,5 +1,6 @@
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::scalar::Scalar;
+use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::groups::Scalar as _;
 use rand_core::{CryptoRng, RngCore};
 use sha2::Digest;
 use utils::errors::ZeiError;
@@ -145,7 +146,7 @@ fn sec_key_as_scalar(sk: &SecretKey) -> Scalar {
   //expanded.key is not public, I need to extract it via serialization
   let mut key_bytes = [0u8; 32];
   key_bytes.copy_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
-  Scalar::from_bits(key_bytes)
+  Scalar::from_bytes(&key_bytes).unwrap() // safe unwrap
 }
 
 fn symmetric_key_from_x25519_secret_key(sec_key: &x25519_dalek::StaticSecret,
@@ -162,7 +163,9 @@ fn symmetric_key_from_secret_key(sec_key: &SecretKey,
                                  ephemeral_public_key: &x25519_dalek::PublicKey)
                                  -> [u8; 32] {
   let scalar_sec_key = sec_key_as_scalar(sec_key);
-  let x_secret = x25519_dalek::StaticSecret::from(scalar_sec_key.to_bytes());
+  let mut bytes = [0u8;32];
+  bytes.copy_from_slice(scalar_sec_key.to_bytes().as_slice());
+  let x_secret = x25519_dalek::StaticSecret::from(bytes);
   symmetric_key_from_x25519_secret_key(&x_secret, ephemeral_public_key)
 }
 

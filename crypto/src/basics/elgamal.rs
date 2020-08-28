@@ -1,5 +1,5 @@
 use algebra::groups::{Group, Scalar};
-use curve25519_dalek::ristretto::RistrettoPoint;
+use algebra::ristretto::RistrettoPoint;
 use rand_core::{CryptoRng, RngCore};
 use std::hash::{Hash, Hasher};
 use utils::errors::ZeiError;
@@ -138,7 +138,7 @@ mod elgamal_test {
   use algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
   use algebra::groups::{Group, Scalar};
   use algebra::jubjub::JubjubGroup;
-  use curve25519_dalek::ristretto::RistrettoPoint;
+  use algebra::ristretto::RistrettoPoint;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::Deserializer;

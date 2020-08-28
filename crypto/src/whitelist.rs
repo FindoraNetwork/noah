@@ -6,11 +6,11 @@ use crate::merkle_tree::binary_merkle_tree::{
 };
 use bulletproofs::r1cs::{Prover, R1CSProof, Variable, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
+use algebra::ristretto::{RistrettoScalar as Scalar, CompressedRistretto};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
+use algebra::groups::Scalar as _;
 
 pub const THRESHOLD: usize = 10;
 
@@ -37,20 +37,24 @@ pub fn prove_mt_membership<R: CryptoRng + RngCore>(prng: &mut R,
   let mut prover_transcript = Transcript::new(b"MerkleTreePath");
   let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
 
-  let (com_elem, var_elem) = prover.commit(s, *blind);
-  if com_elem != *elem {
+  let (com_elem, var_elem) = prover.commit(s.0, blind.0);
+  if CompressedRistretto(com_elem) != *elem {
     return Err(ZeiError::ParameterError);
   }
   let mut var_path = vec![];
   for (direction, sibling) in path.iter() {
     let (dir_com, dir_var) = match *direction {
-      PathDirection::RIGHT => prover.commit(Scalar::from(1u8), Scalar::random(prng)),
-      PathDirection::LEFT => prover.commit(Scalar::from(0u8), Scalar::random(prng)),
+      PathDirection::RIGHT => prover.commit(
+        curve25519_dalek::scalar::Scalar::from(1u8),
+        curve25519_dalek::scalar::Scalar::random(prng)),
+      PathDirection::LEFT => prover.commit(
+        curve25519_dalek::scalar::Scalar::from(0u8),
+        curve25519_dalek::scalar::Scalar::random(prng)),
     };
-    let (sibling_com, sibling_var) = prover.commit(*sibling, Scalar::random(prng));
+    let (sibling_com, sibling_var) = prover.commit(sibling.0, curve25519_dalek::scalar::Scalar::random(prng));
     var_path.push((dir_var, sibling_var));
-    witness_commitments.push(dir_com);
-    witness_commitments.push(sibling_com);
+    witness_commitments.push(CompressedRistretto(dir_com));
+    witness_commitments.push(CompressedRistretto(sibling_com));
   }
 
   let num_left_wires =
@@ -58,7 +62,7 @@ pub fn prove_mt_membership<R: CryptoRng + RngCore>(prng: &mut R,
                        var_elem,
                        &var_path[..],
                        mt.root.value,
-                       Scalar::from(mt.size as u64)).map_err(|_| ZeiError::WhitelistProveError)?;
+                       Scalar::from_u64(mt.size as u64)).map_err(|_| ZeiError::WhitelistProveError)?;
   let num_gens = num_left_wires.next_power_of_two();
   let bp_gens = BulletproofGens::new(num_gens, 1);
   let proof = prover.prove(&bp_gens)
@@ -75,8 +79,8 @@ pub fn prove_array_membership(elements: &[Scalar],
   let pc_gens = PedersenGens::default();
   let mut prover_transcript = Transcript::new(b"LinearInclusionProof");
   let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
-  let (com_elem, var_elem) = prover.commit(elements[index], *blind);
-  assert!(com_elem == *elem);
+  let (com_elem, var_elem) = prover.commit(elements[index].0, blind.0);
+  assert_eq!(CompressedRistretto(com_elem), *elem);
   let left_wires = array_membership(&mut prover, &elements[..], var_elem);
   let bp_gens = BulletproofGens::new(left_wires.next_power_of_two(), 1);
   let proof = prover.prove(&bp_gens)
@@ -94,15 +98,15 @@ pub fn verify_mt_membership(mt_root: &MerkleRoot<Scalar>,
 
   let mut verifier_transcript = Transcript::new(b"MerkleTreePath");
   let mut verifier = Verifier::new(&mut verifier_transcript);
-  let elem_var = verifier.commit(*elem_com);
+  let elem_var = verifier.commit(elem_com.0);
   let mut path_var = vec![];
   let mut direction: Variable = Variable::One();
   let mut even = true;
   for e in proof.witness_commitments.iter() {
     if even {
-      direction = verifier.commit(*e);
+      direction = verifier.commit(e.0);
     } else {
-      let sibling = verifier.commit(*e);
+      let sibling = verifier.commit(e.0);
       path_var.push((direction, sibling));
     }
     even = !even;
@@ -112,7 +116,7 @@ pub fn verify_mt_membership(mt_root: &MerkleRoot<Scalar>,
                        elem_var,
                        &path_var[..],
                        mt_root.value,
-                       Scalar::from(mt_root.size as u64)).map_err(|_| {
+                       Scalar::from_u64(mt_root.size as u64)).map_err(|_| {
                                                            ZeiError::WhitelistVerificationError
                                                          })?;
 
@@ -128,7 +132,7 @@ pub fn verify_array_membership(elements: &[Scalar],
   let pc_gens = PedersenGens::default();
   let mut verifier_transcript = Transcript::new(b"LinearInclusionProof");
   let mut verifier = Verifier::new(&mut verifier_transcript);
-  let elem_var = verifier.commit(*elem_com);
+  let elem_var = verifier.commit(elem_com.0);
 
   let num_left_wires = array_membership(&mut verifier, &elements[..], elem_var);
   let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);

@@ -152,14 +152,15 @@ fn is_power_two(n: usize) -> bool {
 mod test {
   use super::*;
   use crate::basics::hash_functions::mimc::MiMCHash;
-  use curve25519_dalek::scalar::Scalar;
+  use algebra::ristretto::RistrettoScalar as Scalar;
+  use algebra::groups::Scalar as _;
 
   #[test]
   fn test_mt() {
     let mut elements = vec![];
-    let size = 32;
+    let size = 32usize;
     for i in 0..size {
-      elements.push(Scalar::from(i as u64));
+      elements.push(Scalar::from_u64(i as u64));
     }
     let merkle_tree = mt_build::<Scalar, MiMCHash>(&elements[..]).unwrap();
 
@@ -170,14 +171,14 @@ mod test {
       let b = mt_verify::<Scalar, MiMCHash>(&merkle_root, &e, &path[..]);
       assert_eq!(true, b.is_ok());
 
-      let b = mt_verify::<Scalar, MiMCHash>(&merkle_root, &(e + Scalar::from(1u8)), &path[..]);
+      let b = mt_verify::<Scalar, MiMCHash>(&merkle_root, &e.add(&Scalar::from_u32(1)), &path[..]);
       assert_eq!(false, b.is_ok());
 
       merkle_root.size = size * 2;
       let b = mt_verify::<Scalar, MiMCHash>(&merkle_root, &e, &path[..]);
       assert_eq!(false, b.is_ok());
 
-      merkle_root.size = size;
+      merkle_root.size = size as usize;
     }
   }
 }

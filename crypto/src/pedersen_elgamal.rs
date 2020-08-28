@@ -1,13 +1,14 @@
 use crate::basics::elgamal::{ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use bulletproofs::PedersenGens;
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{Identity, MultiscalarMul};
+use algebra::ristretto::RistrettoPoint;
+use algebra::ristretto::RistrettoScalar as Scalar;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::serialization;
+use algebra::groups::{Group, Scalar as _, GroupArithmetic};
+use curve25519_dalek::traits::{MultiscalarMul, Identity};
+use crate::ristretto_pedersen::RistrettoPedersenGens;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PedersenElGamalEqProof {
@@ -23,13 +24,15 @@ pub struct PedersenElGamalEqProof {
 
 // Initiate transcript for Pedersen-Elgamal aggregate proof
 fn init_pedersen_elgamal_aggregate(transcript: &mut Transcript,
-                                   pc_gens: &PedersenGens,
+                                   pc_gens: &RistrettoPedersenGens,
                                    public_key: &ElGamalEncKey<RistrettoPoint>,
                                    ctexts: &[ElGamalCiphertext<RistrettoPoint>],
                                    commitments: &[RistrettoPoint]) {
   let mut public_elems = vec![];
-  public_elems.push(&pc_gens.B);
-  public_elems.push(&pc_gens.B_blinding);
+  let b = pc_gens.B;
+  let b_blinding = pc_gens.B_blinding;
+  public_elems.push(&b);
+  public_elems.push(&b_blinding);
   public_elems.push(&public_key.0);
   for ctext in ctexts {
     public_elems.push(&ctext.e1);
@@ -45,7 +48,7 @@ fn init_pedersen_elgamal_aggregate(transcript: &mut Transcript,
 // lhs indices matrix and rhs indices vector to be used as input to the sigma protocol
 fn init_pok_pedersen_elgamal<'a>(transcript: &mut Transcript,
                                  identity: &'a RistrettoPoint,
-                                 pc_gens: &'a PedersenGens,
+                                 pc_gens: &'a RistrettoPedersenGens,
                                  public_key: &'a ElGamalEncKey<RistrettoPoint>,
                                  ctext: &'a ElGamalCiphertext<RistrettoPoint>,
                                  commitment: &'a RistrettoPoint)
@@ -76,8 +79,8 @@ pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(transcript: &mut Transc
                                                          ctext: &ElGamalCiphertext<RistrettoPoint>,
                                                          commitment: &RistrettoPoint)
                                                          -> PedersenElGamalEqProof {
-  let pc_gens = PedersenGens::default();
-  let identity = RistrettoPoint::identity();
+  let pc_gens = RistrettoPedersenGens::default();
+  let identity = RistrettoPoint::get_identity();
   let (elems, lhs_matrix, _) =
     init_pok_pedersen_elgamal(transcript, &identity, &pc_gens, public_key, ctext, commitment);
   let proof = sigma_prove(transcript,
@@ -94,13 +97,13 @@ pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(transcript: &mut Transc
 
 fn pedersem_elgamal_eq_verify_scalars<R: CryptoRng + RngCore>(transcript: &mut Transcript,
                                                               prng: &mut R,
-                                                              pc_gens: &PedersenGens,
+                                                              pc_gens: &RistrettoPedersenGens,
                                                               public_key: &ElGamalEncKey<RistrettoPoint>,
                                                               ctext: &ElGamalCiphertext<RistrettoPoint>,
                                                               commitment: &RistrettoPoint,
                                                               proof: &PedersenElGamalEqProof)
                                                               -> Vec<Scalar> {
-  let identity = RistrettoPoint::identity();
+  let identity = RistrettoPoint::get_identity();
   let (elems, lhs_matrix, rhs_vec) =
     init_pok_pedersen_elgamal(transcript, &identity, &pc_gens, public_key, ctext, commitment);
   let sigma_proof = SigmaProof { commitments: vec![proof.e1.e1, proof.e1.e2, proof.c1],
@@ -121,7 +124,7 @@ fn pedersem_elgamal_eq_verify_scalars<R: CryptoRng + RngCore>(transcript: &mut T
 #[allow(dead_code)]
 fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(transcript: &mut Transcript,
                                                       prng: &mut R,
-                                                      pc_gens: &PedersenGens,
+                                                      pc_gens: &RistrettoPedersenGens,
                                                       public_key: &ElGamalEncKey<RistrettoPoint>,
                                                       ctext: &ElGamalCiphertext<RistrettoPoint>,
                                                       commitment: &RistrettoPoint,
@@ -139,9 +142,10 @@ fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(transcript: &mut Transcrip
                proof.e1.e1,
                proof.e1.e2,
                proof.c1];
-  let multi_exp = RistrettoPoint::multiscalar_mul(scalars, &elems);
+  let multi_exp = curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(
+    scalars.iter().map(|x| x.0), elems.iter().map(|x| x.0));
 
-  if multi_exp != RistrettoPoint::identity() {
+  if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
     Err(ZeiError::ZKProofVerificationError)
   } else {
     Ok(())
@@ -152,7 +156,7 @@ fn get_linear_combination_scalars(transcript: &mut Transcript, n: usize) -> Vec<
   if n == 0 {
     return vec![];
   }
-  let mut r = vec![Scalar::one()];
+  let mut r = vec![Scalar::from_u32(1)];
   for _ in 0..n - 1 {
     r.push(transcript.get_challenge::<Scalar>());
   }
@@ -174,28 +178,28 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(transcript: &
   assert_eq!(n, ctexts.len());
   assert_eq!(n, commitments.len());
 
-  let pc_gens = PedersenGens::default();
+  let pc_gens = RistrettoPedersenGens::default();
   init_pedersen_elgamal_aggregate(transcript, &pc_gens, public_key, ctexts, commitments);
 
   // 1. compute x vector
   let x = get_linear_combination_scalars(transcript, n);
   // 2. compute linear combination
-  let mut lc_m = Scalar::zero();
-  let mut lc_r = Scalar::zero();
-  let mut lc_e1 = RistrettoPoint::identity();
-  let mut lc_e2 = RistrettoPoint::identity();
-  let mut lc_c = RistrettoPoint::identity();
+  let mut lc_m = Scalar::from_u32(0);
+  let mut lc_r = Scalar::from_u32(0);
+  let mut lc_e1 = RistrettoPoint::get_identity();
+  let mut lc_e2 = RistrettoPoint::get_identity();
+  let mut lc_c = RistrettoPoint::get_identity();
   for (xi, mi, ri, ctext, com) in izip!(x.iter(),
                                         m.iter(),
                                         r.iter(),
                                         ctexts.iter(),
                                         commitments.iter())
   {
-    lc_m += xi * mi;
-    lc_r += xi * ri;
-    lc_e1 += xi * ctext.e1;
-    lc_e2 += xi * ctext.e2;
-    lc_c += xi * com;
+    lc_m = lc_m.add(&xi.mul(mi));
+    lc_r = lc_r.add(&xi.mul(ri));
+    lc_e1 = lc_e1.add(&ctext.e1.mul(xi));
+    lc_e2 = lc_e2.add(&ctext.e2.mul(xi));
+    lc_c = lc_c.add(&com.mul(xi));
   }
   let lc_ctext = ElGamalCiphertext { e1: lc_e1,
                                      e2: lc_e2 };
@@ -216,7 +220,7 @@ pub struct PedersenElGamalProofInstance<'a> {
 pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
   transcript: &mut Transcript,
   prng: &mut R,
-  pc_gens: &PedersenGens,
+  pc_gens: &RistrettoPedersenGens,
   instances: &[PedersenElGamalProofInstance<'a>])
   -> Result<(), ZeiError> {
   let m = instances.len();
@@ -226,15 +230,15 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
   //                       proof.ctext.e1, proof.ctext.e2, proof.commitment
   let mut all_scalars = Vec::with_capacity(2 + m * 7);
   let mut all_elems = Vec::with_capacity(2 + m * 7);
-  all_scalars.push(Scalar::zero());
-  all_scalars.push(Scalar::zero());
+  all_scalars.push(Scalar::from_u32(0));
+  all_scalars.push(Scalar::from_u32(0));
   all_elems.push(pc_gens.B);
   all_elems.push(pc_gens.B_blinding);
   for instance in instances {
     let n = instance.ctexts.len();
     assert_eq!(n, instance.commitments.len());
     let mut inst_transcript = transcript.clone();
-    let alpha = Scalar::random(prng);
+    let alpha = Scalar::random_scalar(prng);
     init_pedersen_elgamal_aggregate(&mut inst_transcript,
                                     &pc_gens,
                                     instance.public_key,
@@ -243,16 +247,16 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
     // 1. compute x vector
     let x = get_linear_combination_scalars(&mut inst_transcript, n);
     // 2. compute linear combination
-    let mut lc_e1 = RistrettoPoint::identity();
-    let mut lc_e2 = RistrettoPoint::identity();
-    let mut lc_c = RistrettoPoint::identity();
+    let mut lc_e1 = RistrettoPoint::get_identity();
+    let mut lc_e2 = RistrettoPoint::get_identity();
+    let mut lc_c = RistrettoPoint::get_identity();
     for (xi, ei, ci) in izip!(x.iter(),
                               instance.ctexts.iter(),
                               instance.commitments.iter())
     {
-      lc_e1 += xi * ei.e1;
-      lc_e2 += xi * ei.e2;
-      lc_c += xi * ci;
+      lc_e1 = lc_e1.add(&ei.e1.mul(xi));
+      lc_e2 = lc_e2.add(&ei.e2.mul(xi));
+      lc_c = lc_c.add(&ci.mul(xi));
     }
     let lc_e = ElGamalCiphertext { e1: lc_e1,
                                    e2: lc_e2 };
@@ -265,8 +269,8 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
                                                               &lc_c,
                                                               instance.proof);
 
-    all_scalars[0] += alpha * instance_scalars[0];
-    all_scalars[1] += alpha * instance_scalars[1];
+    all_scalars[0] = all_scalars[1].add(&alpha.mul(&instance_scalars[0]));
+    all_scalars[1] = all_scalars[1].add(&alpha.mul(&instance_scalars[1]));
     all_elems.push(instance.public_key.0);
     all_elems.push(lc_e1);
     all_elems.push(lc_e2);
@@ -275,12 +279,14 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
     all_elems.push(instance.proof.e1.e2);
     all_elems.push(instance.proof.c1);
     for scalar in instance_scalars[2..].iter() {
-      all_scalars.push(alpha * scalar);
+      all_scalars.push(alpha.mul(scalar));
     }
   }
 
-  let multi_exp = RistrettoPoint::multiscalar_mul(all_scalars, all_elems);
-  if multi_exp != RistrettoPoint::identity() {
+  let multi_exp = curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(
+    all_scalars.iter().map(|x| x.0),
+    all_elems.iter().map(|x| x.0));
+  if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
     return Err(ZeiError::ZKProofBatchVerificationError);
   }
 
@@ -289,7 +295,7 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
 /// Verification of Proof of Knowledge for PedersenElGamal equality proof, for a set of statement.
 pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(transcript: &mut Transcript,
                                                                     prng: &mut R,
-                                                                    pc_gens: &PedersenGens,
+                                                                    pc_gens: &RistrettoPedersenGens,
                                                                     public_key: &ElGamalEncKey<RistrettoPoint>,
                                                                     ctexts: &[ElGamalCiphertext<RistrettoPoint>],
                                                                     commitments: &[RistrettoPoint],
@@ -306,11 +312,10 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(transcript: 
 
 #[cfg(test)]
 mod test {
+  use algebra::groups::Scalar as _;
+  use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
   use super::PedersenElGamalEqProof;
   use crate::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
-  use bulletproofs::PedersenGens;
-  use curve25519_dalek::ristretto::RistrettoPoint;
-  use curve25519_dalek::scalar::Scalar;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -318,13 +323,14 @@ mod test {
   use serde::de::Deserialize;
   use serde::ser::Serialize;
   use utils::errors::ZeiError;
+  use crate::ristretto_pedersen::RistrettoPedersenGens;
 
   #[test]
   fn good_proof_verify() {
-    let m = Scalar::from(10u8);
-    let r = Scalar::from(7657u32);
+    let m = Scalar::from_u32(10);
+    let r = Scalar::from_u32(7657u32);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
@@ -353,11 +359,11 @@ mod test {
 
   #[test]
   fn bad_proof_verify() {
-    let m = Scalar::from(10u8);
-    let m2 = Scalar::from(11u8);
-    let r = Scalar::from(7657u32);
+    let m = Scalar::from_u32(10);
+    let m2 = Scalar::from_u32(11);
+    let r = Scalar::from_u32(7657);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
@@ -386,16 +392,16 @@ mod test {
 
   #[test]
   fn proof_aggregate() {
-    let m1 = Scalar::from(11u8);
-    let r1 = Scalar::from(7657u32);
-    let m2 = Scalar::from(12u8);
-    let r2 = Scalar::from(7658u32);
-    let m3 = Scalar::from(13u8);
-    let r3 = Scalar::from(7659u32);
-    let m4 = Scalar::from(14u8);
-    let r4 = Scalar::from(7660u32);
+    let m1 = Scalar::from_u32(11);
+    let r1 = Scalar::from_u32(7657);
+    let m2 = Scalar::from_u32(12);
+    let r2 = Scalar::from_u32(7658);
+    let m3 = Scalar::from_u32(13);
+    let r3 = Scalar::from_u32(7659);
+    let m4 = Scalar::from_u32(14);
+    let r4 = Scalar::from_u32(7660);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
@@ -544,12 +550,12 @@ mod test {
 
   #[test]
   fn to_json() {
-    let m = Scalar::from(10u8);
-    let r = Scalar::from(7657u32);
+    let m = Scalar::from_u32(10);
+    let r = Scalar::from_u32(7657);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
-    let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
+    let (_sk, pk) = elgamal_key_gen(&mut prng, &pc_gens.B);
     let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
     let commitment = pc_gens.commit(m, r);
     let mut transcript = Transcript::new(b"test");
@@ -568,10 +574,10 @@ mod test {
 
   #[test]
   fn to_message_pack() {
-    let m = Scalar::from(10u8);
-    let r = Scalar::from(7657u32);
+    let m = Scalar::from_u32(10);
+    let r = Scalar::from_u32(7657);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 

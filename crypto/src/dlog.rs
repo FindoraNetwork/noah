@@ -102,9 +102,8 @@ mod test {
     prove_knowledge_dlog, prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog,
     verify_proof_of_knowledge_dlog,
   };
-  use algebra::groups::Group;
-  use curve25519_dalek::ristretto::RistrettoPoint;
-  use curve25519_dalek::scalar::Scalar;
+  use algebra::groups::{Group, Scalar as _, GroupArithmetic};
+  use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -116,10 +115,10 @@ mod test {
 
     let mut prover_transcript = Transcript::new(b"test");
     let mut verifier_transcript = Transcript::new(b"test");
-    let base = RistrettoPoint::random(&mut csprng);
-    let scalar = Scalar::random(&mut csprng);
-    let scalar2 = scalar + Scalar::from(1u8);
-    let point = scalar * base;
+    let base = RistrettoPoint::get_base();
+    let scalar = Scalar::random_scalar(&mut csprng);
+    let scalar2 = scalar.add(&Scalar::from_u32(1));
+    let point = base.mul(&scalar);
 
     let proof = prove_knowledge_dlog(&mut prover_transcript, &mut csprng, &base, &point, &scalar);
     assert!(verify_proof_of_knowledge_dlog(&mut verifier_transcript,
@@ -144,22 +143,22 @@ mod test {
     let mut prover_transcript = Transcript::new(b"test");
     let mut verifier_transcript = Transcript::new(b"test");
 
-    let base = RistrettoPoint::random(&mut csprng);
-    let scalar1 = Scalar::random(&mut csprng);
-    let scalar2 = Scalar::random(&mut csprng);
-    let scalar3 = Scalar::random(&mut csprng);
-    let scalar4 = Scalar::random(&mut csprng);
-    let scalar5 = Scalar::random(&mut csprng);
-    let scalar6 = Scalar::random(&mut csprng);
-    let scalar7 = Scalar::random(&mut csprng);
+    let base = RistrettoPoint::get_base();
+    let scalar1 = Scalar::random_scalar(&mut csprng);
+    let scalar2 = Scalar::random_scalar(&mut csprng);
+    let scalar3 = Scalar::random_scalar(&mut csprng);
+    let scalar4 = Scalar::random_scalar(&mut csprng);
+    let scalar5 = Scalar::random_scalar(&mut csprng);
+    let scalar6 = Scalar::random_scalar(&mut csprng);
+    let scalar7 = Scalar::random_scalar(&mut csprng);
 
-    let point1 = scalar1 * base;
-    let point2 = scalar2 * base;
-    let point3 = scalar3 * base;
-    let point4 = scalar4 * base;
-    let point5 = scalar5 * base;
-    let point6 = scalar6 * base;
-    let point7 = scalar7 * base;
+    let point1 = base.mul(&scalar1);
+    let point2 = base.mul(&scalar2);
+    let point3 = base.mul(&scalar3);
+    let point4 = base.mul(&scalar4);
+    let point5 = base.mul(&scalar5);
+    let point6 = base.mul(&scalar6);
+    let point7 = base.mul(&scalar7);
 
     let proof = prove_multiple_knowledge_dlog(&mut prover_transcript,
                                               &mut csprng,

@@ -197,14 +197,15 @@ mod test {
   use super::*;
   use crate::basics::hash_functions::mimc::MiMCHash;
   use crate::merkle_tree::binary_merkle_tree::mt_build;
-  use curve25519_dalek::scalar::Scalar;
+  use algebra::ristretto::RistrettoScalar as Scalar;
+  use algebra::groups::Scalar as _;
 
   #[test]
   fn root_computation() {
     let mut elements = vec![];
     let size = 32;
     for i in 0..size {
-      elements.push(Scalar::from(i as u64));
+      elements.push(Scalar::from_u64(i));
     }
     let k_merkle_tree = k_mt_build::<Scalar, MiMCHash>(&elements[..], 2).unwrap();
 
@@ -218,20 +219,20 @@ mod test {
     let mut elements = vec![];
     let size = 27;
     for i in 0..size {
-      elements.push(Scalar::from(i as u64));
+      elements.push(Scalar::from_u64(i));
     }
     let k_merkle_tree = k_mt_build::<Scalar, MiMCHash>(&elements[..], 3).unwrap();
     let k_merkle_root = k_merkle_tree.get_root();
     let k_merkle_root_bytes_expected: [u8; 32] =
       [131, 67, 191, 251, 189, 176, 78, 250, 36, 176, 46, 156, 15, 60, 78, 245, 211, 223, 183,
        127, 173, 76, 54, 75, 131, 216, 238, 50, 52, 25, 242, 11];
-    assert_eq!(k_merkle_root.value.as_bytes(),
+    assert_eq!(&k_merkle_root.value.to_bytes(),
                &k_merkle_root_bytes_expected);
 
     // Fails if the size of the input is not a power of k
     let k = 3;
     let not_a_power_of_3 = 30;
-    let elements = vec![Scalar::from(0 as u64); not_a_power_of_3];
+    let elements = vec![Scalar::from_u64(0); not_a_power_of_3];
     let k_merkle_tree = k_mt_build::<Scalar, MiMCHash>(&elements[..], k);
     assert!(k_merkle_tree.is_err());
   }
@@ -242,7 +243,7 @@ mod test {
     let k = 3;
     let size = 27;
     for i in 0..size {
-      elements.push(Scalar::from(i as u64));
+      elements.push(Scalar::from_u64(i as u64));
     }
     let k_merkle_tree = k_mt_build::<Scalar, MiMCHash>(&elements[..], k).unwrap();
     let mut k_merkle_root = k_merkle_tree.get_root();
@@ -253,7 +254,7 @@ mod test {
       let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &e, &path);
       assert_eq!(true, b.is_ok());
 
-      let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &(e + Scalar::from(1u8)), &path);
+      let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &e.add(&Scalar::from_u64(1)), &path);
       assert_eq!(false, b.is_ok());
 
       k_merkle_root.size = size * 2;
