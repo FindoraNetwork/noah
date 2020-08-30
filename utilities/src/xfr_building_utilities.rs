@@ -96,14 +96,13 @@ pub fn setup_with_policies(
 
     let user_key_pair = &sender_key_pairs[i];
 
-    let (commitment_user_addr, proof, ac_commitment_key) =
-      ac_commit(&mut prng,
-                &user_ac_sk,
-                &credential_user.clone(),
-                user_key_pair.get_pk_ref().as_bytes()).unwrap();
-    ac_commitment_keys.push(ac_commitment_key);
-    ac_commitments.push(commitment_user_addr);
-    ac_proofs.push(proof);
+    let output = ac_commit(&mut prng,
+                           &user_ac_sk,
+                           &credential_user.clone(),
+                           user_key_pair.get_pk_ref().as_bytes()).unwrap();
+    ac_commitment_keys.push(output.key.unwrap());
+    ac_commitments.push(output.commitment);
+    ac_proofs.push(output.pok);
   }
 
   let id_tracking_policy = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk,

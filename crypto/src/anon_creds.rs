@@ -203,6 +203,13 @@ pub struct ACKey<S> {
   pub t: S,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ACCommitOutput<P: Pairing> {
+  pub commitment: ACCommitment<P::G1>,
+  pub pok: ACPoK<P::G2, P::ScalarField>,
+  pub key: Option<ACKey<P::ScalarField>>,
+}
+
 /// I generate e key pair for a credential issuer
 #[allow(clippy::type_complexity)]
 pub fn ac_keygen_issuer<R: CryptoRng + RngCore, P: Pairing>(
@@ -274,26 +281,31 @@ pub fn ac_commitment_key_gen<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R)
 }
 
 /// Credential commitment to a message
-#[allow(clippy::type_complexity)] //TODO simplify it
-pub fn ac_commit<R: CryptoRng + RngCore, P: Pairing>(
-  prng: &mut R,
-  user_sk: &ACUserSecretKey<P::ScalarField>,
-  credential: &Credential<P::G1, P::G2, P::ScalarField>,
-  msg: &[u8])
-  -> Result<(ACCommitment<P::G1>, ACPoK<P::G2, P::ScalarField>, ACKey<P::ScalarField>), ZeiError> {
+pub fn ac_commit<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
+                                                     user_sk: &ACUserSecretKey<P::ScalarField>,
+                                                     credential: &Credential<P::G1,
+                                                                 P::G2,
+                                                                 P::ScalarField>,
+                                                     msg: &[u8])
+                                                     -> Result<ACCommitOutput<P>, ZeiError> {
   let key = ac_commitment_key_gen::<_, P>(prng);
-  let (commitment, sok) = ac_commit_with_key::<_, P>(prng, user_sk, credential, &key, msg)?;
-  Ok((commitment, sok, key))
+  let output = ac_commit_with_key::<_, P>(prng, user_sk, credential, &key, msg)?;
+  let commitment = output.commitment;
+  let sok = output.pok;
+
+  let res = ACCommitOutput { commitment,
+                             pok: sok,
+                             key: Some(key) };
+  Ok(res)
 }
 
-#[allow(clippy::type_complexity)] //TODO simplify it
 pub fn ac_commit_with_key<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
   credential: &Credential<P::G1, P::G2, P::ScalarField>,
   key: &ACKey<P::ScalarField>,
   msg: &[u8])
-  -> Result<(ACCommitment<P::G1>, ACPoK<P::G2, P::ScalarField>), ZeiError> {
+  -> Result<ACCommitOutput<P>, ZeiError> {
   let hidden_attrs = credential.attributes
                                .iter()
                                .map(|attr| Attribute::Hidden(Some(attr)))
@@ -310,7 +322,10 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore, P: Pairing>(
                               &key.t,
                               hidden_attrs.as_slice())?;
 
-  Ok((sig_commitment, sok))
+  let res = ACCommitOutput { commitment: sig_commitment,
+                             pok: sok,
+                             key: None };
+  Ok(res)
 }
 
 /// Produces a credential commitment by randomizing the credential signature

@@ -607,8 +607,9 @@ pub(crate) mod tests {
                                     attributes: attrs,
                                     issuer_pub_key: cred_issuer_pk.clone() };
 
-      let (sig_commitment, _, key) =
-        ac_commit(&mut prng, &receiver_ac_sk, &credential, addr).unwrap();
+      let output = ac_commit(&mut prng, &receiver_ac_sk, &credential, addr).unwrap();
+      let sig_commitment = output.commitment;
+      let key = output.key.unwrap();
 
       let id_tracking_policy = IdentityRevealPolicy { cred_issuer_pub_key:
                                                         cred_issuer_pk.clone(),

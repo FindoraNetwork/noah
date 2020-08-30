@@ -204,6 +204,7 @@ impl GroupArithmetic for BLSG2 {
   }
 }
 
+#[derive(Clone)]
 pub struct Bls12381;
 
 impl Pairing for Bls12381 {

@@ -1,6 +1,6 @@
 use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
 use algebra::groups::{Group, Scalar};
-use crypto::anon_creds::Attribute;
+use crypto::anon_creds::{ACCommitOutput, Attribute};
 use crypto::basics::elgamal::elgamal_key_gen;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
@@ -124,14 +124,13 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 ///   attributes,
 ///   issuer_pub_key:issuer_pk
 /// };
-/// let (commitment, proof, key) = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"some addr").unwrap();
+/// let output = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"some addr").unwrap();
 /// ```
-pub fn ac_commit<R: CryptoRng + RngCore>(
-  prng: &mut R,
-  user_sk: &ACUserSecretKey,
-  credential: &Credential,
-  msg: &[u8])
-  -> Result<(ACCommitment, ACPoK, ACCommitmentKey), ZeiError> {
+pub fn ac_commit<R: CryptoRng + RngCore>(prng: &mut R,
+                                         user_sk: &ACUserSecretKey,
+                                         credential: &Credential,
+                                         msg: &[u8])
+                                         -> Result<ACCommitOutput<Bls12381>, ZeiError> {
   let c = crypto::anon_creds::Credential { signature: credential.signature.clone(),
                                            attributes: credential.attributes
                                                                  .iter()
@@ -162,14 +161,14 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
 /// };
 /// let ac_key = ac_keygen_commitment::<ChaChaRng>(&mut prng);
 /// let addr = b"some addr";
-/// let (commitment, proof) = ac_commit_with_key::<ChaChaRng>(&mut prng, &user_sk, &credential, &ac_key, addr).unwrap();
+/// let output = ac_commit_with_key::<ChaChaRng>(&mut prng, &user_sk, &credential, &ac_key, addr).unwrap();
 /// ```
 pub fn ac_commit_with_key<R: CryptoRng + RngCore>(prng: &mut R,
                                                   user_sk: &ACUserSecretKey,
                                                   credential: &Credential,
                                                   key: &ACCommitmentKey,
                                                   msg: &[u8])
-                                                  -> Result<(ACCommitment, ACPoK), ZeiError> {
+                                                  -> Result<ACCommitOutput<Bls12381>, ZeiError> {
   let c = crypto::anon_creds::Credential { signature: credential.signature.clone(),
                                            attributes: credential.attributes
                                                                  .iter()
@@ -206,7 +205,10 @@ pub fn ac_verify_commitment(issuer_pub_key: &ACIssuerPublicKey,
 ///   attributes,
 ///   issuer_pub_key:issuer_pk,
 /// };
-/// let (commitment, pok, key) = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Some message").unwrap();
+/// let output = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Some message").unwrap();
+/// let commitment = output.commitment;
+/// let pok = output.pok;
+/// let key = output.key.unwrap();
 /// let attrs_map = [true, false];
 /// let reveal_sig = ac_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key, &attrs_map).unwrap();
 /// ```
@@ -327,7 +329,9 @@ pub type ConfidentialAC = crypto::conf_cred_reveal::ConfidentialAC<G1, G2, S>;
 ///   attributes: attrs,
 ///   issuer_pub_key: issuer_pk.clone(),
 /// };
-/// let (sig_commitment,_,key) = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Address").unwrap();
+/// let output = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Address").unwrap();
+/// let sig_commitment = output.commitment;
+/// let key = output.key.unwrap();
 /// let conf_reveal_proof = ac_confidential_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key, &enc_key, &bitmap[..], b"Some Message").unwrap();
 /// assert!(ac_confidential_verify(&issuer_pk, &enc_key, &bitmap[..], &sig_commitment, &conf_reveal_proof.ctexts, &conf_reveal_proof.pok, b"Some Message").is_ok())
 /// ```

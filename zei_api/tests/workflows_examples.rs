@@ -466,28 +466,26 @@ pub(crate) mod examples {
                                         issuer_pub_key: cred_issuer_pk.clone() };
 
     // 2.2 credential commitments
-    let (commitment_user1, proof_user1, commitment_key_user1) =
-      ac_commit(&mut prng,
-                &user1_ac_sk,
-                &credential_user1,
-                user1_keypair.get_pk_ref().as_bytes()).unwrap();
-    let (commitment_user2, proof_user2, commitment_key_user2) =
-      ac_commit(&mut prng,
-                &user2_ac_sk,
-                &credential_user2,
-                user2_keypair.get_pk_ref().as_bytes()).unwrap();
+    let ac_output_user1 = ac_commit(&mut prng,
+                                    &user1_ac_sk,
+                                    &credential_user1,
+                                    user1_keypair.get_pk_ref().as_bytes()).unwrap();
+    let ac_output_user2 = ac_commit(&mut prng,
+                                    &user2_ac_sk,
+                                    &credential_user2,
+                                    user2_keypair.get_pk_ref().as_bytes()).unwrap();
 
     // 2.3 verifying commitment and put them on AIR
     assert!(ac_verify_commitment(&cred_issuer_pk,
-                                 &commitment_user1,
-                                 &proof_user1,
+                                 &ac_output_user1.commitment,
+                                 &ac_output_user1.pok,
                                  user1_pubkey.as_bytes()).is_ok());
-    AIR.insert(user1_pubkey.as_bytes(), commitment_user1.clone());
+    AIR.insert(user1_pubkey.as_bytes(), ac_output_user1.commitment.clone());
     assert!(ac_verify_commitment(&cred_issuer_pk,
-                                 &commitment_user2,
-                                 &proof_user2,
+                                 &ac_output_user2.commitment,
+                                 &ac_output_user2.pok,
                                  user2_pubkey.as_bytes()).is_ok());
-    AIR.insert(user2_pubkey.as_bytes(), commitment_user2.clone());
+    AIR.insert(user2_pubkey.as_bytes(), ac_output_user2.commitment.clone());
 
     // 3. Prepare input AssetRecord
     // 3.1 get blind asset records "from ledger" and open them
@@ -505,7 +503,7 @@ pub(crate) mod examples {
                                                                  policies.clone(),
                                                                  &user1_ac_sk,
                                                                  &credential_user1,
-                                                                 &commitment_key_user1).unwrap();
+                                                                 &ac_output_user1.key.unwrap()).unwrap();
 
     let input_asset_record2 =
       AssetRecord::from_open_asset_record_with_identity_tracking(&mut prng,
@@ -513,7 +511,7 @@ pub(crate) mod examples {
                                                                  policies.clone(),
                                                                  &user2_ac_sk,
                                                                  &credential_user2,
-                                                                 &commitment_key_user2).unwrap();
+                                                                 &ac_output_user2.key.unwrap()).unwrap();
 
     // 3. Prepare output AssetRecord
     // 3.1. build output asset_record template
@@ -643,28 +641,29 @@ pub(crate) mod examples {
                                         issuer_pub_key: cred_issuer_pk.clone() };
 
     // 2.2 credential commitments
-    let (commitment_user1, proof_user1, commitment_key_user1) =
-      ac_commit(&mut prng,
-                &recv_user1_ac_sk,
-                &credential_user1,
-                recv_user1_keypair.get_pk_ref().as_bytes()).unwrap();
-    let (commitment_user2, proof_user2, commitment_key_user2) =
-      ac_commit(&mut prng,
-                &recv_user2_ac_sk,
-                &credential_user2,
-                recv_user2_keypair.get_pk_ref().as_bytes()).unwrap();
+    let ac_output_user1 = ac_commit(&mut prng,
+                                    &recv_user1_ac_sk,
+                                    &credential_user1,
+                                    recv_user1_keypair.get_pk_ref().as_bytes()).unwrap();
+    let ac_output_user2 = ac_commit(&mut prng,
+                                    &recv_user2_ac_sk,
+                                    &credential_user2,
+                                    recv_user2_keypair.get_pk_ref().as_bytes()).unwrap();
 
     // 2.3 verifying commitment and put them on AIR
+    let commitment_user1 = ac_output_user1.clone().commitment;
     assert!(ac_verify_commitment(&cred_issuer_pk,
                                  &commitment_user1,
-                                 &proof_user1,
+                                 &ac_output_user1.pok,
                                  recv_user1_pub_key.as_bytes()).is_ok());
-    AIR.insert(recv_user1_pub_key.as_bytes(), commitment_user1.clone());
+    AIR.insert(recv_user1_pub_key.as_bytes(), &commitment_user1);
+
+    let commitment_user2 = ac_output_user2.clone().commitment;
     assert!(ac_verify_commitment(&cred_issuer_pk,
-                                 &commitment_user2,
-                                 &proof_user2,
+                                 &ac_output_user2.commitment,
+                                 &ac_output_user2.pok,
                                  recv_user2_pub_key.as_bytes()).is_ok());
-    AIR.insert(recv_user2_pub_key.as_bytes(), commitment_user2.clone());
+    AIR.insert(recv_user2_pub_key.as_bytes(), &commitment_user2);
 
     // 3. Prepare input AssetRecord
     // 3.1 get blind asset records "from ledger" and open them
@@ -689,7 +688,7 @@ pub(crate) mod examples {
                                                         &template,
                                                         &recv_user1_ac_sk,
                                                         &credential_user1,
-                                                        &commitment_key_user1).unwrap();
+                                                        &ac_output_user1.key.unwrap()).unwrap();
 
     let template = AssetRecordTemplate::with_asset_tracking(
       amount_out2,
@@ -702,7 +701,7 @@ pub(crate) mod examples {
                                                         &template,
                                                         &recv_user2_ac_sk,
                                                         &credential_user2,
-                                                        &commitment_key_user2).unwrap();
+                                                        &ac_output_user2.key.unwrap()).unwrap();
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -856,53 +855,49 @@ pub(crate) mod examples {
                                         issuer_pub_key: cred_issuer_pk.clone() };
 
     // 1.4 Register address/identity in AIR
-    let (commitment_user1_addr1, proof, commitment_user1_addr1_key) =
-      ac_commit(&mut prng,
-                &user1_ac_sk,
-                &credential_user1,
-                user1_key_pair1.get_pk_ref().as_bytes()).unwrap();
+    let ac_output_user1 = ac_commit(&mut prng,
+                                    &user1_ac_sk,
+                                    &credential_user1,
+                                    user1_key_pair1.get_pk_ref().as_bytes()).unwrap();
     assert!(ac_verify_commitment(&cred_issuer_pk,
-                                 &commitment_user1_addr1,
-                                 &proof,
+                                 &ac_output_user1.commitment,
+                                 &ac_output_user1.pok,
                                  user1_key_pair1.get_pk_ref().as_bytes()).is_ok());
     AIR.insert(user1_key_pair1.get_pk_ref().as_bytes(),
-               commitment_user1_addr1);
+               ac_output_user1.commitment);
 
-    let (commitment_user2_addr1, proof, _commitment_user2_addr1_key) =
-      ac_commit(&mut prng,
-                &user2_ac_sk,
-                &credential_user2,
-                user2_key_pair1.get_pk_ref().as_bytes()).unwrap();
+    let ac_output_user2 = ac_commit(&mut prng,
+                                    &user2_ac_sk,
+                                    &credential_user2,
+                                    user2_key_pair1.get_pk_ref().as_bytes()).unwrap();
     assert!(ac_verify_commitment(&cred_issuer_pk,
-                                 &commitment_user2_addr1,
-                                 &proof,
+                                 &ac_output_user2.commitment,
+                                 &ac_output_user2.pok,
                                  user2_key_pair1.get_pk_ref().as_bytes()).is_ok());
     AIR.insert(user2_key_pair1.get_pk_ref().as_bytes(),
-               commitment_user2_addr1);
+               ac_output_user2.commitment);
 
-    let (commitment_user3_addr1, proof, commitment_user3_addr1_key) =
-      ac_commit(&mut prng,
-                &user3_ac_sk,
-                &credential_user3,
-                user3_key_pair1.get_pk_ref().as_bytes()).unwrap();
+    let ac_output_user3 = ac_commit(&mut prng,
+                                    &user3_ac_sk,
+                                    &credential_user3,
+                                    user3_key_pair1.get_pk_ref().as_bytes()).unwrap();
     assert!(ac_verify_commitment(&cred_issuer_pk,
-                                 &commitment_user3_addr1,
-                                 &proof,
+                                 &ac_output_user3.commitment,
+                                 &ac_output_user3.pok,
                                  user3_key_pair1.get_pk_ref().as_bytes()).is_ok());
     AIR.insert(user3_key_pair1.get_pk_ref().as_bytes(),
-               commitment_user3_addr1);
+               ac_output_user3.commitment);
 
-    let (commitment_user4_addr1, proof, _commitment_user4_addr1_key) =
-      ac_commit(&mut prng,
-                &user4_ac_sk,
-                &credential_user4,
-                user4_key_pair1.get_pk_ref().as_bytes()).unwrap();
+    let ac_output_user4 = ac_commit(&mut prng,
+                                    &user4_ac_sk,
+                                    &credential_user4,
+                                    user4_key_pair1.get_pk_ref().as_bytes()).unwrap();
     assert!(ac_verify_commitment(&cred_issuer_pk,
-                                 &commitment_user4_addr1,
-                                 &proof,
+                                 &ac_output_user4.commitment,
+                                 &ac_output_user4.pok,
                                  user4_key_pair1.get_pk_ref().as_bytes()).is_ok());
     AIR.insert(user4_key_pair1.get_pk_ref().as_bytes(),
-               commitment_user4_addr1);
+               ac_output_user4.commitment);
 
     // 1.5 Define asset issuer tracking policies
     let id_tracking_policy1 = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk.clone(),
@@ -957,7 +952,7 @@ pub(crate) mod examples {
                                                                             oar_user1_addr1,
                                                                             asset_tracing_policy_asset1_input.clone(),
                                                                             &user1_ac_sk,
-                                                                            &credential_user1, &commitment_user1_addr1_key).unwrap();
+                                                                            &credential_user1, &ac_output_user1.key.unwrap()).unwrap();
     let ar_in2 = AssetRecord::from_open_asset_record_no_asset_tracking(oar_user1_addr2);
     let ar_in3 = AssetRecord::from_open_asset_record_no_asset_tracking(oar_user1_addr3);
 
@@ -987,7 +982,7 @@ pub(crate) mod examples {
                                                         &template3,
                                                         &user3_ac_sk,
                                                         &credential_user3,
-                                                        &commitment_user3_addr1_key).unwrap();
+                                                        &ac_output_user3.key.unwrap()).unwrap();
 
     let output_asset_record4 =
       AssetRecord::from_template_no_identity_tracking(&mut prng, &template4).unwrap();
