@@ -9,12 +9,16 @@ use curve25519_dalek::traits::Identity;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
+use curve25519_dalek::edwards::EdwardsPoint;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoScalar(pub Scalar);
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CompressedRistretto(pub CR);
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct CompressedEdwardsY(pub curve25519_dalek::edwards::CompressedEdwardsY);
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoPoint(pub RPoint);
@@ -87,10 +91,16 @@ impl RistrettoPoint {
 
 impl CompressedRistretto {
   pub fn decompress(&self) -> Option<RistrettoPoint> {
-    self.0.decompress().map(|x| RistrettoPoint(x))
+    self.0.decompress().map(RistrettoPoint)
   }
   pub fn identity() -> CompressedRistretto {
     CompressedRistretto(CR::identity())
+  }
+}
+
+impl CompressedEdwardsY {
+  pub fn decompress(&self) -> Option<EdwardsPoint> {
+    self.0.decompress()
   }
 }
 

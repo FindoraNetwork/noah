@@ -1,7 +1,7 @@
 use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::groups::{Group, Scalar};
 use crate::jubjub::{JubjubGroup, JubjubScalar};
-use crate::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar};
+use crate::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar, CompressedEdwardsY};
 use serde::Serializer;
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
@@ -34,7 +34,17 @@ impl ZeiFromToBytes for CompressedRistretto {
   }
 }
 
+impl ZeiFromToBytes for CompressedEdwardsY {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    self.0.as_bytes().to_vec()
+  }
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    Ok(CompressedEdwardsY(curve25519_dalek::edwards::CompressedEdwardsY::from_slice(bytes)))
+  }
+}
+
 serialize_deserialize!(CompressedRistretto);
+serialize_deserialize!(CompressedEdwardsY);
 serialize_deserialize!(RistrettoScalar);
 serialize_deserialize!(JubjubScalar);
 serialize_deserialize!(BLSScalar);
