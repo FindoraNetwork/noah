@@ -1319,6 +1319,11 @@ pub(crate) mod tests {
                                                    outputs.as_slice(),
                                                    in_keys_ref.as_slice());
 
+      // test serialization
+      let string = serde_json::to_string(&xfr_note).unwrap();
+      let xfr_note2 = serde_json::from_str(&string).unwrap();
+      assert_eq!(xfr_note, xfr_note2);
+
       let xfr_body = &xfr_note.body;
 
       let input_policies = input_templates.iter()
