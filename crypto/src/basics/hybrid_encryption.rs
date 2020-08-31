@@ -3,14 +3,35 @@ use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use rand_core::{CryptoRng, RngCore};
 use sha2::Digest;
+use serde::Serializer;
 use utils::errors::ZeiError;
-use utils::serialization::zei_obj_serde;
+use utils::serialization::{ZeiFromToBytes};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct XPublicKey {
-  #[serde(with = "zei_obj_serde")]
   pub(crate) key: x25519_dalek::PublicKey,
 }
+
+impl ZeiFromToBytes for XPublicKey {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    self.key.as_bytes().to_vec()
+  }
+
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    if bytes.len() != 32 {
+      Err(ZeiError::DeserializationError)
+    }
+    else{
+      let mut array = [0u8; 32];
+      array.copy_from_slice(bytes);
+      Ok(XPublicKey{
+        key: x25519_dalek::PublicKey::from(array)
+      })
+    }
+  }
+}
+
+serialize_deserialize!(XPublicKey);
 
 impl XPublicKey {
   pub fn from(sk: &XSecretKey) -> XPublicKey {
@@ -26,11 +47,31 @@ impl PartialEq for XPublicKey {
 
 impl Eq for XPublicKey {}
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct XSecretKey {
-  #[serde(with = "zei_obj_serde")]
   pub(crate) key: x25519_dalek::StaticSecret,
 }
+
+impl ZeiFromToBytes for XSecretKey {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    self.key.to_bytes().to_vec()
+  }
+
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    if bytes.len() != 32 {
+      Err(ZeiError::DeserializationError)
+    }
+    else{
+      let mut array = [0u8; 32];
+      array.copy_from_slice(bytes);
+      Ok(XSecretKey{
+        key: x25519_dalek::StaticSecret::from(array)
+      })
+    }
+  }
+}
+
+serialize_deserialize!(XSecretKey);
 
 impl XSecretKey {
   pub fn new<R: CryptoRng + RngCore>(prng: &mut R) -> XSecretKey {
@@ -46,9 +87,22 @@ impl PartialEq for XSecretKey {
 
 impl Eq for XSecretKey {}
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Ctext(pub Vec<u8>);
+impl ZeiFromToBytes for Ctext {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    self.0.clone()
+  }
+
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    Ok(Ctext(bytes.to_vec()))
+  }
+}
+serialize_deserialize!(Ctext);
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct ZeiHybridCipher {
-  pub(crate) ciphertext: Vec<u8>,
+  pub(crate) ciphertext: Ctext,
   pub(crate) ephemeral_public_key: XPublicKey,
 }
 
@@ -86,7 +140,7 @@ pub fn hybrid_decrypt_with_x25519_secret_key(ctext: &ZeiHybridCipher,
                                              sec_key: &XSecretKey)
                                              -> Vec<u8> {
   let key = symmetric_key_from_x25519_secret_key(&sec_key.key, &ctext.ephemeral_public_key.key);
-  symmetric_decrypt_fresh_key(&key, ctext.ciphertext.as_slice())
+  symmetric_decrypt_fresh_key(&key, &ctext.ciphertext)
 }
 
 /// I decrypt a hybrid ciphertext for a secret key.
@@ -96,7 +150,7 @@ pub fn hybrid_decrypt_with_ed25519_secret_key(ctext: &ZeiHybridCipher,
                                               sec_key: &SecretKey)
                                               -> Vec<u8> {
   let key = symmetric_key_from_secret_key(sec_key, &ctext.ephemeral_public_key.key);
-  symmetric_decrypt_fresh_key(&key, ctext.ciphertext.as_slice())
+  symmetric_decrypt_fresh_key(&key, &ctext.ciphertext)
 }
 
 fn shared_key_to_32_bytes(shared_key: &x25519_dalek::SharedSecret) -> [u8; 32] {
@@ -174,19 +228,19 @@ use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes256Ctr;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 
-fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Vec<u8> {
+fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Ctext {
   let kkey = GenericArray::from_slice(key);
   let ctr = GenericArray::from_slice(&[0u8; 16]); // counter can be zero because key is fresh
   let mut ctext_vec = plaintext.to_vec();
   let mut cipher = Aes256Ctr::new(&kkey, ctr);
   cipher.apply_keystream(ctext_vec.as_mut_slice());
-  ctext_vec
+  Ctext(ctext_vec)
 }
 
-fn symmetric_decrypt_fresh_key(key: &[u8; 32], ciphertext: &[u8]) -> Vec<u8> {
+fn symmetric_decrypt_fresh_key(key: &[u8; 32], ciphertext: &Ctext) -> Vec<u8> {
   let kkey = GenericArray::from_slice(key);
   let ctr = GenericArray::from_slice(&[0u8; 16]);
-  let mut plaintext_vec = ciphertext.to_vec();
+  let mut plaintext_vec = ciphertext.0.clone();
   let mut cipher = Aes256Ctr::new(&kkey, ctr);
   cipher.apply_keystream(plaintext_vec.as_mut_slice());
   plaintext_vec
@@ -215,12 +269,12 @@ mod test {
     let msg = b"this is a message";
     let key: [u8; 32] = [0u8; 32];
     let mut ciphertext = symmetric_encrypt_fresh_key(&key, msg);
-    let decrypted = symmetric_decrypt_fresh_key(&key, ciphertext.as_slice());
+    let decrypted = symmetric_decrypt_fresh_key(&key, &ciphertext);
     assert_eq!(msg, decrypted.as_slice());
 
-    ciphertext[0] = 0xFF - ciphertext[0];
-    let result = symmetric_decrypt_fresh_key(&key, ciphertext.as_slice());
-    assert!(msg != result.as_slice());
+    ciphertext.0[0] = 0xFF - ciphertext.0[0];
+    let result = symmetric_decrypt_fresh_key(&key, &ciphertext);
+    assert_ne!(msg, result.as_slice());
   }
 
   #[test]

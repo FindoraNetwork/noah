@@ -6,6 +6,9 @@
 #![allow(clippy::many_single_char_names)]
 
 #[macro_use]
+extern crate utils;
+
+#[macro_use]
 extern crate itertools;
 
 #[macro_use]

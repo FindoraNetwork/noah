@@ -6,19 +6,19 @@ use crate::xfr::asset_mixer::AssetMixProof;
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
 use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
-use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
+use algebra::ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::RangeProof;
 use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCipher};
 use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
-use curve25519_dalek::edwards::CompressedEdwardsY;
 use utils::serialization;
 use utils::u8_bigendian_slice_to_u128;
 
 /// Asset Type identifier
 pub const ASSET_TYPE_LENGTH: usize = 32;
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct AssetType(pub [u8; ASSET_TYPE_LENGTH]);
+
 impl AssetType {
   /// Helper function to generate an asset type with identical value in each byte
   pub fn from_identical_byte(byte: u8) -> Self {

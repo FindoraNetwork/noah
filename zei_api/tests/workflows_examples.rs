@@ -1000,6 +1000,8 @@ pub(crate) mod examples {
                                   output_asset_record3,
                                   output_asset_record4],
                                 &[&user1_key_pair1, &user1_key_pair2, &user1_key_pair3]).unwrap();
+    let string = serde_json::to_string(&xfr_note);
+    println!("{}", string.unwrap());
     // 5. Verify xfr_note
     let no_policy = AssetTracingPolicies::new();
     let input1_credential_commitment = &AIR[xfr_note.body.inputs[0].public_key.as_bytes()];

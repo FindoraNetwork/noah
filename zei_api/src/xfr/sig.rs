@@ -48,19 +48,6 @@ impl XfrPublicKey {
   }
 }
 
-impl ZeiFromToBytes for XfrPublicKey {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    let bytes = self.0.to_bytes();
-    let mut vec = vec![];
-    vec.extend_from_slice(&bytes[..]);
-    vec
-  }
-
-  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
-    Ok(XfrPublicKey(PublicKey::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError)?))
-  }
-}
-
 impl XfrSecretKey {
   pub fn sign(&self, message: &[u8], public_key: &XfrPublicKey) -> XfrSignature {
     let expanded: ExpandedSecretKey = (&self.0).into();
@@ -82,19 +69,6 @@ impl XfrSecretKey {
   pub fn clone(&self) -> Self {
     let bytes = self.zei_to_bytes();
     XfrSecretKey::zei_from_bytes(bytes.as_slice()).unwrap() // This shouldn't fail
-  }
-}
-
-impl ZeiFromToBytes for XfrSecretKey {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    let bytes = self.0.to_bytes();
-    let mut vec = vec![];
-    vec.extend_from_slice(&bytes[..]);
-    vec
-  }
-
-  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
-    Ok(XfrSecretKey(SecretKey::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError)?))
   }
 }
 

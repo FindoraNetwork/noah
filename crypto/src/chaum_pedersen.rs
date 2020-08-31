@@ -7,20 +7,14 @@ use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
-use utils::serialization;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
   /// A Chaum-Perdersen equality of commitment proof
-  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) c3: RistrettoPoint,
-  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) c4: RistrettoPoint,
-  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) z1: Scalar,
-  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) z2: Scalar,
-  #[serde(with = "serialization::zei_obj_serde")]
   pub(crate) z3: Scalar,
 }
 

@@ -1,187 +1,51 @@
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
+use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use ed25519_dalek::{PublicKey, SecretKey};
-use serde::de::{SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::Serializer;
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
-use utils::{b64dec, b64enc};
 
-impl Serialize for XfrPublicKey {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(&self.as_bytes()))
+impl ZeiFromToBytes for AssetType {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    self.0.to_vec()
+  }
+
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    if bytes.len() != ASSET_TYPE_LENGTH {
+      Err(ZeiError::DeserializationError)
     } else {
-      serializer.serialize_bytes(self.as_bytes())
+      let mut array = [0u8; ASSET_TYPE_LENGTH];
+      array.copy_from_slice(bytes);
+      Ok(AssetType(array))
     }
   }
 }
 
-impl<'de> Deserialize<'de> for XfrPublicKey {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct XfrPublicKeyVisitor;
+serialize_deserialize!(AssetType);
 
-    impl<'de> Visitor<'de> for XfrPublicKeyVisitor {
-      type Value = XfrPublicKey;
+impl ZeiFromToBytes for XfrPublicKey {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    self.0.as_bytes().to_vec()
+  }
 
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("an array of 32 bytes")
-      }
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    let pk = PublicKey::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError)?;
+    Ok(XfrPublicKey(pk))
+  }
+}
+serialize_deserialize!(XfrPublicKey);
 
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<XfrPublicKey, E>
-        where E: serde::de::Error
-      {
-        if v.len() == 32 {
-          let mut bytes = [0u8; 32];
-          bytes.copy_from_slice(v);
+impl ZeiFromToBytes for XfrSecretKey {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    self.0.as_bytes().to_vec()
+  }
 
-          static ERRMSG: &str = "Bad public key encoding";
-
-          let pk = match PublicKey::from_bytes(&bytes[..]) {
-            Ok(pk) => pk,
-            Err(_) => {
-              return Err(serde::de::Error::invalid_value(serde::de::Unexpected::Bytes(v),
-                                                         &ERRMSG));
-            }
-          };
-          Ok(XfrPublicKey(pk))
-        } else {
-          Err(serde::de::Error::invalid_length(v.len(), &self))
-        }
-      }
-      fn visit_str<E>(self, s: &str) -> Result<XfrPublicKey, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(XfrPublicKeyVisitor)
-    } else {
-      deserializer.deserialize_bytes(XfrPublicKeyVisitor)
-    }
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    Ok(XfrSecretKey(SecretKey::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError)?))
   }
 }
 
-impl Serialize for XfrSecretKey {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(&self.zei_to_bytes()))
-    } else {
-      serializer.serialize_bytes(self.zei_to_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for XfrSecretKey {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct XfrSecretKeyVisitor;
-
-    impl<'de> Visitor<'de> for XfrSecretKeyVisitor {
-      type Value = XfrSecretKey;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("an array of 32 bytes")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<XfrSecretKey, E>
-        where E: serde::de::Error
-      {
-        if v.len() == 32 {
-          let mut bytes = [0u8; 32];
-          bytes.copy_from_slice(v);
-
-          static ERRMSG: &str = "Bad secret key encoding";
-
-          let sk = match SecretKey::from_bytes(&bytes[..]) {
-            Ok(sk) => sk,
-            Err(_) => {
-              return Err(serde::de::Error::invalid_value(serde::de::Unexpected::Bytes(v),
-                                                         &ERRMSG));
-            }
-          };
-          Ok(XfrSecretKey(sk))
-        } else {
-          Err(serde::de::Error::invalid_length(v.len(), &self))
-        }
-      }
-      fn visit_str<E>(self, s: &str) -> Result<XfrSecretKey, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(XfrSecretKeyVisitor)
-    } else {
-      deserializer.deserialize_bytes(XfrSecretKeyVisitor)
-    }
-  }
-}
-
-/*
-impl Serialize for XPublicKey {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.zei_to_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.zei_to_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for XPublicKey {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct XPublicKeyVisitor;
-
-    impl<'de> Visitor<'de> for XPublicKeyVisitor {
-      type Value = XPublicKey;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded XPublicKey")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<XPublicKey, E>
-        where E: serde::de::Error
-      {
-        XPublicKey::zei_from_bytes(v).map_err(serde::de::Error::custom)
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<XPublicKey, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().map_err(serde::de::Error::custom)? {
-          vec.push(x);
-        }
-        XPublicKey::zei_from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
-      }
-      fn visit_str<E>(self, s: &str) -> Result<XPublicKey, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(XPublicKeyVisitor)
-    } else {
-      deserializer.deserialize_bytes(XPublicKeyVisitor)
-    }
-  }
-}
-*/
+serialize_deserialize!(XfrSecretKey);
 
 impl ZeiFromToBytes for XfrSignature {
   fn zei_to_bytes(&self) -> Vec<u8> {
@@ -199,60 +63,7 @@ impl ZeiFromToBytes for XfrSignature {
   }
 }
 
-impl Serialize for XfrSignature {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
-  {
-    if serializer.is_human_readable() {
-      serializer.serialize_str(&b64enc(self.zei_to_bytes().as_slice()))
-    } else {
-      serializer.serialize_bytes(self.zei_to_bytes().as_slice())
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for XfrSignature {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>
-  {
-    struct XfrSignatureVisitor;
-
-    impl<'de> Visitor<'de> for XfrSignatureVisitor {
-      type Value = XfrSignature;
-
-      fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        formatter.write_str("a encoded Signature")
-      }
-
-      fn visit_bytes<E>(self, v: &[u8]) -> Result<XfrSignature, E>
-        where E: serde::de::Error
-      {
-        XfrSignature::zei_from_bytes(v).map_err(serde::de::Error::custom)
-      }
-
-      fn visit_seq<V>(self, mut seq: V) -> Result<XfrSignature, V::Error>
-        where V: SeqAccess<'de>
-      {
-        let mut vec: Vec<u8> = vec![];
-        while let Some(x) = seq.next_element().map_err(serde::de::Error::custom)? {
-          vec.push(x);
-        }
-        XfrSignature::zei_from_bytes(vec.as_slice()).map_err(serde::de::Error::custom)
-      }
-      fn visit_str<E>(self, s: &str) -> Result<XfrSignature, E>
-        where E: serde::de::Error
-      {
-        self.visit_bytes(&b64dec(s).map_err(serde::de::Error::custom)?)
-      }
-    }
-
-    if deserializer.is_human_readable() {
-      deserializer.deserialize_str(XfrSignatureVisitor)
-    } else {
-      deserializer.deserialize_bytes(XfrSignatureVisitor)
-    }
-  }
-}
+serialize_deserialize!(XfrSignature);
 
 /*
 // XXX keep this for future reference

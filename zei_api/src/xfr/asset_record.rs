@@ -9,14 +9,14 @@ use crate::xfr::structs::{
   ASSET_TYPE_LENGTH,
 };
 use algebra::groups::Scalar as _;
-use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar};
 use boolinator::Boolinator;
 use crypto::basics::hybrid_encryption::{
   hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
 };
 use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
+use curve25519_dalek::edwards::EdwardsPoint;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 use utils::errors::ZeiError;
@@ -423,7 +423,7 @@ fn sample_point_and_blind_share<R: CryptoRng + RngCore>(
   let pk_point = public_key.get_curve_point();
   let derived_point: EdwardsPoint = blind_key.0 * pk_point;
   let blind_share = blind_key.0 * ED25519_BASEPOINT_POINT;
-  (derived_point.compress(), blind_share.compress())
+  (CompressedEdwardsY(derived_point.compress()), CompressedEdwardsY(blind_share.compress()))
 }
 
 pub(crate) fn derive_point_from_blind_share(blind_share: &CompressedEdwardsY,
@@ -431,13 +431,13 @@ pub(crate) fn derive_point_from_blind_share(blind_share: &CompressedEdwardsY,
                                             -> Result<CompressedEdwardsY, ZeiError> {
   let blind_share_decompressed = blind_share.decompress()
                                             .ok_or(ZeiError::DecompressElementError)?;
-  Ok(secret_key.as_scalar_multiply_by_curve_point(&blind_share_decompressed)
-               .compress())
+  Ok(CompressedEdwardsY(secret_key.as_scalar_multiply_by_curve_point(&blind_share_decompressed)
+                                  .compress()))
 }
 
 pub(crate) fn compute_blind_factor(point: &CompressedEdwardsY, aux: &'static [u8]) -> Scalar {
   let mut hasher = Sha512::new();
-  hasher.input(point.as_bytes());
+  hasher.input(point.0.as_bytes());
   hasher.input(aux);
   Scalar::from_hash(hasher)
 }
