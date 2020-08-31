@@ -38,7 +38,7 @@ impl BLSScalar {
 
 impl ZeiScalar for BLSScalar {
   // scalar generation
-  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> BLSScalar {
+  fn random<R: CryptoRng + RngCore>(rng: &mut R) -> BLSScalar {
     BLSScalar(Scalar::random(rng))
   }
 
@@ -57,7 +57,7 @@ impl ZeiScalar for BLSScalar {
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&result[0..32]);
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-    Self::random_scalar(&mut prng)
+    Self::random(&mut prng)
   }
 
   // scalar arithmetic

@@ -295,18 +295,18 @@ pub mod option_bytes {
 
 #[cfg(test)]
 mod test {
+  use algebra::ristretto::RistrettoPoint;
   use crate::serialization::ZeiFromToBytes;
   use crate::xfr::asset_tracer::RecordDataEncKey;
   use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
-  use bulletproofs::PedersenGens;
   use crypto::basics::elgamal::elgamal_key_gen;
   use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-  use curve25519_dalek::ristretto::RistrettoPoint;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
+  use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
   #[test]
   fn public_key_message_pack_serialization() {
@@ -410,7 +410,7 @@ mod test {
   #[test]
   fn serialize_and_deserialize_elgamal() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
     let (_sk, xfr_pub_key) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
     let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
       res

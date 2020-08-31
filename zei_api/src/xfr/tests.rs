@@ -1,5 +1,7 @@
 #[cfg(test)]
 pub(crate) mod tests {
+  use algebra::groups::Scalar as _;
+  use algebra::ristretto::{RistrettoScalar as Scalar};
   use crate::api::anon_creds;
   use crate::api::anon_creds::{ac_commit, ACCommitment, Credential};
   use crate::setup::PublicParams;
@@ -13,12 +15,9 @@ pub(crate) mod tests {
     AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerMemo, AssetTracingPolicy,
     AssetType, IdentityRevealPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH,
   };
-  use bulletproofs::PedersenGens;
   use crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
   use crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
 
-  use curve25519_dalek::ristretto::RistrettoPoint;
-  use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
@@ -30,6 +29,7 @@ pub(crate) mod tests {
     XfrVerifyAssetTracingAssetAmountError, XfrVerifyAssetTracingIdentityError,
   };
   use utils::u64_to_u32_pair;
+  use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
   pub(crate) fn create_xfr(prng: &mut ChaChaRng,
                            input_templates: &[AssetRecordTemplate],
@@ -98,7 +98,7 @@ pub(crate) mod tests {
                                   })
                                   .collect_vec();
 
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let tuple = create_xfr(&mut prng,
                            inputs.as_slice(),
@@ -152,9 +152,9 @@ pub(crate) mod tests {
       AssetRecordType::ConfidentialAmount_ConfidentialAssetType
       | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
         let (low, high) = u64_to_u32_pair(total_amount + 1);
-        let commitment_low = pc_gens.commit(Scalar::from(low), Scalar::random(&mut prng))
+        let commitment_low = pc_gens.commit(Scalar::from_u32(low), Scalar::random(&mut prng))
                                     .compress();
-        let commitment_high = pc_gens.commit(Scalar::from(high), Scalar::random(&mut prng))
+        let commitment_high = pc_gens.commit(Scalar::from_u32(high), Scalar::random(&mut prng))
                                      .compress();
         xfr_note.body.outputs[3].amount =
           XfrAmount::Confidential((commitment_low, commitment_high));
@@ -203,7 +203,7 @@ pub(crate) mod tests {
       | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
         XfrAssetType::NonConfidential(AssetType::from_identical_byte(1u8))
       }
-      _ => XfrAssetType::Confidential(pc_gens.commit(Scalar::from(10u32),
+      _ => XfrAssetType::Confidential(pc_gens.commit(Scalar::from_u32(10),
                                                      old_output1.open_asset_record.type_blind)
                                              .compress()),
     };
@@ -246,7 +246,7 @@ pub(crate) mod tests {
       | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
         XfrAssetType::NonConfidential(AssetType::from_identical_byte(1u8))
       }
-      _ => XfrAssetType::Confidential(pc_gens.commit(Scalar::from(10u32),
+      _ => XfrAssetType::Confidential(pc_gens.commit(Scalar::from_u32(10),
                                                      old_input1.open_asset_record.type_blind)
                                              .compress()),
     };
@@ -698,15 +698,18 @@ pub(crate) mod tests {
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
     use crypto::basics::elgamal::ElGamalCiphertext;
+    use crypto::ristretto_pedersen::RistrettoPedersenGens;
+    use algebra::groups::GroupArithmetic;
+    use algebra::ristretto::RistrettoPoint;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
 
     fn create_wrong_proof() -> PedersenElGamalEqProof {
-      let m = Scalar::from(10u8);
-      let r = Scalar::from(7657u32);
+      let m = Scalar::from_u32(10);
+      let r = Scalar::from_u32(7657);
       let mut prng = ChaChaRng::from_seed([0u8; 32]);
-      let pc_gens = PedersenGens::default();
+      let pc_gens = RistrettoPedersenGens::default();
 
       let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
@@ -739,7 +742,7 @@ pub(crate) mod tests {
 
       let input_amount = 100u64;
 
-      let pc_gens = PedersenGens::default();
+      let pc_gens = RistrettoPedersenGens::default();
 
       let in_keys = gen_key_pair_vec(input_templates.len(), &mut prng);
       let in_keys_ref = in_keys.iter().map(|x| x).collect_vec();
@@ -827,7 +830,7 @@ pub(crate) mod tests {
                                                          .unwrap()
                                                          .clone();
 
-        let new_enc = old_enc.e2 + pc_gens.B; //adding 1 to the exponent
+        let new_enc = old_enc.e2.add(&pc_gens.B); //adding 1 to the exponent
 
         let tracer_memo =
           AssetTracerMemo { lock_asset_type: Some(ElGamalCiphertext { e1: old_enc.e1,

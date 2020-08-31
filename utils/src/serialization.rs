@@ -2,37 +2,11 @@ use crate::errors::ZeiError;
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
 
 /// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
 pub trait ZeiFromToBytes: Sized {
   fn zei_to_bytes(&self) -> Vec<u8>;
   fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError>;
-}
-
-impl ZeiFromToBytes for RistrettoPoint {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    self.compress().zei_to_bytes()
-  }
-  fn zei_from_bytes(bytes: &[u8]) -> Result<RistrettoPoint, ZeiError> {
-    let compressed = CompressedRistretto::from_slice(bytes);
-    match compressed.decompress() {
-      Some(x) => Ok(x),
-      None => Err(ZeiError::DecompressElementError),
-    }
-  }
-}
-
-impl ZeiFromToBytes for CompressedRistretto {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    let mut v = vec![];
-    v.extend_from_slice(&self.to_bytes()[..]);
-    v
-  }
-  fn zei_from_bytes(bytes: &[u8]) -> Result<CompressedRistretto, ZeiError> {
-    Ok(CompressedRistretto::from_slice(bytes))
-  }
 }
 
 impl ZeiFromToBytes for RangeProof {
@@ -95,19 +69,6 @@ impl ZeiFromToBytes for x25519_dalek::StaticSecret {
     let mut array = [0u8; 32];
     array.copy_from_slice(&bytes[0..32]);
     Ok(x25519_dalek::StaticSecret::from(array))
-  }
-}
-
-impl ZeiFromToBytes for Scalar {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    let mut v = vec![];
-    v.extend_from_slice(&self.to_bytes()[..]);
-    v
-  }
-  fn zei_from_bytes(bytes: &[u8]) -> Result<Scalar, ZeiError> {
-    let mut bits = [0u8; 32];
-    bits.copy_from_slice(bytes);
-    Ok(Scalar::from_bits(bits))
   }
 }
 

@@ -103,7 +103,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
   }
   for (attr, b) in credential.attributes.iter().zip(reveal_map.iter()) {
     if *b {
-      let r = P::ScalarField::random_scalar(prng);
+      let r = P::ScalarField::random(prng);
       let ctext = elgamal_encrypt::<P::G1>(&base, attr, &r, enc_key);
       rands.push(r);
       ctexts.push(ctext);
@@ -191,18 +191,18 @@ pub(crate) fn ac_confidential_sok_prove<R: CryptoRng + RngCore, P: Pairing>(
   -> CACPoK<P::G1, P::G2, P::ScalarField> {
   transcript.cac_init::<P>(issuer_pk, enc_key, &sig_commitment, ctexts);
   transcript.append_message(SOK_LABEL, msg); // SoK
-  let r_t = P::ScalarField::random_scalar(prng);
-  let r_sk = P::ScalarField::random_scalar(prng);
+  let r_t = P::ScalarField::random(prng);
+  let r_sk = P::ScalarField::random(prng);
   let mut r_attrs = vec![];
   let mut r_rands = vec![];
   let mut commitment = issuer_pk.gen2.mul(&r_t).add(&issuer_pk.zz2.mul(&r_sk));
   let mut ctext_coms = vec![];
   for (Y2_i, attr) in issuer_pk.yy2.iter().zip(attrs.iter()) {
-    let r_attr = P::ScalarField::random_scalar(prng);
+    let r_attr = P::ScalarField::random(prng);
     let elem = Y2_i.mul(&r_attr);
     commitment = commitment.add(&elem);
     if let Attribute::Revealed(_) = attr {
-      let r_rand = P::ScalarField::random_scalar(prng);
+      let r_rand = P::ScalarField::random(prng);
       let ctext_com = elgamal_encrypt(&P::G1::get_base(), &r_attr, &r_rand, enc_key);
       transcript.append_proof_commitment(&ctext_com.e1);
       transcript.append_proof_commitment(&ctext_com.e2);

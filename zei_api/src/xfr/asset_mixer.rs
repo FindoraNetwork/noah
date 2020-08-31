@@ -1,15 +1,16 @@
+use algebra::groups::Scalar as _;
+use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crate::setup::PublicParams;
 use bulletproofs::r1cs::{batch_verify, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::serialization::zei_obj_serde;
 use wasm_bindgen::__rt::std::collections::HashSet;
+
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
@@ -25,22 +26,23 @@ impl Eq for AssetMixProof {}
 /// I compute a proof that the assets were mixed correctly
 /// # Example
 /// ```
-/// use curve25519_dalek::scalar::Scalar;
+/// use algebra::ristretto::RistrettoScalar;
 /// use zei::xfr::asset_mixer::prove_asset_mixing;
+/// use algebra::groups::Scalar;
 /// let input = [
-///            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
-///            (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
-///            (10u64, Scalar::from(1u8), Scalar::from(10002u64), Scalar::from(200002u64)),
-///            (50u64, Scalar::from(2u8), Scalar::from(10003u64), Scalar::from(200003u64)),
+///            (60u64, RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(10000), RistrettoScalar::from_u32(200000)),
+///            (100u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10001), RistrettoScalar::from_u32(200001)),
+///            (10u64, RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(10002), RistrettoScalar::from_u32(200002)),
+///            (50u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10003), RistrettoScalar::from_u32(200003)),
 ///            ];
 /// let output = [
-///            (40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
-///            (9u64, Scalar::from(1u8), Scalar::from(10005u64), Scalar::from(200005u64)),
-///            (1u64, Scalar::from(1u8), Scalar::from(10006u64), Scalar::from(200006u64)),
-///            (80u64, Scalar::from(2u8), Scalar::from(10007u64), Scalar::from(200007u64)),
-///            (50u64, Scalar::from(0u8), Scalar::from(10008u64), Scalar::from(200008u64)),
-///            (10u64, Scalar::from(0u8), Scalar::from(10009u64), Scalar::from(200009u64)),
-///            (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64)),
+///            (40u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10004), RistrettoScalar::from_u32(200004)),
+///            (9u64, RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(10005), RistrettoScalar::from_u32(200005)),
+///            (1u64, RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(10006), RistrettoScalar::from_u32(200006)),
+///            (80u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10007), RistrettoScalar::from_u32(200007)),
+///            (50u64, RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(10008), RistrettoScalar::from_u32(200008)),
+///            (10u64, RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(10009), RistrettoScalar::from_u32(200009)),
+///            (30u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10010), RistrettoScalar::from_u32(200010)),
 ///        ];
 ///
 /// let proof = prove_asset_mixing(&input, &output).unwrap();
@@ -55,7 +57,7 @@ pub fn prove_asset_mixing(inputs: &[(u64, Scalar, Scalar, Scalar)],
   fn extract_values_and_blinds(list: &[(u64, Scalar, Scalar, Scalar)])
                                -> (Vec<CloakValue>, Vec<CloakValue>) {
     let values = list.iter()
-                     .map(|(amount, asset_type, _, _)| CloakValue { amount: Scalar::from(*amount),
+                     .map(|(amount, asset_type, _, _)| CloakValue { amount: Scalar::from_u64(*amount),
                                                                     asset_type: *asset_type })
                      .collect();
     let blinds =
@@ -71,12 +73,12 @@ pub fn prove_asset_mixing(inputs: &[(u64, Scalar, Scalar, Scalar)],
 
   let mut in_set = HashSet::new();
   for in_value in in_values.iter() {
-    in_set.insert(in_value.asset_type);
+    in_set.insert(in_value.asset_type.0);
   }
 
-  let mut out_set: HashSet<Scalar> = HashSet::new();
+  let mut out_set = HashSet::new();
   for out_value in out_values.iter() {
-    out_set.insert(out_value.asset_type);
+    out_set.insert(out_value.asset_type.0);
   }
   if in_set != out_set {
     return Err(ZeiError::ParameterError);
@@ -115,41 +117,42 @@ pub struct AssetMixingInstance<'a> {
 /// I verify that the assets were mixed correctly
 /// # Example
 /// ```
+/// use algebra::ristretto::{RistrettoScalar, CompressedRistretto};
+/// use algebra::groups::Scalar;
 /// use zei::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
-/// use curve25519_dalek::scalar::Scalar;
-/// use curve25519_dalek::ristretto::CompressedRistretto;
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
 /// use zei::setup::PublicParams;
+/// use crypto::ristretto_pedersen::RistrettoPedersenGens;
 /// let input = [
-///            (60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
-///            (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
-///            (10u64, Scalar::from(1u8), Scalar::from(10002u64), Scalar::from(200002u64)),
-///            (50u64, Scalar::from(2u8), Scalar::from(10003u64), Scalar::from(200003u64)),
+///            (60u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10000), RistrettoScalar::from_u64(200000)),
+///            (100u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10001), RistrettoScalar::from_u64(200001)),
+///            (10u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10002), RistrettoScalar::from_u64(200002)),
+///            (50u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10003), RistrettoScalar::from_u64(200003)),
 ///            ];
 /// let output = [
-///            (40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
-///            (9u64, Scalar::from(1u8), Scalar::from(10005u64), Scalar::from(200005u64)),
-///            (1u64, Scalar::from(1u8), Scalar::from(10006u64), Scalar::from(200006u64)),
-///            (80u64, Scalar::from(2u8), Scalar::from(10007u64), Scalar::from(200007u64)),
-///            (50u64, Scalar::from(0u8), Scalar::from(10008u64), Scalar::from(200008u64)),
-///            (10u64, Scalar::from(0u8), Scalar::from(10009u64), Scalar::from(200009u64)),
-///            (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64)),
+///            (40u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004)),
+///            (9u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10005), RistrettoScalar::from_u64(200005)),
+///            (1u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10006), RistrettoScalar::from_u64(200006)),
+///            (80u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10007), RistrettoScalar::from_u64(200007)),
+///            (50u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10008), RistrettoScalar::from_u64(200008)),
+///            (10u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10009), RistrettoScalar::from_u64(200009)),
+///            (30u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10010), RistrettoScalar::from_u64(200010)),
 ///        ];
 ///
 /// let proof = prove_asset_mixing(&input, &output).unwrap();
-/// let pc_gens = PedersenGens::default();
+/// let pc_gens = RistrettoPedersenGens::default();
 /// let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
 ///      input.iter()
 ///           .map(|(amount, typ, blind_a, blind_typ)| {
-///             (pc_gens.commit(Scalar::from(*amount), *blind_a).compress(),
+///             (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a).compress(),
 ///              pc_gens.commit(*typ, *blind_typ).compress())
 ///           })
 ///           .collect();
 ///    let output_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
 ///      output.iter()
 ///            .map(|(amount, typ, blind_a, blind_typ)| {
-///              (pc_gens.commit(Scalar::from(*amount), *blind_a).compress(),
+///              (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a).compress(),
 ///               pc_gens.commit(*typ, *blind_typ).compress())
 ///            })
 ///            .collect();
@@ -189,7 +192,8 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(prng: &mut R,
     params.increase_circuit_gens(max_circuit_size);
     // info!("Zei: Bulletproof gens increased");
   }
-  batch_verify(prng, verifiers, &params.pc_gens, &params.bp_circuit_gens).map_err(|_| {
+  let pc_gens = (&params.pc_gens).into();
+  batch_verify(prng, verifiers, &pc_gens, &params.bp_circuit_gens).map_err(|_| {
                                                             ZeiError::AssetMixerVerificationError
                                                           })
 }
@@ -254,53 +258,53 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
 mod test {
   use crate::setup::PublicParams;
   use crate::xfr::asset_mixer::AssetMixingInstance;
-  use bulletproofs::PedersenGens;
-  use curve25519_dalek::ristretto::CompressedRistretto;
-  use curve25519_dalek::scalar::Scalar;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
+  use algebra::ristretto::{RistrettoScalar, CompressedRistretto};
+  use algebra::groups::Scalar;
+  use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
   #[test]
   fn test_asset_mixer() {
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     // asset type set to not match errors
-    let input = [(60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
-                 (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64))];
-    let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
-                  (10u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64))];
+    let input = [(60u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10000), RistrettoScalar::from_u64(200000)),
+                 (100u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10001), RistrettoScalar::from_u64(200001))];
+    let output = [(40u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004)),
+                  (10u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004))];
     let proof_result = super::prove_asset_mixing(&input, &output);
     assert!(proof_result.is_err());
 
-    let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64))];
+    let output = [(40u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004))];
     let proof_result = super::prove_asset_mixing(&input, &output);
     assert!(proof_result.is_err());
 
-    let input = [(60u64, Scalar::from(0u8), Scalar::from(10000u64), Scalar::from(200000u64)),
-                 (100u64, Scalar::from(2u8), Scalar::from(10001u64), Scalar::from(200001u64)),
-                 (10u64, Scalar::from(1u8), Scalar::from(10002u64), Scalar::from(200002u64)),
-                 (50u64, Scalar::from(2u8), Scalar::from(10003u64), Scalar::from(200003u64))];
-    let output = [(40u64, Scalar::from(2u8), Scalar::from(10004u64), Scalar::from(200004u64)),
-                  (9u64, Scalar::from(1u8), Scalar::from(10005u64), Scalar::from(200005u64)),
-                  (1u64, Scalar::from(1u8), Scalar::from(10006u64), Scalar::from(200006u64)),
-                  (80u64, Scalar::from(2u8), Scalar::from(10007u64), Scalar::from(200007u64)),
-                  (50u64, Scalar::from(0u8), Scalar::from(10008u64), Scalar::from(200008u64)),
-                  (10u64, Scalar::from(0u8), Scalar::from(10009u64), Scalar::from(200009u64)),
-                  (30u64, Scalar::from(2u8), Scalar::from(10010u64), Scalar::from(200010u64))];
+    let input = [(60u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10000), RistrettoScalar::from_u64(200000)),
+                 (100u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10001), RistrettoScalar::from_u64(200001)),
+                 (10u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10002), RistrettoScalar::from_u64(200002)),
+                 (50u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10003), RistrettoScalar::from_u64(200003))];
+    let output = [(40u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004)),
+                  (9u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10005), RistrettoScalar::from_u64(200005)),
+                  (1u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10006), RistrettoScalar::from_u64(200006)),
+                  (80u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10007), RistrettoScalar::from_u64(200007)),
+                  (50u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10008), RistrettoScalar::from_u64(200008)),
+                  (10u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10009), RistrettoScalar::from_u64(200009)),
+                  (30u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10010), RistrettoScalar::from_u64(200010))];
 
     let proof = super::prove_asset_mixing(&input, &output).unwrap();
 
     let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
       input.iter()
            .map(|(amount, typ, blind_a, blind_typ)| {
-             (pc_gens.commit(Scalar::from(*amount), *blind_a).compress(),
+             (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a).compress(),
               pc_gens.commit(*typ, *blind_typ).compress())
            })
            .collect();
     let output_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
       output.iter()
             .map(|(amount, typ, blind_a, blind_typ)| {
-              (pc_gens.commit(Scalar::from(*amount), *blind_a).compress(),
+              (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a).compress(),
                pc_gens.commit(*typ, *blind_typ).compress())
             })
             .collect();

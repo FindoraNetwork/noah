@@ -6,6 +6,7 @@ edition = "2018"
 description = "Utilities for Zei tests and benchmarks"
 
 [dependencies]
+crypto = {path = "../crypto"}
 zei = {path = "../zei_api"}
 rand = { version = "0.7", default-features = false}
 rand_chacha = "0.2"

@@ -1,3 +1,5 @@
+use algebra::groups::{Scalar as _, GroupArithmetic};
+use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crate::api::anon_creds::{ACCommitment, Attr};
 use crate::setup::PublicParams;
 use crate::xfr::asset_mixer::{
@@ -9,9 +11,7 @@ use crate::xfr::proofs::{
 };
 use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use crate::xfr::structs::*;
-use bulletproofs::PedersenGens;
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use serde::ser::Serialize;
@@ -330,7 +330,7 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
                               outputs: &[&OpenAssetRecord],
                               xfr_type: XfrType)
                               -> Result<AssetTypeAndAmountProof, ZeiError> {
-  let pow2_32 = Scalar::from(POW_2_32);
+  let pow2_32 = Scalar::from_u64(POW_2_32);
 
   let mut ins = vec![];
 
@@ -339,7 +339,7 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
     let type_scalar = Scalar::from(type_as_u128);
     ins.push((x.amount,
               type_scalar,
-              x.amount_blinds.0 + pow2_32 * x.amount_blinds.1,
+              x.amount_blinds.0.add(&pow2_32.mul(&x.amount_blinds.1)),
               x.type_blind));
   }
 
@@ -349,7 +349,7 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
     let type_scalar = Scalar::from(type_as_u128);
     out.push((x.amount,
               type_scalar,
-              x.amount_blinds.0 + pow2_32 * x.amount_blinds.1,
+              x.amount_blinds.0.add(&pow2_32.mul(&x.amount_blinds.1)),
               x.type_blind));
   }
 
@@ -369,7 +369,7 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
   outputs: &[&OpenAssetRecord],
   xfr_type: XfrType)
   -> Result<AssetTypeAndAmountProof, ZeiError> {
-  let pc_gens = PedersenGens::default();
+  let pc_gens = RistrettoPedersenGens::default();
 
   match xfr_type {
     XfrType::NonConfidential_SingleAsset => Ok(AssetTypeAndAmountProof::NoProof),
@@ -754,7 +754,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
                                                   -> Result<(), ZeiError> {
   fn process_bars(bars: &[BlindAssetRecord])
                   -> Result<Vec<(CompressedRistretto, CompressedRistretto)>, ZeiError> {
-    let pow2_32 = Scalar::from(POW_2_32);
+    let pow2_32 = Scalar::from_u64(POW_2_32);
     bars.iter()
         .map(|x| {
           let (com_amount_low, com_amount_high) = match x.amount {
@@ -763,22 +763,22 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
                c2.decompress().ok_or(ZeiError::DecompressElementError))
             }
             XfrAmount::NonConfidential(amount) => {
-              let pc_gens = PedersenGens::default();
+              let pc_gens = RistrettoPedersenGens::default();
               let (low, high) = u64_to_u32_pair(amount);
-              (Ok(pc_gens.commit(Scalar::from(low), Scalar::zero())),
-               Ok(pc_gens.commit(Scalar::from(high), Scalar::zero())))
+              (Ok(pc_gens.commit(Scalar::from_u32(low), Scalar::from_u32(0))),
+               Ok(pc_gens.commit(Scalar::from_u32(high), Scalar::from_u32(0))))
             }
           };
           match (com_amount_low, com_amount_high) {
             (Ok(com_amount_low), Ok(com_amount_high)) => {
-              let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
+              let com_amount = (com_amount_low.add(&com_amount_high.mul(&pow2_32))).compress();
 
               let com_type = match x.asset_type {
                 XfrAssetType::Confidential(c) => c,
                 XfrAssetType::NonConfidential(asset_type) => {
                   let scalar = asset_type_to_scalar(&asset_type);
-                  let pc_gens = PedersenGens::default();
-                  pc_gens.commit(scalar, Scalar::zero()).compress()
+                  let pc_gens = RistrettoPedersenGens::default();
+                  pc_gens.commit(scalar, Scalar::from_u32(0)).compress()
                 }
               };
               Ok((com_amount, com_type))

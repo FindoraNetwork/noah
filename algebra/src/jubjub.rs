@@ -22,7 +22,7 @@ pub struct JubjubGroup(pub(crate) ExtendedPoint);
 
 impl Scalar for JubjubScalar {
   // scalar generation
-  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> JubjubScalar {
+  fn random<R: CryptoRng + RngCore>(rng: &mut R) -> JubjubScalar {
     let mut bytes = [0u8; 64];
     rng.fill_bytes(&mut bytes);
     JubjubScalar(Fr::from_bytes_wide(&bytes))

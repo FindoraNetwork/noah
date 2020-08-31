@@ -1,11 +1,12 @@
 //The Public Setup needed for Proofs
-use bulletproofs::{BulletproofGens, PedersenGens};
+use bulletproofs::{BulletproofGens};
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
 //Shared by all members of the ledger
 pub struct PublicParams {
   pub bp_gens: BulletproofGens,
   pub bp_circuit_gens: BulletproofGens,
-  pub pc_gens: PedersenGens,
+  pub pc_gens: RistrettoPedersenGens,
   pub range_proof_bits: usize,
 }
 
@@ -20,7 +21,7 @@ impl PublicParams {
     let range_generators = BulletproofGens::new(BULLET_PROOF_RANGE, MAX_PARTY_NUMBER);
     let circuit_generators = BulletproofGens::new(256, 1);
     // Pedersen commitment parameters
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     PublicParams { bp_gens: range_generators,
                    bp_circuit_gens: circuit_generators,

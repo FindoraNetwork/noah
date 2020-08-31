@@ -271,7 +271,7 @@ pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
                                                     &get_fake_zero_commitment(),
                                                     proof.zero.as_ref().unwrap()); //safe unwrap
 
-  let alpha = Scalar::random_scalar(prng);
+  let alpha = Scalar::random(prng);
 
   let mut result = c1_eq_c2_scalars;
   result[0] = result[0].add(&alpha.mul(&ci_scalars[0])); // aggregate B scalars
@@ -358,7 +358,7 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(transcrip
                                                 commitments.as_slice(),
                                                 proof)?;
 
-    let alpha = Scalar::random_scalar(prng); // scale instance verification equation by random scalar
+    let alpha = Scalar::random(prng); // scale instance verification equation by random scalar
     all_scalars[0] = all_scalars[0].add(&instance_scalars[0].mul(&alpha)); // aggregate B
     all_scalars[1] = all_scalars[1].add(&instance_scalars[1].mul(&alpha)); // aggregate B_blinding
     all_scalars.push(instance_scalars[2].mul(&alpha));

@@ -19,8 +19,14 @@ pub struct CompressedRistretto(pub CR);
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoPoint(pub RPoint);
 
+impl From<u128> for RistrettoScalar {
+  fn from(x: u128) -> Self {
+    RistrettoScalar(curve25519_dalek::scalar::Scalar::from(x))
+  }
+}
+
 impl ZeiScalar for RistrettoScalar {
-  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> RistrettoScalar {
+  fn random<R: CryptoRng + RngCore>(rng: &mut R) -> RistrettoScalar {
     RistrettoScalar(curve25519_dalek::scalar::Scalar::random(rng))
   }
 
@@ -76,6 +82,15 @@ impl ZeiScalar for RistrettoScalar {
 impl RistrettoPoint {
   pub fn compress(&self) -> CompressedRistretto {
     CompressedRistretto(self.0.compress())
+  }
+}
+
+impl CompressedRistretto {
+  pub fn decompress(&self) -> Option<RistrettoPoint> {
+    self.0.decompress().map(|x| RistrettoPoint(x))
+  }
+  pub fn identity() -> CompressedRistretto {
+    CompressedRistretto(CR::identity())
   }
 }
 

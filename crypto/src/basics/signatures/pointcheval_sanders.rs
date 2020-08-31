@@ -57,8 +57,8 @@ pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R)
   -> (PSPublicKey<P::G2>, PSSecretKey<P::ScalarField>) {
   let g2 = P::G2::get_base(); // TODO can I use the base or does it need to be a random element
-  let x = P::ScalarField::random_scalar(prng);
-  let y = P::ScalarField::random_scalar(prng);
+  let x = P::ScalarField::random(prng);
+  let y = P::ScalarField::random(prng);
   let xx = g2.mul(&x);
   let yy = g2.mul(&y);
 
@@ -98,7 +98,7 @@ pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
                                                           sk: &PSSecretKey<P::ScalarField>,
                                                           m: &P::ScalarField)
                                                           -> PSSignature<P::G1> {
-  let a = P::ScalarField::random_scalar(prng);
+  let a = P::ScalarField::random(prng);
   let s1 = P::G1::get_base().mul(&a);
 
   let s2 = s1.mul(&sk.x.add(&sk.y.mul(&m)));
@@ -170,7 +170,7 @@ pub fn ps_randomize_sig<R: RngCore + CryptoRng, P: Pairing>(
   prng: &mut R,
   sig: &PSSignature<P::G1>)
   -> (P::ScalarField, PSSignature<P::G1>) {
-  let rand_factor = P::ScalarField::random_scalar(prng);
+  let rand_factor = P::ScalarField::random(prng);
   let s1 = sig.s1.mul(&rand_factor);
   let s2 = sig.s2.mul(&rand_factor);
   (rand_factor, PSSignature { s1, s2 })

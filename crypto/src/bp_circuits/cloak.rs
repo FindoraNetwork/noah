@@ -362,8 +362,8 @@ pub mod tests {
       let in_com_and_vars = inputs.iter()
                                   .map(|input| {
                                     input.commit_prover(&mut prover,
-                                                        &CloakValue::new(RistrettoScalar::random_scalar(&mut prng),
-                                                                         RistrettoScalar::random_scalar(&mut prng)))
+                                                        &CloakValue::new(RistrettoScalar::random(&mut prng),
+                                                                         RistrettoScalar::random(&mut prng)))
                                   })
                                   .collect_vec();
       input_coms = in_com_and_vars.iter().map(|(com, _)| *com).collect_vec();
@@ -372,8 +372,8 @@ pub mod tests {
       let out_com_and_vars = outputs.iter()
                                     .map(|output| {
                                       output.commit_prover(&mut prover,
-                               &CloakValue::new(RistrettoScalar::random_scalar(&mut prng),
-                                                RistrettoScalar::random_scalar(&mut prng)))
+                               &CloakValue::new(RistrettoScalar::random(&mut prng),
+                                                RistrettoScalar::random(&mut prng)))
                                     })
                                     .collect_vec();
       output_coms = out_com_and_vars.iter().map(|(com, _)| *com).collect_vec();

@@ -18,7 +18,7 @@ pub struct BlsSignature<P: Pairing>(pub(crate) P::G2);
 /// bls key generation function
 pub fn bls_gen_keys<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R)
                                                         -> (BlsSecretKey<P>, BlsPublicKey<P>) {
-  let sec_key = P::ScalarField::random_scalar(prng);
+  let sec_key = P::ScalarField::random(prng);
   let pub_key = P::G1::get_base().mul(&sec_key);
   (BlsSecretKey(sec_key), BlsPublicKey(pub_key))
 }

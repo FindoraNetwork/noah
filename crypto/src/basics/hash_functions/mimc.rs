@@ -50,7 +50,7 @@ pub(crate) fn compute_mimc_constants(level: usize) -> [Scalar; MIMC_ROUNDS] {
   seed.copy_from_slice(&hash.result()[..]);
   let mut prng = ChaChaRng::from_seed(seed);
   for i in 1..MIMC_ROUNDS - 1 {
-    c[i] = Scalar::random_scalar(&mut prng);
+    c[i] = Scalar::random(&mut prng);
   }
   c
 }

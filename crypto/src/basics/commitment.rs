@@ -32,7 +32,7 @@ impl<S: Scalar> Commitment<S> {
     if msgs.len() != self.msg_len {
       return Err(ZeiError::CommitmentInputError);
     }
-    let blind_scalar = S::random_scalar(rng);
+    let blind_scalar = S::random(rng);
     let mut input_vec = vec![blind_scalar.clone()];
     input_vec.extend(msgs.to_vec());
     // Pad zeroes

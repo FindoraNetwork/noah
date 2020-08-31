@@ -66,7 +66,7 @@ pub struct TagKey<G1>(G1);
 pub fn gpsig_join_cert<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
                                                            msk: &GroupSecretKey<P>)
                                                            -> (JoinCert<P>, TagKey<P::G1>) {
-  let tag = P::ScalarField::random_scalar(prng);
+  let tag = P::ScalarField::random(prng);
   let sig = ps_sign_scalar::<R, P>(prng, &msk.sig_key, &tag);
   let tag_key = TagKey(P::G1::get_base().mul(&tag));
   (JoinCert { tag, sig }, tag_key)
@@ -89,7 +89,7 @@ pub fn gpsig_sign<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
   let (_, rsig) = ps_randomize_sig::<R, P>(prng, &join_cert.sig);
 
   // 2. Encrypt tag
-  let r = P::ScalarField::random_scalar(prng);
+  let r = P::ScalarField::random(prng);
   let enc = elgamal_encrypt(&g1_base, &join_cert.tag, &r, &gpk.enc_key);
 
   // 3. Signature proof of knowledge of r and tag such that ps_verify(rsig, tag) = 1 and enc = ElGamal(tag, r)
@@ -123,8 +123,8 @@ fn signature_proof_of_knowledge<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R
   let g2_base = P::G2::get_base();
 
   // 1. Sample blindings
-  let blind_tag = P::ScalarField::random_scalar(prng);
-  let blind_r = P::ScalarField::random_scalar(prng);
+  let blind_tag = P::ScalarField::random(prng);
+  let blind_r = P::ScalarField::random(prng);
 
   // 2. Compute proof commitments
   let com_yy_blind_tag = gpk.ver_key.yy.mul(&blind_tag); // commitment of tag under Y

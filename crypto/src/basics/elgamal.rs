@@ -24,7 +24,7 @@ pub fn elgamal_key_gen<R: CryptoRng + RngCore, G: Group>(
   prng: &mut R,
   base: &G)
   -> (ElGamalDecKey<G::S>, ElGamalEncKey<G>) {
-  let secret_key = ElGamalDecKey(G::S::random_scalar(prng));
+  let secret_key = ElGamalDecKey(G::S::random(prng));
   let public_key = ElGamalEncKey(base.mul(&secret_key.0));
   (secret_key, public_key)
 }
@@ -153,7 +153,7 @@ mod elgamal_test {
     let (secret_key, public_key) = super::elgamal_key_gen::<_, G>(&mut prng, &base);
 
     let m = G::S::from_u32(100u32);
-    let r = G::S::random_scalar(&mut prng);
+    let r = G::S::random(&mut prng);
     let ctext = super::elgamal_encrypt::<G>(&base, &m, &r, &public_key);
     assert_eq!(Ok(()),
                super::elgamal_verify::<G>(&base, &m, &ctext, &secret_key));
@@ -172,7 +172,7 @@ mod elgamal_test {
 
     let mu32 = 100u32;
     let m = G::S::from_u32(mu32);
-    let r = G::S::random_scalar(&mut prng);
+    let r = G::S::random(&mut prng);
     let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
     assert_eq!(Ok(()),
                super::elgamal_verify(&base, &m, &ctext, &secret_key));
@@ -217,7 +217,7 @@ mod elgamal_test {
 
     //ciphertext serialization
     let m = G::S::from_u32(100u32);
-    let r = G::S::random_scalar(&mut prng);
+    let r = G::S::random(&mut prng);
 
     let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
     let json_str = serde_json::to_string(&ctext).unwrap();
@@ -250,7 +250,7 @@ mod elgamal_test {
 
     //ciphertext serialization
     let m = G::S::from_u32(100u32);
-    let r = G::S::random_scalar(&mut prng);
+    let r = G::S::random(&mut prng);
 
     let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
 

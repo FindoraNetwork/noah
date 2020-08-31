@@ -1,3 +1,5 @@
+use algebra::groups::Scalar as _;
+use algebra::ristretto::RistrettoScalar as Scalar;
 use crate::api::anon_creds::{
   ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
   ConfidentialAC, Credential,
@@ -9,17 +11,16 @@ use crate::xfr::structs::{
   ASSET_TYPE_LENGTH,
 };
 use boolinator::Boolinator;
-use bulletproofs::PedersenGens;
 use crypto::basics::hybrid_encryption::{
   hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
 };
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
-use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 use utils::errors::ZeiError;
 use utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
 const U64_BYTE_LEN: usize = 8;
 
@@ -280,7 +281,7 @@ impl AssetRecordTemplate {
 }
 fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
-  pc_gens: &PedersenGens,
+  pc_gens: &RistrettoPedersenGens,
   asset_record: &AssetRecordTemplate,
   attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>)
   -> (BlindAssetRecord, (Scalar, Scalar), Scalar, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
@@ -302,7 +303,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     let amount_blind_high = compute_blind_factor(&derived_point, b"amount_high");
     (amount_blind_low, amount_blind_high, type_blind, blind_share)
   } else {
-    (Scalar::zero(), Scalar::zero(), Scalar::zero(), CompressedEdwardsY::default())
+    (Scalar::from_u32(0), Scalar::from_u32(0), Scalar::from_u32(0), CompressedEdwardsY::default())
   };
 
   let (amount_low, amount_high) = u64_to_u32_pair(asset_record.amount);
@@ -313,14 +314,14 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     let amount_bytes = u64_to_bigendian_u8array(asset_record.amount);
     amount_type_bytes.extend_from_slice(&amount_bytes[..]);
 
-    let amount_commitment_low = pc_gens.commit(Scalar::from(amount_low), amount_blind_low);
-    let amount_commitment_high = pc_gens.commit(Scalar::from(amount_high), amount_blind_high);
+    let amount_commitment_low = pc_gens.commit(Scalar::from_u32(amount_low), amount_blind_low);
+    let amount_commitment_high = pc_gens.commit(Scalar::from_u32(amount_high), amount_blind_high);
     let xfr_amount = XfrAmount::Confidential((amount_commitment_low.compress(),
                                               amount_commitment_high.compress()));
     (xfr_amount, (amount_blind_low, amount_blind_high))
   } else {
     let xfr_amount = XfrAmount::NonConfidential(asset_record.amount);
-    (xfr_amount, (Scalar::zero(), Scalar::zero()))
+    (xfr_amount, (Scalar::from_u32(0), Scalar::from_u32(0)))
   };
 
   // build asset type fields
@@ -330,7 +331,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
       XfrAssetType::Confidential(pc_gens.commit(type_scalar, type_blind).compress());
     (xfr_asset_type, type_blind)
   } else {
-    (XfrAssetType::NonConfidential(asset_record.asset_type), Scalar::zero())
+    (XfrAssetType::NonConfidential(asset_record.asset_type), Scalar::from_u32(0))
   };
 
   // asset tracing amount
@@ -379,7 +380,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 ///  - Option<OwnerMemo> // Some(memo)  if asset_record.asset_record_type has a confidential flag
 pub fn build_open_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
-  pc_gens: &PedersenGens,
+  pc_gens: &RistrettoPedersenGens,
   asset_record: &AssetRecordTemplate,
   attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>)
   -> (OpenAssetRecord, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
@@ -404,7 +405,7 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(
 ///  - Option<OwnerMemo> // Some(memo)  if asset_record.asset_record_type has a confidential flag
 pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
   prng: &mut R,
-  pc_gens: &PedersenGens,
+  pc_gens: &RistrettoPedersenGens,
   asset_record: &AssetRecordTemplate,
   attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>)
   -> (BlindAssetRecord, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
@@ -420,8 +421,8 @@ fn sample_point_and_blind_share<R: CryptoRng + RngCore>(
   -> (CompressedEdwardsY, CompressedEdwardsY) {
   let blind_key = Scalar::random(prng);
   let pk_point = public_key.get_curve_point();
-  let derived_point: EdwardsPoint = blind_key * pk_point;
-  let blind_share = blind_key * ED25519_BASEPOINT_POINT;
+  let derived_point: EdwardsPoint = blind_key.0 * pk_point;
+  let blind_share = blind_key.0 * ED25519_BASEPOINT_POINT;
   (derived_point.compress(), blind_share.compress())
 }
 
@@ -477,8 +478,8 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
     }
     XfrAmount::NonConfidential(a) => {
       amount = a;
-      amount_blind_low = Scalar::zero();
-      amount_blind_high = Scalar::zero();
+      amount_blind_low = Scalar::from_u32(0);
+      amount_blind_high = Scalar::from_u32(0);
     }
   }
 
@@ -493,7 +494,7 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
     }
     XfrAssetType::NonConfidential(a) => {
       asset_type = a;
-      type_blind = Scalar::zero();
+      type_blind = Scalar::from_u32(0);
     }
   };
 
@@ -515,7 +516,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
   if asset_record.asset_tracing_policies.len() != identity_proofs_and_attrs.len() {
     return Err(ZeiError::ParameterError);
   }
-  let pc_gens = PedersenGens::default();
+  let pc_gens = RistrettoPedersenGens::default();
   let mut attrs_ctexts = vec![];
   let mut reveal_proofs = vec![];
   let tracing_policy = asset_record.asset_tracing_policies.get_policies();
@@ -548,6 +549,8 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
 
 #[cfg(test)]
 mod test {
+  use algebra::groups::Scalar as _;
+  use algebra::ristretto::RistrettoScalar as Scalar;
   use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
   use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
@@ -557,18 +560,17 @@ mod test {
     XfrAmount, XfrAssetType,
   };
   use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
-  use bulletproofs::PedersenGens;
-  use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
   use rand::Rng;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
+  use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
   fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracking: bool) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let amount = 100u64;
     let asset_type = AssetType::from_identical_byte(0u8);
@@ -608,9 +610,9 @@ mod test {
     let (confidential_amount, confidential_asset) = record_type.get_booleans();
     if confidential_amount {
       let (low, high) = u64_to_u32_pair(amount);
-      let commitment_low = pc_gens.commit(Scalar::from(low), open_ar.amount_blinds.0)
+      let commitment_low = pc_gens.commit(Scalar::from_u32(low), open_ar.amount_blinds.0)
                                   .compress();
-      let commitment_high = pc_gens.commit(Scalar::from(high), open_ar.amount_blinds.1)
+      let commitment_high = pc_gens.commit(Scalar::from_u32(high), open_ar.amount_blinds.1)
                                    .compress();
       expected_bar_amount = XfrAmount::Confidential((commitment_low, commitment_high));
     } else {
@@ -669,7 +671,7 @@ mod test {
   fn do_test_open_asset_record(record_type: AssetRecordType) {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let asset_type = AssetType::from_identical_byte(1u8);
 
@@ -708,9 +710,9 @@ mod test {
 
     if confidential_amount {
       let (low, high) = u64_to_u32_pair(open_ar.amount);
-      let commitment_low = pc_gens.commit(Scalar::from(low), open_ar.amount_blinds.0)
+      let commitment_low = pc_gens.commit(Scalar::from_u32(low), open_ar.amount_blinds.0)
                                   .compress();
-      let commitment_high = pc_gens.commit(Scalar::from(high), open_ar.amount_blinds.1)
+      let commitment_high = pc_gens.commit(Scalar::from_u32(high), open_ar.amount_blinds.1)
                                    .compress();
       let derived_commitment = (commitment_low, commitment_high);
       assert_eq!(derived_commitment,
@@ -741,7 +743,7 @@ mod test {
 
   fn build_and_open_blind_record(record_type: AssetRecordType, amt: u64, asset_type: AssetType) {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let keypair = XfrKeyPair::generate(&mut prng);
     let (pubkey, privkey) = (keypair.get_pk_ref(), keypair.get_sk_ref());
@@ -784,7 +786,7 @@ mod test {
   #[test]
   fn open_blind_asset_record_error() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
 
     let keypair = XfrKeyPair::generate(&mut prng);
     let (pubkey, privkey) = (keypair.get_pk_ref(), keypair.get_sk_ref());

@@ -92,7 +92,7 @@ fn init_sigma_protocol<G: Group>(transcript: &mut Transcript, elems: &[&G]) {
 fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R, n: usize) -> Vec<S> {
   let mut r = vec![];
   for _ in 0..n {
-    r.push(S::random_scalar(prng));
+    r.push(S::random(prng));
   }
   r
 }
@@ -162,7 +162,7 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R,
   let mut alphas = vec![]; // linear combination scalars
                            // find in the matrix each element and multiply corresponding response by alpha
   for (j, row) in matrix.iter().enumerate() {
-    let alpha = S::random_scalar(prng);
+    let alpha = S::random(prng);
     for (i, s_i) in s[0..n_elems].iter_mut().enumerate() {
       for (elem_index, r) in row.iter().zip(responses) {
         if i == *elem_index {

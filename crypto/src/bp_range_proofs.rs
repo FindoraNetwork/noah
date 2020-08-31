@@ -5,19 +5,21 @@ use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use itertools::Itertools;
+use crate::ristretto_pedersen::RistrettoPedersenGens;
 
 /// Gives a bulletproof range proof that values committed using  `blindings`
 /// are within [0..2^{`log_range_upper_bound`}-1].
 pub fn prove_ranges(bp_gens: &BulletproofGens,
-                    pc_gens: &PedersenGens,
+                    pc_gens: &RistrettoPedersenGens,
                     transcript: &mut Transcript,
                     values: &[u64],
                     blindings: &[Scalar],
                     log_range_upper_bound: usize)
                     -> Result<(RangeProof, Vec<CompressedRistretto>), ZeiError> {
   let blindings = blindings.iter().map(|s| s.0).collect_vec();
+  let pc_gens = pc_gens.into();
   let (proof, coms) = RangeProof::prove_multiple(bp_gens,
-                             pc_gens,
+                             &pc_gens,
                              transcript,
                              values,
                              &blindings,
@@ -51,7 +53,7 @@ pub fn verify_ranges<R: CryptoRng + RngCore>(prng: &mut R,
 /// State of transcripts should match the state just before each proof was computed
 pub fn batch_verify_ranges<R: CryptoRng + RngCore>(prng: &mut R,
                                                    bp_gens: &BulletproofGens,
-                                                   pc_gens: &PedersenGens,
+                                                   pc_gens: &RistrettoPedersenGens,
                                                    proofs: &[&RangeProof],
                                                    transcripts: &mut [Transcript],
                                                    commitments: &[&[CompressedRistretto]],
@@ -67,11 +69,12 @@ pub fn batch_verify_ranges<R: CryptoRng + RngCore>(prng: &mut R,
     slices.push(v.as_slice());
   }
 
+  let pc_gens = pc_gens.into();
   RangeProof::batch_verify(prng,
                            proofs,
                            transcripts,
                            slices.as_slice(),
                            bp_gens,
-                           pc_gens,
+                           &pc_gens,
                            log_range_upper_bound).map_err(|_| ZeiError::RangeProofVerifyError)
 }

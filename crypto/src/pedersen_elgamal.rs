@@ -238,7 +238,7 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
     let n = instance.ctexts.len();
     assert_eq!(n, instance.commitments.len());
     let mut inst_transcript = transcript.clone();
-    let alpha = Scalar::random_scalar(prng);
+    let alpha = Scalar::random(prng);
     init_pedersen_elgamal_aggregate(&mut inst_transcript,
                                     &pc_gens,
                                     instance.public_key,
@@ -269,7 +269,7 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
                                                               &lc_c,
                                                               instance.proof);
 
-    all_scalars[0] = all_scalars[1].add(&alpha.mul(&instance_scalars[0]));
+    all_scalars[0] = all_scalars[0].add(&alpha.mul(&instance_scalars[0]));
     all_scalars[1] = all_scalars[1].add(&alpha.mul(&instance_scalars[1]));
     all_elems.push(instance.public_key.0);
     all_elems.push(lc_e1);
@@ -313,9 +313,9 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(transcript: 
 #[cfg(test)]
 mod test {
   use algebra::groups::Scalar as _;
-  use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+  use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
   use super::PedersenElGamalEqProof;
-  use crate::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
+  use crate::basics::elgamal::{elgamal_encrypt, elgamal_key_gen, ElGamalEncKey, ElGamalCiphertext};
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -324,11 +324,13 @@ mod test {
   use serde::ser::Serialize;
   use utils::errors::ZeiError;
   use crate::ristretto_pedersen::RistrettoPedersenGens;
+  use crate::pedersen_elgamal::{pedersen_elgamal_aggregate_eq_proof, PedersenElGamalProofInstance, pedersen_elgamal_batch_aggregate_eq_verify};
+  use itertools::Itertools;
 
   #[test]
   fn good_proof_verify() {
-    let m = Scalar::from_u32(10);
-    let r = Scalar::from_u32(7657u32);
+    let m = RistrettoScalar::from_u32(10);
+    let r = RistrettoScalar::from_u32(7657u32);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = RistrettoPedersenGens::default();
 
@@ -359,9 +361,9 @@ mod test {
 
   #[test]
   fn bad_proof_verify() {
-    let m = Scalar::from_u32(10);
-    let m2 = Scalar::from_u32(11);
-    let r = Scalar::from_u32(7657);
+    let m = RistrettoScalar::from_u32(10);
+    let m2 = RistrettoScalar::from_u32(11);
+    let r = RistrettoScalar::from_u32(7657);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = RistrettoPedersenGens::default();
 
@@ -392,14 +394,14 @@ mod test {
 
   #[test]
   fn proof_aggregate() {
-    let m1 = Scalar::from_u32(11);
-    let r1 = Scalar::from_u32(7657);
-    let m2 = Scalar::from_u32(12);
-    let r2 = Scalar::from_u32(7658);
-    let m3 = Scalar::from_u32(13);
-    let r3 = Scalar::from_u32(7659);
-    let m4 = Scalar::from_u32(14);
-    let r4 = Scalar::from_u32(7660);
+    let m1 = RistrettoScalar::from_u32(11);
+    let r1 = RistrettoScalar::from_u32(7657);
+    let m2 = RistrettoScalar::from_u32(12);
+    let r2 = RistrettoScalar::from_u32(7658);
+    let m3 = RistrettoScalar::from_u32(13);
+    let r3 = RistrettoScalar::from_u32(7659);
+    let m4 = RistrettoScalar::from_u32(14);
+    let r4 = RistrettoScalar::from_u32(7660);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = RistrettoPedersenGens::default();
 
@@ -549,9 +551,58 @@ mod test {
   }
 
   #[test]
+  fn batch_aggregate_eq_verify() {
+    let prover_transcript = Transcript::new(b"test");
+    let mut verifier_transcript = Transcript::new(b"test");
+    let mut rng = ChaChaRng::from_seed([0u8;32]);
+    let pc_gens = RistrettoPedersenGens::default();
+    fn get_proof_instance<'a>(transcript: &mut Transcript,
+                              rng: &mut ChaChaRng,
+                              pk: &'a ElGamalEncKey<RistrettoPoint>,
+                              plaintexts: &[RistrettoScalar],
+                              rands: &[RistrettoScalar],
+                              pc_gens: &RistrettoPedersenGens,
+    ) -> (Vec<ElGamalCiphertext<RistrettoPoint>>, Vec<RistrettoPoint>, PedersenElGamalEqProof) {
+      let ctexts = plaintexts.iter().zip(rands.iter()).map(|(p,r)| {
+        elgamal_encrypt(&pc_gens.B, p, r, pk) }).collect_vec();
+      let commitments = plaintexts.iter().zip(rands.iter()).map(|(p,r)| {
+          pc_gens.commit(*p, *r) } ).collect_vec();
+      let proof = pedersen_elgamal_aggregate_eq_proof( transcript,
+        rng, &plaintexts,&rands,&pk, &ctexts, &commitments );
+      (ctexts, commitments, proof)
+    }
+    let (_, pk1) = elgamal_key_gen(&mut rng, &pc_gens.B);
+    let plaintexts1 = [RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(2) , RistrettoScalar::from_u32(3)];
+    let rands1 = [RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(20) , RistrettoScalar::from_u32(30)];
+    let (ctexts1, commitments1, proof1) = get_proof_instance(
+      &mut prover_transcript.clone(), &mut rng, &pk1, &plaintexts1, &rands1, &pc_gens);
+    let (_, pk2) = elgamal_key_gen(&mut rng, &pc_gens.B);
+    let plaintexts2 = [RistrettoScalar::from_u32(100), RistrettoScalar::from_u32(200) , RistrettoScalar::from_u32(300)];
+    let rands2 = [RistrettoScalar::from_u32(1000), RistrettoScalar::from_u32(2000) , RistrettoScalar::from_u32(3000)];
+    let (ctexts2, commitments2, proof2) = get_proof_instance(
+      &mut prover_transcript.clone(), &mut rng, &pk2, &plaintexts2, &rands2, &pc_gens);
+
+    let instances = [PedersenElGamalProofInstance {
+      public_key: &pk1,
+      ctexts: ctexts1,
+      commitments: commitments1,
+      proof: &proof1,
+    },PedersenElGamalProofInstance {
+      public_key: &pk2,
+      ctexts: ctexts2,
+      commitments: commitments2,
+      proof: &proof2,
+    },];
+    assert!(pedersen_elgamal_batch_aggregate_eq_verify(
+      &mut verifier_transcript,
+      &mut rng,
+      &pc_gens,
+      &instances).is_ok());
+  }
+  #[test]
   fn to_json() {
-    let m = Scalar::from_u32(10);
-    let r = Scalar::from_u32(7657);
+    let m = RistrettoScalar::from_u32(10);
+    let r = RistrettoScalar::from_u32(7657);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = RistrettoPedersenGens::default();
 
@@ -574,8 +625,8 @@ mod test {
 
   #[test]
   fn to_message_pack() {
-    let m = Scalar::from_u32(10);
-    let r = Scalar::from_u32(7657);
+    let m = RistrettoScalar::from_u32(10);
+    let r = RistrettoScalar::from_u32(7657);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = RistrettoPedersenGens::default();
 

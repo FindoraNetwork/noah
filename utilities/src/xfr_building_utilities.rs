@@ -1,4 +1,3 @@
-use bulletproofs::PedersenGens;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 
@@ -16,6 +15,7 @@ use zei::xfr::structs::{
   AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
   BlindAssetRecord, IdentityRevealPolicy, OwnerMemo, XfrAmount, XfrAssetType,
 };
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
 // Simulate getting a BlindAssetRecord from Ledger
 #[allow(clippy::clone_on_copy)]
@@ -43,7 +43,7 @@ pub fn conf_blind_asset_record_from_ledger(key: &XfrPublicKey,
                                          AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
                                        asset_tracing_policies: Default::default() };
   let (bar, _, owner) =
-    build_blind_asset_record(&mut prng, &PedersenGens::default(), &template, vec![]);
+    build_blind_asset_record(&mut prng, &RistrettoPedersenGens::default(), &template, vec![]);
 
   (bar, owner.unwrap())
 }

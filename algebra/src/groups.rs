@@ -16,7 +16,7 @@ pub trait Scalar:
   Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>
 {
   // generation
-  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
+  fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
   fn from_u32(value: u32) -> Self;
   fn from_u64(value: u64) -> Self;
   fn from_hash<D>(hash: D) -> Self

@@ -56,8 +56,8 @@ use crate::ristretto_pedersen::RistrettoPedersenGens;
 /// ];
 ///
 /// // blinding factors
-/// let mut assets_blinds = vec![CloakValue::new(Scalar::random_scalar(&mut prng), Scalar::random_scalar(&mut prng)); 3];
-/// let mut liabilities_blinds = vec![CloakValue::new(Scalar::random_scalar(&mut prng), Scalar::random_scalar(&mut prng)); 2];
+/// let mut assets_blinds = vec![CloakValue::new(RistrettoScalar::random(&mut prng), RistrettoScalar::random(&mut prng)); 3];
+/// let mut liabilities_blinds = vec![CloakValue::new(RistrettoScalar::random(&mut prng), RistrettoScalar::random(&mut prng)); 2];
 ///
 /// let pc_gens = RistrettoPedersenGens::default();
 /// let bp_gens = BulletproofGens::new(256, 1);
@@ -281,13 +281,13 @@ mod test {
     let mut prng = ChaChaRng::from_seed([1u8; 32]);
     let mut assets_blinds = vec![];
     for _ in 0..hidden_asset_set.len() {
-      assets_blinds.push(CloakValue::new(Scalar::random_scalar(&mut prng), Scalar::random_scalar(&mut prng)));
+      assets_blinds.push(CloakValue::new(Scalar::random(&mut prng), Scalar::random(&mut prng)));
     }
 
     let mut liabilities_blinds = vec![];
     for _ in 0..hidden_liability_set.len() {
-      liabilities_blinds.push(CloakValue::new(Scalar::random_scalar(&mut prng),
-                                              Scalar::random_scalar(&mut prng)));
+      liabilities_blinds.push(CloakValue::new(Scalar::random(&mut prng),
+                                              Scalar::random(&mut prng)));
     }
 
     let proof = super::prove_solvency(bp_gens,

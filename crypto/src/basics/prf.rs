@@ -63,7 +63,7 @@ mod test {
   fn test_prf_consistency() {
     let prf = PRF::<BLSScalar>::new();
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let key = BLSScalar::random_scalar(&mut prng);
+    let key = BLSScalar::random(&mut prng);
     let mut input = vec![BLSScalar::from_u32(1),
                          BLSScalar::from_u32(2),
                          BLSScalar::from_u32(3),

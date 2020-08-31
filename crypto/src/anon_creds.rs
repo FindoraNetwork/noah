@@ -209,15 +209,15 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R,
   num_attrs: usize)
   -> (ACIssuerPublicKey<P::G1, P::G2>, ACIssuerSecretKey<P::G1, P::ScalarField>) {
-  let x = P::ScalarField::random_scalar(prng);
-  let z = P::ScalarField::random_scalar(prng);
+  let x = P::ScalarField::random(prng);
+  let z = P::ScalarField::random(prng);
   //TODO check that G1 and G2 are of prime order so that every element is generator
-  let gen1: P::G1 = P::G1::get_base().mul(&P::ScalarField::random_scalar(prng));
-  let gen2 = P::G2::get_base().mul(&P::ScalarField::random_scalar(prng));
+  let gen1: P::G1 = P::G1::get_base().mul(&P::ScalarField::random(prng));
+  let gen2 = P::G2::get_base().mul(&P::ScalarField::random(prng));
   let mut y = vec![];
   let mut yy2 = vec![];
   for _ in 0..num_attrs {
-    let yi = P::ScalarField::random_scalar(prng);
+    let yi = P::ScalarField::random(prng);
     yy2.push(gen2.mul(&yi));
     y.push(yi);
   }
@@ -237,7 +237,7 @@ pub fn ac_user_key_gen<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R,
   issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>)
   -> (ACUserPublicKey<P::G1>, ACUserSecretKey<P::ScalarField>) {
-  let secret = P::ScalarField::random_scalar(prng);
+  let secret = P::ScalarField::random(prng);
   let pk = issuer_pk.zz1.mul(&secret);
   (ACUserPublicKey(pk), ACUserSecretKey(secret))
 }
@@ -256,7 +256,7 @@ pub fn ac_sign<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
     return Err(ZeiError::AnonymousCredentialSignError);
   }
 
-  let u = P::ScalarField::random_scalar(prng);
+  let u = P::ScalarField::random(prng);
   let mut exponent = issuer_sk.x.clone();
   for (attr, yi) in attrs.iter().zip(issuer_sk.y.iter()) {
     exponent = exponent.add(&attr.mul(yi));
@@ -269,8 +269,8 @@ pub fn ac_sign<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
 /// Sample an  AC commitment key
 pub fn ac_commitment_key_gen<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R)
                                                                  -> ACKey<P::ScalarField> {
-  ACKey { r: P::ScalarField::random_scalar(prng),
-          t: P::ScalarField::random_scalar(prng) }
+  ACKey { r: P::ScalarField::random(prng),
+          t: P::ScalarField::random(prng) }
 }
 
 /// Credential commitment to a message
@@ -540,14 +540,14 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
   t: &P::ScalarField,
   attrs: &[Attribute<&P::ScalarField>])
   -> Result<ACPoK<P::G2, P::ScalarField>, ZeiError> {
-  let beta1 = P::ScalarField::random_scalar(prng);
-  let beta2 = P::ScalarField::random_scalar(prng);
+  let beta1 = P::ScalarField::random(prng);
+  let beta2 = P::ScalarField::random(prng);
   let mut gamma = vec![];
   let mut commitment = issuer_pk.gen2.mul(&beta1).add(&issuer_pk.zz2.mul(&beta2));
   for (yy2i, attr) in issuer_pk.yy2.iter().zip(attrs) {
     match attr {
       Attribute::Hidden(Some(_)) => {
-        let gamma_i = P::ScalarField::random_scalar(prng);
+        let gamma_i = P::ScalarField::random(prng);
         let elem = yy2i.mul(&gamma_i);
         commitment = commitment.add(&elem);
         gamma.push(gamma_i);
@@ -616,7 +616,7 @@ pub(crate) mod credentials_tests {
     let mut attrs = vec![];
 
     for _ in bitmap.iter() {
-      attrs.push(P::ScalarField::random_scalar(&mut prng));
+      attrs.push(P::ScalarField::random(&mut prng));
     }
 
     let sig = super::ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs);
@@ -667,7 +667,7 @@ pub(crate) mod credentials_tests {
     let mut attrs = vec![];
 
     for _ in bitmap.iter() {
-      attrs.push(P::ScalarField::random_scalar(&mut prng));
+      attrs.push(P::ScalarField::random(&mut prng));
     }
 
     let sig = super::ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, attrs.as_slice()).unwrap();

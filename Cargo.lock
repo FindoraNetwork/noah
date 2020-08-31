@@ -1272,6 +1272,7 @@ dependencies = [
  "bulletproofs",
  "criterion",
  "criterion-cycles-per-byte",
+ "crypto",
  "itertools 0.8.2",
  "rand",
  "rand_chacha",

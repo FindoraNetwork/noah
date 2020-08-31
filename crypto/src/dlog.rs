@@ -116,7 +116,7 @@ mod test {
     let mut prover_transcript = Transcript::new(b"test");
     let mut verifier_transcript = Transcript::new(b"test");
     let base = RistrettoPoint::get_base();
-    let scalar = Scalar::random_scalar(&mut csprng);
+    let scalar = Scalar::random(&mut csprng);
     let scalar2 = scalar.add(&Scalar::from_u32(1));
     let point = base.mul(&scalar);
 
@@ -144,13 +144,13 @@ mod test {
     let mut verifier_transcript = Transcript::new(b"test");
 
     let base = RistrettoPoint::get_base();
-    let scalar1 = Scalar::random_scalar(&mut csprng);
-    let scalar2 = Scalar::random_scalar(&mut csprng);
-    let scalar3 = Scalar::random_scalar(&mut csprng);
-    let scalar4 = Scalar::random_scalar(&mut csprng);
-    let scalar5 = Scalar::random_scalar(&mut csprng);
-    let scalar6 = Scalar::random_scalar(&mut csprng);
-    let scalar7 = Scalar::random_scalar(&mut csprng);
+    let scalar1 = Scalar::random(&mut csprng);
+    let scalar2 = Scalar::random(&mut csprng);
+    let scalar3 = Scalar::random(&mut csprng);
+    let scalar4 = Scalar::random(&mut csprng);
+    let scalar5 = Scalar::random(&mut csprng);
+    let scalar6 = Scalar::random(&mut csprng);
+    let scalar7 = Scalar::random(&mut csprng);
 
     let point1 = base.mul(&scalar1);
     let point2 = base.mul(&scalar2);

@@ -1,11 +1,11 @@
+use algebra::bls12_381::{BLSScalar, BLSG1};
+use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
+use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
 use crate::api::anon_creds::{Attr, AttributeCiphertext};
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetTracerDecKeys, AssetTracerEncKeys, AssetTracerKeyPair, AssetTracerMemo,
 };
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
-use algebra::bls12_381::{BLSScalar, BLSG1};
-use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
-use bulletproofs::PedersenGens;
 use crypto::basics::elgamal::{
   elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
   ElGamalDecKey, ElGamalEncKey,
@@ -13,11 +13,10 @@ use crypto::basics::elgamal::{
 use crypto::basics::hybrid_encryption::{
   hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
 };
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::{u32_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u32};
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
 pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
 pub type RecordDataDecKey = ElGamalDecKey<Scalar>;
@@ -54,7 +53,7 @@ impl AssetTracerMemo {
                                      add_memo: bool)
                                      -> AssetTracerMemo {
     let mut plaintext = vec![];
-    let pc_gens = PedersenGens::default();
+    let pc_gens = RistrettoPedersenGens::default();
     let lock_amount =
       amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
                    plaintext.extend_from_slice(&u32_to_bigendian_u8array(amount_low));
@@ -164,7 +163,7 @@ impl AssetTracerMemo {
       let decrypted_low = elgamal_decrypt_elem(ctext_low, dec_key);
       let decrypted_high = elgamal_decrypt_elem(ctext_high, dec_key);
       let base = RistrettoPoint::get_base();
-      if base * Scalar::from(low) != decrypted_low || base * Scalar::from(high) != decrypted_high {
+      if base.mul(&Scalar::from_u32(low)) != decrypted_low || base.mul(&Scalar::from_u32(high)) != decrypted_high {
         Err(ZeiError::AssetTracingExtractionError)
       } else {
         Ok(())
@@ -206,7 +205,7 @@ impl AssetTracerMemo {
       let decrypted = elgamal_decrypt_elem(ctext, dec_key);
       for candidate in candidate_asset_types.iter() {
         let scalar_candidate = asset_type_to_scalar(candidate);
-        if decrypted == RistrettoPoint::get_base() * scalar_candidate {
+        if decrypted == RistrettoPoint::get_base().mul(&scalar_candidate) {
           return Ok(*candidate);
         }
       }
@@ -257,6 +256,7 @@ impl AssetTracerMemo {
 
 #[cfg(test)]
 mod tests {
+  use algebra::ristretto::{RistrettoScalar as Scalar};
   use crate::xfr::structs::{AssetTracerMemo, AssetType};
   use algebra::bls12_381::{BLSScalar, BLSG1};
   use algebra::groups::{Group, Scalar as ZeiScalar};
@@ -265,7 +265,6 @@ mod tests {
   use rand_core::SeedableRng;
 
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
-  use curve25519_dalek::scalar::Scalar;
   use itertools::Itertools;
   use utils::errors::ZeiError;
   use utils::u64_to_u32_pair;
@@ -283,7 +282,7 @@ mod tests {
     let memo =
       AssetTracerMemo::new(&mut prng,
                            &tracer_keys.enc_key,
-                           Some((low, high, &Scalar::from(191919u32), &Scalar::from(2222u32))),
+                           Some((low, high, &Scalar::from_u32(191919u32), &Scalar::from_u32(2222u32))),
                            None,
                            vec![],
                            true);
@@ -306,7 +305,7 @@ mod tests {
     let memo = AssetTracerMemo::new(&mut prng,
                                     &tracer_keys.enc_key,
                                     None,
-                                    Some((asset_type, &Scalar::from(191919u32))),
+                                    Some((asset_type, &Scalar::from_u32(191919u32))),
                                     vec![],
                                     true);
 

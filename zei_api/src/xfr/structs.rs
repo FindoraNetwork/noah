@@ -1,3 +1,4 @@
+use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crate::api::anon_creds::{
   ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
   AttributeEncKey,
@@ -11,8 +12,6 @@ use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCipher}
 use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
 use utils::serialization;
 use utils::u8_bigendian_slice_to_u128;
 
@@ -91,7 +90,7 @@ impl XfrAmount {
   /// # Example:
   /// ```
   /// use zei::xfr::structs::XfrAmount;
-  /// use curve25519_dalek::ristretto::CompressedRistretto;
+  /// use algebra::ristretto::CompressedRistretto;
   /// let xfr_amount = XfrAmount::Confidential((CompressedRistretto::default(), CompressedRistretto::default()));
   /// assert!(xfr_amount.is_confidential());
   /// let xfr_amount = XfrAmount::NonConfidential(100u64);
@@ -107,7 +106,7 @@ impl XfrAmount {
   /// # Example:
   /// ```
   /// use zei::xfr::structs::XfrAmount;
-  /// use curve25519_dalek::ristretto::CompressedRistretto;
+  /// use algebra::ristretto::CompressedRistretto;
   /// let xfr_amount = XfrAmount::NonConfidential(100u64);
   /// assert_eq!(xfr_amount.get_amount().unwrap(), 100u64);
   /// let xfr_amount = XfrAmount::Confidential((CompressedRistretto::default(), CompressedRistretto::default()));
@@ -125,7 +124,7 @@ impl XfrAmount {
   /// # Example:
   /// ```
   /// use zei::xfr::structs::XfrAmount;
-  /// use curve25519_dalek::ristretto::CompressedRistretto;
+  /// use algebra::ristretto::CompressedRistretto;
   /// let xfr_amount = XfrAmount::NonConfidential(100u64);
   /// assert!(xfr_amount.get_commitments().is_none());
   /// let xfr_amount = XfrAmount::Confidential((CompressedRistretto::default(), CompressedRistretto::default()));
@@ -151,7 +150,7 @@ impl XfrAssetType {
   /// # Example:
   /// ```
   /// use zei::xfr::structs::{AssetType, XfrAssetType};
-  /// use curve25519_dalek::ristretto::CompressedRistretto;
+  /// use algebra::ristretto::CompressedRistretto;
   /// let xfr_asset_type = XfrAssetType::Confidential(CompressedRistretto::default());
   /// assert!(xfr_asset_type.is_confidential());
   /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
@@ -168,7 +167,7 @@ impl XfrAssetType {
   /// # Example:
   /// ```
   /// use zei::xfr::structs::{AssetType, XfrAssetType};
-  /// use curve25519_dalek::ristretto::CompressedRistretto;
+  /// use algebra::ristretto::CompressedRistretto;
   /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
   /// assert_eq!(xfr_asset_type.get_asset_type().unwrap(), AssetType::from_identical_byte(0u8));
   /// let xfr_asset_type = XfrAssetType::Confidential(CompressedRistretto::default());
@@ -186,7 +185,7 @@ impl XfrAssetType {
   /// # Example:
   /// ```
   /// use zei::xfr::structs::{AssetType, XfrAssetType};
-  /// use curve25519_dalek::ristretto::CompressedRistretto;
+  /// use algebra::ristretto::CompressedRistretto;
   /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
   /// assert!(xfr_asset_type.get_commitment().is_none());
   /// let xfr_amount = XfrAssetType::Confidential(CompressedRistretto::default());
