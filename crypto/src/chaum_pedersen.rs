@@ -197,9 +197,11 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     z = z.add(&zi);
   }
 
-  //TODO can we produce proof to zero commitment in a more direct way?
-  // it seems a simple Dlog proof should be enough
-  //produce fake commitment to 0 for chaum pedersen commitment
+  // Note that a simpler way to prove that 'd' is a commitment to 0 consists in
+  // proving knowledge of the discrete logarithm of 'z' given Z=g^z
+  // However in this implementation it is convenient to have several Chaum-Pedersen proofs
+  //  because these proofs can be batched.
+  // See for example zei_api/src/xfr/proofs.rs:batch_verify_confidential_asset
   let proof_zero = chaum_pedersen_prove_eq(transcript,
                                            prng,
                                            pc_gens,
