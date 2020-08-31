@@ -152,8 +152,8 @@ fn is_power_two(n: usize) -> bool {
 mod test {
   use super::*;
   use crate::basics::hash_functions::mimc::MiMCHash;
-  use algebra::ristretto::RistrettoScalar as Scalar;
   use algebra::groups::Scalar as _;
+  use algebra::ristretto::RistrettoScalar as Scalar;
 
   #[test]
   fn test_mt() {

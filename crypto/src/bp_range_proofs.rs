@@ -1,11 +1,11 @@
-use algebra::ristretto::RistrettoScalar as Scalar;
+use crate::ristretto_pedersen::RistrettoPedersenGens;
 use algebra::ristretto::CompressedRistretto;
+use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
-use itertools::Itertools;
-use crate::ristretto_pedersen::RistrettoPedersenGens;
 
 /// Gives a bulletproof range proof that values committed using  `blindings`
 /// are within [0..2^{`log_range_upper_bound`}-1].
@@ -18,12 +18,13 @@ pub fn prove_ranges(bp_gens: &BulletproofGens,
                     -> Result<(RangeProof, Vec<CompressedRistretto>), ZeiError> {
   let blindings = blindings.iter().map(|s| s.0).collect_vec();
   let pc_gens = pc_gens.into();
-  let (proof, coms) = RangeProof::prove_multiple(bp_gens,
-                             &pc_gens,
-                             transcript,
-                             values,
-                             &blindings,
-                             log_range_upper_bound).map_err(|_| ZeiError::RangeProofProveError)?;
+  let (proof, coms) =
+    RangeProof::prove_multiple(bp_gens,
+                               &pc_gens,
+                               transcript,
+                               values,
+                               &blindings,
+                               log_range_upper_bound).map_err(|_| ZeiError::RangeProofProveError)?;
   let commitments = coms.iter().map(|x| CompressedRistretto(*x)).collect_vec();
   Ok((proof, commitments))
 }

@@ -9,8 +9,8 @@ use ff::{Field, PrimeField};
 use group::Group as _;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use std::ops::{Add, Mul, Sub};
-use utils::{u8_littleendian_slice_to_u64};
 use std::str::FromStr;
+use utils::u8_littleendian_slice_to_u64;
 
 pub type Bls12381field = Scalar;
 
@@ -190,7 +190,6 @@ impl Group for BLSG2 {
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
     BLSG2(G2Projective::random(&mut prng))
   }
-
 }
 
 impl GroupArithmetic for BLSG2 {

@@ -1,14 +1,14 @@
 use crate::basics::elgamal::{ElGamalCiphertext, ElGamalEncKey};
+use crate::ristretto_pedersen::RistrettoPedersenGens;
 use crate::sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
+use algebra::groups::{Group, GroupArithmetic, Scalar as _};
 use algebra::ristretto::RistrettoPoint;
 use algebra::ristretto::RistrettoScalar as Scalar;
+use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::serialization;
-use algebra::groups::{Group, Scalar as _, GroupArithmetic};
-use curve25519_dalek::traits::{MultiscalarMul, Identity};
-use crate::ristretto_pedersen::RistrettoPedersenGens;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PedersenElGamalEqProof {
@@ -142,8 +142,9 @@ fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(transcript: &mut Transcrip
                proof.e1.e1,
                proof.e1.e2,
                proof.c1];
-  let multi_exp = curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(
-    scalars.iter().map(|x| x.0), elems.iter().map(|x| x.0));
+  let multi_exp =
+    curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(scalars.iter().map(|x| x.0),
+                                                                 elems.iter().map(|x| x.0));
 
   if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
     Err(ZeiError::ZKProofVerificationError)
@@ -283,9 +284,9 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
     }
   }
 
-  let multi_exp = curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(
-    all_scalars.iter().map(|x| x.0),
-    all_elems.iter().map(|x| x.0));
+  let multi_exp =
+    curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(all_scalars.iter().map(|x| x.0),
+                                                                 all_elems.iter().map(|x| x.0));
   if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
     return Err(ZeiError::ZKProofBatchVerificationError);
   }
@@ -312,10 +313,18 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(transcript: 
 
 #[cfg(test)]
 mod test {
+  use super::PedersenElGamalEqProof;
+  use crate::basics::elgamal::{
+    elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey,
+  };
+  use crate::pedersen_elgamal::{
+    pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
+    PedersenElGamalProofInstance,
+  };
+  use crate::ristretto_pedersen::RistrettoPedersenGens;
   use algebra::groups::Scalar as _;
   use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
-  use super::PedersenElGamalEqProof;
-  use crate::basics::elgamal::{elgamal_encrypt, elgamal_key_gen, ElGamalEncKey, ElGamalCiphertext};
+  use itertools::Itertools;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -323,9 +332,6 @@ mod test {
   use serde::de::Deserialize;
   use serde::ser::Serialize;
   use utils::errors::ZeiError;
-  use crate::ristretto_pedersen::RistrettoPedersenGens;
-  use crate::pedersen_elgamal::{pedersen_elgamal_aggregate_eq_proof, PedersenElGamalProofInstance, pedersen_elgamal_batch_aggregate_eq_verify};
-  use itertools::Itertools;
 
   #[test]
   fn good_proof_verify() {
@@ -554,50 +560,72 @@ mod test {
   fn batch_aggregate_eq_verify() {
     let prover_transcript = Transcript::new(b"test");
     let mut verifier_transcript = Transcript::new(b"test");
-    let mut rng = ChaChaRng::from_seed([0u8;32]);
+    let mut rng = ChaChaRng::from_seed([0u8; 32]);
     let pc_gens = RistrettoPedersenGens::default();
-    fn get_proof_instance<'a>(transcript: &mut Transcript,
-                              rng: &mut ChaChaRng,
-                              pk: &'a ElGamalEncKey<RistrettoPoint>,
-                              plaintexts: &[RistrettoScalar],
-                              rands: &[RistrettoScalar],
-                              pc_gens: &RistrettoPedersenGens,
-    ) -> (Vec<ElGamalCiphertext<RistrettoPoint>>, Vec<RistrettoPoint>, PedersenElGamalEqProof) {
-      let ctexts = plaintexts.iter().zip(rands.iter()).map(|(p,r)| {
-        elgamal_encrypt(&pc_gens.B, p, r, pk) }).collect_vec();
-      let commitments = plaintexts.iter().zip(rands.iter()).map(|(p,r)| {
-          pc_gens.commit(*p, *r) } ).collect_vec();
-      let proof = pedersen_elgamal_aggregate_eq_proof( transcript,
-        rng, &plaintexts,&rands,&pk, &ctexts, &commitments );
+    fn get_proof_instance<'a>(
+      transcript: &mut Transcript,
+      rng: &mut ChaChaRng,
+      pk: &'a ElGamalEncKey<RistrettoPoint>,
+      plaintexts: &[RistrettoScalar],
+      rands: &[RistrettoScalar],
+      pc_gens: &RistrettoPedersenGens)
+      -> (Vec<ElGamalCiphertext<RistrettoPoint>>, Vec<RistrettoPoint>, PedersenElGamalEqProof) {
+      let ctexts = plaintexts.iter()
+                             .zip(rands.iter())
+                             .map(|(p, r)| elgamal_encrypt(&pc_gens.B, p, r, pk))
+                             .collect_vec();
+      let commitments = plaintexts.iter()
+                                  .zip(rands.iter())
+                                  .map(|(p, r)| pc_gens.commit(*p, *r))
+                                  .collect_vec();
+      let proof = pedersen_elgamal_aggregate_eq_proof(transcript,
+                                                      rng,
+                                                      &plaintexts,
+                                                      &rands,
+                                                      &pk,
+                                                      &ctexts,
+                                                      &commitments);
       (ctexts, commitments, proof)
     }
     let (_, pk1) = elgamal_key_gen(&mut rng, &pc_gens.B);
-    let plaintexts1 = [RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(2) , RistrettoScalar::from_u32(3)];
-    let rands1 = [RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(20) , RistrettoScalar::from_u32(30)];
-    let (ctexts1, commitments1, proof1) = get_proof_instance(
-      &mut prover_transcript.clone(), &mut rng, &pk1, &plaintexts1, &rands1, &pc_gens);
+    let plaintexts1 = [RistrettoScalar::from_u32(1),
+                       RistrettoScalar::from_u32(2),
+                       RistrettoScalar::from_u32(3)];
+    let rands1 = [RistrettoScalar::from_u32(10),
+                  RistrettoScalar::from_u32(20),
+                  RistrettoScalar::from_u32(30)];
+    let (ctexts1, commitments1, proof1) = get_proof_instance(&mut prover_transcript.clone(),
+                                                             &mut rng,
+                                                             &pk1,
+                                                             &plaintexts1,
+                                                             &rands1,
+                                                             &pc_gens);
     let (_, pk2) = elgamal_key_gen(&mut rng, &pc_gens.B);
-    let plaintexts2 = [RistrettoScalar::from_u32(100), RistrettoScalar::from_u32(200) , RistrettoScalar::from_u32(300)];
-    let rands2 = [RistrettoScalar::from_u32(1000), RistrettoScalar::from_u32(2000) , RistrettoScalar::from_u32(3000)];
-    let (ctexts2, commitments2, proof2) = get_proof_instance(
-      &mut prover_transcript.clone(), &mut rng, &pk2, &plaintexts2, &rands2, &pc_gens);
+    let plaintexts2 = [RistrettoScalar::from_u32(100),
+                       RistrettoScalar::from_u32(200),
+                       RistrettoScalar::from_u32(300)];
+    let rands2 = [RistrettoScalar::from_u32(1000),
+                  RistrettoScalar::from_u32(2000),
+                  RistrettoScalar::from_u32(3000)];
+    let (ctexts2, commitments2, proof2) = get_proof_instance(&mut prover_transcript.clone(),
+                                                             &mut rng,
+                                                             &pk2,
+                                                             &plaintexts2,
+                                                             &rands2,
+                                                             &pc_gens);
 
-    let instances = [PedersenElGamalProofInstance {
-      public_key: &pk1,
-      ctexts: ctexts1,
-      commitments: commitments1,
-      proof: &proof1,
-    },PedersenElGamalProofInstance {
-      public_key: &pk2,
-      ctexts: ctexts2,
-      commitments: commitments2,
-      proof: &proof2,
-    },];
-    assert!(pedersen_elgamal_batch_aggregate_eq_verify(
-      &mut verifier_transcript,
-      &mut rng,
-      &pc_gens,
-      &instances).is_ok());
+    let instances = [PedersenElGamalProofInstance { public_key: &pk1,
+                                                    ctexts: ctexts1,
+                                                    commitments: commitments1,
+                                                    proof: &proof1 },
+                     PedersenElGamalProofInstance { public_key: &pk2,
+                                                    ctexts: ctexts2,
+                                                    commitments: commitments2,
+                                                    proof: &proof2 }];
+    assert!(pedersen_elgamal_batch_aggregate_eq_verify(&mut verifier_transcript,
+                                                       &mut rng,
+                                                       &pc_gens,
+                                                       &instances).is_ok());
   }
   #[test]
   fn to_json() {

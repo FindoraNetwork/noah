@@ -1,24 +1,24 @@
-use crate::ristretto::{RistrettoScalar, RistrettoPoint, CompressedRistretto};
-use crate::jubjub::{JubjubScalar, JubjubGroup};
-use crate::bls12_381::{BLSScalar, BLSG1, BLSG2, BLSGt};
-use crate::groups::{Scalar, Group};
-use utils::serialization::ZeiFromToBytes;
-use serde::{Serializer};
+use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
+use crate::groups::{Group, Scalar};
+use crate::jubjub::{JubjubGroup, JubjubScalar};
+use crate::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar};
+use serde::Serializer;
 use utils::errors::ZeiError;
+use utils::serialization::ZeiFromToBytes;
 
 macro_rules! to_from_bytes_scalar {
- ($t:ident) => {
-   impl utils::serialization::ZeiFromToBytes for $t {
-    fn zei_to_bytes(&self) -> Vec<u8> {
-      let mut v = vec![];
-      v.extend_from_slice(&self.to_bytes()[..]);
-      v
+  ($t:ident) => {
+    impl utils::serialization::ZeiFromToBytes for $t {
+      fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(&self.to_bytes()[..]);
+        v
+      }
+      fn zei_from_bytes(bytes: &[u8]) -> Result<$t, utils::errors::ZeiError> {
+        $t::from_bytes(bytes).map_err(|_| utils::errors::ZeiError::DeserializationError)
+      }
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<$t, utils::errors::ZeiError> {
-      $t::from_bytes(bytes).map_err(|_| utils::errors::ZeiError::DeserializationError)
-    }
-   }
- };
+  };
 }
 
 to_from_bytes_scalar!(RistrettoScalar);
@@ -39,9 +39,8 @@ serialize_deserialize!(RistrettoScalar);
 serialize_deserialize!(JubjubScalar);
 serialize_deserialize!(BLSScalar);
 
-
 macro_rules! to_from_bytes_group {
-  ($g:ident)  => {
+  ($g:ident) => {
     impl utils::serialization::ZeiFromToBytes for $g {
       fn zei_to_bytes(&self) -> Vec<u8> {
         self.to_compressed_bytes()

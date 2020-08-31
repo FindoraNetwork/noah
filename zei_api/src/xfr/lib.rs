@@ -1,5 +1,3 @@
-use algebra::groups::{Scalar as _, GroupArithmetic};
-use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crate::api::anon_creds::{ACCommitment, Attr};
 use crate::setup::PublicParams;
 use crate::xfr::asset_mixer::{
@@ -11,6 +9,8 @@ use crate::xfr::proofs::{
 };
 use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use crate::xfr::structs::*;
+use algebra::groups::{GroupArithmetic, Scalar as _};
+use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};

@@ -295,18 +295,18 @@ pub mod option_bytes {
 
 #[cfg(test)]
 mod test {
-  use algebra::ristretto::RistrettoPoint;
   use crate::serialization::ZeiFromToBytes;
   use crate::xfr::asset_tracer::RecordDataEncKey;
   use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
+  use algebra::ristretto::RistrettoPoint;
   use crypto::basics::elgamal::elgamal_key_gen;
   use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+  use crypto::ristretto_pedersen::RistrettoPedersenGens;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};
   use serde::de::Deserialize;
   use serde::ser::Serialize;
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
   #[test]
   fn public_key_message_pack_serialization() {

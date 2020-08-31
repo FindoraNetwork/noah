@@ -1,13 +1,13 @@
-use algebra::ristretto::RistrettoScalar as Scalar;
 use crate::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
 use crate::bp_circuits::solvency::solvency;
+use crate::ristretto_pedersen::RistrettoPedersenGens;
+use algebra::groups::Scalar as _;
+use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSError, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use linear_map::LinearMap;
 use merlin::Transcript;
 use utils::errors::ZeiError;
-use algebra::groups::Scalar as _;
-use crate::ristretto_pedersen::RistrettoPedersenGens;
 
 /// I produce a proof of solvency for a set of assets vs liabilities for potentially different
 /// asset types using a conversion table to a common type.
@@ -262,13 +262,13 @@ fn padd_values(values: &mut Vec<CloakValue>, types: &[Scalar]) {
 #[cfg(test)]
 mod test {
   use crate::bp_circuits::cloak::CloakValue;
-  use bulletproofs::{BulletproofGens};
+  use crate::ristretto_pedersen::RistrettoPedersenGens;
+  use algebra::groups::Scalar;
+  use algebra::ristretto::RistrettoScalar;
+  use bulletproofs::BulletproofGens;
   use linear_map::LinearMap;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use algebra::ristretto::RistrettoScalar;
-  use algebra::groups::Scalar;
-  use crate::ristretto_pedersen::RistrettoPedersenGens;
 
   fn do_test_solvency(bp_gens: &BulletproofGens,
                       pc_gens: &RistrettoPedersenGens,

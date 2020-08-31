@@ -102,7 +102,7 @@ mod test {
     prove_knowledge_dlog, prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog,
     verify_proof_of_knowledge_dlog,
   };
-  use algebra::groups::{Group, Scalar as _, GroupArithmetic};
+  use algebra::groups::{Group, GroupArithmetic, Scalar as _};
   use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;

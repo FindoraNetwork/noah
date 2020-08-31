@@ -4,16 +4,16 @@ extern crate itertools;
 #[macro_use]
 extern crate serde_derive;
 
+pub mod anon_creds;
 pub mod basics;
 pub mod bp_circuits;
-pub mod merkle_tree;
-pub mod ristretto_pedersen;
-pub mod anon_creds;
 pub mod bp_range_proofs;
 pub mod chaum_pedersen;
 pub mod conf_cred_reveal;
 pub mod dlog;
 pub mod group_signatures;
+pub mod merkle_tree;
+pub mod ristretto_pedersen;
 // pub mod inner_product_pairing; // TODO back in when BlsGt is serializable
 pub mod pedersen_elgamal;
 pub mod sigma;

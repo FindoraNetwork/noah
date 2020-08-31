@@ -1,5 +1,3 @@
-use algebra::groups::{Scalar as _, GroupArithmetic, Group};
-use algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar};
 use crate::api::anon_creds::ACCommitment;
 use crate::api::anon_creds::{ac_confidential_verify, ACConfidentialRevealProof};
 use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
@@ -10,7 +8,9 @@ use crate::xfr::structs::{
   asset_type_to_scalar, AssetRecord, AssetTracerMemo, AssetTracingPolicies, BlindAssetRecord,
   OpenAssetRecord, XfrAmount, XfrAssetType, XfrBody, XfrRangeProof,
 };
-use bulletproofs::{RangeProof};
+use algebra::groups::{Group, GroupArithmetic, Scalar as _};
+use algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar};
+use bulletproofs::RangeProof;
 use crypto::basics::elgamal::ElGamalCiphertext;
 use crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
 use crypto::chaum_pedersen::{
@@ -20,13 +20,13 @@ use crypto::pedersen_elgamal::{
   pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
   PedersenElGamalEqProof, PedersenElGamalProofInstance,
 };
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 use linear_map::LinearMap;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
@@ -469,10 +469,8 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
                      xfr_diff_commitment_high: diff_com_high })
 }
 fn add_blindings(oar: &[&OpenAssetRecord]) -> (Scalar, Scalar) {
-  oar.iter()
-     .fold((Scalar::from_u32(0), Scalar::from_u32(0)), |(low, high), x| {
-       (low.add(&x.amount_blinds.0), high.add(&x.amount_blinds.1))
-     })
+  oar.iter().fold((Scalar::from_u32(0), Scalar::from_u32(0)),
+                  |(low, high), x| (low.add(&x.amount_blinds.0), high.add(&x.amount_blinds.1)))
 }
 
 pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(prng: &mut R,
@@ -551,9 +549,10 @@ fn extract_value_commitments(inputs: &[BlindAssetRecord],
   }
 
   // 3. derive input - output commitment, compare with proof struct low anc high commitments
-  let derived_xfr_diff_com = total_input_com_low
-    .sub(&total_output_com_low)
-    .add(&total_input_com_high.sub(&total_output_com_high).mul(&pow2_32));
+  let derived_xfr_diff_com =
+    total_input_com_low.sub(&total_output_com_low)
+                       .add(&total_input_com_high.sub(&total_output_com_high)
+                                                 .mul(&pow2_32));
   let proof_xfr_com_low = proof.xfr_diff_commitment_low
                                .decompress()
                                .ok_or(ZeiError::DecompressElementError)?;

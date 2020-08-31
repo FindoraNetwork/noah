@@ -1,6 +1,6 @@
+use crate::setup::PublicParams;
 use algebra::groups::Scalar as _;
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
-use crate::setup::PublicParams;
 use bulletproofs::r1cs::{batch_verify, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
@@ -10,7 +10,6 @@ use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::serialization::zei_obj_serde;
 use wasm_bindgen::__rt::std::collections::HashSet;
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
@@ -56,10 +55,11 @@ pub fn prove_asset_mixing(inputs: &[(u64, Scalar, Scalar, Scalar)],
   let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
   fn extract_values_and_blinds(list: &[(u64, Scalar, Scalar, Scalar)])
                                -> (Vec<CloakValue>, Vec<CloakValue>) {
-    let values = list.iter()
-                     .map(|(amount, asset_type, _, _)| CloakValue { amount: Scalar::from_u64(*amount),
-                                                                    asset_type: *asset_type })
-                     .collect();
+    let values =
+      list.iter()
+          .map(|(amount, asset_type, _, _)| CloakValue { amount: Scalar::from_u64(*amount),
+                                                         asset_type: *asset_type })
+          .collect();
     let blinds =
       list.iter()
           .map(|(_, _, blind_amount, blind_asset_type)| CloakValue { amount: *blind_amount,
@@ -258,53 +258,103 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
 mod test {
   use crate::setup::PublicParams;
   use crate::xfr::asset_mixer::AssetMixingInstance;
+  use algebra::groups::Scalar;
+  use algebra::ristretto::{CompressedRistretto, RistrettoScalar};
+  use crypto::ristretto_pedersen::RistrettoPedersenGens;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use algebra::ristretto::{RistrettoScalar, CompressedRistretto};
-  use algebra::groups::Scalar;
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
   #[test]
   fn test_asset_mixer() {
     let pc_gens = RistrettoPedersenGens::default();
 
     // asset type set to not match errors
-    let input = [(60u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10000), RistrettoScalar::from_u64(200000)),
-                 (100u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10001), RistrettoScalar::from_u64(200001))];
-    let output = [(40u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004)),
-                  (10u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004))];
+    let input = [(60u64,
+                  RistrettoScalar::from_u64(0),
+                  RistrettoScalar::from_u64(10000),
+                  RistrettoScalar::from_u64(200000)),
+                 (100u64,
+                  RistrettoScalar::from_u64(2),
+                  RistrettoScalar::from_u64(10001),
+                  RistrettoScalar::from_u64(200001))];
+    let output = [(40u64,
+                   RistrettoScalar::from_u64(2),
+                   RistrettoScalar::from_u64(10004),
+                   RistrettoScalar::from_u64(200004)),
+                  (10u64,
+                   RistrettoScalar::from_u64(2),
+                   RistrettoScalar::from_u64(10004),
+                   RistrettoScalar::from_u64(200004))];
     let proof_result = super::prove_asset_mixing(&input, &output);
     assert!(proof_result.is_err());
 
-    let output = [(40u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004))];
+    let output = [(40u64,
+                   RistrettoScalar::from_u64(2),
+                   RistrettoScalar::from_u64(10004),
+                   RistrettoScalar::from_u64(200004))];
     let proof_result = super::prove_asset_mixing(&input, &output);
     assert!(proof_result.is_err());
 
-    let input = [(60u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10000), RistrettoScalar::from_u64(200000)),
-                 (100u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10001), RistrettoScalar::from_u64(200001)),
-                 (10u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10002), RistrettoScalar::from_u64(200002)),
-                 (50u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10003), RistrettoScalar::from_u64(200003))];
-    let output = [(40u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004)),
-                  (9u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10005), RistrettoScalar::from_u64(200005)),
-                  (1u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10006), RistrettoScalar::from_u64(200006)),
-                  (80u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10007), RistrettoScalar::from_u64(200007)),
-                  (50u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10008), RistrettoScalar::from_u64(200008)),
-                  (10u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10009), RistrettoScalar::from_u64(200009)),
-                  (30u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10010), RistrettoScalar::from_u64(200010))];
+    let input = [(60u64,
+                  RistrettoScalar::from_u64(0),
+                  RistrettoScalar::from_u64(10000),
+                  RistrettoScalar::from_u64(200000)),
+                 (100u64,
+                  RistrettoScalar::from_u64(2),
+                  RistrettoScalar::from_u64(10001),
+                  RistrettoScalar::from_u64(200001)),
+                 (10u64,
+                  RistrettoScalar::from_u64(1),
+                  RistrettoScalar::from_u64(10002),
+                  RistrettoScalar::from_u64(200002)),
+                 (50u64,
+                  RistrettoScalar::from_u64(2),
+                  RistrettoScalar::from_u64(10003),
+                  RistrettoScalar::from_u64(200003))];
+    let output = [(40u64,
+                   RistrettoScalar::from_u64(2),
+                   RistrettoScalar::from_u64(10004),
+                   RistrettoScalar::from_u64(200004)),
+                  (9u64,
+                   RistrettoScalar::from_u64(1),
+                   RistrettoScalar::from_u64(10005),
+                   RistrettoScalar::from_u64(200005)),
+                  (1u64,
+                   RistrettoScalar::from_u64(1),
+                   RistrettoScalar::from_u64(10006),
+                   RistrettoScalar::from_u64(200006)),
+                  (80u64,
+                   RistrettoScalar::from_u64(2),
+                   RistrettoScalar::from_u64(10007),
+                   RistrettoScalar::from_u64(200007)),
+                  (50u64,
+                   RistrettoScalar::from_u64(0),
+                   RistrettoScalar::from_u64(10008),
+                   RistrettoScalar::from_u64(200008)),
+                  (10u64,
+                   RistrettoScalar::from_u64(0),
+                   RistrettoScalar::from_u64(10009),
+                   RistrettoScalar::from_u64(200009)),
+                  (30u64,
+                   RistrettoScalar::from_u64(2),
+                   RistrettoScalar::from_u64(10010),
+                   RistrettoScalar::from_u64(200010))];
 
     let proof = super::prove_asset_mixing(&input, &output).unwrap();
 
     let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
       input.iter()
            .map(|(amount, typ, blind_a, blind_typ)| {
-             (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a).compress(),
+             (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a)
+                     .compress(),
               pc_gens.commit(*typ, *blind_typ).compress())
            })
            .collect();
     let output_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
       output.iter()
             .map(|(amount, typ, blind_a, blind_typ)| {
-              (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a).compress(),
+              (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a)
+                      .compress(),
                pc_gens.commit(*typ, *blind_typ).compress())
             })
             .collect();

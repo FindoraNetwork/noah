@@ -1,4 +1,3 @@
-use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crate::api::anon_creds::{
   ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
   AttributeEncKey,
@@ -7,6 +6,7 @@ use crate::xfr::asset_mixer::AssetMixProof;
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
 use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
+use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::RangeProof;
 use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCipher};
 use crypto::chaum_pedersen::ChaumPedersenProofX;

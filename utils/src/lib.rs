@@ -5,7 +5,7 @@ macro_rules! serialize_deserialize {
   ($t:ident) => {
     impl serde::Serialize for $t {
       fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-      where S: Serializer
+        where S: Serializer
       {
         if serializer.is_human_readable() {
           serializer.serialize_str(&utils::b64enc(&self.zei_to_bytes()))
@@ -27,7 +27,6 @@ macro_rules! serialize_deserialize {
         $t::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
       }
     }
-
   };
 }
 

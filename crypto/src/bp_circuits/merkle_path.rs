@@ -1,6 +1,6 @@
 use super::mimc_hash::mimc_hash;
-use bulletproofs::r1cs::{ConstraintSystem, R1CSError, Variable};
 use algebra::ristretto::RistrettoScalar as Scalar;
+use bulletproofs::r1cs::{ConstraintSystem, R1CSError, Variable};
 
 pub fn merkle_verify_mimc<CS: ConstraintSystem>(cs: &mut CS,
                                                 element: Variable,
@@ -54,14 +54,14 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(cs: &mut CS,
 mod test {
   use crate::basics::hash_functions::mimc::MiMCHash;
   use crate::merkle_tree::binary_merkle_tree::{mt_build, mt_prove, mt_verify, PathDirection};
-  use bulletproofs::r1cs::{Prover, Variable, Verifier};
-  use bulletproofs::{BulletproofGens, PedersenGens};
+  use algebra::groups::Scalar as _;
   use algebra::ristretto::CompressedRistretto;
   use algebra::ristretto::RistrettoScalar as Scalar;
+  use bulletproofs::r1cs::{Prover, Variable, Verifier};
+  use bulletproofs::{BulletproofGens, PedersenGens};
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use algebra::groups::Scalar as _;
 
   #[test]
   fn test_bp_merkle_inclusion() {
@@ -84,19 +84,23 @@ mod test {
 
     let mut prover_transcript = Transcript::new(b"MerkleTreePath");
     let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
-    let (com_elem, var_elem) = prover.commit(elem.0, curve25519_dalek::scalar::Scalar::random(&mut prng));
+    let (com_elem, var_elem) =
+      prover.commit(elem.0, curve25519_dalek::scalar::Scalar::random(&mut prng));
     let com_var_path: Vec<((CompressedRistretto, CompressedRistretto), (Variable, Variable))> =
       path.iter()
           .map(|(b, s)| {
             let (com_b, var_b) = match *b {
-              PathDirection::RIGHT => prover.commit(
-                curve25519_dalek::scalar::Scalar::from(1u8),
-                curve25519_dalek::scalar::Scalar::random(&mut prng)),
-              PathDirection::LEFT => prover.commit(
-                curve25519_dalek::scalar::Scalar::from(0u8),
-                curve25519_dalek::scalar::Scalar::random(&mut prng)),
+              PathDirection::RIGHT => {
+                prover.commit(curve25519_dalek::scalar::Scalar::from(1u8),
+                              curve25519_dalek::scalar::Scalar::random(&mut prng))
+              }
+              PathDirection::LEFT => {
+                prover.commit(curve25519_dalek::scalar::Scalar::from(0u8),
+                              curve25519_dalek::scalar::Scalar::random(&mut prng))
+              }
             };
-            let (com_s, var_s) = prover.commit(s.0, curve25519_dalek::scalar::Scalar::random(&mut prng));
+            let (com_s, var_s) =
+              prover.commit(s.0, curve25519_dalek::scalar::Scalar::random(&mut prng));
             ((CompressedRistretto(com_b), CompressedRistretto(com_s)), (var_b, var_s))
           })
           .collect();

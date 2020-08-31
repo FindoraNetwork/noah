@@ -197,8 +197,8 @@ mod test {
   use super::*;
   use crate::basics::hash_functions::mimc::MiMCHash;
   use crate::merkle_tree::binary_merkle_tree::mt_build;
-  use algebra::ristretto::RistrettoScalar as Scalar;
   use algebra::groups::Scalar as _;
+  use algebra::ristretto::RistrettoScalar as Scalar;
 
   #[test]
   fn root_computation() {

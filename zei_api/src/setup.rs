@@ -1,5 +1,5 @@
 //The Public Setup needed for Proofs
-use bulletproofs::{BulletproofGens};
+use bulletproofs::BulletproofGens;
 use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
 //Shared by all members of the ledger

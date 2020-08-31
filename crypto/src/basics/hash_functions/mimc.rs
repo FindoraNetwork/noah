@@ -1,9 +1,9 @@
 use super::MTHash;
+use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use digest::Digest;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
-use algebra::groups::Scalar as _;
 
 pub struct MiMCHash {
   c: [Scalar; MIMC_ROUNDS],

@@ -2,8 +2,8 @@ use crate::errors::AlgebraError;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 pub trait GroupArithmetic {
   type S: Scalar;
@@ -56,7 +56,8 @@ pub trait Scalar:
 }
 
 pub trait Group:
-  Debug + Sized + PartialEq + Eq + Clone + GroupArithmetic + Serialize + for<'de> Deserialize<'de> //+ GroupArithmetic + ZeiFromToBytes
+  Debug + Sized + PartialEq + Eq + Clone + GroupArithmetic + Serialize + for<'de> Deserialize<'de>
+//+ GroupArithmetic + ZeiFromToBytes
 {
   const COMPRESSED_LEN: usize;
   fn get_identity() -> Self;

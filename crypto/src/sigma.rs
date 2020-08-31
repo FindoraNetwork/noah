@@ -238,7 +238,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcrip
 
 #[cfg(test)]
 mod tests {
-  use algebra::groups::{Group, Scalar as _, GroupArithmetic};
+  use algebra::groups::{Group, GroupArithmetic, Scalar as _};
   use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
   use merlin::Transcript;
   use rand_core::SeedableRng;

@@ -1,5 +1,5 @@
-use bulletproofs::r1cs::{ConstraintSystem, Variable};
 use algebra::ristretto::RistrettoScalar as Scalar;
+use bulletproofs::r1cs::{ConstraintSystem, Variable};
 
 pub fn array_membership<CS: ConstraintSystem>(cs: &mut CS,
                                               set: &[Scalar],
@@ -24,10 +24,10 @@ pub fn array_membership<CS: ConstraintSystem>(cs: &mut CS,
 #[cfg(test)]
 mod test {
   use super::array_membership;
+  use algebra::groups::Scalar as _;
+  use algebra::ristretto::RistrettoScalar as Scalar;
   use bulletproofs::r1cs::{Prover, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
-  use algebra::ristretto::RistrettoScalar as Scalar;
-  use algebra::groups::Scalar as _;
   use merlin::Transcript;
 
   #[test]
@@ -43,7 +43,8 @@ mod test {
 
     let mut prover_transcript = Transcript::new(b"TransactionTest");
     let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
-    let (com_elem, var_elem) = prover.commit(set[4].0, curve25519_dalek::scalar::Scalar::from(1299u32));
+    let (com_elem, var_elem) =
+      prover.commit(set[4].0, curve25519_dalek::scalar::Scalar::from(1299u32));
     let left_wires = array_membership(&mut prover, &set[..], var_elem);
     let bp_gens = BulletproofGens::new(left_wires.next_power_of_two(), 1);
     let proof = prover.prove(&bp_gens).unwrap();

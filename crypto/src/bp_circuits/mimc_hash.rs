@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use crate::basics::hash_functions::mimc::compute_mimc_constants;
-use bulletproofs::r1cs::*;
 use algebra::ristretto::RistrettoScalar as Scalar;
+use bulletproofs::r1cs::*;
 
 pub(crate) fn mimc_func<CS: ConstraintSystem>(cs: &mut CS,
                                               x: LinearCombination,
@@ -51,8 +51,10 @@ pub(crate) fn mimc_hash<CS: ConstraintSystem>(cs: &mut CS,
                                               -> Result<(LinearCombination, usize), R1CSError> {
   let c = compute_mimc_constants(level);
 
-  let mut sa: LinearCombination = cs.allocate(Some(curve25519_dalek::scalar::Scalar::zero()))?.into();
-  let mut sc: LinearCombination = cs.allocate(Some(curve25519_dalek::scalar::Scalar::zero()))?.into();
+  let mut sa: LinearCombination = cs.allocate(Some(curve25519_dalek::scalar::Scalar::zero()))?
+                                    .into();
+  let mut sc: LinearCombination = cs.allocate(Some(curve25519_dalek::scalar::Scalar::zero()))?
+                                    .into();
   let mut num_left_wires = 2;
   for v in values.iter() {
     let x = sa + (*v).clone();
@@ -79,11 +81,11 @@ mod test {
   use super::*;
   use crate::basics::hash_functions::mimc::{mimc_f, mimc_feistel, MiMCHash};
   use crate::basics::hash_functions::MTHash;
+  use algebra::groups::Scalar as _;
+  use algebra::ristretto::RistrettoScalar as Scalar;
   use bulletproofs::r1cs::Verifier;
   use bulletproofs::{BulletproofGens, PedersenGens};
-  use algebra::ristretto::RistrettoScalar as Scalar;
   use merlin::Transcript;
-  use algebra::groups::Scalar as _;
 
   #[test]
   fn test_mimc_fn() {
@@ -124,7 +126,9 @@ mod test {
 
     let scalar_x = Scalar::from_u32(2);
     let scalar_y = Scalar::from_u32(0);
-    let scalar_c = [Scalar::from_u32(0), Scalar::from_u32(8), Scalar::from_u32(0)];
+    let scalar_c = [Scalar::from_u32(0),
+                    Scalar::from_u32(8),
+                    Scalar::from_u32(0)];
     let (expected_output_x, expected_output_y) = mimc_feistel(&scalar_x, &scalar_y, &scalar_c);
 
     let (cx, x) = prover.commit(scalar_x.0, curve25519_dalek::scalar::Scalar::from(10u8));

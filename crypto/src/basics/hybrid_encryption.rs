@@ -1,6 +1,6 @@
-use curve25519_dalek::edwards::CompressedEdwardsY;
-use algebra::ristretto::RistrettoScalar as Scalar;
 use algebra::groups::Scalar as _;
+use algebra::ristretto::RistrettoScalar as Scalar;
+use curve25519_dalek::edwards::CompressedEdwardsY;
 use rand_core::{CryptoRng, RngCore};
 use sha2::Digest;
 use utils::errors::ZeiError;
@@ -163,7 +163,7 @@ fn symmetric_key_from_secret_key(sec_key: &SecretKey,
                                  ephemeral_public_key: &x25519_dalek::PublicKey)
                                  -> [u8; 32] {
   let scalar_sec_key = sec_key_as_scalar(sec_key);
-  let mut bytes = [0u8;32];
+  let mut bytes = [0u8; 32];
   bytes.copy_from_slice(scalar_sec_key.to_bytes().as_slice());
   let x_secret = x25519_dalek::StaticSecret::from(bytes);
   symmetric_key_from_x25519_secret_key(&x_secret, ephemeral_public_key)

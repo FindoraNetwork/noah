@@ -1,5 +1,6 @@
+use crate::ristretto_pedersen::RistrettoPedersenGens;
 use crate::sigma::{sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use algebra::groups::{Group, Scalar as _, GroupArithmetic};
+use algebra::groups::{Group, GroupArithmetic, Scalar as _};
 use algebra::ristretto::RistrettoPoint;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
@@ -7,7 +8,6 @@ use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::serialization;
-use crate::ristretto_pedersen::RistrettoPedersenGens;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
@@ -379,9 +379,11 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(transcrip
     }
   }
 
-  let multiexp = curve25519_dalek::ristretto::RistrettoPoint::vartime_multiscalar_mul(
-    all_scalars.iter().map(|x| x.0),
-    all_elems.iter().map(|x| x.0));
+  let multiexp =
+    curve25519_dalek::ristretto::RistrettoPoint::vartime_multiscalar_mul(all_scalars.iter()
+                                                                                    .map(|x| x.0),
+                                                                         all_elems.iter()
+                                                                                  .map(|x| x.0));
   if multiexp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
     Err(ZeiError::ZKProofBatchVerificationError)
   } else {
@@ -391,9 +393,9 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(transcrip
 #[cfg(test)]
 mod test {
   use super::*;
+  use crate::ristretto_pedersen::RistrettoPedersenGens;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use crate::ristretto_pedersen::RistrettoPedersenGens;
 
   #[test]
   pub fn test_chaum_pedersen_equality_commitment() {

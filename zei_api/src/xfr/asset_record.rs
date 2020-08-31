@@ -1,5 +1,3 @@
-use algebra::groups::Scalar as _;
-use algebra::ristretto::RistrettoScalar as Scalar;
 use crate::api::anon_creds::{
   ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
   ConfidentialAC, Credential,
@@ -10,17 +8,19 @@ use crate::xfr::structs::{
   AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
   ASSET_TYPE_LENGTH,
 };
+use algebra::groups::Scalar as _;
+use algebra::ristretto::RistrettoScalar as Scalar;
 use boolinator::Boolinator;
 use crypto::basics::hybrid_encryption::{
   hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
 };
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 use utils::errors::ZeiError;
 use utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
 const U64_BYTE_LEN: usize = 8;
 
@@ -549,8 +549,6 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
 
 #[cfg(test)]
 mod test {
-  use algebra::groups::Scalar as _;
-  use algebra::ristretto::RistrettoScalar as Scalar;
   use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
   use crate::xfr::asset_record::AssetRecordType;
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
@@ -560,12 +558,14 @@ mod test {
     XfrAmount, XfrAssetType,
   };
   use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
+  use algebra::groups::Scalar as _;
+  use algebra::ristretto::RistrettoScalar as Scalar;
+  use crypto::ristretto_pedersen::RistrettoPedersenGens;
   use itertools::Itertools;
   use rand::Rng;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
   fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracking: bool) {
     let mut prng: ChaChaRng;

@@ -1,7 +1,5 @@
 #[cfg(test)]
 pub(crate) mod tests {
-  use algebra::groups::Scalar as _;
-  use algebra::ristretto::{RistrettoScalar as Scalar};
   use crate::api::anon_creds;
   use crate::api::anon_creds::{ac_commit, ACCommitment, Credential};
   use crate::setup::PublicParams;
@@ -15,9 +13,12 @@ pub(crate) mod tests {
     AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerMemo, AssetTracingPolicy,
     AssetType, IdentityRevealPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH,
   };
+  use algebra::groups::Scalar as _;
+  use algebra::ristretto::RistrettoScalar as Scalar;
   use crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
   use crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
 
+  use crypto::ristretto_pedersen::RistrettoPedersenGens;
   use itertools::Itertools;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
@@ -29,7 +30,6 @@ pub(crate) mod tests {
     XfrVerifyAssetTracingAssetAmountError, XfrVerifyAssetTracingIdentityError,
   };
   use utils::u64_to_u32_pair;
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
   pub(crate) fn create_xfr(prng: &mut ChaChaRng,
                            input_templates: &[AssetRecordTemplate],
@@ -697,10 +697,10 @@ pub(crate) mod tests {
     };
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
-    use crypto::basics::elgamal::ElGamalCiphertext;
-    use crypto::ristretto_pedersen::RistrettoPedersenGens;
     use algebra::groups::GroupArithmetic;
     use algebra::ristretto::RistrettoPoint;
+    use crypto::basics::elgamal::ElGamalCiphertext;
+    use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);

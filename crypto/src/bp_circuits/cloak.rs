@@ -39,14 +39,14 @@ match on each list. On each product the elements are shifted by a random challen
   - The last intermediate value is appended to the output list.
 */
 
+use crate::ristretto_pedersen::RistrettoPedersenGens;
+use algebra::groups::Scalar as _;
+use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::r1cs::{
   ConstraintSystem, Prover, R1CSError, RandomizableConstraintSystem, Variable, Verifier,
 };
-use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use merlin::Transcript;
 use utils::errors::ZeiError;
-use crate::ristretto_pedersen::RistrettoPedersenGens;
-use algebra::groups::Scalar as _;
 
 /// Represent AssetRecord amount and asset type
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -291,16 +291,16 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
 
 #[cfg(test)]
 pub mod tests {
-  use algebra::ristretto::RistrettoScalar;
   use crate::bp_circuits::cloak::{CloakCommitment, CloakValue};
   use ::lazy_static::lazy_static;
+  use algebra::groups::Scalar;
+  use algebra::ristretto::RistrettoScalar;
   use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
   use itertools::Itertools;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use algebra::groups::Scalar;
 
   // Taken from https://github.com/stellar/slingshot/tree/main/cloak
   fn yuan(q: u64) -> CloakValue {
@@ -338,13 +338,14 @@ pub mod tests {
                       CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1))];
 
     let (_, added) = super::merge(&values);
-    let expected = vec![CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-                        CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-                        CloakValue::new(RistrettoScalar::from_u32(90), RistrettoScalar::from_u32(3)),
-                        CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
-                        CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-                        CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-                        CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(1))];
+    let expected =
+      vec![CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+           CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+           CloakValue::new(RistrettoScalar::from_u32(90), RistrettoScalar::from_u32(3)),
+           CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
+           CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+           CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
+           CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(1))];
 
     assert_eq!(&added[..], &expected[..]);
   }
@@ -359,13 +360,14 @@ pub mod tests {
       // prover scope
       let mut prover_transcript = Transcript::new(b"test");
       let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
-      let in_com_and_vars = inputs.iter()
-                                  .map(|input| {
-                                    input.commit_prover(&mut prover,
-                                                        &CloakValue::new(RistrettoScalar::random(&mut prng),
-                                                                         RistrettoScalar::random(&mut prng)))
-                                  })
-                                  .collect_vec();
+      let in_com_and_vars =
+        inputs.iter()
+              .map(|input| {
+                input.commit_prover(&mut prover,
+                                    &CloakValue::new(RistrettoScalar::random(&mut prng),
+                                                     RistrettoScalar::random(&mut prng)))
+              })
+              .collect_vec();
       input_coms = in_com_and_vars.iter().map(|(com, _)| *com).collect_vec();
       let input_vars = in_com_and_vars.iter().map(|(_, var)| *var).collect_vec();
 
@@ -425,10 +427,14 @@ pub mod tests {
   #[test]
   fn range_proofs() {
     // Range proof verifies
-    test_range_proof(RistrettoScalar::from_u64(u64::MAX - 1), RistrettoScalar::from_u32(1), true);
+    test_range_proof(RistrettoScalar::from_u64(u64::MAX - 1),
+                     RistrettoScalar::from_u32(1),
+                     true);
 
     // Range proof does not verifies due to overflow in output
-    test_range_proof(RistrettoScalar::from_u64(u64::MAX), RistrettoScalar::from_u32(1), false);
+    test_range_proof(RistrettoScalar::from_u64(u64::MAX),
+                     RistrettoScalar::from_u32(1),
+                     false);
   }
 
   #[test]

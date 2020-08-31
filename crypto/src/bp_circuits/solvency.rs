@@ -8,13 +8,12 @@
  * 5) Apply range proof for total_asset - total_liabilities
 */
 
+use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable};
 use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
-use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable};
 use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
 use linear_map::LinearMap;
 use utils::errors::ZeiError;
-
 
 /// I implement a proof of solvency bulletproof protocol
 /// The prover needs to provide asset and liabilities plaintain
@@ -68,10 +67,9 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
                                                .collect();
 
       //let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
-      let total_asset = converted_asset
-        .iter()
-        .fold(Scalar::from_u32(0), |acc, b| acc.add(b))
-        .add(&public_asset_sum);
+      let total_asset = converted_asset.iter()
+                                       .fold(Scalar::from_u32(0), |acc, b| acc.add(b))
+                                       .add(&public_asset_sum);
 
       let converted_lia: Vec<Scalar> =
         liability_set_values.unwrap() // safe unwrap
@@ -79,10 +77,9 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
                             .map(|v| v.amount.mul(conversion_rates.get(&v.asset_type).unwrap())) // TODO remove this unwrap
                             .collect();
       //let total_lia = converted_lia.iter().sum::<Scalar>().add(&public_liability_sum);
-      let total_lia = converted_lia
-        .iter()
-        .fold(Scalar::from_u32(0), |acc, b| acc.add(b))
-        .add(&public_liability_sum);
+      let total_lia = converted_lia.iter()
+                                   .fold(Scalar::from_u32(0), |acc, b| acc.add(b))
+                                   .add(&public_liability_sum);
 
       Some(total_asset.sub(&total_lia))
     }
@@ -219,13 +216,13 @@ fn trim(values: &[CloakValue]) -> Vec<CloakValue> {
 
 #[cfg(test)]
 mod test {
-  use algebra::ristretto::{RistrettoScalar};
   use crate::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
+  use algebra::groups::Scalar;
+  use algebra::ristretto::RistrettoScalar;
   use bulletproofs::r1cs::{Prover, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
   use linear_map::LinearMap;
   use merlin::Transcript;
-  use algebra::groups::Scalar;
 
   #[test]
   fn sort() {
@@ -237,16 +234,19 @@ mod test {
                       CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
                       CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3))];
 
-    let t = [RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(1)];
+    let t = [RistrettoScalar::from_u32(3),
+             RistrettoScalar::from_u32(2),
+             RistrettoScalar::from_u32(1)];
 
     let sorted = super::sort_by_rate_type(&values, &t);
-    let expected = vec![CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
-                        CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
-                        CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
-                        CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
-                        CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
-                        CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
-                        CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1))];
+    let expected =
+      vec![CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
+           CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
+           CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
+           CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
+           CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
+           CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
+           CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1))];
     assert_eq!(&sorted[..], &expected[..]);
   }
 
@@ -303,7 +303,8 @@ mod test {
       asset_set.iter()
                .map(|value| {
                  value.commit_prover(&mut prover,
-                                     &CloakValue::new(RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(2)))
+                                     &CloakValue::new(RistrettoScalar::from_u32(1),
+                                                      RistrettoScalar::from_u32(2)))
                })
                .collect();
     let asset_com: Vec<CloakCommitment> = asset_com_vars.iter().map(|(com, _)| *com).collect();
@@ -313,7 +314,8 @@ mod test {
       liability_set.iter()
                    .map(|value| {
                      value.commit_prover(&mut prover,
-                                         &CloakValue::new(RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(4)))
+                                         &CloakValue::new(RistrettoScalar::from_u32(3),
+                                                          RistrettoScalar::from_u32(4)))
                    })
                    .collect();
     let lia_com: Vec<CloakCommitment> = lia_com_vars.iter().map(|(com, _)| *com).collect();

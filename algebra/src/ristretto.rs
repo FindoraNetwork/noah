@@ -4,8 +4,8 @@ use crate::groups::{Group, GroupArithmetic};
 use byteorder::ByteOrder;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint};
-use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::Identity;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
@@ -113,7 +113,7 @@ impl Group for RistrettoPoint {
 
   fn from_compressed_bytes(bytes: &[u8]) -> Result<RistrettoPoint, AlgebraError> {
     Ok(RistrettoPoint(CR::from_slice(bytes).decompress()
-      .ok_or(AlgebraError::DecompressElementError)?))
+                                           .ok_or(AlgebraError::DecompressElementError)?))
   }
 
   fn from_hash<D>(hash: D) -> RistrettoPoint

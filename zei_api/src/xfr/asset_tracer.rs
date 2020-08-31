@@ -1,11 +1,11 @@
-use algebra::bls12_381::{BLSScalar, BLSG1};
-use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
-use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
 use crate::api::anon_creds::{Attr, AttributeCiphertext};
 use crate::xfr::structs::{
   asset_type_to_scalar, AssetTracerDecKeys, AssetTracerEncKeys, AssetTracerKeyPair, AssetTracerMemo,
 };
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
+use algebra::bls12_381::{BLSScalar, BLSG1};
+use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
+use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
 use crypto::basics::elgamal::{
   elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
   ElGamalDecKey, ElGamalEncKey,
@@ -13,10 +13,10 @@ use crypto::basics::elgamal::{
 use crypto::basics::hybrid_encryption::{
   hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
 };
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::{u32_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u32};
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
 pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
 pub type RecordDataDecKey = ElGamalDecKey<Scalar>;
@@ -163,7 +163,9 @@ impl AssetTracerMemo {
       let decrypted_low = elgamal_decrypt_elem(ctext_low, dec_key);
       let decrypted_high = elgamal_decrypt_elem(ctext_high, dec_key);
       let base = RistrettoPoint::get_base();
-      if base.mul(&Scalar::from_u32(low)) != decrypted_low || base.mul(&Scalar::from_u32(high)) != decrypted_high {
+      if base.mul(&Scalar::from_u32(low)) != decrypted_low
+         || base.mul(&Scalar::from_u32(high)) != decrypted_high
+      {
         Err(ZeiError::AssetTracingExtractionError)
       } else {
         Ok(())
@@ -256,10 +258,10 @@ impl AssetTracerMemo {
 
 #[cfg(test)]
 mod tests {
-  use algebra::ristretto::{RistrettoScalar as Scalar};
   use crate::xfr::structs::{AssetTracerMemo, AssetType};
   use algebra::bls12_381::{BLSScalar, BLSG1};
   use algebra::groups::{Group, Scalar as ZeiScalar};
+  use algebra::ristretto::RistrettoScalar as Scalar;
   use crypto::basics::elgamal::elgamal_encrypt;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -279,13 +281,15 @@ mod tests {
 
     let amount = (1u64 << 40) + 500; // low and high are small u32 numbers
     let (low, high) = u64_to_u32_pair(amount);
-    let memo =
-      AssetTracerMemo::new(&mut prng,
-                           &tracer_keys.enc_key,
-                           Some((low, high, &Scalar::from_u32(191919u32), &Scalar::from_u32(2222u32))),
-                           None,
-                           vec![],
-                           true);
+    let memo = AssetTracerMemo::new(&mut prng,
+                                    &tracer_keys.enc_key,
+                                    Some((low,
+                                          high,
+                                          &Scalar::from_u32(191919u32),
+                                          &Scalar::from_u32(2222u32))),
+                                    None,
+                                    vec![],
+                                    true);
     assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_eg_dec_key, amount)
                 .is_ok());
 
