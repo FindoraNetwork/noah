@@ -71,9 +71,10 @@ pub mod test {
 
   use crate::basics::hash_functions::mimc::MiMCHash;
   use crate::basics::hash_functions::MTHash;
-  use algebra::groups::Scalar;
+  use algebra::groups::Scalar as _;
+  use algebra::ristretto::RistrettoScalar as Scalar;
 
-  fn check_mimc(level: usize, input: &[&curve25519_dalek::scalar::Scalar], expected_output: &[u8]) {
+  fn check_mimc(level: usize, input: &[&Scalar], expected_output: &[u8]) {
     let hash = MiMCHash::new(level);
 
     let expected_output_scalar = Scalar::from_bytes(expected_output).unwrap();

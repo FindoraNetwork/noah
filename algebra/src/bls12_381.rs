@@ -6,18 +6,11 @@ use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt, Sca
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use ff::{Field, PrimeField};
-use std::str::FromStr;
-
 use group::Group as _;
-
-use pairing::bls12_381::{Fq, Fq12, Fq2, Fq6, FqRepr, Fr, FrRepr, G1, G2};
-use pairing::PairingCurveAffine;
-
 use rand_core::{CryptoRng, RngCore};
-use serde::de::{SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::ops::{Add, Mul, Sub};
-use utils::{b64dec, b64enc, compute_prng_from_hash, u8_littleendian_slice_to_u64};
+use std::str::FromStr;
+use utils::{compute_prng_from_hash, u8_littleendian_slice_to_u64};
 
 pub type Bls12381field = Scalar;
 
@@ -61,7 +54,7 @@ impl ZeiScalar for BLSScalar {
     where D: Digest<OutputSize = U64> + Default
   {
     let mut prng = compute_prng_from_hash(hash);
-    Self::random_scalar(&mut prng)
+    Self::random(&mut prng)
   }
 
   // scalar arithmetic

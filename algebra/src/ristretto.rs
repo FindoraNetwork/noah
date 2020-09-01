@@ -3,13 +3,13 @@ use crate::groups::Scalar as ZeiScalar;
 use crate::groups::{Group, GroupArithmetic};
 use byteorder::ByteOrder;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use curve25519_dalek::edwards::EdwardsPoint;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoScalar(pub Scalar);

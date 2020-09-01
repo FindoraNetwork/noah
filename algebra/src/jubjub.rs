@@ -7,18 +7,8 @@ use ff::Field;
 use group::Group as _;
 use jubjub::{AffinePoint, ExtendedPoint, Fr};
 use rand_core::{CryptoRng, RngCore};
-use serde::de::{SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
-
-const GENERATOR: AffinePoint =
-  AffinePoint::from_raw_unchecked(Fq::from_raw([0xe4b3_d35d_f1a7_adfe,
-                                                0xcaf5_5d1b_29bf_81af,
-                                                0x8b0f_03dd_d60a_8187,
-                                                0x62ed_cbb8_bf37_87c8]),
-                                  Fq::from_raw([0xb, 0x0, 0x0, 0x0]));
-
-use utils::{b64dec, b64enc, compute_prng_from_hash, u8_littleendian_slice_to_u64};
+use utils::{compute_prng_from_hash, u8_littleendian_slice_to_u64};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
@@ -27,7 +17,7 @@ pub struct JubjubGroup(pub(crate) ExtendedPoint);
 
 impl Scalar for JubjubScalar {
   // scalar generation
-  fn random_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> JubjubScalar {
+  fn random<R: CryptoRng + RngCore>(rng: &mut R) -> JubjubScalar {
     JubjubScalar(Fr::random(rng))
   }
 
@@ -43,7 +33,7 @@ impl Scalar for JubjubScalar {
     where D: Digest<OutputSize = U64> + Default
   {
     let mut prng = compute_prng_from_hash(hash);
-    Self::random_scalar(&mut prng)
+    Self::random(&mut prng)
   }
 
   // scalar arithmetic
@@ -177,17 +167,17 @@ mod jubjub_groups_test {
     let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
 
     // Private key
-    let alpha = JubjubScalar::random_scalar(&mut rng);
+    let alpha = JubjubScalar::random(&mut rng);
 
     // Public key
     let base = JubjubGroup::get_base();
     let u = base.mul(&alpha);
 
     // Verifier challenge
-    let c = JubjubScalar::random_scalar(&mut rng);
+    let c = JubjubScalar::random(&mut rng);
 
     // Prover commitment
-    let alpha_t = JubjubScalar::random_scalar(&mut rng);
+    let alpha_t = JubjubScalar::random(&mut rng);
     let u_t = base.mul(&alpha_t);
 
     // Prover response

@@ -2,10 +2,10 @@ use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use rand_core::{CryptoRng, RngCore};
-use sha2::Digest;
 use serde::Serializer;
+use sha2::Digest;
 use utils::errors::ZeiError;
-use utils::serialization::{ZeiFromToBytes};
+use utils::serialization::ZeiFromToBytes;
 
 #[derive(Debug, Clone)]
 pub struct XPublicKey {
@@ -20,13 +20,10 @@ impl ZeiFromToBytes for XPublicKey {
   fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
     if bytes.len() != 32 {
       Err(ZeiError::DeserializationError)
-    }
-    else{
+    } else {
       let mut array = [0u8; 32];
       array.copy_from_slice(bytes);
-      Ok(XPublicKey{
-        key: x25519_dalek::PublicKey::from(array)
-      })
+      Ok(XPublicKey { key: x25519_dalek::PublicKey::from(array) })
     }
   }
 }
@@ -60,13 +57,10 @@ impl ZeiFromToBytes for XSecretKey {
   fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
     if bytes.len() != 32 {
       Err(ZeiError::DeserializationError)
-    }
-    else{
+    } else {
       let mut array = [0u8; 32];
       array.copy_from_slice(bytes);
-      Ok(XSecretKey{
-        key: x25519_dalek::StaticSecret::from(array)
-      })
+      Ok(XSecretKey { key: x25519_dalek::StaticSecret::from(array) })
     }
   }
 }

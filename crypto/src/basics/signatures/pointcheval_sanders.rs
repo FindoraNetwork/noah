@@ -56,12 +56,11 @@ pub struct PSSignature<G1> {
 pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R)
   -> (PSPublicKey<P::G2>, PSSecretKey<P::ScalarField>) {
-
   // In the paper the construction of section 4.1 suggests to pick the generator in G2 at random
   // However the security proof is a direct reduction to Assumption 2 for which one can pick any generator in G2.
   let g2 = P::G2::get_base();
-  let x = P::ScalarField::random_scalar(prng);
-  let y = P::ScalarField::random_scalar(prng);
+  let x = P::ScalarField::random(prng);
+  let y = P::ScalarField::random(prng);
 
   let xx = g2.mul(&x);
   let yy = g2.mul(&y);

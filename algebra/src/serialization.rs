@@ -1,7 +1,7 @@
 use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::groups::{Group, Scalar};
 use crate::jubjub::{JubjubGroup, JubjubScalar};
-use crate::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar, CompressedEdwardsY};
+use crate::ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar};
 use serde::Serializer;
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
