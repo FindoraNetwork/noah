@@ -79,6 +79,8 @@ in the credentials by
 */
 
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
+
+use algebra::bls12_381::BLSScalar;
 use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::multi_exp::MultiExp;
 use algebra::pairing::Pairing;
@@ -422,25 +424,29 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(issuer_pub_key: &ACIs
 /// Produce a AttrsRevealProof, attributes that are not Revealed(attr) and secret parameters
 /// are proved in ZeroKnowledge.
 #[allow(clippy::type_complexity)]
-pub fn ac_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
+pub fn ac_open_commitment<R: CryptoRng + RngCore,
+                          P: Pairing<ScalarField = algebra::bls12_381::BLSScalar>>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
-  credential: &Credential<P::G1, P::G2, P::ScalarField>,
+  credential: &Credential<P::G1, P::G2, u32>,
   key: &ACKey<P::ScalarField>,
   reveal_map: &[bool])
   -> Result<ACRevealProof<P::G2, P::ScalarField>, ZeiError> {
   let sig_commitment = ac_randomize::<P>(&credential.signature, key);
-  let revealed_attributes = credential.attributes
-                                      .iter()
-                                      .zip(reveal_map.iter())
-                                      .map(|(attr, b)| {
-                                        if *b {
-                                          Attribute::Revealed(attr)
-                                        } else {
-                                          Attribute::Hidden(Some(attr))
-                                        }
-                                      })
-                                      .collect_vec();
+  let credential_attributes = credential.attributes
+                                        .iter()
+                                        .map(|a| BLSScalar::from_u32(*a))
+                                        .collect_vec();
+  let revealed_attributes = credential_attributes.iter()
+                                                 .zip(reveal_map.iter())
+                                                 .map(|(attr, b)| {
+                                                   if *b {
+                                                     Attribute::Revealed(attr)
+                                                   } else {
+                                                     Attribute::Hidden(Some(attr))
+                                                   }
+                                                 })
+                                                 .collect_vec();
   let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
   ac_init_transcript::<P>(&mut transcript, &credential.issuer_pub_key, &sig_commitment); // public parameters
   let pok = prove_pok::<_, P>(&mut transcript,

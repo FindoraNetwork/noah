@@ -218,14 +218,7 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(prng: &mut R,
                                                   key: &ACCommitmentKey,
                                                   reveal_map: &[bool])
                                                   -> Result<ACRevealProof, ZeiError> {
-  // TODO avoid this cloning
-  let c = crypto::anon_creds::Credential { signature: credential.signature.clone(),
-                                           attributes: credential.attributes
-                                                                 .iter()
-                                                                 .map(|a| BLSScalar::from_u32(*a))
-                                                                 .collect_vec(),
-                                           issuer_pub_key: credential.issuer_pub_key.clone() };
-  crypto::anon_creds::ac_open_commitment::<_, Bls12381>(prng, user_sk, &c, key, reveal_map)
+  crypto::anon_creds::ac_open_commitment::<_, Bls12381>(prng, user_sk, credential, key, reveal_map)
 }
 
 /// Produces a ACRevealSig for a credential. ACRevealSig includes new commitment to the credential,
