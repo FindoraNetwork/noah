@@ -377,11 +377,13 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
       Ok(AssetTypeAndAmountProof::ConfAmount(range_proof(inputs, outputs)?))
     }
     XfrType::NonConfidentialAmount_ConfidentialAssetType_SingleAsset => {
-      Ok(AssetTypeAndAmountProof::ConfAsset(asset_proof(prng, &pc_gens, inputs, outputs)?))
+      Ok(AssetTypeAndAmountProof::ConfAsset(Box::new(asset_proof(prng, &pc_gens, inputs,
+                                                                 outputs)?)))
     }
     XfrType::Confidential_SingleAsset => {
-      Ok(AssetTypeAndAmountProof::ConfAll((range_proof(inputs, outputs)?,
-                                           asset_proof(prng, &pc_gens, inputs, outputs)?)))
+      Ok(AssetTypeAndAmountProof::ConfAll(Box::new((range_proof(inputs, outputs)?,
+                                                    asset_proof(prng, &pc_gens, inputs,
+                                                                outputs)?))))
     }
     _ => Err(ZeiError::XfrCreationAssetAmountError), // Type cannot be multi asset
   }
@@ -494,8 +496,10 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
 
   for body in bodies {
     match &body.proofs.asset_type_and_amount_proof {
-      AssetTypeAndAmountProof::ConfAll((range_proof, asset_proof)) => {
-        conf_amount_records.push((&body.inputs, &body.outputs, range_proof)); // save for batching
+      AssetTypeAndAmountProof::ConfAll(x) => {
+        let range_proof = &(*x).0;
+        let asset_proof = &(*x).1;
+        conf_amount_records.push((&body.inputs, &body.outputs, range_proof));
         conf_asset_type_records.push((&body.inputs, &body.outputs, asset_proof));
         // save for batching
       }

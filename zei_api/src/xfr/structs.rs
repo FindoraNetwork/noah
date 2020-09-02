@@ -339,16 +339,13 @@ pub struct AssetRecordTemplate {
 }
 
 // PROOFS STRUCTURES
-
-// TODO is this clippy warning a problem?
-#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum AssetTypeAndAmountProof {
-  AssetMix(AssetMixProof),        // multi-type fully confidential Xfr
-  ConfAmount(XfrRangeProof),      // single-type and public, confidental amount
-  ConfAsset(ChaumPedersenProofX), // single-type confidential, public amount
-  ConfAll((XfrRangeProof, ChaumPedersenProofX)), // fully confidential single type
-  NoProof,                        // non-confidential transaction
+  AssetMix(AssetMixProof),             // multi-type fully confidential Xfr
+  ConfAmount(XfrRangeProof),           // single-type and public, confidential amount
+  ConfAsset(Box<ChaumPedersenProofX>), // single-type confidential, public amount
+  ConfAll(Box<(XfrRangeProof, ChaumPedersenProofX)>), // fully confidential single type
+  NoProof,                             // non-confidential transaction
 }
 
 /// I contain the proofs of a transfer note
