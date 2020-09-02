@@ -9,6 +9,7 @@ use jubjub::{AffinePoint, ExtendedPoint, Fr};
 use rand_core::{CryptoRng, RngCore};
 use std::convert::TryInto;
 use utils::{compute_prng_from_hash, u8_littleendian_slice_to_u64};
+use rand_chacha::ChaCha20Rng;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
@@ -32,7 +33,7 @@ impl Scalar for JubjubScalar {
   fn from_hash<D>(hash: D) -> JubjubScalar
     where D: Digest<OutputSize = U64> + Default
   {
-    let mut prng = compute_prng_from_hash(hash);
+    let mut prng = compute_prng_from_hash::<D,ChaCha20Rng>(hash);
     Self::random(&mut prng)
   }
 
@@ -112,7 +113,7 @@ impl Group for JubjubGroup {
   fn from_hash<D>(hash: D) -> JubjubGroup
     where D: Digest<OutputSize = U64> + Default
   {
-    let mut prng = compute_prng_from_hash(hash);
+    let mut prng = compute_prng_from_hash::<D,ChaCha20Rng>(hash);
     JubjubGroup(ExtendedPoint::random(&mut prng))
   }
 }

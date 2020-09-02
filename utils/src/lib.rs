@@ -2,8 +2,7 @@ pub mod errors;
 pub mod serialization;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 
 #[macro_export]
 macro_rules! serialize_deserialize {
@@ -148,14 +147,15 @@ pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>, base64::Dec
   base64::decode_config(input, base64::URL_SAFE)
 }
 
-pub fn compute_prng_from_hash<D>(hash: D) -> ChaCha20Rng
-  where D: Digest<OutputSize = U64> + Default
+pub fn compute_prng_from_hash<D, R>(hash: D) -> R
+  where D: Digest<OutputSize = U64> + Default,
+        R: CryptoRng + RngCore + SeedableRng<Seed = [u8; 32]>
 {
   const SEED_SIZE: usize = 32;
   let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
   let result = hash.result();
   seed.copy_from_slice(&result[0..SEED_SIZE]);
-  rand_chacha::ChaChaRng::from_seed(seed)
+  R::from_seed(seed)
 }
 
 #[cfg(test)]
