@@ -130,15 +130,39 @@ fn collect_records_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey,
   }
 }
 
+pub struct BarMemosPoliciesCollection<'a> {
+  bars: &'a [BlindAssetRecord],
+  memos: &'a [Vec<AssetTracerMemo>],
+  policies: &'a [&'a AssetTracingPolicies],
+}
+
+impl<'a> BarMemosPoliciesCollection<'a> {
+  pub fn new(bars: &'a [BlindAssetRecord],
+             memos: &'a [Vec<AssetTracerMemo>],
+             policies: &'a [&'a AssetTracingPolicies])
+             -> Self {
+    BarMemosPoliciesCollection { bars,
+                                 memos,
+                                 policies }
+  }
+
+  pub fn check(self) -> Result<(), ZeiError> {
+    if self.policies.len() != self.bars.len() || self.bars.len() != self.memos.len() {
+      Err(ZeiError::ParameterError)
+    } else {
+      Ok(())
+    }
+  }
+}
+
 fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarMemoVec<'a>>,
                                       reveal_policies: &[&AssetTracingPolicies],
                                       bars: &'a [BlindAssetRecord],
                                       memos: &'a [Vec<AssetTracerMemo>])
                                       -> Result<(), ZeiError> {
-  if reveal_policies.len() != bars.len() || bars.len() != memos.len() {
-    // TODO avoid this if and below zip by having a single structure for bar, policies and memo
-    return Err(ZeiError::ParameterError);
-  }
+  let bars_memo_policies = BarMemosPoliciesCollection::new(bars, memos, reveal_policies);
+  bars_memo_policies.check()?;
+
   for ((tracing_policies_i, bar_i), memos_i) in reveal_policies.iter().zip(bars.iter()).zip(memos) {
     // If the bar is non confidential skip memo and bar, since there is no tracing proof
     if bar_i.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
