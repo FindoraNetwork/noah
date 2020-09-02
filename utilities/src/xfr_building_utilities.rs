@@ -100,9 +100,9 @@ pub fn setup_with_policies(
                            &user_ac_sk,
                            &credential_user.clone(),
                            user_key_pair.get_pk_ref().as_bytes()).unwrap();
-    ac_commitment_keys.push(output.key.unwrap());
-    ac_commitments.push(output.commitment);
-    ac_proofs.push(output.pok);
+    ac_commitment_keys.push(output.2.unwrap());
+    ac_commitments.push(output.0);
+    ac_proofs.push(output.1);
   }
 
   let id_tracking_policy = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk,

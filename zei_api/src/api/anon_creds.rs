@@ -206,9 +206,9 @@ pub fn ac_verify_commitment(issuer_pub_key: &ACIssuerPublicKey,
 ///   issuer_pub_key:issuer_pk,
 /// };
 /// let output = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Some message").unwrap();
-/// let commitment = output.commitment;
-/// let pok = output.pok;
-/// let key = output.key.unwrap();
+/// let commitment = output.0;
+/// let pok = output.1;
+/// let key = output.2.unwrap();
 /// let attrs_map = [true, false];
 /// let reveal_sig = ac_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key, &attrs_map).unwrap();
 /// ```
@@ -323,8 +323,8 @@ pub type ConfidentialAC = crypto::conf_cred_reveal::ConfidentialAC<G1, G2, S>;
 ///   issuer_pub_key: issuer_pk.clone(),
 /// };
 /// let output = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Address").unwrap();
-/// let sig_commitment = output.commitment;
-/// let key = output.key.unwrap();
+/// let sig_commitment = output.0;
+/// let key = output.2.unwrap();
 /// let conf_reveal_proof = ac_confidential_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key, &enc_key, &bitmap[..], b"Some Message").unwrap();
 /// assert!(ac_confidential_verify(&issuer_pk, &enc_key, &bitmap[..], &sig_commitment, &conf_reveal_proof.ctexts, &conf_reveal_proof.pok, b"Some Message").is_ok())
 /// ```
