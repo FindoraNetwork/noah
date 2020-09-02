@@ -3,7 +3,6 @@ use algebra::pairing::Pairing;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
-use utils::u64_to_bigendian_u8array;
 
 type HashFnc = sha2::Sha512;
 
@@ -132,7 +131,7 @@ pub fn bls_hash_pubkeys_to_scalars<P: Pairing>(ver_keys: &[&BlsPublicKey<P>])
   let mut scalars = Vec::with_capacity(n);
   for i in 0..n {
     hasher = HashFnc::default();
-    hasher.input(u64_to_bigendian_u8array(i as u64));
+    hasher.input(i.to_be_bytes());
     hasher.input(&hash[..]);
     scalars.push(P::ScalarField::from_hash(hasher));
   }

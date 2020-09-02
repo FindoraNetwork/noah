@@ -17,7 +17,7 @@ use rand_core::{CryptoRng, RngCore};
 use serde::ser::Serialize;
 use std::collections::HashMap;
 use utils::errors::ZeiError;
-use utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
+use utils::u64_to_u32_pair;
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
@@ -335,8 +335,7 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
   let mut ins = vec![];
 
   for x in inputs.iter() {
-    let type_as_u128 = u8_bigendian_slice_to_u128(&x.asset_type.0[..]);
-    let type_scalar = Scalar::from(type_as_u128);
+    let type_scalar = asset_type_to_scalar(&x.asset_type);
     ins.push((x.amount,
               type_scalar,
               x.amount_blinds.0.add(&pow2_32.mul(&x.amount_blinds.1)),
@@ -345,8 +344,7 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
 
   let mut out = vec![];
   for x in outputs.iter() {
-    let type_as_u128 = u8_bigendian_slice_to_u128(&x.asset_type.0[..]);
-    let type_scalar = Scalar::from(type_as_u128);
+    let type_scalar = asset_type_to_scalar(&x.asset_type);
     out.push((x.amount,
               type_scalar,
               x.amount_blinds.0.add(&pow2_32.mul(&x.amount_blinds.1)),

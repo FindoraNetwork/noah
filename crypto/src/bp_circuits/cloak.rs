@@ -360,14 +360,13 @@ pub mod tests {
       // prover scope
       let mut prover_transcript = Transcript::new(b"test");
       let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
-      let in_com_and_vars =
-        inputs.iter()
-              .map(|input| {
-                input.commit_prover(&mut prover,
+      let in_com_and_vars = inputs.iter()
+                                  .map(|input| {
+                                    input.commit_prover(&mut prover,
                                     &CloakValue::new(RistrettoScalar::random(&mut prng),
                                                      RistrettoScalar::random(&mut prng)))
-              })
-              .collect_vec();
+                                  })
+                                  .collect_vec();
       input_coms = in_com_and_vars.iter().map(|(com, _)| *com).collect_vec();
       let input_vars = in_com_and_vars.iter().map(|(_, var)| *var).collect_vec();
 
