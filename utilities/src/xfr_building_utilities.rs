@@ -174,13 +174,12 @@ pub fn prepare_inputs_and_outputs_with_policies(sender_key_pairs: &[&XfrKeyPair]
       None => AssetTracingPolicies::new(),
     };
 
-    let ar_in =
-      AssetRecord::from_open_asset_record_with_identity_tracking(&mut prng,
-                                                                 oar_user_addr,
-                                                                 policies,
-                                                                 &user_ac_sk,
-                                                                 &credential_user,
-                                                                 &ac_commitment_key).unwrap();
+    let ar_in = AssetRecord::from_open_asset_record_with_tracking(&mut prng,
+                                                                  oar_user_addr,
+                                                                  policies,
+                                                                  &user_ac_sk,
+                                                                  &credential_user,
+                                                                  &ac_commitment_key).unwrap();
 
     ar_ins.push(ar_in);
   }
