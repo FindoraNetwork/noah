@@ -170,12 +170,9 @@ fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarM
     }
 
     let tracing_policies_i = tracing_policies_i.get_policies();
-    for (j, policy_i_j) in tracing_policies_i.iter().enumerate() {
-      // TODO avoid indexing by j
+    for (policy_i_j, memo_i_j) in tracing_policies_i.iter().zip(memos_i.iter()) {
       if policy_i_j.asset_tracking {
         let key = policy_i_j.enc_keys.record_data_eg_enc_key.clone();
-        let memo_i_j = memos_i.get(j).ok_or(ZeiError::ParameterError)?;
-
         map.entry(key)
            .or_insert(Default::default())
            .push(bar_i, memo_i_j); // insert ith record with j-th memo
