@@ -148,19 +148,13 @@ pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>, base64::Dec
   base64::decode_config(input, base64::URL_SAFE)
 }
 
-pub const SEED_SIZE: usize = 32;
-pub fn compute_seed_from_hash<D>(hash: D, seed: &mut [u8; SEED_SIZE])
-  where D: Digest<OutputSize = U64> + Default
-{
-  let result = hash.result();
-  seed.copy_from_slice(&result[0..SEED_SIZE]);
-}
-
 pub fn compute_prng_from_hash<D>(hash: D) -> ChaCha20Rng
   where D: Digest<OutputSize = U64> + Default
 {
+  const SEED_SIZE: usize = 32;
   let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
-  compute_seed_from_hash(hash, &mut seed);
+  let result = hash.result();
+  seed.copy_from_slice(&result[0..SEED_SIZE]);
   rand_chacha::ChaChaRng::from_seed(seed)
 }
 
