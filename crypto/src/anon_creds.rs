@@ -79,7 +79,7 @@ in the credentials by
 */
 
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::multi_exp::MultiExp;
 use algebra::pairing::Pairing;
 use itertools::Itertools;
@@ -257,7 +257,7 @@ pub fn ac_sign<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
   }
 
   let u = P::ScalarField::random(prng);
-  let mut exponent = issuer_sk.x.clone();
+  let mut exponent = issuer_sk.x;
   for (attr, yi) in attrs.iter().zip(issuer_sk.y.iter()) {
     exponent = exponent.add(&attr.mul(yi));
   }

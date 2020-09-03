@@ -1,5 +1,5 @@
 use crate::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
-use algebra::groups::{Group, Scalar as ZeiScalar};
+use algebra::groups::{Group, Scalar as ZeiScalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
@@ -102,7 +102,7 @@ mod test {
     prove_knowledge_dlog, prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog,
     verify_proof_of_knowledge_dlog,
   };
-  use algebra::groups::{Group, GroupArithmetic, Scalar as _};
+  use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
   use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;

@@ -4,6 +4,7 @@ use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use utils::shift_u8_vec;
 
 pub trait GroupArithmetic {
   type S: Scalar;
@@ -12,8 +13,47 @@ pub trait GroupArithmetic {
   fn sub(&self, other: &Self) -> Self;
 }
 
+pub trait One {
+  fn one() -> Self;
+}
+
+pub trait Zero {
+  fn zero() -> Self;
+  fn is_zero(&self) -> bool;
+}
+
+pub trait ScalarArithmetic: Clone + One + Zero + Sized {
+  fn add(&self, b: &Self) -> Self;
+  fn add_assign(&mut self, b: &Self);
+  fn mul(&self, b: &Self) -> Self;
+  fn mul_assign(&mut self, b: &Self);
+  fn sub(&self, b: &Self) -> Self;
+  fn sub_assign(&mut self, b: &Self);
+  fn inv(&self) -> Result<Self, AlgebraError>;
+  fn neg(&self) -> Self {
+    Self::zero().sub(self)
+  }
+  /// exponent form: least significant limb first, with u64 limbs
+  fn pow(&self, exponent: &[u64]) -> Self {
+    let mut base = self.clone();
+    let mut result = Self::one();
+    for exp_u64 in exponent {
+      let mut e = *exp_u64;
+      // we have to square the base for 64 times.
+      for _ in 0..64 {
+        if e % 2 == 1 {
+          result.mul_assign(&base);
+        }
+        base = base.mul(&base);
+        e >>= 1;
+      }
+    }
+    result
+  }
+}
+
 pub trait Scalar:
-  Debug + Sized + PartialEq + Eq + Clone + Serialize + for<'de> Deserialize<'de>
+  Copy + Debug + PartialEq + Eq + ScalarArithmetic + Serialize + for<'de> Deserialize<'de>
 {
   // generation
   fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
@@ -21,32 +61,16 @@ pub trait Scalar:
   fn from_u64(value: u64) -> Self;
   fn from_hash<D>(hash: D) -> Self
     where D: Digest<OutputSize = U64> + Default;
+  // multiplicative generator of r-1 order, that is also a quadratic nonresidue
+  fn multiplicative_generator() -> Self;
 
-  //arithmetic
-  fn add(&self, b: &Self) -> Self;
-  fn mul(&self, b: &Self) -> Self;
-  fn sub(&self, b: &Self) -> Self;
-  fn inv(&self) -> Result<Self, AlgebraError>;
-  fn neg(&self) -> Self {
-    Self::from_u32(0).sub(self)
-  }
-
-  /// exponent form: least significant limb first, with u64 limbs
-  fn pow(&self, exponent: &[u64]) -> Self {
-    let mut base = self.clone();
-    let mut result = Self::from_u32(1);
-    for exp_u64 in exponent {
-      let mut e = *exp_u64;
-      // we have to square the base for 64 times.
-      for _ in 0..64 {
-        if e % 2 == 1 {
-          result = result.mul(&base);
-        }
-        base = base.mul(&base);
-        e >>= 1;
-      }
-    }
-    result
+  // field size
+  fn get_field_size_lsf_bytes() -> Vec<u8>;
+  fn field_size_minus_one_half() -> Vec<u8> {
+    let mut q_minus_1_half_le = Self::get_field_size_lsf_bytes();
+    // divide by 2 by shifting, first bit is one since F is odd prime
+    shift_u8_vec(&mut q_minus_1_half_le);
+    q_minus_1_half_le
   }
 
   fn get_little_endian_u64(&self) -> Vec<u64>;

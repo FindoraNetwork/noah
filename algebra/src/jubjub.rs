@@ -1,12 +1,14 @@
 use crate::errors::AlgebraError;
 use crate::groups::GroupArithmetic;
-use crate::groups::{Group, Scalar};
+use crate::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
+use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use jubjub::{AffinePoint, ExtendedPoint, Fq, Fr};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use std::convert::TryInto;
+use utils::u8_le_slice_to_u64;
 
 const GENERATOR: AffinePoint =
   AffinePoint::from_raw_unchecked(Fq::from_raw([0xe4b3_d35d_f1a7_adfe,
@@ -15,10 +17,60 @@ const GENERATOR: AffinePoint =
                                                 0x62ed_cbb8_bf37_87c8]),
                                   Fq::from_raw([0xb, 0x0, 0x0, 0x0]));
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
 #[derive(Clone, PartialEq, Debug)]
 pub struct JubjubGroup(pub(crate) ExtendedPoint);
+
+impl One for JubjubScalar {
+  fn one() -> JubjubScalar {
+    JubjubScalar(Fr::one())
+  }
+}
+
+impl Zero for JubjubScalar {
+  fn zero() -> JubjubScalar {
+    JubjubScalar(Fr::zero())
+  }
+
+  fn is_zero(&self) -> bool {
+    self.0.eq(&Fr::zero())
+  }
+}
+
+impl ScalarArithmetic for JubjubScalar {
+  fn add(&self, b: &JubjubScalar) -> JubjubScalar {
+    JubjubScalar(self.0.add(&b.0))
+  }
+
+  fn add_assign(&mut self, b: &JubjubScalar) {
+    (self.0).add_assign(&b.0);
+  }
+
+  fn mul(&self, b: &JubjubScalar) -> JubjubScalar {
+    JubjubScalar(self.0.mul(&b.0))
+  }
+
+  fn mul_assign(&mut self, b: &JubjubScalar) {
+    (self.0).mul_assign(&b.0);
+  }
+
+  fn sub(&self, b: &JubjubScalar) -> JubjubScalar {
+    JubjubScalar(self.0.sub(&b.0))
+  }
+
+  fn sub_assign(&mut self, b: &JubjubScalar) {
+    (self.0).sub_assign(&b.0);
+  }
+
+  fn inv(&self) -> Result<JubjubScalar, AlgebraError> {
+    let a = self.0.invert();
+    if bool::from(a.is_none()) {
+      return Err(AlgebraError::GroupInversionError);
+    }
+    Ok(JubjubScalar(a.unwrap()))
+  }
+}
 
 impl Scalar for JubjubScalar {
   // scalar generation
@@ -50,30 +102,23 @@ impl Scalar for JubjubScalar {
     JubjubScalar(Fr::from_bytes_wide(&bytes))
   }
 
-  // scalar arithmetic
-  fn add(&self, b: &JubjubScalar) -> JubjubScalar {
-    JubjubScalar(self.0 + b.0)
+  fn multiplicative_generator() -> Self {
+    Self::from_u64(6)
   }
 
-  fn mul(&self, b: &JubjubScalar) -> JubjubScalar {
-    JubjubScalar(self.0 * b.0)
-  }
-
-  fn sub(&self, b: &JubjubScalar) -> JubjubScalar {
-    JubjubScalar(self.0 - b.0)
-  }
-
-  fn inv(&self) -> Result<JubjubScalar, AlgebraError> {
-    let inv = (self.0).invert();
-    if inv.is_some().into() {
-      Ok(JubjubScalar(inv.unwrap())) // safe unwrap
-    } else {
-      Err(AlgebraError::GroupInversionError)
-    }
+  // scalar field size
+  fn get_field_size_lsf_bytes() -> Vec<u8> {
+    [183, 44, 247, 214, 94, 14, 151, 208, 130, 16, 200, 204, 147, 32, 104, 166, 0, 59, 52, 1, 1,
+     59, 103, 6, 169, 175, 51, 101, 234, 180, 125, 14].to_vec()
   }
 
   fn get_little_endian_u64(&self) -> Vec<u64> {
-    panic!("get_little_endian_u64 not implemented for JubjubScalar")
+    let a = self.0.to_bytes();
+    let a1 = u8_le_slice_to_u64(&a[0..8]);
+    let a2 = u8_le_slice_to_u64(&a[8..16]);
+    let a3 = u8_le_slice_to_u64(&a[16..24]);
+    let a4 = u8_le_slice_to_u64(&a[24..]);
+    vec![a1, a2, a3, a4]
   }
 
   //scalar serialization

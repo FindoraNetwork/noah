@@ -22,7 +22,7 @@ impl<S: Scalar> PRF<S> {
   pub fn eval(&self, key: &S, msgs: &[S]) -> S {
     let width = self.0.state_size();
     let mut state = vec![S::from_u32(0); width];
-    state[width - 1] = key.clone();
+    state[width - 1] = *key;
     // Each round can absorb `width` messages, so it takes \ceil{n/width} rounds to absorb all of
     // the n messages
     let n_rounds = (msgs.len() - 1) / width + 1;
@@ -34,7 +34,7 @@ impl<S: Scalar> PRF<S> {
       }
       state = self.0.rescue_hash(&state);
     }
-    state[0].clone()
+    state[0]
   }
 }
 
@@ -55,7 +55,7 @@ mod test {
   use crate::basics::hash::rescue::RescueInstance;
   use crate::basics::prf::PRF;
   use algebra::bls12_381::BLSScalar;
-  use algebra::groups::Scalar;
+  use algebra::groups::{Scalar, ScalarArithmetic};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 

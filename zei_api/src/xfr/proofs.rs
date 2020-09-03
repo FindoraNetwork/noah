@@ -8,7 +8,7 @@ use crate::xfr::structs::{
   asset_type_to_scalar, AssetRecord, AssetTracerMemo, AssetTracingPolicies, BlindAssetRecord,
   OpenAssetRecord, XfrAmount, XfrAssetType, XfrBody, XfrRangeProof,
 };
-use algebra::groups::{Group, GroupArithmetic, Scalar as _};
+use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar};
 use bulletproofs::RangeProof;
 use crypto::basics::elgamal::ElGamalCiphertext;

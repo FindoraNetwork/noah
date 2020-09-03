@@ -33,11 +33,11 @@ impl<S: Scalar> Commitment<S> {
       return Err(ZeiError::CommitmentInputError);
     }
     let blind_scalar = S::random(rng);
-    let mut input_vec = vec![blind_scalar.clone()];
+    let mut input_vec = vec![blind_scalar];
     input_vec.extend(msgs.to_vec());
     // Pad zeroes
     input_vec.extend(vec![S::from_u32(0); self.hash.rate + self.hash.capacity - msgs.len() - 1]);
-    Ok((self.hash.rescue_hash(&input_vec)[0].clone(), blind_scalar))
+    Ok((self.hash.rescue_hash(&input_vec)[0], blind_scalar))
   }
 
   /// Check the opening of a commitment.
@@ -49,7 +49,7 @@ impl<S: Scalar> Commitment<S> {
     if msgs.len() != self.msg_len {
       return Err(ZeiError::CommitmentInputError);
     }
-    let mut input_vec = vec![blind_scalar.clone()];
+    let mut input_vec = vec![*blind_scalar];
     input_vec.extend(msgs.to_vec());
     // Pad zeroes
     input_vec.extend(vec![S::from_u32(0); self.hash.rate + self.hash.capacity - msgs.len() - 1]);

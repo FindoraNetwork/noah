@@ -1,4 +1,4 @@
-use algebra::groups::{Group, Scalar};
+use algebra::groups::{Group, Scalar, ScalarArithmetic};
 use algebra::multi_exp::MultiExp;
 use algebra::pairing::Pairing;
 use digest::Digest;

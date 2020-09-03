@@ -4,7 +4,7 @@ use crate::anon_creds::{
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::groups::{Group, GroupArithmetic, Scalar};
+use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
@@ -107,7 +107,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
       let ctext = elgamal_encrypt::<P::G1>(&base, attr, &r, enc_key);
       rands.push(r);
       ctexts.push(ctext);
-      revealed_attrs.push(attr.clone());
+      revealed_attrs.push(*attr);
     }
   }
   // 2. Recover credential commitment

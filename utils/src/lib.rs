@@ -74,6 +74,19 @@ pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>, base64::Dec
   base64::decode_config(input, base64::URL_SAFE)
 }
 
+/// I shift a big integer (represented as a littleendian bytes vector) by one bit.
+pub fn shift_u8_vec(r: &mut Vec<u8>) {
+  let mut next = 0u8;
+  for e in r.iter_mut().rev() {
+    let prev = *e;
+    *e = (*e >> 1) | next;
+    next = (prev % 2) << 7;
+  }
+  if *r.last().unwrap() == 0 && r.len() > 1 {
+    r.pop();
+  }
+}
+
 #[cfg(test)]
 mod test {
 

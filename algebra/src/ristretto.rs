@@ -1,7 +1,8 @@
 use crate::errors::AlgebraError;
-use crate::groups::Scalar as ZeiScalar;
 use crate::groups::{Group, GroupArithmetic};
+use crate::groups::{One, Scalar as ZeiScalar, ScalarArithmetic, Zero};
 use byteorder::ByteOrder;
+use core::ops::{AddAssign, MulAssign, SubAssign};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint};
@@ -29,6 +30,52 @@ impl From<u128> for RistrettoScalar {
   }
 }
 
+impl One for RistrettoScalar {
+  fn one() -> RistrettoScalar {
+    RistrettoScalar(Scalar::one())
+  }
+}
+
+impl Zero for RistrettoScalar {
+  fn zero() -> RistrettoScalar {
+    RistrettoScalar(Scalar::zero())
+  }
+
+  fn is_zero(&self) -> bool {
+    self.0.eq(&Scalar::zero())
+  }
+}
+
+impl ScalarArithmetic for RistrettoScalar {
+  fn add(&self, b: &RistrettoScalar) -> RistrettoScalar {
+    RistrettoScalar(self.0 + b.0)
+  }
+
+  fn add_assign(&mut self, b: &RistrettoScalar) {
+    (self.0).add_assign(&b.0);
+  }
+
+  fn mul(&self, b: &RistrettoScalar) -> RistrettoScalar {
+    RistrettoScalar(self.0 * b.0)
+  }
+
+  fn mul_assign(&mut self, b: &RistrettoScalar) {
+    (self.0).mul_assign(&b.0);
+  }
+
+  fn sub(&self, b: &RistrettoScalar) -> RistrettoScalar {
+    RistrettoScalar(self.0 - b.0)
+  }
+
+  fn sub_assign(&mut self, b: &RistrettoScalar) {
+    (self.0).sub_assign(&b.0);
+  }
+
+  fn inv(&self) -> Result<RistrettoScalar, AlgebraError> {
+    Ok(RistrettoScalar(self.0.invert()))
+  }
+}
+
 impl ZeiScalar for RistrettoScalar {
   fn random<R: CryptoRng + RngCore>(rng: &mut R) -> RistrettoScalar {
     RistrettoScalar(curve25519_dalek::scalar::Scalar::random(rng))
@@ -48,20 +95,16 @@ impl ZeiScalar for RistrettoScalar {
     RistrettoScalar(Scalar::from_hash(hash))
   }
 
-  fn add(&self, b: &RistrettoScalar) -> RistrettoScalar {
-    RistrettoScalar(self.0 + b.0)
+  // TODO: Implement
+  fn multiplicative_generator() -> Self {
+    unimplemented!();
   }
 
-  fn mul(&self, b: &RistrettoScalar) -> RistrettoScalar {
-    RistrettoScalar(self.0 * b.0)
-  }
-
-  fn sub(&self, b: &RistrettoScalar) -> RistrettoScalar {
-    RistrettoScalar(self.0 - b.0)
-  }
-
-  fn inv(&self) -> Result<RistrettoScalar, AlgebraError> {
-    Ok(RistrettoScalar(self.0.invert()))
+  // scalar field size: 2**252 + 27742317777372353535851937790883648493
+  fn get_field_size_lsf_bytes() -> Vec<u8> {
+    [0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde,
+     0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     0x00, 0x10].to_vec()
   }
 
   fn get_little_endian_u64(&self) -> Vec<u64> {

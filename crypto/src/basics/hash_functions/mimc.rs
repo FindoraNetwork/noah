@@ -1,5 +1,5 @@
 use super::MTHash;
-use algebra::groups::Scalar as _;
+use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use digest::Digest;
 use rand_chacha::ChaChaRng;
