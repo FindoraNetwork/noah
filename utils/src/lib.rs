@@ -89,6 +89,31 @@ pub fn shift_u8_vec(r: &mut Vec<u8>) {
 
 #[cfg(test)]
 mod test {
+  #[test]
+  fn test_shift_u8_vec() {
+    let mut v = vec![0];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![0]);
+
+    let mut v = vec![1];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![0]);
+
+    let mut v = vec![2];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![1]);
+
+    let mut v = vec![255];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![127]);
+
+    let mut v = vec![0, 1];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![128]);
+    let mut v = vec![0, 0, 1];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![0, 128]);
+  }
 
   #[test]
   fn test_u8_be_slice_to_u32() {
