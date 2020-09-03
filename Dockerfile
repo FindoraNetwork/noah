@@ -1,4 +1,4 @@
-FROM nexus.findora.org/bulletproofs:batch_verification AS BP
+FROM 563536162678.dkr.ecr.us-west-2.amazonaws.com/bulletproofs:batch_verification AS BP
 FROM rustlang/rust:nightly as builder
 RUN cargo install cargo-audit
 RUN mkdir /app
