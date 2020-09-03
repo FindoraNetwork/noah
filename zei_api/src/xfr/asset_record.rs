@@ -20,7 +20,7 @@ use curve25519_dalek::edwards::EdwardsPoint;
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 use utils::errors::ZeiError;
-use utils::{u64_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u64};
+use utils::{u64_to_u32_pair, u8_be_slice_to_u64};
 
 const U64_BYTE_LEN: usize = 8;
 
@@ -310,7 +310,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 
   // build amount fields
   let (xfr_amount, amount_blinds) = if confidential_amount {
-    let amount_bytes = u64_to_bigendian_u8array(asset_record.amount);
+    let amount_bytes = asset_record.amount.to_be_bytes();
     amount_type_bytes.extend_from_slice(&amount_bytes[..]);
 
     let amount_commitment_low = pc_gens.commit(Scalar::from_u32(amount_low), amount_blind_low);
@@ -470,7 +470,7 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
       if amount_type.len() < U64_BYTE_LEN {
         return Err(ZeiError::ParameterError);
       }
-      amount = u8_bigendian_slice_to_u64(&amount_type[0..U64_BYTE_LEN]);
+      amount = u8_be_slice_to_u64(&amount_type[0..U64_BYTE_LEN]);
       amount_blind_low = compute_blind_factor(&shared_point, b"amount_low");
       amount_blind_high = compute_blind_factor(&shared_point, b"amount_high");
       i += U64_BYTE_LEN;
@@ -553,8 +553,8 @@ mod test {
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
-    AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType, OpenAssetRecord,
-    XfrAmount, XfrAssetType,
+    asset_type_to_scalar, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
+    OpenAssetRecord, XfrAmount, XfrAssetType,
   };
   use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
   use algebra::groups::Scalar as _;
@@ -564,7 +564,7 @@ mod test {
   use rand::Rng;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use utils::{u64_to_u32_pair, u8_bigendian_slice_to_u128};
+  use utils::u64_to_u32_pair;
 
   fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracking: bool) {
     let mut prng: ChaChaRng;
@@ -620,8 +620,7 @@ mod test {
     }
 
     if confidential_asset {
-      let type_as_u128 = u8_bigendian_slice_to_u128(&asset_record.asset_type.0[..]);
-      let type_scalar = Scalar::from(type_as_u128);
+      let type_scalar = asset_type_to_scalar(&asset_record.asset_type);
       expected_bar_asset_type =
         XfrAssetType::Confidential(pc_gens.commit(type_scalar, open_ar.type_blind).compress());
     } else {
@@ -719,10 +718,9 @@ mod test {
     }
 
     if confidential_asset {
-      let derived_commitment =
-        pc_gens.commit(Scalar::from(u8_bigendian_slice_to_u128(&open_ar.asset_type.0[..])),
-                       open_ar.type_blind)
-               .compress();
+      let derived_commitment = pc_gens.commit(asset_type_to_scalar(&open_ar.asset_type),
+                                              open_ar.type_blind)
+                                      .compress();
       assert_eq!(derived_commitment,
                  open_ar.blind_asset_record
                         .asset_type

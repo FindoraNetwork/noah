@@ -26,7 +26,7 @@ use linear_map::LinearMap;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
-use utils::{min_greater_equal_power_of_two, u64_to_u32_pair, u8_bigendian_slice_to_u128};
+use utils::{min_greater_equal_power_of_two, u64_to_u32_pair};
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
@@ -606,7 +606,7 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
                                                   open_outputs: &[&OpenAssetRecord])
                                                   -> Result<ChaumPedersenProofX, ZeiError> {
   let asset = open_inputs[0].asset_type;
-  let asset_scalar = Scalar::from(u8_bigendian_slice_to_u128(&asset.0[..]));
+  let asset_scalar = asset_type_to_scalar(&asset);
 
   let mut asset_coms = vec![];
   let mut asset_blinds = vec![];

@@ -6,13 +6,15 @@ use crate::xfr::asset_mixer::AssetMixProof;
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
 use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
+use algebra::groups::Scalar as _;
 use algebra::ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::RangeProof;
 use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCipher};
 use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
+use digest::Digest;
+use sha2::Sha512;
 use utils::serialization;
-use utils::u8_bigendian_slice_to_u128;
 
 /// Asset Type identifier
 pub const ASSET_TYPE_LENGTH: usize = 32;
@@ -27,8 +29,9 @@ impl AssetType {
 }
 
 pub fn asset_type_to_scalar(asset_type: &AssetType) -> Scalar {
-  let type_as_u128 = u8_bigendian_slice_to_u128(&asset_type.0[..]);
-  Scalar::from(type_as_u128)
+  let mut sha512 = Sha512::new();
+  sha512.input(&asset_type.0);
+  Scalar::from_hash(sha512)
 }
 
 /// A Transfer note: contains a transfer body and a (multi)signature

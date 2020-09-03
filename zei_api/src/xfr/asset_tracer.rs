@@ -16,7 +16,7 @@ use crypto::basics::hybrid_encryption::{
 use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
-use utils::{u32_to_bigendian_u8array, u64_to_u32_pair, u8_bigendian_slice_to_u32};
+use utils::{u64_to_u32_pair, u8_be_slice_to_u32};
 
 pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
 pub type RecordDataDecKey = ElGamalDecKey<Scalar>;
@@ -56,8 +56,8 @@ impl AssetTracerMemo {
     let pc_gens = RistrettoPedersenGens::default();
     let lock_amount =
       amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
-                   plaintext.extend_from_slice(&u32_to_bigendian_u8array(amount_low));
-                   plaintext.extend_from_slice(&u32_to_bigendian_u8array(amount_high));
+                   plaintext.extend_from_slice(&amount_low.to_be_bytes());
+                   plaintext.extend_from_slice(&amount_high.to_be_bytes());
                    let ctext_amount_low = elgamal_encrypt(&pc_gens.B,
                                                           &Scalar::from_u32(amount_low),
                                                           blind_low,
@@ -79,7 +79,7 @@ impl AssetTracerMemo {
 
     let ctext = if add_memo {
       for (attr, _) in attributes_ctext.iter() {
-        plaintext.extend_from_slice(&u32_to_bigendian_u8array(*attr))
+        plaintext.extend_from_slice(&attr.to_be_bytes())
       }
       Some(hybrid_encrypt_with_x25519_key(prng, &tracer_enc_key.zei_cipher_enc_key, &plaintext))
     } else {
@@ -110,8 +110,8 @@ impl AssetTracerMemo {
       }
       let low_bytes = &plaintext[0..U32_BYTES];
       let high_bytes = &plaintext[U32_BYTES..2 * U32_BYTES];
-      let amount_low = u8_bigendian_slice_to_u32(low_bytes);
-      let amount_high = u8_bigendian_slice_to_u32(high_bytes);
+      let amount_low = u8_be_slice_to_u32(low_bytes);
+      let amount_high = u8_be_slice_to_u32(high_bytes);
       let amount = (amount_low as u64) + ((amount_high as u64) << 32);
       self.verify_amount(&dec_key.record_data_eg_dec_key, amount)
           .map_err(|_| ZeiError::BogusAssetTracerMemo)?;
@@ -141,7 +141,7 @@ impl AssetTracerMemo {
       return Err(ZeiError::BogusAssetTracerMemo);
     }
     for _ in 0..self.lock_attributes.len() {
-      attrs.push(u8_bigendian_slice_to_u32(&plaintext[index..index + U32_BYTES]));
+      attrs.push(u8_be_slice_to_u32(&plaintext[index..index + U32_BYTES]));
       index += U32_BYTES;
     }
     let results = self.verify_identity_attributes(&dec_key.attrs_dec_key, &attrs)

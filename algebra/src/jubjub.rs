@@ -9,7 +9,7 @@ use jubjub::{AffinePoint, ExtendedPoint, Fr};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore};
 use std::convert::TryInto;
-use utils::{compute_prng_from_hash, u8_littleendian_slice_to_u64};
+use utils::{compute_prng_from_hash, u8_le_slice_to_u64};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
@@ -61,10 +61,10 @@ impl Scalar for JubjubScalar {
 
   fn get_little_endian_u64(&self) -> Vec<u64> {
     let a = self.0.to_bytes();
-    let a1 = u8_littleendian_slice_to_u64(&a[0..8]);
-    let a2 = u8_littleendian_slice_to_u64(&a[8..16]);
-    let a3 = u8_littleendian_slice_to_u64(&a[16..24]);
-    let a4 = u8_littleendian_slice_to_u64(&a[24..]);
+    let a1 = u8_le_slice_to_u64(&a[0..8]);
+    let a2 = u8_le_slice_to_u64(&a[8..16]);
+    let a3 = u8_le_slice_to_u64(&a[16..24]);
+    let a4 = u8_le_slice_to_u64(&a[24..]);
     vec![a1, a2, a3, a4]
   }
 
