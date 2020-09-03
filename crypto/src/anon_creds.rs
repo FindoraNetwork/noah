@@ -217,9 +217,8 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore, P: Pairing>(
   -> (ACIssuerPublicKey<P::G1, P::G2>, ACIssuerSecretKey<P::G1, P::ScalarField>) {
   let x = P::ScalarField::random(prng);
   let z = P::ScalarField::random(prng);
-  //TODO check that G1 and G2 are of prime order so that every element is generator
-  let gen1: P::G1 = P::G1::get_base().mul(&P::ScalarField::random(prng));
-  let gen2 = P::G2::get_base().mul(&P::ScalarField::random(prng));
+  let gen1: P::G1 = P::G1::get_random_base(prng);
+  let gen2 = P::G2::get_random_base(prng);
   let mut y = vec![];
   let mut yy2 = vec![];
   for _ in 0..num_attrs {

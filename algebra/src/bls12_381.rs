@@ -7,11 +7,11 @@ use digest::generic_array::typenum::U64;
 use digest::Digest;
 use ff::{Field, PrimeField};
 use group::Group as _;
+use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore};
 use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
 use utils::{compute_prng_from_hash, u8_littleendian_slice_to_u64};
-use rand_chacha::ChaCha20Rng;
 
 pub type Bls12381field = Scalar;
 
@@ -54,7 +54,7 @@ impl ZeiScalar for BLSScalar {
   fn from_hash<D>(hash: D) -> BLSScalar
     where D: Digest<OutputSize = U64> + Default
   {
-    let mut prng = compute_prng_from_hash::<D,ChaCha20Rng>(hash);
+    let mut prng = compute_prng_from_hash::<D, ChaCha20Rng>(hash);
     Self::random(&mut prng)
   }
 
@@ -113,6 +113,13 @@ impl Group for BLSG1 {
     BLSG1(bls12_381::G1Projective::generator())
   }
 
+  /// Pick a random base/generator inside BLSG1
+  /// Note that BLSG1 is of prime order q = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
+  /// and thus any scalar sampled at random (except 0 which only happens with very low probability) will be coprime with q.
+  fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> BLSG1 {
+    Self::get_base().mul(&BLSScalar::random(prng))
+  }
+
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
     let affine = G1Affine::from(&self.0);
@@ -132,7 +139,7 @@ impl Group for BLSG1 {
   fn from_hash<D>(hash: D) -> BLSG1
     where D: Digest<OutputSize = U64> + Default
   {
-    let mut prng = compute_prng_from_hash::<D,ChaCha20Rng>(hash);
+    let mut prng = compute_prng_from_hash::<D, ChaCha20Rng>(hash);
     BLSG1(bls12_381::G1Projective::random(&mut prng))
   }
 }
@@ -161,6 +168,13 @@ impl Group for BLSG2 {
     BLSG2(G2Projective::generator())
   }
 
+  /// Pick a random base/generator inside BLSG2
+  /// Note that BLSG2 is of prime order q = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
+  /// and thus any scalar sampled at random (except 0 which only happens with very low probability) will be coprime with q.
+  fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> BLSG2 {
+    Self::get_base().mul(&BLSScalar::random(prng))
+  }
+
   fn to_compressed_bytes(&self) -> Vec<u8> {
     let affine = G2Affine::from(&self.0);
     affine.to_compressed().to_vec()
@@ -179,7 +193,7 @@ impl Group for BLSG2 {
   fn from_hash<D>(hash: D) -> BLSG2
     where D: Digest<OutputSize = U64> + Default
   {
-    let mut prng = compute_prng_from_hash::<D,ChaCha20Rng>(hash);
+    let mut prng = compute_prng_from_hash::<D, ChaCha20Rng>(hash);
     BLSG2(G2Projective::random(&mut prng))
   }
 }
@@ -248,7 +262,7 @@ impl Group for BLSGt {
   fn from_hash<D>(hash: D) -> Self
     where D: Digest<OutputSize = U64> + Default
   {
-    let mut prng = compute_prng_from_hash::<D,ChaCha20Rng>(hash);
+    let mut prng = compute_prng_from_hash::<D, ChaCha20Rng>(hash);
     BLSGt(Gt::random(&mut prng))
   }
 }

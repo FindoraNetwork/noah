@@ -64,6 +64,16 @@ pub trait Group:
   fn get_identity() -> Self;
   fn get_base() -> Self;
 
+  /// Pick a random base/generator inside the group
+  /// The generic algorithm consists of the following steps:
+  /// 1. pick a fix generator g
+  /// 2. sample a random scalar x
+  /// 3. check that gcd(x,q)=1 where q is the order of the group
+  /// 4. return g^x
+  fn get_random_base<R: CryptoRng + RngCore>(_prng: &mut R) -> Self {
+    panic!("Not implemented.");
+  }
+
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8>;
   fn from_compressed_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
