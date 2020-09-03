@@ -130,6 +130,12 @@ fn collect_records_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey,
   }
 }
 
+type BarMemosPoliciesCollectionIterator<'a> =
+  std::iter::Zip<std::iter::Zip<std::slice::Iter<'a, &'a AssetTracingPolicies>,
+                                std::slice::Iter<'a, BlindAssetRecord>>,
+                 std::slice::Iter<'a, std::vec::Vec<AssetTracerMemo>>>;
+
+#[derive(Clone)]
 pub struct BarMemosPoliciesCollection<'a> {
   bars: &'a [BlindAssetRecord],
   memos: &'a [Vec<AssetTracerMemo>],
@@ -146,6 +152,10 @@ impl<'a> BarMemosPoliciesCollection<'a> {
                                  policies }
   }
 
+  pub fn range_over(self) -> BarMemosPoliciesCollectionIterator<'a> {
+    self.policies.iter().zip(self.bars.iter()).zip(self.memos)
+  }
+
   pub fn check(self) -> Result<(), ZeiError> {
     if self.policies.len() != self.bars.len() || self.bars.len() != self.memos.len() {
       Err(ZeiError::ParameterError)
@@ -156,14 +166,11 @@ impl<'a> BarMemosPoliciesCollection<'a> {
 }
 
 fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarMemoVec<'a>>,
-                                      reveal_policies: &[&AssetTracingPolicies],
-                                      bars: &'a [BlindAssetRecord],
-                                      memos: &'a [Vec<AssetTracerMemo>])
+                                      bmp: BarMemosPoliciesCollection<'a>)
                                       -> Result<(), ZeiError> {
-  let bars_memo_policies = BarMemosPoliciesCollection::new(bars, memos, reveal_policies);
-  bars_memo_policies.check()?;
+  bmp.clone().check()?;
 
-  for ((tracing_policies_i, bar_i), memos_i) in reveal_policies.iter().zip(bars.iter()).zip(memos) {
+  for ((tracing_policies_i, bar_i), memos_i) in bmp.range_over() {
     // If the bar is non confidential skip memo and bar, since there is no tracing proof
     if bar_i.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
       continue;
@@ -308,18 +315,21 @@ fn collect_records_memos_by_key<'a>(
   -> Result<LinearMap<RecordDataEncKey, BarMemoVec<'a>>, ZeiError> {
   let mut map: LinearMap<RecordDataEncKey, BarMemoVec<'a>> = LinearMap::new();
   let inputs_len = xfr_body.inputs.len();
+  let bars_memo_policies_input = BarMemosPoliciesCollection::new(&xfr_body.inputs,
+                                                                 &xfr_body.asset_tracing_memos
+                                                                   [..inputs_len], // only inputs
+                                                                 input_reveal_policies);
   collect_bars_and_memos_by_keys(
     &mut map,
-    input_reveal_policies,
-    &xfr_body.inputs,
-    &xfr_body.asset_tracing_memos[..inputs_len] // only inputs
+    bars_memo_policies_input
   ).map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?;
-  collect_bars_and_memos_by_keys(
-    &mut map,
-    output_reveal_policies,
-    &xfr_body.outputs,
-    &xfr_body.asset_tracing_memos[inputs_len..] //only outputs
-  ).map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?;
+
+  let bars_memo_policies_output = BarMemosPoliciesCollection::new(&xfr_body.outputs,
+                                                                  &xfr_body.asset_tracing_memos
+                                                                    [inputs_len..], // only outputs
+                                                                  output_reveal_policies);
+  collect_bars_and_memos_by_keys( &mut map,
+  bars_memo_policies_output).map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?;
   Ok(map)
 }
 
