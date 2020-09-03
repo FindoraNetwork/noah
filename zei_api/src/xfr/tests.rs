@@ -607,9 +607,8 @@ pub(crate) mod tests {
                                     attributes: attrs,
                                     issuer_pub_key: cred_issuer_pk.clone() };
 
-      let output = ac_commit(&mut prng, &receiver_ac_sk, &credential, addr).unwrap();
-      let sig_commitment = output.0;
-      let key = output.2.unwrap();
+      let (sig_commitment, _, key) =
+        ac_commit(&mut prng, &receiver_ac_sk, &credential, addr).unwrap();
 
       let id_tracking_policy = IdentityRevealPolicy { cred_issuer_pub_key:
                                                         cred_issuer_pk.clone(),
@@ -644,7 +643,7 @@ pub(crate) mod tests {
                                                                        &output_asset_record,
                                                                        &receiver_ac_sk,
                                                                        &credential,
-                                                                       &key).unwrap()];
+                                                                       &key.unwrap()).unwrap()];
 
       let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
 

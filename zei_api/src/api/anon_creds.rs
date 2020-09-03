@@ -124,7 +124,7 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 ///   attributes,
 ///   issuer_pub_key:issuer_pk
 /// };
-/// let output = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"some addr").unwrap();
+/// let (_,_,_) = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"some addr").unwrap();
 /// ```
 pub fn ac_commit<R: CryptoRng + RngCore>(prng: &mut R,
                                          user_sk: &ACUserSecretKey,
@@ -205,12 +205,9 @@ pub fn ac_verify_commitment(issuer_pub_key: &ACIssuerPublicKey,
 ///   attributes,
 ///   issuer_pub_key:issuer_pk,
 /// };
-/// let output = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Some message").unwrap();
-/// let commitment = output.0;
-/// let pok = output.1;
-/// let key = output.2.unwrap();
+/// let (commitment,pok,key) = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Some message").unwrap();
 /// let attrs_map = [true, false];
-/// let reveal_sig = ac_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key, &attrs_map).unwrap();
+/// let reveal_sig = ac_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key.unwrap(), &attrs_map).unwrap();
 /// ```
 pub fn ac_open_commitment<R: CryptoRng + RngCore>(prng: &mut R,
                                                   user_sk: &ACUserSecretKey,
@@ -328,10 +325,8 @@ pub type ConfidentialAC = crypto::conf_cred_reveal::ConfidentialAC<G1, G2, S>;
 ///   attributes: attrs,
 ///   issuer_pub_key: issuer_pk.clone(),
 /// };
-/// let output = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Address").unwrap();
-/// let sig_commitment = output.0;
-/// let key = output.2.unwrap();
-/// let conf_reveal_proof = ac_confidential_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key, &enc_key, &bitmap[..], b"Some Message").unwrap();
+/// let (sig_commitment,_,key) = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"Address").unwrap();
+/// let conf_reveal_proof = ac_confidential_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key.unwrap(), &enc_key, &bitmap[..], b"Some Message").unwrap();
 /// assert!(ac_confidential_verify(&issuer_pk, &enc_key, &bitmap[..], &sig_commitment, &conf_reveal_proof.ctexts, &conf_reveal_proof.pok, b"Some Message").is_ok())
 /// ```
 pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
