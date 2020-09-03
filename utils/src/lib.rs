@@ -78,7 +78,7 @@ pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>, base64::Dec
   base64::decode_config(input, base64::URL_SAFE)
 }
 
-pub fn compute_prng_from_hash<D, R>(hash: D) -> R
+pub fn derive_prng_from_hash<D, R>(hash: D) -> R
   where D: Digest<OutputSize = U64> + Default,
         R: CryptoRng + RngCore + SeedableRng<Seed = [u8; 32]>
 {
