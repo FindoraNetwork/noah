@@ -3,6 +3,7 @@ use utils::errors::ZeiError;
 
 pub mod bls;
 pub mod pointcheval_sanders;
+pub mod schnorr;
 
 pub trait SignatureTrait {
   type PublicKey;
