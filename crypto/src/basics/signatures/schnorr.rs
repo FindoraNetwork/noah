@@ -67,33 +67,37 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
 
 #[cfg(test)]
 mod schnorr_sig {
-  use crate::basics::signatures::schnorr::{schnorr_gen_keys, schnorr_sign, schnorr_verify};
-  use algebra::groups::{Group, One};
-  use algebra::jubjub::{JubjubGroup, JubjubScalar};
+
+  use crate::basics::signatures::schnorr::{
+    schnorr_gen_keys, schnorr_sign, schnorr_verify, SchnorrPublicKey, SchnorrSecretKey,
+  };
+  use algebra::groups::{Group, GroupArithmetic, One};
+  use algebra::jubjub::JubjubGroup;
   use rand_chacha::rand_core::SeedableRng;
   use rand_chacha::ChaCha20Rng;
 
-  #[test]
-  fn check_schnorr() {
+  fn check_schnorr<G: Group>() {
     let seed = [0_u8; 32];
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
 
-    let (private_key, public_key) = schnorr_gen_keys::<ChaCha20Rng, JubjubGroup>(&mut prng);
+    let (private_key, public_key): (SchnorrSecretKey<G>, SchnorrPublicKey<G>) =
+      schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
 
     let message = String::from("message");
 
-    let sig = schnorr_sign::<String, JubjubGroup>(&private_key, &message);
+    let sig = schnorr_sign::<String, G>(&private_key, &message);
 
-    let res = schnorr_verify::<String, JubjubGroup>(&public_key, &message, &sig);
+    let res = schnorr_verify::<String, G>(&public_key, &message, &sig);
     assert!(res.is_ok());
 
-    let wrong_sig = (JubjubGroup::get_base(), JubjubScalar::one(), JubjubScalar::one());
-    let res = schnorr_verify::<String, JubjubGroup>(&public_key, &message, &wrong_sig);
+    let wrong_sig =
+      (G::get_base(), <G as GroupArithmetic>::S::one(), <G as GroupArithmetic>::S::one());
+    let res = schnorr_verify::<String, G>(&public_key, &message, &wrong_sig);
     assert!(res.is_err());
   }
 
   #[test]
   fn schnorr_over_jubjub() {
-    check_schnorr();
+    check_schnorr::<JubjubGroup>();
   }
 }
