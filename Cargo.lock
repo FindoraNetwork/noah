@@ -1103,7 +1103,11 @@ dependencies = [
  "base64",
  "bulletproofs",
  "curve25519-dalek",
+ "digest",
  "ed25519-dalek",
+ "rand",
+ "rand_chacha",
+ "rand_core",
  "serde",
  "x25519-dalek",
 ]

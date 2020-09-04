@@ -203,6 +203,10 @@ pub struct ACKey<S> {
   pub t: S,
 }
 
+#[allow(type_alias_bounds)]
+pub type ACCommitOutput<P: Pairing> =
+  (ACCommitment<P::G1>, ACPoK<P::G2, P::ScalarField>, Option<ACKey<P::ScalarField>>);
+
 /// I generate e key pair for a credential issuer
 #[allow(clippy::type_complexity)]
 pub fn ac_keygen_issuer<R: CryptoRng + RngCore, P: Pairing>(
@@ -211,9 +215,8 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore, P: Pairing>(
   -> (ACIssuerPublicKey<P::G1, P::G2>, ACIssuerSecretKey<P::G1, P::ScalarField>) {
   let x = P::ScalarField::random(prng);
   let z = P::ScalarField::random(prng);
-  //TODO check that G1 and G2 are of prime order so that every element is generator
-  let gen1: P::G1 = P::G1::get_base().mul(&P::ScalarField::random(prng));
-  let gen2 = P::G2::get_base().mul(&P::ScalarField::random(prng));
+  let gen1: P::G1 = P::G1::get_random_base(prng);
+  let gen2 = P::G2::get_random_base(prng);
   let mut y = vec![];
   let mut yy2 = vec![];
   for _ in 0..num_attrs {
@@ -274,26 +277,28 @@ pub fn ac_commitment_key_gen<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R)
 }
 
 /// Credential commitment to a message
-#[allow(clippy::type_complexity)] //TODO simplify it
-pub fn ac_commit<R: CryptoRng + RngCore, P: Pairing>(
-  prng: &mut R,
-  user_sk: &ACUserSecretKey<P::ScalarField>,
-  credential: &Credential<P::G1, P::G2, P::ScalarField>,
-  msg: &[u8])
-  -> Result<(ACCommitment<P::G1>, ACPoK<P::G2, P::ScalarField>, ACKey<P::ScalarField>), ZeiError> {
+pub fn ac_commit<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
+                                                     user_sk: &ACUserSecretKey<P::ScalarField>,
+                                                     credential: &Credential<P::G1,
+                                                                 P::G2,
+                                                                 P::ScalarField>,
+                                                     msg: &[u8])
+                                                     -> Result<ACCommitOutput<P>, ZeiError> {
   let key = ac_commitment_key_gen::<_, P>(prng);
-  let (commitment, sok) = ac_commit_with_key::<_, P>(prng, user_sk, credential, &key, msg)?;
-  Ok((commitment, sok, key))
+  let output = ac_commit_with_key::<_, P>(prng, user_sk, credential, &key, msg)?;
+  let commitment = output.0;
+  let sok = output.1;
+
+  Ok((commitment, sok, Some(key)))
 }
 
-#[allow(clippy::type_complexity)] //TODO simplify it
 pub fn ac_commit_with_key<R: CryptoRng + RngCore, P: Pairing>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
   credential: &Credential<P::G1, P::G2, P::ScalarField>,
   key: &ACKey<P::ScalarField>,
   msg: &[u8])
-  -> Result<(ACCommitment<P::G1>, ACPoK<P::G2, P::ScalarField>), ZeiError> {
+  -> Result<ACCommitOutput<P>, ZeiError> {
   let hidden_attrs = credential.attributes
                                .iter()
                                .map(|attr| Attribute::Hidden(Some(attr)))
@@ -310,7 +315,7 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore, P: Pairing>(
                               &key.t,
                               hidden_attrs.as_slice())?;
 
-  Ok((sig_commitment, sok))
+  Ok((sig_commitment, sok, None))
 }
 
 /// Produces a credential commitment by randomizing the credential signature
@@ -407,7 +412,8 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(issuer_pub_key: &ACIs
 /// Produce a AttrsRevealProof, attributes that are not Revealed(attr) and secret parameters
 /// are proved in ZeroKnowledge.
 #[allow(clippy::type_complexity)]
-pub fn ac_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
+pub fn ac_open_commitment<R: CryptoRng + RngCore,
+                          P: Pairing<ScalarField = algebra::bls12_381::BLSScalar>>(
   prng: &mut R,
   user_sk: &ACUserSecretKey<P::ScalarField>,
   credential: &Credential<P::G1, P::G2, P::ScalarField>,
@@ -415,6 +421,7 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
   reveal_map: &[bool])
   -> Result<ACRevealProof<P::G2, P::ScalarField>, ZeiError> {
   let sig_commitment = ac_randomize::<P>(&credential.signature, key);
+
   let revealed_attributes = credential.attributes
                                       .iter()
                                       .zip(reveal_map.iter())

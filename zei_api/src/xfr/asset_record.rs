@@ -140,12 +140,11 @@ impl AssetRecord {
                      owner_memo: None })
   }
 
-  /// Build a record input from OpenAssetRecord with associated policies
+  /// Build a record input from OpenAssetRecord with associated policies for asset *and* identity tracking
   /// Important: It assumes that RecordInput will be used as an input to xfr_note_gen and not as an output
   /// since OpenAsset record was recovered from a BlindAsset record. This means owner_memo field is None.
-  pub fn from_open_asset_record_with_identity_tracking<R: CryptoRng + RngCore>(
+  pub fn from_open_asset_record_with_tracking<R: CryptoRng + RngCore>(
     // TODO (fernando): currently support a single credential, but many policies
-    // TODO confusing name as it also considers asset tracking
     prng: &mut R,
     oar: OpenAssetRecord,
     asset_tracking_policies: AssetTracingPolicies,

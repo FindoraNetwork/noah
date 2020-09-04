@@ -96,14 +96,13 @@ pub fn setup_with_policies(
 
     let user_key_pair = &sender_key_pairs[i];
 
-    let (commitment_user_addr, proof, ac_commitment_key) =
-      ac_commit(&mut prng,
-                &user_ac_sk,
-                &credential_user.clone(),
-                user_key_pair.get_pk_ref().as_bytes()).unwrap();
-    ac_commitment_keys.push(ac_commitment_key);
-    ac_commitments.push(commitment_user_addr);
-    ac_proofs.push(proof);
+    let (sig_commitment, pok, key) = ac_commit(&mut prng,
+                                               &user_ac_sk,
+                                               &credential_user.clone(),
+                                               user_key_pair.get_pk_ref().as_bytes()).unwrap();
+    ac_commitment_keys.push(key.unwrap());
+    ac_commitments.push(sig_commitment);
+    ac_proofs.push(pok);
   }
 
   let id_tracking_policy = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk,
@@ -175,13 +174,12 @@ pub fn prepare_inputs_and_outputs_with_policies(sender_key_pairs: &[&XfrKeyPair]
       None => AssetTracingPolicies::new(),
     };
 
-    let ar_in =
-      AssetRecord::from_open_asset_record_with_identity_tracking(&mut prng,
-                                                                 oar_user_addr,
-                                                                 policies,
-                                                                 &user_ac_sk,
-                                                                 &credential_user,
-                                                                 &ac_commitment_key).unwrap();
+    let ar_in = AssetRecord::from_open_asset_record_with_tracking(&mut prng,
+                                                                  oar_user_addr,
+                                                                  policies,
+                                                                  &user_ac_sk,
+                                                                  &credential_user,
+                                                                  &ac_commitment_key).unwrap();
 
     ar_ins.push(ar_in);
   }

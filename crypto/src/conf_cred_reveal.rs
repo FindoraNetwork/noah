@@ -349,8 +349,11 @@ pub(crate) mod test_helper {
     let credential = Credential { signature: ac_sig,
                                   attributes: attrs,
                                   issuer_pub_key: issuer_pk.clone() };
-    let (sig_commitment, sok, key) =
-      ac_commit::<_, P>(&mut prng, &user_sk, &credential, credential_addr).unwrap();
+    let output = ac_commit::<_, P>(&mut prng, &user_sk, &credential, credential_addr).unwrap();
+
+    let sig_commitment = output.0;
+    let sok = output.1;
+    let key = output.2.unwrap(); // safe unwrap()
 
     // 1. Verify commitment
     assert!(ac_verify_commitment::<P>(&issuer_pk, &sig_commitment, &sok, credential_addr).is_ok());
@@ -529,7 +532,8 @@ mod test_serialization {
                                   attributes: attrs,
                                   issuer_pub_key: issuer_pk };
 
-    let (_, _, key) = ac_commit::<_, P>(&mut prng, &user_sk, &credential, b"an address").unwrap();
+    let output = ac_commit::<_, P>(&mut prng, &user_sk, &credential, b"an address").unwrap();
+    let key = output.2.unwrap(); // Safe unwrap()
     let conf_reveal_proof = ac_confidential_open_commitment::<_, P>(&mut prng,
                                                                     &user_sk,
                                                                     &credential,

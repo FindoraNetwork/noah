@@ -8,9 +8,11 @@ use digest::generic_array::typenum::U64;
 use digest::Digest;
 use ff::{Field, PrimeField};
 use group::Group as _;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+use rand_core::{CryptoRng, RngCore};
+
 use std::str::FromStr;
-use utils::u8_le_slice_to_u64;
+use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 pub type Bls12381field = Scalar;
 
@@ -119,10 +121,7 @@ impl ZeiScalar for BLSScalar {
   fn from_hash<D>(hash: D) -> BLSScalar
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&result[0..32]);
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
     Self::random(&mut prng)
   }
 
@@ -171,6 +170,13 @@ impl Group for BLSG1 {
     BLSG1(bls12_381::G1Projective::generator())
   }
 
+  /// Pick a random base/generator inside BLSG1
+  /// Note that BLSG1 is of prime order q = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
+  /// and thus any scalar sampled at random (except 0 which only happens with very low probability) will be coprime with q.
+  fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> BLSG1 {
+    Self::get_base().mul(&BLSScalar::random(prng))
+  }
+
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8> {
     let affine = G1Affine::from(&self.0);
@@ -190,10 +196,7 @@ impl Group for BLSG1 {
   fn from_hash<D>(hash: D) -> BLSG1
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&result[0..32]);
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
     BLSG1(bls12_381::G1Projective::random(&mut prng))
   }
 }
@@ -213,13 +216,20 @@ impl GroupArithmetic for BLSG1 {
 }
 
 impl Group for BLSG2 {
-  const COMPRESSED_LEN: usize = 96; // TODO
+  const COMPRESSED_LEN: usize = 96;
 
   fn get_identity() -> BLSG2 {
     BLSG2(G2Projective::identity())
   }
   fn get_base() -> BLSG2 {
     BLSG2(G2Projective::generator())
+  }
+
+  /// Pick a random base/generator inside BLSG2
+  /// Note that BLSG2 is of prime order q = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
+  /// and thus any scalar sampled at random (except 0 which only happens with very low probability) will be coprime with q.
+  fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> BLSG2 {
+    Self::get_base().mul(&BLSScalar::random(prng))
   }
 
   fn to_compressed_bytes(&self) -> Vec<u8> {
@@ -240,10 +250,7 @@ impl Group for BLSG2 {
   fn from_hash<D>(hash: D) -> BLSG2
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&result[0..32]);
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
     BLSG2(G2Projective::random(&mut prng))
   }
 }
@@ -314,19 +321,17 @@ impl Group for BLSGt {
   fn from_hash<D>(hash: D) -> Self
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&result[0..32]);
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+    let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
     BLSGt(Gt::random(&mut prng))
   }
 }
 
 #[cfg(test)]
 mod bls12_381_groups_test {
-  use crate::bls12_381::BLSScalar;
+  use crate::bls12_381::{BLSGt, BLSScalar, Bls12381, BLSG1, BLSG2};
   use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
-  use crate::groups::Scalar;
+  use crate::groups::{Group, Scalar};
+  use crate::pairing::Pairing;
 
   #[test]
   fn test_scalar_ops() {
@@ -348,5 +353,13 @@ mod bls12_381_groups_test {
 
     let small_value_from_bytes = BLSScalar::from_bytes(&small_value_bytes).unwrap();
     assert_eq!(small_value_from_bytes, small_value);
+  }
+
+  #[test]
+  fn hard_coded_group_elements() {
+    // BLSGt
+    let base_bls_gt = BLSGt::get_base();
+    let expected_base = Bls12381::pairing(&BLSG1::get_base(), &BLSG2::get_base());
+    assert_eq!(base_bls_gt, expected_base);
   }
 }

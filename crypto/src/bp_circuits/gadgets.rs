@@ -175,8 +175,13 @@ pub fn range_proof_64<CS: ConstraintSystem>(cs: &mut CS,
     // Create low-level variables and add them to constraints
     let (a, b, o) = match value_bytes.as_ref() {
       Some(bytes) => {
-        let bit = ((bytes[i >> 3] >> (i & 7)) & 1u8) as i8; //TODO this operation is unsafe, since it depends on Scalar's representation
-        let assignment = (Scalar::from_u32((1 - bit) as u32), Scalar::from_u32(bit as u32));
+        let index = i >> 3;
+        if index > bytes.len() {
+          // This could happen due to the scalar's representation
+          return Err(R1CSError::FormatError);
+        }
+        let bit = ((bytes[index] >> (i & 7)) & 1u8) as i8;
+        let assignment = (Scalar::from_u32(1 - bit as u32), Scalar::from_u32(bit as u32));
         cs.allocate_multiplier(Some(assignment).map(|(a, b)| (a.0, b.0)))
       }
       None => cs.allocate_multiplier(None),

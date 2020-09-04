@@ -500,20 +500,20 @@ pub(crate) mod examples {
 
     // 3.2. build AssetRecord from oar
     let input_asset_record1 =
-      AssetRecord::from_open_asset_record_with_identity_tracking(&mut prng,
-                                                                 oar1,
-                                                                 policies.clone(),
-                                                                 &user1_ac_sk,
-                                                                 &credential_user1,
-                                                                 &commitment_key_user1).unwrap();
+      AssetRecord::from_open_asset_record_with_tracking(&mut prng,
+                                                        oar1,
+                                                        policies.clone(),
+                                                        &user1_ac_sk,
+                                                        &credential_user1,
+                                                        &commitment_key_user1.unwrap()).unwrap();
 
     let input_asset_record2 =
-      AssetRecord::from_open_asset_record_with_identity_tracking(&mut prng,
-                                                                 oar2,
-                                                                 policies.clone(),
-                                                                 &user2_ac_sk,
-                                                                 &credential_user2,
-                                                                 &commitment_key_user2).unwrap();
+      AssetRecord::from_open_asset_record_with_tracking(&mut prng,
+                                                        oar2,
+                                                        policies.clone(),
+                                                        &user2_ac_sk,
+                                                        &credential_user2,
+                                                        &commitment_key_user2.unwrap()).unwrap();
 
     // 3. Prepare output AssetRecord
     // 3.1. build output asset_record template
@@ -689,7 +689,7 @@ pub(crate) mod examples {
                                                         &template,
                                                         &recv_user1_ac_sk,
                                                         &credential_user1,
-                                                        &commitment_key_user1).unwrap();
+                                                        &commitment_key_user1.unwrap()).unwrap();
 
     let template = AssetRecordTemplate::with_asset_tracking(
       amount_out2,
@@ -702,7 +702,7 @@ pub(crate) mod examples {
                                                         &template,
                                                         &recv_user2_ac_sk,
                                                         &credential_user2,
-                                                        &commitment_key_user2).unwrap();
+                                                        &commitment_key_user2.unwrap()).unwrap();
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -953,11 +953,12 @@ pub(crate) mod examples {
                                                   &Some(memo3),
                                                   user1_key_pair3.get_sk_ref()).unwrap();
     // 2.3 prepare inputs
-    let ar_in1 = AssetRecord::from_open_asset_record_with_identity_tracking(&mut prng,
+    let ar_in1 = AssetRecord::from_open_asset_record_with_tracking(&mut prng,
                                                                             oar_user1_addr1,
                                                                             asset_tracing_policy_asset1_input.clone(),
                                                                             &user1_ac_sk,
-                                                                            &credential_user1, &commitment_user1_addr1_key).unwrap();
+                                                                            &credential_user1,
+                                                                   &commitment_user1_addr1_key.unwrap()).unwrap();
     let ar_in2 = AssetRecord::from_open_asset_record_no_asset_tracking(oar_user1_addr2);
     let ar_in3 = AssetRecord::from_open_asset_record_no_asset_tracking(oar_user1_addr3);
 
@@ -987,7 +988,7 @@ pub(crate) mod examples {
                                                         &template3,
                                                         &user3_ac_sk,
                                                         &credential_user3,
-                                                        &commitment_user3_addr1_key).unwrap();
+                                                        &commitment_user3_addr1_key.unwrap()).unwrap();
 
     let output_asset_record4 =
       AssetRecord::from_template_no_identity_tracking(&mut prng, &template4).unwrap();

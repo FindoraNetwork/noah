@@ -4,18 +4,13 @@ use crate::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
 use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use jubjub::{AffinePoint, ExtendedPoint, Fq, Fr};
-use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use ff::Field;
+use group::Group as _;
+use jubjub::{AffinePoint, ExtendedPoint, Fr};
+use rand_chacha::ChaCha20Rng;
+use rand_core::{CryptoRng, RngCore};
 use std::convert::TryInto;
-use utils::u8_le_slice_to_u64;
-
-const GENERATOR: AffinePoint =
-  AffinePoint::from_raw_unchecked(Fq::from_raw([0xe4b3_d35d_f1a7_adfe,
-                                                0xcaf5_5d1b_29bf_81af,
-                                                0x8b0f_03dd_d60a_8187,
-                                                0x62ed_cbb8_bf37_87c8]),
-                                  Fq::from_raw([0xb, 0x0, 0x0, 0x0]));
+use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
@@ -75,9 +70,7 @@ impl ScalarArithmetic for JubjubScalar {
 impl Scalar for JubjubScalar {
   // scalar generation
   fn random<R: CryptoRng + RngCore>(rng: &mut R) -> JubjubScalar {
-    let mut bytes = [0u8; 64];
-    rng.fill_bytes(&mut bytes);
-    JubjubScalar(Fr::from_bytes_wide(&bytes))
+    JubjubScalar(Fr::random(rng))
   }
 
   fn from_u32(value: u32) -> JubjubScalar {
@@ -91,15 +84,8 @@ impl Scalar for JubjubScalar {
   fn from_hash<D>(hash: D) -> JubjubScalar
     where D: Digest<OutputSize = U64> + Default
   {
-    let result = hash.result();
-    let mut seed = [0u8; 32];
-    for i in 0..32 {
-      seed[i] = result[i];
-    }
-    let mut prng = ChaChaRng::from_seed(seed);
-    let mut bytes = [0u8; 64];
-    prng.fill_bytes(&mut bytes);
-    JubjubScalar(Fr::from_bytes_wide(&bytes))
+    let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
+    Self::random(&mut prng)
   }
 
   fn multiplicative_generator() -> Self {
@@ -127,13 +113,13 @@ impl Scalar for JubjubScalar {
   }
 
   fn from_bytes(bytes: &[u8]) -> Result<JubjubScalar, AlgebraError> {
-    let res = Fr::from_bytes(&bytes[..32].try_into()
-                                         .map_err(|_| AlgebraError::DeserializationError)?);
-    if res.is_some().into() {
-      Ok(JubjubScalar(res.unwrap()))
-    } else {
-      Err(AlgebraError::DeserializationError)
+    let mut array = [0u8; 32];
+    array.copy_from_slice(bytes);
+    let scalar = Fr::from_bytes(&array);
+    if bool::from(scalar.is_none()) {
+      return Err(AlgebraError::SerializationError);
     }
+    Ok(JubjubScalar(scalar.unwrap()))
   }
 }
 
@@ -147,7 +133,7 @@ impl Group for JubjubGroup {
   }
 
   fn get_base() -> JubjubGroup {
-    JubjubGroup(ExtendedPoint::from(GENERATOR))
+    JubjubGroup(ExtendedPoint::generator().mul_by_cofactor())
   }
 
   fn to_compressed_bytes(&self) -> Vec<u8> {
@@ -163,10 +149,11 @@ impl Group for JubjubGroup {
     }
   }
 
-  fn from_hash<D>(_hash: D) -> JubjubGroup
+  fn from_hash<D>(hash: D) -> JubjubGroup
     where D: Digest<OutputSize = U64> + Default
   {
-    panic!("from_hash not implemented for JubjubGroup")
+    let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
+    JubjubGroup(ExtendedPoint::random(&mut prng))
   }
 }
 
@@ -184,12 +171,12 @@ impl GroupArithmetic for JubjubGroup {
   }
 }
 
-// TODO: Add tests for Schnorr signatures
 #[cfg(test)]
 mod jubjub_groups_test {
   use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
-  use crate::groups::Scalar;
-  use crate::jubjub::JubjubScalar;
+  use crate::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
+  use crate::jubjub::{JubjubGroup, JubjubScalar};
+  use rand_core::SeedableRng;
 
   #[test]
   fn test_scalar_ops() {
@@ -211,5 +198,35 @@ mod jubjub_groups_test {
 
     let small_value_from_bytes = JubjubScalar::from_bytes(&small_value_bytes).unwrap();
     assert_eq!(small_value_from_bytes, small_value);
+  }
+
+  #[test]
+  fn schnorr_identification_protocol() {
+    // PRNG
+    let seed = [0_u8; 32];
+    let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
+
+    // Private key
+    let alpha = JubjubScalar::random(&mut rng);
+
+    // Public key
+    let base = JubjubGroup::get_base();
+    let u = base.mul(&alpha);
+
+    // Verifier challenge
+    let c = JubjubScalar::random(&mut rng);
+
+    // Prover commitment
+    let alpha_t = JubjubScalar::random(&mut rng);
+    let u_t = base.mul(&alpha_t);
+
+    // Prover response
+    let alpha_z = alpha_t.add(&c.mul(&alpha));
+
+    // Proof verification
+    let left = base.mul(&alpha_z);
+    let right = u_t.add(&u.mul(&c));
+
+    assert_eq!(left, right);
   }
 }

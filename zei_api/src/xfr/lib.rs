@@ -375,11 +375,13 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
       Ok(AssetTypeAndAmountProof::ConfAmount(range_proof(inputs, outputs)?))
     }
     XfrType::NonConfidentialAmount_ConfidentialAssetType_SingleAsset => {
-      Ok(AssetTypeAndAmountProof::ConfAsset(asset_proof(prng, &pc_gens, inputs, outputs)?))
+      Ok(AssetTypeAndAmountProof::ConfAsset(Box::new(asset_proof(prng, &pc_gens, inputs,
+                                                                 outputs)?)))
     }
     XfrType::Confidential_SingleAsset => {
-      Ok(AssetTypeAndAmountProof::ConfAll((range_proof(inputs, outputs)?,
-                                           asset_proof(prng, &pc_gens, inputs, outputs)?)))
+      Ok(AssetTypeAndAmountProof::ConfAll(Box::new((range_proof(inputs, outputs)?,
+                                                    asset_proof(prng, &pc_gens, inputs,
+                                                                outputs)?))))
     }
     _ => Err(ZeiError::XfrCreationAssetAmountError), // Type cannot be multi asset
   }
@@ -492,8 +494,10 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
 
   for body in bodies {
     match &body.proofs.asset_type_and_amount_proof {
-      AssetTypeAndAmountProof::ConfAll((range_proof, asset_proof)) => {
-        conf_amount_records.push((&body.inputs, &body.outputs, range_proof)); // save for batching
+      AssetTypeAndAmountProof::ConfAll(x) => {
+        let range_proof = &(*x).0;
+        let asset_proof = &(*x).1;
+        conf_amount_records.push((&body.inputs, &body.outputs, range_proof));
         conf_asset_type_records.push((&body.inputs, &body.outputs, asset_proof));
         // save for batching
       }
@@ -797,70 +801,6 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
   }
   batch_verify_asset_mixing(prng, params, &asset_mix_instances)
 }
-
-/*
-fn verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
-                                            params: &PublicParams,
-                                            inputs: &[BlindAssetRecord],
-                                            outputs: &[BlindAssetRecord],
-                                            proof: &AssetMixProof)
-                                            -> Result<(), ZeiError> {
-  let pow2_32 = Scalar::from(POW_2_32);
-
-  let mut in_coms = vec![];
-  for x in inputs.iter() {
-    let (com_amount_low, com_amount_high) = match x.amount {
-      XfrAmount::Confidential((c1, c2)) => (c1.decompress().unwrap(), c2.decompress().unwrap()),
-      XfrAmount::NonConfidential(amount) => {
-        let pc_gens = PedersenGens::default();
-        let (low, high) = u64_to_u32_pair(amount);
-        (pc_gens.commit(Scalar::from(low), Scalar::zero()),
-         pc_gens.commit(Scalar::from(high), Scalar::zero()))
-      }
-    };
-    let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
-
-    let com_type = match x.asset_type {
-      XfrAssetType::Confidential(c) => c,
-      XfrAssetType::NonConfidential(asset_type) => {
-        let scalar = asset_type_to_scalar(&asset_type);
-        let pc_gens = PedersenGens::default();
-        pc_gens.commit(scalar, Scalar::zero()).compress()
-      }
-    };
-    in_coms.push((com_amount, com_type));
-  }
-
-  let mut out_coms = vec![];
-  for x in outputs.iter() {
-    // TODO avoid code duplication
-    let (com_amount_low, com_amount_high) = match x.amount {
-      XfrAmount::Confidential((c1, c2)) => (c1.decompress().unwrap(), c2.decompress().unwrap()),
-      XfrAmount::NonConfidential(amount) => {
-        let pc_gens = PedersenGens::default();
-        let (low, high) = u64_to_u32_pair(amount);
-        (pc_gens.commit(Scalar::from(low), Scalar::zero()),
-         pc_gens.commit(Scalar::from(high), Scalar::zero()))
-      }
-    };
-    let com_amount = (com_amount_low + pow2_32 * com_amount_high).compress();
-
-    let com_type = match x.asset_type {
-      XfrAssetType::Confidential(c) => c,
-      XfrAssetType::NonConfidential(asset_type) => {
-        let scalar = asset_type_to_scalar(&asset_type);
-        let pc_gens = PedersenGens::default();
-        pc_gens.commit(scalar, Scalar::zero()).compress()
-      }
-    };
-    out_coms.push((com_amount, com_type));
-  }
-  let instance = AssetMixingIntance { inputs: &in_coms,
-                                      outputs: &out_coms,
-                                      proof };
-  batch_verify_asset_mixing(prng, params, &[instance])
-}
-*/
 
 // ASSET TRACKING
 pub fn find_tracing_memos<'a>(

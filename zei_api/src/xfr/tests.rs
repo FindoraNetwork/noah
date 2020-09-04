@@ -643,7 +643,7 @@ pub(crate) mod tests {
                                                                        &output_asset_record,
                                                                        &receiver_ac_sk,
                                                                        &credential,
-                                                                       &key).unwrap()];
+                                                                       &key.unwrap()).unwrap()];
 
       let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
 
