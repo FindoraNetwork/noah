@@ -96,7 +96,7 @@ pub trait Group:
   /// 4. return g^x
   fn get_random_base<R: CryptoRng + RngCore>(_prng: &mut R) -> Self {
     panic!("Not implemented.");
-  }
+  } // TODO ticket #445 (redmine)
 
   // compression/serialization helpers
   fn to_compressed_bytes(&self) -> Vec<u8>;
