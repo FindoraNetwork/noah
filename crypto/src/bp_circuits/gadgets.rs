@@ -1,5 +1,5 @@
 use crate::bp_circuits::cloak::CloakVariable;
-use algebra::groups::Scalar as _;
+use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{
   ConstraintSystem, LinearCombination, R1CSError, RandomizableConstraintSystem,

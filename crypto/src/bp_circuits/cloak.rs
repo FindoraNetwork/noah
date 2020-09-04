@@ -40,7 +40,7 @@ match on each list. On each product the elements are shifted by a random challen
 */
 
 use crate::ristretto_pedersen::RistrettoPedersenGens;
-use algebra::groups::Scalar as _;
+use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::r1cs::{
   ConstraintSystem, Prover, R1CSError, RandomizableConstraintSystem, Variable, Verifier,
@@ -293,7 +293,7 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
 pub mod tests {
   use crate::bp_circuits::cloak::{CloakCommitment, CloakValue};
   use ::lazy_static::lazy_static;
-  use algebra::groups::Scalar;
+  use algebra::groups::{Scalar, ScalarArithmetic};
   use algebra::ristretto::RistrettoScalar;
   use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};

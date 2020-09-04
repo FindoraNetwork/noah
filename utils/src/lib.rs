@@ -89,8 +89,46 @@ pub fn derive_prng_from_hash<D, R>(hash: D) -> R
   R::from_seed(seed)
 }
 
+/// I shift a big integer (represented as a littleendian bytes vector) by one bit.
+pub fn shift_u8_vec(r: &mut Vec<u8>) {
+  let mut next = 0u8;
+  for e in r.iter_mut().rev() {
+    let prev = *e;
+    *e = (*e >> 1) | next;
+    next = (prev % 2) << 7;
+  }
+  if *r.last().unwrap() == 0 && r.len() > 1 {
+    r.pop();
+  }
+}
+
 #[cfg(test)]
 mod test {
+  #[test]
+  fn test_shift_u8_vec() {
+    let mut v = vec![0];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![0]);
+
+    let mut v = vec![1];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![0]);
+
+    let mut v = vec![2];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![1]);
+
+    let mut v = vec![255];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![127]);
+
+    let mut v = vec![0, 1];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![128]);
+    let mut v = vec![0, 0, 1];
+    super::shift_u8_vec(&mut v);
+    assert_eq!(v, vec![0, 128]);
+  }
 
   #[test]
   fn test_u8_be_slice_to_u32() {

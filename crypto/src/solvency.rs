@@ -1,7 +1,7 @@
 use crate::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
 use crate::bp_circuits::solvency::solvency;
 use crate::ristretto_pedersen::RistrettoPedersenGens;
-use algebra::groups::Scalar as _;
+use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSError, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};

@@ -1,21 +1,22 @@
 use crate::errors::AlgebraError;
 use crate::groups::GroupArithmetic;
-use crate::groups::{Group, Scalar as ZeiScalar};
+use crate::groups::{Group, One, Scalar as ZeiScalar, ScalarArithmetic, Zero};
 use crate::pairing::Pairing;
 use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt, Scalar};
+use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use ff::{Field, PrimeField};
 use group::Group as _;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore};
-use std::ops::{Add, Mul, Sub};
+
 use std::str::FromStr;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 pub type Bls12381field = Scalar;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct BLSScalar(Bls12381field);
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSG1(pub(crate) G1Projective);
@@ -31,9 +32,75 @@ impl FromStr for BLSScalar {
     Ok(BLSScalar(Scalar::from_str(string).ok_or(AlgebraError::DeserializationError)?))
   }
 }
+
 impl BLSScalar {
+  pub fn new(elem: Scalar) -> Self {
+    Self(elem)
+  }
+
   pub fn get_scalar(&self) -> Scalar {
     self.0
+  }
+}
+
+impl One for BLSScalar {
+  fn one() -> BLSScalar {
+    BLSScalar(Scalar::one())
+  }
+}
+
+impl Zero for BLSScalar {
+  fn zero() -> BLSScalar {
+    BLSScalar(Scalar::zero())
+  }
+
+  fn is_zero(&self) -> bool {
+    self.0.is_zero()
+  }
+}
+
+impl ScalarArithmetic for BLSScalar {
+  fn add(&self, b: &BLSScalar) -> BLSScalar {
+    BLSScalar(self.0.add(&b.0))
+  }
+
+  fn add_assign(&mut self, b: &BLSScalar) {
+    (self.0).add_assign(&b.0);
+  }
+
+  fn mul(&self, b: &BLSScalar) -> BLSScalar {
+    BLSScalar(self.0.mul(&b.0))
+  }
+
+  fn mul_assign(&mut self, b: &BLSScalar) {
+    (self.0).mul_assign(&b.0);
+  }
+
+  fn sub(&self, b: &BLSScalar) -> BLSScalar {
+    BLSScalar(self.0.sub(&b.0))
+  }
+
+  fn sub_assign(&mut self, b: &BLSScalar) {
+    (self.0).sub_assign(&b.0);
+  }
+
+  fn inv(&self) -> Result<BLSScalar, AlgebraError> {
+    let a = self.0.invert();
+    if bool::from(a.is_none()) {
+      return Err(AlgebraError::GroupInversionError);
+    }
+    Ok(BLSScalar(a.unwrap()))
+  }
+
+  fn neg(&self) -> Self {
+    Self(self.0.neg())
+  }
+
+  fn pow(&self, exponent: &[u64]) -> Self {
+    let len = exponent.len();
+    let mut array = [0u64; 4];
+    array[..len].copy_from_slice(&exponent[..]);
+    Self(self.0.pow(&array))
   }
 }
 
@@ -58,24 +125,14 @@ impl ZeiScalar for BLSScalar {
     Self::random(&mut prng)
   }
 
-  // scalar arithmetic
-  fn add(&self, b: &BLSScalar) -> BLSScalar {
-    BLSScalar(self.0.add(&b.0))
+  fn multiplicative_generator() -> Self {
+    BLSScalar(Scalar::multiplicative_generator())
   }
-  fn mul(&self, b: &BLSScalar) -> BLSScalar {
-    BLSScalar(self.0.mul(&b.0))
-  }
-
-  fn sub(&self, b: &BLSScalar) -> BLSScalar {
-    BLSScalar(self.0.sub(&b.0))
-  }
-
-  fn inv(&self) -> Result<BLSScalar, AlgebraError> {
-    let a = self.0.invert();
-    if bool::from(a.is_none()) {
-      return Err(AlgebraError::GroupInversionError);
-    }
-    Ok(BLSScalar(a.unwrap()))
+  // scalar field size
+  fn get_field_size_lsf_bytes() -> Vec<u8> {
+    [0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x5b, 0xfe, 0xff, 0x02, 0xa4, 0xbd,
+     0x53, 0x05, 0xd8, 0xa1, 0x09, 0x08, 0xd8, 0x39, 0x33, 0x48, 0x7d, 0x9d, 0x29, 0x53, 0xa7,
+     0xed, 0x73].to_vec()
   }
 
   fn get_little_endian_u64(&self) -> Vec<u64> {
@@ -251,10 +308,12 @@ impl Group for BLSGt {
     BLSGt(Gt::generator())
   }
 
+  // TODO: Implement
   fn to_compressed_bytes(&self) -> Vec<u8> {
     unimplemented!()
   }
 
+  // TODO: Implement
   fn from_compressed_bytes(_bytes: &[u8]) -> Result<Self, AlgebraError> {
     unimplemented!()
   }

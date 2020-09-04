@@ -1,7 +1,7 @@
 use crate::basics::elgamal::{ElGamalCiphertext, ElGamalEncKey};
 use crate::ristretto_pedersen::RistrettoPedersenGens;
 use crate::sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use algebra::groups::{Group, GroupArithmetic, Scalar as _};
+use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoPoint;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};

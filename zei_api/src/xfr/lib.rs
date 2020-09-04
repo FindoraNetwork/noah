@@ -9,7 +9,7 @@ use crate::xfr::proofs::{
 };
 use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use crate::xfr::structs::*;
-use algebra::groups::{GroupArithmetic, Scalar as _};
+use algebra::groups::{GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;

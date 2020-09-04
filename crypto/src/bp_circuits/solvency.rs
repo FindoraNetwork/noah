@@ -9,7 +9,7 @@
 */
 
 use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable};
-use algebra::groups::Scalar as _;
+use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
 use linear_map::LinearMap;
