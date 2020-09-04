@@ -1,63 +1,99 @@
-use crate::basics::signatures::SignatureTrait;
-use algebra::groups::{Group, One, Scalar};
-use std::marker::PhantomData;
+use algebra::groups::{Group, Scalar, ScalarArithmetic};
 
+use rand_chacha::rand_core::SeedableRng;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
-
-pub struct Schnorr<G> {
-  phantom_group: PhantomData<G>,
-}
 
 pub type SchnorrSecretKey<G: Group> = G::S;
 pub type SchnorrPublicKey<G: Group> = G;
 pub type SchnorrSignature<G: Group> = (G, <G>::S, <G>::S);
 
-pub fn schnorr_gen_keys<G: Group, R: CryptoRng + RngCore>(
+pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(
   prng: &mut R)
   -> (SchnorrSecretKey<G>, SchnorrPublicKey<G>) {
-  let random_scalar = <G>::S::random(prng);
-  let point = G::get_base().mul(&random_scalar);
-  (random_scalar, point)
+  // Private key
+  let alpha = G::S::random(prng);
+
+  // Public key
+  let base = G::get_base();
+  let u = base.mul(&alpha);
+
+  (alpha, u)
 }
 
-// TODO should the signature be deterministic or randomized?
-pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(_signing_key: &SchnorrSecretKey<G>,
+pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrSecretKey<G>,
                                               _message: &B)
                                               -> SchnorrSignature<G> {
-  (G::get_base(), <G>::S::one(), <G>::S::one())
+  // TODO should the signature be deterministic or randomized?
+  let seed = [0_u8; 32];
+  let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
+
+  // Verifier challenge
+  // TODO use merlin?
+  let c = G::S::random(&mut rng);
+
+  // TODO hash message inside commitment
+  // Prover commitment
+  let base = G::get_base();
+  let alpha_t = G::S::random(&mut rng);
+  let u_t = base.mul(&alpha_t);
+
+  // Prover response
+  let alpha_z = alpha_t.add(&c.mul(&signing_key));
+
+  (u_t, c, alpha_z)
 }
 
-pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(_pk: &SchnorrPublicKey<G>,
-                                                _msg: &B,
-                                                _sig: &SchnorrSignature<G>)
+pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
+                                                msg: &B,
+                                                sig: &SchnorrSignature<G>)
                                                 -> Result<(), ZeiError> {
-  Ok(())
-}
+  let alpha_z = sig.2.clone();
+  let u_t = sig.0.clone();
+  let c = sig.1.clone();
 
-impl<G> SignatureTrait for Schnorr<G> where G: Group
-{
-  type PublicKey = SchnorrPublicKey<G>;
-  type SecretKey = SchnorrSecretKey<G>;
-  type Signature = SchnorrSignature<G>;
-  fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R) -> (SchnorrSecretKey<G>, SchnorrPublicKey<G>) {
-    schnorr_gen_keys(prng)
-  }
-  fn sign<B: AsRef<[u8]>>(sk: &Self::SecretKey, msg: &B) -> Self::Signature {
-    schnorr_sign(sk, msg)
-  }
-  fn verify<B: AsRef<[u8]>>(pk: &Self::PublicKey,
-                            sig: &Self::Signature,
-                            msg: &B)
-                            -> Result<(), ZeiError> {
-    schnorr_verify(pk, msg, sig)
+  // TODO recompute the challenge !
+
+  let base = G::get_base();
+  let left = base.mul(&alpha_z);
+  let right = u_t.add(&pk.mul(&c));
+
+  if left == right {
+    Ok(())
+  } else {
+    Err(ZeiError::ArgumentVerificationError)
   }
 }
 
 #[cfg(test)]
 mod schnorr_sig {
+  use crate::basics::signatures::schnorr::{schnorr_gen_keys, schnorr_sign, schnorr_verify};
+  use algebra::groups::{Group, One};
+  use algebra::jubjub::{JubjubGroup, JubjubScalar};
+  use rand_chacha::rand_core::SeedableRng;
+  use rand_chacha::ChaCha20Rng;
+
+  #[test]
+  fn check_schnorr() {
+    let seed = [0_u8; 32];
+    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+
+    let (private_key, public_key) = schnorr_gen_keys::<ChaCha20Rng, JubjubGroup>(&mut prng);
+
+    let message = String::from("message");
+
+    let sig = schnorr_sign::<String, JubjubGroup>(&private_key, &message);
+
+    let res = schnorr_verify::<String, JubjubGroup>(&public_key, &message, &sig);
+    assert!(res.is_ok());
+
+    let wrong_sig = (JubjubGroup::get_base(), JubjubScalar::one(), JubjubScalar::one());
+    let res = schnorr_verify::<String, JubjubGroup>(&public_key, &message, &wrong_sig);
+    assert!(res.is_err());
+  }
+
   #[test]
   fn schnorr_over_jubjub() {
-    assert!(true);
+    check_schnorr();
   }
 }
