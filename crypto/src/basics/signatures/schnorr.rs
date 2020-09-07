@@ -10,7 +10,10 @@ pub struct SchnorrPublicKey<G: Group>(G);
 pub struct SchnorrKeyPair<G: Group>(SchnorrSecretKey<G>, SchnorrPublicKey<G>);
 pub struct SchnorrSignature<G: Group>((G, G::S));
 
-// TODO serialization ?
+// TODO from_bytes, to_bytes
+
+// TODO use merlin?
+
 pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> SchnorrKeyPair<G> {
   // Private key
   let alpha = G::S::random(prng);
@@ -80,6 +83,7 @@ mod schnorr_sig {
   };
   use algebra::groups::{Group, GroupArithmetic, One};
   use algebra::jubjub::JubjubGroup;
+  use algebra::ristretto::RistrettoPoint;
   use rand_chacha::rand_core::SeedableRng;
   use rand_chacha::ChaCha20Rng;
 
@@ -110,5 +114,10 @@ mod schnorr_sig {
   #[test]
   fn schnorr_over_jubjub() {
     check_schnorr::<JubjubGroup>();
+  }
+
+  #[test]
+  fn schnorr_over_ristretto() {
+    check_schnorr::<RistrettoPoint>();
   }
 }
