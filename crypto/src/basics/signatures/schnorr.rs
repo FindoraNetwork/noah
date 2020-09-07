@@ -7,12 +7,11 @@ use sha2::Sha512;
 
 pub struct SchnorrSecretKey<G: Group>(G::S);
 pub struct SchnorrPublicKey<G: Group>(G);
-pub struct SchnorrSignature<G: Group>((G::S, G::S));
+pub struct SchnorrKeyPair<G: Group>(SchnorrSecretKey<G>, SchnorrPublicKey<G>);
+pub struct SchnorrSignature<G: Group>((G, G::S));
 
 // TODO serialization ?
-pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(
-  prng: &mut R)
-  -> (SchnorrSecretKey<G>, SchnorrPublicKey<G>) {
+pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> SchnorrKeyPair<G> {
   // Private key
   let alpha = G::S::random(prng);
 
@@ -20,45 +19,53 @@ pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(
   let base = G::get_base();
   let u = base.mul(&alpha);
 
-  (SchnorrSecretKey(alpha), SchnorrPublicKey(u))
+  SchnorrKeyPair(SchnorrSecretKey(alpha), SchnorrPublicKey(u))
 }
 
-fn hash_commitment_and_message<G: Group, B: AsRef<[u8]>>(commitment: G, message: &B) -> G::S {
-  // TODO make hash function a parameter
+fn hash_commitment_and_message<G: Group, B: AsRef<[u8]>>(public_key: &SchnorrPublicKey<G>,
+                                                         commitment: &G,
+                                                         message: &B)
+                                                         -> G::S {
+  // TODO make hash function a parameter ?
   let mut hasher = Sha512::new();
-  hasher.input(message);
+  hasher.input(public_key.0.to_compressed_bytes());
   hasher.input(commitment.to_compressed_bytes());
+  hasher.input(message);
   G::S::from_hash(hasher)
 }
 
 #[allow(clippy::many_single_char_names)]
+#[allow(non_snake_case)]
 pub fn schnorr_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>, G: Group>(prng: &mut R,
-                                                                      signing_key: &SchnorrSecretKey<G>,
+                                                                      signing_key: &SchnorrKeyPair<G>,
                                                                       message: &B)
                                                                       -> SchnorrSignature<G> {
   let g = G::get_base();
-  let u = G::S::random(prng);
-  let a = g.mul(&u);
+  let r = G::S::random(prng);
+  let R = g.mul(&r);
 
-  let c: G::S = hash_commitment_and_message::<G, B>(a, message);
-  let r: G::S = u.add(&c.mul(&signing_key.0));
+  let public_key = &signing_key.1;
+  let c: G::S = hash_commitment_and_message::<G, B>(&public_key, &R, message);
+  let private_key = &(signing_key.0).0;
+  let s: G::S = r.add(&c.mul(private_key));
 
   // TODO use ::zeroize::Zeroize::zeroize(&mut u); How to test this?
-  SchnorrSignature((c, r))
+  SchnorrSignature((R, s))
 }
 
+#[allow(non_snake_case)]
 pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
                                                 msg: &B,
                                                 sig: &SchnorrSignature<G>)
                                                 -> Result<(), ZeiError> {
   let g = G::get_base();
-  let (c, r) = sig.0;
+  let (R, s) = &sig.0;
 
-  let point = g.mul(&r).add(&pk.0.mul(&c.neg()));
+  let c = hash_commitment_and_message(&pk, &R, msg);
+  let left = R.add(&pk.0.mul(&c));
+  let right = g.mul(&s);
 
-  let c_computed = hash_commitment_and_message(point, msg);
-
-  if c == c_computed {
+  if left == right {
     Ok(())
   } else {
     Err(ZeiError::ArgumentVerificationError)
@@ -69,8 +76,7 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
 mod schnorr_sig {
 
   use crate::basics::signatures::schnorr::{
-    schnorr_gen_keys, schnorr_sign, schnorr_verify, SchnorrPublicKey, SchnorrSecretKey,
-    SchnorrSignature,
+    schnorr_gen_keys, schnorr_sign, schnorr_verify, SchnorrKeyPair, SchnorrSignature,
   };
   use algebra::groups::{Group, GroupArithmetic, One};
   use algebra::jubjub::JubjubGroup;
@@ -81,18 +87,18 @@ mod schnorr_sig {
     let seed = [0_u8; 32];
     let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
 
-    let (private_key, public_key): (SchnorrSecretKey<G>, SchnorrPublicKey<G>) =
-      schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+    let key_pair: SchnorrKeyPair<G> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
 
     let message = String::from("message");
 
-    let sig = schnorr_sign::<ChaCha20Rng, String, G>(&mut prng, &private_key, &message);
+    let sig = schnorr_sign::<ChaCha20Rng, String, G>(&mut prng, &key_pair, &message);
 
+    let public_key = key_pair.1;
     let res = schnorr_verify::<String, G>(&public_key, &message, &sig);
     assert!(res.is_ok());
 
     let wrong_sig =
-      SchnorrSignature((<G as GroupArithmetic>::S::one(), <G as GroupArithmetic>::S::one()));
+      SchnorrSignature((<G as Group>::get_identity(), <G as GroupArithmetic>::S::one()));
     let res = schnorr_verify::<String, G>(&public_key, &message, &wrong_sig);
     assert!(res.is_err());
 
