@@ -1,10 +1,12 @@
 use algebra::groups::{Group, Scalar, ScalarArithmetic};
 use digest::Digest;
+use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha2::Sha512;
 use utils::errors::ZeiError;
 
 // TODO use ::zeroize::Zeroize where needed
+// TODO remove magic number 32
 
 pub type SchnorrNonce = [u8; 32];
 
@@ -19,15 +21,21 @@ impl<G: Group> SchnorrSecretKey<G> {
   }
 }
 
+#[derive(Clone)]
 pub struct SchnorrPublicKey<G: Group>(G);
+
+impl<G: Group> SchnorrPublicKey<G> {
+  pub fn to_bytes(&self) -> Vec<u8> {
+    self.0.to_compressed_bytes()
+  }
+}
+
 pub struct SchnorrKeyPair<G: Group>(SchnorrSecretKey<G>, SchnorrPublicKey<G>);
 pub struct SchnorrSignature<G: Group>((G, G::S));
 
 // TODO document
 
 // TODO from_bytes, to_bytes
-
-// TODO use merlin?
 
 pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> SchnorrKeyPair<G> {
   // Private key
@@ -43,34 +51,27 @@ pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> Schno
   SchnorrKeyPair(SchnorrSecretKey::new(alpha, nonce), SchnorrPublicKey(u))
 }
 
-fn hash_commitment_and_message<G: Group, B: AsRef<[u8]>>(public_key: &SchnorrPublicKey<G>,
-                                                         commitment: &G,
-                                                         message: &B)
-                                                         -> G::S {
-  // TODO make hash function a parameter ?
-  let mut hasher = Sha512::new();
-  hasher.input(public_key.0.to_compressed_bytes());
-  hasher.input(commitment.to_compressed_bytes());
-  hasher.input(message);
-  G::S::from_hash(hasher)
+fn compute_challenge<G: Group>(t: &mut Transcript) -> G::S {
+  const CHALLENGE_BYTES_LEN: usize = 32;
+  let mut c_bytes = [0_u8; CHALLENGE_BYTES_LEN];
+  t.challenge_bytes(b"c", &mut c_bytes);
+  G::S::from_bytes_safe(&c_bytes)
 }
 
 //TODO check this below
-
 /// Deterministic computation of a scalar based on the secret nonce of the private key.
 /// This is to avoid attacks due to bad implementation of prng involving the generation
 /// of the commitment in the signature.
 /// See RFC 6979 https://www.hjp.at/doc/rfc/rfc6979.html
-fn deterministic_scalar_gen<G: Group, R: CryptoRng + RngCore + SeedableRng<Seed = SchnorrNonce>>(
+fn deterministic_scalar_gen<G: Group, R: CryptoRng + RngCore + SeedableRng<Seed = [u8; 32]>>(
+  message: &[u8],
   secret_key: &SchnorrSecretKey<G>)
   -> G::S {
-  let mut scalar_bytes = [0u8; 32];
-  let mut seed = [0u8; 32];
-  seed.copy_from_slice(&secret_key.nonce[..]);
-  let mut prng = R::from_seed(seed);
-  prng.fill_bytes(&mut scalar_bytes);
-
-  G::S::from_bytes_safe(&scalar_bytes)
+  // The seed is computed from the hash of the message and the secret nonce
+  let mut hasher = Sha512::new();
+  hasher.input(message);
+  hasher.input(&secret_key.nonce);
+  G::S::from_hash(hasher)
 }
 
 #[allow(clippy::many_single_char_names)]
@@ -81,27 +82,47 @@ pub fn schnorr_sign<R: CryptoRng + RngCore + SeedableRng<Seed = SchnorrNonce>,
   signing_key: &SchnorrKeyPair<G>,
   message: &B)
   -> SchnorrSignature<G> {
-  let g = G::get_base();
-  let r = deterministic_scalar_gen::<G, R>(&signing_key.0);
-  let R = g.mul(&r);
+  let mut transcript = Transcript::new(b"schnorr_sig");
 
-  let public_key = &signing_key.1;
-  let c: G::S = hash_commitment_and_message::<G, B>(&public_key, &R, message);
+  // Note the message must be part of the transcript before computing other values, in particular the challenge `c`
+  transcript.append_message(b"message", message.as_ref());
+
+  let g = G::get_base();
+  let r = deterministic_scalar_gen::<G, R>(message.as_ref(), &signing_key.0);
+
+  let R = g.mul(&r);
+  let public_key = &signing_key.1.clone();
+
+  transcript.append_message(b"public key", &public_key.clone().to_bytes());
+  transcript.append_message(b"R", &R.to_compressed_bytes());
+
+  let c: G::S = compute_challenge::<G>(&mut transcript);
+
   let private_key = &(signing_key.0).key;
   let s: G::S = r.add(&c.mul(private_key));
 
   SchnorrSignature((R, s))
 }
 
+// TODO multisig => start with naive (but not insecure) implementation
+
 #[allow(non_snake_case)]
 pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
                                                 msg: &B,
                                                 sig: &SchnorrSignature<G>)
                                                 -> Result<(), ZeiError> {
+  let mut transcript = Transcript::new(b"schnorr_sig");
+  transcript.append_message(b"message", msg.as_ref());
+
   let g = G::get_base();
   let (R, s) = &sig.0;
 
-  let c = hash_commitment_and_message(&pk, &R, msg);
+  transcript.append_message(b"public key", &pk.clone().to_bytes());
+  transcript.append_message(b"R", &R.to_compressed_bytes());
+
+  // TODO check scalar see https://github.com/w3f/schnorrkel/blob/cfdbe9ae865a4d3ffa2566d896d4dbedf5107028/src/sign.rs#L66
+  let c = compute_challenge::<G>(&mut transcript);
+
   let left = R.add(&pk.0.mul(&c));
   let right = g.mul(&s);
 
