@@ -1,7 +1,7 @@
 use algebra::groups::{Group, Scalar, ScalarArithmetic};
 use digest::Digest;
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use rand_core::{CryptoRng, RngCore};
 use sha2::Sha512;
 use utils::errors::ZeiError;
 
@@ -31,11 +31,13 @@ impl<G: Group> SchnorrPublicKey<G> {
 }
 
 pub struct SchnorrKeyPair<G: Group>(SchnorrSecretKey<G>, SchnorrPublicKey<G>);
+
+#[derive(Clone)]
 pub struct SchnorrSignature<G: Group>((G, G::S));
 
-// TODO document
+pub struct SchnorrMultiSignature<G: Group>(Vec<SchnorrSignature<G>>);
 
-// TODO from_bytes, to_bytes
+// TODO document
 
 pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> SchnorrKeyPair<G> {
   // Private key
@@ -63,10 +65,7 @@ fn compute_challenge<G: Group>(t: &mut Transcript) -> G::S {
 /// This is to avoid attacks due to bad implementation of prng involving the generation
 /// of the commitment in the signature.
 /// See RFC 6979 https://www.hjp.at/doc/rfc/rfc6979.html
-fn deterministic_scalar_gen<G: Group, R: CryptoRng + RngCore + SeedableRng<Seed = [u8; 32]>>(
-  message: &[u8],
-  secret_key: &SchnorrSecretKey<G>)
-  -> G::S {
+fn deterministic_scalar_gen<G: Group>(message: &[u8], secret_key: &SchnorrSecretKey<G>) -> G::S {
   // The seed is computed from the hash of the message and the secret nonce
   let mut hasher = Sha512::new();
   hasher.input(message);
@@ -76,24 +75,22 @@ fn deterministic_scalar_gen<G: Group, R: CryptoRng + RngCore + SeedableRng<Seed 
 
 #[allow(clippy::many_single_char_names)]
 #[allow(non_snake_case)]
-pub fn schnorr_sign<R: CryptoRng + RngCore + SeedableRng<Seed = SchnorrNonce>,
-                    B: AsRef<[u8]>,
-                    G: Group>(
-  signing_key: &SchnorrKeyPair<G>,
-  message: &B)
-  -> SchnorrSignature<G> {
+pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
+                                              message: &B)
+                                              -> SchnorrSignature<G> {
+  // TODO handle errors
   let mut transcript = Transcript::new(b"schnorr_sig");
 
   // Note the message must be part of the transcript before computing other values, in particular the challenge `c`
   transcript.append_message(b"message", message.as_ref());
 
   let g = G::get_base();
-  let r = deterministic_scalar_gen::<G, R>(message.as_ref(), &signing_key.0);
+  let r = deterministic_scalar_gen::<G>(message.as_ref(), &signing_key.0);
 
   let R = g.mul(&r);
-  let public_key = &signing_key.1.clone();
+  let public_key = &signing_key.1;
 
-  transcript.append_message(b"public key", &public_key.clone().to_bytes());
+  transcript.append_message(b"public key", &public_key.to_bytes());
   transcript.append_message(b"R", &R.to_compressed_bytes());
 
   let c: G::S = compute_challenge::<G>(&mut transcript);
@@ -102,6 +99,20 @@ pub fn schnorr_sign<R: CryptoRng + RngCore + SeedableRng<Seed = SchnorrNonce>,
   let s: G::S = r.add(&c.mul(private_key));
 
   SchnorrSignature((R, s))
+}
+
+pub fn schnorr_multisig_sign<B: AsRef<[u8]>, G: Group>(signing_keys: &[SchnorrKeyPair<G>],
+                                                       message: &B)
+                                                       -> SchnorrMultiSignature<G> {
+  // TODO handle errors?
+
+  let mut signatures = vec![];
+
+  for signing_key in signing_keys {
+    let sig = schnorr_sign::<B, G>(&signing_key, &message);
+    signatures.push(sig);
+  }
+  SchnorrMultiSignature(signatures)
 }
 
 // TODO multisig => start with naive (but not insecure) implementation
@@ -133,43 +144,111 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
   }
 }
 
-#[cfg(test)]
-mod schnorr_sig {
-
-  use crate::basics::signatures::schnorr::{
-    schnorr_gen_keys, schnorr_sign, schnorr_verify, SchnorrKeyPair, SchnorrSignature,
-  };
-  use algebra::groups::{Group, GroupArithmetic, One};
-  use algebra::jubjub::JubjubGroup;
-  use rand_chacha::rand_core::SeedableRng;
-  use rand_chacha::ChaCha20Rng;
-
-  fn check_schnorr<G: Group>() {
-    let seed = [0_u8; 32];
-    let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-
-    let key_pair: SchnorrKeyPair<G> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
-
-    let message = String::from("message");
-
-    let sig = schnorr_sign::<ChaCha20Rng, String, G>(&key_pair, &message);
-
-    let public_key = key_pair.1;
-    let res = schnorr_verify::<String, G>(&public_key, &message, &sig);
-    assert!(res.is_ok());
-
-    let wrong_sig =
-      SchnorrSignature((<G as Group>::get_identity(), <G as GroupArithmetic>::S::one()));
-    let res = schnorr_verify::<String, G>(&public_key, &message, &wrong_sig);
-    assert!(res.is_err());
-
-    let wrong_message = String::from("wrong_message");
-    let res = schnorr_verify::<String, G>(&public_key, &wrong_message, &sig);
-    assert!(res.is_err());
+pub fn schnorr_multisig_verify<B: AsRef<[u8]>, G: Group>(public_keys: &[SchnorrPublicKey<G>],
+                                                         msg: &B,
+                                                         msig: &SchnorrMultiSignature<G>)
+                                                         -> Result<(), ZeiError> {
+  for (pk, sig) in public_keys.iter().zip(msig.0.clone()) {
+    schnorr_verify(&pk, msg, &sig)?;
   }
 
-  #[test]
-  fn schnorr_over_jubjub() {
-    check_schnorr::<JubjubGroup>();
+  Ok(())
+}
+
+#[cfg(test)]
+mod schnorr_sigs {
+
+  mod schnorr_simple_sig {
+
+    use crate::basics::signatures::schnorr::{
+      schnorr_gen_keys, schnorr_sign, schnorr_verify, SchnorrKeyPair, SchnorrSignature,
+    };
+    use algebra::groups::{Group, GroupArithmetic, One};
+    use algebra::jubjub::JubjubGroup;
+    use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaCha20Rng;
+
+    fn check_schnorr<G: Group>() {
+      let seed = [0_u8; 32];
+      let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+
+      let key_pair: SchnorrKeyPair<G> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+
+      let message = String::from("message");
+
+      let sig = schnorr_sign::<String, G>(&key_pair, &message);
+
+      let public_key = key_pair.1;
+      let res = schnorr_verify::<String, G>(&public_key, &message, &sig);
+      assert!(res.is_ok());
+
+      let wrong_sig =
+        SchnorrSignature((<G as Group>::get_identity(), <G as GroupArithmetic>::S::one()));
+      let res = schnorr_verify::<String, G>(&public_key, &message, &wrong_sig);
+      assert!(res.is_err());
+
+      let wrong_message = String::from("wrong_message");
+      let res = schnorr_verify::<String, G>(&public_key, &wrong_message, &sig);
+      assert!(res.is_err());
+    }
+
+    #[test]
+    fn schnorr_sig_over_jubjub() {
+      check_schnorr::<JubjubGroup>();
+    }
+  }
+
+  #[cfg(test)]
+  mod schnorr_multisig {
+
+    use crate::basics::signatures::schnorr::{
+      schnorr_gen_keys, schnorr_multisig_sign, schnorr_multisig_verify, SchnorrKeyPair,
+      SchnorrMultiSignature, SchnorrSignature,
+    };
+    use algebra::groups::{Group, GroupArithmetic, One};
+
+    use algebra::jubjub::JubjubGroup;
+    use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaCha20Rng;
+
+    fn check_schnorr_multisig<G: Group>() {
+      let seed = [0_u8; 32];
+      let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+
+      const NUMBER_OF_KEYS: usize = 3;
+      let mut key_pairs = vec![];
+      let mut public_keys = vec![];
+      for _i in 0..NUMBER_OF_KEYS {
+        let key_pair: SchnorrKeyPair<G> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+        let public_key = key_pair.1.clone();
+        key_pairs.push(key_pair);
+        public_keys.push(public_key);
+      }
+
+      let message = String::from("message");
+
+      let msig = schnorr_multisig_sign::<String, G>(&key_pairs, &message);
+
+      let res = schnorr_multisig_verify::<String, G>(&public_keys, &message, &msig);
+      assert!(res.is_ok());
+
+      let wrong_msig: SchnorrMultiSignature<G> =
+        SchnorrMultiSignature(vec![
+                                SchnorrSignature((<G as Group>::get_identity(),
+                                                  <G as GroupArithmetic>::S::one()));
+                                3
+                              ]);
+      let res = schnorr_multisig_verify::<String, G>(&public_keys, &message, &wrong_msig);
+      assert!(res.is_err());
+
+      let wrong_message = String::from("wrong_message");
+      let res = schnorr_multisig_verify::<String, G>(&public_keys, &wrong_message, &msig);
+      assert!(res.is_err());
+    }
+
+    #[test]
+    fn schnorr_multi_sig_over_jubjub() {
+      check_schnorr_multisig::<JubjubGroup>();
+    }
   }
 }
