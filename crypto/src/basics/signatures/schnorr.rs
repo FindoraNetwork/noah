@@ -8,8 +8,8 @@
 //!
 //! At a high level the scheme works as follows:
 //! * `key_gen()` => sample a random scalar `x` and compute `X=g^x` where `g` is some group generator. Return return the key pair `(x,X)`
-//! * `sign(m,sk)` => sample a random scalar `r` and compute `R=g^r`. Compute scalars `c=H(X,m)` and `s=r+cx`. Return `(R,s)`
-//! * `verify(m,pk,sig)` => parse `sig` as `(R,s)`. Compute `c=H(X,m)`. Check that `R.X^c == g^s`.
+//! * `sign(m,sk)` => sample a random scalar `r` and compute `R=g^r`. Compute scalars `c=H(X,R,m)` and `s=r+cx`. Return `(R,s)`
+//! * `verify(m,pk,sig)` => parse `sig` as `(R,s)`. Compute `c=H(X,R,m)`. Check that `R.X^c == g^s`.
 
 use algebra::groups::{Group, Scalar, ScalarArithmetic};
 use digest::Digest;
@@ -156,7 +156,7 @@ pub fn schnorr_multisig_sign<B: AsRef<[u8]>, G: Group>(signing_keys: &[SchnorrKe
 /// * `pk` -  public key
 /// * `msg` - message
 /// * `sig` - signature
-/// * `returns` - Nothing if the verification succeeds, or an error otherwise
+/// * `returns` - Nothing if the verification succeeds, an error otherwise
 #[allow(non_snake_case)]
 pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
                                                 msg: &B,
@@ -187,7 +187,7 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
 /// * `public_keys` - list of public keys. Note that the order of the public keys must correspond to the order of the signing keys used to produce the multi-signature
 /// * `msg` - message
 /// * `msig` - multi signature
-/// * `returns` - Nothing if the verification succeeds, or an error otherwise
+/// * `returns` - Nothing if the verification succeeds, an error otherwise
 pub fn schnorr_multisig_verify<B: AsRef<[u8]>, G: Group>(public_keys: &[SchnorrPublicKey<G>],
                                                          msg: &B,
                                                          msig: &SchnorrMultiSignature<G>)
