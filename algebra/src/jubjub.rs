@@ -121,6 +121,21 @@ impl Scalar for JubjubScalar {
     }
     Ok(JubjubScalar(scalar.unwrap()))
   }
+
+  fn from_bytes_safe(bytes: &[u8]) -> JubjubScalar {
+    let scalar = Self::from_bytes(&bytes);
+    match scalar {
+      Ok(scalar) => scalar,
+      _ => {
+        // Reduce to the modulus
+        let mut array = [0u8; 64];
+        let padding = [0u8; 32];
+        array.copy_from_slice(&[bytes, &padding].concat());
+        let scalar = Fr::from_bytes_wide(&array);
+        JubjubScalar(scalar)
+      }
+    }
+  }
 }
 
 impl Eq for JubjubGroup {}

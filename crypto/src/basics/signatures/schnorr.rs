@@ -1,14 +1,29 @@
 use algebra::groups::{Group, Scalar, ScalarArithmetic};
-use rand_core::{CryptoRng, RngCore};
+use digest::Digest;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
+use sha2::Sha512;
 use utils::errors::ZeiError;
 
-use digest::Digest;
-use sha2::Sha512;
+// TODO use ::zeroize::Zeroize where needed
 
-pub struct SchnorrSecretKey<G: Group>(G::S);
+pub type SchnorrNonce = [u8; 32];
+
+pub struct SchnorrSecretKey<G: Group> {
+  pub(crate) key: G::S,
+  pub(crate) nonce: SchnorrNonce,
+}
+
+impl<G: Group> SchnorrSecretKey<G> {
+  pub fn new(key: G::S, nonce: SchnorrNonce) -> SchnorrSecretKey<G> {
+    SchnorrSecretKey { key, nonce }
+  }
+}
+
 pub struct SchnorrPublicKey<G: Group>(G);
 pub struct SchnorrKeyPair<G: Group>(SchnorrSecretKey<G>, SchnorrPublicKey<G>);
 pub struct SchnorrSignature<G: Group>((G, G::S));
+
+// TODO document
 
 // TODO from_bytes, to_bytes
 
@@ -17,12 +32,15 @@ pub struct SchnorrSignature<G: Group>((G, G::S));
 pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> SchnorrKeyPair<G> {
   // Private key
   let alpha = G::S::random(prng);
+  // Secret nonce:
+  let mut nonce = [0u8; 32];
+  prng.fill_bytes(&mut nonce);
 
   // Public key
   let base = G::get_base();
   let u = base.mul(&alpha);
 
-  SchnorrKeyPair(SchnorrSecretKey(alpha), SchnorrPublicKey(u))
+  SchnorrKeyPair(SchnorrSecretKey::new(alpha, nonce), SchnorrPublicKey(u))
 }
 
 fn hash_commitment_and_message<G: Group, B: AsRef<[u8]>>(public_key: &SchnorrPublicKey<G>,
@@ -37,22 +55,41 @@ fn hash_commitment_and_message<G: Group, B: AsRef<[u8]>>(public_key: &SchnorrPub
   G::S::from_hash(hasher)
 }
 
+//TODO check this below
+
+/// Deterministic computation of a scalar based on the secret nonce of the private key.
+/// This is to avoid attacks due to bad implementation of prng involving the generation
+/// of the commitment in the signature.
+/// See RFC 6979 https://www.hjp.at/doc/rfc/rfc6979.html
+fn deterministic_scalar_gen<G: Group, R: CryptoRng + RngCore + SeedableRng<Seed = SchnorrNonce>>(
+  secret_key: &SchnorrSecretKey<G>)
+  -> G::S {
+  let mut scalar_bytes = [0u8; 32];
+  let mut seed = [0u8; 32];
+  seed.copy_from_slice(&secret_key.nonce[..]);
+  let mut prng = R::from_seed(seed);
+  prng.fill_bytes(&mut scalar_bytes);
+
+  G::S::from_bytes_safe(&scalar_bytes)
+}
+
 #[allow(clippy::many_single_char_names)]
 #[allow(non_snake_case)]
-pub fn schnorr_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>, G: Group>(prng: &mut R,
-                                                                      signing_key: &SchnorrKeyPair<G>,
-                                                                      message: &B)
-                                                                      -> SchnorrSignature<G> {
+pub fn schnorr_sign<R: CryptoRng + RngCore + SeedableRng<Seed = SchnorrNonce>,
+                    B: AsRef<[u8]>,
+                    G: Group>(
+  signing_key: &SchnorrKeyPair<G>,
+  message: &B)
+  -> SchnorrSignature<G> {
   let g = G::get_base();
-  let r = G::S::random(prng);
+  let r = deterministic_scalar_gen::<G, R>(&signing_key.0);
   let R = g.mul(&r);
 
   let public_key = &signing_key.1;
   let c: G::S = hash_commitment_and_message::<G, B>(&public_key, &R, message);
-  let private_key = &(signing_key.0).0;
+  let private_key = &(signing_key.0).key;
   let s: G::S = r.add(&c.mul(private_key));
 
-  // TODO use ::zeroize::Zeroize::zeroize(&mut u); How to test this?
   SchnorrSignature((R, s))
 }
 
@@ -83,7 +120,6 @@ mod schnorr_sig {
   };
   use algebra::groups::{Group, GroupArithmetic, One};
   use algebra::jubjub::JubjubGroup;
-  use algebra::ristretto::RistrettoPoint;
   use rand_chacha::rand_core::SeedableRng;
   use rand_chacha::ChaCha20Rng;
 
@@ -95,7 +131,7 @@ mod schnorr_sig {
 
     let message = String::from("message");
 
-    let sig = schnorr_sign::<ChaCha20Rng, String, G>(&mut prng, &key_pair, &message);
+    let sig = schnorr_sign::<ChaCha20Rng, String, G>(&key_pair, &message);
 
     let public_key = key_pair.1;
     let res = schnorr_verify::<String, G>(&public_key, &message, &sig);
@@ -114,10 +150,5 @@ mod schnorr_sig {
   #[test]
   fn schnorr_over_jubjub() {
     check_schnorr::<JubjubGroup>();
-  }
-
-  #[test]
-  fn schnorr_over_ristretto() {
-    check_schnorr::<RistrettoPoint>();
   }
 }

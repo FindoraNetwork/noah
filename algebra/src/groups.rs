@@ -77,6 +77,11 @@ pub trait Scalar:
   // serialization
   fn to_bytes(&self) -> Vec<u8>;
   fn from_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
+
+  // returns a scalar even if the bytes represent a number bigger than the modulus
+  fn from_bytes_safe(_bytes: &[u8]) -> Self {
+    panic!("Not implemented")
+  }
 }
 
 pub trait Group:
