@@ -189,6 +189,10 @@ impl GroupArithmetic for RistrettoPoint {
   fn sub(&self, other: &RistrettoPoint) -> RistrettoPoint {
     RistrettoPoint(self.0 - other.0)
   }
+
+  fn double(&self) -> RistrettoPoint {
+    RistrettoPoint(self.0 + self.0)
+  }
 }
 
 #[cfg(test)]

@@ -213,6 +213,9 @@ impl GroupArithmetic for BLSG1 {
   fn sub(&self, other: &Self) -> BLSG1 {
     BLSG1(self.0.sub(&other.0))
   }
+  fn double(&self) -> BLSG1 {
+    BLSG1(self.0.double())
+  }
 }
 
 impl Group for BLSG2 {
@@ -267,6 +270,9 @@ impl GroupArithmetic for BLSG2 {
   fn sub(&self, other: &Self) -> BLSG2 {
     BLSG2(self.0.sub(&other.0))
   }
+  fn double(&self) -> BLSG2 {
+    BLSG2(self.0.double())
+  }
 }
 
 pub struct Bls12381;
@@ -294,6 +300,9 @@ impl GroupArithmetic for BLSGt {
   }
   fn sub(&self, other: &Self) -> Self {
     BLSGt(self.0.sub(&other.0))
+  }
+  fn double(&self) -> BLSGt {
+    BLSGt(self.0.double())
   }
 }
 

@@ -11,6 +11,7 @@ pub trait GroupArithmetic {
   fn mul(&self, scalar: &Self::S) -> Self;
   fn add(&self, other: &Self) -> Self;
   fn sub(&self, other: &Self) -> Self;
+  fn double(&self) -> Self;
 }
 
 pub trait One {
