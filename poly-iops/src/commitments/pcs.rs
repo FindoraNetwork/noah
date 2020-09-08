@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use custom_error::custom_error;
+use serde::{Deserialize, Serialize};
 
 custom_error! {#[derive(PartialEq)] pub PolyComSchemeError
     PCSProveEvalError  = "It is not possible to compute the proof as F(x) != y.",
@@ -41,6 +42,7 @@ pub trait HomomorphicPolyComElem: ToBytes {
   fn inv(&self) -> Self;
 }
 
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BatchProofEval<C, E> {
   commitment: C,
   eval_proof: E,
@@ -62,10 +64,16 @@ pub trait PolyComScheme {
   type Field: Scalar;
 
   /// Type of commitment produces, need to implement HomomorphicPolyComElem
-  type Commitment: HomomorphicPolyComElem<Scalar = Self::Field> + Debug + PartialEq + Eq + Clone;
+  type Commitment: HomomorphicPolyComElem<Scalar = Self::Field>
+    + Debug
+    + PartialEq
+    + Eq
+    + Clone
+    + Serialize
+    + for<'de> Deserialize<'de>;
 
   /// Type of EvalProof
-  type EvalProof: ToBytes;
+  type EvalProof: ToBytes + Serialize + for<'de> Deserialize<'de> + Debug + PartialEq + Eq;
 
   /// Type of Opening
   type Opening: HomomorphicPolyComElem<Scalar = Self::Field> + Debug + PartialEq + Eq + Clone;

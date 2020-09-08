@@ -772,6 +772,7 @@ dependencies = [
  "rand_core",
  "serde",
  "serde_derive",
+ "serde_json",
  "utils",
 ]
 

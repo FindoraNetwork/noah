@@ -96,6 +96,7 @@ pub mod prover {
 
   /// A PlonkProof is generic on the polynomial commitment scheme, PCS.
   /// PCS is generic in the commitment group C, the eval proof type E, and Field elements F.
+  #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
   pub struct PlonkProof<C, E, F> {
     pub(crate) C_witness_polys: Vec<C>,
     pub(crate) C_q_polys: Vec<C>, // splitted quotient polynomials
@@ -398,7 +399,7 @@ mod test {
   use crate::commitments::kzg_poly_com::KZGCommitmentScheme;
   use crate::commitments::pcs::PolyComScheme;
   use crate::plonk::plonk_setup::{preprocess_prover, preprocess_verifier, PlonkConstraintSystem};
-  use crate::plonk::protocol::prover::{prover, verifier};
+  use crate::plonk::protocol::prover::{prover, verifier, PlonkPf};
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{One, ScalarArithmetic};
   use merlin::Transcript;
@@ -437,7 +438,10 @@ mod test {
       let mut transcript = Transcript::new(b"TestPlonk");
       prover(prng, &mut transcript, pcs, &cs, &prover_params, &witness).unwrap()
     };
-
+    // test serialization
+    let proof_json = serde_json::to_string(&proof).unwrap();
+    let proof_de: PlonkPf<PCS> = serde_json::from_str(&proof_json).unwrap();
+    assert_eq!(proof, proof_de);
     {
       let verifier_params = preprocess_verifier(pcs, &cs, common_seed).unwrap();
       let mut transcript = Transcript::new(b"TestPlonk");
@@ -552,7 +556,6 @@ mod test {
              &prover_params,
              &witness).unwrap()
     };
-
     {
       let verifier_params = preprocess_verifier(&pcs, &cs, common_seed).unwrap();
       let mut transcript = Transcript::new(b"TestPlonk");
