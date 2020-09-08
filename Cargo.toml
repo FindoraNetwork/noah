@@ -2,6 +2,7 @@
 members = [
  "algebra",
  "crypto",
- "zei_api",
+ "poly-iops",
  "utils",
+ "zei_api",
 ]

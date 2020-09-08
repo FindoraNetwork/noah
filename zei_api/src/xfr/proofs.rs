@@ -152,11 +152,11 @@ impl<'a> BarMemosPoliciesCollection<'a> {
                                  policies }
   }
 
-  pub fn range_over(self) -> BarMemosPoliciesCollectionIterator<'a> {
+  pub fn range_over(&self) -> BarMemosPoliciesCollectionIterator<'a> {
     self.policies.iter().zip(self.bars.iter()).zip(self.memos)
   }
 
-  pub fn check(self) -> Result<(), ZeiError> {
+  pub fn check(&self) -> Result<(), ZeiError> {
     if self.policies.len() != self.bars.len() || self.bars.len() != self.memos.len() {
       Err(ZeiError::ParameterError)
     } else {
@@ -166,9 +166,9 @@ impl<'a> BarMemosPoliciesCollection<'a> {
 }
 
 fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarMemoVec<'a>>,
-                                      bmp: BarMemosPoliciesCollection<'a>)
+                                      bmp: &BarMemosPoliciesCollection<'a>)
                                       -> Result<(), ZeiError> {
-  bmp.clone().check()?;
+  bmp.check()?;
 
   for ((tracing_policies_i, bar_i), memos_i) in bmp.range_over() {
     // If the bar is non confidential skip memo and bar, since there is no tracing proof
@@ -321,7 +321,7 @@ fn collect_records_memos_by_key<'a>(
                                                                  input_reveal_policies);
   collect_bars_and_memos_by_keys(
     &mut map,
-    bars_memo_policies_input
+    &bars_memo_policies_input
   ).map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?;
 
   let bars_memo_policies_output = BarMemosPoliciesCollection::new(&xfr_body.outputs,
@@ -329,7 +329,7 @@ fn collect_records_memos_by_key<'a>(
                                                                     [inputs_len..], // only outputs
                                                                   output_reveal_policies);
   collect_bars_and_memos_by_keys( &mut map,
-  bars_memo_policies_output).map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?;
+  &bars_memo_policies_output).map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?;
   Ok(map)
 }
 

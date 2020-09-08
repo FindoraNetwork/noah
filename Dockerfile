@@ -8,6 +8,7 @@ COPY ./Cargo* /app/
 COPY ./rustfmt.toml /app/
 COPY ./algebra /app/algebra
 COPY ./crypto /app/crypto
+COPY ./poly-iops /app/poly-iops
 COPY ./utils /app/utils
 COPY ./utilities /app/utilities
 COPY ./zei_api /app/zei_api

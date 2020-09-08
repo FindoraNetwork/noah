@@ -1,9 +1,9 @@
 [package]
 name = "algebra"
 version = "0.1.0"
-authors = ["fernando@findora.org, philippe@findora.org"]
+authors = ["Findora <engineering@findora.org>"]
 edition = "2018"
-description = "Zei Algebra commons"
+description = "Zei algebra commons"
 
 [lib]
 name = "algebra"

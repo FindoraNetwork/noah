@@ -1,9 +1,9 @@
 [package]
 name = "utils"
 version = "0.1.0"
-authors = ["fernando@findora.org, philippe@findora.org"]
+authors = ["Findora <engineering@findora.org>"]
 edition = "2018"
-description = "Zei utils"
+description = "Zei utility functions"
 
 [lib]
 name = "utils"
