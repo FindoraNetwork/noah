@@ -18,8 +18,6 @@ use rand_core::{CryptoRng, RngCore};
 use sha2::Sha512;
 use utils::errors::ZeiError;
 
-// TODO use ::zeroize::Zeroize where needed
-
 const SCALAR_SIZE: usize = 32;
 
 /// A random value part of the secret key, which purpose is to make the Schnorr signature computation
