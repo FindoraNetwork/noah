@@ -27,6 +27,7 @@ const SCALAR_SIZE: usize = 32;
 /// deterministic.
 pub type SchnorrNonce = [u8; SCALAR_SIZE];
 
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct SchnorrSecretKey<S> {
   pub(crate) key: S,
   pub(crate) nonce: SchnorrNonce,
@@ -54,7 +55,7 @@ impl<G: Group> ZeiFromToBytes for SchnorrPublicKey<G> {
     }
   }
 }
-
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct SchnorrKeyPair<G, S> {
   sk: SchnorrSecretKey<S>,
   pk: SchnorrPublicKey<G>,
