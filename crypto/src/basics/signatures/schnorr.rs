@@ -242,7 +242,7 @@ pub fn schnorr_multisig_verify<B: AsRef<[u8]>, G: Group>(public_keys: &[SchnorrP
                                                          msg: &B,
                                                          msig: &SchnorrMultiSignature<G>)
                                                          -> Result<(), ZeiError> {
-  if public_keys.len() != msig.0.len() {
+  if public_keys.len() != msig.0.len() || public_keys.is_empty() {
     return Err(ZeiError::ParameterError);
   }
 
@@ -383,6 +383,11 @@ mod schnorr_sigs {
 
       let too_short_multi_sig = SchnorrMultiSignature(msig.0.clone()[0..2].to_vec());
       let res = schnorr_multisig_verify::<String, G>(&public_keys, &message, &too_short_multi_sig);
+      assert_eq!(res, Err(ZeiError::ParameterError));
+
+      let empty_msig = SchnorrMultiSignature(vec![]);
+      let empty_public_keys = vec![];
+      let res = schnorr_multisig_verify::<String, G>(&empty_public_keys, &message, &empty_msig);
       assert_eq!(res, Err(ZeiError::ParameterError));
     }
 
