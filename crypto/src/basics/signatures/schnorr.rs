@@ -15,6 +15,7 @@ use algebra::groups::{Group, Scalar, ScalarArithmetic};
 use digest::Digest;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use utils::errors::ZeiError;
 
@@ -35,8 +36,8 @@ impl<G: Group> SchnorrSecretKey<G> {
   }
 }
 
-#[derive(Clone, Debug)]
-pub struct SchnorrPublicKey<G: Group>(G);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SchnorrPublicKey<G>(G);
 
 impl<G: Group> SchnorrPublicKey<G> {
   pub fn to_bytes(&self) -> Vec<u8> {
@@ -49,12 +50,6 @@ impl<G: Group> SchnorrPublicKey<G> {
       Ok(g) => Ok(SchnorrPublicKey(g)),
       _ => Err(ZeiError::ParameterError),
     }
-  }
-}
-
-impl<G: Group> PartialEq for SchnorrPublicKey<G> {
-  fn eq(&self, other: &Self) -> bool {
-    self.to_bytes() == other.to_bytes()
   }
 }
 
