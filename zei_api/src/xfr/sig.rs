@@ -1,9 +1,8 @@
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use ed25519_dalek::SecretKey; // remove when v1.0.0-pre.4 is ready in platform dependencies
-use ed25519_dalek::Signature;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey};
+use ed25519_dalek::{SecretKey, Signature, Verifier};
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;

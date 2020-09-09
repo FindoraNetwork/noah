@@ -777,8 +777,8 @@ mod turbo_plonk_proofs_test {
   use crate::plonk::turbo_plonk_cs::rescue::State;
   use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
   use algebra::bls12_381::BLSScalar;
-  use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
-  use jubjub::{AffinePoint, ExtendedPoint, Fq as JubjubField};
+  use algebra::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
+  use algebra::jubjub::JubjubGroup;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::{CryptoRng, RngCore, SeedableRng};
@@ -884,13 +884,7 @@ mod turbo_plonk_proofs_test {
     let scalar_bytes: [u8; 32] = [47, 113, 87, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
-    let generator: AffinePoint =
-      AffinePoint::from_raw_unchecked(JubjubField::from_raw([0xe4b3_d35d_f1a7_adfe,
-                                                             0xcaf5_5d1b_29bf_81af,
-                                                             0x8b0f_03dd_d60a_8187,
-                                                             0x62ed_cbb8_bf37_87c8]),
-                                      JubjubField::from_raw([0xb, 0x0, 0x0, 0x0]));
-    let base_ext = ExtendedPoint::from(generator);
+    let base_ext = JubjubGroup::get_base();
 
     // The circuit: P = [scalar] * G
     let scalar_var = cs.new_variable(scalar);

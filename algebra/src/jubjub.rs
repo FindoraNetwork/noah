@@ -1,3 +1,4 @@
+use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::groups::GroupArithmetic;
 use crate::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
@@ -183,6 +184,22 @@ impl GroupArithmetic for JubjubGroup {
   }
   fn sub(&self, other: &Self) -> JubjubGroup {
     JubjubGroup(self.0 - other.0)
+  }
+  fn double(&self) -> JubjubGroup {
+    JubjubGroup(self.0.double())
+  }
+}
+
+impl JubjubGroup {
+  /// Get the x-coordinate of the Jubjub affine point.
+  pub fn get_x(&self) -> BLSScalar {
+    let affine_point = AffinePoint::from(&self.0);
+    BLSScalar::new(affine_point.get_u())
+  }
+  /// Get the y-coordinate of the Jubjub affine point.
+  pub fn get_y(&self) -> BLSScalar {
+    let affine_point = AffinePoint::from(&self.0);
+    BLSScalar::new(affine_point.get_v())
   }
 }
 

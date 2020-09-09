@@ -118,9 +118,10 @@ impl<F: Scalar> HomomorphicPolyComElem for FpPolynomial<F> {
   }
 }
 
-pub struct KZGEvalProof<P: Pairing>(P::G1);
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct KZGEvalProof<G1>(G1);
 
-impl<P: Pairing> ToBytes for KZGEvalProof<P> {
+impl<G: Group> ToBytes for KZGEvalProof<G> {
   fn to_bytes(&self) -> Vec<u8> {
     self.0.to_compressed_bytes()
   }
@@ -161,7 +162,7 @@ pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<Bls12381>;
 impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
   type Field = BLSScalar;
   type Commitment = KZGCommitment<BLSG1>;
-  type EvalProof = KZGEvalProof<Bls12381>;
+  type EvalProof = KZGEvalProof<BLSG1>;
   type Opening = FpPolynomial<Self::Field>;
 
   fn commit(&self,
@@ -236,7 +237,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 
     let proof_value = self.commit(quotient_polynomial).unwrap().0.value;
 
-    let res = (evaluation, KZGEvalProof::<algebra::bls12_381::Bls12381>(proof_value));
+    let res = (evaluation, KZGEvalProof::<algebra::bls12_381::BLSG1>(proof_value));
     Ok(res)
   }
 
