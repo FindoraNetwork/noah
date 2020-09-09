@@ -1,4 +1,6 @@
 pub mod mimc;
+pub mod rescue;
+pub mod rescue_bls12_381;
 
 pub trait MTHash {
   type S;

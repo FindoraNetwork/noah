@@ -9,7 +9,7 @@
 //      2.1 Inject the messages into the state: s := s + (m_{i*w}||...||m_{i*w+w-1})
 //      2.2 Permute the state: s := p(s)
 // 3. Return s_0.
-use crate::basics::hash::rescue::RescueInstance;
+use crate::basics::hash_functions::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Scalar;
 
@@ -52,7 +52,7 @@ impl PRF<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-  use crate::basics::hash::rescue::RescueInstance;
+  use crate::basics::hash_functions::rescue::RescueInstance;
   use crate::basics::prf::PRF;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{Scalar, ScalarArithmetic};
