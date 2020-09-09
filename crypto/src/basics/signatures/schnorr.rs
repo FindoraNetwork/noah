@@ -113,10 +113,10 @@ pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> Schno
 }
 
 /// The challenge is computed from the transcript
-fn compute_challenge<G: Group>(t: &mut Transcript) -> G::S {
+fn compute_challenge<S: Scalar>(t: &mut Transcript) -> S {
   let mut c_bytes = [0_u8; SCALAR_SIZE];
   t.challenge_bytes(b"c", &mut c_bytes);
-  G::S::from_bytes_safe(&c_bytes)
+  S::from_bytes_safe(&c_bytes)
 }
 
 /// Deterministic computation of a scalar based on the secret nonce of the private key.
@@ -161,7 +161,7 @@ pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
   transcript.append_message(b"public key", &public_key.zei_to_bytes());
   transcript.append_message(b"R", &R.to_compressed_bytes());
 
-  let c: G::S = compute_challenge::<G>(&mut transcript);
+  let c: G::S = compute_challenge::<G::S>(&mut transcript);
 
   let private_key = &(signing_key.0).key;
   let s: G::S = r.add(&c.mul(private_key));
@@ -202,7 +202,7 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
   transcript.append_message(b"public key", &pk.clone().zei_to_bytes());
   transcript.append_message(b"R", &sig.R.to_compressed_bytes());
 
-  let c = compute_challenge::<G>(&mut transcript);
+  let c = compute_challenge::<G::S>(&mut transcript);
 
   let left = sig.R.add(&pk.0.mul(&c));
   let right = g.mul(&sig.s);
