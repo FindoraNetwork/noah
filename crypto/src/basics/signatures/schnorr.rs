@@ -64,6 +64,34 @@ pub struct SchnorrSignature<G: Group> {
   s: G::S,
 }
 
+/// Transcript functions
+pub trait SchnorrTranscript {
+  fn update_transcript_with_sig_info<B: AsRef<[u8]>, G: Group>(&mut self,
+                                                               msg: &B,
+                                                               pk: &SchnorrPublicKey<G>,
+                                                               commitment: &G);
+
+  fn compute_challenge<S: Scalar>(&mut self) -> S;
+}
+
+impl SchnorrTranscript for Transcript {
+  fn update_transcript_with_sig_info<B: AsRef<[u8]>, G: Group>(&mut self,
+                                                               msg: &B,
+                                                               pk: &SchnorrPublicKey<G>,
+                                                               commitment: &G) {
+    self.append_message(b"message", msg.as_ref());
+    self.append_message(b"public key", &pk.clone().zei_to_bytes());
+    self.append_message(b"R", &commitment.to_compressed_bytes());
+  }
+
+  /// The challenge is computed from the transcript
+  fn compute_challenge<S: Scalar>(&mut self) -> S {
+    let mut c_bytes = [0_u8; SCALAR_SIZE];
+    self.challenge_bytes(b"c", &mut c_bytes);
+    S::from_bytes_safe(&c_bytes)
+  }
+}
+
 #[allow(non_snake_case)]
 impl<G: Group> ZeiFromToBytes for SchnorrSignature<G> {
   fn zei_to_bytes(&self) -> Vec<u8> {
@@ -112,13 +140,6 @@ pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> Schno
   SchnorrKeyPair(SchnorrSecretKey::new(alpha, nonce), SchnorrPublicKey(u))
 }
 
-/// The challenge is computed from the transcript
-fn compute_challenge<S: Scalar>(t: &mut Transcript) -> S {
-  let mut c_bytes = [0_u8; SCALAR_SIZE];
-  t.challenge_bytes(b"c", &mut c_bytes);
-  S::from_bytes_safe(&c_bytes)
-}
-
 /// Deterministic computation of a scalar based on the secret nonce of the private key.
 /// This is to avoid attacks due to bad implementation of prng involving the generation
 /// of the commitment in the signature.
@@ -145,23 +166,19 @@ fn deterministic_scalar_gen<G: Group>(message: &[u8], sk: &SchnorrSecretKey<G>) 
 /// * `message` - sequence of bytes to be signed
 /// * `returns` - a Schnorr signature
 pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
-                                              message: &B)
+                                              msg: &B)
                                               -> SchnorrSignature<G> {
   let mut transcript = Transcript::new(b"schnorr_sig");
 
-  // Note the message must be part of the transcript before computing other values, in particular the challenge `c`
-  transcript.append_message(b"message", message.as_ref());
-
   let g = G::get_base();
-  let r = deterministic_scalar_gen::<G>(message.as_ref(), &signing_key.0);
+  let r = deterministic_scalar_gen::<G>(msg.as_ref(), &signing_key.0);
 
   let R = g.mul(&r);
-  let public_key = &signing_key.1;
+  let pk = &signing_key.1;
 
-  transcript.append_message(b"public key", &public_key.zei_to_bytes());
-  transcript.append_message(b"R", &R.to_compressed_bytes());
+  transcript.update_transcript_with_sig_info::<B, G>(msg, &pk, &R);
 
-  let c: G::S = compute_challenge::<G::S>(&mut transcript);
+  let c = transcript.compute_challenge::<G::S>();
 
   let private_key = &(signing_key.0).key;
   let s: G::S = r.add(&c.mul(private_key));
@@ -195,14 +212,12 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
                                                 sig: &SchnorrSignature<G>)
                                                 -> Result<(), ZeiError> {
   let mut transcript = Transcript::new(b"schnorr_sig");
-  transcript.append_message(b"message", msg.as_ref());
 
   let g = G::get_base();
 
-  transcript.append_message(b"public key", &pk.clone().zei_to_bytes());
-  transcript.append_message(b"R", &sig.R.to_compressed_bytes());
+  transcript.update_transcript_with_sig_info(msg, pk, &sig.R);
 
-  let c = compute_challenge::<G::S>(&mut transcript);
+  let c = transcript.compute_challenge::<G::S>();
 
   let left = sig.R.add(&pk.0.mul(&c));
   let right = g.mul(&sig.s);
