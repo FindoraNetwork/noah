@@ -261,6 +261,7 @@ mod schnorr_sigs {
     };
     use algebra::groups::{Group, GroupArithmetic, One};
     use algebra::jubjub::JubjubGroup;
+    use algebra::ristretto::RistrettoPoint;
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use utils::serialization::ZeiFromToBytes;
@@ -294,6 +295,11 @@ mod schnorr_sigs {
       check_schnorr::<JubjubGroup>();
     }
 
+    #[test]
+    fn schnorr_sig_over_ristretto() {
+      check_schnorr::<RistrettoPoint>();
+    }
+
     fn check_from_to_bytes<G: Group>() {
       let seed = [0_u8; SCALAR_SIZE];
       let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
@@ -317,6 +323,11 @@ mod schnorr_sigs {
     pub fn schnorr_from_to_bytes() {
       check_from_to_bytes::<JubjubGroup>();
     }
+
+    #[test]
+    pub fn ristretto_from_to_bytes() {
+      check_from_to_bytes::<RistrettoPoint>();
+    }
   }
 
   #[cfg(test)]
@@ -329,6 +340,7 @@ mod schnorr_sigs {
     use algebra::groups::{Group, GroupArithmetic, One};
 
     use algebra::jubjub::JubjubGroup;
+    use algebra::ristretto::RistrettoPoint;
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
@@ -369,6 +381,11 @@ mod schnorr_sigs {
     #[test]
     fn schnorr_multi_sig_over_jubjub() {
       check_schnorr_multisig::<JubjubGroup>();
+    }
+
+    #[test]
+    fn schnorr_multi_sig_over_ristretto() {
+      check_schnorr_multisig::<RistrettoPoint>();
     }
   }
 }
