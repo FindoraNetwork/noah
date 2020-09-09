@@ -242,6 +242,10 @@ pub fn schnorr_multisig_verify<B: AsRef<[u8]>, G: Group>(public_keys: &[SchnorrP
                                                          msg: &B,
                                                          msig: &SchnorrMultiSignature<G>)
                                                          -> Result<(), ZeiError> {
+  if public_keys.len() != msig.0.len() {
+    return Err(ZeiError::ParameterError);
+  }
+
   for (pk, sig) in public_keys.iter().zip(msig.0.clone()) {
     schnorr_verify(&pk, msg, &sig)?;
   }
@@ -342,6 +346,7 @@ mod schnorr_sigs {
     use algebra::ristretto::RistrettoPoint;
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaCha20Rng;
+    use utils::errors::ZeiError;
 
     fn check_schnorr_multisig<G: Group>() {
       let seed = [0_u8; SCALAR_SIZE];
@@ -374,7 +379,11 @@ mod schnorr_sigs {
 
       let wrong_message = String::from("wrong_message");
       let res = schnorr_multisig_verify::<String, G>(&public_keys, &wrong_message, &msig);
-      assert!(res.is_err());
+      assert_eq!(res, Err(ZeiError::ArgumentVerificationError));
+
+      let too_short_multi_sig = SchnorrMultiSignature(msig.0.clone()[0..2].to_vec());
+      let res = schnorr_multisig_verify::<String, G>(&public_keys, &message, &too_short_multi_sig);
+      assert_eq!(res, Err(ZeiError::ParameterError));
     }
 
     #[test]
