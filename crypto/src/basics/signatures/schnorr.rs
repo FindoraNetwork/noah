@@ -35,23 +35,63 @@ impl<G: Group> SchnorrSecretKey<G> {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SchnorrPublicKey<G: Group>(G);
 
 impl<G: Group> SchnorrPublicKey<G> {
   pub fn to_bytes(&self) -> Vec<u8> {
     self.0.to_compressed_bytes()
   }
+  pub fn from_bytes(bytes: &[u8]) -> Result<SchnorrPublicKey<G>, ZeiError> {
+    let group_element = G::from_compressed_bytes(bytes);
+
+    match group_element {
+      Ok(g) => Ok(SchnorrPublicKey(g)),
+      _ => Err(ZeiError::ParameterError),
+    }
+  }
+}
+
+impl<G: Group> PartialEq for SchnorrPublicKey<G> {
+  fn eq(&self, other: &Self) -> bool {
+    self.to_bytes() == other.to_bytes()
+  }
 }
 
 pub struct SchnorrKeyPair<G: Group>(SchnorrSecretKey<G>, SchnorrPublicKey<G>);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[allow(non_snake_case)]
 /// A Schnorr signature is composed by some group element R and some scalar s
 pub struct SchnorrSignature<G: Group> {
   R: G,
   s: G::S,
+}
+
+#[allow(non_snake_case)]
+impl<G: Group> SchnorrSignature<G> {
+  pub fn to_bytes(&self) -> (Vec<u8>, Vec<u8>) {
+    let group_element_to_bytes = self.R.to_compressed_bytes();
+    let scalar_to_bytes = self.s.to_bytes();
+    (group_element_to_bytes, scalar_to_bytes)
+  }
+
+  pub fn from_bytes(bytes_repr: &(Vec<u8>, Vec<u8>)) -> Result<SchnorrSignature<G>, ZeiError> {
+    let R = G::from_compressed_bytes(&bytes_repr.0);
+    if R.is_err() {
+      return Err(ZeiError::ParameterError);
+    }
+    let R = R.unwrap(); // safe unwrap()
+    let s = G::S::from_bytes_safe(&bytes_repr.1);
+
+    Ok(SchnorrSignature { R, s })
+  }
+}
+
+impl<G: Group> PartialEq for SchnorrSignature<G> {
+  fn eq(&self, other: &Self) -> bool {
+    self.to_bytes() == other.to_bytes()
+  }
 }
 
 /// In this naive implementation a multi signature is a list
@@ -111,7 +151,6 @@ fn deterministic_scalar_gen<G: Group>(message: &[u8], key_pair: &SchnorrKeyPair<
 pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
                                               message: &B)
                                               -> SchnorrSignature<G> {
-  // TODO handle errors
   let mut transcript = Transcript::new(b"schnorr_sig");
 
   // Note the message must be part of the transcript before computing other values, in particular the challenge `c`
@@ -140,7 +179,6 @@ pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
 pub fn schnorr_multisig_sign<B: AsRef<[u8]>, G: Group>(signing_keys: &[SchnorrKeyPair<G>],
                                                        message: &B)
                                                        -> SchnorrMultiSignature<G> {
-  // TODO handle errors?
   let mut signatures = vec![];
 
   for signing_key in signing_keys {
@@ -168,7 +206,6 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
   transcript.append_message(b"public key", &pk.clone().to_bytes());
   transcript.append_message(b"R", &sig.R.to_compressed_bytes());
 
-  // TODO check scalar see https://github.com/w3f/schnorrkel/blob/cfdbe9ae865a4d3ffa2566d896d4dbedf5107028/src/sign.rs#L66
   let c = compute_challenge::<G>(&mut transcript);
 
   let left = sig.R.add(&pk.0.mul(&c));
@@ -182,7 +219,8 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
 }
 
 /// Verifies a multi-signature given a list of public keys and a message
-/// * `public_keys` - list of public keys. Note that the order of the public keys must correspond to the order of the signing keys used to produce the multi-signature
+/// * `public_keys` - list of public keys. Note that the order of the public keys must correspond
+/// to the order of the signing keys used to produce the multi-signature
 /// * `msg` - message
 /// * `msig` - multi signature
 /// * `returns` - Nothing if the verification succeeds, an error otherwise
@@ -203,7 +241,8 @@ mod schnorr_sigs {
   mod schnorr_simple_sig {
 
     use crate::basics::signatures::schnorr::{
-      schnorr_gen_keys, schnorr_sign, schnorr_verify, SchnorrKeyPair, SchnorrSignature, SCALAR_SIZE,
+      schnorr_gen_keys, schnorr_sign, schnorr_verify, SchnorrKeyPair, SchnorrPublicKey,
+      SchnorrSignature, SCALAR_SIZE,
     };
     use algebra::groups::{Group, GroupArithmetic, One};
     use algebra::jubjub::JubjubGroup;
@@ -237,6 +276,30 @@ mod schnorr_sigs {
     #[test]
     fn schnorr_sig_over_jubjub() {
       check_schnorr::<JubjubGroup>();
+    }
+
+    fn check_from_to_bytes<G: Group>() {
+      let seed = [0_u8; SCALAR_SIZE];
+      let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+      let key_pair: SchnorrKeyPair<G> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+      let message = String::from("message");
+      let sig = schnorr_sign::<String, G>(&key_pair, &message);
+      let public_key = key_pair.1;
+
+      // Public key
+      let public_key_bytes = public_key.to_bytes();
+      let public_key_from_bytes = SchnorrPublicKey::from_bytes(&public_key_bytes).unwrap();
+      assert_eq!(public_key, public_key_from_bytes);
+
+      // Signature
+      let signature_bytes = sig.to_bytes();
+      let signature_from_bytes = SchnorrSignature::from_bytes(&signature_bytes).unwrap();
+      assert_eq!(sig, signature_from_bytes);
+    }
+
+    #[test]
+    pub fn schnorr_from_to_bytes() {
+      check_from_to_bytes::<JubjubGroup>();
     }
   }
 
