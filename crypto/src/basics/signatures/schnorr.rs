@@ -27,13 +27,13 @@ const SCALAR_SIZE: usize = 32;
 /// deterministic.
 pub type SchnorrNonce = [u8; SCALAR_SIZE];
 
-pub struct SchnorrSecretKey<G: Group> {
-  pub(crate) key: G::S,
+pub struct SchnorrSecretKey<S> {
+  pub(crate) key: S,
   pub(crate) nonce: SchnorrNonce,
 }
 
-impl<G: Group> SchnorrSecretKey<G> {
-  pub fn new(key: G::S, nonce: SchnorrNonce) -> SchnorrSecretKey<G> {
+impl<S: Scalar> SchnorrSecretKey<S> {
+  pub fn new(key: S, nonce: SchnorrNonce) -> SchnorrSecretKey<S> {
     SchnorrSecretKey { key, nonce }
   }
 }
@@ -55,7 +55,7 @@ impl<G: Group> ZeiFromToBytes for SchnorrPublicKey<G> {
   }
 }
 
-pub struct SchnorrKeyPair<G: Group>(SchnorrSecretKey<G>, SchnorrPublicKey<G>);
+pub struct SchnorrKeyPair<G, S>(SchnorrSecretKey<S>, SchnorrPublicKey<G>);
 
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
@@ -130,7 +130,7 @@ pub struct SchnorrMultiSignature<G: Group>(Vec<SchnorrSignature<G>>);
 /// Generates a key pair for the Schnorr signature scheme
 /// * `prng` - pseudo-random generator
 /// * `returns` - a key pair
-pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> SchnorrKeyPair<G> {
+pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> SchnorrKeyPair<G, G::S> {
   // Private key
   let alpha = G::S::random(prng);
   // Secret nonce:
@@ -152,13 +152,12 @@ pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> Schno
 /// Note that the transcript is not involved here as the verifier has no access to the
 /// secret nonce.
 /// * `message` - message to be signed. Needed to make the scalar unique
-/// * `sk` - Schnorr secret key that contains the nonce.
-fn deterministic_scalar_gen<G: Group>(message: &[u8], sk: &SchnorrSecretKey<G>) -> G::S {
+/// * `nonce` - nonce from the Schnorr secret key.
+fn deterministic_scalar_gen<G: Group>(message: &[u8], nonce: &SchnorrNonce) -> G::S {
   let mut hasher = Sha512::new();
 
-  let secret_nonce = &sk.nonce;
   hasher.input(message);
-  hasher.input(secret_nonce);
+  hasher.input(nonce);
 
   G::S::from_hash(hasher)
 }
@@ -169,13 +168,13 @@ fn deterministic_scalar_gen<G: Group>(message: &[u8], sk: &SchnorrSecretKey<G>) 
 /// * `signing_key` - key pair. Having both public and private key makes the signature computation more efficient
 /// * `message` - sequence of bytes to be signed
 /// * `returns` - a Schnorr signature
-pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
+pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G, G::S>,
                                               msg: &B)
                                               -> SchnorrSignature<G> {
   let mut transcript = Transcript::new(b"schnorr_sig");
 
   let g = G::get_base();
-  let r = deterministic_scalar_gen::<G>(msg.as_ref(), &signing_key.0);
+  let r = deterministic_scalar_gen::<G>(msg.as_ref(), &signing_key.0.nonce);
 
   let R = g.mul(&r);
   let pk = &signing_key.1;
@@ -193,7 +192,8 @@ pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
 /// Computes a signature with key pairs sk_1, sk_2,...,sk_n on a message m
 /// * `signing_keys` - list of key pairs
 /// * `message` - message to be signed
-pub fn schnorr_multisig_sign<B: AsRef<[u8]>, G: Group>(signing_keys: &[SchnorrKeyPair<G>],
+pub fn schnorr_multisig_sign<B: AsRef<[u8]>, G: Group>(signing_keys: &[SchnorrKeyPair<G,
+                                                                        G::S>],
                                                        message: &B)
                                                        -> SchnorrMultiSignature<G> {
   let mut signatures = vec![];
@@ -269,7 +269,7 @@ mod schnorr_sigs {
       let seed = [0_u8; SCALAR_SIZE];
       let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
 
-      let key_pair: SchnorrKeyPair<G> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+      let key_pair: SchnorrKeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
 
       let message = String::from("message");
 
@@ -297,7 +297,7 @@ mod schnorr_sigs {
     fn check_from_to_bytes<G: Group>() {
       let seed = [0_u8; SCALAR_SIZE];
       let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-      let key_pair: SchnorrKeyPair<G> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+      let key_pair: SchnorrKeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
       let message = String::from("message");
       let sig = schnorr_sign::<String, G>(&key_pair, &message);
       let public_key = key_pair.1;
@@ -340,7 +340,7 @@ mod schnorr_sigs {
       let mut key_pairs = vec![];
       let mut public_keys = vec![];
       for _i in 0..NUMBER_OF_KEYS {
-        let key_pair: SchnorrKeyPair<G> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+        let key_pair: SchnorrKeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
         let public_key = key_pair.1.clone();
         key_pairs.push(key_pair);
         public_keys.push(public_key);
