@@ -55,7 +55,10 @@ impl<G: Group> ZeiFromToBytes for SchnorrPublicKey<G> {
   }
 }
 
-pub struct SchnorrKeyPair<G, S>(SchnorrSecretKey<S>, SchnorrPublicKey<G>);
+pub struct SchnorrKeyPair<G, S> {
+  sk: SchnorrSecretKey<S>,
+  pk: SchnorrPublicKey<G>,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
@@ -135,7 +138,8 @@ pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> Schno
   let base = G::get_base();
   let u = base.mul(&alpha);
 
-  SchnorrKeyPair(SchnorrSecretKey::new(alpha, nonce), SchnorrPublicKey(u))
+  SchnorrKeyPair { sk: SchnorrSecretKey::new(alpha, nonce),
+                   pk: SchnorrPublicKey(u) }
 }
 
 /// Deterministic computation of a scalar based on the secret nonce of the private key.
@@ -168,16 +172,16 @@ pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G, G:
   let mut transcript = Transcript::new(b"schnorr_sig");
 
   let g = G::get_base();
-  let r = deterministic_scalar_gen::<G>(msg.as_ref(), &signing_key.0.nonce);
+  let r = deterministic_scalar_gen::<G>(msg.as_ref(), &signing_key.sk.nonce);
 
   let R = g.mul(&r);
-  let pk = &signing_key.1;
+  let pk = &signing_key.pk;
 
   transcript.update_transcript_with_sig_info::<B, G>(msg, &pk, &R);
 
   let c = transcript.compute_challenge::<G::S>();
 
-  let private_key = &(signing_key.0).key;
+  let private_key = &(signing_key.sk).key;
   let s: G::S = r.add(&c.mul(private_key));
 
   SchnorrSignature { R, s }
@@ -270,7 +274,7 @@ mod schnorr_sigs {
 
       let sig = schnorr_sign::<String, G>(&key_pair, &message);
 
-      let public_key = key_pair.1;
+      let public_key = key_pair.pk;
       let res = schnorr_verify::<String, G>(&public_key, &message, &sig);
       assert!(res.is_ok());
 
@@ -300,7 +304,7 @@ mod schnorr_sigs {
       let key_pair: SchnorrKeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
       let message = String::from("message");
       let sig = schnorr_sign::<String, G>(&key_pair, &message);
-      let public_key = key_pair.1;
+      let public_key = key_pair.pk;
 
       // Public key
       let public_key_bytes = public_key.zei_to_bytes();
@@ -347,7 +351,7 @@ mod schnorr_sigs {
       let mut public_keys = vec![];
       for _i in 0..NUMBER_OF_KEYS {
         let key_pair: SchnorrKeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
-        let public_key = key_pair.1.clone();
+        let public_key = key_pair.pk.clone();
         key_pairs.push(key_pair);
         public_keys.push(public_key);
       }
