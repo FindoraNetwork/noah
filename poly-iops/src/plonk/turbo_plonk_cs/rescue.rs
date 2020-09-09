@@ -2,7 +2,7 @@ use crate::ioputils::u8_lsf_slice_to_u64_lsf_le_vec;
 use crate::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{One, ScalarArithmetic, Zero};
-use crypto::basics::hash_functions::rescue::RescueInstance;
+use crypto::basics::hash::rescue::RescueInstance;
 
 // state size
 const WIDTH: usize = 4;
@@ -253,7 +253,7 @@ mod test {
   use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{Scalar, Zero};
-  use crypto::basics::hash_functions::rescue::RescueInstance;
+  use crypto::basics::hash::rescue::RescueInstance;
 
   type F = BLSScalar;
 

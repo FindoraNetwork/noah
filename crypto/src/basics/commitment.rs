@@ -9,7 +9,7 @@
 
 // Opening verification: verify(m_1, ..., m_n, rand, commitment)
 // 1. Check whether commitment == rescue(rand, m_1, ..., m_n, 0^{r+c-n-1})[0]
-use crate::basics::hash_functions::rescue::RescueInstance;
+use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Scalar;
 use rand_core::{CryptoRng, RngCore};
@@ -78,7 +78,7 @@ impl Commitment<BLSScalar> {
 #[cfg(test)]
 mod test {
   use crate::basics::commitment::Commitment;
-  use crate::basics::hash_functions::rescue::RescueInstance;
+  use crate::basics::hash::rescue::RescueInstance;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::Scalar;
   use rand_chacha::ChaChaRng;

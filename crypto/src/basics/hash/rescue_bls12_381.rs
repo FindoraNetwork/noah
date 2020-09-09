@@ -125,7 +125,7 @@ impl RescueInstance<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-  use crate::basics::hash_functions::rescue::RescueInstance;
+  use crate::basics::hash::rescue::RescueInstance;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::Scalar;
   use std::str::FromStr;

@@ -1,4 +1,4 @@
-use crate::basics::hash_functions::MTHash;
+use crate::basics::hash::MTHash;
 use itertools::Itertools;
 use std::fmt::Debug;
 use utils::errors::ZeiError;
@@ -195,7 +195,7 @@ pub fn kmt_verify<S, H>(root: &KMerkleRoot<S>,
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::basics::hash_functions::mimc::MiMCHash;
+  use crate::basics::hash::mimc::MiMCHash;
   use crate::merkle_tree::binary_merkle_tree::mt_build;
   use algebra::groups::{Scalar as _, ScalarArithmetic};
   use algebra::ristretto::RistrettoScalar as Scalar;
