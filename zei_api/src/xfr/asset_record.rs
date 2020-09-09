@@ -48,24 +48,19 @@ impl AssetRecordType {
   }
 
   pub fn is_confidential_amount(self) -> bool {
-    match self {
-      AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
-      | AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => false,
-      _ => true,
-    }
+    matches!(self,
+             AssetRecordType::ConfidentialAmount_ConfidentialAssetType
+             | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType)
   }
   pub fn is_confidential_asset_type(self) -> bool {
-    match self {
-      AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
-      | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => false,
-      _ => true,
-    }
+    matches!(self,
+             AssetRecordType::ConfidentialAmount_ConfidentialAssetType
+             | AssetRecordType::NonConfidentialAmount_ConfidentialAssetType)
   }
+
   pub fn is_confidential_amount_and_asset_type(self) -> bool {
-    match self {
-      AssetRecordType::ConfidentialAmount_ConfidentialAssetType => true,
-      _ => false,
-    }
+    matches!(self,
+             AssetRecordType::ConfidentialAmount_ConfidentialAssetType)
   }
 
   pub fn from_booleans(conf_amt: bool, conf_type: bool) -> Self {

@@ -53,24 +53,12 @@ impl XfrType {
       if asset_type != record.open_asset_record.asset_type {
         multi_asset = true;
       }
-      let confidential_amount;
-      match record.open_asset_record.blind_asset_record.amount {
-        XfrAmount::Confidential(_) => {
-          confidential_amount = true;
-        }
-        _ => {
-          confidential_amount = false;
-        }
-      }
-      let confidential_asset_type;
-      match record.open_asset_record.blind_asset_record.asset_type {
-        XfrAssetType::Confidential(_) => {
-          confidential_asset_type = true;
-        }
-        _ => {
-          confidential_asset_type = false;
-        }
-      }
+      let confidential_amount = matches!(record.open_asset_record.blind_asset_record.amount,
+                                         XfrAmount::Confidential(_));
+      let confidential_asset_type =
+        matches!(record.open_asset_record.blind_asset_record.asset_type,
+                 XfrAssetType::Confidential(_));
+
       if confidential_amount && confidential_asset_type {
         confidential_all = true;
       } else if confidential_amount {
@@ -249,10 +237,9 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
   let xfr_type = XfrType::from_inputs_outputs(inputs, outputs);
   check_asset_amount(inputs, outputs)?;
 
-  let single_asset = match xfr_type {
-    XfrType::NonConfidential_MultiAsset | XfrType::Confidential_MultiAsset => false,
-    _ => true,
-  };
+  let single_asset = !matches!(xfr_type,
+                               XfrType::NonConfidential_MultiAsset
+                               | XfrType::Confidential_MultiAsset);
 
   let open_inputs = inputs.iter()
                           .map(|input| &input.open_asset_record)

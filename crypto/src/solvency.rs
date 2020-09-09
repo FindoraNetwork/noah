@@ -96,6 +96,7 @@ use utils::errors::ZeiError;
 ///                 &proof.unwrap());
 /// assert!(vrfy.is_ok());
 /// ```
+// TODO: (alex) consider streamline this api by merging public assets into hidden asset with blinding of zero
 #[allow(clippy::too_many_arguments)] // TODO (fernando) simplify this signature
 pub fn prove_solvency(bp_gens: &BulletproofGens,
                       pc_gens: &RistrettoPedersenGens,

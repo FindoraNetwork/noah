@@ -68,15 +68,15 @@ pub struct BlindAssetRecord {
 
 impl BlindAssetRecord {
   pub fn get_record_type(&self) -> AssetRecordType {
-    let conf_amount = match self.amount {
-      XfrAmount::Confidential(_) => true,
-      _ => false,
-    };
-    let conf_asset_type = match self.asset_type {
-      XfrAssetType::Confidential(_) => true,
-      _ => false,
-    };
-    AssetRecordType::from_booleans(conf_amount, conf_asset_type)
+    AssetRecordType::from_booleans(matches!(self.amount, XfrAmount::Confidential(_)),
+                                   matches!(self.asset_type, XfrAssetType::Confidential(_)))
+  }
+
+  // TODO: (alex) remove this if the concept of public v.s. hidden asset are no longer in use
+  /// returns true if it is a "public record" where both amount and asset type are non-confidential
+  pub fn is_public(&self) -> bool {
+    matches!(self.get_record_type(),
+             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType)
   }
 }
 
@@ -100,10 +100,7 @@ impl XfrAmount {
   /// assert!(!xfr_amount.is_confidential());
   /// ```
   pub fn is_confidential(&self) -> bool {
-    match self {
-      XfrAmount::Confidential(_) => true,
-      _ => false,
-    }
+    matches!(self, XfrAmount::Confidential(_))
   }
   /// Return Some(amount) if amount is non-confidential. Otherwise, return None
   /// # Example:
@@ -160,10 +157,7 @@ impl XfrAssetType {
   /// assert!(!xfr_asset_type.is_confidential());
   /// ```
   pub fn is_confidential(&self) -> bool {
-    match self {
-      XfrAssetType::Confidential(_) => true,
-      _ => false,
-    }
+    matches!(self, XfrAssetType::Confidential(_))
   }
 
   /// Return Some(asset_type) if asset_type is non-confidential. Otherwise, return None
