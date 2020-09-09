@@ -125,26 +125,25 @@ fn compute_challenge<G: Group>(t: &mut Transcript) -> G::S {
 /// Deterministic computation of a scalar based on the secret nonce of the private key.
 /// This is to avoid attacks due to bad implementation of prng involving the generation
 /// of the commitment in the signature.
-/// Inspired from https://github.com/w3f/schnorrkel/blob/cfdbe9ae865a4d3ffa2566d896d4dbedf5107028/src/sign.rs#L179
+/// The scalar is computed as PRF(nonce,message) where PRF is the CRHF Sha512 following the
+/// high level idea of RFC 6979 (https://tools.ietf.org/html/rfc6979#section-3.2)
 /// Note that the transcript is not involved here as the verifier has no access to the
 /// secret nonce.
 /// * `message` - message to be signed. Needed to make the scalar unique
-/// * `key_pair` - Schnorr key pair. In the Schnorrkel library the "signing context" contains the message as well as the public key.
-fn deterministic_scalar_gen<G: Group>(message: &[u8], key_pair: &SchnorrKeyPair<G>) -> G::S {
+/// * `sk` - Schnorr secret key that contains the nonce.
+fn deterministic_scalar_gen<G: Group>(message: &[u8], sk: &SchnorrSecretKey<G>) -> G::S {
   let mut hasher = Sha512::new();
 
-  let pk = &key_pair.1; // TODO is this needed? It seems that hashing the message with the secret nonce is enough
-  let secret_nonce = &key_pair.0.nonce;
-
+  let secret_nonce = &sk.nonce;
   hasher.input(message);
-  hasher.input(pk.to_bytes());
   hasher.input(secret_nonce);
+
   G::S::from_hash(hasher)
 }
 
 #[allow(clippy::many_single_char_names)]
 #[allow(non_snake_case)]
-/// Computes a signature given a key pair and a message
+/// Computes a signature given a key pair and a message.
 /// * `signing_key` - key pair. Having both public and private key makes the signature computation more efficient
 /// * `message` - sequence of bytes to be signed
 /// * `returns` - a Schnorr signature
@@ -157,7 +156,7 @@ pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
   transcript.append_message(b"message", message.as_ref());
 
   let g = G::get_base();
-  let r = deterministic_scalar_gen::<G>(message.as_ref(), &signing_key);
+  let r = deterministic_scalar_gen::<G>(message.as_ref(), &signing_key.0);
 
   let R = g.mul(&r);
   let public_key = &signing_key.1;
