@@ -57,7 +57,7 @@ impl<G: Group> ZeiFromToBytes for SchnorrPublicKey<G> {
 
 pub struct SchnorrKeyPair<G, S>(SchnorrSecretKey<S>, SchnorrPublicKey<G>);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 /// A Schnorr signature is composed by some group element R and some scalar s
 pub struct SchnorrSignature<G: Group> {
@@ -114,12 +114,6 @@ impl<G: Group> ZeiFromToBytes for SchnorrSignature<G> {
       Ok(s) => Ok(SchnorrSignature { R, s }),
       _ => Err(ZeiError::DeserializationError),
     }
-  }
-}
-
-impl<G: Group> PartialEq for SchnorrSignature<G> {
-  fn eq(&self, other: &Self) -> bool {
-    self.zei_to_bytes() == other.zei_to_bytes()
   }
 }
 
