@@ -14,7 +14,8 @@
 use algebra::groups::{Group, Scalar, ScalarArithmetic};
 use digest::Digest;
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
+use rand_chacha::ChaChaRng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use utils::errors::ZeiError;
@@ -88,7 +89,8 @@ impl SchnorrTranscript for Transcript {
   fn compute_challenge<S: Scalar>(&mut self) -> S {
     let mut c_bytes = [0_u8; SCALAR_SIZE];
     self.challenge_bytes(b"c", &mut c_bytes);
-    S::from_bytes_safe(&c_bytes)
+    let mut prg = ChaChaRng::from_seed(c_bytes);
+    Scalar::random(&mut prg)
   }
 }
 
@@ -107,9 +109,11 @@ impl<G: Group> ZeiFromToBytes for SchnorrSignature<G> {
       return Err(ZeiError::ParameterError);
     }
     let R = R.unwrap(); // safe unwrap()
-    let s = G::S::from_bytes_safe(&bytes_repr[G::COMPRESSED_LEN..]);
-
-    Ok(SchnorrSignature { R, s })
+    let s = G::S::from_bytes(&bytes_repr[G::COMPRESSED_LEN..]);
+    match s {
+      Ok(s) => Ok(SchnorrSignature { R, s }),
+      _ => Err(ZeiError::DeserializationError),
+    }
   }
 }
 
