@@ -18,6 +18,7 @@ use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use utils::errors::ZeiError;
+use utils::serialization::ZeiFromToBytes;
 
 const SCALAR_SIZE: usize = 32;
 
@@ -39,11 +40,11 @@ impl<G: Group> SchnorrSecretKey<G> {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SchnorrPublicKey<G>(G);
 
-impl<G: Group> SchnorrPublicKey<G> {
-  pub fn to_bytes(&self) -> Vec<u8> {
+impl<G: Group> ZeiFromToBytes for SchnorrPublicKey<G> {
+  fn zei_to_bytes(&self) -> Vec<u8> {
     self.0.to_compressed_bytes()
   }
-  pub fn from_bytes(bytes: &[u8]) -> Result<SchnorrPublicKey<G>, ZeiError> {
+  fn zei_from_bytes(bytes: &[u8]) -> Result<SchnorrPublicKey<G>, ZeiError> {
     let group_element = G::from_compressed_bytes(bytes);
 
     match group_element {
@@ -64,20 +65,21 @@ pub struct SchnorrSignature<G: Group> {
 }
 
 #[allow(non_snake_case)]
-impl<G: Group> SchnorrSignature<G> {
-  pub fn to_bytes(&self) -> (Vec<u8>, Vec<u8>) {
-    let group_element_to_bytes = self.R.to_compressed_bytes();
-    let scalar_to_bytes = self.s.to_bytes();
-    (group_element_to_bytes, scalar_to_bytes)
+impl<G: Group> ZeiFromToBytes for SchnorrSignature<G> {
+  fn zei_to_bytes(&self) -> Vec<u8> {
+    let mut v1 = self.R.to_compressed_bytes();
+    let mut v2 = self.s.to_bytes();
+    v1.append(&mut v2);
+    v1
   }
 
-  pub fn from_bytes(bytes_repr: &(Vec<u8>, Vec<u8>)) -> Result<SchnorrSignature<G>, ZeiError> {
-    let R = G::from_compressed_bytes(&bytes_repr.0);
+  fn zei_from_bytes(bytes_repr: &[u8]) -> Result<SchnorrSignature<G>, ZeiError> {
+    let R = G::from_compressed_bytes(&bytes_repr[..G::COMPRESSED_LEN]);
     if R.is_err() {
       return Err(ZeiError::ParameterError);
     }
     let R = R.unwrap(); // safe unwrap()
-    let s = G::S::from_bytes_safe(&bytes_repr.1);
+    let s = G::S::from_bytes_safe(&bytes_repr[G::COMPRESSED_LEN..]);
 
     Ok(SchnorrSignature { R, s })
   }
@@ -85,7 +87,7 @@ impl<G: Group> SchnorrSignature<G> {
 
 impl<G: Group> PartialEq for SchnorrSignature<G> {
   fn eq(&self, other: &Self) -> bool {
-    self.to_bytes() == other.to_bytes()
+    self.zei_to_bytes() == other.zei_to_bytes()
   }
 }
 
@@ -156,7 +158,7 @@ pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &SchnorrKeyPair<G>,
   let R = g.mul(&r);
   let public_key = &signing_key.1;
 
-  transcript.append_message(b"public key", &public_key.to_bytes());
+  transcript.append_message(b"public key", &public_key.zei_to_bytes());
   transcript.append_message(b"R", &R.to_compressed_bytes());
 
   let c: G::S = compute_challenge::<G>(&mut transcript);
@@ -197,7 +199,7 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &SchnorrPublicKey<G>,
 
   let g = G::get_base();
 
-  transcript.append_message(b"public key", &pk.clone().to_bytes());
+  transcript.append_message(b"public key", &pk.clone().zei_to_bytes());
   transcript.append_message(b"R", &sig.R.to_compressed_bytes());
 
   let c = compute_challenge::<G>(&mut transcript);
@@ -242,6 +244,7 @@ mod schnorr_sigs {
     use algebra::jubjub::JubjubGroup;
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaCha20Rng;
+    use utils::serialization::ZeiFromToBytes;
 
     fn check_schnorr<G: Group>() {
       let seed = [0_u8; SCALAR_SIZE];
@@ -281,13 +284,13 @@ mod schnorr_sigs {
       let public_key = key_pair.1;
 
       // Public key
-      let public_key_bytes = public_key.to_bytes();
-      let public_key_from_bytes = SchnorrPublicKey::from_bytes(&public_key_bytes).unwrap();
+      let public_key_bytes = public_key.zei_to_bytes();
+      let public_key_from_bytes = SchnorrPublicKey::zei_from_bytes(&public_key_bytes).unwrap();
       assert_eq!(public_key, public_key_from_bytes);
 
       // Signature
-      let signature_bytes = sig.to_bytes();
-      let signature_from_bytes = SchnorrSignature::from_bytes(&signature_bytes).unwrap();
+      let signature_bytes = sig.zei_to_bytes();
+      let signature_from_bytes = SchnorrSignature::zei_from_bytes(&signature_bytes).unwrap();
       assert_eq!(sig, signature_from_bytes);
     }
 
