@@ -420,7 +420,7 @@ fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result
 
   for (_, a) in amounts.iter() {
     let sum = a.iter().sum::<i128>();
-    if sum < 0i128 {
+    if sum != 0i128 {
       return Err(ZeiError::XfrCreationAssetAmountError);
     }
   }

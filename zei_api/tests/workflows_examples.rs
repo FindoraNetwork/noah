@@ -423,7 +423,7 @@ pub(crate) mod examples {
     let mut AIR: HashMap<&[u8], _> = HashMap::new();
     let amount_in1 = 50u64;
     let amount_in2 = 75u64;
-    let amount_out1 = 100u64;
+    let amount_out1 = 125u64;
     // 1. setup
     // 1.1 user keys
     let user1_keypair = XfrKeyPair::generate(&mut prng);
