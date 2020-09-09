@@ -1,4 +1,4 @@
-use crate::basics::hash_functions::MTHash;
+use crate::basics::hash::MTHash;
 use std::fmt::Debug;
 use utils::errors::ZeiError;
 
@@ -157,7 +157,7 @@ fn is_power_two(n: usize) -> bool {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::basics::hash_functions::mimc::MiMCHash;
+  use crate::basics::hash::mimc::MiMCHash;
   use algebra::groups::{Scalar as _, ScalarArithmetic};
   use algebra::ristretto::RistrettoScalar as Scalar;
 
