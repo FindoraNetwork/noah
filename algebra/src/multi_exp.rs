@@ -96,7 +96,7 @@ fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G, AlgebraErro
                                               buckets[b_index] = buckets[b_index].add(elem);
                                             }
                                             if digit < 0 {
-                                              let b_index = (-digit - 1) as usize;
+                                              let b_index = (-(digit + 1)) as usize;
                                               buckets[b_index] = buckets[b_index].sub(elem);
                                             }
                                           }

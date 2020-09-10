@@ -1,6 +1,7 @@
 use crate::errors::AlgebraError;
 use crate::groups::GroupArithmetic;
 use crate::groups::{Group, One, Scalar as ZeiScalar, ScalarArithmetic, Zero};
+use crate::jubjub::JubjubScalar;
 use crate::pairing::Pairing;
 use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt, Scalar};
 use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
@@ -30,6 +31,13 @@ impl FromStr for BLSScalar {
 
   fn from_str(string: &str) -> Result<BLSScalar, AlgebraError> {
     Ok(BLSScalar(Scalar::from_str(string).ok_or(AlgebraError::DeserializationError)?))
+  }
+}
+
+impl From<&JubjubScalar> for BLSScalar {
+  fn from(scalar: &JubjubScalar) -> Self {
+    let bytes = scalar.to_bytes();
+    BLSScalar::from_bytes(&bytes).unwrap()
   }
 }
 
