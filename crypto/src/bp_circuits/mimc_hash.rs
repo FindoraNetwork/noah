@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use crate::basics::hash_functions::mimc::compute_mimc_constants;
+use crate::basics::hash::mimc::compute_mimc_constants;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::*;
 
@@ -79,8 +79,8 @@ pub fn hash_proof<CS: ConstraintSystem>(cs: &mut CS,
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::basics::hash_functions::mimc::{mimc_f, mimc_feistel, MiMCHash};
-  use crate::basics::hash_functions::MTHash;
+  use crate::basics::hash::mimc::{mimc_f, mimc_feistel, MiMCHash};
+  use crate::basics::hash::MTHash;
   use algebra::groups::Scalar as _;
   use algebra::ristretto::RistrettoScalar as Scalar;
   use bulletproofs::r1cs::Verifier;

@@ -27,6 +27,8 @@ pub struct TurboPlonkConstraintSystem<F> {
   witness: Vec<F>,
   // A reserved variable that maps to value zero
   zero_var: Option<VarIndex>,
+  // A reserved variable that maps to value one
+  one_var: Option<VarIndex>,
 }
 
 impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
@@ -187,7 +189,8 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
                                  public_vars_constraint_indices: vec![],
                                  public_vars_witness_indices: vec![],
                                  witness: vec![],
-                                 zero_var: None }
+                                 zero_var: None,
+                                 one_var: None }
   }
 
   pub fn zero_var(&mut self) -> VarIndex {
@@ -197,6 +200,15 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
       self.num_vars += 1;
     }
     self.zero_var.unwrap() // safe unwrap
+  }
+
+  pub fn one_var(&mut self) -> VarIndex {
+    if self.one_var.is_none() {
+      self.one_var = Some(self.num_vars);
+      self.witness.push(F::one());
+      self.num_vars += 1;
+    }
+    self.one_var.unwrap() // safe unwrap
   }
 
   /// Insert a linear combination gate: wo = w1 * q1 + w2 * q2 + w3 * q3 + w4 * q4.

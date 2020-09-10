@@ -14,6 +14,7 @@ extern crate itertools;
 #[macro_use]
 extern crate serde_derive;
 
+pub mod anon_xfr;
 pub mod api;
 pub mod serialization;
 pub mod setup;

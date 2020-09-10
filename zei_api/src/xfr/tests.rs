@@ -69,9 +69,11 @@ pub(crate) mod tests {
     prng = ChaChaRng::from_seed([0u8; 32]);
     let asset_type = AssetType::from_identical_byte(0u8);
 
-    let input_amount = 100u64;
+    let input_amount = 100u64 * outputs_template.len() as u64;
     let total_amount = input_amount * inputs_template.len() as u64;
     let output_amount = total_amount / outputs_template.len() as u64;
+    // make sure no truncation during integer division, and that total input == total output
+    assert_eq!(total_amount, output_amount * outputs_template.len() as u64);
 
     let inkeys = gen_key_pair_vec(inputs_template.len(), &mut prng);
     let inkeys_ref = inkeys.iter().map(|x| x).collect_vec();

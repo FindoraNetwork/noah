@@ -1,4 +1,5 @@
 pub mod errors;
+pub mod macros;
 pub mod serialization;
 use digest::generic_array::typenum::U64;
 use digest::Digest;

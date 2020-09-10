@@ -69,8 +69,8 @@ pub(crate) fn mimc_feistel(left: &Scalar, right: &Scalar, c: &[Scalar]) -> (Scal
 #[cfg(test)]
 pub mod test {
 
-  use crate::basics::hash_functions::mimc::MiMCHash;
-  use crate::basics::hash_functions::MTHash;
+  use crate::basics::hash::mimc::MiMCHash;
+  use crate::basics::hash::MTHash;
   use algebra::groups::Scalar as _;
   use algebra::ristretto::RistrettoScalar as Scalar;
 

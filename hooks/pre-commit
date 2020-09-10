@@ -17,8 +17,8 @@ pushd $GIT_ROOT >/dev/null
 #    sed 's| |\\ |g')`
 for f in $(find -type f -name 'Cargo.toml'); do
   pushd $(dirname $f) >/dev/null
-  cargo fmt -- --check
-  cargo clippy
+  cargo-fmt -- --check
+  cargo-clippy
   popd >/dev/null
 done
 popd >/dev/null
