@@ -128,7 +128,7 @@ pub struct MultiSignature<G: Group>(Vec<Signature<G>>);
 /// Generates a key pair for the Schnorr signature scheme
 /// * `prng` - pseudo-random generator
 /// * `returns` - a key pair
-pub fn schnorr_gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G::S> {
+pub fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G::S> {
   // Private key
   let alpha = G::S::random(prng);
   // Secret nonce:
@@ -167,9 +167,7 @@ fn deterministic_scalar_gen<G: Group>(message: &[u8], nonce: &SchnorrNonce) -> G
 /// * `signing_key` - key pair. Having both public and private key makes the signature computation more efficient
 /// * `message` - sequence of bytes to be signed
 /// * `returns` - a Schnorr signature
-pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &KeyPair<G, G::S>,
-                                              msg: &B)
-                                              -> Signature<G> {
+pub fn sign<B: AsRef<[u8]>, G: Group>(signing_key: &KeyPair<G, G::S>, msg: &B) -> Signature<G> {
   let mut transcript = Transcript::new(b"schnorr_sig");
 
   let g = G::get_base();
@@ -191,13 +189,13 @@ pub fn schnorr_sign<B: AsRef<[u8]>, G: Group>(signing_key: &KeyPair<G, G::S>,
 /// Computes a signature with key pairs sk_1, sk_2,...,sk_n on a message m
 /// * `signing_keys` - list of key pairs
 /// * `message` - message to be signed
-pub fn schnorr_multisig_sign<B: AsRef<[u8]>, G: Group>(signing_keys: &[KeyPair<G, G::S>],
-                                                       message: &B)
-                                                       -> MultiSignature<G> {
+pub fn multisig_sign<B: AsRef<[u8]>, G: Group>(signing_keys: &[KeyPair<G, G::S>],
+                                               message: &B)
+                                               -> MultiSignature<G> {
   let mut signatures = vec![];
 
   for signing_key in signing_keys {
-    let sig = schnorr_sign::<B, G>(&signing_key, &message);
+    let sig = sign::<B, G>(&signing_key, &message);
     signatures.push(sig);
   }
   MultiSignature(signatures)
@@ -209,10 +207,10 @@ pub fn schnorr_multisig_sign<B: AsRef<[u8]>, G: Group>(signing_keys: &[KeyPair<G
 /// * `sig` - signature
 /// * `returns` - Nothing if the verification succeeds, an error otherwise
 #[allow(non_snake_case)]
-pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &PublicKey<G>,
-                                                msg: &B,
-                                                sig: &Signature<G>)
-                                                -> Result<(), ZeiError> {
+pub fn verify<B: AsRef<[u8]>, G: Group>(pk: &PublicKey<G>,
+                                        msg: &B,
+                                        sig: &Signature<G>)
+                                        -> Result<(), ZeiError> {
   let mut transcript = Transcript::new(b"schnorr_sig");
 
   let g = G::get_base();
@@ -237,16 +235,16 @@ pub fn schnorr_verify<B: AsRef<[u8]>, G: Group>(pk: &PublicKey<G>,
 /// * `msg` - message
 /// * `msig` - multi signature
 /// * `returns` - Nothing if the verification succeeds, an error otherwise
-pub fn schnorr_multisig_verify<B: AsRef<[u8]>, G: Group>(public_keys: &[PublicKey<G>],
-                                                         msg: &B,
-                                                         msig: &MultiSignature<G>)
-                                                         -> Result<(), ZeiError> {
+pub fn multisig_verify<B: AsRef<[u8]>, G: Group>(public_keys: &[PublicKey<G>],
+                                                 msg: &B,
+                                                 msig: &MultiSignature<G>)
+                                                 -> Result<(), ZeiError> {
   if public_keys.len() != msig.0.len() || public_keys.is_empty() {
     return Err(ZeiError::ParameterError);
   }
 
   for (pk, sig) in public_keys.iter().zip(msig.0.clone()) {
-    schnorr_verify(&pk, msg, &sig)?;
+    verify(&pk, msg, &sig)?;
   }
 
   Ok(())
@@ -258,7 +256,7 @@ mod schnorr_sigs {
   mod schnorr_simple_sig {
 
     use crate::basics::signatures::schnorr::{
-      schnorr_gen_keys, schnorr_sign, schnorr_verify, KeyPair, PublicKey, Signature, SCALAR_SIZE,
+      gen_keys, sign, verify, KeyPair, PublicKey, Signature, SCALAR_SIZE,
     };
     use algebra::groups::{Group, GroupArithmetic, One};
     use algebra::jubjub::JubjubGroup;
@@ -271,23 +269,23 @@ mod schnorr_sigs {
       let seed = [0_u8; SCALAR_SIZE];
       let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
 
-      let key_pair: KeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+      let key_pair: KeyPair<G, G::S> = gen_keys::<ChaCha20Rng, G>(&mut prng);
 
       let message = String::from("message");
 
-      let sig = schnorr_sign::<String, G>(&key_pair, &message);
+      let sig = sign::<String, G>(&key_pair, &message);
 
       let public_key = key_pair.pub_key;
-      let res = schnorr_verify::<String, G>(&public_key, &message, &sig);
+      let res = verify::<String, G>(&public_key, &message, &sig);
       assert!(res.is_ok());
 
       let wrong_sig = Signature { R: <G as Group>::get_identity(),
                                   s: <G as GroupArithmetic>::S::one() };
-      let res = schnorr_verify::<String, G>(&public_key, &message, &wrong_sig);
+      let res = verify::<String, G>(&public_key, &message, &wrong_sig);
       assert!(res.is_err());
 
       let wrong_message = String::from("wrong_message");
-      let res = schnorr_verify::<String, G>(&public_key, &wrong_message, &sig);
+      let res = verify::<String, G>(&public_key, &wrong_message, &sig);
       assert!(res.is_err());
     }
 
@@ -304,9 +302,9 @@ mod schnorr_sigs {
     fn check_from_to_bytes<G: Group>() {
       let seed = [0_u8; SCALAR_SIZE];
       let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-      let key_pair: KeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+      let key_pair: KeyPair<G, G::S> = gen_keys::<ChaCha20Rng, G>(&mut prng);
       let message = String::from("message");
-      let sig = schnorr_sign::<String, G>(&key_pair, &message);
+      let sig = sign::<String, G>(&key_pair, &message);
       let public_key = key_pair.pub_key;
 
       // Public key
@@ -335,8 +333,7 @@ mod schnorr_sigs {
   mod schnorr_multisig {
 
     use crate::basics::signatures::schnorr::{
-      schnorr_gen_keys, schnorr_multisig_sign, schnorr_multisig_verify, KeyPair, MultiSignature,
-      Signature, SCALAR_SIZE,
+      gen_keys, multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature, SCALAR_SIZE,
     };
     use algebra::groups::{Group, GroupArithmetic, One};
 
@@ -354,7 +351,7 @@ mod schnorr_sigs {
       let mut key_pairs = vec![];
       let mut public_keys = vec![];
       for _ in 0..NUMBER_OF_KEYS {
-        let key_pair: KeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
+        let key_pair: KeyPair<G, G::S> = gen_keys::<ChaCha20Rng, G>(&mut prng);
         let public_key = key_pair.pub_key.clone();
         key_pairs.push(key_pair);
         public_keys.push(public_key);
@@ -362,9 +359,9 @@ mod schnorr_sigs {
 
       let message = String::from("message");
 
-      let msig = schnorr_multisig_sign::<String, G>(&key_pairs, &message);
+      let msig = multisig_sign::<String, G>(&key_pairs, &message);
 
-      let res = schnorr_multisig_verify::<String, G>(&public_keys, &message, &msig);
+      let res = multisig_verify::<String, G>(&public_keys, &message, &msig);
       assert!(res.is_ok());
 
       let wrong_msig: MultiSignature<G> =
@@ -373,20 +370,20 @@ mod schnorr_sigs {
                                      s: <G as GroupArithmetic>::S::one() };
                          3
                        ]);
-      let res = schnorr_multisig_verify::<String, G>(&public_keys, &message, &wrong_msig);
+      let res = multisig_verify::<String, G>(&public_keys, &message, &wrong_msig);
       assert!(res.is_err());
 
       let wrong_message = String::from("wrong_message");
-      let res = schnorr_multisig_verify::<String, G>(&public_keys, &wrong_message, &msig);
+      let res = multisig_verify::<String, G>(&public_keys, &wrong_message, &msig);
       assert_eq!(res, Err(ZeiError::ArgumentVerificationError));
 
       let too_short_multi_sig = MultiSignature(msig.0.clone()[0..2].to_vec());
-      let res = schnorr_multisig_verify::<String, G>(&public_keys, &message, &too_short_multi_sig);
+      let res = multisig_verify::<String, G>(&public_keys, &message, &too_short_multi_sig);
       assert_eq!(res, Err(ZeiError::ParameterError));
 
       let empty_msig = MultiSignature(vec![]);
       let empty_public_keys = vec![];
-      let res = schnorr_multisig_verify::<String, G>(&empty_public_keys, &message, &empty_msig);
+      let res = multisig_verify::<String, G>(&empty_public_keys, &message, &empty_msig);
       assert_eq!(res, Err(ZeiError::ParameterError));
     }
 
