@@ -1,6 +1,6 @@
 // BLS Signatures
 use algebra::bls12_381::Bls12381;
-use crypto::basics::signatures::{AggSignatureTrait, SignatureTrait};
+use crypto::basics::signatures::{AggSignature, Signature};
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 
@@ -66,7 +66,7 @@ pub fn bls_batch_verify_added_signatures<B: AsRef<[u8]>>(ver_keys: &[BlsPublicKe
 
 pub struct Bls;
 
-impl SignatureTrait for Bls {
+impl Signature for Bls {
   type PublicKey = BlsPublicKey;
   type SecretKey = BlsSecretKey;
   type Signature = BlsSignature;
@@ -84,7 +84,7 @@ impl SignatureTrait for Bls {
   }
 }
 
-impl AggSignatureTrait for Bls {
+impl AggSignature for Bls {
   type AggSignature = BlsSignature;
   fn aggregate<B: AsRef<[u8]>>(pks: &[&Self::PublicKey],
                                sigs: &[&Self::Signature])

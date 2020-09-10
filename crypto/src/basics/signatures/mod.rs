@@ -5,7 +5,7 @@ pub mod bls;
 pub mod pointcheval_sanders;
 pub mod schnorr;
 
-pub trait SignatureTrait {
+pub trait Signature {
   type PublicKey;
   type SecretKey;
   type Signature;
@@ -17,7 +17,7 @@ pub trait SignatureTrait {
                             -> Result<(), ZeiError>;
 }
 
-pub trait AggSignatureTrait: SignatureTrait {
+pub trait AggSignature: Signature {
   type AggSignature;
   fn aggregate<B: AsRef<[u8]>>(pks: &[&Self::PublicKey],
                                sigs: &[&Self::Signature])
