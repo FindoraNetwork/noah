@@ -355,7 +355,7 @@ mod schnorr_sigs {
       const NUMBER_OF_KEYS: usize = 3;
       let mut key_pairs = vec![];
       let mut public_keys = vec![];
-      for _i in 0..NUMBER_OF_KEYS {
+      for _ in 0..NUMBER_OF_KEYS {
         let key_pair: SchnorrKeyPair<G, G::S> = schnorr_gen_keys::<ChaCha20Rng, G>(&mut prng);
         let public_key = key_pair.pk.clone();
         key_pairs.push(key_pair);
