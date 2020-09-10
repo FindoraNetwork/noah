@@ -10,11 +10,9 @@ use bulletproofs::BulletproofGens;
 use crypto::bp_circuits::cloak::{CloakCommitment, CloakValue};
 use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::solvency;
-use linear_map::LinearMap;
 use std::collections::HashSet;
 use std::fmt;
 use utils::errors::ZeiError;
-use utils::not_matches;
 
 /// record for solvency proof, indicates asset or liability
 pub enum SolvencyRecordType {
@@ -48,7 +46,7 @@ pub enum SolvencyRecordType {
 /// - `ReadyForProof`: when all records are finalized and verified, conversion rates are finalized, we enter the stage
 /// where we are ready to prove solvency. At this stage, prover and verifier can derive their own objects of type
 /// `SolvencyProver` and `SolvencyVerifier` that contains all necessary values they need to prove and verify.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum SolvencyAuditStage {
   RecordCollection,
   LiabilitiesVerification, // optional
@@ -74,11 +72,11 @@ impl fmt::Display for SolvencyAuditStage {
 }
 
 /// Represent a solvency audit, owned by an Auditor
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct SolvencyAudit {
   assets: Vec<BlindAssetRecord>,
   liabilities: Vec<BlindAssetRecord>,
-  conv_rates: LinearMap<Scalar, Scalar>,
+  conv_rates: Vec<(Scalar, Scalar)>,
   asset_types: HashSet<AssetType>,
   stage: SolvencyAuditStage,
 }
@@ -139,7 +137,7 @@ impl SolvencyAudit {
   /// Finalize a list of conversion rates of each asset_type, provided by Auditor.
   /// Noted that the list can be much longer than the `self.asset_types` list, because many of records may
   /// have confidential asset type, thus an auditor may provide an overarching list of rates
-  pub fn finalize_rates(&mut self, rates: &LinearMap<AssetType, u64>) -> Result<(), ZeiError> {
+  pub fn finalize_rates(&mut self, rates: &[(AssetType, u64)]) -> Result<(), ZeiError> {
     if not_matches!(self.stage, SolvencyAuditStage::LiabilitiesVerified)
        || rates.len() < self.asset_types.len()
     {
@@ -148,14 +146,14 @@ impl SolvencyAudit {
 
     // make sure at least all non-confidential asset types are provided with a rate
     for asset_type in self.asset_types.iter() {
-      if !rates.contains_key(asset_type) {
+      if rates.binary_search_by_key(&asset_type, |(a, _)| a).is_err() {
         return Err(ZeiError::SolvencyInputError);
       }
     }
 
     for (asset_type, rate) in rates.iter() {
       self.conv_rates
-          .insert(asset_type_to_scalar(&asset_type), Scalar::from_u64(*rate));
+          .push((asset_type_to_scalar(&asset_type), Scalar::from_u64(*rate)));
     }
 
     // with records and rates finalized, we are ready to build Prover and Verifier for proof
@@ -299,7 +297,7 @@ impl SolvencyAudit {
 }
 
 /// Represents a prover object in a solvency proof
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct SolvencyProver {
   public_assets: Vec<CloakValue>,
   public_liabilities: Vec<CloakValue>,
@@ -307,7 +305,7 @@ pub struct SolvencyProver {
   hidden_assets_blinds: Vec<CloakValue>,
   hidden_liabilities: Vec<CloakValue>,
   hidden_liabilities_blinds: Vec<CloakValue>,
-  conv_rates: LinearMap<Scalar, Scalar>,
+  pub conv_rates: Vec<(Scalar, Scalar)>,
 }
 
 impl SolvencyProver {
@@ -334,13 +332,13 @@ impl SolvencyProver {
 }
 
 /// Represents a verifier object in a solvency proof
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct SolvencyVerifier {
   public_assets: Vec<CloakValue>,
   public_liabilities: Vec<CloakValue>,
   hidden_assets_commitments: Vec<CloakCommitment>,
   hidden_liabilities_commitments: Vec<CloakCommitment>,
-  conv_rates: LinearMap<Scalar, Scalar>,
+  pub conv_rates: Vec<(Scalar, Scalar)>,
 }
 impl SolvencyVerifier {
   /// verify a solvency proof
@@ -367,7 +365,7 @@ impl SolvencyVerifier {
 #[cfg(test)]
 mod test {
   use crate::{
-    api::solvency::{SolvencyAudit, SolvencyRecordType},
+    api::solvency::{SolvencyAudit, SolvencyProver, SolvencyRecordType, SolvencyVerifier},
     xfr::{
       asset_record::{build_blind_asset_record, AssetRecordType},
       sig::{XfrKeyPair, XfrPublicKey},
@@ -376,7 +374,6 @@ mod test {
   };
   use bulletproofs::BulletproofGens;
   use crypto::ristretto_pedersen::RistrettoPedersenGens;
-  use linear_map::LinearMap;
   use rand_chacha::ChaChaRng;
   use rand_core::{CryptoRng, RngCore, SeedableRng};
 
@@ -431,15 +428,15 @@ mod test {
     bars
   }
 
-  fn build_rates() -> LinearMap<AssetType, u64> {
-    let mut map = LinearMap::new();
-    map.insert(AssetType::from_identical_byte(1), 5);
-    map.insert(AssetType::from_identical_byte(2), 4);
-    map.insert(AssetType::from_identical_byte(3), 3);
-    map.insert(AssetType::from_identical_byte(4), 2);
-    map.insert(AssetType::from_identical_byte(5), 9);
-    map.insert(AssetType::from_identical_byte(6), 1098);
-    map.insert(AssetType::from_identical_byte(7), 3432);
+  fn build_rates() -> Vec<(AssetType, u64)> {
+    let mut map = vec![];
+    map.push((AssetType::from_identical_byte(1), 5));
+    map.push((AssetType::from_identical_byte(2), 4));
+    map.push((AssetType::from_identical_byte(3), 3));
+    map.push((AssetType::from_identical_byte(4), 2));
+    map.push((AssetType::from_identical_byte(5), 9));
+    map.push((AssetType::from_identical_byte(6), 1098));
+    map.push((AssetType::from_identical_byte(7), 3432));
     map
   }
 
@@ -542,5 +539,52 @@ mod test {
     assert!(proof_result.is_ok());
     let proof = proof_result.unwrap();
     assert!(verifier.verify(&bp_gens, &pc_gens, &proof).is_err());
+  }
+
+  #[test]
+  fn test_solvency_ser_de() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut key_pairs = vec![];
+    for _ in 0..5 {
+      key_pairs.push(XfrKeyPair::generate(&mut prng));
+    }
+    let pubkeys: Vec<_> = key_pairs.iter().map(|x| x.get_pk_ref()).collect();
+    let pc_gens = RistrettoPedersenGens::default();
+    let bars = build_bars(&pubkeys, &mut prng, &pc_gens);
+    let rates = build_rates();
+    let mut audit: SolvencyAudit = Default::default();
+    assert!(audit.add_record(SolvencyRecordType::Liability, &bars[0].0)
+                 .is_ok()); // 10 * 5 = 50
+    assert!(audit.add_record(SolvencyRecordType::Liability, &bars[2].0)
+                 .is_ok()); // 30 * 4 = 120
+    assert!(audit.add_record(SolvencyRecordType::Asset, &bars[1].0)
+                 .is_ok()); // 20 * 5 = 100
+    assert!(audit.add_record(SolvencyRecordType::Asset, &bars[4].0)
+                 .is_ok()); // 50 * 2 = 100
+    assert!(audit.finalize_verified_records().is_ok());
+    assert!(audit.finalize_rates(&rates).is_ok());
+    let memo_for_assets = vec![&bars[1].1, &bars[4].1];
+    let prikeys_for_assets = vec![key_pairs[1].get_sk_ref(), key_pairs[4].get_sk_ref()];
+    let memo_for_liabilities = vec![&bars[0].1, &bars[2].1];
+    let prikeys_for_liabilities = vec![key_pairs[0].get_sk_ref(), key_pairs[2].get_sk_ref()];
+    let prover = audit.build_prover(&memo_for_assets,
+                                    &prikeys_for_assets,
+                                    &memo_for_liabilities,
+                                    &prikeys_for_liabilities)
+                      .unwrap();
+    let verifier = audit.build_verifier();
+
+    // test serialization and deserialization
+    let audit_se = serde_json::to_string(&audit).unwrap();
+    let audit_de: SolvencyAudit = serde_json::from_str(&audit_se).unwrap();
+    assert_eq!(audit, audit_de);
+
+    let prover_se = serde_json::to_string(&prover).unwrap();
+    let prover_de: SolvencyProver = serde_json::from_str(&prover_se).unwrap();
+    assert_eq!(prover, prover_de);
+
+    let verifier_se = serde_json::to_string(&verifier).unwrap();
+    let verifier_de: SolvencyVerifier = serde_json::from_str(&verifier_se).unwrap();
+    assert_eq!(verifier, verifier_de);
   }
 }

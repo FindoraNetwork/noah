@@ -18,7 +18,7 @@ use utils::serialization;
 
 /// Asset Type identifier
 pub const ASSET_TYPE_LENGTH: usize = 32;
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct AssetType(pub [u8; ASSET_TYPE_LENGTH]);
 
 impl AssetType {

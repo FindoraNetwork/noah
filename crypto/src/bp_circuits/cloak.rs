@@ -90,7 +90,7 @@ pub struct CloakVariable {
 }
 
 /// Represent a commitment Cloak value.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub struct CloakCommitment {
   pub amount: CompressedRistretto,
   pub asset_type: CompressedRistretto,
@@ -292,12 +292,12 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
 #[cfg(test)]
 pub mod tests {
   use crate::bp_circuits::cloak::{CloakCommitment, CloakValue};
-  use ::lazy_static::lazy_static;
   use algebra::groups::{Scalar, ScalarArithmetic};
   use algebra::ristretto::RistrettoScalar;
   use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
   use itertools::Itertools;
+  use lazy_static::lazy_static;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;

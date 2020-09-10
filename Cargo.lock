@@ -375,7 +375,6 @@ dependencies = [
  "ed25519-dalek",
  "itertools 0.8.2",
  "lazy_static",
- "linear-map",
  "merlin",
  "rand",
  "rand_chacha",

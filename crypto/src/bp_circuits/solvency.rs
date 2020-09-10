@@ -12,7 +12,6 @@ use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable
 use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
-use linear_map::LinearMap;
 use utils::errors::ZeiError;
 
 /// I implement a proof of solvency bulletproof protocol
@@ -29,8 +28,7 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
                                                          liability_set_vars: &[CloakVariable],
                                                          liability_set_values: Option<&[CloakValue]>,
                                                          public_liability_sum: Scalar,
-                                                         conversion_rates: &LinearMap<Scalar,
-                                                                    Scalar>)
+                                                         conversion_rates: &[(Scalar, Scalar)])
                                                          -> Result<usize, ZeiError> {
   let mut rate_types = vec![];
   let mut rate_values = vec![];
@@ -62,9 +60,16 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
   let diff_var = total_assets_var - total_lia_var;
   let diff_value = match asset_set_values {
     Some(values) => {
-      let converted_asset: Vec<Scalar> = values.iter()
-                                               .map(|v| v.amount.mul(conversion_rates.get(&v.asset_type).unwrap())) // TODO remove this unwrap
-                                               .collect();
+      let converted_asset: Vec<Scalar> =
+        values.iter()
+              .map(|v| {
+                let rate = conversion_rates.iter()
+                                           .find(|(a, _)| a == &v.asset_type)
+                                           .unwrap()
+                                           .1;
+                v.amount.mul(&rate)
+              })
+              .collect();
 
       //let total_asset = converted_asset.iter().sum::<Scalar>() + public_asset_sum;
       let total_asset = converted_asset.iter()
@@ -74,7 +79,13 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(cs: &mut CS,
       let converted_lia: Vec<Scalar> =
         liability_set_values.unwrap() // safe unwrap
                             .iter()
-                            .map(|v| v.amount.mul(conversion_rates.get(&v.asset_type).unwrap())) // TODO remove this unwrap
+                            .map(|v| {
+                              let rate = conversion_rates.iter()
+                                                         .find(|(a, _)| a == &v.asset_type)
+                                                         .unwrap()
+                                                         .1;
+                              v.amount.mul(&rate)
+                            })
                             .collect();
       //let total_lia = converted_lia.iter().sum::<Scalar>().add(&public_liability_sum);
       let total_lia = converted_lia.iter()
@@ -221,7 +232,6 @@ mod test {
   use algebra::ristretto::RistrettoScalar;
   use bulletproofs::r1cs::{Prover, Verifier};
   use bulletproofs::{BulletproofGens, PedersenGens};
-  use linear_map::LinearMap;
   use merlin::Transcript;
 
   #[test]
@@ -275,10 +285,10 @@ mod test {
   #[test]
   fn test_solvency() {
     let pc_gens = PedersenGens::default();
-    let mut rates = LinearMap::new();
-    rates.insert(RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1));
-    rates.insert(RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2));
-    rates.insert(RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3));
+    let mut rates = vec![];
+    rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
+    rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
+    rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
     let asset_set = vec![
       CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), //total 10
       CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(2)), //total 20
