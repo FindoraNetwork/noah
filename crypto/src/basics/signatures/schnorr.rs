@@ -218,7 +218,7 @@ pub fn verify<B: AsRef<[u8]>, G: Group>(pk: &PublicKey<G>,
   if left == right {
     Ok(())
   } else {
-    Err(ZeiError::ArgumentVerificationError)
+    Err(ZeiError::SignatureError)
   }
 }
 
@@ -368,7 +368,7 @@ mod schnorr_sigs {
 
       let wrong_message = String::from("wrong_message");
       let res = multisig_verify::<String, G>(&public_keys, &wrong_message, &msig);
-      assert_eq!(res, Err(ZeiError::ArgumentVerificationError));
+      assert_eq!(res, Err(ZeiError::SignatureError));
 
       let too_short_multi_sig = MultiSignature(msig.0.clone()[0..2].to_vec());
       let res = multisig_verify::<String, G>(&public_keys, &message, &too_short_multi_sig);

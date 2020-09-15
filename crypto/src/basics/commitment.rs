@@ -27,7 +27,7 @@ impl<S: Scalar> Commitment<S> {
     if msgs.len() != self.msg_len {
       return Err(ZeiError::CommitmentInputError);
     }
-    let mut input_vec = vec![blind_scalar.clone()];
+    let mut input_vec = vec![*blind_scalar];
     input_vec.extend(msgs.to_vec());
     // Pad zeroes
     input_vec.extend(vec![S::from_u32(0); self.hash.rate + self.hash.capacity - msgs.len() - 1]);
