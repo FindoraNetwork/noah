@@ -22,22 +22,10 @@ use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
 
 const SCALAR_SIZE: usize = 32;
-
-/// A random value part of the secret key, which purpose is to make the Schnorr signature computation
-/// deterministic.
-pub type SchnorrNonce = [u8; SCALAR_SIZE];
+const PACKAGE_VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
-pub struct SecretKey<S> {
-  pub(crate) key: S,
-  pub(crate) nonce: SchnorrNonce,
-}
-
-impl<S: Scalar> SecretKey<S> {
-  pub fn new(key: S, nonce: SchnorrNonce) -> SecretKey<S> {
-    SecretKey { key, nonce }
-  }
-}
+pub struct SecretKey<S>(S);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublicKey<G>(G);
@@ -139,24 +127,34 @@ pub fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G:
   let base = G::get_base();
   let u = base.mul(&alpha);
 
-  KeyPair { sec_key: SecretKey::new(alpha, nonce),
+  KeyPair { sec_key: SecretKey(alpha),
             pub_key: PublicKey(u) }
 }
 
-/// Deterministic computation of a scalar based on the secret nonce of the private key.
+/// Deterministic computation of a scalar based on the secret key and the message.
 /// This is to avoid attacks due to bad implementation of prng involving the generation
 /// of the commitment in the signature.
-/// The scalar is computed as PRF(nonce,message) where PRF is the CRHF Sha512 following the
-/// high level idea of RFC 6979 (https://tools.ietf.org/html/rfc6979#section-3.2)
+/// The scalar is computed as PRF(algorith_desc, nonce,message) where PRF is the CRHF Sha512 following the
+/// high level idea of RFC 6979 (https://tools.ietf.org/html/rfc6979#section-3.2) and
+/// algorith_desc is a constant string describing the algorithm involved.
+/// This is to avoid attacks where the same private key is used with different
+/// algorithms (ECDSA and Schnorr) for example.
 /// Note that the transcript is not involved here as the verifier has no access to the
-/// secret nonce.
+/// secret key.
 /// * `message` - message to be signed. Needed to make the scalar unique
-/// * `nonce` - nonce from the Schnorr secret key.
-fn deterministic_scalar_gen<G: Group>(message: &[u8], nonce: &SchnorrNonce) -> G::S {
+/// * `secret_key` - Schnorr secret key.
+/// * `returns` - pseudo-random scalar
+#[allow(non_snake_case)]
+fn deterministic_scalar_gen<G: Group, S: Scalar>(message: &[u8],
+                                                 secret_key: &SecretKey<S>)
+                                                 -> G::S {
   let mut hasher = Sha512::new();
 
+  let ALGORITHM_DESC: String = format!("ZeiSchnorrAlgorithm_v{}",
+                                       PACKAGE_VERSION.unwrap_or("unknown"));
+  hasher.input(ALGORITHM_DESC);
   hasher.input(message);
-  hasher.input(nonce);
+  hasher.input(&secret_key.0.to_bytes());
 
   G::S::from_hash(hasher)
 }
@@ -171,7 +169,8 @@ pub fn sign<B: AsRef<[u8]>, G: Group>(signing_key: &KeyPair<G, G::S>, msg: &B) -
   let mut transcript = Transcript::new(b"schnorr_sig");
 
   let g = G::get_base();
-  let r = deterministic_scalar_gen::<G>(msg.as_ref(), &signing_key.sec_key.nonce);
+
+  let r = deterministic_scalar_gen::<G, G::S>(msg.as_ref(), &signing_key.sec_key);
 
   let R = g.mul(&r);
   let pk = &signing_key.pub_key;
@@ -180,8 +179,8 @@ pub fn sign<B: AsRef<[u8]>, G: Group>(signing_key: &KeyPair<G, G::S>, msg: &B) -
 
   let c = transcript.compute_challenge::<G::S>();
 
-  let private_key = &(signing_key.sec_key).key;
-  let s: G::S = r.add(&c.mul(private_key));
+  let private_key = &(signing_key.sec_key);
+  let s: G::S = r.add(&c.mul(&private_key.0));
 
   Signature { R, s }
 }
