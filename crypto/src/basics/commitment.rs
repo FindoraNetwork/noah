@@ -3,16 +3,14 @@
 
 // Let r and c be the rate and the capacity of the rescue permutation.
 // Let n < r be the number of messages.
-// Committing algorithm: commit(m_1, ..., m_n)
-// 1. Sample a random blinding factor rand.
-// 2. Return rescue(rand, m_1, ..., m_n, 0^{r+c-n-1})[0].
+// Committing algorithm: commit(rand; m_1, ..., m_n) (rand is a randomly sampled bliding factor)
+// 1. Return rescue(rand, m_1, ..., m_n, 0^{r+c-n-1})[0].
 
 // Opening verification: verify(m_1, ..., m_n, rand, commitment)
 // 1. Check whether commitment == rescue(rand, m_1, ..., m_n, 0^{r+c-n-1})[0]
 use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Scalar;
-use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 
 pub struct Commitment<S> {
@@ -21,23 +19,19 @@ pub struct Commitment<S> {
 }
 
 impl<S: Scalar> Commitment<S> {
-  /// Returns the commitment and the opening to a message vector.
+  /// Returns the commitment to a message vector.
   /// It returns an error when the number of input messages is invalid.
-  /// * `rng` - source of randomness
+  /// * `blind_scalar` - blinding randomness
   /// * `msgs` - the messages to be committed
-  pub fn commit<R: CryptoRng + RngCore>(&self,
-                                        rng: &mut R,
-                                        msgs: &[S])
-                                        -> Result<(S, S), ZeiError> {
+  pub fn commit(&self, blind_scalar: &S, msgs: &[S]) -> Result<S, ZeiError> {
     if msgs.len() != self.msg_len {
       return Err(ZeiError::CommitmentInputError);
     }
-    let blind_scalar = S::random(rng);
-    let mut input_vec = vec![blind_scalar];
+    let mut input_vec = vec![blind_scalar.clone()];
     input_vec.extend(msgs.to_vec());
     // Pad zeroes
     input_vec.extend(vec![S::from_u32(0); self.hash.rate + self.hash.capacity - msgs.len() - 1]);
-    Ok((self.hash.rescue_hash(&input_vec)[0], blind_scalar))
+    Ok(self.hash.rescue_hash(&input_vec)[0])
   }
 
   /// Check the opening of a commitment.
@@ -88,15 +82,16 @@ mod test {
   fn test_hash_commitment() {
     let hash_comm = Commitment::<BLSScalar>::new();
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let blind_scalar = BLSScalar::random(&mut prng);
     // wrong number of input messages
-    assert!(hash_comm.commit(&mut prng, &[BLSScalar::from_u32(0)])
+    assert!(hash_comm.commit(&blind_scalar, &[BLSScalar::from_u32(0)])
                      .is_err());
 
     // the commitment is successful
     let mut msgs = [BLSScalar::from_u32(1), BLSScalar::from_u32(2)];
-    let comm = hash_comm.commit(&mut prng, &msgs);
+    let comm = hash_comm.commit(&blind_scalar, &msgs);
     assert!(comm.is_ok());
-    let (commitment, blind_scalar) = comm.unwrap(); // safe unwrap
+    let commitment = comm.unwrap(); // safe unwrap
 
     // the commitment value is consistent with the hash output
     let hash = RescueInstance::<BLSScalar>::new();

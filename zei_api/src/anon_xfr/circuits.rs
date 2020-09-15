@@ -334,10 +334,10 @@ pub(crate) mod tests {
     // generate blinding factors
     let comm = Commitment::new();
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let (send_commitment, blind_in) =
-      comm.commit(&mut prng, &[/*amount=*/ two, /*asset_type=*/ one])?;
-    let (recv_commitment, blind_out) =
-      comm.commit(&mut prng, &[/*amount=*/ two, /*asset_type=*/ one])?;
+    let blind_in = BLSScalar::random(&mut prng);
+    let blind_out = BLSScalar::random(&mut prng);
+    let send_commitment = comm.commit(&blind_in, &[/*amount=*/ two, /*asset_type=*/ one])?;
+    let recv_commitment = comm.commit(&blind_out, &[/*amount=*/ two, /*asset_type=*/ one])?;
     let secret_inputs = AXfrWitness { sec_key_in,
                                       diversifier,
                                       uid: 1,
@@ -399,7 +399,8 @@ pub(crate) mod tests {
     let asset_type = BLSScalar::from_u32(5);
     let comm = Commitment::new();
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let (commitment, blind) = comm.commit(&mut prng, &[amount, asset_type]).unwrap(); // safe unwrap
+    let blind = BLSScalar::random(&mut prng);
+    let commitment = comm.commit(&blind, &[amount, asset_type]).unwrap(); // safe unwrap
 
     let amount_var = cs.new_variable(amount);
     let asset_var = cs.new_variable(asset_type);
