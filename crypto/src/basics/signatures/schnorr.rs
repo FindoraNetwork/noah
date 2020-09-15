@@ -119,9 +119,6 @@ pub struct MultiSignature<G: Group>(Vec<Signature<G>>);
 pub fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G::S> {
   // Private key
   let alpha = G::S::random(prng);
-  // Secret nonce:
-  let mut nonce = [0u8; SCALAR_SIZE];
-  prng.fill_bytes(&mut nonce);
 
   // Public key
   let base = G::get_base();
