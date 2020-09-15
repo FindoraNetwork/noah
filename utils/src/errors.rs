@@ -5,6 +5,7 @@ use std::{error, fmt};
 pub enum ZeiError {
   AXfrProverParamsError,
   AXfrVerifierParamsError,
+  AXfrVerificationError,
   AXfrProofError,
   ArgumentVerificationError,
   CommitmentInputError,
@@ -53,6 +54,7 @@ impl fmt::Display for ZeiError {
     f.write_str(match self {
       ZeiError::AXfrProverParamsError => "Could not preprocess anonymous transfer prover",
       ZeiError::AXfrVerifierParamsError => "Could not preprocess anonymous transfer verifier",
+      ZeiError::AXfrVerificationError => "Invalid AXfrBody for merkle root",
       ZeiError::AXfrProofError => "Could not create anonymous transfer proof",
                   ZeiError::ArgumentVerificationError => "Proof(argument) not valid for statement",
                   ZeiError::CommitmentInputError => "The number of messages to be committed is invalid",

@@ -12,7 +12,7 @@ pub type TurboPlonkCS = TurboPlonkConstraintSystem<BLSScalar>;
 // TODO: Move these constants to another file.
 const SK_LEN: usize = 252; // secret key size (in bits)
 const AMOUNT_LEN: usize = 64; // amount value size (in bits)
-const TREE_DEPTH: usize = 20; // Depth of the Merkle Tree
+pub const TREE_DEPTH: usize = 20; // Depth of the Merkle Tree
 
 /// Public inputs of a single input/output anonymous transaction.
 #[derive(Debug)]
@@ -46,9 +46,9 @@ pub(crate) struct AXfrWitness<'a> {
   pub blind_out: BlindFactor,
 }
 
-impl<'a> From<&'a AXfrSecKey> for AXfrWitness<'a> {
+impl<'a> AXfrWitness<'a> {
   // create a default `AXfrWitness` from an anonymous transfer secret key.
-  fn from(sec_key_in: &'a AXfrSecKey) -> Self {
+  pub(crate) fn fake(sec_key_in: &'a AXfrSecKey, tree_depth: usize) -> Self {
     let zero = BLSScalar::zero();
     let node = MTNode { siblings1: zero,
                         siblings2: zero,
@@ -60,7 +60,7 @@ impl<'a> From<&'a AXfrSecKey> for AXfrWitness<'a> {
                   uid: 0,
                   amount: 0,
                   asset_type: zero,
-                  path: MTPath::new(vec![node; TREE_DEPTH]),
+                  path: MTPath::new(vec![node; tree_depth]),
                   blind_in: BlindFactor::zero(),
                   blind_out: BlindFactor::zero() }
   }

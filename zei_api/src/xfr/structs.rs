@@ -6,7 +6,7 @@ use crate::xfr::asset_mixer::AssetMixProof;
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
 use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
-use algebra::groups::Scalar as _;
+use algebra::groups::Scalar as ZeiScalar;
 use algebra::ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::RangeProof;
 use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCipher};
@@ -28,10 +28,10 @@ impl AssetType {
   }
 }
 
-pub fn asset_type_to_scalar(asset_type: &AssetType) -> Scalar {
+pub fn asset_type_to_scalar<S: ZeiScalar>(asset_type: &AssetType) -> S {
   let mut sha512 = Sha512::new();
   sha512.input(&asset_type.0);
-  Scalar::from_hash(sha512)
+  S::from_hash(sha512)
 }
 
 /// A Transfer note: contains a transfer body and a (multi)signature
