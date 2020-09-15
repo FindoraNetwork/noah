@@ -72,7 +72,7 @@ impl SchnorrTranscript for Transcript {
                                                                pk: &PublicKey<G>,
                                                                commitment: &G) {
     self.append_message(b"message", msg.as_ref());
-    self.append_message(b"public key", &pk.clone().zei_to_bytes());
+    self.append_message(b"public key", &pk.zei_to_bytes());
     self.append_message(b"R", &commitment.to_compressed_bytes());
   }
 
