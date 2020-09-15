@@ -141,9 +141,7 @@ pub fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G:
 /// * `secret_key` - Schnorr secret key.
 /// * `returns` - pseudo-random scalar
 #[allow(non_snake_case)]
-fn deterministic_scalar_gen<G: Group, S: Scalar>(message: &[u8],
-                                                 secret_key: &SecretKey<S>)
-                                                 -> G::S {
+fn deterministic_scalar_gen<G: Group>(message: &[u8], secret_key: &SecretKey<G::S>) -> G::S {
   let mut hasher = Sha512::new();
 
   let ALGORITHM_DESC = b"ZeiSchnorrAlgorithm";
@@ -166,7 +164,7 @@ pub fn sign<B: AsRef<[u8]>, G: Group>(signing_key: &KeyPair<G, G::S>, msg: &B) -
 
   let g = G::get_base();
 
-  let r = deterministic_scalar_gen::<G, G::S>(msg.as_ref(), &signing_key.sec_key);
+  let r = deterministic_scalar_gen::<G>(msg.as_ref(), &signing_key.sec_key);
 
   let R = g.mul(&r);
   let pk = &signing_key.pub_key;
