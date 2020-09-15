@@ -22,7 +22,6 @@ use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
 
 const SCALAR_SIZE: usize = 32;
-const PACKAGE_VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct SecretKey<S>(S);
@@ -147,8 +146,8 @@ fn deterministic_scalar_gen<G: Group, S: Scalar>(message: &[u8],
                                                  -> G::S {
   let mut hasher = Sha512::new();
 
-  let ALGORITHM_DESC: String = format!("ZeiSchnorrAlgorithm_v{}",
-                                       PACKAGE_VERSION.unwrap_or("unknown"));
+  let ALGORITHM_DESC = b"ZeiSchnorrAlgorithm";
+
   hasher.input(ALGORITHM_DESC);
   hasher.input(message);
   hasher.input(&secret_key.0.to_bytes());
