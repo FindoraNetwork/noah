@@ -17,6 +17,8 @@ use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 pub type Bls12381field = Scalar;
 
+pub const BLS_SCALAR_LEN: usize = 32;
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct BLSScalar(Bls12381field);
 #[derive(Clone, PartialEq, Eq, Debug)]

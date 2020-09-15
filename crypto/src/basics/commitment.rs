@@ -40,18 +40,11 @@ impl<S: Scalar> Commitment<S> {
   /// * `blind_scalar` - the blinding factor of the commitment
   /// * `commitment` - the commitment value
   pub fn verify(&self, msgs: &[S], blind_scalar: &S, commitment: &S) -> Result<(), ZeiError> {
-    if msgs.len() != self.msg_len {
-      return Err(ZeiError::CommitmentInputError);
+    let expected = self.commit(blind_scalar, msgs)?;
+    if expected != *commitment {
+      return Err(ZeiError::CommitmentVerificationError);
     }
-    let mut input_vec = vec![*blind_scalar];
-    input_vec.extend(msgs.to_vec());
-    // Pad zeroes
-    input_vec.extend(vec![S::from_u32(0); self.hash.rate + self.hash.capacity - msgs.len() - 1]);
-    if &self.hash.rescue_hash(&input_vec)[0] != commitment {
-      Err(ZeiError::CommitmentVerificationError)
-    } else {
-      Ok(())
-    }
+    Ok(())
   }
 }
 

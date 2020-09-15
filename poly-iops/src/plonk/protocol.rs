@@ -150,7 +150,7 @@ pub mod prover {
   ///   prover(& mut prng, &mut transcript, &pcs, &cs, &prover_params, &witness).unwrap()
   /// };
   ///
-  /// let verifier_params = preprocess_verifier(&pcs, &cs, common_seed).unwrap();
+  /// let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
   /// let mut transcript = Transcript::new(b"Test");
   /// assert!(verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof).is_ok())
   /// ```
@@ -443,7 +443,7 @@ mod test {
     let proof_de: PlonkPf<PCS> = serde_json::from_str(&proof_json).unwrap();
     assert_eq!(proof, proof_de);
     {
-      let verifier_params = preprocess_verifier(pcs, &cs, common_seed).unwrap();
+      let verifier_params = preprocess_verifier(&cs, pcs, common_seed).unwrap();
       let mut transcript = Transcript::new(b"TestPlonk");
       assert!(verifier(&mut transcript, pcs, &cs, &verifier_params, &[], &proof).is_ok())
     }
@@ -500,7 +500,7 @@ mod test {
     };
 
     {
-      let verifier_params = preprocess_verifier(&pcs, &cs, common_seed).unwrap();
+      let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
       let mut transcript = Transcript::new(b"TestPlonk");
       assert!(verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof).is_ok())
     }
@@ -557,7 +557,7 @@ mod test {
              &witness).unwrap()
     };
     {
-      let verifier_params = preprocess_verifier(&pcs, &cs, common_seed).unwrap();
+      let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
       let mut transcript = Transcript::new(b"TestPlonk");
       assert!(verifier(&mut transcript,
                        &pcs,

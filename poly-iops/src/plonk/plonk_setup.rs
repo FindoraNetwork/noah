@@ -406,6 +406,16 @@ pub struct PlonkProverParams<O, C, F> {
   pub(crate) Z_H_inv_coset_evals: Vec<F>,
 }
 
+impl<O, C, F> PlonkProverParams<O, C, F> {
+  pub fn get_verifier_params(self) -> PlonkVerifierParams<C, F> {
+    self.verifier_params
+  }
+
+  pub fn get_verifier_params_ref(&self) -> &PlonkVerifierParams<C, F> {
+    &self.verifier_params
+  }
+}
+
 #[derive(Debug)]
 #[allow(non_snake_case)]
 pub struct PlonkVerifierParams<C, F> {
@@ -568,8 +578,8 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
 /// // See plonk::prover::prover
 /// ```
 pub fn preprocess_verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
-  pcs: &PCS,
   cs: &CS,
+  pcs: &PCS,
   prg_seed: [u8; 32])
   -> Result<VerifierParams<PCS>, PlonkError> {
   let prover_params = preprocess_prover(cs, pcs, prg_seed)?;

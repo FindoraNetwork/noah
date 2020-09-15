@@ -1,13 +1,14 @@
-use crate::anon_xfr::structs::{AXfrPubKey, AXfrSecKey};
+//use crate::anon_xfr::structs::{AXfrPubKey, AXfrSecKey};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
-use algebra::jubjub::{JubjubGroup, JubjubScalar};
+//use algebra::jubjub::{JubjubGroup, JubjubScalar};
 use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
 use serde::Serializer;
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
 
+/*
 impl ZeiFromToBytes for AXfrPubKey {
   fn zei_to_bytes(&self) -> Vec<u8> {
     self.0.zei_to_bytes()
@@ -33,6 +34,7 @@ impl ZeiFromToBytes for AXfrSecKey {
 }
 
 serialize_deserialize!(AXfrSecKey);
+*/
 
 impl ZeiFromToBytes for AssetType {
   fn zei_to_bytes(&self) -> Vec<u8> {
