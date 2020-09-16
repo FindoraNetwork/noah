@@ -18,6 +18,8 @@ pub struct JubjubScalar(pub(crate) Fr);
 #[derive(Clone, PartialEq, Debug)]
 pub struct JubjubGroup(pub(crate) ExtendedPoint);
 
+pub const JUBJUB_SCALAR_LEN: usize = 32;
+
 impl One for JubjubScalar {
   fn one() -> JubjubScalar {
     JubjubScalar(Fr::one())

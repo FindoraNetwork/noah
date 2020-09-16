@@ -8,7 +8,7 @@ use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{asset_type_to_scalar, AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
 use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-use algebra::jubjub::{JubjubGroup, JubjubScalar};
+use algebra::jubjub::{JubjubGroup, JubjubScalar, JUBJUB_SCALAR_LEN};
 use crypto::basics::hybrid_encryption::{
   hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key, XSecretKey,
 };
@@ -40,10 +40,10 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
   assert_eq!(inputs[0].asset_type, outputs[0].asset_type);
 
   // 2. build output ABAR
-  let (out_abar, out_blind, owner_memo) = build_abar(prng, &outputs[0]);
+  let (out_abar, out_blind, _key_rand, owner_memo) = build_abar(prng, &outputs[0]);
 
   // 3. build input witness info
-  let nullifier = nullifier(inputs[0].secret_key,
+  let nullifier = nullifier(&inputs[0].secret_key,
                             inputs[0].amount,
                             &inputs[0].asset_type,
                             inputs[0].mt_leaf_info.uid);
@@ -51,7 +51,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
   let signing_key = AXfrPubKey(inputs[0].abar.public_key.0.mul(&diversifier));
 
   // 4. build proof
-  let secret_input = AXfrWitness { sec_key_in: inputs[0].secret_key,
+  let secret_input = AXfrWitness { sec_key_in: inputs[0].secret_key.0,
                                    diversifier,
                                    uid: inputs[0].mt_leaf_info.uid,
                                    amount: inputs[0].amount,
@@ -90,9 +90,12 @@ pub fn verify_anon_xfr_body(params: &NodeParams,
                                                                   })
 }
 
-fn build_abar<R: CryptoRng + RngCore>(prng: &mut R,
-                                      record: &AnonAssetRecordTemplate)
-                                      -> (AnonBlindAssetRecord, BLSScalar, OwnerMemo) {
+fn build_abar<R: CryptoRng + RngCore>(
+  prng: &mut R,
+  record: &AnonAssetRecordTemplate)
+  -> (AnonBlindAssetRecord, BLSScalar, JubjubScalar, OwnerMemo) {
+  let rand = JubjubScalar::random(prng);
+  let rand_pub_key = record.public_key.randomize(&rand);
   let a = BLSScalar::from_u64(record.amount);
   let at = asset_type_to_scalar::<BLSScalar>(&record.asset_type);
   let blinding = BLSScalar::random(prng);
@@ -102,28 +105,32 @@ fn build_abar<R: CryptoRng + RngCore>(prng: &mut R,
   msg.extend_from_slice(&record.amount.to_le_bytes());
   msg.extend_from_slice(&record.asset_type.0);
   msg.extend_from_slice(&blinding.to_bytes());
+  msg.extend_from_slice(&rand.to_bytes());
   let cipher = hybrid_encrypt_with_x25519_key(prng, &record.encryption_key, &msg);
   (AnonBlindAssetRecord { amount_type_commitment: commitment,
-                          public_key: record.public_key.clone() },
+                          public_key: rand_pub_key },
    blinding,
+   rand,
    OwnerMemo { blind_share: Default::default(),
                lock: cipher })
 }
 
 /// Open AnonBlindAssetRecord structure from owner memo and decryption key, appending other
 /// parameters to OpenAnonBlindAssetRecord structure.
-pub fn open_abar<'a, 'b>(abar: &'a AnonBlindAssetRecord,
-                         memo: &OwnerMemo,
-                         signing_key: &'b AXfrSecKey,
-                         dec_key: &XSecretKey,
-                         mt_info: MTLeafInfo)
-                         -> Result<OpenAnonBlindAssetRecord<'a, 'b>, ZeiError> {
-  let (amount, asset_type, blind) = decrypt_memo(memo, dec_key, abar)?;
+pub fn open_abar<'a>(abar: &'a AnonBlindAssetRecord,
+                     memo: &OwnerMemo,
+                     sec_key: &AXfrSecKey,
+                     dec_key: &XSecretKey,
+                     mt_info: MTLeafInfo)
+                     -> Result<OpenAnonBlindAssetRecord<'a>, ZeiError> {
+  let (amount, asset_type, blind, key_rand) = decrypt_memo(memo, dec_key, abar)?;
+  let secret_key = sec_key.randomize(&key_rand);
   Ok(OpenAnonBlindAssetRecord { amount,
                                 asset_type,
                                 blind,
+                                key_rand,
                                 mt_leaf_info: mt_info,
-                                secret_key: signing_key,
+                                secret_key,
                                 abar })
 }
 
@@ -136,23 +143,29 @@ pub fn open_abar<'a, 'b>(abar: &'a AnonBlindAssetRecord,
 pub fn decrypt_memo(memo: &OwnerMemo,
                     dec_key: &XSecretKey,
                     abar: &AnonBlindAssetRecord)
-                    -> Result<(u64, AssetType, BLSScalar), ZeiError> {
+                    -> Result<(u64, AssetType, BLSScalar, JubjubScalar), ZeiError> {
   let plaintext = hybrid_decrypt_with_x25519_secret_key(&memo.lock, dec_key);
-  if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS_SCALAR_LEN {
+  if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS_SCALAR_LEN + JUBJUB_SCALAR_LEN {
     return Err(ZeiError::ParameterError);
   }
   let amount = utils::u8_le_slice_to_u64(&plaintext[0..8]);
+  let mut i = 8;
   let mut asset_type_array = [0u8; ASSET_TYPE_LENGTH];
-  asset_type_array.copy_from_slice(&plaintext[8..8 + ASSET_TYPE_LENGTH]);
+  asset_type_array.copy_from_slice(&plaintext[i..i + ASSET_TYPE_LENGTH]);
   let asset_type = AssetType(asset_type_array);
-  let blind = BLSScalar::from_bytes(&plaintext[8 + ASSET_TYPE_LENGTH..]).map_err(|_| {
-                                                                          ZeiError::ParameterError
-                                                                        })?;
+  i += ASSET_TYPE_LENGTH;
+  let blind =
+    BLSScalar::from_bytes(&plaintext[i..i + BLS_SCALAR_LEN]).map_err(|_| ZeiError::ParameterError)?;
+  i += BLS_SCALAR_LEN;
+  let rand =
+    JubjubScalar::from_bytes(&plaintext[i..i + JUBJUB_SCALAR_LEN]).map_err(|_| {
+                                                                    ZeiError::ParameterError
+                                                                  })?;
   crypto::basics::commitment::Commitment::new().verify(&[BLSScalar::from_u64(amount),
                                                          asset_type_to_scalar(&asset_type)],
                                                        &blind,
                                                        &abar.amount_type_commitment)?;
-  Ok((amount, asset_type, blind))
+  Ok((amount, asset_type, blind, rand))
 }
 
 fn nullifier(secret_key: &AXfrSecKey, amount: u64, asset_type: &AssetType, uid: u64) -> BLSScalar {
@@ -208,26 +221,27 @@ mod tests {
     // simulate input abar
     let amount = 10u64;
     let asset_type = AssetType::from_identical_byte(0);
-
-    let (in_abar, in_blind, in_memo) =
+    let (in_abar, in_blind, key_rand_factor, in_memo) =
       build_abar(&mut prng,
                  &AnonAssetRecordTemplate { amount,
                                             asset_type,
-                                            public_key: pk_in.clone(),
+                                            public_key: pk_in,
                                             encryption_key: enc_key_in });
     // simulate merklee tree state
+    let rand_pk_in = &in_abar.public_key;
     let node = MTNode { siblings1: one,
                         siblings2: two,
                         is_left_child: 0u8,
                         is_right_child: 1u8 };
     let hash = RescueInstance::new();
-    let pk_in_hash = hash.rescue_hash(&[pk_in.0.get_x(), pk_in.0.get_y(), zero, zero])[0];
+    let pk_in_hash = hash.rescue_hash(&[rand_pk_in.0.get_x(), rand_pk_in.0.get_y(), zero, zero])[0];
     let leaf = hash.rescue_hash(&[/*uid=*/ two,
                                   in_abar.amount_type_commitment,
                                   pk_in_hash,
                                   zero])[0];
     let merkle_root = hash.rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
 
+    // output keys
     let sk_out = AXfrSecKey(JubjubScalar::random(&mut prng));
     let pk_out = AXfrPubKey(JubjubGroup::get_base().mul(&sk_out.0));
     let dec_key_out = XSecretKey::new(&mut prng);
@@ -239,15 +253,17 @@ mod tests {
                                  root: merkle_root,
                                  uid: 2 };
 
-      // leaf is the right child
       let open_abar_in = open_abar(&in_abar, &in_memo, &sk_in, &dec_key_in, mt_info).unwrap();
+      let rand_sk_in = sk_in.randomize(&open_abar_in.key_rand);
       assert_eq!(amount, open_abar_in.amount);
       assert_eq!(asset_type, open_abar_in.asset_type);
       assert_eq!(in_blind, open_abar_in.blind);
+      assert_eq!(key_rand_factor, open_abar_in.key_rand);
+      assert_eq!(rand_sk_in, open_abar_in.secret_key);
 
       let out_template = AnonAssetRecordTemplate { amount,
                                                    asset_type,
-                                                   public_key: pk_out,
+                                                   public_key: pk_out.clone(),
                                                    encryption_key: enc_key_out };
       let (body, _) =
         gen_anon_xfr_body(&mut prng, &user_params, &[open_abar_in], &[out_template]).unwrap();
@@ -256,10 +272,12 @@ mod tests {
     {
       // owner scope
       let memo = &body.memo[0];
-      let (dec_amount, dec_asset_type, _) =
+      let (dec_amount, dec_asset_type, _, key_rand_factor) =
         decrypt_memo(memo, &dec_key_out, &body.outputs[0]).unwrap();
+      let rand_pk = pk_out.randomize(&key_rand_factor);
       assert_eq!(amount, dec_amount);
       assert_eq!(asset_type, dec_asset_type);
+      assert_eq!(rand_pk, body.outputs[0].public_key);
     }
     {
       // verifier scope

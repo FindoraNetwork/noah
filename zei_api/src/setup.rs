@@ -1,8 +1,5 @@
 //The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{build_single_spend_cs, AXfrWitness, TurboPlonkCS, TREE_DEPTH};
-use crate::anon_xfr::structs::AXfrSecKey;
-use algebra::groups::Scalar;
-use algebra::jubjub::JubjubScalar;
 use bulletproofs::BulletproofGens;
 use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use poly_iops::commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
@@ -68,10 +65,9 @@ impl Default for PublicParams {
 
 impl UserParams {
   pub fn new(tree_depth: Option<usize>, kzg_degree: usize) -> UserParams {
-    let fake_key = AXfrSecKey(JubjubScalar::from_u32(0));
     let cs = match tree_depth {
-      Some(depth) => build_single_spend_cs(AXfrWitness::fake(&fake_key, depth)),
-      None => build_single_spend_cs(AXfrWitness::fake(&fake_key, TREE_DEPTH)),
+      Some(depth) => build_single_spend_cs(AXfrWitness::fake(depth)),
+      None => build_single_spend_cs(AXfrWitness::fake(TREE_DEPTH)),
     };
     let pcs = KZGCommitmentScheme::new(kzg_degree, &mut ChaChaRng::from_seed([0u8; 32]));
     let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();

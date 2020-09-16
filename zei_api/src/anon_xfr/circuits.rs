@@ -1,6 +1,4 @@
-use crate::anon_xfr::structs::{
-  AXfrPubKey, AXfrSecKey, BlindFactor, Commitment, MTNode, MTPath, Nullifier,
-};
+use crate::anon_xfr::structs::{AXfrPubKey, BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubGroup, JubjubScalar};
@@ -35,8 +33,8 @@ impl AXfrPubInputs {
 
 /// Secret witness of a single input/output anonymous transaction.
 #[derive(Debug)]
-pub(crate) struct AXfrWitness<'a> {
-  pub sec_key_in: &'a AXfrSecKey,
+pub(crate) struct AXfrWitness {
+  pub sec_key_in: JubjubScalar,
   pub diversifier: JubjubScalar, // the randomness for re-randomizing sender's public key
   pub uid: u64,
   pub amount: u64,
@@ -46,16 +44,16 @@ pub(crate) struct AXfrWitness<'a> {
   pub blind_out: BlindFactor,
 }
 
-impl<'a> AXfrWitness<'a> {
+impl AXfrWitness {
   // create a default `AXfrWitness` from an anonymous transfer secret key.
-  pub(crate) fn fake(sec_key_in: &'a AXfrSecKey, tree_depth: usize) -> Self {
+  pub(crate) fn fake(tree_depth: usize) -> Self {
     let zero = BLSScalar::zero();
     let node = MTNode { siblings1: zero,
                         siblings2: zero,
                         is_left_child: 0,
                         is_right_child: 0 };
 
-    AXfrWitness { sec_key_in,
+    AXfrWitness { sec_key_in: JubjubScalar::zero(),
                   diversifier: JubjubScalar::zero(),
                   uid: 0,
                   amount: 0,
@@ -178,7 +176,7 @@ struct WitnessVars {
 
 // Add secret inputs into the constraint system.
 fn add_secret_inputs(cs: &mut TurboPlonkCS, witness: AXfrWitness) -> WitnessVars {
-  let sec_key_scalar = BLSScalar::from(&witness.sec_key_in.0);
+  let sec_key_scalar = BLSScalar::from(&witness.sec_key_in);
   let diversifier_scalar = BLSScalar::from(&witness.diversifier);
   let sec_key_in = cs.new_variable(sec_key_scalar);
   let diversifier = cs.new_variable(diversifier_scalar);
@@ -302,6 +300,7 @@ fn nullify(cs: &mut TurboPlonkCS,
 #[cfg(test)]
 pub(crate) mod tests {
   use super::*;
+  use crate::anon_xfr::structs::AXfrSecKey;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{Group, GroupArithmetic, One, Scalar, Zero};
   use algebra::jubjub::JubjubScalar;
@@ -338,7 +337,7 @@ pub(crate) mod tests {
     let blind_out = BLSScalar::random(&mut prng);
     let send_commitment = comm.commit(&blind_in, &[/*amount=*/ two, /*asset_type=*/ one])?;
     let recv_commitment = comm.commit(&blind_out, &[/*amount=*/ two, /*asset_type=*/ one])?;
-    let secret_inputs = AXfrWitness { sec_key_in,
+    let secret_inputs = AXfrWitness { sec_key_in: sec_key_in.0,
                                       diversifier,
                                       uid: 1,
                                       amount: 2,
