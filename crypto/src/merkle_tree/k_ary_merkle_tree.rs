@@ -91,9 +91,8 @@ fn create_k_merkle_node<S: Copy + Debug, H: MTHash<S = S>>(elements: &[S],
                                          .collect();
 
   let value: S = match level {
-    0 => hash.digest_root(elements.len(),
-                          values_vec.iter().map(|v| v).collect_vec().as_slice()),
-    _ => hash.digest(values_vec.iter().map(|v| v).collect_vec().as_slice()),
+    0 => hash.digest_root(elements.len(), values_vec.iter().collect_vec().as_slice()),
+    _ => hash.digest(values_vec.iter().collect_vec().as_slice()),
   };
 
   KMerkleNode { children: k_merkle_nodes,
@@ -167,7 +166,7 @@ pub fn kmt_verify<S, H>(root: &KMerkleRoot<S>,
     v_to_hash.append(&mut siblings_left);
     v_to_hash.push(prev);
     v_to_hash.append(&mut siblings_right);
-    let v_to_hash = v_to_hash.iter().map(|v| v).collect_vec();
+    let v_to_hash = v_to_hash.iter().collect_vec();
     prev = hasher.digest(v_to_hash.as_slice());
 
     level -= 1;
@@ -182,7 +181,7 @@ pub fn kmt_verify<S, H>(root: &KMerkleRoot<S>,
   v_to_hash.append(&mut siblings_left);
   v_to_hash.push(prev);
   v_to_hash.append(&mut siblings_right);
-  let v_to_hash = v_to_hash.iter().map(|v| v).collect_vec();
+  let v_to_hash = v_to_hash.iter().collect_vec();
   let computed_root = hasher.digest_root(root.size, v_to_hash.as_slice());
 
   if computed_root == root.value {

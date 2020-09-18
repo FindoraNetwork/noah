@@ -433,6 +433,7 @@ fn extract_ciphertext_and_commitments(
 /// I compute a range proof for confidential amount transfers.
 /// The proof guarantees that output amounts and difference between total input
 /// and total output are in the range [0,2^{64} - 1]
+#[allow(clippy::same_item_push)]
 pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
                           outputs: &[&OpenAssetRecord])
                           -> Result<XfrRangeProof, ZeiError> {

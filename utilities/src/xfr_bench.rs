@@ -116,7 +116,7 @@ fn run_batch_xfr_note_verify(xfr_notes: &[XfrNote], xfr_notes_policies: &[XfrNot
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
   let mut params = PublicParams::new();
 
-  let xfr_notes_vec = xfr_notes.iter().map(|x| x).collect_vec();
+  let xfr_notes_vec = xfr_notes.iter().collect_vec();
   let xfr_notes_ref = xfr_notes_vec.as_slice();
 
   let mut xfr_notes_policies_ref = vec![];
@@ -129,10 +129,7 @@ fn run_batch_xfr_note_verify(xfr_notes: &[XfrNote], xfr_notes_policies: &[XfrNot
   let res = batch_verify_xfr_notes(&mut prng,
                                    &mut params,
                                    xfr_notes_ref,
-                                   xfr_notes_policies_ref.iter()
-                                                         .map(|x| x)
-                                                         .collect_vec()
-                                                         .as_slice());
+                                   xfr_notes_policies_ref.iter().collect_vec().as_slice());
   assert!(res.is_ok());
 }
 
@@ -167,7 +164,7 @@ pub fn run_benchmark_create_complex_xfr_note<B: Measurement>(benchmark_group: &m
        ac_commitment_keys,
        asset_tracing_policy_asset_input,
        _ac_commitments) = setup_with_policies(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| {
@@ -187,7 +184,7 @@ pub fn run_benchmark_create_xfr_note_identity_tracking<B: Measurement>(benchmark
 
   let (sender_key_pairs, user_ac_sks, credentials, ac_commitment_keys, _, _ac_commitments) =
     setup_with_policies(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| {
@@ -210,7 +207,7 @@ pub fn run_benchmark_create_complex_xfr_note_multiple_assets<B: Measurement>(ben
        ac_commitment_keys,
        asset_tracing_policy_asset_input,
        _ac_commitments) = setup_with_policies(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| {
@@ -229,7 +226,7 @@ pub fn run_benchmark_create_simple_xfr_note<B: Measurement>(benchmark_group: &mu
   let title = make_title::<B>("Simple XfrNote creation", n);
 
   let (sender_key_pairs, _) = multiple_key_gen(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| run_simple_xfr_note_create(sender_key_pairs_ref.as_slice(), n))
@@ -241,7 +238,7 @@ pub fn run_benchmark_verify_simple_xfr_note<B: Measurement>(benchmark_group: &mu
   let title = make_title::<B>("Simple XfrNote verification", n);
 
   let (sender_key_pairs, _) = multiple_key_gen(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   let xfr_note = run_simple_xfr_note_create(sender_key_pairs_ref.as_slice(), n);
 
@@ -265,7 +262,7 @@ pub fn run_benchmark_verify_batch_xfr<B: Measurement>(benchmark_group: &mut Benc
 
   for _i in 0..k {
     let (sender_key_pairs, _) = multiple_key_gen(n);
-    let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+    let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
     let (ar_ins, output_asset_records) =
       prepare_inputs_and_outputs_without_policies_single_asset(sender_key_pairs_ref.as_slice(), n);
@@ -299,7 +296,7 @@ pub fn run_benchmark_create_complex_xfr_body<B: Measurement>(benchmark_group: &m
        ac_commitment_keys,
        asset_tracing_policy_asset_input,
        _ac_commitments) = setup_with_policies(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| {
@@ -323,7 +320,7 @@ pub fn run_benchmark_verify_complex_xfr_note<B: Measurement>(benchmark_group: &m
        ac_commitment_keys,
        asset_tracing_policy_input,
        ac_commitments) = setup_with_policies(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   let xfr_note = run_complex_xfr_note_create(sender_key_pairs_ref.as_slice(),
                                              user_ac_sks,
@@ -351,7 +348,7 @@ pub fn run_benchmark_verify_xfr_note_identity_tracking<B: Measurement>(benchmark
        ac_commitment_keys,
        asset_tracing_policy_input,
        ac_commitments) = setup_with_policies(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   let xfr_note = run_complex_xfr_note_create(sender_key_pairs_ref.as_slice(),
                                              user_ac_sks,
@@ -379,7 +376,7 @@ pub fn run_benchmark_verify_complex_xfr_note_many_assets<B: Measurement>(benchma
        ac_commitment_keys,
        asset_tracing_policy_input,
        ac_commitments) = setup_with_policies(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   let xfr_note = run_complex_xfr_note_multiple_assets_create(sender_key_pairs_ref.as_slice(),
                                                              user_ac_sks,
@@ -407,7 +404,7 @@ pub fn run_benchmark_verify_complex_xfr_body<B: Measurement>(benchmark_group: &m
        ac_commitment_keys,
        asset_tracing_policy_input,
        ac_commitments) = setup_with_policies(n);
-  let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+  let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
   let xfr_body = run_complex_xfr_body_create(sender_key_pairs_ref.as_slice(),
                                              user_ac_sks,

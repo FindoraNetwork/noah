@@ -220,7 +220,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(transcript: &mut Transcrip
                                                       -> Result<(), ZeiError> {
   let multi_exp_scalars = sigma_verify_scalars(transcript, prng, elems, lhs_matrix, rhs_vec, proof);
 
-  let scalars_as_ref = multi_exp_scalars.iter().map(|s| s).collect_vec();
+  let scalars_as_ref = multi_exp_scalars.iter().collect_vec();
   let mut me_elems = vec![];
   for e in elems {
     me_elems.push(*e);

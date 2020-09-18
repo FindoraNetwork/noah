@@ -56,7 +56,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(transcrip
                                                                        dlogs: &[G::S])
                                                                        -> SigmaProof<G::S, G> {
   let mut public_elems = vec![base];
-  let mut ref_points: Vec<&G> = points.iter().map(|x| x).collect();
+  let mut ref_points: Vec<&G> = points.iter().collect();
   public_elems.append(&mut ref_points);
   transcript.init_sigma(b"PoK Dlog Multiple", &[], public_elems.as_slice());
 
@@ -82,7 +82,7 @@ pub fn verify_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(transcri
                                                                                     G>)
                                                                         -> Result<(), ZeiError> {
   let mut public_elems = vec![base];
-  let mut ref_points: Vec<&G> = points.iter().map(|x| x).collect();
+  let mut ref_points: Vec<&G> = points.iter().collect();
   public_elems.append(&mut ref_points);
   transcript.init_sigma(b"PoK Dlog Multiple", &[], public_elems.as_slice());
 
