@@ -1,21 +1,23 @@
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 
-use crate::xfr_bench::bench_utils::{ASSET_TYPE_1, ASSET_TYPE_2};
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
-use itertools::Itertools;
-use zei::api::anon_creds;
-use zei::api::anon_creds::{
+use super::asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType};
+use super::asset_tracer::gen_asset_tracer_keypair;
+use super::lib::XfrNotePolicies;
+use super::sig::{XfrKeyPair, XfrPublicKey};
+use super::structs::{
+  AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
+  BlindAssetRecord, IdentityRevealPolicy, OwnerMemo, XfrAmount, XfrAssetType, ASSET_TYPE_LENGTH,
+};
+use crate::api::anon_creds;
+use crate::api::anon_creds::{
   ac_commit, ac_sign, ACCommitment, ACCommitmentKey, ACUserSecretKey, Credential,
 };
-use zei::xfr::asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType};
-use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
-use zei::xfr::lib::XfrNotePolicies;
-use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
-use zei::xfr::structs::{
-  AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
-  BlindAssetRecord, IdentityRevealPolicy, OwnerMemo, XfrAmount, XfrAssetType,
-};
+use crypto::ristretto_pedersen::RistrettoPedersenGens;
+use itertools::Itertools;
+
+pub const ASSET_TYPE_1: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
+pub const ASSET_TYPE_2: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
 
 // Simulate getting a BlindAssetRecord from Ledger
 #[allow(clippy::clone_on_copy)]
@@ -99,7 +101,7 @@ pub fn setup_with_policies(
     let (sig_commitment, pok, key) = ac_commit(&mut prng,
                                                &user_ac_sk,
                                                &credential_user.clone(),
-                                               user_key_pair.get_pk_ref().as_bytes()).unwrap();
+                                               user_key_pair.pub_key.as_bytes()).unwrap();
     ac_commitment_keys.push(key.unwrap());
     ac_commitments.push(sig_commitment);
     ac_proofs.push(pok);
@@ -159,10 +161,10 @@ pub fn prepare_inputs_and_outputs_with_policies(sender_key_pairs: &[&XfrKeyPair]
     let asset_type = asset_types[i % l];
 
     let (bar_user_addr, memo) =
-      conf_blind_asset_record_from_ledger(user_key_pair.get_pk_ref(), amount, asset_type);
+      conf_blind_asset_record_from_ledger(&user_key_pair.pub_key, amount, asset_type);
 
     let oar_user_addr =
-      open_blind_asset_record(&bar_user_addr, &Some(memo), user_key_pair.get_sk_ref()).unwrap();
+      open_blind_asset_record(&bar_user_addr, &Some(memo), &user_key_pair).unwrap();
 
     let credential_user = credentials[i].clone();
 
@@ -204,7 +206,7 @@ pub fn prepare_inputs_and_outputs_with_policies(sender_key_pairs: &[&XfrKeyPair]
   (ar_ins, output_asset_records)
 }
 
-pub(crate) fn prepare_inputs_and_outputs_without_policies_single_asset(
+pub fn prepare_inputs_and_outputs_without_policies_single_asset(
   sender_key_pairs: &[&XfrKeyPair],
   n: usize)
   -> (Vec<AssetRecord>, Vec<AssetRecord>) {
@@ -219,10 +221,10 @@ pub(crate) fn prepare_inputs_and_outputs_without_policies_single_asset(
     let user_key_pair = &sender_key_pairs[i];
 
     let (bar_user_addr, memo) =
-      conf_blind_asset_record_from_ledger(user_key_pair.get_pk_ref(), amount, ASSET_TYPE_1);
+      conf_blind_asset_record_from_ledger(&user_key_pair.pub_key, amount, ASSET_TYPE_1);
 
     let oar_user_addr =
-      open_blind_asset_record(&bar_user_addr, &Some(memo), user_key_pair.get_sk_ref()).unwrap();
+      open_blind_asset_record(&bar_user_addr, &Some(memo), &user_key_pair).unwrap();
 
     let ar_in = AssetRecord::from_open_asset_record_no_asset_tracking(oar_user_addr);
 
@@ -261,7 +263,7 @@ pub fn prepare_inputs_and_outputs_with_policies_single_asset(
                                            n)
 }
 
-pub(crate) fn prepare_inputs_and_outputs_with_policies_multiple_assets(
+pub fn prepare_inputs_and_outputs_with_policies_multiple_assets(
   sender_key_pairs: &[&XfrKeyPair],
   user_ac_sks: Vec<ACUserSecretKey>,
   credentials: Vec<Credential>,
@@ -278,10 +280,10 @@ pub(crate) fn prepare_inputs_and_outputs_with_policies_multiple_assets(
                                            n)
 }
 
-pub(crate) fn gen_policies_with_id_tracking(ac_commitments: &[ACCommitment],
-                                            asset_tracing_policy_input: AssetTracingPolicy,
-                                            n: usize)
-                                            -> XfrNotePolicies {
+pub fn gen_policies_with_id_tracking(ac_commitments: &[ACCommitment],
+                                     asset_tracing_policy_input: AssetTracingPolicy,
+                                     n: usize)
+                                     -> XfrNotePolicies {
   let inputs_sig_commitments = ac_commitments.iter().map(|x| Some(x.clone())).collect_vec();
   let outputs_tracking_policies = vec![AssetTracingPolicies::new(); n];
   let outputs_sig_commitments = vec![None; n];
@@ -294,7 +296,7 @@ pub(crate) fn gen_policies_with_id_tracking(ac_commitments: &[ACCommitment],
                        outputs_sig_commitments)
 }
 
-pub(crate) fn gen_policies_no_id_tracking(n: usize) -> XfrNotePolicies {
+pub fn gen_policies_no_id_tracking(n: usize) -> XfrNotePolicies {
   let inputs_sig_commitments = vec![None; n];
   let outputs_tracking_policies = vec![AssetTracingPolicies::new(); n];
   let outputs_sig_commitments = vec![None; n];

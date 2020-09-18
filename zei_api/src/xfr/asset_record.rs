@@ -2,11 +2,10 @@ use crate::api::anon_creds::{
   ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
   ConfidentialAC, Credential,
 };
-use crate::xfr::sig::{XfrPublicKey, XfrSecretKey};
+use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey};
 use crate::xfr::structs::{
-  asset_type_to_scalar, AssetRecord, AssetRecordTemplate, AssetTracerMemo, AssetTracingPolicies,
-  AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
-  ASSET_TYPE_LENGTH,
+  AssetRecord, AssetRecordTemplate, AssetTracerMemo, AssetTracingPolicies, AssetType,
+  BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType, ASSET_TYPE_LENGTH,
 };
 use algebra::groups::Scalar as _;
 use algebra::ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar};
@@ -279,8 +278,6 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   asset_record: &AssetRecordTemplate,
   attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>)
   -> (BlindAssetRecord, (Scalar, Scalar), Scalar, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
-  let type_scalar = asset_type_to_scalar(&asset_record.asset_type);
-
   let (confidential_amount, confidential_asset) = match &asset_record.asset_record_type {
     AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => (false, false),
     AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => (true, false),
@@ -322,7 +319,8 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   let (xfr_asset_type, type_blind) = if confidential_asset {
     amount_type_bytes.extend_from_slice(&asset_record.asset_type.0);
     let xfr_asset_type =
-      XfrAssetType::Confidential(pc_gens.commit(type_scalar, type_blind).compress());
+      XfrAssetType::Confidential(pc_gens.commit(asset_record.asset_type.as_scalar(), type_blind)
+                                        .compress());
     (xfr_asset_type, type_blind)
   } else {
     (XfrAssetType::NonConfidential(asset_record.asset_type), Scalar::from_u32(0))
@@ -442,8 +440,9 @@ pub(crate) fn compute_blind_factor(point: &CompressedEdwardsY, aux: &'static [u8
 /// Used by transfers receivers
 pub fn open_blind_asset_record(input: &BlindAssetRecord,
                                owner_memo: &Option<OwnerMemo>,
-                               secret_key: &XfrSecretKey)
+                               key_pair: &XfrKeyPair)
                                -> Result<OpenAssetRecord, ZeiError> {
+  let secret_key = &key_pair.sec_key;
   let amount;
   let mut asset_type = AssetType::from_identical_byte(0u8);
   let amount_blind_low;
@@ -455,7 +454,7 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
   let amount_type = match owner_memo {
     None => vec![],
     Some(memo) => {
-      shared_point = derive_point_from_blind_share(&memo.blind_share, secret_key)?;
+      shared_point = derive_point_from_blind_share(&memo.blind_share, &secret_key)?;
       hybrid_decrypt_with_ed25519_secret_key(&memo.lock, &secret_key.0)
     }
   };
@@ -548,8 +547,8 @@ mod test {
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
-    asset_type_to_scalar, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
-    OpenAssetRecord, XfrAmount, XfrAssetType,
+    AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType, OpenAssetRecord,
+    XfrAmount, XfrAssetType,
   };
   use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
   use algebra::groups::Scalar as _;
@@ -596,7 +595,7 @@ mod test {
 
     assert_eq!(amount, open_ar.amount);
     assert_eq!(asset_type, open_ar.asset_type);
-    assert_eq!(keypair.get_pk_ref(), &open_ar.blind_asset_record.public_key);
+    assert_eq!(&keypair.pub_key, &open_ar.blind_asset_record.public_key);
 
     let expected_bar_amount;
     let expected_bar_asset_type;
@@ -615,9 +614,10 @@ mod test {
     }
 
     if confidential_asset {
-      let type_scalar = asset_type_to_scalar(&asset_record.asset_type);
       expected_bar_asset_type =
-        XfrAssetType::Confidential(pc_gens.commit(type_scalar, open_ar.type_blind).compress());
+        XfrAssetType::Confidential(pc_gens.commit(asset_record.asset_type.as_scalar(),
+                                                  open_ar.type_blind)
+                                          .compress());
     } else {
       expected_bar_asset_type = XfrAssetType::NonConfidential(asset_type);
       //expected_bar_lock_type_none = true;
@@ -690,10 +690,10 @@ mod test {
                                       &output_templates,
                                       inkeys.iter().map(|x| x).collect_vec().as_slice());
 
-    let secret_key = outkeys.get(0).unwrap().get_sk_ref();
+    let key_pair = outkeys.get(0).unwrap();
     let open_ar = open_blind_asset_record(&xfr_note.body.outputs[0],
                                           &xfr_note.body.owners_memos[0],
-                                          secret_key).unwrap();
+                                          &key_pair).unwrap();
 
     assert_eq!(&open_ar.blind_asset_record, &xfr_note.body.outputs[0]);
     assert_eq!(open_ar.amount, 30u64);
@@ -713,8 +713,7 @@ mod test {
     }
 
     if confidential_asset {
-      let derived_commitment = pc_gens.commit(asset_type_to_scalar(&open_ar.asset_type),
-                                              open_ar.type_blind)
+      let derived_commitment = pc_gens.commit(open_ar.asset_type.as_scalar(), open_ar.type_blind)
                                       .compress();
       assert_eq!(derived_commitment,
                  open_ar.blind_asset_record
@@ -738,14 +737,15 @@ mod test {
     let pc_gens = RistrettoPedersenGens::default();
 
     let keypair = XfrKeyPair::generate(&mut prng);
-    let (pubkey, privkey) = (keypair.get_pk_ref(), keypair.get_sk_ref());
-    let ar =
-      AssetRecordTemplate::with_no_asset_tracking(amt, asset_type, record_type, pubkey.clone());
+    let ar = AssetRecordTemplate::with_no_asset_tracking(amt,
+                                                         asset_type,
+                                                         record_type,
+                                                         keypair.pub_key.clone());
 
     let (blind_rec, _asset_tracer_memo, owner_memo) =
       build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
 
-    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey).unwrap();
+    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &keypair).unwrap();
 
     assert_eq!(*open_rec.get_amount(), amt);
     assert_eq!(*open_rec.get_asset_type(), asset_type);
@@ -781,38 +781,37 @@ mod test {
     let pc_gens = RistrettoPedersenGens::default();
 
     let keypair = XfrKeyPair::generate(&mut prng);
-    let (pubkey, privkey) = (keypair.get_pk_ref(), keypair.get_sk_ref());
     let asset_type: AssetType = AssetType(prng.gen());
     let amount = 10u64;
     let ar =
-      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, pubkey.clone());
+      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, keypair.pub_key.clone());
     let (blind_rec, _asset_tracer_memo, owner_memo) =
       build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
 
-    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
+    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &keypair);
     assert!(open_rec.is_ok(), "Open a just created asset record");
-    let open_rec = open_blind_asset_record(&blind_rec, &None, &privkey);
+    let open_rec = open_blind_asset_record(&blind_rec, &None, &keypair);
     assert!(open_rec.is_err(), "Expect error as amount is confidential");
 
     let ar =
-      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::NonConfidentialAmount_ConfidentialAssetType, pubkey.clone());
+      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::NonConfidentialAmount_ConfidentialAssetType, keypair.pub_key.clone());
     let (blind_rec, _asset_tracer_memo, owner_memo) =
       build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
 
-    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
+    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &keypair);
     assert!(open_rec.is_ok(), "Open a just created asset record");
-    let open_rec = open_blind_asset_record(&blind_rec, &None, &privkey);
+    let open_rec = open_blind_asset_record(&blind_rec, &None, &keypair);
     assert!(open_rec.is_err(),
             "Expect error as asset type is confidential");
 
     let ar =
-      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::ConfidentialAmount_ConfidentialAssetType, pubkey.clone());
+    AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, AssetRecordType::ConfidentialAmount_ConfidentialAssetType, keypair.pub_key.clone());
     let (blind_rec, _asset_tracer_memo, owner_memo) =
       build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
 
-    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &privkey);
+    let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &keypair);
     assert!(open_rec.is_ok(), "Open a just created asset record");
-    let open_rec = open_blind_asset_record(&blind_rec, &None, &privkey);
+    let open_rec = open_blind_asset_record(&blind_rec, &None, &keypair);
     assert!(open_rec.is_err(),
             "Expect error as asset type and amount are confidential");
   }

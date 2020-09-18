@@ -133,7 +133,7 @@ impl XfrType {
 ///   let asset_record = AssetRecordTemplate::with_no_asset_tracking( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
-///                                        keypair.get_pk_ref().clone());
+///                                        keypair.pub_key.clone());
 ///
 ///   inputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &asset_record).unwrap());
 ///
@@ -144,7 +144,7 @@ impl XfrType {
 /// for x in outputs_amounts.iter() {
 ///     let keypair = XfrKeyPair::generate(&mut prng);
 ///
-///     let ar = AssetRecordTemplate::with_no_asset_tracking(x.0, x.1, asset_record_type, keypair.get_pk_ref().clone());
+///     let ar = AssetRecordTemplate::with_no_asset_tracking(x.0, x.1, asset_record_type, keypair.pub_key.clone());
 ///     let output = AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap();
 ///     outputs.push(output);
 /// }
@@ -212,7 +212,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 ///   let ar = AssetRecordTemplate::with_no_asset_tracking( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
-///                                        keypair.get_pk_ref().clone(),
+///                                        keypair.pub_key.clone(),
 ///                                        );
 ///
 ///   inputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap());
@@ -306,7 +306,7 @@ fn check_keys(inputs: &[AssetRecord], input_key_pairs: &[&XfrKeyPair]) -> Result
   }
   for (input, key) in inputs.iter().zip(input_key_pairs.iter()) {
     let inkey = &input.open_asset_record.blind_asset_record.public_key;
-    if inkey != key.get_pk_ref() {
+    if inkey != &key.pub_key {
       return Err(ZeiError::ParameterError);
     }
   }
@@ -322,18 +322,16 @@ fn gen_xfr_proofs_multi_asset(inputs: &[&OpenAssetRecord],
   let mut ins = vec![];
 
   for x in inputs.iter() {
-    let type_scalar = asset_type_to_scalar(&x.asset_type);
     ins.push((x.amount,
-              type_scalar,
+              x.asset_type.as_scalar(),
               x.amount_blinds.0.add(&pow2_32.mul(&x.amount_blinds.1)),
               x.type_blind));
   }
 
   let mut out = vec![];
   for x in outputs.iter() {
-    let type_scalar = asset_type_to_scalar(&x.asset_type);
     out.push((x.amount,
-              type_scalar,
+              x.asset_type.as_scalar(),
               x.amount_blinds.0.add(&pow2_32.mul(&x.amount_blinds.1)),
               x.type_blind));
   }
@@ -759,9 +757,9 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
               let com_type = match x.asset_type {
                 XfrAssetType::Confidential(c) => c,
                 XfrAssetType::NonConfidential(asset_type) => {
-                  let scalar = asset_type_to_scalar(&asset_type);
                   let pc_gens = RistrettoPedersenGens::default();
-                  pc_gens.commit(scalar, Scalar::from_u32(0)).compress()
+                  pc_gens.commit(asset_type.as_scalar(), Scalar::from_u32(0))
+                         .compress()
                 }
               };
               Ok((com_amount, com_type))

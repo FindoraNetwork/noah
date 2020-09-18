@@ -1,8 +1,6 @@
-extern crate criterion;
-
+use bench_utils::api::xfr::xfr_body_idtracking_assettracking_singleasset;
 use criterion::{criterion_group, criterion_main, Criterion};
 use criterion_cycles_per_byte::CyclesPerByte;
-use zei_utilities::xfr_bench::xfr_body_idtracking_assettracking_singleasset;
 
 // Benchmark with cycles
 criterion_group!(

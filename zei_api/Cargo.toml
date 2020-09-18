@@ -38,7 +38,7 @@ lazy_static = "1.4.0"
 rand = { version = "0.7", default-features = false }
 serde_json = "1.0"
 typenum = "1.11.2"
-zei_utilities = { path = "../utilities" }
+bench-utils = { path = "../bench-utils" }
 
 [features]
 default = ["std", "u64_backend"]

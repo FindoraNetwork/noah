@@ -5,7 +5,7 @@ use crate::anon_xfr::structs::{
   MTLeafInfo, OpenAnonBlindAssetRecord,
 };
 use crate::setup::{NodeParams, UserParams};
-use crate::xfr::structs::{asset_type_to_scalar, AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
+use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
 use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::jubjub::{JubjubGroup, JubjubScalar, JUBJUB_SCALAR_LEN};
@@ -55,7 +55,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
                                    diversifier,
                                    uid: inputs[0].mt_leaf_info.uid,
                                    amount: inputs[0].amount,
-                                   asset_type: asset_type_to_scalar(&inputs[0].asset_type),
+                                   asset_type: inputs[0].asset_type.as_scalar(),
                                    path: inputs[0].mt_leaf_info.path.clone(),
                                    blind_in: inputs[0].blind,
                                    blind_out: out_blind };
@@ -97,7 +97,7 @@ fn build_abar<R: CryptoRng + RngCore>(
   let rand = JubjubScalar::random(prng);
   let rand_pub_key = record.public_key.randomize(&rand);
   let a = BLSScalar::from_u64(record.amount);
-  let at = asset_type_to_scalar::<BLSScalar>(&record.asset_type);
+  let at = record.asset_type.as_scalar::<BLSScalar>();
   let blinding = BLSScalar::random(prng);
   let commitment = crypto::basics::commitment::Commitment::new().commit(&blinding, &[a, at])
                                                                 .unwrap();
@@ -162,7 +162,7 @@ pub fn decrypt_memo(memo: &OwnerMemo,
                                                                     ZeiError::ParameterError
                                                                   })?;
   crypto::basics::commitment::Commitment::new().verify(&[BLSScalar::from_u64(amount),
-                                                         asset_type_to_scalar(&asset_type)],
+                                                         asset_type.as_scalar()],
                                                        &blind,
                                                        &abar.amount_type_commitment)?;
   Ok((amount, asset_type, blind, rand))
@@ -179,10 +179,7 @@ fn nullifier(secret_key: &AXfrSecKey, amount: u64, asset_type: &AssetType, uid: 
   let uid_shifted = BLSScalar::from_u64(uid).mul(&pow_2_64);
   let uid_amount = uid_shifted.add(&BLSScalar::from_u64(amount));
   PRF::new().eval(&BLSScalar::from(&secret_key.0),
-                  &[uid_amount,
-                    asset_type_to_scalar(asset_type),
-                    pub_key_x,
-                    pub_key_y])
+                  &[uid_amount, asset_type.as_scalar(), pub_key_x, pub_key_y])
 }
 
 #[cfg(test)]

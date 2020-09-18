@@ -26,12 +26,13 @@ impl AssetType {
   pub fn from_identical_byte(byte: u8) -> Self {
     Self([byte; ASSET_TYPE_LENGTH])
   }
-}
 
-pub fn asset_type_to_scalar<S: ZeiScalar>(asset_type: &AssetType) -> S {
-  let mut sha512 = Sha512::new();
-  sha512.input(&asset_type.0);
-  S::from_hash(sha512)
+  /// converts AssetType into a Scalar
+  pub fn as_scalar<S: ZeiScalar>(&self) -> S {
+    let mut sha512 = Sha512::new();
+    sha512.input(&self.0);
+    S::from_hash(sha512)
+  }
 }
 
 /// A Transfer note: contains a transfer body and a (multi)signature

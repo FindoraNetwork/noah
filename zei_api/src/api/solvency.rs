@@ -1,7 +1,7 @@
 use crate::xfr::{
   asset_record::open_blind_asset_record,
-  sig::XfrSecretKey,
-  structs::{asset_type_to_scalar, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo},
+  sig::XfrKeyPair,
+  structs::{AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo},
 };
 use algebra::groups::{GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
@@ -153,7 +153,7 @@ impl SolvencyAudit {
 
     for (asset_type, rate) in rates.iter() {
       self.conv_rates
-          .push((asset_type_to_scalar(&asset_type), Scalar::from_u64(*rate)));
+          .push((asset_type.as_scalar(), Scalar::from_u64(*rate)));
     }
 
     // with records and rates finalized, we are ready to build Prover and Verifier for proof
@@ -164,14 +164,14 @@ impl SolvencyAudit {
   /// invoked by Prover once all BAR records and rates are finalized
   pub fn build_prover(&self,
                       owner_memos_for_assets: &[&Option<OwnerMemo>],
-                      secret_keys_for_assets: &[&XfrSecretKey],
+                      keypairs_for_assets: &[&XfrKeyPair],
                       owner_memos_for_liabilities: &[&Option<OwnerMemo>],
-                      secret_keys_for_liabilities: &[&XfrSecretKey])
+                      keypairs_for_liabilities: &[&XfrKeyPair])
                       -> Result<SolvencyProver, ZeiError> {
     if owner_memos_for_assets.len() != self.assets.len()
-       || secret_keys_for_assets.len() != self.assets.len()
+       || keypairs_for_assets.len() != self.assets.len()
        || owner_memos_for_liabilities.len() != self.liabilities.len()
-       || secret_keys_for_liabilities.len() != self.liabilities.len()
+       || keypairs_for_liabilities.len() != self.liabilities.len()
     {
       return Err(ZeiError::SolvencyInputError);
     }
@@ -184,12 +184,12 @@ impl SolvencyAudit {
     for (i, rec) in self.assets.iter().enumerate() {
       asset_oars.push(open_blind_asset_record(&rec,
                                               owner_memos_for_assets[i],
-                                              secret_keys_for_assets[i])?);
+                                              keypairs_for_assets[i])?);
     }
     for (i, rec) in self.liabilities.iter().enumerate() {
       liability_oars.push(open_blind_asset_record(&rec,
                                                   owner_memos_for_liabilities[i],
-                                                  secret_keys_for_liabilities[i])?);
+                                                  keypairs_for_liabilities[i])?);
     }
 
     // 2. build SolvencyProver from OAR
@@ -253,13 +253,13 @@ impl SolvencyAudit {
 impl SolvencyAudit {
   fn get_record_entry_from_oar(record: &OpenAssetRecord) -> CloakValue {
     CloakValue::new(Scalar::from_u64(record.amount),
-                    asset_type_to_scalar(&record.asset_type))
+                    record.asset_type.as_scalar())
   }
 
   fn get_record_entry_from_bar(record: &BlindAssetRecord) -> CloakValue {
     assert!(record.is_public());
     CloakValue::new(Scalar::from_u64(record.amount.get_amount().unwrap()),
-                    asset_type_to_scalar(&record.asset_type.get_asset_type().unwrap()))
+                    record.asset_type.get_asset_type().unwrap().as_scalar())
   }
 
   fn get_hidden_record_blinds(record: &OpenAssetRecord) -> CloakValue {
@@ -286,7 +286,7 @@ impl SolvencyAudit {
     let type_com = if record.asset_type.is_confidential() {
       record.asset_type.get_commitment().unwrap()
     } else {
-      pc_gens.commit(asset_type_to_scalar(&record.asset_type.get_asset_type().unwrap()),
+      pc_gens.commit(record.asset_type.get_asset_type().unwrap().as_scalar(),
                      Scalar::from_u32(0))
              .compress()
     };
@@ -447,7 +447,7 @@ mod test {
     for _ in 0..5 {
       key_pairs.push(XfrKeyPair::generate(&mut prng));
     }
-    let pubkeys: Vec<_> = key_pairs.iter().map(|x| x.get_pk_ref()).collect();
+    let pubkeys: Vec<_> = key_pairs.iter().map(|x| &x.pub_key).collect();
 
     let bp_gens = BulletproofGens::new(512, 1);
     let pc_gens = RistrettoPedersenGens::default();
@@ -479,13 +479,13 @@ mod test {
 
     // Step 6. Derive `SolvencyProver` and `SolvencyVerifier` separately
     let memo_for_assets = vec![&bars[1].1, &bars[4].1];
-    let prikeys_for_assets = vec![key_pairs[1].get_sk_ref(), key_pairs[4].get_sk_ref()];
+    let keypairs_for_assets = vec![&key_pairs[1], &key_pairs[4]];
     let memo_for_liabilities = vec![&bars[0].1, &bars[2].1];
-    let prikeys_for_liabilities = vec![key_pairs[0].get_sk_ref(), key_pairs[2].get_sk_ref()];
+    let keypairs_for_liabilities = vec![&key_pairs[0], &key_pairs[2]];
     let prover = audit.build_prover(&memo_for_assets,
-                                    &prikeys_for_assets,
+                                    &keypairs_for_assets,
                                     &memo_for_liabilities,
-                                    &prikeys_for_liabilities)
+                                    &keypairs_for_liabilities)
                       .unwrap();
     let verifier = audit.build_verifier();
 
@@ -504,7 +504,7 @@ mod test {
     for _ in 0..5 {
       key_pairs.push(XfrKeyPair::generate(&mut prng));
     }
-    let pubkeys: Vec<_> = key_pairs.iter().map(|x| x.get_pk_ref()).collect();
+    let pubkeys: Vec<_> = key_pairs.iter().map(|x| &x.pub_key).collect();
 
     let bp_gens = BulletproofGens::new(512, 1);
     let pc_gens = RistrettoPedersenGens::default();
@@ -525,13 +525,13 @@ mod test {
     assert!(audit.finalize_rates(&rates).is_ok());
 
     let memo_for_assets = vec![&bars[1].1, &bars[4].1];
-    let prikeys_for_assets = vec![key_pairs[1].get_sk_ref(), key_pairs[4].get_sk_ref()];
+    let keypairs_for_assets = vec![&key_pairs[1], &key_pairs[4]];
     let memo_for_liabilities = vec![&bars[1].1, &bars[3].1];
-    let prikeys_for_liabilities = vec![key_pairs[1].get_sk_ref(), key_pairs[3].get_sk_ref()];
+    let keypairs_for_liabilities = vec![&key_pairs[1], &key_pairs[3]];
     let prover = audit.build_prover(&memo_for_assets,
-                                    &prikeys_for_assets,
+                                    &keypairs_for_assets,
                                     &memo_for_liabilities,
-                                    &prikeys_for_liabilities)
+                                    &keypairs_for_liabilities)
                       .unwrap();
     let verifier = audit.build_verifier();
 
@@ -548,7 +548,7 @@ mod test {
     for _ in 0..5 {
       key_pairs.push(XfrKeyPair::generate(&mut prng));
     }
-    let pubkeys: Vec<_> = key_pairs.iter().map(|x| x.get_pk_ref()).collect();
+    let pubkeys: Vec<_> = key_pairs.iter().map(|x| &x.pub_key).collect();
     let pc_gens = RistrettoPedersenGens::default();
     let bars = build_bars(&pubkeys, &mut prng, &pc_gens);
     let rates = build_rates();
@@ -564,13 +564,13 @@ mod test {
     assert!(audit.finalize_verified_records().is_ok());
     assert!(audit.finalize_rates(&rates).is_ok());
     let memo_for_assets = vec![&bars[1].1, &bars[4].1];
-    let prikeys_for_assets = vec![key_pairs[1].get_sk_ref(), key_pairs[4].get_sk_ref()];
+    let keypairs_for_assets = vec![&key_pairs[1], &key_pairs[4]];
     let memo_for_liabilities = vec![&bars[0].1, &bars[2].1];
-    let prikeys_for_liabilities = vec![key_pairs[0].get_sk_ref(), key_pairs[2].get_sk_ref()];
+    let keypairs_for_liabilities = vec![&key_pairs[0], &key_pairs[2]];
     let prover = audit.build_prover(&memo_for_assets,
-                                    &prikeys_for_assets,
+                                    &keypairs_for_assets,
                                     &memo_for_liabilities,
-                                    &prikeys_for_liabilities)
+                                    &keypairs_for_liabilities)
                       .unwrap();
     let verifier = audit.build_verifier();
 

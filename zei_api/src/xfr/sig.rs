@@ -22,8 +22,8 @@ pub struct XfrSecretKey(pub(crate) SecretKey);
 #[wasm_bindgen]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct XfrKeyPair {
-  pub_key: XfrPublicKey,
-  sec_key: XfrSecretKey,
+  pub pub_key: XfrPublicKey,
+  pub(crate) sec_key: XfrSecretKey,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -82,18 +82,6 @@ impl XfrKeyPair {
     let kp = ed25519_dalek::Keypair::generate(prng);
     XfrKeyPair { pub_key: XfrPublicKey(kp.public),
                  sec_key: XfrSecretKey(kp.secret) }
-  }
-
-  pub fn get_pk_ref(&self) -> &XfrPublicKey {
-    &self.pub_key
-  }
-
-  pub fn get_sk_ref(&self) -> &XfrSecretKey {
-    &self.sec_key
-  }
-
-  pub fn get_sk(&self) -> XfrSecretKey {
-    self.sec_key.clone()
   }
 
   pub fn sign(&self, msg: &[u8]) -> XfrSignature {
@@ -161,41 +149,38 @@ mod test {
     let message = "";
 
     let sig = keypair.sign(message.as_bytes());
-    assert_eq!(Ok(()), keypair.get_pk_ref().verify("".as_bytes(), &sig));
+    assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
     //same test with secret key
-    let sig = keypair.get_sk_ref()
-                     .sign(message.as_bytes(), keypair.get_pk_ref());
-    assert_eq!(Ok(()), keypair.get_pk_ref().verify("".as_bytes(), &sig));
+    let sig = keypair.sec_key.sign(message.as_bytes(), &keypair.pub_key);
+    assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
 
     //test again with fresh same key
     let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
     let keypair = XfrKeyPair::generate(&mut prng);
-    assert_eq!(Ok(()), keypair.get_pk_ref().verify("".as_bytes(), &sig));
+    assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
 
     let keypair = XfrKeyPair::generate(&mut prng);
     let message = [10u8; 500];
     let sig = keypair.sign(&message);
     assert_eq!(Err(SignatureError),
-               keypair.get_pk_ref().verify("".as_bytes(), &sig),
+               keypair.pub_key.verify("".as_bytes(), &sig),
                "Verifying sig on different message should have return Err(Signature Error)");
     assert_eq!(Ok(()),
-               keypair.get_pk_ref().verify(&message, &sig),
+               keypair.pub_key.verify(&message, &sig),
                "Verifying sig on samme message should have return Ok(())");
     //test again with secret key
-    let sk = keypair.get_sk_ref();
-    let pk = keypair.get_pk_ref();
-    let sig = sk.sign(&message, pk);
+    let sig = keypair.sec_key.sign(&message, &keypair.pub_key);
     assert_eq!(Err(SignatureError),
-               keypair.get_pk_ref().verify("".as_bytes(), &sig),
+               keypair.pub_key.verify("".as_bytes(), &sig),
                "Verifying sig on different message should have return Err(Signature Error)");
     assert_eq!(Ok(()),
-               pk.verify(&message, &sig),
+               keypair.pub_key.verify(&message, &sig),
                "Verifying sig on samme message should have return Ok(())");
 
     // test with different keys
     let keypair = XfrKeyPair::generate(&mut prng);
     assert_eq!(Err(SignatureError),
-               keypair.get_pk_ref().verify(&message, &sig),
+               keypair.pub_key.verify(&message, &sig),
                "Verifying sig on with a different key should have return Err(Signature Error)");
   }
 
@@ -212,7 +197,7 @@ mod test {
     let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
     // test with one key
     let keypairs = generate_keys(&mut prng, 1);
-    let pk = keypairs.get(0).unwrap().get_pk_ref();
+    let pk = keypairs.get(0).unwrap().pub_key;
     let msig = sign_multisig(&[&keypairs[0]], "HELLO".as_bytes());
     assert_eq!(Ok(()),
                verify_multisig(&[pk.clone()], "HELLO".as_bytes(), &msig),
@@ -220,22 +205,22 @@ mod test {
     //try with more keys
     let extra_key = XfrKeyPair::generate(&mut prng);
     assert_eq!(Err(SignatureError),
-               verify_multisig(&[pk.clone(), extra_key.get_pk_ref().clone()],
+               verify_multisig(&[pk.clone(), extra_key.pub_key.clone()],
                                "HELLO".as_bytes(),
                                &msig),
                "Multisignature should have not verify correctly");
 
     // test with two keys
     let keypairs = generate_keys(&mut prng, 2);
-    let pk0 = keypairs.get(0).unwrap().get_pk_ref();
-    let pk1 = keypairs.get(1).unwrap().get_pk_ref();
+    let pk0 = keypairs.get(0).unwrap().pub_key;
+    let pk1 = keypairs.get(1).unwrap().pub_key;
     let msig = sign_multisig(&[&keypairs[0], &keypairs[1]], "HELLO".as_bytes());
     assert_eq!(Ok(()),
                verify_multisig(&[pk0.clone(), pk1.clone()], "HELLO".as_bytes(), &msig),
                "Multisignature should have verify correctly");
 
     let newkeypair = XfrKeyPair::generate(&mut prng);
-    let pk2 = newkeypair.get_pk_ref();
+    let pk2 = newkeypair.pub_key;
     assert_eq!(Err(SignatureError),
                verify_multisig(&[pk0.clone(), pk1.clone(), pk2.clone()],
                                "HELLO".as_bytes(),
@@ -247,9 +232,7 @@ mod test {
 
     // test with 20 keys
     let keypairs = generate_keys(&mut prng, 20);
-    let pks = keypairs.iter()
-                      .map(|x| x.get_pk_ref().clone())
-                      .collect_vec();
+    let pks = keypairs.iter().map(|x| x.pub_key.clone()).collect_vec();
     let keypairsref = keypairs.iter().map(|x| x).collect_vec();
     let msig = sign_multisig(keypairsref.as_slice(), "HELLO".as_bytes());
     assert_eq!(Ok(()),

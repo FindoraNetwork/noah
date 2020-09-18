@@ -1,8 +1,8 @@
 use crate::api::anon_creds::{Attr, AttributeCiphertext};
-use crate::xfr::structs::{asset_type_to_scalar, AssetType, ASSET_TYPE_LENGTH};
 use crate::xfr::structs::{
   AssetTracerDecKeys, AssetTracerEncKeys, AssetTracerKeyPair, AssetTracerMemo,
 };
+use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLSG1};
 use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
@@ -72,7 +72,7 @@ impl AssetTracerMemo {
     let lock_asset_type = asset_type_info.map(|(asset_type, blind)| {
                                            plaintext.extend_from_slice(&asset_type.0);
                                            elgamal_encrypt(&pc_gens.B,
-                                                           &asset_type_to_scalar(&asset_type),
+                                                           &asset_type.as_scalar(),
                                                            blind,
                                                            &tracer_enc_key.record_data_eg_enc_key)
                                          });
@@ -206,7 +206,7 @@ impl AssetTracerMemo {
     if let Some(ctext) = self.lock_asset_type.as_ref() {
       let decrypted = elgamal_decrypt_elem(ctext, dec_key);
       for candidate in candidate_asset_types.iter() {
-        let scalar_candidate = asset_type_to_scalar(&candidate);
+        let scalar_candidate = candidate.as_scalar();
         if decrypted == RistrettoPoint::get_base().mul(&scalar_candidate) {
           return Ok(*candidate);
         }

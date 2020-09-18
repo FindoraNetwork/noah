@@ -10,7 +10,7 @@ COPY ./algebra /app/algebra
 COPY ./crypto /app/crypto
 COPY ./poly-iops /app/poly-iops
 COPY ./utils /app/utils
-COPY ./utilities /app/utilities
+COPY ./bench-utils /app/bench-utils
 COPY ./zei_api /app/zei_api
 RUN cargo audit
 RUN cargo test --workspace

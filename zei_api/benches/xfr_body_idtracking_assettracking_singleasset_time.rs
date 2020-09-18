@@ -1,8 +1,6 @@
-extern crate criterion;
-
+use bench_utils::api::xfr::xfr_body_idtracking_assettracking_singleasset;
 use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, Criterion};
-use zei_utilities::xfr_bench::xfr_body_idtracking_assettracking_singleasset;
 
 // Benchmark with time
 criterion_group!(

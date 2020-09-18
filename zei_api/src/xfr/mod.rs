@@ -5,4 +5,5 @@ pub mod lib;
 pub mod proofs;
 pub mod sig;
 pub mod structs;
-pub(crate) mod tests;
+pub mod test_utils; // for integration test
+pub(crate) mod tests; // unit tests

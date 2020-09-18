@@ -8,7 +8,7 @@ pub(crate) mod xfr_note_complex_variable_size {
   use zei::setup::PublicParams;
   use zei::xfr::lib::{gen_xfr_body, verify_xfr_body, XfrNotePoliciesRef};
   use zei::xfr::structs::AssetTracingPolicies;
-  use zei_utilities::xfr_building_utilities::{
+  use zei::xfr::test_utils::{
     prepare_inputs_and_outputs_with_policies_single_asset, setup_with_policies,
   };
 

@@ -5,8 +5,8 @@ use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::RecordDataEncKey;
 use crate::xfr::lib::XfrNotePoliciesRef;
 use crate::xfr::structs::{
-  asset_type_to_scalar, AssetRecord, AssetTracerMemo, AssetTracingPolicies, BlindAssetRecord,
-  OpenAssetRecord, XfrAmount, XfrAssetType, XfrBody, XfrRangeProof,
+  AssetRecord, AssetTracerMemo, AssetTracingPolicies, BlindAssetRecord, OpenAssetRecord, XfrAmount,
+  XfrAssetType, XfrBody, XfrRangeProof,
 };
 use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar};
@@ -89,7 +89,7 @@ fn build_same_key_asset_type_amount_tracking_proof<R: CryptoRng + RngCore>(
       let lock_asset_type = memo.lock_asset_type
                                 .as_ref()
                                 .ok_or(ZeiError::InconsistentStructureError)?;
-      m.push(asset_type_to_scalar(&open_record.asset_type));
+      m.push(open_record.asset_type.as_scalar());
       r.push(open_record.type_blind);
       ctexts.push(lock_asset_type.clone()); // TODO avoid this clone
       commitments.push(com.decompress().ok_or(ZeiError::DecompressElementError)?);
@@ -616,9 +616,6 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
                                                   open_inputs: &[&OpenAssetRecord],
                                                   open_outputs: &[&OpenAssetRecord])
                                                   -> Result<ChaumPedersenProofX, ZeiError> {
-  let asset = open_inputs[0].asset_type;
-  let asset_scalar = asset_type_to_scalar(&asset);
-
   let mut asset_coms = vec![];
   let mut asset_blinds = vec![];
 
@@ -626,7 +623,7 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
     let commitment = match x.blind_asset_record.asset_type {
       XfrAssetType::Confidential(com) => com.decompress().ok_or(ZeiError::ParameterError)?,
       XfrAssetType::NonConfidential(asset_type) => {
-        pc_gens.commit(asset_type_to_scalar(&asset_type), x.type_blind)
+        pc_gens.commit(asset_type.as_scalar(), x.type_blind)
       }
     };
     asset_coms.push(commitment);
@@ -636,7 +633,7 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(prng: &mut R,
   let proof = chaum_pedersen_prove_multiple_eq(&mut transcript,
                                                prng,
                                                pc_gens,
-                                               &asset_scalar,
+                                               &open_inputs[0].asset_type.as_scalar(),
                                                asset_coms.as_slice(),
                                                asset_blinds.as_slice())?;
 
@@ -656,7 +653,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut
             .map(|x| match x.asset_type {
               XfrAssetType::Confidential(com) => com.decompress().ok_or(ZeiError::ParameterError),
               XfrAssetType::NonConfidential(asset_type) => {
-                Ok(pc_gens.commit(asset_type_to_scalar(&asset_type), Scalar::from_u32(0)))
+                Ok(pc_gens.commit(asset_type.as_scalar(), Scalar::from_u32(0)))
               }
             })
             .collect();

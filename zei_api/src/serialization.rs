@@ -174,15 +174,16 @@ mod test {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
     let keypair = XfrKeyPair::generate(&mut prng);
-    let pk = keypair.get_pk_ref();
 
     let mut pk_mp_vec = vec![];
     assert_eq!(true,
-               pk.serialize(&mut Serializer::new(&mut pk_mp_vec)).is_ok());
+               keypair.pub_key
+                      .serialize(&mut Serializer::new(&mut pk_mp_vec))
+                      .is_ok());
     let mut de = Deserializer::new(&pk_mp_vec[..]);
     let pk2: XfrPublicKey = Deserialize::deserialize(&mut de).unwrap();
 
-    assert_eq!(pk, &pk2);
+    assert_eq!(&keypair.pub_key, &pk2);
   }
 
   #[test]
@@ -235,8 +236,7 @@ mod test {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
     let keypair = XfrKeyPair::generate(&mut prng);
-    let pk = keypair.get_pk_ref();
-    let test_struct = StructWithPubKey { key: pk.clone() };
+    let test_struct = StructWithPubKey { key: keypair.pub_key };
     let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
       res
     } else {
@@ -251,8 +251,7 @@ mod test {
       assert!(false);
     }
 
-    let sk = keypair.get_sk_ref();
-    let test_struct = StructWithSecKey { key: sk.clone() };
+    let test_struct = StructWithSecKey { key: keypair.sec_key };
     let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
       res
     } else {

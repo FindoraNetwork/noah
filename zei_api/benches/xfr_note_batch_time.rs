@@ -1,8 +1,6 @@
-extern crate criterion;
-
+use bench_utils::api::xfr::xfr_note_batch;
 use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, Criterion};
-use zei_utilities::xfr_bench::xfr_note_batch;
 
 // Benchmark with time
 criterion_group!(

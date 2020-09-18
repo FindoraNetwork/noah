@@ -9,22 +9,51 @@ use criterion::{BenchmarkGroup, Criterion};
 use zei::api::anon_creds::{ACCommitmentKey, ACUserSecretKey, Credential};
 use zei::setup::PublicParams;
 use zei::xfr::lib::{
-  batch_verify_xfr_notes, gen_xfr_body, gen_xfr_note, verify_xfr_note, XfrNotePolicies,
+  batch_verify_xfr_notes, gen_xfr_body, gen_xfr_note, verify_xfr_body, verify_xfr_note,
+  XfrNotePolicies, XfrNotePoliciesRef,
 };
 use zei::xfr::sig::XfrKeyPair;
-use zei::xfr::structs::{AssetTracingPolicy, XfrBody, XfrNote};
+use zei::xfr::structs::{AssetTracingPolicy, AssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH};
 
-pub mod bench_utils;
-
-use crate::xfr_bench::bench_utils::{
-  get_string_measurement_type, make_title, run_verify_xfr_body, run_verify_xfr_note, XFR_NOTE_SIZES,
-};
-use crate::xfr_building_utilities::{
+use zei::xfr::test_utils::{
   gen_policies_no_id_tracking, gen_policies_with_id_tracking, multiple_key_gen,
   prepare_inputs_and_outputs_with_policies_multiple_assets,
   prepare_inputs_and_outputs_with_policies_single_asset,
   prepare_inputs_and_outputs_without_policies_single_asset, setup_with_policies,
 };
+
+pub const ASSET_TYPE_1: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
+pub const ASSET_TYPE_2: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
+
+pub const XFR_NOTE_SIZES: [usize; 3] = [1, 4, 16];
+
+fn run_verify_xfr_note(xfr_note: &XfrNote, policies: &XfrNotePoliciesRef) {
+  let mut prng = ChaChaRng::from_seed([0u8; 32]);
+  let mut params = PublicParams::new();
+  assert!(verify_xfr_note(&mut prng, &mut params, xfr_note, policies).is_ok());
+}
+
+fn run_verify_xfr_body(xfr_body: &XfrBody, policies: &XfrNotePoliciesRef) {
+  let mut prng = ChaChaRng::from_seed([0u8; 32]);
+  let mut params = PublicParams::new();
+  assert!(verify_xfr_body(&mut prng, &mut params, xfr_body, policies).is_ok());
+}
+
+fn get_string_measurement_type<B: Measurement>() -> String {
+  if std::any::type_name::<B>() == "criterion::measurement::WallTime" {
+    String::from("time")
+  } else {
+    String::from("cycles")
+  }
+}
+
+fn make_title<B: Measurement>(desc: &str, n: usize) -> String {
+  let title = format!("{desc} n={n} ({b_type})",
+                      desc = desc,
+                      n = n,
+                      b_type = get_string_measurement_type::<B>());
+  title
+}
 
 fn run_simple_xfr_note_create(sender_key_pairs: &[&XfrKeyPair], n: usize) -> XfrNote {
   let (ar_ins, output_asset_records) =

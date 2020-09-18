@@ -92,6 +92,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bench-utils"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "criterion-cycles-per-byte",
+ "itertools 0.8.2",
+ "rand",
+ "rand_chacha",
+ "rand_core",
+ "zei",
+]
+
+[[package]]
 name = "bit-array"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1359,6 +1372,7 @@ name = "zei"
 version = "0.0.3"
 dependencies = [
  "algebra",
+ "bench-utils",
  "bit-array",
  "boolinator",
  "bulletproofs",
@@ -1384,22 +1398,6 @@ dependencies = [
  "typenum",
  "utils",
  "wasm-bindgen",
- "zei_utilities",
-]
-
-[[package]]
-name = "zei_utilities"
-version = "0.0.3"
-dependencies = [
- "bulletproofs",
- "criterion",
- "criterion-cycles-per-byte",
- "crypto",
- "itertools 0.8.2",
- "rand",
- "rand_chacha",
- "rand_core",
- "zei",
 ]
 
 [[package]]
