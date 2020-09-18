@@ -582,18 +582,12 @@ impl XfrNotePolicies {
 
   pub fn to_ref(&self) -> XfrNotePoliciesRef {
     if self.valid {
-      XfrNotePoliciesRef::new(self.inputs_tracking_policies
-                                  .iter()
-                                  .map(|x| x)
-                                  .collect_vec(),
+      XfrNotePoliciesRef::new(self.inputs_tracking_policies.iter().collect_vec(),
                               self.inputs_sig_commitments
                                   .iter()
                                   .map(|x| if_some_closure(x))
                                   .collect_vec(),
-                              self.outputs_tracking_policies
-                                  .iter()
-                                  .map(|x| x)
-                                  .collect_vec(),
+                              self.outputs_tracking_policies.iter().collect_vec(),
                               self.outputs_sig_commitments
                                   .iter()
                                   .map(|x| if_some_closure(x))
