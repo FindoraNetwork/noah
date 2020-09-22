@@ -162,7 +162,7 @@ pub struct AssetMixingInstance<'a> {
 ///        proof: &proof
 ///    };
 ///    let mut prng = thread_rng();
-///    let mut params = PublicParams::new();
+///    let mut params = PublicParams::default();
 ///    assert_eq!(Ok(()),
 ///               batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
 /// ```
@@ -363,7 +363,7 @@ mod test {
                                          outputs: output_coms,
                                          proof: &proof };
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let mut params = PublicParams::new();
+    let mut params = PublicParams::default();
     assert_eq!(Ok(()),
                super::batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
   }

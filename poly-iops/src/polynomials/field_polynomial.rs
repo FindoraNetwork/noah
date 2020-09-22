@@ -5,7 +5,7 @@ use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use std::ops::Sub;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FpPolynomial<F> {
   pub(crate) coefs: Vec<F>,
 }

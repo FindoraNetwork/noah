@@ -5,6 +5,10 @@ authors = ["Findora <engineering@findora.org>"]
 edition = "2018"
 description = "Zei Platform Interface"
 
+[[bin]]
+name = "gen-params"
+path = "src/bin/gen-params.rs"
+
 [lib]
 name = "zei"
 crate-type = ["rlib"]
@@ -29,6 +33,8 @@ sha2 = "0.8.0"
 utils = { path = "../utils" }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 poly-iops = { path = "../poly-iops" }
+structopt = "0.3.17"
+bincode = "1.3.1"
 
 [dev-dependencies]
 bit-array = "0.4.3"

@@ -387,7 +387,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct PlonkProverParams<O, C, F> {
   pub(crate) selectors: Vec<O>,
@@ -416,7 +416,7 @@ impl<O, C, F> PlonkProverParams<O, C, F> {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct PlonkVerifierParams<C, F> {
   pub(crate) selectors: Vec<C>,

@@ -16,6 +16,7 @@ pub type CsIndex = usize; // Constraint index
 pub const N_WIRES_PER_GATE: usize = 5;
 pub const N_SELECTORS: usize = 13;
 
+#[derive(Serialize, Deserialize)]
 pub struct TurboPlonkConstraintSystem<F> {
   pub selectors: Vec<Vec<F>>,
   pub wiring: [Vec<VarIndex>; N_WIRES_PER_GATE],

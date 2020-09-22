@@ -110,7 +110,7 @@ impl XfrType {
 /// use zei::setup::PublicParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
-/// let mut params = PublicParams::new();
+/// let mut params = PublicParams::default();
 /// let asset_type = AssetType::from_identical_byte(0u8);
 /// let inputs_amounts = [(10u64, asset_type),
 ///                       (10u64, asset_type),
@@ -192,7 +192,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// use zei::setup::PublicParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
-/// let mut params = PublicParams::new();
+/// let mut params = PublicParams::default();
 /// let asset_type = AssetType::from_identical_byte(0u8);
 /// let inputs_amounts = [(10u64, asset_type),
 ///                       (10u64, asset_type),

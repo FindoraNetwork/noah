@@ -190,7 +190,7 @@ mod tests {
   use crate::anon_xfr::{
     build_abar, decrypt_memo, gen_anon_xfr_body, open_abar, verify_anon_xfr_body,
   };
-  use crate::setup::{NodeParams, UserParams};
+  use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
   use crate::xfr::structs::AssetType;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
@@ -203,7 +203,8 @@ mod tests {
   #[test]
   fn test_anon_xfr() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let user_params = UserParams::new(Some(1), 4100);
+    //let user_params = UserParams::new(Some(1), 4100);
+    let user_params = UserParams::from_file_if_exists(1, 4100, DEFAULT_BP_NUM_GENS, None).unwrap();
 
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();

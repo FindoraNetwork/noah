@@ -1,6 +1,7 @@
 # IDE files
 .idea
 
+
 # Build files
 /release
 /target
@@ -11,3 +12,6 @@
 
 utilities/target
 
+
+#zei_api
+zei_api/data/*.bin

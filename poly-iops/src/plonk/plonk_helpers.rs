@@ -537,8 +537,8 @@ mod test {
   use crate::plonk::plonk_setup::{preprocess_prover, PlonkConstraintSystem};
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{One, ScalarArithmetic, Zero};
+  use rand::SeedableRng;
   use rand_chacha::ChaChaRng;
-  use rand_core::SeedableRng;
 
   type F = BLSScalar;
 
@@ -550,7 +550,8 @@ mod test {
     cs.insert_add_gate(2, 4, 6);
     cs.insert_add_gate(3, 5, 7);
     cs.pad();
-    let pcs = KZGCommitmentScheme::new(20, &mut ChaChaRng::from_seed([10u8; 32]));
+    let mut prng = ChaChaRng::from_seed([0_u8; 32]);
+    let pcs = KZGCommitmentScheme::new(20, &mut prng);
     let params = preprocess_prover(&cs, &pcs, [0u8; 32]).unwrap();
     let group = &params.group[..];
     let zero = F::zero();

@@ -56,7 +56,7 @@ mod tests {
   use crate::anon_xfr::circuits::tests::gen_secret_pub_inputs;
   use crate::anon_xfr::proofs::{prove_single_spend, verify_single_spend};
   use crate::anon_xfr::structs::AXfrSecKey;
-  use crate::setup::{NodeParams, UserParams};
+  use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
   use algebra::groups::{One, Scalar};
   use algebra::jubjub::JubjubScalar;
   use rand_chacha::ChaChaRng;
@@ -68,7 +68,7 @@ mod tests {
     // build cs
     let sec_key_in = AXfrSecKey(JubjubScalar::random(&mut prng));
     let (secret_inputs, pub_inputs) = gen_secret_pub_inputs(&sec_key_in).unwrap();
-    let params = UserParams::new(Some(1), 4100);
+    let params = UserParams::from_file_if_exists(1, 4100, DEFAULT_BP_NUM_GENS, None).unwrap();
     let proof = prove_single_spend(&mut prng, &params, secret_inputs).unwrap();
 
     // A bad proof should fail the verification

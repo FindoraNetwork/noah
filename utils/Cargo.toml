@@ -13,10 +13,7 @@ crate-type = ["rlib"]
 base64 = "0.10"
 bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/findoraorg/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
 curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
-ed25519-dalek = "1.0.0-pre.3"
 x25519-dalek = "0.6"
 serde = "1.0"
 digest = "0.8"
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
-rand = { version = "0.7", default-features = false, optional = true }
-rand_chacha = "0.2"

@@ -443,7 +443,7 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
     return Err(ZeiError::RangeProofProveError);
   }
 
-  let params = PublicParams::new();
+  let params = PublicParams::default();
 
   //build values vector (out amounts + amount difference)
   let in_total = inputs.iter().fold(0u64, |accum, x| accum + x.amount);

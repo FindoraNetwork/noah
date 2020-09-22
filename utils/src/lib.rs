@@ -4,6 +4,9 @@ pub mod serialization;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 
 #[macro_export]
 macro_rules! serialize_deserialize {
@@ -168,4 +171,11 @@ mod test {
     assert_eq!((0, 0xFFFFFFFF),
                super::u64_to_u32_pair(0xFFFFFFFF00000000u64));
   }
+}
+
+pub fn save_to_file(params_ser: &[u8], out_filename: PathBuf) {
+  let filename = out_filename.to_str().unwrap();
+  let mut f = File::create(&filename).expect("Unable to create file");
+  f.write_all(params_ser).expect("Unable to write data");
+  println!("Public parameters written in file {}.", filename);
 }

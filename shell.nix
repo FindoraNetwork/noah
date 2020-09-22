@@ -27,6 +27,7 @@ stdenv.mkDerivation {
     zlib
     pkgconfig openssl binutils-unwrapped
     protobuf
+    cargo-udeps
   ] ++ stdenv.lib.optionals stdenv.isDarwin [
         darwin.apple_sdk.frameworks.Security
       ];
@@ -36,5 +37,9 @@ stdenv.mkDerivation {
   LD_LIBRARY_PATH = "${zlib}/lib";
   PROTOC          = "${protobuf}/bin/protoc";
   PROTOC_INCLUDE  = "${protobuf}/include";
+
+   shellHook = ''
+      export PATH="$PATH:./target/debug"
+    '';
 }
 

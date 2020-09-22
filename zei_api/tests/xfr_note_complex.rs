@@ -42,7 +42,7 @@ pub(crate) mod xfr_note_complex_variable_size {
                                            vec![&no_policies; n],
                                            vec![None; n]);
 
-    let mut params = PublicParams::new();
+    let mut params = PublicParams::default();
 
     assert!(verify_xfr_body(&mut prng, &mut params, &xfr_body, &policies).is_ok());
   }

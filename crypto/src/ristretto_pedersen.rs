@@ -3,7 +3,7 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek::traits::MultiscalarMul;
 
 #[allow(non_snake_case)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RistrettoPedersenGens {
   pub B: RistrettoPoint,
   pub B_blinding: RistrettoPoint,
