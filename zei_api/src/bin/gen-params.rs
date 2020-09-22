@@ -13,8 +13,9 @@ use zei::setup::{PublicParams, UserParams};
             rename_all = "kebab-case")]
 enum Actions {
   User {
+    n_payers: usize,
+    n_payees: usize,
     tree_depth: usize,
-    kzg_degree: usize,
     bp_num_gens: usize,
     out_filename: PathBuf,
   },
@@ -40,11 +41,12 @@ fn main() {
   use Actions::*;
   let action = Actions::from_args();
   match action {
-    User { tree_depth,
-           kzg_degree,
+    User { n_payers,
+           n_payees,
+           tree_depth,
            bp_num_gens,
            out_filename, } => {
-      gen_user_params(tree_depth, kzg_degree, bp_num_gens, out_filename).unwrap();
+      gen_user_params(n_payers, n_payees, tree_depth, bp_num_gens, out_filename).unwrap();
     }
     BP { gens_capacity,
          party_capacity,
@@ -59,13 +61,14 @@ fn main() {
   };
 }
 
-fn gen_user_params(tree_depth: usize,
-                   kzg_degree: usize,
+fn gen_user_params(n_payers: usize,
+                   n_payees: usize,
+                   tree_depth: usize,
                    bp_num_gens: usize,
                    out_filename: PathBuf)
                    -> Result<(), ZeiError> {
-  println!("Generating 'User Parameters' with tree depth={} and KZG degree={} ...",
-           tree_depth, kzg_degree);
+  println!("Generating 'User Parameters' for {} payers, {} payees and with tree depth={}...",
+           n_payers, n_payees, tree_depth);
 
   let tree_dept_option = if tree_depth == 0 {
     None
@@ -73,7 +76,7 @@ fn gen_user_params(tree_depth: usize,
     Some(tree_depth)
   };
 
-  let user_params = UserParams::new(tree_dept_option, kzg_degree, bp_num_gens)?;
+  let user_params = UserParams::new(n_payers, n_payees, tree_dept_option, bp_num_gens);
   let user_params_ser = bincode::serialize(&user_params).unwrap();
   save_to_file(&user_params_ser, out_filename);
   Ok(())

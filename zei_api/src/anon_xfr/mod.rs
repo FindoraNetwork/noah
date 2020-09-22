@@ -1,5 +1,5 @@
-use crate::anon_xfr::circuits::{AXfrPubInputs, AXfrWitness};
-use crate::anon_xfr::proofs::{prove_single_spend, verify_single_spend};
+use crate::anon_xfr::circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret};
+use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
 use crate::anon_xfr::structs::{
   AXfrBody, AXfrProof, AXfrPubKey, AXfrSecKey, AnonAssetRecordTemplate, AnonBlindAssetRecord,
   MTLeafInfo, OpenAnonBlindAssetRecord,
@@ -51,15 +51,18 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
   let signing_key = AXfrPubKey(inputs[0].abar.public_key.0.mul(&diversifier));
 
   // 4. build proof
-  let secret_input = AXfrWitness { sec_key_in: inputs[0].secret_key.0,
-                                   diversifier,
-                                   uid: inputs[0].mt_leaf_info.uid,
-                                   amount: inputs[0].amount,
-                                   asset_type: inputs[0].asset_type.as_scalar(),
-                                   path: inputs[0].mt_leaf_info.path.clone(),
-                                   blind_in: inputs[0].blind,
-                                   blind_out: out_blind };
-  let proof = prove_single_spend(prng, params, secret_input)?;
+  let payers_secrets = vec![PayerSecret { sec_key: inputs[0].secret_key.0,
+                                          diversifier,
+                                          uid: inputs[0].mt_leaf_info.uid,
+                                          amount: inputs[0].amount,
+                                          path: inputs[0].mt_leaf_info.path.clone(),
+                                          blind: inputs[0].blind }];
+  let payees_secrets = vec![PayeeSecret { amount: inputs[0].amount,
+                                          blind: out_blind }];
+  let secret_inputs = AMultiXfrWitness { asset_type: inputs[0].asset_type.as_scalar(),
+                                         payers_secrets,
+                                         payees_secrets };
+  let proof = prove_xfr(prng, params, secret_inputs)?;
 
   Ok((AXfrBody { inputs: vec![(nullifier, signing_key)],
                  outputs: vec![out_abar],
@@ -80,14 +83,14 @@ pub fn verify_anon_xfr_body(params: &NodeParams,
   if *merkle_root != body.proof.merkle_root {
     return Err(ZeiError::AXfrVerificationError);
   }
-  let pub_input = AXfrPubInputs { nullifier: body.inputs[0].0,
-                                  merkle_root: *merkle_root,
-                                  signing_key: body.inputs[0].1.clone(),
-                                  recv_amount_type_commitment:
-                                    body.outputs[0].amount_type_commitment };
-  verify_single_spend(params, &pub_input, &body.proof.snark_proof).map_err(|_| {
-                                                                    ZeiError::AXfrVerificationError
-                                                                  })
+  let pub_inputs =
+    AMultiXfrPubInputs { payers_inputs: vec![(body.inputs[0].0, body.inputs[0].1.clone())],
+                         payees_commitments: vec![body.outputs[0].amount_type_commitment],
+                         merkle_root: *merkle_root,
+                         fee: 0 };
+  verify_xfr(params, &pub_inputs, &body.proof.snark_proof).map_err(|_| {
+                                                            ZeiError::AXfrVerificationError
+                                                          })
 }
 
 fn build_abar<R: CryptoRng + RngCore>(
@@ -203,8 +206,9 @@ mod tests {
   #[test]
   fn test_anon_xfr() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    //let user_params = UserParams::new(Some(1), 4100);
-    let user_params = UserParams::from_file_if_exists(1, 4100, DEFAULT_BP_NUM_GENS, None).unwrap();
+
+    let user_params =
+      UserParams::from_file_if_exists(1, 1, Some(1), DEFAULT_BP_NUM_GENS, None).unwrap();
 
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();

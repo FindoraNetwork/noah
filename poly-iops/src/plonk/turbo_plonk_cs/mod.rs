@@ -246,6 +246,15 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
                         F::zero());
   }
 
+  pub fn insert_sub_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
+    self.insert_lc_gate(&[left_var, right_var, 0, 0],
+                        out_var,
+                        F::one(),
+                        F::one().neg(),
+                        F::zero(),
+                        F::zero());
+  }
+
   pub fn insert_mul_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
     assert!(left_var < self.num_vars, "left_var index out of bound");
     assert!(right_var < self.num_vars, "right_var index out of bound");
@@ -310,6 +319,21 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
     let out_var = self.new_variable(self.witness[left_var].add(&self.witness[right_var]));
     self.insert_add_gate(left_var, right_var, out_var);
     out_var
+  }
+
+  /// Create an output variable and insert a subraction gate.
+  pub fn sub(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
+    assert!(left_var < self.num_vars, "left_var index out of bound");
+    assert!(right_var < self.num_vars, "right_var index out of bound");
+    let out_var = self.new_variable(self.witness[left_var].sub(&self.witness[right_var]));
+    self.insert_sub_gate(left_var, right_var, out_var);
+    out_var
+  }
+
+  // Add a constraint that `left_var` and `right_var` have the same value.
+  pub fn equal(&mut self, left_var: VarIndex, right_var: VarIndex) {
+    let zero_var = self.zero_var();
+    self.insert_sub_gate(left_var, right_var, zero_var);
   }
 
   /// Create an output variable and insert a multiplication gate.
@@ -572,6 +596,29 @@ mod test {
               .is_ok());
 
     assert!(cs.verify_witness(&[num[0], num[1], num[2], num[3], num[3], num[2]], &[])
+              .is_err());
+  }
+
+  #[test]
+  fn test_sub_and_equal() {
+    let mut cs = TurboPlonkConstraintSystem::new();
+    let zero = F::from_u32(0);
+    let one = F::from_u32(1);
+    let two = one.add(&one);
+    let three = two.add(&one);
+    cs.new_variable(zero);
+    cs.new_variable(one);
+    cs.new_variable(two);
+    cs.new_variable(three);
+    let add = cs.add(0, 2);
+    let sub = cs.sub(3, 1);
+    cs.equal(add, sub);
+
+    let witness = cs.get_and_clear_witness();
+    let verify = cs.verify_witness(&witness[..], &[]);
+    assert!(verify.is_ok(), verify.unwrap_err());
+
+    assert!(cs.verify_witness(&[zero, one, two, two, two, one, zero], &[])
               .is_err());
   }
 

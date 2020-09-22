@@ -1,4 +1,4 @@
-use crate::anon_xfr::circuits::{build_single_spend_cs, AXfrPubInputs, AXfrWitness};
+use crate::anon_xfr::circuits::{build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness};
 use crate::setup::{NodeParams, UserParams};
 use merlin::Transcript;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
@@ -7,23 +7,30 @@ use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 
-const SINGLE_SPEND_TRANSCRIPT: &[u8] = b"AnonXfr Single Spend";
+const ANON_XFR_TRANSCRIPT: &[u8] = b"Anon Xfr";
+const N_INPUTS_TRANSCRIPT: &[u8] = b"Number of input ABARs";
+const N_OUTPUTS_TRANSCRIPT: &[u8] = b"Number of output ABARs";
 
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 pub(crate) type AXfrProverParams = ProverParams<KZGCommitmentSchemeBLS>;
 pub(crate) type AXfrVerifierParams = VerifierParams<KZGCommitmentSchemeBLS>;
 
-/// I generates the plonk proof for a single-input/output anonymous transaction.
+/// I generates the plonk proof for a multi-inputs/outputs anonymous transaction.
 /// * `rng` - pseudo-random generator.
 /// * `params` - System params
-/// * `secret_input` - input to generate witness of the constraint system
-pub(crate) fn prove_single_spend<R: CryptoRng + RngCore>(rng: &mut R,
-                                                         params: &UserParams,
-                                                         secret_input: AXfrWitness)
-                                                         -> Result<AXfrPlonkPf, ZeiError> {
-  let mut cs = build_single_spend_cs(secret_input);
+/// * `secret_inputs` - input to generate witness of the constraint system
+pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(rng: &mut R,
+                                                params: &UserParams,
+                                                secret_inputs: AMultiXfrWitness)
+                                                -> Result<AXfrPlonkPf, ZeiError> {
+  let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
+  transcript.append_u64(N_INPUTS_TRANSCRIPT,
+                        secret_inputs.payers_secrets.len() as u64);
+  transcript.append_u64(N_OUTPUTS_TRANSCRIPT,
+                        secret_inputs.payees_secrets.len() as u64);
+
+  let (mut cs, _) = build_multi_xfr_cs(secret_inputs);
   let witness = cs.get_and_clear_witness();
-  let mut transcript = Transcript::new(SINGLE_SPEND_TRANSCRIPT);
   let zkproof = prover(rng,
                        &mut transcript,
                        &params.pcs,
@@ -33,15 +40,18 @@ pub(crate) fn prove_single_spend<R: CryptoRng + RngCore>(rng: &mut R,
   Ok(zkproof)
 }
 
-/// I verify the plonk proof for a single-input/output anonymous transaction.
-/// * `params` - System parameters including KZG params and single spend constrain system
+/// I verify the plonk proof for a multi-input/output anonymous transaction.
+/// * `params` - System parameters including KZG params and the constraint system
 /// * `pub_inputs` - the public inputs of the transaction.
 /// * `proof` - the proof
-pub(crate) fn verify_single_spend(params: &NodeParams,
-                                  pub_inputs: &AXfrPubInputs,
-                                  proof: &AXfrPlonkPf)
-                                  -> Result<(), ZeiError> {
-  let mut transcript = Transcript::new(SINGLE_SPEND_TRANSCRIPT);
+pub(crate) fn verify_xfr(params: &NodeParams,
+                         pub_inputs: &AMultiXfrPubInputs,
+                         proof: &AXfrPlonkPf)
+                         -> Result<(), ZeiError> {
+  let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
+  transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);
+  transcript.append_u64(N_OUTPUTS_TRANSCRIPT,
+                        pub_inputs.payees_commitments.len() as u64);
   let online_inputs = pub_inputs.to_vec();
   verifier(&mut transcript,
            &params.pcs,
@@ -53,34 +63,63 @@ pub(crate) fn verify_single_spend(params: &NodeParams,
 
 #[cfg(test)]
 mod tests {
-  use crate::anon_xfr::circuits::tests::gen_secret_pub_inputs;
-  use crate::anon_xfr::proofs::{prove_single_spend, verify_single_spend};
-  use crate::anon_xfr::structs::AXfrSecKey;
+  use crate::anon_xfr::circuits::tests::new_multi_xfr_witness_for_test;
+  use crate::anon_xfr::circuits::AMultiXfrPubInputs;
+  use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
   use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
-  use algebra::groups::{One, Scalar};
-  use algebra::jubjub::JubjubScalar;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
   #[test]
-  fn test_anon_xfr_proof() {
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+  fn test_anon_multi_xfr_proof() {
+    test_multi_xfr_proof(1, 2);
+    test_multi_xfr_proof(2, 1);
+    test_multi_xfr_proof(2, 3);
+    test_multi_xfr_proof(3, 2);
+  }
+
+  fn test_multi_xfr_proof(n_payers: usize, n_payees: usize) {
     // build cs
-    let sec_key_in = AXfrSecKey(JubjubScalar::random(&mut prng));
-    let (secret_inputs, pub_inputs) = gen_secret_pub_inputs(&sec_key_in).unwrap();
-    let params = UserParams::from_file_if_exists(1, 4100, DEFAULT_BP_NUM_GENS, None).unwrap();
-    let proof = prove_single_spend(&mut prng, &params, secret_inputs).unwrap();
+    let secret_inputs = new_multi_xfr_witness_for_test(n_payers, n_payees, [0u8; 32]);
+    let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
+    let params = UserParams::from_file_if_exists(n_payers,
+                                                 n_payees,
+                                                 Some(1),
+                                                 DEFAULT_BP_NUM_GENS,
+                                                 None).unwrap();
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let proof = prove_xfr(&mut prng, &params, secret_inputs).unwrap();
 
     // A bad proof should fail the verification
-    let bad_sk = AXfrSecKey(JubjubScalar::one());
-    let (bad_secret_inputs, _) = gen_secret_pub_inputs(&bad_sk).unwrap();
-    let bad_proof = prove_single_spend(&mut prng, &params, bad_secret_inputs).unwrap();
+    let bad_secret_inputs = new_multi_xfr_witness_for_test(n_payers, n_payees, [1u8; 32]);
+    let bad_proof = prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
 
     // verify good witness
     let node_params = NodeParams::from(params);
-    assert!(verify_single_spend(&node_params, &pub_inputs, &proof).is_ok());
+    assert!(verify_xfr(&node_params, &pub_inputs, &proof).is_ok());
 
-    // verify bar witness
-    assert!(verify_single_spend(&node_params, &pub_inputs, &bad_proof).is_err());
+    // verify bad witness
+    assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
+  }
+
+  #[test]
+  fn test_anon_single_xfr_proof() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    // build cs
+    let secret_inputs = new_multi_xfr_witness_for_test(1, 1, [0u8; 32]);
+    let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
+    let params = UserParams::from_file_if_exists(1, 1, Some(1), DEFAULT_BP_NUM_GENS, None).unwrap();
+    let proof = prove_xfr(&mut prng, &params, secret_inputs).unwrap();
+
+    // A bad proof should fail the verification
+    let bad_secret_inputs = new_multi_xfr_witness_for_test(1, 1, [1u8; 32]);
+    let bad_proof = prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
+
+    // verify good witness
+    let node_params = NodeParams::from(params);
+    assert!(verify_xfr(&node_params, &pub_inputs, &proof).is_ok());
+
+    // verify bad witness
+    assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
   }
 }

@@ -1,5 +1,5 @@
 //The Public Setup needed for Proofs
-use crate::anon_xfr::circuits::{build_single_spend_cs, AXfrWitness, TurboPlonkCS, TREE_DEPTH};
+use crate::anon_xfr::circuits::{build_multi_xfr_cs, AMultiXfrWitness, TurboPlonkCS, TREE_DEPTH};
 use bulletproofs::BulletproofGens;
 use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use poly_iops::commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
@@ -104,21 +104,21 @@ impl Default for PublicParams {
 }
 
 impl UserParams {
-  pub fn new(tree_depth: Option<usize>,
-             kzg_degree: usize,
+  pub fn new(n_payers: usize,
+             n_payees: usize,
+             tree_depth: Option<usize>,
              bp_num_gens: usize)
-             -> Result<UserParams, ZeiError> {
-    let cs = match tree_depth {
-      Some(depth) => build_single_spend_cs(AXfrWitness::fake(depth)),
-      None => build_single_spend_cs(AXfrWitness::fake(TREE_DEPTH)),
+             -> UserParams {
+    let (cs, n_constraints) = match tree_depth {
+      Some(depth) => build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth)),
+      None => build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH)),
     };
-    let pcs = KZGCommitmentScheme::new(kzg_degree, &mut ChaChaRng::from_seed([0u8; 32]));
-    let prover_params =
-      preprocess_prover(&cs, &pcs, COMMON_SEED).map_err(|_| ZeiError::ParameterError)?;
-    Ok(UserParams { bp_params: PublicParams::new(bp_num_gens),
-                    pcs,
-                    cs,
-                    prover_params })
+    let pcs = KZGCommitmentScheme::new(n_constraints + 2, &mut ChaChaRng::from_seed([0u8; 32]));
+    let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+    UserParams { bp_params: PublicParams::new(bp_num_gens),
+                 pcs,
+                 cs,
+                 prover_params }
   }
 
   pub fn from_file(filename: &str) -> Result<UserParams, ZeiError> {
@@ -126,27 +126,31 @@ impl UserParams {
   }
 
   /// Generate the parameters from a file if it exists.
-  /// The filename is derived from some internal path and the values of `tree_depth` and `kzg_degree`.
+  /// The filename is derived from some internal path and the values of `n_payers`,`n_payees`,`tree_depth`and `bp_num_gens`.
   /// Otherwise it generates the parameters and store them on disk so that these parameters can be retrieved later.
+  /// * `n_payers` - number of payers
+  /// * `n_payees` - number of payeers
   /// * `tree_depth` - depth of the merkle tree
-  /// * `kzg_degree` - size of the polynomial
   /// * `bp_num_gens` - number of BP generators for the circuit
-  /// * `path` -
+  /// * `path` - path to retrieve the file. If set to None, a default value will be used
   /// * `returns` the parameters for the user
-  pub fn from_file_if_exists(tree_depth: usize,
-                             kzg_degree: usize,
+  pub fn from_file_if_exists(n_payers: usize,
+                             n_payees: usize,
+                             tree_depth: Option<usize>,
                              bp_num_gens: usize,
                              path: Option<String>)
                              -> Result<UserParams, ZeiError> {
-    let default_filename =
-      compute_full_path_from_root(&format!("user_params_{}_{}_{}.bin",
-                                           tree_depth, kzg_degree, bp_num_gens));
+    let default_filename = compute_full_path_from_root(&format!("user_params_{}_{}_{}_{}.bin",
+                                                                n_payers,
+                                                                n_payees,
+                                                                tree_depth.unwrap_or(0_usize),
+                                                                bp_num_gens));
     let full_filename = path.unwrap_or(default_filename);
 
     let user_params =
       Self::from_file(&full_filename).or_else(|_| {
                                        let res =
-                                         Self::new(Some(tree_depth), kzg_degree, bp_num_gens)?;
+                                         Self::new(n_payers, n_payees, tree_depth, bp_num_gens);
                                        let val = bincode::serialize(&res).unwrap();
                                        save_to_file(&val, PathBuf::from(full_filename));
                                        Ok(res)
@@ -157,10 +161,11 @@ impl UserParams {
 
 impl NodeParams {
   pub fn new(tree_depth: Option<usize>,
-             kzg_degree: usize,
+             n_payers: usize,
+             n_payees: usize,
              bp_num_gens: usize)
              -> Result<NodeParams, ZeiError> {
-    let user_params = UserParams::new(tree_depth, kzg_degree, bp_num_gens)?;
+    let user_params = UserParams::new(n_payers, n_payees, tree_depth, bp_num_gens);
     Ok(Self::from(user_params))
   }
 }
@@ -188,7 +193,7 @@ mod test {
 
   #[test]
   fn test_params_serialization() {
-    let params = UserParams::from_file_if_exists(1, 4100, DEFAULT_BP_NUM_GENS, None).unwrap();
+    let params = UserParams::from_file_if_exists(1, 1, Some(1), DEFAULT_BP_NUM_GENS, None).unwrap();
 
     let v = bincode::serialize(&params).unwrap();
     let params_de: UserParams = bincode::deserialize(&v).unwrap();

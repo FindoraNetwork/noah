@@ -1,7 +1,10 @@
 use crate::anon_xfr::structs::{AXfrPubKey, BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
+use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubGroup, JubjubScalar};
+use crypto::basics::commitment::Commitment as CommScheme;
+use crypto::basics::hash::rescue::RescueInstance;
+use crypto::basics::prf::PRF;
 use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
 use poly_iops::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
 
@@ -12,125 +15,292 @@ const SK_LEN: usize = 252; // secret key size (in bits)
 const AMOUNT_LEN: usize = 64; // amount value size (in bits)
 pub const TREE_DEPTH: usize = 20; // Depth of the Merkle Tree
 
-/// Public inputs of a single input/output anonymous transaction.
-#[derive(Debug)]
-pub(crate) struct AXfrPubInputs {
-  pub nullifier: Nullifier,
-  pub recv_amount_type_commitment: Commitment,
-  pub merkle_root: BLSScalar,
-  pub signing_key: AXfrPubKey,
-}
-
-impl AXfrPubInputs {
-  pub fn to_vec(&self) -> Vec<BLSScalar> {
-    vec![self.nullifier,
-         self.recv_amount_type_commitment,
-         self.merkle_root,
-         self.signing_key.0.get_x(),
-         self.signing_key.0.get_y()]
-  }
-}
-
-/// Secret witness of a single input/output anonymous transaction.
-#[derive(Debug)]
-pub(crate) struct AXfrWitness {
-  pub sec_key_in: JubjubScalar,
-  pub diversifier: JubjubScalar, // the randomness for re-randomizing sender's public key
-  pub uid: u64,
+#[derive(Debug, Clone)]
+pub(crate) struct PayerSecret {
+  pub sec_key: JubjubScalar,
+  pub diversifier: JubjubScalar, // key randomizer for the signature verification key
   pub amount: u64,
-  pub asset_type: BLSScalar,
+  // pub asset_type: BLSScalar, // TODO: add it when we support multi-asset_types in a Xfr
+  pub uid: u64,
   pub path: MTPath,
-  pub blind_in: BlindFactor,
-  pub blind_out: BlindFactor,
+  pub blind: BlindFactor,
 }
 
-impl AXfrWitness {
-  // create a default `AXfrWitness` from an anonymous transfer secret key.
-  pub(crate) fn fake(tree_depth: usize) -> Self {
-    let zero = BLSScalar::zero();
-    let node = MTNode { siblings1: zero,
-                        siblings2: zero,
+#[derive(Debug, Clone)]
+pub(crate) struct PayeeSecret {
+  pub amount: u64,
+  pub blind: BlindFactor,
+}
+
+/// Secret witness of an anonymous transaction.
+#[derive(Debug)]
+pub(crate) struct AMultiXfrWitness {
+  pub asset_type: BLSScalar,
+  pub payers_secrets: Vec<PayerSecret>,
+  pub payees_secrets: Vec<PayeeSecret>,
+}
+
+impl AMultiXfrWitness {
+  // create a default `AMultiXfrWitness`.
+  pub(crate) fn fake(n_payers: usize, n_payees: usize, tree_depth: usize) -> Self {
+    let bls_zero = BLSScalar::zero();
+    let jubjub_zero = JubjubScalar::zero();
+    let node = MTNode { siblings1: bls_zero,
+                        siblings2: bls_zero,
                         is_left_child: 0,
                         is_right_child: 0 };
+    let payer_secret = PayerSecret { sec_key: jubjub_zero,
+                                     diversifier: jubjub_zero,
+                                     uid: 0,
+                                     amount: 0,
+                                     path: MTPath::new(vec![node; tree_depth]),
+                                     blind: bls_zero };
+    let payee_secret = PayeeSecret { amount: 0,
+                                     blind: bls_zero };
 
-    AXfrWitness { sec_key_in: JubjubScalar::zero(),
-                  diversifier: JubjubScalar::zero(),
-                  uid: 0,
-                  amount: 0,
-                  asset_type: zero,
-                  path: MTPath::new(vec![node; tree_depth]),
-                  blind_in: BlindFactor::zero(),
-                  blind_out: BlindFactor::zero() }
+    AMultiXfrWitness { asset_type: bls_zero,
+                       payers_secrets: vec![payer_secret; n_payers],
+                       payees_secrets: vec![payee_secret; n_payees] }
   }
 }
 
-/// Returns the constraint system for the single input/output transaction
+/// Public inputs of an anonymous transaction.
+#[derive(Debug)]
+pub(crate) struct AMultiXfrPubInputs {
+  pub payers_inputs: Vec<(Nullifier, AXfrPubKey)>,
+  pub payees_commitments: Vec<Commitment>,
+  pub merkle_root: BLSScalar,
+  pub fee: u64, // transaction fee
+}
+
+impl AMultiXfrPubInputs {
+  pub fn to_vec(&self) -> Vec<BLSScalar> {
+    let mut result = vec![];
+    // nullifiers and signature verification keys
+    for (nullifier, pk_sign) in &self.payers_inputs {
+      result.push(*nullifier);
+      result.push(pk_sign.0.get_x());
+      result.push(pk_sign.0.get_y());
+    }
+    // merkle_root
+    result.push(self.merkle_root);
+    // output commitments
+    for comm in &self.payees_commitments {
+      result.push(*comm);
+    }
+    // transaction fee
+    result.push(BLSScalar::from_u64(self.fee));
+    result
+  }
+
+  // Compute the public inputs from the secret inputs
+  pub(crate) fn from_witness(witness: &AMultiXfrWitness) -> Self {
+    // nullifiers and signature public keys
+    let prf = PRF::new();
+    let base = JubjubGroup::get_base();
+    let payers_inputs: Vec<(Nullifier, AXfrPubKey)> =
+      witness.payers_secrets
+             .iter()
+             .map(|sec| {
+               let pk_point = base.mul(&sec.sec_key);
+               let pk_sign = AXfrPubKey(pk_point.mul(&sec.diversifier));
+
+               let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::one());
+               let uid_amount = pow_2_64.mul(&BLSScalar::from_u64(sec.uid))
+                                        .add(&BLSScalar::from_u64(sec.amount));
+               let nullifier = prf.eval(&BLSScalar::from(&sec.sec_key),
+                                        &[uid_amount,
+                                          witness.asset_type,
+                                          pk_point.get_x(),
+                                          pk_point.get_y()]);
+               (nullifier, pk_sign)
+             })
+             .collect();
+
+    // output commitments
+    let comm = CommScheme::new();
+    let payees_commitments: Vec<Commitment> = witness.payees_secrets
+                                                     .iter()
+                                                     .map(|sec| {
+                                                       comm.commit(&sec.blind,
+                           &[BLSScalar::from_u64(sec.amount), witness.asset_type])
+                   .unwrap()
+                                                     })
+                                                     .collect();
+
+    // transaction fee
+    let balance: u64 = witness.payers_secrets
+                              .iter()
+                              .fold(0, |acc, x| acc + x.amount);
+    let fee: u64 = witness.payees_secrets
+                          .iter()
+                          .fold(balance, |acc, x| acc - x.amount);
+
+    // merkle root
+    let hash = RescueInstance::new();
+    let payer = &witness.payers_secrets[0];
+    let pk_point = base.mul(&payer.sec_key);
+    let zero = BLSScalar::zero();
+    let pk_hash = hash.rescue_hash(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
+    let commitment = comm.commit(&payer.blind,
+                                 &[BLSScalar::from_u64(payer.amount), witness.asset_type])
+                         .unwrap();
+    let mut node =
+      hash.rescue_hash(&[BLSScalar::from_u64(payer.uid), commitment, pk_hash, zero])[0];
+    for path_node in payer.path.nodes.iter().rev() {
+      let input = match (path_node.is_left_child, path_node.is_right_child) {
+        (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
+        (0, 0) => vec![path_node.siblings1, node, path_node.siblings2, zero],
+        _ => vec![path_node.siblings1, path_node.siblings2, node, zero],
+      };
+      node = hash.rescue_hash(&input)[0];
+    }
+
+    Self { payers_inputs,
+           payees_commitments,
+           merkle_root: node,
+           fee }
+  }
+}
+
+/// Returns the constraint system for a multi-inputs/outputs transaction, and the corresponding number of constraints.
 /// A prover can provide honest `secret_inputs` and obtain the cs witness by calling `cs.get_and_clear_witness()`.
-/// A verifier can provide an empty secret_inputs to get the constraint system `cs` for verification only.
-pub(crate) fn build_single_spend_cs(secret_inputs: AXfrWitness) -> TurboPlonkCS {
+/// One provide an empty secret_inputs to get the constraint system `cs` for verification only.
+pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonkCS, usize) {
+  assert_ne!(secret_inputs.payers_secrets.len(), 0);
+  assert_ne!(secret_inputs.payees_secrets.len(), 0);
+
   let mut cs = TurboPlonkConstraintSystem::new();
-  let witness_vars = add_secret_inputs(&mut cs, secret_inputs);
-  let (sec_key_in, diversifier, uid, amount, asset_type, blind_in, blind_out) =
-    (witness_vars.sec_key_in,
-     witness_vars.diversifier,
-     witness_vars.uid,
-     witness_vars.amount,
-     witness_vars.asset_type,
-     witness_vars.blind_in,
-     witness_vars.blind_out);
+  let payers_secrets = add_payers_secrets(&mut cs, &secret_inputs.payers_secrets);
+  let payees_secrets = add_payees_secrets(&mut cs, &secret_inputs.payees_secrets);
+  let asset_type = cs.new_variable(secret_inputs.asset_type);
 
-  // prove knowledge of sender's secret key: pk = base^{sk}
   let base = JubjubGroup::get_base();
-  let (pub_key_in_var, pub_key_in_point) = cs.scalar_mul(base, sec_key_in, SK_LEN);
-  let pk_in_x = pub_key_in_var.get_x();
-  let pk_in_y = pub_key_in_var.get_y();
-
-  // prove knowledge of diversifier for sender's signing key: pk_sign = pk^{diversifier}
-  let (signing_key_var, _) =
-    cs.var_base_scalar_mul(pub_key_in_var, pub_key_in_point, diversifier, SK_LEN);
-
-  // commitments
-  let com_abar_in_var = commit(&mut cs, blind_in, amount, asset_type);
-  let com_abar_out_var = commit(&mut cs, blind_out, amount, asset_type);
-
-  // prove pre-image of the nullifier
-  let pow_2_63 = BLSScalar::from_u64(1 << 63);
-  let pow_2_64 = pow_2_63.add(&pow_2_63);
+  let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::one());
   let zero = BLSScalar::zero();
   let one = BLSScalar::one();
   let zero_var = cs.zero_var();
+  let mut root_var: Option<VarIndex> = None;
+  for payer in &payers_secrets {
+    // prove knowledge of payer's secret key: pk = base^{sk}
+    let (pk_var, pk_point) = cs.scalar_mul(base.clone(), payer.sec_key, SK_LEN);
+    let pk_x = pk_var.get_x();
+    let pk_y = pk_var.get_y();
 
-  // we can encode (`uid`||`amount`) to `uid_amount` := `uid` * 2^64 + `amount` because 0 <= `amount` < 2^64
-  let uid_amount = cs.linear_combine(&[uid, amount, zero_var, zero_var],
-                                     pow_2_64,
-                                     one,
-                                     zero,
-                                     zero);
-  let nullifier_input_vars = NullifierInputVars { uid_amount,
-                                                  asset_type,
-                                                  pub_key_x: pk_in_x,
-                                                  pub_key_y: pk_in_y };
-  let nullifier_var = nullify(&mut cs, sec_key_in, nullifier_input_vars);
+    // prove knowledge of diversifier: pk_sign = pk^{diversifier}
+    let (pk_sign_var, _) = cs.var_base_scalar_mul(pk_var, pk_point, payer.diversifier, SK_LEN);
 
-  // Merkle path authentication
-  let acc_elem = AccElemVars { uid,
-                               commitment: com_abar_in_var,
-                               pub_key_x: pk_in_x,
-                               pub_key_y: pk_in_y };
-  let root_var = compute_merkle_root(&mut cs, acc_elem, witness_vars.path);
+    // commitments
+    let com_abar_in_var = commit(&mut cs, payer.blind, payer.amount, asset_type);
 
-  // Range check `amount`
-  cs.range_check(amount, AMOUNT_LEN);
+    // prove pre-image of the nullifier
+    // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
+    let uid_amount = cs.linear_combine(&[payer.uid, payer.amount, zero_var, zero_var],
+                                       pow_2_64,
+                                       one,
+                                       zero,
+                                       zero);
+    let nullifier_input_vars = NullifierInputVars { uid_amount,
+                                                    asset_type,
+                                                    pub_key_x: pk_x,
+                                                    pub_key_y: pk_y };
+    let nullifier_var = nullify(&mut cs, payer.sec_key, nullifier_input_vars);
 
-  // prepare public inputs variables
-  cs.prepare_io_variable(nullifier_var);
-  cs.prepare_io_variable(com_abar_out_var);
-  cs.prepare_io_variable(root_var);
-  cs.prepare_io_point_variable(signing_key_var);
+    // Merkle path authentication
+    let acc_elem = AccElemVars { uid: payer.uid,
+                                 commitment: com_abar_in_var,
+                                 pub_key_x: pk_x,
+                                 pub_key_y: pk_y };
+    let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payer.path);
 
-  // pad to power of two
+    if let Some(root) = root_var {
+      cs.equal(root, tmp_root_var);
+    } else {
+      root_var = Some(tmp_root_var);
+    }
+
+    // prepare public inputs variables
+    cs.prepare_io_variable(nullifier_var);
+    cs.prepare_io_point_variable(pk_sign_var);
+  }
+  // prepare the publc input for merkle_root
+  cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
+
+  for payee in &payees_secrets {
+    // commitment
+    let com_abar_out_var = commit(&mut cs, payee.blind, payee.amount, asset_type);
+
+    // Range check `amount`
+    // Note we don't need to range-check payers' `amount`, because those amounts are bound
+    // to payers' accumulated abars, whose underlying amounts have already been range-checked
+    // in the transactions that created the payers' abars.
+    cs.range_check(payee.amount, AMOUNT_LEN);
+
+    // prepare the public input for the output commitment
+    cs.prepare_io_variable(com_abar_out_var);
+  }
+
+  // Balance check: fee = \sum_{i} amount_in_i - \sum_{j} amount_out_j
+  let mut balance_var = zero_var;
+  for payer in &payers_secrets {
+    balance_var = cs.add(balance_var, payer.amount);
+  }
+  for payee in &payees_secrets {
+    balance_var = cs.sub(balance_var, payee.amount);
+  }
+  // prepare the public input for the transaction fee
+  cs.prepare_io_variable(balance_var);
+
+  // pad the number of constraints to power of two
   cs.pad();
-  cs
+
+  let n_constraints = cs.size;
+  (cs, n_constraints)
+}
+
+fn add_payers_secrets(cs: &mut TurboPlonkCS, secrets: &[PayerSecret]) -> Vec<PayerSecretVars> {
+  secrets.iter()
+         .map(|secret| {
+           let bls_sk = BLSScalar::from(&secret.sec_key);
+           let bls_diversifier = BLSScalar::from(&secret.diversifier);
+           let sec_key = cs.new_variable(bls_sk);
+           let diversifier = cs.new_variable(bls_diversifier);
+           let uid = cs.new_variable(BLSScalar::from_u64(secret.uid));
+           let amount = cs.new_variable(BLSScalar::from_u64(secret.amount));
+           let blind = cs.new_variable(secret.blind);
+           let path = add_merkle_path_variables(cs, secret.path.clone());
+           PayerSecretVars { sec_key,
+                             diversifier,
+                             uid,
+                             amount,
+                             path,
+                             blind }
+         })
+         .collect()
+}
+
+fn add_payees_secrets(cs: &mut TurboPlonkCS, secrets: &[PayeeSecret]) -> Vec<PayeeSecretVars> {
+  secrets.iter()
+         .map(|secret| {
+           let amount = cs.new_variable(BLSScalar::from_u64(secret.amount));
+           let blind = cs.new_variable(secret.blind);
+           PayeeSecretVars { amount, blind }
+         })
+         .collect()
+}
+
+struct PayerSecretVars {
+  pub sec_key: VarIndex,
+  pub diversifier: VarIndex,
+  pub uid: VarIndex,
+  pub amount: VarIndex,
+  pub path: MerklePathVars,
+  pub blind: VarIndex,
+}
+
+struct PayeeSecretVars {
+  pub amount: VarIndex,
+  pub blind: VarIndex,
 }
 
 // cs variables for a Merkle node
@@ -160,41 +330,6 @@ struct NullifierInputVars {
   pub asset_type: VarIndex,
   pub pub_key_x: VarIndex,
   pub pub_key_y: VarIndex,
-}
-
-// cs variables for the secret inputs of a single input/output anonymous transaction
-struct WitnessVars {
-  pub sec_key_in: VarIndex,
-  pub diversifier: VarIndex,
-  pub uid: VarIndex,
-  pub amount: VarIndex,
-  pub asset_type: VarIndex,
-  pub path: MerklePathVars,
-  pub blind_in: VarIndex,
-  pub blind_out: VarIndex,
-}
-
-// Add secret inputs into the constraint system.
-fn add_secret_inputs(cs: &mut TurboPlonkCS, witness: AXfrWitness) -> WitnessVars {
-  let sec_key_scalar = BLSScalar::from(&witness.sec_key_in);
-  let diversifier_scalar = BLSScalar::from(&witness.diversifier);
-  let sec_key_in = cs.new_variable(sec_key_scalar);
-  let diversifier = cs.new_variable(diversifier_scalar);
-
-  let uid = cs.new_variable(BLSScalar::from_u64(witness.uid));
-  let amount = cs.new_variable(BLSScalar::from_u64(witness.amount));
-  let asset_type = cs.new_variable(witness.asset_type);
-  let blind_in = cs.new_variable(witness.blind_in);
-  let blind_out = cs.new_variable(witness.blind_out);
-  let path = add_merkle_path_variables(cs, witness.path);
-  WitnessVars { sec_key_in,
-                diversifier,
-                uid,
-                amount,
-                asset_type,
-                path,
-                blind_in,
-                blind_out }
 }
 
 fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
@@ -247,7 +382,7 @@ fn sort(cs: &mut TurboPlonkCS,
 
 fn compute_merkle_root(cs: &mut TurboPlonkCS,
                        elem: AccElemVars,
-                       path_vars: MerklePathVars)
+                       path_vars: &MerklePathVars)
                        -> VarIndex {
   let (uid, commitment, pub_key_x, pub_key_y) =
     (elem.uid, elem.commitment, elem.pub_key_x, elem.pub_key_y);
@@ -300,10 +435,8 @@ fn nullify(cs: &mut TurboPlonkCS,
 #[cfg(test)]
 pub(crate) mod tests {
   use super::*;
-  use crate::anon_xfr::structs::AXfrSecKey;
   use algebra::bls12_381::BLSScalar;
-  use algebra::groups::{Group, GroupArithmetic, One, Scalar, Zero};
-  use algebra::jubjub::JubjubScalar;
+  use algebra::groups::{One, Scalar, Zero};
   use crypto::basics::commitment::Commitment;
   use crypto::basics::hash::rescue::RescueInstance;
   use crypto::basics::prf::PRF;
@@ -311,84 +444,85 @@ pub(crate) mod tests {
   use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use utils::errors::ZeiError;
+  use std::cmp::min;
 
-  pub(crate) fn gen_secret_pub_inputs(sec_key_in: &AXfrSecKey)
-                                      -> Result<(AXfrWitness, AXfrPubInputs), ZeiError> {
+  pub(crate) fn new_multi_xfr_witness_for_test(n_payers: usize,
+                                               n_payees: usize,
+                                               seed: [u8; 32])
+                                               -> AMultiXfrWitness {
+    assert!(n_payers <= 3);
+    assert!(n_payees <= 3);
+    let mut prng = ChaChaRng::from_seed(seed);
+    let asset_type = BLSScalar::random(&mut prng);
     let zero = BLSScalar::zero();
-    let one = BLSScalar::one();
-    let two = one.add(&one);
-    let jubjub_one = JubjubScalar::one();
-    // build secret inputs
-    let diversifier = jubjub_one.add(&jubjub_one);
-    let siblings1 = one;
-    let siblings2 = two;
-    let is_left_child = 0u8;
-    let is_right_child = 1u8;
-    let node = MTNode { siblings1,
-                        siblings2,
-                        is_left_child,
-                        is_right_child };
-    let path = MTPath::new(vec![node]);
-    // generate blinding factors
-    let comm = Commitment::new();
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let blind_in = BLSScalar::random(&mut prng);
-    let blind_out = BLSScalar::random(&mut prng);
-    let send_commitment = comm.commit(&blind_in, &[/*amount=*/ two, /*asset_type=*/ one])?;
-    let recv_commitment = comm.commit(&blind_out, &[/*amount=*/ two, /*asset_type=*/ one])?;
-    let secret_inputs = AXfrWitness { sec_key_in: sec_key_in.0,
-                                      diversifier,
-                                      uid: 1,
-                                      amount: 2,
-                                      asset_type: one,
-                                      path,
-                                      blind_in,
-                                      blind_out };
+    let mut payers_secrets: Vec<PayerSecret> =
+      (0..n_payers).map(|i| {
+                     let (is_left_child, is_right_child) = match i % 3 {
+                       0 => (1, 0),
+                       1 => (0, 0),
+                       _ => (0, 1),
+                     };
+                     let node = MTNode { siblings1: zero,
+                                         siblings2: zero,
+                                         is_left_child,
+                                         is_right_child };
+                     PayerSecret { sec_key: JubjubScalar::random(&mut prng),
+                                   diversifier: JubjubScalar::random(&mut prng),
+                                   uid: i as u64,
+                                   amount: 10 * (i + 1) as u64,
+                                   path: MTPath::new(vec![node]),
+                                   blind: BLSScalar::random(&mut prng) }
+                   })
+                   .collect();
+    // compute the merkle leafs and update the merkle paths if there are more than 1 payers
+    if n_payers > 1 {
+      let hash = RescueInstance::new();
+      let comm = CommScheme::new();
+      let base = JubjubGroup::get_base();
+      let leafs: Vec<BLSScalar> =
+        payers_secrets.iter()
+                      .map(|payer| {
+                        let pk_point = base.mul(&payer.sec_key);
+                        let pk_hash =
+                          hash.rescue_hash(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
+                        let commitment = comm.commit(&payer.blind,
+                                                     &[BLSScalar::from_u64(payer.amount),
+                                                       asset_type])
+                                             .unwrap();
+                        hash.rescue_hash(&[BLSScalar::from_u64(payer.uid),
+                                           commitment,
+                                           pk_hash,
+                                           zero])[0]
+                      })
+                      .collect();
+      if n_payers == 2 {
+        payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
+        payers_secrets[0].path.nodes[0].siblings2 = zero;
+        payers_secrets[1].path.nodes[0].siblings1 = leafs[0];
+        payers_secrets[1].path.nodes[0].siblings2 = zero;
+      } else {
+        payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
+        payers_secrets[0].path.nodes[0].siblings2 = leafs[2];
+        payers_secrets[1].path.nodes[0].siblings1 = leafs[0];
+        payers_secrets[1].path.nodes[0].siblings2 = leafs[2];
+        payers_secrets[2].path.nodes[0].siblings1 = leafs[0];
+        payers_secrets[2].path.nodes[0].siblings2 = leafs[1];
+      }
+    }
 
-    // compute public inputs
-    // sender's randomized public key
-    let base = JubjubGroup::get_base();
-    let pub_key_in = AXfrPubKey(base.mul(&sec_key_in.0));
-    let signing_key = AXfrPubKey(pub_key_in.0.mul(&diversifier));
-    // nullifier
-    let pow_2_63 = BLSScalar::from_u64(1 << 63);
-    let pow_2_64 = pow_2_63.add(&pow_2_63);
-    // encode `uid_amount` = `uid` * 2^64 + `amount`
-    let uid_amount = pow_2_64.add(&two);
-    let prf = PRF::new();
-    let nullifier = prf.eval(/*sec_key_in=*/
-                             &BLSScalar::from(&sec_key_in.0),
-                             &[uid_amount,
-                               /*asset_type=*/ one,
-                               pub_key_in.0.get_x(),
-                               pub_key_in.0.get_y()]);
-    // merkle root
-    let hash = RescueInstance::new();
-    let pk_hash = hash.rescue_hash(&[pub_key_in.0.get_x(), pub_key_in.0.get_y(), zero, zero])[0];
-    let leaf = hash.rescue_hash(&[/*uid=*/ one, send_commitment, pk_hash, zero])[0];
-    // leaf is the right child
-    let merkle_root = hash.rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
-    let pub_inputs = AXfrPubInputs { nullifier,
-                                     merkle_root,
-                                     signing_key,
-                                     recv_amount_type_commitment: recv_commitment };
-    Ok((secret_inputs, pub_inputs))
-  }
-  #[test]
-  fn test_build_single_spend_cs() {
-    let mut prng = ChaChaRng::from_seed([1u8; 32]);
-    let sec_key_in = AXfrSecKey(JubjubScalar::random(&mut prng));
-    let (secret_inputs, pub_inputs) = gen_secret_pub_inputs(&sec_key_in).unwrap();
+    let mut balance = (n_payers * (n_payers + 1) * 5) as u64;
+    let payees_secrets: Vec<PayeeSecret> = (0..n_payees).map(|i| {
+                                                          let amount =
+                                                            min(9 * (i + 1) as u64, balance);
+                                                          balance -= amount;
+                                                          PayeeSecret { amount,
+                      blind: BLSScalar::random(&mut prng) }
+                                                        })
+                                                        .collect();
 
-    // check the constraints
-    let mut cs = build_single_spend_cs(secret_inputs);
-    let mut witness = cs.get_and_clear_witness();
-    let online_inputs = pub_inputs.to_vec();
-    let verify = cs.verify_witness(&witness, &online_inputs);
-    assert!(verify.is_ok(), verify.unwrap_err());
-    witness[1].add_assign(&BLSScalar::one());
-    assert!(cs.verify_witness(&witness, &online_inputs).is_err());
+    AMultiXfrWitness { asset_type,
+                       payers_secrets,
+                       payees_secrets }
   }
 
   #[test]
@@ -520,7 +654,7 @@ pub(crate) mod tests {
     // compute the constraints
     let path = MTPath::new(vec![path_node1, path_node2]);
     let path_vars = add_merkle_path_variables(&mut cs, path);
-    let root_var = compute_merkle_root(&mut cs, elem, path_vars);
+    let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
 
     // Check Merkle root correctness
     let mut witness = cs.get_and_clear_witness();
@@ -570,5 +704,27 @@ pub(crate) mod tests {
     let _ = add_merkle_path_variables(&mut cs, path);
     let witness = cs.get_and_clear_witness();
     assert!(cs.verify_witness(&witness, &[]).is_err());
+  }
+
+  #[test]
+  fn test_build_multi_xfr_cs() {
+    test_multi_xfr_cs(1, 2);
+    test_multi_xfr_cs(2, 1);
+    test_multi_xfr_cs(2, 3);
+    test_multi_xfr_cs(3, 2);
+  }
+
+  fn test_multi_xfr_cs(n_payers: usize, n_payees: usize) {
+    let secret_inputs = new_multi_xfr_witness_for_test(n_payers, n_payees, [0u8; 32]);
+    let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
+
+    // check the constraints
+    let (mut cs, _) = build_multi_xfr_cs(secret_inputs);
+    let mut witness = cs.get_and_clear_witness();
+    let online_inputs = pub_inputs.to_vec();
+    let verify = cs.verify_witness(&witness, &online_inputs);
+    assert!(verify.is_ok(), verify.unwrap_err());
+    witness[1].add_assign(&BLSScalar::one());
+    assert!(cs.verify_witness(&witness, &online_inputs).is_err());
   }
 }
