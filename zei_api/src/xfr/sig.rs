@@ -3,6 +3,7 @@ use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey};
 use ed25519_dalek::{SecretKey, Signature, Verifier};
+use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
@@ -55,28 +56,16 @@ impl XfrSecretKey {
     XfrSignature(sign)
   }
 
-  pub fn as_scalar_multiply_by_curve_point(&self, y: &EdwardsPoint) -> EdwardsPoint {
+  /// Returns SecretKey as a Scalar
+  pub(crate) fn as_scalar(&self) -> Scalar {
     let expanded: ExpandedSecretKey = (&self.0).into();
-    //expanded.key is not public, I need to extract it via serialization
+    // expanded.key is not public, thus extract it via serialization
     let mut key_bytes = [0u8; 32];
     key_bytes.copy_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
-    let key_scalar = Scalar::from_bits(key_bytes);
-    key_scalar * y
-  }
-
-  #[allow(clippy::should_implement_trait)]
-  pub fn clone(&self) -> Self {
-    let bytes = self.zei_to_bytes();
-    XfrSecretKey::zei_from_bytes(bytes.as_slice()).unwrap() // This shouldn't fail
+    Scalar::from_bits(key_bytes)
   }
 }
 
-#[wasm_bindgen]
-impl XfrKeyPair {
-  pub fn get_pk(&self) -> XfrPublicKey {
-    self.pub_key
-  }
-}
 impl XfrKeyPair {
   pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
     let kp = ed25519_dalek::Keypair::generate(prng);
@@ -111,31 +100,34 @@ pub struct XfrMultiSig {
   pub signatures: Vec<XfrSignature>,
 }
 
-pub fn verify_multisig(keylist: &[XfrPublicKey],
-                       message: &[u8],
-                       multi_signature: &XfrMultiSig)
-                       -> Result<(), ZeiError> {
-  if multi_signature.signatures.len() != keylist.len() {
-    return Err(ZeiError::SignatureError); //TODO return MultiSignatureError different length
+impl XfrMultiSig {
+  /// Sign a multisig under a list of keypairs
+  pub fn sign(keypairs: &[&XfrKeyPair], message: &[u8]) -> Self {
+    // sort the key pairs based on alphabetical order of their public keys
+    let mut sorted = keypairs.to_owned();
+    sorted.sort_unstable_by_key(|kp| kp.pub_key.zei_to_bytes());
+    let signatures = sorted.iter().map(|kp| kp.sign(&message)).collect_vec();
+    XfrMultiSig { signatures }
   }
-  for (pk, signature) in keylist.iter().zip(multi_signature.signatures.iter()) {
-    pk.verify(message, signature)?; //TODO return MultiSignatureError
-  }
-  Ok(())
-}
 
-pub fn sign_multisig(keylist: &[&XfrKeyPair], message: &[u8]) -> XfrMultiSig {
-  let mut signatures = vec![];
-  for keypair in keylist.iter() {
-    let signature = keypair.sign(message);
-    signatures.push(signature);
+  /// Verify a multisig
+  pub fn verify(&self, pubkeys: &[&XfrPublicKey], message: &[u8]) -> Result<(), ZeiError> {
+    if pubkeys.len() != self.signatures.len() {
+      return Err(ZeiError::SignatureError);
+    }
+    // sort the key pairs based on alphabetical order of their public keys
+    let mut sorted = pubkeys.to_owned();
+    sorted.sort_unstable_by_key(|k| k.zei_to_bytes());
+    for (pk, sig) in sorted.iter().zip(self.signatures.iter()) {
+      pk.verify(&message, &sig)?;
+    }
+    Ok(())
   }
-  XfrMultiSig { signatures }
 }
 
 #[cfg(test)]
 mod test {
-  use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair};
+  use crate::xfr::sig::{XfrKeyPair, XfrMultiSig};
   use itertools::Itertools;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -184,7 +176,7 @@ mod test {
                "Verifying sig on with a different key should have return Err(Signature Error)");
   }
 
-  fn generate_keys(prng: &mut ChaChaRng, n: usize) -> Vec<XfrKeyPair> {
+  fn generate_keypairs(prng: &mut ChaChaRng, n: usize) -> Vec<XfrKeyPair> {
     let mut v = vec![];
     for _ in 0..n {
       v.push(XfrKeyPair::generate(prng));
@@ -195,48 +187,31 @@ mod test {
   #[test]
   fn multisig() {
     let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
+    let msg = b"random message here!".to_vec();
     // test with one key
-    let keypairs = generate_keys(&mut prng, 1);
-    let pk = keypairs.get(0).unwrap().pub_key;
-    let msig = sign_multisig(&[&keypairs[0]], "HELLO".as_bytes());
-    assert_eq!(Ok(()),
-               verify_multisig(&[pk.clone()], "HELLO".as_bytes(), &msig),
-               "Multisignature should have verify correctly");
-    //try with more keys
-    let extra_key = XfrKeyPair::generate(&mut prng);
-    assert_eq!(Err(SignatureError),
-               verify_multisig(&[pk.clone(), extra_key.pub_key.clone()],
-                               "HELLO".as_bytes(),
-                               &msig),
-               "Multisignature should have not verify correctly");
+    let keypairs = generate_keypairs(&mut prng, 1);
+    let keypairs_refs = keypairs.iter().collect_vec();
+    let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
+    assert!(XfrMultiSig::sign(&keypairs_refs, &msg).verify(&pubkeys, &msg)
+                                                   .is_ok(),
+            "Multisignature should have verify correctly for a single key");
 
-    // test with two keys
-    let keypairs = generate_keys(&mut prng, 2);
-    let pk0 = keypairs.get(0).unwrap().pub_key;
-    let pk1 = keypairs.get(1).unwrap().pub_key;
-    let msig = sign_multisig(&[&keypairs[0], &keypairs[1]], "HELLO".as_bytes());
-    assert_eq!(Ok(()),
-               verify_multisig(&[pk0.clone(), pk1.clone()], "HELLO".as_bytes(), &msig),
-               "Multisignature should have verify correctly");
+    // test with multiple keys
+    let keypairs = generate_keypairs(&mut prng, 10);
+    let keypairs_refs = keypairs.iter().collect_vec();
+    let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
+    assert!(XfrMultiSig::sign(&keypairs_refs, &msg).verify(&pubkeys, &msg)
+                                                   .is_ok(),
+            "Multisignature should have verify correctly for 10 keys");
 
-    let newkeypair = XfrKeyPair::generate(&mut prng);
-    let pk2 = newkeypair.pub_key;
-    assert_eq!(Err(SignatureError),
-               verify_multisig(&[pk0.clone(), pk1.clone(), pk2.clone()],
-                               "HELLO".as_bytes(),
-                               &msig),
-               "Message was signed with two keys");
-    assert_eq!(Err(SignatureError),
-               verify_multisig(&[pk0.clone(), pk2.clone()], "HELLO".as_bytes(), &msig),
-               "Message was signed under different key set");
-
-    // test with 20 keys
-    let keypairs = generate_keys(&mut prng, 20);
-    let pks = keypairs.iter().map(|x| x.pub_key.clone()).collect_vec();
-    let keypairsref = keypairs.iter().map(|x| x).collect_vec();
-    let msig = sign_multisig(keypairsref.as_slice(), "HELLO".as_bytes());
-    assert_eq!(Ok(()),
-               verify_multisig(pks.as_slice(), "HELLO".as_bytes(), &msig),
-               "Multisignature should have verify correctly");
+    // test with unmatching order of keypairs
+    let keypairs = generate_keypairs(&mut prng, 10);
+    let keypairs_refs = keypairs.iter().collect_vec();
+    let mut pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
+    pubkeys.swap(1, 3);
+    pubkeys.swap(4, 9);
+    assert!(XfrMultiSig::sign(&keypairs_refs, &msg).verify(&pubkeys, &msg)
+                                                   .is_ok(),
+            "Multisignature should have verify correctly even when keylist is unordered");
   }
 }

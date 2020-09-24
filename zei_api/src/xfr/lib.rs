@@ -7,7 +7,7 @@ use crate::xfr::proofs::{
   asset_amount_tracking_proofs, asset_proof, batch_verify_confidential_amount,
   batch_verify_confidential_asset, batch_verify_tracer_tracking_proof, range_proof,
 };
-use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig, XfrPublicKey};
+use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use crate::xfr::structs::*;
 use algebra::groups::{GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
@@ -220,7 +220,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 /// for x in outputs_amounts.iter() {
 ///     let keypair = XfrKeyPair::generate(&mut prng);
 ///
-///     let ar = AssetRecordTemplate::with_no_asset_tracking(x.0, x.1, asset_record_type, keypair.get_pk());
+///     let ar = AssetRecordTemplate::with_no_asset_tracking(x.0, x.1, asset_record_type, keypair.pub_key);
 ///     outputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap());
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();
@@ -417,23 +417,24 @@ fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result
 pub(crate) fn compute_transfer_multisig(body: &XfrBody,
                                         keys: &[&XfrKeyPair])
                                         -> Result<XfrMultiSig, ZeiError> {
-  let mut vec = vec![];
-  body.serialize(&mut rmp_serde::Serializer::new(&mut vec))
+  let mut bytes = vec![];
+  body.serialize(&mut rmp_serde::Serializer::new(&mut bytes))
       .map_err(|_| ZeiError::SerializationError)?;
-  Ok(sign_multisig(keys, vec.as_slice()))
+  Ok(XfrMultiSig::sign(&keys, &bytes))
 }
 
 /// I verify the transfer multisignature over the its body
 pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiError> {
-  let mut vec = vec![];
+  let mut bytes = vec![];
   xfr_note.body
-          .serialize(&mut rmp_serde::Serializer::new(&mut vec))
+          .serialize(&mut rmp_serde::Serializer::new(&mut bytes))
           .map_err(|_| ZeiError::SerializationError)?;
-  let mut public_keys = vec![];
-  for x in xfr_note.body.inputs.iter() {
-    public_keys.push(x.public_key)
-  }
-  verify_multisig(public_keys.as_slice(), vec.as_slice(), &xfr_note.multisig)
+  let pubkeys = xfr_note.body
+                        .inputs
+                        .iter()
+                        .map(|input| &input.public_key)
+                        .collect_vec();
+  xfr_note.multisig.verify(&pubkeys, &bytes)
 }
 
 /// XfrNote verification

@@ -936,17 +936,17 @@ pub(crate) mod examples {
     // 3. Prepare outputs
 
     let template1 = AssetRecordTemplate::with_no_asset_tracking(
-      amount_asset1_out1, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user1_key_pair1.get_pk());
+      amount_asset1_out1, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user1_key_pair1.pub_key);
 
     let template2 = AssetRecordTemplate::with_no_asset_tracking(
-      amount_asset1_out2, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user2_key_pair1.get_pk());
+      amount_asset1_out2, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user2_key_pair1.pub_key);
 
     let template3 = AssetRecordTemplate::with_asset_tracking(
-      amount_asset2_out3, ASSET2_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user3_key_pair1.get_pk(),
+      amount_asset2_out3, ASSET2_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user3_key_pair1.pub_key,
       asset_tracing_policy_asset2_output.clone());
 
     let template4 = AssetRecordTemplate::with_no_asset_tracking(
-      amount_asset3_out4, ASSET3_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user4_key_pair1.get_pk());
+      amount_asset3_out4, ASSET3_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user4_key_pair1.pub_key);
 
     let output_asset_record1 =
       AssetRecord::from_template_no_identity_tracking(&mut prng, &template1).unwrap();

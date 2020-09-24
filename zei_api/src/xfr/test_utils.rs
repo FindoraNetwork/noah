@@ -135,7 +135,7 @@ pub fn multiple_key_gen(n: usize) -> (Vec<XfrKeyPair>, XfrPublicKey) {
 
   let mut prng = ChaChaRng::from_seed([0u8; 32]);
   let recv_keypair = XfrKeyPair::generate(&mut prng);
-  let recv_pub_key = recv_keypair.get_pk();
+  let recv_pub_key = recv_keypair.pub_key;
   (sender_key_pairs, recv_pub_key)
 }
 
@@ -195,7 +195,7 @@ pub fn prepare_inputs_and_outputs_with_policies(sender_key_pairs: &[&XfrKeyPair]
     let asset_type = asset_types[i % l];
 
     let template = AssetRecordTemplate::with_no_asset_tracking(
-      amount, asset_type, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user_key_pair.get_pk());
+      amount, asset_type, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user_key_pair.pub_key);
 
     let output_asset_record =
       AssetRecord::from_template_no_identity_tracking(&mut prng, &template).unwrap();
@@ -235,7 +235,7 @@ pub fn prepare_inputs_and_outputs_without_policies_single_asset(
   let mut output_asset_records = vec![];
   for user_key_pair in sender_key_pairs.iter().take(n) {
     let template = AssetRecordTemplate::with_no_asset_tracking(
-      amount, ASSET_TYPE_1, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user_key_pair.get_pk());
+      amount, ASSET_TYPE_1, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user_key_pair.pub_key);
 
     let output_asset_record =
       AssetRecord::from_template_no_identity_tracking(&mut prng, &template).unwrap();

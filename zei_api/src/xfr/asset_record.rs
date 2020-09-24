@@ -419,12 +419,12 @@ fn sample_point_and_blind_share<R: CryptoRng + RngCore>(
 }
 
 pub(crate) fn derive_point_from_blind_share(blind_share: &CompressedEdwardsY,
-                                            secret_key: &XfrSecretKey)
+                                            sec_key: &XfrSecretKey)
                                             -> Result<CompressedEdwardsY, ZeiError> {
-  let blind_share_decompressed = blind_share.decompress()
-                                            .ok_or(ZeiError::DecompressElementError)?;
-  Ok(CompressedEdwardsY(secret_key.as_scalar_multiply_by_curve_point(&blind_share_decompressed)
-                                  .compress()))
+  let shared_edwards_point = sec_key.as_scalar()
+                             * blind_share.decompress()
+                                          .ok_or_else(|| ZeiError::DecompressElementError)?;
+  Ok(CompressedEdwardsY(shared_edwards_point.compress()))
 }
 
 pub(crate) fn compute_blind_factor(point: &CompressedEdwardsY, aux: &'static [u8]) -> Scalar {
@@ -584,10 +584,10 @@ mod test {
       AssetRecordTemplate::with_asset_tracking(amount,
                                                asset_type,
                                                record_type,
-                                               keypair.get_pk(),
+                                               keypair.pub_key,
                                                tracing_policy.unwrap())
     } else {
-      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, record_type, keypair.get_pk())
+      AssetRecordTemplate::with_no_asset_tracking(amount, asset_type, record_type, keypair.pub_key)
     };
 
     let (open_ar, asset_tracer_memo, owner_memo) =
@@ -674,16 +674,16 @@ mod test {
     let input_templates = [AssetRecordTemplate::with_no_asset_tracking(10u64,
                                                                        asset_type,
                                                                        record_type,
-                                                                       inkeys[0].get_pk()),
+                                                                       inkeys[0].pub_key),
                            AssetRecordTemplate::with_no_asset_tracking(20u64,
                                                                        asset_type,
                                                                        record_type,
-                                                                       inkeys[1].get_pk())];
+                                                                       inkeys[1].pub_key)];
 
     let output_templates = [AssetRecordTemplate::with_no_asset_tracking(30u64,
                                                                         asset_type,
                                                                         record_type,
-                                                                        outkeys[0].get_pk())];
+                                                                        outkeys[0].pub_key)];
 
     let (xfr_note, _, _) = create_xfr(&mut prng,
                                       &input_templates,

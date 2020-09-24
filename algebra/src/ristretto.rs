@@ -3,7 +3,7 @@ use crate::groups::{Group, GroupArithmetic};
 use crate::groups::{One, Scalar as ZeiScalar, ScalarArithmetic, Zero};
 use byteorder::ByteOrder;
 use core::ops::{AddAssign, MulAssign, SubAssign};
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+use curve25519_dalek::constants::{ED25519_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT};
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -144,6 +144,11 @@ impl CompressedRistretto {
 impl CompressedEdwardsY {
   pub fn decompress(&self) -> Option<EdwardsPoint> {
     self.0.decompress()
+  }
+
+  /// returns compressed edwards point of (`ED25519_BASEPOINT_POINT` ^ s)
+  pub fn scalar_mul_basepoint(s: &RistrettoScalar) -> Self {
+    CompressedEdwardsY((s.0 * ED25519_BASEPOINT_POINT).compress())
   }
 }
 
