@@ -110,27 +110,19 @@ More information available in this [tutorial](https://blog.jetbrains.com/clion/2
 
 ## Tests
 
-We follow Rust convention for unit tests which are written in the same file as the source.
-We use [proptest](https://lib.rs/crates/proptest) for property testing. These tests are located in the `tests` directory.
+The tests generate some parameters which are stored in the directory `zei_api/data`.
+If the tests fail, try first to remove the `*.bin` files in this directory and launch the tests again.
 
-### Run the tests
+We recommend to use the option `--release` for tests faster execution.
 
-Run all the tests except property-testing tests which are slow.
-
+Run all the tests:
 ```
-> cargo test --workspace
-```
-
-Run only the unit tests.
-
-```
-> cargo test --lib
+> cargo test --all --release
 ```
 
-Run only the documentation tests.
-
+Run only the documentation tests:
 ```
-> cargo test --doc
+> cargo test --doc --release
 ```
 
 ### Test coverage
