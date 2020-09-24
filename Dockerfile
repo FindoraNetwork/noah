@@ -13,7 +13,7 @@ COPY ./utils /app/utils
 COPY ./bench-utils /app/bench-utils
 COPY ./zei_api /app/zei_api
 RUN cargo audit
-RUN cargo test --workspace
+RUN cargo test --workspace --release
 RUN rm -rf /app/target
 FROM debian:buster
 COPY --from=builder /app /app
