@@ -13,7 +13,7 @@ use crate::api::anon_creds;
 use crate::api::anon_creds::{
   ac_commit, ac_sign, ACCommitment, ACCommitmentKey, ACUserSecretKey, Credential,
 };
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 
 pub const ASSET_TYPE_1: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);

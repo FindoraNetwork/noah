@@ -1,6 +1,6 @@
+use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
 use crate::bp_circuits::solvency::solvency;
-use crate::ristretto_pedersen::RistrettoPedersenGens;
 use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSError, R1CSProof, Verifier};
@@ -27,7 +27,7 @@ use utils::errors::ZeiError;
 /// use crypto::bp_circuits::cloak::{CloakValue, CloakCommitment};
 /// use crypto::solvency::{verify_solvency, prove_solvency};
 /// use bulletproofs::{BulletproofGens};
-/// use crypto::ristretto_pedersen::RistrettoPedersenGens;
+/// use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 ///
 /// // asset types
 /// let type1 = RistrettoScalar::from_u32(1);
@@ -268,8 +268,8 @@ fn padd_values(values: &mut Vec<CloakValue>, types: &[Scalar]) {
 
 #[cfg(test)]
 mod test {
+  use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use crate::bp_circuits::cloak::CloakValue;
-  use crate::ristretto_pedersen::RistrettoPedersenGens;
   use algebra::groups::Scalar;
   use algebra::ristretto::RistrettoScalar;
   use bulletproofs::BulletproofGens;

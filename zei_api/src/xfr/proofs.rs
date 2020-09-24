@@ -11,6 +11,7 @@ use crate::xfr::structs::{
 use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar};
 use bulletproofs::RangeProof;
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::basics::elgamal::ElGamalCiphertext;
 use crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
 use crypto::chaum_pedersen::{
@@ -20,7 +21,6 @@ use crypto::pedersen_elgamal::{
   pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
   PedersenElGamalEqProof, PedersenElGamalProofInstance,
 };
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 use linear_map::LinearMap;
 use merlin::Transcript;

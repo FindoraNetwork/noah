@@ -123,7 +123,7 @@ pub struct AssetMixingInstance<'a> {
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
 /// use zei::setup::PublicParams;
-/// use crypto::ristretto_pedersen::RistrettoPedersenGens;
+/// use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 /// let input = [
 ///            (60u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10000), RistrettoScalar::from_u64(200000)),
 ///            (100u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10001), RistrettoScalar::from_u64(200001)),
@@ -260,7 +260,7 @@ mod test {
   use crate::xfr::asset_mixer::AssetMixingInstance;
   use algebra::groups::Scalar;
   use algebra::ristretto::{CompressedRistretto, RistrettoScalar};
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
+  use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 

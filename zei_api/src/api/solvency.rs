@@ -7,8 +7,8 @@ use algebra::groups::{GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::BulletproofGens;
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::bp_circuits::cloak::{CloakCommitment, CloakValue};
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::solvency;
 use std::collections::HashSet;
 use std::fmt;
@@ -373,7 +373,7 @@ mod test {
     },
   };
   use bulletproofs::BulletproofGens;
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
+  use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use rand_chacha::ChaChaRng;
   use rand_core::{CryptoRng, RngCore, SeedableRng};
 

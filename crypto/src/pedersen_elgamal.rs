@@ -1,5 +1,5 @@
+use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::basics::elgamal::{ElGamalCiphertext, ElGamalEncKey};
-use crate::ristretto_pedersen::RistrettoPedersenGens;
 use crate::sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
 use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoPoint;
@@ -314,6 +314,7 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(transcript: 
 #[cfg(test)]
 mod test {
   use super::PedersenElGamalEqProof;
+  use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use crate::basics::elgamal::{
     elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey,
   };
@@ -321,7 +322,6 @@ mod test {
     pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
     PedersenElGamalProofInstance,
   };
-  use crate::ristretto_pedersen::RistrettoPedersenGens;
   use algebra::groups::Scalar as _;
   use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
   use itertools::Itertools;

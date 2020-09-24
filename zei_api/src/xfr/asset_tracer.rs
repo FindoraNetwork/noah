@@ -6,6 +6,7 @@ use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLSG1};
 use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::basics::elgamal::{
   elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
   ElGamalDecKey, ElGamalEncKey,
@@ -13,7 +14,6 @@ use crypto::basics::elgamal::{
 use crypto::basics::hybrid_encryption::{
   hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
 };
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 use utils::{u64_to_u32_pair, u8_be_slice_to_u32};

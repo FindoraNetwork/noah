@@ -10,10 +10,10 @@ use crate::xfr::structs::{
 use algebra::groups::Scalar as _;
 use algebra::ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar};
 use boolinator::Boolinator;
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::basics::hybrid_encryption::{
   hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
 };
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use rand_core::{CryptoRng, RngCore};
@@ -553,7 +553,7 @@ mod test {
   use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
   use algebra::groups::Scalar as _;
   use algebra::ristretto::RistrettoScalar as Scalar;
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
+  use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use itertools::Itertools;
   use rand::Rng;
   use rand_chacha::ChaChaRng;

@@ -11,7 +11,7 @@ use crate::xfr::sig::{sign_multisig, verify_multisig, XfrKeyPair, XfrMultiSig, X
 use crate::xfr::structs::*;
 use algebra::groups::{GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use serde::ser::Serialize;

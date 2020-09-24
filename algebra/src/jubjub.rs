@@ -128,6 +128,12 @@ impl Scalar for JubjubScalar {
 
 impl Eq for JubjubGroup {}
 
+impl JubjubGroup {
+  pub fn mul_by_cofactor(&self) -> JubjubGroup {
+    JubjubGroup(self.0.mul_by_cofactor())
+  }
+}
+
 impl Group for JubjubGroup {
   const COMPRESSED_LEN: usize = 32;
 

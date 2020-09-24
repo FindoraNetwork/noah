@@ -1,4 +1,4 @@
-use crate::ristretto_pedersen::RistrettoPedersenGens;
+use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::sigma::{sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript};
 use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoPoint;
@@ -389,7 +389,7 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(transcrip
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::ristretto_pedersen::RistrettoPedersenGens;
+  use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 

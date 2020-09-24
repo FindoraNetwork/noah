@@ -102,8 +102,9 @@ fn build_abar<R: CryptoRng + RngCore>(
   let a = BLSScalar::from_u64(record.amount);
   let at = record.asset_type.as_scalar::<BLSScalar>();
   let blinding = BLSScalar::random(prng);
-  let commitment = crypto::basics::commitment::Commitment::new().commit(&blinding, &[a, at])
-                                                                .unwrap();
+  let commitment = crypto::basics::commitments::rescue::HashCommitment::new().commit(&blinding,
+                                                                                     &[a, at])
+                                                                             .unwrap();
   let mut msg = vec![];
   msg.extend_from_slice(&record.amount.to_le_bytes());
   msg.extend_from_slice(&record.asset_type.0);
@@ -164,10 +165,10 @@ pub fn decrypt_memo(memo: &OwnerMemo,
     JubjubScalar::from_bytes(&plaintext[i..i + JUBJUB_SCALAR_LEN]).map_err(|_| {
                                                                     ZeiError::ParameterError
                                                                   })?;
-  crypto::basics::commitment::Commitment::new().verify(&[BLSScalar::from_u64(amount),
+  crypto::basics::commitments::rescue::HashCommitment::new().verify(&[BLSScalar::from_u64(amount),
                                                          asset_type.as_scalar()],
-                                                       &blind,
-                                                       &abar.amount_type_commitment)?;
+                                                                    &blind,
+                                                                    &abar.amount_type_commitment)?;
   Ok((amount, asset_type, blind, rand))
 }
 

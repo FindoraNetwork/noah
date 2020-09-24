@@ -82,7 +82,6 @@ pub trait Scalar:
 
 pub trait Group:
   Debug + Sized + PartialEq + Eq + Clone + GroupArithmetic + Serialize + for<'de> Deserialize<'de>
-//+ GroupArithmetic + ZeiFromToBytes
 {
   const COMPRESSED_LEN: usize;
 

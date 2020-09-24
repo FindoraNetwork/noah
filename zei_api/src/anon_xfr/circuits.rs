@@ -2,7 +2,7 @@ use crate::anon_xfr::structs::{AXfrPubKey, BlindFactor, Commitment, MTNode, MTPa
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubGroup, JubjubScalar};
-use crypto::basics::commitment::Commitment as CommScheme;
+use crypto::basics::commitments::rescue::HashCommitment as CommScheme;
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::prf::PRF;
 use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
@@ -437,7 +437,7 @@ pub(crate) mod tests {
   use super::*;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{One, Scalar, Zero};
-  use crypto::basics::commitment::Commitment;
+  use crypto::basics::commitments::rescue::HashCommitment;
   use crypto::basics::hash::rescue::RescueInstance;
   use crypto::basics::prf::PRF;
   use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
@@ -530,7 +530,7 @@ pub(crate) mod tests {
     let mut cs = TurboPlonkConstraintSystem::new();
     let amount = BLSScalar::from_u32(7);
     let asset_type = BLSScalar::from_u32(5);
-    let comm = Commitment::new();
+    let comm = HashCommitment::new();
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let blind = BLSScalar::random(&mut prng);
     let commitment = comm.commit(&blind, &[amount, asset_type]).unwrap(); // safe unwrap

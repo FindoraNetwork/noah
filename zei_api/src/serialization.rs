@@ -144,9 +144,9 @@ mod test {
   use algebra::groups::{Group, GroupArithmetic, Scalar};
   use algebra::jubjub::{JubjubGroup, JubjubScalar};
   use algebra::ristretto::RistrettoPoint;
+  use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use crypto::basics::elgamal::elgamal_key_gen;
   use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use rmp_serde::{Deserializer, Serializer};

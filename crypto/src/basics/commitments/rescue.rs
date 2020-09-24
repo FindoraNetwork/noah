@@ -13,12 +13,12 @@ use algebra::bls12_381::BLSScalar;
 use algebra::groups::Scalar;
 use utils::errors::ZeiError;
 
-pub struct Commitment<S> {
+pub struct HashCommitment<S> {
   hash: RescueInstance<S>,
   msg_len: usize, // number of messages to be committed
 }
 
-impl<S: Scalar> Commitment<S> {
+impl<S: Scalar> HashCommitment<S> {
   /// Returns the commitment to a message vector.
   /// It returns an error when the number of input messages is invalid.
   /// * `blind_scalar` - blinding randomness
@@ -48,13 +48,13 @@ impl<S: Scalar> Commitment<S> {
   }
 }
 
-impl Default for Commitment<BLSScalar> {
+impl Default for HashCommitment<BLSScalar> {
   fn default() -> Self {
     Self::new()
   }
 }
 
-impl Commitment<BLSScalar> {
+impl HashCommitment<BLSScalar> {
   pub fn new() -> Self {
     let hash = RescueInstance::<BLSScalar>::new();
     let msg_len = hash.rate - 1;
@@ -64,7 +64,7 @@ impl Commitment<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-  use crate::basics::commitment::Commitment;
+  use crate::basics::commitments::rescue::HashCommitment;
   use crate::basics::hash::rescue::RescueInstance;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::Scalar;
@@ -73,7 +73,7 @@ mod test {
 
   #[test]
   fn test_hash_commitment() {
-    let hash_comm = Commitment::<BLSScalar>::new();
+    let hash_comm = HashCommitment::<BLSScalar>::new();
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let blind_scalar = BLSScalar::random(&mut prng);
     // wrong number of input messages

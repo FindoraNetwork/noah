@@ -1,7 +1,7 @@
 //The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{build_multi_xfr_cs, AMultiXfrWitness, TurboPlonkCS, TREE_DEPTH};
 use bulletproofs::BulletproofGens;
-use crypto::ristretto_pedersen::RistrettoPedersenGens;
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use poly_iops::commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
 use poly_iops::plonk::plonk_setup::{preprocess_prover, ProverParams, VerifierParams};
 use rand_chacha::ChaChaRng;

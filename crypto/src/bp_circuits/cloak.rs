@@ -39,7 +39,7 @@ match on each list. On each product the elements are shifted by a random challen
   - The last intermediate value is appended to the output list.
 */
 
-use crate::ristretto_pedersen::RistrettoPedersenGens;
+use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::r1cs::{

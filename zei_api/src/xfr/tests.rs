@@ -18,7 +18,7 @@ pub(crate) mod tests {
   use crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
   use crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
 
-  use crypto::ristretto_pedersen::RistrettoPedersenGens;
+  use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use itertools::Itertools;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
@@ -702,8 +702,8 @@ pub(crate) mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
     use algebra::groups::GroupArithmetic;
     use algebra::ristretto::RistrettoPoint;
+    use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crypto::basics::elgamal::ElGamalCiphertext;
-    use crypto::ristretto_pedersen::RistrettoPedersenGens;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);

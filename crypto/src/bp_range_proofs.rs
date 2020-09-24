@@ -1,4 +1,4 @@
-use crate::ristretto_pedersen::RistrettoPedersenGens;
+use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use algebra::ristretto::CompressedRistretto;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
