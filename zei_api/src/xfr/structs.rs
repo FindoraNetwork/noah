@@ -13,11 +13,11 @@ use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCipher}
 use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use digest::Digest;
-use sha2::Sha512;
 use utils::serialization;
 
 /// Asset Type identifier
 pub const ASSET_TYPE_LENGTH: usize = 32;
+
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct AssetType(pub [u8; ASSET_TYPE_LENGTH]);
 
@@ -29,12 +29,49 @@ impl AssetType {
 
   /// converts AssetType into a Scalar
   pub fn as_scalar<S: ZeiScalar>(&self) -> S {
-    let mut sha512 = Sha512::new();
-    sha512.input(&self.0);
-    S::from_hash(sha512)
+    let repr = AssetTypeZeiRepr::from(self);
+    repr.as_scalar()
   }
 }
 
+/// Asset type prepresentation length. must be less than MIN_SCALAR_LEN
+/// All scalars in this code base are representable by 32 bytes, but
+/// values are less than 2^256 -1
+pub(crate) const ASSET_TYPE_ZEI_REPR_LENGTH: usize = 30;
+/// Scalar representation length for JubjubScalar, RistrettoScalar and BlsScalar
+pub(crate) const MIN_SCALAR_LENGTH: usize = 32;
+
+/// Internal representation of asset types
+/// Representable by any >= ASSET_TYPE_ZEI_REPR_LENGTH bytes scalar via little endian
+/// Last MIN_SCALAR_LENGTH - ASSET_TYPE_ZEI_REPR_LENGTH are 0
+pub(crate) struct AssetTypeZeiRepr([u8; MIN_SCALAR_LENGTH]);
+
+/// Hash public AssetType into an internal representation that allows
+/// to represent the asset_type in different scalars fields
+impl<'a> From<&'a AssetType> for AssetTypeZeiRepr {
+  fn from(asset_type: &'a AssetType) -> Self {
+    let mut hash = sha2::Sha256::default();
+    hash.input(&asset_type.0);
+    let array = hash.result();
+    let mut zei_repr = [0u8; MIN_SCALAR_LENGTH];
+    zei_repr[0..ASSET_TYPE_ZEI_REPR_LENGTH].copy_from_slice(&array[0..ASSET_TYPE_ZEI_REPR_LENGTH]);
+    AssetTypeZeiRepr(zei_repr)
+  }
+}
+
+impl AssetTypeZeiRepr {
+  pub(crate) fn as_scalar<S: ZeiScalar>(&self) -> S {
+    // interpret AssetTypeZeiRepr bytes as a little endian scalar that fits in S's representation
+    // JubjubScalar, BlsScalar and RistrettoScalar have length MIN_SCALAR_LENGTH
+    // but in case anther scalar length is larger then we can set to 0 high order bytes
+    if MIN_SCALAR_LENGTH == S::bytes_len() {
+      return S::from_le_bytes(&self.0).unwrap(); //safe unwrap
+    }
+    let mut v = vec![0u8; S::bytes_len()];
+    v[0..ASSET_TYPE_ZEI_REPR_LENGTH].copy_from_slice(&self.0);
+    S::from_le_bytes(&v).unwrap()
+  }
+}
 /// A Transfer note: contains a transfer body and a (multi)signature
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrNote {

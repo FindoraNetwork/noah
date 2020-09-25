@@ -326,7 +326,7 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(transcript: &mu
                            pc_gens,
                            &d,
                            &get_fake_zero_commitment(),
-                           proof.zero.as_ref().unwrap()) // save unwrap
+                           proof.zero.as_ref().unwrap()) // safe unwrap
 }
 
 /// Batch verification of chaum pedersen equality of commitment proofs

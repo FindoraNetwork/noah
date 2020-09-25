@@ -696,8 +696,10 @@ pub(crate) mod tests {
     };
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
+    use algebra::bls12_381::BLSScalar;
     use algebra::groups::GroupArithmetic;
-    use algebra::ristretto::RistrettoPoint;
+    use algebra::jubjub::JubjubScalar;
+    use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crypto::basics::elgamal::ElGamalCiphertext;
 
@@ -1440,6 +1442,31 @@ pub(crate) mod tests {
     fn test_integer_overflow() {
       do_integer_overflow(AssetRecordType::NonConfidentialAmount_ConfidentialAssetType);
       do_integer_overflow(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType);
+    }
+
+    #[test]
+    fn test_asset_type_handling() {
+      let at1 = AssetType([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 1, 1, 1]);
+      let at2 = AssetType([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 1, 1, 1]);
+      let at3 = AssetType([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 1, 1, 0]);
+      let at1_rist_scalar = at1.as_scalar::<RistrettoScalar>();
+      let at2_rist_scalar = at2.as_scalar::<RistrettoScalar>();
+      let at3_rist_scalar = at3.as_scalar::<RistrettoScalar>();
+      assert_ne!(at1_rist_scalar, at2_rist_scalar);
+      assert_ne!(at1_rist_scalar, at3_rist_scalar);
+      assert_ne!(at2_rist_scalar, at3_rist_scalar);
+
+      let at1_bls_scalar = at1.as_scalar::<BLSScalar>();
+      let at1_jubjub_scalar = at1.as_scalar::<JubjubScalar>();
+      let v1 = at1_rist_scalar.to_bytes();
+      let v2 = at1_bls_scalar.to_bytes();
+      let v3 = at1_jubjub_scalar.to_bytes();
+      assert_eq!(v1, v2);
+      assert_eq!(v1, v3);
+      assert_eq!(v2, v3);
     }
   }
 }

@@ -12,6 +12,8 @@ use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 
+pub const RISTRETTO_SCALAR_LEN: usize = 32;
+
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoScalar(pub Scalar);
 
@@ -113,6 +115,10 @@ impl ZeiScalar for RistrettoScalar {
     r
   }
 
+  fn bytes_len() -> usize {
+    RISTRETTO_SCALAR_LEN
+  }
+
   fn to_bytes(&self) -> Vec<u8> {
     let mut v = vec![];
     v.extend_from_slice(self.0.as_bytes());
@@ -120,9 +126,16 @@ impl ZeiScalar for RistrettoScalar {
   }
 
   fn from_bytes(bytes: &[u8]) -> Result<RistrettoScalar, AlgebraError> {
-    let mut array = [0u8; 32];
+    if bytes.len() != RISTRETTO_SCALAR_LEN {
+      return Err(AlgebraError::ParameterError);
+    }
+    let mut array = [0u8; RISTRETTO_SCALAR_LEN];
     array.copy_from_slice(bytes);
     Ok(RistrettoScalar(Scalar::from_bits(array)))
+  }
+
+  fn from_le_bytes(bytes: &[u8]) -> Result<RistrettoScalar, AlgebraError> {
+    Self::from_bytes(bytes)
   }
 }
 

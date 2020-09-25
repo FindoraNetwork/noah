@@ -110,12 +110,18 @@ impl Scalar for JubjubScalar {
     vec![a1, a2, a3, a4]
   }
 
+  fn bytes_len() -> usize {
+    JUBJUB_SCALAR_LEN
+  }
   //scalar serialization
   fn to_bytes(&self) -> Vec<u8> {
     (self.0).to_bytes().to_vec()
   }
 
   fn from_bytes(bytes: &[u8]) -> Result<JubjubScalar, AlgebraError> {
+    if bytes.len() != JUBJUB_SCALAR_LEN {
+      return Err(AlgebraError::ParameterError);
+    }
     let mut array = [0u8; 32];
     array.copy_from_slice(bytes);
     let scalar = Fr::from_bytes(&array);
@@ -123,6 +129,10 @@ impl Scalar for JubjubScalar {
       return Err(AlgebraError::SerializationError);
     }
     Ok(JubjubScalar(scalar.unwrap()))
+  }
+
+  fn from_le_bytes(bytes: &[u8]) -> Result<JubjubScalar, AlgebraError> {
+    Self::from_bytes(bytes)
   }
 }
 

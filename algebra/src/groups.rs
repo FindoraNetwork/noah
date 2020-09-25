@@ -73,11 +73,12 @@ pub trait Scalar:
     shift_u8_vec(&mut q_minus_1_half_le);
     q_minus_1_half_le
   }
-
   fn get_little_endian_u64(&self) -> Vec<u64>;
+  fn bytes_len() -> usize;
   // serialization
   fn to_bytes(&self) -> Vec<u8>;
   fn from_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
+  fn from_le_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
 }
 
 pub trait Group:
@@ -148,7 +149,7 @@ pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
   }
 
   while digits.len() > 1 && *digits.last().unwrap() == 0i8 {
-    // save unwrap
+    // safe unwrap
     digits.pop();
   }
   digits
