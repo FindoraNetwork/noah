@@ -5,14 +5,18 @@ use crate::api::anon_creds::{
 use crate::xfr::asset_mixer::AssetMixProof;
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
-use crate::xfr::sig::{XfrMultiSig, XfrPublicKey};
+use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use algebra::groups::Scalar as ZeiScalar;
 use algebra::ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::RangeProof;
-use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCipher};
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+use crypto::basics::hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCipher};
 use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use digest::Digest;
+use rand_core::{CryptoRng, RngCore};
+use sha2::Sha512;
+use utils::errors::ZeiError;
 use utils::serialization;
 
 /// Asset Type identifier
@@ -174,6 +178,20 @@ impl XfrAmount {
       _ => None,
     }
   }
+
+  /// construct a confidential XfrAmount with amount and amount blinds
+  pub fn from_blinds(pc_gens: &RistrettoPedersenGens,
+                     amount: u64,
+                     blind_lo: &Scalar,
+                     blind_hi: &Scalar)
+                     -> Self {
+    let (amount_lo, amount_hi) = utils::u64_to_u32_pair(amount);
+    let comm_lo = pc_gens.commit(Scalar::from_u32(amount_lo), *blind_lo)
+                         .compress();
+    let comm_hi = pc_gens.commit(Scalar::from_u32(amount_hi), *blind_hi)
+                         .compress();
+    XfrAmount::Confidential((comm_lo, comm_hi))
+  }
 }
 
 /// Asset type in BlindAsset record: if confidential, provide commitment.
@@ -231,6 +249,15 @@ impl XfrAssetType {
       XfrAssetType::Confidential(x) => Some(*x),
       _ => None,
     }
+  }
+
+  /// constructs a confidential XfrAssetType with an asset type and asset type blind
+  pub fn from_blind(pc_gens: &RistrettoPedersenGens,
+                    asset_type: &AssetType,
+                    blind: &Scalar)
+                    -> Self {
+    let comm_type = pc_gens.commit(asset_type.as_scalar(), *blind).compress();
+    XfrAssetType::Confidential(comm_type)
   }
 }
 
@@ -323,6 +350,164 @@ pub struct AssetTracerMemo {
 pub struct OwnerMemo {
   pub blind_share: CompressedEdwardsY,
   pub lock: ZeiHybridCipher,
+}
+
+impl OwnerMemo {
+  /// constructs an `OwnerMemo` for an asset record with only confidential amount
+  /// returns (OwnerMemo, (amount_blind_low, amount_blind_high))
+  /// PRNG should be seeded with good entropy instead of being deterministically seeded
+  pub fn from_amount<R: CryptoRng + RngCore>(prng: &mut R,
+                                             amount: u64,
+                                             pub_key: &XfrPublicKey)
+                                             -> Result<(Self, (Scalar, Scalar)), ZeiError> {
+    let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
+    let shared_point =
+      OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())?;
+    let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
+
+    let lock =
+      hybrid_encryption::hybrid_encrypt_with_sign_key(prng, &pub_key.0, &amount.to_be_bytes())?;
+    Ok((OwnerMemo { blind_share, lock }, amount_blinds))
+  }
+
+  /// constructs an `OwnerMemo` for an asset record with only confidential asset type
+  /// returns (OwnerMemo, asset_type_blind)
+  /// PRNG should be seeded with good entropy instead of being deterministically seeded
+  pub fn from_asset_type<R: CryptoRng + RngCore>(prng: &mut R,
+                                                 asset_type: &AssetType,
+                                                 pub_key: &XfrPublicKey)
+                                                 -> Result<(Self, Scalar), ZeiError> {
+    let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
+    let shared_point =
+      OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())?;
+    let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
+
+    let lock = hybrid_encryption::hybrid_encrypt_with_sign_key(prng, &pub_key.0, &asset_type.0)?;
+    Ok((OwnerMemo { blind_share, lock }, asset_type_blind))
+  }
+
+  /// constructs an `OwnerMemo` for an asset record with both confidential amount and confidential asset type
+  /// returns (OwnerMemo, (amount_blind_low, amount_blind_high), asset_type_blind)
+  /// PRNG should be seeded with good entropy instead of being deterministically seeded
+  pub fn from_amount_and_asset_type<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    amount: u64,
+    asset_type: &AssetType,
+    pub_key: &XfrPublicKey)
+    -> Result<(Self, (Scalar, Scalar), Scalar), ZeiError> {
+    let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
+    let shared_point =
+      OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())?;
+    let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
+    let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
+
+    let mut amount_asset_type_plaintext = vec![];
+    amount_asset_type_plaintext.extend_from_slice(&amount.to_be_bytes()[..]);
+    amount_asset_type_plaintext.extend_from_slice(&asset_type.0[..]);
+    let lock = hybrid_encryption::hybrid_encrypt_with_sign_key(prng,
+                                                               &pub_key.0,
+                                                               &amount_asset_type_plaintext)?;
+    Ok((OwnerMemo { blind_share, lock }, amount_blinds, asset_type_blind))
+  }
+
+  /// decrypt the `OwnerMemo.lock` which encrypts only the confidential amount
+  /// returns error if the decrypted bytes length doesn't match
+  pub fn decrypt_amount(&self, keypair: &XfrKeyPair) -> Result<u64, ZeiError> {
+    let decrypted_bytes = self.decrypt(&keypair);
+    // amount is u64, thus u64.to_be_bytes should be 8 bytes
+    if decrypted_bytes.len() != 8 {
+      return Err(ZeiError::InconsistentStructureError);
+    }
+    let mut amt_be_bytes: [u8; 8] = Default::default();
+    amt_be_bytes.copy_from_slice(&decrypted_bytes[..]);
+    Ok(u64::from_be_bytes(amt_be_bytes))
+  }
+
+  /// decrypt the `OwnerMemo.lock` which encrypts only the confidential asset type
+  /// returns error if the decrypted bytes length doesn't match
+  pub fn decrypt_asset_type(&self, keypair: &XfrKeyPair) -> Result<AssetType, ZeiError> {
+    let decrypted_bytes = self.decrypt(&keypair);
+    if decrypted_bytes.len() != ASSET_TYPE_LENGTH {
+      return Err(ZeiError::InconsistentStructureError);
+    }
+    let mut asset_type_bytes: [u8; ASSET_TYPE_LENGTH] = Default::default();
+    asset_type_bytes.copy_from_slice(&decrypted_bytes[..]);
+    Ok(AssetType(asset_type_bytes))
+  }
+
+  /// decrypt the `OwnerMemo.lock` which encrypts "amount || asset type", both amount and asset type
+  /// are confidential. Returns error if the decrypted bytes length doesn't match.
+  pub fn decrypt_amount_and_asset_type(&self,
+                                       keypair: &XfrKeyPair)
+                                       -> Result<(u64, AssetType), ZeiError> {
+    let decrypted_bytes = self.decrypt(&keypair);
+    if decrypted_bytes.len() != ASSET_TYPE_LENGTH + 8 {
+      return Err(ZeiError::InconsistentStructureError);
+    }
+    let mut amt_be_bytes: [u8; 8] = Default::default();
+    amt_be_bytes.copy_from_slice(&decrypted_bytes[..8]);
+    let mut asset_type_bytes: [u8; ASSET_TYPE_LENGTH] = Default::default();
+    asset_type_bytes.copy_from_slice(&decrypted_bytes[8..]);
+
+    Ok((u64::from_be_bytes(amt_be_bytes), AssetType(asset_type_bytes)))
+  }
+
+  /// Returns the amount blind (blind_low, blind_high)
+  pub fn derive_amount_blinds(&self, keypair: &XfrKeyPair) -> Result<(Scalar, Scalar), ZeiError> {
+    let shared_point =
+      OwnerMemo::derive_shared_edwards_point(&keypair.sec_key.as_scalar(), &self.blind_share)?;
+    Ok(OwnerMemo::calc_amount_blinds(&shared_point))
+  }
+
+  /// Returns the asset type blind
+  pub fn derive_asset_type_blind(&self, keypair: &XfrKeyPair) -> Result<Scalar, ZeiError> {
+    let shared_point =
+      OwnerMemo::derive_shared_edwards_point(&keypair.sec_key.as_scalar(), &self.blind_share)?;
+    Ok(OwnerMemo::calc_asset_type_blind(&shared_point))
+  }
+}
+
+// internal function
+impl OwnerMemo {
+  // Decrypts the lock, returns bytes
+  fn decrypt(&self, keypair: &XfrKeyPair) -> Vec<u8> {
+    hybrid_encryption::hybrid_decrypt_with_ed25519_secret_key(&self.lock, &keypair.sec_key.0)
+  }
+
+  // Given a shared point, calculate the amount blinds
+  // returns (amount_blind_low, amount_blind_high)
+  // noted shared_point = PK ^ r = blind_share ^ sk = (g^sk) ^ r
+  fn calc_amount_blinds(shared_point: &CompressedEdwardsY) -> (Scalar, Scalar) {
+    (OwnerMemo::hash_to_scalar(&shared_point, b"amount_low"),
+     OwnerMemo::hash_to_scalar(&shared_point, b"amount_high"))
+  }
+
+  // Given a shared point, calculate the asset type blind
+  // noted shared_point = PK ^ r = blind_share ^ sk = (g^sk) ^ r
+  fn calc_asset_type_blind(shared_point: &CompressedEdwardsY) -> Scalar {
+    OwnerMemo::hash_to_scalar(&shared_point, b"asset_type")
+  }
+
+  // returns point ^ s, where point is a compressed edwards point, s is a scalar
+  // during `OwnerMemo` creation, point = PublicKey = g^sk, s = r, where r is the randomization scalar
+  // during `OwnerMemo` decryption, point = blind_share = g^r, s = sk, where sk is the secret key
+  // in both cases, returns g^(sk*r) in `CompressedEdwardsY` form
+  fn derive_shared_edwards_point(s: &Scalar,
+                                 point: &CompressedEdwardsY)
+                                 -> Result<CompressedEdwardsY, ZeiError> {
+    let shared_edwards_point = s.0
+                               * point.decompress()
+                                      .ok_or_else(|| ZeiError::DecompressElementError)?;
+    Ok(CompressedEdwardsY(shared_edwards_point.compress()))
+  }
+
+  // returns H(point || aux) as a Scalar
+  fn hash_to_scalar(point: &CompressedEdwardsY, aux: &'static [u8]) -> Scalar {
+    let mut hasher = Sha512::new();
+    hasher.input(point.0.as_bytes());
+    hasher.input(aux);
+    Scalar::from_hash(hasher)
+  }
 }
 
 // ASSET RECORD STRUCTURES

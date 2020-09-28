@@ -1,6 +1,5 @@
-use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::edwards::EdwardsPoint;
-use curve25519_dalek::scalar::Scalar;
+use algebra::groups::Scalar as _;
+use algebra::ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar};
 use ed25519_dalek::{ExpandedSecretKey, PublicKey};
 use ed25519_dalek::{SecretKey, Signature, Verifier};
 use itertools::Itertools;
@@ -10,10 +9,6 @@ use utils::serialization::ZeiFromToBytes;
 use wasm_bindgen::prelude::*;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
-//pub const XFR_PUBLIC_KEY_LENGTH: usize = ed25519_dalek::PUBLIC_KEY_LENGTH;
-
-pub const KEY_BASE_POINT: CompressedEdwardsY =
-  curve25519_dalek::constants::ED25519_BASEPOINT_COMPRESSED;
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -31,10 +26,9 @@ pub struct XfrKeyPair {
 pub struct XfrSignature(pub Signature);
 
 impl XfrPublicKey {
-  pub fn get_curve_point(&self) -> EdwardsPoint {
+  /// returns XfrPublicKey as a compressed edwards point
+  pub fn as_compressed_edwards_point(&self) -> CompressedEdwardsY {
     CompressedEdwardsY::from_slice(self.0.as_bytes())
-      .decompress()
-      .expect("Get curve point from public should not fail as public key is an Edward point")
   }
 
   pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), ZeiError> {
@@ -60,9 +54,9 @@ impl XfrSecretKey {
   pub(crate) fn as_scalar(&self) -> Scalar {
     let expanded: ExpandedSecretKey = (&self.0).into();
     // expanded.key is not public, thus extract it via serialization
-    let mut key_bytes = [0u8; 32];
-    key_bytes.copy_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
-    Scalar::from_bits(key_bytes)
+    let mut key_bytes = vec![];
+    key_bytes.extend_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
+    Scalar::from_bytes(&key_bytes).expect("Internal error, should never fail")
   }
 }
 

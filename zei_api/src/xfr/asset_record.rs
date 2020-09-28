@@ -2,26 +2,17 @@ use crate::api::anon_creds::{
   ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
   ConfidentialAC, Credential,
 };
-use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey};
+use crate::xfr::sig::{XfrKeyPair, XfrPublicKey};
 use crate::xfr::structs::{
   AssetRecord, AssetRecordTemplate, AssetTracerMemo, AssetTracingPolicies, AssetType,
-  BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType, ASSET_TYPE_LENGTH,
+  BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
 };
-use algebra::groups::Scalar as _;
-use algebra::ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar};
-use boolinator::Boolinator;
+use algebra::groups::Zero;
+use algebra::ristretto::RistrettoScalar as Scalar;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use crypto::basics::hybrid_encryption::{
-  hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_with_sign_key,
-};
-use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::EdwardsPoint;
 use rand_core::{CryptoRng, RngCore};
-use sha2::{Digest, Sha512};
 use utils::errors::ZeiError;
-use utils::{u64_to_u32_pair, u8_be_slice_to_u64};
-
-const U64_BYTE_LEN: usize = 8;
+use utils::{self, u64_to_u32_pair};
 
 /// AssetRecrod confidentiality flags. Indicated if amount and/or assettype should be confidential
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -278,89 +269,86 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
   asset_record: &AssetRecordTemplate,
   attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>)
   -> (BlindAssetRecord, (Scalar, Scalar), Scalar, Vec<AssetTracerMemo>, Option<OwnerMemo>) {
-  let (confidential_amount, confidential_asset) = match &asset_record.asset_record_type {
-    AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => (false, false),
-    AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => (true, false),
-    AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => (false, true),
-    AssetRecordType::ConfidentialAmount_ConfidentialAssetType => (true, true),
-  };
+  // use enum matching instead of nested if else clause for readability and clarity
+  let (xfr_amount, xfr_asset_type, amount_blinds, asset_type_blind, owner_memo) =
+    match asset_record.asset_record_type {
+      AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => {
+        (XfrAmount::NonConfidential(asset_record.amount),
+         XfrAssetType::NonConfidential(asset_record.asset_type),
+         (Scalar::zero(), Scalar::zero()),
+         Scalar::zero(),
+         None)
+      }
 
-  let (amount_blind_low, amount_blind_high, type_blind, blind_share) = if confidential_asset
-                                                                          || confidential_amount
-  {
-    let (derived_point, blind_share) = sample_point_and_blind_share(prng, &asset_record.public_key);
-    let type_blind = compute_blind_factor(&derived_point, b"asset_type");
-    let amount_blind_low = compute_blind_factor(&derived_point, b"amount_low");
-    let amount_blind_high = compute_blind_factor(&derived_point, b"amount_high");
-    (amount_blind_low, amount_blind_high, type_blind, blind_share)
-  } else {
-    (Scalar::from_u32(0), Scalar::from_u32(0), Scalar::from_u32(0), CompressedEdwardsY::default())
-  };
+      AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
+        let (owner_memo, amount_blinds) =
+          OwnerMemo::from_amount(prng, asset_record.amount, &asset_record.public_key).unwrap(); // safe unwrap
 
-  let (amount_low, amount_high) = u64_to_u32_pair(asset_record.amount);
-  let mut amount_type_bytes = vec![];
+        (XfrAmount::from_blinds(&pc_gens,
+                                asset_record.amount,
+                                &amount_blinds.0,
+                                &amount_blinds.1),
+         XfrAssetType::NonConfidential(asset_record.asset_type),
+         amount_blinds,
+         Scalar::zero(),
+         Some(owner_memo))
+      }
 
-  // build amount fields
-  let (xfr_amount, amount_blinds) = if confidential_amount {
-    let amount_bytes = asset_record.amount.to_be_bytes();
-    amount_type_bytes.extend_from_slice(&amount_bytes[..]);
+      AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => {
+        let (owner_memo, asset_type_blind) =
+          OwnerMemo::from_asset_type(prng, &asset_record.asset_type, &asset_record.public_key).unwrap(); //safe unwrap
 
-    let amount_commitment_low = pc_gens.commit(Scalar::from_u32(amount_low), amount_blind_low);
-    let amount_commitment_high = pc_gens.commit(Scalar::from_u32(amount_high), amount_blind_high);
-    let xfr_amount = XfrAmount::Confidential((amount_commitment_low.compress(),
-                                              amount_commitment_high.compress()));
-    (xfr_amount, (amount_blind_low, amount_blind_high))
-  } else {
-    let xfr_amount = XfrAmount::NonConfidential(asset_record.amount);
-    (xfr_amount, (Scalar::from_u32(0), Scalar::from_u32(0)))
-  };
+        (XfrAmount::NonConfidential(asset_record.amount),
+         XfrAssetType::from_blind(&pc_gens, &asset_record.asset_type, &asset_type_blind),
+         (Scalar::zero(), Scalar::zero()),
+         asset_type_blind,
+         Some(owner_memo))
+      }
 
-  // build asset type fields
-  let (xfr_asset_type, type_blind) = if confidential_asset {
-    amount_type_bytes.extend_from_slice(&asset_record.asset_type.0);
-    let xfr_asset_type =
-      XfrAssetType::Confidential(pc_gens.commit(asset_record.asset_type.as_scalar(), type_blind)
-                                        .compress());
-    (xfr_asset_type, type_blind)
-  } else {
-    (XfrAssetType::NonConfidential(asset_record.asset_type), Scalar::from_u32(0))
-  };
-
-  // asset tracing amount
-  let mut tracers_memos = vec![];
-  let tracing_policies = asset_record.asset_tracing_policies.get_policies();
-  for (tracing_policy, attr_ctext_vec) in tracing_policies.iter().zip(attrs_and_ctexts) {
-    let (amount_info, asset_type_info) = if tracing_policy.asset_tracking {
-      (confidential_amount.as_some((amount_low,
-                                    amount_high,
-                                    &amount_blind_low,
-                                    &amount_blind_high)),
-       confidential_asset.as_some((asset_record.asset_type, &type_blind)))
-    } else {
-      (None, None)
+      AssetRecordType::ConfidentialAmount_ConfidentialAssetType => {
+        let (owner_memo, amount_blinds, asset_type_blind) =
+          OwnerMemo::from_amount_and_asset_type(prng,
+                                                asset_record.amount,
+                                                &asset_record.asset_type,
+                                                &asset_record.public_key).unwrap(); //safe unwrap
+        (XfrAmount::from_blinds(&pc_gens,
+                                asset_record.amount,
+                                &amount_blinds.0,
+                                &amount_blinds.1),
+         XfrAssetType::from_blind(&pc_gens, &asset_record.asset_type, &asset_type_blind),
+         amount_blinds,
+         asset_type_blind,
+         Some(owner_memo))
+      }
     };
-    let memo = AssetTracerMemo::new(prng,
-                                    &tracing_policy.enc_keys,
-                                    amount_info,
-                                    asset_type_info,
-                                    attr_ctext_vec,
-                                    true);
-    tracers_memos.push(memo);
-  }
-
-  let owner_memo = if confidential_asset || confidential_amount {
-    let lock = hybrid_encrypt_with_sign_key(prng,
-                                            &asset_record.public_key.0,
-                                            amount_type_bytes.as_slice()).unwrap(); // safe unwrap()
-    Some(OwnerMemo { blind_share, lock })
-  } else {
-    None
-  };
   let blind_asset_record = BlindAssetRecord { public_key: asset_record.public_key,
                                               amount: xfr_amount,
                                               asset_type: xfr_asset_type };
 
-  (blind_asset_record, amount_blinds, type_blind, tracers_memos, owner_memo)
+  // TODO: (alex) API for asset tracer to be improved
+  let mut tracer_memos = vec![];
+  let tracing_policies = &asset_record.asset_tracing_policies.0;
+  for (policy, attr_ctexts) in tracing_policies.iter().zip(attrs_and_ctexts) {
+    let mut amount_info = None;
+    let mut asset_type_info = None;
+    if policy.asset_tracking {
+      if asset_record.asset_record_type.is_confidential_amount() {
+        let (amount_lo, amount_hi) = utils::u64_to_u32_pair(asset_record.amount);
+        amount_info = Some((amount_lo, amount_hi, &amount_blinds.0, &amount_blinds.1));
+      }
+      if asset_record.asset_record_type.is_confidential_asset_type() {
+        asset_type_info = Some((asset_record.asset_type, &asset_type_blind));
+      }
+    }
+    let memo = AssetTracerMemo::new(prng,
+                                    &policy.enc_keys,
+                                    amount_info,
+                                    asset_type_info,
+                                    attr_ctexts,
+                                    true);
+    tracer_memos.push(memo);
+  }
+  (blind_asset_record, amount_blinds, asset_type_blind, tracer_memos, owner_memo)
 }
 
 /// Build OpenAssetRecord and associated memos from an Asset Record Template
@@ -407,95 +395,67 @@ pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
   (blind_asset_record, asset_tracing_memos, owner_memo)
 }
 
-fn sample_point_and_blind_share<R: CryptoRng + RngCore>(
-  prng: &mut R,
-  public_key: &XfrPublicKey)
-  -> (CompressedEdwardsY, CompressedEdwardsY) {
-  let blind_key = Scalar::random(prng);
-  let pk_point = public_key.get_curve_point();
-  let derived_point: EdwardsPoint = blind_key.0 * pk_point;
-  let blind_share = blind_key.0 * ED25519_BASEPOINT_POINT;
-  (CompressedEdwardsY(derived_point.compress()), CompressedEdwardsY(blind_share.compress()))
-}
-
-pub(crate) fn derive_point_from_blind_share(blind_share: &CompressedEdwardsY,
-                                            sec_key: &XfrSecretKey)
-                                            -> Result<CompressedEdwardsY, ZeiError> {
-  let shared_edwards_point = sec_key.as_scalar()
-                             * blind_share.decompress()
-                                          .ok_or_else(|| ZeiError::DecompressElementError)?;
-  Ok(CompressedEdwardsY(shared_edwards_point.compress()))
-}
-
-pub(crate) fn compute_blind_factor(point: &CompressedEdwardsY, aux: &'static [u8]) -> Scalar {
-  let mut hasher = Sha512::new();
-  hasher.input(point.0.as_bytes());
-  hasher.input(aux);
-  Scalar::from_hash(hasher)
-}
-
 /// Open a blind asset record using owner secret key and associated owner's memo.
 /// Return Ok(OpenAssetRecord) or
 /// ZeiError if case of decryption error or inconsistent plaintext error.
 /// Used by transfers receivers
 pub fn open_blind_asset_record(input: &BlindAssetRecord,
                                owner_memo: &Option<OwnerMemo>,
-                               key_pair: &XfrKeyPair)
+                               keypair: &XfrKeyPair)
                                -> Result<OpenAssetRecord, ZeiError> {
-  let secret_key = &key_pair.sec_key;
-  let amount;
-  let mut asset_type = AssetType::from_identical_byte(0u8);
-  let amount_blind_low;
-  let amount_blind_high;
-  let type_blind;
-  let mut shared_point = CompressedEdwardsY::default();
+  let (amount, asset_type, amount_blinds, type_blind) = match input.get_record_type() {
+    AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => {
+      (input.amount
+            .get_amount()
+            .ok_or_else(|| ZeiError::ParameterError)?,
+       input.asset_type
+            .get_asset_type()
+            .ok_or_else(|| ZeiError::ParameterError)?,
+       (Scalar::zero(), Scalar::zero()),
+       Scalar::zero())
+    }
 
-  let mut i = 0;
-  let amount_type = match owner_memo {
-    None => vec![],
-    Some(memo) => {
-      shared_point = derive_point_from_blind_share(&memo.blind_share, &secret_key)?;
-      hybrid_decrypt_with_ed25519_secret_key(&memo.lock, &secret_key.0)
+    AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
+      let owner_memo = owner_memo.as_ref()
+                                 .ok_or_else(|| ZeiError::ParameterError)?;
+      let amount = owner_memo.decrypt_amount(&keypair)?;
+      let amount_blinds = owner_memo.derive_amount_blinds(&keypair)?;
+      (amount,
+       input.asset_type
+            .get_asset_type()
+            .ok_or_else(|| ZeiError::ParameterError)?,
+       amount_blinds,
+       Scalar::zero())
+    }
+
+    AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => {
+      let owner_memo = owner_memo.as_ref()
+                                 .ok_or_else(|| ZeiError::ParameterError)?;
+      let asset_type = owner_memo.decrypt_asset_type(&keypair)?;
+      let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair)?;
+      (input.amount
+            .get_amount()
+            .ok_or_else(|| ZeiError::ParameterError)?,
+       asset_type,
+       (Scalar::zero(), Scalar::zero()),
+       asset_type_blind)
+    }
+
+    AssetRecordType::ConfidentialAmount_ConfidentialAssetType => {
+      let owner_memo = owner_memo.as_ref()
+                                 .ok_or_else(|| ZeiError::ParameterError)?;
+      let (amount, asset_type) = owner_memo.decrypt_amount_and_asset_type(&keypair)?;
+      let amount_blinds = owner_memo.derive_amount_blinds(&keypair)?;
+      let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair)?;
+
+      (amount, asset_type, amount_blinds, asset_type_blind)
     }
   };
-
-  match input.amount {
-    XfrAmount::Confidential(_) => {
-      if amount_type.len() < U64_BYTE_LEN {
-        return Err(ZeiError::ParameterError);
-      }
-      amount = u8_be_slice_to_u64(&amount_type[0..U64_BYTE_LEN]);
-      amount_blind_low = compute_blind_factor(&shared_point, b"amount_low");
-      amount_blind_high = compute_blind_factor(&shared_point, b"amount_high");
-      i += U64_BYTE_LEN;
-    }
-    XfrAmount::NonConfidential(a) => {
-      amount = a;
-      amount_blind_low = Scalar::from_u32(0);
-      amount_blind_high = Scalar::from_u32(0);
-    }
-  }
-
-  match input.asset_type {
-    XfrAssetType::Confidential(_) => {
-      if amount_type.len() < i + ASSET_TYPE_LENGTH {
-        return Err(ZeiError::ParameterError);
-      }
-      asset_type.0
-                .copy_from_slice(&amount_type[i..i + ASSET_TYPE_LENGTH]);
-      type_blind = compute_blind_factor(&shared_point, b"asset_type");
-    }
-    XfrAssetType::NonConfidential(a) => {
-      asset_type = a;
-      type_blind = Scalar::from_u32(0);
-    }
-  };
-
   // TODO check correctness of BlindAssetRecord
-  Ok(OpenAssetRecord { asset_type,
+  Ok(OpenAssetRecord { blind_asset_record: input.clone(),
                        amount,
-                       blind_asset_record: input.clone(),
-                       amount_blinds: (amount_blind_low, amount_blind_high),
+                       amount_blinds,
+                       asset_type,
                        type_blind })
 }
 

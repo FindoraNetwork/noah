@@ -4,7 +4,7 @@ use crate::groups::{One, Scalar as ZeiScalar, ScalarArithmetic, Zero};
 use byteorder::ByteOrder;
 use core::ops::{AddAssign, MulAssign, SubAssign};
 use curve25519_dalek::constants::{ED25519_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT};
-use curve25519_dalek::edwards::EdwardsPoint;
+use curve25519_dalek::edwards::{CompressedEdwardsY as CEY, EdwardsPoint};
 use curve25519_dalek::ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
@@ -139,6 +139,18 @@ impl ZeiScalar for RistrettoScalar {
   }
 }
 
+impl RistrettoScalar {
+  /// returns a tuple of (r, g^r)
+  /// where r is a random `RistrettoScalar`, and g is the `ED25519_BASEPOINT_POINT`
+  pub fn random_scalar_with_compressed_edwards<R: CryptoRng + RngCore>(
+    prng: &mut R)
+    -> (Self, CompressedEdwardsY) {
+    let r = RistrettoScalar::random(prng);
+    let r_mul_edwards_base = CompressedEdwardsY::scalar_mul_basepoint(&r);
+    (r, r_mul_edwards_base)
+  }
+}
+
 impl RistrettoPoint {
   pub fn compress(&self) -> CompressedRistretto {
     CompressedRistretto(self.0.compress())
@@ -155,6 +167,11 @@ impl CompressedRistretto {
 }
 
 impl CompressedEdwardsY {
+  /// builds a `CompressedEdwardsY` from slice of bytes
+  pub fn from_slice(bytes: &[u8]) -> Self {
+    CompressedEdwardsY(CEY::from_slice(&bytes))
+  }
+
   pub fn decompress(&self) -> Option<EdwardsPoint> {
     self.0.decompress()
   }
