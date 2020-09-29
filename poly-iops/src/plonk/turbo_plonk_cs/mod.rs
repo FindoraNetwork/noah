@@ -436,6 +436,27 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
     out_var
   }
 
+  // Returns a boolean variable that equals 1 if and only if `left_var` == `right_var`
+  pub fn is_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
+    let diff = self.sub(left_var, right_var);
+    // set `inv_diff` = `diff`^{-1} when `diff` != 0, otherwise we can set `inv_diff` to arbirary value since `diff` * `inv_diff` will always be 0 when `diff` == 0
+    let inv_diff_scalar = self.witness[diff].inv().unwrap_or(F::zero());
+    let inv_diff = self.new_variable(inv_diff_scalar);
+
+    // `diff_is_zero` = 1 - `diff` * `inv_diff`
+    // `diff_is_zero` will be 1 when `diff` == 0, and `diff_is_zero` will be 0 when `diff != 0` and `inv_diff` == `diff`^{-1}
+    let mul_var = self.mul(diff, inv_diff);
+    let one_var = self.one_var();
+    let diff_is_zero = self.sub(one_var, mul_var);
+
+    // enforce `diff` * `diff_is_zero` == 0
+    // without this constraint, a malicious prover can set `diff_is_zero` to arbitrary value when `diff` != 0
+    let zero_var = self.zero_var();
+    self.insert_mul_gate(diff, diff_is_zero, zero_var);
+
+    diff_is_zero
+  }
+
   /// Insert a constant constraint: wo = constant
   pub fn insert_constant_gate(&mut self, var: VarIndex, constant: F) {
     assert!(var < self.num_vars, "variable index out of bound");
@@ -620,6 +641,27 @@ mod test {
 
     assert!(cs.verify_witness(&[zero, one, two, two, two, one, zero], &[])
               .is_err());
+  }
+
+  #[test]
+  fn test_is_equal() {
+    let mut cs = TurboPlonkConstraintSystem::new();
+    let zero = F::from_u32(0);
+    let one = F::from_u32(1);
+    let two = one.add(&one);
+    cs.new_variable(one);
+    cs.new_variable(two);
+    cs.new_variable(two);
+    let one_equals_two = cs.is_equal(0, 1);
+    assert_eq!(cs.witness[one_equals_two], zero);
+    let two_equals_two = cs.is_equal(1, 2);
+    assert_eq!(cs.witness[two_equals_two], one);
+
+    let mut witness = cs.get_and_clear_witness();
+    let verify = cs.verify_witness(&witness, &[]);
+    assert!(verify.is_ok(), verify.unwrap_err());
+    witness[0] = two;
+    assert!(cs.verify_witness(&witness, &[]).is_err());
   }
 
   #[test]

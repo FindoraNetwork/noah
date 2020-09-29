@@ -2,7 +2,6 @@ use crate::anon_xfr::circuits::{build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXf
 use crate::setup::{NodeParams, UserParams};
 use merlin::Transcript;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
-use poly_iops::plonk::plonk_setup::{ProverParams, VerifierParams};
 use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
@@ -12,8 +11,6 @@ const N_INPUTS_TRANSCRIPT: &[u8] = b"Number of input ABARs";
 const N_OUTPUTS_TRANSCRIPT: &[u8] = b"Number of output ABARs";
 
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
-pub(crate) type AXfrProverParams = ProverParams<KZGCommitmentSchemeBLS>;
-pub(crate) type AXfrVerifierParams = VerifierParams<KZGCommitmentSchemeBLS>;
 
 /// I generates the plonk proof for a multi-inputs/outputs anonymous transaction.
 /// * `rng` - pseudo-random generator.
@@ -67,20 +64,70 @@ mod tests {
   use crate::anon_xfr::circuits::AMultiXfrPubInputs;
   use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
   use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
+  use algebra::bls12_381::BLSScalar;
+  use algebra::groups::{One, Zero};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
   #[test]
   fn test_anon_multi_xfr_proof() {
-    test_multi_xfr_proof(1, 2);
-    test_multi_xfr_proof(2, 1);
-    test_multi_xfr_proof(2, 3);
-    test_multi_xfr_proof(3, 2);
+    // single asset type
+    let zero = BLSScalar::zero();
+    // (n, m) = (3, 6)
+    let inputs = vec![(/*amount=*/ 30, /*asset_type=*/ zero),
+                      (20, zero),
+                      (10, zero)];
+    let outputs = vec![(5, zero),
+                       (15, zero),
+                       (22, zero),
+                       (11, zero),
+                       (0, zero),
+                       (7, zero)];
+    test_anon_xfr_proof(inputs, outputs);
+
+    // (n, m) = (3, 3)
+    let inputs = vec![(30, zero), (20, zero), (0, zero)];
+    let outputs = vec![(5, zero), (17, zero), (28, zero)];
+    test_anon_xfr_proof(outputs, inputs);
+
+    // (n, m) = (1, 2)
+    let inputs = vec![(30, zero)];
+    let outputs = vec![(13, zero), (17, zero)];
+    test_anon_xfr_proof(inputs.to_vec(), outputs.to_vec());
+    // (n, m) = (2, 1)
+    test_anon_xfr_proof(outputs, inputs);
+
+    // (n, m) = (1, 1)
+    let inputs = vec![(10, zero)];
+    let outputs = vec![(10, zero)];
+    test_anon_xfr_proof(outputs, inputs);
+
+    // multiple asset types
+    // (n, m) = (3, 6)
+    let one = BLSScalar::one();
+    let inputs = vec![(/*amount=*/ 50, /*asset_type=*/ zero),
+                      (60, one),
+                      (20, zero)];
+    let outputs = vec![(19, one),
+                       (15, zero),
+                       (1, one),
+                       (35, zero),
+                       (20, zero),
+                       (40, one)];
+    test_anon_xfr_proof(inputs, outputs);
+
+    // (n, m) = (3, 3)
+    let inputs = vec![(23, zero), (20, one), (7, zero)];
+    let outputs = vec![(5, one), (30, zero), (15, one)];
+    test_anon_xfr_proof(outputs, inputs);
   }
 
-  fn test_multi_xfr_proof(n_payers: usize, n_payees: usize) {
+  fn test_anon_xfr_proof(inputs: Vec<(u64, BLSScalar)>, outputs: Vec<(u64, BLSScalar)>) {
+    let n_payers = inputs.len();
+    let n_payees = outputs.len();
     // build cs
-    let secret_inputs = new_multi_xfr_witness_for_test(n_payers, n_payees, [0u8; 32]);
+    let secret_inputs =
+      new_multi_xfr_witness_for_test(inputs.to_vec(), outputs.to_vec(), [0u8; 32]);
     let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
     let params = UserParams::from_file_if_exists(n_payers,
                                                  n_payees,
@@ -91,28 +138,7 @@ mod tests {
     let proof = prove_xfr(&mut prng, &params, secret_inputs).unwrap();
 
     // A bad proof should fail the verification
-    let bad_secret_inputs = new_multi_xfr_witness_for_test(n_payers, n_payees, [1u8; 32]);
-    let bad_proof = prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
-
-    // verify good witness
-    let node_params = NodeParams::from(params);
-    assert!(verify_xfr(&node_params, &pub_inputs, &proof).is_ok());
-
-    // verify bad witness
-    assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
-  }
-
-  #[test]
-  fn test_anon_single_xfr_proof() {
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    // build cs
-    let secret_inputs = new_multi_xfr_witness_for_test(1, 1, [0u8; 32]);
-    let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
-    let params = UserParams::from_file_if_exists(1, 1, Some(1), DEFAULT_BP_NUM_GENS, None).unwrap();
-    let proof = prove_xfr(&mut prng, &params, secret_inputs).unwrap();
-
-    // A bad proof should fail the verification
-    let bad_secret_inputs = new_multi_xfr_witness_for_test(1, 1, [1u8; 32]);
+    let bad_secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [1u8; 32]);
     let bad_proof = prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
 
     // verify good witness

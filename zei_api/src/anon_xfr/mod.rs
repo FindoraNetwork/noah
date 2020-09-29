@@ -17,10 +17,8 @@ use crypto::basics::prf::PRF;
 use rand_core::{CryptoRng, RngCore};
 use utils::errors::ZeiError;
 
-#[allow(dead_code)]
 pub(crate) mod circuits;
 pub mod keys;
-#[allow(dead_code)]
 pub(crate) mod proofs;
 pub mod structs;
 
@@ -58,12 +56,13 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
                                           diversifier,
                                           uid: inputs[0].mt_leaf_info.uid,
                                           amount: inputs[0].amount,
+                                          asset_type: inputs[0].asset_type.as_scalar(),
                                           path: inputs[0].mt_leaf_info.path.clone(),
                                           blind: inputs[0].blind }];
   let payees_secrets = vec![PayeeSecret { amount: inputs[0].amount,
-                                          blind: out_blind }];
-  let secret_inputs = AMultiXfrWitness { asset_type: inputs[0].asset_type.as_scalar(),
-                                         payers_secrets,
+                                          blind: out_blind,
+                                          asset_type: inputs[0].asset_type.as_scalar() }];
+  let secret_inputs = AMultiXfrWitness { payers_secrets,
                                          payees_secrets };
   let proof = prove_xfr(prng, params, secret_inputs)?;
 
@@ -89,8 +88,8 @@ pub fn verify_anon_xfr_body(params: &NodeParams,
   let pub_inputs =
     AMultiXfrPubInputs { payers_inputs: vec![(body.inputs[0].0, body.inputs[0].1.clone())],
                          payees_commitments: vec![body.outputs[0].amount_type_commitment],
-                         merkle_root: *merkle_root,
-                         fee: 0 };
+                         merkle_root: *merkle_root };
+  // fee: 0 };
   verify_xfr(params, &pub_inputs, &body.proof.snark_proof).map_err(|_| {
                                                             ZeiError::AXfrVerificationError
                                                           })

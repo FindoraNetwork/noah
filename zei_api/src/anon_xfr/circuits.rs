@@ -21,7 +21,7 @@ pub(crate) struct PayerSecret {
   pub sec_key: JubjubScalar,
   pub diversifier: JubjubScalar, // key randomizer for the signature verification key
   pub amount: u64,
-  // pub asset_type: BLSScalar, // TODO: add it when we support multi-asset_types in a Xfr
+  pub asset_type: BLSScalar,
   pub uid: u64,
   pub path: MTPath,
   pub blind: BlindFactor,
@@ -31,12 +31,12 @@ pub(crate) struct PayerSecret {
 pub(crate) struct PayeeSecret {
   pub amount: u64,
   pub blind: BlindFactor,
+  pub asset_type: BLSScalar,
 }
 
 /// Secret witness of an anonymous transaction.
 #[derive(Debug)]
 pub(crate) struct AMultiXfrWitness {
-  pub asset_type: BLSScalar,
   pub payers_secrets: Vec<PayerSecret>,
   pub payees_secrets: Vec<PayeeSecret>,
 }
@@ -54,13 +54,14 @@ impl AMultiXfrWitness {
                                      diversifier: jubjub_zero,
                                      uid: 0,
                                      amount: 0,
+                                     asset_type: bls_zero,
                                      path: MTPath::new(vec![node; tree_depth]),
                                      blind: bls_zero };
     let payee_secret = PayeeSecret { amount: 0,
-                                     blind: bls_zero };
+                                     blind: bls_zero,
+                                     asset_type: bls_zero };
 
-    AMultiXfrWitness { asset_type: bls_zero,
-                       payers_secrets: vec![payer_secret; n_payers],
+    AMultiXfrWitness { payers_secrets: vec![payer_secret; n_payers],
                        payees_secrets: vec![payee_secret; n_payees] }
   }
 }
@@ -71,7 +72,6 @@ pub(crate) struct AMultiXfrPubInputs {
   pub payers_inputs: Vec<(Nullifier, AXfrPubKey)>,
   pub payees_commitments: Vec<Commitment>,
   pub merkle_root: BLSScalar,
-  pub fee: u64, // transaction fee
 }
 
 impl AMultiXfrPubInputs {
@@ -89,12 +89,11 @@ impl AMultiXfrPubInputs {
     for comm in &self.payees_commitments {
       result.push(*comm);
     }
-    // transaction fee
-    result.push(BLSScalar::from_u64(self.fee));
     result
   }
 
   // Compute the public inputs from the secret inputs
+  #[allow(dead_code)]
   pub(crate) fn from_witness(witness: &AMultiXfrWitness) -> Self {
     // nullifiers and signature public keys
     let prf = PRF::new();
@@ -111,7 +110,7 @@ impl AMultiXfrPubInputs {
                                         .add(&BLSScalar::from_u64(sec.amount));
                let nullifier = prf.eval(&BLSScalar::from(&sec.sec_key),
                                         &[uid_amount,
-                                          witness.asset_type,
+                                          sec.asset_type,
                                           pk_point.get_x(),
                                           pk_point.get_y()]);
                (nullifier, pk_sign)
@@ -124,18 +123,10 @@ impl AMultiXfrPubInputs {
                                                      .iter()
                                                      .map(|sec| {
                                                        comm.commit(&sec.blind,
-                           &[BLSScalar::from_u64(sec.amount), witness.asset_type])
+                           &[BLSScalar::from_u64(sec.amount), sec.asset_type])
                    .unwrap()
                                                      })
                                                      .collect();
-
-    // transaction fee
-    let balance: u64 = witness.payers_secrets
-                              .iter()
-                              .fold(0, |acc, x| acc + x.amount);
-    let fee: u64 = witness.payees_secrets
-                          .iter()
-                          .fold(balance, |acc, x| acc - x.amount);
 
     // merkle root
     let hash = RescueInstance::new();
@@ -144,7 +135,7 @@ impl AMultiXfrPubInputs {
     let zero = BLSScalar::zero();
     let pk_hash = hash.rescue_hash(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
     let commitment = comm.commit(&payer.blind,
-                                 &[BLSScalar::from_u64(payer.amount), witness.asset_type])
+                                 &[BLSScalar::from_u64(payer.amount), payer.asset_type])
                          .unwrap();
     let mut node =
       hash.rescue_hash(&[BLSScalar::from_u64(payer.uid), commitment, pk_hash, zero])[0];
@@ -159,12 +150,11 @@ impl AMultiXfrPubInputs {
 
     Self { payers_inputs,
            payees_commitments,
-           merkle_root: node,
-           fee }
+           merkle_root: node }
   }
 }
 
-/// Returns the constraint system for a multi-inputs/outputs transaction, and the corresponding number of constraints.
+/// Returns the constraint system (and associated number of constraints) for a multi-inputs/outputs transaction.
 /// A prover can provide honest `secret_inputs` and obtain the cs witness by calling `cs.get_and_clear_witness()`.
 /// One provide an empty secret_inputs to get the constraint system `cs` for verification only.
 pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonkCS, usize) {
@@ -174,7 +164,6 @@ pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonk
   let mut cs = TurboPlonkConstraintSystem::new();
   let payers_secrets = add_payers_secrets(&mut cs, &secret_inputs.payers_secrets);
   let payees_secrets = add_payees_secrets(&mut cs, &secret_inputs.payees_secrets);
-  let asset_type = cs.new_variable(secret_inputs.asset_type);
 
   let base = JubjubGroup::get_base();
   let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::one());
@@ -192,7 +181,7 @@ pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonk
     let (pk_sign_var, _) = cs.var_base_scalar_mul(pk_var, pk_point, payer.diversifier, SK_LEN);
 
     // commitments
-    let com_abar_in_var = commit(&mut cs, payer.blind, payer.amount, asset_type);
+    let com_abar_in_var = commit(&mut cs, payer.blind, payer.amount, payer.asset_type);
 
     // prove pre-image of the nullifier
     // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
@@ -202,7 +191,7 @@ pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonk
                                        zero,
                                        zero);
     let nullifier_input_vars = NullifierInputVars { uid_amount,
-                                                    asset_type,
+                                                    asset_type: payer.asset_type,
                                                     pub_key_x: pk_x,
                                                     pub_key_y: pk_y };
     let nullifier_var = nullify(&mut cs, payer.sec_key, nullifier_input_vars);
@@ -229,7 +218,7 @@ pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonk
 
   for payee in &payees_secrets {
     // commitment
-    let com_abar_out_var = commit(&mut cs, payee.blind, payee.amount, asset_type);
+    let com_abar_out_var = commit(&mut cs, payee.blind, payee.amount, payee.asset_type);
 
     // Range check `amount`
     // Note we don't need to range-check payers' `amount`, because those amounts are bound
@@ -241,16 +230,16 @@ pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonk
     cs.prepare_io_variable(com_abar_out_var);
   }
 
-  // Balance check: fee = \sum_{i} amount_in_i - \sum_{j} amount_out_j
-  let mut balance_var = zero_var;
-  for payer in &payers_secrets {
-    balance_var = cs.add(balance_var, payer.amount);
-  }
-  for payee in &payees_secrets {
-    balance_var = cs.sub(balance_var, payee.amount);
-  }
-  // prepare the public input for the transaction fee
-  cs.prepare_io_variable(balance_var);
+  // add asset-mixing constraints
+  let inputs: Vec<(VarIndex, VarIndex)> =
+    payers_secrets.into_iter()
+                  .map(|payer| (payer.asset_type, payer.amount))
+                  .collect();
+  let outputs: Vec<(VarIndex, VarIndex)> =
+    payees_secrets.into_iter()
+                  .map(|payee| (payee.asset_type, payee.amount))
+                  .collect();
+  asset_mixing(&mut cs, &inputs, &outputs);
 
   // pad the number of constraints to power of two
   cs.pad();
@@ -270,12 +259,14 @@ fn add_payers_secrets(cs: &mut TurboPlonkCS, secrets: &[PayerSecret]) -> Vec<Pay
            let amount = cs.new_variable(BLSScalar::from_u64(secret.amount));
            let blind = cs.new_variable(secret.blind);
            let path = add_merkle_path_variables(cs, secret.path.clone());
+           let asset_type = cs.new_variable(secret.asset_type);
            PayerSecretVars { sec_key,
                              diversifier,
                              uid,
                              amount,
                              path,
-                             blind }
+                             blind,
+                             asset_type }
          })
          .collect()
 }
@@ -285,7 +276,10 @@ fn add_payees_secrets(cs: &mut TurboPlonkCS, secrets: &[PayeeSecret]) -> Vec<Pay
          .map(|secret| {
            let amount = cs.new_variable(BLSScalar::from_u64(secret.amount));
            let blind = cs.new_variable(secret.blind);
-           PayeeSecretVars { amount, blind }
+           let asset_type = cs.new_variable(secret.asset_type);
+           PayeeSecretVars { amount,
+                             blind,
+                             asset_type }
          })
          .collect()
 }
@@ -295,6 +289,7 @@ struct PayerSecretVars {
   pub diversifier: VarIndex,
   pub uid: VarIndex,
   pub amount: VarIndex,
+  pub asset_type: VarIndex,
   pub path: MerklePathVars,
   pub blind: VarIndex,
 }
@@ -302,6 +297,7 @@ struct PayerSecretVars {
 struct PayeeSecretVars {
   pub amount: VarIndex,
   pub blind: VarIndex,
+  pub asset_type: VarIndex,
 }
 
 // cs variables for a Merkle node
@@ -433,6 +429,91 @@ fn nullify(cs: &mut TurboPlonkCS,
   cs.rescue_hash(&input_var)
 }
 
+/// Enforce asset_mixing constraints:
+/// Inputs = [(type_in_1, v_in_1), ..., (type_in_n, v_in_n)], values {v_in_i} are guaranteed to be positive.
+/// Outputs = [(type_out_1, v_out_1), ..., (type_out_m, v_out_m)], values {v_out_j} are guaranteed to be positive.
+/// Goal: Prove that for every asset type, the corresponding inputs sum equals the corresponding outputs sum.
+/// The circuit:
+/// 1. Compute [sum_in_1, ..., sum_in_n] from inputs, where sum_in_i = \sum_{j : type_in_j == type_in_i} v_in_j
+/// 2. Similarly, compute [sum_out_1, ..., sum_out_m] from outputs.
+/// 3. Enumerate pair (i \in [n], j \in [m]), check that: (type_in_i != type_out_j) \lor (sum_in_i == sum_out_j)
+fn asset_mixing(cs: &mut TurboPlonkCS,
+                inputs: &[(VarIndex, VarIndex)],
+                outputs: &[(VarIndex, VarIndex)]) {
+  let inputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> =
+    inputs.iter()
+          .map(|input| {
+            let zero_var = cs.zero_var();
+            let sum_var = inputs.iter().fold(zero_var, |sum, other_input| {
+                                         let adder = match_select(cs,
+                                                                  input.0,       // asset_type
+                                                                  other_input.0, // asset_type
+                                                                  other_input.1); // amount
+                                         cs.add(sum, adder)
+                                       });
+            (input.0, sum_var)
+          })
+          .collect();
+
+  let outputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> =
+    outputs.iter()
+           .map(|output| {
+             let zero_var = cs.zero_var();
+             let sum_var = outputs.iter().fold(zero_var, |sum, other_output| {
+                                           let adder = match_select(cs,
+                                                                    output.0, // asset_type
+                                                                    other_output.0, // asset_type
+                                                                    other_output.1); // amount
+                                           cs.add(sum, adder)
+                                         });
+             (output.0, sum_var)
+           })
+           .collect();
+
+  for (input_type, input_sum) in inputs_type_sum_amounts {
+    for &(output_type, output_sum) in &outputs_type_sum_amounts {
+      let type_matched = cs.is_equal(input_type, output_type);
+      // enforce `type_matched` * (input_sum - output_sum) == 0, which guarantees that
+      // (`input_type` != `output_type`) \lor (`input_sum` == `output_sum`)
+      let zero_var = cs.zero_var();
+      let diff = cs.sub(input_sum, output_sum);
+      cs.insert_mul_gate(type_matched, diff, zero_var);
+    }
+  }
+
+  // check that every input type appears in the set of output types
+  for &(input_type, _) in inputs {
+    // \prod_j (input_type - output_type_j) == 0
+    let mut product = cs.one_var();
+    for &(output_type, _) in outputs {
+      let diff = cs.sub(input_type, output_type);
+      product = cs.mul(product, diff);
+    }
+    cs.insert_constant_gate(product, BLSScalar::zero());
+  }
+
+  // check that every output type appears in the set of input types
+  for &(output_type, _) in outputs {
+    // \prod_i (input_type_i - output_type) == 0
+    let mut product = cs.one_var();
+    for &(input_type, _) in inputs {
+      let diff = cs.sub(input_type, output_type);
+      product = cs.mul(product, diff);
+    }
+    cs.insert_constant_gate(product, BLSScalar::zero());
+  }
+}
+
+// If `type1` == `type2`, returns a variable that equals `val`, otherwise returns a zero variable
+fn match_select(cs: &mut TurboPlonkCS,
+                type1: VarIndex,
+                type2: VarIndex,
+                val: VarIndex)
+                -> VarIndex {
+  let is_equal_var = cs.is_equal(type1, type2);
+  cs.mul(is_equal_var, val)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
   use super::*;
@@ -445,36 +526,37 @@ pub(crate) mod tests {
   use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
-  use std::cmp::min;
 
-  pub(crate) fn new_multi_xfr_witness_for_test(n_payers: usize,
-                                               n_payees: usize,
+  pub(crate) fn new_multi_xfr_witness_for_test(inputs: Vec<(u64, BLSScalar)>,
+                                               outputs: Vec<(u64, BLSScalar)>,
                                                seed: [u8; 32])
                                                -> AMultiXfrWitness {
+    let n_payers = inputs.len();
     assert!(n_payers <= 3);
-    assert!(n_payees <= 3);
     let mut prng = ChaChaRng::from_seed(seed);
-    let asset_type = BLSScalar::random(&mut prng);
     let zero = BLSScalar::zero();
     let mut payers_secrets: Vec<PayerSecret> =
-      (0..n_payers).map(|i| {
-                     let (is_left_child, is_right_child) = match i % 3 {
-                       0 => (1, 0),
-                       1 => (0, 0),
-                       _ => (0, 1),
-                     };
-                     let node = MTNode { siblings1: zero,
-                                         siblings2: zero,
-                                         is_left_child,
-                                         is_right_child };
-                     PayerSecret { sec_key: JubjubScalar::random(&mut prng),
-                                   diversifier: JubjubScalar::random(&mut prng),
-                                   uid: i as u64,
-                                   amount: 10 * (i + 1) as u64,
-                                   path: MTPath::new(vec![node]),
-                                   blind: BLSScalar::random(&mut prng) }
-                   })
-                   .collect();
+      inputs.iter()
+            .enumerate()
+            .map(|(i, &(amount, asset_type))| {
+              let (is_left_child, is_right_child) = match i % 3 {
+                0 => (1, 0),
+                1 => (0, 0),
+                _ => (0, 1),
+              };
+              let node = MTNode { siblings1: zero,
+                                  siblings2: zero,
+                                  is_left_child,
+                                  is_right_child };
+              PayerSecret { sec_key: JubjubScalar::random(&mut prng),
+                            diversifier: JubjubScalar::random(&mut prng),
+                            uid: i as u64,
+                            amount,
+                            asset_type,
+                            path: MTPath::new(vec![node]),
+                            blind: BLSScalar::random(&mut prng) }
+            })
+            .collect();
     // compute the merkle leafs and update the merkle paths if there are more than 1 payers
     if n_payers > 1 {
       let hash = RescueInstance::new();
@@ -488,7 +570,7 @@ pub(crate) mod tests {
                           hash.rescue_hash(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
                         let commitment = comm.commit(&payer.blind,
                                                      &[BLSScalar::from_u64(payer.amount),
-                                                       asset_type])
+                                                       payer.asset_type])
                                              .unwrap();
                         hash.rescue_hash(&[BLSScalar::from_u64(payer.uid),
                                            commitment,
@@ -511,19 +593,158 @@ pub(crate) mod tests {
       }
     }
 
-    let mut balance = (n_payers * (n_payers + 1) * 5) as u64;
-    let payees_secrets: Vec<PayeeSecret> = (0..n_payees).map(|i| {
-                                                          let amount =
-                                                            min(9 * (i + 1) as u64, balance);
-                                                          balance -= amount;
-                                                          PayeeSecret { amount,
-                      blind: BLSScalar::random(&mut prng) }
-                                                        })
-                                                        .collect();
+    let payees_secrets: Vec<PayeeSecret> =
+      outputs.iter()
+             .map(|&(amount, asset_type)| PayeeSecret { amount,
+                                                        blind: BLSScalar::random(&mut prng),
+                                                        asset_type })
+             .collect();
 
-    AMultiXfrWitness { asset_type,
-                       payers_secrets,
+    AMultiXfrWitness { payers_secrets,
                        payees_secrets }
+  }
+
+  #[test]
+  fn test_asset_mixing() {
+    // The error path
+    let mut cs = TurboPlonkConstraintSystem::new();
+    let zero = BLSScalar::zero();
+    let one = BLSScalar::one();
+    let two = one.add(&one);
+    // asset_types = (0, 2)
+    let in_types = [cs.new_variable(zero), cs.new_variable(two)];
+    // amoutns = (60, 100)
+    let in_amounts = [cs.new_variable(BLSScalar::from_u32(60)),
+                      cs.new_variable(BLSScalar::from_u32(100))];
+    let inputs: Vec<(VarIndex, VarIndex)> =
+      in_types.iter()
+              .zip(in_amounts.iter())
+              .map(|(&asset_type, &amount)| (asset_type, amount))
+              .collect();
+
+    // asset_types = (2, 2)
+    let out_types = [cs.new_variable(two), cs.new_variable(two)];
+    // amoutns = (40, 10)
+    let out_amounts = [cs.new_variable(BLSScalar::from_u32(40)),
+                       cs.new_variable(BLSScalar::from_u32(10))];
+    let outputs: Vec<(VarIndex, VarIndex)> =
+      out_types.iter()
+               .zip(out_amounts.iter())
+               .map(|(&asset_type, &amount)| (asset_type, amount))
+               .collect();
+
+    asset_mixing(&mut cs, &inputs, &outputs);
+    let witness = cs.get_and_clear_witness();
+    assert!(cs.verify_witness(&witness, &[]).is_err());
+
+    // The happy path
+    let mut cs = TurboPlonkConstraintSystem::new();
+    // asset_types = (0, 2, 1, 2)
+    let in_types = [cs.new_variable(zero),
+                    cs.new_variable(two),
+                    cs.new_variable(one),
+                    cs.new_variable(two)];
+    // amounts = (60, 100, 10, 50)
+    let in_amounts = [cs.new_variable(BLSScalar::from_u32(60)),
+                      cs.new_variable(BLSScalar::from_u32(100)),
+                      cs.new_variable(BLSScalar::from_u32(10)),
+                      cs.new_variable(BLSScalar::from_u32(50))];
+    let inputs: Vec<(VarIndex, VarIndex)> =
+      in_types.iter()
+              .zip(in_amounts.iter())
+              .map(|(&asset_type, &amount)| (asset_type, amount))
+              .collect();
+
+    // asset_types = (2, 1, 1, 2, 0, 0, 2)
+    let out_types = [cs.new_variable(two),
+                     cs.new_variable(one),
+                     cs.new_variable(one),
+                     cs.new_variable(two),
+                     cs.new_variable(zero),
+                     cs.new_variable(zero),
+                     cs.new_variable(two)];
+    // amounts = (40, 9, 1, 80, 50, 10, 30)
+    let out_amounts = [cs.new_variable(BLSScalar::from_u32(40)),
+                       cs.new_variable(BLSScalar::from_u32(9)),
+                       cs.new_variable(BLSScalar::from_u32(1)),
+                       cs.new_variable(BLSScalar::from_u32(80)),
+                       cs.new_variable(BLSScalar::from_u32(50)),
+                       cs.new_variable(BLSScalar::from_u32(10)),
+                       cs.new_variable(BLSScalar::from_u32(30))];
+    let outputs: Vec<(VarIndex, VarIndex)> =
+      out_types.iter()
+               .zip(out_amounts.iter())
+               .map(|(&asset_type, &amount)| (asset_type, amount))
+               .collect();
+
+    asset_mixing(&mut cs, &inputs, &outputs);
+    let witness = cs.get_and_clear_witness();
+    assert!(cs.verify_witness(&witness, &[]).is_ok());
+
+    // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
+    let mut cs = TurboPlonkConstraintSystem::new();
+    // asset_types = (1, 0, 1, 2)
+    let in_types = [cs.new_variable(one),
+                    cs.new_variable(zero),
+                    cs.new_variable(one),
+                    cs.new_variable(two)];
+    // amounts = (10, 5, 5, 10)
+    let in_amounts = [cs.new_variable(BLSScalar::from_u32(10)),
+                      cs.new_variable(BLSScalar::from_u32(5)),
+                      cs.new_variable(BLSScalar::from_u32(5)),
+                      cs.new_variable(BLSScalar::from_u32(10))];
+    let inputs: Vec<(VarIndex, VarIndex)> =
+      in_types.iter()
+              .zip(in_amounts.iter())
+              .map(|(&asset_type, &amount)| (asset_type, amount))
+              .collect();
+    // asset_types = (0, 1, 0)
+    let out_types = [cs.new_variable(zero),
+                     cs.new_variable(one),
+                     cs.new_variable(zero)];
+    // amounts = (1, 15, 4)
+    let out_amounts = [cs.new_variable(BLSScalar::from_u32(1)),
+                       cs.new_variable(BLSScalar::from_u32(15)),
+                       cs.new_variable(BLSScalar::from_u32(4))];
+    let outputs: Vec<(VarIndex, VarIndex)> =
+      out_types.iter()
+               .zip(out_amounts.iter())
+               .map(|(&asset_type, &amount)| (asset_type, amount))
+               .collect();
+    asset_mixing(&mut cs, &inputs, &outputs);
+    let witness = cs.get_and_clear_witness();
+    assert!(cs.verify_witness(&witness, &[]).is_err());
+
+    let mut cs = TurboPlonkConstraintSystem::new();
+    // asset_types = (1, 0, 1)
+    let in_types = [cs.new_variable(one),
+                    cs.new_variable(zero),
+                    cs.new_variable(one)];
+    // amounts = (10, 5, 5)
+    let in_amounts = [cs.new_variable(BLSScalar::from_u32(10)),
+                      cs.new_variable(BLSScalar::from_u32(5)),
+                      cs.new_variable(BLSScalar::from_u32(5))];
+    let inputs: Vec<(VarIndex, VarIndex)> =
+      in_types.iter()
+              .zip(in_amounts.iter())
+              .map(|(&asset_type, &amount)| (asset_type, amount))
+              .collect();
+    // asset_types = (0, 1, 2)
+    let out_types = [cs.new_variable(zero),
+                     cs.new_variable(one),
+                     cs.new_variable(two)];
+    // amounts = (5, 15, 4)
+    let out_amounts = [cs.new_variable(BLSScalar::from_u32(5)),
+                       cs.new_variable(BLSScalar::from_u32(15)),
+                       cs.new_variable(BLSScalar::from_u32(4))];
+    let outputs: Vec<(VarIndex, VarIndex)> =
+      out_types.iter()
+               .zip(out_amounts.iter())
+               .map(|(&asset_type, &amount)| (asset_type, amount))
+               .collect();
+    asset_mixing(&mut cs, &inputs, &outputs);
+    let witness = cs.get_and_clear_witness();
+    assert!(cs.verify_witness(&witness, &[]).is_err());
   }
 
   #[test]
@@ -709,23 +930,51 @@ pub(crate) mod tests {
 
   #[test]
   fn test_build_multi_xfr_cs() {
-    test_multi_xfr_cs(1, 2);
-    test_multi_xfr_cs(2, 1);
-    test_multi_xfr_cs(2, 3);
-    test_multi_xfr_cs(3, 2);
+    // single-asset xfr: good witness
+    let zero = BLSScalar::zero();
+    let inputs = vec![(/*amount=*/ 30, /*asset_type=*/ zero),
+                      (20, zero),
+                      (10, zero)];
+    let mut outputs = vec![(19, zero), (17, zero), (24, zero)];
+    test_xfr_cs(inputs.to_vec(), outputs.to_vec(), true);
+
+    // single-asset xfr: bad witness
+    outputs[0].0 = 18;
+    test_xfr_cs(inputs, outputs, false);
+
+    // multi-assets xfr: good witness
+    let one = BLSScalar::one();
+    let inputs = vec![(/*amount=*/ 50, /*asset_type=*/ zero),
+                      (60, one),
+                      (20, zero)];
+    let mut outputs = vec![(19, one),
+                           (15, zero),
+                           (1, one),
+                           (35, zero),
+                           (20, zero),
+                           (40, one)];
+    test_xfr_cs(inputs.to_vec(), outputs.to_vec(), true);
+
+    // multi-assets xfr: bad witness
+    outputs[0].0 = 18;
+    test_xfr_cs(inputs, outputs, false);
   }
 
-  fn test_multi_xfr_cs(n_payers: usize, n_payees: usize) {
-    let secret_inputs = new_multi_xfr_witness_for_test(n_payers, n_payees, [0u8; 32]);
+  fn test_xfr_cs(inputs: Vec<(u64, BLSScalar)>,
+                 outputs: Vec<(u64, BLSScalar)>,
+                 witness_is_valid: bool) {
+    let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [0u8; 32]);
     let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
 
     // check the constraints
     let (mut cs, _) = build_multi_xfr_cs(secret_inputs);
-    let mut witness = cs.get_and_clear_witness();
+    let witness = cs.get_and_clear_witness();
     let online_inputs = pub_inputs.to_vec();
     let verify = cs.verify_witness(&witness, &online_inputs);
-    assert!(verify.is_ok(), verify.unwrap_err());
-    witness[1].add_assign(&BLSScalar::one());
-    assert!(cs.verify_witness(&witness, &online_inputs).is_err());
+    if witness_is_valid {
+      assert!(verify.is_ok(), verify.unwrap_err());
+    } else {
+      assert!(verify.is_err());
+    }
   }
 }
