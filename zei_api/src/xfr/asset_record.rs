@@ -405,45 +405,38 @@ pub fn open_blind_asset_record(input: &BlindAssetRecord,
                                -> Result<OpenAssetRecord, ZeiError> {
   let (amount, asset_type, amount_blinds, type_blind) = match input.get_record_type() {
     AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => {
-      (input.amount
-            .get_amount()
-            .ok_or_else(|| ZeiError::ParameterError)?,
+      (input.amount.get_amount().ok_or(ZeiError::ParameterError)?,
        input.asset_type
             .get_asset_type()
-            .ok_or_else(|| ZeiError::ParameterError)?,
+            .ok_or(ZeiError::ParameterError)?,
        (Scalar::zero(), Scalar::zero()),
        Scalar::zero())
     }
 
     AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
-      let owner_memo = owner_memo.as_ref()
-                                 .ok_or_else(|| ZeiError::ParameterError)?;
+      let owner_memo = owner_memo.as_ref().ok_or(ZeiError::ParameterError)?;
       let amount = owner_memo.decrypt_amount(&keypair)?;
       let amount_blinds = owner_memo.derive_amount_blinds(&keypair)?;
       (amount,
        input.asset_type
             .get_asset_type()
-            .ok_or_else(|| ZeiError::ParameterError)?,
+            .ok_or(ZeiError::ParameterError)?,
        amount_blinds,
        Scalar::zero())
     }
 
     AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => {
-      let owner_memo = owner_memo.as_ref()
-                                 .ok_or_else(|| ZeiError::ParameterError)?;
+      let owner_memo = owner_memo.as_ref().ok_or(ZeiError::ParameterError)?;
       let asset_type = owner_memo.decrypt_asset_type(&keypair)?;
       let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair)?;
-      (input.amount
-            .get_amount()
-            .ok_or_else(|| ZeiError::ParameterError)?,
+      (input.amount.get_amount().ok_or(ZeiError::ParameterError)?,
        asset_type,
        (Scalar::zero(), Scalar::zero()),
        asset_type_blind)
     }
 
     AssetRecordType::ConfidentialAmount_ConfidentialAssetType => {
-      let owner_memo = owner_memo.as_ref()
-                                 .ok_or_else(|| ZeiError::ParameterError)?;
+      let owner_memo = owner_memo.as_ref().ok_or(ZeiError::ParameterError)?;
       let (amount, asset_type) = owner_memo.decrypt_amount_and_asset_type(&keypair)?;
       let amount_blinds = owner_memo.derive_amount_blinds(&keypair)?;
       let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair)?;

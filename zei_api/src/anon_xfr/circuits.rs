@@ -1,4 +1,5 @@
-use crate::anon_xfr::structs::{AXfrPubKey, BlindFactor, Commitment, MTNode, MTPath, Nullifier};
+use crate::anon_xfr::keys::AXfrPubKey;
+use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubGroup, JubjubScalar};
@@ -79,8 +80,8 @@ impl AMultiXfrPubInputs {
     // nullifiers and signature verification keys
     for (nullifier, pk_sign) in &self.payers_inputs {
       result.push(*nullifier);
-      result.push(pk_sign.0.get_x());
-      result.push(pk_sign.0.get_y());
+      result.push(pk_sign.as_jubjub_point().get_x());
+      result.push(pk_sign.as_jubjub_point().get_y());
     }
     // merkle_root
     result.push(self.merkle_root);
@@ -103,7 +104,7 @@ impl AMultiXfrPubInputs {
              .iter()
              .map(|sec| {
                let pk_point = base.mul(&sec.sec_key);
-               let pk_sign = AXfrPubKey(pk_point.mul(&sec.diversifier));
+               let pk_sign = AXfrPubKey::from_jubjub_point(pk_point.mul(&sec.diversifier));
 
                let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::one());
                let uid_amount = pow_2_64.mul(&BLSScalar::from_u64(sec.uid))

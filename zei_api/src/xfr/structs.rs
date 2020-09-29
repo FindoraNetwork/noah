@@ -495,9 +495,7 @@ impl OwnerMemo {
   fn derive_shared_edwards_point(s: &Scalar,
                                  point: &CompressedEdwardsY)
                                  -> Result<CompressedEdwardsY, ZeiError> {
-    let shared_edwards_point = s.0
-                               * point.decompress()
-                                      .ok_or_else(|| ZeiError::DecompressElementError)?;
+    let shared_edwards_point = s.0 * point.decompress().ok_or(ZeiError::DecompressElementError)?;
     Ok(CompressedEdwardsY(shared_edwards_point.compress()))
   }
 

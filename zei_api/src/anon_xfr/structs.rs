@@ -1,7 +1,7 @@
+use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use algebra::bls12_381::{BLSScalar, Bls12381};
-use algebra::groups::{GroupArithmetic, ScalarArithmetic};
-use algebra::jubjub::{JubjubGroup, JubjubScalar};
+use algebra::jubjub::JubjubScalar;
 use crypto::basics::hybrid_encryption::XPublicKey;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentScheme;
 use poly_iops::plonk::protocol::prover::PlonkPf;
@@ -9,23 +9,6 @@ use poly_iops::plonk::protocol::prover::PlonkPf;
 pub type Nullifier = BLSScalar;
 pub type Commitment = BLSScalar;
 pub type BlindFactor = BLSScalar;
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AXfrSecKey(pub(crate) JubjubScalar);
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AXfrPubKey(pub(crate) JubjubGroup);
-
-impl AXfrSecKey {
-  pub fn randomize(&self, factor: &JubjubScalar) -> AXfrSecKey {
-    AXfrSecKey(self.0.mul(factor))
-  }
-}
-
-impl AXfrPubKey {
-  pub fn randomize(&self, factor: &JubjubScalar) -> AXfrPubKey {
-    AXfrPubKey(self.0.mul(factor))
-  }
-}
 
 /// A Merkle tree node which consists of the following:
 /// * `siblings1` - the 1st sibling of the tree node
@@ -76,7 +59,7 @@ pub struct OpenAnonBlindAssetRecord<'a> {
   pub blind: BLSScalar,
   pub key_rand: JubjubScalar,
   pub mt_leaf_info: MTLeafInfo,
-  pub secret_key: AXfrSecKey,
+  pub key_pair: AXfrKeyPair,
   pub abar: &'a AnonBlindAssetRecord,
 }
 

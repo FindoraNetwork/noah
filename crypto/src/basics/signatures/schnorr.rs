@@ -23,11 +23,35 @@ use utils::serialization::ZeiFromToBytes;
 
 const SCALAR_SIZE: usize = 32;
 
-#[derive(Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SecretKey<S>(S);
+
+impl<S: Scalar> SecretKey<S> {
+  pub fn randomize(&self, factor: &S) -> SecretKey<S> {
+    SecretKey(self.0.mul(factor))
+  }
+  pub fn public_key<G: Group<S = S>>(&self) -> PublicKey<G> {
+    PublicKey(G::get_base().mul(&self.0))
+  }
+  pub fn scalar(&self) -> S {
+    self.0
+  }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublicKey<G>(G);
+
+impl<G: Group> PublicKey<G> {
+  pub fn randomize(&self, factor: &G::S) -> PublicKey<G> {
+    PublicKey(self.0.mul(factor))
+  }
+  pub fn point_ref(&self) -> &G {
+    &self.0
+  }
+  pub fn from_point(point: G) -> PublicKey<G> {
+    PublicKey(point)
+  }
+}
 
 impl<G: Group> ZeiFromToBytes for PublicKey<G> {
   fn zei_to_bytes(&self) -> Vec<u8> {
@@ -44,8 +68,14 @@ impl<G: Group> ZeiFromToBytes for PublicKey<G> {
 }
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct KeyPair<G, S> {
-  sec_key: SecretKey<S>,
-  pub_key: PublicKey<G>,
+  pub(crate) sec_key: SecretKey<S>,
+  pub pub_key: PublicKey<G>,
+}
+
+impl<G, S> KeyPair<G, S> {
+  pub fn into_pair(self) -> (SecretKey<S>, PublicKey<G>) {
+    (self.sec_key, self.pub_key)
+  }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

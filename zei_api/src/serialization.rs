@@ -137,12 +137,10 @@ pub mod option_bytes {
 
 #[cfg(test)]
 mod test {
-  use crate::anon_xfr::structs::{AXfrPubKey, AXfrSecKey};
+  use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSecKey};
   use crate::serialization::ZeiFromToBytes;
   use crate::xfr::asset_tracer::RecordDataEncKey;
   use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
-  use algebra::groups::{Group, GroupArithmetic, Scalar};
-  use algebra::jubjub::{JubjubGroup, JubjubScalar};
   use algebra::ristretto::RistrettoPoint;
   use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
   use crypto::basics::elgamal::elgamal_key_gen;
@@ -158,15 +156,25 @@ mod test {
   fn anon_xfr_pub_key_serialization() {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
-    let sk = AXfrSecKey(JubjubScalar::random(&mut prng));
-    let pk = AXfrPubKey(JubjubGroup::get_base().mul(&sk.0));
+    let key_pair = AXfrKeyPair::generate(&mut prng);
 
     let mut pk_mp_vec = vec![];
     assert_eq!(true,
-               pk.serialize(&mut Serializer::new(&mut pk_mp_vec)).is_ok());
+               key_pair.pub_key
+                       .serialize(&mut Serializer::new(&mut pk_mp_vec))
+                       .is_ok());
     let mut de = Deserializer::new(&pk_mp_vec[..]);
     let pk2: AXfrPubKey = Deserialize::deserialize(&mut de).unwrap();
-    assert_eq!(pk, pk2);
+    assert_eq!(key_pair.pub_key, pk2);
+
+    let mut sk_mp_vec = vec![];
+    assert_eq!(true,
+               key_pair.sec_key
+                       .serialize(&mut Serializer::new(&mut sk_mp_vec))
+                       .is_ok());
+    let mut de = Deserializer::new(&sk_mp_vec[..]);
+    let sk2: AXfrSecKey = Deserialize::deserialize(&mut de).unwrap();
+    assert_eq!(key_pair.sec_key, sk2);
   }
 
   #[test]
