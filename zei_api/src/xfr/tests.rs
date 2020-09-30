@@ -10,8 +10,8 @@ pub(crate) mod tests {
   };
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
-    AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerMemo, AssetTracingPolicy,
-    AssetType, IdentityRevealPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH,
+    AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetType, IdentityRevealPolicy,
+    TracerMemo, TracingPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH,
   };
   use algebra::groups::Scalar as _;
   use algebra::ristretto::RistrettoScalar as Scalar;
@@ -39,13 +39,13 @@ pub(crate) mod tests {
     let inputs =
       input_templates.iter()
                      .map(|template| {
-                       AssetRecord::from_template_no_identity_tracking(prng, template).unwrap()
+                       AssetRecord::from_template_no_identity_tracing(prng, template).unwrap()
                      })
                      .collect_vec();
     let outputs =
       output_templates.iter()
                       .map(|template| {
-                        AssetRecord::from_template_no_identity_tracking(prng, &template).unwrap()
+                        AssetRecord::from_template_no_identity_tracing(prng, &template).unwrap()
                       })
                       .collect_vec();
 
@@ -83,20 +83,20 @@ pub(crate) mod tests {
     let inputs = inputs_template.iter()
                                 .zip(inkeys.iter())
                                 .map(|(asset_record_type, key_pair)| {
-                                  AssetRecordTemplate::with_no_asset_tracking(input_amount,
-                                                                              asset_type,
-                                                                              *asset_record_type,
-                                                                              key_pair.pub_key)
+                                  AssetRecordTemplate::with_no_asset_tracing(input_amount,
+                                                                             asset_type,
+                                                                             *asset_record_type,
+                                                                             key_pair.pub_key)
                                 })
                                 .collect_vec();
 
     let outputs = outputs_template.iter()
                                   .zip(outkeys.iter())
                                   .map(|(asset_record_type, key_pair)| {
-                                    AssetRecordTemplate::with_no_asset_tracking(output_amount,
-                                                                                asset_type,
-                                                                                *asset_record_type,
-                                                                                key_pair.pub_key)
+                                    AssetRecordTemplate::with_no_asset_tracing(output_amount,
+                                                                               asset_type,
+                                                                               *asset_record_type,
+                                                                               key_pair.pub_key)
                                   })
                                   .collect_vec();
 
@@ -127,14 +127,14 @@ pub(crate) mod tests {
 
     // test 2: overflow transfer
     let old_output3: AssetRecord = outputs[3].clone();
-    let asset_record = AssetRecordTemplate::with_no_asset_tracking(total_amount + 1,
-                                                                   asset_type,
-                                                                   outputs[3].open_asset_record
-                                                                             .get_record_type(),
-                                                                   outputs[3].open_asset_record
-                                                                             .blind_asset_record
-                                                                             .public_key);
-    outputs[3] = AssetRecord::from_template_no_identity_tracking(&mut prng, &asset_record).unwrap();
+    let asset_record = AssetRecordTemplate::with_no_asset_tracing(total_amount + 1,
+                                                                  asset_type,
+                                                                  outputs[3].open_asset_record
+                                                                            .get_record_type(),
+                                                                  outputs[3].open_asset_record
+                                                                            .blind_asset_record
+                                                                            .public_key);
+    outputs[3] = AssetRecord::from_template_no_identity_tracing(&mut prng, &asset_record).unwrap();
     let xfr_note = gen_xfr_note(&mut prng,
                                 inputs.as_slice(),
                                 outputs.as_slice(),
@@ -172,13 +172,13 @@ pub(crate) mod tests {
     //test 3: one output asset type different from rest
     let old_output3 = outputs[3].clone();
     let asset_record =
-      AssetRecordTemplate::with_no_asset_tracking(old_output3.open_asset_record.amount,
-                                                  AssetType::from_identical_byte(1u8),
-                                                  outputs[3].open_asset_record.get_record_type(),
-                                                  old_output3.open_asset_record
-                                                             .blind_asset_record
-                                                             .public_key);
-    outputs[3] = AssetRecord::from_template_no_identity_tracking(&mut prng, &asset_record).unwrap();
+      AssetRecordTemplate::with_no_asset_tracing(old_output3.open_asset_record.amount,
+                                                 AssetType::from_identical_byte(1u8),
+                                                 outputs[3].open_asset_record.get_record_type(),
+                                                 old_output3.open_asset_record
+                                                            .blind_asset_record
+                                                            .public_key);
+    outputs[3] = AssetRecord::from_template_no_identity_tracing(&mut prng, &asset_record).unwrap();
     let xfr_note = gen_xfr_note(&mut prng,
                                 inputs.as_slice(),
                                 outputs.as_slice(),
@@ -218,13 +218,13 @@ pub(crate) mod tests {
     let old_input1 = inputs[1].clone();
 
     let ar_template =
-      AssetRecordTemplate::with_no_asset_tracking(input_amount,
-                                                  AssetType::from_identical_byte(1u8),
-                                                  inputs_template[1],
-                                                  inputs[1].open_asset_record
-                                                           .blind_asset_record
-                                                           .public_key);
-    inputs[1] = AssetRecord::from_template_no_identity_tracking(&mut prng, &ar_template).unwrap();
+      AssetRecordTemplate::with_no_asset_tracing(input_amount,
+                                                 AssetType::from_identical_byte(1u8),
+                                                 inputs_template[1],
+                                                 inputs[1].open_asset_record
+                                                          .blind_asset_record
+                                                          .public_key);
+    inputs[1] = AssetRecord::from_template_no_identity_tracing(&mut prng, &ar_template).unwrap();
     let xfr_note = gen_xfr_note(&mut prng,
                                 inputs.as_slice(),
                                 outputs.as_slice(),
@@ -257,7 +257,7 @@ pub(crate) mod tests {
             "Confidential transfer with different asset types should fail verification ok");
   }
 
-  mod single_asset_no_tracking {
+  mod single_asset_no_tracing {
 
     use super::*;
     use crate::setup::{PublicParams, DEFAULT_BP_NUM_GENS};
@@ -405,7 +405,7 @@ pub(crate) mod tests {
     }
   }
 
-  mod multi_asset_no_tracking {
+  mod multi_asset_no_tracing {
 
     use super::*;
     use crate::setup::DEFAULT_BP_NUM_GENS;
@@ -432,9 +432,10 @@ pub(crate) mod tests {
       let input_record = input_amount.iter()
                                      .zip(inkeys.iter())
                                      .map(|((amount, asset_type), key_pair)| {
-                                       AssetRecordTemplate::with_no_asset_tracking(
-                                         *amount, *asset_type, asset_record_type, key_pair.pub_key
-                                       )
+                                       AssetRecordTemplate::with_no_asset_tracing(*amount,
+                                                                                  *asset_type,
+                                                                                  asset_record_type,
+                                                                                  key_pair.pub_key)
                                      })
                                      .collect_vec();
 
@@ -449,10 +450,10 @@ pub(crate) mod tests {
       let output_record = out_amount.iter()
                                     .zip(out_keys.iter())
                                     .map(|((amount, asset_type), key_pair)| {
-                                      AssetRecordTemplate::with_no_asset_tracking(*amount,
-                                                                                  *asset_type,
-                                                                                  asset_record_type,
-                                                                                  key_pair.pub_key)
+                                      AssetRecordTemplate::with_no_asset_tracing(*amount,
+                                                                                 *asset_type,
+                                                                                 asset_record_type,
+                                                                                 key_pair.pub_key)
                                     })
                                     .collect_vec();
 
@@ -480,9 +481,10 @@ pub(crate) mod tests {
       let input_record = input_amount.iter()
                                      .zip(inkeys.iter())
                                      .map(|((amount, asset_type), key_pair)| {
-                                       AssetRecordTemplate::with_no_asset_tracking(
-                                         *amount, *asset_type, asset_record_type, key_pair.pub_key
-                                       )
+                                       AssetRecordTemplate::with_no_asset_tracing(*amount,
+                                                                                  *asset_type,
+                                                                                  asset_record_type,
+                                                                                  key_pair.pub_key)
                                      })
                                      .collect_vec();
 
@@ -491,7 +493,7 @@ pub(crate) mod tests {
       let output_record = input_amount.iter()
                                       .zip(out_keys.iter())
                                       .map(|((amount, asset_type), key_pair)| {
-                                        AssetRecordTemplate::with_no_asset_tracking(
+                                        AssetRecordTemplate::with_no_asset_tracing(
                                           *amount, *asset_type, asset_record_type, key_pair.pub_key
                                         )
                                       })
@@ -540,9 +542,9 @@ pub(crate) mod tests {
       for x in amounts.iter() {
         let keypair = XfrKeyPair::generate(&mut prng);
         let asset_record =
-          AssetRecordTemplate::with_no_asset_tracking(x.0, x.1, asset_record_type, keypair.pub_key);
+          AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.pub_key);
 
-        inputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &asset_record).unwrap());
+        inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &asset_record).unwrap());
 
         in_asset_records.push(asset_record);
         inkeys.push(keypair);
@@ -552,8 +554,8 @@ pub(crate) mod tests {
         let keypair = XfrKeyPair::generate(&mut prng);
 
         let ar_template =
-          AssetRecordTemplate::with_no_asset_tracking(x.0, x.1, asset_record_type, keypair.pub_key);
-        outputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &ar_template).unwrap());
+          AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.pub_key);
+        outputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar_template).unwrap());
         outkeys.push(keypair);
       }
 
@@ -575,18 +577,18 @@ pub(crate) mod tests {
     }
   }
 
-  mod identity_tracking {
+  mod identity_tracing {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
-    ////    Tests with identity tracking                                                          ////
+    ////    Tests with identity tracing                                                          ////
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
     use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
     use crate::xfr::lib::XfrNotePoliciesRef;
-    use crate::xfr::structs::AssetTracingPolicies;
+    use crate::xfr::structs::TracingPolicies;
 
-    fn check_identity_tracking_for_asset_type(asset_record_type: AssetRecordType) {
+    fn check_identity_tracing_for_asset_type(asset_record_type: AssetRecordType) {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
@@ -609,53 +611,51 @@ pub(crate) mod tests {
       let (sig_commitment, _, key) =
         ac_commit(&mut prng, &receiver_ac_sk, &credential, addr).unwrap();
 
-      let id_tracking_policy = IdentityRevealPolicy { cred_issuer_pub_key:
-                                                        cred_issuer_pk.clone(),
-                                                      reveal_map: vec![false, true, false, true] }; // revealing attr2 and attr4
+      let id_tracing_policy = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk.clone(),
+                                                     reveal_map: vec![false, true, false, true] }; // revealing attr2 and attr4
 
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys: tracer_keys.enc_key
-                                                                                    .clone(),
-                                                               asset_tracking: false,
-                                                               identity_tracking:
-                                                                 Some(id_tracking_policy.clone()) });
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: tracer_keys.enc_key.clone(),
+                                                     asset_tracing: false,
+                                                     identity_tracing:
+                                                       Some(id_tracing_policy.clone()) });
 
       let input_keypair = XfrKeyPair::generate(&mut prng);
 
       let input_asset_record =
-        AssetRecordTemplate::with_no_asset_tracking(10,
-                                                    AssetType::from_identical_byte(0u8),
-                                                    asset_record_type,
-                                                    input_keypair.pub_key);
+        AssetRecordTemplate::with_no_asset_tracing(10,
+                                                   AssetType::from_identical_byte(0u8),
+                                                   asset_record_type,
+                                                   input_keypair.pub_key);
 
       let input =
-        AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
+        AssetRecord::from_template_no_identity_tracing(&mut prng, &input_asset_record).unwrap();
 
       let output_asset_record =
-        AssetRecordTemplate::with_asset_tracking(10,
-                                                 AssetType::from_identical_byte(0u8),
-                                                 asset_record_type,
-                                                 input_keypair.pub_key,
-                                                 tracking_policy.clone());
+        AssetRecordTemplate::with_asset_tracing(10,
+                                                AssetType::from_identical_byte(0u8),
+                                                asset_record_type,
+                                                input_keypair.pub_key,
+                                                tracing_policy.clone());
 
-      let outputs = [AssetRecord::from_template_with_identity_tracking(&mut prng,
-                                                                       &output_asset_record,
-                                                                       &receiver_ac_sk,
-                                                                       &credential,
-                                                                       &key.unwrap()).unwrap()];
+      let outputs = [AssetRecord::from_template_with_identity_tracing(&mut prng,
+                                                                      &output_asset_record,
+                                                                      &receiver_ac_sk,
+                                                                      &credential,
+                                                                      &key.unwrap()).unwrap()];
 
       let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
 
-      let null_policies_input = &AssetTracingPolicies::new();
+      let null_policies_input = &TracingPolicies::new();
 
       let policies = XfrNotePoliciesRef::new(vec![null_policies_input],
                                              vec![None; 1],
-                                             vec![&tracking_policy],
+                                             vec![&tracing_policy],
                                              vec![Some(&sig_commitment)]);
 
       assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
                  Ok(()));
-      let policies = XfrNotePoliciesRef::new(vec![&tracking_policy],
+      let policies = XfrNotePoliciesRef::new(vec![&tracing_policy],
                                              vec![Some(&sig_commitment)],
                                              vec![null_policies_input],
                                              vec![None; 1]);
@@ -673,20 +673,20 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_identity_tracking_for_conf_assets() {
-      check_identity_tracking_for_asset_type(AssetRecordType::ConfidentialAmount_ConfidentialAssetType);
+    fn test_identity_tracing_for_conf_assets() {
+      check_identity_tracing_for_asset_type(AssetRecordType::ConfidentialAmount_ConfidentialAssetType);
     }
 
     #[test]
-    fn test_identity_tracking_for_non_conf_assets() {
-      check_identity_tracking_for_asset_type(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType);
+    fn test_identity_tracing_for_non_conf_assets() {
+      check_identity_tracing_for_asset_type(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType);
     }
   }
 
-  mod asset_tracking {
+  mod asset_tracing {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
-    ////    Tests with asset tracking                                                              ///
+    ////    Tests with asset tracing                                                              ///
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
@@ -695,7 +695,7 @@ pub(crate) mod tests {
       trace_assets, trace_assets_brute_force, XfrNotePolicies, XfrNotePoliciesRef,
     };
     use crate::xfr::structs::XfrAmount::NonConfidential;
-    use crate::xfr::structs::{AssetTracerKeyPair, AssetTracingPolicies};
+    use crate::xfr::structs::{AssetTracerKeyPair, TracingPolicies};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::GroupArithmetic;
     use algebra::jubjub::JubjubScalar;
@@ -729,15 +729,15 @@ pub(crate) mod tests {
       proof
     }
 
-    fn do_test_asset_tracking(params: &mut PublicParams,
-                              input_templates: &[(AssetRecordType,
-                                 &AssetTracingPolicies,
-                                 &AssetTracerKeyPair,
-                                 AssetType)],
-                              output_templates: &[(AssetRecordType,
-                                 &AssetTracingPolicies,
-                                 &AssetTracerKeyPair,
-                                 AssetType)]) {
+    fn do_test_asset_tracing(params: &mut PublicParams,
+                             input_templates: &[(AssetRecordType,
+                                &TracingPolicies,
+                                &AssetTracerKeyPair,
+                                AssetType)],
+                             output_templates: &[(AssetRecordType,
+                                &TracingPolicies,
+                                &AssetTracerKeyPair,
+                                AssetType)]) {
       let mut prng: ChaChaRng;
       prng = ChaChaRng::from_seed([0u8; 32]);
 
@@ -747,33 +747,34 @@ pub(crate) mod tests {
 
       let in_keys = gen_key_pair_vec(input_templates.len(), &mut prng);
       let in_keys_ref = in_keys.iter().map(|x| x).collect_vec();
-      let inputs = input_templates.iter()
-                                  .zip(in_keys.iter())
-                                  .map(|((asset_record_type,
-                                          tracking_policies,
-                                          _tracer_keypair,
-                                          asset_type),
-                                         key_pair)| {
-                                         AssetRecordTemplate::with_asset_tracking(input_amount,
-                                                                       *asset_type,
-                                                                       *asset_record_type,
-                                                                       key_pair.pub_key,
-                                                                       (*tracking_policies).clone())
-                                       })
-                                  .collect_vec();
+      let inputs =
+        input_templates.iter()
+                       .zip(in_keys.iter())
+                       .map(|((asset_record_type,
+                               tracing_policies,
+                               _tracer_keypair,
+                               asset_type),
+                              key_pair)| {
+                              AssetRecordTemplate::with_asset_tracing(input_amount,
+                                                                      *asset_type,
+                                                                      *asset_record_type,
+                                                                      key_pair.pub_key,
+                                                                      (*tracing_policies).clone())
+                            })
+                       .collect_vec();
       let out_keys = gen_key_pair_vec(output_templates.len(), &mut prng);
       let outputs = output_templates.iter()
                                     .zip(out_keys.iter())
                                     .map(|((asset_record_type,
-                                            tracking_policies,
+                                            tracing_policies,
                                             _tracer_keypair,
                                             asset_type),
                                            key_pair)| {
-                                           AssetRecordTemplate::with_asset_tracking(input_amount,
-                                                     *asset_type,
-                                                     *asset_record_type,
-                                                     key_pair.pub_key,
-                                                                                    (*tracking_policies).clone())
+                                           AssetRecordTemplate::with_asset_tracing(input_amount,
+                                                                       *asset_type,
+                                                                       *asset_record_type,
+                                                                       key_pair.pub_key,
+                                                                       (*tracing_policies).clone())
                                          })
                                     .collect_vec();
 
@@ -785,10 +786,10 @@ pub(crate) mod tests {
       let xfr_body = &xfr_note.body;
 
       let input_policies = input_templates.iter()
-                                          .map(|(_, tracking_policies, _, _)| *tracking_policies)
+                                          .map(|(_, tracing_policies, _, _)| *tracing_policies)
                                           .collect_vec();
       let output_policies = output_templates.iter()
-                                            .map(|(_, tracking_policies, _, _)| *tracking_policies)
+                                            .map(|(_, tracing_policies, _, _)| *tracing_policies)
                                             .collect_vec();
 
       let input_sig_commitment: Vec<Option<&ACCommitment>> = vec![None; inputs.len()];
@@ -834,22 +835,22 @@ pub(crate) mod tests {
         let new_enc = old_enc.e2.add(&pc_gens.B); //adding 1 to the exponent
 
         let tracer_memo =
-          AssetTracerMemo { lock_asset_type: Some(ElGamalCiphertext { e1: old_enc.e1,
-                                                                      e2: new_enc }),
-                            lock_amount: xfr_body.clone().asset_tracing_memos[0].get(0)
-                                                                                .unwrap()
-                                                                                .lock_amount
-                                                                                .clone(),
-                            enc_key: xfr_body.clone().asset_tracing_memos[0].get(0)
-                                                                            .unwrap()
-                                                                            .enc_key
-                                                                            .clone(),
-                            lock_attributes: vec![],
+          TracerMemo { lock_asset_type: Some(ElGamalCiphertext { e1: old_enc.e1,
+                                                                 e2: new_enc }),
+                       lock_amount: xfr_body.clone().asset_tracing_memos[0].get(0)
+                                                                           .unwrap()
+                                                                           .lock_amount
+                                                                           .clone(),
+                       enc_key: xfr_body.clone().asset_tracing_memos[0].get(0)
+                                                                       .unwrap()
+                                                                       .enc_key
+                                                                       .clone(),
+                       lock_attributes: vec![],
 
-                            lock_info: xfr_body.clone().asset_tracing_memos[0].get(0)
-                                                                              .unwrap()
-                                                                              .lock_info
-                                                                              .clone() };
+                       lock_info: xfr_body.clone().asset_tracing_memos[0].get(0)
+                                                                         .unwrap()
+                                                                         .lock_info
+                                                                         .clone() };
         new_xfr_body.asset_tracing_memos[0] = vec![tracer_memo];
 
         let policies = XfrNotePoliciesRef::new(input_policies.clone(),
@@ -859,7 +860,7 @@ pub(crate) mod tests {
 
         assert_eq!(verify_xfr_body(&mut prng, params, &new_xfr_body, &policies),
                    Err(XfrVerifyAssetTracingAssetAmountError),
-                   "Asset tracking verification fails as the ciphertext has been altered.");
+                   "Asset tracing verification fails as the ciphertext has been altered.");
       }
 
       // Restore body
@@ -870,7 +871,7 @@ pub(crate) mod tests {
 
       // test 3: without proof
       new_xfr_body.proofs
-                  .asset_tracking_proof
+                  .asset_tracing_proof
                   .asset_type_and_amount_proofs = vec![];
 
       let check = verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies);
@@ -891,7 +892,7 @@ pub(crate) mod tests {
       let wrong_proof = create_wrong_proof();
 
       new_xfr_body.proofs
-                  .asset_tracking_proof
+                  .asset_tracing_proof
                   .asset_type_and_amount_proofs[0] = wrong_proof;
 
       let check = verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies);
@@ -902,7 +903,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn asset_tracking_for_non_conf_assets_should_work() {
+    fn asset_tracing_for_non_conf_assets_should_work() {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
@@ -910,38 +911,37 @@ pub(crate) mod tests {
 
       let asset_tracer_public_keys = gen_asset_tracer_keypair(&mut prng);
 
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_public_keys.enc_key
-                                                                                         .clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_public_keys.enc_key
+                                                                                       .clone(),
+                                                     asset_tracing: true,
+                                                     identity_tracing: None });
 
       let input_keypair = XfrKeyPair::generate(&mut prng);
       let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
-      let input_asset_record = AssetRecordTemplate::with_asset_tracking(10,
+      let input_asset_record = AssetRecordTemplate::with_asset_tracing(10,
+                                                                       asset_type,
+                                                                       asset_record_type,
+                                                                       input_keypair.pub_key,
+                                                                       tracing_policy.clone());
+
+      let input =
+        AssetRecord::from_template_no_identity_tracing(&mut prng, &input_asset_record).unwrap();
+
+      let output_asset_record = AssetRecordTemplate::with_asset_tracing(10,
                                                                         asset_type,
                                                                         asset_record_type,
                                                                         input_keypair.pub_key,
-                                                                        tracking_policy.clone());
-
-      let input =
-        AssetRecord::from_template_no_identity_tracking(&mut prng, &input_asset_record).unwrap();
-
-      let output_asset_record = AssetRecordTemplate::with_asset_tracking(10,
-                                                                         asset_type,
-                                                                         asset_record_type,
-                                                                         input_keypair.pub_key,
-                                                                         tracking_policy.clone());
+                                                                        tracing_policy.clone());
 
       let outputs =
-        [AssetRecord::from_template_no_identity_tracking(&mut prng, &output_asset_record).unwrap()];
+        [AssetRecord::from_template_no_identity_tracing(&mut prng, &output_asset_record).unwrap()];
 
       let xfr_note = gen_xfr_note(&mut prng, &[input], &outputs, &[&input_keypair]).unwrap();
 
-      let policies = XfrNotePoliciesRef::new(vec![&tracking_policy],
+      let policies = XfrNotePoliciesRef::new(vec![&tracing_policy],
                                              vec![None; 1],
-                                             vec![&tracking_policy],
+                                             vec![&tracing_policy],
                                              vec![None; 1]);
 
       assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
@@ -954,36 +954,35 @@ pub(crate) mod tests {
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_keypair.enc_key
-                                                                                     .clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
+                                                                                   .clone(),
+                                                     asset_tracing: true,
+                                                     identity_tracing: None });
 
       let input_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &tracking_policy,
+                              &tracing_policy,
                               &asset_tracer_keypair,
                               BITCOIN_ASSET)];
       let output_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                               &AssetTracingPolicies::new(), // no policy
+                               &TracingPolicies::new(), // no policy
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
+      do_test_asset_tracing(&mut params, &input_templates, &output_templates);
 
-      // Both input and output with asset tracking
+      // Both input and output with asset tracing
       let input_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &tracking_policy,
+                              &tracing_policy,
                               &asset_tracer_keypair,
                               BITCOIN_ASSET)];
 
       let output_templates = vec![(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                                   &tracking_policy,
+                                   &tracing_policy,
                                    &asset_tracer_keypair,
                                    BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&mut params, &input_templates, output_templates.as_slice());
+      do_test_asset_tracing(&mut params, &input_templates, output_templates.as_slice());
     }
 
     #[test]
@@ -993,25 +992,24 @@ pub(crate) mod tests {
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_keypair.enc_key
-                                                                                     .clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
+                                                                                   .clone(),
+                                                     asset_tracing: true,
+                                                     identity_tracing: None });
 
-      // Input with asset tracking, output without asset tracking
+      // Input with asset tracing, output without asset tracing
       let input_templates = [(AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-                              &tracking_policy,
+                              &tracing_policy,
                               &asset_tracer_keypair,
                               BITCOIN_ASSET)];
 
       let output_templates = [(AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-                               &AssetTracingPolicies::new(), // no policy
+                               &TracingPolicies::new(), // no policy
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
+      do_test_asset_tracing(&mut params, &input_templates, &output_templates);
     }
 
     #[test]
@@ -1020,117 +1018,113 @@ pub(crate) mod tests {
       let mut params = PublicParams::default();
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_keypair.enc_key
-                                                                                     .clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
+                                                                                   .clone(),
+                                                     asset_tracing: true,
+                                                     identity_tracing: None });
 
-      // Input with asset tracking, output without asset tracking
+      // Input with asset tracing, output without asset tracing
       let input_templates = vec![(AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
-                                  &tracking_policy,
+                                  &tracing_policy,
                                   &asset_tracer_keypair,
                                   BITCOIN_ASSET)];
 
-      let no_policy = AssetTracingPolicies::new();
+      let no_policy = TracingPolicies::new();
       let output_templates = vec![(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
                                    &no_policy, // no policy
                                    &asset_tracer_keypair, BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&mut params,
-                             input_templates.as_slice(),
-                             output_templates.as_slice());
+      do_test_asset_tracing(&mut params,
+                            input_templates.as_slice(),
+                            output_templates.as_slice());
     }
 
     #[test]
-    fn test_two_inputs_two_outputs_all_confidential_tracking_on_inputs() {
+    fn test_two_inputs_two_outputs_all_confidential_tracing_on_inputs() {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_keypair.enc_key
-                                                                                     .clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
-      // Input with asset tracking, output without asset tracking
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
+                                                                                   .clone(),
+                                                     asset_tracing: true,
+                                                     identity_tracing: None });
+      // Input with asset tracing, output without asset tracing
       let input_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &tracking_policy,
+                              &tracing_policy,
                               &asset_tracer_keypair,
                               BITCOIN_ASSET),
                              (AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &tracking_policy,
+                              &tracing_policy,
                               &asset_tracer_keypair,
                               BITCOIN_ASSET)];
 
       let output_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                               &AssetTracingPolicies::new(), // no policy
+                               &TracingPolicies::new(), // no policy
                                &asset_tracer_keypair,
                                BITCOIN_ASSET),
                               (AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                               &AssetTracingPolicies::new(),
+                               &TracingPolicies::new(),
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
+      do_test_asset_tracing(&mut params, &input_templates, &output_templates);
     }
 
     #[test]
-    fn test_two_inputs_two_outputs_all_confidential_tracking_on_inputs_and_outputs() {
+    fn test_two_inputs_two_outputs_all_confidential_tracing_on_inputs_and_outputs() {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_keypair.enc_key
-                                                                                     .clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
+                                                                                   .clone(),
+                                                     asset_tracing: true,
+                                                     identity_tracing: None });
 
       let input_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &tracking_policy,
+                              &tracing_policy,
                               &asset_tracer_keypair,
                               BITCOIN_ASSET),
                              (AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &tracking_policy,
+                              &tracing_policy,
                               &asset_tracer_keypair,
                               BITCOIN_ASSET)];
 
       let output_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                               &tracking_policy,
+                               &tracing_policy,
                                &asset_tracer_keypair,
                                BITCOIN_ASSET),
                               (AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                               &tracking_policy,
+                               &tracing_policy,
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
 
-      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
+      do_test_asset_tracing(&mut params, &input_templates, &output_templates);
     }
 
     #[test]
-    fn test_single_asset_first_input_asset_tracking() {
+    fn test_single_asset_first_input_asset_tracing() {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_keypair.enc_key
-                                                                                     .clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
+                                                                                   .clone(),
+                                                     asset_tracing: true,
+                                                     identity_tracing: None });
 
-      // Only a single asset tracking policy for the first input
-      let no_policies = AssetTracingPolicies::new();
+      // Only a single asset tracing policy for the first input
+      let no_policies = TracingPolicies::new();
       let input_templates = [(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &tracking_policy,
+                              &tracing_policy,
                               &asset_tracer_keypair,
                               BITCOIN_ASSET),
                              (AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
@@ -1153,31 +1147,30 @@ pub(crate) mod tests {
                                &no_policies,
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
-      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
+      do_test_asset_tracing(&mut params, &input_templates, &output_templates);
     }
 
     #[test]
-    fn test_single_asset_two_first_input_asset_tracking() {
-      // The first two inputs have asset tracking policies
+    fn test_single_asset_two_first_input_asset_tracing() {
+      // The first two inputs have asset tracing policies
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
 
-      let tracking_policy =
-        AssetTracingPolicies::from_policy(AssetTracingPolicy { enc_keys:
-                                                                 asset_tracer_keypair.enc_key
-                                                                                     .clone(),
-                                                               asset_tracking: true,
-                                                               identity_tracking: None });
-      let no_policies = AssetTracingPolicies::new();
+      let tracing_policy =
+        TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
+                                                                                   .clone(),
+                                                     asset_tracing: true,
+                                                     identity_tracing: None });
+      let no_policies = TracingPolicies::new();
 
       let input_templates = vec![(AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                                  &tracking_policy,
+                                  &tracing_policy,
                                   &asset_tracer_keypair,
                                   BITCOIN_ASSET),
                                  (AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                                  &tracking_policy,
+                                  &tracing_policy,
                                   &asset_tracer_keypair,
                                   BITCOIN_ASSET),
                                  (AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
@@ -1196,20 +1189,20 @@ pub(crate) mod tests {
                                &no_policies,
                                &asset_tracer_keypair,
                                BITCOIN_ASSET)];
-      do_test_asset_tracking(&mut params, &input_templates, &output_templates);
+      do_test_asset_tracing(&mut params, &input_templates, &output_templates);
     }
 
-    fn gen_asset_tracking_policy(public_keys: &AssetTracerEncKeys) -> AssetTracingPolicy {
-      AssetTracingPolicy { enc_keys: public_keys.clone(),
-                           asset_tracking: true,
-                           identity_tracking: None }
+    fn gen_asset_tracing_policy(public_keys: &AssetTracerEncKeys) -> TracingPolicy {
+      TracingPolicy { enc_keys: public_keys.clone(),
+                      asset_tracing: true,
+                      identity_tracing: None }
     }
 
     #[test]
     fn test_complex_transaction() {
       // Multiple asset types
       // Multiple asset tracers
-      // Mix of asset_tracking policies for inputs / outputs
+      // Mix of asset_tracing policies for inputs / outputs
       // Mix of asset record type for inputs /outputs
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
@@ -1218,68 +1211,68 @@ pub(crate) mod tests {
       let tracer1_keypair = gen_asset_tracer_keypair(&mut prng);
       let tracer2_keypair = gen_asset_tracer_keypair(&mut prng);
 
-      let input1_tracking_policy =
-        AssetTracingPolicies::from_policy(gen_asset_tracking_policy(&tracer1_keypair.enc_key));
+      let input1_tracing_policy =
+        TracingPolicies::from_policy(gen_asset_tracing_policy(&tracer1_keypair.enc_key));
 
-      let input2_tracking_policy =
-        AssetTracingPolicies::from_policy(gen_asset_tracking_policy(&tracer1_keypair.enc_key));
+      let input2_tracing_policy =
+        TracingPolicies::from_policy(gen_asset_tracing_policy(&tracer1_keypair.enc_key));
 
-      let input3_tracking_policy =
-        AssetTracingPolicies::from_policy(gen_asset_tracking_policy(&tracer2_keypair.enc_key));
+      let input3_tracing_policy =
+        TracingPolicies::from_policy(gen_asset_tracing_policy(&tracer2_keypair.enc_key));
 
-      let output1_tracking_policy =
-        AssetTracingPolicies::from_policy(gen_asset_tracking_policy(&tracer2_keypair.enc_key));
+      let output1_tracing_policy =
+        TracingPolicies::from_policy(gen_asset_tracing_policy(&tracer2_keypair.enc_key));
 
-      let output2_tracking_policy =
-        AssetTracingPolicies::from_policy(gen_asset_tracking_policy(&tracer2_keypair.enc_key));
+      let output2_tracing_policy =
+        TracingPolicies::from_policy(gen_asset_tracing_policy(&tracer2_keypair.enc_key));
 
-      let output3_tracking_policy =
-        AssetTracingPolicies::from_policy(gen_asset_tracking_policy(&tracer1_keypair.enc_key));
+      let output3_tracing_policy =
+        TracingPolicies::from_policy(gen_asset_tracing_policy(&tracer1_keypair.enc_key));
 
       let input_templates = [(10u64,
                               AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &input1_tracking_policy,
+                              &input1_tracing_policy,
                               &tracer1_keypair,
                               BITCOIN_ASSET),
                              (10u64,
                               AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                              &input2_tracking_policy,
+                              &input2_tracing_policy,
                               &tracer1_keypair,
                               BITCOIN_ASSET),
                              (20u64,
                               AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
-                              &input3_tracking_policy,
+                              &input3_tracing_policy,
                               &tracer2_keypair,
                               GOLD_ASSET),
                              (10u64,
                               AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-                              &AssetTracingPolicies::new(), // no policy
+                              &TracingPolicies::new(), // no policy
                               &tracer1_keypair,
                               BITCOIN_ASSET)];
 
       let output_templates = [(10u64,
                                AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                               &output1_tracking_policy,
+                               &output1_tracing_policy,
                                &tracer2_keypair,
                                GOLD_ASSET),
                               (10u64,
                                AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-                               &output2_tracking_policy,
+                               &output2_tracing_policy,
                                &tracer2_keypair,
                                GOLD_ASSET),
                               (20u64,
                                AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
-                               &output3_tracking_policy,
+                               &output3_tracing_policy,
                                &tracer1_keypair,
                                BITCOIN_ASSET),
                               (5u64,
                                AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-                               &AssetTracingPolicies::new(), // no policy
+                               &TracingPolicies::new(), // no policy
                                &tracer1_keypair,
                                BITCOIN_ASSET),
                               (5u64,
                                AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-                               &AssetTracingPolicies::new(), // no policy
+                               &TracingPolicies::new(), // no policy
                                &tracer1_keypair,
                                BITCOIN_ASSET)];
 
@@ -1291,13 +1284,13 @@ pub(crate) mod tests {
       let inputs =
         input_templates.iter()
                        .zip(in_keys.iter())
-                       .map(|((amount, asset_record_type, tracking_policies, _, asset_type),
+                       .map(|((amount, asset_record_type, tracing_policies, _, asset_type),
                               key_pair)| {
-                              AssetRecordTemplate::with_asset_tracking(*amount,
-                                                                       *asset_type,
-                                                                       *asset_record_type,
-                                                                       key_pair.pub_key,
-                                                                       (*tracking_policies).clone())
+                              AssetRecordTemplate::with_asset_tracing(*amount,
+                                                                      *asset_type,
+                                                                      *asset_record_type,
+                                                                      key_pair.pub_key,
+                                                                      (*tracing_policies).clone())
                             })
                        .collect_vec();
 
@@ -1305,13 +1298,13 @@ pub(crate) mod tests {
       let outputs =
         output_templates.iter()
                         .zip(out_keys.iter())
-                        .map(|((amount, asset_record_type, tracking_policies, _, asset_type),
+                        .map(|((amount, asset_record_type, tracing_policies, _, asset_type),
                                key_pair)| {
-                               AssetRecordTemplate::with_asset_tracking(*amount,
-                                                                        *asset_type,
-                                                                        *asset_record_type,
-                                                                        key_pair.pub_key,
-                                                                        (*tracking_policies).clone())
+                               AssetRecordTemplate::with_asset_tracing(*amount,
+                                                                       *asset_type,
+                                                                       *asset_record_type,
+                                                                       key_pair.pub_key,
+                                                                       (*tracing_policies).clone())
                              })
                         .collect_vec();
 
@@ -1328,10 +1321,10 @@ pub(crate) mod tests {
       let xfr_body = &xfr_note.body;
 
       let input_policies = input_templates.iter()
-                                          .map(|(_, _, tracking_policy, _, _)| *tracking_policy)
+                                          .map(|(_, _, tracing_policy, _, _)| *tracing_policy)
                                           .collect_vec();
       let output_policies = output_templates.iter()
-                                            .map(|(_, _, tracking_policy, _, _)| *tracking_policy)
+                                            .map(|(_, _, tracing_policy, _, _)| *tracing_policy)
                                             .collect_vec();
 
       let input_sig_commitment = vec![None; inputs.len()];
@@ -1354,16 +1347,16 @@ pub(crate) mod tests {
       assert_eq!(records_data.len(), 3);
       assert_eq!(records_data[0].0, 10); // first input amount
       assert_eq!(records_data[0].1, BITCOIN_ASSET); // first input asset type
-      assert_eq!(records_data[0].2, ids); // first input no id tracking
-      assert_eq!(records_data[0].3, in_keys[0].pub_key); // first input no id tracking
+      assert_eq!(records_data[0].2, ids); // first input no id tracing
+      assert_eq!(records_data[0].3, in_keys[0].pub_key); // first input no id tracing
       assert_eq!(records_data[1].0, 10); // second input amount
       assert_eq!(records_data[1].1, BITCOIN_ASSET); // second input asset_type
-      assert_eq!(records_data[1].2, ids); // second input no ide tracking
-      assert_eq!(records_data[1].3, in_keys[1].pub_key); // second input no id tracking
+      assert_eq!(records_data[1].2, ids); // second input no ide tracing
+      assert_eq!(records_data[1].3, in_keys[1].pub_key); // second input no id tracing
       assert_eq!(records_data[2].0, 20); // third output amount
       assert_eq!(records_data[2].1, BITCOIN_ASSET); // third output asset type
-      assert_eq!(records_data[2].2, ids); // third output no id tracking
-      assert_eq!(records_data[2].3, out_keys[2].pub_key); // third output no id tracking
+      assert_eq!(records_data[2].2, ids); // third output no id tracing
+      assert_eq!(records_data[2].3, out_keys[2].pub_key); // third output no id tracing
 
       let records_data_brute_force =
         trace_assets_brute_force(&xfr_note.body, &tracer2_keypair, &candidate_assets).unwrap();
@@ -1373,16 +1366,16 @@ pub(crate) mod tests {
       assert_eq!(records_data.len(), 3);
       assert_eq!(records_data[0].0, 20); // third input amount
       assert_eq!(records_data[0].1, GOLD_ASSET); // third input asset type
-      assert_eq!(records_data[0].2, ids); // third input no id tracking
-      assert_eq!(records_data[0].3, in_keys[2].pub_key); // third input no id tracking
+      assert_eq!(records_data[0].2, ids); // third input no id tracing
+      assert_eq!(records_data[0].3, in_keys[2].pub_key); // third input no id tracing
       assert_eq!(records_data[1].0, 10); // second input amount
       assert_eq!(records_data[1].1, GOLD_ASSET); // second input asset_type
-      assert_eq!(records_data[1].2, ids); // second input no ide tracking
-      assert_eq!(records_data[1].3, out_keys[0].pub_key); // second input no id tracking
+      assert_eq!(records_data[1].2, ids); // second input no ide tracing
+      assert_eq!(records_data[1].3, out_keys[0].pub_key); // second input no id tracing
       assert_eq!(records_data[2].0, 10); // third output amount
       assert_eq!(records_data[2].1, GOLD_ASSET); // third output asset type
-      assert_eq!(records_data[2].2, ids); // third output no id tracking
-      assert_eq!(records_data[2].3, out_keys[1].pub_key); // third output no id tracking
+      assert_eq!(records_data[2].2, ids); // third output no id tracing
+      assert_eq!(records_data[2].3, out_keys[1].pub_key); // third output no id tracing
     }
 
     fn do_integer_overflow(asset_record_type: AssetRecordType) {
@@ -1401,19 +1394,19 @@ pub(crate) mod tests {
       let output_amount_1 = 5_u64;
       let output_amount_2 = 5_u64;
 
-      let inputs = vec![AssetRecordTemplate::with_no_asset_tracking(input_amount,
+      let inputs = vec![AssetRecordTemplate::with_no_asset_tracing(input_amount,
+                                                                   asset_type,
+                                                                   asset_record_type,
+                                                                   inkeys[0].pub_key),];
+
+      let outputs = vec![AssetRecordTemplate::with_no_asset_tracing(output_amount_1,
                                                                     asset_type,
                                                                     asset_record_type,
-                                                                    inkeys[0].pub_key),];
-
-      let outputs = vec![AssetRecordTemplate::with_no_asset_tracking(output_amount_1,
-                                                                     asset_type,
-                                                                     asset_record_type,
-                                                                     outkeys[0].pub_key),
-                         AssetRecordTemplate::with_no_asset_tracking(output_amount_2,
-                                                                     asset_type,
-                                                                     asset_record_type,
-                                                                     outkeys[1].pub_key)];
+                                                                    outkeys[0].pub_key),
+                         AssetRecordTemplate::with_no_asset_tracing(output_amount_2,
+                                                                    asset_type,
+                                                                    asset_record_type,
+                                                                    outkeys[1].pub_key)];
 
       let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
       let policies_ref = policies.to_ref();

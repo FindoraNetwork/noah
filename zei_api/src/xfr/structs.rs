@@ -95,7 +95,7 @@ pub struct XfrBody {
   pub inputs: Vec<BlindAssetRecord>,
   pub outputs: Vec<BlindAssetRecord>,
   pub proofs: XfrProofs,
-  pub asset_tracing_memos: Vec<Vec<AssetTracerMemo>>, // each input or output can have a set of tracing memos
+  pub asset_tracing_memos: Vec<Vec<TracerMemo>>, // each input or output can have a set of tracing memos
   pub owners_memos: Vec<Option<OwnerMemo>>, // If confidential amount or asset type, lock the amount and/or asset type to the public key in asset_record
 }
 
@@ -110,8 +110,8 @@ pub struct BlindAssetRecord {
 
 impl BlindAssetRecord {
   pub fn get_record_type(&self) -> AssetRecordType {
-    AssetRecordType::from_booleans(matches!(self.amount, XfrAmount::Confidential(_)),
-                                   matches!(self.asset_type, XfrAssetType::Confidential(_)))
+    AssetRecordType::from_flags(matches!(self.amount, XfrAmount::Confidential(_)),
+                                matches!(self.asset_type, XfrAssetType::Confidential(_)))
   }
 
   // TODO: (alex) remove this if the concept of public v.s. hidden asset are no longer in use
@@ -287,24 +287,24 @@ pub struct AssetTracerKeyPair {
   pub dec_key: AssetTracerDecKeys,
 }
 
-/// An asset and identity tracking policies for an asset record
+/// An asset and identity tracing policies for an asset record
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AssetTracingPolicies(pub Vec<AssetTracingPolicy>);
+pub struct TracingPolicies(pub Vec<TracingPolicy>);
 
-impl AssetTracingPolicies {
-  pub fn new() -> AssetTracingPolicies {
-    AssetTracingPolicies(vec![])
+impl TracingPolicies {
+  pub fn new() -> Self {
+    TracingPolicies(vec![])
   }
-  pub fn from_policy(policy: AssetTracingPolicy) -> AssetTracingPolicies {
-    AssetTracingPolicies(vec![policy])
+  pub fn from_policy(policy: TracingPolicy) -> Self {
+    TracingPolicies(vec![policy])
   }
-  pub fn add(&mut self, policy: AssetTracingPolicy) {
+  pub fn add(&mut self, policy: TracingPolicy) {
     self.0.push(policy);
   }
-  pub fn get_policy(&self, index: usize) -> Option<&AssetTracingPolicy> {
+  pub fn get_policy(&self, index: usize) -> Option<&TracingPolicy> {
     self.0.get(index)
   }
-  pub fn get_policies(&self) -> &[AssetTracingPolicy] {
+  pub fn get_policies(&self) -> &[TracingPolicy] {
     self.0.as_slice()
   }
   pub fn len(&self) -> usize {
@@ -315,12 +315,12 @@ impl AssetTracingPolicies {
   }
 }
 
-/// An asset and identity tracking policy for an asset record
+/// An asset and identity tracing policy for an asset record
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AssetTracingPolicy {
+pub struct TracingPolicy {
   pub enc_keys: AssetTracerEncKeys,
-  pub asset_tracking: bool, // track amount and asset type
-  pub identity_tracking: Option<IdentityRevealPolicy>, // get identity attribute of asset holder
+  pub asset_tracing: bool, // track amount and asset type
+  pub identity_tracing: Option<IdentityRevealPolicy>, // get identity attribute of asset holder
 }
 
 /// An identity reveal policy. It indicates the credential issuer public key
@@ -334,15 +334,16 @@ pub struct IdentityRevealPolicy {
 
 /// Information directed to an asset tracer
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AssetTracerMemo {
-  pub enc_key: AssetTracerEncKeys,
-  // amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
-  pub lock_amount: Option<(RecordDataCiphertext, RecordDataCiphertext)>, //None if amount is not confidential
-  pub lock_asset_type: Option<RecordDataCiphertext>, // None asset_type is not confidential
+pub struct TracerMemo {
+  pub enc_key: AssetTracerEncKeys, // FIXME: (alex) to be removed with authenticated encyrption
+  /// amount is a 64 bit positive integer expressed in base 2^32 in confidential transaction
+  /// None if amount is non-confidential
+  pub lock_amount: Option<(RecordDataCiphertext, RecordDataCiphertext)>,
+  /// None if asset type is non-confidential
+  pub lock_asset_type: Option<RecordDataCiphertext>,
   pub lock_attributes: Vec<AttributeCiphertext>,
-  #[serde(default)]
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub lock_info: Option<ZeiHybridCipher>, // hybrid encryption of amount, asset type and attributes encrypted above
+  /// A hybrid encryption of amount, asset type and attributes encrypted above for faster access
+  pub lock_info: ZeiHybridCipher,
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
@@ -540,20 +541,20 @@ impl OpenAssetRecord {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetRecord {
   pub open_asset_record: OpenAssetRecord,
-  pub tracking_policies: AssetTracingPolicies,
+  pub tracing_policies: TracingPolicies,
   pub identity_proofs: Vec<Option<ACConfidentialRevealProof>>,
-  pub asset_tracers_memos: Vec<AssetTracerMemo>,
+  pub asset_tracers_memos: Vec<TracerMemo>,
   pub owner_memo: Option<OwnerMemo>,
 }
 
-/// An asset record template: amount, asset type, owner public key, type and tracking
+/// An asset record template: amount, asset type, owner public key, type and tracing
 #[derive(Deserialize, Serialize)]
 pub struct AssetRecordTemplate {
   pub amount: u64,
   pub asset_type: AssetType,
   pub public_key: XfrPublicKey, // ownership address
   pub asset_record_type: AssetRecordType,
-  pub asset_tracing_policies: AssetTracingPolicies,
+  pub asset_tracing_policies: TracingPolicies,
 }
 
 // PROOFS STRUCTURES
@@ -570,7 +571,7 @@ pub enum AssetTypeAndAmountProof {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrProofs {
   pub asset_type_and_amount_proof: AssetTypeAndAmountProof,
-  pub asset_tracking_proof: AssetTrackingProofs,
+  pub asset_tracing_proof: AssetTracingProofs,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -581,12 +582,12 @@ pub struct XfrRangeProof {
   pub xfr_diff_commitment_high: CompressedRistretto, //higher 32 bits transfer amount difference commitment
 }
 
-/// Proof of records' data and identity tracking
+/// Proof of records' data and identity tracing
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AssetTrackingProofs {
+pub struct AssetTracingProofs {
   pub asset_type_and_amount_proofs: Vec<PedersenElGamalEqProof>, // One proof for each tracing key
-  pub inputs_identity_proofs: Vec<Vec<Option<ACConfidentialRevealProof>>>, // None if asset policy does not require identity tracking for input. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
-  pub outputs_identity_proofs: Vec<Vec<Option<ACConfidentialRevealProof>>>, // None if asset policy does not require identity tracking for output. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+  pub inputs_identity_proofs: Vec<Vec<Option<ACConfidentialRevealProof>>>, // None if asset policy does not require identity tracing for input. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
+  pub outputs_identity_proofs: Vec<Vec<Option<ACConfidentialRevealProof>>>, // None if asset policy does not require identity tracing for output. Otherwise, value proves that ElGamal ciphertexts encrypts encrypts attributes that satisfy an credential verification
 }
 
 impl PartialEq for XfrRangeProof {

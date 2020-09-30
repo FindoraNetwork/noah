@@ -5,7 +5,7 @@ use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::RecordDataEncKey;
 use crate::xfr::lib::XfrNotePoliciesRef;
 use crate::xfr::structs::{
-  AssetRecord, AssetTracerMemo, AssetTracingPolicies, BlindAssetRecord, OpenAssetRecord, XfrAmount,
+  AssetRecord, BlindAssetRecord, OpenAssetRecord, TracerMemo, TracingPolicies, XfrAmount,
   XfrAssetType, XfrBody, XfrRangeProof,
 };
 use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
@@ -31,36 +31,35 @@ use utils::{min_greater_equal_power_of_two, u64_to_u32_pair};
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
 #[allow(clippy::or_fun_call)]
-pub(crate) fn asset_amount_tracking_proofs<R: CryptoRng + RngCore>(
+pub(crate) fn asset_amount_tracing_proofs<R: CryptoRng + RngCore>(
   prng: &mut R,
   inputs: &[AssetRecord],
   outputs: &[AssetRecord])
   -> Result<Vec<PedersenElGamalEqProof>, ZeiError> {
-  let mut pks_map: LinearMap<RecordDataEncKey, Vec<(&AssetRecord, &AssetTracerMemo)>> =
-    LinearMap::new(); // use linear map because of determinism  (rather than HashMap)
+  let mut pks_map: LinearMap<RecordDataEncKey, Vec<(&AssetRecord, &TracerMemo)>> = LinearMap::new(); // use linear map because of determinism  (rather than HashMap)
 
   // 1. group records by policies with same asset_tracer public keys
-  // discard when there is no policy or policy asset tracking flag is off
+  // discard when there is no policy or policy asset tracing flag is off
   collect_records_and_memos_by_keys(&mut pks_map, inputs, outputs);
 
-  // 2. do asset tracking for each tracer_key
+  // 2. do asset tracing for each tracer_key
   let mut proofs = vec![];
   for (tracer_pub_key, records_memos) in pks_map.iter() {
-    let mut transcript = Transcript::new(b"AssetTrackingProofs");
-    let proof = build_same_key_asset_type_amount_tracking_proof(prng,
-                                                                &mut transcript,
-                                                                &tracer_pub_key,
-                                                                &records_memos)?;
+    let mut transcript = Transcript::new(b"AssetTracingProofs");
+    let proof = build_same_key_asset_type_amount_tracing_proof(prng,
+                                                               &mut transcript,
+                                                               &tracer_pub_key,
+                                                               &records_memos)?;
     proofs.push(proof)
   }
   Ok(proofs)
 }
 
-fn build_same_key_asset_type_amount_tracking_proof<R: CryptoRng + RngCore>(
+fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
   prng: &mut R,
   transcript: &mut Transcript,
   pub_key: &RecordDataEncKey,
-  records_memos: &[(&AssetRecord, &AssetTracerMemo)])
+  records_memos: &[(&AssetRecord, &TracerMemo)])
   -> Result<PedersenElGamalEqProof, ZeiError> {
   let mut m = vec![];
   let mut r = vec![];
@@ -106,16 +105,16 @@ fn build_same_key_asset_type_amount_tracking_proof<R: CryptoRng + RngCore>(
 
 fn collect_records_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey,
                                                         Vec<(&'a AssetRecord,
-                                                             &'a AssetTracerMemo)>>,
+                                                             &'a TracerMemo)>>,
                                          inputs: &'a [AssetRecord],
                                          outputs: &'a [AssetRecord]) {
   for record in inputs.iter().chain(outputs) {
-    for (policy, memo) in record.tracking_policies
+    for (policy, memo) in record.tracing_policies
                                 .get_policies()
                                 .iter()
                                 .zip(record.asset_tracers_memos.iter())
     {
-      if policy.asset_tracking
+      if policy.asset_tracing
          && record.open_asset_record
                   .blind_asset_record
                   .get_record_type()
@@ -131,21 +130,21 @@ fn collect_records_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey,
 }
 
 type BarMemosPoliciesCollectionIterator<'a> =
-  std::iter::Zip<std::iter::Zip<std::slice::Iter<'a, &'a AssetTracingPolicies>,
+  std::iter::Zip<std::iter::Zip<std::slice::Iter<'a, &'a TracingPolicies>,
                                 std::slice::Iter<'a, BlindAssetRecord>>,
-                 std::slice::Iter<'a, std::vec::Vec<AssetTracerMemo>>>;
+                 std::slice::Iter<'a, std::vec::Vec<TracerMemo>>>;
 
 #[derive(Clone)]
 pub struct BarMemosPoliciesCollection<'a> {
   bars: &'a [BlindAssetRecord],
-  memos: &'a [Vec<AssetTracerMemo>],
-  policies: &'a [&'a AssetTracingPolicies],
+  memos: &'a [Vec<TracerMemo>],
+  policies: &'a [&'a TracingPolicies],
 }
 
 impl<'a> BarMemosPoliciesCollection<'a> {
   pub fn new(bars: &'a [BlindAssetRecord],
-             memos: &'a [Vec<AssetTracerMemo>],
-             policies: &'a [&'a AssetTracingPolicies])
+             memos: &'a [Vec<TracerMemo>],
+             policies: &'a [&'a TracingPolicies])
              -> Self {
     BarMemosPoliciesCollection { bars,
                                  memos,
@@ -178,7 +177,7 @@ fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarM
 
     let tracing_policies_i = tracing_policies_i.get_policies();
     for (policy_i_j, memo_i_j) in tracing_policies_i.iter().zip(memos_i.iter()) {
-      if policy_i_j.asset_tracking {
+      if policy_i_j.asset_tracing {
         let key = policy_i_j.enc_keys.record_data_eg_enc_key.clone();
         map.entry(key)
            .or_insert(Default::default())
@@ -189,38 +188,37 @@ fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarM
   Ok(())
 }
 
-pub(crate) fn batch_verify_tracer_tracking_proof<R: CryptoRng + RngCore>(
-  prng: &mut R,
-  pc_gens: &RistrettoPedersenGens,
-  xfr_bodies: &[&XfrBody],
-  instances_policies: &[&XfrNotePoliciesRef])
-  -> Result<(), ZeiError> {
+pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(prng: &mut R,
+                                                                        pc_gens: &RistrettoPedersenGens,
+                                                                        xfr_bodies: &[&XfrBody],
+                                                                        instances_policies: &[&XfrNotePoliciesRef])
+                                                                        -> Result<(), ZeiError> {
   if xfr_bodies.len() != instances_policies.len() {
     return Err(ZeiError::ParameterError);
   }
 
-  // 1. batch asset_type and amount tracking
-  let input_reveal_policies: Result<Vec<&[&AssetTracingPolicies]>, ZeiError> =
+  // 1. batch asset_type and amount tracing
+  let input_reveal_policies: Result<Vec<&[&TracingPolicies]>, ZeiError> =
     instances_policies.iter()
                       .map(|policies| {
                         if policies.valid {
-                          Ok(policies.inputs_tracking_policies.as_slice())
+                          Ok(policies.inputs_tracing_policies.as_slice())
                         } else {
                           Err(ZeiError::ParameterError)
                         }
                       })
                       .collect();
-  let output_reveal_policies: Result<Vec<&[&AssetTracingPolicies]>, ZeiError> =
+  let output_reveal_policies: Result<Vec<&[&TracingPolicies]>, ZeiError> =
     instances_policies.iter()
                       .map(|policies| {
                         if policies.valid {
-                          Ok(policies.outputs_tracking_policies.as_slice())
+                          Ok(policies.outputs_tracing_policies.as_slice())
                         } else {
                           Err(ZeiError::ParameterError)
                         }
                       })
                       .collect();
-  batch_verify_asset_tracking_proofs(
+  batch_verify_asset_tracing_proofs(
     prng,
     pc_gens,
     xfr_bodies,
@@ -230,27 +228,27 @@ pub(crate) fn batch_verify_tracer_tracking_proof<R: CryptoRng + RngCore>(
 
   // Identity proofs can be batched(?)
   for (xfr_body, policies) in xfr_bodies.iter().zip(instances_policies.iter()) {
-    // 2. do identity tracking proof
+    // 2. do identity tracing proof
     let inputs_len = xfr_body.inputs.len();
-    verify_identity_proofs(&policies.inputs_tracking_policies,
+    verify_identity_proofs(&policies.inputs_tracing_policies,
                            &xfr_body.asset_tracing_memos[..inputs_len],
-                           &xfr_body.proofs.asset_tracking_proof.inputs_identity_proofs,
+                           &xfr_body.proofs.asset_tracing_proof.inputs_identity_proofs,
                            &policies.inputs_sig_commitments)?;
-    verify_identity_proofs(&policies.outputs_tracking_policies,
+    verify_identity_proofs(&policies.outputs_tracing_policies,
                            &xfr_body.asset_tracing_memos[inputs_len..],
-                           &xfr_body.proofs.asset_tracking_proof.outputs_identity_proofs,
+                           &xfr_body.proofs.asset_tracing_proof.outputs_identity_proofs,
                            &policies.outputs_sig_commitments)?;
   }
 
   Ok(())
 }
 
-fn batch_verify_asset_tracking_proofs<R: CryptoRng + RngCore>(prng: &mut R,
-                                                              pc_gens: &RistrettoPedersenGens,
-                                                              xfr_bodies: &[&XfrBody],
-                                                              input_reveal_policies: &[&[&AssetTracingPolicies]],
-                                                              output_reveal_policies: &[&[&AssetTracingPolicies]])
-                                                              -> Result<(), ZeiError> {
+fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(prng: &mut R,
+                                                             pc_gens: &RistrettoPedersenGens,
+                                                             xfr_bodies: &[&XfrBody],
+                                                             input_reveal_policies: &[&[&TracingPolicies]],
+                                                             output_reveal_policies: &[&[&TracingPolicies]])
+                                                             -> Result<(), ZeiError> {
   // Idea: collect all instances of perdersen_elgamal_equality proofs and call a single
   // batch verification for all of them.
 
@@ -273,7 +271,7 @@ fn batch_verify_asset_tracking_proofs<R: CryptoRng + RngCore>(prng: &mut R,
     let m = records_map.len();
     if m
        != xfr_body.proofs
-                  .asset_tracking_proof
+                  .asset_tracing_proof
                   .asset_type_and_amount_proofs
                   .len()
     {
@@ -281,7 +279,7 @@ fn batch_verify_asset_tracking_proofs<R: CryptoRng + RngCore>(prng: &mut R,
     }
     all_records_map.push(records_map);
     all_proofs.push(&xfr_body.proofs
-                             .asset_tracking_proof
+                             .asset_tracing_proof
                              .asset_type_and_amount_proofs);
   }
 
@@ -295,23 +293,23 @@ fn batch_verify_asset_tracking_proofs<R: CryptoRng + RngCore>(prng: &mut R,
       instances.push(peg_eq_instance);
     }
   }
-  let mut transcript = Transcript::new(b"AssetTrackingProofs");
+  let mut transcript = Transcript::new(b"AssetTracingProofs");
   pedersen_elgamal_batch_aggregate_eq_verify(&mut transcript, prng, pc_gens, &instances)
 }
 
 #[derive(Default)]
-struct BarMemoVec<'a>(Vec<(&'a BlindAssetRecord, &'a AssetTracerMemo)>);
+struct BarMemoVec<'a>(Vec<(&'a BlindAssetRecord, &'a TracerMemo)>);
 
 impl<'a> BarMemoVec<'a> {
-  fn push(&mut self, record: &'a BlindAssetRecord, memo: &'a AssetTracerMemo) {
+  fn push(&mut self, record: &'a BlindAssetRecord, memo: &'a TracerMemo) {
     self.0.push((record, memo))
   }
 }
 
 fn collect_records_memos_by_key<'a>(
   xfr_body: &'a XfrBody,
-  input_reveal_policies: &'a [&AssetTracingPolicies],
-  output_reveal_policies: &'a [&AssetTracingPolicies])
+  input_reveal_policies: &'a [&TracingPolicies],
+  output_reveal_policies: &'a [&TracingPolicies])
   -> Result<LinearMap<RecordDataEncKey, BarMemoVec<'a>>, ZeiError> {
   let mut map: LinearMap<RecordDataEncKey, BarMemoVec<'a>> = LinearMap::new();
   let inputs_len = xfr_body.inputs.len();
@@ -333,8 +331,8 @@ fn collect_records_memos_by_key<'a>(
   Ok(map)
 }
 
-fn verify_identity_proofs(reveal_policies: &[&AssetTracingPolicies],
-                          memos: &[Vec<AssetTracerMemo>],
+fn verify_identity_proofs(reveal_policies: &[&TracingPolicies],
+                          memos: &[Vec<TracerMemo>],
                           proofs: &[Vec<Option<ACConfidentialRevealProof>>],
                           sig_commitments: &[Option<&ACCommitment>])
                           -> Result<(), ZeiError> {
@@ -367,7 +365,7 @@ fn verify_identity_proofs(reveal_policies: &[&AssetTracingPolicies],
     let policies = policies.get_policies();
     for (policy, (memo, proof)) in policies.iter().zip(memos.iter().zip(proofs)) {
       let enc_keys = &policy.enc_keys.attrs_enc_eg_key;
-      match (&policy.identity_tracking, proof) {
+      match (&policy.identity_tracing, proof) {
         (Some(policy), Some(proof)) => {
           let sig_com = sig_commitment.ok_or(ZeiError::XfrVerifyAssetTracingIdentityError)?;
           ac_confidential_verify(&policy.cred_issuer_pub_key,
@@ -389,7 +387,7 @@ fn verify_identity_proofs(reveal_policies: &[&AssetTracingPolicies],
 }
 
 fn extract_ciphertext_and_commitments(
-  records_and_memos: &[(&BlindAssetRecord, &AssetTracerMemo)])
+  records_and_memos: &[(&BlindAssetRecord, &TracerMemo)])
   -> Result<(Vec<ElGamalCiphertext<RistrettoPoint>>, Vec<RistrettoPoint>), ZeiError> {
   let mut ctexts = vec![];
   let mut coms = vec![];
@@ -667,7 +665,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut
 mod tests {
   use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::proofs::verify_identity_proofs;
-  use crate::xfr::structs::{AssetTracerMemo, AssetTracingPolicies, AssetTracingPolicy};
+  use crate::xfr::structs::{TracerMemo, TracingPolicies, TracingPolicy};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use utils::errors::ZeiError;
@@ -704,13 +702,13 @@ mod tests {
     assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
 
     // 2. if policy, then there must be memos and proofs
-    let policy = AssetTracingPolicy{
+    let policy = TracingPolicy{
       enc_keys: gen_asset_tracer_keypair(&mut prng).enc_key,
-      asset_tracking: true, // do asset tracing
-      identity_tracking: None // do not trace identity
+      asset_tracing: true, // do asset tracing
+      identity_tracing: None // do not trace identity
     };
 
-    let asset_tracing_policies = AssetTracingPolicies(vec![policy]);
+    let asset_tracing_policies = TracingPolicies(vec![policy]);
     let reveal_policies = vec![&asset_tracing_policies];
 
     let res = verify_identity_proofs(reveal_policies.as_slice(),
@@ -722,7 +720,7 @@ mod tests {
 
     // fake memo
     let tracer_key = gen_asset_tracer_keypair(&mut prng).enc_key;
-    let memos = vec![vec![AssetTracerMemo::new(&mut prng, &tracer_key, None, None, vec![], false)]];
+    let memos = vec![vec![TracerMemo::new(&mut prng, &tracer_key, None, None, vec![])]];
     let reveal_policies = vec![&asset_tracing_policies];
 
     let res = verify_identity_proofs(reveal_policies.as_slice(),

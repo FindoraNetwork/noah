@@ -7,7 +7,7 @@ pub(crate) mod xfr_note_complex_variable_size {
   use rand_chacha::ChaChaRng;
   use zei::setup::PublicParams;
   use zei::xfr::lib::{gen_xfr_body, verify_xfr_body, XfrNotePoliciesRef};
-  use zei::xfr::structs::AssetTracingPolicies;
+  use zei::xfr::structs::TracingPolicies;
   use zei::xfr::test_utils::{
     prepare_inputs_and_outputs_with_policies_single_asset, setup_with_policies,
   };
@@ -34,8 +34,8 @@ pub(crate) mod xfr_note_complex_variable_size {
                                 ar_ins.as_slice(),
                                 output_asset_records.as_slice()).unwrap();
 
-    let no_policies = AssetTracingPolicies::new();
-    let policies = AssetTracingPolicies::from_policy(asset_tracing_policy_asset_input);
+    let no_policies = TracingPolicies::new();
+    let policies = TracingPolicies::from_policy(asset_tracing_policy_asset_input);
 
     let policies = XfrNotePoliciesRef::new(vec![&policies; n],
                                            ac_commitments.iter().map(Some).collect_vec(),

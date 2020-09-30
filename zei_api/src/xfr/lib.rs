@@ -4,8 +4,8 @@ use crate::xfr::asset_mixer::{
   batch_verify_asset_mixing, prove_asset_mixing, AssetMixProof, AssetMixingInstance,
 };
 use crate::xfr::proofs::{
-  asset_amount_tracking_proofs, asset_proof, batch_verify_confidential_amount,
-  batch_verify_confidential_asset, batch_verify_tracer_tracking_proof, range_proof,
+  asset_amount_tracing_proofs, asset_proof, batch_verify_confidential_amount,
+  batch_verify_confidential_asset, batch_verify_tracer_tracing_proof, range_proof,
 };
 use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use crate::xfr::structs::*;
@@ -130,12 +130,12 @@ impl XfrType {
 ///
 /// for x in inputs_amounts.iter() {
 ///   let keypair = XfrKeyPair::generate(&mut prng);
-///   let asset_record = AssetRecordTemplate::with_no_asset_tracking( x.0,
+///   let asset_record = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
 ///                                        keypair.pub_key.clone());
 ///
-///   inputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &asset_record).unwrap());
+///   inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &asset_record).unwrap());
 ///
 ///   in_asset_records.push(asset_record);
 ///   inkeys.push(keypair);
@@ -144,8 +144,8 @@ impl XfrType {
 /// for x in outputs_amounts.iter() {
 ///     let keypair = XfrKeyPair::generate(&mut prng);
 ///
-///     let ar = AssetRecordTemplate::with_no_asset_tracking(x.0, x.1, asset_record_type, keypair.pub_key.clone());
-///     let output = AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap();
+///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.pub_key.clone());
+///     let output = AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap();
 ///     outputs.push(output);
 /// }
 ///
@@ -209,19 +209,19 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(prng: &mut R,
 ///
 /// for x in inputs_amounts.iter() {
 ///   let keypair = XfrKeyPair::generate(&mut prng);
-///   let ar = AssetRecordTemplate::with_no_asset_tracking( x.0,
+///   let ar = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
 ///                                        keypair.pub_key.clone(),
 ///                                        );
 ///
-///   inputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap());
+///   inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
 /// }
 /// for x in outputs_amounts.iter() {
 ///     let keypair = XfrKeyPair::generate(&mut prng);
 ///
-///     let ar = AssetRecordTemplate::with_no_asset_tracking(x.0, x.1, asset_record_type, keypair.pub_key);
-///     outputs.push(AssetRecord::from_template_no_identity_tracking(&mut prng, &ar).unwrap());
+///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.pub_key);
+///     outputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();
 /// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
@@ -256,21 +256,21 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(prng: &mut R,
     gen_xfr_proofs_multi_asset(open_inputs.as_slice(), open_outputs.as_slice(), xfr_type)?
   };
 
-  //do tracking proofs
+  //do tracing proofs
   // TODO avoid clones below
-  let asset_type_amount_tracking_proof = asset_amount_tracking_proofs(prng, inputs, outputs)?;
-  let asset_tracking_proof =
-    AssetTrackingProofs { asset_type_and_amount_proofs: asset_type_amount_tracking_proof,
-                          inputs_identity_proofs: inputs.iter()
-                                                        .map(|input| input.identity_proofs.clone())
-                                                        .collect_vec(),
-                          outputs_identity_proofs:
-                            outputs.iter()
-                                   .map(|output| output.identity_proofs.clone())
-                                   .collect_vec() };
+  let asset_type_amount_tracing_proof = asset_amount_tracing_proofs(prng, inputs, outputs)?;
+  let asset_tracing_proof =
+    AssetTracingProofs { asset_type_and_amount_proofs: asset_type_amount_tracing_proof,
+                         inputs_identity_proofs: inputs.iter()
+                                                       .map(|input| input.identity_proofs.clone())
+                                                       .collect_vec(),
+                         outputs_identity_proofs:
+                           outputs.iter()
+                                  .map(|output| output.identity_proofs.clone())
+                                  .collect_vec() };
 
   let proofs = XfrProofs { asset_type_and_amount_proof: asset_amount_proof,
-                           asset_tracking_proof };
+                           asset_tracing_proof };
 
   let mut xfr_inputs = vec![];
   for x in open_inputs {
@@ -522,22 +522,22 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
 #[derive(Clone, Default)]
 pub struct XfrNotePoliciesRef<'b> {
   pub(crate) valid: bool,
-  pub(crate) inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+  pub(crate) inputs_tracing_policies: Vec<&'b TracingPolicies>,
   pub(crate) inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
-  pub(crate) outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+  pub(crate) outputs_tracing_policies: Vec<&'b TracingPolicies>,
   pub(crate) outputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
 }
 
 impl<'b> XfrNotePoliciesRef<'b> {
-  pub fn new(inputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+  pub fn new(inputs_tracing_policies: Vec<&'b TracingPolicies>,
              inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
-             outputs_tracking_policies: Vec<&'b AssetTracingPolicies>,
+             outputs_tracing_policies: Vec<&'b TracingPolicies>,
              outputs_sig_commitments: Vec<Option<&'b ACCommitment>>)
              -> XfrNotePoliciesRef<'b> {
     XfrNotePoliciesRef { valid: true,
-                         inputs_tracking_policies,
+                         inputs_tracing_policies,
                          inputs_sig_commitments,
-                         outputs_tracking_policies,
+                         outputs_tracing_policies,
                          outputs_sig_commitments }
   }
 }
@@ -553,40 +553,40 @@ pub(crate) fn if_some_closure(x: &Option<ACCommitment>) -> Option<&ACCommitment>
 #[derive(Clone, Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct XfrNotePolicies {
   pub valid: bool, // allows to implement Default, if false (as after Default), then use empty_policies to create a "valid" XfrNotePolicies struct with empty policies
-  pub inputs_tracking_policies: Vec<AssetTracingPolicies>,
+  pub inputs_tracing_policies: Vec<TracingPolicies>,
   pub inputs_sig_commitments: Vec<Option<ACCommitment>>,
-  pub outputs_tracking_policies: Vec<AssetTracingPolicies>,
+  pub outputs_tracing_policies: Vec<TracingPolicies>,
   pub outputs_sig_commitments: Vec<Option<ACCommitment>>,
 }
 
 impl XfrNotePolicies {
-  pub fn new(inputs_tracking_policies: Vec<AssetTracingPolicies>,
+  pub fn new(inputs_tracing_policies: Vec<TracingPolicies>,
              inputs_sig_commitments: Vec<Option<ACCommitment>>,
-             outputs_tracking_policies: Vec<AssetTracingPolicies>,
+             outputs_tracing_policies: Vec<TracingPolicies>,
              outputs_sig_commitments: Vec<Option<ACCommitment>>)
              -> XfrNotePolicies {
     XfrNotePolicies { valid: true,
-                      inputs_tracking_policies,
+                      inputs_tracing_policies,
                       inputs_sig_commitments,
-                      outputs_tracking_policies,
+                      outputs_tracing_policies,
                       outputs_sig_commitments }
   }
   pub fn empty_policies(num_inputs: usize, num_outputs: usize) -> XfrNotePolicies {
     XfrNotePolicies { valid: true,
-                      inputs_tracking_policies: vec![Default::default(); num_inputs],
+                      inputs_tracing_policies: vec![Default::default(); num_inputs],
                       inputs_sig_commitments: vec![None; num_inputs],
-                      outputs_tracking_policies: vec![Default::default(); num_outputs],
+                      outputs_tracing_policies: vec![Default::default(); num_outputs],
                       outputs_sig_commitments: vec![None; num_outputs] }
   }
 
   pub fn to_ref(&self) -> XfrNotePoliciesRef {
     if self.valid {
-      XfrNotePoliciesRef::new(self.inputs_tracking_policies.iter().collect_vec(),
+      XfrNotePoliciesRef::new(self.inputs_tracing_policies.iter().collect_vec(),
                               self.inputs_sig_commitments
                                   .iter()
                                   .map(|x| if_some_closure(x))
                                   .collect_vec(),
-                              self.outputs_tracking_policies.iter().collect_vec(),
+                              self.outputs_tracing_policies.iter().collect_vec(),
                               self.outputs_sig_commitments
                                   .iter()
                                   .map(|x| if_some_closure(x))
@@ -597,7 +597,7 @@ impl XfrNotePolicies {
   }
 }
 
-/// XfrBody verification with tracking policies
+/// XfrBody verification with tracing policies
 /// * `prng` - pseudo-random number generator. Needed for verifying proofs in batch.
 /// * `body` - XfrBody structure to be verified
 /// * `policies` - list of set of policies and associated information corresponding to each xfr_note
@@ -624,7 +624,7 @@ pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(prng: &mut R,
   batch_verify_xfr_body_asset_records(prng, params, bodies)?;
 
   // 2. verify tracing proofs
-  batch_verify_tracer_tracking_proof(prng, &params.pc_gens, bodies, policies)
+  batch_verify_tracer_tracing_proof(prng, &params.pc_gens, bodies, policies)
 }
 
 /// Takes a vector of u64, converts each element to u128 and compute the sum of the new elements.
@@ -782,11 +782,10 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(prng: &mut R,
   batch_verify_asset_mixing(prng, params, &asset_mix_instances)
 }
 
-// ASSET TRACKING
-pub fn find_tracing_memos<'a>(
-  xfr_body: &'a XfrBody,
-  pub_key: &AssetTracerEncKeys)
-  -> Result<Vec<(&'a BlindAssetRecord, &'a AssetTracerMemo)>, ZeiError> {
+// ASSET TRACING
+pub fn find_tracing_memos<'a>(xfr_body: &'a XfrBody,
+                              pub_key: &AssetTracerEncKeys)
+                              -> Result<Vec<(&'a BlindAssetRecord, &'a TracerMemo)>, ZeiError> {
   let mut result = vec![];
   if xfr_body.inputs.len() + xfr_body.outputs.len() != xfr_body.asset_tracing_memos.len() {
     return Err(ZeiError::InconsistentStructureError);
@@ -816,7 +815,7 @@ pub fn trace_assets(xfr_body: &XfrBody,
                     tracer_keypair: &AssetTracerKeyPair)
                     -> Result<Vec<RecordData>, ZeiError> {
   let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
-  extract_tracking_info(bars_memos.as_slice(), &tracer_keypair.dec_key)
+  extract_tracing_info(bars_memos.as_slice(), &tracer_keypair.dec_key)
 }
 
 /// Scan XfrBody transfers involving asset tracing memos intended for `tracer_keypair`.
@@ -830,9 +829,9 @@ pub fn trace_assets_brute_force(xfr_body: &XfrBody,
                                 candidate_asset_types: &[AssetType])
                                 -> Result<Vec<RecordData>, ZeiError> {
   let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
-  extract_tracking_info_brute_force(bars_memos.as_slice(),
-                                    &tracer_keypair.dec_key,
-                                    candidate_asset_types)
+  extract_tracing_info_brute_force(bars_memos.as_slice(),
+                                   &tracer_keypair.dec_key,
+                                   candidate_asset_types)
 }
 
 /// Scan list of (BlindAssetRecord, AssetTracerMemo) retrieved by find_tracing_memos
@@ -842,9 +841,9 @@ pub fn trace_assets_brute_force(xfr_body: &XfrBody,
 /// Returning ZeiError::BogusAssetTracerMemo in case a TracerMemo decrypts inconsistent information, and
 /// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
 /// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
-pub(crate) fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
-                                    dec_key: &AssetTracerDecKeys)
-                                    -> Result<Vec<RecordData>, ZeiError> {
+pub(crate) fn extract_tracing_info(memos: &[(&BlindAssetRecord, &TracerMemo)],
+                                   dec_key: &AssetTracerDecKeys)
+                                   -> Result<Vec<RecordData>, ZeiError> {
   let mut result = vec![];
   for bar_memo in memos {
     let blind_asset_record = bar_memo.0;
@@ -886,11 +885,10 @@ pub(crate) fn extract_tracking_info(memos: &[(&BlindAssetRecord, &AssetTracerMem
 /// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
 /// Return Error in case data cannot be retrieved due to inconsistent structure.
 /// Eg. amount is not in a BlindAssetRecord nor in the corresponding AssetTracerMemo
-pub(crate) fn extract_tracking_info_brute_force(memos: &[(&BlindAssetRecord,
-                                                   &AssetTracerMemo)],
-                                                dec_key: &AssetTracerDecKeys,
-                                                candidate_asset_types: &[AssetType])
-                                                -> Result<Vec<RecordData>, ZeiError> {
+pub(crate) fn extract_tracing_info_brute_force(memos: &[(&BlindAssetRecord, &TracerMemo)],
+                                               dec_key: &AssetTracerDecKeys,
+                                               candidate_asset_types: &[AssetType])
+                                               -> Result<Vec<RecordData>, ZeiError> {
   let mut result = vec![];
   for bar_memo in memos {
     let blind_asset_record = bar_memo.0;

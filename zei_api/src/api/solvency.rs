@@ -385,7 +385,7 @@ mod test {
                                        asset_type: AssetType,
                                        ar_type: AssetRecordType)
                                        -> (BlindAssetRecord, Option<OwnerMemo>) {
-    let ar = AssetRecordTemplate::with_no_asset_tracking(amt, asset_type, ar_type, *pubkey);
+    let ar = AssetRecordTemplate::with_no_asset_tracing(amt, asset_type, ar_type, *pubkey);
     let (bar, _, memo) = build_blind_asset_record(prng, &pc_gens, &ar, vec![]);
     (bar, memo)
   }

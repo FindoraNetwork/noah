@@ -13,10 +13,10 @@ use zei::xfr::lib::{
   XfrNotePolicies, XfrNotePoliciesRef,
 };
 use zei::xfr::sig::XfrKeyPair;
-use zei::xfr::structs::{AssetTracingPolicy, AssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH};
+use zei::xfr::structs::{AssetType, TracingPolicy, XfrBody, XfrNote, ASSET_TYPE_LENGTH};
 
 use zei::xfr::test_utils::{
-  gen_policies_no_id_tracking, gen_policies_with_id_tracking, multiple_key_gen,
+  gen_policies_no_id_tracing, gen_policies_with_id_tracing, multiple_key_gen,
   prepare_inputs_and_outputs_with_policies_multiple_assets,
   prepare_inputs_and_outputs_with_policies_single_asset,
   prepare_inputs_and_outputs_without_policies_single_asset, setup_with_policies,
@@ -71,7 +71,7 @@ fn run_complex_xfr_note_create(sender_key_pairs: &[&XfrKeyPair],
                                user_ac_sks: Vec<ACUserSecretKey>,
                                credentials: Vec<Credential>,
                                ac_commitment_keys: Vec<ACCommitmentKey>,
-                               asset_tracing_policy_asset_input: AssetTracingPolicy,
+                               asset_tracing_policy_asset_input: TracingPolicy,
                                n: usize)
                                -> XfrNote {
   let (ar_ins, output_asset_records) =
@@ -89,12 +89,12 @@ fn run_complex_xfr_note_create(sender_key_pairs: &[&XfrKeyPair],
                sender_key_pairs).unwrap()
 }
 
-fn run_xfr_note_with_identity_tracking_create(sender_key_pairs: &[&XfrKeyPair],
-                                              user_ac_sks: Vec<ACUserSecretKey>,
-                                              credentials: Vec<Credential>,
-                                              ac_commitment_keys: Vec<ACCommitmentKey>,
-                                              n: usize)
-                                              -> XfrNote {
+fn run_xfr_note_with_identity_tracing_create(sender_key_pairs: &[&XfrKeyPair],
+                                             user_ac_sks: Vec<ACUserSecretKey>,
+                                             credentials: Vec<Credential>,
+                                             ac_commitment_keys: Vec<ACCommitmentKey>,
+                                             n: usize)
+                                             -> XfrNote {
   let (ar_ins, output_asset_records) =
     prepare_inputs_and_outputs_with_policies_single_asset(sender_key_pairs,
                                                           user_ac_sks,
@@ -114,7 +114,7 @@ pub fn run_complex_xfr_note_multiple_assets_create(sender_key_pairs: &[&XfrKeyPa
                                                    user_ac_sks: Vec<ACUserSecretKey>,
                                                    credentials: Vec<Credential>,
                                                    ac_commitment_keys: Vec<ACCommitmentKey>,
-                                                   asset_tracing_policy_asset_input: AssetTracingPolicy,
+                                                   asset_tracing_policy_asset_input: TracingPolicy,
                                                    n: usize)
                                                    -> XfrNote {
   let (ar_ins, output_asset_records) =
@@ -166,7 +166,7 @@ fn run_complex_xfr_body_create(sender_key_pairs: &[&XfrKeyPair],
                                user_ac_sks: Vec<ACUserSecretKey>,
                                credentials: Vec<Credential>,
                                ac_commitment_keys: Vec<ACCommitmentKey>,
-                               asset_tracing_policy_asset_input: AssetTracingPolicy,
+                               asset_tracing_policy_asset_input: TracingPolicy,
                                n: usize)
                                -> XfrBody {
   let (ar_ins, output_asset_records) =
@@ -207,9 +207,9 @@ pub fn run_benchmark_create_complex_xfr_note<B: Measurement>(benchmark_group: &m
                  });
 }
 
-pub fn run_benchmark_create_xfr_note_identity_tracking<B: Measurement>(benchmark_group: &mut BenchmarkGroup<B>,
-                                                                       n: usize) {
-  let title = make_title::<B>("XfrNote with identity tracking creation", n);
+pub fn run_benchmark_create_xfr_note_identity_tracing<B: Measurement>(benchmark_group: &mut BenchmarkGroup<B>,
+                                                                      n: usize) {
+  let title = make_title::<B>("XfrNote with identity tracing creation", n);
 
   let (sender_key_pairs, user_ac_sks, credentials, ac_commitment_keys, _, _ac_commitments) =
     setup_with_policies(n);
@@ -217,11 +217,11 @@ pub fn run_benchmark_create_xfr_note_identity_tracking<B: Measurement>(benchmark
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| {
-                      run_xfr_note_with_identity_tracking_create(sender_key_pairs_ref.as_slice(),
-                                                                 user_ac_sks.clone(),
-                                                                 credentials.clone(),
-                                                                 ac_commitment_keys.clone(),
-                                                                 n)
+                      run_xfr_note_with_identity_tracing_create(sender_key_pairs_ref.as_slice(),
+                                                                user_ac_sks.clone(),
+                                                                credentials.clone(),
+                                                                ac_commitment_keys.clone(),
+                                                                n)
                     })
                  });
 }
@@ -271,7 +271,7 @@ pub fn run_benchmark_verify_simple_xfr_note<B: Measurement>(benchmark_group: &mu
 
   let xfr_note = run_simple_xfr_note_create(sender_key_pairs_ref.as_slice(), n);
 
-  let xfr_policies = gen_policies_no_id_tracking(n);
+  let xfr_policies = gen_policies_no_id_tracing(n);
 
   benchmark_group.bench_function(title, move |b| {
                    b.iter(|| run_simple_xfr_note_verify(xfr_note.clone(), xfr_policies.clone()))
@@ -303,7 +303,7 @@ pub fn run_benchmark_verify_batch_xfr<B: Measurement>(benchmark_group: &mut Benc
                                 sender_key_pairs_ref.as_slice());
     xfr_notes.push(xfr_note.unwrap().clone());
 
-    let policies = gen_policies_no_id_tracking(n);
+    let policies = gen_policies_no_id_tracing(n);
     xfr_policies.push(policies);
   }
 
@@ -359,7 +359,7 @@ pub fn run_benchmark_verify_complex_xfr_note<B: Measurement>(benchmark_group: &m
                                              n);
 
   let policies_no_ref =
-    gen_policies_with_id_tracking(ac_commitments.as_slice(), asset_tracing_policy_input, n);
+    gen_policies_with_id_tracing(ac_commitments.as_slice(), asset_tracing_policy_input, n);
   let policies = policies_no_ref.to_ref();
 
   benchmark_group.bench_function(title, move |b| {
@@ -367,9 +367,9 @@ pub fn run_benchmark_verify_complex_xfr_note<B: Measurement>(benchmark_group: &m
                  });
 }
 
-pub fn run_benchmark_verify_xfr_note_identity_tracking<B: Measurement>(benchmark_group: &mut BenchmarkGroup<B>,
-                                                                       n: usize) {
-  let title = make_title::<B>("XfrNote with identity tracking verification", n);
+pub fn run_benchmark_verify_xfr_note_identity_tracing<B: Measurement>(benchmark_group: &mut BenchmarkGroup<B>,
+                                                                      n: usize) {
+  let title = make_title::<B>("XfrNote with identity tracing verification", n);
 
   let (sender_key_pairs,
        user_ac_sks,
@@ -387,7 +387,7 @@ pub fn run_benchmark_verify_xfr_note_identity_tracking<B: Measurement>(benchmark
                                              n);
 
   let policies_no_ref =
-    gen_policies_with_id_tracking(ac_commitments.as_slice(), asset_tracing_policy_input, n);
+    gen_policies_with_id_tracing(ac_commitments.as_slice(), asset_tracing_policy_input, n);
   let policies = policies_no_ref.to_ref();
 
   benchmark_group.bench_function(title, move |b| {
@@ -415,7 +415,7 @@ pub fn run_benchmark_verify_complex_xfr_note_many_assets<B: Measurement>(benchma
                                                              n);
 
   let policies_no_ref =
-    gen_policies_with_id_tracking(ac_commitments.as_slice(), asset_tracing_policy_input, n);
+    gen_policies_with_id_tracing(ac_commitments.as_slice(), asset_tracing_policy_input, n);
   let policies = policies_no_ref.to_ref();
 
   benchmark_group.bench_function(title, move |b| {
@@ -443,7 +443,7 @@ pub fn run_benchmark_verify_complex_xfr_body<B: Measurement>(benchmark_group: &m
                                              n);
 
   let policies_no_ref =
-    gen_policies_with_id_tracking(ac_commitments.as_slice(), asset_tracing_policy_input, n);
+    gen_policies_with_id_tracing(ac_commitments.as_slice(), asset_tracing_policy_input, n);
   let policies = policies_no_ref.to_ref();
 
   benchmark_group.bench_function(title, |b| {
@@ -455,10 +455,10 @@ pub fn run_benchmark_verify_complex_xfr_body<B: Measurement>(benchmark_group: &m
 //// Bench main functions //////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn xfr_note_noidtracking_noassettracking_singleasset<B: Measurement>(c: &mut Criterion<B>) {
+pub fn xfr_note_noidtracing_noassettracing_singleasset<B: Measurement>(c: &mut Criterion<B>) {
   // Configure the benchmark
   let mut benchmark_group =
-    c.benchmark_group(format!("xfr_note_noidtracking_noassettracking_singleasset_{}",
+    c.benchmark_group(format!("xfr_note_noidtracing_noassettracing_singleasset_{}",
                               get_string_measurement_type::<B>()));
   benchmark_group.sample_size(10);
 
@@ -468,9 +468,9 @@ pub fn xfr_note_noidtracking_noassettracking_singleasset<B: Measurement>(c: &mut
   }
 }
 
-pub fn xfr_note_idtracking_assettracking_singleasset<B: Measurement>(c: &mut Criterion<B>) {
+pub fn xfr_note_idtracing_assettracing_singleasset<B: Measurement>(c: &mut Criterion<B>) {
   let mut benchmark_group =
-    c.benchmark_group(format!("xfr_note_idtracking_assettracking_singleasset_{}",
+    c.benchmark_group(format!("xfr_note_idtracing_assettracing_singleasset_{}",
                               get_string_measurement_type::<B>()));
   benchmark_group.sample_size(10);
 
@@ -480,21 +480,21 @@ pub fn xfr_note_idtracking_assettracking_singleasset<B: Measurement>(c: &mut Cri
   }
 }
 
-pub fn xfr_note_idtracking_noassettracking_singleasset<B: Measurement>(c: &mut Criterion<B>) {
+pub fn xfr_note_idtracing_noassettracing_singleasset<B: Measurement>(c: &mut Criterion<B>) {
   let mut benchmark_group =
-    c.benchmark_group(format!("xfr_note_idtracking_noassettracking_singleasset_{}",
+    c.benchmark_group(format!("xfr_note_idtracing_noassettracing_singleasset_{}",
                               get_string_measurement_type::<B>()));
   benchmark_group.sample_size(10);
 
   for xfr_note_size in XFR_NOTE_SIZES.iter() {
-    run_benchmark_create_xfr_note_identity_tracking::<B>(&mut benchmark_group, *xfr_note_size);
-    run_benchmark_verify_xfr_note_identity_tracking::<B>(&mut benchmark_group, *xfr_note_size);
+    run_benchmark_create_xfr_note_identity_tracing::<B>(&mut benchmark_group, *xfr_note_size);
+    run_benchmark_verify_xfr_note_identity_tracing::<B>(&mut benchmark_group, *xfr_note_size);
   }
 }
 
-pub fn xfr_note_idtracking_assettracking_multiasset<B: Measurement>(c: &mut Criterion<B>) {
+pub fn xfr_note_idtracing_assettracing_multiasset<B: Measurement>(c: &mut Criterion<B>) {
   let mut benchmark_group =
-    c.benchmark_group(format!("xfr_note_idtracking_assettracking_multiasset_{}",
+    c.benchmark_group(format!("xfr_note_idtracing_assettracing_multiasset_{}",
                               std::any::type_name::<B>()));
   benchmark_group.sample_size(10);
 
@@ -505,9 +505,9 @@ pub fn xfr_note_idtracking_assettracking_multiasset<B: Measurement>(c: &mut Crit
   }
 }
 
-pub fn xfr_body_idtracking_assettracking_singleasset<B: Measurement>(c: &mut Criterion<B>) {
+pub fn xfr_body_idtracing_assettracing_singleasset<B: Measurement>(c: &mut Criterion<B>) {
   let mut benchmark_group =
-    c.benchmark_group(format!("xfr_body_idtracking_assettracking_singleasset_{}",
+    c.benchmark_group(format!("xfr_body_idtracing_assettracing_singleasset_{}",
                               get_string_measurement_type::<B>()));
   benchmark_group.sample_size(10);
 

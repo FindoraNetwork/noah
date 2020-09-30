@@ -16,8 +16,8 @@ pub(crate) mod examples {
   use zei::xfr::lib::{trace_assets, verify_xfr_note};
   use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
   use zei::xfr::structs::{
-    AssetRecord, AssetRecordTemplate, AssetTracingPolicies, AssetTracingPolicy, AssetType,
-    IdentityRevealPolicy, ASSET_TYPE_LENGTH,
+    AssetRecord, AssetRecordTemplate, AssetType, IdentityRevealPolicy, TracingPolicies,
+    TracingPolicy, ASSET_TYPE_LENGTH,
   };
   use zei::xfr::test_utils::{
     conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
@@ -57,15 +57,15 @@ pub(crate) mod examples {
     let oar = open_blind_asset_record(&bar, &None, &sender_keypair).unwrap();
 
     // 2.2. build AssetRecord from oar
-    let sender_asset_record = AssetRecord::from_open_asset_record_no_asset_tracking(oar);
+    let sender_asset_record = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
     // 3. Prepare output AssetRecord
     // 3.1. build output asset_record template
-    let template = AssetRecordTemplate::with_no_asset_tracking(
+    let template = AssetRecordTemplate::with_no_asset_tracing(
       amount, ASSET1_TYPE, AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType, recv_pub_key.clone());
     // 3.3 build output asset record
     let recv_asset_record =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template).unwrap(); // do not attach identity tracking fields
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap(); // do not attach identity tracking fields
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -108,15 +108,15 @@ pub(crate) mod examples {
     let oar = open_blind_asset_record(&bar, &None, &sender_keypair).unwrap();
 
     // 2.2. build AssetRecord from oar
-    let sender_asset_record = AssetRecord::from_open_asset_record_no_asset_tracking(oar);
+    let sender_asset_record = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
     // 3. Prepare output AssetRecord
     // 3.1. build output asset_record template
-    let template = AssetRecordTemplate::with_no_asset_tracking(
+    let template = AssetRecordTemplate::with_no_asset_tracing(
       amount, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, recv_pub_key.clone());
     // 3.3 build output asset record
     let recv_asset_record =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template).unwrap(); // do not attach identity tracking fields
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap(); // do not attach identity tracking fields
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -142,7 +142,7 @@ pub(crate) mod examples {
   }
 
   #[test]
-  fn xfr_note_confidential_two_inputs_two_outputs_asset_tracking_on_inputs() {
+  fn xfr_note_confidential_two_inputs_two_outputs_asset_tracing_on_inputs() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let mut params = PublicParams::default();
     let amount_in1 = 50u64;
@@ -160,10 +160,10 @@ pub(crate) mod examples {
 
     // setup policy
     let tracer_keys = gen_asset_tracer_keypair(&mut prng);
-    let policy = AssetTracingPolicy{
+    let policy = TracingPolicy{
       enc_keys: tracer_keys.enc_key.clone(),
-      asset_tracking: true, // do asset tracing
-      identity_tracking: None // do not trace identity
+      asset_tracing: true, // do asset tracing
+      identity_tracing: None // do not trace identity
     };
 
     // 1.2. fake input blind_asset_record with associated policy
@@ -177,29 +177,29 @@ pub(crate) mod examples {
     let oar_in1 = open_blind_asset_record(&bar_in1, &Some(memo1), &sender1_keypair).unwrap();
     let oar_in2 = open_blind_asset_record(&bar_in2, &Some(memo2), &sender2_keypair).unwrap();
     // create inputs from open asset record and policies
-    let policies = AssetTracingPolicies::from_policy(policy);
-    let no_policy = AssetTracingPolicies::new();
+    let policies = TracingPolicies::from_policy(policy);
+    let no_policy = TracingPolicies::new();
 
-    let ar_in1 = AssetRecord::from_open_asset_record_with_asset_tracking_but_no_identity(
+    let ar_in1 = AssetRecord::from_open_asset_record_with_asset_tracing_but_no_identity(
       &mut prng,
       oar_in1,
       policies.clone()).unwrap();
-    let ar_in2 = AssetRecord::from_open_asset_record_with_asset_tracking_but_no_identity(
+    let ar_in2 = AssetRecord::from_open_asset_record_with_asset_tracing_but_no_identity(
       &mut prng,
       oar_in2,
       policies.clone()).unwrap();
 
     // 3. Prepare output AssetRecord
     // 3.1. build output asset_record template
-    let template_out1 = AssetRecordTemplate::with_no_asset_tracking(
+    let template_out1 = AssetRecordTemplate::with_no_asset_tracing(
       amount_out1, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_ConfidentialAssetType, recv1_pub_key.clone());
-    let template_out2 = AssetRecordTemplate::with_no_asset_tracking(
+    let template_out2 = AssetRecordTemplate::with_no_asset_tracing(
       amount_out2, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_ConfidentialAssetType, recv2_pub_key.clone());
     // 3.3 build output asset record
     let ar_out1 =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template_out1).unwrap(); // do not attach identity tracking fields
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template_out1).unwrap(); // do not attach identity tracking fields
     let ar_out2 =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template_out2).unwrap(); // do not attach identity tracking fields
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template_out2).unwrap(); // do not attach identity tracking fields
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -274,7 +274,7 @@ pub(crate) mod examples {
   }
 
   #[test]
-  fn xfr_note_confidential_one_input_two_outputs_asset_tracking_on_outputs() {
+  fn xfr_note_confidential_one_input_two_outputs_asset_tracing_on_outputs() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let mut params = PublicParams::default();
     let amount_in1 = 50u64;
@@ -292,15 +292,15 @@ pub(crate) mod examples {
     // 1.3 Instantiate issuer with his public keys
     let asset_tracing_key_pair = gen_asset_tracer_keypair(&mut prng);
 
-    // 1.4 Define issuer tracking policy
-    let asset_tracing_policy = AssetTracingPolicy{
+    // 1.4 Define issuer tracing policy
+    let asset_tracing_policy = TracingPolicy{
       enc_keys: asset_tracing_key_pair.enc_key.clone(), // publicly available
-      asset_tracking: true, // encrypt record info to asset issuer
-      identity_tracking: None, // no identity tracking
+      asset_tracing: true, // encrypt record info to asset issuer
+      identity_tracing: None, // no identity tracking
     };
 
-    let policies = AssetTracingPolicies::from_policy(asset_tracing_policy);
-    let no_policy = AssetTracingPolicies::new();
+    let policies = TracingPolicies::from_policy(asset_tracing_policy);
+    let no_policy = TracingPolicies::new();
 
     // 2. Prepare input AssetRecord
     // 2.1 user opens blind asset record, it is not confidential so no memo was received
@@ -308,17 +308,17 @@ pub(crate) mod examples {
       non_conf_blind_asset_record_from_ledger(&sender1_keypair.pub_key, amount_in1, ASSET1_TYPE);
     let oar = open_blind_asset_record(&bar, &None, &sender1_keypair).unwrap();
     // 2.2. build AssetRecord from oar
-    let input_asset_record = AssetRecord::from_open_asset_record_no_asset_tracking(oar);
+    let input_asset_record = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
     // 3. Prepare output AssetRecord
     // 3.2. build output asset_record template
-    let template1 = AssetRecordTemplate::with_asset_tracking(
+    let template1 = AssetRecordTemplate::with_asset_tracing(
       amount_out1,
       ASSET1_TYPE,
       AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
       recv1_pub_key.clone(),
       policies.clone());
-    let template2 = AssetRecordTemplate::with_asset_tracking(
+    let template2 = AssetRecordTemplate::with_asset_tracing(
       amount_out2,
       ASSET1_TYPE,
       AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
@@ -327,9 +327,9 @@ pub(crate) mod examples {
 
     // 3.3
     let output_asset_record1 =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template1).unwrap();
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template1).unwrap();
     let output_asset_record2 =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template2).unwrap();
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template2).unwrap();
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -405,7 +405,7 @@ pub(crate) mod examples {
 
   #[test]
   #[allow(non_snake_case)]
-  fn xfr_note_confidential_two_inputs_one_output_asset_tracking_and_identity_tracking_on_inputs() {
+  fn xfr_note_confidential_two_inputs_one_output_asset_tracing_and_identity_tracking_on_inputs() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let mut params = PublicParams::default();
     let mut AIR: HashMap<&[u8], _> = HashMap::new();
@@ -432,13 +432,13 @@ pub(crate) mod examples {
       cred_issuer_pub_key: cred_issuer_pk.clone(),
       reveal_map: vec![true, true, false, false], // reveal first two attributes
     };
-    let policy = AssetTracingPolicy{
+    let policy = TracingPolicy{
       enc_keys: tracer_keys.enc_key.clone(),
-      asset_tracking: true, // do asset tracing
-      identity_tracking: Some(id_policy_policy) // do not trace identity
+      asset_tracing: true, // do asset tracing
+      identity_tracing: Some(id_policy_policy) // do not trace identity
     };
-    let policies = AssetTracingPolicies::from_policy(policy);
-    let no_policies = AssetTracingPolicies::new();
+    let policies = TracingPolicies::from_policy(policy);
+    let no_policies = TracingPolicies::new();
     // 2. Credential for input users
     // 2.1 credential issuance:
     let user1_attr = vec![1u32, 2u32, 3u32, 4u32];
@@ -487,28 +487,28 @@ pub(crate) mod examples {
 
     // 3.2. build AssetRecord from oar
     let input_asset_record1 =
-      AssetRecord::from_open_asset_record_with_tracking(&mut prng,
-                                                        oar1,
-                                                        policies.clone(),
-                                                        &user1_ac_sk,
-                                                        &credential_user1,
-                                                        &commitment_key_user1.unwrap()).unwrap();
+      AssetRecord::from_open_asset_record_with_tracing(&mut prng,
+                                                       oar1,
+                                                       policies.clone(),
+                                                       &user1_ac_sk,
+                                                       &credential_user1,
+                                                       &commitment_key_user1.unwrap()).unwrap();
 
     let input_asset_record2 =
-      AssetRecord::from_open_asset_record_with_tracking(&mut prng,
-                                                        oar2,
-                                                        policies.clone(),
-                                                        &user2_ac_sk,
-                                                        &credential_user2,
-                                                        &commitment_key_user2.unwrap()).unwrap();
+      AssetRecord::from_open_asset_record_with_tracing(&mut prng,
+                                                       oar2,
+                                                       policies.clone(),
+                                                       &user2_ac_sk,
+                                                       &credential_user2,
+                                                       &commitment_key_user2.unwrap()).unwrap();
 
     // 3. Prepare output AssetRecord
     // 3.1. build output asset_record template
-    let template = AssetRecordTemplate::with_no_asset_tracking(
+    let template = AssetRecordTemplate::with_no_asset_tracing(
       amount_out1, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, recv1_pub_key.clone());
     // 3.3
     let output_asset_record =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template).unwrap();
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap();
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -575,8 +575,7 @@ pub(crate) mod examples {
 
   #[test]
   #[allow(non_snake_case)]
-  fn xfr_note_confidential_one_input_two_outputs_asset_tracking_and_identity_tracking_on_outputs(
-    ) {
+  fn xfr_note_confidential_one_input_two_outputs_asset_tracing_and_identity_tracking_on_outputs() {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let mut params = PublicParams::default();
     let mut AIR: HashMap<&[u8], _> = HashMap::new();
@@ -605,13 +604,13 @@ pub(crate) mod examples {
       cred_issuer_pub_key: cred_issuer_pk.clone(),
       reveal_map: vec![false, true, true, true], // reveal last three attributes
     };
-    let policy = AssetTracingPolicy{
+    let policy = TracingPolicy{
       enc_keys: tracer_keys.enc_key.clone(),
-      asset_tracking: true, // do asset tracing
-      identity_tracking: Some(id_policy_policy) // do not trace identity
+      asset_tracing: true, // do asset tracing
+      identity_tracing: Some(id_policy_policy) // do not trace identity
     };
-    let policies = AssetTracingPolicies::from_policy(policy);
-    let no_policy = AssetTracingPolicies::new();
+    let policies = TracingPolicies::from_policy(policy);
+    let no_policy = TracingPolicies::new();
     // 2. Credential for input users
     // 2.1 credential issuance:
     let recv1_attr = vec![1u32, 2u32, 3u32, 4u32];
@@ -658,35 +657,35 @@ pub(crate) mod examples {
     let oar1 = open_blind_asset_record(&bar1, &Some(memo1), &sender_user_keypair).unwrap();
 
     // 3.2. build AssetRecord from oar
-    let input_asset_record1 = AssetRecord::from_open_asset_record_no_asset_tracking(oar1);
+    let input_asset_record1 = AssetRecord::from_open_asset_record_no_asset_tracing(oar1);
 
     // 4. Prepare output AssetRecord
     // 3.1. build output asset_record template
-    let template = AssetRecordTemplate::with_asset_tracking(
+    let template = AssetRecordTemplate::with_asset_tracing(
       amount_out1,
       ASSET1_TYPE,
       AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
       recv_user1_pub_key.clone(),
       policies.clone());
     let output_asset_record_1 =
-      AssetRecord::from_template_with_identity_tracking(&mut prng,
-                                                        &template,
-                                                        &recv_user1_ac_sk,
-                                                        &credential_user1,
-                                                        &commitment_key_user1.unwrap()).unwrap();
+      AssetRecord::from_template_with_identity_tracing(&mut prng,
+                                                       &template,
+                                                       &recv_user1_ac_sk,
+                                                       &credential_user1,
+                                                       &commitment_key_user1.unwrap()).unwrap();
 
-    let template = AssetRecordTemplate::with_asset_tracking(
+    let template = AssetRecordTemplate::with_asset_tracing(
       amount_out2,
       ASSET1_TYPE,
       AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
       recv_user2_pub_key.clone(),
       policies.clone());
     let output_asset_record_2 =
-      AssetRecord::from_template_with_identity_tracking(&mut prng,
-                                                        &template,
-                                                        &recv_user2_ac_sk,
-                                                        &credential_user2,
-                                                        &commitment_key_user2.unwrap()).unwrap();
+      AssetRecord::from_template_with_identity_tracing(&mut prng,
+                                                       &template,
+                                                       &recv_user2_ac_sk,
+                                                       &credential_user2,
+                                                       &commitment_key_user2.unwrap()).unwrap();
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -884,27 +883,27 @@ pub(crate) mod examples {
                                  user4_key_pair1.pub_key.as_bytes()).is_ok());
     AIR.insert(user4_key_pair1.pub_key.as_bytes(), commitment_user4_addr1);
 
-    // 1.5 Define asset issuer tracking policies
-    let id_tracking_policy1 = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk.clone(),
-                                                     reveal_map: vec![false, true, false, true] }; // revealing attr2 and attr4
+    // 1.5 Define asset issuer tracing policies
+    let id_tracing_policy1 = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk.clone(),
+                                                    reveal_map: vec![false, true, false, true] }; // revealing attr2 and attr4
 
-    let id_tracking_policy2 = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk.clone(),
-                                                     reveal_map: vec![true, true, false, true] }; // revealing attr1 , attr2 and attr4
+    let id_tracing_policy2 = IdentityRevealPolicy { cred_issuer_pub_key: cred_issuer_pk.clone(),
+                                                    reveal_map: vec![true, true, false, true] }; // revealing attr1 , attr2 and attr4
 
     let asset_tracing_policy_asset1_input =
-      AssetTracingPolicies::from_policy(
-                                        AssetTracingPolicy{ // use in asset 1 when it is an input of a Xfr
+      TracingPolicies::from_policy(
+                                   TracingPolicy{ // use in asset 1 when it is an input of a Xfr
       enc_keys: asset1_tracing_key.enc_key.clone(), // publicly available
-      asset_tracking: true, // encrypt record info to asset issuer
-      identity_tracking: Some(id_tracking_policy1), // no identity tracking
+      asset_tracing: true, // encrypt record info to asset issuer
+      identity_tracing: Some(id_tracing_policy1), // no identity tracking
     },
       );
     let asset_tracing_policy_asset2_output =
-      AssetTracingPolicies::from_policy(
-                                        AssetTracingPolicy{ // use in asset 2 when it is an output of a Xfr
+      TracingPolicies::from_policy(
+                                   TracingPolicy{ // use in asset 2 when it is an output of a Xfr
       enc_keys: asset2_tracing_key.enc_key.clone(), // publicly available
-      asset_tracking: true, // encrypt record info to asset issuer
-      identity_tracking: Some(id_tracking_policy2), // no identity tracking
+      asset_tracing: true, // encrypt record info to asset issuer
+      identity_tracing: Some(id_tracing_policy2), // no identity tracking
     },
       );
 
@@ -924,45 +923,45 @@ pub(crate) mod examples {
     let oar_user1_addr3 =
       open_blind_asset_record(&bar_user1_addr3, &Some(memo3), &user1_key_pair3).unwrap();
     // 2.3 prepare inputs
-    let ar_in1 = AssetRecord::from_open_asset_record_with_tracking(&mut prng,
+    let ar_in1 = AssetRecord::from_open_asset_record_with_tracing(&mut prng,
                                                                             oar_user1_addr1,
                                                                             asset_tracing_policy_asset1_input.clone(),
                                                                             &user1_ac_sk,
                                                                             &credential_user1,
                                                                    &commitment_user1_addr1_key.unwrap()).unwrap();
-    let ar_in2 = AssetRecord::from_open_asset_record_no_asset_tracking(oar_user1_addr2);
-    let ar_in3 = AssetRecord::from_open_asset_record_no_asset_tracking(oar_user1_addr3);
+    let ar_in2 = AssetRecord::from_open_asset_record_no_asset_tracing(oar_user1_addr2);
+    let ar_in3 = AssetRecord::from_open_asset_record_no_asset_tracing(oar_user1_addr3);
 
     // 3. Prepare outputs
 
-    let template1 = AssetRecordTemplate::with_no_asset_tracking(
+    let template1 = AssetRecordTemplate::with_no_asset_tracing(
       amount_asset1_out1, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user1_key_pair1.pub_key);
 
-    let template2 = AssetRecordTemplate::with_no_asset_tracking(
+    let template2 = AssetRecordTemplate::with_no_asset_tracing(
       amount_asset1_out2, ASSET1_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user2_key_pair1.pub_key);
 
-    let template3 = AssetRecordTemplate::with_asset_tracking(
+    let template3 = AssetRecordTemplate::with_asset_tracing(
       amount_asset2_out3, ASSET2_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user3_key_pair1.pub_key,
       asset_tracing_policy_asset2_output.clone());
 
-    let template4 = AssetRecordTemplate::with_no_asset_tracking(
+    let template4 = AssetRecordTemplate::with_no_asset_tracing(
       amount_asset3_out4, ASSET3_TYPE, AssetRecordType::ConfidentialAmount_NonConfidentialAssetType, user4_key_pair1.pub_key);
 
     let output_asset_record1 =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template1).unwrap();
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template1).unwrap();
 
     let output_asset_record2 =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template2).unwrap();
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template2).unwrap();
 
     let output_asset_record3 =
-      AssetRecord::from_template_with_identity_tracking(&mut prng,
+      AssetRecord::from_template_with_identity_tracing(&mut prng,
                                                         &template3,
                                                         &user3_ac_sk,
                                                         &credential_user3,
                                                         &commitment_user3_addr1_key.unwrap()).unwrap();
 
     let output_asset_record4 =
-      AssetRecord::from_template_no_identity_tracking(&mut prng, &template4).unwrap();
+      AssetRecord::from_template_no_identity_tracing(&mut prng, &template4).unwrap();
 
     // 4. create xfr_note
     let xfr_note = gen_xfr_note(&mut prng,
@@ -974,7 +973,7 @@ pub(crate) mod examples {
                                 &[&user1_key_pair1, &user1_key_pair2, &user1_key_pair3]).unwrap();
 
     // 5. Verify xfr_note
-    let no_policy = AssetTracingPolicies::new();
+    let no_policy = TracingPolicies::new();
     let input1_credential_commitment = &AIR[xfr_note.body.inputs[0].public_key.as_bytes()];
     let input_policies = vec![&asset_tracing_policy_asset1_input, &no_policy, &no_policy];
     let inputs_sig_commitments = vec![Some(input1_credential_commitment), None, None];
