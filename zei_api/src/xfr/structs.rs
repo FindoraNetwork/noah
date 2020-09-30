@@ -264,21 +264,23 @@ impl XfrAssetType {
 /// Public Asset Tracer Encryption keys
 /// Identity attributes are encrypted with keys.attrs_enc_key
 /// Amount and Asset Type encrypted with keys.record_data_enc_key
+/// All three info above are encrypted with keys.lock_info_enc_key
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTracerEncKeys {
-  pub record_data_eg_enc_key: RecordDataEncKey,
-  pub attrs_enc_eg_key: AttributeEncKey,
-  pub zei_cipher_enc_key: XPublicKey,
+  pub record_data_enc_key: RecordDataEncKey,
+  pub attrs_enc_key: AttributeEncKey,
+  pub lock_info_enc_key: XPublicKey,
 }
 
 /// Secret Asset Tracer Decryption keys
 /// Identity attributed are encrypted with keys.attrs_enc_key
 /// Amount and Asset Type encrypted with keys.record_data_enc_key
+/// All three info above are encrypted with keys.lock_info_enc_key
 #[derive(Deserialize, Eq, PartialEq, Serialize)]
 pub struct AssetTracerDecKeys {
-  pub record_data_eg_dec_key: RecordDataDecKey,
+  pub record_data_dec_key: RecordDataDecKey,
   pub attrs_dec_key: AttributeDecKey,
-  pub zei_cipher_dec_key: XSecretKey,
+  pub lock_info_dec_key: XSecretKey,
 }
 
 #[derive(Deserialize, Eq, PartialEq, Serialize)]

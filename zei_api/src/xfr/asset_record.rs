@@ -170,7 +170,7 @@ impl AssetRecord {
                                             credential_sec_key,
                                             credential,
                                             credential_commitment_key,
-                                            &asset_tracing_policy.enc_keys.attrs_enc_eg_key,
+                                            &asset_tracing_policy.enc_keys.attrs_enc_key,
                                             id_policy.reveal_map.as_slice(),
                                             &[])?.get_fields();
           let attrs = credential.get_revealed_attributes(id_policy.reveal_map.as_slice())?;
@@ -223,7 +223,7 @@ impl AssetRecord {
                                               credential_user_sec_key,
                                               credential,
                                               credential_key,
-                                              &policy.enc_keys.attrs_enc_eg_key,
+                                              &policy.enc_keys.attrs_enc_key,
                                               &reveal_policy.reveal_map,
                                               &[])?),
          credential.get_revealed_attributes(reveal_policy.reveal_map.as_slice())?)

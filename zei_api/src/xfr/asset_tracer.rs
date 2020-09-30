@@ -29,16 +29,14 @@ pub fn gen_asset_tracer_keypair<R: CryptoRng + RngCore>(prng: &mut R) -> AssetTr
   let (record_data_dec_key, record_data_enc_key) =
     elgamal_key_gen(prng, &RistrettoPoint::get_base());
   let (attrs_dec_key, attrs_enc_key) = elgamal_key_gen(prng, &BLSG1::get_base());
-  let zei_cipher_dec_key = XSecretKey::new(prng);
-  let zei_cipher_enc_key = XPublicKey::from(&zei_cipher_dec_key);
-  AssetTracerKeyPair { enc_key: AssetTracerEncKeys { record_data_eg_enc_key:
-                                                       record_data_enc_key,
-                                                     attrs_enc_eg_key: attrs_enc_key,
-                                                     zei_cipher_enc_key },
-                       dec_key: AssetTracerDecKeys { record_data_eg_dec_key:
-                                                       record_data_dec_key,
+  let lock_info_dec_key = XSecretKey::new(prng);
+  let lock_info_enc_key = XPublicKey::from(&lock_info_dec_key);
+  AssetTracerKeyPair { enc_key: AssetTracerEncKeys { record_data_enc_key,
+                                                     attrs_enc_key,
+                                                     lock_info_enc_key },
+                       dec_key: AssetTracerDecKeys { record_data_dec_key,
                                                      attrs_dec_key,
-                                                     zei_cipher_dec_key } }
+                                                     lock_info_dec_key } }
 }
 
 impl TracerMemo {
@@ -58,11 +56,11 @@ impl TracerMemo {
                    let ctext_amount_low = elgamal_encrypt(&pc_gens.B,
                                                           &Scalar::from_u32(amount_low),
                                                           blind_low,
-                                                          &tracer_enc_key.record_data_eg_enc_key);
+                                                          &tracer_enc_key.record_data_enc_key);
                    let ctext_amount_high = elgamal_encrypt(&pc_gens.B,
                                                            &Scalar::from_u32(amount_high),
                                                            blind_high,
-                                                           &tracer_enc_key.record_data_eg_enc_key);
+                                                           &tracer_enc_key.record_data_enc_key);
                    (ctext_amount_low, ctext_amount_high)
                  });
 
@@ -71,14 +69,13 @@ impl TracerMemo {
                                            elgamal_encrypt(&pc_gens.B,
                                                            &asset_type.as_scalar(),
                                                            blind,
-                                                           &tracer_enc_key.record_data_eg_enc_key)
+                                                           &tracer_enc_key.record_data_enc_key)
                                          });
 
     for (attr, _) in attributes_ctext.iter() {
       plaintext.extend_from_slice(&attr.to_be_bytes())
     }
-    let ctext =
-      hybrid_encrypt_with_x25519_key(prng, &tracer_enc_key.zei_cipher_enc_key, &plaintext);
+    let ctext = hybrid_encrypt_with_x25519_key(prng, &tracer_enc_key.lock_info_enc_key, &plaintext);
 
     TracerMemo { enc_key: tracer_enc_key.clone(),
                  lock_amount,
@@ -93,7 +90,7 @@ impl TracerMemo {
   /// Returns ZeiError:BogusAssetTracerMemo in case decrypted values are inconsistents
   pub fn decrypt(&self, dec_key: &AssetTracerDecKeys) -> Result<DecryptedAssetMemo, ZeiError> {
     let plaintext =
-      hybrid_decrypt_with_x25519_secret_key(&self.lock_info, &dec_key.zei_cipher_dec_key);
+      hybrid_decrypt_with_x25519_secret_key(&self.lock_info, &dec_key.lock_info_dec_key);
     let mut index = 0;
     let amount = if self.lock_amount.is_some() {
       if plaintext.len() < 2 * U32_BYTES {
@@ -104,7 +101,7 @@ impl TracerMemo {
       let amount_low = u8_be_slice_to_u32(low_bytes);
       let amount_high = u8_be_slice_to_u32(high_bytes);
       let amount = (amount_low as u64) + ((amount_high as u64) << 32);
-      self.verify_amount(&dec_key.record_data_eg_dec_key, amount)
+      self.verify_amount(&dec_key.record_data_dec_key, amount)
           .map_err(|_| ZeiError::BogusAssetTracerMemo)?;
       index = 2 * U32_BYTES;
       Some(amount)
@@ -119,7 +116,7 @@ impl TracerMemo {
       asset_type.copy_from_slice(&plaintext[index..index + ASSET_TYPE_LENGTH]);
       let asset_type = AssetType(asset_type);
 
-      self.extract_asset_type(&dec_key.record_data_eg_dec_key, &[asset_type])
+      self.extract_asset_type(&dec_key.record_data_dec_key, &[asset_type])
           .map_err(|_| ZeiError::BogusAssetTracerMemo)?;
       index += ASSET_TYPE_LENGTH;
       Some(asset_type)
@@ -267,7 +264,7 @@ mod tests {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let tracer_keys = gen_asset_tracer_keypair(&mut prng);
     let memo = TracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, vec![]);
-    assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_eg_dec_key, 10)
+    assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_dec_key, 10)
                 .is_err());
 
     let amount = (1u64 << 40) + 500; // low and high are small u32 numbers
@@ -278,10 +275,10 @@ mod tests {
                       Some((low, high, &Scalar::from_u32(191919u32), &Scalar::from_u32(2222u32))),
                       None,
                       vec![]);
-    assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_eg_dec_key, amount)
+    assert!(memo.verify_amount(&tracer_keys.dec_key.record_data_dec_key, amount)
                 .is_ok());
 
-    assert!(memo.extract_amount_brute_force(&tracer_keys.dec_key.record_data_eg_dec_key)
+    assert!(memo.extract_amount_brute_force(&tracer_keys.dec_key.record_data_dec_key)
                 .is_ok());
   }
 
@@ -290,7 +287,7 @@ mod tests {
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let tracer_keys = gen_asset_tracer_keypair(&mut prng);
     let memo = TracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, vec![]);
-    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key, &[])
+    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[])
                 .is_err());
 
     let asset_type = AssetType::from_identical_byte(2u8);
@@ -300,26 +297,26 @@ mod tests {
                                Some((asset_type, &Scalar::from_u32(191919u32))),
                                vec![]);
 
-    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key, &[]),
+    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[]),
                Err(ZeiError::ParameterError));
-    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
+    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key,
                                        &[AssetType::from_identical_byte(0u8)]),
                Err(ZeiError::AssetTracingExtractionError));
-    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
+    assert_eq!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key,
                                        &[AssetType::from_identical_byte(0u8),
                                          AssetType::from_identical_byte(1u8)]),
                Err(ZeiError::AssetTracingExtractionError));
-    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
+    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key,
                                     &[AssetType::from_identical_byte(0u8),
                                       AssetType::from_identical_byte(1u8),
                                       asset_type])
                 .is_ok());
-    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
+    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key,
                                     &[asset_type,
                                       AssetType::from_identical_byte(0u8),
                                       AssetType::from_identical_byte(1u8)])
                 .is_ok());
-    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_eg_dec_key,
+    assert!(memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key,
                                     &[AssetType::from_identical_byte(0u8),
                                       asset_type,
                                       AssetType::from_identical_byte(1u8)])
@@ -342,7 +339,7 @@ mod tests {
                                    elgamal_encrypt(&base,
                                                    &scalar,
                                                    &BLSScalar::from_u32(1000u32),
-                                                   &tracer_keys.enc_key.attrs_enc_eg_key))
+                                                   &tracer_keys.enc_key.attrs_enc_key))
                                 })
                                 .collect_vec();
 

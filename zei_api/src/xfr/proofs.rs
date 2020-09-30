@@ -120,7 +120,7 @@ fn collect_records_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey,
                   .get_record_type()
             != AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
       {
-        let tracer_pub_key = policy.enc_keys.record_data_eg_enc_key.clone();
+        let tracer_pub_key = policy.enc_keys.record_data_enc_key.clone();
         map.entry(tracer_pub_key)
            .or_insert(vec![])
            .push((record, memo))
@@ -178,7 +178,7 @@ fn collect_bars_and_memos_by_keys<'a>(map: &mut LinearMap<RecordDataEncKey, BarM
     let tracing_policies_i = tracing_policies_i.get_policies();
     for (policy_i_j, memo_i_j) in tracing_policies_i.iter().zip(memos_i.iter()) {
       if policy_i_j.asset_tracing {
-        let key = policy_i_j.enc_keys.record_data_eg_enc_key.clone();
+        let key = policy_i_j.enc_keys.record_data_enc_key.clone();
         map.entry(key)
            .or_insert(Default::default())
            .push(bar_i, memo_i_j); // insert ith record with j-th memo
@@ -364,7 +364,7 @@ fn verify_identity_proofs(reveal_policies: &[&TracingPolicies],
     // for each policy memo and proof
     let policies = policies.get_policies();
     for (policy, (memo, proof)) in policies.iter().zip(memos.iter().zip(proofs)) {
-      let enc_keys = &policy.enc_keys.attrs_enc_eg_key;
+      let enc_keys = &policy.enc_keys.attrs_enc_key;
       match (&policy.identity_tracing, proof) {
         (Some(policy), Some(proof)) => {
           let sig_com = sig_commitment.ok_or(ZeiError::XfrVerifyAssetTracingIdentityError)?;

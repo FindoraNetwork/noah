@@ -897,14 +897,14 @@ pub(crate) fn extract_tracing_info_brute_force(memos: &[(&BlindAssetRecord, &Tra
       None => blind_asset_record.amount
                                 .get_amount()
                                 .ok_or(ZeiError::InconsistentStructureError)?,
-      Some(_) => memo.extract_amount_brute_force(&dec_key.record_data_eg_dec_key)?,
+      Some(_) => memo.extract_amount_brute_force(&dec_key.record_data_dec_key)?,
     };
 
     let asset_type = match memo.lock_asset_type {
       None => blind_asset_record.asset_type
                                 .get_asset_type()
                                 .ok_or(ZeiError::InconsistentStructureError)?,
-      Some(_) => memo.extract_asset_type(&dec_key.record_data_eg_dec_key, candidate_asset_types)?,
+      Some(_) => memo.extract_asset_type(&dec_key.record_data_dec_key, candidate_asset_types)?,
     };
 
     let attributes = memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?;
@@ -934,7 +934,7 @@ pub(crate) fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo
           return Err(ZeiError::AssetTracingExtractionError);
         }
       }
-      Some(_) => memo.verify_amount(&dec_key.record_data_eg_dec_key, expected.0)?,
+      Some(_) => memo.verify_amount(&dec_key.record_data_dec_key, expected.0)?,
     };
 
     match memo.lock_asset_type {
@@ -947,7 +947,7 @@ pub(crate) fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo
         }
       }
       Some(_) => {
-        memo.extract_asset_type(&dec_key.record_data_eg_dec_key, &[expected.1])?;
+        memo.extract_asset_type(&dec_key.record_data_dec_key, &[expected.1])?;
       }
     };
 
