@@ -174,7 +174,7 @@ impl<S: Scalar> RescueInstance<S> {
   }
 
   // helper function: compute r = M*r + c, where M is a square matrix and r and c are vectors. Result is stored in r.
-  fn linear_op(matrix: &[Vec<S>], mul_assign_vector: &mut [S], add_vector: &[S]) {
+  pub fn linear_op(matrix: &[Vec<S>], mul_assign_vector: &mut [S], add_vector: &[S]) {
     let mut aux_vec = add_vector.to_vec();
     // multiply matrix agains mul assign vector, result in aux_vec
     for (m_i, aux_i) in matrix.iter().zip(aux_vec.iter_mut()) {

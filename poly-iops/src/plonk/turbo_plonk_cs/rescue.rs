@@ -14,6 +14,7 @@ const ALPHA_INV: [u8; 32] = [0xCD, 0xCC, 0xCC, 0xCC, 0x32, 0x33, 0x33, 0x33, 0x9
                              0x99, 0x67, 0x0E, 0x7F, 0x21, 0x02, 0xF0, 0x73, 0x9D, 0x69, 0x56,
                              0x4A, 0xE1, 0x1C, 0x32, 0x72, 0xDD, 0xBA, 0x0F, 0x5F, 0x2E];
 
+#[derive(Clone)]
 pub struct StateVar(Vec<VarIndex>); // StateVar.0.len() == WIDTH
 #[derive(Clone)]
 pub struct State(Vec<BLSScalar>); // State.0.len() == WIDTH
@@ -63,7 +64,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
   }
 
   /// Create a rescue input variable and add a zero constraint for the last input elem.
-  pub fn new_rescue_input_variable(&mut self, input_state: State) -> StateVar {
+  pub fn new_hash_input_variable(&mut self, input_state: State) -> StateVar {
     assert_eq!(input_state.0[WIDTH - 1], BLSScalar::zero());
     let input_var = self.new_rescue_state_variable(input_state);
     self.insert_constant_gate(input_var.0[WIDTH - 1], BLSScalar::zero());
@@ -101,6 +102,76 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
       }
     }
     state_var.0[0]
+  }
+
+  /// Rescue block cipher
+  /// * `key_var` - the state variable representing the cipher key.
+  /// * `input_var` - the state variable representing the block cipher input.
+  /// * Returns the state variable representing the block cipher output.
+  pub fn rescue_cipher(&mut self, key_var: &StateVar, input_var: &StateVar) -> StateVar {
+    let cipher = RescueInstance::new();
+    let mds_states: Vec<State> = cipher.MDS.iter().map(|mi| State::from(&mi[..])).collect();
+    let keys_vars = self.key_scheduling(&cipher, &mds_states, key_var);
+    self.rescue_cipher_with_keys(input_var, &keys_vars, &mds_states)
+  }
+
+  /// Returns the output of the rescue block cipher on input variable `input_var`, round keys `keys_vars`,
+  /// and an MDS matrix `mds`.
+  pub fn rescue_cipher_with_keys(&mut self,
+                                 input_var: &StateVar,
+                                 keys_vars: &[StateVar],
+                                 mds: &[State])
+                                 -> StateVar {
+    assert_eq!(keys_vars.len(), 2 * NR + 1);
+    assert_eq!(mds.len(), WIDTH);
+
+    let zero_state = State::new([BLSScalar::zero(); WIDTH]);
+    let mut state_var = self.add_state(input_var, &keys_vars[0]);
+    for (r, key_var) in keys_vars.iter().skip(1).enumerate() {
+      if r % 2 == 0 {
+        state_var = self.pow_5_inv(&state_var);
+        state_var = self.linear_op(&state_var, mds, &zero_state);
+      } else {
+        state_var = self.non_linear_op(&state_var, mds, &zero_state);
+      }
+      state_var = self.add_state(&state_var, key_var);
+    }
+    state_var
+  }
+
+  /// Return the round keys for Rescue block ciphers.
+  /// * `cipher`: The Rescue instance.
+  /// * `mds`: MDS matrix.
+  /// * `key_var`: A state variable representing the input cipher key.
+  pub fn key_scheduling(&mut self,
+                        cipher: &RescueInstance<BLSScalar>,
+                        mds: &[State],
+                        key_var: &StateVar)
+                        -> Vec<StateVar> {
+    let mut key_injection = State::from(&cipher.IC[..]);
+    let mut key_state_var = self.add_constant_state(key_var, &key_injection);
+    let mut result = vec![key_state_var.clone()];
+    for r in 0..2 * cipher.num_rounds() {
+      RescueInstance::linear_op(&cipher.K, &mut key_injection.0, &cipher.C);
+      if r % 2 == 0 {
+        key_state_var = self.pow_5_inv(&key_state_var);
+        key_state_var = self.linear_op(&key_state_var, mds, &key_injection);
+      } else {
+        key_state_var = self.non_linear_op(&key_state_var, mds, &key_injection);
+      }
+      result.push(key_state_var.clone());
+    }
+    result
+  }
+
+  fn add_state(&mut self, left_state_var: &StateVar, right_state_var: &StateVar) -> StateVar {
+    let vars: Vec<VarIndex> =
+      left_state_var.0
+                    .iter()
+                    .zip(right_state_var.0.iter())
+                    .map(|(&left_var, &right_var)| self.add(left_var, right_var))
+                    .collect();
+    StateVar(vars)
   }
 
   fn add_constant_state(&mut self, state_var: &StateVar, constant: &State) -> StateVar {
@@ -254,17 +325,11 @@ mod test {
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{Scalar, Zero};
   use crypto::basics::hash::rescue::RescueInstance;
+  use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
 
   type F = BLSScalar;
 
-  /*
-  /// BLS12-381 scalar size:
-  /// q = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
-  /// TODO: Move MODULUS to a pub(crate) constant.
-  const MODULUS: [u8; 32] = [0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x5b, 0xfe,
-                             0xff, 0x02, 0xa4, 0xbd, 0x53, 0x05, 0xd8, 0xa1, 0x09, 0x08, 0xd8,
-                             0x39, 0x33, 0x48, 0x7d, 0x9d, 0x29, 0x53, 0xa7, 0xed, 0x73];
-   */
   #[test]
   fn test_rescue_hash() {
     let hash = RescueInstance::new();
@@ -275,7 +340,7 @@ mod test {
                      BLSScalar::from_u32(273),
                      BLSScalar::from_u32(0)];
     let input_state = State::from(&input_vec[..]);
-    let input_var = cs.new_rescue_input_variable(input_state.clone());
+    let input_var = cs.new_hash_input_variable(input_state.clone());
     let out_var = cs.rescue_hash(&input_var);
 
     // Check consistency between witness[input_var] and input_state
@@ -296,6 +361,54 @@ mod test {
 
     // Check bad witness: witness[out_var] = zero()
     witness[out_var] = F::zero();
+    assert!(cs.verify_witness(&witness[..], &[]).is_err());
+  }
+
+  #[test]
+  fn test_rescue_cipher() {
+    let cipher = RescueInstance::new();
+    let mut cs = TurboPlonkConstraintSystem::new();
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let key_vec = vec![BLSScalar::random(&mut prng),
+                       BLSScalar::random(&mut prng),
+                       BLSScalar::random(&mut prng),
+                       BLSScalar::random(&mut prng)];
+    let input_vec = vec![BLSScalar::random(&mut prng),
+                         BLSScalar::random(&mut prng),
+                         BLSScalar::random(&mut prng),
+                         BLSScalar::random(&mut prng)];
+    let key_var = cs.new_rescue_state_variable(State::from(&key_vec[..]));
+    let input_var = cs.new_rescue_state_variable(State::from(&input_vec[..]));
+    let out_var = cs.rescue_cipher(&key_var, &input_var);
+
+    // Check consistency between witness[input_var] and input_vec
+    let witness_input: Vec<F> = input_var.0
+                                         .iter()
+                                         .map(|&var| cs.witness[var].clone())
+                                         .collect();
+    assert_eq!(witness_input, input_vec);
+
+    // Check consistency between witness[key_var] and key_vec
+    let witness_key: Vec<F> = key_var.0
+                                     .iter()
+                                     .map(|&var| cs.witness[var].clone())
+                                     .collect();
+    assert_eq!(witness_key, key_vec);
+
+    // Check consistency between witness[out_var] and rescue cipher output
+    let witness_output: Vec<F> = out_var.0
+                                        .iter()
+                                        .map(|&var| cs.witness[var].clone())
+                                        .collect();
+    assert_eq!(witness_output, cipher.rescue(&input_vec, &key_vec));
+
+    // Check good witness
+    let mut witness = cs.get_and_clear_witness();
+    let verify = cs.verify_witness(&witness[..], &[]);
+    assert!(verify.is_ok(), verify.unwrap_err());
+
+    // Check bad witness
+    witness[out_var.0[0]] = F::zero();
     assert!(cs.verify_witness(&witness[..], &[]).is_err());
   }
 }

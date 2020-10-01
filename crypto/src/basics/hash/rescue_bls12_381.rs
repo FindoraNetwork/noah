@@ -151,6 +151,36 @@ mod test {
   const OUT3: &str =
     "11841671251183135941416472468814974558690471402623537939181412432991452533485";
 
+  // A random input
+  const IN_CIPHER_0: &str =
+    "17047322336802935932966007034442804612620899178809238248872011064560235003714";
+  const IN_CIPHER_1: &str =
+    "2045333206533209083668612725439622118360198910432032235844388049409215095381";
+  const IN_CIPHER_2: &str =
+    "1642228842277729705860016938270236538607392160414102928978303153597069223721";
+  const IN_CIPHER_3: &str =
+    "48419811036094400223779862424201122839898117899462236227760442336438612701726";
+
+  // A random cipher key
+  const KEY0: &str =
+    "23251924544707311382291758084128319995502527926309628858518193057549428891074";
+  const KEY1: &str =
+    "36061817328448659066838422656238087102177513559336208519436493169840580462739";
+  const KEY2: &str =
+    "48702917103848154848521702847688693584523900615918095821362126424245826494713";
+  const KEY3: &str =
+    "15698057721419363988770047723026739897170462568163171281853217653643878723977";
+
+  // Cipher output on the random input and the random cipher key
+  const OUT_CIPHER_0: &str =
+    "5371231393178517404840883995935105926463670246247999128171111383365403545937";
+  const OUT_CIPHER_1: &str =
+    "38004649067166652603148575803198850531805576584746170907117206112588747351985";
+  const OUT_CIPHER_2: &str =
+    "41019147083216142191446223204064376892979855390919734149770647006552233340804";
+  const OUT_CIPHER_3: &str =
+    "44516252630166309349262106481347856899153840478794847950915811117572760286157";
+
   #[test]
   fn rescue_hash_consistency() {
     let hash = RescueInstance::<BLSScalar>::new();
@@ -215,5 +245,24 @@ mod test {
     let hash_state2 = hash.rescue_hash(&input_vec);
     assert_eq!(hash_state, expected_output);
     assert_eq!(hash_state2, expected_output);
+  }
+
+  #[test]
+  fn test_rescue_cipher() {
+    let cipher = RescueInstance::new();
+    let input_vec = [BLSScalar::from_str(IN_CIPHER_0).unwrap(),
+                     BLSScalar::from_str(IN_CIPHER_1).unwrap(),
+                     BLSScalar::from_str(IN_CIPHER_2).unwrap(),
+                     BLSScalar::from_str(IN_CIPHER_3).unwrap()];
+    let key_vec = [BLSScalar::from_str(KEY0).unwrap(),
+                   BLSScalar::from_str(KEY1).unwrap(),
+                   BLSScalar::from_str(KEY2).unwrap(),
+                   BLSScalar::from_str(KEY3).unwrap()];
+    let expected_output = vec![BLSScalar::from_str(OUT_CIPHER_0).unwrap(),
+                               BLSScalar::from_str(OUT_CIPHER_1).unwrap(),
+                               BLSScalar::from_str(OUT_CIPHER_2).unwrap(),
+                               BLSScalar::from_str(OUT_CIPHER_3).unwrap(),];
+    let output = cipher.rescue(&input_vec, &key_vec);
+    assert_eq!(output, expected_output);
   }
 }

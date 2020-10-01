@@ -1005,7 +1005,7 @@ mod turbo_plonk_proofs_test {
     let mut cs = TurboPlonkConstraintSystem::<PCS::Field>::new();
     // Prove the knowledge of hash pre-image.
     let input_state = State::new(zero_vec);
-    let input_var = cs.new_rescue_input_variable(input_state);
+    let input_var = cs.new_hash_input_variable(input_state);
     let out_var = cs.rescue_hash(&input_var);
     cs.prepare_io_variable(out_var);
     cs.pad();
