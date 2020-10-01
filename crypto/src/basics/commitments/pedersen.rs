@@ -1,5 +1,5 @@
 use algebra::groups::Group;
-use algebra::jubjub::JubjubGroup;
+use algebra::ristretto::RistrettoPoint;
 use digest::Digest;
 use itertools::Itertools;
 use utils::errors::ZeiError;
@@ -11,6 +11,19 @@ pub struct PedersenGens<G> {
 }
 
 impl<G: Group> PedersenGens<G> {
+  /// create new pedersen bases for vector commitments of size n
+  pub fn new(n: usize) -> PedersenGens<G> {
+    let mut bases = vec![];
+    let mut base = G::get_base();
+    bases.push(base.clone());
+    for _ in 0..n {
+      let mut hash = sha2::Sha512::new();
+      hash.input(base.to_compressed_bytes());
+      base = G::from_hash(hash);
+      bases.push(base.clone());
+    }
+    PedersenGens { bases }
+  }
   /// returns the i-th base
   pub fn get_base(&self, index: usize) -> Option<&G> {
     self.bases.get(index)
@@ -34,18 +47,9 @@ impl<G: Group> PedersenGens<G> {
   }
 }
 
-impl PedersenGens<JubjubGroup> {
-  pub fn new(n: usize) -> PedersenGens<JubjubGroup> {
-    let mut bases = vec![];
-    let mut base = JubjubGroup::get_base();
-    bases.push(base.clone());
-    for _ in 0..n {
-      let mut hash = sha2::Sha512::new();
-      hash.input(base.to_compressed_bytes());
-      let hashed = JubjubGroup::from_hash(hash);
-      base = hashed.mul_by_cofactor();
-      bases.push(base.clone());
-    }
-    PedersenGens { bases }
+impl From<bulletproofs::PedersenGens> for PedersenGens<RistrettoPoint> {
+  fn from(bp_pc_gens: bulletproofs::PedersenGens) -> Self {
+    PedersenGens { bases: vec![RistrettoPoint(bp_pc_gens.B),
+                               RistrettoPoint(bp_pc_gens.B_blinding)] }
   }
 }

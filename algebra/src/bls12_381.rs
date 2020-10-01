@@ -176,7 +176,12 @@ impl ZeiScalar for BLSScalar {
   }
 
   fn from_le_bytes(bytes: &[u8]) -> Result<BLSScalar, AlgebraError> {
-    Self::from_bytes(bytes)
+    if bytes.len() > Self::bytes_len() {
+      return Err(AlgebraError::DeserializationError);
+    }
+    let mut array = vec![0u8; Self::bytes_len()];
+    array[0..bytes.len()].copy_from_slice(bytes);
+    Self::from_bytes(&array)
   }
 }
 

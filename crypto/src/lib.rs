@@ -17,6 +17,7 @@ pub mod dlog;
 pub mod group_signatures;
 pub mod merkle_tree;
 // pub mod inner_product_pairing; // TODO back in when BlsGt is serializable
+pub mod pc_eq_groups;
 pub mod pedersen_elgamal;
 pub mod sigma;
 pub mod solvency;

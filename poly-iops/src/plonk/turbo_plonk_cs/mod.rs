@@ -440,7 +440,7 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
   pub fn is_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
     let diff = self.sub(left_var, right_var);
     // set `inv_diff` = `diff`^{-1} when `diff` != 0, otherwise we can set `inv_diff` to arbirary value since `diff` * `inv_diff` will always be 0 when `diff` == 0
-    let inv_diff_scalar = self.witness[diff].inv().unwrap_or(F::zero());
+    let inv_diff_scalar = self.witness[diff].inv().unwrap_or_else(|_| F::zero());
     let inv_diff = self.new_variable(inv_diff_scalar);
 
     // `diff_is_zero` = 1 - `diff` * `inv_diff`

@@ -132,7 +132,12 @@ impl Scalar for JubjubScalar {
   }
 
   fn from_le_bytes(bytes: &[u8]) -> Result<JubjubScalar, AlgebraError> {
-    Self::from_bytes(bytes)
+    if bytes.len() > Self::bytes_len() {
+      return Err(AlgebraError::DeserializationError);
+    }
+    let mut array = vec![0u8; Self::bytes_len()];
+    array[0..bytes.len()].copy_from_slice(bytes);
+    Self::from_bytes(&array)
   }
 }
 
@@ -172,7 +177,7 @@ impl Group for JubjubGroup {
     where D: Digest<OutputSize = U64> + Default
   {
     let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
-    JubjubGroup(ExtendedPoint::random(&mut prng))
+    JubjubGroup(ExtendedPoint::random(&mut prng).mul_by_cofactor())
   }
 }
 

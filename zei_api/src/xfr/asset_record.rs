@@ -118,7 +118,7 @@ impl AssetRecord {
       identity_proofs.push(None);
     }
     Ok(AssetRecord { open_asset_record: oar,
-                     tracing_policies: asset_tracing_policies.clone(),
+                     tracing_policies: asset_tracing_policies,
                      identity_proofs,
                      asset_tracers_memos: memos,
                      owner_memo: None })
@@ -190,7 +190,7 @@ impl AssetRecord {
       memos.push(asset_tracer_memo);
     }
     Ok(AssetRecord { open_asset_record: oar,
-                     tracing_policies: asset_tracing_policies.clone(),
+                     tracing_policies: asset_tracing_policies,
                      identity_proofs,
                      asset_tracers_memos: memos,
                      owner_memo: None })

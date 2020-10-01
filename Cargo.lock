@@ -409,6 +409,7 @@ dependencies = [
  "itertools 0.8.2",
  "lazy_static",
  "merlin",
+ "num-bigint",
  "rand",
  "rand_chacha",
  "rand_core",
@@ -773,6 +774,7 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
+ "rand",
 ]
 
 [[package]]
