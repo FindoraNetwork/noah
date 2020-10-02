@@ -1,4 +1,4 @@
-use super::rescue::RescueInstance;
+use super::rescue::{RescueCtr, RescueInstance};
 use algebra::bls12_381::BLSScalar;
 use std::str::FromStr;
 
@@ -123,11 +123,24 @@ impl RescueInstance<BLSScalar> {
   }
 }
 
+impl RescueCtr<BLSScalar> {
+  // Create a ctr-mode instance from the secret key `key` and the initial counter `nonce`.
+  pub fn new(key: &[BLSScalar], nonce: BLSScalar) -> Self {
+    let cipher = RescueInstance::new();
+    let round_keys = cipher.key_scheduling(key);
+    Self { round_keys,
+           nonce,
+           cipher }
+  }
+}
+
 #[cfg(test)]
 mod test {
-  use crate::basics::hash::rescue::RescueInstance;
+  use crate::basics::hash::rescue::{RescueCtr, RescueInstance};
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::Scalar;
+  use rand_chacha::ChaChaRng;
+  use rand_core::SeedableRng;
   use std::str::FromStr;
 
   // Hash output on zero inputs
@@ -245,6 +258,39 @@ mod test {
     let hash_state2 = hash.rescue_hash(&input_vec);
     assert_eq!(hash_state, expected_output);
     assert_eq!(hash_state2, expected_output);
+  }
+
+  #[test]
+  fn test_rescue_ctr() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let zero = BLSScalar::from_u32(0);
+    let one = BLSScalar::from_u32(1);
+    let key = [BLSScalar::random(&mut prng),
+               BLSScalar::random(&mut prng),
+               BLSScalar::random(&mut prng),
+               BLSScalar::random(&mut prng)];
+    let mut ctr_mode = RescueCtr::new(&key, zero);
+    let original_data = vec![one; 7];
+    let mut data = original_data.clone();
+    ctr_mode.add_keystream(&mut data);
+    assert_eq!(data.len(), 7);
+    let mut new_data = original_data.clone();
+    ctr_mode.add_keystream(&mut new_data);
+    // The new key stream is different from the previous key stream
+    assert_ne!(data, new_data);
+    // The keystream for each data block is distinct
+    for (i, a) in data.iter().chain(new_data.iter()).enumerate() {
+      for b in data.iter().chain(new_data.iter()).skip(i + 1) {
+        assert_ne!(*a, *b);
+      }
+    }
+
+    let mut ctr_mode = RescueCtr::new(&key, zero);
+    // decryptions are correct
+    ctr_mode.sub_keystream(&mut data);
+    assert_eq!(original_data, data);
+    ctr_mode.sub_keystream(&mut new_data);
+    assert_eq!(original_data, new_data);
   }
 
   #[test]

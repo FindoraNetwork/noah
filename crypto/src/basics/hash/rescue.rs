@@ -193,3 +193,45 @@ impl<S: Scalar> RescueInstance<S> {
     }
   }
 }
+
+/// A counter mode encryption based on Rescue block ciphers.
+/// * `round_keys`: the round keys determined by the input secret key.
+/// * `nonce`: a counter.
+/// * `cipher`: the Rescue block cipher instance.
+pub struct RescueCtr<S> {
+  pub(super) round_keys: Vec<RoundSubKey<S>>,
+  pub(super) nonce: S,
+  pub(super) cipher: RescueInstance<S>,
+}
+
+impl<S: Scalar> RescueCtr<S> {
+  // Add keystream to the data.
+  pub fn add_keystream(&mut self, data: &mut [S]) {
+    self.apply_keystream(data, true);
+  }
+
+  // Subtract keystream to the data.
+  pub fn sub_keystream(&mut self, data: &mut [S]) {
+    self.apply_keystream(data, false);
+  }
+
+  fn apply_keystream(&mut self, data: &mut [S], is_add: bool) {
+    let zero = S::zero();
+    let one = S::one();
+    for block in data.chunks_mut(self.cipher.state_size()) {
+      let mut input_vec = vec![self.nonce];
+      input_vec.extend(vec![zero; self.cipher.state_size() - 1]);
+      let keystream = self.cipher
+                          .rescue_with_round_keys(&input_vec, &self.round_keys);
+      let len = block.len();
+      for (a, b) in block.iter_mut().zip(keystream.iter().take(len)) {
+        if is_add {
+          a.add_assign(b);
+        } else {
+          a.sub_assign(b);
+        }
+      }
+      self.nonce.add_assign(&one);
+    }
+  }
+}
