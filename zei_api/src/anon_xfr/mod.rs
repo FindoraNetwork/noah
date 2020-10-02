@@ -270,6 +270,7 @@ mod tests {
                                                    asset_type,
                                                    public_key: pk_out.clone(),
                                                    encryption_key: enc_key_out };
+
       let (body, _) =
         gen_anon_xfr_body(&mut prng, &user_params, &[open_abar_in], &[out_template]).unwrap();
       (body, merkle_root)

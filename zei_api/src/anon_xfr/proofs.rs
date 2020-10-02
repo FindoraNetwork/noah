@@ -70,7 +70,7 @@ mod tests {
   use rand_core::SeedableRng;
 
   #[test]
-  fn test_anon_multi_xfr_proof() {
+  fn test_anon_multi_xfr_proof_3in_6out_single_asset() {
     // single asset type
     let zero = BLSScalar::zero();
     // (n, m) = (3, 6)
@@ -84,24 +84,47 @@ mod tests {
                        (0, zero),
                        (7, zero)];
     test_anon_xfr_proof(inputs, outputs);
+  }
 
+  #[test]
+  fn test_anon_multi_xfr_proof_3in_3out_single_asset() {
+    let zero = BLSScalar::zero();
     // (n, m) = (3, 3)
     let inputs = vec![(30, zero), (20, zero), (0, zero)];
     let outputs = vec![(5, zero), (17, zero), (28, zero)];
     test_anon_xfr_proof(outputs, inputs);
+  }
 
+  #[test]
+  fn test_anon_multi_xfr_proof_1in_2out_single_asset() {
+    let zero = BLSScalar::zero();
     // (n, m) = (1, 2)
     let inputs = vec![(30, zero)];
     let outputs = vec![(13, zero), (17, zero)];
     test_anon_xfr_proof(inputs.to_vec(), outputs.to_vec());
+  }
+
+  #[test]
+  fn test_anon_multi_xfr_proof_2in_1out_single_asset() {
+    let zero = BLSScalar::zero();
+    let inputs = vec![(30, zero)];
+    let outputs = vec![(13, zero), (17, zero)];
     // (n, m) = (2, 1)
     test_anon_xfr_proof(outputs, inputs);
+  }
 
+  #[test]
+  fn test_anon_multi_xfr_proof_1in_1out_single_asset() {
+    let zero = BLSScalar::zero();
     // (n, m) = (1, 1)
     let inputs = vec![(10, zero)];
     let outputs = vec![(10, zero)];
     test_anon_xfr_proof(outputs, inputs);
+  }
 
+  #[test]
+  fn test_anon_multi_xfr_proof_3in_6out_multi_asset() {
+    let zero = BLSScalar::zero();
     // multiple asset types
     // (n, m) = (3, 6)
     let one = BLSScalar::one();
@@ -115,7 +138,12 @@ mod tests {
                        (20, zero),
                        (40, one)];
     test_anon_xfr_proof(inputs, outputs);
+  }
 
+  #[test]
+  fn test_anon_multi_xfr_proof_3in_3out_multi_asset() {
+    let zero = BLSScalar::zero();
+    let one = BLSScalar::one();
     // (n, m) = (3, 3)
     let inputs = vec![(23, zero), (20, one), (7, zero)];
     let outputs = vec![(5, one), (30, zero), (15, one)];
@@ -125,6 +153,7 @@ mod tests {
   fn test_anon_xfr_proof(inputs: Vec<(u64, BLSScalar)>, outputs: Vec<(u64, BLSScalar)>) {
     let n_payers = inputs.len();
     let n_payees = outputs.len();
+
     // build cs
     let secret_inputs =
       new_multi_xfr_witness_for_test(inputs.to_vec(), outputs.to_vec(), [0u8; 32]);
