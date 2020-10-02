@@ -880,7 +880,7 @@ mod turbo_plonk_proofs_test {
   use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
-  use algebra::jubjub::JubjubGroup;
+  use algebra::jubjub::JubjubPoint;
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
   use rand_core::{CryptoRng, RngCore, SeedableRng};
@@ -986,7 +986,7 @@ mod turbo_plonk_proofs_test {
     let scalar_bytes: [u8; 32] = [47, 113, 87, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
-    let base_ext = JubjubGroup::get_base();
+    let base_ext = JubjubPoint::get_base();
 
     // The circuit: P = [scalar] * G
     let scalar_var = cs.new_variable(scalar);

@@ -1,6 +1,6 @@
 use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
 use crate::groups::{Group, Scalar};
-use crate::jubjub::{JubjubGroup, JubjubScalar};
+use crate::jubjub::{JubjubPoint, JubjubScalar};
 use crate::ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar};
 use serde::Serializer;
 use utils::errors::ZeiError;
@@ -63,13 +63,13 @@ macro_rules! to_from_bytes_group {
 }
 
 to_from_bytes_group!(RistrettoPoint);
-to_from_bytes_group!(JubjubGroup);
+to_from_bytes_group!(JubjubPoint);
 to_from_bytes_group!(BLSG1);
 to_from_bytes_group!(BLSG2);
 to_from_bytes_group!(BLSGt);
 
 serialize_deserialize!(RistrettoPoint);
-serialize_deserialize!(JubjubGroup);
+serialize_deserialize!(JubjubPoint);
 serialize_deserialize!(BLSG1);
 serialize_deserialize!(BLSG2);
 serialize_deserialize!(BLSGt);

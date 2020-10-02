@@ -2,7 +2,7 @@ use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
-use algebra::jubjub::{JubjubGroup, JubjubScalar};
+use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use crypto::basics::commitments::rescue::HashCommitment as CommScheme;
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::prf::PRF;
@@ -97,7 +97,7 @@ impl AMultiXfrPubInputs {
   pub(crate) fn from_witness(witness: &AMultiXfrWitness) -> Self {
     // nullifiers and signature public keys
     let prf = PRF::new();
-    let base = JubjubGroup::get_base();
+    let base = JubjubPoint::get_base();
     let payers_inputs: Vec<(Nullifier, AXfrPubKey)> =
       witness.payers_secrets
              .iter()
@@ -165,7 +165,7 @@ pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonk
   let payers_secrets = add_payers_secrets(&mut cs, &secret_inputs.payers_secrets);
   let payees_secrets = add_payees_secrets(&mut cs, &secret_inputs.payees_secrets);
 
-  let base = JubjubGroup::get_base();
+  let base = JubjubPoint::get_base();
   let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::one());
   let zero = BLSScalar::zero();
   let one = BLSScalar::one();
@@ -561,7 +561,7 @@ pub(crate) mod tests {
     if n_payers > 1 {
       let hash = RescueInstance::new();
       let comm = CommScheme::new();
-      let base = JubjubGroup::get_base();
+      let base = JubjubPoint::get_base();
       let leafs: Vec<BLSScalar> =
         payers_secrets.iter()
                       .map(|payer| {

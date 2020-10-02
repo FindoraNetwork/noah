@@ -282,7 +282,7 @@ mod schnorr_sigs {
       gen_keys, sign, verify, KeyPair, PublicKey, Signature, SCALAR_SIZE,
     };
     use algebra::groups::{Group, GroupArithmetic, One};
-    use algebra::jubjub::JubjubGroup;
+    use algebra::jubjub::JubjubPoint;
     use algebra::ristretto::RistrettoPoint;
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -314,7 +314,7 @@ mod schnorr_sigs {
 
     #[test]
     fn schnorr_sig_over_jubjub() {
-      check_schnorr::<JubjubGroup>();
+      check_schnorr::<JubjubPoint>();
     }
 
     #[test]
@@ -343,7 +343,7 @@ mod schnorr_sigs {
 
     #[test]
     pub fn schnorr_from_to_bytes() {
-      check_from_to_bytes::<JubjubGroup>();
+      check_from_to_bytes::<JubjubPoint>();
     }
 
     #[test]
@@ -360,7 +360,7 @@ mod schnorr_sigs {
     };
     use algebra::groups::{Group, GroupArithmetic, One};
 
-    use algebra::jubjub::JubjubGroup;
+    use algebra::jubjub::JubjubPoint;
     use algebra::ristretto::RistrettoPoint;
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -412,7 +412,7 @@ mod schnorr_sigs {
 
     #[test]
     fn schnorr_multi_sig_over_jubjub() {
-      check_schnorr_multisig::<JubjubGroup>();
+      check_schnorr_multisig::<JubjubPoint>();
     }
 
     #[test]

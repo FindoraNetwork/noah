@@ -220,7 +220,7 @@ mod test {
   use crate::basics::commitments::pedersen::PedersenGens;
   use crate::pc_eq_groups::BigNum;
   use algebra::groups::{Group, GroupArithmetic, Scalar};
-  use algebra::jubjub::{JubjubGroup, JubjubScalar};
+  use algebra::jubjub::{JubjubPoint, JubjubScalar};
   use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
   use merlin::Transcript;
   use rand_chacha::ChaChaRng;
@@ -243,7 +243,7 @@ mod test {
     let value2_g2 = JubjubScalar::from_u64(200);
     let blind3 = JubjubScalar::random(&mut prng);
 
-    let pc_gens_jubjub = PedersenGens::<JubjubGroup>::new(2);
+    let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
     let com_value1_value2 = pc_gens_jubjub.commit(&[value1_g2, value2_g2], &blind3)
                                           .unwrap();
 
@@ -284,7 +284,7 @@ mod test {
 
     let mut proof = proof;
     proof.responses[0] = BigNum(proof.responses[0].0.clone().sub(1u8));
-    proof.com_v1_v2 = proof.com_v1_v2.add(&JubjubGroup::get_base());
+    proof.com_v1_v2 = proof.com_v1_v2.add(&JubjubPoint::get_base());
     let mut verifier_transcript = Transcript::new(b"test");
     assert!(super::verify_pair_to_vector_pc(&mut verifier_transcript,
                                             (&com_value1, &com_value2),

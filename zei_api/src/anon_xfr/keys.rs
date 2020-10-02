@@ -1,10 +1,10 @@
-use algebra::jubjub::{JubjubGroup, JubjubScalar};
+use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use crypto::basics::signatures::schnorr;
 use rand_core::{CryptoRng, RngCore};
 
 /// Public key used to address an Anonymous records and verify transaction spending it
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubGroup>);
+pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
 /// Secret key associated with an Anonymous records. It is used to spending it
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,11 +52,11 @@ impl AXfrPubKey {
     AXfrPubKey(self.0.randomize(factor))
   }
   /// return a reference to the EC group point defining the public key
-  pub fn as_jubjub_point(&self) -> &JubjubGroup {
+  pub fn as_jubjub_point(&self) -> &JubjubPoint {
     self.0.point_ref()
   }
 
-  pub(crate) fn from_jubjub_point(point: JubjubGroup) -> AXfrPubKey {
+  pub(crate) fn from_jubjub_point(point: JubjubPoint) -> AXfrPubKey {
     AXfrPubKey(schnorr::PublicKey::from_point(point))
   }
 }

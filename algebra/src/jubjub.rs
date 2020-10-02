@@ -16,7 +16,7 @@ use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
 #[derive(Clone, PartialEq, Debug)]
-pub struct JubjubGroup(pub(crate) ExtendedPoint);
+pub struct JubjubPoint(pub(crate) ExtendedPoint);
 
 pub const JUBJUB_SCALAR_LEN: usize = 32;
 
@@ -141,23 +141,23 @@ impl Scalar for JubjubScalar {
   }
 }
 
-impl Eq for JubjubGroup {}
+impl Eq for JubjubPoint {}
 
-impl JubjubGroup {
-  pub fn mul_by_cofactor(&self) -> JubjubGroup {
-    JubjubGroup(self.0.mul_by_cofactor())
+impl JubjubPoint {
+  pub fn mul_by_cofactor(&self) -> JubjubPoint {
+    JubjubPoint(self.0.mul_by_cofactor())
   }
 }
 
-impl Group for JubjubGroup {
+impl Group for JubjubPoint {
   const COMPRESSED_LEN: usize = 32;
 
-  fn get_identity() -> JubjubGroup {
-    JubjubGroup(ExtendedPoint::identity())
+  fn get_identity() -> JubjubPoint {
+    JubjubPoint(ExtendedPoint::identity())
   }
 
-  fn get_base() -> JubjubGroup {
-    JubjubGroup(ExtendedPoint::generator().mul_by_cofactor())
+  fn get_base() -> JubjubPoint {
+    JubjubPoint(ExtendedPoint::generator().mul_by_cofactor())
   }
 
   fn to_compressed_bytes(&self) -> Vec<u8> {
@@ -167,38 +167,38 @@ impl Group for JubjubGroup {
   fn from_compressed_bytes(bytes: &[u8]) -> Result<Self, AlgebraError> {
     let affine = AffinePoint::from_bytes(bytes[..Self::COMPRESSED_LEN].try_into().map_err(|_| AlgebraError::DecompressElementError)?);
     if affine.is_some().into() {
-      Ok(JubjubGroup(ExtendedPoint::from(affine.unwrap()))) // safe unwrap
+      Ok(JubjubPoint(ExtendedPoint::from(affine.unwrap()))) // safe unwrap
     } else {
       Err(AlgebraError::DecompressElementError)
     }
   }
 
-  fn from_hash<D>(hash: D) -> JubjubGroup
+  fn from_hash<D>(hash: D) -> JubjubPoint
     where D: Digest<OutputSize = U64> + Default
   {
     let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
-    JubjubGroup(ExtendedPoint::random(&mut prng).mul_by_cofactor())
+    JubjubPoint(ExtendedPoint::random(&mut prng).mul_by_cofactor())
   }
 }
 
-impl GroupArithmetic for JubjubGroup {
+impl GroupArithmetic for JubjubPoint {
   type S = JubjubScalar;
   //arithmetic
-  fn mul(&self, scalar: &JubjubScalar) -> JubjubGroup {
-    JubjubGroup(self.0 * scalar.0)
+  fn mul(&self, scalar: &JubjubScalar) -> JubjubPoint {
+    JubjubPoint(self.0 * scalar.0)
   }
-  fn add(&self, other: &Self) -> JubjubGroup {
-    JubjubGroup(self.0 + other.0)
+  fn add(&self, other: &Self) -> JubjubPoint {
+    JubjubPoint(self.0 + other.0)
   }
-  fn sub(&self, other: &Self) -> JubjubGroup {
-    JubjubGroup(self.0 - other.0)
+  fn sub(&self, other: &Self) -> JubjubPoint {
+    JubjubPoint(self.0 - other.0)
   }
-  fn double(&self) -> JubjubGroup {
-    JubjubGroup(self.0.double())
+  fn double(&self) -> JubjubPoint {
+    JubjubPoint(self.0.double())
   }
 }
 
-impl JubjubGroup {
+impl JubjubPoint {
   /// Get the x-coordinate of the Jubjub affine point.
   pub fn get_x(&self) -> BLSScalar {
     let affine_point = AffinePoint::from(&self.0);
@@ -215,7 +215,7 @@ impl JubjubGroup {
 mod jubjub_groups_test {
   use crate::groups::group_tests::{test_scalar_operations, test_scalar_serialization};
   use crate::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-  use crate::jubjub::{JubjubGroup, JubjubScalar};
+  use crate::jubjub::{JubjubPoint, JubjubScalar};
   use rand_core::SeedableRng;
 
   #[test]
@@ -250,7 +250,7 @@ mod jubjub_groups_test {
     let alpha = JubjubScalar::random(&mut rng);
 
     // Public key
-    let base = JubjubGroup::get_base();
+    let base = JubjubPoint::get_base();
     let u = base.mul(&alpha);
 
     // Verifier challenge

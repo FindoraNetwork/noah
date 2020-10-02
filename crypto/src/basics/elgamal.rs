@@ -137,7 +137,7 @@ mod elgamal_test {
   use crate::basics::elgamal::{ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey};
   use algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
   use algebra::groups::{Group, Scalar};
-  use algebra::jubjub::JubjubGroup;
+  use algebra::jubjub::JubjubPoint;
   use algebra::ristretto::RistrettoPoint;
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
@@ -269,7 +269,7 @@ mod elgamal_test {
     verification::<BLSG1>();
     verification::<BLSG2>();
     verification::<BLSGt>();
-    verification::<JubjubGroup>();
+    verification::<JubjubPoint>();
   }
 
   #[test]
@@ -278,7 +278,7 @@ mod elgamal_test {
     decryption::<BLSG1>();
     decryption::<BLSG2>();
     decryption::<BLSGt>();
-    decryption::<JubjubGroup>();
+    decryption::<JubjubPoint>();
   }
 
   #[test]
@@ -287,7 +287,7 @@ mod elgamal_test {
     serialize_to_json::<BLSG1>();
     serialize_to_json::<BLSG2>();
     // serialize_to_json::<BLSGt>(); TODO BLSGt is not serializable yet
-    serialize_to_json::<JubjubGroup>();
+    serialize_to_json::<JubjubPoint>();
   }
 
   #[test]
@@ -296,6 +296,6 @@ mod elgamal_test {
     serialize_to_message_pack::<BLSG1>();
     serialize_to_message_pack::<BLSG2>();
     // serialize_to_message_pack::<BLSGt>(); TODO BLSGt is not serializable yet
-    serialize_to_message_pack::<JubjubGroup>();
+    serialize_to_message_pack::<JubjubPoint>();
   }
 }
