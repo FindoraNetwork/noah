@@ -26,6 +26,7 @@ pub struct MTNode {
 pub type SnarkProof = PlonkPf<KZGCommitmentScheme<Bls12381>>;
 
 /// Anonymous transfers structure
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct AXfrBody {
   pub inputs: Vec<(Nullifier, AXfrPubKey)>,
   pub outputs: Vec<AnonBlindAssetRecord>,
@@ -34,12 +35,14 @@ pub struct AXfrBody {
 }
 
 /// Asset record to be published
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct AnonBlindAssetRecord {
   pub amount_type_commitment: Commitment,
   pub public_key: AXfrPubKey,
 }
 
 /// Proof for an AXfrBody correctness
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct AXfrProof {
   pub snark_proof: SnarkProof,
   pub merkle_root: BLSScalar,

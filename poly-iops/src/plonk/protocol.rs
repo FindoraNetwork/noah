@@ -96,7 +96,7 @@ pub mod prover {
 
   /// A PlonkProof is generic on the polynomial commitment scheme, PCS.
   /// PCS is generic in the commitment group C, the eval proof type E, and Field elements F.
-  #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+  #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
   pub struct PlonkProof<C, E, F> {
     pub(crate) C_witness_polys: Vec<C>,
     pub(crate) C_q_polys: Vec<C>, // splitted quotient polynomials

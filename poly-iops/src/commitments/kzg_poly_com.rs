@@ -116,7 +116,7 @@ impl<F: Scalar> HomomorphicPolyComElem for FpPolynomial<F> {
   }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KZGEvalProof<G1>(G1);
 
 impl<G: Group> ToBytes for KZGEvalProof<G> {

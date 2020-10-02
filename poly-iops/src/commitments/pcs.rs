@@ -42,7 +42,7 @@ pub trait HomomorphicPolyComElem: ToBytes {
   fn inv(&self) -> Self;
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
 pub struct BatchProofEval<C, E> {
   commitment: C,
   eval_proof: E,
