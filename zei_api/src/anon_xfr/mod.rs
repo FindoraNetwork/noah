@@ -35,7 +35,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
   outputs: &[AnonAssetRecordTemplate])
   -> Result<(AXfrBody, Vec<AXfrKeyPair>), ZeiError> {
   // 1. check input correctness
-  if (inputs.len() == 0) || (outputs.len() == 0) {
+  if inputs.is_empty() || outputs.is_empty() {
     return Err(ZeiError::AXfrProverParamsError);
   }
   check_asset_amount(inputs, outputs)?;

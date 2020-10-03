@@ -10,8 +10,9 @@ pub(crate) mod tests {
   };
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
-    AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetType, IdentityRevealPolicy,
-    TracerMemo, TracingPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote, ASSET_TYPE_LENGTH,
+    AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerKeyPair, AssetType,
+    IdentityRevealPolicy, TracerMemo, TracingPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote,
+    ASSET_TYPE_LENGTH,
   };
   use algebra::groups::Scalar as _;
   use algebra::ristretto::RistrettoScalar as Scalar;
@@ -584,7 +585,6 @@ pub(crate) mod tests {
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
-    use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
     use crate::xfr::lib::XfrNotePoliciesRef;
     use crate::xfr::structs::TracingPolicies;
 
@@ -594,7 +594,7 @@ pub(crate) mod tests {
       prng = ChaChaRng::from_seed([0u8; 32]);
       let addr = b"0x7789654"; // receiver address
 
-      let tracer_keys = gen_asset_tracer_keypair(&mut prng);
+      let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
 
       let attrs = vec![1u32, 2, 3, 4];
       let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
@@ -690,7 +690,6 @@ pub(crate) mod tests {
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
-    use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
     use crate::xfr::lib::{
       trace_assets, trace_assets_brute_force, XfrNotePolicies, XfrNotePoliciesRef,
     };
@@ -909,7 +908,7 @@ pub(crate) mod tests {
       prng = ChaChaRng::from_seed([0u8; 32]);
       let asset_type = AssetType::from_identical_byte(0u8);
 
-      let asset_tracer_public_keys = gen_asset_tracer_keypair(&mut prng);
+      let asset_tracer_public_keys = AssetTracerKeyPair::generate(&mut prng);
 
       let tracing_policy =
         TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_public_keys.enc_key
@@ -953,7 +952,7 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
+      let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
       let tracing_policy =
         TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
                                                                                    .clone(),
@@ -990,7 +989,7 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
+      let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
       let tracing_policy =
         TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
@@ -1016,7 +1015,7 @@ pub(crate) mod tests {
     fn test_one_input_one_output_asset_confidential() {
       let mut prng = ChaChaRng::from_seed([0u8; 32]);
       let mut params = PublicParams::default();
-      let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
+      let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
       let tracing_policy =
         TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
@@ -1045,7 +1044,7 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
+      let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
       let tracing_policy =
         TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
@@ -1079,7 +1078,7 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
+      let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
       let tracing_policy =
         TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
@@ -1113,7 +1112,7 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
+      let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
       let tracing_policy =
         TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
@@ -1156,7 +1155,7 @@ pub(crate) mod tests {
       let mut prng: ChaChaRng;
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
-      let asset_tracer_keypair = gen_asset_tracer_keypair(&mut prng);
+      let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
       let tracing_policy =
         TracingPolicies::from_policy(TracingPolicy { enc_keys: asset_tracer_keypair.enc_key
@@ -1208,8 +1207,8 @@ pub(crate) mod tests {
       let mut params = PublicParams::default();
       prng = ChaChaRng::from_seed([0u8; 32]);
 
-      let tracer1_keypair = gen_asset_tracer_keypair(&mut prng);
-      let tracer2_keypair = gen_asset_tracer_keypair(&mut prng);
+      let tracer1_keypair = AssetTracerKeyPair::generate(&mut prng);
+      let tracer2_keypair = AssetTracerKeyPair::generate(&mut prng);
 
       let input1_tracing_policy =
         TracingPolicies::from_policy(gen_asset_tracing_policy(&tracer1_keypair.enc_key));

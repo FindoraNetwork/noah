@@ -9,15 +9,14 @@ pub(crate) mod examples {
   use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Attr, Credential};
   use zei::setup::PublicParams;
   use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
-  use zei::xfr::asset_tracer::gen_asset_tracer_keypair;
   use zei::xfr::lib::{
     gen_xfr_note, trace_assets_brute_force, RecordData, XfrNotePolicies, XfrNotePoliciesRef,
   };
   use zei::xfr::lib::{trace_assets, verify_xfr_note};
   use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
   use zei::xfr::structs::{
-    AssetRecord, AssetRecordTemplate, AssetType, IdentityRevealPolicy, TracingPolicies,
-    TracingPolicy, ASSET_TYPE_LENGTH,
+    AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, IdentityRevealPolicy,
+    TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
   };
   use zei::xfr::test_utils::{
     conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
@@ -159,7 +158,7 @@ pub(crate) mod examples {
     let recv2_pub_key = recv2_keypair.pub_key;
 
     // setup policy
-    let tracer_keys = gen_asset_tracer_keypair(&mut prng);
+    let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
     let policy = TracingPolicy{
       enc_keys: tracer_keys.enc_key.clone(),
       asset_tracing: true, // do asset tracing
@@ -290,7 +289,7 @@ pub(crate) mod examples {
     let recv2_pub_key = recv2_keypair.pub_key;
 
     // 1.3 Instantiate issuer with his public keys
-    let asset_tracing_key_pair = gen_asset_tracer_keypair(&mut prng);
+    let asset_tracing_key_pair = AssetTracerKeyPair::generate(&mut prng);
 
     // 1.4 Define issuer tracing policy
     let asset_tracing_policy = TracingPolicy{
@@ -427,7 +426,7 @@ pub(crate) mod examples {
     let (user2_ac_pk, user2_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
     // 1.3 setup policy
-    let tracer_keys = gen_asset_tracer_keypair(&mut prng);
+    let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
     let id_policy_policy = IdentityRevealPolicy{
       cred_issuer_pub_key: cred_issuer_pk.clone(),
       reveal_map: vec![true, true, false, false], // reveal first two attributes
@@ -599,7 +598,7 @@ pub(crate) mod examples {
       anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
     // 1.3 setup policy
-    let tracer_keys = gen_asset_tracer_keypair(&mut prng);
+    let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
     let id_policy_policy = IdentityRevealPolicy{
       cred_issuer_pub_key: cred_issuer_pk.clone(),
       reveal_map: vec![false, true, true, true], // reveal last three attributes
@@ -793,8 +792,8 @@ pub(crate) mod examples {
     let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
 
     // asset tracing keys
-    let asset1_tracing_key = gen_asset_tracer_keypair(&mut prng);
-    let asset2_tracing_key = gen_asset_tracer_keypair(&mut prng);
+    let asset1_tracing_key = AssetTracerKeyPair::generate(&mut prng);
+    let asset2_tracing_key = AssetTracerKeyPair::generate(&mut prng);
     // 1. setup
     // 1.1 users keys
     let user1_key_pair1 = XfrKeyPair::generate(&mut prng);

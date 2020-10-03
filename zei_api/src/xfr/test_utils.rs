@@ -2,12 +2,12 @@ use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 
 use super::asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType};
-use super::asset_tracer::gen_asset_tracer_keypair;
 use super::lib::XfrNotePolicies;
 use super::sig::{XfrKeyPair, XfrPublicKey};
 use super::structs::{
-  AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, IdentityRevealPolicy, OwnerMemo,
-  TracingPolicies, TracingPolicy, XfrAmount, XfrAssetType, ASSET_TYPE_LENGTH,
+  AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, BlindAssetRecord,
+  IdentityRevealPolicy, OwnerMemo, TracingPolicies, TracingPolicy, XfrAmount, XfrAssetType,
+  ASSET_TYPE_LENGTH,
 };
 use crate::api::anon_creds;
 use crate::api::anon_creds::{
@@ -70,7 +70,7 @@ pub fn setup_with_policies(
   // credential keys
   let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, ATTR_SIZE);
   // asset tracing keys
-  let asset_tracing_key = gen_asset_tracer_keypair(&mut prng);
+  let asset_tracing_key = AssetTracerKeyPair::generate(&mut prng);
 
   // All AC keys are the same
   let mut user_ac_pks = vec![];

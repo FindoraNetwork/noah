@@ -431,7 +431,6 @@ fn extract_ciphertext_and_commitments(
 /// I compute a range proof for confidential amount transfers.
 /// The proof guarantees that output amounts and difference between total input
 /// and total output are in the range [0,2^{64} - 1]
-#[allow(clippy::same_item_push)]
 pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
                           outputs: &[&OpenAssetRecord])
                           -> Result<XfrRangeProof, ZeiError> {
@@ -461,9 +460,7 @@ pub(crate) fn range_proof(inputs: &[&OpenAssetRecord],
   let (diff_low, diff_high) = u64_to_u32_pair(xfr_diff);
   values.push(diff_low as u64);
   values.push(diff_high as u64);
-  for _ in values.len()..upper_power2 {
-    values.push(0u64);
-  }
+  values.resize(upper_power2, 0u64);
 
   //build blinding vectors (out blindings + blindings difference)
   let (total_blind_input_low, total_blind_input_high) = add_blindings(inputs);
@@ -663,9 +660,8 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(prng: &mut
 
 #[cfg(test)]
 mod tests {
-  use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::proofs::verify_identity_proofs;
-  use crate::xfr::structs::{TracerMemo, TracingPolicies, TracingPolicy};
+  use crate::xfr::structs::{AssetTracerKeyPair, TracerMemo, TracingPolicies, TracingPolicy};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
   use utils::errors::ZeiError;
@@ -703,7 +699,7 @@ mod tests {
 
     // 2. if policy, then there must be memos and proofs
     let policy = TracingPolicy{
-      enc_keys: gen_asset_tracer_keypair(&mut prng).enc_key,
+      enc_keys: AssetTracerKeyPair::generate(&mut prng).enc_key,
       asset_tracing: true, // do asset tracing
       identity_tracing: None // do not trace identity
     };
@@ -719,8 +715,8 @@ mod tests {
     assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
 
     // fake memo
-    let tracer_key = gen_asset_tracer_keypair(&mut prng).enc_key;
-    let memos = vec![vec![TracerMemo::new(&mut prng, &tracer_key, None, None, vec![])]];
+    let tracer_key = AssetTracerKeyPair::generate(&mut prng).enc_key;
+    let memos = vec![vec![TracerMemo::new(&mut prng, &tracer_key, None, None, &[])]];
     let reveal_policies = vec![&asset_tracing_policies];
 
     let res = verify_identity_proofs(reveal_policies.as_slice(),

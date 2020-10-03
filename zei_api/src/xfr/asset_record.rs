@@ -103,7 +103,7 @@ impl AssetRecord {
         let asset_type_info = match oar.get_record_type() {
           AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
           | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
-          _ => Some((oar.asset_type, &oar.type_blind)),
+          _ => Some((&oar.asset_type, &oar.type_blind)),
         };
         (amount_info, asset_type_info)
       } else {
@@ -113,7 +113,7 @@ impl AssetRecord {
                                               &asset_tracing_policy.enc_keys,
                                               amount_info,
                                               asset_type_info,
-                                              vec![]);
+                                              &[]);
       memos.push(asset_tracer_memo);
       identity_proofs.push(None);
     }
@@ -152,7 +152,7 @@ impl AssetRecord {
         let asset_type_info = match oar.get_record_type() {
           AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
           | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
-          _ => Some((oar.asset_type, &oar.type_blind)),
+          _ => Some((&oar.asset_type, &oar.type_blind)),
         };
         (amount_info, asset_type_info)
       } else {
@@ -185,7 +185,7 @@ impl AssetRecord {
                                               &asset_tracing_policy.enc_keys,
                                               amount_info,
                                               asset_type_info,
-                                              attrs_and_ctexts);
+                                              &attrs_and_ctexts);
       identity_proofs.push(proof);
       memos.push(asset_tracer_memo);
     }
@@ -335,14 +335,14 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
         amount_info = Some((amount_lo, amount_hi, &amount_blinds.0, &amount_blinds.1));
       }
       if asset_record.asset_record_type.is_confidential_asset_type() {
-        asset_type_info = Some((asset_record.asset_type, &asset_type_blind));
+        asset_type_info = Some((&asset_record.asset_type, &asset_type_blind));
       }
     }
     let memo = TracerMemo::new(prng,
                                &policy.enc_keys,
                                amount_info,
                                asset_type_info,
-                               attr_ctexts);
+                               &attr_ctexts);
     tracer_memos.push(memo);
   }
   (blind_asset_record, amount_blinds, asset_type_blind, tracer_memos, owner_memo)
@@ -494,11 +494,10 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(prng: &mut R,
 mod test {
   use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
   use crate::xfr::asset_record::AssetRecordType;
-  use crate::xfr::asset_tracer::gen_asset_tracer_keypair;
   use crate::xfr::sig::XfrKeyPair;
   use crate::xfr::structs::{
-    AssetRecordTemplate, AssetType, OpenAssetRecord, TracingPolicies, TracingPolicy, XfrAmount,
-    XfrAssetType,
+    AssetRecordTemplate, AssetTracerKeyPair, AssetType, OpenAssetRecord, TracingPolicies,
+    TracingPolicy, XfrAmount, XfrAssetType,
   };
   use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
   use algebra::groups::Scalar as _;
@@ -520,7 +519,7 @@ mod test {
     let keypair = XfrKeyPair::generate(&mut prng);
     let tracing_policy = match asset_tracing {
       true => {
-        let tracer_keys = gen_asset_tracer_keypair(&mut prng);
+        let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
         let tracing_policies =
           TracingPolicies::from_policy(TracingPolicy { enc_keys: tracer_keys.enc_key,
                                                        asset_tracing: true,

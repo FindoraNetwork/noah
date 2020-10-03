@@ -6,10 +6,14 @@ use crate::xfr::asset_mixer::AssetMixProof;
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
 use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
-use algebra::groups::Scalar as ZeiScalar;
-use algebra::ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar as Scalar};
+use algebra::bls12_381::BLSG1;
+use algebra::groups::{Group, Scalar as ZeiScalar};
+use algebra::ristretto::{
+  CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar,
+};
 use bulletproofs::RangeProof;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+use crypto::basics::elgamal::elgamal_key_gen;
 use crypto::basics::hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCipher};
 use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
@@ -289,6 +293,22 @@ pub struct AssetTracerKeyPair {
   pub dec_key: AssetTracerDecKeys,
 }
 
+impl AssetTracerKeyPair {
+  /// Generates a new keypair for asset tracing
+  pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+    let (record_data_dec_key, record_data_enc_key) =
+      elgamal_key_gen(prng, &RistrettoPoint::get_base());
+    let (attrs_dec_key, attrs_enc_key) = elgamal_key_gen(prng, &BLSG1::get_base());
+    let lock_info_dec_key = XSecretKey::new(prng);
+    let lock_info_enc_key = XPublicKey::from(&lock_info_dec_key);
+    AssetTracerKeyPair { enc_key: AssetTracerEncKeys { record_data_enc_key,
+                                                       attrs_enc_key,
+                                                       lock_info_enc_key },
+                         dec_key: AssetTracerDecKeys { record_data_dec_key,
+                                                       attrs_dec_key,
+                                                       lock_info_dec_key } }
+  }
+}
 /// An asset and identity tracing policies for an asset record
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TracingPolicies(pub Vec<TracingPolicy>);

@@ -845,9 +845,7 @@ pub(crate) fn extract_tracing_info(memos: &[(&BlindAssetRecord, &TracerMemo)],
                                    dec_key: &AssetTracerDecKeys)
                                    -> Result<Vec<RecordData>, ZeiError> {
   let mut result = vec![];
-  for bar_memo in memos {
-    let blind_asset_record = bar_memo.0;
-    let memo = bar_memo.1;
+  for (blind_asset_record, memo) in memos {
     let (amount_option, asset_type_option, attributes) = memo.decrypt(dec_key)?; // return BogusAssetTracerMemo in case of error.
     let amount = match memo.lock_amount {
       None => blind_asset_record.amount
