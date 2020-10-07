@@ -18,6 +18,18 @@ pub struct JubjubScalar(pub(crate) Fr);
 #[derive(Clone, PartialEq, Debug)]
 pub struct JubjubPoint(pub(crate) ExtendedPoint);
 
+impl Default for JubjubPoint {
+  fn default() -> Self {
+    JubjubPoint::get_base()
+  }
+}
+
+impl Default for JubjubScalar {
+  fn default() -> Self {
+    JubjubScalar::zero()
+  }
+}
+
 pub const JUBJUB_SCALAR_LEN: usize = 32;
 
 impl One for JubjubScalar {

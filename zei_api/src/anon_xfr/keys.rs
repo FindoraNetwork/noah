@@ -3,7 +3,7 @@ use crypto::basics::signatures::schnorr;
 use rand_core::{CryptoRng, RngCore};
 
 /// Public key used to address an Anonymous records and verify transaction spending it
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
 /// Secret key associated with an Anonymous records. It is used to spending it

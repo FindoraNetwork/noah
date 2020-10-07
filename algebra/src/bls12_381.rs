@@ -43,6 +43,12 @@ impl From<&JubjubScalar> for BLSScalar {
   }
 }
 
+impl Default for BLSScalar {
+  fn default() -> Self {
+    Self::zero()
+  }
+}
+
 impl BLSScalar {
   pub fn new(elem: Scalar) -> Self {
     Self(elem)
