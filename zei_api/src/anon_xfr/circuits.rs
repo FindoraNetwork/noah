@@ -7,6 +7,7 @@ use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::commitments::rescue::HashCommitment as CommScheme;
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::prf::PRF;
+use poly_iops::plonk::turbo_plonk_cs::ecc::PointVar;
 use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
 use poly_iops::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
 
@@ -280,7 +281,7 @@ pub(crate) fn build_eq_committed_vals_cs(amount: BLSScalar,
   // rescue commitment
   let zero_var = cs.zero_var();
   let rescue_comm_var =
-    cs.rescue_hash(&StateVar::new([blind_hash_var, amount_var, at_var, zero_var]));
+    cs.rescue_hash(&StateVar::new([blind_hash_var, amount_var, at_var, zero_var]))[0];
 
   // prepare public inputs
   cs.prepare_io_variable(rescue_comm_var);
@@ -374,6 +375,12 @@ struct NullifierInputVars {
   pub pub_key_y: VarIndex,
 }
 
+// cs variables for ElGamal ciphertexts
+struct ElGamalHybridCtextVars {
+  pub e1: PointVar,              // r*G
+  pub symm_ctxts: Vec<VarIndex>, // ctr-mode ciphertext
+}
+
 fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
   let path_vars: Vec<MerkleNodeVars> = path.nodes
                                            .into_iter()
@@ -430,8 +437,8 @@ fn compute_merkle_root(cs: &mut TurboPlonkCS,
     (elem.uid, elem.commitment, elem.pub_key_x, elem.pub_key_y);
   let zero_var = cs.zero_var();
   // TODO: compute `pk_hash_var` using a simpler encoding that has fewer constraints
-  let pk_hash_var = cs.rescue_hash(&StateVar::new([pub_key_x, pub_key_y, zero_var, zero_var]));
-  let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, pk_hash_var, zero_var]));
+  let pk_hash_var = cs.rescue_hash(&StateVar::new([pub_key_x, pub_key_y, zero_var, zero_var]))[0];
+  let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, pk_hash_var, zero_var]))[0];
 
   for path_node in path_vars.nodes.iter().rev() {
     let input_var = sort(cs,
@@ -440,7 +447,7 @@ fn compute_merkle_root(cs: &mut TurboPlonkCS,
                          path_node.siblings2,
                          path_node.is_left_child,
                          path_node.is_right_child);
-    node_var = cs.rescue_hash(&input_var);
+    node_var = cs.rescue_hash(&input_var)[0];
   }
   node_var
 }
@@ -453,7 +460,7 @@ fn commit(cs: &mut TurboPlonkCS,
           asset_var: VarIndex)
           -> VarIndex {
   let input_var = StateVar::new([blinding_var, amount_var, asset_var, cs.zero_var()]);
-  cs.rescue_hash(&input_var)
+  cs.rescue_hash(&input_var)[0]
 }
 
 // Add the nullifier constraints to the constraint system.
@@ -471,7 +478,7 @@ fn nullify(cs: &mut TurboPlonkCS,
                                                         nullifier_input_vars.pub_key_x,
                                                         nullifier_input_vars.pub_key_y);
   let input_var = StateVar::new([uid_amount, asset_type, pub_key_x, cs.add(pub_key_y, sk_var)]);
-  cs.rescue_hash(&input_var)
+  cs.rescue_hash(&input_var)[0]
 }
 
 /// Enforce asset_mixing constraints:
@@ -557,6 +564,34 @@ fn match_select(cs: &mut TurboPlonkCS,
                 -> VarIndex {
   let is_equal_var = cs.is_equal(type1, type2);
   cs.mul(is_equal_var, val)
+}
+
+#[allow(dead_code)]
+fn elgamal_hybrid_encrypt(cs: &mut TurboPlonkCS,
+                          base: JubjubPoint,
+                          pk_var: PointVar,
+                          pk_point: JubjubPoint,
+                          rand_var: VarIndex,
+                          data_vars: &[VarIndex])
+                          -> ElGamalHybridCtextVars {
+  let (e1_var, _) = cs.scalar_mul(base, rand_var, JUBJUB_SCALAR_BIT_LEN);
+  let (e2_var, _) = cs.var_base_scalar_mul(PointVar::new(pk_var.get_x(), pk_var.get_y()),
+                                           pk_point,
+                                           rand_var,
+                                           JUBJUB_SCALAR_BIT_LEN);
+  let zero_var = cs.zero_var();
+  let key_vars =
+    cs.rescue_hash(&StateVar::new([e2_var.get_x(), e2_var.get_y(), zero_var, zero_var]));
+  let symm_ctxts_vars = cs.rescue_ctr(key_vars, data_vars);
+
+  // prepare public inputs: the public key and the ciphertext
+  cs.prepare_io_point_variable(pk_var);
+  cs.prepare_io_point_variable(PointVar::new(e1_var.get_x(), e1_var.get_y()));
+  for &ctxt in &symm_ctxts_vars {
+    cs.prepare_io_variable(ctxt);
+  }
+  ElGamalHybridCtextVars { e1: e1_var,
+                           symm_ctxts: symm_ctxts_vars }
 }
 
 #[cfg(test)]
@@ -648,6 +683,63 @@ pub(crate) mod tests {
 
     AMultiXfrWitness { payers_secrets,
                        payees_secrets }
+  }
+
+  #[test]
+  fn test_elgamal_hybrid_encrypt_cs() {
+    let mut cs = TurboPlonkConstraintSystem::new();
+
+    // prepare inputs
+    let base = JubjubPoint::get_base();
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let (_, pub_key) = crypto::basics::elgamal::elgamal_key_gen::<_, JubjubPoint>(&mut prng, &base);
+    let pk_point = pub_key.get_point();
+    let pk_var = cs.new_point_variable(Point::from(&pk_point));
+    let mut data_vars = vec![];
+    let mut data = vec![];
+    for i in 0..10 {
+      data.push(BLSScalar::from_u32(i as u32));
+      data_vars.push(cs.new_variable(data[i]));
+    }
+    let r = JubjubScalar::random(&mut prng);
+    let rand_var = cs.new_variable(BLSScalar::from(&r));
+
+    // encrypt
+    let ctxts = crypto::basics::elgamal::elgamal_hybrid_encrypt(&base, &pub_key, &r, &data);
+    let ctxts_vars = elgamal_hybrid_encrypt(&mut cs, base, pk_var, pk_point, rand_var, &data_vars);
+
+    // check that the ciphertext in the witness is correct
+    let witness = cs.get_and_clear_witness();
+    assert_eq!(ctxts.e1.get_x(), witness[ctxts_vars.e1.get_x()]);
+    assert_eq!(ctxts.e1.get_y(), witness[ctxts_vars.e1.get_y()]);
+    for (&ctxt, &ctxt_var) in ctxts.symm_ctxts.iter().zip(ctxts_vars.symm_ctxts.iter()) {
+      assert_eq!(ctxt, witness[ctxt_var]);
+    }
+
+    // check the constraint system
+    let mut public_inputs = vec![pub_key.get_point().get_x(), pub_key.get_point().get_y()];
+    public_inputs.extend(vec![ctxts.e1.get_x(), ctxts.e1.get_y()]);
+    public_inputs.extend(ctxts.symm_ctxts.clone());
+    assert!(cs.verify_witness(&witness, &public_inputs).is_ok());
+
+    let bad_pk_point = pub_key.get_point().double();
+    let mut public_inputs = vec![bad_pk_point.get_x(), bad_pk_point.get_y()];
+    public_inputs.extend(vec![ctxts.e1.get_x(), ctxts.e1.get_y()]);
+    public_inputs.extend(ctxts.symm_ctxts.clone());
+    assert!(cs.verify_witness(&witness, &public_inputs).is_err());
+
+    let bad_e1 = ctxts.e1.double();
+    let mut public_inputs = vec![pub_key.get_point().get_x(), pub_key.get_point().get_y()];
+    public_inputs.extend(vec![bad_e1.get_x(), bad_e1.get_y()]);
+    public_inputs.extend(ctxts.symm_ctxts.clone());
+    assert!(cs.verify_witness(&witness, &public_inputs).is_err());
+
+    let mut bad_symm_ctxts = ctxts.symm_ctxts;
+    bad_symm_ctxts[0] = BLSScalar::from_u32(1);
+    let mut public_inputs = vec![pub_key.get_point().get_x(), pub_key.get_point().get_y()];
+    public_inputs.extend(vec![ctxts.e1.get_x(), ctxts.e1.get_y()]);
+    public_inputs.extend(bad_symm_ctxts);
+    assert!(cs.verify_witness(&witness, &public_inputs).is_err());
   }
 
   #[test]

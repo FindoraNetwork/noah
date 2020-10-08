@@ -1006,7 +1006,7 @@ mod turbo_plonk_proofs_test {
     // Prove the knowledge of hash pre-image.
     let input_state = State::new(zero_vec);
     let input_var = cs.new_hash_input_variable(input_state);
-    let out_var = cs.rescue_hash(&input_var);
+    let out_var = cs.rescue_hash(&input_var)[0];
     cs.prepare_io_variable(out_var);
     cs.pad();
 

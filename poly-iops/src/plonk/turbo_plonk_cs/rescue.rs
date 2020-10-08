@@ -72,7 +72,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
   }
 
   /// Returns the output of the rescue hash function on input variable `input_var`
-  pub fn rescue_hash(&mut self, input_var: &StateVar) -> VarIndex {
+  pub fn rescue_hash(&mut self, input_var: &StateVar) -> Vec<VarIndex> {
     let hash = RescueInstance::new();
     let zero = BLSScalar::zero();
     let zero_vec = vec![zero, zero, zero, zero];
@@ -88,7 +88,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
                            input_var: &StateVar,
                            mds: &[State],
                            keys: &[State])
-                           -> VarIndex {
+                           -> Vec<VarIndex> {
     assert_eq!(keys.len(), 2 * NR + 1);
     assert_eq!(mds.len(), WIDTH);
 
@@ -101,7 +101,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
         state_var = self.non_linear_op(&state_var, mds, key);
       }
     }
-    state_var.0[0]
+    state_var.0
   }
 
   /// Rescue block cipher
@@ -162,6 +162,35 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
       result.push(key_state_var.clone());
     }
     result
+  }
+
+  /// Rescue counter mode encryption.
+  /// The key should be a freshed one in each call, and the nonce is initialized to zero.
+  /// * `key_vars` - the symmetric key variables
+  /// * `data_vars` - the variables for the data to be encrypted
+  /// * Returns the variables that map to the ciphertext
+  pub fn rescue_ctr(&mut self, key_vars: Vec<VarIndex>, data_vars: &[VarIndex]) -> Vec<VarIndex> {
+    let cipher = RescueInstance::new();
+    let mds_states: Vec<State> = cipher.MDS.iter().map(|m| State::from(&m[..])).collect();
+    let round_keys_vars = self.key_scheduling(&cipher, &mds_states, &StateVar(key_vars));
+
+    let zero_var = self.zero_var();
+    let one = BLSScalar::one();
+    let mut nonce_var = zero_var;
+    let mut ctexts = vec![];
+    for block in data_vars.chunks(WIDTH) {
+      let mut input_vars = vec![nonce_var];
+      input_vars.extend(vec![zero_var; WIDTH - 1]);
+      nonce_var = self.add_constant(nonce_var, &one);
+      let keystream =
+        self.rescue_cipher_with_keys(&StateVar(input_vars), &round_keys_vars, &mds_states)
+            .0;
+      let len = block.len();
+      for (&data, &mask) in block.iter().zip(keystream.iter()).take(len) {
+        ctexts.push(self.add(data, mask));
+      }
+    }
+    ctexts
   }
 
   fn add_state(&mut self, left_state_var: &StateVar, right_state_var: &StateVar) -> StateVar {
@@ -324,7 +353,7 @@ mod test {
   use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{Scalar, Zero};
-  use crypto::basics::hash::rescue::RescueInstance;
+  use crypto::basics::hash::rescue::{RescueCtr, RescueInstance};
   use rand_chacha::ChaChaRng;
   use rand_core::SeedableRng;
 
@@ -341,7 +370,7 @@ mod test {
                      BLSScalar::from_u32(0)];
     let input_state = State::from(&input_vec[..]);
     let input_var = cs.new_hash_input_variable(input_state.clone());
-    let out_var = cs.rescue_hash(&input_var);
+    let out_var = cs.rescue_hash(&input_var)[0];
 
     // Check consistency between witness[input_var] and input_state
     let witness_input: Vec<F> = input_var.0
@@ -410,5 +439,37 @@ mod test {
     // Check bad witness
     witness[out_var.0[0]] = F::zero();
     assert!(cs.verify_witness(&witness[..], &[]).is_err());
+  }
+
+  #[test]
+  fn test_rescue_ctr() {
+    let mut cs = TurboPlonkConstraintSystem::new();
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let key_vec = vec![BLSScalar::random(&mut prng),
+                       BLSScalar::random(&mut prng),
+                       BLSScalar::random(&mut prng),
+                       BLSScalar::random(&mut prng)];
+    let key_var = cs.new_rescue_state_variable(State::from(&key_vec[..]));
+    let mut data_vars = vec![];
+    let mut data = vec![];
+    for i in 0..10 {
+      data.push(BLSScalar::from_u32(i as u32));
+      data_vars.push(cs.new_variable(data[i]));
+    }
+
+    let mut ctr = RescueCtr::new(&key_vec, BLSScalar::zero());
+    ctr.add_keystream(&mut data);
+    let ctxts_vars = cs.rescue_ctr(key_var.0, &data_vars);
+
+    let mut witness = cs.get_and_clear_witness();
+    // check ciphertext consistency
+    for (&ctxt, &ctxt_var) in data.iter().zip(ctxts_vars.iter()) {
+      assert_eq!(ctxt, witness[ctxt_var]);
+    }
+
+    // check constraints
+    assert!(cs.verify_witness(&witness, &[]).is_ok());
+    witness[ctxts_vars[0]] = BLSScalar::from_u32(1);
+    assert!(cs.verify_witness(&witness, &[]).is_err());
   }
 }
