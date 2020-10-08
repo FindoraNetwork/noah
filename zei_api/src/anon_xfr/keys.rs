@@ -1,48 +1,42 @@
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use crypto::basics::signatures::schnorr;
 use rand_core::{CryptoRng, RngCore};
+use utils::errors::ZeiError;
 
 /// Public key used to address an Anonymous records and verify transaction spending it
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
-/// Secret key associated with an Anonymous records. It is used to spending it
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct AXfrSecKey(pub(crate) schnorr::SecretKey<JubjubScalar>);
-
 /// Keypair associated with an Anonymous records. It is used to spending it.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AXfrKeyPair {
-  pub(crate) sec_key: AXfrSecKey,
-  pub pub_key: AXfrPubKey,
-}
+pub struct AXfrKeyPair(pub(crate) schnorr::KeyPair<JubjubPoint, JubjubScalar>);
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AXfrSignature(pub(crate) schnorr::Signature<JubjubPoint, JubjubScalar>);
 
 impl AXfrKeyPair {
   /// Generate a new signature key pair
   pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> AXfrKeyPair {
-    let (sec_key, pub_key) = schnorr::gen_keys(prng).into_pair();
-    AXfrKeyPair { sec_key: AXfrSecKey(sec_key),
-                  pub_key: AXfrPubKey(pub_key) }
+    AXfrKeyPair(schnorr::KeyPair::generate(prng))
   }
 
   /// Multiply the secret key scalar by `factor` producing a new "randomized" KeyPair
   pub fn randomize(&self, factor: &JubjubScalar) -> AXfrKeyPair {
-    AXfrKeyPair { sec_key: self.sec_key.randomize(factor),
-                  pub_key: self.pub_key.randomize(factor) }
+    AXfrKeyPair(self.0.randomize(factor))
   }
 
+  /// Return public key
+  pub(crate) fn pub_key(&self) -> AXfrPubKey {
+    AXfrPubKey(self.0.pub_key.clone())
+  }
+
+  /// Return secret key scalar value
   pub(crate) fn get_secret_scalar(&self) -> JubjubScalar {
-    self.sec_key.as_scalar()
+    self.0.get_secret_scalar()
   }
-}
 
-impl AXfrSecKey {
-  /// Multiply the secret key scalar by `factor` producing a new "randomized" secret key
-  pub(crate) fn randomize(&self, factor: &JubjubScalar) -> AXfrSecKey {
-    AXfrSecKey(self.0.randomize(factor))
-  }
-  pub(crate) fn as_scalar(&self) -> JubjubScalar {
-    self.0.scalar()
+  pub fn sign(&self, msg: &[u8]) -> AXfrSignature {
+    AXfrSignature(self.0.sign(msg))
   }
 }
 
@@ -58,5 +52,10 @@ impl AXfrPubKey {
 
   pub(crate) fn from_jubjub_point(point: JubjubPoint) -> AXfrPubKey {
     AXfrPubKey(schnorr::PublicKey::from_point(point))
+  }
+
+  /// Signature verification function
+  pub fn verify(&self, msg: &[u8], sig: AXfrSignature) -> Result<(), ZeiError> {
+    self.0.verify(msg, &sig.0)
   }
 }

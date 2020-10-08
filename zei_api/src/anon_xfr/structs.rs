@@ -2,8 +2,9 @@ use crate::anon_xfr::decrypt_memo;
 use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use algebra::bls12_381::{BLSScalar, Bls12381};
-use algebra::groups::Scalar;
+use algebra::groups::{Scalar, Zero};
 use algebra::jubjub::JubjubScalar;
+use crypto::basics::commitments::rescue;
 use crypto::basics::hybrid_encryption::{hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey};
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentScheme;
 use poly_iops::plonk::protocol::prover::PlonkPf;
@@ -68,6 +69,14 @@ pub struct MTLeafInfo {
   pub uid: u64,
 }
 
+impl Default for MTLeafInfo {
+  fn default() -> Self {
+    MTLeafInfo { path: MTPath { nodes: vec![] },
+                 root: BLSScalar::zero(),
+                 uid: 0 }
+  }
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct OpenAnonBlindAssetRecord {
   pub(crate) amount: u64,
@@ -113,9 +122,10 @@ impl OpenAnonBlindAssetRecord {
 
   /// computes record's amount||asset type commitment
   pub fn compute_commitment(&self) -> Commitment {
-    crypto::basics::commitments::rescue::HashCommitment::new()
-      .commit(&self.blind,
-              &[BLSScalar::from_u64(self.amount), self.asset_type.as_scalar()]).unwrap()
+    rescue::HashCommitment::new().commit(&self.blind,
+                                         &[BLSScalar::from_u64(self.amount),
+                                           self.asset_type.as_scalar()])
+                                 .unwrap()
     // safe unwrap
   }
 }
@@ -199,7 +209,7 @@ impl OpenAnonBlindAssetRecordBuilder {
                    -> Result<Self, ZeiError> {
     let (amount, asset_type, blind, key_rand) =
       decrypt_memo(&owner_memo, dec_key, key_pair, record)?;
-    let mut builder = OpenAnonBlindAssetRecordBuilder::new().pub_key(key_pair.pub_key.clone())
+    let mut builder = OpenAnonBlindAssetRecordBuilder::new().pub_key(key_pair.pub_key())
                                                             .amount(amount)
                                                             .asset_type(asset_type);
 

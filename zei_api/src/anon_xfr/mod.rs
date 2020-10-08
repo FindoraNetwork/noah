@@ -20,6 +20,7 @@ use rand_core::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use utils::errors::ZeiError;
 
+pub mod bar_to_from_abar;
 pub(crate) mod circuits;
 pub mod keys;
 pub(crate) mod proofs;
@@ -60,7 +61,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
           .map(|((input, keypair), diversifier)| {
             let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
             (nullifier(&keypair, input.amount, &input.asset_type, mt_leaf_info.uid),
-             keypair.pub_key.randomize(diversifier))
+             keypair.pub_key().randomize(diversifier))
           })
           .collect();
 
@@ -146,7 +147,7 @@ fn check_inputs(inputs: &[OpenAnonBlindAssetRecord],
     return Err(ZeiError::ParameterError);
   }
   for (input, keypair) in inputs.iter().zip(keypairs.iter()) {
-    if input.mt_leaf_info.is_none() || keypair.pub_key != input.pub_key {
+    if input.mt_leaf_info.is_none() || keypair.pub_key() != input.pub_key {
       return Err(ZeiError::ParameterError);
     }
   }
@@ -237,7 +238,7 @@ pub fn decrypt_memo(memo: &OwnerMemo,
                                                                     &blind,
                                                                     &abar.amount_type_commitment)?;
   // verify abar's public key
-  if key_pair.randomize(&rand).pub_key != abar.public_key {
+  if key_pair.randomize(&rand).pub_key() != abar.public_key {
     return Err(ZeiError::InconsistentStructureError);
   }
 
@@ -245,9 +246,10 @@ pub fn decrypt_memo(memo: &OwnerMemo,
 }
 
 fn nullifier(key_pair: &AXfrKeyPair, amount: u64, asset_type: &AssetType, uid: u64) -> BLSScalar {
-  let pub_key = key_pair.pub_key.as_jubjub_point();
-  let pub_key_x = pub_key.get_x();
-  let pub_key_y = pub_key.get_y();
+  let pub_key = key_pair.pub_key();
+  let pub_key_point = pub_key.as_jubjub_point();
+  let pub_key_x = pub_key_point.get_x();
+  let pub_key_y = pub_key_point.get_y();
 
   // TODO From<u128> for ZeiScalar and do let uid_amount = BLSScalar::from(amount as u128 + ((uid as u128) << 64));
   let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::from_u32(1));
@@ -294,14 +296,14 @@ mod tests {
     // simulate input abar
     let (oabar, keypair_in, dec_key_in, _) = gen_oabar_and_keys(&mut prng, amount, asset_type);
     let abar = AnonBlindAssetRecord::from_oabar(&oabar);
-    assert_eq!(keypair_in.pub_key, *oabar.pub_key_ref());
+    assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
     let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
-    assert_eq!(rand_keypair_in.pub_key, abar.public_key);
+    assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
 
     let owner_memo = oabar.get_owner_memo().unwrap();
 
     // simulate merklee tree state
-    let rand_pk_in = rand_keypair_in.pub_key;
+    let rand_pk_in = rand_keypair_in.pub_key();
     let node = MTNode { siblings1: one,
                         siblings2: two,
                         is_left_child: 0u8,
@@ -338,11 +340,11 @@ mod tests {
           .unwrap();
       assert_eq!(amount, oabar_in.get_amount());
       assert_eq!(asset_type, oabar_in.get_asset_type());
-      assert_eq!(keypair_in.pub_key, oabar_in.pub_key);
+      assert_eq!(keypair_in.pub_key(), oabar_in.pub_key);
 
       let oabar_out = OpenAnonBlindAssetRecordBuilder::new().amount(amount)
                                                             .asset_type(asset_type)
-                                                            .pub_key(keypair_out.pub_key.clone())
+                                                            .pub_key(keypair_out.pub_key())
                                                             .finalize(&mut prng, &enc_key_out)
                                                             .unwrap()
                                                             .build()
@@ -363,7 +365,8 @@ mod tests {
                                                              &dec_key_out).unwrap()
                                                                           .build()
                                                                           .unwrap();
-      let rand_pk = keypair_out.pub_key.randomize(&oabar.get_key_rand_factor());
+      let rand_pk = keypair_out.pub_key()
+                               .randomize(&oabar.get_key_rand_factor());
       assert_eq!(amount, oabar.get_amount());
       assert_eq!(asset_type, oabar.get_asset_type());
       assert_eq!(rand_pk, body.outputs[0].public_key);
@@ -448,7 +451,7 @@ mod tests {
     for i in 0..n_payees {
       outputs.push(OpenAnonBlindAssetRecordBuilder::new().amount(amounts_out[i])
                                                          .asset_type(asset_types_out[i])
-                                                         .pub_key(keypairs_out[i].pub_key.clone())
+                                                         .pub_key(keypairs_out[i].pub_key())
                                                          .finalize(&mut prng, &enc_keys_out[i])
                                                          .unwrap()
                                                          .build()
@@ -479,7 +482,7 @@ mod tests {
                                           OpenAnonBlindAssetRecordBuilder::new()
           .amount(amounts_out[i])
           .asset_type(asset_types_out[i])
-          .pub_key(keypairs_out[i].pub_key.clone())
+          .pub_key(keypairs_out[i].pub_key())
           .finalize(&mut prng, &enc_keys_out[i]).unwrap().build().unwrap()
                                         })
                                         .collect_vec();
@@ -526,7 +529,7 @@ mod tests {
                                                                    &dec_keys_out[i]).unwrap()
                                                                                     .build()
                                                                                     .unwrap();
-        let rand_pk = keypairs_out[i].pub_key
+        let rand_pk = keypairs_out[i].pub_key()
                                      .randomize(&oabar_out.key_rand_factor);
         assert_eq!(amounts_out[i], oabar_out.amount);
         assert_eq!(asset_types_out[i], oabar_out.asset_type);
@@ -564,7 +567,7 @@ mod tests {
     let enc_key = XPublicKey::from(&dec_key);
     let oabar = OpenAnonBlindAssetRecordBuilder::new().amount(amount)
                                                       .asset_type(asset_type)
-                                                      .pub_key(keypair.pub_key.clone())
+                                                      .pub_key(keypair.pub_key())
                                                       .finalize(prng, &enc_key)
                                                       .unwrap()
                                                       .build()

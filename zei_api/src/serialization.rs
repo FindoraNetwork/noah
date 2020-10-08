@@ -1,7 +1,5 @@
-//use crate::anon_xfr::structs::{AXfrPubKey, AXfrSecKey};
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
-//use algebra::jubjub::{JubjubGroup, JubjubScalar};
 use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
 use serde::Serializer;
@@ -137,7 +135,7 @@ pub mod option_bytes {
 
 #[cfg(test)]
 mod test {
-  use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSecKey};
+  use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
   use crate::serialization::ZeiFromToBytes;
   use crate::xfr::asset_tracer::RecordDataEncKey;
   use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
@@ -151,30 +149,28 @@ mod test {
   use serde::de::Deserialize;
   use serde::ser::Serialize;
 
-  // TODO: More serialization tests for `AXfrPubKey` and `AXfrSecKey`
   #[test]
   fn anon_xfr_pub_key_serialization() {
     let mut prng: ChaChaRng;
     prng = ChaChaRng::from_seed([0u8; 32]);
-    let key_pair = AXfrKeyPair::generate(&mut prng);
+    let keypair = AXfrKeyPair::generate(&mut prng);
 
     let mut pk_mp_vec = vec![];
     assert_eq!(true,
-               key_pair.pub_key
-                       .serialize(&mut Serializer::new(&mut pk_mp_vec))
-                       .is_ok());
+               keypair.pub_key()
+                      .serialize(&mut Serializer::new(&mut pk_mp_vec))
+                      .is_ok());
     let mut de = Deserializer::new(&pk_mp_vec[..]);
     let pk2: AXfrPubKey = Deserialize::deserialize(&mut de).unwrap();
-    assert_eq!(key_pair.pub_key, pk2);
+    assert_eq!(keypair.pub_key(), pk2);
 
-    let mut sk_mp_vec = vec![];
+    let mut keypair_mp_vec = vec![];
     assert_eq!(true,
-               key_pair.sec_key
-                       .serialize(&mut Serializer::new(&mut sk_mp_vec))
-                       .is_ok());
-    let mut de = Deserializer::new(&sk_mp_vec[..]);
-    let sk2: AXfrSecKey = Deserialize::deserialize(&mut de).unwrap();
-    assert_eq!(key_pair.sec_key, sk2);
+               keypair.serialize(&mut Serializer::new(&mut keypair_mp_vec))
+                      .is_ok());
+    let mut de = Deserializer::new(&keypair_mp_vec[..]);
+    let keypair_2: AXfrKeyPair = Deserialize::deserialize(&mut de).unwrap();
+    assert_eq!(keypair, keypair_2);
   }
 
   #[test]

@@ -3,6 +3,7 @@ use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifie
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
+use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::commitments::rescue::HashCommitment as CommScheme;
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::prf::PRF;
@@ -13,6 +14,7 @@ pub type TurboPlonkCS = TurboPlonkConstraintSystem<BLSScalar>;
 
 // TODO: Move these constants to another file.
 const SK_LEN: usize = 252; // secret key size (in bits)
+const JUBJUB_SCALAR_BIT_LEN: usize = 252; // jubjub scalar size (in bits)
 const AMOUNT_LEN: usize = 64; // amount value size (in bits)
 pub const TREE_DEPTH: usize = 20; // Depth of the Merkle Tree
 
@@ -240,6 +242,49 @@ pub(crate) fn build_multi_xfr_cs(secret_inputs: AMultiXfrWitness) -> (TurboPlonk
                   .map(|payee| (payee.asset_type, payee.amount))
                   .collect();
   asset_mixing(&mut cs, &inputs, &outputs);
+
+  // pad the number of constraints to power of two
+  cs.pad();
+
+  let n_constraints = cs.size;
+  (cs, n_constraints)
+}
+
+/// Returns the constraint system (and associated number of constraints) for equality of values
+/// in a Pedersen commitment and a Rescue commitment.
+pub(crate) fn build_eq_committed_vals_cs(amount: BLSScalar,
+                                         asset_type: BLSScalar,
+                                         blind_pc: BLSScalar,
+                                         blind_hash: BLSScalar,
+                                         pc_gens: &PedersenGens<JubjubPoint>)
+                                         -> (TurboPlonkCS, usize) {
+  let mut cs = TurboPlonkConstraintSystem::new();
+  // add secret inputs
+  let amount_var = cs.new_variable(amount);
+  let at_var = cs.new_variable(asset_type);
+  let blind_pc_var = cs.new_variable(blind_pc);
+  let blind_hash_var = cs.new_variable(blind_hash);
+
+  // pedersen commitment
+  let (point1_var, point1) =
+    cs.scalar_mul(pc_gens.get_base(0).unwrap().clone(), amount_var, AMOUNT_LEN); // safe unwrap
+  let (point2_var, point2) = cs.scalar_mul(pc_gens.get_base(1).unwrap().clone(),
+                                           at_var,
+                                           JUBJUB_SCALAR_BIT_LEN); // safe unwrap
+  let (point3_var, point3) = cs.scalar_mul(pc_gens.get_blinding_base().clone(),
+                                           blind_pc_var,
+                                           JUBJUB_SCALAR_BIT_LEN);
+  let tmp_ext = cs.ecc_add(&point1_var, &point2_var, &point1, &point2);
+  let ped_comm_ext = cs.ecc_add(&point3_var, tmp_ext.get_var(), &point3, tmp_ext.get_point());
+
+  // rescue commitment
+  let zero_var = cs.zero_var();
+  let rescue_comm_var =
+    cs.rescue_hash(&StateVar::new([blind_hash_var, amount_var, at_var, zero_var]));
+
+  // prepare public inputs
+  cs.prepare_io_variable(rescue_comm_var);
+  cs.prepare_io_point_variable(ped_comm_ext.into_point_var());
 
   // pad the number of constraints to power of two
   cs.pad();
@@ -519,6 +564,7 @@ pub(crate) mod tests {
   use super::*;
   use algebra::bls12_381::BLSScalar;
   use algebra::groups::{One, Scalar, Zero};
+  use crypto::basics::commitments::pedersen::PedersenGens;
   use crypto::basics::commitments::rescue::HashCommitment;
   use crypto::basics::hash::rescue::RescueInstance;
   use crypto::basics::prf::PRF;
@@ -745,6 +791,39 @@ pub(crate) mod tests {
     asset_mixing(&mut cs, &inputs, &outputs);
     let witness = cs.get_and_clear_witness();
     assert!(cs.verify_witness(&witness, &[]).is_err());
+  }
+
+  #[test]
+  fn test_eq_committed_vals_cs() {
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    // compute Rescue commitment
+    let comm = HashCommitment::new();
+    let amount = BLSScalar::from_u32(71);
+    let asset_type = BLSScalar::from_u32(52);
+    let blind_hash = BLSScalar::random(&mut prng);
+    let hash_comm = comm.commit(&blind_hash, &[amount, asset_type]).unwrap();
+
+    // compute Pedersen commitment
+    let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
+    let amount_jj = JubjubScalar::from_u32(71);
+    let at_jj = JubjubScalar::from_u32(52);
+    let blind_pc = JubjubScalar::random(&mut prng);
+    let ped_comm = pc_gens_jubjub.commit(&[amount_jj, at_jj], &blind_pc)
+                                 .unwrap(); // safe unwrap
+
+    // compute cs
+    let (mut cs, _) = build_eq_committed_vals_cs(amount,
+                                                 asset_type,
+                                                 BLSScalar::from(&blind_pc),
+                                                 blind_hash,
+                                                 &pc_gens_jubjub);
+    let witness = cs.get_and_clear_witness();
+    let mut pub_inputs = vec![hash_comm, ped_comm.get_x(), ped_comm.get_y()];
+
+    // Check the constraints
+    assert!(cs.verify_witness(&witness, &pub_inputs).is_ok());
+    pub_inputs[0].add_assign(&BLSScalar::one());
+    assert!(cs.verify_witness(&witness, &pub_inputs).is_err());
   }
 
   #[test]

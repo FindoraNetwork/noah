@@ -8,8 +8,21 @@ type F = BLSScalar;
 #[derive(Clone)]
 pub struct Point(F, F); // represents a curve point in Affine form
 pub struct PointVar(VarIndex, VarIndex); // The witness indices for x/y-coordinates of a point
-pub(crate) struct ExtendedPointVar(PointVar, JubjubPoint); // PointVar plus the corresponding Jubjub point
+pub struct ExtendedPointVar(PointVar, JubjubPoint); // PointVar plus the corresponding Jubjub point
 
+impl ExtendedPointVar {
+  pub fn get_var(&self) -> &PointVar {
+    &self.0
+  }
+
+  pub fn get_point(&self) -> &JubjubPoint {
+    &self.1
+  }
+
+  pub fn into_point_var(self) -> PointVar {
+    self.0
+  }
+}
 impl Point {
   pub fn new(x: F, y: F) -> Point {
     Point(x, y)
@@ -143,12 +156,12 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
   }
 
   /// Given two elliptic curve point variables [P1] and [P2], returns [P1] + [P2]
-  fn ecc_add(&mut self,
-             p1_var: &PointVar,
-             p2_var: &PointVar,
-             p1_ext: &JubjubPoint,
-             p2_ext: &JubjubPoint)
-             -> ExtendedPointVar {
+  pub fn ecc_add(&mut self,
+                 p1_var: &PointVar,
+                 p2_var: &PointVar,
+                 p1_ext: &JubjubPoint,
+                 p2_ext: &JubjubPoint)
+                 -> ExtendedPointVar {
     assert!(p1_var.0 < self.num_vars, "p1.x variable index out of bound");
     assert!(p1_var.1 < self.num_vars, "p1.y variable index out of bound");
     assert!(p2_var.0 < self.num_vars, "p2.x variable index out of bound");

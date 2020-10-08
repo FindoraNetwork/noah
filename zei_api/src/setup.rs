@@ -1,6 +1,12 @@
 //The Public Setup needed for Proofs
-use crate::anon_xfr::circuits::{build_multi_xfr_cs, AMultiXfrWitness, TurboPlonkCS, TREE_DEPTH};
+use crate::anon_xfr::circuits::{
+  build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, TurboPlonkCS, TREE_DEPTH,
+};
+use algebra::bls12_381::BLSScalar;
+use algebra::groups::Zero;
+use algebra::jubjub::JubjubPoint;
 use bulletproofs::BulletproofGens;
+use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use poly_iops::commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
 use poly_iops::plonk::plonk_setup::{preprocess_prover, ProverParams, VerifierParams};
@@ -116,6 +122,18 @@ impl UserParams {
     let pcs = KZGCommitmentScheme::new(n_constraints + 2, &mut ChaChaRng::from_seed([0u8; 32]));
     let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
     UserParams { bp_params: PublicParams::new(bp_num_gens),
+                 pcs,
+                 cs,
+                 prover_params }
+  }
+
+  pub fn eq_committed_vals_params() -> UserParams {
+    let zero = BLSScalar::zero();
+    let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
+    let (cs, n_constraints) = build_eq_committed_vals_cs(zero, zero, zero, zero, &pc_gens_jubjub);
+    let pcs = KZGCommitmentScheme::new(n_constraints + 2, &mut ChaChaRng::from_seed([0u8; 32]));
+    let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+    UserParams { bp_params: PublicParams::new(DEFAULT_BP_NUM_GENS),
                  pcs,
                  cs,
                  prover_params }
