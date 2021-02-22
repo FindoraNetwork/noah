@@ -43,6 +43,12 @@ impl XfrPublicKey {
 }
 
 impl XfrSecretKey {
+  #[inline(always)]
+  pub fn into_keypair(self) -> XfrKeyPair {
+    XfrKeyPair { pub_key: XfrPublicKey(ed25519_dalek::PublicKey::from(&self.0)),
+                 sec_key: self }
+  }
+
   pub fn sign(&self, message: &[u8], public_key: &XfrPublicKey) -> XfrSignature {
     let expanded: ExpandedSecretKey = (&self.0).into();
     let sign = expanded.sign(message, &public_key.0);
@@ -69,6 +75,21 @@ impl XfrKeyPair {
 
   pub fn sign(&self, msg: &[u8]) -> XfrSignature {
     self.sec_key.sign(msg, &self.pub_key)
+  }
+
+  #[inline(always)]
+  pub fn get_pk(&self) -> XfrPublicKey {
+      self.pub_key
+  }
+
+  #[inline(always)]
+  pub fn get_pk_ref(&self) -> &XfrPublicKey {
+      &self.pub_key
+  }
+
+  #[inline(always)]
+  pub fn get_sk_ref(&self) -> &XfrSecretKey {
+      &self.sec_key
   }
 }
 
