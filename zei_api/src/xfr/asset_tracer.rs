@@ -149,7 +149,7 @@ impl TracerMemo {
     /// Check if the amount encrypted in self.lock_amount is expected
     /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
     /// Otherwise, if decrypted amount is not expected amount, return Err(ZeiError::AssetTracingExtractionError), else Ok(())
-    fn verify_amount(
+    pub fn verify_amount(
         &self,
         dec_key: &ElGamalDecKey<Scalar>,
         expected: u64,
@@ -230,7 +230,7 @@ impl TracerMemo {
     /// Check is the attributes encrypted in self.lock_attrs are the same as in expected_attributes
     /// If self.lock_attrs is None or if attribute length doesn't match expected list, return Err(ZeiError::ParameterError)
     /// Otherwise, it returns a boolean vector indicating true for every positive match and false otherwise.
-    fn verify_identity_attributes(
+    pub fn verify_identity_attributes(
         &self,
         dec_key: &ElGamalDecKey<BLSScalar>,
         expected_attributes: &[u32],
