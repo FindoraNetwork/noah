@@ -44,10 +44,11 @@ pub type Attr = u32;
 /// let num_attrs = 10;
 /// let keys = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
 /// ```
-pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(prng: &mut R,
-                                                num_attrs: usize)
-                                                -> (ACIssuerPublicKey, ACIssuerSecretKey) {
-  crypto::anon_creds::ac_keygen_issuer::<_, Bls12381>(prng, num_attrs)
+pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    num_attrs: usize,
+) -> (ACIssuerPublicKey, ACIssuerSecretKey) {
+    crypto::anon_creds::ac_keygen_issuer::<_, Bls12381>(prng, num_attrs)
 }
 
 /// Generates a credential user key pair for a given credential issuer
@@ -61,10 +62,11 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(prng: &mut R,
 /// let (issuer_pk,_) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
 /// let user_keys = ac_keygen_user::<ChaChaRng>(&mut prng, &issuer_pk);
 /// ```
-pub fn ac_keygen_user<R: CryptoRng + RngCore>(prng: &mut R,
-                                              issuer_pk: &ACIssuerPublicKey)
-                                              -> (ACUserPublicKey, ACUserSecretKey) {
-  crypto::anon_creds::ac_user_key_gen::<_, Bls12381>(prng, issuer_pk)
+pub fn ac_keygen_user<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    issuer_pk: &ACIssuerPublicKey,
+) -> (ACUserPublicKey, ACUserSecretKey) {
+    crypto::anon_creds::ac_user_key_gen::<_, Bls12381>(prng, issuer_pk)
 }
 
 /// Computes a credential signature for a set of attributes.
@@ -81,13 +83,20 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(prng: &mut R,
 /// let attributes = vec![1u32, 2];
 /// let signature = ac_sign::<ChaChaRng>(&mut prng, &issuer_sk, &user_pk, &attributes[..]);
 /// ```
-pub fn ac_sign<R: CryptoRng + RngCore>(prng: &mut R,
-                                       issuer_sk: &ACIssuerSecretKey,
-                                       user_pk: &ACUserPublicKey,
-                                       attrs: &[Attr])
-                                       -> Result<ACSignature, ZeiError> {
-  let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from_u32(*x)).collect();
-  crypto::anon_creds::ac_sign::<_, Bls12381>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
+pub fn ac_sign<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    issuer_sk: &ACIssuerSecretKey,
+    user_pk: &ACUserPublicKey,
+    attrs: &[Attr],
+) -> Result<ACSignature, ZeiError> {
+    let attrs_scalar: Vec<BLSScalar> =
+        attrs.iter().map(|x| BLSScalar::from_u32(*x)).collect();
+    crypto::anon_creds::ac_sign::<_, Bls12381>(
+        prng,
+        issuer_sk,
+        user_pk,
+        attrs_scalar.as_slice(),
+    )
 }
 
 /// Produces opening key for credential commitment creation and attribute opening
@@ -100,7 +109,7 @@ pub fn ac_sign<R: CryptoRng + RngCore>(prng: &mut R,
 /// let com_key = ac_keygen_commitment::<ChaChaRng>(&mut prng);
 /// ```
 pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmentKey {
-  crypto::anon_creds::ac_commitment_key_gen::<_, Bls12381>(prng)
+    crypto::anon_creds::ac_commitment_key_gen::<_, Bls12381>(prng)
 }
 
 /// Compute a commitment to a credential signature with a binding message, returning the opening key.
@@ -126,18 +135,22 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 /// };
 /// let (_,_,_) = ac_commit::<ChaChaRng>(&mut prng, &user_sk, &credential, b"some addr").unwrap();
 /// ```
-pub fn ac_commit<R: CryptoRng + RngCore>(prng: &mut R,
-                                         user_sk: &ACUserSecretKey,
-                                         credential: &Credential,
-                                         msg: &[u8])
-                                         -> Result<ACCommitOutput<Bls12381>, ZeiError> {
-  let c = crypto::anon_creds::Credential { signature: credential.signature.clone(),
-                                           attributes: credential.attributes
-                                                                 .iter()
-                                                                 .map(|x| BLSScalar::from_u32(*x))
-                                                                 .collect_vec(),
-                                           issuer_pub_key: credential.issuer_pub_key.clone() };
-  crypto::anon_creds::ac_commit::<_, Bls12381>(prng, user_sk, &c, msg)
+pub fn ac_commit<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    user_sk: &ACUserSecretKey,
+    credential: &Credential,
+    msg: &[u8],
+) -> Result<ACCommitOutput<Bls12381>, ZeiError> {
+    let c = crypto::anon_creds::Credential {
+        signature: credential.signature.clone(),
+        attributes: credential
+            .attributes
+            .iter()
+            .map(|x| BLSScalar::from_u32(*x))
+            .collect_vec(),
+        issuer_pub_key: credential.issuer_pub_key.clone(),
+    };
+    crypto::anon_creds::ac_commit::<_, Bls12381>(prng, user_sk, &c, msg)
 }
 
 /// Produces a AttrsRevealProof, bitmap indicates which attributes are revealed
@@ -163,29 +176,39 @@ pub fn ac_commit<R: CryptoRng + RngCore>(prng: &mut R,
 /// let addr = b"some addr";
 /// let output = ac_commit_with_key::<ChaChaRng>(&mut prng, &user_sk, &credential, &ac_key, addr).unwrap();
 /// ```
-pub fn ac_commit_with_key<R: CryptoRng + RngCore>(prng: &mut R,
-                                                  user_sk: &ACUserSecretKey,
-                                                  credential: &Credential,
-                                                  key: &ACCommitmentKey,
-                                                  msg: &[u8])
-                                                  -> Result<ACCommitOutput<Bls12381>, ZeiError> {
-  let c = crypto::anon_creds::Credential { signature: credential.signature.clone(),
-                                           attributes: credential.attributes
-                                                                 .iter()
-                                                                 .map(|x| BLSScalar::from_u32(*x))
-                                                                 .collect_vec(),
-                                           issuer_pub_key: credential.issuer_pub_key.clone() };
-  crypto::anon_creds::ac_commit_with_key::<_, Bls12381>(prng, user_sk, &c, key, msg)
+pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    user_sk: &ACUserSecretKey,
+    credential: &Credential,
+    key: &ACCommitmentKey,
+    msg: &[u8],
+) -> Result<ACCommitOutput<Bls12381>, ZeiError> {
+    let c = crypto::anon_creds::Credential {
+        signature: credential.signature.clone(),
+        attributes: credential
+            .attributes
+            .iter()
+            .map(|x| BLSScalar::from_u32(*x))
+            .collect_vec(),
+        issuer_pub_key: credential.issuer_pub_key.clone(),
+    };
+    crypto::anon_creds::ac_commit_with_key::<_, Bls12381>(prng, user_sk, &c, key, msg)
 }
 
 /// Verifies that the underlying credential is valid and that the commitment was issued using the
 /// message msg in particular.
-pub fn ac_verify_commitment(issuer_pub_key: &ACIssuerPublicKey,
-                            sig_commitment: &ACCommitment,
-                            sok: &ACPoK,
-                            msg: &[u8])
-                            -> Result<(), ZeiError> {
-  crypto::anon_creds::ac_verify_commitment::<Bls12381>(issuer_pub_key, sig_commitment, sok, msg)
+pub fn ac_verify_commitment(
+    issuer_pub_key: &ACIssuerPublicKey,
+    sig_commitment: &ACCommitment,
+    sok: &ACPoK,
+    msg: &[u8],
+) -> Result<(), ZeiError> {
+    crypto::anon_creds::ac_verify_commitment::<Bls12381>(
+        issuer_pub_key,
+        sig_commitment,
+        sok,
+        msg,
+    )
 }
 
 /// Produces a AttrsRevealProof for a committed credential produced using key. bitmap indicates which attributes are revealed
@@ -209,37 +232,47 @@ pub fn ac_verify_commitment(issuer_pub_key: &ACIssuerPublicKey,
 /// let attrs_map = [true, false];
 /// let reveal_sig = ac_open_commitment::<ChaChaRng>(&mut prng, &user_sk, &credential, &key.unwrap(), &attrs_map).unwrap();
 /// ```
-pub fn ac_open_commitment<R: CryptoRng + RngCore>(prng: &mut R,
-                                                  user_sk: &ACUserSecretKey,
-                                                  credential: &Credential,
-                                                  key: &ACCommitmentKey,
-                                                  reveal_map: &[bool])
-                                                  -> Result<ACRevealProof, ZeiError> {
-  let c = crypto::anon_creds::Credential { signature: credential.signature.clone(),
-                                           attributes: credential.attributes
-                                                                 .iter()
-                                                                 .map(|a| BLSScalar::from_u32(*a))
-                                                                 .collect_vec(),
-                                           issuer_pub_key: credential.issuer_pub_key.clone() };
-  crypto::anon_creds::ac_open_commitment::<_, Bls12381>(prng, user_sk, &c, key, reveal_map)
+pub fn ac_open_commitment<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    user_sk: &ACUserSecretKey,
+    credential: &Credential,
+    key: &ACCommitmentKey,
+    reveal_map: &[bool],
+) -> Result<ACRevealProof, ZeiError> {
+    let c = crypto::anon_creds::Credential {
+        signature: credential.signature.clone(),
+        attributes: credential
+            .attributes
+            .iter()
+            .map(|a| BLSScalar::from_u32(*a))
+            .collect_vec(),
+        issuer_pub_key: credential.issuer_pub_key.clone(),
+    };
+    crypto::anon_creds::ac_open_commitment::<_, Bls12381>(
+        prng, user_sk, &c, key, reveal_map,
+    )
 }
 
 /// Produces a ACRevealSig for a credential. ACRevealSig includes new commitment to the credential,
 /// and a AttrRevealProof for the revealed attributed.
 /// bitmap indicates which attributes are revealed.
 /// Calling ac_reveal is analogous to calling ac_commit and then ac_open_commitment.
-pub fn ac_reveal<R: CryptoRng + RngCore>(prng: &mut R,
-                                         user_sk: &ACUserSecretKey,
-                                         credential: &Credential,
-                                         reveal_bitmap: &[bool])
-                                         -> Result<ACRevealSig, ZeiError> {
-  let c = crypto::anon_creds::Credential { signature: credential.signature.clone(),
-                                           attributes: credential.attributes
-                                                                 .iter()
-                                                                 .map(|a| BLSScalar::from_u32(*a))
-                                                                 .collect_vec(),
-                                           issuer_pub_key: credential.issuer_pub_key.clone() };
-  crypto::anon_creds::ac_reveal::<_, Bls12381>(prng, user_sk, &c, reveal_bitmap)
+pub fn ac_reveal<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    user_sk: &ACUserSecretKey,
+    credential: &Credential,
+    reveal_bitmap: &[bool],
+) -> Result<ACRevealSig, ZeiError> {
+    let c = crypto::anon_creds::Credential {
+        signature: credential.signature.clone(),
+        attributes: credential
+            .attributes
+            .iter()
+            .map(|a| BLSScalar::from_u32(*a))
+            .collect_vec(),
+        issuer_pub_key: credential.issuer_pub_key.clone(),
+    };
+    crypto::anon_creds::ac_reveal::<_, Bls12381>(prng, user_sk, &c, reveal_bitmap)
 }
 /// Verifies an anonymous credential reveal proof.
 /// # Example
@@ -269,23 +302,26 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(prng: &mut R,
 /// let result_verification_err = ac_verify(&issuer_pk, &attr_map, &reveal_sig.sig_commitment, &reveal_sig.pok);
 /// assert!(result_verification_err.is_err());
 /// ```
-pub fn ac_verify(issuer_pub_key: &ACIssuerPublicKey,
-                 attrs: &[Option<Attr>],
-                 sig_commitment: &ACCommitment,
-                 reveal_proof: &ACRevealProof)
-                 -> Result<(), ZeiError> {
-  let attrs_scalar: Vec<Attribute<S>> =
-    attrs.iter()
-         .map(|attr| match attr {
-           Some(x) => Attribute::Revealed(BLSScalar::from_u32(*x)),
-           None => Attribute::Hidden(None),
-         })
-         .collect();
+pub fn ac_verify(
+    issuer_pub_key: &ACIssuerPublicKey,
+    attrs: &[Option<Attr>],
+    sig_commitment: &ACCommitment,
+    reveal_proof: &ACRevealProof,
+) -> Result<(), ZeiError> {
+    let attrs_scalar: Vec<Attribute<S>> = attrs
+        .iter()
+        .map(|attr| match attr {
+            Some(x) => Attribute::Revealed(BLSScalar::from_u32(*x)),
+            None => Attribute::Hidden(None),
+        })
+        .collect();
 
-  crypto::anon_creds::ac_verify::<Bls12381>(issuer_pub_key,
-                                            attrs_scalar.as_slice(),
-                                            &sig_commitment,
-                                            &reveal_proof)
+    crypto::anon_creds::ac_verify::<Bls12381>(
+        issuer_pub_key,
+        attrs_scalar.as_slice(),
+        &sig_commitment,
+        &reveal_proof,
+    )
 }
 
 pub type AttributeEncKey = crypto::basics::elgamal::ElGamalEncKey<G1>;
@@ -330,23 +366,27 @@ pub type ConfidentialAC = crypto::conf_cred_reveal::ConfidentialAC<G1, G2, S>;
 /// assert!(ac_confidential_verify(&issuer_pk, &enc_key, &bitmap[..], &sig_commitment, &conf_reveal_proof.ctexts, &conf_reveal_proof.pok, b"Some Message").is_ok())
 /// ```
 pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
-  prng: &mut R,
-  user_sk: &ACUserSecretKey,
-  credential: &Credential,
-  key: &ACCommitmentKey,
-  enc_key: &AttributeEncKey,
-  reveal_map: &[bool],
-  msg: &[u8])
-  -> Result<ConfidentialAC, ZeiError> {
-  let attrs_scalar = credential.attributes
-                               .iter()
-                               .map(|x| BLSScalar::from_u32(*x))
-                               .collect_vec();
-  let c = crypto::anon_creds::Credential { signature: credential.signature.clone(),
-                                           attributes: attrs_scalar,
-                                           issuer_pub_key: credential.issuer_pub_key.clone() };
-  crypto::conf_cred_reveal::ac_confidential_open_commitment::<R, Bls12381>(prng, user_sk, &c, key,
-                                                                           reveal_map, enc_key, msg)
+    prng: &mut R,
+    user_sk: &ACUserSecretKey,
+    credential: &Credential,
+    key: &ACCommitmentKey,
+    enc_key: &AttributeEncKey,
+    reveal_map: &[bool],
+    msg: &[u8],
+) -> Result<ConfidentialAC, ZeiError> {
+    let attrs_scalar = credential
+        .attributes
+        .iter()
+        .map(|x| BLSScalar::from_u32(*x))
+        .collect_vec();
+    let c = crypto::anon_creds::Credential {
+        signature: credential.signature.clone(),
+        attributes: attrs_scalar,
+        issuer_pub_key: credential.issuer_pub_key.clone(),
+    };
+    crypto::conf_cred_reveal::ac_confidential_open_commitment::<R, Bls12381>(
+        prng, user_sk, &c, key, reveal_map, enc_key, msg,
+    )
 }
 
 /// Verifies a Confidential Anonymous Credential reveal proof. Proof asserts
@@ -361,25 +401,28 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
 /// ```
 ///  // see zei::api::anon_creds::ac_confidential_open_commitment;
 /// ```
-pub fn ac_confidential_verify(issuer_pk: &ACIssuerPublicKey,
-                              enc_key: &AttributeEncKey,
-                              reveal_map: &[bool],
-                              sig_commitment: &ACCommitment,
-                              attr_ctext: &[AttributeCiphertext],
-                              cac_proof: &ACConfidentialRevealProof,
-                              msg: &[u8])
-                              -> Result<(), ZeiError> {
-  crypto::conf_cred_reveal::ac_confidential_open_verify::<Bls12381>(issuer_pk,
-                                                                    enc_key,
-                                                                    reveal_map,
-                                                                    sig_commitment,
-                                                                    attr_ctext,
-                                                                    cac_proof,
-                                                                    msg)
+pub fn ac_confidential_verify(
+    issuer_pk: &ACIssuerPublicKey,
+    enc_key: &AttributeEncKey,
+    reveal_map: &[bool],
+    sig_commitment: &ACCommitment,
+    attr_ctext: &[AttributeCiphertext],
+    cac_proof: &ACConfidentialRevealProof,
+    msg: &[u8],
+) -> Result<(), ZeiError> {
+    crypto::conf_cred_reveal::ac_confidential_open_verify::<Bls12381>(
+        issuer_pk,
+        enc_key,
+        reveal_map,
+        sig_commitment,
+        attr_ctext,
+        cac_proof,
+        msg,
+    )
 }
 
 pub fn ac_confidential_gen_encryption_keys<R: CryptoRng + RngCore>(
-  prng: &mut R)
-  -> (AttributeDecKey, AttributeEncKey) {
-  elgamal_key_gen::<_, G1>(prng, &G1::get_base())
+    prng: &mut R,
+) -> (AttributeDecKey, AttributeEncKey) {
+    elgamal_key_gen::<_, G1>(prng, &G1::get_base())
 }

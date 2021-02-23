@@ -7,11 +7,12 @@
 */
 
 use crate::api::anon_creds::{
-  ac_reveal, ac_verify, ACIssuerPublicKey, ACRevealSig, ACUserSecretKey, Attr, Credential,
+    ac_reveal, ac_verify, ACIssuerPublicKey, ACRevealSig, ACUserSecretKey, Attr,
+    Credential,
 };
 use crate::api::gp_sig::{
-  gpsig_join_cert, gpsig_open, gpsig_verify, GroupPublicKey, GroupSecretKey, GroupSignature,
-  JoinCert, TagKey,
+    gpsig_join_cert, gpsig_open, gpsig_verify, GroupPublicKey, GroupSecretKey,
+    GroupSignature, JoinCert, TagKey,
 };
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
@@ -20,63 +21,74 @@ use utils::errors::ZeiError;
 /// JoinRequest message from the User to the Regulator. It contains the identity of the user.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JoinRequest {
-  credential_proof: ACRevealSig,
-  attrs: Vec<Attr>,
+    credential_proof: ACRevealSig,
+    attrs: Vec<Attr>,
 }
 
 /// Users that register with regulators must produce a JoinRequest message using this function
 /// # Example
 /// see zei::api::regulator_tracking::rt_get_trace_tag;
-pub fn rt_user_gen_join_request<R: CryptoRng + RngCore>(prng: &mut R,
-                                                        ac_user_sk: &ACUserSecretKey,
-                                                        credential: &Credential)
-                                                        -> Result<JoinRequest, ZeiError> {
-  // all attributed are revealed to the regulator
-  let cred_proof = ac_reveal(prng,
-                             ac_user_sk,
-                             credential,
-                             credential.issuer_pub_key
-                                       .yy2
-                                       .iter()
-                                       .map(|_| true)
-                                       .collect_vec()
-                                       .as_slice())?;
-  Ok(JoinRequest { credential_proof: cred_proof,
-                   attrs: credential.attributes.clone() })
+pub fn rt_user_gen_join_request<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    ac_user_sk: &ACUserSecretKey,
+    credential: &Credential,
+) -> Result<JoinRequest, ZeiError> {
+    // all attributed are revealed to the regulator
+    let cred_proof = ac_reveal(
+        prng,
+        ac_user_sk,
+        credential,
+        credential
+            .issuer_pub_key
+            .yy2
+            .iter()
+            .map(|_| true)
+            .collect_vec()
+            .as_slice(),
+    )?;
+    Ok(JoinRequest {
+        credential_proof: cred_proof,
+        attrs: credential.attributes.clone(),
+    })
 }
 
 /// Regulator process the user's join request message and returning a join certificate for the client
 /// and a trace tag to store locally.
 /// # Example
 /// see zei::api::regulator_tracking::rt_get_trace_tag;
-pub fn rt_process_join_request<R: CryptoRng + RngCore>(prng: &mut R,
-                                                       rsk: &GroupSecretKey,
-                                                       user_join_req: &JoinRequest,
-                                                       ac_issuer_pk: &ACIssuerPublicKey)
-                                                       -> Result<(JoinCert, TagKey), ZeiError> {
-  // 1 check credential
-  let attrs_as_option: Vec<Option<u32>> = user_join_req.attrs
-                                                       .as_slice()
-                                                       .iter()
-                                                       .map(|x| Some(*x))
-                                                       .collect();
-  ac_verify(ac_issuer_pk,
-            attrs_as_option.as_slice(),
-            &user_join_req.credential_proof.sig_commitment,
-            &user_join_req.credential_proof.pok)?;
+pub fn rt_process_join_request<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    rsk: &GroupSecretKey,
+    user_join_req: &JoinRequest,
+    ac_issuer_pk: &ACIssuerPublicKey,
+) -> Result<(JoinCert, TagKey), ZeiError> {
+    // 1 check credential
+    let attrs_as_option: Vec<Option<u32>> = user_join_req
+        .attrs
+        .as_slice()
+        .iter()
+        .map(|x| Some(*x))
+        .collect();
+    ac_verify(
+        ac_issuer_pk,
+        attrs_as_option.as_slice(),
+        &user_join_req.credential_proof.sig_commitment,
+        &user_join_req.credential_proof.pok,
+    )?;
 
-  // 2 generate tag
-  Ok(gpsig_join_cert(prng, rsk))
+    // 2 generate tag
+    Ok(gpsig_join_cert(prng, rsk))
 }
 
 /// Group signature verification function
 /// # Example
 /// see zei::api::regulator_tracking::rt_get_trace_tag;
-pub fn rt_verify_sig<B: AsRef<[u8]>>(rpk: &GroupPublicKey,
-                                     sig: &GroupSignature,
-                                     msg: &B)
-                                     -> Result<(), ZeiError> {
-  gpsig_verify(rpk, sig, msg)
+pub fn rt_verify_sig<B: AsRef<[u8]>>(
+    rpk: &GroupPublicKey,
+    sig: &GroupSignature,
+    msg: &B,
+) -> Result<(), ZeiError> {
+    gpsig_verify(rpk, sig, msg)
 }
 
 /// Regulator obtains tag from signature
@@ -111,5 +123,5 @@ pub fn rt_verify_sig<B: AsRef<[u8]>>(rpk: &GroupPublicKey,
 /// assert_eq!(trace_tag, signature_trace_tag);
 /// ```
 pub fn rt_get_trace_tag(rsk: &GroupSecretKey, sig: &GroupSignature) -> TagKey {
-  gpsig_open(sig, rsk)
+    gpsig_open(sig, rsk)
 }

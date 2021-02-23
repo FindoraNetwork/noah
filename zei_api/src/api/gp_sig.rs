@@ -14,8 +14,10 @@ pub type GroupSignature = crypto::group_signatures::GroupSignature<Bls12381>;
 /// Generates the private and public parameters for the Group manager.
 /// * `prng` - source of randomness
 /// * `returns` - a group public key and a group secret key
-pub fn gpsig_setup<R: CryptoRng + RngCore>(prng: &mut R) -> (GroupPublicKey, GroupSecretKey) {
-  crypto::group_signatures::gpsig_setup::<R, Bls12381>(prng)
+pub fn gpsig_setup<R: CryptoRng + RngCore>(
+    prng: &mut R,
+) -> (GroupPublicKey, GroupSecretKey) {
+    crypto::group_signatures::gpsig_setup::<R, Bls12381>(prng)
 }
 
 /// Group membership certificate
@@ -27,10 +29,11 @@ pub type TagKey = crypto::group_signatures::TagKey<BLSG1>;
 /// * `prng` - source of randomness
 /// * `msk` - group secret key
 /// * `return` join certificate
-pub fn gpsig_join_cert<R: CryptoRng + RngCore>(prng: &mut R,
-                                               msk: &GroupSecretKey)
-                                               -> (JoinCert, TagKey) {
-  crypto::group_signatures::gpsig_join_cert(prng, msk)
+pub fn gpsig_join_cert<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    msk: &GroupSecretKey,
+) -> (JoinCert, TagKey) {
+    crypto::group_signatures::gpsig_join_cert(prng, msk)
 }
 
 /// Signature funtion run by a user to produce a group signature
@@ -49,12 +52,13 @@ pub fn gpsig_join_cert<R: CryptoRng + RngCore>(prng: &mut R,
 /// let sig = gpsig_sign(&mut prng, &gpk, &join_cert, b"Some message");
 /// assert!(gpsig_verify(&gpk, &sig, b"Some message").is_ok());
 /// ```
-pub fn gpsig_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
-                                                          gpk: &GroupPublicKey,
-                                                          join_cert: &JoinCert,
-                                                          msg: &B)
-                                                          -> GroupSignature {
-  crypto::group_signatures::gpsig_sign(prng, gpk, join_cert, msg.as_ref())
+pub fn gpsig_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(
+    prng: &mut R,
+    gpk: &GroupPublicKey,
+    join_cert: &JoinCert,
+    msg: &B,
+) -> GroupSignature {
+    crypto::group_signatures::gpsig_sign(prng, gpk, join_cert, msg.as_ref())
 }
 
 /// Group signature verification function
@@ -65,11 +69,12 @@ pub fn gpsig_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(prng: &mut R,
 /// ```
 /// // See zei::api::gp_sig::gpsig_sign
 /// ```
-pub fn gpsig_verify<B: AsRef<[u8]>>(gpk: &GroupPublicKey,
-                                    sig: &GroupSignature,
-                                    msg: &B)
-                                    -> Result<(), ZeiError> {
-  crypto::group_signatures::gpsig_verify(gpk, sig, msg.as_ref())
+pub fn gpsig_verify<B: AsRef<[u8]>>(
+    gpk: &GroupPublicKey,
+    sig: &GroupSignature,
+    msg: &B,
+) -> Result<(), ZeiError> {
+    crypto::group_signatures::gpsig_verify(gpk, sig, msg.as_ref())
 }
 
 /// Signature opening function
@@ -90,5 +95,5 @@ pub fn gpsig_verify<B: AsRef<[u8]>>(gpk: &GroupPublicKey,
 /// assert_eq!(tag_key, tag_group_element_recovered, "Recovered tag key does not match")
 /// ```
 pub fn gpsig_open(sig: &GroupSignature, msk: &GroupSecretKey) -> TagKey {
-  crypto::group_signatures::gpsig_open(sig, msk)
+    crypto::group_signatures::gpsig_open(sig, msk)
 }

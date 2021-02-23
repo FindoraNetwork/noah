@@ -28,20 +28,20 @@ use utils::errors::ZeiError;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PSPublicKey<G2> {
-  pub(crate) xx: G2,
-  pub(crate) yy: G2,
+    pub(crate) xx: G2,
+    pub(crate) yy: G2,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PSSecretKey<S> {
-  pub(crate) x: S,
-  pub(crate) y: S,
+    pub(crate) x: S,
+    pub(crate) y: S,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PSSignature<G1> {
-  pub(crate) s1: G1,
-  pub(crate) s2: G1,
+    pub(crate) s1: G1,
+    pub(crate) s2: G1,
 }
 
 /// Pointcheval-Sanders key generation algorithm
@@ -54,18 +54,18 @@ pub struct PSSignature<G1> {
 /// let keys = ps_gen_keys::<_,Bls12381>(&mut thread_rng());
 /// ```
 pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
-  prng: &mut R)
-  -> (PSPublicKey<P::G2>, PSSecretKey<P::ScalarField>) {
-  // In the paper the construction of section 4.1 suggests to pick the generator in G2 at random
-  // However the security proof is a direct reduction to Assumption 2 for which one can pick any generator in G2.
-  let g2 = P::G2::get_base();
-  let x = P::ScalarField::random(prng);
-  let y = P::ScalarField::random(prng);
+    prng: &mut R,
+) -> (PSPublicKey<P::G2>, PSSecretKey<P::ScalarField>) {
+    // In the paper the construction of section 4.1 suggests to pick the generator in G2 at random
+    // However the security proof is a direct reduction to Assumption 2 for which one can pick any generator in G2.
+    let g2 = P::G2::get_base();
+    let x = P::ScalarField::random(prng);
+    let y = P::ScalarField::random(prng);
 
-  let xx = g2.mul(&x);
-  let yy = g2.mul(&y);
+    let xx = g2.mul(&x);
+    let yy = g2.mul(&y);
 
-  (PSPublicKey { xx, yy }, PSSecretKey { x, y })
+    (PSPublicKey { xx, yy }, PSSecretKey { x, y })
 }
 
 /// Pointcheval-Sanders signing function for byte slices
@@ -78,12 +78,13 @@ pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
 /// let (_, sk) = ps_gen_keys::<_,Bls12381>(&mut thread_rng());
 /// let sig = ps_sign_bytes::<_, Bls12381>(&mut thread_rng(), &sk, b"this is a message");
 /// ```
-pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
-                                                         sk: &PSSecretKey<P::ScalarField>,
-                                                         m: &[u8])
-                                                         -> PSSignature<P::G1> {
-  let m_scalar = hash_message::<P::ScalarField>(m);
-  ps_sign_scalar::<_, P>(prng, sk, &m_scalar)
+pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: Pairing>(
+    prng: &mut R,
+    sk: &PSSecretKey<P::ScalarField>,
+    m: &[u8],
+) -> PSSignature<P::G1> {
+    let m_scalar = hash_message::<P::ScalarField>(m);
+    ps_sign_scalar::<_, P>(prng, sk, &m_scalar)
 }
 
 /// Pointcheval-Sanders signing function for scalars
@@ -97,15 +98,16 @@ pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
 /// let (_, sk) = ps_gen_keys::<_, Bls12381>(&mut thread_rng());
 /// let sig = ps_sign_scalar::<_, Bls12381>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100u32));
 /// ```
-pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
-                                                          sk: &PSSecretKey<P::ScalarField>,
-                                                          m: &P::ScalarField)
-                                                          -> PSSignature<P::G1> {
-  let a = P::ScalarField::random(prng);
-  let s1 = P::G1::get_base().mul(&a);
+pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(
+    prng: &mut R,
+    sk: &PSSecretKey<P::ScalarField>,
+    m: &P::ScalarField,
+) -> PSSignature<P::G1> {
+    let a = P::ScalarField::random(prng);
+    let s1 = P::G1::get_base().mul(&a);
 
-  let s2 = s1.mul(&sk.x.add(&sk.y.mul(&m)));
-  PSSignature { s1, s2 }
+    let s2 = s1.mul(&sk.x.add(&sk.y.mul(&m)));
+    PSSignature { s1, s2 }
 }
 
 /// Pointcheval-Sanders verification function for byte slices
@@ -121,12 +123,13 @@ pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(prng: &mut R,
 /// assert!(ps_verify_sig_bytes::<Bls12381>(&pk, b"this is a message", &sig).is_ok());
 /// assert_eq!(Some(ZeiError::SignatureError), ps_verify_sig_bytes::<Bls12381>(&pk, b"this is ANOTHER message", &sig).err());
 /// ```
-pub fn ps_verify_sig_bytes<P: Pairing>(pk: &PSPublicKey<P::G2>,
-                                       m: &[u8],
-                                       sig: &PSSignature<P::G1>)
-                                       -> Result<(), ZeiError> {
-  let m_scalar = hash_message::<P::ScalarField>(m);
-  ps_verify_sig_scalar::<P>(pk, &m_scalar, sig)
+pub fn ps_verify_sig_bytes<P: Pairing>(
+    pk: &PSPublicKey<P::G2>,
+    m: &[u8],
+    sig: &PSSignature<P::G1>,
+) -> Result<(), ZeiError> {
+    let m_scalar = hash_message::<P::ScalarField>(m);
+    ps_verify_sig_scalar::<P>(pk, &m_scalar, sig)
 }
 
 /// Pointcheval-Sanders verification function for scalars
@@ -143,17 +146,18 @@ pub fn ps_verify_sig_bytes<P: Pairing>(pk: &PSPublicKey<P::G2>,
 /// assert!(ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(100), &sig).is_ok());
 /// assert_eq!(Some(ZeiError::SignatureError), ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(333), &sig).err());
 /// ```
-pub fn ps_verify_sig_scalar<P: Pairing>(pk: &PSPublicKey<P::G2>,
-                                        m: &P::ScalarField,
-                                        sig: &PSSignature<P::G1>)
-                                        -> Result<(), ZeiError> {
-  let a = pk.xx.add(&pk.yy.mul(&m));
-  let e1 = P::pairing(&sig.s1, &a);
-  let e2 = P::pairing(&sig.s2, &P::G2::get_base());
-  if e1 != e2 || sig.s1 == P::G1::get_identity() {
-    return Err(ZeiError::SignatureError);
-  }
-  Ok(())
+pub fn ps_verify_sig_scalar<P: Pairing>(
+    pk: &PSPublicKey<P::G2>,
+    m: &P::ScalarField,
+    sig: &PSSignature<P::G1>,
+) -> Result<(), ZeiError> {
+    let a = pk.xx.add(&pk.yy.mul(&m));
+    let e1 = P::pairing(&sig.s1, &a);
+    let e2 = P::pairing(&sig.s2, &P::G2::get_base());
+    if e1 != e2 || sig.s1 == P::G1::get_identity() {
+        return Err(ZeiError::SignatureError);
+    }
+    Ok(())
 }
 
 /// Pointcheval-Sanders signature randomization function
@@ -170,17 +174,17 @@ pub fn ps_verify_sig_scalar<P: Pairing>(pk: &PSPublicKey<P::G2>,
 ///
 /// ```
 pub fn ps_randomize_sig<R: RngCore + CryptoRng, P: Pairing>(
-  prng: &mut R,
-  sig: &PSSignature<P::G1>)
-  -> (P::ScalarField, PSSignature<P::G1>) {
-  let rand_factor = P::ScalarField::random(prng);
-  let s1 = sig.s1.mul(&rand_factor);
-  let s2 = sig.s2.mul(&rand_factor);
-  (rand_factor, PSSignature { s1, s2 })
+    prng: &mut R,
+    sig: &PSSignature<P::G1>,
+) -> (P::ScalarField, PSSignature<P::G1>) {
+    let rand_factor = P::ScalarField::random(prng);
+    let s1 = sig.s1.mul(&rand_factor);
+    let s2 = sig.s2.mul(&rand_factor);
+    (rand_factor, PSSignature { s1, s2 })
 }
 
 fn hash_message<S: Scalar>(message: &[u8]) -> S {
-  let mut hasher = Sha512::new();
-  hasher.input(message);
-  S::from_hash(hasher)
+    let mut hasher = Sha512::new();
+    hasher.input(message);
+    S::from_hash(hasher)
 }

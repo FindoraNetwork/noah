@@ -96,79 +96,84 @@ use utils::errors::ZeiError;
 /// ```
 // TODO: (alex) consider streamline this api by merging public assets into hidden asset with blinding of zero
 #[allow(clippy::too_many_arguments)] // TODO (fernando) simplify this signature
-pub fn prove_solvency(bp_gens: &BulletproofGens,
-                      pc_gens: &RistrettoPedersenGens,
-                      hidden_asset_set: &[CloakValue], // amount and type of hidden assets
-                      asset_set_blinds: &[CloakValue], // blindings for amount and type of hidden assets
-                      public_asset_set: &[CloakValue], // amount and type of public/known assets
-                      hidden_liability_set: &[CloakValue], // amount and type of hidden liabilities
-                      liability_set_blinds: &[CloakValue], // blindings for amount and type in hidden liabilities
-                      public_liability_set: &[CloakValue], // amount and type of public/known assets
-                      conversion_rates: &[(Scalar, Scalar)]  // exchange rates for asset types
+pub fn prove_solvency(
+    bp_gens: &BulletproofGens,
+    pc_gens: &RistrettoPedersenGens,
+    hidden_asset_set: &[CloakValue], // amount and type of hidden assets
+    asset_set_blinds: &[CloakValue], // blindings for amount and type of hidden assets
+    public_asset_set: &[CloakValue], // amount and type of public/known assets
+    hidden_liability_set: &[CloakValue], // amount and type of hidden liabilities
+    liability_set_blinds: &[CloakValue], // blindings for amount and type in hidden liabilities
+    public_liability_set: &[CloakValue], // amount and type of public/known assets
+    conversion_rates: &[(Scalar, Scalar)], // exchange rates for asset types
 ) -> Result<R1CSProof, ZeiError> {
-  let pc_gens: PedersenGens = pc_gens.into();
-  let mut transcript = Transcript::new(b"SolvencyProof");
-  let mut prover = Prover::new(&pc_gens, &mut transcript);
+    let pc_gens: PedersenGens = pc_gens.into();
+    let mut transcript = Transcript::new(b"SolvencyProof");
+    let mut prover = Prover::new(&pc_gens, &mut transcript);
 
-  // compute assets circuit variables
-  let mut asset_vars = Vec::with_capacity(hidden_asset_set.len());
-  for (asset, blinds) in hidden_asset_set.iter().zip(asset_set_blinds) {
-    let (_, var) = asset.commit_prover(&mut prover, blinds);
-    asset_vars.push(var);
-  }
+    // compute assets circuit variables
+    let mut asset_vars = Vec::with_capacity(hidden_asset_set.len());
+    for (asset, blinds) in hidden_asset_set.iter().zip(asset_set_blinds) {
+        let (_, var) = asset.commit_prover(&mut prover, blinds);
+        asset_vars.push(var);
+    }
 
-  // compute liabilities circuit variables
-  let mut liabilities_vars = Vec::with_capacity(hidden_liability_set.len());
-  for (lia, blinds) in hidden_liability_set.iter().zip(liability_set_blinds) {
-    let (_, var) = lia.commit_prover(&mut prover, blinds);
-    liabilities_vars.push(var);
-  }
+    // compute liabilities circuit variables
+    let mut liabilities_vars = Vec::with_capacity(hidden_liability_set.len());
+    for (lia, blinds) in hidden_liability_set.iter().zip(liability_set_blinds) {
+        let (_, var) = lia.commit_prover(&mut prover, blinds);
+        liabilities_vars.push(var);
+    }
 
-  // compute public asset total
-  let mut public_asset_sum = Scalar::from_u32(0);
-  for public_asset in public_asset_set {
-    let rate = conversion_rates.iter()
-                               .find(|(a, _)| a == &public_asset.asset_type)
-                               .ok_or(ZeiError::SolvencyProveError)?
-                               .1;
-    public_asset_sum = public_asset_sum.add(&rate.mul(&public_asset.amount));
-  }
+    // compute public asset total
+    let mut public_asset_sum = Scalar::from_u32(0);
+    for public_asset in public_asset_set {
+        let rate = conversion_rates
+            .iter()
+            .find(|(a, _)| a == &public_asset.asset_type)
+            .ok_or(ZeiError::SolvencyProveError)?
+            .1;
+        public_asset_sum = public_asset_sum.add(&rate.mul(&public_asset.amount));
+    }
 
-  // compute public liabilities total
-  let mut public_liability_sum = Scalar::from_u32(0);
-  for public_lia in public_liability_set {
-    let rate = conversion_rates.iter()
-                               .find(|(a, _)| a == &public_lia.asset_type)
-                               .ok_or(ZeiError::SolvencyProveError)?
-                               .1;
-    public_liability_sum = public_liability_sum.add(&rate.mul(&public_lia.amount));
-  }
+    // compute public liabilities total
+    let mut public_liability_sum = Scalar::from_u32(0);
+    for public_lia in public_liability_set {
+        let rate = conversion_rates
+            .iter()
+            .find(|(a, _)| a == &public_lia.asset_type)
+            .ok_or(ZeiError::SolvencyProveError)?
+            .1;
+        public_liability_sum = public_liability_sum.add(&rate.mul(&public_lia.amount));
+    }
 
-  // padding:
-  let mut types = vec![];
-  for (t, _) in conversion_rates {
-    types.push(*t);
-  }
-  let mut padded_hidden_assets = hidden_asset_set.to_vec();
-  let mut padded_hidden_liabilities = hidden_liability_set.to_vec();
-  padd_vars(&mut prover, &mut asset_vars, types.as_slice()).map_err(|_| {
-                                                             ZeiError::SolvencyProveError
-                                                           })?;
-  padd_values(&mut padded_hidden_assets, types.as_slice());
-  padd_vars(&mut prover, &mut liabilities_vars, types.as_slice()).map_err(|_| {
-                                                                   ZeiError::SolvencyProveError
-                                                                 })?;
-  padd_values(&mut padded_hidden_liabilities, types.as_slice());
+    // padding:
+    let mut types = vec![];
+    for (t, _) in conversion_rates {
+        types.push(*t);
+    }
+    let mut padded_hidden_assets = hidden_asset_set.to_vec();
+    let mut padded_hidden_liabilities = hidden_liability_set.to_vec();
+    padd_vars(&mut prover, &mut asset_vars, types.as_slice())
+        .map_err(|_| ZeiError::SolvencyProveError)?;
+    padd_values(&mut padded_hidden_assets, types.as_slice());
+    padd_vars(&mut prover, &mut liabilities_vars, types.as_slice())
+        .map_err(|_| ZeiError::SolvencyProveError)?;
+    padd_values(&mut padded_hidden_liabilities, types.as_slice());
 
-  let _num_gates = solvency(&mut prover,
-                            &asset_vars[..],
-                            Some(padded_hidden_assets.as_slice()),
-                            public_asset_sum,
-                            &liabilities_vars[..],
-                            Some(padded_hidden_liabilities.as_slice()),
-                            public_liability_sum,
-                            conversion_rates).map_err(|_| ZeiError::SolvencyProveError)?;
-  prover.prove(bp_gens)
+    let _num_gates = solvency(
+        &mut prover,
+        &asset_vars[..],
+        Some(padded_hidden_assets.as_slice()),
+        public_asset_sum,
+        &liabilities_vars[..],
+        Some(padded_hidden_liabilities.as_slice()),
+        public_liability_sum,
+        conversion_rates,
+    )
+    .map_err(|_| ZeiError::SolvencyProveError)?;
+    prover
+        .prove(bp_gens)
         .map_err(|_| ZeiError::SolvencyProveError)
 }
 
@@ -185,346 +190,402 @@ pub fn prove_solvency(bp_gens: &BulletproofGens,
 /// // See zei::crypto::solvency::prove_solvency
 /// ```
 #[allow(clippy::too_many_arguments)] // TODO (fernando) simplify this signature
-pub fn verify_solvency(bp_gens: &BulletproofGens,
-                       pc_gens: &RistrettoPedersenGens,
-                       hidden_asset_set: &[CloakCommitment], //commitments to assets
-                       public_asset_set: &[CloakValue],
-                       hidden_liability_set: &[CloakCommitment], //commitments to liabilities
-                       public_liability_set: &[CloakValue],
-                       conversion_rates: &[(Scalar, Scalar)], // exchange rate for asset types
-                       proof: &R1CSProof)
-                       -> Result<(), ZeiError> {
-  let pc_gens = pc_gens.into();
-  let mut transcript = Transcript::new(b"SolvencyProof");
-  let mut verifier = Verifier::new(&mut transcript);
+pub fn verify_solvency(
+    bp_gens: &BulletproofGens,
+    pc_gens: &RistrettoPedersenGens,
+    hidden_asset_set: &[CloakCommitment], //commitments to assets
+    public_asset_set: &[CloakValue],
+    hidden_liability_set: &[CloakCommitment], //commitments to liabilities
+    public_liability_set: &[CloakValue],
+    conversion_rates: &[(Scalar, Scalar)], // exchange rate for asset types
+    proof: &R1CSProof,
+) -> Result<(), ZeiError> {
+    let pc_gens = pc_gens.into();
+    let mut transcript = Transcript::new(b"SolvencyProof");
+    let mut verifier = Verifier::new(&mut transcript);
 
-  let mut asset_vars: Vec<CloakVariable> =
-    hidden_asset_set.iter()
-                    .map(|com| com.commit_verifier(&mut verifier))
-                    .collect();
+    let mut asset_vars: Vec<CloakVariable> = hidden_asset_set
+        .iter()
+        .map(|com| com.commit_verifier(&mut verifier))
+        .collect();
 
-  let mut liabilities_vars: Vec<CloakVariable> =
-    hidden_liability_set.iter()
-                        .map(|com| com.commit_verifier(&mut verifier))
-                        .collect();
+    let mut liabilities_vars: Vec<CloakVariable> = hidden_liability_set
+        .iter()
+        .map(|com| com.commit_verifier(&mut verifier))
+        .collect();
 
-  let mut public_asset_sum = Scalar::from_u32(0);
-  for public_asset in public_asset_set {
-    let rate = conversion_rates.iter()
-                               .find(|(a, _)| a == &public_asset.asset_type)
-                               .ok_or(ZeiError::SolvencyProveError)?
-                               .1;
-    public_asset_sum = public_asset_sum.add(&rate.mul(&public_asset.amount));
-  }
+    let mut public_asset_sum = Scalar::from_u32(0);
+    for public_asset in public_asset_set {
+        let rate = conversion_rates
+            .iter()
+            .find(|(a, _)| a == &public_asset.asset_type)
+            .ok_or(ZeiError::SolvencyProveError)?
+            .1;
+        public_asset_sum = public_asset_sum.add(&rate.mul(&public_asset.amount));
+    }
 
-  let mut public_liability_sum = Scalar::from_u32(0);
-  for public_lia in public_liability_set {
-    let rate = conversion_rates.iter()
-                               .find(|(a, _)| a == &public_lia.asset_type)
-                               .ok_or(ZeiError::SolvencyProveError)?
-                               .1;
-    public_liability_sum = public_liability_sum.add(&rate.mul(&public_lia.amount));
-  }
+    let mut public_liability_sum = Scalar::from_u32(0);
+    for public_lia in public_liability_set {
+        let rate = conversion_rates
+            .iter()
+            .find(|(a, _)| a == &public_lia.asset_type)
+            .ok_or(ZeiError::SolvencyProveError)?
+            .1;
+        public_liability_sum = public_liability_sum.add(&rate.mul(&public_lia.amount));
+    }
 
-  // padding:
-  let mut types = vec![];
-  for (t, _) in conversion_rates {
-    types.push(*t);
-  }
-  padd_vars(&mut verifier, &mut asset_vars, types.as_slice()).map_err(|_| {
-                                                               ZeiError::SolvencyVerificationError
-                                                             })?;
-  padd_vars(&mut verifier, &mut liabilities_vars, types.as_slice()).map_err(|_| ZeiError::SolvencyVerificationError)?;
+    // padding:
+    let mut types = vec![];
+    for (t, _) in conversion_rates {
+        types.push(*t);
+    }
+    padd_vars(&mut verifier, &mut asset_vars, types.as_slice())
+        .map_err(|_| ZeiError::SolvencyVerificationError)?;
+    padd_vars(&mut verifier, &mut liabilities_vars, types.as_slice())
+        .map_err(|_| ZeiError::SolvencyVerificationError)?;
 
-  let _num_gates = solvency(&mut verifier,
-                            &asset_vars[..],
-                            None,
-                            public_asset_sum,
-                            &liabilities_vars[..],
-                            None,
-                            public_liability_sum,
-                            conversion_rates).map_err(|_| ZeiError::SolvencyVerificationError)?;
+    let _num_gates = solvency(
+        &mut verifier,
+        &asset_vars[..],
+        None,
+        public_asset_sum,
+        &liabilities_vars[..],
+        None,
+        public_liability_sum,
+        conversion_rates,
+    )
+    .map_err(|_| ZeiError::SolvencyVerificationError)?;
 
-  verifier.verify(proof, &pc_gens, bp_gens)
-          .map_err(|_| ZeiError::SolvencyVerificationError)
+    verifier
+        .verify(proof, &pc_gens, bp_gens)
+        .map_err(|_| ZeiError::SolvencyVerificationError)
 }
 
-fn padd_vars<CS: ConstraintSystem>(cs: &mut CS,
-                                   vars: &mut Vec<CloakVariable>,
-                                   types: &[Scalar])
-                                   -> Result<(), R1CSError> {
-  for t in types {
-    vars.push(CloakVariable { amount: cs.allocate(Some(Scalar::from_u32(0).0))?,
-                              asset_type: cs.allocate(Some(t.0))? });
-  }
-  Ok(())
+fn padd_vars<CS: ConstraintSystem>(
+    cs: &mut CS,
+    vars: &mut Vec<CloakVariable>,
+    types: &[Scalar],
+) -> Result<(), R1CSError> {
+    for t in types {
+        vars.push(CloakVariable {
+            amount: cs.allocate(Some(Scalar::from_u32(0).0))?,
+            asset_type: cs.allocate(Some(t.0))?,
+        });
+    }
+    Ok(())
 }
 
 fn padd_values(values: &mut Vec<CloakValue>, types: &[Scalar]) {
-  for t in types {
-    values.push(CloakValue::new(Scalar::from_u32(0), *t));
-  }
+    for t in types {
+        values.push(CloakValue::new(Scalar::from_u32(0), *t));
+    }
 }
 
 #[cfg(test)]
 mod test {
-  use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-  use crate::bp_circuits::cloak::CloakValue;
-  use algebra::groups::Scalar;
-  use algebra::ristretto::RistrettoScalar;
-  use bulletproofs::BulletproofGens;
-  use rand_chacha::ChaChaRng;
-  use rand_core::SeedableRng;
+    use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+    use crate::bp_circuits::cloak::CloakValue;
+    use algebra::groups::Scalar;
+    use algebra::ristretto::RistrettoScalar;
+    use bulletproofs::BulletproofGens;
+    use rand_chacha::ChaChaRng;
+    use rand_core::SeedableRng;
 
-  fn do_test_solvency(bp_gens: &BulletproofGens,
-                      pc_gens: &RistrettoPedersenGens,
-                      hidden_asset_set: &[CloakValue],
-                      public_asset_set: &[CloakValue],
-                      hidden_liability_set: &[CloakValue],
-                      public_liability_set: &[CloakValue],
-                      conversion_rates: &[(RistrettoScalar, RistrettoScalar)],
-                      pass: bool) {
-    let mut prng = ChaChaRng::from_seed([1u8; 32]);
-    let mut assets_blinds = vec![];
-    for _ in 0..hidden_asset_set.len() {
-      assets_blinds.push(CloakValue::new(Scalar::random(&mut prng), Scalar::random(&mut prng)));
+    fn do_test_solvency(
+        bp_gens: &BulletproofGens,
+        pc_gens: &RistrettoPedersenGens,
+        hidden_asset_set: &[CloakValue],
+        public_asset_set: &[CloakValue],
+        hidden_liability_set: &[CloakValue],
+        public_liability_set: &[CloakValue],
+        conversion_rates: &[(RistrettoScalar, RistrettoScalar)],
+        pass: bool,
+    ) {
+        let mut prng = ChaChaRng::from_seed([1u8; 32]);
+        let mut assets_blinds = vec![];
+        for _ in 0..hidden_asset_set.len() {
+            assets_blinds.push(CloakValue::new(
+                Scalar::random(&mut prng),
+                Scalar::random(&mut prng),
+            ));
+        }
+
+        let mut liabilities_blinds = vec![];
+        for _ in 0..hidden_liability_set.len() {
+            liabilities_blinds.push(CloakValue::new(
+                Scalar::random(&mut prng),
+                Scalar::random(&mut prng),
+            ));
+        }
+
+        let proof = super::prove_solvency(
+            bp_gens,
+            pc_gens,
+            hidden_asset_set,
+            assets_blinds.as_slice(),
+            public_asset_set,
+            hidden_liability_set,
+            liabilities_blinds.as_slice(),
+            public_liability_set,
+            &conversion_rates,
+        )
+        .unwrap();
+
+        let mut hidden_assets_coms = vec![];
+        for (asset, blinds) in hidden_asset_set.iter().zip(assets_blinds.iter()) {
+            hidden_assets_coms.push(asset.commit(pc_gens, blinds));
+        }
+        let mut hidden_liabilities_coms = vec![];
+        for (liability, blinds) in
+            hidden_liability_set.iter().zip(liabilities_blinds.iter())
+        {
+            hidden_liabilities_coms.push(liability.commit(pc_gens, blinds));
+        }
+
+        let vrfy = super::verify_solvency(
+            bp_gens,
+            pc_gens,
+            hidden_assets_coms.as_slice(),
+            public_asset_set,
+            hidden_liabilities_coms.as_slice(),
+            public_liability_set,
+            &conversion_rates,
+            &proof,
+        );
+        assert_eq!(pass, vrfy.is_ok());
     }
 
-    let mut liabilities_blinds = vec![];
-    for _ in 0..hidden_liability_set.len() {
-      liabilities_blinds.push(CloakValue::new(Scalar::random(&mut prng),
-                                              Scalar::random(&mut prng)));
+    fn create_values_and_do_test(hidden_asset: bool, hidden_lia: bool, pass: bool) {
+        let mut rates = vec![];
+        rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
+        rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
+        rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
+
+        let smaller = [
+            CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10
+            CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)), // 40
+            CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(2)), // 60
+            CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(3)), // 120
+            CloakValue::new(RistrettoScalar::from_u32(50), RistrettoScalar::from_u32(2)), // 100, total 330
+        ];
+
+        let greater = [
+            CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10
+            CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)), // 40
+            CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(2)), // 60
+            CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(1)), // 40
+            CloakValue::new(RistrettoScalar::from_u32(50), RistrettoScalar::from_u32(3)), // 150
+            CloakValue::new(RistrettoScalar::from_u32(60), RistrettoScalar::from_u32(2)), // 120
+            CloakValue::new(RistrettoScalar::from_u32(70), RistrettoScalar::from_u32(3)), // 210, total 630
+        ];
+        let pc_gens = RistrettoPedersenGens::default();
+        let bp_gens = BulletproofGens::new(512, 1);
+        match (hidden_asset, hidden_lia, pass) {
+            (false, false, false) => do_test_solvency(
+                &bp_gens,
+                &pc_gens,
+                &[],
+                &smaller,
+                &[],
+                &greater,
+                &rates,
+                pass,
+            ),
+            (false, false, true) => do_test_solvency(
+                &bp_gens,
+                &pc_gens,
+                &[],
+                &greater,
+                &[],
+                &smaller,
+                &rates,
+                pass,
+            ),
+            (false, true, false) => do_test_solvency(
+                &bp_gens,
+                &pc_gens,
+                &[],
+                &smaller,
+                &greater,
+                &[],
+                &rates,
+                pass,
+            ),
+            (false, true, true) => do_test_solvency(
+                &bp_gens,
+                &pc_gens,
+                &[],
+                &greater,
+                &smaller,
+                &[],
+                &rates,
+                pass,
+            ),
+            (true, false, false) => do_test_solvency(
+                &bp_gens,
+                &pc_gens,
+                &smaller,
+                &[],
+                &[],
+                &greater,
+                &rates,
+                pass,
+            ),
+            (true, false, true) => do_test_solvency(
+                &bp_gens,
+                &pc_gens,
+                &greater,
+                &[],
+                &[],
+                &smaller,
+                &rates,
+                pass,
+            ),
+            (true, true, false) => do_test_solvency(
+                &bp_gens,
+                &pc_gens,
+                &smaller,
+                &[],
+                &greater,
+                &[],
+                &rates,
+                pass,
+            ),
+            (true, true, true) => do_test_solvency(
+                &bp_gens,
+                &pc_gens,
+                &greater,
+                &[],
+                &smaller,
+                &[],
+                &rates,
+                pass,
+            ),
+        }
     }
 
-    let proof = super::prove_solvency(bp_gens,
-                                      pc_gens,
-                                      hidden_asset_set,
-                                      assets_blinds.as_slice(),
-                                      public_asset_set,
-                                      hidden_liability_set,
-                                      liabilities_blinds.as_slice(),
-                                      public_liability_set,
-                                      &conversion_rates).unwrap();
-
-    let mut hidden_assets_coms = vec![];
-    for (asset, blinds) in hidden_asset_set.iter().zip(assets_blinds.iter()) {
-      hidden_assets_coms.push(asset.commit(pc_gens, blinds));
-    }
-    let mut hidden_liabilities_coms = vec![];
-    for (liability, blinds) in hidden_liability_set.iter().zip(liabilities_blinds.iter()) {
-      hidden_liabilities_coms.push(liability.commit(pc_gens, blinds));
+    #[test]
+    fn test_solvency_all_hidden_fail() {
+        create_values_and_do_test(false, false, false);
     }
 
-    let vrfy = super::verify_solvency(bp_gens,
-                                      pc_gens,
-                                      hidden_assets_coms.as_slice(),
-                                      public_asset_set,
-                                      hidden_liabilities_coms.as_slice(),
-                                      public_liability_set,
-                                      &conversion_rates,
-                                      &proof);
-    assert_eq!(pass, vrfy.is_ok());
-  }
-
-  fn create_values_and_do_test(hidden_asset: bool, hidden_lia: bool, pass: bool) {
-    let mut rates = vec![];
-    rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
-    rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
-    rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
-
-    let smaller = [
-			CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10
-      CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)), // 40
-      CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(2)), // 60
-      CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(3)), // 120
-      CloakValue::new(RistrettoScalar::from_u32(50), RistrettoScalar::from_u32(2)), // 100, total 330
-		];
-
-    let greater = [
-      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10
-      CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)), // 40
-      CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(2)), // 60
-      CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(1)), // 40
-      CloakValue::new(RistrettoScalar::from_u32(50), RistrettoScalar::from_u32(3)), // 150
-      CloakValue::new(RistrettoScalar::from_u32(60), RistrettoScalar::from_u32(2)), // 120
-      CloakValue::new(RistrettoScalar::from_u32(70), RistrettoScalar::from_u32(3)), // 210, total 630
-		];
-    let pc_gens = RistrettoPedersenGens::default();
-    let bp_gens = BulletproofGens::new(512, 1);
-    match (hidden_asset, hidden_lia, pass) {
-      (false, false, false) => do_test_solvency(&bp_gens,
-                                                &pc_gens,
-                                                &[],
-                                                &smaller,
-                                                &[],
-                                                &greater,
-                                                &rates,
-                                                pass),
-      (false, false, true) => do_test_solvency(&bp_gens,
-                                               &pc_gens,
-                                               &[],
-                                               &greater,
-                                               &[],
-                                               &smaller,
-                                               &rates,
-                                               pass),
-      (false, true, false) => do_test_solvency(&bp_gens,
-                                               &pc_gens,
-                                               &[],
-                                               &smaller,
-                                               &greater,
-                                               &[],
-                                               &rates,
-                                               pass),
-      (false, true, true) => do_test_solvency(&bp_gens,
-                                              &pc_gens,
-                                              &[],
-                                              &greater,
-                                              &smaller,
-                                              &[],
-                                              &rates,
-                                              pass),
-      (true, false, false) => do_test_solvency(&bp_gens,
-                                               &pc_gens,
-                                               &smaller,
-                                               &[],
-                                               &[],
-                                               &greater,
-                                               &rates,
-                                               pass),
-      (true, false, true) => do_test_solvency(&bp_gens,
-                                              &pc_gens,
-                                              &greater,
-                                              &[],
-                                              &[],
-                                              &smaller,
-                                              &rates,
-                                              pass),
-      (true, true, false) => do_test_solvency(&bp_gens,
-                                              &pc_gens,
-                                              &smaller,
-                                              &[],
-                                              &greater,
-                                              &[],
-                                              &rates,
-                                              pass),
-      (true, true, true) => do_test_solvency(&bp_gens,
-                                             &pc_gens,
-                                             &greater,
-                                             &[],
-                                             &smaller,
-                                             &[],
-                                             &rates,
-                                             pass),
+    #[test]
+    fn test_solvency_all_hidden_pass() {
+        create_values_and_do_test(false, false, true);
     }
-  }
 
-  #[test]
-  fn test_solvency_all_hidden_fail() {
-    create_values_and_do_test(false, false, false);
-  }
+    #[test]
+    fn test_solvency_liabilities_hidden_fail() {
+        create_values_and_do_test(false, true, false);
+    }
 
-  #[test]
-  fn test_solvency_all_hidden_pass() {
-    create_values_and_do_test(false, false, true);
-  }
+    #[test]
+    fn test_solvency_liabilities_hidden_pass() {
+        create_values_and_do_test(false, true, true);
+    }
 
-  #[test]
-  fn test_solvency_liabilities_hidden_fail() {
-    create_values_and_do_test(false, true, false);
-  }
+    #[test]
+    fn test_solvency_assets_hidden_fail() {
+        create_values_and_do_test(true, false, false);
+    }
 
-  #[test]
-  fn test_solvency_liabilities_hidden_pass() {
-    create_values_and_do_test(false, true, true);
-  }
+    #[test]
+    fn test_solvency_assets_hidden_pass() {
+        create_values_and_do_test(true, false, true);
+    }
 
-  #[test]
-  fn test_solvency_assets_hidden_fail() {
-    create_values_and_do_test(true, false, false);
-  }
+    #[test]
+    fn test_solvency_all_public_fail() {
+        create_values_and_do_test(true, true, false);
+    }
 
-  #[test]
-  fn test_solvency_assets_hidden_pass() {
-    create_values_and_do_test(true, false, true);
-  }
+    #[test]
+    fn test_solvency_all_public_pass() {
+        create_values_and_do_test(true, true, true);
+    }
 
-  #[test]
-  fn test_solvency_all_public_fail() {
-    create_values_and_do_test(true, true, false);
-  }
+    #[test]
+    fn test_solvency_mixed() {
+        let mut rates = vec![];
+        rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
+        rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
+        rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
 
-  #[test]
-  fn test_solvency_all_public_pass() {
-    create_values_and_do_test(true, true, true);
-  }
+        let lia_hidden = [
+            CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(1)), // 40
+            CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(2)), // 20
+            CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(3)), // 60
+            CloakValue::new(RistrettoScalar::from_u32(80), RistrettoScalar::from_u32(1)), // 80, total 200
+        ];
+        let greater = [
+            CloakValue::new(
+                RistrettoScalar::from_u32(100),
+                RistrettoScalar::from_u32(2),
+            ), // 200
+            CloakValue::new(
+                RistrettoScalar::from_u32(100),
+                RistrettoScalar::from_u32(3),
+            ), // 300, total 500
+        ];
 
-  #[test]
-  fn test_solvency_mixed() {
-    let mut rates = vec![];
-    rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
-    rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
-    rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
+        let asset_hidden = [
+            CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10
+            CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)), // 40
+            CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(3)), // 60
+            CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(2)), // 80
+            CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10, total 200
+        ];
+        let smaller = [
+            CloakValue::new(
+                RistrettoScalar::from_u32(499),
+                RistrettoScalar::from_u32(1),
+            ), // 499
+        ];
 
-    let lia_hidden = [
-			CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(1)), // 40
-      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(2)), // 20
-      CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(3)), // 60
-      CloakValue::new(RistrettoScalar::from_u32(80), RistrettoScalar::from_u32(1)), // 80, total 200
+        let pc_gens = RistrettoPedersenGens::default();
+        let bp_gens = BulletproofGens::new(256, 1);
 
-		];
-    let greater = [
-      CloakValue::new(RistrettoScalar::from_u32(100), RistrettoScalar::from_u32(2)), // 200
-      CloakValue::new(RistrettoScalar::from_u32(100), RistrettoScalar::from_u32(3)), // 300, total 500
-		];
+        do_test_solvency(
+            &bp_gens,
+            &pc_gens,
+            &asset_hidden,
+            &smaller,
+            &lia_hidden,
+            &greater,
+            &rates,
+            false,
+        );
+        do_test_solvency(
+            &bp_gens,
+            &pc_gens,
+            &asset_hidden,
+            &greater,
+            &lia_hidden,
+            &smaller,
+            &rates,
+            true,
+        );
 
-    let asset_hidden = [
-      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10
-      CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)), // 40
-      CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(3)), // 60
-      CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(2)), // 80
-      CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10, total 200
-		];
-    let smaller = [
-      CloakValue::new(RistrettoScalar::from_u32(499), RistrettoScalar::from_u32(1)), // 499
-		];
-
-    let pc_gens = RistrettoPedersenGens::default();
-    let bp_gens = BulletproofGens::new(256, 1);
-
-    do_test_solvency(&bp_gens,
-                     &pc_gens,
-                     &asset_hidden,
-                     &smaller,
-                     &lia_hidden,
-                     &greater,
-                     &rates,
-                     false);
-    do_test_solvency(&bp_gens,
-                     &pc_gens,
-                     &asset_hidden,
-                     &greater,
-                     &lia_hidden,
-                     &smaller,
-                     &rates,
-                     true);
-
-    // test with incomplete hidden asset list
-    do_test_solvency(&bp_gens,
-                     &pc_gens,
-                     &smaller,
-                     &asset_hidden,
-                     &greater,
-                     &lia_hidden,
-                     &rates,
-                     false);
-    do_test_solvency(&bp_gens,
-                     &pc_gens,
-                     &greater,
-                     &asset_hidden,
-                     &smaller,
-                     &lia_hidden,
-                     &rates,
-                     true);
-  }
+        // test with incomplete hidden asset list
+        do_test_solvency(
+            &bp_gens,
+            &pc_gens,
+            &smaller,
+            &asset_hidden,
+            &greater,
+            &lia_hidden,
+            &rates,
+            false,
+        );
+        do_test_solvency(
+            &bp_gens,
+            &pc_gens,
+            &greater,
+            &asset_hidden,
+            &smaller,
+            &lia_hidden,
+            &rates,
+            true,
+        );
+    }
 }

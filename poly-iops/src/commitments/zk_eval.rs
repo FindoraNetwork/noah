@@ -12,7 +12,9 @@
  6) Verifier check proof using C_XS and accepts if S(z) - alpha(z) = y*c (in the field)
 */
 
-use crate::commitments::pcs::{HidingPCS, HomomorphicPolyComElem, PolyComScheme, ShiftPCS};
+use crate::commitments::pcs::{
+    HidingPCS, HomomorphicPolyComElem, PolyComScheme, ShiftPCS,
+};
 use crate::commitments::transcript::PolyComTranscript;
 use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{Scalar, ScalarArithmetic, Zero};
@@ -21,206 +23,228 @@ use rand_core::{CryptoRng, RngCore};
 
 const ZK_EVAL_CHALLENGE: &[u8] = b"zk_eval challenge";
 
-fn init_zk_eval_transcript<PCS: PolyComScheme>(transcript: &mut Transcript,
-                                               degree: usize,
-                                               commitment: &PCS::Commitment,
-                                               point: &PCS::Field,
-                                               eval: &PCS::Field) {
-  transcript.append_message(b"Domain Separator", b"New ZK-Eval Protocol");
-  transcript_append_params::<PCS>(transcript, degree, commitment, point, eval);
+fn init_zk_eval_transcript<PCS: PolyComScheme>(
+    transcript: &mut Transcript,
+    degree: usize,
+    commitment: &PCS::Commitment,
+    point: &PCS::Field,
+    eval: &PCS::Field,
+) {
+    transcript.append_message(b"Domain Separator", b"New ZK-Eval Protocol");
+    transcript_append_params::<PCS>(transcript, degree, commitment, point, eval);
 }
 
-fn init_non_hiding_poly_zk_eval_transcript<PCS: PolyComScheme>(transcript: &mut Transcript,
-                                                               degree: usize,
-                                                               commitment: &PCS::Commitment,
-                                                               point: &PCS::Field,
-                                                               eval: &PCS::Field) {
-  transcript.append_message(b"Domain Separator", b"New Non-Hiding Poly ZK-Eval Protocol");
-  transcript_append_params::<PCS>(transcript, degree, commitment, point, eval);
+fn init_non_hiding_poly_zk_eval_transcript<PCS: PolyComScheme>(
+    transcript: &mut Transcript,
+    degree: usize,
+    commitment: &PCS::Commitment,
+    point: &PCS::Field,
+    eval: &PCS::Field,
+) {
+    transcript
+        .append_message(b"Domain Separator", b"New Non-Hiding Poly ZK-Eval Protocol");
+    transcript_append_params::<PCS>(transcript, degree, commitment, point, eval);
 }
 
-fn transcript_append_params<PCS: PolyComScheme>(transcript: &mut Transcript,
-                                                degree: usize,
-                                                commitment: &PCS::Commitment,
-                                                point: &PCS::Field,
-                                                eval: &PCS::Field) {
-  transcript.append_message(b"field size", &PCS::Field::get_field_size_lsf_bytes());
-  transcript.append_u64(b"degree", degree as u64);
-  transcript.append_commitment::<PCS::Commitment>(commitment);
-  transcript.append_field_elem(point);
-  transcript.append_field_elem(eval);
+fn transcript_append_params<PCS: PolyComScheme>(
+    transcript: &mut Transcript,
+    degree: usize,
+    commitment: &PCS::Commitment,
+    point: &PCS::Field,
+    eval: &PCS::Field,
+) {
+    transcript.append_message(b"field size", &PCS::Field::get_field_size_lsf_bytes());
+    transcript.append_u64(b"degree", degree as u64);
+    transcript.append_commitment::<PCS::Commitment>(commitment);
+    transcript.append_field_elem(point);
+    transcript.append_field_elem(eval);
 }
 
 #[allow(non_snake_case)]
 #[derive(Clone)]
 pub struct ZKEvalProof<C, P, F> {
-  C_alpha: C,
-  alpha_eval_z: F,
-  response: F,
-  S_eval_z: F,
-  XS_eval_z_proof: P,
+    C_alpha: C,
+    alpha_eval_z: F,
+    response: F,
+    S_eval_z: F,
+    XS_eval_z_proof: P,
 }
 
-pub type ZKEvalPf<PCS> = ZKEvalProof<<PCS as PolyComScheme>::Commitment,
-                                     <PCS as PolyComScheme>::EvalProof,
-                                     <PCS as PolyComScheme>::Field>;
+pub type ZKEvalPf<PCS> = ZKEvalProof<
+    <PCS as PolyComScheme>::Commitment,
+    <PCS as PolyComScheme>::EvalProof,
+    <PCS as PolyComScheme>::Field,
+>;
 #[allow(non_snake_case)]
-pub fn prove_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>(prng: &mut R,
-                                                                 transcript: &mut Transcript,
-                                                                 hpcs: &HidingPCS<PCS>,
-                                                                 polynomial: &FpPolynomial<PCS::Field>,
-                                                                 blind: &PCS::Field,
-                                                                 point: &PCS::Field)
-                                                                 -> Result<ZKEvalPf<PCS>, ()> {
-  let degree = polynomial.degree();
-  init_zk_eval_transcript::<PCS>(transcript,
-                                 degree,
-                                 &hpcs.commit(polynomial, blind),
-                                 point,
-                                 &polynomial.eval(point));
+pub fn prove_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>(
+    prng: &mut R,
+    transcript: &mut Transcript,
+    hpcs: &HidingPCS<PCS>,
+    polynomial: &FpPolynomial<PCS::Field>,
+    blind: &PCS::Field,
+    point: &PCS::Field,
+) -> Result<ZKEvalPf<PCS>, ()> {
+    let degree = polynomial.degree();
+    init_zk_eval_transcript::<PCS>(
+        transcript,
+        degree,
+        &hpcs.commit(polynomial, blind),
+        point,
+        &polynomial.eval(point),
+    );
 
-  let alpha = FpPolynomial::random(prng, degree);
-  let alpha_blind = PCS::Field::random(prng);
-  let C_alpha = hpcs.commit(&alpha, &alpha_blind);
-  let alpha_eval_z = alpha.eval(point);
+    let alpha = FpPolynomial::random(prng, degree);
+    let alpha_blind = PCS::Field::random(prng);
+    let C_alpha = hpcs.commit(&alpha, &alpha_blind);
+    let alpha_eval_z = alpha.eval(point);
 
-  transcript.append_commitment::<PCS::Commitment>(&C_alpha);
-  transcript.append_field_elem(&alpha_eval_z);
+    transcript.append_commitment::<PCS::Commitment>(&C_alpha);
+    transcript.append_field_elem(&alpha_eval_z);
 
-  let c = transcript.get_challenge_field_elem::<PCS::Field>(ZK_EVAL_CHALLENGE);
+    let c = transcript.get_challenge_field_elem::<PCS::Field>(ZK_EVAL_CHALLENGE);
 
-  let mut response = c.mul(&blind);
-  response.add_assign(&alpha_blind);
+    let mut response = c.mul(&blind);
+    response.add_assign(&alpha_blind);
 
-  transcript.append_field_elem(&response);
+    transcript.append_field_elem(&response);
 
-  // let S = alpha.add(&polynomial.mul_scalar(&c));
-  let mut S = polynomial.mul_scalar(&c);
-  S.add_assign(&alpha);
+    // let S = alpha.add(&polynomial.mul_scalar(&c));
+    let mut S = polynomial.mul_scalar(&c);
+    S.add_assign(&alpha);
 
-  let XS = S.shift(1);
-  let (_, open) = hpcs.pcs.commit(XS).unwrap();
-  let (XS_eval_z, proof) = hpcs.pcs
-                               .prove_eval(transcript, &open, point, 1)
-                               .map_err(|_| ())?; // TODO max degree
-  let S_eval_z = S.eval(point);
-  let expected = point.mul(&S_eval_z);
-  assert_eq!(XS_eval_z, expected);
+    let XS = S.shift(1);
+    let (_, open) = hpcs.pcs.commit(XS).unwrap();
+    let (XS_eval_z, proof) = hpcs
+        .pcs
+        .prove_eval(transcript, &open, point, 1)
+        .map_err(|_| ())?; // TODO max degree
+    let S_eval_z = S.eval(point);
+    let expected = point.mul(&S_eval_z);
+    assert_eq!(XS_eval_z, expected);
 
-  transcript.append_field_elem(&S_eval_z);
-  transcript.append_eval_proof::<PCS>(&proof);
+    transcript.append_field_elem(&S_eval_z);
+    transcript.append_eval_proof::<PCS>(&proof);
 
-  Ok(ZKEvalProof { C_alpha,
-                   alpha_eval_z,
-                   response,
-                   S_eval_z,
-                   XS_eval_z_proof: proof })
+    Ok(ZKEvalProof {
+        C_alpha,
+        alpha_eval_z,
+        response,
+        S_eval_z,
+        XS_eval_z_proof: proof,
+    })
 }
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
-pub fn verify_zk_eval<PCS: PolyComScheme>(transcript: &mut Transcript,
-                                          hpcs: &HidingPCS<PCS>,
-                                          degree: usize,
-                                          commitment: &PCS::Commitment,
-                                          point: &PCS::Field,
-                                          eval_value: &PCS::Field,
-                                          proof: &ZKEvalPf<PCS>)
-                                          -> Result<(), ()> {
-  init_zk_eval_transcript::<PCS>(transcript, degree, commitment, point, eval_value);
+pub fn verify_zk_eval<PCS: PolyComScheme>(
+    transcript: &mut Transcript,
+    hpcs: &HidingPCS<PCS>,
+    degree: usize,
+    commitment: &PCS::Commitment,
+    point: &PCS::Field,
+    eval_value: &PCS::Field,
+    proof: &ZKEvalPf<PCS>,
+) -> Result<(), ()> {
+    init_zk_eval_transcript::<PCS>(transcript, degree, commitment, point, eval_value);
 
-  // 1. first message, append to transcript
-  let C_alpha = &proof.C_alpha;
-  let alpha_eval_z = &proof.alpha_eval_z;
+    // 1. first message, append to transcript
+    let C_alpha = &proof.C_alpha;
+    let alpha_eval_z = &proof.alpha_eval_z;
 
-  transcript.append_commitment::<PCS::Commitment>(&C_alpha);
-  transcript.append_field_elem::<PCS::Field>(&alpha_eval_z);
+    transcript.append_commitment::<PCS::Commitment>(&C_alpha);
+    transcript.append_field_elem::<PCS::Field>(&alpha_eval_z);
 
-  // 2. compute challenge
-  let c = transcript.get_challenge_field_elem::<PCS::Field>(ZK_EVAL_CHALLENGE);
+    // 2. compute challenge
+    let c = transcript.get_challenge_field_elem::<PCS::Field>(ZK_EVAL_CHALLENGE);
 
-  // 3. append second message to transcript
-  let response = &proof.response;
-  transcript.append_field_elem(response);
-  transcript.append_field_elem(&proof.S_eval_z);
-  transcript.append_eval_proof::<PCS>(&proof.XS_eval_z_proof);
+    // 3. append second message to transcript
+    let response = &proof.response;
+    transcript.append_field_elem(response);
+    transcript.append_field_elem(&proof.S_eval_z);
+    transcript.append_eval_proof::<PCS>(&proof.XS_eval_z_proof);
 
-  // 4. D0 checks
-  // 4.1 C_f^c * C_alpha * com(0; response) should be a non-hiding commitment to X*S(X) of degree deg(f) + 1
-  // and should evaluate to z*S(z)
-  let zero_poly = FpPolynomial::from_coefs(vec![PCS::Field::zero()]);
-  let C_zero = hpcs.commit(&zero_poly, response);
-  let derived_C_XS = commitment.exp(&c).op(&C_alpha).op(&C_zero.inv());
-  let XS_eval_z = point.mul(&proof.S_eval_z);
+    // 4. D0 checks
+    // 4.1 C_f^c * C_alpha * com(0; response) should be a non-hiding commitment to X*S(X) of degree deg(f) + 1
+    // and should evaluate to z*S(z)
+    let zero_poly = FpPolynomial::from_coefs(vec![PCS::Field::zero()]);
+    let C_zero = hpcs.commit(&zero_poly, response);
+    let derived_C_XS = commitment.exp(&c).op(&C_alpha).op(&C_zero.inv());
+    let XS_eval_z = point.mul(&proof.S_eval_z);
 
-  hpcs.pcs
-      .verify_eval(transcript,
-                   &derived_C_XS,
-                   degree + 1,
-                   point,
-                   &XS_eval_z,
-                   &proof.XS_eval_z_proof)
-      .map_err(|_| ())?;
+    hpcs.pcs
+        .verify_eval(
+            transcript,
+            &derived_C_XS,
+            degree + 1,
+            point,
+            &XS_eval_z,
+            &proof.XS_eval_z_proof,
+        )
+        .map_err(|_| ())?;
 
-  // 4.2 check that S(z) - alpha(z) = c*f(z)
-  let a = proof.S_eval_z.sub(alpha_eval_z);
-  let b = c.sub(eval_value);
+    // 4.2 check that S(z) - alpha(z) = c*f(z)
+    let a = proof.S_eval_z.sub(alpha_eval_z);
+    let b = c.sub(eval_value);
 
-  if a == b {
-    Ok(())
-  } else {
-    Err(())
-  }
+    if a == b { Ok(()) } else { Err(()) }
 }
 
 #[allow(non_snake_case)]
 pub fn prove_non_hiding_poly_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>(
-  prng: &mut R,
-  transcript: &mut Transcript,
-  pcs: &PCS,
-  polynomial: &FpPolynomial<PCS::Field>,
-  point: &PCS::Field)
-  -> Result<ZKEvalPf<PCS>, ()> {
-  init_non_hiding_poly_zk_eval_transcript::<PCS>(transcript,
-                                                 polynomial.degree(),
-                                                 &pcs.commit(polynomial.clone()).unwrap().0, // FIXME
-                                                 point,
-                                                 &polynomial.eval(point));
-  let hpcs = HidingPCS::new(pcs);
-  let blinding = PCS::Field::zero();
-  let hidden_polynomial = hpcs.hide_polynomial(polynomial, &blinding);
-  prove_zk_eval(prng,
-                transcript,
-                &hpcs,
-                &hidden_polynomial,
-                &blinding,
-                point)
+    prng: &mut R,
+    transcript: &mut Transcript,
+    pcs: &PCS,
+    polynomial: &FpPolynomial<PCS::Field>,
+    point: &PCS::Field,
+) -> Result<ZKEvalPf<PCS>, ()> {
+    init_non_hiding_poly_zk_eval_transcript::<PCS>(
+        transcript,
+        polynomial.degree(),
+        &pcs.commit(polynomial.clone()).unwrap().0, // FIXME
+        point,
+        &polynomial.eval(point),
+    );
+    let hpcs = HidingPCS::new(pcs);
+    let blinding = PCS::Field::zero();
+    let hidden_polynomial = hpcs.hide_polynomial(polynomial, &blinding);
+    prove_zk_eval(
+        prng,
+        transcript,
+        &hpcs,
+        &hidden_polynomial,
+        &blinding,
+        point,
+    )
 }
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
-pub fn verify_non_hiding_poly_zk_eval<SPCS: ShiftPCS>(transcript: &mut Transcript,
-                                                      pcs: &SPCS,
-                                                      degree: usize,
-                                                      commitment: &SPCS::Commitment,
-                                                      point: &SPCS::Field,
-                                                      eval_value: &SPCS::Field,
-                                                      proof: &ZKEvalPf<SPCS>)
-                                                      -> Result<(), ()> {
-  init_non_hiding_poly_zk_eval_transcript::<SPCS>(transcript, degree, commitment, point,
-                                                  eval_value);
-  let hpcs = HidingPCS::new(pcs);
-  let hiding_commitment = pcs.shift(commitment, 1);
-  let eval_value = eval_value.mul(point);
+pub fn verify_non_hiding_poly_zk_eval<SPCS: ShiftPCS>(
+    transcript: &mut Transcript,
+    pcs: &SPCS,
+    degree: usize,
+    commitment: &SPCS::Commitment,
+    point: &SPCS::Field,
+    eval_value: &SPCS::Field,
+    proof: &ZKEvalPf<SPCS>,
+) -> Result<(), ()> {
+    init_non_hiding_poly_zk_eval_transcript::<SPCS>(
+        transcript, degree, commitment, point, eval_value,
+    );
+    let hpcs = HidingPCS::new(pcs);
+    let hiding_commitment = pcs.shift(commitment, 1);
+    let eval_value = eval_value.mul(point);
 
-  verify_zk_eval(transcript,
-                 &hpcs,
-                 degree + 1,
-                 &hiding_commitment,
-                 point,
-                 //&field.mul(point, eval_value),
-                 &eval_value,
-                 proof)
+    verify_zk_eval(
+        transcript,
+        &hpcs,
+        degree + 1,
+        &hiding_commitment,
+        point,
+        //&field.mul(point, eval_value),
+        &eval_value,
+        proof,
+    )
 }
 
 /*

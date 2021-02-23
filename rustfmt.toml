@@ -1,2 +1,4 @@
-indent_style = "Visual"
-tab_spaces = 2
+max_width = 89
+version = "Two"
+comment_width = 89
+# error_on_line_overflow = true

@@ -16,95 +16,117 @@ pub struct XfrPublicKey(pub(crate) PublicKey);
 #[derive(Debug)]
 pub struct XfrSecretKey(pub(crate) SecretKey);
 #[wasm_bindgen]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct XfrKeyPair {
-  pub pub_key: XfrPublicKey,
-  pub(crate) sec_key: XfrSecretKey,
+    pub pub_key: XfrPublicKey,
+    pub(crate) sec_key: XfrSecretKey,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct XfrSignature(pub Signature);
 
 impl XfrPublicKey {
-  /// returns XfrPublicKey as a compressed edwards point
-  pub fn as_compressed_edwards_point(&self) -> CompressedEdwardsY {
-    CompressedEdwardsY::from_slice(self.0.as_bytes())
-  }
+    /// returns XfrPublicKey as a compressed edwards point
+    pub fn as_compressed_edwards_point(&self) -> CompressedEdwardsY {
+        CompressedEdwardsY::from_slice(self.0.as_bytes())
+    }
 
-  pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<(), ZeiError> {
-    Ok(self.0
-           .verify(message, &signature.0)
-           .map_err(|_| ZeiError::SignatureError)?)
-  }
+    pub fn verify(
+        &self,
+        message: &[u8],
+        signature: &XfrSignature,
+    ) -> Result<(), ZeiError> {
+        Ok(self
+            .0
+            .verify(message, &signature.0)
+            .map_err(|_| ZeiError::SignatureError)?)
+    }
 
-  pub fn as_bytes(&self) -> &[u8] {
-    self.0.as_bytes()
-  }
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+impl Clone for XfrSecretKey {
+    fn clone(&self) -> Self {
+        XfrSecretKey(SecretKey::from_bytes(self.0.as_ref()).unwrap())
+    }
 }
 
 impl XfrSecretKey {
-  #[inline(always)]
-  pub fn into_keypair(self) -> XfrKeyPair {
-    XfrKeyPair { pub_key: XfrPublicKey(ed25519_dalek::PublicKey::from(&self.0)),
-                 sec_key: self }
-  }
+    #[inline(always)]
+    pub fn into_keypair(self) -> XfrKeyPair {
+        XfrKeyPair {
+            pub_key: XfrPublicKey(ed25519_dalek::PublicKey::from(&self.0)),
+            sec_key: self,
+        }
+    }
 
-  pub fn sign(&self, message: &[u8], public_key: &XfrPublicKey) -> XfrSignature {
-    let expanded: ExpandedSecretKey = (&self.0).into();
-    let sign = expanded.sign(message, &public_key.0);
+    pub fn sign(&self, message: &[u8], public_key: &XfrPublicKey) -> XfrSignature {
+        let expanded: ExpandedSecretKey = (&self.0).into();
+        let sign = expanded.sign(message, &public_key.0);
 
-    XfrSignature(sign)
-  }
+        XfrSignature(sign)
+    }
 
-  /// Returns SecretKey as a Scalar
-  pub(crate) fn as_scalar(&self) -> Scalar {
-    let expanded: ExpandedSecretKey = (&self.0).into();
-    // expanded.key is not public, thus extract it via serialization
-    let mut key_bytes = vec![];
-    key_bytes.extend_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
-    Scalar::from_bytes(&key_bytes).expect("Internal error, should never fail")
-  }
+    /// Returns SecretKey as a Scalar
+    pub(crate) fn as_scalar(&self) -> Scalar {
+        let expanded: ExpandedSecretKey = (&self.0).into();
+        // expanded.key is not public, thus extract it via serialization
+        let mut key_bytes = vec![];
+        key_bytes.extend_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
+        Scalar::from_bytes(&key_bytes).expect("Internal error, should never fail")
+    }
 }
 
 impl XfrKeyPair {
-  pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-    let kp = ed25519_dalek::Keypair::generate(prng);
-    XfrKeyPair { pub_key: XfrPublicKey(kp.public),
-                 sec_key: XfrSecretKey(kp.secret) }
-  }
+    pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+        let kp = ed25519_dalek::Keypair::generate(prng);
+        XfrKeyPair {
+            pub_key: XfrPublicKey(kp.public),
+            sec_key: XfrSecretKey(kp.secret),
+        }
+    }
 
-  pub fn sign(&self, msg: &[u8]) -> XfrSignature {
-    self.sec_key.sign(msg, &self.pub_key)
-  }
+    pub fn sign(&self, msg: &[u8]) -> XfrSignature {
+        self.sec_key.sign(msg, &self.pub_key)
+    }
 
-  #[inline(always)]
-  pub fn get_pk(&self) -> XfrPublicKey {
-      self.pub_key
-  }
+    #[inline(always)]
+    pub fn get_pk(&self) -> XfrPublicKey {
+        self.pub_key
+    }
 
-  #[inline(always)]
-  pub fn get_pk_ref(&self) -> &XfrPublicKey {
-      &self.pub_key
-  }
+    #[inline(always)]
+    pub fn get_pk_ref(&self) -> &XfrPublicKey {
+        &self.pub_key
+    }
 
-  #[inline(always)]
-  pub fn get_sk_ref(&self) -> &XfrSecretKey {
-      &self.sec_key
-  }
+    #[inline(always)]
+    pub fn get_sk(&self) -> XfrSecretKey {
+        self.sec_key.clone()
+    }
+
+    #[inline(always)]
+    pub fn get_sk_ref(&self) -> &XfrSecretKey {
+        &self.sec_key
+    }
 }
 
 impl ZeiFromToBytes for XfrKeyPair {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    let mut vec = vec![];
-    vec.extend_from_slice(self.sec_key.zei_to_bytes().as_slice());
-    vec.extend_from_slice(self.pub_key.zei_to_bytes().as_slice());
-    vec
-  }
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(self.sec_key.zei_to_bytes().as_slice());
+        vec.extend_from_slice(self.pub_key.zei_to_bytes().as_slice());
+        vec
+    }
 
-  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
-    Ok(XfrKeyPair { sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH])?,
-                    pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..])? })
-  }
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+        Ok(XfrKeyPair {
+            sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH])?,
+            pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..])?,
+        })
+    }
 }
 
 ////Primitive for multisignatures /////
@@ -112,121 +134,144 @@ impl ZeiFromToBytes for XfrKeyPair {
 // naive implementation below
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrMultiSig {
-  pub signatures: Vec<XfrSignature>,
+    pub signatures: Vec<XfrSignature>,
 }
 
 impl XfrMultiSig {
-  /// Sign a multisig under a list of keypairs
-  pub fn sign(keypairs: &[&XfrKeyPair], message: &[u8]) -> Self {
-    // sort the key pairs based on alphabetical order of their public keys
-    let mut sorted = keypairs.to_owned();
-    sorted.sort_unstable_by_key(|kp| kp.pub_key.zei_to_bytes());
-    let signatures = sorted.iter().map(|kp| kp.sign(&message)).collect_vec();
-    XfrMultiSig { signatures }
-  }
+    /// Sign a multisig under a list of keypairs
+    pub fn sign(keypairs: &[&XfrKeyPair], message: &[u8]) -> Self {
+        // sort the key pairs based on alphabetical order of their public keys
+        let mut sorted = keypairs.to_owned();
+        sorted.sort_unstable_by_key(|kp| kp.pub_key.zei_to_bytes());
+        let signatures = sorted.iter().map(|kp| kp.sign(&message)).collect_vec();
+        XfrMultiSig { signatures }
+    }
 
-  /// Verify a multisig
-  pub fn verify(&self, pubkeys: &[&XfrPublicKey], message: &[u8]) -> Result<(), ZeiError> {
-    if pubkeys.len() != self.signatures.len() {
-      return Err(ZeiError::SignatureError);
+    /// Verify a multisig
+    pub fn verify(
+        &self,
+        pubkeys: &[&XfrPublicKey],
+        message: &[u8],
+    ) -> Result<(), ZeiError> {
+        if pubkeys.len() != self.signatures.len() {
+            return Err(ZeiError::SignatureError);
+        }
+        // sort the key pairs based on alphabetical order of their public keys
+        let mut sorted = pubkeys.to_owned();
+        sorted.sort_unstable_by_key(|k| k.zei_to_bytes());
+        for (pk, sig) in sorted.iter().zip(self.signatures.iter()) {
+            pk.verify(&message, &sig)?;
+        }
+        Ok(())
     }
-    // sort the key pairs based on alphabetical order of their public keys
-    let mut sorted = pubkeys.to_owned();
-    sorted.sort_unstable_by_key(|k| k.zei_to_bytes());
-    for (pk, sig) in sorted.iter().zip(self.signatures.iter()) {
-      pk.verify(&message, &sig)?;
-    }
-    Ok(())
-  }
 }
 
 #[cfg(test)]
 mod test {
-  use crate::xfr::sig::{XfrKeyPair, XfrMultiSig};
-  use itertools::Itertools;
-  use rand_chacha::ChaChaRng;
-  use rand_core::SeedableRng;
-  use utils::errors::ZeiError::SignatureError;
+    use crate::xfr::sig::{XfrKeyPair, XfrMultiSig};
+    use itertools::Itertools;
+    use rand_chacha::ChaChaRng;
+    use rand_core::SeedableRng;
+    use utils::errors::ZeiError::SignatureError;
 
-  #[test]
-  fn signatures() {
-    let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
+    #[test]
+    fn signatures() {
+        let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
 
-    let keypair = XfrKeyPair::generate(&mut prng);
-    let message = "";
+        let keypair = XfrKeyPair::generate(&mut prng);
+        let message = "";
 
-    let sig = keypair.sign(message.as_bytes());
-    assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
-    //same test with secret key
-    let sig = keypair.sec_key.sign(message.as_bytes(), &keypair.pub_key);
-    assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
+        let sig = keypair.sign(message.as_bytes());
+        assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
+        //same test with secret key
+        let sig = keypair.sec_key.sign(message.as_bytes(), &keypair.pub_key);
+        assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
 
-    //test again with fresh same key
-    let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
-    let keypair = XfrKeyPair::generate(&mut prng);
-    assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
+        //test again with fresh same key
+        let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
+        let keypair = XfrKeyPair::generate(&mut prng);
+        assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
 
-    let keypair = XfrKeyPair::generate(&mut prng);
-    let message = [10u8; 500];
-    let sig = keypair.sign(&message);
-    assert_eq!(Err(SignatureError),
-               keypair.pub_key.verify("".as_bytes(), &sig),
-               "Verifying sig on different message should have return Err(Signature Error)");
-    assert_eq!(Ok(()),
-               keypair.pub_key.verify(&message, &sig),
-               "Verifying sig on samme message should have return Ok(())");
-    //test again with secret key
-    let sig = keypair.sec_key.sign(&message, &keypair.pub_key);
-    assert_eq!(Err(SignatureError),
-               keypair.pub_key.verify("".as_bytes(), &sig),
-               "Verifying sig on different message should have return Err(Signature Error)");
-    assert_eq!(Ok(()),
-               keypair.pub_key.verify(&message, &sig),
-               "Verifying sig on samme message should have return Ok(())");
+        let keypair = XfrKeyPair::generate(&mut prng);
+        let message = [10u8; 500];
+        let sig = keypair.sign(&message);
+        assert_eq!(
+            Err(SignatureError),
+            keypair.pub_key.verify("".as_bytes(), &sig),
+            "Verifying sig on different message should have return Err(Signature Error)"
+        );
+        assert_eq!(
+            Ok(()),
+            keypair.pub_key.verify(&message, &sig),
+            "Verifying sig on samme message should have return Ok(())"
+        );
+        //test again with secret key
+        let sig = keypair.sec_key.sign(&message, &keypair.pub_key);
+        assert_eq!(
+            Err(SignatureError),
+            keypair.pub_key.verify("".as_bytes(), &sig),
+            "Verifying sig on different message should have return Err(Signature Error)"
+        );
+        assert_eq!(
+            Ok(()),
+            keypair.pub_key.verify(&message, &sig),
+            "Verifying sig on samme message should have return Ok(())"
+        );
 
-    // test with different keys
-    let keypair = XfrKeyPair::generate(&mut prng);
-    assert_eq!(Err(SignatureError),
-               keypair.pub_key.verify(&message, &sig),
-               "Verifying sig on with a different key should have return Err(Signature Error)");
-  }
-
-  fn generate_keypairs(prng: &mut ChaChaRng, n: usize) -> Vec<XfrKeyPair> {
-    let mut v = vec![];
-    for _ in 0..n {
-      v.push(XfrKeyPair::generate(prng));
+        // test with different keys
+        let keypair = XfrKeyPair::generate(&mut prng);
+        assert_eq!(
+            Err(SignatureError),
+            keypair.pub_key.verify(&message, &sig),
+            "Verifying sig on with a different key should have return Err(Signature Error)"
+        );
     }
-    v
-  }
 
-  #[test]
-  fn multisig() {
-    let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
-    let msg = b"random message here!".to_vec();
-    // test with one key
-    let keypairs = generate_keypairs(&mut prng, 1);
-    let keypairs_refs = keypairs.iter().collect_vec();
-    let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
-    assert!(XfrMultiSig::sign(&keypairs_refs, &msg).verify(&pubkeys, &msg)
-                                                   .is_ok(),
-            "Multisignature should have verify correctly for a single key");
+    fn generate_keypairs(prng: &mut ChaChaRng, n: usize) -> Vec<XfrKeyPair> {
+        let mut v = vec![];
+        for _ in 0..n {
+            v.push(XfrKeyPair::generate(prng));
+        }
+        v
+    }
 
-    // test with multiple keys
-    let keypairs = generate_keypairs(&mut prng, 10);
-    let keypairs_refs = keypairs.iter().collect_vec();
-    let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
-    assert!(XfrMultiSig::sign(&keypairs_refs, &msg).verify(&pubkeys, &msg)
-                                                   .is_ok(),
-            "Multisignature should have verify correctly for 10 keys");
+    #[test]
+    fn multisig() {
+        let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
+        let msg = b"random message here!".to_vec();
+        // test with one key
+        let keypairs = generate_keypairs(&mut prng, 1);
+        let keypairs_refs = keypairs.iter().collect_vec();
+        let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
+        assert!(
+            XfrMultiSig::sign(&keypairs_refs, &msg)
+                .verify(&pubkeys, &msg)
+                .is_ok(),
+            "Multisignature should have verify correctly for a single key"
+        );
 
-    // test with unmatching order of keypairs
-    let keypairs = generate_keypairs(&mut prng, 10);
-    let keypairs_refs = keypairs.iter().collect_vec();
-    let mut pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
-    pubkeys.swap(1, 3);
-    pubkeys.swap(4, 9);
-    assert!(XfrMultiSig::sign(&keypairs_refs, &msg).verify(&pubkeys, &msg)
-                                                   .is_ok(),
-            "Multisignature should have verify correctly even when keylist is unordered");
-  }
+        // test with multiple keys
+        let keypairs = generate_keypairs(&mut prng, 10);
+        let keypairs_refs = keypairs.iter().collect_vec();
+        let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
+        assert!(
+            XfrMultiSig::sign(&keypairs_refs, &msg)
+                .verify(&pubkeys, &msg)
+                .is_ok(),
+            "Multisignature should have verify correctly for 10 keys"
+        );
+
+        // test with unmatching order of keypairs
+        let keypairs = generate_keypairs(&mut prng, 10);
+        let keypairs_refs = keypairs.iter().collect_vec();
+        let mut pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
+        pubkeys.swap(1, 3);
+        pubkeys.swap(4, 9);
+        assert!(
+            XfrMultiSig::sign(&keypairs_refs, &msg)
+                .verify(&pubkeys, &msg)
+                .is_ok(),
+            "Multisignature should have verify correctly even when keylist is unordered"
+        );
+    }
 }
