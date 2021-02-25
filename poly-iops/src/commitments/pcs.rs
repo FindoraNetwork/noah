@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use custom_error::custom_error;
+use ruc::{err::*, *};
 use serde::{Deserialize, Serialize};
 
 custom_error! {#[derive(PartialEq)] pub PolyComSchemeError
@@ -98,7 +99,7 @@ pub trait PolyComScheme {
     fn commit(
         &self,
         polynomial: FpPolynomial<Self::Field>,
-    ) -> Result<(Self::Commitment, Self::Opening), PolyComSchemeError>;
+    ) -> Result<(Self::Commitment, Self::Opening)>;
 
     /// Returns the opening of an original commitment of the polynomial
     fn opening(&self, polynomial: &FpPolynomial<Self::Field>) -> Self::Opening;
@@ -128,7 +129,7 @@ pub trait PolyComScheme {
         opening: &Self::Opening,
         point: &Self::Field,
         max_degree: usize,
-    ) -> Result<(Self::Field, Self::EvalProof), PolyComSchemeError>;
+    ) -> Result<(Self::Field, Self::EvalProof)>;
 
     /// Verify an evaluation proof that polynomial inside commitment evaluates to `value` on input `point `
     fn verify_eval(
@@ -139,7 +140,7 @@ pub trait PolyComScheme {
         point: &Self::Field,
         value: &Self::Field,
         proof: &Self::EvalProof,
-    ) -> Result<(), PolyComSchemeError>;
+    ) -> Result<()>;
 
     /// Batch proof for polynomial evaluation.
     /// `param` stores the instance parameters to be appended to the transcript.
@@ -152,7 +153,7 @@ pub trait PolyComScheme {
         points: &[Self::Field],
         max_degree: usize,
         params: OptionParams<Self>,
-    ) -> Result<(Vec<Self::Field>, BatchPfEval<Self>), ()> {
+    ) -> Result<(Vec<Self::Field>, BatchPfEval<Self>)> {
         let n = openings.len();
         assert_eq!(n, points.len());
         assert!(n > 0);
@@ -181,10 +182,10 @@ pub trait PolyComScheme {
 
         let (q, rem) = h.div_rem(&z);
         if !rem.is_zero() {
-            return Err(());
+            return Err(eg!());
         }
 
-        let (C_q, O_q) = self.commit(q).map_err(|_| ())?;
+        let (C_q, O_q) = self.commit(q).c(d!())?;
         transcript.append_commitment::<Self::Commitment>(&C_q);
 
         // Derive opening of g(X) = sum \alpha^i * z_i_bar(\rho) * (fi(X) - fi(xi)) - q(X) * z(rho)
@@ -221,9 +222,9 @@ pub trait PolyComScheme {
 
         let (g_value, g_proof) = self
             .prove_eval(transcript, &g_opening, &rho, max_degree)
-            .map_err(|_| ())?;
+            .c(d!())?;
         if !g_value.is_zero() {
-            Err(())
+            Err(eg!())
         } else {
             Ok((
                 eval_values,
@@ -249,7 +250,7 @@ pub trait PolyComScheme {
         values: &[Self::Field],
         proof: &BatchPfEval<Self>,
         params: OptionParams<Self>,
-    ) -> Result<(), ()> {
+    ) -> Result<()> {
         Self::init_pcs_batch_eval_transcript(transcript, max_degree, points, params);
         let alpha = transcript.get_challenge_field_elem::<Self::Field>(b"alpha");
         transcript.append_commitment::<Self::Commitment>(&proof.commitment);
@@ -268,7 +269,7 @@ pub trait PolyComScheme {
         let mut com_lc = Self::Commitment::get_identity();
         let mut val_lc = Self::Field::zero(); // \sum y_i * alpha^i * \z_i_bar(rho)
         for ((point, value), commitment) in points.iter().zip(values).zip(commitments) {
-            let rho_minus_point_inv = rho.sub(point).inv().map_err(|_| ())?;
+            let rho_minus_point_inv = rho.sub(point).inv().c(d!())?;
             let z_i_bar_eval_rho = z_eval_rho.mul(&rho_minus_point_inv);
 
             let scalar = z_i_bar_eval_rho.mul(&c_i);
@@ -283,7 +284,7 @@ pub trait PolyComScheme {
         }
         let (com, _) = self
             .commit(FpPolynomial::from_coefs(vec![val_lc]))
-            .map_err(|_| ())?;
+            .c(d!())?;
         com_lc = com_lc.op(&com.inv());
         // - Com(q(X) * z(\rho))
         let com_z_q = proof.commitment.exp(&z_eval_rho);
@@ -296,7 +297,7 @@ pub trait PolyComScheme {
             &Self::Field::zero(),
             &proof.eval_proof,
         )
-        .map_err(|_| ())
+        .c(d!())
     }
 
     fn init_pcs_batch_eval_transcript(

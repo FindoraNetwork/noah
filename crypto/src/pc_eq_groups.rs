@@ -4,6 +4,7 @@ use merlin::Transcript;
 use num_bigint::{BigUint, RandBigInt};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
+use ruc::{err::*, *};
 use serde::ser::Serializer;
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
@@ -16,7 +17,7 @@ impl ZeiFromToBytes for BigNum {
         self.0.to_bytes_le()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(BigNum(BigUint::from_bytes_le(bytes)))
     }
 }
@@ -97,21 +98,23 @@ pub fn prove_pair_to_vector_pc<R: CryptoRng + RngCore, G1: Group, G2: Group>(
     blind_g2: &G2::S,
     pc_gens1: &PedersenGens<G1>,
     pc_gens2: &PedersenGens<G2>,
-) -> Result<Proof<G1, G2>, ZeiError> {
+) -> Result<Proof<G1, G2>> {
     // input commitments
     let value1_g1 =
-        G1::S::from_le_bytes(values.0).map_err(|_| ZeiError::SerializationError)?;
+        G1::S::from_le_bytes(values.0).c(d!(ZeiError::SerializationError))?;
     let value2_g1 =
-        G1::S::from_le_bytes(values.1).map_err(|_| ZeiError::SerializationError)?;
-    let c1 = pc_gens1.commit(&[value1_g1], &blinds_g1.0)?;
-    let c2 = pc_gens1.commit(&[value2_g1], &blinds_g1.1)?;
+        G1::S::from_le_bytes(values.1).c(d!(ZeiError::SerializationError))?;
+    let c1 = pc_gens1.commit(&[value1_g1], &blinds_g1.0).c(d!())?;
+    let c2 = pc_gens1.commit(&[value2_g1], &blinds_g1.1).c(d!())?;
 
     let value1_g2 =
-        G2::S::from_le_bytes(values.0).map_err(|_| ZeiError::SerializationError)?;
+        G2::S::from_le_bytes(values.0).c(d!(ZeiError::SerializationError))?;
     let value2_g2 =
-        G2::S::from_le_bytes(values.1).map_err(|_| ZeiError::SerializationError)?;
+        G2::S::from_le_bytes(values.1).c(d!(ZeiError::SerializationError))?;
 
-    let c3 = pc_gens2.commit(&[value1_g2, value2_g2], &blind_g2)?;
+    let c3 = pc_gens2
+        .commit(&[value1_g2, value2_g2], &blind_g2)
+        .c(d!())?;
     trascript_init(transcript, &pc_gens1, &pc_gens2, &c1, &c2, &c3);
 
     // 1. compute scalar group Z_{p * q}
@@ -142,7 +145,7 @@ pub fn prove_pair_to_vector_pc<R: CryptoRng + RngCore, G1: Group, G2: Group>(
     let b3_scalar = G2::S::from_le_bytes(&b3.to_bytes_le()).unwrap();
     let com_v1_v2 = pc_gens2
         .commit(&[v1_mod_q, v2_mod_q], &b3_scalar)
-        .map_err(|_| ZeiError::ParameterError)?;
+        .c(d!(ZeiError::ParameterError))?;
 
     // 3. commit and get challenge
     let challenge = transcript_append_commitments_get_challenge(
@@ -182,7 +185,7 @@ pub fn verify_pair_to_vector_pc<G1: Group, G2: Group>(
     pc_gens1: &PedersenGens<G1>,
     pc_gens2: &PedersenGens<G2>,
     proof: &Proof<G1, G2>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     // 1. init transcript
     trascript_init(transcript, pc_gens1, pc_gens2, coms_g1.0, coms_g1.1, com_g2);
 
@@ -210,16 +213,16 @@ pub fn verify_pair_to_vector_pc<G1: Group, G2: Group>(
 
     let com_response_value1 = pc_gens1
         .commit(&[response_value1_mod_p], &response_blind1_mod_p)
-        .map_err(|_| ZeiError::ZKProofVerificationError)?;
+        .c(d!(ZeiError::ZKProofVerificationError))?;
     if com_response_value1 != coms_g1.0.mul(&challenge_mod_p).add(&proof.com_v1) {
-        return Err(ZeiError::ZKProofVerificationError);
+        return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
     let com_response_value2 = pc_gens1
         .commit(&[response_value2_mod_p], &response_blind2_mod_p)
-        .map_err(|_| ZeiError::ZKProofVerificationError)?;
+        .c(d!(ZeiError::ZKProofVerificationError))?;
     if com_response_value2 != coms_g1.1.mul(&challenge_mod_p).add(&proof.com_v2) {
-        return Err(ZeiError::ZKProofVerificationError);
+        return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
     let challenge_mod_q = biguint_mod_scalar::<G2::S>(&challenge);
@@ -232,9 +235,9 @@ pub fn verify_pair_to_vector_pc<G1: Group, G2: Group>(
             &[response_value1_mod_q, response_value2_mod_q],
             &response_blind3_mod_q,
         )
-        .map_err(|_| ZeiError::ZKProofVerificationError)?;
+        .c(d!(ZeiError::ZKProofVerificationError))?;
     if response_com_v1_v2 != com_g2.mul(&challenge_mod_q).add(&proof.com_v1_v2) {
-        return Err(ZeiError::ZKProofVerificationError);
+        return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
     Ok(())

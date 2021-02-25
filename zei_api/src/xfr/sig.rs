@@ -4,6 +4,7 @@ use ed25519_dalek::{ExpandedSecretKey, PublicKey};
 use ed25519_dalek::{SecretKey, Signature, Verifier};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
 use wasm_bindgen::prelude::*;
@@ -31,15 +32,10 @@ impl XfrPublicKey {
         CompressedEdwardsY::from_slice(self.0.as_bytes())
     }
 
-    pub fn verify(
-        &self,
-        message: &[u8],
-        signature: &XfrSignature,
-    ) -> Result<(), ZeiError> {
-        Ok(self
-            .0
+    pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<()> {
+        self.0
             .verify(message, &signature.0)
-            .map_err(|_| ZeiError::SignatureError)?)
+            .c(d!(ZeiError::SignatureError))
     }
 
     pub fn as_bytes(&self) -> &[u8] {
@@ -121,10 +117,12 @@ impl ZeiFromToBytes for XfrKeyPair {
         vec
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(XfrKeyPair {
-            sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH])?,
-            pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..])?,
+            sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH])
+                .c(d!())?,
+            pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..])
+                .c(d!())?,
         })
     }
 }
@@ -148,19 +146,15 @@ impl XfrMultiSig {
     }
 
     /// Verify a multisig
-    pub fn verify(
-        &self,
-        pubkeys: &[&XfrPublicKey],
-        message: &[u8],
-    ) -> Result<(), ZeiError> {
+    pub fn verify(&self, pubkeys: &[&XfrPublicKey], message: &[u8]) -> Result<()> {
         if pubkeys.len() != self.signatures.len() {
-            return Err(ZeiError::SignatureError);
+            return Err(eg!(ZeiError::SignatureError));
         }
         // sort the key pairs based on alphabetical order of their public keys
         let mut sorted = pubkeys.to_owned();
         sorted.sort_unstable_by_key(|k| k.zei_to_bytes());
         for (pk, sig) in sorted.iter().zip(self.signatures.iter()) {
-            pk.verify(&message, &sig)?;
+            pk.verify(&message, &sig).c(d!())?;
         }
         Ok(())
     }
@@ -172,6 +166,7 @@ mod test {
     use itertools::Itertools;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::err::*;
     use utils::errors::ZeiError::SignatureError;
 
     #[test]
@@ -182,47 +177,47 @@ mod test {
         let message = "";
 
         let sig = keypair.sign(message.as_bytes());
-        assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
+        assert_eq!((), keypair.pub_key.verify("".as_bytes(), &sig).unwrap());
         //same test with secret key
         let sig = keypair.sec_key.sign(message.as_bytes(), &keypair.pub_key);
-        assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
+        assert_eq!((), keypair.pub_key.verify("".as_bytes(), &sig).unwrap());
 
         //test again with fresh same key
         let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
         let keypair = XfrKeyPair::generate(&mut prng);
-        assert_eq!(Ok(()), keypair.pub_key.verify("".as_bytes(), &sig));
+        assert_eq!((), keypair.pub_key.verify("".as_bytes(), &sig).unwrap());
 
         let keypair = XfrKeyPair::generate(&mut prng);
         let message = [10u8; 500];
         let sig = keypair.sign(&message);
-        assert_eq!(
-            Err(SignatureError),
-            keypair.pub_key.verify("".as_bytes(), &sig),
+        err_eq!(
+            SignatureError,
+            keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
         assert_eq!(
-            Ok(()),
-            keypair.pub_key.verify(&message, &sig),
+            (),
+            keypair.pub_key.verify(&message, &sig).unwrap(),
             "Verifying sig on samme message should have return Ok(())"
         );
         //test again with secret key
         let sig = keypair.sec_key.sign(&message, &keypair.pub_key);
-        assert_eq!(
-            Err(SignatureError),
-            keypair.pub_key.verify("".as_bytes(), &sig),
+        err_eq!(
+            SignatureError,
+            keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
         assert_eq!(
-            Ok(()),
-            keypair.pub_key.verify(&message, &sig),
+            (),
+            keypair.pub_key.verify(&message, &sig).unwrap(),
             "Verifying sig on samme message should have return Ok(())"
         );
 
         // test with different keys
         let keypair = XfrKeyPair::generate(&mut prng);
-        assert_eq!(
-            Err(SignatureError),
-            keypair.pub_key.verify(&message, &sig),
+        err_eq!(
+            SignatureError,
+            keypair.pub_key.verify(&message, &sig).unwrap_err(),
             "Verifying sig on with a different key should have return Err(Signature Error)"
         );
     }

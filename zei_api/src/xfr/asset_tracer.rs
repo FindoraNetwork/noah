@@ -13,6 +13,7 @@ use crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key,
 };
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 use utils::{u64_to_u32_pair, u8_be_slice_to_u32};
 
@@ -85,10 +86,7 @@ impl TracerMemo {
 
     /// Decrypts the asset tracer memo:
     /// Returns ZeiError:BogusAssetTracerMemo in case decrypted values are inconsistents
-    pub fn decrypt(
-        &self,
-        dec_key: &AssetTracerDecKeys,
-    ) -> Result<DecryptedAssetMemo, ZeiError> {
+    pub fn decrypt(&self, dec_key: &AssetTracerDecKeys) -> Result<DecryptedAssetMemo> {
         let mut plaintext = hybrid_decrypt_with_x25519_secret_key(
             &self.lock_info,
             &dec_key.lock_info_dec_key,
@@ -97,13 +95,13 @@ impl TracerMemo {
         // decrypt and sanitize amount
         let amount = if self.lock_amount.is_some() {
             if plaintext.len() < 2 * U32_BYTES {
-                return Err(ZeiError::BogusAssetTracerMemo);
+                return Err(eg!(ZeiError::BogusAssetTracerMemo));
             }
             let amount_low = u8_be_slice_to_u32(&plaintext[0..U32_BYTES]);
             let amount_high = u8_be_slice_to_u32(&plaintext[U32_BYTES..2 * U32_BYTES]);
             let amount = (amount_low as u64) + ((amount_high as u64) << 32);
             self.verify_amount(&dec_key.record_data_dec_key, amount)
-                .map_err(|_| ZeiError::BogusAssetTracerMemo)?;
+                .c(d!(ZeiError::BogusAssetTracerMemo))?;
             plaintext = plaintext.split_off(2 * U32_BYTES);
             Some(amount)
         } else {
@@ -113,14 +111,14 @@ impl TracerMemo {
         // decrypt and sanitize asset type
         let asset_type = if self.lock_asset_type.is_some() {
             if plaintext.len() < ASSET_TYPE_LENGTH {
-                return Err(ZeiError::BogusAssetTracerMemo);
+                return Err(eg!(ZeiError::BogusAssetTracerMemo));
             }
             let mut asset_type = [0u8; ASSET_TYPE_LENGTH];
             asset_type.copy_from_slice(&plaintext[0..ASSET_TYPE_LENGTH]);
             let asset_type = AssetType(asset_type);
 
             self.verify_asset_type(&dec_key.record_data_dec_key, &asset_type)
-                .map_err(|_| ZeiError::BogusAssetTracerMemo)?;
+                .c(d!(ZeiError::BogusAssetTracerMemo))?;
             plaintext = plaintext.split_off(ASSET_TYPE_LENGTH);
             Some(asset_type)
         } else {
@@ -128,7 +126,7 @@ impl TracerMemo {
         };
 
         if plaintext.len() < self.lock_attributes.len() * U32_BYTES {
-            return Err(ZeiError::BogusAssetTracerMemo);
+            return Err(eg!(ZeiError::BogusAssetTracerMemo));
         }
         let mut attrs = vec![];
         for attr_byte in plaintext.chunks(U32_BYTES) {
@@ -137,11 +135,11 @@ impl TracerMemo {
 
         if !self
             .verify_identity_attributes(&dec_key.attrs_dec_key, &attrs)
-            .map_err(|_| ZeiError::BogusAssetTracerMemo)?
+            .c(d!(ZeiError::BogusAssetTracerMemo))?
             .iter()
             .all(|&x| x)
         {
-            return Err(ZeiError::BogusAssetTracerMemo);
+            return Err(eg!(ZeiError::BogusAssetTracerMemo));
         }
         Ok((amount, asset_type, attrs))
     }
@@ -153,7 +151,7 @@ impl TracerMemo {
         &self,
         dec_key: &ElGamalDecKey<Scalar>,
         expected: u64,
-    ) -> Result<(), ZeiError> {
+    ) -> Result<()> {
         let (low, high) = u64_to_u32_pair(expected);
         if let Some((ctext_low, ctext_high)) = self.lock_amount.as_ref() {
             let decrypted_low = elgamal_decrypt_elem(ctext_low, dec_key);
@@ -162,12 +160,12 @@ impl TracerMemo {
             if base.mul(&Scalar::from_u32(low)) != decrypted_low
                 || base.mul(&Scalar::from_u32(high)) != decrypted_high
             {
-                Err(ZeiError::AssetTracingExtractionError)
+                Err(eg!(ZeiError::AssetTracingExtractionError))
             } else {
                 Ok(())
             }
         } else {
-            Err(ZeiError::ParameterError) // nothing to decrypt
+            Err(eg!(ZeiError::ParameterError)) // nothing to decrypt
         }
     }
 
@@ -177,15 +175,15 @@ impl TracerMemo {
         &self,
         dec_key: &ElGamalDecKey<Scalar>,
         expected: &AssetType,
-    ) -> Result<(), ZeiError> {
+    ) -> Result<()> {
         if let Some(ctext) = self.lock_asset_type.as_ref() {
             let decrypted = elgamal_decrypt_elem(ctext, dec_key);
             if decrypted == RistrettoPoint::get_base().mul(&expected.as_scalar()) {
                 return Ok(());
             }
-            Err(ZeiError::AssetTracingExtractionError)
+            Err(eg!(ZeiError::AssetTracingExtractionError))
         } else {
-            Err(ZeiError::ParameterError) // nothing to decrypt
+            Err(eg!(ZeiError::ParameterError)) // nothing to decrypt
         }
     }
 
@@ -195,15 +193,15 @@ impl TracerMemo {
     pub fn extract_amount_brute_force(
         &self,
         dec_key: &ElGamalDecKey<Scalar>,
-    ) -> Result<u64, ZeiError> {
+    ) -> Result<u64> {
         if let Some((ctext_low, ctext_high)) = self.lock_amount.as_ref() {
             let base = RistrettoPoint::get_base();
-            let decrypted_low = elgamal_decrypt(&base, ctext_low, dec_key)?;
-            let decrypted_high = elgamal_decrypt(&base, ctext_high, dec_key)?;
+            let decrypted_low = elgamal_decrypt(&base, ctext_low, dec_key).c(d!())?;
+            let decrypted_high = elgamal_decrypt(&base, ctext_high, dec_key).c(d!())?;
             let result = decrypted_low + decrypted_high * (1u64 << 32);
             Ok(result)
         } else {
-            Err(ZeiError::ParameterError) // nothing to decrypt
+            Err(eg!(ZeiError::ParameterError)) // nothing to decrypt
         }
     }
 
@@ -215,16 +213,16 @@ impl TracerMemo {
         &self,
         dec_key: &ElGamalDecKey<Scalar>,
         candidate_asset_types: &[AssetType],
-    ) -> Result<AssetType, ZeiError> {
+    ) -> Result<AssetType> {
         if candidate_asset_types.is_empty() {
-            return Err(ZeiError::ParameterError);
+            return Err(eg!(ZeiError::ParameterError));
         }
         for candidate in candidate_asset_types.iter() {
             if self.verify_asset_type(&dec_key, &candidate).is_ok() {
                 return Ok(*candidate);
             }
         }
-        Err(ZeiError::AssetTracingExtractionError)
+        Err(eg!(ZeiError::AssetTracingExtractionError))
     }
 
     /// Check is the attributes encrypted in self.lock_attrs are the same as in expected_attributes
@@ -234,9 +232,9 @@ impl TracerMemo {
         &self,
         dec_key: &ElGamalDecKey<BLSScalar>,
         expected_attributes: &[u32],
-    ) -> Result<Vec<bool>, ZeiError> {
+    ) -> Result<Vec<bool>> {
         if self.lock_attributes.len() != expected_attributes.len() {
-            return Err(ZeiError::ParameterError);
+            return Err(eg!(ZeiError::ParameterError));
         }
         let mut result = vec![];
         for (ctext, expected) in
@@ -259,11 +257,11 @@ impl TracerMemo {
     pub fn extract_identity_attributes_brute_force(
         &self,
         dec_key: &ElGamalDecKey<BLSScalar>,
-    ) -> Result<Vec<u32>, ZeiError> {
+    ) -> Result<Vec<u32>> {
         let mut result = vec![];
         let base = BLSG1::get_base();
         for ctext in self.lock_attributes.iter() {
-            let attr = elgamal_decrypt(&base, ctext, dec_key)? as u32;
+            let attr = elgamal_decrypt(&base, ctext, dec_key).c(d!())? as u32;
             result.push(attr);
         }
         Ok(result)
@@ -281,6 +279,7 @@ mod tests {
     use rand_core::SeedableRng;
 
     use itertools::Itertools;
+    use ruc::err::*;
     use utils::errors::ZeiError;
     use utils::u64_to_u32_pair;
 
@@ -338,26 +337,29 @@ mod tests {
             &[],
         );
 
-        assert_eq!(
-            memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[]),
-            Err(ZeiError::ParameterError)
+        err_eq!(
+            ZeiError::ParameterError,
+            memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[])
+                .unwrap_err(),
         );
-        assert_eq!(
+        err_eq!(
+            ZeiError::AssetTracingExtractionError,
             memo.extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
                 &[AssetType::from_identical_byte(0u8)]
-            ),
-            Err(ZeiError::AssetTracingExtractionError)
+            )
+            .unwrap_err(),
         );
-        assert_eq!(
+        err_eq!(
+            ZeiError::AssetTracingExtractionError,
             memo.extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
                 &[
                     AssetType::from_identical_byte(0u8),
                     AssetType::from_identical_byte(1u8)
                 ]
-            ),
-            Err(ZeiError::AssetTracingExtractionError)
+            )
+            .unwrap_err(),
         );
         assert!(
             memo.extract_asset_type(
@@ -427,44 +429,50 @@ mod tests {
             &attrs_and_ctexts,
         );
 
-        assert_eq!(
-            memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32]),
-            Err(ZeiError::ParameterError)
+        err_eq!(
+            ZeiError::ParameterError,
+            memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32])
+                .unwrap_err(),
         );
-        assert_eq!(
+        err_eq!(
+            ZeiError::ParameterError,
             memo.verify_identity_attributes(
                 &tracer_keys.dec_key.attrs_dec_key,
                 &[1u32, 2, 3, 4]
-            ),
-            Err(ZeiError::ParameterError)
+            )
+            .unwrap_err(),
         );
         assert_eq!(
             memo.verify_identity_attributes(
                 &tracer_keys.dec_key.attrs_dec_key,
                 &[1u32, 2, 4]
-            ),
-            Ok(vec![true, true, false])
+            )
+            .unwrap(),
+            vec![true, true, false]
         );
         assert_eq!(
             memo.verify_identity_attributes(
                 &tracer_keys.dec_key.attrs_dec_key,
                 &[4u32, 2, 3]
-            ),
-            Ok(vec![false, true, true])
+            )
+            .unwrap(),
+            vec![false, true, true]
         );
         assert_eq!(
             memo.verify_identity_attributes(
                 &tracer_keys.dec_key.attrs_dec_key,
                 &[1u32, 2, 3]
-            ),
-            Ok(vec![true, true, true])
+            )
+            .unwrap(),
+            vec![true, true, true]
         );
         assert_eq!(
             memo.verify_identity_attributes(
                 &tracer_keys.dec_key.attrs_dec_key,
                 &[3u32, 1, 2]
-            ),
-            Ok(vec![false, false, false])
+            )
+            .unwrap(),
+            vec![false, false, false]
         );
 
         let attrs = memo

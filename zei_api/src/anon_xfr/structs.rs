@@ -11,6 +11,7 @@ use crypto::basics::hybrid_encryption::{
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentScheme;
 use poly_iops::plonk::protocol::prover::PlonkPf;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 pub type Nullifier = BLSScalar;
@@ -187,9 +188,9 @@ impl OpenAnonBlindAssetRecordBuilder {
         mut self,
         prng: &mut R,
         enc_key: &XPublicKey,
-    ) -> Result<Self, ZeiError> {
+    ) -> Result<Self> {
         if self.oabar.owner_memo.is_some() {
-            return Err(ZeiError::InconsistentStructureError);
+            return Err(eg!(ZeiError::InconsistentStructureError));
         }
 
         self.oabar.blind = BLSScalar::random(prng);
@@ -209,8 +210,8 @@ impl OpenAnonBlindAssetRecordBuilder {
     }
 
     /// Run a sanity check and if ok, return Ok(OpenBlindAssetRecord)
-    pub fn build(self) -> Result<OpenAnonBlindAssetRecord, ZeiError> {
-        self.sanity_check()?;
+    pub fn build(self) -> Result<OpenAnonBlindAssetRecord> {
+        self.sanity_check().c(d!())?;
         Ok(self.oabar)
     }
 }
@@ -223,9 +224,9 @@ impl OpenAnonBlindAssetRecordBuilder {
         owner_memo: OwnerMemo,
         key_pair: &AXfrKeyPair,
         dec_key: &XSecretKey,
-    ) -> Result<Self, ZeiError> {
+    ) -> Result<Self> {
         let (amount, asset_type, blind, key_rand) =
-            decrypt_memo(&owner_memo, dec_key, key_pair, record)?;
+            decrypt_memo(&owner_memo, dec_key, key_pair, record).c(d!())?;
         let mut builder = OpenAnonBlindAssetRecordBuilder::new()
             .pub_key(key_pair.pub_key())
             .amount(amount)
@@ -237,15 +238,15 @@ impl OpenAnonBlindAssetRecordBuilder {
         Ok(builder)
     }
 
-    fn sanity_check(&self) -> Result<(), ZeiError> {
+    fn sanity_check(&self) -> Result<()> {
         // 1. check public key is non-default
         if self.oabar.pub_key == AXfrPubKey::default() {
-            return Err(ZeiError::InconsistentStructureError);
+            return Err(eg!(ZeiError::InconsistentStructureError));
         }
 
         // 2. OwnerMemo is not None
         if self.oabar.owner_memo.is_none() {
-            return Err(ZeiError::InconsistentStructureError);
+            return Err(eg!(ZeiError::InconsistentStructureError));
         }
         Ok(())
     }

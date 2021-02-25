@@ -1,4 +1,5 @@
 use crate::basics::hash_functions::mimc::MiMCHash;
+use ruc::{*, err::*};
 use crate::bp_circuits::array_inclusion::array_membership;
 use crate::bp_circuits::merkle_path::merkle_verify_mimc;
 use crate::merkle_tree::binary_merkle_tree::{
@@ -14,8 +15,8 @@ use algebra::groups::Scalar as _;
 
 pub const THRESHOLD: usize = 10;
 
-pub fn build_mt_whitelist(elements: &[Scalar]) -> Result<MerkleTree<Scalar>, ZeiError> {
-  mt_build::<Scalar, MiMCHash>(elements)
+pub fn build_mt_whitelist(elements: &[Scalar]) -> Result<MerkleTree<Scalar>> {
+  mt_build::<Scalar, MiMCHash>(elements).c(d!())
 }
 
 pub struct WhitelistProof {
@@ -28,18 +29,18 @@ pub fn prove_mt_membership<R: CryptoRng + RngCore>(prng: &mut R,
                                                    index: usize,
                                                    elem: &CompressedRistretto,
                                                    blind: &Scalar)
-                                                   -> Result<WhitelistProof, ZeiError> {
+                                                   -> Result<WhitelistProof> {
   let pc_gens = PedersenGens::default();
 
   let mut witness_commitments = vec![];
 
-  let (s, path) = mt_prove(mt, index)?;
+  let (s, path) = mt_prove(mt, index).c(d!())?;
   let mut prover_transcript = Transcript::new(b"MerkleTreePath");
   let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
 
   let (com_elem, var_elem) = prover.commit(s.0, blind.0);
   if CompressedRistretto(com_elem) != *elem {
-    return Err(ZeiError::ParameterError);
+    return Err(eg!(ZeiError::ParameterError));
   }
   let mut var_path = vec![];
   for (direction, sibling) in path.iter() {
@@ -62,11 +63,10 @@ pub fn prove_mt_membership<R: CryptoRng + RngCore>(prng: &mut R,
                        var_elem,
                        &var_path[..],
                        mt.root.value,
-                       Scalar::from_u64(mt.size as u64)).map_err(|_| ZeiError::WhitelistProveError)?;
+                       Scalar::from_u64(mt.size as u64)).map_err(|_| ZeiError::WhitelistProveError).c(d!())?;
   let num_gens = num_left_wires.next_power_of_two();
   let bp_gens = BulletproofGens::new(num_gens, 1);
-  let proof = prover.prove(&bp_gens)
-                    .map_err(|_| ZeiError::WhitelistProveError)?;
+  let proof = prover.prove(&bp_gens).c(d!(ZeiError::WhitelistProveError))?;
 
   Ok(WhitelistProof { witness_commitments,
                       proof })
@@ -75,7 +75,7 @@ pub fn prove_array_membership(elements: &[Scalar],
                               index: usize,
                               elem: &CompressedRistretto,
                               blind: &Scalar)
-                              -> Result<WhitelistProof, ZeiError> {
+                              -> Result<WhitelistProof> {
   let pc_gens = PedersenGens::default();
   let mut prover_transcript = Transcript::new(b"LinearInclusionProof");
   let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
@@ -83,8 +83,7 @@ pub fn prove_array_membership(elements: &[Scalar],
   assert_eq!(CompressedRistretto(com_elem), *elem);
   let left_wires = array_membership(&mut prover, &elements[..], var_elem);
   let bp_gens = BulletproofGens::new(left_wires.next_power_of_two(), 1);
-  let proof = prover.prove(&bp_gens)
-                    .map_err(|_| ZeiError::WhitelistProveError)?;
+  let proof = prover.prove(&bp_gens).c(d!(ZeiError::WhitelistProveError))?;
 
   Ok(WhitelistProof { witness_commitments: vec![],
                       proof })
@@ -93,7 +92,7 @@ pub fn prove_array_membership(elements: &[Scalar],
 pub fn verify_mt_membership(mt_root: &MerkleRoot<Scalar>,
                             elem_com: &CompressedRistretto,
                             proof: &WhitelistProof)
-                            -> Result<(), ZeiError> {
+                            -> Result<()> {
   let pc_gens = PedersenGens::default();
 
   let mut verifier_transcript = Transcript::new(b"MerkleTreePath");
@@ -116,19 +115,18 @@ pub fn verify_mt_membership(mt_root: &MerkleRoot<Scalar>,
                        elem_var,
                        &path_var[..],
                        mt_root.value,
-                       Scalar::from_u64(mt_root.size as u64)).map_err(|_| {
-                                                           ZeiError::WhitelistVerificationError
-                                                         })?;
+                       Scalar::from_u64(mt_root.size as u64))
+    .c(d!(ZeiError::WhitelistVerificationError))?;
 
   let num_gens = num_left_wires.next_power_of_two();
   let bp_gens = BulletproofGens::new(num_gens, 1);
   verifier.verify(&proof.proof, &pc_gens, &bp_gens)
-          .map_err(|_| ZeiError::WhitelistVerificationError)
+      .c(d!(ZeiError::WhitelistVerificationError))
 }
 pub fn verify_array_membership(elements: &[Scalar],
                                elem_com: &CompressedRistretto,
                                proof: &WhitelistProof)
-                               -> Result<(), ZeiError> {
+                               -> Result<()> {
   let pc_gens = PedersenGens::default();
   let mut verifier_transcript = Transcript::new(b"LinearInclusionProof");
   let mut verifier = Verifier::new(&mut verifier_transcript);
@@ -137,7 +135,7 @@ pub fn verify_array_membership(elements: &[Scalar],
   let num_left_wires = array_membership(&mut verifier, &elements[..], elem_var);
   let bp_gens = BulletproofGens::new(num_left_wires.next_power_of_two(), 1);
   verifier.verify(&proof.proof, &pc_gens, &bp_gens)
-          .map_err(|_| ZeiError::WhitelistVerificationError)
+      .c(d!(ZeiError::WhitelistVerificationError))
 }
 
 #[cfg(test)]

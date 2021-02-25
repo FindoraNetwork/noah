@@ -19,6 +19,7 @@ use crypto::basics::hybrid_encryption::{
 use crypto::basics::prf::PRF;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use std::collections::HashMap;
 use utils::errors::ZeiError;
 
@@ -39,14 +40,14 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
     input_keypairs: &[AXfrKeyPair],
-) -> Result<(AXfrBody, Vec<AXfrKeyPair>), ZeiError> {
+) -> Result<(AXfrBody, Vec<AXfrKeyPair>)> {
     // 1. check input correctness
     if inputs.is_empty() || outputs.is_empty() {
-        return Err(ZeiError::AXfrProverParamsError);
+        return Err(eg!(ZeiError::AXfrProverParamsError));
     }
-    check_inputs(inputs, input_keypairs)?;
-    check_asset_amount(inputs, outputs)?;
-    check_roots(inputs)?;
+    check_inputs(inputs, input_keypairs).c(d!())?;
+    check_asset_amount(inputs, outputs).c(d!())?;
+    check_roots(inputs).c(d!())?;
 
     // 2. randomize input key pair with open_abar rand key
     let rand_input_keypairs = inputs
@@ -102,7 +103,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
         payers_secrets,
         payees_secrets,
     };
-    let proof = prove_xfr(prng, params, secret_inputs)?;
+    let proof = prove_xfr(prng, params, secret_inputs).c(d!())?;
 
     let diversified_key_pairs = rand_input_keypairs
         .iter()
@@ -114,9 +115,9 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
         .iter()
         .map(|output| AnonBlindAssetRecord::from_oabar(output))
         .collect_vec();
-    let out_memos: Result<Vec<OwnerMemo>, ZeiError> = outputs
+    let out_memos: Result<Vec<OwnerMemo>> = outputs
         .iter()
-        .map(|output| output.owner_memo.clone().ok_or(ZeiError::ParameterError))
+        .map(|output| output.owner_memo.clone().c(d!(ZeiError::ParameterError)))
         .collect();
 
     Ok((
@@ -127,7 +128,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
                 snark_proof: proof,
                 merkle_root: inputs[0].mt_leaf_info.as_ref().unwrap().root,
             },
-            owner_memos: out_memos?,
+            owner_memos: out_memos.c(d!())?,
         },
         diversified_key_pairs,
     ))
@@ -141,9 +142,9 @@ pub fn verify_anon_xfr_body(
     params: &NodeParams,
     body: &AXfrBody,
     merkle_root: &BLSScalar,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     if *merkle_root != body.proof.merkle_root {
-        return Err(ZeiError::AXfrVerificationError);
+        return Err(eg!(ZeiError::AXfrVerificationError));
     }
     let payees_commitments = body
         .outputs
@@ -156,20 +157,20 @@ pub fn verify_anon_xfr_body(
         merkle_root: *merkle_root,
     };
     verify_xfr(params, &pub_inputs, &body.proof.snark_proof)
-        .map_err(|_| ZeiError::AXfrVerificationError)
+        .c(d!(ZeiError::AXfrVerificationError))
 }
 
 /// Check that inputs have mt witness and keypair matched pubkey
 fn check_inputs(
     inputs: &[OpenAnonBlindAssetRecord],
     keypairs: &[AXfrKeyPair],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     if inputs.len() != keypairs.len() {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
     for (input, keypair) in inputs.iter().zip(keypairs.iter()) {
         if input.mt_leaf_info.is_none() || keypair.pub_key() != input.pub_key {
-            return Err(ZeiError::ParameterError);
+            return Err(eg!(ZeiError::ParameterError));
         }
     }
     Ok(())
@@ -178,7 +179,7 @@ fn check_inputs(
 fn check_asset_amount(
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut balances = HashMap::new();
 
     for record in inputs.iter() {
@@ -199,7 +200,7 @@ fn check_asset_amount(
 
     for (_, &sum) in balances.iter() {
         if sum != 0i128 {
-            return Err(ZeiError::XfrCreationAssetAmountError);
+            return Err(eg!(ZeiError::XfrCreationAssetAmountError));
         }
     }
 
@@ -208,21 +209,21 @@ fn check_asset_amount(
 
 /// Check that the merkle roots in input asset records are consistent
 /// `inputs` is guaranteed to have at least one asset record
-fn check_roots(inputs: &[OpenAnonBlindAssetRecord]) -> Result<(), ZeiError> {
+fn check_roots(inputs: &[OpenAnonBlindAssetRecord]) -> Result<()> {
     let root = inputs[0]
         .mt_leaf_info
         .as_ref()
-        .ok_or(ZeiError::ParameterError)?
+        .c(d!(ZeiError::ParameterError))?
         .root;
     for input in inputs.iter().skip(1) {
         if input
             .mt_leaf_info
             .as_ref()
-            .ok_or(ZeiError::ParameterError)?
+            .c(d!(ZeiError::ParameterError))?
             .root
             != root
         {
-            return Err(ZeiError::AXfrVerificationError);
+            return Err(eg!(ZeiError::AXfrVerificationError));
         }
     }
     Ok(())
@@ -239,10 +240,10 @@ pub fn decrypt_memo(
     dec_key: &XSecretKey,
     key_pair: &AXfrKeyPair,
     abar: &AnonBlindAssetRecord,
-) -> Result<(u64, AssetType, BLSScalar, JubjubScalar), ZeiError> {
+) -> Result<(u64, AssetType, BLSScalar, JubjubScalar)> {
     let plaintext = hybrid_decrypt_with_x25519_secret_key(&memo.lock, dec_key);
     if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS_SCALAR_LEN + JUBJUB_SCALAR_LEN {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
     let amount = utils::u8_le_slice_to_u64(&plaintext[0..8]);
     let mut i = 8;
@@ -251,19 +252,21 @@ pub fn decrypt_memo(
     let asset_type = AssetType(asset_type_array);
     i += ASSET_TYPE_LENGTH;
     let blind = BLSScalar::from_bytes(&plaintext[i..i + BLS_SCALAR_LEN])
-        .map_err(|_| ZeiError::ParameterError)?;
+        .c(d!(ZeiError::ParameterError))?;
     i += BLS_SCALAR_LEN;
     let rand = JubjubScalar::from_bytes(&plaintext[i..i + JUBJUB_SCALAR_LEN])
-        .map_err(|_| ZeiError::ParameterError)?;
+        .c(d!(ZeiError::ParameterError))?;
     // verify abar's commitment
-    crypto::basics::commitments::rescue::HashCommitment::new().verify(
-        &[BLSScalar::from_u64(amount), asset_type.as_scalar()],
-        &blind,
-        &abar.amount_type_commitment,
-    )?;
+    crypto::basics::commitments::rescue::HashCommitment::new()
+        .verify(
+            &[BLSScalar::from_u64(amount), asset_type.as_scalar()],
+            &blind,
+            &abar.amount_type_commitment,
+        )
+        .c(d!())?;
     // verify abar's public key
     if key_pair.randomize(&rand).pub_key() != abar.public_key {
-        return Err(ZeiError::InconsistentStructureError);
+        return Err(eg!(ZeiError::InconsistentStructureError));
     }
 
     Ok((amount, asset_type, blind, rand))
@@ -308,6 +311,7 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rand_core::{CryptoRng, RngCore};
+    use ruc::err::*;
     use utils::errors::ZeiError;
 
     #[test]
@@ -574,19 +578,21 @@ mod tests {
                 .collect_vec();
 
             // empty inputs/outputs
-            assert_eq!(
-                gen_anon_xfr_body(&mut prng, &user_params, &[], &open_abars_out, &[]),
-                Err(ZeiError::AXfrProverParamsError)
+            err_eq!(
+                ZeiError::AXfrProverParamsError,
+                gen_anon_xfr_body(&mut prng, &user_params, &[], &open_abars_out, &[])
+                    .unwrap_err(),
             );
-            assert_eq!(
+            err_eq!(
+                ZeiError::AXfrProverParamsError,
                 gen_anon_xfr_body(
                     &mut prng,
                     &user_params,
                     &open_abars_in,
                     &[],
                     &in_keypairs
-                ),
-                Err(ZeiError::AXfrProverParamsError)
+                )
+                .unwrap_err(),
             );
             // invalid inputs/outputs
             open_abars_in[0].amount += 1;

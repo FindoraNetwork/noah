@@ -407,6 +407,7 @@ mod test {
     use crypto::basics::hash::rescue::{RescueCtr, RescueInstance};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::{err::*, *};
 
     type F = BLSScalar;
 
@@ -439,8 +440,7 @@ mod test {
 
         // Check good witness
         let mut witness = cs.get_and_clear_witness();
-        let verify = cs.verify_witness(&witness[..], &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness[..], &[]));
 
         // Check bad witness: witness[out_var] = zero()
         witness[out_var] = F::zero();
@@ -494,8 +494,7 @@ mod test {
 
         // Check good witness
         let mut witness = cs.get_and_clear_witness();
-        let verify = cs.verify_witness(&witness[..], &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness[..], &[]));
 
         // Check bad witness
         witness[out_var.0[0]] = F::zero();

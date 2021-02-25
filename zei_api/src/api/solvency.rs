@@ -10,6 +10,7 @@ use bulletproofs::BulletproofGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::bp_circuits::cloak::{CloakCommitment, CloakValue};
 use crypto::solvency;
+use ruc::{err::*, *};
 use std::collections::HashSet;
 use std::fmt;
 use utils::errors::ZeiError;
@@ -91,9 +92,9 @@ impl SolvencyAudit {
         &mut self,
         record_type: SolvencyRecordType,
         record: &BlindAssetRecord,
-    ) -> Result<(), ZeiError> {
+    ) -> Result<()> {
         if not_matches!(self.stage, SolvencyAuditStage::RecordCollection) {
-            return Err(ZeiError::SolvencyInputError);
+            return Err(eg!(ZeiError::SolvencyInputError));
         }
         match record_type {
             SolvencyRecordType::Asset => self.assets.push(record.clone()),
@@ -129,9 +130,9 @@ impl SolvencyAudit {
     /// Finalize all assets and liabilities as all of them are verified.
     /// For scenarios where liability records are added by a trusted auditor, liability verification stage
     /// is unnecessary, thus can be skipped and directly proceed to `LiabilitiesVerified` stage.
-    pub fn finalize_verified_records(&mut self) -> Result<(), ZeiError> {
+    pub fn finalize_verified_records(&mut self) -> Result<()> {
         if not_matches!(self.stage, SolvencyAuditStage::RecordCollection) {
-            return Err(ZeiError::SolvencyInputError);
+            return Err(eg!(ZeiError::SolvencyInputError));
         }
         self.stage = SolvencyAuditStage::LiabilitiesVerified;
         Ok(())
@@ -140,20 +141,17 @@ impl SolvencyAudit {
     /// Finalize a list of conversion rates of each asset_type, provided by Auditor.
     /// Noted that the list can be much longer than the `self.asset_types` list, because many of records may
     /// have confidential asset type, thus an auditor may provide an overarching list of rates
-    pub fn finalize_rates(
-        &mut self,
-        rates: &[(AssetType, u64)],
-    ) -> Result<(), ZeiError> {
+    pub fn finalize_rates(&mut self, rates: &[(AssetType, u64)]) -> Result<()> {
         if not_matches!(self.stage, SolvencyAuditStage::LiabilitiesVerified)
             || rates.len() < self.asset_types.len()
         {
-            return Err(ZeiError::SolvencyInputError);
+            return Err(eg!(ZeiError::SolvencyInputError));
         }
 
         // make sure at least all non-confidential asset types are provided with a rate
         for asset_type in self.asset_types.iter() {
             if rates.binary_search_by_key(&asset_type, |(a, _)| a).is_err() {
-                return Err(ZeiError::SolvencyInputError);
+                return Err(eg!(ZeiError::SolvencyInputError));
             }
         }
 
@@ -174,13 +172,13 @@ impl SolvencyAudit {
         keypairs_for_assets: &[&XfrKeyPair],
         owner_memos_for_liabilities: &[&Option<OwnerMemo>],
         keypairs_for_liabilities: &[&XfrKeyPair],
-    ) -> Result<SolvencyProver, ZeiError> {
+    ) -> Result<SolvencyProver> {
         if owner_memos_for_assets.len() != self.assets.len()
             || keypairs_for_assets.len() != self.assets.len()
             || owner_memos_for_liabilities.len() != self.liabilities.len()
             || keypairs_for_liabilities.len() != self.liabilities.len()
         {
-            return Err(ZeiError::SolvencyInputError);
+            return Err(eg!(ZeiError::SolvencyInputError));
         }
 
         let mut prover: SolvencyProver = Default::default();
@@ -189,18 +187,24 @@ impl SolvencyAudit {
         let mut asset_oars = vec![];
         let mut liability_oars = vec![];
         for (i, rec) in self.assets.iter().enumerate() {
-            asset_oars.push(open_blind_asset_record(
-                &rec,
-                owner_memos_for_assets[i],
-                keypairs_for_assets[i],
-            )?);
+            asset_oars.push(
+                open_blind_asset_record(
+                    &rec,
+                    owner_memos_for_assets[i],
+                    keypairs_for_assets[i],
+                )
+                .c(d!())?,
+            );
         }
         for (i, rec) in self.liabilities.iter().enumerate() {
-            liability_oars.push(open_blind_asset_record(
-                &rec,
-                owner_memos_for_liabilities[i],
-                keypairs_for_liabilities[i],
-            )?);
+            liability_oars.push(
+                open_blind_asset_record(
+                    &rec,
+                    owner_memos_for_liabilities[i],
+                    keypairs_for_liabilities[i],
+                )
+                .c(d!())?,
+            );
         }
 
         // 2. build SolvencyProver from OAR
@@ -351,9 +355,9 @@ impl SolvencyProver {
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &RistrettoPedersenGens,
-    ) -> Result<Vec<u8>, ZeiError> {
+    ) -> Result<Vec<u8>> {
         if self.conv_rates.is_empty() {
-            return Err(ZeiError::SolvencyProveError);
+            return Err(eg!(ZeiError::SolvencyProveError));
         }
 
         let proof = solvency::prove_solvency(
@@ -366,7 +370,8 @@ impl SolvencyProver {
             &self.hidden_liabilities_blinds,
             &self.public_liabilities,
             &self.conv_rates,
-        )?;
+        )
+        .c(d!())?;
         Ok(proof.to_bytes())
     }
 }
@@ -387,9 +392,9 @@ impl SolvencyVerifier {
         bp_gens: &BulletproofGens,
         pc_gens: &RistrettoPedersenGens,
         proof: &[u8],
-    ) -> Result<(), ZeiError> {
+    ) -> Result<()> {
         if self.conv_rates.is_empty() {
-            return Err(ZeiError::SolvencyVerificationError);
+            return Err(eg!(ZeiError::SolvencyVerificationError));
         }
 
         solvency::verify_solvency(

@@ -10,6 +10,7 @@ use group::Group as _;
 use jubjub::{AffinePoint, ExtendedPoint, Fr};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use std::convert::TryInto;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
@@ -73,10 +74,10 @@ impl ScalarArithmetic for JubjubScalar {
         (self.0).sub_assign(&b.0);
     }
 
-    fn inv(&self) -> Result<JubjubScalar, AlgebraError> {
+    fn inv(&self) -> Result<JubjubScalar> {
         let a = self.0.invert();
         if bool::from(a.is_none()) {
-            return Err(AlgebraError::GroupInversionError);
+            return Err(eg!(AlgebraError::GroupInversionError));
         }
         Ok(JubjubScalar(a.unwrap()))
     }
@@ -134,22 +135,22 @@ impl Scalar for JubjubScalar {
         (self.0).to_bytes().to_vec()
     }
 
-    fn from_bytes(bytes: &[u8]) -> Result<JubjubScalar, AlgebraError> {
+    fn from_bytes(bytes: &[u8]) -> Result<JubjubScalar> {
         if bytes.len() != JUBJUB_SCALAR_LEN {
-            return Err(AlgebraError::ParameterError);
+            return Err(eg!(AlgebraError::ParameterError));
         }
         let mut array = [0u8; 32];
         array.copy_from_slice(bytes);
         let scalar = Fr::from_bytes(&array);
         if bool::from(scalar.is_none()) {
-            return Err(AlgebraError::SerializationError);
+            return Err(eg!(AlgebraError::SerializationError));
         }
         Ok(JubjubScalar(scalar.unwrap()))
     }
 
-    fn from_le_bytes(bytes: &[u8]) -> Result<JubjubScalar, AlgebraError> {
+    fn from_le_bytes(bytes: &[u8]) -> Result<JubjubScalar> {
         if bytes.len() > Self::bytes_len() {
-            return Err(AlgebraError::DeserializationError);
+            return Err(eg!(AlgebraError::DeserializationError));
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
@@ -180,16 +181,16 @@ impl Group for JubjubPoint {
         AffinePoint::from(&self.0).to_bytes().to_vec()
     }
 
-    fn from_compressed_bytes(bytes: &[u8]) -> Result<Self, AlgebraError> {
+    fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let affine = AffinePoint::from_bytes(
             bytes[..Self::COMPRESSED_LEN]
                 .try_into()
-                .map_err(|_| AlgebraError::DecompressElementError)?,
+                .map_err(|_| eg!(AlgebraError::DecompressElementError))?,
         );
         if affine.is_some().into() {
             Ok(JubjubPoint(ExtendedPoint::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(AlgebraError::DecompressElementError)
+            Err(eg!(AlgebraError::DecompressElementError))
         }
     }
 

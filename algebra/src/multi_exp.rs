@@ -3,6 +3,7 @@
  */
 use crate::errors::AlgebraError;
 use crate::groups::{scalar_to_radix_2_power_w, Group, Scalar};
+use ruc::{err::*, *};
 use std::borrow::Borrow;
 
 pub trait MultiExp: Group {
@@ -55,11 +56,11 @@ impl<G: Group> MultiExp for G {
     }
 }
 
-fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G, AlgebraError> {
+fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
     let size = scalars.len();
 
     if size == 0 {
-        return Err(AlgebraError::ParameterError);
+        return Err(eg!(AlgebraError::ParameterError));
     }
 
     let w = if size < 500 {

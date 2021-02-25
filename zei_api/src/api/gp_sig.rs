@@ -1,6 +1,6 @@
 use algebra::bls12_381::{Bls12381, BLSG1};
 use rand_core::{CryptoRng, RngCore};
-use utils::errors::ZeiError;
+use ruc::{err::*, *};
 
 /// The public key of the group manager
 pub type GroupPublicKey = crypto::group_signatures::GroupPublicKey<Bls12381>;
@@ -73,8 +73,8 @@ pub fn gpsig_verify<B: AsRef<[u8]>>(
     gpk: &GroupPublicKey,
     sig: &GroupSignature,
     msg: &B,
-) -> Result<(), ZeiError> {
-    crypto::group_signatures::gpsig_verify(gpk, sig, msg.as_ref())
+) -> Result<()> {
+    crypto::group_signatures::gpsig_verify(gpk, sig, msg.as_ref()).c(d!())
 }
 
 /// Signature opening function

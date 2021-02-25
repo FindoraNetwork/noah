@@ -2,6 +2,7 @@ use algebra::groups::Group;
 use algebra::ristretto::RistrettoPoint;
 use digest::Digest;
 use itertools::Itertools;
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 #[allow(non_snake_case)]
@@ -35,9 +36,9 @@ impl<G: Group> PedersenGens<G> {
     }
 
     /// commit
-    pub fn commit(&self, values: &[G::S], blinding: &G::S) -> Result<G, ZeiError> {
+    pub fn commit(&self, values: &[G::S], blinding: &G::S) -> Result<G> {
         if values.len() != self.bases.len() - 1 {
-            return Err(ZeiError::ParameterError);
+            return Err(eg!(ZeiError::ParameterError));
         }
         let mut scalars = values.iter().collect_vec();
         scalars.push(blinding);

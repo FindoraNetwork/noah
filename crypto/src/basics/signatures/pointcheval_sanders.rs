@@ -23,6 +23,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use sha2::Sha512;
 use utils::errors::ZeiError;
 
@@ -127,9 +128,9 @@ pub fn ps_verify_sig_bytes<P: Pairing>(
     pk: &PSPublicKey<P::G2>,
     m: &[u8],
     sig: &PSSignature<P::G1>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let m_scalar = hash_message::<P::ScalarField>(m);
-    ps_verify_sig_scalar::<P>(pk, &m_scalar, sig)
+    ps_verify_sig_scalar::<P>(pk, &m_scalar, sig).c(d!())
 }
 
 /// Pointcheval-Sanders verification function for scalars
@@ -150,12 +151,12 @@ pub fn ps_verify_sig_scalar<P: Pairing>(
     pk: &PSPublicKey<P::G2>,
     m: &P::ScalarField,
     sig: &PSSignature<P::G1>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let a = pk.xx.add(&pk.yy.mul(&m));
     let e1 = P::pairing(&sig.s1, &a);
     let e2 = P::pairing(&sig.s2, &P::G2::get_base());
     if e1 != e2 || sig.s1 == P::G1::get_identity() {
-        return Err(ZeiError::SignatureError);
+        return Err(eg!(ZeiError::SignatureError));
     }
     Ok(())
 }

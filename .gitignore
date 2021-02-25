@@ -12,6 +12,7 @@
 
 utilities/target
 
+Cargo.lock
 
 #zei_api
 zei_api/data/*.bin

@@ -11,6 +11,7 @@ use curve25519_dalek::traits::Identity;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 
 pub const RISTRETTO_SCALAR_LEN: usize = 32;
 
@@ -73,7 +74,7 @@ impl ScalarArithmetic for RistrettoScalar {
         (self.0).sub_assign(&b.0);
     }
 
-    fn inv(&self) -> Result<RistrettoScalar, AlgebraError> {
+    fn inv(&self) -> Result<RistrettoScalar> {
         Ok(RistrettoScalar(self.0.invert()))
     }
 }
@@ -129,18 +130,18 @@ impl ZeiScalar for RistrettoScalar {
         v
     }
 
-    fn from_bytes(bytes: &[u8]) -> Result<RistrettoScalar, AlgebraError> {
+    fn from_bytes(bytes: &[u8]) -> Result<RistrettoScalar> {
         if bytes.len() != RISTRETTO_SCALAR_LEN {
-            return Err(AlgebraError::ParameterError);
+            return Err(eg!(AlgebraError::ParameterError));
         }
         let mut array = [0u8; RISTRETTO_SCALAR_LEN];
         array.copy_from_slice(bytes);
         Ok(RistrettoScalar(Scalar::from_bits(array)))
     }
 
-    fn from_le_bytes(bytes: &[u8]) -> Result<RistrettoScalar, AlgebraError> {
+    fn from_le_bytes(bytes: &[u8]) -> Result<RistrettoScalar> {
         if bytes.len() > Self::bytes_len() {
-            return Err(AlgebraError::DeserializationError);
+            return Err(eg!(AlgebraError::DeserializationError));
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
@@ -208,11 +209,11 @@ impl Group for RistrettoPoint {
         v
     }
 
-    fn from_compressed_bytes(bytes: &[u8]) -> Result<RistrettoPoint, AlgebraError> {
+    fn from_compressed_bytes(bytes: &[u8]) -> Result<RistrettoPoint> {
         Ok(RistrettoPoint(
             CR::from_slice(bytes)
                 .decompress()
-                .ok_or(AlgebraError::DecompressElementError)?,
+                .ok_or(eg!(AlgebraError::DecompressElementError))?,
         ))
     }
 

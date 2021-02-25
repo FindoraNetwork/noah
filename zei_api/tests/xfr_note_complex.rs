@@ -1,7 +1,6 @@
 #![deny(warnings)]
 #[cfg(test)]
 pub(crate) mod xfr_note_complex_variable_size {
-
     use itertools::Itertools;
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;

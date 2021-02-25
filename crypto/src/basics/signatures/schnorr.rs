@@ -16,6 +16,7 @@ use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
+use ruc::{err::*, *};
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use utils::errors::ZeiError;
@@ -64,8 +65,8 @@ impl<G: Group> PublicKey<G> {
     /// * `msg` - message
     /// * `sig` - signature
     /// * `returns` - Nothing if the verification succeeds, an error otherwise
-    pub fn verify(&self, msg: &[u8], sign: &Signature<G, G::S>) -> Result<(), ZeiError> {
-        verify(&self, msg, sign)
+    pub fn verify(&self, msg: &[u8], sign: &Signature<G, G::S>) -> Result<()> {
+        verify(&self, msg, sign).c(d!())
     }
 }
 
@@ -73,12 +74,12 @@ impl<G: Group> ZeiFromToBytes for PublicKey<G> {
     fn zei_to_bytes(&self) -> Vec<u8> {
         self.0.to_compressed_bytes()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<PublicKey<G>, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<PublicKey<G>> {
         let group_element = G::from_compressed_bytes(bytes);
 
         match group_element {
             Ok(g) => Ok(PublicKey(g)),
-            _ => Err(ZeiError::ParameterError),
+            _ => Err(eg!(ZeiError::ParameterError)),
         }
     }
 }
@@ -156,16 +157,16 @@ impl<G: Group> ZeiFromToBytes for Signature<G, G::S> {
         v1
     }
 
-    fn zei_from_bytes(bytes_repr: &[u8]) -> Result<Signature<G, G::S>, ZeiError> {
+    fn zei_from_bytes(bytes_repr: &[u8]) -> Result<Signature<G, G::S>> {
         let R = G::from_compressed_bytes(&bytes_repr[..G::COMPRESSED_LEN]);
         if R.is_err() {
-            return Err(ZeiError::ParameterError);
+            return Err(eg!(ZeiError::ParameterError));
         }
         let R = R.unwrap(); // safe unwrap()
         let s = G::S::from_bytes(&bytes_repr[G::COMPRESSED_LEN..]);
         match s {
             Ok(s) => Ok(Signature { R, s }),
-            _ => Err(ZeiError::DeserializationError),
+            _ => Err(eg!(ZeiError::DeserializationError)),
         }
     }
 }
@@ -272,7 +273,7 @@ fn verify<G: Group>(
     pk: &PublicKey<G>,
     msg: &[u8],
     sig: &Signature<G, G::S>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut transcript = Transcript::new(b"schnorr_sig");
 
     let g = G::get_base();
@@ -287,7 +288,7 @@ fn verify<G: Group>(
     if left == right {
         Ok(())
     } else {
-        Err(ZeiError::SignatureError)
+        Err(eg!(ZeiError::SignatureError))
     }
 }
 
@@ -301,13 +302,13 @@ pub fn multisig_verify<G: Group>(
     public_keys: &[PublicKey<G>],
     msg: &[u8],
     msig: &MultiSignature<G>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     if public_keys.len() != msig.0.len() || public_keys.is_empty() {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
 
     for (pk, sig) in public_keys.iter().zip(msig.0.clone()) {
-        verify(&pk, msg, &sig)?;
+        verify(&pk, msg, &sig).c(d!())?;
     }
 
     Ok(())
@@ -400,6 +401,7 @@ mod schnorr_sigs {
             multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature,
         };
         use algebra::groups::{Group, GroupArithmetic, One};
+        use ruc::err::*;
 
         use algebra::jubjub::JubjubPoint;
         use algebra::ristretto::RistrettoPoint;
@@ -439,16 +441,16 @@ mod schnorr_sigs {
 
             let wrong_message = b"wrong_message";
             let res = multisig_verify(&public_keys, wrong_message, &msig);
-            assert_eq!(res, Err(ZeiError::SignatureError));
+            err_eq!(ZeiError::SignatureError, res.unwrap_err());
 
             let too_short_multi_sig = MultiSignature(msig.0.clone()[0..2].to_vec());
             let res = multisig_verify(&public_keys, message, &too_short_multi_sig);
-            assert_eq!(res, Err(ZeiError::ParameterError));
+            err_eq!(ZeiError::ParameterError, res.unwrap_err());
 
             let empty_msig: MultiSignature<G> = MultiSignature(vec![]);
             let empty_public_keys = vec![];
             let res = multisig_verify(&empty_public_keys, message, &empty_msig);
-            assert_eq!(res, Err(ZeiError::ParameterError));
+            err_eq!(ZeiError::ParameterError, res.unwrap_err());
         }
 
         #[test]

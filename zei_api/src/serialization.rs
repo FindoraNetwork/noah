@@ -2,6 +2,7 @@ use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
+use ruc::{err::*, *};
 use serde::Serializer;
 use utils::errors::ZeiError;
 pub use utils::serialization::ZeiFromToBytes;
@@ -12,8 +13,8 @@ impl ZeiFromToBytes for AXfrPubKey {
     self.0.zei_to_bytes()
   }
 
-  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
-    let point = JubjubGroup::zei_from_bytes(bytes)?;
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    let point = JubjubGroup::zei_from_bytes(bytes).c(d!())?;
     Ok(AXfrPubKey(point))
   }
 }
@@ -25,8 +26,8 @@ impl ZeiFromToBytes for AXfrSecKey {
     self.0.zei_to_bytes()
   }
 
-  fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
-    let scalar = JubjubScalar::zei_from_bytes(bytes)?;
+  fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    let scalar = JubjubScalar::zei_from_bytes(bytes).c(d!())?;
     Ok(AXfrSecKey(scalar))
   }
 }
@@ -39,9 +40,9 @@ impl ZeiFromToBytes for AssetType {
         self.0.to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != ASSET_TYPE_LENGTH {
-            Err(ZeiError::DeserializationError)
+            Err(eg!(ZeiError::DeserializationError))
         } else {
             let mut array = [0u8; ASSET_TYPE_LENGTH];
             array.copy_from_slice(bytes);
@@ -57,9 +58,8 @@ impl ZeiFromToBytes for XfrPublicKey {
         self.0.as_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
-        let pk =
-            PublicKey::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError)?;
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+        let pk = PublicKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?;
         Ok(XfrPublicKey(pk))
     }
 }
@@ -70,9 +70,9 @@ impl ZeiFromToBytes for XfrSecretKey {
         self.0.as_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(XfrSecretKey(
-            SecretKey::from_bytes(bytes).map_err(|_| ZeiError::DeserializationError)?,
+            SecretKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?,
         ))
     }
 }
@@ -87,10 +87,10 @@ impl ZeiFromToBytes for XfrSignature {
         vec
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         match ed25519_dalek::Signature::from_bytes(bytes) {
             Ok(e) => Ok(XfrSignature(e)),
-            Err(_) => Err(ZeiError::DeserializationError),
+            Err(_) => Err(eg!(ZeiError::DeserializationError)),
         }
     }
 }

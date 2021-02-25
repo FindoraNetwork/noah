@@ -3,6 +3,8 @@
 pub(crate) mod examples {
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
+    use ruc::{err::*, *};
+    use utils::err_eq;
     use utils::errors::ZeiError;
     use wasm_bindgen::__rt::std::collections::HashMap;
     use zei::api::anon_creds;
@@ -336,18 +338,13 @@ pub(crate) mod examples {
         let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
             Ok(data) => data,
             Err(e) => {
-                match e {
-                    ZeiError::BogusAssetTracerMemo => {
-                        // User may choose to call brute_force decrypt to get the correct information
-                        trace_assets_brute_force(
-                            &xfr_note.body,
-                            &tracer_keys,
-                            &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                        )
-                        .unwrap()
-                    }
-                    _ => panic!("Inconsistent xfr_note.body"),
-                }
+                err_eq!(ZeiError::BogusAssetTracerMemo, e);
+                // User may choose to call brute_force decrypt to get the correct information
+                pnk!(trace_assets_brute_force(
+                    &xfr_note.body,
+                    &tracer_keys,
+                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
+                ))
             }
         };
 
@@ -498,18 +495,13 @@ pub(crate) mod examples {
         let records_data = match trace_assets(&xfr_note.body, &asset_tracing_key_pair) {
             Ok(data) => data,
             Err(e) => {
-                match e {
-                    ZeiError::BogusAssetTracerMemo => {
-                        // User may choose to call brute_force decrypt to get the correct information
-                        trace_assets_brute_force(
-                            &xfr_note.body,
-                            &asset_tracing_key_pair,
-                            &[ASSET1_TYPE, ASSET2_TYPE],
-                        )
-                        .unwrap()
-                    }
-                    _ => panic!("Inconsistent xfr_note.body"),
-                }
+                err_eq!(ZeiError::BogusAssetTracerMemo, e);
+                // User may choose to call brute_force decrypt to get the correct information
+                pnk!(trace_assets_brute_force(
+                    &xfr_note.body,
+                    &asset_tracing_key_pair,
+                    &[ASSET1_TYPE, ASSET2_TYPE],
+                ))
             }
         };
 
@@ -725,18 +717,13 @@ pub(crate) mod examples {
         let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
             Ok(data) => data,
             Err(e) => {
-                match e {
-                    ZeiError::BogusAssetTracerMemo => {
-                        // User may choose to call brute_force decrypt to get the correct information
-                        trace_assets_brute_force(
-                            &xfr_note.body,
-                            &tracer_keys,
-                            &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                        )
-                        .unwrap()
-                    }
-                    _ => panic!("Inconsistent xfr_note.body"),
-                }
+                err_eq!(ZeiError::BogusAssetTracerMemo, e);
+                // User may choose to call brute_force decrypt to get the correct information
+                pnk!(trace_assets_brute_force(
+                    &xfr_note.body,
+                    &tracer_keys,
+                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
+                ))
             }
         };
 
@@ -970,18 +957,13 @@ pub(crate) mod examples {
         let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
             Ok(data) => data,
             Err(e) => {
-                match e {
-                    ZeiError::BogusAssetTracerMemo => {
-                        // User may choose to call brute_force decrypt to get the correct information
-                        trace_assets_brute_force(
-                            &xfr_note.body,
-                            &tracer_keys,
-                            &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                        )
-                        .unwrap()
-                    }
-                    _ => panic!("Inconsistent xfr_note.body"),
-                }
+                err_eq!(ZeiError::BogusAssetTracerMemo, e);
+                // User may choose to call brute_force decrypt to get the correct information
+                pnk!(trace_assets_brute_force(
+                    &xfr_note.body,
+                    &tracer_keys,
+                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
+                ))
             }
         };
 

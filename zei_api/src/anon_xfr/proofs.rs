@@ -9,6 +9,7 @@ use merlin::Transcript;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
 use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 const ANON_XFR_TRANSCRIPT: &[u8] = b"Anon Xfr";
@@ -26,7 +27,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &UserParams,
     secret_inputs: AMultiXfrWitness,
-) -> Result<AXfrPlonkPf, ZeiError> {
+) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
     transcript.append_u64(
         N_INPUTS_TRANSCRIPT,
@@ -39,7 +40,8 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
 
     let (mut cs, _) = build_multi_xfr_cs(secret_inputs);
     let witness = cs.get_and_clear_witness();
-    let zkproof = prover(
+
+    prover(
         rng,
         &mut transcript,
         &params.pcs,
@@ -47,8 +49,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
         &params.prover_params,
         &witness,
     )
-    .map_err(|_| ZeiError::AXfrProofError)?;
-    Ok(zkproof)
+    .c(d!(ZeiError::AXfrProofError))
 }
 
 /// I verify the plonk proof for a multi-input/output anonymous transaction.
@@ -59,7 +60,7 @@ pub(crate) fn verify_xfr(
     params: &NodeParams,
     pub_inputs: &AMultiXfrPubInputs,
     proof: &AXfrPlonkPf,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
     transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);
     transcript.append_u64(
@@ -75,7 +76,7 @@ pub(crate) fn verify_xfr(
         &online_inputs,
         proof,
     )
-    .map_err(|_| ZeiError::ZKProofVerificationError)
+    .c(d!(ZeiError::ZKProofVerificationError))
 }
 
 /// I generates the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
@@ -95,12 +96,13 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     blind_pc: BLSScalar,
     blind_hash: BLSScalar,
     pc_gens: &PedersenGens<JubjubPoint>,
-) -> Result<AXfrPlonkPf, ZeiError> {
+) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
     let (mut cs, _) =
         build_eq_committed_vals_cs(amount, asset_type, blind_pc, blind_hash, pc_gens);
     let witness = cs.get_and_clear_witness();
-    let zkproof = prover(
+
+    prover(
         rng,
         &mut transcript,
         &params.pcs,
@@ -108,8 +110,7 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
         &params.prover_params,
         &witness,
     )
-    .map_err(|_| ZeiError::AXfrProofError)?;
-    Ok(zkproof)
+    .c(d!(ZeiError::AXfrProofError))
 }
 
 /// I verify the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
@@ -123,7 +124,7 @@ pub(crate) fn verify_eq_committed_vals(
     hash_comm: BLSScalar,
     ped_comm: &JubjubPoint,
     proof: &AXfrPlonkPf,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
     let online_inputs = vec![hash_comm, ped_comm.get_x(), ped_comm.get_y()];
     verifier(
@@ -134,7 +135,7 @@ pub(crate) fn verify_eq_committed_vals(
         &online_inputs,
         proof,
     )
-    .map_err(|_| ZeiError::ZKProofVerificationError)
+    .c(d!(ZeiError::ZKProofVerificationError))
 }
 
 #[cfg(test)]

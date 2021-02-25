@@ -1,5 +1,6 @@
 use crate::sigma::SigmaTranscript;
 use algebra::groups::{Group, GroupArithmetic, Scalar};
+use ruc::{*, err::*};
 use algebra::pairing::Pairing;
 use merlin::Transcript;
 use utils::errors::ZeiError;
@@ -47,14 +48,14 @@ pub fn outsource_pairings_prover<P: Pairing>(A: &[P::G1],
                                              B: &[P::G2],
                                              C: &[P::G1],
                                              D: &[P::G2])
-                                             -> Result<OPProof<P>, ZeiError> {
+                                             -> Result<OPProof<P>> {
   let m = A.len();
 
   if !(m == B.len() && m == C.len() && m == D.len()) {
-    Err(ZeiError::ParameterError)
+    Err(eg!(ZeiError::ParameterError))
   } else {
     let (new_A, new_B) = to_inner_product::<P>(A, B, C, D);
-    outsource_inner_pairing_product_prover::<P>(&new_A[..], &new_B[..], &P::Gt::get_identity())
+    outsource_inner_pairing_product_prover::<P>(&new_A[..], &new_B[..], &P::Gt::get_identity()).c(d!())
   }
 }
 
@@ -65,17 +66,17 @@ pub fn outsource_pairings_verifier<P: Pairing>(A: &[P::G1],
                                                C: &[P::G1],
                                                D: &[P::G2],
                                                proof: &OPProof<P>)
-                                               -> Result<(), ZeiError> {
+                                               -> Result<()> {
   let m = A.len();
 
   if m != B.len() || m != C.len() || m != D.len() {
-    Err(ZeiError::ParameterError)
+    Err(eg!(ZeiError::ParameterError))
   } else {
     let (new_A, new_B) = to_inner_product::<P>(A, B, C, D);
     outsource_inner_pairing_product_verifier::<P>(&new_A[..],
                                                   &new_B[..],
                                                   &P::Gt::get_identity(),
-                                                  proof)
+                                                  proof).c(d!())
   }
 }
 
@@ -116,9 +117,9 @@ fn to_inner_product<P: Pairing>(A: &[P::G1],
 pub fn outsource_inner_pairing_product_prover<P: Pairing>(A: &[P::G1],
                                                           B: &[P::G2],
                                                           Z: &P::Gt)
-                                                          -> Result<OPProof<P>, ZeiError> {
+                                                          -> Result<OPProof<P>> {
   if A.len() != B.len() || !A.len().is_power_of_two() {
-    Err(ZeiError::ParameterError)
+    Err(eg!(ZeiError::ParameterError))
   } else {
     let mut transcript = Transcript::new(b"Inner Pairing Product");
     transcript.init_inner_pairing_product::<P>(A, B, Z);
@@ -158,13 +159,13 @@ pub fn outsource_inner_pairing_product_verifier<P: Pairing>(A: &[P::G1],
                                                             B: &[P::G2],
                                                             Z: &P::Gt,
                                                             proof: &OPProof<P>)
-                                                            -> Result<(), ZeiError> {
+                                                            -> Result<()> {
   if A.len() != B.len() {
-    Err(ZeiError::ParameterError)
+    Err(eg!(ZeiError::ParameterError))
   } else {
     let mut transcript = Transcript::new(b"Inner Pairing Product");
     transcript.init_inner_pairing_product::<P>(A, B, Z);
-    verifier::<P>(&mut transcript, A, B, Z, proof.elems.as_slice())
+    verifier::<P>(&mut transcript, A, B, Z, proof.elems.as_slice()).c(d!())
   }
 }
 
@@ -174,15 +175,15 @@ fn verifier<P: Pairing>(transcript: &mut Transcript,
                         B: &[P::G2],
                         Z: &P::Gt,
                         proof_elems: &[(P::Gt, P::Gt)])
-                        -> Result<(), ZeiError> {
+                        -> Result<()> {
   let m = A.len();
   if m == 0 {
-    return Err(ZeiError::ParameterError);
+    return Err(eg!(ZeiError::ParameterError));
   }
   if m == 1 {
     let expected = P::pairing(&A[0], &B[0]);
     if *Z != expected {
-      return Err(ZeiError::ArgumentVerificationError);
+      return Err(eg!(ZeiError::ArgumentVerificationError));
     } else {
       return Ok(());
     }

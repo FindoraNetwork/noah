@@ -4,6 +4,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use algebra::ristretto::RistrettoPoint;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use std::hash::{Hash, Hasher};
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
@@ -57,15 +58,15 @@ impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint> {
         v.extend_from_slice(self.e2.to_compressed_bytes().as_slice());
         v
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         let e1 = RistrettoPoint::from_compressed_bytes(
             &bytes[0..RistrettoPoint::COMPRESSED_LEN],
         )
-        .map_err(|_| ZeiError::DeserializationError)?;
+        .c(d!(ZeiError::DeserializationError))?;
         let e2 = RistrettoPoint::from_compressed_bytes(
             &bytes[RistrettoPoint::COMPRESSED_LEN..],
         )
-        .map_err(|_| ZeiError::DeserializationError)?;
+        .c(d!(ZeiError::DeserializationError))?;
         Ok(ElGamalCiphertext { e1, e2 })
     }
 }
@@ -79,15 +80,15 @@ impl ZeiFromToBytes for ElGamalHybridCiphertext<JubjubPoint, BLSScalar> {
         }
         v
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         let e1 = JubjubPoint::zei_from_bytes(&bytes[0..JubjubPoint::COMPRESSED_LEN])
-            .map_err(|_| ZeiError::DeserializationError)?;
+            .c(d!(ZeiError::DeserializationError))?;
         let mut pos = JubjubPoint::COMPRESSED_LEN;
         let mut symm_ctxts = vec![];
         while pos < bytes.len() {
             symm_ctxts.push(
                 BLSScalar::zei_from_bytes(&bytes[pos..pos + BLS_SCALAR_LEN])
-                    .map_err(|_| ZeiError::DeserializationError)?,
+                    .c(d!(ZeiError::DeserializationError))?,
             );
             pos += BLS_SCALAR_LEN;
         }
@@ -164,11 +165,11 @@ pub fn elgamal_verify<G: Group>(
     m: &G::S,
     ctext: &ElGamalCiphertext<G>,
     sec_key: &ElGamalDecKey<G::S>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     if base.mul(m).add(&ctext.e1.mul(&sec_key.0)) == ctext.e2 {
         Ok(())
     } else {
-        Err(ZeiError::ElGamalVerificationError)
+        Err(eg!(ZeiError::ElGamalVerificationError))
     }
 }
 
@@ -186,8 +187,9 @@ pub fn elgamal_decrypt<G: Group>(
     base: &G,
     ctext: &ElGamalCiphertext<G>,
     sec_key: &ElGamalDecKey<G::S>,
-) -> Result<u64, ZeiError> {
+) -> Result<u64> {
     elgamal_decrypt_hinted::<G>(base, ctext, sec_key, 0, (u32::max_value() as u64) + 1)
+        .c(d!())
 }
 
 /// I decrypt en ElGamal ciphertext on the exponent via brute force
@@ -196,8 +198,10 @@ pub fn elgamal_decrypt_as_scalar<G: Group>(
     base: &G,
     ctext: &ElGamalCiphertext<G>,
     sec_key: &ElGamalDecKey<G::S>,
-) -> Result<G::S, ZeiError> {
-    Ok(G::S::from_u64(elgamal_decrypt(base, ctext, sec_key)?))
+) -> Result<G::S> {
+    Ok(G::S::from_u64(
+        elgamal_decrypt(base, ctext, sec_key).c(d!())?,
+    ))
 }
 
 /// I decrypt en ElGamal ciphertext on the exponent via brute force in the range [lower_bound..upper_bound]
@@ -208,9 +212,9 @@ pub fn elgamal_decrypt_hinted<G: Group>(
     sec_key: &ElGamalDecKey<G::S>,
     lower_bound: u64,
     upper_bound: u64,
-) -> Result<u64, ZeiError> {
+) -> Result<u64> {
     let encoded = elgamal_decrypt_elem(ctext, sec_key);
-    brute_force::<G>(base, &encoded, lower_bound, upper_bound)
+    brute_force::<G>(base, &encoded, lower_bound, upper_bound).c(d!())
 }
 
 fn brute_force<G: Group>(
@@ -218,7 +222,7 @@ fn brute_force<G: Group>(
     encoded: &G,
     lower_bound: u64,
     upper_bound: u64,
-) -> Result<u64, ZeiError> {
+) -> Result<u64> {
     let mut b = base.mul(&G::S::from_u64(lower_bound));
     for i in lower_bound..upper_bound {
         if b == *encoded {
@@ -226,7 +230,7 @@ fn brute_force<G: Group>(
         }
         b = b.add(base);
     }
-    Err(ZeiError::ElGamalDecryptionError)
+    Err(eg!(ZeiError::ElGamalDecryptionError))
 }
 
 #[cfg(test)]
@@ -241,6 +245,7 @@ mod elgamal_test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
+    use ruc::err::*;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use utils::errors::ZeiError;
@@ -255,15 +260,15 @@ mod elgamal_test {
         let r = G::S::random(&mut prng);
         let ctext = super::elgamal_encrypt::<G>(&base, &m, &r, &public_key);
         assert_eq!(
-            Ok(()),
-            super::elgamal_verify::<G>(&base, &m, &ctext, &secret_key)
+            (),
+            super::elgamal_verify::<G>(&base, &m, &ctext, &secret_key).unwrap()
         );
 
         let wrong_m = G::S::from_u32(99u32);
         let err = super::elgamal_verify(&base, &wrong_m, &ctext, &secret_key)
             .err()
             .unwrap();
-        assert_eq!(ZeiError::ElGamalVerificationError, err);
+        err_eq!(ZeiError::ElGamalVerificationError, err);
     }
 
     fn decryption<G: Group>() {
@@ -277,8 +282,8 @@ mod elgamal_test {
         let r = G::S::random(&mut prng);
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         assert_eq!(
-            Ok(()),
-            super::elgamal_verify(&base, &m, &ctext, &secret_key)
+            (),
+            super::elgamal_verify(&base, &m, &ctext, &secret_key).unwrap()
         );
 
         assert_eq!(
@@ -294,24 +299,24 @@ mod elgamal_test {
         let err = super::elgamal_decrypt_hinted(&base, &ctext, &secret_key, 0, 50)
             .err()
             .unwrap();
-        assert_eq!(ZeiError::ElGamalDecryptionError, err);
+        err_eq!(ZeiError::ElGamalDecryptionError, err);
 
         let err = super::elgamal_decrypt_hinted(&base, &ctext, &secret_key, 200, 300)
             .err()
             .unwrap();
-        assert_eq!(ZeiError::ElGamalDecryptionError, err);
+        err_eq!(ZeiError::ElGamalDecryptionError, err);
 
         let m = G::S::from_u64(u64::max_value());
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         assert_eq!(
-            Ok(()),
-            super::elgamal_verify(&base, &m, &ctext, &secret_key)
+            (),
+            super::elgamal_verify(&base, &m, &ctext, &secret_key).unwrap()
         );
 
         let err = super::elgamal_decrypt_hinted(&base, &ctext, &secret_key, 200, 300)
             .err()
             .unwrap();
-        assert_eq!(ZeiError::ElGamalDecryptionError, err);
+        err_eq!(ZeiError::ElGamalDecryptionError, err);
     }
 
     fn serialize_to_json<G: Group>() {

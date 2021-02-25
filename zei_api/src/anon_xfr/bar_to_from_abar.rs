@@ -19,6 +19,7 @@ use crypto::basics::hybrid_encryption::XPublicKey;
 use crypto::pc_eq_groups::{prove_pair_to_vector_pc, Proof as PCEqProof};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 const TWO_POW_32: u64 = 1 << 32;
@@ -59,8 +60,9 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
     record: &OpenAssetRecord,
     abar_keypair: &AXfrKeyPair,
     enc_key: &XPublicKey,
-) -> Result<BarToAbarBody, ZeiError> {
-    let (open_abar, proof) = bar_to_abar(prng, params, record, abar_keypair, enc_key)?;
+) -> Result<BarToAbarBody> {
+    let (open_abar, proof) =
+        bar_to_abar(prng, params, record, abar_keypair, enc_key).c(d!())?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
         output: AnonBlindAssetRecord::from_oabar(&open_abar),
@@ -79,9 +81,12 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     bar_keypair: &XfrKeyPair,
     abar_keypair: &AXfrKeyPair,
     enc_key: &XPublicKey,
-) -> Result<BarToAbarNote, ZeiError> {
-    let body = gen_bar_to_abar_body(prng, params, record, &abar_keypair, enc_key)?;
-    let msg = bincode::serialize(&body).map_err(|_| ZeiError::SerializationError)?;
+) -> Result<BarToAbarNote> {
+    let body =
+        gen_bar_to_abar_body(prng, params, record, &abar_keypair, enc_key).c(d!())?;
+    let msg = bincode::serialize(&body)
+        .map_err(|_| ZeiError::SerializationError)
+        .c(d!())?;
     let signature = bar_keypair.sign(&msg);
     let note = BarToAbarNote { body, signature };
     Ok(note)
@@ -89,11 +94,8 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
 
 /// Verifies BlindAssetRecord To AnonymousBlindAssetRecord conversion body
 /// Warning: This function doesn't check that input owner has signed the body
-pub fn verify_bar_to_abar_body(
-    params: &NodeParams,
-    body: &BarToAbarBody,
-) -> Result<(), ZeiError> {
-    verify_bar_to_abar(params, &body.input, &body.output, &body.proof)
+pub fn verify_bar_to_abar_body(params: &NodeParams, body: &BarToAbarBody) -> Result<()> {
+    verify_bar_to_abar(params, &body.input, &body.output, &body.proof).c(d!())
 }
 
 /// Verifies BlindAssetRecord To AnonymousBlindAssetRecord conversion note by verifying proof of conversion
@@ -102,11 +104,10 @@ pub fn verify_bar_to_abar_note(
     params: &NodeParams,
     note: &BarToAbarNote,
     bar_pub_key: &XfrPublicKey,
-) -> Result<(), ZeiError> {
-    verify_bar_to_abar_body(params, &note.body)?;
-    let msg =
-        bincode::serialize(&note.body).map_err(|_| ZeiError::SerializationError)?;
-    bar_pub_key.verify(&msg, &note.signature)
+) -> Result<()> {
+    verify_bar_to_abar_body(params, &note.body).c(d!())?;
+    let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+    bar_pub_key.verify(&msg, &note.signature).c(d!())
 }
 
 pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
@@ -115,17 +116,19 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     obar: &OpenAssetRecord,
     abar_keypair: &AXfrKeyPair,
     enc_key: &XPublicKey,
-) -> Result<(OpenAnonBlindAssetRecord, ConvertBarAbarProof), ZeiError> {
+) -> Result<(OpenAnonBlindAssetRecord, ConvertBarAbarProof)> {
     // 1. compute commitments under jubjub
     let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
     let pc_gens_ristretto =
         PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
     let blind = JubjubScalar::random(prng);
     let asset_type_scalar: JubjubScalar = obar.asset_type.as_scalar();
-    let commitment_amount_asset_type = pc_gens_jubjub.commit(
-        &[JubjubScalar::from_u64(obar.amount), asset_type_scalar],
-        &blind,
-    )?;
+    let commitment_amount_asset_type = pc_gens_jubjub
+        .commit(
+            &[JubjubScalar::from_u64(obar.amount), asset_type_scalar],
+            &blind,
+        )
+        .c(d!())?;
 
     let ristretto_amount_blind = obar.amount_blinds.0.add(
         &obar
@@ -143,15 +146,18 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         &blind,
         &pc_gens_ristretto,
         &pc_gens_jubjub,
-    )?;
+    )
+    .c(d!())?;
 
     // 3. compute ABAR
     let oabar = OpenAnonBlindAssetRecordBuilder::new()
         .amount(obar.amount)
         .asset_type(obar.asset_type)
         .pub_key(abar_keypair.pub_key())
-        .finalize(prng, &enc_key)?
-        .build()?;
+        .finalize(prng, &enc_key)
+        .c(d!())?
+        .build()
+        .c(d!())?;
     // 4. prove abar correctness
     let pc_rescue_commitments_eq_proof = prove_eq_committed_vals(
         prng,
@@ -161,7 +167,8 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         BLSScalar::from(&blind),
         oabar.blind,
         &pc_gens_jubjub,
-    )?;
+    )
+    .c(d!())?;
 
     Ok((
         oabar,
@@ -178,7 +185,7 @@ pub(crate) fn verify_bar_to_abar(
     bar: &BlindAssetRecord,
     abar: &AnonBlindAssetRecord,
     proof: &ConvertBarAbarProof,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let pc_gens_rist =
         PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
     let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
@@ -187,17 +194,23 @@ pub(crate) fn verify_bar_to_abar(
     // 1.1 reconstruct total amount commitment from bar object
     let (com_low, com_high) = match bar.amount {
         XfrAmount::Confidential((low, high)) => (
-            low.decompress().ok_or(ZeiError::DecompressElementError)?,
-            high.decompress().ok_or(ZeiError::DecompressElementError)?,
+            low.decompress()
+                .ok_or(ZeiError::DecompressElementError)
+                .c(d!())?,
+            high.decompress()
+                .ok_or(ZeiError::DecompressElementError)
+                .c(d!())?,
         ),
         XfrAmount::NonConfidential(amount) => {
             // fake commitment
             let (l, h) = utils::u64_to_u32_pair(amount);
             (
                 pc_gens_rist
-                    .commit(&[RistrettoScalar::from_u32(l)], &RistrettoScalar::zero())?,
+                    .commit(&[RistrettoScalar::from_u32(l)], &RistrettoScalar::zero())
+                    .c(d!())?,
                 pc_gens_rist
-                    .commit(&[RistrettoScalar::from_u32(h)], &RistrettoScalar::zero())?,
+                    .commit(&[RistrettoScalar::from_u32(h)], &RistrettoScalar::zero())
+                    .c(d!())?,
             )
         }
     };
@@ -205,12 +218,15 @@ pub(crate) fn verify_bar_to_abar(
     // 1.2 get asset type commitment
     let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from_u64(TWO_POW_32)));
     let com_asset_type = match bar.asset_type {
-        XfrAssetType::Confidential(a) => {
-            a.decompress().ok_or(ZeiError::DecompressElementError)?
-        }
+        XfrAssetType::Confidential(a) => a
+            .decompress()
+            .ok_or(ZeiError::DecompressElementError)
+            .c(d!())?,
         XfrAssetType::NonConfidential(a) => {
             // fake commitment
-            pc_gens_rist.commit(&[a.as_scalar()], &RistrettoScalar::zero())?
+            pc_gens_rist
+                .commit(&[a.as_scalar()], &RistrettoScalar::zero())
+                .c(d!())?
         }
     };
 
@@ -226,7 +242,8 @@ pub(crate) fn verify_bar_to_abar(
         &pc_gens_rist,
         &pc_gens_jubjub,
         &proof.commitment_eq_proof,
-    )?;
+    )
+    .c(d!())?;
 
     // 3. verify PLONK proof
     verify_eq_committed_vals(
@@ -235,6 +252,7 @@ pub(crate) fn verify_bar_to_abar(
         com_amount_asset_type,
         &proof.pc_rescue_commitments_eq_proof,
     )
+    .c(d!())
 }
 
 #[cfg(test)]

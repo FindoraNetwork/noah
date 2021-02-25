@@ -23,6 +23,7 @@ use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use sha2::Sha512;
 use utils::errors::ZeiError;
 use utils::serialization;
@@ -403,19 +404,20 @@ impl OwnerMemo {
         prng: &mut R,
         amount: u64,
         pub_key: &XfrPublicKey,
-    ) -> Result<(Self, (Scalar, Scalar)), ZeiError> {
+    ) -> Result<(Self, (Scalar, Scalar))> {
         let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
         let shared_point = OwnerMemo::derive_shared_edwards_point(
             &r,
             &pub_key.as_compressed_edwards_point(),
-        )?;
+        )
+        .c(d!())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
         let lock = hybrid_encryption::hybrid_encrypt_with_sign_key(
             prng,
             &pub_key.0,
             &amount.to_be_bytes(),
-        )?;
+        );
         Ok((OwnerMemo { blind_share, lock }, amount_blinds))
     }
 
@@ -426,19 +428,20 @@ impl OwnerMemo {
         prng: &mut R,
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
-    ) -> Result<(Self, Scalar), ZeiError> {
+    ) -> Result<(Self, Scalar)> {
         let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
         let shared_point = OwnerMemo::derive_shared_edwards_point(
             &r,
             &pub_key.as_compressed_edwards_point(),
-        )?;
+        )
+        .c(d!())?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
         let lock = hybrid_encryption::hybrid_encrypt_with_sign_key(
             prng,
             &pub_key.0,
             &asset_type.0,
-        )?;
+        );
         Ok((OwnerMemo { blind_share, lock }, asset_type_blind))
     }
 
@@ -450,12 +453,13 @@ impl OwnerMemo {
         amount: u64,
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
-    ) -> Result<(Self, (Scalar, Scalar), Scalar), ZeiError> {
+    ) -> Result<(Self, (Scalar, Scalar), Scalar)> {
         let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
         let shared_point = OwnerMemo::derive_shared_edwards_point(
             &r,
             &pub_key.as_compressed_edwards_point(),
-        )?;
+        )
+        .c(d!())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
@@ -466,7 +470,7 @@ impl OwnerMemo {
             prng,
             &pub_key.0,
             &amount_asset_type_plaintext,
-        )?;
+        );
         Ok((
             OwnerMemo { blind_share, lock },
             amount_blinds,
@@ -476,11 +480,11 @@ impl OwnerMemo {
 
     /// decrypt the `OwnerMemo.lock` which encrypts only the confidential amount
     /// returns error if the decrypted bytes length doesn't match
-    pub fn decrypt_amount(&self, keypair: &XfrKeyPair) -> Result<u64, ZeiError> {
+    pub fn decrypt_amount(&self, keypair: &XfrKeyPair) -> Result<u64> {
         let decrypted_bytes = self.decrypt(&keypair);
         // amount is u64, thus u64.to_be_bytes should be 8 bytes
         if decrypted_bytes.len() != 8 {
-            return Err(ZeiError::InconsistentStructureError);
+            return Err(eg!(ZeiError::InconsistentStructureError));
         }
         let mut amt_be_bytes: [u8; 8] = Default::default();
         amt_be_bytes.copy_from_slice(&decrypted_bytes[..]);
@@ -489,13 +493,10 @@ impl OwnerMemo {
 
     /// decrypt the `OwnerMemo.lock` which encrypts only the confidential asset type
     /// returns error if the decrypted bytes length doesn't match
-    pub fn decrypt_asset_type(
-        &self,
-        keypair: &XfrKeyPair,
-    ) -> Result<AssetType, ZeiError> {
+    pub fn decrypt_asset_type(&self, keypair: &XfrKeyPair) -> Result<AssetType> {
         let decrypted_bytes = self.decrypt(&keypair);
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH {
-            return Err(ZeiError::InconsistentStructureError);
+            return Err(eg!(ZeiError::InconsistentStructureError));
         }
         let mut asset_type_bytes: [u8; ASSET_TYPE_LENGTH] = Default::default();
         asset_type_bytes.copy_from_slice(&decrypted_bytes[..]);
@@ -507,10 +508,10 @@ impl OwnerMemo {
     pub fn decrypt_amount_and_asset_type(
         &self,
         keypair: &XfrKeyPair,
-    ) -> Result<(u64, AssetType), ZeiError> {
+    ) -> Result<(u64, AssetType)> {
         let decrypted_bytes = self.decrypt(&keypair);
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH + 8 {
-            return Err(ZeiError::InconsistentStructureError);
+            return Err(eg!(ZeiError::InconsistentStructureError));
         }
         let mut amt_be_bytes: [u8; 8] = Default::default();
         amt_be_bytes.copy_from_slice(&decrypted_bytes[..8]);
@@ -527,23 +528,22 @@ impl OwnerMemo {
     pub fn derive_amount_blinds(
         &self,
         keypair: &XfrKeyPair,
-    ) -> Result<(Scalar, Scalar), ZeiError> {
+    ) -> Result<(Scalar, Scalar)> {
         let shared_point = OwnerMemo::derive_shared_edwards_point(
             &keypair.sec_key.as_scalar(),
             &self.blind_share,
-        )?;
+        )
+        .c(d!())?;
         Ok(OwnerMemo::calc_amount_blinds(&shared_point))
     }
 
     /// Returns the asset type blind
-    pub fn derive_asset_type_blind(
-        &self,
-        keypair: &XfrKeyPair,
-    ) -> Result<Scalar, ZeiError> {
+    pub fn derive_asset_type_blind(&self, keypair: &XfrKeyPair) -> Result<Scalar> {
         let shared_point = OwnerMemo::derive_shared_edwards_point(
             &keypair.sec_key.as_scalar(),
             &self.blind_share,
-        )?;
+        )
+        .c(d!())?;
         Ok(OwnerMemo::calc_asset_type_blind(&shared_point))
     }
 }
@@ -581,9 +581,9 @@ impl OwnerMemo {
     fn derive_shared_edwards_point(
         s: &Scalar,
         point: &CompressedEdwardsY,
-    ) -> Result<CompressedEdwardsY, ZeiError> {
+    ) -> Result<CompressedEdwardsY> {
         let shared_edwards_point =
-            s.0 * point.decompress().ok_or(ZeiError::DecompressElementError)?;
+            s.0 * point.decompress().c(d!(ZeiError::DecompressElementError))?;
         Ok(CompressedEdwardsY(shared_edwards_point.compress()))
     }
 

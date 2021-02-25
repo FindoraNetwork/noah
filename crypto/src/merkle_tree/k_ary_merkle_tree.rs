@@ -1,5 +1,6 @@
 use crate::basics::hash::MTHash;
 use itertools::Itertools;
+use ruc::{err::*, *};
 use std::fmt::Debug;
 use utils::errors::ZeiError;
 
@@ -50,13 +51,13 @@ fn is_power_of_k(k: usize, n: usize) -> bool {
 /// * `elements` - elements to be placed at the leaves of the tree. The number of elements must be a power of k.
 /// * `k` - number of children of each node
 /// * `returns` Merkle tree data structure or an error
-pub fn k_mt_build<S, H>(elements: &[S], k: usize) -> Result<KMerkleTree<S>, ZeiError>
+pub fn k_mt_build<S, H>(elements: &[S], k: usize) -> Result<KMerkleTree<S>>
 where
     S: Copy + PartialEq + Eq + Debug,
     H: MTHash<S = S>,
 {
     if !is_power_of_k(k, elements.len()) {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
 
     let tree = KMerkleTree {
@@ -120,15 +121,12 @@ type KMTPath<S> = Vec<(PathPosition, Vec<S>)>;
 /// * `tree` - merkle tree data structure
 /// * `index` - location of the leaf, 0 being the index of the most left one
 /// * `returns` - the value of the root node and the path
-pub fn kmt_prove<S>(
-    tree: &KMerkleTree<S>,
-    index: usize,
-) -> Result<(S, KMTPath<S>), ZeiError>
+pub fn kmt_prove<S>(tree: &KMerkleTree<S>, index: usize) -> Result<(S, KMTPath<S>)>
 where
     S: Copy + PartialEq + Eq + Debug,
 {
     if index >= tree.size {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
     Ok(prove_node::<S>(&tree.root, index, tree.size))
 }
@@ -171,7 +169,7 @@ pub fn kmt_verify<S, H>(
     root: &KMerkleRoot<S>,
     element: &S,
     path: &KMTPath<S>,
-) -> Result<(), ZeiError>
+) -> Result<()>
 where
     S: Copy + PartialEq + Eq,
     H: MTHash<S = S>,
@@ -208,7 +206,7 @@ where
     if computed_root == root.value {
         Ok(())
     } else {
-        Err(ZeiError::MerkleTreeVerificationError)
+        Err(eg!(ZeiError::MerkleTreeVerificationError))
     }
 }
 

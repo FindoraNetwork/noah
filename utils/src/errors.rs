@@ -2,6 +2,7 @@
 use std::{error, fmt};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum ZeiError {
     AXfrProverParamsError,
     AXfrVerifierParamsError,

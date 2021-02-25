@@ -14,6 +14,7 @@ use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use serde::ser::Serialize;
 use std::collections::HashMap;
 use utils::errors::ZeiError;
@@ -167,16 +168,16 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
     inputs: &[AssetRecord],
     outputs: &[AssetRecord],
     input_key_pairs: &[&XfrKeyPair],
-) -> Result<XfrNote, ZeiError> {
+) -> Result<XfrNote> {
     if inputs.is_empty() {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
 
-    check_keys(inputs, input_key_pairs)?;
+    check_keys(inputs, input_key_pairs).c(d!())?;
 
-    let body = gen_xfr_body(prng, inputs, outputs)?;
+    let body = gen_xfr_body(prng, inputs, outputs).c(d!())?;
 
-    let multisig = compute_transfer_multisig(&body, input_key_pairs)?;
+    let multisig = compute_transfer_multisig(&body, input_key_pairs).c(d!())?;
 
     Ok(XfrNote { body, multisig })
 }
@@ -236,12 +237,12 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     inputs: &[AssetRecord],
     outputs: &[AssetRecord],
-) -> Result<XfrBody, ZeiError> {
+) -> Result<XfrBody> {
     if inputs.is_empty() {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
     let xfr_type = XfrType::from_inputs_outputs(inputs, outputs);
-    check_asset_amount(inputs, outputs)?;
+    check_asset_amount(inputs, outputs).c(d!())?;
 
     let single_asset = !matches!(
         xfr_type,
@@ -262,19 +263,21 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
             open_inputs.as_slice(),
             open_outputs.as_slice(),
             xfr_type,
-        )?
+        )
+        .c(d!())?
     } else {
         gen_xfr_proofs_multi_asset(
             open_inputs.as_slice(),
             open_outputs.as_slice(),
             xfr_type,
-        )?
+        )
+        .c(d!())?
     };
 
     //do tracing proofs
     // TODO avoid clones below
     let asset_type_amount_tracing_proof =
-        asset_amount_tracing_proofs(prng, inputs, outputs)?;
+        asset_amount_tracing_proofs(prng, inputs, outputs).c(d!())?;
     let asset_tracing_proof = AssetTracingProofs {
         asset_type_and_amount_proofs: asset_type_amount_tracing_proof,
         inputs_identity_proofs: inputs
@@ -324,17 +327,14 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
     })
 }
 
-fn check_keys(
-    inputs: &[AssetRecord],
-    input_key_pairs: &[&XfrKeyPair],
-) -> Result<(), ZeiError> {
+fn check_keys(inputs: &[AssetRecord], input_key_pairs: &[&XfrKeyPair]) -> Result<()> {
     if inputs.len() != input_key_pairs.len() {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
     for (input, key) in inputs.iter().zip(input_key_pairs.iter()) {
         let inkey = &input.open_asset_record.blind_asset_record.public_key;
         if inkey != &key.pub_key {
-            return Err(ZeiError::ParameterError);
+            return Err(eg!(ZeiError::ParameterError));
         }
     }
     Ok(())
@@ -344,7 +344,7 @@ fn gen_xfr_proofs_multi_asset(
     inputs: &[&OpenAssetRecord],
     outputs: &[&OpenAssetRecord],
     xfr_type: XfrType,
-) -> Result<AssetTypeAndAmountProof, ZeiError> {
+) -> Result<AssetTypeAndAmountProof> {
     let pow2_32 = Scalar::from_u64(POW_2_32);
 
     let mut ins = vec![];
@@ -370,11 +370,12 @@ fn gen_xfr_proofs_multi_asset(
 
     match xfr_type {
         XfrType::Confidential_MultiAsset => {
-            let mix_proof = prove_asset_mixing(ins.as_slice(), out.as_slice())?;
+            let mix_proof =
+                prove_asset_mixing(ins.as_slice(), out.as_slice()).c(d!())?;
             Ok(AssetTypeAndAmountProof::AssetMix(mix_proof))
         }
         XfrType::NonConfidential_MultiAsset => Ok(AssetTypeAndAmountProof::NoProof),
-        _ => Err(ZeiError::XfrCreationAssetAmountError),
+        _ => Err(eg!(ZeiError::XfrCreationAssetAmountError)),
     }
 }
 
@@ -383,26 +384,26 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
     inputs: &[&OpenAssetRecord],
     outputs: &[&OpenAssetRecord],
     xfr_type: XfrType,
-) -> Result<AssetTypeAndAmountProof, ZeiError> {
+) -> Result<AssetTypeAndAmountProof> {
     let pc_gens = RistrettoPedersenGens::default();
 
     match xfr_type {
         XfrType::NonConfidential_SingleAsset => Ok(AssetTypeAndAmountProof::NoProof),
         XfrType::ConfidentialAmount_NonConfidentialAssetType_SingleAsset => Ok(
-            AssetTypeAndAmountProof::ConfAmount(range_proof(inputs, outputs)?),
+            AssetTypeAndAmountProof::ConfAmount(range_proof(inputs, outputs).c(d!())?),
         ),
         XfrType::NonConfidentialAmount_ConfidentialAssetType_SingleAsset => {
-            Ok(AssetTypeAndAmountProof::ConfAsset(Box::new(asset_proof(
-                prng, &pc_gens, inputs, outputs,
-            )?)))
+            Ok(AssetTypeAndAmountProof::ConfAsset(Box::new(
+                asset_proof(prng, &pc_gens, inputs, outputs).c(d!())?,
+            )))
         }
         XfrType::Confidential_SingleAsset => {
             Ok(AssetTypeAndAmountProof::ConfAll(Box::new((
-                range_proof(inputs, outputs)?,
-                asset_proof(prng, &pc_gens, inputs, outputs)?,
+                range_proof(inputs, outputs).c(d!())?,
+                asset_proof(prng, &pc_gens, inputs, outputs).c(d!())?,
             ))))
         }
-        _ => Err(ZeiError::XfrCreationAssetAmountError), // Type cannot be multi asset
+        _ => Err(eg!(ZeiError::XfrCreationAssetAmountError)), // Type cannot be multi asset
     }
 }
 
@@ -410,10 +411,7 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
 /// returns Err(ZeiError::XfrCreationAssetAmountError) otherwise.
 /// Return Ok(true) if all inputs and outputs involve a single asset type. If multiple assets
 /// are detected, then return Ok(false)
-fn check_asset_amount(
-    inputs: &[AssetRecord],
-    outputs: &[AssetRecord],
-) -> Result<(), ZeiError> {
+fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result<()> {
     let mut amounts = HashMap::new();
 
     for record in inputs.iter() {
@@ -447,7 +445,7 @@ fn check_asset_amount(
     for (_, a) in amounts.iter() {
         let sum = a.iter().sum::<i128>();
         if sum != 0i128 {
-            return Err(ZeiError::XfrCreationAssetAmountError);
+            return Err(eg!(ZeiError::XfrCreationAssetAmountError));
         }
     }
 
@@ -458,20 +456,20 @@ fn check_asset_amount(
 pub(crate) fn compute_transfer_multisig(
     body: &XfrBody,
     keys: &[&XfrKeyPair],
-) -> Result<XfrMultiSig, ZeiError> {
+) -> Result<XfrMultiSig> {
     let mut bytes = vec![];
     body.serialize(&mut rmp_serde::Serializer::new(&mut bytes))
-        .map_err(|_| ZeiError::SerializationError)?;
+        .c(d!(ZeiError::SerializationError))?;
     Ok(XfrMultiSig::sign(&keys, &bytes))
 }
 
 /// I verify the transfer multisignature over the its body
-pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<(), ZeiError> {
+pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<()> {
     let mut bytes = vec![];
     xfr_note
         .body
         .serialize(&mut rmp_serde::Serializer::new(&mut bytes))
-        .map_err(|_| ZeiError::SerializationError)?;
+        .c(d!(ZeiError::SerializationError))?;
     let pubkeys = xfr_note
         .body
         .inputs
@@ -491,8 +489,8 @@ pub fn verify_xfr_note<R: CryptoRng + RngCore>(
     params: &mut PublicParams,
     xfr_note: &XfrNote,
     policies: &XfrNotePoliciesRef,
-) -> Result<(), ZeiError> {
-    batch_verify_xfr_notes(prng, params, &[&xfr_note], &[&policies])
+) -> Result<()> {
+    batch_verify_xfr_notes(prng, params, &[&xfr_note], &[&policies]).c(d!())
 }
 
 /// XfrNote Batch verification
@@ -505,21 +503,21 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
     params: &mut PublicParams,
     notes: &[&XfrNote],
     policies: &[&XfrNotePoliciesRef],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     // 1. verify signature
     for xfr_note in notes {
-        verify_transfer_multisig(xfr_note)?;
+        verify_transfer_multisig(xfr_note).c(d!())?;
     }
 
     let bodies = notes.iter().map(|note| &note.body).collect_vec();
-    batch_verify_xfr_bodies(prng, params, &bodies, policies)
+    batch_verify_xfr_bodies(prng, params, &bodies, policies).c(d!())
 }
 
 pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut PublicParams,
     bodies: &[&XfrBody],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut conf_amount_records = vec![];
     let mut conf_asset_type_records = vec![];
     let mut conf_asset_mix_bodies = vec![];
@@ -535,15 +533,18 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
             }
             AssetTypeAndAmountProof::ConfAmount(range_proof) => {
                 conf_amount_records.push((&body.inputs, &body.outputs, range_proof)); // save for batching
-                verify_plain_asset(body.inputs.as_slice(), body.outputs.as_slice())?; // no batching
+                verify_plain_asset(body.inputs.as_slice(), body.outputs.as_slice())
+                    .c(d!())?; // no batching
             }
             AssetTypeAndAmountProof::ConfAsset(asset_proof) => {
-                verify_plain_amounts(body.inputs.as_slice(), body.outputs.as_slice())?; // no batching
+                verify_plain_amounts(body.inputs.as_slice(), body.outputs.as_slice())
+                    .c(d!())?; // no batching
                 conf_asset_type_records.push((&body.inputs, &body.outputs, asset_proof));
                 // save for batch proof
             }
             AssetTypeAndAmountProof::NoProof => {
-                verify_plain_asset_mix(body.inputs.as_slice(), body.outputs.as_slice())?;
+                verify_plain_asset_mix(body.inputs.as_slice(), body.outputs.as_slice())
+                    .c(d!())?;
                 // no batching
             }
             AssetTypeAndAmountProof::AssetMix(asset_mix_proof) => {
@@ -558,13 +559,15 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
     }
 
     // 1. verify confidential amounts
-    batch_verify_confidential_amount(prng, params, conf_amount_records.as_slice())?;
+    batch_verify_confidential_amount(prng, params, conf_amount_records.as_slice())
+        .c(d!())?;
 
     // 2. verify confidential asset_types
-    batch_verify_confidential_asset(prng, &params.pc_gens, &conf_asset_type_records)?;
+    batch_verify_confidential_asset(prng, &params.pc_gens, &conf_asset_type_records)
+        .c(d!())?;
 
     // 3. verify confidential asset mix proofs
-    batch_verify_asset_mix(prng, params, conf_asset_mix_bodies.as_slice())
+    batch_verify_asset_mix(prng, params, conf_asset_mix_bodies.as_slice()).c(d!())
 }
 
 #[derive(Clone, Default)]
@@ -665,8 +668,8 @@ pub fn verify_xfr_body<R: CryptoRng + RngCore>(
     params: &mut PublicParams,
     body: &XfrBody,
     policies: &XfrNotePoliciesRef,
-) -> Result<(), ZeiError> {
-    batch_verify_xfr_bodies(prng, params, &[body], &[policies])
+) -> Result<()> {
+    batch_verify_xfr_bodies(prng, params, &[body], &[policies]).c(d!())
 }
 
 /// XfrBodys batch verification
@@ -679,12 +682,12 @@ pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(
     params: &mut PublicParams,
     bodies: &[&XfrBody],
     policies: &[&XfrNotePoliciesRef],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     // 1. verify amounts and asset types
-    batch_verify_xfr_body_asset_records(prng, params, bodies)?;
+    batch_verify_xfr_body_asset_records(prng, params, bodies).c(d!())?;
 
     // 2. verify tracing proofs
-    batch_verify_tracer_tracing_proof(prng, &params.pc_gens, bodies, policies)
+    batch_verify_tracer_tracing_proof(prng, &params.pc_gens, bodies, policies).c(d!())
 }
 
 /// Takes a vector of u64, converts each element to u128 and compute the sum of the new elements.
@@ -696,21 +699,21 @@ fn safe_sum_u64(terms: &[u64]) -> u128 {
 fn verify_plain_amounts(
     inputs: &[BlindAssetRecord],
     outputs: &[BlindAssetRecord],
-) -> Result<(), ZeiError> {
-    let in_amount: Result<Vec<u64>, ZeiError> = inputs
+) -> Result<()> {
+    let in_amount: Result<Vec<u64>> = inputs
         .iter()
-        .map(|x| x.amount.get_amount().ok_or(ZeiError::ParameterError))
+        .map(|x| x.amount.get_amount().c(d!(ZeiError::ParameterError)))
         .collect();
-    let out_amount: Result<Vec<u64>, ZeiError> = outputs
+    let out_amount: Result<Vec<u64>> = outputs
         .iter()
-        .map(|x| x.amount.get_amount().ok_or(ZeiError::ParameterError))
+        .map(|x| x.amount.get_amount().c(d!(ZeiError::ParameterError)))
         .collect();
 
-    let sum_inputs = safe_sum_u64(in_amount?.as_slice());
-    let sum_outputs = safe_sum_u64(out_amount?.as_slice());
+    let sum_inputs = safe_sum_u64(in_amount.c(d!())?.as_slice());
+    let sum_outputs = safe_sum_u64(out_amount.c(d!())?.as_slice());
 
     if sum_inputs < sum_outputs {
-        return Err(ZeiError::XfrVerifyAssetAmountError);
+        return Err(eg!(ZeiError::XfrVerifyAssetAmountError));
     }
 
     Ok(())
@@ -719,33 +722,33 @@ fn verify_plain_amounts(
 fn verify_plain_asset(
     inputs: &[BlindAssetRecord],
     outputs: &[BlindAssetRecord],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut list = vec![];
     for x in inputs.iter() {
         list.push(
             x.asset_type
                 .get_asset_type()
-                .ok_or(ZeiError::ParameterError)?,
+                .c(d!(ZeiError::ParameterError))?,
         );
     }
     for x in outputs.iter() {
         list.push(
             x.asset_type
                 .get_asset_type()
-                .ok_or(ZeiError::ParameterError)?,
+                .c(d!(ZeiError::ParameterError))?,
         );
     }
     if list.iter().all_equal() {
         Ok(())
     } else {
-        Err(ZeiError::XfrVerifyAssetAmountError)
+        Err(eg!(ZeiError::XfrVerifyAssetAmountError))
     }
 }
 
 fn verify_plain_asset_mix(
     inputs: &[BlindAssetRecord],
     outputs: &[BlindAssetRecord],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut amounts = HashMap::new();
 
     for record in inputs.iter() {
@@ -753,22 +756,22 @@ fn verify_plain_asset_mix(
             &record
                 .asset_type
                 .get_asset_type()
-                .ok_or(ZeiError::ParameterError)?,
+                .c(d!(ZeiError::ParameterError))?,
         ) {
             None => {
                 amounts.insert(
                     record
                         .asset_type
                         .get_asset_type()
-                        .ok_or(ZeiError::ParameterError)?,
+                        .c(d!(ZeiError::ParameterError))?,
                     vec![i128::from(
-                        record.amount.get_amount().ok_or(ZeiError::ParameterError)?,
+                        record.amount.get_amount().c(d!(ZeiError::ParameterError))?,
                     )],
                 );
             }
             Some(vec) => {
                 vec.push(i128::from(
-                    record.amount.get_amount().ok_or(ZeiError::ParameterError)?,
+                    record.amount.get_amount().c(d!(ZeiError::ParameterError))?,
                 ));
             }
         };
@@ -779,22 +782,22 @@ fn verify_plain_asset_mix(
             &record
                 .asset_type
                 .get_asset_type()
-                .ok_or(ZeiError::ParameterError)?,
+                .c(d!(ZeiError::ParameterError))?,
         ) {
             None => {
                 amounts.insert(
                     record
                         .asset_type
                         .get_asset_type()
-                        .ok_or(ZeiError::ParameterError)?,
+                        .c(d!(ZeiError::ParameterError))?,
                     vec![-i128::from(
-                        record.amount.get_amount().ok_or(ZeiError::ParameterError)?,
+                        record.amount.get_amount().c(d!(ZeiError::ParameterError))?,
                     )],
                 );
             }
             Some(vec) => {
                 vec.push(-i128::from(
-                    record.amount.get_amount().ok_or(ZeiError::ParameterError)?,
+                    record.amount.get_amount().c(d!(ZeiError::ParameterError))?,
                 ));
             }
         };
@@ -803,7 +806,7 @@ fn verify_plain_asset_mix(
     for (_, a) in amounts.iter() {
         let sum = a.iter().sum::<i128>();
         if sum < 0i128 {
-            return Err(ZeiError::XfrVerifyAssetAmountError);
+            return Err(eg!(ZeiError::XfrVerifyAssetAmountError));
         }
     }
     Ok(())
@@ -813,17 +816,17 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut PublicParams,
     bars_instances: &[(&[BlindAssetRecord], &[BlindAssetRecord], &AssetMixProof)],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     fn process_bars(
         bars: &[BlindAssetRecord],
-    ) -> Result<Vec<(CompressedRistretto, CompressedRistretto)>, ZeiError> {
+    ) -> Result<Vec<(CompressedRistretto, CompressedRistretto)>> {
         let pow2_32 = Scalar::from_u64(POW_2_32);
         bars.iter()
             .map(|x| {
                 let (com_amount_low, com_amount_high) = match x.amount {
                     XfrAmount::Confidential((c1, c2)) => (
-                        c1.decompress().ok_or(ZeiError::DecompressElementError),
-                        c2.decompress().ok_or(ZeiError::DecompressElementError),
+                        c1.decompress().c(d!(ZeiError::DecompressElementError)),
+                        c2.decompress().c(d!(ZeiError::DecompressElementError)),
                     ),
                     XfrAmount::NonConfidential(amount) => {
                         let pc_gens = RistrettoPedersenGens::default();
@@ -853,7 +856,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
                         };
                         Ok((com_amount, com_type))
                     }
-                    _ => Err(ZeiError::ParameterError),
+                    _ => Err(eg!(ZeiError::ParameterError)),
                 }
             })
             .collect()
@@ -861,27 +864,28 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
 
     let mut asset_mix_instances = vec![];
     for instance in bars_instances {
-        let in_coms = process_bars(instance.0)?;
-        let out_coms = process_bars(instance.1)?;
+        let in_coms = process_bars(instance.0).c(d!())?;
+        let out_coms = process_bars(instance.1).c(d!())?;
         asset_mix_instances.push(AssetMixingInstance {
             inputs: in_coms,
             outputs: out_coms,
             proof: instance.2,
         });
     }
-    batch_verify_asset_mixing(prng, params, &asset_mix_instances)
+
+    batch_verify_asset_mixing(prng, params, &asset_mix_instances).c(d!())
 }
 
 // ASSET TRACING
 pub fn find_tracing_memos<'a>(
     xfr_body: &'a XfrBody,
     pub_key: &AssetTracerEncKeys,
-) -> Result<Vec<(&'a BlindAssetRecord, &'a TracerMemo)>, ZeiError> {
+) -> Result<Vec<(&'a BlindAssetRecord, &'a TracerMemo)>> {
     let mut result = vec![];
     if xfr_body.inputs.len() + xfr_body.outputs.len()
         != xfr_body.asset_tracing_memos.len()
     {
-        return Err(ZeiError::InconsistentStructureError);
+        return Err(eg!(ZeiError::InconsistentStructureError));
     }
     for (blind_asset_record, bar_memos) in xfr_body
         .inputs
@@ -908,9 +912,9 @@ pub type RecordData = (u64, AssetType, Vec<Attr>, XfrPublicKey);
 pub fn trace_assets(
     xfr_body: &XfrBody,
     tracer_keypair: &AssetTracerKeyPair,
-) -> Result<Vec<RecordData>, ZeiError> {
-    let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
-    extract_tracing_info(bars_memos.as_slice(), &tracer_keypair.dec_key)
+) -> Result<Vec<RecordData>> {
+    let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key).c(d!())?;
+    extract_tracing_info(bars_memos.as_slice(), &tracer_keypair.dec_key).c(d!())
 }
 
 /// Scan XfrBody transfers involving asset tracing memos intended for `tracer_keypair`.
@@ -923,13 +927,14 @@ pub fn trace_assets_brute_force(
     xfr_body: &XfrBody,
     tracer_keypair: &AssetTracerKeyPair,
     candidate_asset_types: &[AssetType],
-) -> Result<Vec<RecordData>, ZeiError> {
-    let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
+) -> Result<Vec<RecordData>> {
+    let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key).c(d!())?;
     extract_tracing_info_brute_force(
         bars_memos.as_slice(),
         &tracer_keypair.dec_key,
         candidate_asset_types,
     )
+    .c(d!())
 }
 
 /// Scan list of (BlindAssetRecord, AssetTracerMemo) retrieved by find_tracing_memos
@@ -942,18 +947,19 @@ pub fn trace_assets_brute_force(
 pub(crate) fn extract_tracing_info(
     memos: &[(&BlindAssetRecord, &TracerMemo)],
     dec_key: &AssetTracerDecKeys,
-) -> Result<Vec<RecordData>, ZeiError> {
+) -> Result<Vec<RecordData>> {
     let mut result = vec![];
     for (blind_asset_record, memo) in memos {
-        let (amount_option, asset_type_option, attributes) = memo.decrypt(dec_key)?; // return BogusAssetTracerMemo in case of error.
+        let (amount_option, asset_type_option, attributes) =
+            memo.decrypt(dec_key).c(d!())?; // return BogusAssetTracerMemo in case of error.
         let amount = match memo.lock_amount {
             None => blind_asset_record
                 .amount
                 .get_amount()
-                .ok_or(ZeiError::InconsistentStructureError)?,
+                .c(d!(ZeiError::InconsistentStructureError))?,
             Some(_) => match amount_option {
                 None => {
-                    return Err(ZeiError::InconsistentStructureError);
+                    return Err(eg!(ZeiError::InconsistentStructureError));
                 }
                 Some(amt) => amt,
             },
@@ -963,10 +969,10 @@ pub(crate) fn extract_tracing_info(
             None => blind_asset_record
                 .asset_type
                 .get_asset_type()
-                .ok_or(ZeiError::InconsistentStructureError)?,
+                .c(d!(ZeiError::InconsistentStructureError))?,
             Some(_) => match asset_type_option {
                 None => {
-                    return Err(ZeiError::InconsistentStructureError);
+                    return Err(eg!(ZeiError::InconsistentStructureError));
                 }
                 Some(asset_type) => asset_type,
             },
@@ -993,7 +999,7 @@ pub(crate) fn extract_tracing_info_brute_force(
     memos: &[(&BlindAssetRecord, &TracerMemo)],
     dec_key: &AssetTracerDecKeys,
     candidate_asset_types: &[AssetType],
-) -> Result<Vec<RecordData>, ZeiError> {
+) -> Result<Vec<RecordData>> {
     let mut result = vec![];
     for bar_memo in memos {
         let blind_asset_record = bar_memo.0;
@@ -1002,23 +1008,25 @@ pub(crate) fn extract_tracing_info_brute_force(
             None => blind_asset_record
                 .amount
                 .get_amount()
-                .ok_or(ZeiError::InconsistentStructureError)?,
-            Some(_) => memo.extract_amount_brute_force(&dec_key.record_data_dec_key)?,
+                .c(d!(ZeiError::InconsistentStructureError))?,
+            Some(_) => memo
+                .extract_amount_brute_force(&dec_key.record_data_dec_key)
+                .c(d!())?,
         };
 
         let asset_type = match memo.lock_asset_type {
             None => blind_asset_record
                 .asset_type
                 .get_asset_type()
-                .ok_or(ZeiError::InconsistentStructureError)?,
-            Some(_) => memo.extract_asset_type(
-                &dec_key.record_data_dec_key,
-                candidate_asset_types,
-            )?,
+                .c(d!(ZeiError::InconsistentStructureError))?,
+            Some(_) => memo
+                .extract_asset_type(&dec_key.record_data_dec_key, candidate_asset_types)
+                .c(d!())?,
         };
 
-        let attributes =
-            memo.extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)?;
+        let attributes = memo
+            .extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)
+            .c(d!())?;
 
         result.push((
             amount,
@@ -1034,9 +1042,9 @@ pub(crate) fn extract_tracing_info_brute_force(
 pub(crate) fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo)],
                             dec_key: &AssetTracerDecKeys,
                             expected_data: &[RecordData])
-                            -> Result<(), ZeiError> {
+                            -> Result<()> {
   if memos.len() != expected_data.len() {
-    return Err(ZeiError::ParameterError);
+    return Err(eg!(ZeiError::ParameterError));
   }
   for (bar_memo, expected) in memos.iter().zip(expected_data) {
     let blind_asset_record = bar_memo.0;
@@ -1045,31 +1053,31 @@ pub(crate) fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo
       None => {
         let bar_amount = blind_asset_record.amount
                                            .get_amount()
-                                           .ok_or(ZeiError::InconsistentStructureError)?;
+                                           .c(d!(ZeiError::InconsistentStructureError))?;
         if bar_amount != expected.0 {
-          return Err(ZeiError::AssetTracingExtractionError);
+          return Err(eg!(ZeiError::AssetTracingExtractionError));
         }
       }
-      Some(_) => memo.verify_amount(&dec_key.record_data_dec_key, expected.0)?,
+      Some(_) => memo.verify_amount(&dec_key.record_data_dec_key, expected.0).c(d!())?,
     };
 
     match memo.lock_asset_type {
       None => {
         let asset_type = blind_asset_record.asset_type
                                            .get_asset_type()
-                                           .ok_or(ZeiError::InconsistentStructureError)?;
+                                           .c(d!(ZeiError::InconsistentStructureError))?;
         if asset_type != expected.1 {
-          return Err(ZeiError::AssetTracingExtractionError);
+          return Err(eg!(ZeiError::AssetTracingExtractionError));
         }
       }
       Some(_) => {
-        memo.extract_asset_type(&dec_key.record_data_dec_key, &[expected.1])?;
+        memo.extract_asset_type(&dec_key.record_data_dec_key, &[expected.1]).c(d!())?;
       }
     };
 
-    let result = memo.verify_identity_attributes(&dec_key.attrs_dec_key, (expected.2).as_slice())?;
+    let result = memo.verify_identity_attributes(&dec_key.attrs_dec_key, (expected.2).as_slice()).c(d!())?;
     if !result.iter().all(|current| *current) {
-      return Err(ZeiError::IdentityTracingExtractionError);
+      return Err(eg!(ZeiError::IdentityTracingExtractionError));
     }
   }
   Ok(())
@@ -1078,10 +1086,10 @@ pub(crate) fn verify_tracing_memos(memos: &[(&BlindAssetRecord, &AssetTracerMemo
 pub fn verify_tracing_ctexts(xfr_body: &XfrBody,
                              tracer_keypair: &AssetTracerKeyPair,
                              expected_data: &[RecordData])
-                             -> Result<(), ZeiError> {
-  let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key)?;
+                             -> Result<()> {
+  let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key).c(d!())?;
   verify_tracing_memos(bars_memos.as_slice(),
                        &tracer_keypair.dec_key,
-                       expected_data)
+                       expected_data).c(d!())
 }
 */

@@ -5,6 +5,7 @@ use bulletproofs::r1cs::{
     ConstraintSystem, LinearCombination, R1CSError, RandomizableConstraintSystem,
     RandomizedConstraintSystem, Variable,
 };
+use ruc::{err::*, *};
 use std::iter;
 
 pub(crate) fn cloak_merge_gadget<CS: RandomizableConstraintSystem>(
@@ -12,7 +13,7 @@ pub(crate) fn cloak_merge_gadget<CS: RandomizableConstraintSystem>(
     sorted: &[CloakVariable],
     intermediate: &[CloakVariable],
     merged: &[CloakVariable],
-) -> Result<usize, R1CSError> {
+) -> Result<usize> {
     let in1 = sorted[0];
     let out1 = merged[0];
     let mut n_gates = 0;
@@ -35,7 +36,7 @@ pub(crate) fn cloak_merge_gadget<CS: RandomizableConstraintSystem>(
     let out2iter = intermediate.iter().chain(iter::once(&merged[l - 1]));
 
     for (((in1, in2), out1), out2) in in1iter.zip(in2iter).zip(out1iter).zip(out2iter) {
-        n_gates += gate_mix(cs, *in1, *in2, *out1, *out2)?;
+        n_gates += gate_mix(cs, *in1, *in2, *out1, *out2).c(d!())?;
     }
 
     Ok(n_gates)
@@ -51,7 +52,7 @@ pub(super) fn gate_mix<CS: RandomizableConstraintSystem>(
     in2: CloakVariable,
     out1: CloakVariable,
     out2: CloakVariable,
-) -> Result<usize, R1CSError> {
+) -> Result<usize> {
     cs.specify_randomized_constraints(move |cs| {
         let w1 = cs.challenge_scalar(b"mix challenge1");
         let w2 = cs.challenge_scalar(b"mix challenge2");
@@ -68,7 +69,8 @@ pub(super) fn gate_mix<CS: RandomizableConstraintSystem>(
         );
         cs.constrain(out.into());
         Ok(())
-    })?;
+    })
+    .c(d!())?;
     Ok(1usize)
 }
 
@@ -78,13 +80,13 @@ pub(super) fn cloak_shuffle_gadget<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     input: Vec<CloakVariable>,
     permuted: Vec<CloakVariable>,
-) -> Result<usize, R1CSError> {
+) -> Result<usize> {
     let l = input.len();
     if l != permuted.len() {
-        return Err(R1CSError::GadgetError {
+        return Err(eg!(R1CSError::GadgetError {
             description: "list shuffle error, input and output list differ in length"
                 .to_string(),
-        });
+        }));
     }
     if l == 0 {
         return Ok(0usize);
@@ -110,9 +112,17 @@ pub(super) fn cloak_shuffle_gadget<CS: RandomizableConstraintSystem>(
             single_perm.push(single_pe);
         }
 
-        list_shuffle(cs, &single_input[..], &single_perm[..])?;
-        Ok(())
-    })?;
+        list_shuffle(cs, &single_input[..], &single_perm[..])
+            .c(d!())
+            .map_err(|e| {
+                p(e);
+                R1CSError::GadgetError {
+                    description: "".to_string(),
+                }
+            })
+            .map(|_| ())
+    })
+    .c(d!())?;
 
     // list_shuffle does 2*(l-1) multiplications
     Ok(l + 2 * (l - 1))
@@ -124,13 +134,13 @@ pub(super) fn list_shuffle<CS: RandomizedConstraintSystem>(
     cs: &mut CS,
     input: &[Variable],
     permuted: &[Variable],
-) -> Result<usize, R1CSError> {
+) -> Result<usize> {
     let l = input.len();
     if l != permuted.len() {
-        return Err(R1CSError::GadgetError {
+        return Err(eg!(R1CSError::GadgetError {
             description: "list shuffle error, input and output list differ in length"
                 .to_string(),
-        });
+        }));
     }
     if l == 0 {
         return Ok(0usize);
@@ -174,7 +184,7 @@ pub fn range_proof_64<CS: ConstraintSystem>(
     cs: &mut CS,
     mut var: LinearCombination,
     value: Option<Scalar>,
-) -> Result<usize, R1CSError> {
+) -> Result<usize> {
     let mut exp_2 = Scalar::from_u32(1);
     let n_usize = 64usize;
     let value_bytes = value.as_ref().map(|v| v.to_bytes());
@@ -185,7 +195,7 @@ pub fn range_proof_64<CS: ConstraintSystem>(
                 let index = i >> 3;
                 if index > bytes.len() {
                     // This could happen due to the scalar's representation
-                    return Err(R1CSError::FormatError);
+                    return Err(eg!(R1CSError::FormatError));
                 }
                 let bit = ((bytes[index] >> (i & 7)) & 1u8) as i8;
                 let assignment = (
@@ -195,7 +205,8 @@ pub fn range_proof_64<CS: ConstraintSystem>(
                 cs.allocate_multiplier(Some(assignment).map(|(a, b)| (a.0, b.0)))
             }
             None => cs.allocate_multiplier(None),
-        }?;
+        }
+        .c(d!())?;
 
         // Enforce a * b = 0, so one of (a,b) is zero
         cs.constrain(o.into());

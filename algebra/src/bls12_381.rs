@@ -11,7 +11,9 @@ use ff::{Field, PrimeField};
 use group::Group as _;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 
+use std::result::Result as StdResult;
 use std::str::FromStr;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
@@ -31,7 +33,7 @@ pub struct BLSGt(pub(crate) Gt);
 impl FromStr for BLSScalar {
     type Err = AlgebraError;
 
-    fn from_str(string: &str) -> Result<BLSScalar, AlgebraError> {
+    fn from_str(string: &str) -> StdResult<BLSScalar, AlgebraError> {
         Ok(BLSScalar(
             Scalar::from_str(string).ok_or(AlgebraError::DeserializationError)?,
         ))
@@ -102,10 +104,10 @@ impl ScalarArithmetic for BLSScalar {
         (self.0).sub_assign(&b.0);
     }
 
-    fn inv(&self) -> Result<BLSScalar, AlgebraError> {
+    fn inv(&self) -> Result<BLSScalar> {
         let a = self.0.invert();
         if bool::from(a.is_none()) {
-            return Err(AlgebraError::GroupInversionError);
+            return Err(eg!(AlgebraError::GroupInversionError));
         }
         Ok(BLSScalar(a.unwrap()))
     }
@@ -117,7 +119,7 @@ impl ScalarArithmetic for BLSScalar {
     fn pow(&self, exponent: &[u64]) -> Self {
         let len = exponent.len();
         let mut array = [0u64; 4];
-        array[..len].copy_from_slice(&exponent[..]);
+        array[..len].copy_from_slice(exponent);
         Self(self.0.pow(&array))
     }
 }
@@ -174,26 +176,26 @@ impl ZeiScalar for BLSScalar {
         self.0.to_bytes().to_vec()
     }
 
-    fn from_bytes(bytes: &[u8]) -> Result<BLSScalar, AlgebraError> {
+    fn from_bytes(bytes: &[u8]) -> Result<BLSScalar> {
         if bytes.len() != BLS_SCALAR_LEN {
-            return Err(AlgebraError::ParameterError);
+            return Err(eg!(AlgebraError::ParameterError));
         }
         let mut array = [0u8; 32];
         array.copy_from_slice(bytes);
         let scalar = bls12_381::Scalar::from_bytes(&array);
         if bool::from(scalar.is_none()) {
-            return Err(AlgebraError::SerializationError);
+            return Err(eg!(AlgebraError::SerializationError));
         }
         Ok(BLSScalar(scalar.unwrap()))
     }
 
-    fn from_le_bytes(bytes: &[u8]) -> Result<BLSScalar, AlgebraError> {
+    fn from_le_bytes(bytes: &[u8]) -> Result<BLSScalar> {
         if bytes.len() > Self::bytes_len() {
-            return Err(AlgebraError::DeserializationError);
+            return Err(eg!(AlgebraError::DeserializationError));
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
-        Self::from_bytes(&array)
+        Self::from_bytes(&array).c(d!())
     }
 }
 
@@ -219,12 +221,12 @@ impl Group for BLSG1 {
         let affine = G1Affine::from(&self.0);
         affine.to_compressed().to_vec()
     }
-    fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG1, AlgebraError> {
+    fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG1> {
         let mut array = [0u8; Self::COMPRESSED_LEN];
         array.copy_from_slice(bytes);
         let affine = bls12_381::G1Affine::from_compressed(&array);
         if bool::from(affine.is_none()) {
-            return Err(AlgebraError::DeserializationError);
+            return Err(eg!(AlgebraError::DeserializationError));
         }
         let projective = G1Projective::from(affine.unwrap());
         Ok(BLSG1(projective))
@@ -278,12 +280,12 @@ impl Group for BLSG2 {
         affine.to_compressed().to_vec()
     }
 
-    fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG2, AlgebraError> {
+    fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG2> {
         let mut array = [0u8; Self::COMPRESSED_LEN];
         array.copy_from_slice(bytes);
         let affine = bls12_381::G2Affine::from_compressed(&array);
         if bool::from(affine.is_none()) {
-            return Err(AlgebraError::DeserializationError);
+            return Err(eg!(AlgebraError::DeserializationError));
         }
         let projective = G2Projective::from(affine.unwrap());
         Ok(BLSG2(projective))
@@ -362,7 +364,7 @@ impl Group for BLSGt {
     }
 
     // TODO: Implement
-    fn from_compressed_bytes(_bytes: &[u8]) -> Result<Self, AlgebraError> {
+    fn from_compressed_bytes(_bytes: &[u8]) -> Result<Self> {
         unimplemented!()
     }
 

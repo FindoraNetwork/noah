@@ -9,6 +9,7 @@ pub mod rescue;
 use crate::plonk::errors::PlonkError;
 use crate::plonk::plonk_setup::ConstraintSystem;
 use algebra::groups::Scalar;
+use ruc::{err::*, *};
 
 pub type VarIndex = usize; // Variable index
 pub type CsIndex = usize; // Constraint index
@@ -73,9 +74,9 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
         &self.public_vars_witness_indices
     }
 
-    fn selector(&self, index: usize) -> Result<&[F], PlonkError> {
+    fn selector(&self, index: usize) -> Result<&[F]> {
         if index >= self.selectors.len() {
-            return Err(PlonkError::FuncParamsError);
+            return Err(eg!(PlonkError::FuncParamsError));
         }
         Ok(&self.selectors[index])
     }
@@ -90,9 +91,9 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
         wire_vals: &[&F],
         sel_vals: &[&F],
         pub_input: &F,
-    ) -> Result<F, PlonkError> {
+    ) -> Result<F> {
         if wire_vals.len() != N_WIRES_PER_GATE || sel_vals.len() != N_SELECTORS {
-            return Err(PlonkError::FuncParamsError);
+            return Err(eg!(PlonkError::FuncParamsError));
         }
         let add1 = sel_vals[0].mul(&wire_vals[0]);
         let add2 = sel_vals[1].mul(&wire_vals[1]);
@@ -131,9 +132,9 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
 
     /// The coefficients are
     /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1*w2*w3*w4*wo, w1^5, w2^5, w3^5, w4^5, -w4)
-    fn eval_selector_multipliers(&self, wire_vals: &[&F]) -> Result<Vec<F>, PlonkError> {
+    fn eval_selector_multipliers(&self, wire_vals: &[&F]) -> Result<Vec<F>> {
         if wire_vals.len() < N_WIRES_PER_GATE {
-            return Err(PlonkError::FuncParamsError);
+            return Err(eg!(PlonkError::FuncParamsError));
         }
         let five = &[5u64];
         let mut w0w1w2w3w4 = *wire_vals[0];
@@ -588,22 +589,18 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
         self.wiring[wire_index][cs_index]
     }
 
-    pub fn verify_witness(
-        &self,
-        witness: &[F],
-        online_vars: &[F],
-    ) -> Result<(), String> {
+    pub fn verify_witness(&self, witness: &[F], online_vars: &[F]) -> Result<()> {
         if witness.len() != self.num_vars {
-            return Err(format!(
+            return Err(eg!(format!(
                 "witness len = {}, num_vars = {}",
                 witness.len(),
                 self.num_vars
-            ));
+            )));
         }
         if online_vars.len() != self.public_vars_witness_indices.len()
             || online_vars.len() != self.public_vars_constraint_indices.len()
         {
-            return Err("wrong number of online variables".to_string());
+            return Err(eg!("wrong number of online variables"));
         }
         for cs_index in 0..self.size() {
             let mut public_online = F::zero();
@@ -619,10 +616,10 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
                     // found
                     public_online = *online_var;
                     if witness[*w_i] != *online_var {
-                        return Err(format!(
+                        return Err(eg!(format!(
                             "cs index {}: online var {:?} does not match witness {:?}",
                             cs_index, *online_var, witness[*w_i]
-                        ));
+                        )));
                     }
                 }
             }
@@ -635,14 +632,14 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
             let sel_vals: Vec<&F> = (0..self.num_selectors())
                 .map(|i| &self.selectors[i][cs_index])
                 .collect();
-            let eval_gate =
-                self.eval_gate_func(&wire_vals, &sel_vals, &public_online)
-                    .map_err(|_| "wrong func params for eval_gate_func()".to_string())?;
+            let eval_gate = self
+                .eval_gate_func(&wire_vals, &sel_vals, &public_online)
+                .c(d!("wrong func params for eval_gate_func()"))?;
             if eval_gate != F::zero() {
-                return Err(format!(
+                return Err(eg!(format!(
                     "cs index {}: wire_vals = ({:?}), sel_vals = ({:?})",
                     cs_index, wire_vals, sel_vals
-                ));
+                )));
             }
         }
         Ok(())
@@ -662,6 +659,7 @@ mod test {
     use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, ScalarArithmetic};
+    use ruc::{err::*, *};
 
     type F = BLSScalar;
     #[test]
@@ -713,8 +711,7 @@ mod test {
         cs.equal(add, sub);
 
         let witness = cs.get_and_clear_witness();
-        let verify = cs.verify_witness(&witness[..], &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness[..], &[]));
 
         assert!(
             cs.verify_witness(&[zero, one, two, two, two, one, zero], &[])
@@ -737,8 +734,8 @@ mod test {
         assert_eq!(cs.witness[two_equals_two], one);
 
         let mut witness = cs.get_and_clear_witness();
-        let verify = cs.verify_witness(&witness, &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness, &[]));
+
         witness[0] = two;
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }
@@ -764,8 +761,7 @@ mod test {
         cs.range_check(e_idx, 3);
 
         let witness = cs.get_and_clear_witness();
-        let verify = cs.verify_witness(&witness[..], &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness[..], &[]));
 
         let eight = num[3].add(&num[5]);
         // Bad witness: [a, b] = [1, 2], [c, d, e] = [3, 2, 8] and e >= 8
@@ -844,8 +840,7 @@ mod test {
         let twelve = num[8].add(&num[4]);
         // Good witness: [1, 2, 3, 1, 7, 6], e_binary_le = [1, 1, 1], f_binary_le = [0, 1, 1]
         let witness = cs.get_and_clear_witness();
-        let verify = cs.verify_witness(&witness[..], &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness[..], &[]));
 
         // Another good witness also satisfies the circuit:
         // [0, 2, 2, 1, 5, 4], e_binary_le = [1, 0, 1], f_binary_le = [0, 0, 1]
@@ -866,7 +861,8 @@ mod test {
             ],
             &[],
         );
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(verify);
+
         // Bad witness: a is not boolean
         assert!(
             cs.verify_witness(

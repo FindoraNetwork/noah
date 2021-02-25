@@ -8,6 +8,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
@@ -109,14 +110,14 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
     reveal_map: &[bool],
     enc_key: &ElGamalEncKey<P::G1>,
     msg: &[u8],
-) -> Result<ConfidentialAC<P::G1, P::G2, P::ScalarField>, ZeiError> {
+) -> Result<ConfidentialAC<P::G1, P::G2, P::ScalarField>> {
     // 1. create ciphertext for all revealed attributes
     let mut ctexts = vec![];
     let mut rands = vec![];
     let base = P::G1::get_base();
     let mut revealed_attrs = vec![];
     if credential.attributes.len() != reveal_map.len() {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
     for (attr, b) in credential.attributes.iter().zip(reveal_map.iter()) {
         if *b {
@@ -167,24 +168,25 @@ pub fn ac_confidential_open_verify<P: Pairing>(
     ctexts: &[ElGamalCiphertext<P::G1>],
     cac_pok: &CACPoK<P::G1, P::G2, P::ScalarField>,
     msg: &[u8],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     // 1. error checking
     let n = ctexts.len();
     let revealed_count = reveal_map
         .iter()
         .fold(0, |sum, b| if *b { sum + 1 } else { sum });
     if reveal_map.len() != issuer_pk.num_attrs() {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
     if n > issuer_pk.num_attrs()
         || n != cac_pok.commitment_ctexts.len()
         || n != cac_pok.response_rands.len()
         || n != revealed_count
     {
-        return Err(ZeiError::IdentityRevealVerifyError);
+        return Err(eg!(ZeiError::IdentityRevealVerifyError));
     }
 
     let mut transcript = Transcript::new(CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
+
     ac_confidential_sok_verify::<P>(
         &mut transcript,
         issuer_pk,
@@ -194,9 +196,8 @@ pub fn ac_confidential_open_verify<P: Pairing>(
         cac_pok,
         reveal_map,
         msg,
-    )?;
-
-    Ok(())
+    )
+    .c(d!())
 }
 
 #[allow(non_snake_case)]
@@ -282,7 +283,7 @@ fn ac_confidential_sok_verify<P: Pairing>(
     cac_pok: &CACPoK<P::G1, P::G2, P::ScalarField>,
     bitmap: &[bool], // indicates which hidden attributes are encrypted under enc_key
     msg: &[u8],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     transcript.cac_init::<P>(ac_issuer_pub_key, enc_key, &sig_commitment, ctexts);
     transcript.append_message(SOK_LABEL, msg); // SoK
     // 1. compute challenge
@@ -309,7 +310,8 @@ fn ac_confidential_sok_verify<P: Pairing>(
         attr_resps.as_slice(),
         &cac_pok.response_rands.as_slice(),
         enc_key,
-    )?;
+    )
+    .c(d!())?;
 
     // 3. verify credential proof
     let hidden_attributes = vec![Attribute::Hidden(None); ac_issuer_pub_key.num_attrs()];
@@ -320,6 +322,7 @@ fn ac_confidential_sok_verify<P: Pairing>(
         hidden_attributes.as_slice(),
         &challenge,
     )
+    .c(d!())
 }
 
 fn verify_ciphertext<P: Pairing>(
@@ -329,7 +332,7 @@ fn verify_ciphertext<P: Pairing>(
     attrs_resp: &[&P::ScalarField],
     rands_resps: &[P::ScalarField],
     enc_key: &ElGamalEncKey<P::G1>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     for (ctext, ctext_com, attr_resp, rand_resp) in izip!(
         ctexts.iter(),
         ctexts_coms.iter(),
@@ -338,10 +341,10 @@ fn verify_ciphertext<P: Pairing>(
     ) {
         let enc = elgamal_encrypt(&P::G1::get_base(), attr_resp, rand_resp, enc_key);
         if enc.e1 != ctext.e1.mul(&challenge).add(&ctext_com.e1) {
-            return Err(ZeiError::IdentityRevealVerifyError);
+            return Err(eg!(ZeiError::IdentityRevealVerifyError));
         }
         if enc.e2 != ctext.e2.mul(&challenge).add(&ctext_com.e2) {
-            return Err(ZeiError::IdentityRevealVerifyError);
+            return Err(eg!(ZeiError::IdentityRevealVerifyError));
         }
     }
     Ok(())
@@ -361,6 +364,7 @@ pub(crate) mod test_helper {
     use algebra::pairing::Pairing;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::err::*;
     use utils::errors::ZeiError;
 
     pub(super) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
@@ -452,9 +456,9 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_message,
         );
-        assert_eq!(
-            Err(ZeiError::IdentityRevealVerifyError),
-            vrfy,
+        err_eq!(
+            ZeiError::IdentityRevealVerifyError,
+            vrfy.unwrap_err(),
             "proof should fail, reveal map doesn't match"
         );
 
@@ -469,9 +473,9 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_message,
         );
-        assert_eq!(
-            Err(ZeiError::ParameterError),
-            vrfy,
+        err_eq!(
+            ZeiError::ParameterError,
+            vrfy.unwrap_err(),
             "proof should fail, bitmap length does not match number of attributes"
         );
 
@@ -486,9 +490,9 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_message,
         );
-        assert_eq!(
-            vrfy,
-            Err(ZeiError::IdentityRevealVerifyError),
+        err_eq!(
+            ZeiError::IdentityRevealVerifyError,
+            vrfy.unwrap_err(),
             "proof should fail, bad ac issuer public key"
         );
 
@@ -504,9 +508,9 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_message,
         );
-        assert_eq!(
-            Err(ZeiError::IdentityRevealVerifyError),
-            vrfy,
+        err_eq!(
+            ZeiError::IdentityRevealVerifyError,
+            vrfy.unwrap_err(),
             "proof should fail, bad encryption key"
         );
 
@@ -521,9 +525,9 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             wrong_message,
         );
-        assert_eq!(
-            Err(ZeiError::IdentityRevealVerifyError),
-            vrfy,
+        err_eq!(
+            ZeiError::IdentityRevealVerifyError,
+            vrfy.unwrap_err(),
             "proof should fail, bad sok message"
         );
     }

@@ -16,7 +16,7 @@ use crate::api::gp_sig::{
 };
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
-use utils::errors::ZeiError;
+use ruc::{err::*, *};
 
 /// JoinRequest message from the User to the Regulator. It contains the identity of the user.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,7 +32,7 @@ pub fn rt_user_gen_join_request<R: CryptoRng + RngCore>(
     prng: &mut R,
     ac_user_sk: &ACUserSecretKey,
     credential: &Credential,
-) -> Result<JoinRequest, ZeiError> {
+) -> Result<JoinRequest> {
     // all attributed are revealed to the regulator
     let cred_proof = ac_reveal(
         prng,
@@ -45,7 +45,8 @@ pub fn rt_user_gen_join_request<R: CryptoRng + RngCore>(
             .map(|_| true)
             .collect_vec()
             .as_slice(),
-    )?;
+    )
+    .c(d!())?;
     Ok(JoinRequest {
         credential_proof: cred_proof,
         attrs: credential.attributes.clone(),
@@ -61,7 +62,7 @@ pub fn rt_process_join_request<R: CryptoRng + RngCore>(
     rsk: &GroupSecretKey,
     user_join_req: &JoinRequest,
     ac_issuer_pk: &ACIssuerPublicKey,
-) -> Result<(JoinCert, TagKey), ZeiError> {
+) -> Result<(JoinCert, TagKey)> {
     // 1 check credential
     let attrs_as_option: Vec<Option<u32>> = user_join_req
         .attrs
@@ -69,12 +70,14 @@ pub fn rt_process_join_request<R: CryptoRng + RngCore>(
         .iter()
         .map(|x| Some(*x))
         .collect();
+
     ac_verify(
         ac_issuer_pk,
         attrs_as_option.as_slice(),
         &user_join_req.credential_proof.sig_commitment,
         &user_join_req.credential_proof.pok,
-    )?;
+    )
+    .c(d!())?;
 
     // 2 generate tag
     Ok(gpsig_join_cert(prng, rsk))
@@ -87,8 +90,8 @@ pub fn rt_verify_sig<B: AsRef<[u8]>>(
     rpk: &GroupPublicKey,
     sig: &GroupSignature,
     msg: &B,
-) -> Result<(), ZeiError> {
-    gpsig_verify(rpk, sig, msg)
+) -> Result<()> {
+    gpsig_verify(rpk, sig, msg).c(d!())
 }
 
 /// Regulator obtains tag from signature

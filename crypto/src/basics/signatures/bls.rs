@@ -2,6 +2,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::pairing::Pairing;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 type HashFnc = sha2::Sha512;
@@ -37,7 +38,7 @@ pub fn bls_verify<P: Pairing, B: AsRef<[u8]>>(
     ver_key: &BlsPublicKey<P>,
     message: &B,
     signature: &BlsSignature<P>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let hashed = bls_hash_message::<P>(message.as_ref());
     let a = P::pairing(&P::G1::get_base(), &signature.0);
     let b = P::pairing(&ver_key.0, &hashed);
@@ -45,7 +46,7 @@ pub fn bls_verify<P: Pairing, B: AsRef<[u8]>>(
     if a == b {
         Ok(())
     } else {
-        Err(ZeiError::SignatureError)
+        Err(eg!(ZeiError::SignatureError))
     }
 }
 
@@ -68,13 +69,13 @@ pub fn bls_verify_aggregated<P: Pairing, B: AsRef<[u8]>>(
     ver_keys: &[&BlsPublicKey<P>],
     message: &B,
     agg_signature: &BlsSignature<P>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let scalars = bls_hash_pubkeys_to_scalars::<P>(ver_keys);
     let mut agg_pub_key = P::G1::get_identity();
     for (t, key) in scalars.iter().zip(ver_keys) {
         agg_pub_key = agg_pub_key.add(&key.0.mul(t));
     }
-    bls_verify::<P, B>(&BlsPublicKey(agg_pub_key), message, agg_signature)
+    bls_verify::<P, B>(&BlsPublicKey(agg_pub_key), message, agg_signature).c(d!())
 }
 
 /// Batch verification of many signatures
@@ -82,10 +83,10 @@ pub fn bls_batch_verify<P: Pairing, B: AsRef<[u8]>>(
     ver_keys: &[BlsPublicKey<P>],
     messages: &[B],
     signatures: &[BlsSignature<P>],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     assert!(ver_keys.len() == messages.len() && ver_keys.len() == signatures.len());
     let sig = bls_add_signatures(signatures);
-    bls_batch_verify_added_signatures(ver_keys, messages, &sig)
+    bls_batch_verify_added_signatures(ver_keys, messages, &sig).c(d!())
 }
 
 /// signature aggregation for (possibly) different messages
@@ -104,7 +105,7 @@ pub fn bls_batch_verify_added_signatures<P: Pairing, B: AsRef<[u8]>>(
     ver_keys: &[BlsPublicKey<P>],
     messages: &[B],
     signature: &BlsSignature<P>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let a = P::pairing(&P::G1::get_base(), &signature.0);
     let mut b = P::Gt::get_identity();
     for (pk, m) in ver_keys.iter().zip(messages) {
@@ -116,7 +117,7 @@ pub fn bls_batch_verify_added_signatures<P: Pairing, B: AsRef<[u8]>>(
     if a == b {
         Ok(())
     } else {
-        Err(ZeiError::SignatureError)
+        Err(eg!(ZeiError::SignatureError))
     }
 }
 
@@ -178,6 +179,7 @@ impl<S> AsRef<S> for BlsSecretKey<S> {
 mod tests {
     use algebra::bls12_381::Bls12381;
     use rand_core::SeedableRng;
+    use ruc::err::*;
     use utils::errors::ZeiError;
 
     #[test]
@@ -189,10 +191,10 @@ mod tests {
 
         let signature = super::bls_sign::<Bls12381, _>(&sk, message);
 
-        assert_eq!(Ok(()), super::bls_verify(&pk, message, &signature));
-        assert_eq!(
-            Err(ZeiError::SignatureError),
-            super::bls_verify(&pk, b"wrong message", &signature)
+        assert_eq!((), super::bls_verify(&pk, message, &signature).unwrap());
+        err_eq!(
+            ZeiError::SignatureError,
+            super::bls_verify(&pk, b"wrong message", &signature).unwrap_err()
         )
     }
 
@@ -217,8 +219,8 @@ mod tests {
         );
 
         assert_eq!(
-            Ok(()),
-            super::bls_verify_aggregated(&keys, message, &agg_signature)
+            (),
+            super::bls_verify_aggregated(&keys, message, &agg_signature).unwrap()
         );
     }
 
@@ -241,15 +243,18 @@ mod tests {
         let messages = [message1.as_ref(), message2.as_ref(), message3.as_ref()];
         let sigs = [signature1, signature2, signature3];
 
-        assert_eq!(Ok(()), super::bls_batch_verify(&keys, &messages[..], &sigs));
+        assert_eq!(
+            (),
+            super::bls_batch_verify(&keys, &messages[..], &sigs).unwrap()
+        );
 
         let new_message3 = b"this message has not been signed";
 
         let messages = [&message1[..], &message2[..], &new_message3[..]];
 
-        assert_eq!(
-            Err(ZeiError::SignatureError),
-            super::bls_batch_verify(&keys, &messages, &sigs)
+        err_eq!(
+            ZeiError::SignatureError,
+            super::bls_batch_verify(&keys, &messages, &sigs).unwrap_err()
         );
     }
 }

@@ -4,8 +4,8 @@ use crate::jubjub::{JubjubPoint, JubjubScalar};
 use crate::ristretto::{
     CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
 };
+use ruc::{err::*, *};
 use serde::Serializer;
-use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
 
 macro_rules! to_from_bytes_scalar {
@@ -16,9 +16,9 @@ macro_rules! to_from_bytes_scalar {
                 v.extend_from_slice(&self.to_bytes()[..]);
                 v
             }
-            fn zei_from_bytes(bytes: &[u8]) -> Result<$t, utils::errors::ZeiError> {
+            fn zei_from_bytes(bytes: &[u8]) -> Result<$t> {
                 $t::from_bytes(bytes)
-                    .map_err(|_| utils::errors::ZeiError::DeserializationError)
+                    .map_err(|_| eg!(utils::errors::ZeiError::DeserializationError))
             }
         }
     };
@@ -32,7 +32,7 @@ impl ZeiFromToBytes for CompressedRistretto {
     fn zei_to_bytes(&self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(CompressedRistretto(
             curve25519_dalek::ristretto::CompressedRistretto::from_slice(bytes),
         ))
@@ -43,7 +43,7 @@ impl ZeiFromToBytes for CompressedEdwardsY {
     fn zei_to_bytes(&self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(CompressedEdwardsY(
             curve25519_dalek::edwards::CompressedEdwardsY::from_slice(bytes),
         ))
@@ -62,9 +62,9 @@ macro_rules! to_from_bytes_group {
             fn zei_to_bytes(&self) -> Vec<u8> {
                 self.to_compressed_bytes()
             }
-            fn zei_from_bytes(bytes: &[u8]) -> Result<$g, utils::errors::ZeiError> {
+            fn zei_from_bytes(bytes: &[u8]) -> Result<$g> {
                 $g::from_compressed_bytes(bytes)
-                    .map_err(|_| utils::errors::ZeiError::SerializationError)
+                    .map_err(|_| eg!(utils::errors::ZeiError::SerializationError))
             }
         }
     };

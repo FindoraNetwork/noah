@@ -376,6 +376,8 @@ mod test {
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Group, GroupArithmetic, One, Scalar, Zero};
     use algebra::jubjub::{JubjubPoint, JubjubScalar};
+    use ruc::{err::*, *};
+
     #[test]
     fn test_ecc_add() {
         // use BLS12-381 field
@@ -393,8 +395,7 @@ mod test {
         cs.insert_ecc_add_gate(&p1_var, &p1_var, &p2_var);
         cs.insert_ecc_add_gate(&p1_var, &p2_var, &p3_var);
         let witness = cs.get_and_clear_witness();
-        let verify = cs.verify_witness(&witness[..], &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness[..], &[]));
 
         let p3_double_ext = p3_ext.double();
         let p3_double_point = Point::from(&p3_double_ext);
@@ -434,8 +435,7 @@ mod test {
         let scalar_var = cs.new_variable(scalar);
         let (p_out_var, _) = cs.scalar_mul(base_ext, scalar_var, 256);
         let mut witness = cs.get_and_clear_witness();
-        let verify = cs.verify_witness(&witness[..], &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness[..], &[]));
 
         // wrong witness: point = GENERATOR * (jubjub_scalar + 1)
         let p_out_plus_point = Point::from(&p_out_plus_ext);
@@ -456,8 +456,7 @@ mod test {
         // check p_out is an identity point
         assert_eq!(witness[p_out_var.0], BLSScalar::zero());
         assert_eq!(witness[p_out_var.1], BLSScalar::one());
-        let verify = cs.verify_witness(&witness[..], &[]);
-        assert!(verify.is_ok(), verify.unwrap_err());
+        pnk!(cs.verify_witness(&witness[..], &[]));
 
         // wrong witness: p_out = GENERATOR
         witness[p_out_var.0] = base_point.0;

@@ -19,6 +19,7 @@ pub(crate) mod tests {
     use algebra::ristretto::RistrettoScalar as Scalar;
     use crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
     use crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
+    use ruc::err::*;
 
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use itertools::Itertools;
@@ -131,20 +132,21 @@ pub(crate) mod tests {
         let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
         // test 1: simple transfer
         assert_eq!(
-            Ok(()),
-            verify_xfr_note(&mut prng, params, &xfr_note, &policies.to_ref()),
+            (),
+            verify_xfr_note(&mut prng, params, &xfr_note, &policies.to_ref()).unwrap(),
             "Simple transaction should verify ok"
         );
 
         // 1.1 test batching
         assert_eq!(
-            Ok(()),
+            (),
             batch_verify_xfr_notes(
                 &mut prng,
                 params,
                 &[&xfr_note, &xfr_note, &xfr_note],
                 &[&policies.to_ref(); 3]
-            ),
+            )
+            .unwrap(),
             "batch verify"
         );
 
@@ -165,9 +167,9 @@ pub(crate) mod tests {
             outputs.as_slice(),
             inkeys_ref.as_slice(),
         );
-        assert_eq!(
-            xfr_note,
-            Err(ZeiError::XfrCreationAssetAmountError),
+        err_eq!(
+            ZeiError::XfrCreationAssetAmountError,
+            xfr_note.unwrap_err(),
             "Xfr cannot be build if output total amount is greater than input amounts"
         );
 
@@ -223,9 +225,9 @@ pub(crate) mod tests {
             outputs.as_slice(),
             inkeys_ref.as_slice(),
         );
-        assert_eq!(
-            Err(ZeiError::XfrCreationAssetAmountError),
-            xfr_note,
+        err_eq!(
+            ZeiError::XfrCreationAssetAmountError,
+            xfr_note.unwrap_err(),
             "Xfr cannot be build if output asset types are different"
         );
 
@@ -289,9 +291,9 @@ pub(crate) mod tests {
             inkeys_ref.as_slice(),
         );
 
-        assert_eq!(
-            Err(ZeiError::XfrCreationAssetAmountError),
-            xfr_note,
+        err_eq!(
+            ZeiError::XfrCreationAssetAmountError,
+            xfr_note.unwrap_err(),
             "Xfr cannot be build if output asset types are different"
         );
         inputs[1] = old_input1;
@@ -641,8 +643,9 @@ pub(crate) mod tests {
 
             // test 1: simple transfer using confidential asset mixer
             assert_eq!(
-                Ok(()),
-                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()),
+                (),
+                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref())
+                    .unwrap(),
                 "Multi asset transfer confidential"
             );
 
@@ -700,8 +703,9 @@ pub(crate) mod tests {
                 XfrNotePolicies::empty_policies(input_record.len(), output_record.len());
 
             assert_eq!(
-                Ok(()),
-                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()),
+                (),
+                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref())
+                    .unwrap(),
                 "Multi asset transfer non confidential"
             );
 
@@ -711,9 +715,10 @@ pub(crate) mod tests {
                 compute_transfer_multisig(&xfr_note.body, inkeys_ref.as_slice())
                     .unwrap();
 
-            assert_eq!(
-                Err(ZeiError::XfrVerifyAssetAmountError),
-                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()),
+            err_eq!(
+                ZeiError::XfrVerifyAssetAmountError,
+                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref())
+                    .unwrap_err(),
                 "Multi asset transfer non confidential"
             );
         }
@@ -787,7 +792,7 @@ pub(crate) mod tests {
                 outputs.as_slice(),
                 &[], //no keys
             );
-            assert_eq!(Err(ZeiError::ParameterError), xfr_note);
+            err_eq!(ZeiError::ParameterError, xfr_note.unwrap_err());
 
             let key1 = XfrKeyPair::generate(&mut prng);
             let key2 = XfrKeyPair::generate(&mut prng);
@@ -798,7 +803,7 @@ pub(crate) mod tests {
                 &[&key1, &key2],
             );
 
-            assert_eq!(Err(ZeiError::ParameterError), xfr_note);
+            err_eq!(ZeiError::ParameterError, xfr_note.unwrap_err());
         }
     }
 
@@ -898,8 +903,8 @@ pub(crate) mod tests {
             );
 
             assert_eq!(
-                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
-                Ok(())
+                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).unwrap(),
+                ()
             );
             let policies = XfrNotePoliciesRef::new(
                 vec![&tracing_policy],
@@ -907,9 +912,10 @@ pub(crate) mod tests {
                 vec![null_policies_input],
                 vec![None; 1],
             );
-            assert_eq!(
-                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
-                Err(XfrVerifyAssetTracingIdentityError),
+            err_eq!(
+                XfrVerifyAssetTracingIdentityError,
+                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies)
+                    .unwrap_err(),
             );
 
             //test serialization
@@ -1090,8 +1096,9 @@ pub(crate) mod tests {
 
             // test 1: the verification is successful
             assert_eq!(
-                verify_xfr_body(&mut prng, params, &xfr_body.clone(), &policies),
-                Ok(()),
+                verify_xfr_body(&mut prng, params, &xfr_body.clone(), &policies)
+                    .unwrap(),
+                (),
                 "Simple transaction should verify ok"
             );
 
@@ -1163,9 +1170,10 @@ pub(crate) mod tests {
                     output_sig_commitment.clone(),
                 );
 
-                assert_eq!(
-                    verify_xfr_body(&mut prng, params, &new_xfr_body, &policies),
-                    Err(XfrVerifyAssetTracingAssetAmountError),
+                err_eq!(
+                    XfrVerifyAssetTracingAssetAmountError,
+                    verify_xfr_body(&mut prng, params, &new_xfr_body, &policies)
+                        .unwrap_err(),
                     "Asset tracing verification fails as the ciphertext has been altered."
                 );
             }
@@ -1173,8 +1181,9 @@ pub(crate) mod tests {
             // Restore body
             let mut new_xfr_body: XfrBody = xfr_body.clone();
             assert_eq!(
-                verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies),
-                Ok(()),
+                verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies)
+                    .unwrap(),
+                (),
                 "Everything back to normal."
             );
 
@@ -1187,9 +1196,9 @@ pub(crate) mod tests {
             let check =
                 verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies);
 
-            assert_eq!(
-                check,
-                Err(XfrVerifyAssetTracingAssetAmountError),
+            err_eq!(
+                XfrVerifyAssetTracingAssetAmountError,
+                check.unwrap_err(),
                 "Transfer should fail without proof."
             );
 
@@ -1198,8 +1207,9 @@ pub(crate) mod tests {
             // Restore body
             let mut new_xfr_body: XfrBody = xfr_body.clone();
             assert_eq!(
-                verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies),
-                Ok(()),
+                verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies)
+                    .unwrap(),
+                (),
                 "Everything back to normal."
             );
 
@@ -1214,9 +1224,9 @@ pub(crate) mod tests {
             let check =
                 verify_xfr_body(&mut prng, params, &new_xfr_body.clone(), &policies);
 
-            assert_eq!(
-                check,
-                Err(XfrVerifyAssetTracingAssetAmountError),
+            err_eq!(
+                XfrVerifyAssetTracingAssetAmountError,
+                check.unwrap_err(),
                 "Transfer should fail as the proof is not correctly computed."
             );
         }
@@ -1278,8 +1288,8 @@ pub(crate) mod tests {
             );
 
             assert_eq!(
-                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies),
-                Ok(())
+                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).unwrap(),
+                ()
             );
         }
 
@@ -1798,8 +1808,9 @@ pub(crate) mod tests {
             );
             // test 1: the verification is successful
             assert_eq!(
-                verify_xfr_body(&mut prng, &mut params, &xfr_body.clone(), &policies),
-                Ok(()),
+                verify_xfr_body(&mut prng, &mut params, &xfr_body.clone(), &policies)
+                    .unwrap(),
+                (),
                 "Simple transaction should verify ok"
             );
             let candidate_assets = [BITCOIN_ASSET, GOLD_ASSET];
@@ -1898,8 +1909,9 @@ pub(crate) mod tests {
             );
 
             assert_eq!(
-                Ok(()),
-                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref),
+                (),
+                verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref)
+                    .unwrap(),
                 "Verification is successful"
             );
 
@@ -1910,9 +1922,10 @@ pub(crate) mod tests {
             xfr_body_new.outputs[0].amount = NonConfidential(1_u64);
             xfr_body_new.outputs[1].amount = NonConfidential(u64::max_value());
 
-            assert_eq!(
-                Err(ZeiError::XfrVerifyAssetAmountError),
-                verify_xfr_body(&mut prng, &mut params, &xfr_body_new, &policies_ref),
+            err_eq!(
+                ZeiError::XfrVerifyAssetAmountError,
+                verify_xfr_body(&mut prng, &mut params, &xfr_body_new, &policies_ref)
+                    .unwrap_err(),
                 "An integer overflow error must be raised"
             );
         }
