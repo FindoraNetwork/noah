@@ -191,8 +191,8 @@ mod test {
         let message = [10u8; 500];
         let sig = keypair.sign(&message);
         err_eq!(
-            SignatureError,
-            keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
+            dbg!(SignatureError),
+            dbg!(keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err()),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
         pnk!(keypair.pub_key.verify(&message, &sig));

@@ -1,4 +1,3 @@
-
 use crate::api::anon_creds;
 use crate::api::anon_creds::{ac_commit, ACCommitment, Credential};
 use crate::setup::PublicParams;

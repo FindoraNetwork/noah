@@ -134,6 +134,7 @@ pub struct AssetMixingInstance<'a> {
 /// use zei::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
+/// use ruc::{*, err::*};
 /// use zei::setup::PublicParams;
 /// use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 /// let input = [
@@ -175,8 +176,7 @@ pub struct AssetMixingInstance<'a> {
 ///    };
 ///    let mut prng = thread_rng();
 ///    let mut params = PublicParams::default();
-///    assert_eq!(Ok(()),
-///               batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
+///    pnk!(batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
 /// ```
 pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     prng: &mut R,

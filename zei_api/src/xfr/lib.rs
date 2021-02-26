@@ -112,6 +112,7 @@ impl XfrType {
 /// use zei::xfr::asset_record::AssetRecordType;
 /// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
 /// use itertools::Itertools;
+/// use ruc::{*, err::*};
 /// use zei::setup::PublicParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -160,7 +161,7 @@ impl XfrType {
 ///                              inkeys.iter().map(|x| x).collect_vec().as_slice()
 ///                ).unwrap();
 /// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
-/// assert_eq!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()), Ok(()));
+/// pnk!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()));
 /// ```
 
 pub fn gen_xfr_note<R: CryptoRng + RngCore>(
@@ -190,6 +191,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
+/// use ruc::{*, err::*};
 /// use rand_core::SeedableRng;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
@@ -231,7 +233,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();
 /// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
-/// assert_eq!(verify_xfr_body(&mut prng, &mut params, &body, &policies.to_ref()), Ok(()));
+/// pnk!(verify_xfr_body(&mut prng, &mut params, &body, &policies.to_ref()));
 /// ```
 pub fn gen_xfr_body<R: CryptoRng + RngCore>(
     prng: &mut R,
