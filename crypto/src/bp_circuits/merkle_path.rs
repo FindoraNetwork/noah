@@ -126,7 +126,7 @@ mod test {
             })
             .collect();
         let var_path: Vec<(Variable, Variable)> =
-            com_var_path.iter().map(|(_, y)| y.clone()).collect();
+            com_var_path.iter().map(|(_, y)| *y).collect();
         super::merkle_verify_mimc(
             &mut prover,
             var_elem,

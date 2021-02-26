@@ -789,7 +789,7 @@ mod tests {
     };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::err::*;
+    use ruc::{err::*, *};
     use utils::errors::ZeiError;
 
     #[test]
@@ -810,7 +810,7 @@ mod tests {
             proofs.as_slice(),
             sig_commitments.as_slice(),
         );
-        assert_eq!(res.unwrap(), ());
+        pnk!(res);
 
         // fake sig commitment
         let sig_commitment = crate::api::anon_creds::ACCommitment::default(); // { 0: ACSignature { sigma1: BLSG1::get_identity(),

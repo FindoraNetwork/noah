@@ -773,7 +773,7 @@ pub(crate) mod credentials_tests {
             .zip(bitmap.iter())
             .map(|(a, b)| {
                 if *b {
-                    Attribute::Revealed(a.clone())
+                    Attribute::Revealed(*a)
                 } else {
                     Attribute::Hidden(None)
                 }

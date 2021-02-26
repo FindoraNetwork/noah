@@ -448,60 +448,60 @@ mod test {
         prng: &mut R,
         pc_gens: &RistrettoPedersenGens,
     ) -> Vec<(BlindAssetRecord, Option<OwnerMemo>)> {
-        let mut bars = vec![];
-        bars.push(build_bar(
-            pubkey[0],
-            prng,
-            &pc_gens,
-            10,
-            AssetType::from_identical_byte(1),
-            AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-        ));
-        bars.push(build_bar(
-            pubkey[1],
-            prng,
-            &pc_gens,
-            20,
-            AssetType::from_identical_byte(1),
-            AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-        ));
-        bars.push(build_bar(
-            pubkey[2],
-            prng,
-            &pc_gens,
-            30,
-            AssetType::from_identical_byte(2),
-            AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
-        ));
-        bars.push(build_bar(
-            pubkey[3],
-            prng,
-            &pc_gens,
-            40,
-            AssetType::from_identical_byte(3),
-            AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-        ));
-        bars.push(build_bar(
-            pubkey[4],
-            prng,
-            &pc_gens,
-            50,
-            AssetType::from_identical_byte(4),
-            AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-        ));
-        bars
+        vec![
+            build_bar(
+                pubkey[0],
+                prng,
+                &pc_gens,
+                10,
+                AssetType::from_identical_byte(1),
+                AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+            ),
+            build_bar(
+                pubkey[1],
+                prng,
+                &pc_gens,
+                20,
+                AssetType::from_identical_byte(1),
+                AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
+            ),
+            build_bar(
+                pubkey[2],
+                prng,
+                &pc_gens,
+                30,
+                AssetType::from_identical_byte(2),
+                AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
+            ),
+            build_bar(
+                pubkey[3],
+                prng,
+                &pc_gens,
+                40,
+                AssetType::from_identical_byte(3),
+                AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
+            ),
+            build_bar(
+                pubkey[4],
+                prng,
+                &pc_gens,
+                50,
+                AssetType::from_identical_byte(4),
+                AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+            ),
+        ]
     }
 
     fn build_rates() -> Vec<(AssetType, u64)> {
-        let mut map = vec![];
-        map.push((AssetType::from_identical_byte(1), 5));
-        map.push((AssetType::from_identical_byte(2), 4));
-        map.push((AssetType::from_identical_byte(3), 3));
-        map.push((AssetType::from_identical_byte(4), 2));
-        map.push((AssetType::from_identical_byte(5), 9));
-        map.push((AssetType::from_identical_byte(6), 1098));
-        map.push((AssetType::from_identical_byte(7), 3432));
-        map
+        vec![
+            (AssetType::from_identical_byte(1), 5),
+            (AssetType::from_identical_byte(2), 4),
+            (AssetType::from_identical_byte(3), 3),
+            (AssetType::from_identical_byte(4), 2),
+            (AssetType::from_identical_byte(5), 9),
+            (AssetType::from_identical_byte(6), 1098),
+            (AssetType::from_identical_byte(7), 3432),
+        ]
     }
 
     #[test]

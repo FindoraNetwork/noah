@@ -179,7 +179,7 @@ impl<S> AsRef<S> for BlsSecretKey<S> {
 mod tests {
     use algebra::bls12_381::Bls12381;
     use rand_core::SeedableRng;
-    use ruc::err::*;
+    use ruc::{err::*, *};
     use utils::errors::ZeiError;
 
     #[test]
@@ -191,7 +191,7 @@ mod tests {
 
         let signature = super::bls_sign::<Bls12381, _>(&sk, message);
 
-        assert_eq!((), super::bls_verify(&pk, message, &signature).unwrap());
+        pnk!(super::bls_verify(&pk, message, &signature));
         err_eq!(
             ZeiError::SignatureError,
             super::bls_verify(&pk, b"wrong message", &signature).unwrap_err()
@@ -218,10 +218,7 @@ mod tests {
             &[&signature1, &signature2, &signature3],
         );
 
-        assert_eq!(
-            (),
-            super::bls_verify_aggregated(&keys, message, &agg_signature).unwrap()
-        );
+        pnk!(super::bls_verify_aggregated(&keys, message, &agg_signature));
     }
 
     #[test]
@@ -243,10 +240,7 @@ mod tests {
         let messages = [message1.as_ref(), message2.as_ref(), message3.as_ref()];
         let sigs = [signature1, signature2, signature3];
 
-        assert_eq!(
-            (),
-            super::bls_batch_verify(&keys, &messages[..], &sigs).unwrap()
-        );
+        pnk!(super::bls_batch_verify(&keys, &messages[..], &sigs));
 
         let new_message3 = b"this message has not been signed";
 

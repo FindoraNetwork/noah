@@ -427,11 +427,8 @@ mod test {
         let out_var = cs.rescue_hash(&input_var)[0];
 
         // Check consistency between witness[input_var] and input_state
-        let witness_input: Vec<F> = input_var
-            .0
-            .iter()
-            .map(|&var| cs.witness[var].clone())
-            .collect();
+        let witness_input: Vec<F> =
+            input_var.0.iter().map(|&var| cs.witness[var]).collect();
         assert_eq!(witness_input, input_state.0);
 
         // Check consistency between witness[out_var] and rescue_out_state[0]
@@ -469,27 +466,17 @@ mod test {
         let out_var = cs.rescue_cipher(&key_var, &input_var);
 
         // Check consistency between witness[input_var] and input_vec
-        let witness_input: Vec<F> = input_var
-            .0
-            .iter()
-            .map(|&var| cs.witness[var].clone())
-            .collect();
+        let witness_input: Vec<F> =
+            input_var.0.iter().map(|&var| cs.witness[var]).collect();
         assert_eq!(witness_input, input_vec);
 
         // Check consistency between witness[key_var] and key_vec
-        let witness_key: Vec<F> = key_var
-            .0
-            .iter()
-            .map(|&var| cs.witness[var].clone())
-            .collect();
+        let witness_key: Vec<F> = key_var.0.iter().map(|&var| cs.witness[var]).collect();
         assert_eq!(witness_key, key_vec);
 
         // Check consistency between witness[out_var] and rescue cipher output
-        let witness_output: Vec<F> = out_var
-            .0
-            .iter()
-            .map(|&var| cs.witness[var].clone())
-            .collect();
+        let witness_output: Vec<F> =
+            out_var.0.iter().map(|&var| cs.witness[var]).collect();
         assert_eq!(witness_output, cipher.rescue(&input_vec, &key_vec));
 
         // Check good witness

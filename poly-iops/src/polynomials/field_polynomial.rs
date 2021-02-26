@@ -966,7 +966,7 @@ mod test {
             assert_eq!(BLSScalar::zero(), poly.eval(root));
         }
 
-        let zeroes_ref: Vec<&BLSScalar> = zeroes.iter().map(|v| v).collect();
+        let zeroes_ref: Vec<&BLSScalar> = zeroes.iter().collect();
         let poly = FpPolynomial::from_zeroes_ref(&zeroes_ref);
         for root in zeroes.iter() {
             assert_eq!(BLSScalar::zero(), poly.eval(root));

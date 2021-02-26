@@ -281,6 +281,7 @@ mod test {
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::{err::*, *};
 
     #[test]
     fn test_asset_mixer() {
@@ -430,10 +431,10 @@ mod test {
         };
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = PublicParams::default();
-        assert_eq!(
-            (),
-            super::batch_verify_asset_mixing(&mut prng, &mut params, &[instance])
-                .unwrap()
-        );
+        pnk!(super::batch_verify_asset_mixing(
+            &mut prng,
+            &mut params,
+            &[instance]
+        ));
     }
 }

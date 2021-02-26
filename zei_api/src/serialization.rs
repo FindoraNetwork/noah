@@ -149,6 +149,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::{Deserializer, Serializer};
+    use ruc::{err::*, *};
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use crate::xfr::structs::XfrAmount;
@@ -281,15 +282,12 @@ mod test {
         let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
             res
         } else {
-            println!("Failed to serialize XfrPublicKey to JSON");
-            assert!(false);
-            "{}".to_string()
+            pnk!(Err(eg!("Failed to serialize XfrPublicKey to JSON")))
         };
         if let Ok(restored) = serde_json::from_str::<StructWithPubKey>(&as_json) {
             assert_eq!(test_struct.key, restored.key);
         } else {
-            println!("Failed to deserialize XfrPublicKey from JSON");
-            assert!(false);
+            pnk!(Err(eg!("Failed to deserialize XfrPublicKey from JSON")));
         }
 
         let test_struct = StructWithSecKey {
@@ -298,15 +296,12 @@ mod test {
         let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
             res
         } else {
-            println!("Failed to serialize XfrSecretKey to JSON");
-            assert!(false);
-            "{}".to_string()
+            pnk!(Err(eg!("Failed to serialize XfrSecretKey to JSON")))
         };
         if let Ok(restored) = serde_json::from_str::<StructWithSecKey>(&as_json) {
             assert_eq!(test_struct.key.zei_to_bytes(), restored.key.zei_to_bytes());
         } else {
-            println!("Failed to deserialize XfrSecretKey from JSON");
-            assert!(false);
+            pnk!(Err(eg!("Failed to deserialize XfrSecretKey from JSON")));
         }
     }
 
@@ -319,15 +314,12 @@ mod test {
         let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
             res
         } else {
-            println!("Failed to serialize Elgamal public key");
-            assert!(false);
-            "{}".to_string()
+            pnk!(Err(eg!("Failed to serialize Elgamal public key")))
         };
         if let Ok(restored) = serde_json::from_str::<RecordDataEncKey>(&serialized) {
             assert_eq!(xfr_pub_key, restored);
         } else {
-            println!("Failed to deserialize XfrPublicKey from JSON");
-            assert!(false);
+            pnk!(Err(eg!("Failed to deserialize XfrPublicKey from JSON")));
         }
     }
 }

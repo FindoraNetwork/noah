@@ -630,7 +630,7 @@ mod test {
         AssetRecordTemplate, AssetTracerKeyPair, AssetType, OpenAssetRecord,
         TracingPolicies, TracingPolicy, XfrAmount, XfrAssetType,
     };
-    use crate::xfr::tests::tests::{create_xfr, gen_key_pair_vec};
+    use crate::xfr::tests::{create_xfr, gen_key_pair_vec};
     use algebra::groups::Scalar as _;
     use algebra::ristretto::RistrettoScalar as Scalar;
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
@@ -815,7 +815,7 @@ mod test {
             &mut prng,
             &input_templates,
             &output_templates,
-            inkeys.iter().map(|x| x).collect_vec().as_slice(),
+            inkeys.iter().collect_vec().as_slice(),
         );
 
         let key_pair = outkeys.get(0).unwrap();
@@ -894,7 +894,7 @@ mod test {
             amt,
             asset_type,
             record_type,
-            keypair.pub_key.clone(),
+            keypair.pub_key,
         );
 
         let (blind_rec, _asset_tracer_memo, owner_memo) =
@@ -951,7 +951,7 @@ mod test {
             amount,
             asset_type,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            keypair.pub_key.clone(),
+            keypair.pub_key,
         );
         let (blind_rec, _asset_tracer_memo, owner_memo) =
             build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
@@ -965,7 +965,7 @@ mod test {
             amount,
             asset_type,
             AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
-            keypair.pub_key.clone(),
+            keypair.pub_key,
         );
         let (blind_rec, _asset_tracer_memo, owner_memo) =
             build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
@@ -982,7 +982,7 @@ mod test {
             amount,
             asset_type,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            keypair.pub_key.clone(),
+            keypair.pub_key,
         );
         let (blind_rec, _asset_tracer_memo, owner_memo) =
             build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);

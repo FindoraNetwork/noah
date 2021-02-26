@@ -156,16 +156,14 @@ mod test {
 
     #[test]
     fn test_u8_be_slice_to_u32() {
-        let array = [0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8];
+        let array = [0xFA_u8, 0x01, 0xC6, 0x73];
         let n = super::u8_be_slice_to_u32(&array);
         assert_eq!(0xFA01C673, n);
     }
 
     #[test]
     fn u8_be_slice_to_u64() {
-        let array = [
-            0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8, 0x22, 0xE4, 0x98, 0xA2,
-        ];
+        let array = [0xFA_u8, 0x01, 0xC6, 0x73, 0x22, 0xE4, 0x98, 0xA2];
         let n = super::u8_be_slice_to_u64(&array);
         assert_eq!(0xFA01C67322E498A2, n);
     }

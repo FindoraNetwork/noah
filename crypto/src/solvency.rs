@@ -291,6 +291,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 
+    #[allow(clippy::too_many_arguments)]
     fn do_test_solvency(
         bp_gens: &BulletproofGens,
         pc_gens: &RistrettoPedersenGens,
@@ -356,10 +357,11 @@ mod test {
     }
 
     fn create_values_and_do_test(hidden_asset: bool, hidden_lia: bool, pass: bool) {
-        let mut rates = vec![];
-        rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
-        rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
-        rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
+        let rates = vec![
+            (RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)),
+            (RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)),
+            (RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)),
+        ];
 
         let smaller = [
             CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10
@@ -506,10 +508,11 @@ mod test {
 
     #[test]
     fn test_solvency_mixed() {
-        let mut rates = vec![];
-        rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
-        rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
-        rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
+        let rates = vec![
+            (RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)),
+            (RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)),
+            (RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)),
+        ];
 
         let lia_hidden = [
             CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(1)), // 40

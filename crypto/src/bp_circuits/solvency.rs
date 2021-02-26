@@ -312,10 +312,11 @@ mod test {
     #[test]
     fn test_solvency() {
         let pc_gens = PedersenGens::default();
-        let mut rates = vec![];
-        rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
-        rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
-        rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
+        let rates = vec![
+            (RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)),
+            (RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)),
+            (RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)),
+        ];
         let asset_set = vec![
             CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), //total 10
             CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(2)), //total 20

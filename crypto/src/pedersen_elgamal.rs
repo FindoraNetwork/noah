@@ -377,7 +377,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
-    use ruc::err::*;
+    use ruc::{err::*, *};
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use utils::errors::ZeiError;
@@ -502,7 +502,7 @@ mod test {
             &commitments,
             &proof,
         );
-        assert_eq!(verify.unwrap(), ());
+        pnk!(verify);
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -524,7 +524,7 @@ mod test {
             &commitments[..1],
             &proof,
         );
-        assert_eq!(verify.unwrap(), ());
+        pnk!(verify);
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -546,7 +546,7 @@ mod test {
             &commitments[1..2],
             &proof,
         );
-        assert_eq!(verify.unwrap(), ());
+        pnk!(verify);
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -643,7 +643,7 @@ mod test {
 
     #[test]
     fn batch_aggregate_eq_verify() {
-        let prover_transcript = Transcript::new(b"test");
+        let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
         let mut rng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
@@ -711,7 +711,7 @@ mod test {
             RistrettoScalar::from_u32(3000),
         ];
         let (ctexts2, commitments2, proof2) = get_proof_instance(
-            &mut prover_transcript.clone(),
+            &mut prover_transcript,
             &mut rng,
             &pk2,
             &plaintexts2,

@@ -351,6 +351,7 @@ mod tests_kzg_impl {
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::{err::*, *};
 
     fn _check_public_parameters_generation<P: Pairing>() {
         let param_size = 5;
@@ -505,7 +506,7 @@ mod tests_kzg_impl {
             &value,
             &proof,
         );
-        assert_eq!(res.unwrap(), ());
+        pnk!(res);
 
         let wrong_value_verif = one;
         let wrong_value_verif = pcs.verify_eval(

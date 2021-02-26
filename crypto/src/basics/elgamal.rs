@@ -245,7 +245,7 @@ mod elgamal_test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
-    use ruc::err::*;
+    use ruc::{err::*, *};
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use utils::errors::ZeiError;
@@ -259,10 +259,7 @@ mod elgamal_test {
         let m = G::S::from_u32(100u32);
         let r = G::S::random(&mut prng);
         let ctext = super::elgamal_encrypt::<G>(&base, &m, &r, &public_key);
-        assert_eq!(
-            (),
-            super::elgamal_verify::<G>(&base, &m, &ctext, &secret_key).unwrap()
-        );
+        pnk!(super::elgamal_verify::<G>(&base, &m, &ctext, &secret_key));
 
         let wrong_m = G::S::from_u32(99u32);
         let err = super::elgamal_verify(&base, &wrong_m, &ctext, &secret_key)
@@ -281,10 +278,7 @@ mod elgamal_test {
         let m = G::S::from_u32(mu32);
         let r = G::S::random(&mut prng);
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
-        assert_eq!(
-            (),
-            super::elgamal_verify(&base, &m, &ctext, &secret_key).unwrap()
-        );
+        pnk!(super::elgamal_verify(&base, &m, &ctext, &secret_key));
 
         assert_eq!(
             m,
@@ -308,10 +302,7 @@ mod elgamal_test {
 
         let m = G::S::from_u64(u64::max_value());
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
-        assert_eq!(
-            (),
-            super::elgamal_verify(&base, &m, &ctext, &secret_key).unwrap()
-        );
+        pnk!(super::elgamal_verify(&base, &m, &ctext, &secret_key));
 
         let err = super::elgamal_decrypt_hinted(&base, &ctext, &secret_key, 200, 300)
             .err()

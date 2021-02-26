@@ -177,15 +177,15 @@ mod test {
         let message = "";
 
         let sig = keypair.sign(message.as_bytes());
-        assert_eq!((), keypair.pub_key.verify("".as_bytes(), &sig).unwrap());
+        pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
         //same test with secret key
         let sig = keypair.sec_key.sign(message.as_bytes(), &keypair.pub_key);
-        assert_eq!((), keypair.pub_key.verify("".as_bytes(), &sig).unwrap());
+        pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
 
         //test again with fresh same key
         let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
         let keypair = XfrKeyPair::generate(&mut prng);
-        assert_eq!((), keypair.pub_key.verify("".as_bytes(), &sig).unwrap());
+        pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
 
         let keypair = XfrKeyPair::generate(&mut prng);
         let message = [10u8; 500];
@@ -195,11 +195,7 @@ mod test {
             keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
-        assert_eq!(
-            (),
-            keypair.pub_key.verify(&message, &sig).unwrap(),
-            "Verifying sig on samme message should have return Ok(())"
-        );
+        pnk!(keypair.pub_key.verify(&message, &sig));
         //test again with secret key
         let sig = keypair.sec_key.sign(&message, &keypair.pub_key);
         err_eq!(
@@ -207,11 +203,7 @@ mod test {
             keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
-        assert_eq!(
-            (),
-            keypair.pub_key.verify(&message, &sig).unwrap(),
-            "Verifying sig on samme message should have return Ok(())"
-        );
+        pnk!(keypair.pub_key.verify(&message, &sig));
 
         // test with different keys
         let keypair = XfrKeyPair::generate(&mut prng);

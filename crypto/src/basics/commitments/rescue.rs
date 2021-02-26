@@ -97,12 +97,8 @@ mod test {
         let hash = RescueInstance::<BLSScalar>::new();
         assert_eq!(
             commitment,
-            hash.rescue_hash(&[
-                blind_scalar.clone(),
-                msgs[0].clone(),
-                msgs[1].clone(),
-                BLSScalar::from_u32(0)
-            ])[0]
+            hash.rescue_hash(&[blind_scalar, msgs[0], msgs[1], BLSScalar::from_u32(0)])
+                [0]
         );
 
         // correct opening

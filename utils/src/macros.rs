@@ -12,10 +12,10 @@ macro_rules! not_matches {
 mod test {
     #[test]
     fn test_not_matches_macro() {
-        let foo = 'g';
-        assert!(not_matches!(foo, 'a'..='f'));
+        let foofoo = 'g';
+        assert!(not_matches!(foofoo, 'a'..='f'));
 
-        let bar = Some(4);
-        assert!(not_matches!(bar, Some(x) if x < 2));
+        let barbar = Some(4);
+        assert!(not_matches!(barbar, Some(x) if x < 2));
     }
 }

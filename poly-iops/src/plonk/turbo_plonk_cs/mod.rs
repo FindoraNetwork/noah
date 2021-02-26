@@ -846,18 +846,8 @@ mod test {
         // [0, 2, 2, 1, 5, 4], e_binary_le = [1, 0, 1], f_binary_le = [0, 0, 1]
         let verify = cs.verify_witness(
             &[
-                num[0].clone(),
-                num[2].clone(),
-                num[2].clone(),
-                num[1].clone(),
-                num[5].clone(),
-                num[4].clone(),
-                num[1].clone(),
-                num[0].clone(),
-                num[1].clone(),
-                num[0].clone(),
-                num[0].clone(),
-                num[1].clone(),
+                num[0], num[2], num[2], num[1], num[5], num[4], num[1], num[0], num[1],
+                num[0], num[0], num[1],
             ],
             &[],
         );
@@ -867,18 +857,8 @@ mod test {
         assert!(
             cs.verify_witness(
                 &[
-                    num[2].clone(),
-                    num[0].clone(),
-                    num[2].clone(),
-                    num[1].clone(),
-                    num[5].clone(),
-                    num[0].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[0].clone(),
-                    num[0].clone()
+                    num[2], num[0], num[2], num[1], num[5], num[0], num[1], num[0],
+                    num[1], num[0], num[0], num[0]
                 ],
                 &[]
             )
@@ -888,18 +868,8 @@ mod test {
         assert!(
             cs.verify_witness(
                 &[
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[2].clone(),
-                    num[5].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[0].clone()
+                    num[1], num[1], num[1], num[2], num[5], num[1], num[1], num[0],
+                    num[1], num[1], num[0], num[0]
                 ],
                 &[]
             )
@@ -909,18 +879,8 @@ mod test {
         assert!(
             cs.verify_witness(
                 &[
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[2].clone(),
-                    num[2].clone(),
-                    num[5].clone(),
-                    num[2].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[1].clone(),
-                    num[0].clone()
+                    num[1], num[1], num[2], num[2], num[5], num[2], num[1], num[0],
+                    num[1], num[0], num[1], num[0]
                 ],
                 &[]
             )
@@ -930,18 +890,8 @@ mod test {
         assert!(
             cs.verify_witness(
                 &[
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[2].clone(),
-                    num[2].clone(),
-                    num[6].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[0].clone()
+                    num[1], num[1], num[2], num[2], num[6], num[1], num[0], num[1],
+                    num[1], num[1], num[0], num[0]
                 ],
                 &[]
             )
@@ -951,18 +901,8 @@ mod test {
         assert!(
             cs.verify_witness(
                 &[
-                    num[1].clone(),
-                    num[2].clone(),
-                    num[3].clone(),
-                    num[2].clone(),
-                    num[8].clone(),
-                    num[6].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[0].clone(),
-                    num[1].clone(),
-                    num[1].clone()
+                    num[1], num[2], num[3], num[2], num[8], num[6], num[1], num[1],
+                    num[1], num[0], num[1], num[1]
                 ],
                 &[]
             )
@@ -972,18 +912,8 @@ mod test {
         assert!(
             cs.verify_witness(
                 &[
-                    num[0].clone(),
-                    num[3].clone(),
-                    num[4].clone(),
-                    num[0].clone(),
-                    num[7].clone(),
-                    twelve,
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[1].clone(),
-                    num[1].clone()
+                    num[0], num[3], num[4], num[0], num[7], twelve, num[1], num[1],
+                    num[1], num[1], num[1], num[1]
                 ],
                 &[]
             )
@@ -1043,7 +973,7 @@ mod turbo_plonk_proofs_test {
         // y0, y1 are online variables
         // witness (1 + 2) * (3 + 4) + 1 * 4 = 25
         let mut cs = TurboPlonkConstraintSystem::<PCS::Field>::new();
-        cs.add_variables(&vec![
+        cs.add_variables(&[
             one,
             two,
             three,
@@ -1060,12 +990,12 @@ mod turbo_plonk_proofs_test {
         cs.insert_mul_gate(4, 5, 6);
         cs.insert_mul_gate(0, 7, 8);
         cs.insert_add_gate(6, 8, 9);
-        cs.insert_constant_gate(3, four.clone());
+        cs.insert_constant_gate(3, four);
         cs.prepare_io_variable(1);
         cs.prepare_io_variable(7);
         cs.pad();
 
-        let mut online_vars = [two, four.clone()];
+        let mut online_vars = [two, four];
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &online_vars).is_ok());
         check_turbo_plonk_proof(pcs, prng, &cs, &witness, &online_vars);
@@ -1089,18 +1019,13 @@ mod turbo_plonk_proofs_test {
         // 4. e = 2 * a + 3 * b + c + d
         // 5. 0 <= e < 16
         // The secret inputs: [a, b] = [1, 2]
-        cs.new_variable(num[1].clone());
-        cs.new_variable(num[2].clone());
+        cs.new_variable(num[1]);
+        cs.new_variable(num[2]);
         cs.insert_boolean_gate(0);
         let c_idx = cs.add(0, 1);
         let d_idx = cs.mul(0, 1);
-        let e_idx = cs.linear_combine(
-            &[0, 1, c_idx, d_idx],
-            num[2].clone(),
-            num[3].clone(),
-            num[1].clone(),
-            num[1].clone(),
-        );
+        let e_idx =
+            cs.linear_combine(&[0, 1, c_idx, d_idx], num[2], num[3], num[1], num[1]);
         cs.range_check(e_idx, 4);
         cs.pad();
 
