@@ -279,7 +279,6 @@ mod tests {
     use rand_core::SeedableRng;
 
     use itertools::Itertools;
-    use ruc::err::*;
     use utils::errors::ZeiError;
     use utils::u64_to_u32_pair;
 

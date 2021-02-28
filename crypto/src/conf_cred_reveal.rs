@@ -364,7 +364,6 @@ pub(crate) mod test_helper {
     use algebra::pairing::Pairing;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::err::*;
     use utils::errors::ZeiError;
 
     pub(super) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {

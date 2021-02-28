@@ -401,7 +401,6 @@ mod schnorr_sigs {
             multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature,
         };
         use algebra::groups::{Group, GroupArithmetic, One};
-        use ruc::err::*;
 
         use algebra::jubjub::JubjubPoint;
         use algebra::ristretto::RistrettoPoint;

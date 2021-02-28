@@ -13,4 +13,4 @@ rand_chacha = "0.2"
 criterion = "0.3.1"
 criterion-cycles-per-byte = "0.1.1"
 itertools = "0.8.0"
-ruc = { git = "https://github.com/ktmlm/RUC.git", branch = "master" }
+ruc = "0.5.1"

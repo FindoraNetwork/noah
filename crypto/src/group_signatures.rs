@@ -290,7 +290,6 @@ mod tests {
     use algebra::groups::{Group, GroupArithmetic};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::err::*;
     use utils::errors::ZeiError;
 
     #[test]

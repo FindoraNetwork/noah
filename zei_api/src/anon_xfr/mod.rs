@@ -311,7 +311,6 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rand_core::{CryptoRng, RngCore};
-    use ruc::err::*;
     use utils::errors::ZeiError;
 
     #[test]

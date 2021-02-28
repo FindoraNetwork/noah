@@ -12,6 +12,7 @@ release:
 
 test:
 	cargo test --release --workspace
+	cargo test --release --workspace -- --ignored
 
 bench:
 	cargo bench --workspace
