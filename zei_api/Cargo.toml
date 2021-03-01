@@ -29,6 +29,7 @@ rand_chacha = "0.2"
 rmp-serde = "0.13.7"
 serde = "1.0"
 serde_derive = "1.0"
+serde_str = "0.1.0"
 sha2 = "0.8.0"
 utils = { path = "../utils" }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }

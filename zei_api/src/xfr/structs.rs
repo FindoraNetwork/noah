@@ -1,3 +1,5 @@
+extern crate serde_str;
+
 use crate::api::anon_creds::{
     ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
     AttributeEncKey,
@@ -138,6 +140,7 @@ impl BlindAssetRecord {
 pub enum XfrAmount {
     // amount is a 64 bit positive integer expressed in base 2^32 in confidential transactions
     Confidential((CompressedRistretto, CompressedRistretto)),
+    #[serde(with = "serde_str")]
     NonConfidential(u64),
 }
 

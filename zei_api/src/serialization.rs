@@ -151,6 +151,25 @@ mod test {
     use rmp_serde::{Deserializer, Serializer};
     use serde::de::Deserialize;
     use serde::ser::Serialize;
+    use crate::xfr::structs::XfrAmount;
+
+    #[test]
+    fn xfr_amount_u64_to_string_serde() {
+        let amt = XfrAmount::NonConfidential(1844674407370955161);
+        let actual_to_string_res = serde_json::to_string(&amt).unwrap();
+        let expected_to_string_res = r##"{"NonConfidential":"1844674407370955161"}"##;
+        assert_eq!(actual_to_string_res, expected_to_string_res);
+    }
+
+    #[test]
+    fn xfr_amount_u64_from_string_serde() {
+        let serialized_str = r##"{"NonConfidential":"1844674407370955161"}"##;
+        let actual_amt: XfrAmount = serde_json::from_str::<XfrAmount>(&serialized_str).unwrap();
+
+        let val = 1844674407370955161;
+        let expected_amt = XfrAmount::NonConfidential(val);
+        assert_eq!(expected_amt.get_amount(), actual_amt.get_amount());
+    }
 
     #[test]
     fn anon_xfr_pub_key_serialization() {

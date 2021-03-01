@@ -1214,6 +1214,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_str"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a26e850fb9dfec51e9fea9dd582030761a4ef011d31b32d904f740961bd16a48"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "sha2"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1566,6 +1575,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "serde_str",
  "sha2 0.8.2",
  "structopt",
  "typenum",
