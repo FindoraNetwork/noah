@@ -7,6 +7,7 @@ use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 use utils::serialization;
 
@@ -149,7 +150,7 @@ fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(
     ctext: &ElGamalCiphertext<RistrettoPoint>,
     commitment: &RistrettoPoint,
     proof: &PedersenElGamalEqProof,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let scalars = pedersem_elgamal_eq_verify_scalars(
         transcript, prng, pc_gens, public_key, ctext, commitment, proof,
     );
@@ -171,7 +172,7 @@ fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(
     );
 
     if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
-        Err(ZeiError::ZKProofVerificationError)
+        Err(eg!(ZeiError::ZKProofVerificationError))
     } else {
         Ok(())
     }
@@ -259,7 +260,7 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
     prng: &mut R,
     pc_gens: &RistrettoPedersenGens,
     instances: &[PedersenElGamalProofInstance<'a>],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let m = instances.len();
     // 2 common elems: B, B_blinding
     // 7 elems per instance: public key,
@@ -332,7 +333,7 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
         all_elems.iter().map(|x| x.0),
     );
     if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
-        return Err(ZeiError::ZKProofBatchVerificationError);
+        return Err(eg!(ZeiError::ZKProofBatchVerificationError));
     }
 
     Ok(())
@@ -346,7 +347,7 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
     ctexts: &[ElGamalCiphertext<RistrettoPoint>],
     commitments: &[RistrettoPoint],
     proof: &PedersenElGamalEqProof,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let instance = PedersenElGamalProofInstance {
         public_key,
         ctexts: ctexts.to_vec(),
@@ -355,7 +356,7 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
     };
 
     pedersen_elgamal_batch_aggregate_eq_verify(transcript, prng, pc_gens, &[instance])
-        .map_err(|_| ZeiError::ZKProofVerificationError)
+        .c(d!(ZeiError::ZKProofVerificationError))
 }
 
 #[cfg(test)]
@@ -376,6 +377,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
+    use ruc::{err::*, *};
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use utils::errors::ZeiError;
@@ -450,7 +452,7 @@ mod test {
             &proof,
         );
         assert_eq!(true, verify.is_err());
-        assert_eq!(ZeiError::ZKProofVerificationError, verify.err().unwrap());
+        err_eq!(ZeiError::ZKProofVerificationError, verify.unwrap_err());
     }
 
     #[test]
@@ -500,7 +502,7 @@ mod test {
             &commitments,
             &proof,
         );
-        assert_eq!(verify, Ok(()));
+        pnk!(verify);
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -522,7 +524,7 @@ mod test {
             &commitments[..1],
             &proof,
         );
-        assert_eq!(verify, Ok(()));
+        pnk!(verify);
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -544,7 +546,7 @@ mod test {
             &commitments[1..2],
             &proof,
         );
-        assert_eq!(verify, Ok(()));
+        pnk!(verify);
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -589,7 +591,7 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        assert_eq!(ZeiError::ZKProofVerificationError, verify.err().unwrap());
+        err_eq!(ZeiError::ZKProofBatchVerificationError, verify.unwrap_err());
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -612,7 +614,7 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        assert_eq!(ZeiError::ZKProofVerificationError, verify.err().unwrap());
+        err_eq!(ZeiError::ZKProofBatchVerificationError, verify.unwrap_err());
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -636,12 +638,12 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        assert_eq!(ZeiError::ZKProofVerificationError, verify.err().unwrap());
+        err_eq!(ZeiError::ZKProofBatchVerificationError, verify.unwrap_err());
     }
 
     #[test]
     fn batch_aggregate_eq_verify() {
-        let prover_transcript = Transcript::new(b"test");
+        let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
         let mut rng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
@@ -709,7 +711,7 @@ mod test {
             RistrettoScalar::from_u32(3000),
         ];
         let (ctexts2, commitments2, proof2) = get_proof_instance(
-            &mut prover_transcript.clone(),
+            &mut prover_transcript,
             &mut rng,
             &pk2,
             &plaintexts2,

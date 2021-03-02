@@ -1,18 +1,31 @@
+#![allow(clippy::upper_case_acronyms)]
+
 pub mod errors;
 pub mod macros;
 pub mod serialization;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
+use ruc::{err::*, *};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
 #[macro_export]
+macro_rules! err_eq {
+    ($zei_err: expr, $ruc_err: expr $(,)?) => {
+        assert!($ruc_err.eq_any(ruc::eg!($zei_err).as_ref()));
+    };
+    ($zei_err: expr, $ruc_err: expr, $msg: expr $(,)?) => {
+        assert!($ruc_err.eq_any(ruc::eg!($zei_err).as_ref()), $msg);
+    };
+}
+
+#[macro_export]
 macro_rules! serialize_deserialize {
     ($t:ident) => {
         impl serde::Serialize for $t {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
             where
                 S: Serializer,
             {
@@ -25,7 +38,7 @@ macro_rules! serialize_deserialize {
         }
 
         impl<'de> serde::Deserialize<'de> for $t {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
@@ -84,10 +97,8 @@ pub fn u64_to_u32_pair(x: u64) -> (u32, u32) {
 pub fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
     base64::encode_config(input, base64::URL_SAFE)
 }
-pub fn b64dec<T: ?Sized + AsRef<[u8]>>(
-    input: &T,
-) -> Result<Vec<u8>, base64::DecodeError> {
-    base64::decode_config(input, base64::URL_SAFE)
+pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>> {
+    base64::decode_config(input, base64::URL_SAFE).c(d!())
 }
 
 pub fn derive_prng_from_hash<D, R>(hash: D) -> R
@@ -145,16 +156,14 @@ mod test {
 
     #[test]
     fn test_u8_be_slice_to_u32() {
-        let array = [0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8];
+        let array = [0xFA_u8, 0x01, 0xC6, 0x73];
         let n = super::u8_be_slice_to_u32(&array);
         assert_eq!(0xFA01C673, n);
     }
 
     #[test]
     fn u8_be_slice_to_u64() {
-        let array = [
-            0xFA as u8, 0x01 as u8, 0xC6 as u8, 0x73 as u8, 0x22, 0xE4, 0x98, 0xA2,
-        ];
+        let array = [0xFA_u8, 0x01, 0xC6, 0x73, 0x22, 0xE4, 0x98, 0xA2];
         let n = super::u8_be_slice_to_u64(&array);
         assert_eq!(0xFA01C67322E498A2, n);
     }

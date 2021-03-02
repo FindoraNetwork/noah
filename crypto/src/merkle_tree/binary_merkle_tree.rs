@@ -1,4 +1,5 @@
 use crate::basics::hash::MTHash;
+use ruc::{err::*, *};
 use std::fmt::Debug;
 use utils::errors::ZeiError;
 
@@ -38,13 +39,13 @@ impl<S: Copy> MerkleTree<S> {
 /// Builds a binary Merkle tree from a set of elements
 /// * `elements` - elements to be placed at the leaves of the tree. The number of elements must be a power of 2.
 /// * `returns` Merkle tree data structure or an error
-pub fn mt_build<Sc, H>(elements: &[Sc]) -> Result<MerkleTree<Sc>, ZeiError>
+pub fn mt_build<Sc, H>(elements: &[Sc]) -> Result<MerkleTree<Sc>>
 where
     Sc: Copy + PartialEq + Eq + Debug,
     H: MTHash<S = Sc>,
 {
     if !is_power_two(elements.len()) {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
 
     let tree = MerkleTree {
@@ -61,12 +62,12 @@ where
 pub fn mt_prove<S>(
     tree: &MerkleTree<S>,
     index: usize,
-) -> Result<(S, Vec<(PathDirection, S)>), ZeiError>
+) -> Result<(S, Vec<(PathDirection, S)>)>
 where
     S: Copy + PartialEq + Eq + Debug,
 {
     if index >= tree.size {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
     Ok(prove_node::<S>(&tree.root, index, tree.size))
 }
@@ -80,7 +81,7 @@ pub fn mt_verify<S, H>(
     root: &MerkleRoot<S>,
     element: &S,
     path: &[(PathDirection, S)],
-) -> Result<(), ZeiError>
+) -> Result<()>
 where
     S: Copy + PartialEq + Eq,
     H: MTHash<S = S>,
@@ -105,7 +106,7 @@ where
     if computed_root == root.value {
         Ok(())
     } else {
-        Err(ZeiError::MerkleTreeVerificationError)
+        Err(eg!(ZeiError::MerkleTreeVerificationError))
     }
 }
 

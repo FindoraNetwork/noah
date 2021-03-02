@@ -15,6 +15,7 @@ use poly_iops::commitments::kzg_poly_com::{
 use poly_iops::plonk::plonk_setup::{preprocess_prover, ProverParams, VerifierParams};
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
+use ruc::{err::*, *};
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
@@ -53,9 +54,9 @@ pub const MAX_PARTY_NUMBER: usize = 128;
 
 const COMMON_SEED: [u8; 32] = [0u8; 32];
 
-fn from_file<T: for<'de> Deserialize<'de>>(filename: &str) -> Result<T, ZeiError> {
-    let contents = fs::read(filename).map_err(|_| ZeiError::ParameterError)?;
-    bincode::deserialize(&contents).map_err(|_| ZeiError::DeserializationError)
+fn from_file<T: for<'de> Deserialize<'de>>(filename: &str) -> Result<T> {
+    let contents = fs::read(filename).c(d!(ZeiError::ParameterError))?;
+    bincode::deserialize(&contents).c(d!(ZeiError::DeserializationError))
 }
 
 #[allow(clippy::new_without_default)]
@@ -76,8 +77,8 @@ impl PublicParams {
         }
     }
 
-    pub fn from_file(filename: &str) -> Result<PublicParams, ZeiError> {
-        from_file::<PublicParams>(filename)
+    pub fn from_file(filename: &str) -> Result<PublicParams> {
+        from_file::<PublicParams>(filename).c(d!())
     }
 
     /// Generate the parameters from a file if it exists.
@@ -163,8 +164,8 @@ impl UserParams {
         }
     }
 
-    pub fn from_file(filename: &str) -> Result<UserParams, ZeiError> {
-        from_file::<UserParams>(filename)
+    pub fn from_file(filename: &str) -> Result<UserParams> {
+        from_file::<UserParams>(filename).c(d!())
     }
 
     /// Generate the parameters from a file if it exists.
@@ -182,7 +183,7 @@ impl UserParams {
         tree_depth: Option<usize>,
         bp_num_gens: usize,
         path: Option<String>,
-    ) -> Result<UserParams, ZeiError> {
+    ) -> Result<UserParams> {
         let default_filename = compute_full_path_from_root(&format!(
             "user_params_{}_{}_{}_{}.bin",
             n_payers,
@@ -208,7 +209,7 @@ impl NodeParams {
         n_payers: usize,
         n_payees: usize,
         bp_num_gens: usize,
-    ) -> Result<NodeParams, ZeiError> {
+    ) -> Result<NodeParams> {
         let user_params = UserParams::new(n_payers, n_payees, tree_depth, bp_num_gens);
         Ok(Self::from(user_params))
     }

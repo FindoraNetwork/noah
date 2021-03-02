@@ -1,10 +1,11 @@
+#![allow(clippy::upper_case_acronyms)]
+
 use bulletproofs::BulletproofGens;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use utils::errors::ZeiError;
 use utils::save_to_file;
 use zei::setup::{PublicParams, UserParams};
 
@@ -50,8 +51,7 @@ fn main() {
             bp_num_gens,
             out_filename,
         } => {
-            gen_user_params(n_payers, n_payees, tree_depth, bp_num_gens, out_filename)
-                .unwrap();
+            gen_user_params(n_payers, n_payees, tree_depth, bp_num_gens, out_filename);
         }
         BP {
             gens_capacity,
@@ -74,7 +74,7 @@ fn gen_user_params(
     tree_depth: usize,
     bp_num_gens: usize,
     out_filename: PathBuf,
-) -> Result<(), ZeiError> {
+) {
     println!(
         "Generating 'User Parameters' for {} payers, {} payees and with tree depth={}...",
         n_payers, n_payees, tree_depth
@@ -89,7 +89,6 @@ fn gen_user_params(
     let user_params = UserParams::new(n_payers, n_payees, tree_dept_option, bp_num_gens);
     let user_params_ser = bincode::serialize(&user_params).unwrap();
     save_to_file(&user_params_ser, out_filename);
-    Ok(())
 }
 
 fn gen_params_bp(gens_capacity: usize, party_capacity: usize, out_filename: PathBuf) {

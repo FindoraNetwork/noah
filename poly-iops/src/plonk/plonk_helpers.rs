@@ -6,18 +6,15 @@ use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 
-pub fn build_group<F: Scalar>(
-    generator: &F,
-    max_elems: usize,
-) -> Result<Vec<F>, PlonkError> {
-    let mut elems = vec![];
-    elems.push(F::one());
+pub fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<Vec<F>> {
+    let mut elems = vec![F::one()];
     let mut current_root = *generator;
     let mut n = 1;
     while current_root != F::one() {
         if n == max_elems {
-            return Err(PlonkError::GroupNotFound(max_elems));
+            return Err(eg!(PlonkError::GroupNotFound(max_elems)));
         }
         elems.push(current_root);
         current_root.mul_assign(&generator);
@@ -36,53 +33,53 @@ impl<F: Scalar> PlonkChallenges<F> {
             challenges: Vec::with_capacity(4),
         }
     }
-    pub(super) fn insert_gamma_delta(&mut self, gamma: F, delta: F) -> Result<(), ()> {
+    pub(super) fn insert_gamma_delta(&mut self, gamma: F, delta: F) -> Result<()> {
         if self.challenges.is_empty() {
             self.challenges.push(gamma);
             self.challenges.push(delta);
             Ok(())
         } else {
-            Err(())
+            Err(eg!())
         }
     }
-    pub(super) fn insert_alpha(&mut self, alpha: F) -> Result<(), ()> {
+    pub(super) fn insert_alpha(&mut self, alpha: F) -> Result<()> {
         if self.challenges.len() == 2 {
             self.challenges.push(alpha);
             Ok(())
         } else {
-            Err(())
+            Err(eg!())
         }
     }
-    pub(super) fn insert_beta(&mut self, beta: F) -> Result<(), ()> {
+    pub(super) fn insert_beta(&mut self, beta: F) -> Result<()> {
         if self.challenges.len() == 3 {
             self.challenges.push(beta);
             Ok(())
         } else {
-            Err(())
+            Err(eg!())
         }
     }
 
-    pub(super) fn get_gamma_delta(&self) -> Result<(&F, &F), ()> {
+    pub(super) fn get_gamma_delta(&self) -> Result<(&F, &F)> {
         if self.challenges.len() > 1 {
             Ok((&self.challenges[0], &self.challenges[1]))
         } else {
-            Err(())
+            Err(eg!())
         }
     }
 
-    pub(super) fn get_alpha(&self) -> Result<&F, ()> {
+    pub(super) fn get_alpha(&self) -> Result<&F> {
         if self.challenges.len() > 2 {
             Ok(&self.challenges[2])
         } else {
-            Err(())
+            Err(eg!())
         }
     }
 
-    pub(super) fn get_beta(&self) -> Result<&F, ()> {
+    pub(super) fn get_beta(&self) -> Result<&F> {
         if self.challenges.len() > 3 {
             Ok(&self.challenges[3])
         } else {
-            Err(())
+            Err(eg!())
         }
     }
 }
@@ -234,12 +231,12 @@ pub(super) fn Quotient_polynomial<
     Sigma: &FpPolynomial<PCS::Field>,
     challenges: &PlonkChallenges<PCS::Field>,
     IO: &FpPolynomial<PCS::Field>,
-) -> Result<FpPolynomial<PCS::Field>, PlonkError> {
+) -> Result<FpPolynomial<PCS::Field>> {
     let n = cs.size();
     let m = cs.quot_eval_dom_size();
     let factor = m / n;
     if n * factor != m {
-        return Err(PlonkError::SetupError);
+        return Err(eg!(PlonkError::SetupError));
     }
     let root_m = &params.root_m;
     let k = &params.verifier_params.k;
@@ -300,7 +297,7 @@ pub(super) fn Quotient_polynomial<
         quot_coset_evals.push(numerator.mul(&params.Z_H_inv_coset_evals[point]));
     }
 
-    let k_inv = k[1].inv().map_err(|_| PlonkError::DivisionByZero)?;
+    let k_inv = k[1].inv().c(d!(PlonkError::DivisionByZero))?;
     Ok(FpPolynomial::coset_ffti(root_m, &quot_coset_evals, &k_inv))
 }
 
@@ -540,7 +537,7 @@ pub(crate) fn split_Q_and_commit<PCS: PolyComScheme>(
     Q: &FpPolynomial<PCS::Field>,
     n_wires_per_gate: usize,
     n: usize,
-) -> Result<(Vec<PCS::Commitment>, Vec<PCS::Opening>), PlonkError> {
+) -> Result<(Vec<PCS::Commitment>, Vec<PCS::Opening>)> {
     let mut C_q_polys = vec![];
     let mut O_q_polys = vec![];
     for i in 0..n_wires_per_gate {
@@ -550,9 +547,7 @@ pub(crate) fn split_Q_and_commit<PCS: PolyComScheme>(
             Q.get_coefs_ref()[(n_wires_per_gate - 1) * n..].to_vec()
         };
         let q_poly = FpPolynomial::from_coefs(coefs);
-        let (C_q, O_q) = pcs
-            .commit(q_poly)
-            .map_err(|_| PlonkError::CommitmentError)?;
+        let (C_q, O_q) = pcs.commit(q_poly).c(d!(PlonkError::CommitmentError))?;
         C_q_polys.push(C_q);
         O_q_polys.push(O_q);
     }

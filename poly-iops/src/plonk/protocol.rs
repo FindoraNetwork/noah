@@ -93,6 +93,7 @@ pub mod prover {
     use algebra::groups::ScalarArithmetic;
     use merlin::Transcript;
     use rand_core::{CryptoRng, RngCore};
+    use ruc::{err::*, *};
 
     /// A PlonkProof is generic on the polynomial commitment scheme, PCS.
     /// PCS is generic in the commitment group C, the eval proof type E, and Field elements F.
@@ -167,7 +168,7 @@ pub mod prover {
         cs: &CS,
         params: &ProverParams<PCS>,
         witness: &[PCS::Field],
-    ) -> Result<PlonkPf<PCS>, PlonkError> {
+    ) -> Result<PlonkPf<PCS>> {
         let online_values: Vec<PCS::Field> = cs
             .public_vars_witness_indices()
             .iter()
@@ -197,7 +198,7 @@ pub mod prover {
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
             );
             hide_polynomial(prng, &mut f, 1, n_constraints);
-            let (C_f, O_f) = pcs.commit(f).map_err(|_| PlonkError::CommitmentError)?;
+            let (C_f, O_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
             transcript.append_commitment::<PCS::Commitment>(&C_f);
             witness_openings.push(O_f);
             C_witness_polys.push(C_f);
@@ -212,8 +213,7 @@ pub mod prover {
         let mut Sigma =
             Sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
         hide_polynomial(prng, &mut Sigma, 2, n_constraints);
-        let (C_Sigma, O_Sigma) =
-            pcs.commit(Sigma).map_err(|_| PlonkError::CommitmentError)?;
+        let (C_Sigma, O_Sigma) = pcs.commit(Sigma).c(d!(PlonkError::CommitmentError))?;
         transcript.append_commitment::<PCS::Commitment>(&C_Sigma);
 
         // 4. get challenge alpha
@@ -234,9 +234,10 @@ pub mod prover {
             &Sigma,
             &challenges,
             &IO,
-        )?;
+        )
+        .c(d!())?;
         let (C_q_polys, O_q_polys) =
-            split_Q_and_commit(pcs, &Q, n_wires_per_gate, n_constraints + 2)?;
+            split_Q_and_commit(pcs, &Q, n_wires_per_gate, n_constraints + 2).c(d!())?;
         for C_q in C_q_polys.iter() {
             transcript.append_commitment::<PCS::Commitment>(C_q);
         }
@@ -309,7 +310,7 @@ pub mod prover {
                 n_constraints + 2,
                 None,
             )
-            .map_err(|_| PlonkError::ProofError)?;
+            .c(d!(PlonkError::ProofError))?;
 
         // return proof
         Ok(PlonkProof {
@@ -338,7 +339,7 @@ pub mod prover {
         cs_params: &VerifierParams<PCS>,
         public_values: &[PCS::Field],
         proof: &PlonkPf<PCS>,
-    ) -> Result<(), PlonkError> {
+    ) -> Result<()> {
         transcript_init_plonk(transcript, cs_params, public_values);
 
         let mut challenges = PlonkChallenges::new();
@@ -441,7 +442,7 @@ pub mod prover {
             &proof.batch_eval_proof,
             None,
         )
-        .map_err(|_| PlonkError::VerificationError)
+        .c(d!(PlonkError::VerificationError))
     }
 }
 

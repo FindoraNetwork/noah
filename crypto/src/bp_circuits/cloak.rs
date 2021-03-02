@@ -43,10 +43,10 @@ use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::r1cs::{
-    ConstraintSystem, Prover, R1CSError, RandomizableConstraintSystem, Variable,
-    Verifier,
+    ConstraintSystem, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
 use merlin::Transcript;
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 /// Represent AssetRecord amount and asset type
@@ -134,7 +134,7 @@ pub fn cloak<CS: RandomizableConstraintSystem>(
     input_values: Option<&[CloakValue]>,
     output_vars: &[CloakVariable],
     output_values: Option<&[CloakValue]>,
-) -> Result<usize, ZeiError> {
+) -> Result<usize> {
     let input_len = input_vars.len();
     let output_len = output_vars.len();
 
@@ -146,8 +146,10 @@ pub fn cloak<CS: RandomizableConstraintSystem>(
     let mut n_gates = 0;
 
     // sort and merge values by type
-    let (n, mut merged_input_vars) = sort_and_merge(cs, input_vars, input_values)?;
-    let (m, mut merged_output_vars) = sort_and_merge(cs, output_vars, output_values)?;
+    let (n, mut merged_input_vars) =
+        sort_and_merge(cs, input_vars, input_values).c(d!())?;
+    let (m, mut merged_output_vars) =
+        sort_and_merge(cs, output_vars, output_values).c(d!())?;
 
     n_gates += n + m;
 
@@ -155,16 +157,16 @@ pub fn cloak<CS: RandomizableConstraintSystem>(
     let pad_value = input_values.map(|_| Scalar::from_u32(0));
     if input_len < output_len {
         pad(cs, output_len, &mut merged_input_vars, pad_value)
-            .map_err(|_| ZeiError::R1CSProofError)?;
+            .c(d!(ZeiError::R1CSProofError))?;
     } else {
         pad(cs, input_len, &mut merged_output_vars, pad_value)
-            .map_err(|_| ZeiError::R1CSProofError)?;
+            .c(d!(ZeiError::R1CSProofError))?;
     }
 
     // do a proof of shuffle
     n_gates +=
         super::gadgets::cloak_shuffle_gadget(cs, merged_input_vars, merged_output_vars)
-            .map_err(|_| ZeiError::R1CSProofError)?;
+            .c(d!(ZeiError::R1CSProofError))?;
 
     // final range proof:
     for (i, out) in output_vars.iter().enumerate() {
@@ -173,7 +175,7 @@ pub fn cloak<CS: RandomizableConstraintSystem>(
             out.amount.into(),
             output_values.map(|out_values| out_values[i].amount),
         )
-        .map_err(|_| ZeiError::R1CSProofError)?;
+        .c(d!(ZeiError::R1CSProofError))?;
     }
 
     Ok(n_gates)
@@ -185,11 +187,11 @@ fn pad<CS: ConstraintSystem>(
     expected_len: usize,
     list: &mut Vec<CloakVariable>,
     value: Option<Scalar>,
-) -> Result<(), R1CSError> {
+) -> Result<()> {
     for _ in list.len()..expected_len {
         list.push(CloakVariable {
-            amount: cs.allocate(value.map(|x| x.0))?,
-            asset_type: cs.allocate(value.map(|x| x.0))?,
+            amount: cs.allocate(value.map(|x| x.0)).c(d!())?,
+            asset_type: cs.allocate(value.map(|x| x.0)).c(d!())?,
         })
     }
     Ok(())
@@ -258,14 +260,14 @@ pub(super) fn sort_and_merge<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     vars: &[CloakVariable],
     values: Option<&[CloakValue]>,
-) -> Result<(usize, Vec<CloakVariable>), ZeiError> {
+) -> Result<(usize, Vec<CloakVariable>)> {
     let len = vars.len();
     if len == 0 {
         return Ok((0, vec![]));
     }
     if len == 1 {
         let v = values.map(|v| v.to_vec());
-        let vars = allocate_cloak_vector(cs, v.as_ref(), 1)?;
+        let vars = allocate_cloak_vector(cs, v.as_ref(), 1).c(d!())?;
         return Ok((0, vars));
     }
     let mut n_gates = 0;
@@ -273,28 +275,27 @@ pub(super) fn sort_and_merge<CS: RandomizableConstraintSystem>(
     let merged_values = sorted_values
         .as_ref()
         .map(|sorted| merge(sorted.as_slice()));
-    let sorted_vars = allocate_cloak_vector(cs, sorted_values.as_ref(), len)?;
+    let sorted_vars = allocate_cloak_vector(cs, sorted_values.as_ref(), len).c(d!())?;
     let intermediate_vars = allocate_cloak_vector(
         cs,
         merged_values.as_ref().map(|(intermediate, _)| intermediate),
         len - 2,
-    )?;
-    let merged_vars = allocate_cloak_vector(
-        cs,
-        merged_values.as_ref().map(|(_, merged)| merged),
-        len,
-    )?;
+    )
+    .c(d!())?;
+    let merged_vars =
+        allocate_cloak_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len)
+            .c(d!())?;
 
     n_gates +=
         super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())
-            .map_err(|_| ZeiError::R1CSProofError)?;
+            .c(d!(ZeiError::R1CSProofError))?;
     n_gates += super::gadgets::cloak_merge_gadget(
         cs,
         &sorted_vars,
         &intermediate_vars,
         &merged_vars,
     )
-    .map_err(|_| ZeiError::R1CSProofError)?;
+    .c(d!(ZeiError::R1CSProofError))?;
 
     Ok((n_gates, merged_vars))
 }
@@ -303,16 +304,14 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
     cs: &mut CS,
     list: Option<&Vec<CloakValue>>,
     len: usize,
-) -> Result<Vec<CloakVariable>, ZeiError> {
+) -> Result<Vec<CloakVariable>> {
     Ok(match list {
         None => {
             let mut v = vec![];
             for _ in 0..len {
                 v.push(CloakVariable {
-                    amount: cs.allocate(None).map_err(|_| ZeiError::R1CSProofError)?,
-                    asset_type: cs
-                        .allocate(None)
-                        .map_err(|_| ZeiError::R1CSProofError)?,
+                    amount: cs.allocate(None).c(d!(ZeiError::R1CSProofError))?,
+                    asset_type: cs.allocate(None).c(d!(ZeiError::R1CSProofError))?,
                 });
             }
             v
@@ -323,10 +322,10 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
                 vars.push(CloakVariable {
                     amount: cs
                         .allocate(Some(v.amount.0))
-                        .map_err(|_| ZeiError::R1CSProofError)?,
+                        .c(d!(ZeiError::R1CSProofError))?,
                     asset_type: cs
                         .allocate(Some(v.asset_type.0))
-                        .map_err(|_| ZeiError::R1CSProofError)?,
+                        .c(d!(ZeiError::R1CSProofError))?,
                 });
             }
             vars
@@ -455,13 +454,7 @@ pub mod tests {
             )
             .unwrap();
 
-            assert!(
-                n_gates <= BP_GENS.gens_capacity,
-                format!(
-                    "Increase number of bp generators to {}",
-                    n_gates.next_power_of_two()
-                )
-            );
+            assert!(n_gates <= BP_GENS.gens_capacity);
 
             proof = prover.prove(&BP_GENS).unwrap();
         }

@@ -11,6 +11,7 @@
 use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Scalar;
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 pub struct HashCommitment<S> {
@@ -23,9 +24,9 @@ impl<S: Scalar> HashCommitment<S> {
     /// It returns an error when the number of input messages is invalid.
     /// * `blind_scalar` - blinding randomness
     /// * `msgs` - the messages to be committed
-    pub fn commit(&self, blind_scalar: &S, msgs: &[S]) -> Result<S, ZeiError> {
+    pub fn commit(&self, blind_scalar: &S, msgs: &[S]) -> Result<S> {
         if msgs.len() != self.msg_len {
-            return Err(ZeiError::CommitmentInputError);
+            return Err(eg!(ZeiError::CommitmentInputError));
         }
         let mut input_vec = vec![*blind_scalar];
         input_vec.extend(msgs.to_vec());
@@ -42,15 +43,10 @@ impl<S: Scalar> HashCommitment<S> {
     /// * `msgs` - the messages to be committed
     /// * `blind_scalar` - the blinding factor of the commitment
     /// * `commitment` - the commitment value
-    pub fn verify(
-        &self,
-        msgs: &[S],
-        blind_scalar: &S,
-        commitment: &S,
-    ) -> Result<(), ZeiError> {
+    pub fn verify(&self, msgs: &[S], blind_scalar: &S, commitment: &S) -> Result<()> {
         let expected = self.commit(blind_scalar, msgs)?;
         if expected != *commitment {
-            return Err(ZeiError::CommitmentVerificationError);
+            return Err(eg!(ZeiError::CommitmentVerificationError));
         }
         Ok(())
     }
@@ -101,12 +97,8 @@ mod test {
         let hash = RescueInstance::<BLSScalar>::new();
         assert_eq!(
             commitment,
-            hash.rescue_hash(&[
-                blind_scalar.clone(),
-                msgs[0].clone(),
-                msgs[1].clone(),
-                BLSScalar::from_u32(0)
-            ])[0]
+            hash.rescue_hash(&[blind_scalar, msgs[0], msgs[1], BLSScalar::from_u32(0)])
+                [0]
         );
 
         // correct opening

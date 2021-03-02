@@ -1,7 +1,7 @@
-use crate::errors::AlgebraError;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
+use ruc::err::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use utils::shift_u8_vec;
@@ -30,7 +30,7 @@ pub trait ScalarArithmetic: Clone + One + Zero + Sized {
     fn mul_assign(&mut self, b: &Self);
     fn sub(&self, b: &Self) -> Self;
     fn sub_assign(&mut self, b: &Self);
-    fn inv(&self) -> Result<Self, AlgebraError>;
+    fn inv(&self) -> Result<Self>;
     fn neg(&self) -> Self {
         Self::zero().sub(self)
     }
@@ -78,8 +78,8 @@ pub trait Scalar:
     fn bytes_len() -> usize;
     // serialization
     fn to_bytes(&self) -> Vec<u8>;
-    fn from_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
-    fn from_le_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
+    fn from_bytes(bytes: &[u8]) -> Result<Self>;
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self>;
 }
 
 pub trait Group:
@@ -109,7 +109,7 @@ pub trait Group:
 
     // compression/serialization helpers
     fn to_compressed_bytes(&self) -> Vec<u8>;
-    fn from_compressed_bytes(bytes: &[u8]) -> Result<Self, AlgebraError>;
+    fn from_compressed_bytes(bytes: &[u8]) -> Result<Self>;
     fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default;

@@ -20,6 +20,7 @@ use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{Scalar, ScalarArithmetic, Zero};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 
 const ZK_EVAL_CHALLENGE: &[u8] = b"zk_eval challenge";
 
@@ -83,7 +84,7 @@ pub fn prove_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>(
     polynomial: &FpPolynomial<PCS::Field>,
     blind: &PCS::Field,
     point: &PCS::Field,
-) -> Result<ZKEvalPf<PCS>, ()> {
+) -> Result<ZKEvalPf<PCS>> {
     let degree = polynomial.degree();
     init_zk_eval_transcript::<PCS>(
         transcript,
@@ -114,10 +115,7 @@ pub fn prove_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>(
 
     let XS = S.shift(1);
     let (_, open) = hpcs.pcs.commit(XS).unwrap();
-    let (XS_eval_z, proof) = hpcs
-        .pcs
-        .prove_eval(transcript, &open, point, 1)
-        .map_err(|_| ())?; // TODO max degree
+    let (XS_eval_z, proof) = hpcs.pcs.prove_eval(transcript, &open, point, 1).c(d!())?; // TODO max degree
     let S_eval_z = S.eval(point);
     let expected = point.mul(&S_eval_z);
     assert_eq!(XS_eval_z, expected);
@@ -144,7 +142,7 @@ pub fn verify_zk_eval<PCS: PolyComScheme>(
     point: &PCS::Field,
     eval_value: &PCS::Field,
     proof: &ZKEvalPf<PCS>,
-) -> Result<(), ()> {
+) -> Result<()> {
     init_zk_eval_transcript::<PCS>(transcript, degree, commitment, point, eval_value);
 
     // 1. first message, append to transcript
@@ -180,13 +178,13 @@ pub fn verify_zk_eval<PCS: PolyComScheme>(
             &XS_eval_z,
             &proof.XS_eval_z_proof,
         )
-        .map_err(|_| ())?;
+        .c(d!())?;
 
     // 4.2 check that S(z) - alpha(z) = c*f(z)
     let a = proof.S_eval_z.sub(alpha_eval_z);
     let b = c.sub(eval_value);
 
-    if a == b { Ok(()) } else { Err(()) }
+    if a == b { Ok(()) } else { Err(eg!()) }
 }
 
 #[allow(non_snake_case)]
@@ -196,7 +194,7 @@ pub fn prove_non_hiding_poly_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>
     pcs: &PCS,
     polynomial: &FpPolynomial<PCS::Field>,
     point: &PCS::Field,
-) -> Result<ZKEvalPf<PCS>, ()> {
+) -> Result<ZKEvalPf<PCS>> {
     init_non_hiding_poly_zk_eval_transcript::<PCS>(
         transcript,
         polynomial.degree(),
@@ -215,6 +213,7 @@ pub fn prove_non_hiding_poly_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>
         &blinding,
         point,
     )
+    .c(d!())
 }
 
 #[allow(non_snake_case)]
@@ -227,7 +226,7 @@ pub fn verify_non_hiding_poly_zk_eval<SPCS: ShiftPCS>(
     point: &SPCS::Field,
     eval_value: &SPCS::Field,
     proof: &ZKEvalPf<SPCS>,
-) -> Result<(), ()> {
+) -> Result<()> {
     init_non_hiding_poly_zk_eval_transcript::<SPCS>(
         transcript, degree, commitment, point, eval_value,
     );
@@ -245,6 +244,7 @@ pub fn verify_non_hiding_poly_zk_eval<SPCS: ShiftPCS>(
         &eval_value,
         proof,
     )
+    .c(d!())
 }
 
 /*

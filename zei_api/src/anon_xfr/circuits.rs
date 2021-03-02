@@ -698,6 +698,7 @@ pub(crate) mod tests {
     use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::{err::*, *};
 
     pub(crate) fn new_multi_xfr_witness_for_test(
         inputs: Vec<(u64, BLSScalar)>,
@@ -1326,7 +1327,7 @@ pub(crate) mod tests {
         let online_inputs = pub_inputs.to_vec();
         let verify = cs.verify_witness(&witness, &online_inputs);
         if witness_is_valid {
-            assert!(verify.is_ok(), verify.unwrap_err());
+            pnk!(verify);
         } else {
             assert!(verify.is_err());
         }

@@ -42,11 +42,11 @@ impl From<PedersenGens> for RistrettoPedersenGens {
     }
 }
 
-impl Into<PedersenGens> for &RistrettoPedersenGens {
-    fn into(self) -> PedersenGens {
+impl From<&RistrettoPedersenGens> for PedersenGens {
+    fn from(rp: &RistrettoPedersenGens) -> Self {
         PedersenGens {
-            B: self.B.0,
-            B_blinding: self.B_blinding.0,
+            B: rp.B.0,
+            B_blinding: rp.B_blinding.0,
         }
     }
 }

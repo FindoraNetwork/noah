@@ -27,6 +27,7 @@ serde_derive = "1.0"
 sha2 = "0.8.0"
 utils = {path = "../utils" }
 x25519-dalek = "0.6"
+ruc = "0.5.1"
 
 [dev-dependencies]
 bit-array = "0.4.3"

@@ -3,6 +3,8 @@
 pub(crate) mod examples {
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
+    use ruc::{err::*, *};
+    use utils::err_eq;
     use utils::errors::ZeiError;
     use wasm_bindgen::__rt::std::collections::HashMap;
     use zei::api::anon_creds;
@@ -74,7 +76,7 @@ pub(crate) mod examples {
             amount,
             ASSET1_TYPE,
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-            recv_pub_key.clone(),
+            recv_pub_key,
         );
         // 3.3 build output asset record
         let recv_asset_record =
@@ -146,7 +148,7 @@ pub(crate) mod examples {
             amount,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            recv_pub_key.clone(),
+            recv_pub_key,
         );
         // 3.3 build output asset record
         let recv_asset_record =
@@ -255,13 +257,13 @@ pub(crate) mod examples {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            recv1_pub_key.clone(),
+            recv1_pub_key,
         );
         let template_out2 = AssetRecordTemplate::with_no_asset_tracing(
             amount_out2,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            recv2_pub_key.clone(),
+            recv2_pub_key,
         );
         // 3.3 build output asset record
         let ar_out1 =
@@ -336,18 +338,13 @@ pub(crate) mod examples {
         let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
             Ok(data) => data,
             Err(e) => {
-                match e {
-                    ZeiError::BogusAssetTracerMemo => {
-                        // User may choose to call brute_force decrypt to get the correct information
-                        trace_assets_brute_force(
-                            &xfr_note.body,
-                            &tracer_keys,
-                            &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                        )
-                        .unwrap()
-                    }
-                    _ => panic!("Inconsistent xfr_note.body"),
-                }
+                err_eq!(ZeiError::BogusAssetTracerMemo, e);
+                // User may choose to call brute_force decrypt to get the correct information
+                pnk!(trace_assets_brute_force(
+                    &xfr_note.body,
+                    &tracer_keys,
+                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
+                ))
             }
         };
 
@@ -414,14 +411,14 @@ pub(crate) mod examples {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            recv1_pub_key.clone(),
+            recv1_pub_key,
             policies.clone(),
         );
         let template2 = AssetRecordTemplate::with_asset_tracing(
             amount_out2,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            recv2_pub_key.clone(),
+            recv2_pub_key,
             policies.clone(),
         );
 
@@ -498,18 +495,13 @@ pub(crate) mod examples {
         let records_data = match trace_assets(&xfr_note.body, &asset_tracing_key_pair) {
             Ok(data) => data,
             Err(e) => {
-                match e {
-                    ZeiError::BogusAssetTracerMemo => {
-                        // User may choose to call brute_force decrypt to get the correct information
-                        trace_assets_brute_force(
-                            &xfr_note.body,
-                            &asset_tracing_key_pair,
-                            &[ASSET1_TYPE, ASSET2_TYPE],
-                        )
-                        .unwrap()
-                    }
-                    _ => panic!("Inconsistent xfr_note.body"),
-                }
+                err_eq!(ZeiError::BogusAssetTracerMemo, e);
+                // User may choose to call brute_force decrypt to get the correct information
+                pnk!(trace_assets_brute_force(
+                    &xfr_note.body,
+                    &asset_tracing_key_pair,
+                    &[ASSET1_TYPE, ASSET2_TYPE],
+                ))
             }
         };
 
@@ -614,7 +606,7 @@ pub(crate) mod examples {
             )
             .is_ok()
         );
-        AIR.insert(user1_pubkey.as_bytes(), commitment_user1.clone());
+        AIR.insert(user1_pubkey.as_bytes(), commitment_user1);
         assert!(
             ac_verify_commitment(
                 &cred_issuer_pk,
@@ -624,7 +616,7 @@ pub(crate) mod examples {
             )
             .is_ok()
         );
-        AIR.insert(user2_pubkey.as_bytes(), commitment_user2.clone());
+        AIR.insert(user2_pubkey.as_bytes(), commitment_user2);
 
         // 3. Prepare input AssetRecord
         // 3.1 get blind asset records "from ledger" and open them
@@ -668,7 +660,7 @@ pub(crate) mod examples {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            recv1_pub_key.clone(),
+            recv1_pub_key,
         );
         // 3.3
         let output_asset_record =
@@ -725,18 +717,13 @@ pub(crate) mod examples {
         let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
             Ok(data) => data,
             Err(e) => {
-                match e {
-                    ZeiError::BogusAssetTracerMemo => {
-                        // User may choose to call brute_force decrypt to get the correct information
-                        trace_assets_brute_force(
-                            &xfr_note.body,
-                            &tracer_keys,
-                            &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                        )
-                        .unwrap()
-                    }
-                    _ => panic!("Inconsistent xfr_note.body"),
-                }
+                err_eq!(ZeiError::BogusAssetTracerMemo, e);
+                // User may choose to call brute_force decrypt to get the correct information
+                pnk!(trace_assets_brute_force(
+                    &xfr_note.body,
+                    &tracer_keys,
+                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
+                ))
             }
         };
 
@@ -842,7 +829,7 @@ pub(crate) mod examples {
             )
             .is_ok()
         );
-        AIR.insert(recv_user1_pub_key.as_bytes(), commitment_user1.clone());
+        AIR.insert(recv_user1_pub_key.as_bytes(), commitment_user1);
         assert!(
             ac_verify_commitment(
                 &cred_issuer_pk,
@@ -852,7 +839,7 @@ pub(crate) mod examples {
             )
             .is_ok()
         );
-        AIR.insert(recv_user2_pub_key.as_bytes(), commitment_user2.clone());
+        AIR.insert(recv_user2_pub_key.as_bytes(), commitment_user2);
 
         // 3. Prepare input AssetRecord
         // 3.1 get blind asset records "from ledger" and open them
@@ -874,7 +861,7 @@ pub(crate) mod examples {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            recv_user1_pub_key.clone(),
+            recv_user1_pub_key,
             policies.clone(),
         );
         let output_asset_record_1 = AssetRecord::from_template_with_identity_tracing(
@@ -890,7 +877,7 @@ pub(crate) mod examples {
             amount_out2,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            recv_user2_pub_key.clone(),
+            recv_user2_pub_key,
             policies.clone(),
         );
         let output_asset_record_2 = AssetRecord::from_template_with_identity_tracing(
@@ -970,18 +957,13 @@ pub(crate) mod examples {
         let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
             Ok(data) => data,
             Err(e) => {
-                match e {
-                    ZeiError::BogusAssetTracerMemo => {
-                        // User may choose to call brute_force decrypt to get the correct information
-                        trace_assets_brute_force(
-                            &xfr_note.body,
-                            &tracer_keys,
-                            &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                        )
-                        .unwrap()
-                    }
-                    _ => panic!("Inconsistent xfr_note.body"),
-                }
+                err_eq!(ZeiError::BogusAssetTracerMemo, e);
+                // User may choose to call brute_force decrypt to get the correct information
+                pnk!(trace_assets_brute_force(
+                    &xfr_note.body,
+                    &tracer_keys,
+                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
+                ))
             }
         };
 
@@ -1181,7 +1163,7 @@ pub(crate) mod examples {
         }; // revealing attr2 and attr4
 
         let id_tracing_policy2 = IdentityRevealPolicy {
-            cred_issuer_pub_key: cred_issuer_pk.clone(),
+            cred_issuer_pub_key: cred_issuer_pk,
             reveal_map: vec![true, true, false, true],
         }; // revealing attr1 , attr2 and attr4
 

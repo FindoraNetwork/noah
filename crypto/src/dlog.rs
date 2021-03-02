@@ -2,7 +2,7 @@ use crate::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
 use algebra::groups::{Group, Scalar as ZeiScalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use utils::errors::ZeiError;
+use ruc::{err::*, *};
 
 fn init_pok_dlog<'a, G: Group>(
     transcript: &mut Transcript,
@@ -42,7 +42,7 @@ pub fn verify_proof_of_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
     base: &G,
     point: &G,
     proof: &SigmaProof<G::S, G>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let (elems, lhs_matrix, rhs_vec) = init_pok_dlog::<G>(transcript, base, point);
     sigma_verify(
         transcript,
@@ -52,6 +52,7 @@ pub fn verify_proof_of_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
         rhs_vec.as_slice(),
         proof,
     )
+    .c(d!())
 }
 
 /// Proof of knowledge of Discrete Logarithm for a set of statements
@@ -90,7 +91,7 @@ pub fn verify_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
     base: &G,
     points: &[G],
     proof: &SigmaProof<G::S, G>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut public_elems = vec![base];
     let mut ref_points: Vec<&G> = points.iter().collect();
     public_elems.append(&mut ref_points);
@@ -105,7 +106,7 @@ pub fn verify_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
         .zip(x.iter())
         .fold(G::get_identity(), |lc, (point, x)| lc.add(&point.mul(x)));
 
-    verify_proof_of_knowledge_dlog(transcript, prng, base, &lc_point, proof)
+    verify_proof_of_knowledge_dlog(transcript, prng, base, &lc_point, proof).c(d!())
 }
 
 #[cfg(test)]

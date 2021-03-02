@@ -2,6 +2,7 @@ use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use serde::Serializer;
 use sha2::Digest;
 use utils::errors::ZeiError;
@@ -17,9 +18,9 @@ impl ZeiFromToBytes for XPublicKey {
         self.key.as_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 32 {
-            Err(ZeiError::DeserializationError)
+            Err(eg!(ZeiError::DeserializationError))
         } else {
             let mut array = [0u8; 32];
             array.copy_from_slice(bytes);
@@ -58,9 +59,9 @@ impl ZeiFromToBytes for XSecretKey {
         self.key.to_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 32 {
-            Err(ZeiError::DeserializationError)
+            Err(eg!(ZeiError::DeserializationError))
         } else {
             let mut array = [0u8; 32];
             array.copy_from_slice(bytes);
@@ -96,7 +97,7 @@ impl ZeiFromToBytes for Ctext {
         self.0.clone()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self, ZeiError> {
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(Ctext(bytes.to_vec()))
     }
 }
@@ -130,14 +131,14 @@ pub fn hybrid_encrypt_with_sign_key<R: CryptoRng + RngCore>(
     prng: &mut R,
     pub_key: &PublicKey,
     message: &[u8],
-) -> Result<ZeiHybridCipher, ZeiError> {
-    let (key, ephemeral_key) = symmetric_key_from_ed25519_public_key(prng, pub_key)?;
+) -> ZeiHybridCipher {
+    let (key, ephemeral_key) = symmetric_key_from_ed25519_public_key(prng, pub_key);
     let ciphertext = symmetric_encrypt_fresh_key(&key, message);
 
-    Ok(ZeiHybridCipher {
+    ZeiHybridCipher {
         ciphertext,
         ephemeral_public_key: XPublicKey { key: ephemeral_key },
-    })
+    }
 }
 
 /// I decrypt a hybrid ciphertext for a secret key.
@@ -196,7 +197,7 @@ fn symmetric_key_from_x25519_public_key<R: CryptoRng + RngCore>(
 fn symmetric_key_from_ed25519_public_key<R>(
     prng: &mut R,
     public_key: &PublicKey,
-) -> Result<([u8; 32], x25519_dalek::PublicKey), ZeiError>
+) -> ([u8; 32], x25519_dalek::PublicKey)
 where
     R: CryptoRng + RngCore,
 {
@@ -205,7 +206,7 @@ where
     let pk_montgomery = pk_curve_point.decompress().unwrap().to_montgomery();
     let x_public_key = x25519_dalek::PublicKey::from(pk_montgomery.to_bytes());
 
-    Ok(symmetric_key_from_x25519_public_key(prng, &x_public_key))
+    symmetric_key_from_x25519_public_key(prng, &x_public_key)
 }
 
 fn sec_key_as_scalar(sk: &SecretKey) -> Scalar {
@@ -274,7 +275,7 @@ mod test {
         prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair = Keypair::generate(&mut prng);
         let (from_pk_key, encoded_rand) =
-            symmetric_key_from_ed25519_public_key(&mut prng, &keypair.public).unwrap();
+            symmetric_key_from_ed25519_public_key(&mut prng, &keypair.public);
         let from_sk_key = symmetric_key_from_secret_key(&keypair.secret, &encoded_rand);
         assert_eq!(from_pk_key, from_sk_key);
     }
@@ -299,8 +300,7 @@ mod test {
         let key_pair = Keypair::generate(&mut prng);
         let msg = b"this is another message";
 
-        let cipherbox =
-            hybrid_encrypt_with_sign_key(&mut prng, &key_pair.public, msg).unwrap();
+        let cipherbox = hybrid_encrypt_with_sign_key(&mut prng, &key_pair.public, msg);
         let plaintext =
             hybrid_decrypt_with_ed25519_secret_key(&cipherbox, &key_pair.secret);
         assert_eq!(msg, plaintext.as_slice());

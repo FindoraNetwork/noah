@@ -3,9 +3,10 @@ use crate::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
 use crate::bp_circuits::solvency::solvency;
 use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
-use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSError, R1CSProof, Verifier};
+use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use merlin::Transcript;
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 /// I produce a proof of solvency for a set of assets vs liabilities for potentially different
@@ -106,7 +107,7 @@ pub fn prove_solvency(
     liability_set_blinds: &[CloakValue], // blindings for amount and type in hidden liabilities
     public_liability_set: &[CloakValue], // amount and type of public/known assets
     conversion_rates: &[(Scalar, Scalar)], // exchange rates for asset types
-) -> Result<R1CSProof, ZeiError> {
+) -> Result<R1CSProof> {
     let pc_gens: PedersenGens = pc_gens.into();
     let mut transcript = Transcript::new(b"SolvencyProof");
     let mut prover = Prover::new(&pc_gens, &mut transcript);
@@ -131,7 +132,7 @@ pub fn prove_solvency(
         let rate = conversion_rates
             .iter()
             .find(|(a, _)| a == &public_asset.asset_type)
-            .ok_or(ZeiError::SolvencyProveError)?
+            .c(d!(ZeiError::SolvencyProveError))?
             .1;
         public_asset_sum = public_asset_sum.add(&rate.mul(&public_asset.amount));
     }
@@ -142,7 +143,7 @@ pub fn prove_solvency(
         let rate = conversion_rates
             .iter()
             .find(|(a, _)| a == &public_lia.asset_type)
-            .ok_or(ZeiError::SolvencyProveError)?
+            .c(d!(ZeiError::SolvencyProveError))?
             .1;
         public_liability_sum = public_liability_sum.add(&rate.mul(&public_lia.amount));
     }
@@ -155,10 +156,10 @@ pub fn prove_solvency(
     let mut padded_hidden_assets = hidden_asset_set.to_vec();
     let mut padded_hidden_liabilities = hidden_liability_set.to_vec();
     padd_vars(&mut prover, &mut asset_vars, types.as_slice())
-        .map_err(|_| ZeiError::SolvencyProveError)?;
+        .c(d!(ZeiError::SolvencyProveError))?;
     padd_values(&mut padded_hidden_assets, types.as_slice());
     padd_vars(&mut prover, &mut liabilities_vars, types.as_slice())
-        .map_err(|_| ZeiError::SolvencyProveError)?;
+        .c(d!(ZeiError::SolvencyProveError))?;
     padd_values(&mut padded_hidden_liabilities, types.as_slice());
 
     let _num_gates = solvency(
@@ -171,10 +172,9 @@ pub fn prove_solvency(
         public_liability_sum,
         conversion_rates,
     )
-    .map_err(|_| ZeiError::SolvencyProveError)?;
-    prover
-        .prove(bp_gens)
-        .map_err(|_| ZeiError::SolvencyProveError)
+    .c(d!(ZeiError::SolvencyProveError))?;
+
+    prover.prove(bp_gens).c(d!(ZeiError::SolvencyProveError))
 }
 
 /// Verify a proof of solvency for a set of assets vs liabilities for potentially different
@@ -199,7 +199,7 @@ pub fn verify_solvency(
     public_liability_set: &[CloakValue],
     conversion_rates: &[(Scalar, Scalar)], // exchange rate for asset types
     proof: &R1CSProof,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let pc_gens = pc_gens.into();
     let mut transcript = Transcript::new(b"SolvencyProof");
     let mut verifier = Verifier::new(&mut transcript);
@@ -219,7 +219,7 @@ pub fn verify_solvency(
         let rate = conversion_rates
             .iter()
             .find(|(a, _)| a == &public_asset.asset_type)
-            .ok_or(ZeiError::SolvencyProveError)?
+            .c(d!(ZeiError::SolvencyProveError))?
             .1;
         public_asset_sum = public_asset_sum.add(&rate.mul(&public_asset.amount));
     }
@@ -229,7 +229,7 @@ pub fn verify_solvency(
         let rate = conversion_rates
             .iter()
             .find(|(a, _)| a == &public_lia.asset_type)
-            .ok_or(ZeiError::SolvencyProveError)?
+            .c(d!(ZeiError::SolvencyProveError))?
             .1;
         public_liability_sum = public_liability_sum.add(&rate.mul(&public_lia.amount));
     }
@@ -240,9 +240,9 @@ pub fn verify_solvency(
         types.push(*t);
     }
     padd_vars(&mut verifier, &mut asset_vars, types.as_slice())
-        .map_err(|_| ZeiError::SolvencyVerificationError)?;
+        .c(d!(ZeiError::SolvencyVerificationError))?;
     padd_vars(&mut verifier, &mut liabilities_vars, types.as_slice())
-        .map_err(|_| ZeiError::SolvencyVerificationError)?;
+        .c(d!(ZeiError::SolvencyVerificationError))?;
 
     let _num_gates = solvency(
         &mut verifier,
@@ -254,22 +254,22 @@ pub fn verify_solvency(
         public_liability_sum,
         conversion_rates,
     )
-    .map_err(|_| ZeiError::SolvencyVerificationError)?;
+    .c(d!(ZeiError::SolvencyVerificationError))?;
 
     verifier
         .verify(proof, &pc_gens, bp_gens)
-        .map_err(|_| ZeiError::SolvencyVerificationError)
+        .c(d!(ZeiError::SolvencyVerificationError))
 }
 
 fn padd_vars<CS: ConstraintSystem>(
     cs: &mut CS,
     vars: &mut Vec<CloakVariable>,
     types: &[Scalar],
-) -> Result<(), R1CSError> {
+) -> Result<()> {
     for t in types {
         vars.push(CloakVariable {
-            amount: cs.allocate(Some(Scalar::from_u32(0).0))?,
-            asset_type: cs.allocate(Some(t.0))?,
+            amount: cs.allocate(Some(Scalar::from_u32(0).0)).c(d!())?,
+            asset_type: cs.allocate(Some(t.0)).c(d!())?,
         });
     }
     Ok(())
@@ -291,6 +291,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 
+    #[allow(clippy::too_many_arguments)]
     fn do_test_solvency(
         bp_gens: &BulletproofGens,
         pc_gens: &RistrettoPedersenGens,
@@ -356,10 +357,11 @@ mod test {
     }
 
     fn create_values_and_do_test(hidden_asset: bool, hidden_lia: bool, pass: bool) {
-        let mut rates = vec![];
-        rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
-        rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
-        rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
+        let rates = vec![
+            (RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)),
+            (RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)),
+            (RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)),
+        ];
 
         let smaller = [
             CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10
@@ -506,10 +508,11 @@ mod test {
 
     #[test]
     fn test_solvency_mixed() {
-        let mut rates = vec![];
-        rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
-        rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
-        rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
+        let rates = vec![
+            (RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)),
+            (RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)),
+            (RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)),
+        ];
 
         let lia_hidden = [
             CloakValue::new(RistrettoScalar::from_u32(40), RistrettoScalar::from_u32(1)), // 40

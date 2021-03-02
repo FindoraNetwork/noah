@@ -1,5 +1,5 @@
 use rand_core::{CryptoRng, RngCore};
-use utils::errors::ZeiError;
+use ruc::err::*;
 
 pub mod bls;
 pub mod pointcheval_sanders;
@@ -17,7 +17,7 @@ pub trait Signature {
         pk: &Self::PublicKey,
         sig: &Self::Signature,
         msg: &B,
-    ) -> Result<(), ZeiError>;
+    ) -> Result<()>;
 }
 
 pub trait AggSignature: Signature {
@@ -30,5 +30,5 @@ pub trait AggSignature: Signature {
         pks: &[&Self::PublicKey],
         agg_sig: &Self::AggSignature,
         msg: &B,
-    ) -> Result<(), ZeiError>;
+    ) -> Result<()>;
 }

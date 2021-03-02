@@ -7,6 +7,7 @@ use crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 use utils::serialization::zei_obj_serde;
 use wasm_bindgen::__rt::std::collections::HashSet;
@@ -50,7 +51,7 @@ impl Eq for AssetMixProof {}
 pub fn prove_asset_mixing(
     inputs: &[(u64, Scalar, Scalar, Scalar)],
     outputs: &[(u64, Scalar, Scalar, Scalar)],
-) -> Result<AssetMixProof, ZeiError> {
+) -> Result<AssetMixProof> {
     let pc_gens = PedersenGens::default();
     let mut prover_transcript = Transcript::new(b"AssetMixingProof");
     let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
@@ -86,7 +87,7 @@ pub fn prove_asset_mixing(
         out_set.insert(out_value.asset_type.0);
     }
     if in_set != out_set {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
 
     let in_vars = in_values
@@ -109,13 +110,13 @@ pub fn prove_asset_mixing(
         &out_vars,
         Some(&out_values),
     )
-    .map_err(|_| ZeiError::AssetMixerVerificationError)?;
+    .c(d!(ZeiError::AssetMixerVerificationError))?;
 
     let num_gates = asset_mix_num_generators(n, m);
     let bp_gens = BulletproofGens::new(num_gates.next_power_of_two(), 1);
     let proof = prover
         .prove(&bp_gens)
-        .map_err(|_| ZeiError::AssetMixerVerificationError)?;
+        .c(d!(ZeiError::AssetMixerVerificationError))?;
     Ok(AssetMixProof(proof))
 }
 
@@ -133,6 +134,7 @@ pub struct AssetMixingInstance<'a> {
 /// use zei::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
+/// use ruc::{*, err::*};
 /// use zei::setup::PublicParams;
 /// use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 /// let input = [
@@ -174,14 +176,13 @@ pub struct AssetMixingInstance<'a> {
 ///    };
 ///    let mut prng = thread_rng();
 ///    let mut params = PublicParams::default();
-///    assert_eq!(Ok(()),
-///               batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
+///    pnk!(batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
 /// ```
 pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut PublicParams,
     instances: &[AssetMixingInstance],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut max_circuit_size = 0;
     let mut transcripts = Vec::with_capacity(instances.len());
     let mut verifiers = Vec::with_capacity(instances.len());
@@ -190,7 +191,7 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     }
     for (instance, transcript) in instances.iter().zip(transcripts.iter_mut()) {
         let mut verifier = Verifier::new(transcript);
-        prepare_asset_mixer_verifier(&mut verifier, instance)?;
+        prepare_asset_mixer_verifier(&mut verifier, instance).c(d!())?;
         let circuit_size =
             asset_mix_num_generators(instance.inputs.len(), instance.outputs.len());
         if circuit_size > max_circuit_size {
@@ -207,13 +208,13 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     }
     let pc_gens = (&params.pc_gens).into();
     batch_verify(prng, verifiers, &pc_gens, &params.bp_circuit_gens)
-        .map_err(|_| ZeiError::AssetMixerVerificationError)
+        .c(d!(ZeiError::AssetMixerVerificationError))
 }
 
 pub(crate) fn prepare_asset_mixer_verifier(
     verifier: &mut Verifier<&mut Transcript>,
     instance: &AssetMixingInstance,
-) -> Result<usize, ZeiError> {
+) -> Result<usize> {
     let in_cloak = instance
         .inputs
         .iter()
@@ -242,7 +243,7 @@ pub(crate) fn prepare_asset_mixer_verifier(
         .collect_vec();
 
     crypto::bp_circuits::cloak::cloak(verifier, &in_vars, None, &out_vars, None)
-        .map_err(|_| ZeiError::AssetMixerVerificationError)
+        .c(d!(ZeiError::AssetMixerVerificationError))
 }
 
 fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
@@ -280,6 +281,7 @@ mod test {
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::{err::*, *};
 
     #[test]
     fn test_asset_mixer() {
@@ -429,9 +431,10 @@ mod test {
         };
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = PublicParams::default();
-        assert_eq!(
-            Ok(()),
-            super::batch_verify_asset_mixing(&mut prng, &mut params, &[instance])
-        );
+        pnk!(super::batch_verify_asset_mixing(
+            &mut prng,
+            &mut params,
+            &[instance]
+        ));
     }
 }

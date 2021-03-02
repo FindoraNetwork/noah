@@ -7,6 +7,7 @@ use crate::basics::signatures::pointcheval_sanders::{
 };
 use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 use digest::Digest;
@@ -203,7 +204,7 @@ fn verify_signature_pok<P: Pairing>(
     gpk: &GroupPublicKey<P>,
     sig: &GroupSignature<P>,
     msg: &[u8],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let g1_base = P::G1::get_base();
     let g2_base = P::G2::get_base();
     let commitments_g1 = &sig.spok.commitments_g1;
@@ -230,7 +231,7 @@ fn verify_signature_pok<P: Pairing>(
     let p2 = P::pairing(&sig.cert.s2.mul(&challenge), &g2_base);
 
     if p1 != p2 {
-        return Err(ZeiError::ZKProofVerificationError);
+        return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
     // 2 Verify tag encryption
@@ -243,14 +244,14 @@ fn verify_signature_pok<P: Pairing>(
 
     // Check e1 correctness: e1 = r * G1
     if e1.mul(&challenge) != g1_base.mul(&response_r).sub(com_g1_blind_r) {
-        return Err(ZeiError::ZKProofVerificationError);
+        return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
     // Check e2 correctness: e2 = tag * G1 + r * PK
     let a = g1_base.mul(&response_tag).sub(com_g1_blind_tag);
     let b = gpk.enc_key.0.mul(&response_r).sub(com_pk_blind_r);
     if e2.mul(&challenge) != a.add(&b) {
-        return Err(ZeiError::ZKProofVerificationError);
+        return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
     Ok(())
@@ -260,12 +261,13 @@ fn verify_signature_pok<P: Pairing>(
 /// * `gpk` - group public key
 /// * `sig` - group signature
 /// * `msg` - message
+#[inline(always)]
 pub fn gpsig_verify<P: Pairing>(
     gpk: &GroupPublicKey<P>,
     sig: &GroupSignature<P>,
     msg: &[u8],
-) -> Result<(), ZeiError> {
-    verify_signature_pok(gpk, sig, msg)
+) -> Result<()> {
+    verify_signature_pok(gpk, sig, msg).c(d!())
 }
 
 /// I recover the identity of the producer of a group signature.
@@ -324,17 +326,17 @@ mod tests {
         assert!(gpsig_verify(&gpk, &sig, b"Some message").is_ok());
 
         // Incorrect message
-        assert_eq!(
-            Err(ZeiError::ZKProofVerificationError),
-            gpsig_verify(&gpk, &sig, b"Wrong message")
+        err_eq!(
+            ZeiError::ZKProofVerificationError,
+            gpsig_verify(&gpk, &sig, b"Wrong message").unwrap_err()
         );
 
         // Use of another group public key
         let (another_gpk, _) = gpsig_setup(&mut prng);
         let sig = gpsig_sign(&mut prng, &gpk, &join_cert, b"Some message");
-        assert_eq!(
-            Err(ZeiError::ZKProofVerificationError),
-            gpsig_verify(&another_gpk, &sig, b"Some message")
+        err_eq!(
+            ZeiError::ZKProofVerificationError,
+            gpsig_verify(&another_gpk, &sig, b"Some message").unwrap_err()
         );
     }
 

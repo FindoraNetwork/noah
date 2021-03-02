@@ -1,7 +1,6 @@
 #![deny(warnings)]
 #[cfg(test)]
 pub(crate) mod xfr_note_complex_variable_size {
-
     use itertools::Itertools;
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
@@ -21,7 +20,7 @@ pub(crate) mod xfr_note_complex_variable_size {
             asset_tracing_policy_asset_input,
             ac_commitments,
         ) = setup_with_policies(n);
-        let sender_key_pairs_ref = sender_key_pairs.iter().map(|x| x).collect_vec();
+        let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
         let (ar_ins, output_asset_records) =
             prepare_inputs_and_outputs_with_policies_single_asset(

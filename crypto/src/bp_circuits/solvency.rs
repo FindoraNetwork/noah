@@ -12,6 +12,7 @@ use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable
 use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 /// I implement a proof of solvency bulletproof protocol
@@ -30,7 +31,7 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
     liability_set_values: Option<&[CloakValue]>,
     public_liability_sum: Scalar,
     conversion_rates: &[(Scalar, Scalar)],
-) -> Result<usize, ZeiError> {
+) -> Result<usize> {
     let mut rate_types = vec![];
     let mut rate_values = vec![];
     for (k, v) in conversion_rates {
@@ -46,7 +47,8 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
             asset_set_values,
             &rate_types[..],
             &rate_values[..],
-        )?,
+        )
+        .c(d!())?,
     };
     let (mut total_lia_var, num_gates_lia) = match liability_set_vars.len() {
         0 => (LinearCombination::default(), 0),
@@ -56,7 +58,8 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
             liability_set_values,
             &rate_types[..],
             &rate_values[..],
-        )?,
+        )
+        .c(d!())?,
     };
 
     total_assets_var = total_assets_var + public_asset_sum.0;
@@ -107,7 +110,7 @@ pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
     };
 
     let num_gates_range_proof = super::gadgets::range_proof_64(cs, diff_var, diff_value)
-        .map_err(|_| ZeiError::R1CSProofError)?;
+        .c(d!(ZeiError::R1CSProofError))?;
 
     Ok(num_gates_asset + num_gates_lia + num_gates_range_proof)
 }
@@ -119,7 +122,7 @@ fn aggregate<CS: RandomizableConstraintSystem>(
     values: Option<&[CloakValue]>,
     rate_types: &[Scalar],
     rate_values: &[Scalar],
-) -> Result<(LinearCombination, usize), ZeiError> {
+) -> Result<(LinearCombination, usize)> {
     let l = vars.len();
     if l <= 1 {
         return Ok((LinearCombination::default(), 0));
@@ -128,22 +131,22 @@ fn aggregate<CS: RandomizableConstraintSystem>(
     let (sorted_vars, mid_vars, added_vars, trimmed_vars) = match values {
         Some(values) => {
             //prover allocate variables
-            let sorted_values = sort_by_rate_type(values, &rate_types[..]);
+            let sorted_values = sort_by_rate_type(values, rate_types);
             let (mid_values, added_values) = super::cloak::merge(&sorted_values[..]);
             let trimmed_values = trim(&added_values[..]);
 
             (
-                allocate_cloak_vector(cs, Some(&sorted_values), l)?,
-                allocate_cloak_vector(cs, Some(&mid_values), l - 2)?,
-                allocate_cloak_vector(cs, Some(&added_values), l)?,
-                allocate_cloak_vector(cs, Some(&trimmed_values), l)?,
+                allocate_cloak_vector(cs, Some(&sorted_values), l).c(d!())?,
+                allocate_cloak_vector(cs, Some(&mid_values), l - 2).c(d!())?,
+                allocate_cloak_vector(cs, Some(&added_values), l).c(d!())?,
+                allocate_cloak_vector(cs, Some(&trimmed_values), l).c(d!())?,
             )
         }
         None => (
-            allocate_cloak_vector(cs, None, l)?,
-            allocate_cloak_vector(cs, None, l - 2)?,
-            allocate_cloak_vector(cs, None, l)?,
-            allocate_cloak_vector(cs, None, l)?,
+            allocate_cloak_vector(cs, None, l).c(d!())?,
+            allocate_cloak_vector(cs, None, l - 2).c(d!())?,
+            allocate_cloak_vector(cs, None, l).c(d!())?,
+            allocate_cloak_vector(cs, None, l).c(d!())?,
         ),
     };
 
@@ -164,14 +167,14 @@ fn aggregate<CS: RandomizableConstraintSystem>(
         &mid_vars[..],
         &added_vars[..],
     )
-    .map_err(|_| ZeiError::R1CSProofError)?;
+    .c(d!(ZeiError::R1CSProofError))?;
     // prove first shuffle
     let n_shuffle1 =
         super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars)
-            .map_err(|_| ZeiError::R1CSProofError)?;
+            .c(d!(ZeiError::R1CSProofError))?;
     // prove second shiffled (zeroed values places at the end of the list)
     let n_shuffle2 = super::gadgets::cloak_shuffle_gadget(cs, added_vars, trimmed_vars)
-        .map_err(|_| ZeiError::R1CSProofError)?;
+        .c(d!(ZeiError::R1CSProofError))?;
     Ok((
         total,
         6 * l + 2 * (l - 2) + rate_values.len() + n_mix + n_shuffle1 + n_shuffle2,
@@ -309,10 +312,11 @@ mod test {
     #[test]
     fn test_solvency() {
         let pc_gens = PedersenGens::default();
-        let mut rates = vec![];
-        rates.push((RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)));
-        rates.push((RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)));
-        rates.push((RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)));
+        let rates = vec![
+            (RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(1)),
+            (RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(2)),
+            (RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(3)),
+        ];
         let asset_set = vec![
             CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), //total 10
             CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(2)), //total 20

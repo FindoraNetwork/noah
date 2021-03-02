@@ -2,17 +2,18 @@
 use crate::basics::hash::mimc::compute_mimc_constants;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::*;
+use ruc::{err::*, *};
 
 pub(crate) fn mimc_func<CS: ConstraintSystem>(
     cs: &mut CS,
     x: LinearCombination,
     c: Scalar,
-) -> Result<(Variable, usize), R1CSError> {
+) -> (Variable, usize) {
     let x_plus_c = x + c.0;
     let (left, _, out) = cs.multiply(x_plus_c.clone(), x_plus_c);
     let (_, _, out) = cs.multiply(out.into(), out.into());
     let (_, _, out) = cs.multiply(out.into(), left.into());
-    Ok((out, 3))
+    (out, 3)
 }
 
 fn feistel_round<CS: ConstraintSystem>(
@@ -20,11 +21,11 @@ fn feistel_round<CS: ConstraintSystem>(
     x: LinearCombination,
     y: LinearCombination,
     c: Scalar,
-) -> Result<(LinearCombination, LinearCombination, usize), R1CSError> {
+) -> (LinearCombination, LinearCombination, usize) {
     let new_y = x.clone();
-    let (aux, num_left_wires) = mimc_func(cs, x, c)?;
+    let (aux, num_left_wires) = mimc_func(cs, x, c);
     let new_x = y + aux;
-    Ok((new_x, new_y, num_left_wires))
+    (new_x, new_y, num_left_wires)
 }
 
 #[allow(clippy::many_single_char_names)]
@@ -33,36 +34,38 @@ pub(crate) fn feistel_network<CS: ConstraintSystem>(
     x: LinearCombination,
     y: LinearCombination,
     c: &[Scalar],
-) -> Result<(LinearCombination, LinearCombination, usize), R1CSError> {
+) -> (LinearCombination, LinearCombination, usize) {
     let mut num_left_wires = 0;
     let mut xi = x;
     let mut yi = y;
     for ci in c {
-        let (a, b, left_wires) = feistel_round(cs, xi, yi, *ci)?;
+        let (a, b, left_wires) = feistel_round(cs, xi, yi, *ci);
         xi = a;
         yi = b;
         num_left_wires += left_wires;
     }
-    Ok((xi, yi, num_left_wires))
+    (xi, yi, num_left_wires)
 }
 
 pub(crate) fn mimc_hash<CS: ConstraintSystem>(
     cs: &mut CS,
     values: &[LinearCombination],
     level: usize,
-) -> Result<(LinearCombination, usize), R1CSError> {
+) -> Result<(LinearCombination, usize)> {
     let c = compute_mimc_constants(level);
 
     let mut sa: LinearCombination = cs
-        .allocate(Some(curve25519_dalek::scalar::Scalar::zero()))?
+        .allocate(Some(curve25519_dalek::scalar::Scalar::zero()))
+        .c(d!())?
         .into();
     let mut sc: LinearCombination = cs
-        .allocate(Some(curve25519_dalek::scalar::Scalar::zero()))?
+        .allocate(Some(curve25519_dalek::scalar::Scalar::zero()))
+        .c(d!())?
         .into();
     let mut num_left_wires = 2;
     for v in values.iter() {
         let x = sa + (*v).clone();
-        let out = feistel_network(cs, x, sc, &c[..])?;
+        let out = feistel_network(cs, x, sc, &c[..]);
         sa = out.0;
         sc = out.1;
         num_left_wires += out.2;
@@ -75,8 +78,8 @@ pub fn hash_proof<CS: ConstraintSystem>(
     x: Variable,
     y: Variable,
     out: Variable,
-) -> Result<usize, R1CSError> {
-    let (sa, num_left_wires) = mimc_hash(cs, &[x.into(), y.into()], 1)?;
+) -> Result<usize> {
+    let (sa, num_left_wires) = mimc_hash(cs, &[x.into(), y.into()], 1).c(d!())?;
     cs.constrain(sa - out);
     Ok(num_left_wires)
 }
@@ -102,8 +105,7 @@ mod test {
         let scalar_c = Scalar::from_u32(0);
         let (cx, x) =
             prover.commit(scalar_x.0, curve25519_dalek::scalar::Scalar::from(10u8));
-        let (out, num_left_wires) =
-            super::mimc_func(&mut prover, x.into(), scalar_c).unwrap();
+        let (out, num_left_wires) = super::mimc_func(&mut prover, x.into(), scalar_c);
 
         let expected_output = mimc_f(&scalar_x, &scalar_c);
         let expected = prover.allocate(Some(expected_output.0)).unwrap();
@@ -118,7 +120,7 @@ mod test {
 
         let ver_x = verifier.commit(cx);
         let (ver_out, num_left_wires) =
-            super::mimc_func(&mut verifier, ver_x.into(), scalar_c).unwrap();
+            super::mimc_func(&mut verifier, ver_x.into(), scalar_c);
         let expected = verifier.allocate(Some(expected_output.0)).unwrap();
         verifier.constrain(ver_out - expected);
         let bp_gens = BulletproofGens::new((num_left_wires + 1).next_power_of_two(), 1);
@@ -146,7 +148,7 @@ mod test {
         let (cy, y) =
             prover.commit(scalar_y.0, curve25519_dalek::scalar::Scalar::from(11u8));
         let (outx, outy, num_left_wires) =
-            super::feistel_network(&mut prover, x.into(), y.into(), &scalar_c).unwrap();
+            super::feistel_network(&mut prover, x.into(), y.into(), &scalar_c);
         let expected_x = prover.allocate(Some(expected_output_x.0)).unwrap();
         let expected_y = prover.allocate(Some(expected_output_y.0)).unwrap();
         prover.constrain(outx - expected_x);
@@ -160,8 +162,7 @@ mod test {
         let ver_x = verifier.commit(cx);
         let ver_y = verifier.commit(cy);
         let (ver_out_x, ver_out_y, num_left_wires) =
-            super::feistel_network(&mut verifier, ver_x.into(), ver_y.into(), &scalar_c)
-                .unwrap();
+            super::feistel_network(&mut verifier, ver_x.into(), ver_y.into(), &scalar_c);
         let expected_x = verifier.allocate(Some(expected_output_x.0)).unwrap();
         let expected_y = verifier.allocate(Some(expected_output_y.0)).unwrap();
         verifier.constrain(ver_out_x - expected_x);

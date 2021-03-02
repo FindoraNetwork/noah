@@ -5,6 +5,7 @@ use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 /// Gives a bulletproof range proof that values committed using  `blindings`
@@ -16,7 +17,7 @@ pub fn prove_ranges(
     values: &[u64],
     blindings: &[Scalar],
     log_range_upper_bound: usize,
-) -> Result<(RangeProof, Vec<CompressedRistretto>), ZeiError> {
+) -> Result<(RangeProof, Vec<CompressedRistretto>)> {
     let blindings = blindings.iter().map(|s| s.0).collect_vec();
     let pc_gens = pc_gens.into();
     let (proof, coms) = RangeProof::prove_multiple(
@@ -27,7 +28,7 @@ pub fn prove_ranges(
         &blindings,
         log_range_upper_bound,
     )
-    .map_err(|_| ZeiError::RangeProofProveError)?;
+    .c(d!(ZeiError::RangeProofProveError))?;
     let commitments = coms.iter().map(|x| CompressedRistretto(*x)).collect_vec();
     Ok((proof, commitments))
 }
@@ -43,7 +44,7 @@ pub fn verify_ranges<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     commitments: &[CompressedRistretto],
     log_range_upper_bound: usize,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let commitments = commitments.iter().map(|x| x.0).collect_vec();
     proof
         .verify_multiple_with_rng(
@@ -54,7 +55,7 @@ pub fn verify_ranges<R: CryptoRng + RngCore>(
             log_range_upper_bound,
             prng,
         )
-        .map_err(|_| ZeiError::RangeProofVerifyError)
+        .c(d!(ZeiError::RangeProofVerifyError))
 }
 
 /// Batch verify a set bulletproof range proofs
@@ -67,7 +68,7 @@ pub fn batch_verify_ranges<R: CryptoRng + RngCore>(
     transcripts: &mut [Transcript],
     commitments: &[&[CompressedRistretto]],
     log_range_upper_bound: usize,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut comms = vec![];
     for slice in commitments {
         let v = slice.iter().map(|x| x.0).collect_vec();
@@ -88,5 +89,5 @@ pub fn batch_verify_ranges<R: CryptoRng + RngCore>(
         &pc_gens,
         log_range_upper_bound,
     )
-    .map_err(|_| ZeiError::RangeProofVerifyError)
+    .c(d!(ZeiError::RangeProofVerifyError))
 }

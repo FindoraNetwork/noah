@@ -6,6 +6,7 @@ use crate::polynomials::field_polynomial::{primitive_nth_root_of_unity, FpPolyno
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
+use ruc::{err::*, *};
 
 /// Trait for Turbo PLONK constraint systems.
 pub trait ConstraintSystem {
@@ -83,7 +84,7 @@ pub trait ConstraintSystem {
     }
 
     /// Borrow the (index)-th selector vector.
-    fn selector(&self, index: usize) -> Result<&[Self::Field], PlonkError>;
+    fn selector(&self, index: usize) -> Result<&[Self::Field]>;
 
     /// Evaluate the constraint equation given public input and the values of the wires and the selectors.
     fn eval_gate_func(
@@ -91,14 +92,14 @@ pub trait ConstraintSystem {
         wire_vals: &[&Self::Field],
         sel_vals: &[&Self::Field],
         pub_input: &Self::Field,
-    ) -> Result<Self::Field, PlonkError>;
+    ) -> Result<Self::Field>;
 
     /// Given the wires values of a gate, evaluate the coefficients of the selectors in the
     /// constraint equation.
     fn eval_selector_multipliers(
         &self,
         wire_vals: &[&Self::Field],
-    ) -> Result<Vec<Self::Field>, PlonkError>;
+    ) -> Result<Vec<Self::Field>>;
 }
 
 #[allow(non_snake_case)]
@@ -150,9 +151,9 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
         &self.public_vars_witness_indices
     }
 
-    fn selector(&self, index: usize) -> Result<&[F], PlonkError> {
+    fn selector(&self, index: usize) -> Result<&[F]> {
         if index >= self.selectors.len() {
-            return Err(PlonkError::FuncParamsError);
+            return Err(eg!(PlonkError::FuncParamsError));
         }
         Ok(&self.selectors[index])
     }
@@ -163,9 +164,9 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
         wire_vals: &[&Self::Field],
         sel_vals: &[&Self::Field],
         pub_input: &Self::Field,
-    ) -> Result<Self::Field, PlonkError> {
+    ) -> Result<Self::Field> {
         if wire_vals.len() < 3 || sel_vals.len() < 5 {
-            return Err(PlonkError::FuncParamsError);
+            return Err(eg!(PlonkError::FuncParamsError));
         }
         let left = sel_vals[0].mul(wire_vals[0]);
         let right = sel_vals[1].mul(wire_vals[1]);
@@ -179,9 +180,9 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
     fn eval_selector_multipliers(
         &self,
         wire_vals: &[&Self::Field],
-    ) -> Result<Vec<Self::Field>, PlonkError> {
+    ) -> Result<Vec<Self::Field>> {
         if wire_vals.len() < 3 {
-            return Err(PlonkError::FuncParamsError);
+            return Err(eg!(PlonkError::FuncParamsError));
         }
         Ok(vec![
             *wire_vals[0],
@@ -379,14 +380,14 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
         self.wiring[2][cs_index] as usize
     }
 
-    pub fn verify_witness(&self, witness: &[F], online_vars: &[F]) -> Result<(), ()> {
+    pub fn verify_witness(&self, witness: &[F], online_vars: &[F]) -> Result<()> {
         if witness.len() != self.num_vars {
-            return Err(());
+            return Err(eg!());
         }
         if online_vars.len() != self.public_vars_witness_indices.len()
             || online_vars.len() != self.public_vars_constraint_indices.len()
         {
-            return Err(());
+            return Err(eg!());
         }
         for cs_index in 0..self.size() {
             let mut public_online = F::zero();
@@ -402,7 +403,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
                     // found
                     public_online = *online_var;
                     if witness[*w_i] != *online_var {
-                        return Err(());
+                        return Err(eg!());
                     }
                 }
             }
@@ -419,7 +420,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
             let constant = &self.selectors[4][cs_index];
             let constant_add = constant.add(&public_online);
             if add.add(&mul.add(&constant_add)).sub(&out) != F::zero() {
-                return Err(());
+                return Err(eg!());
             }
         }
         Ok(())
@@ -532,18 +533,18 @@ pub fn preprocess_prover<
     cs: &CS,
     pcs: &PCS,
     prg_seed: [u8; 32],
-) -> Result<ProverParams<PCS>, PlonkError> {
+) -> Result<ProverParams<PCS>> {
     let mut prng = ChaChaRng::from_seed(prg_seed);
     let n_wires_per_gate = cs.n_wires_per_gate();
     let n = cs.size();
     let m = cs.quot_eval_dom_size();
     let factor = m / n;
     if n * factor != m {
-        return Err(PlonkError::SetupError);
+        return Err(eg!(PlonkError::SetupError));
     }
     // Compute evaluation domains.
     let root_m = primitive_nth_root_of_unity::<PCS::Field>(m)
-        .ok_or(PlonkError::GroupNotFound(m))?;
+        .c(d!(PlonkError::GroupNotFound(m)))?;
     let group_m = build_group(&root_m, m)?;
     let root = group_m[factor % m];
     let group = build_group(&root, n)?;
@@ -563,7 +564,7 @@ pub fn preprocess_prover<
     for i in 0..n_wires_per_gate {
         let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n]);
         perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
-        let (C_perm, O_perm) = pcs.commit(perm).map_err(|_| PlonkError::SetupError)?;
+        let (C_perm, O_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
         prover_extended_perms.push(O_perm);
         verifier_extended_perms.push(C_perm);
     }
@@ -575,7 +576,7 @@ pub fn preprocess_prover<
     for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
         let q = FpPolynomial::ffti(&root, cs.selector(i)?);
         selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
-        let (C_q, O_q) = pcs.commit(q).map_err(|_| PlonkError::SetupError)?;
+        let (C_q, O_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
         prover_selectors.push(O_q);
         verifier_selectors.push(C_q);
     }
@@ -638,8 +639,8 @@ pub fn preprocess_verifier<
     cs: &CS,
     pcs: &PCS,
     prg_seed: [u8; 32],
-) -> Result<VerifierParams<PCS>, PlonkError> {
-    let prover_params = preprocess_prover(cs, pcs, prg_seed)?;
+) -> Result<VerifierParams<PCS>> {
+    let prover_params = preprocess_prover(cs, pcs, prg_seed).c(d!())?;
     Ok(prover_params.verifier_params)
 }
 

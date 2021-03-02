@@ -23,6 +23,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use sha2::Sha512;
 use utils::errors::ZeiError;
 
@@ -113,55 +114,59 @@ pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(
 /// Pointcheval-Sanders verification function for byte slices
 /// #Example
 /// ```
-///
 /// use crypto::basics::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_bytes, ps_verify_sig_bytes};
-/// use utils::errors::ZeiError;
+/// use utils::{errors::ZeiError, err_eq};
 /// use algebra::bls12_381::Bls12381;
 /// use rand::thread_rng;
+/// use ruc::err::*;
+///
 /// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut thread_rng());
 /// let sig = ps_sign_bytes::<_, Bls12381>(&mut thread_rng(), &sk, b"this is a message");
 /// assert!(ps_verify_sig_bytes::<Bls12381>(&pk, b"this is a message", &sig).is_ok());
-/// assert_eq!(Some(ZeiError::SignatureError), ps_verify_sig_bytes::<Bls12381>(&pk, b"this is ANOTHER message", &sig).err());
+/// err_eq!(ZeiError::SignatureError, ps_verify_sig_bytes::<Bls12381>(&pk, b"this is ANOTHER message", &sig).unwrap_err());
 /// ```
 pub fn ps_verify_sig_bytes<P: Pairing>(
     pk: &PSPublicKey<P::G2>,
     m: &[u8],
     sig: &PSSignature<P::G1>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let m_scalar = hash_message::<P::ScalarField>(m);
-    ps_verify_sig_scalar::<P>(pk, &m_scalar, sig)
+    ps_verify_sig_scalar::<P>(pk, &m_scalar, sig).c(d!())
 }
 
 /// Pointcheval-Sanders verification function for scalars
 /// #Example
 /// ```
-///
 /// use crypto::basics::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar};
 /// use algebra::bls12_381::{BLSScalar, Bls12381};
 /// use algebra::groups::Scalar;
 /// use rand::thread_rng;
-/// use utils::errors::ZeiError;
+/// use utils::{errors::ZeiError, err_eq};
+/// use ruc::err::*;
+///
 /// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut thread_rng());
 /// let sig = ps_sign_scalar::<_, Bls12381>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100));
 /// assert!(ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(100), &sig).is_ok());
-/// assert_eq!(Some(ZeiError::SignatureError), ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(333), &sig).err());
+/// err_eq!(ZeiError::SignatureError, ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(333), &sig).unwrap_err());
 /// ```
 pub fn ps_verify_sig_scalar<P: Pairing>(
     pk: &PSPublicKey<P::G2>,
     m: &P::ScalarField,
     sig: &PSSignature<P::G1>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let a = pk.xx.add(&pk.yy.mul(&m));
     let e1 = P::pairing(&sig.s1, &a);
     let e2 = P::pairing(&sig.s2, &P::G2::get_base());
     if e1 != e2 || sig.s1 == P::G1::get_identity() {
-        return Err(ZeiError::SignatureError);
+        return Err(eg!(ZeiError::SignatureError));
     }
     Ok(())
 }
 
 /// Pointcheval-Sanders signature randomization function
+///
 /// #Example
+///
 /// ```
 /// use crypto::basics::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar, ps_randomize_sig};
 /// use algebra::bls12_381::{BLSScalar, Bls12381};
@@ -171,7 +176,6 @@ pub fn ps_verify_sig_scalar<P: Pairing>(
 /// let sig = ps_sign_scalar::<_, Bls12381>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100));
 /// let (_,rand_sig) = ps_randomize_sig::<_, Bls12381>(&mut thread_rng(), &sig);
 /// assert!(ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(100), &rand_sig).is_ok());
-///
 /// ```
 pub fn ps_randomize_sig<R: RngCore + CryptoRng, P: Pairing>(
     prng: &mut R,

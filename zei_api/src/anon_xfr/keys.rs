@@ -1,7 +1,7 @@
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use crypto::basics::signatures::schnorr;
 use rand_core::{CryptoRng, RngCore};
-use utils::errors::ZeiError;
+use ruc::{err::*, *};
 
 /// Public key used to address an Anonymous records and verify transaction spending it
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -55,7 +55,7 @@ impl AXfrPubKey {
     }
 
     /// Signature verification function
-    pub fn verify(&self, msg: &[u8], sig: AXfrSignature) -> Result<(), ZeiError> {
-        self.0.verify(msg, &sig.0)
+    pub fn verify(&self, msg: &[u8], sig: AXfrSignature) -> Result<()> {
+        self.0.verify(msg, &sig.0).c(d!())
     }
 }

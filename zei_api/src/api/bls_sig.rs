@@ -2,7 +2,7 @@
 use algebra::bls12_381::Bls12381;
 use crypto::basics::signatures::{AggSignature, Signature};
 use rand_core::{CryptoRng, RngCore};
-use utils::errors::ZeiError;
+use ruc::{err::*, *};
 
 pub type BlsSecretKey = crypto::basics::signatures::bls::BlsSecretKey<Bls12381>;
 pub type BlsPublicKey = crypto::basics::signatures::bls::BlsPublicKey<Bls12381>;
@@ -28,10 +28,11 @@ pub fn bls_verify<B: AsRef<[u8]>>(
     ver_key: &BlsPublicKey,
     message: &B,
     signature: &BlsSignature,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     crypto::basics::signatures::bls::bls_verify::<Bls12381, B>(
         ver_key, message, signature,
     )
+    .c(d!())
 }
 
 /// aggregate signature (for a single common message)
@@ -47,12 +48,13 @@ pub fn bls_verify_aggregated<B: AsRef<[u8]>>(
     ver_keys: &[&BlsPublicKey],
     message: &B,
     agg_signature: &BlsSignature,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     crypto::basics::signatures::bls::bls_verify_aggregated::<Bls12381, B>(
         ver_keys,
         message,
         agg_signature,
     )
+    .c(d!())
 }
 
 /// Batch verification of many signatures
@@ -60,10 +62,11 @@ pub fn bls_batch_verify<B: AsRef<[u8]>>(
     ver_keys: &[BlsPublicKey],
     messages: &[B],
     signatures: &[BlsSignature],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     crypto::basics::signatures::bls::bls_batch_verify::<Bls12381, B>(
         ver_keys, messages, signatures,
     )
+    .c(d!())
 }
 
 /// signature aggregation for (possibly) different messages
@@ -76,10 +79,11 @@ pub fn bls_batch_verify_added_signatures<B: AsRef<[u8]>>(
     ver_keys: &[BlsPublicKey],
     messages: &[B],
     signature: &BlsSignature,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     crypto::basics::signatures::bls::bls_batch_verify_added_signatures::<Bls12381, B>(
         ver_keys, messages, signature,
     )
+    .c(d!())
 }
 
 pub struct Bls;
@@ -98,8 +102,8 @@ impl Signature for Bls {
         pk: &Self::PublicKey,
         sig: &Self::Signature,
         msg: &B,
-    ) -> Result<(), ZeiError> {
-        bls_verify(pk, msg, sig)
+    ) -> Result<()> {
+        bls_verify(pk, msg, sig).c(d!())
     }
 }
 
@@ -115,7 +119,7 @@ impl AggSignature for Bls {
         pks: &[&Self::PublicKey],
         agg_sig: &Self::AggSignature,
         msg: &B,
-    ) -> Result<(), ZeiError> {
-        bls_verify_aggregated(pks, msg, agg_sig)
+    ) -> Result<()> {
+        bls_verify_aggregated(pks, msg, agg_sig).c(d!())
     }
 }

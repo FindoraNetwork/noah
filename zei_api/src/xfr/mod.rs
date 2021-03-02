@@ -6,4 +6,5 @@ pub mod proofs;
 pub mod sig;
 pub mod structs;
 pub mod test_utils; // for integration test
+#[cfg(test)]
 pub(crate) mod tests; // unit tests

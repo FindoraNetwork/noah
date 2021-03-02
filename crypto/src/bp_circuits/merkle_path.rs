@@ -1,6 +1,7 @@
 use super::mimc_hash::mimc_hash;
 use algebra::ristretto::RistrettoScalar as Scalar;
-use bulletproofs::r1cs::{ConstraintSystem, R1CSError, Variable};
+use bulletproofs::r1cs::{ConstraintSystem, Variable};
+use ruc::{err::*, *};
 
 pub fn merkle_verify_mimc<CS: ConstraintSystem>(
     cs: &mut CS,
@@ -8,7 +9,7 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(
     path: &[(Variable, Variable)],
     root: Scalar,
     tree_size: Scalar,
-) -> Result<usize, R1CSError> {
+) -> Result<usize> {
     let mut num_left_wires = 0;
     let mut node = element.into();
     let path_len = path.len();
@@ -30,7 +31,8 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(
             cs,
             &[b_x_sibling + not_b_x_node, b_x_node + not_b_x_sibling],
             level,
-        )?;
+        )
+        .c(d!())?;
         node = n;
         num_left_wires += 4 + num_wires;
     }
@@ -49,7 +51,8 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(
             b_x_node + not_b_x_sibling,
         ],
         0,
-    )?;
+    )
+    .c(d!())?;
 
     num_left_wires += 4 + num_wires;
 
@@ -123,7 +126,7 @@ mod test {
             })
             .collect();
         let var_path: Vec<(Variable, Variable)> =
-            com_var_path.iter().map(|(_, y)| y.clone()).collect();
+            com_var_path.iter().map(|(_, y)| *y).collect();
         super::merkle_verify_mimc(
             &mut prover,
             var_elem,

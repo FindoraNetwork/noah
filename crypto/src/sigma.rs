@@ -5,6 +5,7 @@ use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 
 pub trait SigmaTranscript {
@@ -245,7 +246,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
     lhs_matrix: &[Vec<usize>],
     rhs_vec: &[usize],
     proof: &SigmaProof<G::S, G>,
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let multi_exp_scalars =
         sigma_verify_scalars(transcript, prng, elems, lhs_matrix, rhs_vec, proof);
 
@@ -259,7 +260,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
     }
     let result = G::vartime_multi_exp(scalars_as_ref.as_slice(), me_elems.as_slice());
     if result != G::get_identity() {
-        Err(ZeiError::ZKProofVerificationError)
+        Err(eg!(ZeiError::ZKProofVerificationError))
     } else {
         Ok(())
     }

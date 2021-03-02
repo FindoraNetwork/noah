@@ -28,6 +28,7 @@ use itertools::Itertools;
 use linear_map::LinearMap;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
+use ruc::{err::*, *};
 use utils::errors::ZeiError;
 use utils::{min_greater_equal_power_of_two, u64_to_u32_pair};
 
@@ -38,7 +39,7 @@ pub(crate) fn asset_amount_tracing_proofs<R: CryptoRng + RngCore>(
     prng: &mut R,
     inputs: &[AssetRecord],
     outputs: &[AssetRecord],
-) -> Result<Vec<PedersenElGamalEqProof>, ZeiError> {
+) -> Result<Vec<PedersenElGamalEqProof>> {
     let mut pks_map: LinearMap<RecordDataEncKey, Vec<(&AssetRecord, &TracerMemo)>> =
         LinearMap::new(); // use linear map because of determinism  (rather than HashMap)
 
@@ -55,7 +56,8 @@ pub(crate) fn asset_amount_tracing_proofs<R: CryptoRng + RngCore>(
             &mut transcript,
             &tracer_pub_key,
             &records_memos,
-        )?;
+        )
+        .c(d!())?;
         proofs.push(proof)
     }
     Ok(proofs)
@@ -66,7 +68,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     pub_key: &RecordDataEncKey,
     records_memos: &[(&AssetRecord, &TracerMemo)],
-) -> Result<PedersenElGamalEqProof, ZeiError> {
+) -> Result<PedersenElGamalEqProof> {
     let mut m = vec![];
     let mut r = vec![];
     let mut ctexts = vec![];
@@ -81,14 +83,14 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
             let (lock_amount_low, lock_amount_high) = memo
                 .lock_amount
                 .as_ref()
-                .ok_or(ZeiError::InconsistentStructureError)?;
+                .c(d!(ZeiError::InconsistentStructureError))?;
             m.push(Scalar::from_u32(low));
             r.push(open_record.amount_blinds.0);
             ctexts.push(lock_amount_low.clone()); // TODO avoid this clone
             commitments.push(
                 com_low
                     .decompress()
-                    .ok_or(ZeiError::DecompressElementError)?,
+                    .c(d!(ZeiError::DecompressElementError))?,
             );
             m.push(Scalar::from_u32(high));
             r.push(open_record.amount_blinds.1);
@@ -96,7 +98,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
             commitments.push(
                 com_high
                     .decompress()
-                    .ok_or(ZeiError::DecompressElementError)?,
+                    .c(d!(ZeiError::DecompressElementError))?,
             );
         }
         if let XfrAssetType::Confidential(com) =
@@ -105,11 +107,11 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
             let lock_asset_type = memo
                 .lock_asset_type
                 .as_ref()
-                .ok_or(ZeiError::InconsistentStructureError)?;
+                .c(d!(ZeiError::InconsistentStructureError))?;
             m.push(open_record.asset_type.as_scalar());
             r.push(open_record.type_blind);
             ctexts.push(lock_asset_type.clone()); // TODO avoid this clone
-            commitments.push(com.decompress().ok_or(ZeiError::DecompressElementError)?);
+            commitments.push(com.decompress().c(d!(ZeiError::DecompressElementError))?);
         }
     }
     Ok(pedersen_elgamal_aggregate_eq_proof(
@@ -183,10 +185,10 @@ impl<'a> BarMemosPoliciesCollection<'a> {
         self.policies.iter().zip(self.bars.iter()).zip(self.memos)
     }
 
-    pub fn check(&self) -> Result<(), ZeiError> {
+    pub fn check(&self) -> Result<()> {
         if self.policies.len() != self.bars.len() || self.bars.len() != self.memos.len()
         {
-            Err(ZeiError::ParameterError)
+            Err(eg!(ZeiError::ParameterError))
         } else {
             Ok(())
         }
@@ -196,8 +198,8 @@ impl<'a> BarMemosPoliciesCollection<'a> {
 fn collect_bars_and_memos_by_keys<'a>(
     map: &mut LinearMap<RecordDataEncKey, BarMemoVec<'a>>,
     bmp: &BarMemosPoliciesCollection<'a>,
-) -> Result<(), ZeiError> {
-    bmp.check()?;
+) -> Result<()> {
+    bmp.check().c(d!())?;
 
     for ((tracing_policies_i, bar_i), memos_i) in bmp.range_over() {
         // If the bar is non confidential skip memo and bar, since there is no tracing proof
@@ -225,34 +227,32 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
     pc_gens: &RistrettoPedersenGens,
     xfr_bodies: &[&XfrBody],
     instances_policies: &[&XfrNotePoliciesRef],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     if xfr_bodies.len() != instances_policies.len() {
-        return Err(ZeiError::ParameterError);
+        return Err(eg!(ZeiError::ParameterError));
     }
 
     // 1. batch asset_type and amount tracing
-    let input_reveal_policies: Result<Vec<&[&TracingPolicies]>, ZeiError> =
-        instances_policies
-            .iter()
-            .map(|policies| {
-                if policies.valid {
-                    Ok(policies.inputs_tracing_policies.as_slice())
-                } else {
-                    Err(ZeiError::ParameterError)
-                }
-            })
-            .collect();
-    let output_reveal_policies: Result<Vec<&[&TracingPolicies]>, ZeiError> =
-        instances_policies
-            .iter()
-            .map(|policies| {
-                if policies.valid {
-                    Ok(policies.outputs_tracing_policies.as_slice())
-                } else {
-                    Err(ZeiError::ParameterError)
-                }
-            })
-            .collect();
+    let input_reveal_policies: Result<Vec<&[&TracingPolicies]>> = instances_policies
+        .iter()
+        .map(|policies| {
+            if policies.valid {
+                Ok(policies.inputs_tracing_policies.as_slice())
+            } else {
+                Err(eg!(ZeiError::ParameterError))
+            }
+        })
+        .collect();
+    let output_reveal_policies: Result<Vec<&[&TracingPolicies]>> = instances_policies
+        .iter()
+        .map(|policies| {
+            if policies.valid {
+                Ok(policies.outputs_tracing_policies.as_slice())
+            } else {
+                Err(eg!(ZeiError::ParameterError))
+            }
+        })
+        .collect();
     batch_verify_asset_tracing_proofs(
         prng,
         pc_gens,
@@ -260,7 +260,7 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
         &input_reveal_policies.unwrap(),
         &output_reveal_policies.unwrap(),
     )
-    .map_err(|_| ZeiError::XfrVerifyAssetTracingAssetAmountError)?;
+    .c(d!(ZeiError::XfrVerifyAssetTracingAssetAmountError))?;
 
     // Identity proofs can be batched(?)
     for (xfr_body, policies) in xfr_bodies.iter().zip(instances_policies.iter()) {
@@ -271,13 +271,15 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
             &xfr_body.asset_tracing_memos[..inputs_len],
             &xfr_body.proofs.asset_tracing_proof.inputs_identity_proofs,
             &policies.inputs_sig_commitments,
-        )?;
+        )
+        .c(d!())?;
         verify_identity_proofs(
             &policies.outputs_tracing_policies,
             &xfr_body.asset_tracing_memos[inputs_len..],
             &xfr_body.proofs.asset_tracing_proof.outputs_identity_proofs,
             &policies.outputs_sig_commitments,
-        )?;
+        )
+        .c(d!())?;
     }
 
     Ok(())
@@ -289,7 +291,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
     xfr_bodies: &[&XfrBody],
     input_reveal_policies: &[&[&TracingPolicies]],
     output_reveal_policies: &[&[&TracingPolicies]],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     // Idea: collect all instances of perdersen_elgamal_equality proofs and call a single
     // batch verification for all of them.
 
@@ -310,7 +312,8 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
             .zip(output_reveal_policies.iter()),
     ) {
         let records_map =
-            collect_records_memos_by_key(xfr_body, input_policies, output_policies)?;
+            collect_records_memos_by_key(xfr_body, input_policies, output_policies)
+                .c(d!())?;
         let m = records_map.len();
         if m != xfr_body
             .proofs
@@ -318,7 +321,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
             .asset_type_and_amount_proofs
             .len()
         {
-            return Err(ZeiError::XfrVerifyAssetTracingAssetAmountError);
+            return Err(eg!(ZeiError::XfrVerifyAssetTracingAssetAmountError));
         }
         all_records_map.push(records_map);
         all_proofs.push(
@@ -332,7 +335,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
     for (records_map, proofs) in all_records_map.iter().zip(all_proofs.iter()) {
         for ((key, records_and_memos), proof) in records_map.iter().zip(proofs.iter()) {
             let (ctexts, commitments) =
-                extract_ciphertext_and_commitments(&records_and_memos.0)?;
+                extract_ciphertext_and_commitments(&records_and_memos.0).c(d!())?;
             let peg_eq_instance = PedersenElGamalProofInstance {
                 public_key: key,
                 ctexts,
@@ -349,6 +352,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
         pc_gens,
         &instances,
     )
+    .c(d!())
 }
 
 #[derive(Default)]
@@ -364,7 +368,7 @@ fn collect_records_memos_by_key<'a>(
     xfr_body: &'a XfrBody,
     input_reveal_policies: &'a [&TracingPolicies],
     output_reveal_policies: &'a [&TracingPolicies],
-) -> Result<LinearMap<RecordDataEncKey, BarMemoVec<'a>>, ZeiError> {
+) -> Result<LinearMap<RecordDataEncKey, BarMemoVec<'a>>> {
     let mut map: LinearMap<RecordDataEncKey, BarMemoVec<'a>> = LinearMap::new();
     let inputs_len = xfr_body.inputs.len();
     let bars_memo_policies_input = BarMemosPoliciesCollection::new(
@@ -373,7 +377,7 @@ fn collect_records_memos_by_key<'a>(
         input_reveal_policies,
     );
     collect_bars_and_memos_by_keys(&mut map, &bars_memo_policies_input)
-        .map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?;
+        .c(d!(ZeiError::XfrVerifyAssetTracingIdentityError))?;
 
     let bars_memo_policies_output = BarMemosPoliciesCollection::new(
         &xfr_body.outputs,
@@ -381,7 +385,7 @@ fn collect_records_memos_by_key<'a>(
         output_reveal_policies,
     );
     collect_bars_and_memos_by_keys(&mut map, &bars_memo_policies_output)
-        .map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?;
+        .c(d!(ZeiError::XfrVerifyAssetTracingIdentityError))?;
     Ok(map)
 }
 
@@ -390,12 +394,12 @@ fn verify_identity_proofs(
     memos: &[Vec<TracerMemo>],
     proofs: &[Vec<Option<ACConfidentialRevealProof>>],
     sig_commitments: &[Option<&ACCommitment>],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     // 1. check for errors
     let n = reveal_policies.len();
 
     if memos.len() != proofs.len() || n != sig_commitments.len() {
-        return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
+        return Err(eg!(ZeiError::XfrVerifyAssetTracingIdentityError));
     }
     // if no policies, memos and proofs should be empty
     if n == 0 {
@@ -403,10 +407,10 @@ fn verify_identity_proofs(
         if !memos.iter().all(|vec| vec.is_empty())
             || !proofs.iter().all(|vec| vec.is_empty())
         {
-            return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
+            return Err(eg!(ZeiError::XfrVerifyAssetTracingIdentityError));
         }
     } else if n != memos.len() {
-        return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
+        return Err(eg!(ZeiError::XfrVerifyAssetTracingIdentityError));
     }
 
     // 2. check proofs
@@ -416,7 +420,7 @@ fn verify_identity_proofs(
     {
         let m = policies.len();
         if m != memos.len() || m != proofs.len() {
-            return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
+            return Err(eg!(ZeiError::XfrVerifyAssetTracingIdentityError));
         }
         // for each policy memo and proof
         let policies = policies.get_policies();
@@ -425,7 +429,7 @@ fn verify_identity_proofs(
             match (&policy.identity_tracing, proof) {
                 (Some(policy), Some(proof)) => {
                     let sig_com = sig_commitment
-                        .ok_or(ZeiError::XfrVerifyAssetTracingIdentityError)?;
+                        .c(d!(ZeiError::XfrVerifyAssetTracingIdentityError))?;
                     ac_confidential_verify(
                         &policy.cred_issuer_pub_key,
                         enc_keys,
@@ -435,11 +439,11 @@ fn verify_identity_proofs(
                         proof,
                         &[],
                     )
-                    .map_err(|_| ZeiError::XfrVerifyAssetTracingIdentityError)?
+                    .c(d!(ZeiError::XfrVerifyAssetTracingIdentityError))?
                 }
                 (None, None) => {}
                 _ => {
-                    return Err(ZeiError::XfrVerifyAssetTracingIdentityError);
+                    return Err(eg!(ZeiError::XfrVerifyAssetTracingIdentityError));
                 }
             }
         }
@@ -449,7 +453,7 @@ fn verify_identity_proofs(
 
 fn extract_ciphertext_and_commitments(
     records_and_memos: &[(&BlindAssetRecord, &TracerMemo)],
-) -> Result<(Vec<ElGamalCiphertext<RistrettoPoint>>, Vec<RistrettoPoint>), ZeiError> {
+) -> Result<(Vec<ElGamalCiphertext<RistrettoPoint>>, Vec<RistrettoPoint>)> {
     let mut ctexts = vec![];
     let mut coms = vec![];
     for record_and_memo in records_and_memos {
@@ -457,7 +461,7 @@ fn extract_ciphertext_and_commitments(
         let asset_tracer_memo = record_and_memo.1;
         // 1 amount
         if asset_tracer_memo.lock_amount.is_none() && record.amount.is_confidential() {
-            return Err(ZeiError::InconsistentStructureError); // There should be a lock for the amount
+            return Err(eg!(ZeiError::InconsistentStructureError)); // There should be a lock for the amount
         }
         if let Some(lock_amount) = &asset_tracer_memo.lock_amount {
             ctexts.push(lock_amount.0.clone());
@@ -465,16 +469,16 @@ fn extract_ciphertext_and_commitments(
             let commitments = record
                 .amount
                 .get_commitments()
-                .ok_or(ZeiError::InconsistentStructureError)?;
+                .c(d!(ZeiError::InconsistentStructureError))?;
             coms.push(
                 (commitments.0)
                     .decompress()
-                    .ok_or(ZeiError::DecompressElementError)?,
+                    .c(d!(ZeiError::DecompressElementError))?,
             );
             coms.push(
                 (commitments.1)
                     .decompress()
-                    .ok_or(ZeiError::DecompressElementError)?,
+                    .c(d!(ZeiError::DecompressElementError))?,
             );
         }
 
@@ -482,7 +486,7 @@ fn extract_ciphertext_and_commitments(
         if asset_tracer_memo.lock_asset_type.is_none()
             && record.asset_type.is_confidential()
         {
-            return Err(ZeiError::InconsistentStructureError); // There should be a lock for the asset type
+            return Err(eg!(ZeiError::InconsistentStructureError)); // There should be a lock for the asset type
         }
         if let Some(lock_type) = &asset_tracer_memo.lock_asset_type {
             ctexts.push(lock_type.clone());
@@ -490,9 +494,9 @@ fn extract_ciphertext_and_commitments(
                 record
                     .asset_type
                     .get_commitment()
-                    .ok_or(ZeiError::InconsistentStructureError)?
+                    .c(d!(ZeiError::InconsistentStructureError))?
                     .decompress()
-                    .ok_or(ZeiError::DecompressElementError)?,
+                    .c(d!(ZeiError::DecompressElementError))?,
             );
         }
     }
@@ -507,12 +511,12 @@ fn extract_ciphertext_and_commitments(
 pub(crate) fn range_proof(
     inputs: &[&OpenAssetRecord],
     outputs: &[&OpenAssetRecord],
-) -> Result<XfrRangeProof, ZeiError> {
+) -> Result<XfrRangeProof> {
     let num_output = outputs.len();
     let upper_power2 =
         min_greater_equal_power_of_two((2 * (num_output + 1)) as u32) as usize;
     if upper_power2 > MAX_PARTY_NUMBER {
-        return Err(ZeiError::RangeProofProveError);
+        return Err(eg!(ZeiError::RangeProofProveError));
     }
 
     let params = PublicParams::default();
@@ -524,7 +528,7 @@ pub(crate) fn range_proof(
     let xfr_diff = if in_total >= out_total {
         in_total - out_total
     } else {
-        return Err(ZeiError::RangeProofProveError);
+        return Err(eg!(ZeiError::RangeProofProveError));
     };
     let mut values = Vec::with_capacity(out_amounts.len() + 1);
     for x in out_amounts {
@@ -564,7 +568,7 @@ pub(crate) fn range_proof(
         range_proof_blinds.as_slice(),
         BULLET_PROOF_RANGE,
     )
-    .map_err(|_| ZeiError::RangeProofProveError)?;
+    .c(d!(ZeiError::RangeProofProveError))?;
 
     let diff_com_low = coms[2 * num_output];
     let diff_com_high = coms[2 * num_output + 1];
@@ -589,17 +593,16 @@ pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
         &Vec<BlindAssetRecord>,
         &XfrRangeProof,
     )],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut transcripts = vec![Transcript::new(b"Zei Range Proof"); instances.len()];
     let proofs: Vec<&RangeProof> =
         instances.iter().map(|(_, _, pf)| &pf.range_proof).collect();
     let mut commitments = vec![];
     for (input, output, proof) in instances {
-        commitments.push(extract_value_commitments(
-            input.as_slice(),
-            output.as_slice(),
-            proof,
-        )?);
+        commitments.push(
+            extract_value_commitments(input.as_slice(), output.as_slice(), proof)
+                .c(d!())?,
+        );
     }
     let value_commitments = commitments.iter().map(|c| c.as_slice()).collect_vec();
     batch_verify_ranges(
@@ -611,14 +614,14 @@ pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
         &value_commitments,
         BULLET_PROOF_RANGE,
     )
-    .map_err(|_| ZeiError::XfrVerifyConfidentialAmountError)
+    .c(d!(ZeiError::XfrVerifyConfidentialAmountError))
 }
 
 fn extract_value_commitments(
     inputs: &[BlindAssetRecord],
     outputs: &[BlindAssetRecord],
     proof: &XfrRangeProof,
-) -> Result<Vec<CompressedRistretto>, ZeiError> {
+) -> Result<Vec<CompressedRistretto>> {
     let num_output = outputs.len();
     let upper_power2 =
         min_greater_equal_power_of_two((2 * num_output + 2) as u32) as usize;
@@ -633,10 +636,10 @@ fn extract_value_commitments(
             XfrAmount::Confidential((com_low, com_high)) => (
                 com_low
                     .decompress()
-                    .ok_or(ZeiError::XfrVerifyConfidentialAmountError)?,
+                    .c(d!(ZeiError::XfrVerifyConfidentialAmountError))?,
                 com_high
                     .decompress()
-                    .ok_or(ZeiError::XfrVerifyConfidentialAmountError)?,
+                    .c(d!(ZeiError::XfrVerifyConfidentialAmountError))?,
             ),
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
@@ -655,8 +658,8 @@ fn extract_value_commitments(
     for output in outputs.iter() {
         let (com_low, com_high) = match output.amount {
             XfrAmount::Confidential((com_low, com_high)) => (
-                com_low.decompress().ok_or(ZeiError::ParameterError)?,
-                com_high.decompress().ok_or(ZeiError::ParameterError)?,
+                com_low.decompress().c(d!(ZeiError::ParameterError))?,
+                com_high.decompress().c(d!(ZeiError::ParameterError))?,
             ),
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
@@ -684,15 +687,15 @@ fn extract_value_commitments(
     let proof_xfr_com_low = proof
         .xfr_diff_commitment_low
         .decompress()
-        .ok_or(ZeiError::DecompressElementError)?;
+        .c(d!(ZeiError::DecompressElementError))?;
     let proof_xfr_com_high = proof
         .xfr_diff_commitment_high
         .decompress()
-        .ok_or(ZeiError::DecompressElementError)?;
+        .c(d!(ZeiError::DecompressElementError))?;
     let proof_xfr_com_diff = proof_xfr_com_low.add(&proof_xfr_com_high.mul(&pow2_32));
 
     if derived_xfr_diff_com.compress() != proof_xfr_com_diff.compress() {
-        return Err(ZeiError::XfrVerifyConfidentialAmountError);
+        return Err(eg!(ZeiError::XfrVerifyConfidentialAmountError));
     }
 
     // 4. Push diff commitments
@@ -714,14 +717,14 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
     pc_gens: &RistrettoPedersenGens,
     open_inputs: &[&OpenAssetRecord],
     open_outputs: &[&OpenAssetRecord],
-) -> Result<ChaumPedersenProofX, ZeiError> {
+) -> Result<ChaumPedersenProofX> {
     let mut asset_coms = vec![];
     let mut asset_blinds = vec![];
 
     for x in open_inputs.iter().chain(open_outputs) {
         let commitment = match x.blind_asset_record.asset_type {
             XfrAssetType::Confidential(com) => {
-                com.decompress().ok_or(ZeiError::ParameterError)?
+                com.decompress().c(d!(ZeiError::ParameterError))?
             }
             XfrAssetType::NonConfidential(asset_type) => {
                 pc_gens.commit(asset_type.as_scalar(), x.type_blind)
@@ -731,16 +734,16 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
         asset_blinds.push(x.type_blind);
     }
     let mut transcript = Transcript::new(b"AssetEquality");
-    let proof = chaum_pedersen_prove_multiple_eq(
+
+    chaum_pedersen_prove_multiple_eq(
         &mut transcript,
         prng,
         pc_gens,
         &open_inputs[0].asset_type.as_scalar(),
         asset_coms.as_slice(),
         asset_blinds.as_slice(),
-    )?;
-
-    Ok(proof)
+    )
+    .c(d!())
 }
 
 pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
@@ -751,23 +754,23 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
         &Vec<BlindAssetRecord>,
         &ChaumPedersenProofX,
     )],
-) -> Result<(), ZeiError> {
+) -> Result<()> {
     let mut transcript = Transcript::new(b"AssetEquality");
     let mut proof_instances = Vec::with_capacity(instances.len());
     for (inputs, outputs, proof) in instances {
-        let instance_commitments: Result<Vec<RistrettoPoint>, ZeiError> = inputs
+        let instance_commitments: Result<Vec<RistrettoPoint>> = inputs
             .iter()
             .chain(outputs.iter())
             .map(|x| match x.asset_type {
                 XfrAssetType::Confidential(com) => {
-                    com.decompress().ok_or(ZeiError::ParameterError)
+                    com.decompress().c(d!(ZeiError::ParameterError))
                 }
                 XfrAssetType::NonConfidential(asset_type) => {
                     Ok(pc_gens.commit(asset_type.as_scalar(), Scalar::from_u32(0)))
                 }
             })
             .collect();
-        proof_instances.push((instance_commitments?, *proof));
+        proof_instances.push((instance_commitments.c(d!())?, *proof));
     }
     chaum_pedersen_batch_verify_multiple_eq(
         &mut transcript,
@@ -775,7 +778,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
         &pc_gens,
         &proof_instances,
     )
-    .map_err(|_| ZeiError::XfrVerifyConfidentialAssetError)
+    .c(d!(ZeiError::XfrVerifyConfidentialAssetError))
 }
 
 #[cfg(test)]
@@ -786,6 +789,7 @@ mod tests {
     };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::{err::*, *};
     use utils::errors::ZeiError;
 
     #[test]
@@ -806,7 +810,7 @@ mod tests {
             proofs.as_slice(),
             sig_commitments.as_slice(),
         );
-        assert_eq!(res, Ok(()));
+        pnk!(res);
 
         // fake sig commitment
         let sig_commitment = crate::api::anon_creds::ACCommitment::default(); // { 0: ACSignature { sigma1: BLSG1::get_identity(),
@@ -821,7 +825,10 @@ mod tests {
             sig_commitments.as_slice(),
         );
 
-        assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
+        err_eq!(
+            ZeiError::XfrVerifyAssetTracingIdentityError,
+            res.unwrap_err()
+        );
 
         // 2. if policy, then there must be memos and proofs
         let policy = TracingPolicy {
@@ -840,7 +847,10 @@ mod tests {
             sig_commitments.as_slice(),
         );
 
-        assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
+        err_eq!(
+            ZeiError::XfrVerifyAssetTracingIdentityError,
+            res.unwrap_err()
+        );
 
         // fake memo
         let tracer_key = AssetTracerKeyPair::generate(&mut prng).enc_key;
@@ -860,6 +870,9 @@ mod tests {
             sig_commitments.as_slice(),
         );
 
-        assert_eq!(res, Err(ZeiError::XfrVerifyAssetTracingIdentityError));
+        err_eq!(
+            ZeiError::XfrVerifyAssetTracingIdentityError,
+            res.unwrap_err()
+        );
     }
 }
