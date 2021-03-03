@@ -152,7 +152,9 @@ mod test {
     use ruc::{err::*, *};
     use serde::de::Deserialize;
     use serde::ser::Serialize;
-    use crate::xfr::structs::XfrAmount;
+    use crate::xfr::structs::{XfrAmount, OpenAssetRecord, BlindAssetRecord, XfrAssetType};
+    use crate::ristretto::CompressedRistretto;
+    use std::convert::TryFrom;
 
     #[test]
     fn xfr_amount_u64_to_string_serde() {
@@ -170,6 +172,37 @@ mod test {
         let val = 1844674407370955161;
         let expected_amt = XfrAmount::NonConfidential(val);
         assert_eq!(expected_amt.get_amount(), actual_amt.get_amount());
+    }
+
+    #[test]
+    fn oar_amount_u64_to_string_serde() {
+        use curve25519_dalek::ristretto::CompressedRistretto as CR;
+        let default_cr = CompressedRistretto(CR(<[u8; 32]>::try_from(vec![0 as u8; 32].as_slice()).unwrap()));
+        let blind_amount = XfrAmount::Confidential((default_cr, default_cr));
+        let blind_type = XfrAssetType::Confidential(default_cr);
+        let amt = 1844674407370955161;
+        let oar = OpenAssetRecord {
+            blind_asset_record: BlindAssetRecord {
+                amount:  blind_amount,
+                asset_type: blind_type,
+                public_key: Default::default()
+            },
+            amount: amt,
+            amount_blinds: (Default::default(), Default::default()),
+            asset_type: Default::default(),
+            type_blind: Default::default()
+        };
+        let actual_to_string_res = serde_json::to_string(&oar).unwrap();
+        let expected_to_string_res = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
+        assert_eq!(actual_to_string_res, expected_to_string_res);
+    }
+
+    #[test]
+    fn oar_amount_u64_from_string_serde() {
+        let serialized_str = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
+        let oar: OpenAssetRecord = serde_json::from_str::<OpenAssetRecord>(&serialized_str).unwrap();
+        let val = 1844674407370955161 as u64;
+        assert_eq!(val, *oar.get_amount());
     }
 
     #[test]
