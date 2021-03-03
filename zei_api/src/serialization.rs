@@ -1,5 +1,4 @@
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
-use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
 use ruc::{err::*, *};
@@ -35,23 +34,23 @@ impl ZeiFromToBytes for AXfrSecKey {
 serialize_deserialize!(AXfrSecKey);
 */
 
-impl ZeiFromToBytes for AssetType {
-    fn zei_to_bytes(&self) -> Vec<u8> {
-        self.0.to_vec()
-    }
-
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != ASSET_TYPE_LENGTH {
-            Err(eg!(ZeiError::DeserializationError))
-        } else {
-            let mut array = [0u8; ASSET_TYPE_LENGTH];
-            array.copy_from_slice(bytes);
-            Ok(AssetType(array))
-        }
-    }
-}
-
-serialize_deserialize!(AssetType);
+// impl ZeiFromToBytes for AssetType {
+//     fn zei_to_bytes(&self) -> Vec<u8> {
+//         self.0.to_vec()
+//     }
+//
+//     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+//         if bytes.len() != ASSET_TYPE_LENGTH {
+//             Err(eg!(ZeiError::DeserializationError))
+//         } else {
+//             let mut array = [0u8; ASSET_TYPE_LENGTH];
+//             array.copy_from_slice(bytes);
+//             Ok(AssetType(array))
+//         }
+//     }
+// }
+//
+// serialize_deserialize!(AssetType);
 
 impl ZeiFromToBytes for XfrPublicKey {
     fn zei_to_bytes(&self) -> Vec<u8> {
