@@ -1,5 +1,4 @@
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
-use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
 use ruc::{err::*, *};
@@ -35,23 +34,23 @@ impl ZeiFromToBytes for AXfrSecKey {
 serialize_deserialize!(AXfrSecKey);
 */
 
-impl ZeiFromToBytes for AssetType {
-    fn zei_to_bytes(&self) -> Vec<u8> {
-        self.0.to_vec()
-    }
-
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != ASSET_TYPE_LENGTH {
-            Err(eg!(ZeiError::DeserializationError))
-        } else {
-            let mut array = [0u8; ASSET_TYPE_LENGTH];
-            array.copy_from_slice(bytes);
-            Ok(AssetType(array))
-        }
-    }
-}
-
-serialize_deserialize!(AssetType);
+// impl ZeiFromToBytes for AssetType {
+//     fn zei_to_bytes(&self) -> Vec<u8> {
+//         self.0.to_vec()
+//     }
+//
+//     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+//         if bytes.len() != ASSET_TYPE_LENGTH {
+//             Err(eg!(ZeiError::DeserializationError))
+//         } else {
+//             let mut array = [0u8; ASSET_TYPE_LENGTH];
+//             array.copy_from_slice(bytes);
+//             Ok(AssetType(array))
+//         }
+//     }
+// }
+//
+// serialize_deserialize!(AssetType);
 
 impl ZeiFromToBytes for XfrPublicKey {
     fn zei_to_bytes(&self) -> Vec<u8> {
@@ -142,6 +141,7 @@ mod test {
     use crate::serialization::ZeiFromToBytes;
     use crate::xfr::asset_tracer::RecordDataEncKey;
     use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
+    use crate::xfr::structs::XfrAmount;
     use algebra::ristretto::RistrettoPoint;
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crypto::basics::elgamal::elgamal_key_gen;
@@ -152,7 +152,6 @@ mod test {
     use ruc::{err::*, *};
     use serde::de::Deserialize;
     use serde::ser::Serialize;
-    use crate::xfr::structs::XfrAmount;
 
     #[test]
     fn xfr_amount_u64_to_string_serde() {
@@ -165,7 +164,8 @@ mod test {
     #[test]
     fn xfr_amount_u64_from_string_serde() {
         let serialized_str = r##"{"NonConfidential":"1844674407370955161"}"##;
-        let actual_amt: XfrAmount = serde_json::from_str::<XfrAmount>(&serialized_str).unwrap();
+        let actual_amt: XfrAmount =
+            serde_json::from_str::<XfrAmount>(&serialized_str).unwrap();
 
         let val = 1844674407370955161;
         let expected_amt = XfrAmount::NonConfidential(val);
