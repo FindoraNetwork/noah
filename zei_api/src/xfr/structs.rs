@@ -614,6 +614,7 @@ impl OwnerMemo {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct OpenAssetRecord {
     pub blind_asset_record: BlindAssetRecord, //TODO have a reference here, and lifetime parameter. We will avoid copying info unnecessarily.
+    #[serde(with = "serde_str")]
     pub amount: u64,
     pub amount_blinds: (Scalar, Scalar), // use Scalar::zero() if unneeded
     pub asset_type: AssetType,
@@ -649,6 +650,7 @@ pub struct AssetRecord {
 /// An asset record template: amount, asset type, owner public key, type and tracing
 #[derive(Deserialize, Serialize)]
 pub struct AssetRecordTemplate {
+    #[serde(with = "serde_str")]
     pub amount: u64,
     pub asset_type: AssetType,
     pub public_key: XfrPublicKey, // ownership address
