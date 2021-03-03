@@ -5,6 +5,7 @@ use ruc::{err::*, *};
 use serde::Serializer;
 use utils::errors::ZeiError;
 pub use utils::serialization::ZeiFromToBytes;
+use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 
 /*
 impl ZeiFromToBytes for AXfrPubKey {
@@ -34,21 +35,21 @@ impl ZeiFromToBytes for AXfrSecKey {
 serialize_deserialize!(AXfrSecKey);
 */
 
-// impl ZeiFromToBytes for AssetType {
-//     fn zei_to_bytes(&self) -> Vec<u8> {
-//         self.0.to_vec()
-//     }
-//
-//     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-//         if bytes.len() != ASSET_TYPE_LENGTH {
-//             Err(eg!(ZeiError::DeserializationError))
-//         } else {
-//             let mut array = [0u8; ASSET_TYPE_LENGTH];
-//             array.copy_from_slice(bytes);
-//             Ok(AssetType(array))
-//         }
-//     }
-// }
+impl ZeiFromToBytes for AssetType {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != ASSET_TYPE_LENGTH {
+            Err(eg!(ZeiError::DeserializationError))
+        } else {
+            let mut array = [0u8; ASSET_TYPE_LENGTH];
+            array.copy_from_slice(bytes);
+            Ok(AssetType(array))
+        }
+    }
+}
 //
 // serialize_deserialize!(AssetType);
 
@@ -198,13 +199,13 @@ mod test {
             type_blind: Default::default(),
         };
         let actual_to_string_res = serde_json::to_string(&oar).unwrap();
-        let expected_to_string_res = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
+        let expected_to_string_res = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
         assert_eq!(actual_to_string_res, expected_to_string_res);
     }
 
     #[test]
     fn oar_amount_u64_from_string_serde() {
-        let serialized_str = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
+        let serialized_str = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
         let oar: OpenAssetRecord =
             serde_json::from_str::<OpenAssetRecord>(&serialized_str).unwrap();
         let val = 1844674407370955161 as u64;
