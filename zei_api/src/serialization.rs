@@ -1,11 +1,11 @@
 use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
+use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
 use ruc::{err::*, *};
 use serde::Serializer;
 use utils::errors::ZeiError;
 pub use utils::serialization::ZeiFromToBytes;
-use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 
 /*
 impl ZeiFromToBytes for AXfrPubKey {
@@ -181,7 +181,7 @@ mod test {
     fn oar_amount_u64_to_string_serde() {
         use curve25519_dalek::ristretto::CompressedRistretto as CR;
         let default_cr = CompressedRistretto(CR(<[u8; 32]>::try_from(
-            vec![0 as u8; 32].as_slice(),
+            vec![0_u8; 32].as_slice(),
         )
         .unwrap()));
         let blind_amount = XfrAmount::Confidential((default_cr, default_cr));
@@ -208,7 +208,7 @@ mod test {
         let serialized_str = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
         let oar: OpenAssetRecord =
             serde_json::from_str::<OpenAssetRecord>(&serialized_str).unwrap();
-        let val = 1844674407370955161 as u64;
+        let val = 1844674407370955161_u64;
         assert_eq!(val, *oar.get_amount());
     }
 

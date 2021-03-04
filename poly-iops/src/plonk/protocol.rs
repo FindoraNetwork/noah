@@ -318,8 +318,8 @@ pub mod prover {
             C_q_polys,
             C_Sigma,
             witness_polys_eval_beta,
-            perms_eval_beta,
             Sigma_eval_g_beta,
+            perms_eval_beta,
             L_eval_beta,
             batch_eval_proof,
         })
