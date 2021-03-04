@@ -50,7 +50,7 @@ impl ZeiFromToBytes for AssetType {
         }
     }
 }
-//
+
 // serialize_deserialize!(AssetType);
 
 impl ZeiFromToBytes for XfrPublicKey {
