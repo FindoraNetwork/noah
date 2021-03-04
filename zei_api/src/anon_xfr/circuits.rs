@@ -364,9 +364,9 @@ fn add_payers_secrets(
                 diversifier,
                 uid,
                 amount,
+                asset_type,
                 path,
                 blind,
-                asset_type,
             }
         })
         .collect()
