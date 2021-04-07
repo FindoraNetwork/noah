@@ -257,8 +257,8 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
         prng,
         pc_gens,
         xfr_bodies,
-        &input_reveal_policies.unwrap(),
-        &output_reveal_policies.unwrap(),
+        &input_reveal_policies.c(d!())?,
+        &output_reveal_policies.c(d!())?,
     )
     .c(d!(ZeiError::XfrVerifyAssetTracingAssetAmountError))?;
 
