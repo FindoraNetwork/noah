@@ -764,13 +764,12 @@ pub(crate) mod tests {
                     ])[0]
                 })
                 .collect();
+            payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
             if n_payers == 2 {
-                payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
                 payers_secrets[0].path.nodes[0].siblings2 = zero;
                 payers_secrets[1].path.nodes[0].siblings1 = leafs[0];
                 payers_secrets[1].path.nodes[0].siblings2 = zero;
             } else {
-                payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
                 payers_secrets[0].path.nodes[0].siblings2 = leafs[2];
                 payers_secrets[1].path.nodes[0].siblings1 = leafs[0];
                 payers_secrets[1].path.nodes[0].siblings2 = leafs[2];

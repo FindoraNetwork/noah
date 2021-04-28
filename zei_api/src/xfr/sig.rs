@@ -5,6 +5,8 @@ use ed25519_dalek::{SecretKey, Signature, Verifier};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use ruc::{err::*, *};
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
 use wasm_bindgen::prelude::*;
@@ -12,7 +14,7 @@ use wasm_bindgen::prelude::*;
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct XfrPublicKey(pub(crate) PublicKey);
 #[derive(Debug)]
 pub struct XfrSecretKey(pub(crate) SecretKey);
@@ -25,6 +27,32 @@ pub struct XfrKeyPair {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct XfrSignature(pub Signature);
+
+impl Eq for XfrPublicKey {}
+
+impl PartialEq for XfrPublicKey {
+    fn eq(&self, other: &XfrPublicKey) -> bool {
+        self.as_bytes().eq(other.as_bytes())
+    }
+}
+
+impl Ord for XfrPublicKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_bytes().cmp(&other.as_bytes())
+    }
+}
+
+impl PartialOrd for XfrPublicKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Hash for XfrPublicKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_bytes().hash(state)
+    }
+}
 
 impl XfrPublicKey {
     /// returns XfrPublicKey as a compressed edwards point
@@ -46,6 +74,35 @@ impl XfrPublicKey {
 impl Clone for XfrSecretKey {
     fn clone(&self) -> Self {
         XfrSecretKey(SecretKey::from_bytes(self.0.as_ref()).unwrap())
+    }
+}
+
+impl Eq for XfrSecretKey {}
+
+impl PartialEq for XfrSecretKey {
+    fn eq(&self, other: &XfrSecretKey) -> bool {
+        self.as_scalar().eq(&other.as_scalar())
+    }
+}
+
+impl Ord for XfrSecretKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_scalar()
+            .0
+            .to_bytes()
+            .cmp(&other.as_scalar().0.to_bytes())
+    }
+}
+
+impl PartialOrd for XfrSecretKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Hash for XfrSecretKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_scalar().0.hash(state)
     }
 }
 
