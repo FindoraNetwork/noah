@@ -22,7 +22,7 @@ use utils::errors::ZeiError;
 /// The rate table is hash map of Scalar to Scalar.
 // TODO rewrite this function so that it has less arguments
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
+pub fn solvency<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     asset_set_vars: &[CloakVariable],
     asset_set_values: Option<&[CloakValue]>,
