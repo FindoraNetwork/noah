@@ -343,8 +343,8 @@ mod test {
                 value.commit_prover(
                     &mut prover,
                     &CloakValue::new(
-                        RistrettoScalar::from_u32(1),
-                        RistrettoScalar::from_u32(2),
+                        RistrettoScalar::from_u32(123),
+                        RistrettoScalar::from_u32(321),
                     ),
                 )
             })
@@ -360,8 +360,8 @@ mod test {
                 value.commit_prover(
                     &mut prover,
                     &CloakValue::new(
-                        RistrettoScalar::from_u32(3),
-                        RistrettoScalar::from_u32(4),
+                        RistrettoScalar::from_u32(987),
+                        RistrettoScalar::from_u32(789),
                     ),
                 )
             })
