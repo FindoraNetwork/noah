@@ -1,4 +1,4 @@
-use crate::anon_xfr::keys::AXfrKeyPair;
+use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::proofs::{
     prove_eq_committed_vals, verify_eq_committed_vals, AXfrPlonkPf,
 };
@@ -58,11 +58,11 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
     record: &OpenAssetRecord,
-    abar_keypair: &AXfrKeyPair,
+    abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
 ) -> Result<BarToAbarBody> {
     let (open_abar, proof) =
-        bar_to_abar(prng, params, record, abar_keypair, enc_key).c(d!())?;
+        bar_to_abar(prng, params, record, abar_pubkey, enc_key).c(d!())?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
         output: AnonBlindAssetRecord::from_oabar(&open_abar),
@@ -79,11 +79,11 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     params: &UserParams,
     record: &OpenAssetRecord,
     bar_keypair: &XfrKeyPair,
-    abar_keypair: &AXfrKeyPair,
+    abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
 ) -> Result<BarToAbarNote> {
     let body =
-        gen_bar_to_abar_body(prng, params, record, &abar_keypair, enc_key).c(d!())?;
+        gen_bar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
@@ -114,7 +114,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
     obar: &OpenAssetRecord,
-    abar_keypair: &AXfrKeyPair,
+    abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
 ) -> Result<(OpenAnonBlindAssetRecord, ConvertBarAbarProof)> {
     // 1. compute commitments under jubjub
@@ -153,7 +153,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     let oabar = OpenAnonBlindAssetRecordBuilder::new()
         .amount(obar.amount)
         .asset_type(obar.asset_type)
-        .pub_key(abar_keypair.pub_key())
+        .pub_key(abar_pubkey.clone())
         .finalize(prng, &enc_key)
         .c(d!())?
         .build()
@@ -314,7 +314,7 @@ mod test {
         );
         let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
         let (oabar_conf, proof_conf) =
-            super::bar_to_abar(&mut prng, &params, &obar, &abar_keypair, &enc_key)
+            super::bar_to_abar(&mut prng, &params, &obar, &abar_keypair.pub_key(), &enc_key)
                 .unwrap();
         let abar_conf = AnonBlindAssetRecord::from_oabar(&oabar_conf);
         // non confidential case
@@ -328,7 +328,7 @@ mod test {
         );
         let obar = open_blind_asset_record(&bar_non_conf, &memo, &bar_keypair).unwrap();
         let (oabar_non_conf, proof_non_conf) =
-            super::bar_to_abar(&mut prng, &params, &obar, &abar_keypair, &enc_key)
+            super::bar_to_abar(&mut prng, &params, &obar, &abar_keypair.pub_key(), &enc_key)
                 .unwrap();
         let abar_non_conf = AnonBlindAssetRecord::from_oabar(&oabar_non_conf);
 
@@ -376,7 +376,7 @@ mod test {
             &params,
             &obar,
             &bar_keypair,
-            &abar_keypair,
+            &abar_keypair.pub_key(),
             &enc_key,
         )
         .unwrap();
