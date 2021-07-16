@@ -46,7 +46,7 @@ pub struct AbarToBarBody {
     pub proof: ConvertBarAbarProof,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct BarToAbarNote {
     pub body: BarToAbarBody,
     pub signature: XfrSignature,
