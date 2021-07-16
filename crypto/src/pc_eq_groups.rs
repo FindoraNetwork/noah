@@ -24,7 +24,7 @@ impl ZeiFromToBytes for BigNum {
 
 serialize_deserialize!(BigNum);
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Eq)]
 pub struct Proof<G1, G2> {
     com_v1: G1,
     com_v2: G1,

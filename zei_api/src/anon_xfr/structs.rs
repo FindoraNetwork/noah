@@ -43,7 +43,7 @@ pub struct AXfrBody {
 }
 
 /// Asset record to be published
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AnonBlindAssetRecord {
     pub amount_type_commitment: Commitment,
     pub public_key: AXfrPubKey,
