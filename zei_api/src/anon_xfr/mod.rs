@@ -28,6 +28,7 @@ pub(crate) mod circuits;
 pub mod keys;
 pub(crate) mod proofs;
 pub mod structs;
+pub mod merkle_tree;
 
 /// Build a anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
@@ -366,6 +367,7 @@ mod tests {
             path: MTPath { nodes: vec![node] },
             root: merkle_root,
             uid: 2,
+            root_version: 0
         };
 
         // output keys
@@ -546,6 +548,7 @@ mod tests {
                         },
                         root: merkle_root,
                         uid: uid as u64,
+                        root_version: 0,
                     };
                     let open_abar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
                         &in_abars[uid],

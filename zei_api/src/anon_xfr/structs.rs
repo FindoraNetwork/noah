@@ -71,6 +71,7 @@ pub struct AXfrProof {
 pub struct MTLeafInfo {
     pub path: MTPath,
     pub root: BLSScalar,
+    pub root_version: u64,
     pub uid: u64,
 }
 
@@ -79,6 +80,7 @@ impl Default for MTLeafInfo {
         MTLeafInfo {
             path: MTPath { nodes: vec![] },
             root: BLSScalar::zero(),
+            root_version: 0,
             uid: 0,
         }
     }

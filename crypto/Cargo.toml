@@ -29,8 +29,6 @@ x25519-dalek = "0.6"
 ruc = { git = "https://github.com/FindoraNetwork/RUC.git", branch = "master" }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 
-aes-ctr = "0.5.0"
-
 [dev-dependencies]
 bit-array = "0.4.3"
 lazy_static = "1.4.0"
