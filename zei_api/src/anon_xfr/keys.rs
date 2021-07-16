@@ -2,12 +2,14 @@ use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use crypto::basics::signatures::schnorr;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use wasm_bindgen::prelude::*;
 
 /// Public key used to address an Anonymous records and verify transaction spending it
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
 /// Keypair associated with an Anonymous records. It is used to spending it.
+#[wasm_bindgen]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AXfrKeyPair(pub(crate) schnorr::KeyPair<JubjubPoint, JubjubScalar>);
 
@@ -26,7 +28,7 @@ impl AXfrKeyPair {
     }
 
     /// Return public key
-    pub(crate) fn pub_key(&self) -> AXfrPubKey {
+    pub fn pub_key(&self) -> AXfrPubKey {
         AXfrPubKey(self.0.pub_key.clone())
     }
 

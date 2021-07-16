@@ -438,7 +438,9 @@ struct NullifierInputVars {
 
 // cs variables for ElGamal ciphertexts
 pub struct ElGamalHybridCtextVars {
+    #[allow(dead_code)]
     pub e1: PointVar,              // r*G
+    #[allow(dead_code)]
     pub symm_ctxts: Vec<VarIndex>, // ctr-mode ciphertext
 }
 

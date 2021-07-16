@@ -24,14 +24,14 @@ use utils::errors::ZeiError;
 
 const TWO_POW_32: u64 = 1 << 32;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ConvertBarAbarProof {
     commitment_amount_asset_type: JubjubPoint,
     commitment_eq_proof: PCEqProof<RistrettoPoint, JubjubPoint>,
     pc_rescue_commitments_eq_proof: AXfrPlonkPf,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct BarToAbarBody {
     pub input: BlindAssetRecord,
     pub output: AnonBlindAssetRecord,
@@ -46,7 +46,7 @@ pub struct AbarToBarBody {
     pub proof: ConvertBarAbarProof,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct BarToAbarNote {
     pub body: BarToAbarBody,
     pub signature: XfrSignature,
