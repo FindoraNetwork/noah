@@ -408,7 +408,7 @@ struct PayeeSecretVars {
 }
 
 // cs variables for a Merkle node
-struct MerkleNodeVars {
+pub(crate) struct MerkleNodeVars {
     pub siblings1: VarIndex,
     pub siblings2: VarIndex,
     pub is_left_child: VarIndex,
@@ -416,12 +416,12 @@ struct MerkleNodeVars {
 }
 
 // cs variables for a merkle authentication path
-struct MerklePathVars {
+pub(crate) struct MerklePathVars {
     pub nodes: Vec<MerkleNodeVars>,
 }
 
 // cs variables for an accumulated element
-struct AccElemVars {
+pub(crate) struct AccElemVars {
     pub uid: VarIndex,
     pub commitment: VarIndex,
     pub pub_key_x: VarIndex,
@@ -444,7 +444,7 @@ pub struct ElGamalHybridCtextVars {
     pub symm_ctxts: Vec<VarIndex>, // ctr-mode ciphertext
 }
 
-fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
+pub(crate) fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
     let path_vars: Vec<MerkleNodeVars> = path
         .nodes
         .into_iter()
@@ -496,7 +496,7 @@ fn sort(
     StateVar::new([left, mid, right, cs.zero_var()])
 }
 
-fn compute_merkle_root(
+pub(crate) fn compute_merkle_root(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,

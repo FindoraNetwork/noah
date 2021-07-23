@@ -30,6 +30,27 @@ pub struct MerkleTree {
     uncommitted_data: Vec<BLSScalar>,
 }
 
+///
+/// MerkleTree is a 3-ary dense tree implmentation for storing any BLSScalar as a log
+/// of existence. It is designed to be used for abar hash storage and merkle path
+/// proof.
+///
+/// Usage:
+///     ```
+///
+///     use zei::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
+///     use zei::anon_xfr::merkle_tree::MerkleTree;
+///     let mut mt = MerkleTree::new();
+///
+///     let uid0 = mt.add_abar(&AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default())).unwrap();
+///
+///     let version = mt.commit();
+///
+///     let leaf_info = mt.get_mt_leaf_info(uid0).unwrap();
+/// ```
+///
+///
+///
 impl MerkleTree {
 
     pub fn new() -> MerkleTree {
@@ -63,7 +84,7 @@ impl MerkleTree {
 
         let pk_hash = hash.rescue_hash(&[
             abar.public_key.0.point_ref().get_x(),
-            abar.public_key.0.point_ref().get_x(),
+            abar.public_key.0.point_ref().get_y(),
             BLSScalar::zero(),
             BLSScalar::zero(),
         ])[0];
@@ -102,6 +123,7 @@ impl MerkleTree {
         let path = MerkleTree::get_path_from_uid(id);
         let mut depth = 0;
         while !current.as_ref().unwrap().is_leaf {
+
             let mut node = MTNode{
                 siblings1: Default::default(),
                 siblings2: Default::default(),
@@ -143,7 +165,6 @@ impl MerkleTree {
         }
 
         info.path.nodes.reverse();
-
         Ok(info)
     }
 
@@ -158,7 +179,7 @@ impl MerkleTree {
         for data in self.uncommitted_data.iter() {
             let new_id = self.entry_count;
             let path = MerkleTree::get_path_from_uid(new_id);
-            root_hash = root.add_child(new_id, *data, path, 0)?;
+            root_hash = root.add_child(*data, path, 0)?;
             self.entry_count += 1;
 
         };
@@ -228,7 +249,7 @@ impl Node {
         }
     }
 
-    pub fn add_child(&mut self, id: u64, data: BLSScalar, path: Vec<Path>, depth: usize) -> Result<BLSScalar>{
+    pub fn add_child(&mut self, data: BLSScalar, path: Vec<Path>, depth: usize) -> Result<BLSScalar>{
 
         let hasher = RescueInstance::new();
 
@@ -256,7 +277,7 @@ impl Node {
                         is_leaf: false
                     }));
                 }
-                let left_hash = self.left_child.as_mut().unwrap().add_child(id /3, data, path, depth+1)?;
+                let left_hash = self.left_child.as_mut().unwrap().add_child(data, path, depth+1)?;
 
                 self.hash = hasher.rescue_hash(
                     &[left_hash,
@@ -277,7 +298,7 @@ impl Node {
                         is_leaf: false
                     }));
                 }
-                let middle_hash = self.middle_child.as_mut().unwrap().add_child(id /3, data, path, depth+1)?;
+                let middle_hash = self.middle_child.as_mut().unwrap().add_child(data, path, depth+1)?;
                 self.hash = hasher.rescue_hash(
                     &[self.left_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
                         middle_hash,
@@ -297,7 +318,7 @@ impl Node {
                         is_leaf: false
                     }));
                 }
-                let right_hash = self.right_child.as_mut().unwrap().add_child(id /3, data, path, depth+1)?;
+                let right_hash = self.right_child.as_mut().unwrap().add_child(data, path, depth+1)?;
                 self.hash = hasher.rescue_hash(
                     &[self.left_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
                         self.middle_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
@@ -312,10 +333,6 @@ impl Node {
     #[inline(always)]
     pub fn update_hash(&mut self) -> BLSScalar{
         let hash = RescueInstance::new();
-
-        println!( "is Left hash zero = {}", self._get_left_child_hash().is_zero());
-        println!( "is middle hash zero = {}", self._get_middle_child_hash().is_zero());
-        println!( "is right hash zero = {}", self._get_right_child_hash().is_zero());
 
         self.hash = hash.rescue_hash( &[
             self._get_left_child_hash(),
@@ -461,4 +478,73 @@ fn test_get_path() {
                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Middle,
                                Path::Right]);
+}
+
+#[test]
+fn test_abar_proof() {
+
+    use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
+    use crate::anon_xfr::keys::{AXfrKeyPair};
+    use crate::anon_xfr::circuits::compute_merkle_root;
+    use rand_chacha::ChaChaRng;
+    use rand_chacha::rand_core::SeedableRng;
+    use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
+    use crate::anon_xfr::circuits::AccElemVars;
+    use crate::anon_xfr::circuits::add_merkle_path_variables;
+
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+    let key_pair = AXfrKeyPair::generate(&mut prng);
+    let abar = AnonBlindAssetRecord{
+        amount_type_commitment: BLSScalar::random(&mut prng),
+        public_key: key_pair.pub_key()
+    };
+
+    let mut mt = MerkleTree::new();
+    let uid = mt.add_abar(&abar).unwrap();
+    let _ver = mt.commit().unwrap();
+
+    let mut cs = TurboPlonkConstraintSystem::new();
+    let uid_var = cs.new_variable(BLSScalar::from_u64(uid));
+    let comm_var = cs.new_variable(abar.amount_type_commitment);
+    let pk_var = cs.new_point_variable(
+                    Point::new( abar.public_key.0.point_ref().get_x(),
+                                abar.public_key.0.point_ref().get_y())
+    );
+    let elem = AccElemVars {
+        uid: uid_var,
+        commitment: comm_var,
+        pub_key_x: pk_var.get_x(),
+        pub_key_y: pk_var.get_y(),
+    };
+
+    let leaf_info = mt.get_mt_leaf_info(uid).unwrap();
+    let path_vars = add_merkle_path_variables(&mut cs, leaf_info.path.clone());
+    let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
+
+    // Check Merkle root correctness
+    let witness = cs.get_and_clear_witness();
+    assert!(cs.verify_witness(&witness, &[]).is_ok());
+
+    let hash = RescueInstance::new();
+    let zero = BLSScalar::zero();
+    let pk_hash = hash.rescue_hash(&[key_pair.pub_key().as_jubjub_point().get_x(),
+        key_pair.pub_key().as_jubjub_point().get_y(), zero, zero])[0];
+    let mut node = hash.rescue_hash(&[BLSScalar::from_u64(uid), abar.amount_type_commitment, pk_hash, zero])[0];
+    let mut depth = 0;
+    leaf_info.path.nodes.iter().map(|n| {
+       if n.is_left_child == 1u8 {
+            node = hash.rescue_hash(&[node, n.siblings1, n.siblings2, zero])[0];
+       } else if n.is_right_child == 1u8 {
+           node = hash.rescue_hash(&[n.siblings1, n.siblings2, node, zero])[0];
+       } else {
+           node = hash.rescue_hash(&[n.siblings1, node, n.siblings2, zero])[0];
+       }
+        println!("hash: {:X?}, depth: {}", node, depth);
+        depth += 1;
+    }).last();
+    println!("root hash{:X?}", node);
+
+    assert_eq!(witness[root_var], node);
+    assert_eq!(witness[root_var], mt.version[&leaf_info.root_version]);
 }
