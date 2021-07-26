@@ -2,7 +2,7 @@ use crate::errors::ZeiError;
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use ruc::{err::*, *};
+use ruc::*;
 
 /// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
 pub trait ZeiFromToBytes: Sized {

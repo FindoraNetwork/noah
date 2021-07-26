@@ -2,7 +2,7 @@ use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use serde::Serializer;
 use sha2::Digest;
 use utils::errors::ZeiError;
@@ -185,7 +185,7 @@ fn symmetric_key_from_x25519_public_key<R: CryptoRng + RngCore>(
     let ephemeral = x25519_dalek::EphemeralSecret::new(prng);
     let dh_pk = x25519_dalek::PublicKey::from(&ephemeral);
 
-    let shared = ephemeral.diffie_hellman(&public_key);
+    let shared = ephemeral.diffie_hellman(public_key);
 
     let symmetric_key = shared_key_to_32_bytes(&shared);
     (symmetric_key, dh_pk)
@@ -248,7 +248,7 @@ fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Ctext {
     let kkey = GenericArray::from_slice(key);
     let ctr = GenericArray::from_slice(&[0u8; 16]); // counter can be zero because key is fresh
     let mut ctext_vec = plaintext.to_vec();
-    let mut cipher = Aes256Ctr::new(&kkey, ctr);
+    let mut cipher = Aes256Ctr::new(kkey, ctr);
     cipher.apply_keystream(ctext_vec.as_mut_slice());
     Ctext(ctext_vec)
 }
@@ -257,7 +257,7 @@ fn symmetric_decrypt_fresh_key(key: &[u8; 32], ciphertext: &Ctext) -> Vec<u8> {
     let kkey = GenericArray::from_slice(key);
     let ctr = GenericArray::from_slice(&[0u8; 16]);
     let mut plaintext_vec = ciphertext.0.clone();
-    let mut cipher = Aes256Ctr::new(&kkey, ctr);
+    let mut cipher = Aes256Ctr::new(kkey, ctr);
     cipher.apply_keystream(plaintext_vec.as_mut_slice());
     plaintext_vec
 }

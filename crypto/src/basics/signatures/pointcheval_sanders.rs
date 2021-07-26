@@ -23,7 +23,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use sha2::Sha512;
 use utils::errors::ZeiError;
 
@@ -107,7 +107,7 @@ pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(
     let a = P::ScalarField::random(prng);
     let s1 = P::G1::get_base().mul(&a);
 
-    let s2 = s1.mul(&sk.x.add(&sk.y.mul(&m)));
+    let s2 = s1.mul(&sk.x.add(&sk.y.mul(m)));
     PSSignature { s1, s2 }
 }
 
@@ -154,7 +154,7 @@ pub fn ps_verify_sig_scalar<P: Pairing>(
     m: &P::ScalarField,
     sig: &PSSignature<P::G1>,
 ) -> Result<()> {
-    let a = pk.xx.add(&pk.yy.mul(&m));
+    let a = pk.xx.add(&pk.yy.mul(m));
     let e1 = P::pairing(&sig.s1, &a);
     let e2 = P::pairing(&sig.s2, &P::G2::get_base());
     if e1 != e2 || sig.s1 == P::G1::get_identity() {

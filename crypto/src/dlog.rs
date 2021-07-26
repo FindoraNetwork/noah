@@ -2,7 +2,7 @@ use crate::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
 use algebra::groups::{Group, Scalar as ZeiScalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 fn init_pok_dlog<'a, G: Group>(
     transcript: &mut Transcript,

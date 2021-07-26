@@ -4,7 +4,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use algebra::ristretto::RistrettoPoint;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use std::hash::{Hash, Hasher};
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
@@ -245,7 +245,7 @@ mod elgamal_test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
-    use ruc::{err::*, *};
+    use ruc::*;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use utils::errors::ZeiError;

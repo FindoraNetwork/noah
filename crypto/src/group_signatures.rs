@@ -7,7 +7,7 @@ use crate::basics::signatures::pointcheval_sanders::{
 };
 use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 use digest::Digest;
@@ -243,13 +243,13 @@ fn verify_signature_pok<P: Pairing>(
     let e2 = &sig.enc.e2;
 
     // Check e1 correctness: e1 = r * G1
-    if e1.mul(&challenge) != g1_base.mul(&response_r).sub(com_g1_blind_r) {
+    if e1.mul(&challenge) != g1_base.mul(response_r).sub(com_g1_blind_r) {
         return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
     // Check e2 correctness: e2 = tag * G1 + r * PK
-    let a = g1_base.mul(&response_tag).sub(com_g1_blind_tag);
-    let b = gpk.enc_key.0.mul(&response_r).sub(com_pk_blind_r);
+    let a = g1_base.mul(response_tag).sub(com_g1_blind_tag);
+    let b = gpk.enc_key.0.mul(response_r).sub(com_pk_blind_r);
     if e2.mul(&challenge) != a.add(&b) {
         return Err(eg!(ZeiError::ZKProofVerificationError));
     }

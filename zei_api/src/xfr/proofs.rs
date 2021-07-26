@@ -28,7 +28,7 @@ use itertools::Itertools;
 use linear_map::LinearMap;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 use utils::{min_greater_equal_power_of_two, u64_to_u32_pair};
 
@@ -789,7 +789,7 @@ mod tests {
     };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::{err::*, *};
+    use ruc::*;
     use utils::errors::ZeiError;
 
     #[test]

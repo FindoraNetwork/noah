@@ -20,7 +20,7 @@ use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{Scalar, ScalarArithmetic, Zero};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 const ZK_EVAL_CHALLENGE: &[u8] = b"zk_eval challenge";
 

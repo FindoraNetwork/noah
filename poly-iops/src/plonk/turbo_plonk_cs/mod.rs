@@ -9,7 +9,7 @@ pub mod rescue;
 use crate::plonk::errors::PlonkError;
 use crate::plonk::plonk_setup::ConstraintSystem;
 use algebra::groups::Scalar;
-use ruc::{err::*, *};
+use ruc::*;
 
 pub type VarIndex = usize; // Variable index
 pub type CsIndex = usize; // Constraint index
@@ -659,7 +659,7 @@ mod test {
     use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, ScalarArithmetic};
-    use ruc::{err::*, *};
+    use ruc::*;
 
     type F = BLSScalar;
     #[test]

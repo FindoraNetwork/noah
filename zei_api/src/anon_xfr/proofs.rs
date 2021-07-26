@@ -9,7 +9,7 @@ use merlin::Transcript;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
 use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 const ANON_XFR_TRANSCRIPT: &[u8] = b"Anon Xfr";

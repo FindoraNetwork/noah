@@ -5,7 +5,9 @@
 // #![deny(warnings)]
 // Skip non useful warnings from clippy
 #![deny(warnings)]
+#![allow(clippy::needless_borrow)]
 #![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::bool_assert_comparison)]
 #![allow(clippy::let_and_return)]
 #![allow(clippy::many_single_char_names)]
 

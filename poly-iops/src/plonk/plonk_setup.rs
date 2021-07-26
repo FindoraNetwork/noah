@@ -6,7 +6,7 @@ use crate::polynomials::field_polynomial::{primitive_nth_root_of_unity, FpPolyno
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::{err::*, *};
+use ruc::*;
 
 /// Trait for Turbo PLONK constraint systems.
 pub trait ConstraintSystem {

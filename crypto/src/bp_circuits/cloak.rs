@@ -46,7 +46,7 @@ use bulletproofs::r1cs::{
     ConstraintSystem, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
 use merlin::Transcript;
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 /// Represent AssetRecord amount and asset type

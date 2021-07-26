@@ -4,7 +4,7 @@ use merlin::Transcript;
 use num_bigint::{BigUint, RandBigInt};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::{err::*, *};
+use ruc::*;
 use serde::ser::Serializer;
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
@@ -104,18 +104,16 @@ pub fn prove_pair_to_vector_pc<R: CryptoRng + RngCore, G1: Group, G2: Group>(
         G1::S::from_le_bytes(values.0).c(d!(ZeiError::SerializationError))?;
     let value2_g1 =
         G1::S::from_le_bytes(values.1).c(d!(ZeiError::SerializationError))?;
-    let c1 = pc_gens1.commit(&[value1_g1], &blinds_g1.0).c(d!())?;
-    let c2 = pc_gens1.commit(&[value2_g1], &blinds_g1.1).c(d!())?;
+    let c1 = pc_gens1.commit(&[value1_g1], blinds_g1.0).c(d!())?;
+    let c2 = pc_gens1.commit(&[value2_g1], blinds_g1.1).c(d!())?;
 
     let value1_g2 =
         G2::S::from_le_bytes(values.0).c(d!(ZeiError::SerializationError))?;
     let value2_g2 =
         G2::S::from_le_bytes(values.1).c(d!(ZeiError::SerializationError))?;
 
-    let c3 = pc_gens2
-        .commit(&[value1_g2, value2_g2], &blind_g2)
-        .c(d!())?;
-    trascript_init(transcript, &pc_gens1, &pc_gens2, &c1, &c2, &c3);
+    let c3 = pc_gens2.commit(&[value1_g2, value2_g2], blind_g2).c(d!())?;
+    trascript_init(transcript, pc_gens1, pc_gens2, &c1, &c2, &c3);
 
     // 1. compute scalar group Z_{p * q}
     let g1_size_le_bytes = G1::S::get_field_size_lsf_bytes();

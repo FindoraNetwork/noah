@@ -14,7 +14,7 @@ use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use serde::ser::Serialize;
 use std::collections::HashMap;
 use utils::errors::ZeiError;

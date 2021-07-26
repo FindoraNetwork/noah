@@ -3,7 +3,7 @@
 pub(crate) mod examples {
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
-    use ruc::{err::*, *};
+    use ruc::*;
     use utils::err_eq;
     use utils::errors::ZeiError;
     use wasm_bindgen::__rt::std::collections::HashMap;

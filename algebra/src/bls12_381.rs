@@ -11,7 +11,7 @@ use ff::{Field, PrimeField};
 use group::Group as _;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 use std::result::Result as StdResult;
 use std::str::FromStr;

@@ -2,7 +2,7 @@
 use algebra::bls12_381::Bls12381;
 use crypto::basics::signatures::{AggSignature, Signature};
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 pub type BlsSecretKey = crypto::basics::signatures::bls::BlsSecretKey<Bls12381>;
 pub type BlsPublicKey = crypto::basics::signatures::bls::BlsPublicKey<Bls12381>;

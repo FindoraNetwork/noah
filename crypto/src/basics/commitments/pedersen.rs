@@ -2,7 +2,7 @@ use algebra::groups::Group;
 use algebra::ristretto::RistrettoPoint;
 use digest::Digest;
 use itertools::Itertools;
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 #[allow(non_snake_case)]

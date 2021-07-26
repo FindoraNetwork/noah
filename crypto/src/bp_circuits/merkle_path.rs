@@ -1,7 +1,7 @@
 use super::mimc_hash::mimc_hash;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{ConstraintSystem, Variable};
-use ruc::{err::*, *};
+use ruc::*;
 
 pub fn merkle_verify_mimc<CS: ConstraintSystem>(
     cs: &mut CS,

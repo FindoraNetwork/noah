@@ -18,4 +18,4 @@ bench:
 	cargo bench --workspace
 
 fmt:
-	cargo fmt --all
+	cargo fmt

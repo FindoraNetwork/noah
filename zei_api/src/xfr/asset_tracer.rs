@@ -13,7 +13,7 @@ use crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key,
 };
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 use utils::{u64_to_u32_pair, u8_be_slice_to_u32};
 

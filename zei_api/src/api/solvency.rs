@@ -10,7 +10,7 @@ use bulletproofs::BulletproofGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::bp_circuits::cloak::{CloakCommitment, CloakValue};
 use crypto::solvency;
-use ruc::{err::*, *};
+use ruc::*;
 use std::collections::HashSet;
 use std::fmt;
 use utils::errors::ZeiError;

@@ -19,7 +19,7 @@ use crypto::basics::hybrid_encryption::{
 use crypto::basics::prf::PRF;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use std::collections::HashMap;
 use utils::errors::ZeiError;
 

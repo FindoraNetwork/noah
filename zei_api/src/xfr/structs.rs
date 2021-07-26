@@ -23,7 +23,7 @@ use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use sha2::Sha512;
 use utils::errors::ZeiError;
 use utils::serialization;

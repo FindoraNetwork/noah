@@ -15,7 +15,7 @@ use poly_iops::commitments::kzg_poly_com::{
 use poly_iops::plonk::plonk_setup::{preprocess_prover, ProverParams, VerifierParams};
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
-use ruc::{err::*, *};
+use ruc::*;
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;

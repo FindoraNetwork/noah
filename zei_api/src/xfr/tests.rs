@@ -17,7 +17,7 @@ use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
 use crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
-use ruc::{err::*, *};
+use ruc::*;
 
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;

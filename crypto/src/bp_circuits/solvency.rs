@@ -12,7 +12,7 @@ use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable
 use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 /// I implement a proof of solvency bulletproof protocol

@@ -2,7 +2,7 @@ use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use ed25519_dalek::ed25519::signature::Signature;
 use ed25519_dalek::{PublicKey, SecretKey};
-use ruc::{err::*, *};
+use ruc::*;
 use serde::Serializer;
 use utils::errors::ZeiError;
 pub use utils::serialization::ZeiFromToBytes;
@@ -153,7 +153,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::{Deserializer, Serializer};
-    use ruc::{err::*, *};
+    use ruc::*;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use std::convert::TryFrom;

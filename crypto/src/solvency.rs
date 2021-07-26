@@ -6,7 +6,7 @@ use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
 use merlin::Transcript;
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 /// I produce a proof of solvency for a set of assets vs liabilities for potentially different

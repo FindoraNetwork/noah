@@ -93,7 +93,7 @@ pub mod prover {
     use algebra::groups::ScalarArithmetic;
     use merlin::Transcript;
     use rand_core::{CryptoRng, RngCore};
-    use ruc::{err::*, *};
+    use ruc::*;
 
     /// A PlonkProof is generic on the polynomial commitment scheme, PCS.
     /// PCS is generic in the commitment group C, the eval proof type E, and Field elements F.

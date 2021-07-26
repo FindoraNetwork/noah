@@ -1,6 +1,6 @@
 use crate::basics::hash::MTHash;
 use itertools::Itertools;
-use ruc::{err::*, *};
+use ruc::*;
 use std::fmt::Debug;
 use utils::errors::ZeiError;
 

@@ -8,7 +8,7 @@ use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
@@ -71,7 +71,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(
     let blinding_factor2 = com2.1;
     let identity = RistrettoPoint::get_identity();
     let (elems, lhs_matrix, _) =
-        init_chaum_pedersen(transcript, &identity, &pc_gens, c1, c2);
+        init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
     let secrets = [value, blinding_factor1, blinding_factor2];
     let proof = sigma_prove(
         transcript,
@@ -109,7 +109,7 @@ pub fn chaum_pedersen_verify_eq_scalars<R: CryptoRng + RngCore>(
 ) -> Vec<Scalar> {
     let identity = RistrettoPoint::get_identity();
     let (elems, lhs_matrix, rhs_vec) =
-        init_chaum_pedersen(transcript, &identity, &pc_gens, c1, c2);
+        init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
 
     let sigma_proof = SigmaProof {
         commitments: vec![proof.c3, proof.c4],
@@ -140,7 +140,7 @@ pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(
 ) -> Result<()> {
     let identity = RistrettoPoint::get_identity();
     let (elems, lhs_matrix, rhs_vec) =
-        init_chaum_pedersen(transcript, &identity, &pc_gens, c1, c2);
+        init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
 
     let sigma_proof = SigmaProof {
         commitments: vec![proof.c3, proof.c4],

@@ -2,7 +2,7 @@
 use crate::basics::hash::mimc::compute_mimc_constants;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::*;
-use ruc::{err::*, *};
+use ruc::*;
 
 pub(crate) fn mimc_func<CS: ConstraintSystem>(
     cs: &mut CS,

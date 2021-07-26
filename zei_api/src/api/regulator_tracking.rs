@@ -16,7 +16,7 @@ use crate::api::gp_sig::{
 };
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 /// JoinRequest message from the User to the Regulator. It contains the identity of the user.
 #[derive(Clone, Debug, Serialize, Deserialize)]

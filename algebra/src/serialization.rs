@@ -4,7 +4,7 @@ use crate::jubjub::{JubjubPoint, JubjubScalar};
 use crate::ristretto::{
     CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
 };
-use ruc::{err::*, *};
+use ruc::*;
 use serde::Serializer;
 use utils::serialization::ZeiFromToBytes;
 

@@ -1,14 +1,16 @@
-use algebra::groups::Scalar as _;
-use algebra::ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar};
-use ed25519_dalek::{ExpandedSecretKey, PublicKey};
-use ed25519_dalek::{SecretKey, Signature, Verifier};
+use algebra::{
+    groups::Scalar as _,
+    ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar},
+};
+use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey, Signature, Verifier};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
-use std::cmp::Ordering;
-use std::hash::{Hash, Hasher};
-use utils::errors::ZeiError;
-use utils::serialization::ZeiFromToBytes;
+use ruc::*;
+use std::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+};
+use utils::{errors::ZeiError, serialization::ZeiFromToBytes};
 use wasm_bindgen::prelude::*;
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;

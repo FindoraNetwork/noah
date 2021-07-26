@@ -376,7 +376,7 @@ mod test {
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Group, GroupArithmetic, One, Scalar, Zero};
     use algebra::jubjub::{JubjubPoint, JubjubScalar};
-    use ruc::{err::*, *};
+    use ruc::*;
 
     #[test]
     fn test_ecc_add() {

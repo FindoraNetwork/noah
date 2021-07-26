@@ -19,7 +19,7 @@ use crypto::basics::hybrid_encryption::XPublicKey;
 use crypto::pc_eq_groups::{prove_pair_to_vector_pc, Proof as PCEqProof};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 const TWO_POW_32: u64 = 1 << 32;

@@ -85,7 +85,7 @@ use algebra::pairing::Pairing;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 pub(crate) const AC_REVEAL_PROOF_DOMAIN: &[u8] = b"AC Reveal PoK";
@@ -369,7 +369,7 @@ pub fn ac_verify_commitment<P: Pairing>(
     msg: &[u8],
 ) -> Result<()> {
     let mut transcript = Transcript::new(AC_COMMIT_NEW_TRANSCRIPT_INSTANCE);
-    ac_init_transcript::<P>(&mut transcript, issuer_pub_key, &sig_commitment); // public parameters
+    ac_init_transcript::<P>(&mut transcript, issuer_pub_key, sig_commitment); // public parameters
     transcript.append_message(SOK_LABEL, msg); // SoK proof on message msg
 
     let attributes: Vec<Attribute<P::ScalarField>> =
@@ -451,7 +451,7 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(
         elems.push(y);
     }
     let p = P::G2::vartime_multi_exp(scalars.as_slice(), elems.as_slice());
-    ac_verify_final_check::<P>(sig_commitment, &challenge, &issuer_pub_key.gen2, &p)
+    ac_verify_final_check::<P>(sig_commitment, challenge, &issuer_pub_key.gen2, &p)
 }
 /// Produce a AttrsRevealProof, attributes that are not Revealed(attr) and secret parameters
 /// are proved in ZeroKnowledge.
@@ -568,7 +568,7 @@ pub fn ac_verify<P: Pairing>(
     reveal_proof: &ACRevealProof<P::G2, P::ScalarField>,
 ) -> Result<()> {
     let mut transcript = Transcript::new(AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
-    ac_init_transcript::<P>(&mut transcript, issuer_pub_key, &sig_commitment);
+    ac_init_transcript::<P>(&mut transcript, issuer_pub_key, sig_commitment);
     pok_verify::<P>(
         &mut transcript,
         issuer_pub_key,

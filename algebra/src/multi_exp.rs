@@ -3,7 +3,7 @@
  */
 use crate::errors::AlgebraError;
 use crate::groups::{scalar_to_radix_2_power_w, Group, Scalar};
-use ruc::{err::*, *};
+use ruc::*;
 use std::borrow::Borrow;
 
 pub trait MultiExp: Group {

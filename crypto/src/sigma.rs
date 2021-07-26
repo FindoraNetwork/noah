@@ -5,7 +5,7 @@ use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 pub trait SigmaTranscript {

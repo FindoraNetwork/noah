@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use custom_error::custom_error;
-use ruc::{err::*, *};
+use ruc::*;
 use serde::{Deserialize, Serialize};
 
 custom_error! {#[derive(PartialEq)] pub PolyComSchemeError

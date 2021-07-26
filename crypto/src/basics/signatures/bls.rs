@@ -2,7 +2,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::pairing::Pairing;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 type HashFnc = sha2::Sha512;
@@ -179,7 +179,7 @@ impl<S> AsRef<S> for BlsSecretKey<S> {
 mod tests {
     use algebra::bls12_381::Bls12381;
     use rand_core::SeedableRng;
-    use ruc::{err::*, *};
+    use ruc::*;
     use utils::errors::ZeiError;
 
     #[test]

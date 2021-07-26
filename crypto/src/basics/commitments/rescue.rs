@@ -11,7 +11,7 @@
 use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Scalar;
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 pub struct HashCommitment<S> {

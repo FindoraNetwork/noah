@@ -437,7 +437,7 @@ struct NullifierInputVars {
 }
 
 // cs variables for ElGamal ciphertexts
-struct ElGamalHybridCtextVars {
+pub struct ElGamalHybridCtextVars {
     pub e1: PointVar,              // r*G
     pub symm_ctxts: Vec<VarIndex>, // ctr-mode ciphertext
 }
@@ -698,7 +698,7 @@ pub(crate) mod tests {
     use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::{err::*, *};
+    use ruc::*;
 
     pub(crate) fn new_multi_xfr_witness_for_test(
         inputs: Vec<(u64, BLSScalar)>,
