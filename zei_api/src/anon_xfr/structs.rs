@@ -23,7 +23,7 @@ pub type BlindFactor = BLSScalar;
 /// * `siblings2` - the 2nd sibling of the tree node
 /// * `is_left_child` - indicates whether the tree node is the left child of its parent
 /// * `is_right_child` - indicates whether the tree node is the right child of its parent
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MTNode {
     pub siblings1: BLSScalar,
     pub siblings2: BLSScalar,
@@ -71,6 +71,7 @@ pub struct AXfrProof {
 pub struct MTLeafInfo {
     pub path: MTPath,
     pub root: BLSScalar,
+    pub root_version: u64,
     pub uid: u64,
 }
 
@@ -79,6 +80,7 @@ impl Default for MTLeafInfo {
         MTLeafInfo {
             path: MTPath { nodes: vec![] },
             root: BLSScalar::zero(),
+            root_version: 0,
             uid: 0,
         }
     }
