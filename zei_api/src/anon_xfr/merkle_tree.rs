@@ -17,6 +17,7 @@ pub enum Path {
     Right
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct MerkleTree {
     root_hash: BLSScalar,
     // consistency_hash: HashValue,
@@ -225,7 +226,7 @@ impl MerkleTree {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Node {
     left_child: Option<Box<Node>>,
     middle_child: Option<Box<Node>>,
