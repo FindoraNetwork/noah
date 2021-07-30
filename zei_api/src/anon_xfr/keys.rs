@@ -5,6 +5,7 @@ use ruc::*;
 use wasm_bindgen::prelude::*;
 
 /// Public key used to address an Anonymous records and verify transaction spending it
+#[wasm_bindgen]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
