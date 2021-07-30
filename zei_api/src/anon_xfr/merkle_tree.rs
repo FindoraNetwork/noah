@@ -5,6 +5,8 @@ use crypto::basics::hash::rescue::RescueInstance;
 use algebra::groups::{Zero, ScalarArithmetic, One, Scalar};
 use std::collections::HashMap;
 use ruc::Result;
+use crate::anon_xfr::keys::AXfrPubKey;
+use itertools::Itertools;
 
 // const HASH_SIZE: i32 = 32;             // assuming we are storing SHA256 hash of abar
 // const MAX_KEYS: u64 = u64::MAX;
@@ -28,7 +30,9 @@ pub struct MerkleTree {
     entry_count: u64,
 
     root: Option<Box<Node>>,
-    uncommitted_data: Vec<BLSScalar>,
+    uncommitted_data: Vec<(BLSScalar, AnonBlindAssetRecord)>,
+
+    leaf_lookup: HashMap<u64, AnonBlindAssetRecord>,
 }
 
 ///
@@ -68,7 +72,8 @@ impl MerkleTree {
                 data: None,
                 is_leaf: false
             })),
-            uncommitted_data: vec![]
+            uncommitted_data: vec![],
+            leaf_lookup: Default::default()
         };
 
         mt.root_hash = mt.root.as_mut().unwrap().update_hash();
@@ -98,15 +103,15 @@ impl MerkleTree {
             BLSScalar::zero()
         ])[0];
 
-        self.add_new_leaf(data)
+        self.add_new_leaf(data, abar.clone())
     }
 
-    fn add_new_leaf(&mut self, data: BLSScalar) -> Result<u64> {
+    fn add_new_leaf(&mut self, data: BLSScalar, abar: AnonBlindAssetRecord) -> Result<u64> {
 
         // TODO: wrap in Mutex
         let new_id: u64 = self.entry_count + self.uncommitted_data.len() as u64;
 
-        self.uncommitted_data.push(data);
+        self.uncommitted_data.push((data, abar));
 
         Ok(new_id)
 
@@ -180,7 +185,9 @@ impl MerkleTree {
         for data in self.uncommitted_data.iter() {
             let new_id = self.entry_count;
             let path = MerkleTree::get_path_from_uid(new_id);
-            root_hash = root.add_child(*data, path, 0)?;
+
+            root_hash = root.add_child(data.0.clone(), path, 0)?;
+            self.leaf_lookup.insert( new_id,data.1.clone());
             self.entry_count += 1;
 
         };
@@ -223,6 +230,26 @@ impl MerkleTree {
         }
         path.reverse();
         path
+    }
+
+    pub fn get_owned_abars_uids(&self, pub_key: AXfrPubKey) -> Vec<u64> {
+
+       self.leaf_lookup.iter().filter_map(|(id, abar)|  {
+          if abar.public_key == pub_key {
+              return Option::from(id.clone());
+          }
+           None
+       }).collect_vec()
+    }
+
+    pub fn get_owned_abars(&self, pub_key: AXfrPubKey) -> Vec<AnonBlindAssetRecord> {
+
+        self.leaf_lookup.iter().filter_map(|(_id, abar)|  {
+            if abar.public_key == pub_key {
+                return Option::from(abar.clone());
+            }
+            None
+        }).collect_vec()
     }
 }
 
@@ -364,13 +391,21 @@ pub fn test_tree() {
     let mut mt = MerkleTree::new();
     assert_eq!(mt.root_hash, hash.rescue_hash(&[BLSScalar::zero(), BLSScalar::zero(), BLSScalar::zero(), BLSScalar::zero()])[0]);
 
-    let uid = mt.add_new_leaf(BLSScalar::one()).unwrap();
+    let uid = mt.add_new_leaf(BLSScalar::one(),
+                              AnonBlindAssetRecord {
+                                  amount_type_commitment: Default::default(),
+                                  public_key: Default::default()
+                              }).unwrap();
     assert_eq!(uid, 0u64);
     assert_eq!(mt.get_committed_count(), 0);
 
     let first_hash = mt.root_hash.get_scalar();
 
-    let uid2 = mt.add_new_leaf(BLSScalar::zero()).unwrap();
+    let uid2 = mt.add_new_leaf(BLSScalar::zero(),
+                               AnonBlindAssetRecord {
+                                   amount_type_commitment: Default::default(),
+                                   public_key: Default::default()
+                               }).unwrap();
     assert_eq!(uid2, 1u64);
     assert_eq!(first_hash, mt.root_hash.get_scalar());
     assert_eq!(mt.get_committed_count(), 0);
@@ -381,7 +416,11 @@ pub fn test_tree() {
     assert_eq!(mt.get_uncommitted_count(), 0);
     let first_commit_hash = mt.root_hash;
 
-    let uid3 = mt.add_new_leaf(BLSScalar::one().add(&BLSScalar::one())).unwrap();
+    let uid3 = mt.add_new_leaf(BLSScalar::one().add(&BLSScalar::one()),
+                               AnonBlindAssetRecord{
+                                   amount_type_commitment: Default::default(),
+                                   public_key: Default::default()
+                               }).unwrap();
     assert_eq!(uid3, 2u64);
     assert_eq!(first_commit_hash, mt.root_hash);
     assert_eq!(mt.get_committed_count(), 2);
@@ -503,14 +542,22 @@ fn test_abar_proof() {
 
     let mut mt = MerkleTree::new();
     let uid = mt.add_abar(&abar).unwrap();
+
+    assert_ne!(mt.leaf_lookup.get(&uid), Option::from(&abar));
+    assert_eq!(mt.get_owned_abars_uids(abar.public_key.clone()).len(), 0);
+    assert_eq!(mt.get_owned_abars(abar.public_key.clone()).len(), 0);
     let _ver = mt.commit().unwrap();
+
+    assert_eq!(mt.leaf_lookup.get(&uid), Option::from(&abar));
+    assert_eq!(mt.get_owned_abars_uids(abar.public_key.clone()), vec![uid]);
+    assert_eq!(mt.get_owned_abars(abar.public_key.clone()), vec![abar.clone()]);
 
     let mut cs = TurboPlonkConstraintSystem::new();
     let uid_var = cs.new_variable(BLSScalar::from_u64(uid));
-    let comm_var = cs.new_variable(abar.amount_type_commitment);
+    let comm_var = cs.new_variable(abar.clone().amount_type_commitment);
     let pk_var = cs.new_point_variable(
-                    Point::new( abar.public_key.0.point_ref().get_x(),
-                                abar.public_key.0.point_ref().get_y())
+                    Point::new( abar.clone().public_key.0.point_ref().get_x(),
+                                abar.clone().public_key.0.point_ref().get_y())
     );
     let elem = AccElemVars {
         uid: uid_var,
@@ -531,7 +578,7 @@ fn test_abar_proof() {
     let zero = BLSScalar::zero();
     let pk_hash = hash.rescue_hash(&[key_pair.pub_key().as_jubjub_point().get_x(),
         key_pair.pub_key().as_jubjub_point().get_y(), zero, zero])[0];
-    let mut node = hash.rescue_hash(&[BLSScalar::from_u64(uid), abar.amount_type_commitment, pk_hash, zero])[0];
+    let mut node = hash.rescue_hash(&[BLSScalar::from_u64(uid), abar.clone().amount_type_commitment, pk_hash, zero])[0];
     let mut depth = 0;
     leaf_info.path.nodes.iter().map(|n| {
        if n.is_left_child == 1u8 {
@@ -548,4 +595,11 @@ fn test_abar_proof() {
 
     assert_eq!(witness[root_var], node);
     assert_eq!(witness[root_var], mt.version[&leaf_info.root_version]);
+
+    let uid2 = mt.add_abar(&abar).unwrap();
+    let _ver = mt.commit().unwrap();
+    let mut list = mt.get_owned_abars_uids(abar.clone().public_key.clone());
+    list.sort();
+    assert_eq!(list, vec![uid, uid2]);
+    assert_eq!(mt.get_owned_abars(abar.clone().public_key.clone()), vec![abar.clone(), abar.clone()]);
 }
