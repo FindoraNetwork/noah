@@ -11,10 +11,10 @@ crate-type = ["rlib"]
 
 [dependencies]
 base64 = "0.10"
-bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/FindoraNetwork/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
-curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
+bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/FindoraNetwork/bp", branch = "feat-use-stable", features = ["yoloproofs"] }
+curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
 x25519-dalek = "0.6"
 serde = "1.0"
-digest = "0.8"
+digest = "0.9"
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
 ruc = { git = "https://github.com/FindoraNetwork/RUC.git", branch = "master" }

@@ -214,9 +214,9 @@ fn deterministic_scalar_gen<G: Group>(
 
     let ALGORITHM_DESC = b"ZeiSchnorrAlgorithm";
 
-    hasher.input(ALGORITHM_DESC);
-    hasher.input(message);
-    hasher.input(&secret_key.0.to_bytes());
+    hasher.update(ALGORITHM_DESC);
+    hasher.update(message);
+    hasher.update(&secret_key.0.to_bytes());
 
     G::S::from_hash(hasher)
 }

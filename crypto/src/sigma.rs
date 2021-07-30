@@ -64,7 +64,7 @@ impl SigmaTranscript for Transcript {
         let mut buffer = vec![0u8; 32];
         self.challenge_bytes(b"Sigma challenge", &mut buffer); // cannot use buffer directly (S::from_bytes(buffer.as_slice())) as it may not represent a valid Scalar
         let mut hash = sha2::Sha512::new();
-        hash.input(&buffer[..]);
+        hash.update(&buffer[..]);
         S::from_hash(hash)
     }
 }

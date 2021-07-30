@@ -370,7 +370,7 @@ pub(crate) mod test_helper {
         use digest::Digest;
         use sha2::Sha512;
         let mut hasher = Sha512::new();
-        hasher.input(slice);
+        hasher.update(slice);
         S::from_hash(hasher)
     }
 

@@ -109,7 +109,7 @@ where
 {
     const SEED_SIZE: usize = 32;
     let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
-    let result = hash.result();
+    let result = hash.finalize();
     seed.copy_from_slice(&result[0..SEED_SIZE]);
     R::from_seed(seed)
 }

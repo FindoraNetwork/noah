@@ -180,19 +180,19 @@ fn compute_signature_pok_challenge<P: Pairing>(
     msg: &[u8],
 ) -> P::ScalarField {
     let mut hasher = Sha512::new();
-    hasher.input(b"spok traceable group signature");
-    hasher.input(g1.to_compressed_bytes());
-    hasher.input(g2.to_compressed_bytes());
-    hasher.input(gpk.enc_key.0.to_compressed_bytes());
-    hasher.input(gpk.ver_key.xx.to_compressed_bytes());
-    hasher.input(gpk.ver_key.yy.to_compressed_bytes());
+    hasher.update(b"spok traceable group signature");
+    hasher.update(g1.to_compressed_bytes());
+    hasher.update(g2.to_compressed_bytes());
+    hasher.update(gpk.enc_key.0.to_compressed_bytes());
+    hasher.update(gpk.ver_key.xx.to_compressed_bytes());
+    hasher.update(gpk.ver_key.yy.to_compressed_bytes());
     for e1 in commitments_g1 {
-        hasher.input(e1.to_compressed_bytes());
+        hasher.update(e1.to_compressed_bytes());
     }
     for e2 in commitments_g2 {
-        hasher.input(e2.to_compressed_bytes());
+        hasher.update(e2.to_compressed_bytes());
     }
-    hasher.input(msg);
+    hasher.update(msg);
     P::ScalarField::from_hash(hasher)
 }
 
