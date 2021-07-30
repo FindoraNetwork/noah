@@ -31,7 +31,7 @@ pub struct PublicParams {
     pub range_proof_bits: usize,
 }
 
-#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct UserParams {
     pub bp_params: PublicParams,
     pub pcs: KZGCommitmentSchemeBLS,
