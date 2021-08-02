@@ -316,20 +316,29 @@ mod tests {
         {
             // verifier scope
             let node_params = NodeParams::from(params);
-            assert!(
-                verify_eq_committed_vals(&node_params, hash_comm, &ped_comm, &proof)
-                    .is_ok()
-            );
+            assert!(verify_eq_committed_vals(
+                &node_params,
+                hash_comm,
+                &ped_comm,
+                &proof
+            )
+            .is_ok());
             let bad_hash_comm = BLSScalar::one();
-            assert!(
-                verify_eq_committed_vals(&node_params, bad_hash_comm, &ped_comm, &proof)
-                    .is_err()
-            );
+            assert!(verify_eq_committed_vals(
+                &node_params,
+                bad_hash_comm,
+                &ped_comm,
+                &proof
+            )
+            .is_err());
             let bad_ped_comm = ped_comm.add(&JubjubPoint::get_base());
-            assert!(
-                verify_eq_committed_vals(&node_params, hash_comm, &bad_ped_comm, &proof)
-                    .is_err()
-            );
+            assert!(verify_eq_committed_vals(
+                &node_params,
+                hash_comm,
+                &bad_ped_comm,
+                &proof
+            )
+            .is_err());
         }
     }
 }

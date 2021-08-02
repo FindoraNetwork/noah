@@ -678,21 +678,18 @@ mod test {
         let b_idx = cs.select(2, 3, 1);
         assert_eq!(cs.witness[b_idx], num[3]);
 
-        assert!(
-            cs.verify_witness(&[num[0], num[1], num[2], num[3], num[2], num[3]], &[])
-                .is_ok()
-        );
+        assert!(cs
+            .verify_witness(&[num[0], num[1], num[2], num[3], num[2], num[3]], &[])
+            .is_ok());
 
         // Set bit0 = 1 and bit1 = 0
-        assert!(
-            cs.verify_witness(&[num[1], num[0], num[2], num[3], num[3], num[2]], &[])
-                .is_ok()
-        );
+        assert!(cs
+            .verify_witness(&[num[1], num[0], num[2], num[3], num[3], num[2]], &[])
+            .is_ok());
 
-        assert!(
-            cs.verify_witness(&[num[0], num[1], num[2], num[3], num[3], num[2]], &[])
-                .is_err()
-        );
+        assert!(cs
+            .verify_witness(&[num[0], num[1], num[2], num[3], num[3], num[2]], &[])
+            .is_err());
     }
 
     #[test]
@@ -713,10 +710,9 @@ mod test {
         let witness = cs.get_and_clear_witness();
         pnk!(cs.verify_witness(&witness[..], &[]));
 
-        assert!(
-            cs.verify_witness(&[zero, one, two, two, two, one, zero], &[])
-                .is_err()
-        );
+        assert!(cs
+            .verify_witness(&[zero, one, two, two, two, one, zero], &[])
+            .is_err());
     }
 
     #[test]
@@ -766,15 +762,12 @@ mod test {
         let eight = num[3].add(&num[5]);
         // Bad witness: [a, b] = [1, 2], [c, d, e] = [3, 2, 8] and e >= 8
         // set e_binary = [1, 1, 1]
-        assert!(
-            cs.verify_witness(
-                &[
-                    num[1], num[2], num[3], num[2], eight, num[1], num[1], num[1]
-                ],
+        assert!(cs
+            .verify_witness(
+                &[num[1], num[2], num[3], num[2], eight, num[1], num[1], num[1]],
                 &[]
             )
-            .is_err()
-        );
+            .is_err());
 
         /*
         // Bad witness: a + b != c
@@ -854,71 +847,65 @@ mod test {
         pnk!(verify);
 
         // Bad witness: a is not boolean
-        assert!(
-            cs.verify_witness(
+        assert!(cs
+            .verify_witness(
                 &[
                     num[2], num[0], num[2], num[1], num[5], num[0], num[1], num[0],
                     num[1], num[0], num[0], num[0]
                 ],
                 &[]
             )
-            .is_err()
-        );
+            .is_err());
         // Bad witness: a + b != c
-        assert!(
-            cs.verify_witness(
+        assert!(cs
+            .verify_witness(
                 &[
                     num[1], num[1], num[1], num[2], num[5], num[1], num[1], num[0],
                     num[1], num[1], num[0], num[0]
                 ],
                 &[]
             )
-            .is_err()
-        );
+            .is_err());
         // Bad witness: a + b + c + d != e
-        assert!(
-            cs.verify_witness(
+        assert!(cs
+            .verify_witness(
                 &[
                     num[1], num[1], num[2], num[2], num[5], num[2], num[1], num[0],
                     num[1], num[0], num[1], num[0]
                 ],
                 &[]
             )
-            .is_err()
-        );
+            .is_err());
         // Bad witness: b * c != f
-        assert!(
-            cs.verify_witness(
+        assert!(cs
+            .verify_witness(
                 &[
                     num[1], num[1], num[2], num[2], num[6], num[1], num[0], num[1],
                     num[1], num[1], num[0], num[0]
                 ],
                 &[]
             )
-            .is_err()
-        );
+            .is_err());
         // Bad witness: e >= 8, set e_binary_le = [1, 1, 1]
-        assert!(
-            cs.verify_witness(
+        assert!(cs
+            .verify_witness(
                 &[
                     num[1], num[2], num[3], num[2], num[8], num[6], num[1], num[1],
                     num[1], num[0], num[1], num[1]
                 ],
                 &[]
             )
-            .is_err()
-        );
+            .is_err());
         // Bad witness: f >= 8, set f_binary_le = [1, 1, 1]
-        assert!(
-            cs.verify_witness(
+        assert!(cs
+            .verify_witness(
                 &[
                     num[0], num[3], num[4], num[0], num[7], twelve, num[1], num[1],
                     num[1], num[1], num[1], num[1]
                 ],
                 &[]
             )
-            .is_err()
-        );
+            .is_err());
     }
 }
 
@@ -1101,16 +1088,14 @@ mod turbo_plonk_proofs_test {
             prover(prng, &mut transcript, pcs, cs, &prover_params, witness).unwrap();
 
         let mut transcript = Transcript::new(b"TestTurboPlonk");
-        assert!(
-            verifier(
-                &mut transcript,
-                pcs,
-                cs,
-                verifier_params_ref,
-                online_vars,
-                &proof
-            )
-            .is_ok()
-        );
+        assert!(verifier(
+            &mut transcript,
+            pcs,
+            cs,
+            verifier_params_ref,
+            online_vars,
+            &proof
+        )
+        .is_ok());
     }
 }
