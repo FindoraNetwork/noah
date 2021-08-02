@@ -513,17 +513,15 @@ mod test {
             (&c3, &bf2),
         );
         let mut verifier_transcript = Transcript::new(b"test");
-        assert!(
-            chaum_pedersen_verify_eq(
-                &mut verifier_transcript,
-                &mut csprng,
-                &pc_gens,
-                &c1,
-                &c3,
-                &proof
-            )
-            .is_ok()
-        );
+        assert!(chaum_pedersen_verify_eq(
+            &mut verifier_transcript,
+            &mut csprng,
+            &pc_gens,
+            &c1,
+            &c3,
+            &proof
+        )
+        .is_ok());
     }
 
     #[test]
@@ -584,16 +582,14 @@ mod test {
         )
         .unwrap();
         let mut verifier_transcript = Transcript::new(b"Test");
-        assert!(
-            chaum_pedersen_verify_multiple_eq(
-                &mut verifier_transcript,
-                &mut csprng,
-                &pc_gens,
-                com_vec,
-                &proof
-            )
-            .is_ok()
-        );
+        assert!(chaum_pedersen_verify_multiple_eq(
+            &mut verifier_transcript,
+            &mut csprng,
+            &pc_gens,
+            com_vec,
+            &proof
+        )
+        .is_ok());
     }
 
     #[test]

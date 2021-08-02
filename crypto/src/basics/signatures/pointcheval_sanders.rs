@@ -189,6 +189,6 @@ pub fn ps_randomize_sig<R: RngCore + CryptoRng, P: Pairing>(
 
 fn hash_message<S: Scalar>(message: &[u8]) -> S {
     let mut hasher = Sha512::new();
-    hasher.input(message);
+    hasher.update(message);
     S::from_hash(hasher)
 }

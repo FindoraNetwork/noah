@@ -733,15 +733,13 @@ mod test {
                 proof: &proof2,
             },
         ];
-        assert!(
-            pedersen_elgamal_batch_aggregate_eq_verify(
-                &mut verifier_transcript,
-                &mut rng,
-                &pc_gens,
-                &instances
-            )
-            .is_ok()
-        );
+        assert!(pedersen_elgamal_batch_aggregate_eq_verify(
+            &mut verifier_transcript,
+            &mut rng,
+            &pc_gens,
+            &instances
+        )
+        .is_ok());
     }
     #[test]
     fn to_json() {

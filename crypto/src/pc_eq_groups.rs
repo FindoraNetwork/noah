@@ -299,60 +299,52 @@ mod test {
         .unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
-        assert!(
-            super::verify_pair_to_vector_pc(
-                &mut verifier_transcript,
-                (&com_value1, &com_value2),
-                &com_value1_value2,
-                &pc_gens_rist,
-                &pc_gens_jubjub,
-                &proof
-            )
-            .is_ok()
-        );
+        assert!(super::verify_pair_to_vector_pc(
+            &mut verifier_transcript,
+            (&com_value1, &com_value2),
+            &com_value1_value2,
+            &pc_gens_rist,
+            &pc_gens_jubjub,
+            &proof
+        )
+        .is_ok());
 
         let mut verifier_transcript = Transcript::new(b"test");
-        assert!(
-            super::verify_pair_to_vector_pc(
-                &mut verifier_transcript,
-                (&RistrettoPoint::get_base(), &com_value2),
-                &com_value1_value2,
-                &pc_gens_rist,
-                &pc_gens_jubjub,
-                &proof
-            )
-            .is_err()
-        );
+        assert!(super::verify_pair_to_vector_pc(
+            &mut verifier_transcript,
+            (&RistrettoPoint::get_base(), &com_value2),
+            &com_value1_value2,
+            &pc_gens_rist,
+            &pc_gens_jubjub,
+            &proof
+        )
+        .is_err());
 
         let mut proof = proof;
         proof.responses[0] = BigNum(proof.responses[0].0.clone().add(1u8));
         let mut verifier_transcript = Transcript::new(b"test");
-        assert!(
-            super::verify_pair_to_vector_pc(
-                &mut verifier_transcript,
-                (&com_value1, &com_value2),
-                &com_value1_value2,
-                &pc_gens_rist,
-                &pc_gens_jubjub,
-                &proof
-            )
-            .is_err()
-        );
+        assert!(super::verify_pair_to_vector_pc(
+            &mut verifier_transcript,
+            (&com_value1, &com_value2),
+            &com_value1_value2,
+            &pc_gens_rist,
+            &pc_gens_jubjub,
+            &proof
+        )
+        .is_err());
 
         let mut proof = proof;
         proof.responses[0] = BigNum(proof.responses[0].0.clone().sub(1u8));
         proof.com_v1_v2 = proof.com_v1_v2.add(&JubjubPoint::get_base());
         let mut verifier_transcript = Transcript::new(b"test");
-        assert!(
-            super::verify_pair_to_vector_pc(
-                &mut verifier_transcript,
-                (&com_value1, &com_value2),
-                &com_value1_value2,
-                &pc_gens_rist,
-                &pc_gens_jubjub,
-                &proof
-            )
-            .is_err()
+        assert!(super::verify_pair_to_vector_pc(
+            &mut verifier_transcript,
+            (&com_value1, &com_value2),
+            &com_value1_value2,
+            &pc_gens_rist,
+            &pc_gens_jubjub,
+            &proof
         )
+        .is_err())
     }
 }

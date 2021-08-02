@@ -17,7 +17,8 @@ impl ZeiFromToBytes for RangeProof {
         v
     }
     fn zei_from_bytes(bytes: &[u8]) -> Result<RangeProof> {
-        RangeProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError)) // TODO import error message
+        RangeProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError))
+        // TODO import error message
     }
 }
 
@@ -26,7 +27,8 @@ impl ZeiFromToBytes for R1CSProof {
         self.to_bytes()
     }
     fn zei_from_bytes(bytes: &[u8]) -> Result<R1CSProof> {
-        R1CSProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError)) // TODO import error message
+        R1CSProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError))
+        // TODO import error message
     }
 }
 

@@ -168,8 +168,8 @@ pub fn hybrid_decrypt_with_ed25519_secret_key(
 
 fn shared_key_to_32_bytes(shared_key: &x25519_dalek::SharedSecret) -> [u8; 32] {
     let mut hasher = sha2::Sha256::new();
-    hasher.input(shared_key.as_bytes());
-    let hash = hasher.result();
+    hasher.update(shared_key.as_bytes());
+    let hash = hasher.finalize();
     let mut symmetric_key = [0u8; 32];
     symmetric_key.copy_from_slice(hash.as_slice());
     symmetric_key

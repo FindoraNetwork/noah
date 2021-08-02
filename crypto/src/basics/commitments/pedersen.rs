@@ -19,7 +19,7 @@ impl<G: Group> PedersenGens<G> {
         bases.push(base.clone());
         for _ in 0..n {
             let mut hash = sha2::Sha512::new();
-            hash.input(base.to_compressed_bytes());
+            hash.update(base.to_compressed_bytes());
             base = G::from_hash(hash);
             bases.push(base.clone());
         }
