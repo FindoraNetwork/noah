@@ -1,5 +1,5 @@
 use crate::anon_xfr::decrypt_memo;
-use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
+use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature};
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use algebra::bls12_381::{BLSScalar, Bls12381};
 use algebra::groups::{Scalar, Zero};
@@ -13,6 +13,7 @@ use poly_iops::plonk::protocol::prover::PlonkPf;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
+use serde::Serialize;
 
 pub type Nullifier = BLSScalar;
 pub type Commitment = BLSScalar;
@@ -32,6 +33,38 @@ pub struct MTNode {
 }
 
 pub type SnarkProof = PlonkPf<KZGCommitmentScheme<Bls12381>>;
+
+// AXfrNote is a wrapper over AXfrBody with signatures and verification.
+pub struct AXfrNote {
+    pub body: AXfrBody,
+    pub signatures: Vec<AXfrSignature>,
+}
+
+impl AXfrNote {
+    pub fn generate_note_from_body(body: AXfrBody, keypairs: Vec<AXfrKeyPair>) -> Result<AXfrNote> {
+        let mut signatures: Vec<AXfrSignature> = Vec::new();
+        let msg: Vec<u8> = bincode::serialize(&body)
+            .map_err(|_| ZeiError::SerializationError)
+            .c(d!())?;
+
+        for keypair in keypairs {
+            signatures.push(keypair.sign(msg.as_slice()))
+        }
+
+        Ok(AXfrNote{body, signatures})
+    }
+
+    pub fn verify_note(&self) -> Result<Vec<()>> {
+        let msg: Vec<u8> = bincode::serialize(&self.body)
+            .map_err(|_| ZeiError::SerializationError)
+            .c(d!())?;
+
+        self.body.inputs.iter().zip(self.signatures.iter()).map(|(inp, sig)| {
+            inp.1.verify(msg.as_slice(), sig)
+        }).collect::<Result<Vec<()>>>().c(d!("AXfrNote signature verification failed"))
+
+    }
+}
 
 /// Anonymous transfers structure
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]

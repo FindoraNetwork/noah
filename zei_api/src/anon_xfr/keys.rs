@@ -58,7 +58,7 @@ impl AXfrPubKey {
     }
 
     /// Signature verification function
-    pub fn verify(&self, msg: &[u8], sig: AXfrSignature) -> Result<()> {
+    pub fn verify(&self, msg: &[u8], sig: &AXfrSignature) -> Result<()> {
         self.0.verify(msg, &sig.0).c(d!())
     }
 }
