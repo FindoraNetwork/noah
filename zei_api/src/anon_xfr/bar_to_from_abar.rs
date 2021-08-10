@@ -313,9 +313,14 @@ mod test {
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         );
         let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
-        let (oabar_conf, proof_conf) =
-            super::bar_to_abar(&mut prng, &params, &obar, &abar_keypair.pub_key(), &enc_key)
-                .unwrap();
+        let (oabar_conf, proof_conf) = super::bar_to_abar(
+            &mut prng,
+            &params,
+            &obar,
+            &abar_keypair.pub_key(),
+            &enc_key,
+        )
+        .unwrap();
         let abar_conf = AnonBlindAssetRecord::from_oabar(&oabar_conf);
         // non confidential case
         let (bar_non_conf, memo) = build_bar(
@@ -327,9 +332,14 @@ mod test {
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
         );
         let obar = open_blind_asset_record(&bar_non_conf, &memo, &bar_keypair).unwrap();
-        let (oabar_non_conf, proof_non_conf) =
-            super::bar_to_abar(&mut prng, &params, &obar, &abar_keypair.pub_key(), &enc_key)
-                .unwrap();
+        let (oabar_non_conf, proof_non_conf) = super::bar_to_abar(
+            &mut prng,
+            &params,
+            &obar,
+            &abar_keypair.pub_key(),
+            &enc_key,
+        )
+        .unwrap();
         let abar_non_conf = AnonBlindAssetRecord::from_oabar(&oabar_non_conf);
 
         // verifications

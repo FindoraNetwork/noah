@@ -439,12 +439,15 @@ struct NullifierInputVars {
 // cs variables for ElGamal ciphertexts
 pub struct ElGamalHybridCtextVars {
     #[allow(dead_code)]
-    pub e1: PointVar,              // r*G
+    pub e1: PointVar, // r*G
     #[allow(dead_code)]
     pub symm_ctxts: Vec<VarIndex>, // ctr-mode ciphertext
 }
 
-pub(crate) fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
+pub(crate) fn add_merkle_path_variables(
+    cs: &mut TurboPlonkCS,
+    path: MTPath,
+) -> MerklePathVars {
     let path_vars: Vec<MerkleNodeVars> = path
         .nodes
         .into_iter()
