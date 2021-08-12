@@ -14,7 +14,7 @@ pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AXfrKeyPair(pub(crate) schnorr::KeyPair<JubjubPoint, JubjubScalar>);
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct AXfrSignature(pub(crate) schnorr::Signature<JubjubPoint, JubjubScalar>);
 
 impl AXfrKeyPair {
@@ -58,7 +58,7 @@ impl AXfrPubKey {
     }
 
     /// Signature verification function
-    pub fn verify(&self, msg: &[u8], sig: AXfrSignature) -> Result<()> {
+    pub fn verify(&self, msg: &[u8], sig: &AXfrSignature) -> Result<()> {
         self.0.verify(msg, &sig.0).c(d!())
     }
 }

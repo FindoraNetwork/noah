@@ -1,29 +1,27 @@
-
-use algebra::bls12_381::{BLSScalar};
-use crate::anon_xfr::structs::{MTNode, MTLeafInfo, AnonBlindAssetRecord};
-use crypto::basics::hash::rescue::RescueInstance;
-use algebra::groups::{Zero, ScalarArithmetic, One, Scalar};
-use std::collections::HashMap;
-use ruc::Result;
 use crate::anon_xfr::keys::AXfrPubKey;
+use crate::anon_xfr::structs::{AnonBlindAssetRecord, MTLeafInfo, MTNode};
+use algebra::bls12_381::BLSScalar;
+use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
+use crypto::basics::hash::rescue::RescueInstance;
 use itertools::Itertools;
+use ruc::Result;
+use std::collections::HashMap;
 
 // const HASH_SIZE: i32 = 32;             // assuming we are storing SHA256 hash of abar
 // const MAX_KEYS: u64 = u64::MAX;
-const TREE_DEPTH: usize = 41;             // ceil(log(u64::MAX, 3))
+const TREE_DEPTH: usize = 41; // ceil(log(u64::MAX, 3))
 
 #[derive(Debug, PartialEq)]
 pub enum Path {
     Left,
     Middle,
-    Right
+    Right,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct MerkleTree {
     root_hash: BLSScalar,
     // consistency_hash: HashValue,
-
     version_count: u64,
     version: HashMap<u64, BLSScalar>,
 
@@ -57,29 +55,34 @@ pub struct MerkleTree {
 ///
 ///
 impl MerkleTree {
-
     pub fn new() -> MerkleTree {
-        let mut mt = MerkleTree{
+        let mut mt = MerkleTree {
             root_hash: Default::default(),
             version_count: 0,
             version: HashMap::new(),
             entry_count: 0,
-            root: Option::from(Box::from(Node{
+            root: Option::from(Box::from(Node {
                 left_child: None,
                 middle_child: None,
                 right_child: None,
                 hash: Default::default(),
                 data: None,
-                is_leaf: false
+                is_leaf: false,
             })),
             uncommitted_data: vec![],
-            leaf_lookup: Default::default()
+            leaf_lookup: Default::default(),
         };
 
         mt.root_hash = mt.root.as_mut().unwrap().update_hash();
         mt.version.insert(0, mt.root_hash);
 
-        println!("is hash 3: {}", mt.root_hash == (BLSScalar::one().add(&BLSScalar::one()).add(&BLSScalar::one())));
+        println!(
+            "is hash 3: {}",
+            mt.root_hash
+                == (BLSScalar::one()
+                    .add(&BLSScalar::one())
+                    .add(&BLSScalar::one()))
+        );
 
         return mt;
     }
@@ -95,30 +98,30 @@ impl MerkleTree {
             BLSScalar::zero(),
         ])[0];
 
-
         let data = hash.rescue_hash(&[
             BLSScalar::from_u64(uid),
             abar.amount_type_commitment,
             pk_hash,
-            BLSScalar::zero()
+            BLSScalar::zero(),
         ])[0];
 
         self.add_new_leaf(data, abar.clone())
     }
 
-    fn add_new_leaf(&mut self, data: BLSScalar, abar: AnonBlindAssetRecord) -> Result<u64> {
-
+    fn add_new_leaf(
+        &mut self,
+        data: BLSScalar,
+        abar: AnonBlindAssetRecord,
+    ) -> Result<u64> {
         // TODO: wrap in Mutex
         let new_id: u64 = self.entry_count + self.uncommitted_data.len() as u64;
 
         self.uncommitted_data.push((data, abar));
 
         Ok(new_id)
-
     }
 
     pub fn get_mt_leaf_info(&self, id: u64) -> Result<MTLeafInfo> {
-
         let mut info = MTLeafInfo::default();
 
         info.uid = id;
@@ -129,12 +132,11 @@ impl MerkleTree {
         let path = MerkleTree::get_path_from_uid(id);
         let mut depth = 0;
         while !current.as_ref().unwrap().is_leaf {
-
-            let mut node = MTNode{
+            let mut node = MTNode {
                 siblings1: Default::default(),
                 siblings2: Default::default(),
                 is_left_child: 0,
-                is_right_child: 0
+                is_right_child: 0,
             };
 
             let current_node = current.as_ref().unwrap();
@@ -146,12 +148,12 @@ impl MerkleTree {
                         node.siblings1 = current_node._get_middle_child_hash();
                         node.siblings2 = current_node._get_right_child_hash();
                         &current_node.left_child
-                    },
+                    }
                     Path::Middle => {
                         node.siblings1 = current_node._get_left_child_hash();
                         node.siblings2 = current_node._get_right_child_hash();
                         &current_node.middle_child
-                    },
+                    }
                     Path::Right => {
                         node.is_right_child = 1;
                         node.siblings1 = current_node._get_left_child_hash();
@@ -166,7 +168,7 @@ impl MerkleTree {
                 depth += 1;
                 current = &next;
             } else {
-                return Err(eg!("uid not found in tree"))
+                return Err(eg!("uid not found in tree"));
             }
         }
 
@@ -176,7 +178,7 @@ impl MerkleTree {
 
     pub fn commit(&mut self) -> Result<u64> {
         if self.uncommitted_data.is_empty() {
-            return Ok(self.version_count)
+            return Ok(self.version_count);
         }
 
         let mut root_hash = BLSScalar::default();
@@ -187,10 +189,9 @@ impl MerkleTree {
             let path = MerkleTree::get_path_from_uid(new_id);
 
             root_hash = root.add_child(data.0.clone(), path, 0)?;
-            self.leaf_lookup.insert( new_id,data.1.clone());
+            self.leaf_lookup.insert(new_id, data.1.clone());
             self.entry_count += 1;
-
-        };
+        }
         self.uncommitted_data.clear();
         self.root_hash = root_hash;
 
@@ -213,11 +214,10 @@ impl MerkleTree {
     }
 
     pub fn get_path_from_uid(mut uid: u64) -> Vec<Path> {
-
         let mut path: Vec<Path> = Vec::new();
         let mut count = 0;
         while count < TREE_DEPTH {
-            let rem =  uid % 3;
+            let rem = uid % 3;
             uid = uid / 3;
 
             match rem {
@@ -233,23 +233,27 @@ impl MerkleTree {
     }
 
     pub fn get_owned_abars_uids(&self, pub_key: AXfrPubKey) -> Vec<u64> {
-
-       self.leaf_lookup.iter().filter_map(|(id, abar)|  {
-          if abar.public_key == pub_key {
-              return Option::from(id.clone());
-          }
-           None
-       }).collect_vec()
+        self.leaf_lookup
+            .iter()
+            .filter_map(|(id, abar)| {
+                if abar.public_key == pub_key {
+                    return Option::from(id.clone());
+                }
+                None
+            })
+            .collect_vec()
     }
 
     pub fn get_owned_abars(&self, pub_key: AXfrPubKey) -> Vec<AnonBlindAssetRecord> {
-
-        self.leaf_lookup.iter().filter_map(|(_id, abar)|  {
-            if abar.public_key == pub_key {
-                return Option::from(abar.clone());
-            }
-            None
-        }).collect_vec()
+        self.leaf_lookup
+            .iter()
+            .filter_map(|(_id, abar)| {
+                if abar.public_key == pub_key {
+                    return Option::from(abar.clone());
+                }
+                None
+            })
+            .collect_vec()
     }
 }
 
@@ -265,20 +269,23 @@ pub struct Node {
 }
 
 impl Node {
-
     pub fn default() -> Node {
-        return Node{
+        return Node {
             left_child: None,
             middle_child: None,
             right_child: None,
             hash: BLSScalar::zero(),
             data: None,
-            is_leaf: false
-        }
+            is_leaf: false,
+        };
     }
 
-    pub fn add_child(&mut self, data: BLSScalar, path: Vec<Path>, depth: usize) -> Result<BLSScalar>{
-
+    pub fn add_child(
+        &mut self,
+        data: BLSScalar,
+        path: Vec<Path>,
+        depth: usize,
+    ) -> Result<BLSScalar> {
         let hasher = RescueInstance::new();
 
         if depth == TREE_DEPTH {
@@ -291,8 +298,6 @@ impl Node {
             return Ok(self.hash);
         }
 
-
-
         match path[depth] {
             Path::Left => {
                 if self.left_child.is_none() {
@@ -302,19 +307,29 @@ impl Node {
                         right_child: None,
                         hash: Default::default(),
                         data: None,
-                        is_leaf: false
+                        is_leaf: false,
                     }));
                 }
-                let left_hash = self.left_child.as_mut().unwrap().add_child(data, path, depth+1)?;
+                let left_hash = self.left_child.as_mut().unwrap().add_child(
+                    data,
+                    path,
+                    depth + 1,
+                )?;
 
-                self.hash = hasher.rescue_hash(
-                    &[left_hash,
-                        self.middle_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
-                        self.right_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
-                        BLSScalar::zero()
+                self.hash = hasher.rescue_hash(&[
+                    left_hash,
+                    self.middle_child
+                        .as_ref()
+                        .unwrap_or(&Box::from(Node::default()))
+                        .hash,
+                    self.right_child
+                        .as_ref()
+                        .unwrap_or(&Box::from(Node::default()))
+                        .hash,
+                    BLSScalar::zero(),
                 ])[0];
                 return Ok(self.hash);
-            },
+            }
             Path::Middle => {
                 if self.middle_child.is_none() {
                     self.middle_child = Option::from(Box::from(Node {
@@ -323,18 +338,28 @@ impl Node {
                         right_child: None,
                         hash: Default::default(),
                         data: None,
-                        is_leaf: false
+                        is_leaf: false,
                     }));
                 }
-                let middle_hash = self.middle_child.as_mut().unwrap().add_child(data, path, depth+1)?;
-                self.hash = hasher.rescue_hash(
-                    &[self.left_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
-                        middle_hash,
-                        self.right_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
-                        BLSScalar::zero()
-                    ])[0];
+                let middle_hash = self.middle_child.as_mut().unwrap().add_child(
+                    data,
+                    path,
+                    depth + 1,
+                )?;
+                self.hash = hasher.rescue_hash(&[
+                    self.left_child
+                        .as_ref()
+                        .unwrap_or(&Box::from(Node::default()))
+                        .hash,
+                    middle_hash,
+                    self.right_child
+                        .as_ref()
+                        .unwrap_or(&Box::from(Node::default()))
+                        .hash,
+                    BLSScalar::zero(),
+                ])[0];
                 return Ok(self.hash);
-            },
+            }
             Path::Right => {
                 if self.right_child.is_none() {
                     self.right_child = Option::from(Box::from(Node {
@@ -343,69 +368,103 @@ impl Node {
                         right_child: None,
                         hash: Default::default(),
                         data: None,
-                        is_leaf: false
+                        is_leaf: false,
                     }));
                 }
-                let right_hash = self.right_child.as_mut().unwrap().add_child(data, path, depth+1)?;
-                self.hash = hasher.rescue_hash(
-                    &[self.left_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
-                        self.middle_child.as_ref().unwrap_or(&Box::from(Node::default())).hash,
-                        right_hash,
-                        BLSScalar::zero()
-                    ])[0];
+                let right_hash = self.right_child.as_mut().unwrap().add_child(
+                    data,
+                    path,
+                    depth + 1,
+                )?;
+                self.hash = hasher.rescue_hash(&[
+                    self.left_child
+                        .as_ref()
+                        .unwrap_or(&Box::from(Node::default()))
+                        .hash,
+                    self.middle_child
+                        .as_ref()
+                        .unwrap_or(&Box::from(Node::default()))
+                        .hash,
+                    right_hash,
+                    BLSScalar::zero(),
+                ])[0];
                 return Ok(self.hash);
             }
         }
     }
 
     #[inline(always)]
-    pub fn update_hash(&mut self) -> BLSScalar{
+    pub fn update_hash(&mut self) -> BLSScalar {
         let hash = RescueInstance::new();
 
-        self.hash = hash.rescue_hash( &[
+        self.hash = hash.rescue_hash(&[
             self._get_left_child_hash(),
             self._get_middle_child_hash(),
             self._get_right_child_hash(),
             BLSScalar::zero(),
         ])[0];
 
-        return self.hash
+        return self.hash;
     }
 
     fn _get_left_child_hash(&self) -> BLSScalar {
-        self.left_child.as_ref().unwrap_or(&Box::from(Node::default())).hash
+        self.left_child
+            .as_ref()
+            .unwrap_or(&Box::from(Node::default()))
+            .hash
     }
     fn _get_middle_child_hash(&self) -> BLSScalar {
-        self.middle_child.as_ref().unwrap_or(&Box::from(Node::default())).hash
+        self.middle_child
+            .as_ref()
+            .unwrap_or(&Box::from(Node::default()))
+            .hash
     }
     fn _get_right_child_hash(&self) -> BLSScalar {
-        self.right_child.as_ref().unwrap_or(&Box::from(Node::default())).hash
+        self.right_child
+            .as_ref()
+            .unwrap_or(&Box::from(Node::default()))
+            .hash
     }
 }
-
 
 #[test]
 pub fn test_tree() {
     let hash = RescueInstance::new();
 
     let mut mt = MerkleTree::new();
-    assert_eq!(mt.root_hash, hash.rescue_hash(&[BLSScalar::zero(), BLSScalar::zero(), BLSScalar::zero(), BLSScalar::zero()])[0]);
+    assert_eq!(
+        mt.root_hash,
+        hash.rescue_hash(&[
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+            BLSScalar::zero()
+        ])[0]
+    );
 
-    let uid = mt.add_new_leaf(BLSScalar::one(),
-                              AnonBlindAssetRecord {
-                                  amount_type_commitment: Default::default(),
-                                  public_key: Default::default()
-                              }).unwrap();
+    let uid = mt
+        .add_new_leaf(
+            BLSScalar::one(),
+            AnonBlindAssetRecord {
+                amount_type_commitment: Default::default(),
+                public_key: Default::default(),
+            },
+        )
+        .unwrap();
     assert_eq!(uid, 0u64);
     assert_eq!(mt.get_committed_count(), 0);
 
     let first_hash = mt.root_hash.get_scalar();
 
-    let uid2 = mt.add_new_leaf(BLSScalar::zero(),
-                               AnonBlindAssetRecord {
-                                   amount_type_commitment: Default::default(),
-                                   public_key: Default::default()
-                               }).unwrap();
+    let uid2 = mt
+        .add_new_leaf(
+            BLSScalar::zero(),
+            AnonBlindAssetRecord {
+                amount_type_commitment: Default::default(),
+                public_key: Default::default(),
+            },
+        )
+        .unwrap();
     assert_eq!(uid2, 1u64);
     assert_eq!(first_hash, mt.root_hash.get_scalar());
     assert_eq!(mt.get_committed_count(), 0);
@@ -416,11 +475,15 @@ pub fn test_tree() {
     assert_eq!(mt.get_uncommitted_count(), 0);
     let first_commit_hash = mt.root_hash;
 
-    let uid3 = mt.add_new_leaf(BLSScalar::one().add(&BLSScalar::one()),
-                               AnonBlindAssetRecord{
-                                   amount_type_commitment: Default::default(),
-                                   public_key: Default::default()
-                               }).unwrap();
+    let uid3 = mt
+        .add_new_leaf(
+            BLSScalar::one().add(&BLSScalar::one()),
+            AnonBlindAssetRecord {
+                amount_type_commitment: Default::default(),
+                public_key: Default::default(),
+            },
+        )
+        .unwrap();
     assert_eq!(uid3, 2u64);
     assert_eq!(first_commit_hash, mt.root_hash);
     assert_eq!(mt.get_committed_count(), 2);
@@ -465,79 +528,263 @@ fn test_get_path() {
     assert_eq!(zero_path[40], Path::Left);
 
     let one_path = MerkleTree::get_path_from_uid(1);
-    assert_eq!(one_path, vec![Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Middle]);
+    assert_eq!(
+        one_path,
+        vec![
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Middle
+        ]
+    );
 
     let two_path = MerkleTree::get_path_from_uid(2);
-    assert_eq!(two_path, vec![Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Right]);
+    assert_eq!(
+        two_path,
+        vec![
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Right
+        ]
+    );
 
     let three_path = MerkleTree::get_path_from_uid(3);
-    assert_eq!(three_path, vec![Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                              Path::Left, Path::Left, Path::Left, Path::Left, Path::Middle,
-                              Path::Left]);
+    assert_eq!(
+        three_path,
+        vec![
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Middle,
+            Path::Left
+        ]
+    );
 
     let four_path = MerkleTree::get_path_from_uid(4);
-    assert_eq!(four_path, vec![Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                                Path::Left, Path::Left, Path::Left, Path::Left, Path::Middle,
-                                Path::Middle]);
+    assert_eq!(
+        four_path,
+        vec![
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Middle,
+            Path::Middle
+        ]
+    );
 
     let five_path = MerkleTree::get_path_from_uid(5);
-    assert_eq!(five_path, vec![Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                               Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                               Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                               Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                               Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                               Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                               Path::Left, Path::Left, Path::Left, Path::Left, Path::Left,
-                               Path::Left, Path::Left, Path::Left, Path::Left, Path::Middle,
-                               Path::Right]);
+    assert_eq!(
+        five_path,
+        vec![
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Left,
+            Path::Middle,
+            Path::Right
+        ]
+    );
 }
 
 #[test]
 fn test_abar_proof() {
-
-    use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
-    use crate::anon_xfr::keys::{AXfrKeyPair};
-    use crate::anon_xfr::circuits::compute_merkle_root;
-    use rand_chacha::ChaChaRng;
-    use rand_chacha::rand_core::SeedableRng;
-    use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
-    use crate::anon_xfr::circuits::AccElemVars;
     use crate::anon_xfr::circuits::add_merkle_path_variables;
+    use crate::anon_xfr::circuits::compute_merkle_root;
+    use crate::anon_xfr::circuits::AccElemVars;
+    use crate::anon_xfr::keys::AXfrKeyPair;
+    use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
+    use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
+    use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaChaRng;
 
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
     let key_pair = AXfrKeyPair::generate(&mut prng);
-    let abar = AnonBlindAssetRecord{
+    let abar = AnonBlindAssetRecord {
         amount_type_commitment: BLSScalar::random(&mut prng),
-        public_key: key_pair.pub_key()
+        public_key: key_pair.pub_key(),
     };
 
     let mut mt = MerkleTree::new();
@@ -550,15 +797,18 @@ fn test_abar_proof() {
 
     assert_eq!(mt.leaf_lookup.get(&uid), Option::from(&abar));
     assert_eq!(mt.get_owned_abars_uids(abar.public_key.clone()), vec![uid]);
-    assert_eq!(mt.get_owned_abars(abar.public_key.clone()), vec![abar.clone()]);
+    assert_eq!(
+        mt.get_owned_abars(abar.public_key.clone()),
+        vec![abar.clone()]
+    );
 
     let mut cs = TurboPlonkConstraintSystem::new();
     let uid_var = cs.new_variable(BLSScalar::from_u64(uid));
     let comm_var = cs.new_variable(abar.clone().amount_type_commitment);
-    let pk_var = cs.new_point_variable(
-                    Point::new( abar.clone().public_key.0.point_ref().get_x(),
-                                abar.clone().public_key.0.point_ref().get_y())
-    );
+    let pk_var = cs.new_point_variable(Point::new(
+        abar.clone().public_key.0.point_ref().get_x(),
+        abar.clone().public_key.0.point_ref().get_y(),
+    ));
     let elem = AccElemVars {
         uid: uid_var,
         commitment: comm_var,
@@ -576,21 +826,35 @@ fn test_abar_proof() {
 
     let hash = RescueInstance::new();
     let zero = BLSScalar::zero();
-    let pk_hash = hash.rescue_hash(&[key_pair.pub_key().as_jubjub_point().get_x(),
-        key_pair.pub_key().as_jubjub_point().get_y(), zero, zero])[0];
-    let mut node = hash.rescue_hash(&[BLSScalar::from_u64(uid), abar.clone().amount_type_commitment, pk_hash, zero])[0];
+    let pk_hash = hash.rescue_hash(&[
+        key_pair.pub_key().as_jubjub_point().get_x(),
+        key_pair.pub_key().as_jubjub_point().get_y(),
+        zero,
+        zero,
+    ])[0];
+    let mut node = hash.rescue_hash(&[
+        BLSScalar::from_u64(uid),
+        abar.clone().amount_type_commitment,
+        pk_hash,
+        zero,
+    ])[0];
     let mut depth = 0;
-    leaf_info.path.nodes.iter().map(|n| {
-       if n.is_left_child == 1u8 {
-            node = hash.rescue_hash(&[node, n.siblings1, n.siblings2, zero])[0];
-       } else if n.is_right_child == 1u8 {
-           node = hash.rescue_hash(&[n.siblings1, n.siblings2, node, zero])[0];
-       } else {
-           node = hash.rescue_hash(&[n.siblings1, node, n.siblings2, zero])[0];
-       }
-        println!("hash: {:X?}, depth: {}", node, depth);
-        depth += 1;
-    }).last();
+    leaf_info
+        .path
+        .nodes
+        .iter()
+        .map(|n| {
+            if n.is_left_child == 1u8 {
+                node = hash.rescue_hash(&[node, n.siblings1, n.siblings2, zero])[0];
+            } else if n.is_right_child == 1u8 {
+                node = hash.rescue_hash(&[n.siblings1, n.siblings2, node, zero])[0];
+            } else {
+                node = hash.rescue_hash(&[n.siblings1, node, n.siblings2, zero])[0];
+            }
+            println!("hash: {:X?}, depth: {}", node, depth);
+            depth += 1;
+        })
+        .last();
     println!("root hash{:X?}", node);
 
     assert_eq!(witness[root_var], node);
@@ -601,5 +865,8 @@ fn test_abar_proof() {
     let mut list = mt.get_owned_abars_uids(abar.clone().public_key.clone());
     list.sort();
     assert_eq!(list, vec![uid, uid2]);
-    assert_eq!(mt.get_owned_abars(abar.clone().public_key.clone()), vec![abar.clone(), abar.clone()]);
+    assert_eq!(
+        mt.get_owned_abars(abar.clone().public_key.clone()),
+        vec![abar.clone(), abar.clone()]
+    );
 }

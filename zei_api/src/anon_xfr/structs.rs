@@ -1,5 +1,5 @@
-use crate::anon_xfr::decrypt_memo;
-use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
+use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature};
+use crate::anon_xfr::{decrypt_memo};
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use algebra::bls12_381::{BLSScalar, Bls12381};
 use algebra::groups::{Scalar, Zero};
@@ -12,6 +12,7 @@ use poly_iops::commitments::kzg_poly_com::KZGCommitmentScheme;
 use poly_iops::plonk::protocol::prover::PlonkPf;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use serde::Serialize;
 use utils::errors::ZeiError;
 
 pub type Nullifier = BLSScalar;
@@ -33,8 +34,50 @@ pub struct MTNode {
 
 pub type SnarkProof = PlonkPf<KZGCommitmentScheme<Bls12381>>;
 
+// AXfrNote is a wrapper over AXfrBody with signatures and verification.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
+pub struct AXfrNote {
+    pub body: AXfrBody,
+    pub signatures: Vec<AXfrSignature>,
+}
+
+impl AXfrNote {
+    pub fn generate_note_from_body(
+        body: AXfrBody,
+        keypairs: Vec<AXfrKeyPair>,
+    ) -> Result<AXfrNote> {
+        let mut signatures: Vec<AXfrSignature> = Vec::new();
+        let msg: Vec<u8> = bincode::serialize(&body)
+            .map_err(|_| ZeiError::SerializationError)
+            .c(d!())?;
+
+        for keypair in keypairs {
+            signatures.push(keypair.sign(msg.as_slice()))
+        }
+
+        Ok(AXfrNote { body, signatures })
+    }
+
+    pub fn verify(&self) -> Result<()> {
+        let msg: Vec<u8> = bincode::serialize(&self.body)
+            .map_err(|_| ZeiError::SerializationError)
+            .c(d!())?;
+
+        self
+            .body
+            .inputs
+            .iter()
+            .zip(self.signatures.iter())
+            .map(|(inp, sig)| inp.1.verify(msg.as_slice(), sig))
+            .collect::<Result<Vec<()>>>()
+            .c(d!("AXfrNote signature verification failed"))?;
+
+        Ok(())
+    }
+}
+
 /// Anonymous transfers structure
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AXfrBody {
     pub inputs: Vec<(Nullifier, AXfrPubKey)>,
     pub outputs: Vec<AnonBlindAssetRecord>,
@@ -60,7 +103,7 @@ impl AnonBlindAssetRecord {
 }
 
 /// Proof for an AXfrBody correctness
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AXfrProof {
     pub snark_proof: SnarkProof,
     pub merkle_root: BLSScalar,
