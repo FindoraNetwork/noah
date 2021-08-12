@@ -107,6 +107,7 @@ impl AnonBlindAssetRecord {
 pub struct AXfrProof {
     pub snark_proof: SnarkProof,
     pub merkle_root: BLSScalar,
+    pub merkle_root_version: u64,
 }
 
 /// MT PATH, merkle root value, leaf identifier

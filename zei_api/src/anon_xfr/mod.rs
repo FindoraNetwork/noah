@@ -121,13 +121,15 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
         .map(|output| output.owner_memo.clone().c(d!(ZeiError::ParameterError)))
         .collect();
 
+    let mt_info_temp = inputs[0].mt_leaf_info.as_ref().unwrap();
     Ok((
         AXfrBody {
             inputs: nullifiers_and_signing_keys,
             outputs: out_abars,
             proof: AXfrProof {
                 snark_proof: proof,
-                merkle_root: inputs[0].mt_leaf_info.as_ref().unwrap().root,
+                merkle_root: mt_info_temp.root,
+                merkle_root_version: mt_info_temp.root_version
             },
             owner_memos: out_memos.c(d!())?,
         },
