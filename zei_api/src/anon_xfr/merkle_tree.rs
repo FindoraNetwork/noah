@@ -255,6 +255,17 @@ impl MerkleTree {
             })
             .collect_vec()
     }
+
+    pub fn get_latest_hash(&self) -> BLSScalar {
+        self.root_hash
+    }
+
+    pub fn get_version_hash(&self, version: u64) -> Result<BLSScalar> {
+        match self.version.get(&version) {
+            None => Err(eg!("version not found in merkle tree")),
+            Some(h) => Ok(h.clone()),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
