@@ -24,7 +24,7 @@ pub type BlindFactor = BLSScalar;
 /// * `siblings2` - the 2nd sibling of the tree node
 /// * `is_left_child` - indicates whether the tree node is the left child of its parent
 /// * `is_right_child` - indicates whether the tree node is the right child of its parent
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTNode {
     pub siblings1: BLSScalar,
     pub siblings2: BLSScalar,
@@ -111,7 +111,7 @@ pub struct AXfrProof {
 }
 
 /// MT PATH, merkle root value, leaf identifier
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MTLeafInfo {
     pub path: MTPath,
     pub root: BLSScalar,
@@ -130,7 +130,7 @@ impl Default for MTLeafInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OpenAnonBlindAssetRecord {
     pub(crate) amount: u64,
     pub(crate) asset_type: AssetType,
@@ -299,7 +299,7 @@ impl OpenAnonBlindAssetRecordBuilder {
 }
 
 /// An authentication path of a ternary Merkle tree.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTPath {
     pub nodes: Vec<MTNode>,
 }
