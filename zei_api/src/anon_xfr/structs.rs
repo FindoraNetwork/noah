@@ -130,7 +130,7 @@ impl Default for MTLeafInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct OpenAnonBlindAssetRecord {
     pub(crate) amount: u64,
     pub(crate) asset_type: AssetType,
