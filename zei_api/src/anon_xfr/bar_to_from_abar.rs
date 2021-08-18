@@ -345,20 +345,21 @@ mod test {
         // verifications
         let node_params = NodeParams::from(params);
         // confidential case
-        assert!(
-            super::verify_bar_to_abar(&node_params, &bar_conf, &abar_conf, &proof_conf)
-                .is_ok()
-        );
+        assert!(super::verify_bar_to_abar(
+            &node_params,
+            &bar_conf,
+            &abar_conf,
+            &proof_conf
+        )
+        .is_ok());
         // non confidential case
-        assert!(
-            super::verify_bar_to_abar(
-                &node_params,
-                &bar_non_conf,
-                &abar_non_conf,
-                &proof_non_conf
-            )
-            .is_ok()
-        );
+        assert!(super::verify_bar_to_abar(
+            &node_params,
+            &bar_non_conf,
+            &abar_non_conf,
+            &proof_non_conf
+        )
+        .is_ok());
     }
 
     #[test]

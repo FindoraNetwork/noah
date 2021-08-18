@@ -47,9 +47,9 @@ pub(crate) fn mimc_f(s: &Scalar, c: &Scalar) -> Scalar {
 pub(crate) fn compute_mimc_constants(level: usize) -> [Scalar; MIMC_ROUNDS] {
     let mut c = [Scalar::from_u32(0u32); MIMC_ROUNDS];
     let mut hash = sha2::Sha256::new();
-    hash.input(level.to_string());
+    hash.update(level.to_string());
     let mut seed = [0u8; 32];
-    seed.copy_from_slice(&hash.result()[..]);
+    seed.copy_from_slice(&hash.finalize()[..]);
     let mut prng = ChaChaRng::from_seed(seed);
     for i in 1..MIMC_ROUNDS - 1 {
         c[i] = Scalar::random(&mut prng);

@@ -523,8 +523,8 @@ pub(crate) mod examples {
 
     #[test]
     #[allow(non_snake_case)]
-    fn xfr_note_confidential_two_inputs_one_output_asset_tracing_and_identity_tracking_on_inputs()
-     {
+    fn xfr_note_confidential_two_inputs_one_output_asset_tracing_and_identity_tracking_on_inputs(
+    ) {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = PublicParams::default();
         let mut AIR: HashMap<&[u8], _> = HashMap::new();
@@ -597,25 +597,21 @@ pub(crate) mod examples {
         .unwrap();
 
         // 2.3 verifying commitment and put them on AIR
-        assert!(
-            ac_verify_commitment(
-                &cred_issuer_pk,
-                &commitment_user1,
-                &proof_user1,
-                user1_pubkey.as_bytes()
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment(
+            &cred_issuer_pk,
+            &commitment_user1,
+            &proof_user1,
+            user1_pubkey.as_bytes()
+        )
+        .is_ok());
         AIR.insert(user1_pubkey.as_bytes(), commitment_user1);
-        assert!(
-            ac_verify_commitment(
-                &cred_issuer_pk,
-                &commitment_user2,
-                &proof_user2,
-                user2_pubkey.as_bytes()
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment(
+            &cred_issuer_pk,
+            &commitment_user2,
+            &proof_user2,
+            user2_pubkey.as_bytes()
+        )
+        .is_ok());
         AIR.insert(user2_pubkey.as_bytes(), commitment_user2);
 
         // 3. Prepare input AssetRecord
@@ -746,8 +742,8 @@ pub(crate) mod examples {
 
     #[test]
     #[allow(non_snake_case)]
-    fn xfr_note_confidential_one_input_two_outputs_asset_tracing_and_identity_tracking_on_outputs()
-     {
+    fn xfr_note_confidential_one_input_two_outputs_asset_tracing_and_identity_tracking_on_outputs(
+    ) {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = PublicParams::default();
         let mut AIR: HashMap<&[u8], _> = HashMap::new();
@@ -820,25 +816,21 @@ pub(crate) mod examples {
         .unwrap();
 
         // 2.3 verifying commitment and put them on AIR
-        assert!(
-            ac_verify_commitment(
-                &cred_issuer_pk,
-                &commitment_user1,
-                &proof_user1,
-                recv_user1_pub_key.as_bytes()
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment(
+            &cred_issuer_pk,
+            &commitment_user1,
+            &proof_user1,
+            recv_user1_pub_key.as_bytes()
+        )
+        .is_ok());
         AIR.insert(recv_user1_pub_key.as_bytes(), commitment_user1);
-        assert!(
-            ac_verify_commitment(
-                &cred_issuer_pk,
-                &commitment_user2,
-                &proof_user2,
-                recv_user2_pub_key.as_bytes()
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment(
+            &cred_issuer_pk,
+            &commitment_user2,
+            &proof_user2,
+            recv_user2_pub_key.as_bytes()
+        )
+        .is_ok());
         AIR.insert(recv_user2_pub_key.as_bytes(), commitment_user2);
 
         // 3. Prepare input AssetRecord
@@ -1091,15 +1083,13 @@ pub(crate) mod examples {
             user1_key_pair1.pub_key.as_bytes(),
         )
         .unwrap();
-        assert!(
-            ac_verify_commitment(
-                &cred_issuer_pk,
-                &commitment_user1_addr1,
-                &proof,
-                user1_key_pair1.pub_key.as_bytes()
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment(
+            &cred_issuer_pk,
+            &commitment_user1_addr1,
+            &proof,
+            user1_key_pair1.pub_key.as_bytes()
+        )
+        .is_ok());
         AIR.insert(user1_key_pair1.pub_key.as_bytes(), commitment_user1_addr1);
 
         let (commitment_user2_addr1, proof, _commitment_user2_addr1_key) = ac_commit(
@@ -1109,15 +1099,13 @@ pub(crate) mod examples {
             user2_key_pair1.pub_key.as_bytes(),
         )
         .unwrap();
-        assert!(
-            ac_verify_commitment(
-                &cred_issuer_pk,
-                &commitment_user2_addr1,
-                &proof,
-                user2_key_pair1.pub_key.as_bytes()
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment(
+            &cred_issuer_pk,
+            &commitment_user2_addr1,
+            &proof,
+            user2_key_pair1.pub_key.as_bytes()
+        )
+        .is_ok());
         AIR.insert(user2_key_pair1.pub_key.as_bytes(), commitment_user2_addr1);
 
         let (commitment_user3_addr1, proof, commitment_user3_addr1_key) = ac_commit(
@@ -1127,15 +1115,13 @@ pub(crate) mod examples {
             user3_key_pair1.pub_key.as_bytes(),
         )
         .unwrap();
-        assert!(
-            ac_verify_commitment(
-                &cred_issuer_pk,
-                &commitment_user3_addr1,
-                &proof,
-                user3_key_pair1.pub_key.as_bytes()
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment(
+            &cred_issuer_pk,
+            &commitment_user3_addr1,
+            &proof,
+            user3_key_pair1.pub_key.as_bytes()
+        )
+        .is_ok());
         AIR.insert(user3_key_pair1.pub_key.as_bytes(), commitment_user3_addr1);
 
         let (commitment_user4_addr1, proof, _commitment_user4_addr1_key) = ac_commit(
@@ -1145,15 +1131,13 @@ pub(crate) mod examples {
             user4_key_pair1.pub_key.as_bytes(),
         )
         .unwrap();
-        assert!(
-            ac_verify_commitment(
-                &cred_issuer_pk,
-                &commitment_user4_addr1,
-                &proof,
-                user4_key_pair1.pub_key.as_bytes()
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment(
+            &cred_issuer_pk,
+            &commitment_user4_addr1,
+            &proof,
+            user4_key_pair1.pub_key.as_bytes()
+        )
+        .is_ok());
         AIR.insert(user4_key_pair1.pub_key.as_bytes(), commitment_user4_addr1);
 
         // 1.5 Define asset issuer tracing policies

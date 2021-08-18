@@ -629,17 +629,15 @@ mod test {
         {
             let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
             let mut transcript = Transcript::new(b"TestPlonk");
-            assert!(
-                verifier(
-                    &mut transcript,
-                    &pcs,
-                    &cs,
-                    &verifier_params,
-                    &online_vars,
-                    &proof
-                )
-                .is_ok()
+            assert!(verifier(
+                &mut transcript,
+                &pcs,
+                &cs,
+                &verifier_params,
+                &online_vars,
+                &proof
             )
+            .is_ok())
         }
     }
 }
