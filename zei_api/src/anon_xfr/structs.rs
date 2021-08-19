@@ -1,5 +1,5 @@
-use crate::anon_xfr::decrypt_memo;
-use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
+use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature};
+use crate::anon_xfr::{decrypt_memo};
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use algebra::bls12_381::{BLSScalar, Bls12381};
 use algebra::groups::{Scalar, Zero};
@@ -12,6 +12,7 @@ use poly_iops::commitments::kzg_poly_com::KZGCommitmentScheme;
 use poly_iops::plonk::protocol::prover::PlonkPf;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use serde::Serialize;
 use utils::errors::ZeiError;
 
 pub type Nullifier = BLSScalar;
@@ -23,7 +24,7 @@ pub type BlindFactor = BLSScalar;
 /// * `siblings2` - the 2nd sibling of the tree node
 /// * `is_left_child` - indicates whether the tree node is the left child of its parent
 /// * `is_right_child` - indicates whether the tree node is the right child of its parent
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTNode {
     pub siblings1: BLSScalar,
     pub siblings2: BLSScalar,
@@ -33,8 +34,50 @@ pub struct MTNode {
 
 pub type SnarkProof = PlonkPf<KZGCommitmentScheme<Bls12381>>;
 
+// AXfrNote is a wrapper over AXfrBody with signatures and verification.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
+pub struct AXfrNote {
+    pub body: AXfrBody,
+    pub signatures: Vec<AXfrSignature>,
+}
+
+impl AXfrNote {
+    pub fn generate_note_from_body(
+        body: AXfrBody,
+        keypairs: Vec<AXfrKeyPair>,
+    ) -> Result<AXfrNote> {
+        let mut signatures: Vec<AXfrSignature> = Vec::new();
+        let msg: Vec<u8> = bincode::serialize(&body)
+            .map_err(|_| ZeiError::SerializationError)
+            .c(d!())?;
+
+        for keypair in keypairs {
+            signatures.push(keypair.sign(msg.as_slice()))
+        }
+
+        Ok(AXfrNote { body, signatures })
+    }
+
+    pub fn verify(&self) -> Result<()> {
+        let msg: Vec<u8> = bincode::serialize(&self.body)
+            .map_err(|_| ZeiError::SerializationError)
+            .c(d!())?;
+
+        self
+            .body
+            .inputs
+            .iter()
+            .zip(self.signatures.iter())
+            .map(|(inp, sig)| inp.1.verify(msg.as_slice(), sig))
+            .collect::<Result<Vec<()>>>()
+            .c(d!("AXfrNote signature verification failed"))?;
+
+        Ok(())
+    }
+}
+
 /// Anonymous transfers structure
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AXfrBody {
     pub inputs: Vec<(Nullifier, AXfrPubKey)>,
     pub outputs: Vec<AnonBlindAssetRecord>,
@@ -43,7 +86,7 @@ pub struct AXfrBody {
 }
 
 /// Asset record to be published
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AnonBlindAssetRecord {
     pub amount_type_commitment: Commitment,
     pub public_key: AXfrPubKey,
@@ -60,17 +103,19 @@ impl AnonBlindAssetRecord {
 }
 
 /// Proof for an AXfrBody correctness
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AXfrProof {
     pub snark_proof: SnarkProof,
     pub merkle_root: BLSScalar,
+    pub merkle_root_version: u64,
 }
 
 /// MT PATH, merkle root value, leaf identifier
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MTLeafInfo {
     pub path: MTPath,
     pub root: BLSScalar,
+    pub root_version: u64,
     pub uid: u64,
 }
 
@@ -79,12 +124,13 @@ impl Default for MTLeafInfo {
         MTLeafInfo {
             path: MTPath { nodes: vec![] },
             root: BLSScalar::zero(),
+            root_version: 0,
             uid: 0,
         }
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OpenAnonBlindAssetRecord {
     pub(crate) amount: u64,
     pub(crate) asset_type: AssetType,
@@ -253,7 +299,7 @@ impl OpenAnonBlindAssetRecordBuilder {
 }
 
 /// An authentication path of a ternary Merkle tree.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTPath {
     pub nodes: Vec<MTNode>,
 }

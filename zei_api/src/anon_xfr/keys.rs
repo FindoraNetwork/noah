@@ -2,16 +2,20 @@ use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use crypto::basics::signatures::schnorr;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use wasm_bindgen::prelude::*;
+use algebra::groups::Group;
 
 /// Public key used to address an Anonymous records and verify transaction spending it
+#[wasm_bindgen]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
 /// Keypair associated with an Anonymous records. It is used to spending it.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[wasm_bindgen]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct AXfrKeyPair(pub(crate) schnorr::KeyPair<JubjubPoint, JubjubScalar>);
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct AXfrSignature(pub(crate) schnorr::Signature<JubjubPoint, JubjubScalar>);
 
 impl AXfrKeyPair {
@@ -26,7 +30,7 @@ impl AXfrKeyPair {
     }
 
     /// Return public key
-    pub(crate) fn pub_key(&self) -> AXfrPubKey {
+    pub fn pub_key(&self) -> AXfrPubKey {
         AXfrPubKey(self.0.pub_key.clone())
     }
 
@@ -55,7 +59,38 @@ impl AXfrPubKey {
     }
 
     /// Signature verification function
-    pub fn verify(&self, msg: &[u8], sig: AXfrSignature) -> Result<()> {
+    pub fn verify(&self, msg: &[u8], sig: &AXfrSignature) -> Result<()> {
         self.0.verify(msg, &sig.0).c(d!())
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<AXfrPubKey> {
+        let point: JubjubPoint = JubjubPoint::from_compressed_bytes(bytes).c(d!())?;
+        Ok(AXfrPubKey::from_jubjub_point(point))
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.0.point_ref().to_compressed_bytes()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
+    use rand_chacha::ChaChaRng;
+    use rand_chacha::rand_core::SeedableRng;
+
+    #[test]
+    fn test_axfr_pub_key_serialization() {
+
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+
+        let pub_key: AXfrPubKey = keypair.pub_key();
+
+        let bytes = pub_key.to_bytes();
+        assert_ne!(bytes.len(), 0);
+
+        let reformed_pub_key = AXfrPubKey::from_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(pub_key, reformed_pub_key);
     }
 }

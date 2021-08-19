@@ -30,7 +30,7 @@ pub struct Signature<G, S> {
     s: S,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 struct SecretKey<S>(S);
 
 impl<S: Scalar> SecretKey<S> {
@@ -84,7 +84,7 @@ impl<G: Group> ZeiFromToBytes for PublicKey<G> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KeyPair<G, S> {
     sec_key: SecretKey<S>,
     pub pub_key: PublicKey<G>,
