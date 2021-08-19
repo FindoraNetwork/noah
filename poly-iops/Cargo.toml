@@ -1,6 +1,6 @@
 [package]
 name = "poly-iops"
-version = "0.1.0"
+version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2018"
 description = "Zei PLONK Poly-IOP protocol"

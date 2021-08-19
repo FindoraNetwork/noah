@@ -1,6 +1,6 @@
 [package]
 name = "zei"
-version = "0.0.3"
+version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2018"
 description = "Zei Platform Interface"
