@@ -5,7 +5,7 @@ use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 /// Gives a bulletproof range proof that values committed using  `blindings`

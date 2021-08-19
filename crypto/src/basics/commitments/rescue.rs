@@ -11,7 +11,7 @@
 use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Scalar;
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 pub struct HashCommitment<S> {
@@ -81,11 +81,9 @@ mod test {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let blind_scalar = BLSScalar::random(&mut prng);
         // wrong number of input messages
-        assert!(
-            hash_comm
-                .commit(&blind_scalar, &[BLSScalar::from_u32(0)])
-                .is_err()
-        );
+        assert!(hash_comm
+            .commit(&blind_scalar, &[BLSScalar::from_u32(0)])
+            .is_err());
 
         // the commitment is successful
         let mut msgs = [BLSScalar::from_u32(1), BLSScalar::from_u32(2)];
@@ -105,11 +103,9 @@ mod test {
         assert!(hash_comm.verify(&msgs, &blind_scalar, &commitment).is_ok());
 
         // wrong blinding randomness
-        assert!(
-            hash_comm
-                .verify(&msgs, &BLSScalar::from_u32(0), &commitment)
-                .is_err()
-        );
+        assert!(hash_comm
+            .verify(&msgs, &BLSScalar::from_u32(0), &commitment)
+            .is_err());
 
         // wrong messages
         msgs[0] = BLSScalar::from_u32(0);

@@ -8,7 +8,7 @@ use algebra::multi_exp::MultiExp;
 use algebra::pairing::Pairing;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 /// Implementation of KZG polynomial commitment scheme
 /// https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf
 /// This polynomial scheme relies on a bilinear map e:G1 x G2 -> Gt,
@@ -351,7 +351,7 @@ mod tests_kzg_impl {
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::{err::*, *};
+    use ruc::*;
 
     fn _check_public_parameters_generation<P: Pairing>() {
         let param_size = 5;

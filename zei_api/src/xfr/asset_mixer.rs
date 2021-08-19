@@ -7,7 +7,7 @@ use crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 use utils::serialization::zei_obj_serde;
 use wasm_bindgen::__rt::std::collections::HashSet;
@@ -281,7 +281,7 @@ mod test {
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::{err::*, *};
+    use ruc::*;
 
     #[test]
     fn test_asset_mixer() {

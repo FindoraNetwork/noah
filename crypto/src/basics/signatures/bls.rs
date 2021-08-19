@@ -2,7 +2,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::pairing::Pairing;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 type HashFnc = sha2::Sha512;
@@ -124,7 +124,7 @@ pub fn bls_batch_verify_added_signatures<P: Pairing, B: AsRef<[u8]>>(
 /// hash function to G2
 pub fn bls_hash_message<P: Pairing>(message: &[u8]) -> P::G2 {
     let mut hash = HashFnc::default();
-    hash.input(message);
+    hash.update(message);
     P::G2::from_hash(hash)
 }
 
@@ -135,15 +135,15 @@ pub fn bls_hash_pubkeys_to_scalars<P: Pairing>(
     let mut hasher = HashFnc::default();
     let n = ver_keys.len();
     for key in ver_keys {
-        hasher.input(key.0.to_compressed_bytes().as_slice());
+        hasher.update(key.0.to_compressed_bytes().as_slice());
     }
-    let hash = hasher.result();
+    let hash = hasher.finalize();
 
     let mut scalars = Vec::with_capacity(n);
     for i in 0..n {
         hasher = HashFnc::default();
-        hasher.input(i.to_be_bytes());
-        hasher.input(&hash[..]);
+        hasher.update(i.to_be_bytes());
+        hasher.update(&hash[..]);
         scalars.push(P::ScalarField::from_hash(hasher));
     }
     scalars
@@ -179,7 +179,7 @@ impl<S> AsRef<S> for BlsSecretKey<S> {
 mod tests {
     use algebra::bls12_381::Bls12381;
     use rand_core::SeedableRng;
-    use ruc::{err::*, *};
+    use ruc::*;
     use utils::errors::ZeiError;
 
     #[test]

@@ -1,6 +1,6 @@
 [package]
 name = "bench-utils"
-version = "0.1.0"
+version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2018"
 description = "Zei utilities for benchmarking"
@@ -13,4 +13,4 @@ rand_chacha = "0.2"
 criterion = "0.3.1"
 criterion-cycles-per-byte = "0.1.1"
 itertools = "0.8.0"
-ruc = "0.5.5"
+ruc = { git = "https://github.com/FindoraNetwork/RUC.git", branch = "master" }

@@ -1,7 +1,7 @@
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use crypto::basics::signatures::schnorr;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 /// Public key used to address an Anonymous records and verify transaction spending it
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]

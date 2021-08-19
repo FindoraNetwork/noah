@@ -6,7 +6,7 @@ use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 pub fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<Vec<F>> {
     let mut elems = vec![F::one()];

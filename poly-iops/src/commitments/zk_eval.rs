@@ -20,7 +20,7 @@ use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{Scalar, ScalarArithmetic, Zero};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 const ZK_EVAL_CHALLENGE: &[u8] = b"zk_eval challenge";
 
@@ -184,7 +184,11 @@ pub fn verify_zk_eval<PCS: PolyComScheme>(
     let a = proof.S_eval_z.sub(alpha_eval_z);
     let b = c.sub(eval_value);
 
-    if a == b { Ok(()) } else { Err(eg!()) }
+    if a == b {
+        Ok(())
+    } else {
+        Err(eg!())
+    }
 }
 
 #[allow(non_snake_case)]

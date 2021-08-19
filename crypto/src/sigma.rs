@@ -5,7 +5,7 @@ use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 pub trait SigmaTranscript {
@@ -64,7 +64,7 @@ impl SigmaTranscript for Transcript {
         let mut buffer = vec![0u8; 32];
         self.challenge_bytes(b"Sigma challenge", &mut buffer); // cannot use buffer directly (S::from_bytes(buffer.as_slice())) as it may not represent a valid Scalar
         let mut hash = sha2::Sha512::new();
-        hash.input(&buffer[..]);
+        hash.update(&buffer[..]);
         S::from_hash(hash)
     }
 }
@@ -185,7 +185,7 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar>(
     // multiexponentiation to verify all equations
     let mut s = vec![S::from_u32(0); n_elems + rhs.len()]; // n elements + m proof commitments
     let mut alphas = vec![]; // linear combination scalars
-    // find in the matrix each element and multiply corresponding response by alpha
+                             // find in the matrix each element and multiply corresponding response by alpha
     for (j, row) in matrix.iter().enumerate() {
         let alpha = S::random(prng);
         for (i, s_i) in s[0..n_elems].iter_mut().enumerate() {
@@ -295,17 +295,15 @@ mod tests {
             lhs_matrix.as_slice(),
             &[&secret],
         );
-        assert!(
-            super::sigma_verify(
-                &mut verifier_transcript,
-                &mut prng,
-                elems,
-                lhs_matrix.as_slice(),
-                rhs_vec.as_slice(),
-                &dlog_proof
-            )
-            .is_ok()
-        );
+        assert!(super::sigma_verify(
+            &mut verifier_transcript,
+            &mut prng,
+            elems,
+            lhs_matrix.as_slice(),
+            rhs_vec.as_slice(),
+            &dlog_proof
+        )
+        .is_ok());
 
         let bad_matrix = vec![vec![1]];
         let dlog_proof = super::sigma_prove(
@@ -315,17 +313,15 @@ mod tests {
             bad_matrix.as_slice(),
             &[&secret],
         );
-        assert!(
-            super::sigma_verify(
-                &mut verifier_transcript,
-                &mut prng,
-                elems,
-                bad_matrix.as_slice(),
-                rhs_vec.as_slice(),
-                &dlog_proof
-            )
-            .is_err()
-        );
+        assert!(super::sigma_verify(
+            &mut verifier_transcript,
+            &mut prng,
+            elems,
+            bad_matrix.as_slice(),
+            rhs_vec.as_slice(),
+            &dlog_proof
+        )
+        .is_err());
 
         // test2: two contrains, two secrets
         // 1) H = secret * G, 2) H2 = secret2 * G
@@ -342,17 +338,15 @@ mod tests {
             lhs_matrix,
             &[&secret, &secret2],
         );
-        assert!(
-            super::sigma_verify(
-                &mut verifier_transcript,
-                &mut prng,
-                elems,
-                lhs_matrix,
-                rhs_vec,
-                &dlog_proof
-            )
-            .is_ok()
-        );
+        assert!(super::sigma_verify(
+            &mut verifier_transcript,
+            &mut prng,
+            elems,
+            lhs_matrix,
+            rhs_vec,
+            &dlog_proof
+        )
+        .is_ok());
 
         let lhs_matrix: &[Vec<usize>] = &[vec![1, 1], vec![0, 1]]; // bad row 1
         let dlog_proof = super::sigma_prove(
@@ -362,17 +356,15 @@ mod tests {
             lhs_matrix,
             &[&secret, &secret2],
         );
-        assert!(
-            super::sigma_verify(
-                &mut verifier_transcript,
-                &mut prng,
-                elems,
-                lhs_matrix,
-                rhs_vec,
-                &dlog_proof
-            )
-            .is_err()
-        );
+        assert!(super::sigma_verify(
+            &mut verifier_transcript,
+            &mut prng,
+            elems,
+            lhs_matrix,
+            rhs_vec,
+            &dlog_proof
+        )
+        .is_err());
 
         let lhs_matrix: &[Vec<usize>] = &[vec![1, 0], vec![0, 0]]; // bad row 2
         let dlog_proof = super::sigma_prove(
@@ -382,17 +374,15 @@ mod tests {
             lhs_matrix,
             &[&secret, &secret2],
         );
-        assert!(
-            super::sigma_verify(
-                &mut verifier_transcript,
-                &mut prng,
-                elems,
-                lhs_matrix,
-                rhs_vec,
-                &dlog_proof
-            )
-            .is_err()
-        );
+        assert!(super::sigma_verify(
+            &mut verifier_transcript,
+            &mut prng,
+            elems,
+            lhs_matrix,
+            rhs_vec,
+            &dlog_proof
+        )
+        .is_err());
 
         // test3: two constarains, 5 secrets
         let secret3 = Scalar::from_u32(30);
@@ -412,17 +402,15 @@ mod tests {
             matrix,
             secrets,
         );
-        assert!(
-            super::sigma_verify(
-                &mut verifier_transcript,
-                &mut prng,
-                elems,
-                matrix,
-                rhs_vec,
-                &proof
-            )
-            .is_ok()
-        );
+        assert!(super::sigma_verify(
+            &mut verifier_transcript,
+            &mut prng,
+            elems,
+            matrix,
+            rhs_vec,
+            &proof
+        )
+        .is_ok());
 
         let secrets: &[&Scalar] =
             &[&secret, &secret2, &secret3, &secret4, &Scalar::from_u32(0)]; // bad secrets
@@ -433,16 +421,14 @@ mod tests {
             matrix,
             secrets,
         );
-        assert!(
-            super::sigma_verify(
-                &mut verifier_transcript,
-                &mut prng,
-                elems,
-                matrix,
-                rhs_vec,
-                &proof
-            )
-            .is_err()
-        );
+        assert!(super::sigma_verify(
+            &mut verifier_transcript,
+            &mut prng,
+            elems,
+            matrix,
+            rhs_vec,
+            &proof
+        )
+        .is_err());
     }
 }

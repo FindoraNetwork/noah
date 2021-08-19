@@ -1,6 +1,6 @@
 use algebra::bls12_381::{Bls12381, BLSG1};
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 /// The public key of the group manager
 pub type GroupPublicKey = crypto::group_signatures::GroupPublicKey<Bls12381>;

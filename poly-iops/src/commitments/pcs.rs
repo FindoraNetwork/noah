@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use custom_error::custom_error;
-use ruc::{err::*, *};
+use ruc::*;
 use serde::{Deserialize, Serialize};
 
 custom_error! {#[derive(PartialEq)] pub PolyComSchemeError
@@ -409,10 +409,9 @@ mod test {
         assert_eq!(eval, pcs.eval_opening(&open, &point));
         {
             let mut transcript = Transcript::new(b"TestPCS");
-            assert!(
-                pcs.verify_eval(&mut transcript, &com, degree, &point, &eval, &proof)
-                    .is_ok()
-            );
+            assert!(pcs
+                .verify_eval(&mut transcript, &com, degree, &point, &eval, &proof)
+                .is_ok());
         }
     }
 
@@ -465,8 +464,8 @@ mod test {
                 commitments: &[&com1, &com2, &com3],
                 evals: &[],
             };
-            assert!(
-                pcs.batch_verify_eval(
+            assert!(pcs
+                .batch_verify_eval(
                     &mut transcript,
                     &[&com1, &com2, &com3],
                     degree,
@@ -475,8 +474,7 @@ mod test {
                     &proof,
                     Some(params)
                 )
-                .is_ok()
-            );
+                .is_ok());
         }
     }
 
@@ -544,8 +542,8 @@ mod test {
         );
         {
             let mut transcript = Transcript::new(b"TestPCS");
-            assert!(
-                pcs.batch_verify_eval(
+            assert!(pcs
+                .batch_verify_eval(
                     &mut transcript,
                     &[
                         &comf1, &comf2, &comf3, &comperm1, &comperm2, &comQ, &comL,
@@ -557,8 +555,7 @@ mod test {
                     &proof,
                     None
                 )
-                .is_ok()
-            );
+                .is_ok());
         }
     }
 }

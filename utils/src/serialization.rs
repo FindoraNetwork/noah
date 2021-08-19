@@ -2,7 +2,7 @@ use crate::errors::ZeiError;
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::RangeProof;
 use curve25519_dalek::edwards::CompressedEdwardsY;
-use ruc::{err::*, *};
+use ruc::*;
 
 /// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
 pub trait ZeiFromToBytes: Sized {
@@ -17,7 +17,8 @@ impl ZeiFromToBytes for RangeProof {
         v
     }
     fn zei_from_bytes(bytes: &[u8]) -> Result<RangeProof> {
-        RangeProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError)) // TODO import error message
+        RangeProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError))
+        // TODO import error message
     }
 }
 
@@ -26,7 +27,8 @@ impl ZeiFromToBytes for R1CSProof {
         self.to_bytes()
     }
     fn zei_from_bytes(bytes: &[u8]) -> Result<R1CSProof> {
-        R1CSProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError)) // TODO import error message
+        R1CSProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError))
+        // TODO import error message
     }
 }
 

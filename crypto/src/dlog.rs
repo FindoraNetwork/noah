@@ -2,7 +2,7 @@ use crate::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
 use algebra::groups::{Group, Scalar as ZeiScalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 fn init_pok_dlog<'a, G: Group>(
     transcript: &mut Transcript,
@@ -140,16 +140,14 @@ mod test {
             &point,
             &scalar,
         );
-        assert!(
-            verify_proof_of_knowledge_dlog(
-                &mut verifier_transcript,
-                &mut csprng,
-                &base,
-                &point,
-                &proof
-            )
-            .is_ok()
-        );
+        assert!(verify_proof_of_knowledge_dlog(
+            &mut verifier_transcript,
+            &mut csprng,
+            &base,
+            &point,
+            &proof
+        )
+        .is_ok());
 
         let proof = prove_knowledge_dlog(
             &mut prover_transcript,
@@ -158,16 +156,14 @@ mod test {
             &point,
             &scalar2,
         );
-        assert!(
-            verify_proof_of_knowledge_dlog(
-                &mut verifier_transcript,
-                &mut csprng,
-                &base,
-                &point,
-                &proof
-            )
-            .is_err()
+        assert!(verify_proof_of_knowledge_dlog(
+            &mut verifier_transcript,
+            &mut csprng,
+            &base,
+            &point,
+            &proof
         )
+        .is_err())
     }
 
     #[test]
@@ -205,16 +201,14 @@ mod test {
             ],
         );
 
-        assert!(
-            verify_multiple_knowledge_dlog(
-                &mut verifier_transcript,
-                &mut csprng,
-                &base,
-                &[point1, point2, point3, point4, point5, point6, point7],
-                &proof
-            )
-            .is_ok()
-        );
+        assert!(verify_multiple_knowledge_dlog(
+            &mut verifier_transcript,
+            &mut csprng,
+            &base,
+            &[point1, point2, point3, point4, point5, point6, point7],
+            &proof
+        )
+        .is_ok());
 
         let proof = prove_multiple_knowledge_dlog(
             &mut prover_transcript,
@@ -227,23 +221,21 @@ mod test {
         );
 
         //bad elements
-        assert!(
-            verify_multiple_knowledge_dlog(
-                &mut verifier_transcript,
-                &mut csprng,
-                &base,
-                &[
-                    RistrettoPoint::get_identity(),
-                    point2,
-                    point3,
-                    point4,
-                    point5,
-                    point6,
-                    point7
-                ],
-                &proof
-            )
-            .is_err()
-        );
+        assert!(verify_multiple_knowledge_dlog(
+            &mut verifier_transcript,
+            &mut csprng,
+            &base,
+            &[
+                RistrettoPoint::get_identity(),
+                point2,
+                point3,
+                point4,
+                point5,
+                point6,
+                point7
+            ],
+            &proof
+        )
+        .is_err());
     }
 }

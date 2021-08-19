@@ -1,4 +1,7 @@
+#![deny(warnings)]
+#![allow(clippy::needless_borrow)]
 #![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::bool_assert_comparison)]
 
 #[macro_use]
 extern crate itertools;

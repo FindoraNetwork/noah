@@ -11,7 +11,7 @@ use algebra::groups::Zero;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 use utils::{self, u64_to_u32_pair};
 

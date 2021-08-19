@@ -10,7 +10,7 @@ use bulletproofs::BulletproofGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::bp_circuits::cloak::{CloakCommitment, CloakValue};
 use crypto::solvency;
-use ruc::{err::*, *};
+use ruc::*;
 use std::collections::HashSet;
 use std::fmt;
 use utils::errors::ZeiError;
@@ -523,28 +523,20 @@ mod test {
         let mut audit: SolvencyAudit = Default::default();
 
         // Step 2. Auditor inputs all liabilities
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Liability, &bars[0].0)
-                .is_ok()
-        ); // 10 * 5 = 50
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Liability, &bars[2].0)
-                .is_ok()
-        ); // 30 * 4 = 120
+        assert!(audit
+            .add_record(SolvencyRecordType::Liability, &bars[0].0)
+            .is_ok()); // 10 * 5 = 50
+        assert!(audit
+            .add_record(SolvencyRecordType::Liability, &bars[2].0)
+            .is_ok()); // 30 * 4 = 120
 
         // Step 3. Prover(asset owner) inputs all assets
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Asset, &bars[1].0)
-                .is_ok()
-        ); // 20 * 5 = 100
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Asset, &bars[4].0)
-                .is_ok()
-        ); // 50 * 2 = 100
+        assert!(audit
+            .add_record(SolvencyRecordType::Asset, &bars[1].0)
+            .is_ok()); // 20 * 5 = 100
+        assert!(audit
+            .add_record(SolvencyRecordType::Asset, &bars[4].0)
+            .is_ok()); // 50 * 2 = 100
 
         // Step 4a. Finalize assets, assuming all liabilities are verified by the auditor
         assert!(audit.finalize_verified_records().is_ok());
@@ -592,26 +584,18 @@ mod test {
         let rates = build_rates();
 
         let mut audit: SolvencyAudit = Default::default();
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Liability, &bars[1].0)
-                .is_ok()
-        ); // 20 * 5 = 100
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Liability, &bars[3].0)
-                .is_ok()
-        ); // 40 * 3 = 120
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Asset, &bars[1].0)
-                .is_ok()
-        ); // 20 * 5 = 100
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Asset, &bars[4].0)
-                .is_ok()
-        ); // 50 * 2 = 100
+        assert!(audit
+            .add_record(SolvencyRecordType::Liability, &bars[1].0)
+            .is_ok()); // 20 * 5 = 100
+        assert!(audit
+            .add_record(SolvencyRecordType::Liability, &bars[3].0)
+            .is_ok()); // 40 * 3 = 120
+        assert!(audit
+            .add_record(SolvencyRecordType::Asset, &bars[1].0)
+            .is_ok()); // 20 * 5 = 100
+        assert!(audit
+            .add_record(SolvencyRecordType::Asset, &bars[4].0)
+            .is_ok()); // 50 * 2 = 100
         assert!(audit.finalize_verified_records().is_ok());
         assert!(audit.finalize_rates(&rates).is_ok());
 
@@ -647,26 +631,18 @@ mod test {
         let bars = build_bars(&pubkeys, &mut prng, &pc_gens);
         let rates = build_rates();
         let mut audit: SolvencyAudit = Default::default();
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Liability, &bars[0].0)
-                .is_ok()
-        ); // 10 * 5 = 50
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Liability, &bars[2].0)
-                .is_ok()
-        ); // 30 * 4 = 120
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Asset, &bars[1].0)
-                .is_ok()
-        ); // 20 * 5 = 100
-        assert!(
-            audit
-                .add_record(SolvencyRecordType::Asset, &bars[4].0)
-                .is_ok()
-        ); // 50 * 2 = 100
+        assert!(audit
+            .add_record(SolvencyRecordType::Liability, &bars[0].0)
+            .is_ok()); // 10 * 5 = 50
+        assert!(audit
+            .add_record(SolvencyRecordType::Liability, &bars[2].0)
+            .is_ok()); // 30 * 4 = 120
+        assert!(audit
+            .add_record(SolvencyRecordType::Asset, &bars[1].0)
+            .is_ok()); // 20 * 5 = 100
+        assert!(audit
+            .add_record(SolvencyRecordType::Asset, &bars[4].0)
+            .is_ok()); // 50 * 2 = 100
         assert!(audit.finalize_verified_records().is_ok());
         assert!(audit.finalize_rates(&rates).is_ok());
         let memo_for_assets = vec![&bars[1].1, &bars[4].1];

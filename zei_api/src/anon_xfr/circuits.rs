@@ -364,9 +364,9 @@ fn add_payers_secrets(
                 diversifier,
                 uid,
                 amount,
+                asset_type,
                 path,
                 blind,
-                asset_type,
             }
         })
         .collect()
@@ -437,7 +437,7 @@ struct NullifierInputVars {
 }
 
 // cs variables for ElGamal ciphertexts
-struct ElGamalHybridCtextVars {
+pub struct ElGamalHybridCtextVars {
     pub e1: PointVar,              // r*G
     pub symm_ctxts: Vec<VarIndex>, // ctr-mode ciphertext
 }
@@ -698,7 +698,7 @@ pub(crate) mod tests {
     use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::{err::*, *};
+    use ruc::*;
 
     pub(crate) fn new_multi_xfr_witness_for_test(
         inputs: Vec<(u64, BLSScalar)>,
@@ -764,13 +764,12 @@ pub(crate) mod tests {
                     ])[0]
                 })
                 .collect();
+            payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
             if n_payers == 2 {
-                payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
                 payers_secrets[0].path.nodes[0].siblings2 = zero;
                 payers_secrets[1].path.nodes[0].siblings1 = leafs[0];
                 payers_secrets[1].path.nodes[0].siblings2 = zero;
             } else {
-                payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
                 payers_secrets[0].path.nodes[0].siblings2 = leafs[2];
                 payers_secrets[1].path.nodes[0].siblings1 = leafs[0];
                 payers_secrets[1].path.nodes[0].siblings2 = leafs[2];

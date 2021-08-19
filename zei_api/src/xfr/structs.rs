@@ -23,7 +23,7 @@ use crypto::chaum_pedersen::ChaumPedersenProofX;
 use crypto::pedersen_elgamal::PedersenElGamalEqProof;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use sha2::Sha512;
 use utils::errors::ZeiError;
 use utils::serialization;
@@ -76,8 +76,8 @@ pub(crate) struct AssetTypeZeiRepr([u8; MIN_SCALAR_LENGTH]);
 impl<'a> From<&'a AssetType> for AssetTypeZeiRepr {
     fn from(asset_type: &'a AssetType) -> Self {
         let mut hash = sha2::Sha256::default();
-        hash.input(&asset_type.0);
-        let array = hash.result();
+        hash.update(&asset_type.0);
+        let array = hash.finalize();
         let mut zei_repr = [0u8; MIN_SCALAR_LENGTH];
         zei_repr[0..ASSET_TYPE_ZEI_REPR_LENGTH]
             .copy_from_slice(&array[0..ASSET_TYPE_ZEI_REPR_LENGTH]);
@@ -602,8 +602,8 @@ impl OwnerMemo {
     // returns H(point || aux) as a Scalar
     fn hash_to_scalar(point: &CompressedEdwardsY, aux: &'static [u8]) -> Scalar {
         let mut hasher = Sha512::new();
-        hasher.input(point.0.as_bytes());
-        hasher.input(aux);
+        hasher.update(point.0.as_bytes());
+        hasher.update(aux);
         Scalar::from_hash(hasher)
     }
 }

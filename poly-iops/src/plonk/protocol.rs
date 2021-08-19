@@ -93,7 +93,7 @@ pub mod prover {
     use algebra::groups::ScalarArithmetic;
     use merlin::Transcript;
     use rand_core::{CryptoRng, RngCore};
-    use ruc::{err::*, *};
+    use ruc::*;
 
     /// A PlonkProof is generic on the polynomial commitment scheme, PCS.
     /// PCS is generic in the commitment group C, the eval proof type E, and Field elements F.
@@ -318,8 +318,8 @@ pub mod prover {
             C_q_polys,
             C_Sigma,
             witness_polys_eval_beta,
-            perms_eval_beta,
             Sigma_eval_g_beta,
+            perms_eval_beta,
             L_eval_beta,
             batch_eval_proof,
         })
@@ -629,17 +629,15 @@ mod test {
         {
             let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
             let mut transcript = Transcript::new(b"TestPlonk");
-            assert!(
-                verifier(
-                    &mut transcript,
-                    &pcs,
-                    &cs,
-                    &verifier_params,
-                    &online_vars,
-                    &proof
-                )
-                .is_ok()
+            assert!(verifier(
+                &mut transcript,
+                &pcs,
+                &cs,
+                &verifier_params,
+                &online_vars,
+                &proof
             )
+            .is_ok())
         }
     }
 }

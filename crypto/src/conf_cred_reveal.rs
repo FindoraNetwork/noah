@@ -8,7 +8,7 @@ use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
@@ -149,8 +149,8 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
         attributes.as_slice(),
         &sig_commitment,
         enc_key,
-        &ctexts.as_slice(),
-        &rands.as_slice(),
+        ctexts.as_slice(),
+        rands.as_slice(),
         msg,
     );
 
@@ -215,7 +215,7 @@ pub(crate) fn ac_confidential_sok_prove<R: CryptoRng + RngCore, P: Pairing>(
     rands: &[P::ScalarField],
     msg: &[u8],
 ) -> CACPoK<P::G1, P::G2, P::ScalarField> {
-    transcript.cac_init::<P>(issuer_pk, enc_key, &sig_commitment, ctexts);
+    transcript.cac_init::<P>(issuer_pk, enc_key, sig_commitment, ctexts);
     transcript.append_message(SOK_LABEL, msg); // SoK
     let r_t = P::ScalarField::random(prng);
     let r_sk = P::ScalarField::random(prng);
@@ -284,9 +284,9 @@ fn ac_confidential_sok_verify<P: Pairing>(
     bitmap: &[bool], // indicates which hidden attributes are encrypted under enc_key
     msg: &[u8],
 ) -> Result<()> {
-    transcript.cac_init::<P>(ac_issuer_pub_key, enc_key, &sig_commitment, ctexts);
+    transcript.cac_init::<P>(ac_issuer_pub_key, enc_key, sig_commitment, ctexts);
     transcript.append_message(SOK_LABEL, msg); // SoK
-    // 1. compute challenge
+                                               // 1. compute challenge
     for ctext in cac_pok.commitment_ctexts.iter() {
         transcript.append_proof_commitment(&ctext.e1);
         transcript.append_proof_commitment(&ctext.e2);
@@ -308,7 +308,7 @@ fn ac_confidential_sok_verify<P: Pairing>(
         ctexts,
         cac_pok.commitment_ctexts.as_slice(),
         attr_resps.as_slice(),
-        &cac_pok.response_rands.as_slice(),
+        cac_pok.response_rands.as_slice(),
         enc_key,
     )
     .c(d!())?;
@@ -340,10 +340,10 @@ fn verify_ciphertext<P: Pairing>(
         rands_resps.iter()
     ) {
         let enc = elgamal_encrypt(&P::G1::get_base(), attr_resp, rand_resp, enc_key);
-        if enc.e1 != ctext.e1.mul(&challenge).add(&ctext_com.e1) {
+        if enc.e1 != ctext.e1.mul(challenge).add(&ctext_com.e1) {
             return Err(eg!(ZeiError::IdentityRevealVerifyError));
         }
-        if enc.e2 != ctext.e2.mul(&challenge).add(&ctext_com.e2) {
+        if enc.e2 != ctext.e2.mul(challenge).add(&ctext_com.e2) {
             return Err(eg!(ZeiError::IdentityRevealVerifyError));
         }
     }
@@ -370,7 +370,7 @@ pub(crate) mod test_helper {
         use digest::Digest;
         use sha2::Sha512;
         let mut hasher = Sha512::new();
-        hasher.input(slice);
+        hasher.update(slice);
         S::from_hash(hasher)
     }
 
@@ -404,15 +404,13 @@ pub(crate) mod test_helper {
         let key = output.2.unwrap(); // safe unwrap()
 
         // 1. Verify commitment
-        assert!(
-            ac_verify_commitment::<P>(
-                &issuer_pk,
-                &sig_commitment,
-                &sok,
-                credential_addr
-            )
-            .is_ok()
-        );
+        assert!(ac_verify_commitment::<P>(
+            &issuer_pk,
+            &sig_commitment,
+            &sok,
+            credential_addr
+        )
+        .is_ok());
         let conf_reveal_proof = ac_confidential_open_commitment::<_, P>(
             &mut prng,
             &user_sk,
@@ -423,18 +421,16 @@ pub(crate) mod test_helper {
             proof_message,
         )
         .unwrap();
-        assert!(
-            ac_confidential_open_verify::<P>(
-                &credential.issuer_pub_key,
-                &enc_key,
-                reveal_bitmap,
-                &sig_commitment,
-                &conf_reveal_proof.ctexts,
-                &conf_reveal_proof.pok,
-                proof_message,
-            )
-            .is_ok()
-        );
+        assert!(ac_confidential_open_verify::<P>(
+            &credential.issuer_pub_key,
+            &enc_key,
+            reveal_bitmap,
+            &sig_commitment,
+            &conf_reveal_proof.ctexts,
+            &conf_reveal_proof.pok,
+            proof_message,
+        )
+        .is_ok());
 
         // Error cases /////////////////////////////////////////////////////////////////////////////////
 

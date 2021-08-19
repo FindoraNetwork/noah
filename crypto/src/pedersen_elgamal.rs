@@ -7,7 +7,7 @@ use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 use utils::serialization;
 
@@ -120,7 +120,7 @@ fn pedersem_elgamal_eq_verify_scalars<R: CryptoRng + RngCore>(
 ) -> Vec<Scalar> {
     let identity = RistrettoPoint::get_identity();
     let (elems, lhs_matrix, rhs_vec) = init_pok_pedersen_elgamal(
-        transcript, &identity, &pc_gens, public_key, ctext, commitment,
+        transcript, &identity, pc_gens, public_key, ctext, commitment,
     );
     let sigma_proof = SigmaProof {
         commitments: vec![proof.e1.e1, proof.e1.e2, proof.c1],
@@ -279,7 +279,7 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
         let alpha = Scalar::random(prng);
         init_pedersen_elgamal_aggregate(
             &mut inst_transcript,
-            &pc_gens,
+            pc_gens,
             instance.public_key,
             &instance.ctexts,
             &instance.commitments,
@@ -377,7 +377,7 @@ mod test {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
-    use ruc::{err::*, *};
+    use ruc::*;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use utils::errors::ZeiError;
@@ -733,15 +733,13 @@ mod test {
                 proof: &proof2,
             },
         ];
-        assert!(
-            pedersen_elgamal_batch_aggregate_eq_verify(
-                &mut verifier_transcript,
-                &mut rng,
-                &pc_gens,
-                &instances
-            )
-            .is_ok()
-        );
+        assert!(pedersen_elgamal_batch_aggregate_eq_verify(
+            &mut verifier_transcript,
+            &mut rng,
+            &pc_gens,
+            &instances
+        )
+        .is_ok());
     }
     #[test]
     fn to_json() {

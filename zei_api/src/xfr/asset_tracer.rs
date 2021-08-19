@@ -13,7 +13,7 @@ use crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key,
 };
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 use utils::{u64_to_u32_pair, u8_be_slice_to_u32};
 
@@ -287,10 +287,9 @@ mod tests {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
         let memo = TracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, &[]);
-        assert!(
-            memo.verify_amount(&tracer_keys.dec_key.record_data_dec_key, 10)
-                .is_err()
-        );
+        assert!(memo
+            .verify_amount(&tracer_keys.dec_key.record_data_dec_key, 10)
+            .is_err());
 
         let amount = (1u64 << 40) + 500; // low and high are small u32 numbers
         let (low, high) = u64_to_u32_pair(amount);
@@ -306,15 +305,13 @@ mod tests {
             None,
             &[],
         );
-        assert!(
-            memo.verify_amount(&tracer_keys.dec_key.record_data_dec_key, amount)
-                .is_ok()
-        );
+        assert!(memo
+            .verify_amount(&tracer_keys.dec_key.record_data_dec_key, amount)
+            .is_ok());
 
-        assert!(
-            memo.extract_amount_brute_force(&tracer_keys.dec_key.record_data_dec_key)
-                .is_ok()
-        );
+        assert!(memo
+            .extract_amount_brute_force(&tracer_keys.dec_key.record_data_dec_key)
+            .is_ok());
     }
 
     #[test]
@@ -322,10 +319,9 @@ mod tests {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
         let memo = TracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, &[]);
-        assert!(
-            memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[])
-                .is_err()
-        );
+        assert!(memo
+            .extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[])
+            .is_err());
 
         let asset_type = AssetType::from_identical_byte(2u8);
         let memo = TracerMemo::new(
@@ -360,8 +356,8 @@ mod tests {
             )
             .unwrap_err(),
         );
-        assert!(
-            memo.extract_asset_type(
+        assert!(memo
+            .extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
                 &[
                     AssetType::from_identical_byte(0u8),
@@ -369,10 +365,9 @@ mod tests {
                     asset_type
                 ]
             )
-            .is_ok()
-        );
-        assert!(
-            memo.extract_asset_type(
+            .is_ok());
+        assert!(memo
+            .extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
                 &[
                     asset_type,
@@ -380,10 +375,9 @@ mod tests {
                     AssetType::from_identical_byte(1u8)
                 ]
             )
-            .is_ok()
-        );
-        assert!(
-            memo.extract_asset_type(
+            .is_ok());
+        assert!(memo
+            .extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
                 &[
                     AssetType::from_identical_byte(0u8),
@@ -391,8 +385,7 @@ mod tests {
                     AssetType::from_identical_byte(1u8)
                 ]
             )
-            .is_ok()
-        );
+            .is_ok());
     }
 
     #[test]

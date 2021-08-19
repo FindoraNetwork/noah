@@ -5,7 +5,7 @@ use bulletproofs::r1cs::{
     ConstraintSystem, LinearCombination, R1CSError, RandomizableConstraintSystem,
     RandomizedConstraintSystem, Variable,
 };
-use ruc::{err::*, *};
+use ruc::*;
 use std::iter;
 
 pub(crate) fn cloak_merge_gadget<CS: RandomizableConstraintSystem>(
@@ -115,9 +115,9 @@ pub(super) fn cloak_shuffle_gadget<CS: RandomizableConstraintSystem>(
         list_shuffle(cs, &single_input[..], &single_perm[..])
             .c(d!())
             .map_err(|e| {
-                ruc::print(e.as_ref());
+                e.print();
                 R1CSError::GadgetError {
-                    description: genlog(e.as_ref()),
+                    description: e.to_string(),
                 }
             })
             .map(|_| ())

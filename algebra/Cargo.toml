@@ -1,6 +1,6 @@
 [package]
 name = "algebra"
-version = "0.1.0"
+version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2018"
 description = "Zei algebra commons"
@@ -15,14 +15,14 @@ byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] 
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
 rand = { version = "0.7", default-features = false, optional = true }
 rand_chacha = "0.2"
-curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
+curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
 serde = "1.0"
 group = "0.7.0"
 ff = "0.7.0"
-digest = "0.8"
+digest = "0.9"
 jubjub = "0.4.0"
 bls12_381 = "0.2.0"
-ruc = "0.5.5"
+ruc = { git = "https://github.com/FindoraNetwork/RUC.git", branch = "master" }
 
 [features]
 default = ["std", "u64_backend"]

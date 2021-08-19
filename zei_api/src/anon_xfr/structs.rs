@@ -11,7 +11,7 @@ use crypto::basics::hybrid_encryption::{
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentScheme;
 use poly_iops::plonk::protocol::prover::PlonkPf;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 pub type Nullifier = BLSScalar;

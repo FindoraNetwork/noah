@@ -6,7 +6,7 @@ use crate::polynomials::field_polynomial::{primitive_nth_root_of_unity, FpPolyno
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::{err::*, *};
+use ruc::*;
 
 /// Trait for Turbo PLONK constraint systems.
 pub trait ConstraintSystem {
@@ -680,11 +680,10 @@ mod test {
         let q_minus_one_half_u64 = u8_lsf_slice_to_u64_lsf_le_vec(&q_minus_one_half);
         assert_eq!(k[0], F::one());
         assert!(k.iter().skip(1).all(|x| *x != F::zero()));
-        assert!(
-            k.iter()
-                .skip(1)
-                .all(|x| x.pow(&q_minus_one_half_u64) != F::one())
-        );
+        assert!(k
+            .iter()
+            .skip(1)
+            .all(|x| x.pow(&q_minus_one_half_u64) != F::one()));
         for i in 1..m {
             for j in 0..i {
                 assert_ne!(k[i], k[j]);

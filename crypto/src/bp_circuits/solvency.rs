@@ -12,7 +12,7 @@ use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable
 use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 /// I implement a proof of solvency bulletproof protocol
@@ -22,7 +22,7 @@ use utils::errors::ZeiError;
 /// The rate table is hash map of Scalar to Scalar.
 // TODO rewrite this function so that it has less arguments
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn solvency<CS: RandomizableConstraintSystem>(
+pub fn solvency<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     asset_set_vars: &[CloakVariable],
     asset_set_values: Option<&[CloakValue]>,
@@ -343,8 +343,8 @@ mod test {
                 value.commit_prover(
                     &mut prover,
                     &CloakValue::new(
-                        RistrettoScalar::from_u32(1),
-                        RistrettoScalar::from_u32(2),
+                        RistrettoScalar::from_u32(123),
+                        RistrettoScalar::from_u32(321),
                     ),
                 )
             })
@@ -360,8 +360,8 @@ mod test {
                 value.commit_prover(
                     &mut prover,
                     &CloakValue::new(
-                        RistrettoScalar::from_u32(3),
-                        RistrettoScalar::from_u32(4),
+                        RistrettoScalar::from_u32(987),
+                        RistrettoScalar::from_u32(789),
                     ),
                 )
             })

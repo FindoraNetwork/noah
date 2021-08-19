@@ -19,7 +19,7 @@ use crypto::basics::hybrid_encryption::{
 use crypto::basics::prf::PRF;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use std::collections::HashMap;
 use utils::errors::ZeiError;
 
@@ -595,31 +595,27 @@ mod tests {
             );
             // invalid inputs/outputs
             open_abars_in[0].amount += 1;
-            assert!(
-                gen_anon_xfr_body(
-                    &mut prng,
-                    &user_params,
-                    &open_abars_in,
-                    &open_abars_out,
-                    &in_keypairs
-                )
-                .is_err()
-            );
+            assert!(gen_anon_xfr_body(
+                &mut prng,
+                &user_params,
+                &open_abars_in,
+                &open_abars_out,
+                &in_keypairs
+            )
+            .is_err());
             open_abars_in[0].amount -= 1;
             // inconsistent roots
             let mut mt_info = open_abars_in[0].mt_leaf_info.clone().unwrap();
             mt_info.root.add_assign(&one);
             open_abars_in[0].mt_leaf_info = Some(mt_info);
-            assert!(
-                gen_anon_xfr_body(
-                    &mut prng,
-                    &user_params,
-                    &open_abars_in,
-                    &open_abars_out,
-                    &in_keypairs
-                )
-                .is_err()
-            );
+            assert!(gen_anon_xfr_body(
+                &mut prng,
+                &user_params,
+                &open_abars_in,
+                &open_abars_out,
+                &in_keypairs
+            )
+            .is_err());
             let mut mt_info = open_abars_in[0].mt_leaf_info.clone().unwrap();
             mt_info.root.sub_assign(&one);
             open_abars_in[0].mt_leaf_info = Some(mt_info);

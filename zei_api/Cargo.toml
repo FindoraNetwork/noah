@@ -1,6 +1,6 @@
 [package]
 name = "zei"
-version = "0.0.3"
+version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2018"
 description = "Zei Platform Interface"
@@ -18,8 +18,8 @@ algebra = { path = "../algebra" }
 boolinator = "2.4.0"
 bulletproofs = { package = "bulletproofs", git = "ssh://git@github.com/FindoraNetwork/bulletproofs", branch = "batch_verification", features = ["yoloproofs"] }
 crypto = { path = "../crypto" }
-curve25519-dalek = { version =  "2.0.0", features = ["serde"] }
-digest = "0.8"
+curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
+digest = "0.9"
 ed25519-dalek = "1.0.0"
 itertools = "0.8.0"
 linear-map = "1.2.0"
@@ -30,13 +30,13 @@ rmp-serde = "0.13.7"
 serde = "1.0"
 serde_derive = "1.0"
 serde_str = "0.1.0"
-sha2 = "0.8.0"
+sha2 = "0.9.0"
 utils = { path = "../utils" }
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 poly-iops = { path = "../poly-iops" }
 structopt = "0.3.17"
 bincode = "1.3.1"
-ruc = "0.5.5"
+ruc = { git = "https://github.com/FindoraNetwork/RUC.git", branch = "master" }
 
 [dev-dependencies]
 bit-array = "0.4.3"

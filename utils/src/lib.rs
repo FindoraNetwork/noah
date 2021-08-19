@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![allow(clippy::upper_case_acronyms)]
 
 pub mod errors;
@@ -6,7 +7,7 @@ pub mod serialization;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::{err::*, *};
+use ruc::*;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -108,7 +109,7 @@ where
 {
     const SEED_SIZE: usize = 32;
     let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
-    let result = hash.result();
+    let result = hash.finalize();
     seed.copy_from_slice(&result[0..SEED_SIZE]);
     R::from_seed(seed)
 }

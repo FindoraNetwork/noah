@@ -376,7 +376,7 @@ mod test {
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Group, GroupArithmetic, One, Scalar, Zero};
     use algebra::jubjub::{JubjubPoint, JubjubScalar};
-    use ruc::{err::*, *};
+    use ruc::*;
 
     #[test]
     fn test_ecc_add() {
@@ -399,8 +399,8 @@ mod test {
 
         let p3_double_ext = p3_ext.double();
         let p3_double_point = Point::from(&p3_double_ext);
-        assert!(
-            cs.verify_witness(
+        assert!(cs
+            .verify_witness(
                 &[
                     p1_point.0,
                     p1_point.1,
@@ -411,8 +411,7 @@ mod test {
                 ],
                 &[]
             )
-            .is_err()
-        )
+            .is_err())
     }
 
     #[test]

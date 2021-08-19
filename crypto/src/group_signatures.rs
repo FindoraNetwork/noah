@@ -7,7 +7,7 @@ use crate::basics::signatures::pointcheval_sanders::{
 };
 use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
 use algebra::pairing::Pairing;
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 use digest::Digest;
@@ -180,19 +180,19 @@ fn compute_signature_pok_challenge<P: Pairing>(
     msg: &[u8],
 ) -> P::ScalarField {
     let mut hasher = Sha512::new();
-    hasher.input(b"spok traceable group signature");
-    hasher.input(g1.to_compressed_bytes());
-    hasher.input(g2.to_compressed_bytes());
-    hasher.input(gpk.enc_key.0.to_compressed_bytes());
-    hasher.input(gpk.ver_key.xx.to_compressed_bytes());
-    hasher.input(gpk.ver_key.yy.to_compressed_bytes());
+    hasher.update(b"spok traceable group signature");
+    hasher.update(g1.to_compressed_bytes());
+    hasher.update(g2.to_compressed_bytes());
+    hasher.update(gpk.enc_key.0.to_compressed_bytes());
+    hasher.update(gpk.ver_key.xx.to_compressed_bytes());
+    hasher.update(gpk.ver_key.yy.to_compressed_bytes());
     for e1 in commitments_g1 {
-        hasher.input(e1.to_compressed_bytes());
+        hasher.update(e1.to_compressed_bytes());
     }
     for e2 in commitments_g2 {
-        hasher.input(e2.to_compressed_bytes());
+        hasher.update(e2.to_compressed_bytes());
     }
-    hasher.input(msg);
+    hasher.update(msg);
     P::ScalarField::from_hash(hasher)
 }
 
@@ -243,13 +243,13 @@ fn verify_signature_pok<P: Pairing>(
     let e2 = &sig.enc.e2;
 
     // Check e1 correctness: e1 = r * G1
-    if e1.mul(&challenge) != g1_base.mul(&response_r).sub(com_g1_blind_r) {
+    if e1.mul(&challenge) != g1_base.mul(response_r).sub(com_g1_blind_r) {
         return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
     // Check e2 correctness: e2 = tag * G1 + r * PK
-    let a = g1_base.mul(&response_tag).sub(com_g1_blind_tag);
-    let b = gpk.enc_key.0.mul(&response_r).sub(com_pk_blind_r);
+    let a = g1_base.mul(response_tag).sub(com_g1_blind_tag);
+    let b = gpk.enc_key.0.mul(response_r).sub(com_pk_blind_r);
     if e2.mul(&challenge) != a.add(&b) {
         return Err(eg!(ZeiError::ZKProofVerificationError));
     }

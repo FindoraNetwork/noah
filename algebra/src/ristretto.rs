@@ -11,7 +11,7 @@ use curve25519_dalek::traits::Identity;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 pub const RISTRETTO_SCALAR_LEN: usize = 32;
 
@@ -179,7 +179,7 @@ impl CompressedRistretto {
 impl CompressedEdwardsY {
     /// builds a `CompressedEdwardsY` from slice of bytes
     pub fn from_slice(bytes: &[u8]) -> Self {
-        CompressedEdwardsY(CEY::from_slice(&bytes))
+        CompressedEdwardsY(CEY::from_slice(bytes))
     }
 
     pub fn decompress(&self) -> Option<EdwardsPoint> {

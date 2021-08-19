@@ -4,7 +4,7 @@ use crypto::anon_creds::{ACCommitOutput, Attribute};
 use crypto::basics::elgamal::elgamal_key_gen;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 
 type G1 = BLSG1;
 type G2 = BLSG2;

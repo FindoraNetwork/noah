@@ -16,7 +16,7 @@ use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::{err::*, *};
+use ruc::*;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use utils::errors::ZeiError;
@@ -66,7 +66,7 @@ impl<G: Group> PublicKey<G> {
     /// * `sig` - signature
     /// * `returns` - Nothing if the verification succeeds, an error otherwise
     pub fn verify(&self, msg: &[u8], sign: &Signature<G, G::S>) -> Result<()> {
-        verify(&self, msg, sign).c(d!())
+        verify(self, msg, sign).c(d!())
     }
 }
 
@@ -214,9 +214,9 @@ fn deterministic_scalar_gen<G: Group>(
 
     let ALGORITHM_DESC = b"ZeiSchnorrAlgorithm";
 
-    hasher.input(ALGORITHM_DESC);
-    hasher.input(message);
-    hasher.input(&secret_key.0.to_bytes());
+    hasher.update(ALGORITHM_DESC);
+    hasher.update(message);
+    hasher.update(&secret_key.0.to_bytes());
 
     G::S::from_hash(hasher)
 }
@@ -237,7 +237,7 @@ fn sign<G: Group>(signing_key: &KeyPair<G, G::S>, msg: &[u8]) -> Signature<G, G:
     let R = g.mul(&r);
     let pk = &signing_key.pub_key;
 
-    transcript.update_transcript_with_sig_info::<G>(msg, &pk, &R);
+    transcript.update_transcript_with_sig_info::<G>(msg, pk, &R);
 
     let c = transcript.compute_challenge::<G::S>();
 
@@ -257,7 +257,7 @@ pub fn multisig_sign<G: Group>(
     let mut signatures = vec![];
 
     for signing_key in signing_keys {
-        let sig = sign::<G>(&signing_key, &message);
+        let sig = sign::<G>(signing_key, message);
         signatures.push(sig);
     }
     MultiSignature(signatures)
@@ -308,7 +308,7 @@ pub fn multisig_verify<G: Group>(
     }
 
     for (pk, sig) in public_keys.iter().zip(msig.0.clone()) {
-        verify(&pk, msg, &sig).c(d!())?;
+        verify(pk, msg, &sig).c(d!())?;
     }
 
     Ok(())

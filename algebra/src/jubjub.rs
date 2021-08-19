@@ -10,7 +10,7 @@ use group::Group as _;
 use jubjub::{AffinePoint, ExtendedPoint, Fr};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use std::convert::TryInto;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 

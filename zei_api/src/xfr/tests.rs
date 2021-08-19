@@ -17,7 +17,7 @@ use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
 use crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
-use ruc::{err::*, *};
+use ruc::*;
 
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
@@ -402,8 +402,8 @@ mod single_asset_no_tracing {
     }
 
     #[test]
-    fn test_transfer_input_some_confidential_amount_and_asset_type_output_non_confidential()
-     {
+    fn test_transfer_input_some_confidential_amount_and_asset_type_output_non_confidential(
+    ) {
         /*! Test confidential amount and asset type in some input AssetRecords transfers*/
         let mut params = PublicParams::from_file_if_exists(DEFAULT_BP_NUM_GENS, None);
         let inputs_template = [
@@ -419,8 +419,8 @@ mod single_asset_no_tracing {
     }
 
     #[test]
-    fn test_transfer_input_some_confidential_amount_other_confidential_asset_type_output_non_confidential()
-     {
+    fn test_transfer_input_some_confidential_amount_other_confidential_asset_type_output_non_confidential(
+    ) {
         /*! Test confidential amount in some input and confidential asset type in other input AssetRecords transfers*/
         let mut params = PublicParams::default();
         let inputs_template = [
@@ -468,8 +468,8 @@ mod single_asset_no_tracing {
     }
 
     #[test]
-    fn test_transfer_output_some_confidential_amount_and_asset_type_input_non_confidential()
-     {
+    fn test_transfer_output_some_confidential_amount_and_asset_type_input_non_confidential(
+    ) {
         /*! I test confidential amount and asset type in some output AssetRecords transfers*/
         let mut params = PublicParams::from_file_if_exists(DEFAULT_BP_NUM_GENS, None);
         let outputs_template = [
@@ -485,8 +485,8 @@ mod single_asset_no_tracing {
     }
 
     #[test]
-    fn test_transfer_output_some_confidential_amount_other_confidential_asset_type_input_non_confidential()
-     {
+    fn test_transfer_output_some_confidential_amount_other_confidential_asset_type_input_non_confidential(
+    ) {
         /*! I test confidential amount in some output and confidential asset type in other output AssetRecords transfers*/
         let mut params = PublicParams::from_file_if_exists(DEFAULT_BP_NUM_GENS, None);
         let outputs_template = [

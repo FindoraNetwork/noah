@@ -28,7 +28,7 @@ use itertools::Itertools;
 use linear_map::LinearMap;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 use utils::{min_greater_equal_power_of_two, u64_to_u32_pair};
 
@@ -257,8 +257,8 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
         prng,
         pc_gens,
         xfr_bodies,
-        &input_reveal_policies.unwrap(),
-        &output_reveal_policies.unwrap(),
+        &input_reveal_policies.c(d!())?,
+        &output_reveal_policies.c(d!())?,
     )
     .c(d!(ZeiError::XfrVerifyAssetTracingAssetAmountError))?;
 
@@ -789,7 +789,7 @@ mod tests {
     };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::{err::*, *};
+    use ruc::*;
     use utils::errors::ZeiError;
 
     #[test]
@@ -814,7 +814,7 @@ mod tests {
 
         // fake sig commitment
         let sig_commitment = crate::api::anon_creds::ACCommitment::default(); // { 0: ACSignature { sigma1: BLSG1::get_identity(),
-        //sigma2: BLSG1::get_identity() } };
+                                                                              //sigma2: BLSG1::get_identity() } };
 
         // 2. sig commitments length doesn't match memos length
         let sig_commitments = vec![Some(&sig_commitment)];

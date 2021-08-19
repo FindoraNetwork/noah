@@ -2,7 +2,7 @@ use algebra::groups::Group;
 use algebra::ristretto::RistrettoPoint;
 use digest::Digest;
 use itertools::Itertools;
-use ruc::{err::*, *};
+use ruc::*;
 use utils::errors::ZeiError;
 
 #[allow(non_snake_case)]
@@ -19,7 +19,7 @@ impl<G: Group> PedersenGens<G> {
         bases.push(base.clone());
         for _ in 0..n {
             let mut hash = sha2::Sha512::new();
-            hash.input(base.to_compressed_bytes());
+            hash.update(base.to_compressed_bytes());
             base = G::from_hash(hash);
             bases.push(base.clone());
         }
