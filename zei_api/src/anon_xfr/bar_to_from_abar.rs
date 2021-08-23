@@ -22,7 +22,7 @@ use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
 
-const TWO_POW_32: u64 = 1 << 32;
+pub const TWO_POW_32: u64 = 1 << 32;
 
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ConvertBarAbarProof {
@@ -134,7 +134,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         &obar
             .amount_blinds
             .1
-            .mul(&RistrettoScalar::from_u64(TWO_POW_32)),
+            .mul(&RistrettoScalar::from_u64(1)),
     );
     // 2. compute proof of equality of commitments
     let mut transcript = Transcript::new(b"Commitment Equality Proof");
