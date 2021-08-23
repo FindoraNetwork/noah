@@ -134,7 +134,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         &obar
             .amount_blinds
             .1
-            .mul(&RistrettoScalar::from_u64(1)),
+            .mul(&RistrettoScalar::from_u64(TWO_POW_32)),
     );
     // 2. compute proof of equality of commitments
     let mut transcript = Transcript::new(b"Commitment Equality Proof");
