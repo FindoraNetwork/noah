@@ -1,13 +1,12 @@
+use algebra::groups::Group;
 use algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
 use crypto::basics::signatures::schnorr;
+use crypto::basics::signatures::schnorr::{KeyPair, PublicKey};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use wasm_bindgen::prelude::*;
-use utils::serialization::ZeiFromToBytes;
-use crypto::basics::signatures::schnorr::{PublicKey, KeyPair};
 use utils::errors::ZeiError;
-use algebra::groups::Group;
-
+use utils::serialization::ZeiFromToBytes;
+use wasm_bindgen::prelude::*;
 
 const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
 const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
@@ -60,8 +59,8 @@ impl ZeiFromToBytes for AXfrKeyPair {
         if bytes.len() != (AXFR_SECRET_KEY_LENGTH + AXFR_PUBLIC_KEY_LENGTH) {
             Err(eg!(ZeiError::DeserializationError))
         } else {
-            let keypair: KeyPair<JubjubPoint, JubjubScalar> = schnorr::KeyPair::zei_from_bytes(bytes)
-                .c(d!(""))?;
+            let keypair: KeyPair<JubjubPoint, JubjubScalar> =
+                schnorr::KeyPair::zei_from_bytes(bytes).c(d!(""))?;
 
             Ok(AXfrKeyPair(keypair))
         }
@@ -86,7 +85,6 @@ impl AXfrPubKey {
     pub fn verify(&self, msg: &[u8], sig: &AXfrSignature) -> Result<()> {
         self.0.verify(msg, &sig.0).c(d!())
     }
-
 }
 
 impl ZeiFromToBytes for AXfrPubKey {
@@ -98,7 +96,8 @@ impl ZeiFromToBytes for AXfrPubKey {
         if bytes.len() != AXFR_PUBLIC_KEY_LENGTH {
             Err(eg!(ZeiError::DeserializationError))
         } else {
-            let point :JubjubPoint = JubjubPoint::zei_from_bytes(bytes).c(d!("error in deserializing JubJub point"))?;
+            let point: JubjubPoint = JubjubPoint::zei_from_bytes(bytes)
+                .c(d!("error in deserializing JubJub point"))?;
             Ok(AXfrPubKey {
                 0: PublicKey::from_point(point),
             })
@@ -109,13 +108,12 @@ impl ZeiFromToBytes for AXfrPubKey {
 #[cfg(test)]
 mod test {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
-    use rand_chacha::ChaChaRng;
     use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaChaRng;
     use utils::serialization::ZeiFromToBytes;
 
     #[test]
     fn test_axfr_pub_key_serialization() {
-
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
 

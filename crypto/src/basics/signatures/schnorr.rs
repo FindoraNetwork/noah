@@ -124,7 +124,6 @@ impl<G: Group> ZeiFromToBytes for KeyPair<G, G::S> {
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-
         let alpha = G::S::from_bytes(&bytes[0..G::S::bytes_len()]).c(d!())?;
         // Public key
         let u = PublicKey::zei_from_bytes(&bytes[G::S::bytes_len()..]).c(d!())?;
