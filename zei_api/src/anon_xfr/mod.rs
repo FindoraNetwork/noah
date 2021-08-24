@@ -129,7 +129,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
             proof: AXfrProof {
                 snark_proof: proof,
                 merkle_root: mt_info_temp.root,
-                merkle_root_version: mt_info_temp.root_version
+                merkle_root_version: mt_info_temp.root_version,
             },
             owner_memos: out_memos.c(d!())?,
         },
