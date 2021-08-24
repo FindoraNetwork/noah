@@ -115,6 +115,27 @@ impl<G: Group> KeyPair<G, G::S> {
     }
 }
 
+impl<G: Group> ZeiFromToBytes for KeyPair<G, G::S> {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(self.get_secret_scalar().to_bytes().as_slice());
+        vec.extend_from_slice(self.pub_key.zei_to_bytes().as_slice());
+        vec
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+
+        let alpha = G::S::from_bytes(&bytes[0..G::S::bytes_len()]).c(d!())?;
+        // Public key
+        let u = PublicKey::zei_from_bytes(&bytes[G::S::bytes_len()..]).c(d!())?;
+
+        Ok(KeyPair {
+            sec_key: SecretKey(alpha),
+            pub_key: u,
+        })
+    }
+}
+
 /// Transcript functions
 pub trait SchnorrTranscript {
     fn update_transcript_with_sig_info<G: Group>(
