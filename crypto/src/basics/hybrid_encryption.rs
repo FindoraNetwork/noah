@@ -1,6 +1,11 @@
+use aes::{
+    cipher::{generic_array::GenericArray, NewCipher, StreamCipher},
+    Aes256Ctr,
+};
 use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::edwards::CompressedEdwardsY;
+use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use serde::Serializer;
@@ -240,11 +245,6 @@ fn symmetric_key_from_secret_key(
     let x_secret = x25519_dalek::StaticSecret::from(bytes);
     symmetric_key_from_x25519_secret_key(&x_secret, ephemeral_public_key)
 }
-
-use aes_ctr::stream_cipher::generic_array::GenericArray;
-use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
-use aes_ctr::Aes256Ctr;
-use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 
 fn symmetric_encrypt_fresh_key(key: &[u8; 32], plaintext: &[u8]) -> Ctext {
     let kkey = GenericArray::from_slice(key);

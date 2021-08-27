@@ -22,7 +22,7 @@ use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
 
-const TWO_POW_32: u64 = 1 << 32;
+pub const TWO_POW_32: u64 = 1 << 32;
 
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ConvertBarAbarProof {

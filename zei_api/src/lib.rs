@@ -2,8 +2,6 @@
 //! Zei: Findora's cryptographic library
 //!
 
-// #![deny(warnings)]
-// Skip non useful warnings from clippy
 #![deny(warnings)]
 #![allow(clippy::needless_borrow)]
 #![allow(clippy::upper_case_acronyms)]

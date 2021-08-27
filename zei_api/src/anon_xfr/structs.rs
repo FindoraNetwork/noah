@@ -1,5 +1,5 @@
+use crate::anon_xfr::decrypt_memo;
 use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature};
-use crate::anon_xfr::{decrypt_memo};
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use algebra::bls12_381::{BLSScalar, Bls12381};
 use algebra::groups::{Scalar, Zero};
@@ -63,8 +63,7 @@ impl AXfrNote {
             .map_err(|_| ZeiError::SerializationError)
             .c(d!())?;
 
-        self
-            .body
+        self.body
             .inputs
             .iter()
             .zip(self.signatures.iter())

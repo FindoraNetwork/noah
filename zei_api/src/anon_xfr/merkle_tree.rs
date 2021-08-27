@@ -84,7 +84,7 @@ impl MerkleTree {
                     .add(&BLSScalar::one()))
         );
 
-        return mt;
+        mt
     }
 
     pub fn add_abar(&mut self, abar: &AnonBlindAssetRecord) -> Result<u64> {
@@ -122,11 +122,12 @@ impl MerkleTree {
     }
 
     pub fn get_mt_leaf_info(&self, id: u64) -> Result<MTLeafInfo> {
-        let mut info = MTLeafInfo::default();
-
-        info.uid = id;
-        info.root = self.root_hash;
-        info.root_version = self.version_count;
+        let mut info = MTLeafInfo {
+            uid: id,
+            root: self.root_hash,
+            root_version: self.version_count,
+            ..Default::default()
+        };
 
         let mut current = &self.root;
         let path = MerkleTree::get_path_from_uid(id);
@@ -163,7 +164,7 @@ impl MerkleTree {
                 }
             };
 
-            if let Some(_) = next {
+            if next.is_some() {
                 info.path.nodes.push(node);
                 depth += 1;
                 current = &next;
@@ -188,7 +189,7 @@ impl MerkleTree {
             let new_id = self.entry_count;
             let path = MerkleTree::get_path_from_uid(new_id);
 
-            root_hash = root.add_child(data.0.clone(), path, 0)?;
+            root_hash = root.add_child(data.0, path, 0)?;
             self.leaf_lookup.insert(new_id, data.1.clone());
             self.entry_count += 1;
         }
@@ -218,7 +219,7 @@ impl MerkleTree {
         let mut count = 0;
         while count < TREE_DEPTH {
             let rem = uid % 3;
-            uid = uid / 3;
+            uid /= 3;
 
             match rem {
                 0 => path.push(Path::Left),
@@ -237,7 +238,7 @@ impl MerkleTree {
             .iter()
             .filter_map(|(id, abar)| {
                 if abar.public_key == pub_key {
-                    return Option::from(id.clone());
+                    return Option::from(*id);
                 }
                 None
             })
@@ -263,7 +264,7 @@ impl MerkleTree {
     pub fn get_version_hash(&self, version: u64) -> Result<BLSScalar> {
         match self.version.get(&version) {
             None => Err(eg!("version not found in merkle tree")),
-            Some(h) => Ok(h.clone()),
+            Some(h) => Ok(*h),
         }
     }
 }
@@ -281,14 +282,14 @@ pub struct Node {
 
 impl Node {
     pub fn default() -> Node {
-        return Node {
+        Node {
             left_child: None,
             middle_child: None,
             right_child: None,
             hash: BLSScalar::zero(),
             data: None,
             is_leaf: false,
-        };
+        }
     }
 
     pub fn add_child(
@@ -339,7 +340,8 @@ impl Node {
                         .hash,
                     BLSScalar::zero(),
                 ])[0];
-                return Ok(self.hash);
+
+                Ok(self.hash)
             }
             Path::Middle => {
                 if self.middle_child.is_none() {
@@ -369,7 +371,8 @@ impl Node {
                         .hash,
                     BLSScalar::zero(),
                 ])[0];
-                return Ok(self.hash);
+
+                Ok(self.hash)
             }
             Path::Right => {
                 if self.right_child.is_none() {
@@ -399,7 +402,8 @@ impl Node {
                     right_hash,
                     BLSScalar::zero(),
                 ])[0];
-                return Ok(self.hash);
+
+                Ok(self.hash)
             }
         }
     }
@@ -415,7 +419,7 @@ impl Node {
             BLSScalar::zero(),
         ])[0];
 
-        return self.hash;
+        self.hash
     }
 
     fn _get_left_child_hash(&self) -> BLSScalar {
@@ -815,10 +819,10 @@ fn test_abar_proof() {
 
     let mut cs = TurboPlonkConstraintSystem::new();
     let uid_var = cs.new_variable(BLSScalar::from_u64(uid));
-    let comm_var = cs.new_variable(abar.clone().amount_type_commitment);
+    let comm_var = cs.new_variable(abar.amount_type_commitment);
     let pk_var = cs.new_point_variable(Point::new(
-        abar.clone().public_key.0.point_ref().get_x(),
-        abar.clone().public_key.0.point_ref().get_y(),
+        abar.public_key.0.point_ref().get_x(),
+        abar.public_key.0.point_ref().get_y(),
     ));
     let elem = AccElemVars {
         uid: uid_var,
@@ -845,7 +849,7 @@ fn test_abar_proof() {
     ])[0];
     let mut node = hash.rescue_hash(&[
         BLSScalar::from_u64(uid),
-        abar.clone().amount_type_commitment,
+        abar.amount_type_commitment,
         pk_hash,
         zero,
     ])[0];
@@ -873,11 +877,11 @@ fn test_abar_proof() {
 
     let uid2 = mt.add_abar(&abar).unwrap();
     let _ver = mt.commit().unwrap();
-    let mut list = mt.get_owned_abars_uids(abar.clone().public_key.clone());
-    list.sort();
+    let mut list = mt.get_owned_abars_uids(abar.public_key.clone());
+    list.sort_unstable();
     assert_eq!(list, vec![uid, uid2]);
     assert_eq!(
-        mt.get_owned_abars(abar.clone().public_key.clone()),
-        vec![abar.clone(), abar.clone()]
+        mt.get_owned_abars(abar.public_key.clone()),
+        vec![abar.clone(), abar]
     );
 }
