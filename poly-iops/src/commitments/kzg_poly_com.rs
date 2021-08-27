@@ -161,6 +161,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
         let mut elem_g1 = P::G1::get_base();
 
         for _ in 0..max_degree + 1 {
+        //for _ in 0..max_degree + 1 {
             public_parameter_group_1.push(elem_g1.clone());
             elem_g1 = elem_g1.mul(&s);
         }
@@ -388,6 +389,16 @@ mod tests_kzg_impl {
         );
     }
 
+    //This test is only for check the size of the CRS which is n + 3
+    //it's g1, g2, s[g2] and s[g1],...,s^n[g1]
+    fn _generation_of_crs<P: Pairing>() {
+        let n = 1 << 5;
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let kzg_scheme = KZGCommitmentScheme::<P>::new(crs_size, &mut prng);
+        assert_eq!(kzg_scheme.public_parameter_group_1.len(), n + 1 );
+        assert_eq!(kzg_scheme.public_parameter_group_2.len(), 2 );
+    }
+
     #[test]
     pub fn test_homomorphic_poly_com_elem() {
         let mut prng = ChaChaRng::from_seed([0_u8; 32]);
@@ -437,6 +448,11 @@ mod tests_kzg_impl {
     #[test]
     fn test_public_parameters() {
         _check_public_parameters_generation::<Bls12381>();
+    }
+
+    #[test]
+    fn test_generation_of_crs() {
+        _generation_of_crs::<Bls12381>();
     }
 
     #[test]

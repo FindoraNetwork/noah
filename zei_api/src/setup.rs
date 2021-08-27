@@ -133,10 +133,47 @@ impl UserParams {
                 n_payers, n_payees, TREE_DEPTH,
             )),
         };
+
         let pcs = KZGCommitmentScheme::new(
             n_constraints + 2,
             &mut ChaChaRng::from_seed([0u8; 32]),
         );
+
+
+        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+        UserParams {
+            bp_params: PublicParams::new(bp_num_gens),
+            pcs,
+            cs,
+            prover_params,
+        }
+    }
+
+    //This function is the same that new, but max_degree_poly_com allows to set the size of the CRS
+    //the parameter max_degree_poly_com is padded to the minimum power of two grater than it.
+    pub fn new_max_degree_poly_com(
+        n_payers: usize,
+        n_payees: usize,
+        tree_depth: Option<usize>,
+        bp_num_gens: usize,
+        max_degree_poly_com: usize,
+    ) -> UserParams {
+        let (cs, /*n_constrains*/_ ) = match tree_depth {
+            Some(depth) => {
+                build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
+            }
+            None => build_multi_xfr_cs(AMultiXfrWitness::fake(
+                n_payers, n_payees, TREE_DEPTH,
+            )),
+        };
+
+        max_degree_poly_com.pad();
+
+        let pcs = KZGCommitmentScheme::new(
+            max_degree + 2,
+            &mut ChaChaRng::from_seed([0u8; 32]),
+        );
+
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
         UserParams {
             bp_params: PublicParams::new(bp_num_gens),
