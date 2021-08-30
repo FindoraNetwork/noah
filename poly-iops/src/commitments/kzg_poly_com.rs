@@ -394,7 +394,7 @@ mod tests_kzg_impl {
     fn _generation_of_crs<P: Pairing>() {
         let n = 1 << 5;
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let kzg_scheme = KZGCommitmentScheme::<P>::new(crs_size, &mut prng);
+        let kzg_scheme = KZGCommitmentScheme::<P>::new(n, &mut prng);
         assert_eq!(kzg_scheme.public_parameter_group_1.len(), n + 1 );
         assert_eq!(kzg_scheme.public_parameter_group_2.len(), 2 );
     }
