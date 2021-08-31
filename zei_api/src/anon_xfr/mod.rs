@@ -440,7 +440,7 @@ mod tests {
             assert!(note.verify().is_ok())
         }
     }
-
+    //new test
     #[test]
     fn test_anon_xfr_multi_assets() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
