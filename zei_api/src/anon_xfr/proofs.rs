@@ -11,6 +11,7 @@ use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
+use std::time::SystemTime;
 
 const ANON_XFR_TRANSCRIPT: &[u8] = b"Anon Xfr";
 const N_INPUTS_TRANSCRIPT: &[u8] = b"Number of input ABARs";
@@ -38,9 +39,10 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
         secret_inputs.payees_secrets.len() as u64,
     );
 
+    println!(" Before CS {:#?}", SystemTime::now());
     let (mut cs, _) = build_multi_xfr_cs(secret_inputs);
     let witness = cs.get_and_clear_witness();
-
+    println!(" After CS {:#?}", SystemTime::now());
     prover(
         rng,
         &mut transcript,

@@ -94,6 +94,7 @@ pub mod prover {
     use merlin::Transcript;
     use rand_core::{CryptoRng, RngCore};
     use ruc::*;
+    use std::time::SystemTime;
 
     /// A PlonkProof is generic on the polynomial commitment scheme, PCS.
     /// PCS is generic in the commitment group C, the eval proof type E, and Field elements F.
@@ -169,11 +170,13 @@ pub mod prover {
         params: &ProverParams<PCS>,
         witness: &[PCS::Field],
     ) -> Result<PlonkPf<PCS>> {
+        println!(" In prover {:#?}", SystemTime::now());
         let online_values: Vec<PCS::Field> = cs
             .public_vars_witness_indices()
             .iter()
             .map(|index| witness[*index])
             .collect();
+        println!(" Before Init transcript {:#?}", SystemTime::now());
         // Init transcript
         transcript_init_plonk::<_, PCS::Field>(
             transcript,
@@ -183,10 +186,14 @@ pub mod prover {
         let mut challenges = PlonkChallenges::new();
         let n_constraints = cs.size();
 
+
+        println!(" Before Prepare extended witness {:#?}", SystemTime::now());
         // Prepare extended witness
         let extended_witness = cs.extend_witness(witness);
         let IO = PublicVars_polynomial::<PCS>(&params, &online_values);
 
+
+        println!(" Before 1 {:#?}", SystemTime::now());
         // 1. build witness polynomials, hide them and commit
         let root = &params.verifier_params.root;
         let n_wires_per_gate = cs.n_wires_per_gate();
@@ -204,11 +211,15 @@ pub mod prover {
             C_witness_polys.push(C_f);
         }
 
+
+        println!(" Before 2 {:#?}", SystemTime::now());
         // 2. get challenges gamma and delta
         let gamma = transcript_get_plonk_challenge_gamma(transcript, n_constraints);
         let delta = transcript_get_plonk_challenge_delta(transcript, n_constraints);
         challenges.insert_gamma_delta(gamma, delta).unwrap(); // safe unwrap
 
+
+        println!(" Before 3 {:#?}", SystemTime::now());
         // 3. build sigma, hide it and commit
         let mut Sigma =
             Sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
@@ -216,17 +227,23 @@ pub mod prover {
         let (C_Sigma, O_Sigma) = pcs.commit(Sigma).c(d!(PlonkError::CommitmentError))?;
         transcript.append_commitment::<PCS::Commitment>(&C_Sigma);
 
+
+        println!(" Before 4 {:#?}", SystemTime::now());
         // 4. get challenge alpha
         let alpha = transcript_get_plonk_challenge_alpha(transcript, n_constraints);
         challenges.insert_alpha(alpha).unwrap();
 
+
+        println!(" Before 5 {:#?}", SystemTime::now());
         // 5. build Q, split into `n_wires_per_gate` degree-(N+2) polynomials and commit
         // TODO: avoid the cloning when computing witness_polys and Sigma
         let witness_polys: Vec<FpPolynomial<PCS::Field>> = witness_openings
             .iter()
             .map(|open| pcs.polynomial_from_opening_ref(open))
             .collect();
+        println!(" Before 5 a {:#?}", SystemTime::now());
         let Sigma = pcs.polynomial_from_opening_ref(&O_Sigma);
+        println!(" Before 5 b {:#?}", SystemTime::now());
         let Q = Quotient_polynomial::<PCS, CS>(
             cs,
             params,
@@ -236,15 +253,23 @@ pub mod prover {
             &IO,
         )
         .c(d!())?;
+        println!(" Before 5 c {:#?}", SystemTime::now());
         let (C_q_polys, O_q_polys) =
             split_Q_and_commit(pcs, &Q, n_wires_per_gate, n_constraints + 2).c(d!())?;
+        println!(" Before 5 d {:#?}", SystemTime::now());
         for C_q in C_q_polys.iter() {
             transcript.append_commitment::<PCS::Commitment>(C_q);
         }
 
+        println!(" After 8 {:#?}", SystemTime::now());
+
+
+        println!(" Before 6 {:#?}", SystemTime::now());
         // 6. get challenge beta
         let beta = transcript_get_plonk_challenge_beta(transcript, n_constraints);
 
+
+        println!(" Before 7 {:#?}", SystemTime::now());
         // 7. a) Evaluate the openings of witness/permutation polynomials at beta, and
         // evaluate the opening of Sigma(X) at point g * beta.
         let witness_polys_eval_beta: Vec<PCS::Field> = witness_openings
@@ -283,6 +308,8 @@ pub mod prover {
         transcript.append_field_elem(&Sigma_eval_g_beta);
         transcript.append_field_elem(&L_eval_beta);
 
+
+        println!(" Before 8 {:#?}", SystemTime::now());
         // 8. batch eval proofs
         let mut openings: Vec<&PCS::Opening> = witness_openings
             .iter()
@@ -293,15 +320,21 @@ pub mod prover {
                     .take(cs.n_wires_per_gate() - 1),
             )
             .collect();
+
+        println!(" Before 8 a {:#?}", SystemTime::now());
         let O_q_combined = combine_q_polys(&O_q_polys, &beta, n_constraints + 2);
         openings.push(&O_q_combined);
         openings.push(&O_L);
         openings.push(&O_Sigma);
+
+        println!(" Before 8 b {:#?}", SystemTime::now());
         // n_wires_per_gate opening proofs for witness polynomials; n_wires_per_gate-1 opening proofs
         // for the first n_wires_per_gate-1 extended permutations; 1 opening proof for each of [Q(X), L(X)]
         let mut points = vec![*beta; 2 * n_wires_per_gate + 1];
         // One opening proof for Sigma(X) at point g * beta
         points.push(g_beta);
+
+        println!(" Before 8 c {:#?}", SystemTime::now());
         let (_, batch_eval_proof) = pcs
             .batch_prove_eval(
                 transcript,
@@ -312,8 +345,11 @@ pub mod prover {
             )
             .c(d!(PlonkError::ProofError))?;
 
-        // return proof
-        Ok(PlonkProof {
+        println!(" After 8 {:#?}", SystemTime::now());
+
+        println!(" Before return {:#?}", SystemTime::now());
+
+        let proof = PlonkProof {
             C_witness_polys,
             C_q_polys,
             C_Sigma,
@@ -322,7 +358,10 @@ pub mod prover {
             perms_eval_beta,
             L_eval_beta,
             batch_eval_proof,
-        })
+        };
+        println!("Proof {:#?}", proof);
+        // return proof
+        Ok(proof)
     }
 
     /// Verify a proof for a constraint system previously preprocessed into `cs_params`

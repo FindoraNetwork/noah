@@ -7,6 +7,7 @@ use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use std::time::SystemTime;
 
 pub fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<Vec<F>> {
     let mut elems = vec![F::one()];
@@ -232,6 +233,7 @@ pub(super) fn Quotient_polynomial<
     challenges: &PlonkChallenges<PCS::Field>,
     IO: &FpPolynomial<PCS::Field>,
 ) -> Result<FpPolynomial<PCS::Field>> {
+    println!(" Quotient_polynomial 0 {:#?}", SystemTime::now());
     let n = cs.size();
     let m = cs.quot_eval_dom_size();
     let factor = m / n;
@@ -241,6 +243,8 @@ pub(super) fn Quotient_polynomial<
     let root_m = &params.root_m;
     let k = &params.verifier_params.k;
 
+    println!("n: {} , m: {}", n, m);
+    println!(" Quotient_polynomial 1 {:#?}", SystemTime::now());
     // Compute the evaluations of witness/IO/Sigma polynomials on the coset k[1] * <root_m>.
     let witness_polys_coset_evals: Vec<Vec<PCS::Field>> = witness_polys
         .iter()
@@ -249,13 +253,16 @@ pub(super) fn Quotient_polynomial<
     let IO_coset_evals = IO.coset_fft_with_unity_root(root_m, m, &k[1]);
     let Sigma_coset_evals = Sigma.coset_fft_with_unity_root(root_m, m, &k[1]);
 
+    println!(" Quotient_polynomial 2 {:#?}", SystemTime::now());
     // Compute the evaluations of the quotient polynomial on the coset.
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
     let alpha = challenges.get_alpha().unwrap();
     let alpha_sq = alpha.mul(&alpha);
     let mut quot_coset_evals = vec![];
 
+    println!(" Quotient_polynomial 3 {:#?}", SystemTime::now());
     for point in 0..m {
+        let _now = SystemTime::now();
         let wire_vals: Vec<&PCS::Field> = witness_polys_coset_evals
             .iter()
             .map(|poly_coset_evals| &poly_coset_evals[point])
@@ -295,9 +302,12 @@ pub(super) fn Quotient_polynomial<
 
         let numerator = term1.add(&term2).add(&term4.sub(&term3));
         quot_coset_evals.push(numerator.mul(&params.Z_H_inv_coset_evals[point]));
+        // println!("{:#?}", SystemTime::now().duration_since(now));
     }
 
+    println!(" Quotient_polynomial 4 {:#?}", SystemTime::now());
     let k_inv = k[1].inv().c(d!(PlonkError::DivisionByZero))?;
+     println!(" Quotient_polynomial result {:#?} {:#?} {:#?}", root_m, &quot_coset_evals.len(), &k_inv);
     Ok(FpPolynomial::coset_ffti(root_m, &quot_coset_evals, &k_inv))
 }
 
