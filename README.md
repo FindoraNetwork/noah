@@ -1,4 +1,4 @@
-![alt text](https://github.com/eianio/zei/raw/master/zei_logo.png)
+![](https://tokei.rs/b1/github/FindoraNetwork/zei)
 
 **Zei: Findora's Cryptographic Library**
 
