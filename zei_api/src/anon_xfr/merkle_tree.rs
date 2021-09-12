@@ -5,13 +5,13 @@ use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use crypto::basics::hash::rescue::RescueInstance;
 use itertools::Itertools;
 use ruc::Result;
-use std::collections::{HashMap};
 use std::borrow::Borrow;
-use utils::serialization::ZeiFromToBytes;
-use storage::store::RocksStore;
-use storage::db::{IRocksDB};
-use storage::store::store_rocks::IRocksStore;
 use std::collections::hash_map::Iter;
+use std::collections::HashMap;
+use storage::db::IRocksDB;
+use storage::store::store_rocks::IRocksStore;
+use storage::store::RocksStore;
+use utils::serialization::ZeiFromToBytes;
 
 // const HASH_SIZE: i32 = 32;             // assuming we are storing SHA256 hash of abar
 // const MAX_KEYS: u64 = u64::MAX;
@@ -73,15 +73,14 @@ pub enum Path {
 ///
 ///
 
-pub struct PersistentMerkleTree<'a, D: IRocksDB>{
+pub struct PersistentMerkleTree<'a, D: IRocksDB> {
     entry_count: u64,
-    store: &'a mut RocksStore<'a, D>
+    store: &'a mut RocksStore<'a, D>,
 }
-
 
 impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
     // Generates a new PersistentMerkleTree based on a sessioned KV store
-    pub fn new(store: &'a mut RocksStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>>{
+    pub fn new(store: &'a mut RocksStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>> {
         let mut entry_count = 0;
         match store.get(BASE_KEY.as_bytes()).unwrap() {
             None => {
@@ -90,7 +89,7 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
                     BLSScalar::zero(),
                     BLSScalar::zero(),
                     BLSScalar::zero(),
-                    BLSScalar::zero()
+                    BLSScalar::zero(),
                 ])[0];
                 store.set(BASE_KEY.as_bytes(), zero_hash.zei_to_bytes());
             }
@@ -99,18 +98,23 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
                 let ecb = store.get(ENTRY_COUNT_KEY.as_bytes()).unwrap();
                 match ecb {
                     Some(bytes) => {
-                        let array: [u8;8] = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]];
+                        let array: [u8; 8] = [
+                            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5],
+                            bytes[6], bytes[7],
+                        ];
                         entry_count = u64::from_be_bytes(array);
-                    },
+                    }
                     None => Err(eg!("entry count key not found in Store"))?,
                 };
             }
         };
-        Ok(PersistentMerkleTree{ entry_count: entry_count, store})
+        Ok(PersistentMerkleTree {
+            entry_count: entry_count,
+            store,
+        })
     }
 
     pub fn add_abar(&mut self, abar: &AnonBlindAssetRecord) -> Result<u64> {
-
         let mut cache = Cache::new();
         // 1. generate keys of ancestors for update in tree
         let path = get_path_from_uid(self.entry_count);
@@ -125,44 +129,47 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
         cache.set(leaf, hash.zei_to_bytes());
 
         // 3. update hash of all ancestors of the new leaf
-        ancestors.iter().rev().map(|node_key| {
-
-            let  parse_hash = |key: &str| -> Result<BLSScalar> {
-                if let Some(b) = cache.get(key) {
-                    return BLSScalar::zei_from_bytes(b.as_slice());
-                }
-                match self.get(key.as_bytes()).unwrap() {
-                    Some(b) => {
-                        BLSScalar::zei_from_bytes(b.as_slice())
+        ancestors
+            .iter()
+            .rev()
+            .map(|node_key| {
+                let parse_hash = |key: &str| -> Result<BLSScalar> {
+                    if let Some(b) = cache.get(key) {
+                        return BLSScalar::zei_from_bytes(b.as_slice());
                     }
-                    None => {
-                        Ok(BLSScalar::zero())
+                    match self.get(key.as_bytes()).unwrap() {
+                        Some(b) => BLSScalar::zei_from_bytes(b.as_slice()),
+                        None => Ok(BLSScalar::zero()),
                     }
-                }
-            };
-            let left_child_hash = parse_hash(format!("{}{}", node_key, "l").as_str())?;
-            let middle_child_hash = parse_hash(format!("{}{}", node_key, "m").as_str())?;
-            let right_child_hash = parse_hash(format!("{}{}", node_key, "r").as_str())?;
+                };
+                let left_child_hash =
+                    parse_hash(format!("{}{}", node_key, "l").as_str())?;
+                let middle_child_hash =
+                    parse_hash(format!("{}{}", node_key, "m").as_str())?;
+                let right_child_hash =
+                    parse_hash(format!("{}{}", node_key, "r").as_str())?;
 
-            let hasher = RescueInstance::new();
-            let hash = hasher.rescue_hash(
-                &[
+                let hasher = RescueInstance::new();
+                let hash = hasher.rescue_hash(&[
                     left_child_hash,
                     middle_child_hash,
                     right_child_hash,
                     BLSScalar::zero(),
-                ]
-            )[0];
-            cache.set(node_key, BLSScalar::zei_to_bytes(&hash));
-            Ok(())
-        }).collect::<Result<()>>()?;
+                ])[0];
+                cache.set(node_key, BLSScalar::zei_to_bytes(&hash));
+                Ok(())
+            })
+            .collect::<Result<()>>()?;
 
         self.entry_count += 1;
         cache.set(ENTRY_COUNT_KEY, self.entry_count.to_be_bytes().to_vec());
 
-        let _ = cache.iter().map(|(k,v)| {
-            self.store.set(k.as_bytes(), v.to_vec());
-        }).collect::<()>();
+        let _ = cache
+            .iter()
+            .map(|(k, v)| {
+                self.store.set(k.as_bytes(), v.to_vec());
+            })
+            .collect::<()>();
         Ok(uid)
     }
 
@@ -172,52 +179,56 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
 
         let mut previous = keys.first().unwrap();
 
-        let mut nodes: Vec<MTNode> = keys.iter().skip(1).map(|key| {
-            // if current node is not present in store then it is not a valid uid to generate
-            match self.store.get(key.as_bytes()).unwrap() {
-                None => return Err(eg!("uid not found in tree, cannot generate proof")),
-                Some(_) => {}
-            };
+        let mut nodes: Vec<MTNode> = keys
+            .iter()
+            .skip(1)
+            .map(|key| {
+                // if current node is not present in store then it is not a valid uid to generate
+                match self.store.get(key.as_bytes()).unwrap() {
+                    None => {
+                        return Err(eg!("uid not found in tree, cannot generate proof"))
+                    }
+                    Some(_) => {}
+                };
 
-            let direction = key.chars().last();
-            let mut node = MTNode{
-                siblings1: Default::default(),
-                siblings2: Default::default(),
-                is_left_child: 1,
-                is_right_child: 0
-            };
-            let sib1_key;
-            let sib2_key;
-            match direction {
-                Some('l') => {
-                    sib1_key = format!("{}{}", previous, "m");
-                    sib2_key = format!("{}{}", previous, "r");
+                let direction = key.chars().last();
+                let mut node = MTNode {
+                    siblings1: Default::default(),
+                    siblings2: Default::default(),
+                    is_left_child: 1,
+                    is_right_child: 0,
+                };
+                let sib1_key;
+                let sib2_key;
+                match direction {
+                    Some('l') => {
+                        sib1_key = format!("{}{}", previous, "m");
+                        sib2_key = format!("{}{}", previous, "r");
+                    }
+                    Some('m') => {
+                        sib1_key = format!("{}{}", previous, "l");
+                        sib2_key = format!("{}{}", previous, "r");
+                    }
+                    Some('r') => {
+                        sib1_key = format!("{}{}", previous, "l");
+                        sib2_key = format!("{}{}", previous, "m");
+                    }
+                    _ => return Err(eg!("incorrect key")),
+                };
+                if let Some(b) = self.store.get(sib1_key.as_bytes()).unwrap() {
+                    node.siblings1 = BLSScalar::zei_from_bytes(b.as_slice())?;
                 }
-                Some('m') => {
-                    sib1_key = format!("{}{}", previous, "l");
-                    sib2_key = format!("{}{}", previous, "r");
+                if let Some(b) = self.store.get(sib2_key.as_bytes()).unwrap() {
+                    node.siblings2 = BLSScalar::zei_from_bytes(b.as_slice())?;
                 }
-                Some('r') => {
-                    sib1_key = format!("{}{}", previous, "l");
-                    sib2_key = format!("{}{}", previous, "m");
-                }
-                _ => {
-                    return Err(eg!("incorrect key"))
-                }
-            };
-            if let Some(b) = self.store.get(sib1_key.as_bytes()).unwrap() {
-                node.siblings1 = BLSScalar::zei_from_bytes(b.as_slice())?;
-            }
-            if let Some(b) = self.store.get(sib2_key.as_bytes()).unwrap() {
-                node.siblings2 = BLSScalar::zei_from_bytes(b.as_slice())?;
-            }
 
-            previous = key;
-            Ok(node)
-        }).collect::<Result<Vec<MTNode>>>()?;
+                previous = key;
+                Ok(node)
+            })
+            .collect::<Result<Vec<MTNode>>>()?;
 
         nodes.reverse();
-        Ok(MTLeafInfo{
+        Ok(MTLeafInfo {
             path: MTPath { nodes },
             root: self.get_current_root_hash().unwrap(),
             root_version: 0,
@@ -227,16 +238,12 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
 
     pub fn get_current_root_hash(&self) -> Result<BLSScalar> {
         match self.store.get(BASE_KEY.as_bytes()).unwrap() {
-            Some(hash) => {
-                BLSScalar::zei_from_bytes(
-                    hash.as_slice()
-                )
-            }
-            None => {Err(eg!("root hash key not found"))}
+            Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
+            None => Err(eg!("root hash key not found")),
         }
     }
 
-     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
+    fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
         let hash = RescueInstance::new();
 
         let pk_hash = hash.rescue_hash(&[
@@ -265,9 +272,9 @@ struct Cache {
 
 impl Cache {
     fn new() -> Cache {
-        return Cache{
-            store: HashMap::new()
-        }
+        return Cache {
+            store: HashMap::new(),
+        };
     }
     fn set(&mut self, key: &str, val: Vec<u8>) {
         self.store.insert(key.to_string(), val);
@@ -704,13 +711,15 @@ impl Node {
     }
 }
 
-
 fn generate_path_keys(path_stream: Vec<Path>) -> Vec<String> {
     let mut key = BASE_KEY.clone().to_string();
-    let mut keys: Vec<String> = path_stream.into_iter().map(|path| {
-        key.push_str(get_path_str(path).borrow());
-        key.clone()
-    }).collect();
+    let mut keys: Vec<String> = path_stream
+        .into_iter()
+        .map(|path| {
+            key.push_str(get_path_str(path).borrow());
+            key.clone()
+        })
+        .collect();
 
     keys.insert(0, BASE_KEY.clone().to_string());
     keys
@@ -718,9 +727,9 @@ fn generate_path_keys(path_stream: Vec<Path>) -> Vec<String> {
 
 fn get_path_str(p: Path) -> String {
     match p {
-        Path::Left => {"l".to_string()}
-        Path::Middle => {"m".to_string()}
-        Path::Right => {"r".to_string()}
+        Path::Left => "l".to_string(),
+        Path::Middle => "m".to_string(),
+        Path::Right => "r".to_string(),
     }
 }
 
@@ -742,7 +751,6 @@ pub fn get_path_from_uid(mut uid: u64) -> Vec<Path> {
     path.reverse();
     path
 }
-
 
 #[test]
 pub fn test_generate_path_keys() {
@@ -1196,23 +1204,25 @@ fn test_abar_proof() {
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
-    use storage::db::TempRocksDB;
-    use std::sync::Arc;
-    use parking_lot::RwLock;
-    use storage::state::{RocksChainState, RocksState};
-    use storage::store::RocksStore;
+    use crate::anon_xfr::circuits::{
+        add_merkle_path_variables, compute_merkle_root, AccElemVars,
+    };
+    use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::merkle_tree::{PersistentMerkleTree, BASE_KEY};
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Zero, Scalar};
-    use crypto::basics::hash::rescue::RescueInstance;
     use crate::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
+    use algebra::bls12_381::BLSScalar;
+    use algebra::groups::{Scalar, Zero};
+    use crypto::basics::hash::rescue::RescueInstance;
+    use parking_lot::RwLock;
+    use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
+    use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::circuits::{AccElemVars, add_merkle_path_variables, compute_merkle_root};
-    use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
-    use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
+    use std::sync::Arc;
+    use std::thread;
+    use storage::db::TempRocksDB;
+    use storage::state::{RocksChainState, RocksState};
+    use storage::store::RocksStore;
 
     #[test]
     fn test_persistent_merkle_tree() {
@@ -1238,7 +1248,8 @@ mod tests {
             ])[0]
         );
 
-        let abar = AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
+        let abar =
+            AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
         assert!(mt.add_abar(&abar).is_ok());
 
         assert_ne!(
@@ -1252,7 +1263,7 @@ mod tests {
         );
 
         let mut key = BASE_KEY.clone().to_owned();
-        for _t in  1..42 {
+        for _t in 1..42 {
             key.push('l');
             let res = mt.get(key.as_bytes());
             assert!(res.is_ok());
@@ -1287,7 +1298,6 @@ mod tests {
 
     #[test]
     fn test_persistant_merkle_tree_proof_commitment() {
-
         let path = thread::current().name().unwrap().to_owned();
         let fdb = TempRocksDB::open(path).expect("failed to open db");
         let cs = Arc::new(RwLock::new(RocksChainState::new(
