@@ -115,7 +115,6 @@ pub(super) fn cloak_shuffle_gadget<CS: RandomizableConstraintSystem>(
         list_shuffle(cs, &single_input[..], &single_perm[..])
             .c(d!())
             .map_err(|e| {
-                e.print();
                 R1CSError::GadgetError {
                     description: e.to_string(),
                 }
