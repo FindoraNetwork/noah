@@ -4,12 +4,12 @@ use algebra::bls12_381::BLSScalar;
 use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 use crypto::basics::hash::rescue::RescueInstance;
 use itertools::Itertools;
-use ruc::Result;
+use ruc::{Result, RucResult};
 use std::borrow::Borrow;
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 use storage::db::IRocksDB;
-use storage::store::store_rocks::IRocksStore;
+use storage::store::store_rocks::{IRocksStore, RStated};
 use storage::store::RocksStore;
 use utils::serialization::ZeiFromToBytes;
 
@@ -62,8 +62,9 @@ pub enum Path {
 ///         mt.get_current_root_hash();
 ///
 ///         mt.add_abar(&AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default()));
-///
+///            mt.commit();
 ///         mt.generate_proof(0);
+///
 ///
 ///     ```
 ///
@@ -75,13 +76,15 @@ pub enum Path {
 
 pub struct PersistentMerkleTree<'a, D: IRocksDB> {
     entry_count: u64,
-    store: &'a mut RocksStore<'a, D>,
+    version: u64,
+    store: RocksStore<'a, D>,
 }
 
 impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
     // Generates a new PersistentMerkleTree based on a sessioned KV store
-    pub fn new(store: &'a mut RocksStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>> {
+    pub fn new(mut store: RocksStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>> {
         let mut entry_count = 0;
+        let mut version = 0;
         match store.get(BASE_KEY.as_bytes()).unwrap() {
             None => {
                 let hash = RescueInstance::new();
@@ -103,13 +106,15 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
                             bytes[6], bytes[7],
                         ];
                         entry_count = u64::from_be_bytes(array);
+                        version = store.state().height().c(d!())?;
                     }
                     None => Err(eg!("entry count key not found in Store"))?,
                 };
             }
         };
         Ok(PersistentMerkleTree {
-            entry_count: entry_count,
+            entry_count,
+            version,
             store,
         })
     }
@@ -259,6 +264,12 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
             pk_hash,
             BLSScalar::zero(),
         ])[0]
+    }
+
+    #[allow(dead_code)]
+    pub fn commit(&mut self) -> Result<u64> {
+        self.version = self.store.state_mut().commit(self.version + 1).c(d!())?;
+        Ok(self.version)
     }
 
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
@@ -1220,9 +1231,10 @@ mod tests {
     use rand_core::SeedableRng;
     use std::sync::Arc;
     use std::thread;
-    use storage::db::TempRocksDB;
+    use storage::db::{TempRocksDB, RocksDB};
     use storage::state::{RocksChainState, RocksState};
     use storage::store::RocksStore;
+    use ruc::{*};
 
     #[test]
     fn test_persistent_merkle_tree() {
@@ -1235,8 +1247,8 @@ mod tests {
             "test_db".to_string(),
         )));
         let mut state = RocksState::new(cs);
-        let mut store = RocksStore::new("my_store", &mut state);
-        let mut mt = PersistentMerkleTree::new(&mut store).unwrap();
+        let store = RocksStore::new("my_store", &mut state);
+        let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         assert_eq!(
             mt.get_current_root_hash().unwrap(),
@@ -1305,8 +1317,8 @@ mod tests {
             "test_db".to_string(),
         )));
         let mut state = RocksState::new(cs);
-        let mut store = RocksStore::new("my_store", &mut state);
-        let mut mt = PersistentMerkleTree::new(&mut store).unwrap();
+        let store = RocksStore::new("my_store", &mut state);
+        let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
@@ -1340,5 +1352,76 @@ mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
         assert_eq!(witness[root_var], mt.get_current_root_hash().unwrap());
+
+        let _ = mt.commit();
+    }
+
+
+    #[test]
+    fn test_persistent_merkle_tree_recovery() {
+
+        let path = thread::current().name().unwrap().to_owned();
+        let _ = build_and_save_dummy_tree(path.clone()).unwrap();
+
+        let fdb = TempRocksDB::open(path.clone()).expect("failed to open db");
+        let cs = Arc::new(RwLock::new(RocksChainState::new(
+            fdb,
+            "test_db".to_string(),
+        )));
+        let mut state = RocksState::new(cs);
+        let store = RocksStore::new("my_store", &mut state);
+        let mt = PersistentMerkleTree::new(store).unwrap();
+
+        assert_eq!(mt.version, 4);
+        assert_eq!(mt.entry_count, 4);
+    }
+
+    #[allow(dead_code)]
+    fn build_and_save_dummy_tree(path: String) -> Result<()> {
+        let fdb = RocksDB::open(path).expect("failed to open db");
+
+        let cs = Arc::new(RwLock::new(RocksChainState::new(
+            fdb,
+            "test_db".to_string(),
+        )));
+        let mut state = RocksState::new(cs);
+        let store = RocksStore::new("my_store", &mut state);
+        let mut mt = PersistentMerkleTree::new(store).unwrap();
+
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let mut key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+        let mut abar = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+        assert!(mt.add_abar(&abar).is_ok());
+        mt.commit()?;
+
+        key_pair = AXfrKeyPair::generate(&mut prng);
+        abar = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+        assert!(mt.add_abar(&abar).is_ok());
+        mt.commit()?;
+
+        key_pair = AXfrKeyPair::generate(&mut prng);
+        abar = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+        assert!(mt.add_abar(&abar).is_ok());
+        mt.commit()?;
+
+        key_pair = AXfrKeyPair::generate(&mut prng);
+        abar = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+        assert!(mt.add_abar(&abar).is_ok());
+        mt.commit()?;
+
+        Ok(())
     }
 }
