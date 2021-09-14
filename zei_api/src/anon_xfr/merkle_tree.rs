@@ -302,8 +302,8 @@ impl Cache {
 pub struct MerkleTree {
     root_hash: BLSScalar,
     // consistency_hash: HashValue,
-    version_count: u64,
-    version: HashMap<u64, BLSScalar>,
+    version_count: usize,
+    version: HashMap<usize, BLSScalar>,
 
     entry_count: u64,
 
@@ -457,7 +457,7 @@ impl MerkleTree {
         Ok(info)
     }
 
-    pub fn commit(&mut self) -> Result<u64> {
+    pub fn commit(&mut self) -> Result<usize> {
         if self.uncommitted_data.is_empty() {
             return Ok(self.version_count);
         }
@@ -541,7 +541,7 @@ impl MerkleTree {
         self.root_hash
     }
 
-    pub fn get_version_hash(&self, version: u64) -> Result<BLSScalar> {
+    pub fn get_version_hash(&self, version: usize) -> Result<BLSScalar> {
         match self.version.get(&version) {
             None => Err(eg!("version not found in merkle tree")),
             Some(h) => Ok(*h),
@@ -766,7 +766,10 @@ pub fn get_path_from_uid(mut uid: u64) -> Vec<Path> {
 #[test]
 pub fn test_generate_path_keys() {
     let keys = generate_path_keys(vec![Path::Right, Path::Left, Path::Middle]);
-    assert_eq!(keys, vec!["root:", "root:r", "root:rl", "root:rlm"]);
+    assert_eq!(
+        keys,
+        vec!["abar:root:", "abar:root:r", "abar:root:rl", "abar:root:rlm"]
+    );
 }
 
 #[test]
@@ -1229,12 +1232,12 @@ mod tests {
     use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use ruc::*;
     use std::sync::Arc;
     use std::thread;
-    use storage::db::{TempRocksDB, RocksDB};
+    use storage::db::{RocksDB, TempRocksDB};
     use storage::state::{RocksChainState, RocksState};
     use storage::store::RocksStore;
-    use ruc::{*};
 
     #[test]
     fn test_persistent_merkle_tree() {
@@ -1356,10 +1359,8 @@ mod tests {
         let _ = mt.commit();
     }
 
-
     #[test]
     fn test_persistent_merkle_tree_recovery() {
-
         let path = thread::current().name().unwrap().to_owned();
         let _ = build_and_save_dummy_tree(path.clone()).unwrap();
 
