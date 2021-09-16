@@ -1,7 +1,7 @@
 use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::structs::{AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath};
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
+use algebra::groups::{Scalar, Zero};
 use crypto::basics::hash::rescue::RescueInstance;
 use itertools::Itertools;
 use ruc::{Result, RucResult};
@@ -39,12 +39,11 @@ pub enum Path {
 ///     use parking_lot::RwLock;
 ///     use storage::state::{RocksChainState, RocksState};
 ///     use storage::store::RocksStore;
-///     use crate::anon_xfr::merkle_tree::PersistentMerkleTree;
+///     use zei::anon_xfr::merkle_tree::PersistentMerkleTree;
 ///     use algebra::bls12_381::BLSScalar;
 ///     use algebra::groups::Zero;
-///     use zei::anon_xfr::merkle_tree::PersistentMerkleTree;
 ///     use zei::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
-///
+///     use crypto::basics::hash::rescue::RescueInstance;
 ///
 ///
 ///     let hash = RescueInstance::new();
@@ -57,7 +56,7 @@ pub enum Path {
 ///         )));
 ///         let mut state = RocksState::new(cs);
 ///         let mut store = RocksStore::new("my_store", &mut state);
-///         let mut mt = PersistentMerkleTree::new(&mut store);
+///         let mut mt = PersistentMerkleTree::new(store).unwrap();
 ///
 ///         mt.get_current_root_hash();
 ///
@@ -66,7 +65,7 @@ pub enum Path {
 ///         mt.generate_proof(0);
 ///
 ///
-///     ```
+/// ```
 ///
 ///
 ///
@@ -95,6 +94,7 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
                     BLSScalar::zero(),
                 ])[0];
                 store.set(BASE_KEY.as_bytes(), zero_hash.zei_to_bytes());
+                store.set(ENTRY_COUNT_KEY.as_bytes(), 0u64.to_be_bytes().to_vec());
             }
             Some(_) => {
                 // TODO: In the case that a pre-existing tree is loaded, calculate the entry-count.
@@ -355,14 +355,6 @@ impl MerkleTree {
 
         mt.root_hash = mt.root.as_mut().unwrap().update_hash();
         mt.version.insert(0, mt.root_hash);
-
-        println!(
-            "is hash 3: {}",
-            mt.root_hash
-                == (BLSScalar::one()
-                    .add(&BLSScalar::one())
-                    .add(&BLSScalar::one()))
-        );
 
         mt
     }
@@ -763,469 +755,16 @@ pub fn get_path_from_uid(mut uid: u64) -> Vec<Path> {
     path
 }
 
-#[test]
-pub fn test_generate_path_keys() {
-    let keys = generate_path_keys(vec![Path::Right, Path::Left, Path::Middle]);
-    assert_eq!(
-        keys,
-        vec!["abar:root:", "abar:root:r", "abar:root:rl", "abar:root:rlm"]
-    );
-}
-
-#[test]
-pub fn test_tree() {
-    let hash = RescueInstance::new();
-
-    let mut mt = MerkleTree::new();
-    assert_eq!(
-        mt.root_hash,
-        hash.rescue_hash(&[
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-            BLSScalar::zero()
-        ])[0]
-    );
-
-    let uid = mt
-        .add_new_leaf(
-            BLSScalar::one(),
-            AnonBlindAssetRecord {
-                amount_type_commitment: Default::default(),
-                public_key: Default::default(),
-            },
-        )
-        .unwrap();
-    assert_eq!(uid, 0u64);
-    assert_eq!(mt.get_committed_count(), 0);
-
-    let first_hash = mt.root_hash.get_scalar();
-
-    let uid2 = mt
-        .add_new_leaf(
-            BLSScalar::zero(),
-            AnonBlindAssetRecord {
-                amount_type_commitment: Default::default(),
-                public_key: Default::default(),
-            },
-        )
-        .unwrap();
-    assert_eq!(uid2, 1u64);
-    assert_eq!(first_hash, mt.root_hash.get_scalar());
-    assert_eq!(mt.get_committed_count(), 0);
-
-    assert_eq!(mt.commit().unwrap(), 1);
-    assert_ne!(mt.root_hash.get_scalar(), first_hash);
-    assert_eq!(mt.get_committed_count(), 2);
-    assert_eq!(mt.get_uncommitted_count(), 0);
-    let first_commit_hash = mt.root_hash;
-
-    let uid3 = mt
-        .add_new_leaf(
-            BLSScalar::one().add(&BLSScalar::one()),
-            AnonBlindAssetRecord {
-                amount_type_commitment: Default::default(),
-                public_key: Default::default(),
-            },
-        )
-        .unwrap();
-    assert_eq!(uid3, 2u64);
-    assert_eq!(first_commit_hash, mt.root_hash);
-    assert_eq!(mt.get_committed_count(), 2);
-
-    let leaf_info = mt.get_mt_leaf_info(0).unwrap();
-    assert_eq!(leaf_info.root, first_commit_hash);
-    assert_eq!(leaf_info.root_version, 1);
-    assert_eq!(leaf_info.uid, 0);
-    assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 1u8);
-    assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 0u8);
-    assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
-    assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
-
-    let leaf_info = mt.get_mt_leaf_info(1).unwrap();
-    assert_eq!(leaf_info.root, first_commit_hash);
-    assert_eq!(leaf_info.root_version, 1);
-    assert_eq!(leaf_info.uid, 1);
-    assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 0u8);
-    assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 0u8);
-    assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
-    assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
-
-    assert!(mt.get_mt_leaf_info(2).is_err());
-
-    assert_eq!(mt.commit().unwrap(), 2);
-    let leaf_info = mt.get_mt_leaf_info(2).unwrap();
-    assert_eq!(leaf_info.root, mt.root_hash);
-    assert_eq!(leaf_info.root_version, 2);
-    assert_eq!(leaf_info.uid, 2);
-    assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 0u8);
-    assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 1u8);
-    assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
-    assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
-}
-
-#[test]
-fn test_get_path() {
-    let zero_path = MerkleTree::get_path_from_uid(0);
-    assert_eq!(zero_path[0], Path::Left);
-    assert_eq!(zero_path[1], Path::Left);
-    assert_eq!(zero_path[2], Path::Left);
-    assert_eq!(zero_path[40], Path::Left);
-
-    let one_path = MerkleTree::get_path_from_uid(1);
-    assert_eq!(
-        one_path,
-        vec![
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Middle
-        ]
-    );
-
-    let two_path = MerkleTree::get_path_from_uid(2);
-    assert_eq!(
-        two_path,
-        vec![
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Right
-        ]
-    );
-
-    let three_path = MerkleTree::get_path_from_uid(3);
-    assert_eq!(
-        three_path,
-        vec![
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Middle,
-            Path::Left
-        ]
-    );
-
-    let four_path = MerkleTree::get_path_from_uid(4);
-    assert_eq!(
-        four_path,
-        vec![
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Middle,
-            Path::Middle
-        ]
-    );
-
-    let five_path = MerkleTree::get_path_from_uid(5);
-    assert_eq!(
-        five_path,
-        vec![
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Left,
-            Path::Middle,
-            Path::Right
-        ]
-    );
-}
-
-#[test]
-fn test_abar_proof() {
-    use crate::anon_xfr::circuits::add_merkle_path_variables;
-    use crate::anon_xfr::circuits::compute_merkle_root;
-    use crate::anon_xfr::circuits::AccElemVars;
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
-    use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
-    use rand_chacha::rand_core::SeedableRng;
-    use rand_chacha::ChaChaRng;
-
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
-
-    let key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
-    let abar = AnonBlindAssetRecord {
-        amount_type_commitment: BLSScalar::random(&mut prng),
-        public_key: key_pair.pub_key(),
-    };
-
-    let mut mt = MerkleTree::new();
-    let uid = mt.add_abar(&abar).unwrap();
-
-    assert_ne!(mt.leaf_lookup.get(&uid), Option::from(&abar));
-    assert_eq!(mt.get_owned_abars_uids(abar.public_key.clone()).len(), 0);
-    assert_eq!(mt.get_owned_abars(abar.public_key.clone()).len(), 0);
-    let _ver = mt.commit().unwrap();
-
-    assert_eq!(mt.leaf_lookup.get(&uid), Option::from(&abar));
-    assert_eq!(mt.get_owned_abars_uids(abar.public_key.clone()), vec![uid]);
-    assert_eq!(
-        mt.get_owned_abars(abar.public_key.clone()),
-        vec![abar.clone()]
-    );
-
-    let mut cs = TurboPlonkConstraintSystem::new();
-    let uid_var = cs.new_variable(BLSScalar::from_u64(uid));
-    let comm_var = cs.new_variable(abar.amount_type_commitment);
-    let pk_var = cs.new_point_variable(Point::new(
-        abar.public_key.0.point_ref().get_x(),
-        abar.public_key.0.point_ref().get_y(),
-    ));
-    let elem = AccElemVars {
-        uid: uid_var,
-        commitment: comm_var,
-        pub_key_x: pk_var.get_x(),
-        pub_key_y: pk_var.get_y(),
-    };
-
-    let leaf_info = mt.get_mt_leaf_info(uid).unwrap();
-    let path_vars = add_merkle_path_variables(&mut cs, leaf_info.path.clone());
-    let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
-
-    // Check Merkle root correctness
-    let witness = cs.get_and_clear_witness();
-    assert!(cs.verify_witness(&witness, &[]).is_ok());
-
-    let hash = RescueInstance::new();
-    let zero = BLSScalar::zero();
-    let pk_hash = hash.rescue_hash(&[
-        key_pair.pub_key().as_jubjub_point().get_x(),
-        key_pair.pub_key().as_jubjub_point().get_y(),
-        zero,
-        zero,
-    ])[0];
-    let mut node = hash.rescue_hash(&[
-        BLSScalar::from_u64(uid),
-        abar.amount_type_commitment,
-        pk_hash,
-        zero,
-    ])[0];
-    let mut depth = 0;
-    leaf_info
-        .path
-        .nodes
-        .iter()
-        .map(|n| {
-            if n.is_left_child == 1u8 {
-                node = hash.rescue_hash(&[node, n.siblings1, n.siblings2, zero])[0];
-            } else if n.is_right_child == 1u8 {
-                node = hash.rescue_hash(&[n.siblings1, n.siblings2, node, zero])[0];
-            } else {
-                node = hash.rescue_hash(&[n.siblings1, node, n.siblings2, zero])[0];
-            }
-            println!("hash: {:X?}, depth: {}", node, depth);
-            depth += 1;
-        })
-        .last();
-    println!("root hash{:X?}", node);
-
-    assert_eq!(witness[root_var], node);
-    assert_eq!(witness[root_var], mt.version[&leaf_info.root_version]);
-
-    let uid2 = mt.add_abar(&abar).unwrap();
-    let _ver = mt.commit().unwrap();
-    let mut list = mt.get_owned_abars_uids(abar.public_key.clone());
-    list.sort_unstable();
-    assert_eq!(list, vec![uid, uid2]);
-    assert_eq!(
-        mt.get_owned_abars(abar.public_key.clone()),
-        vec![abar.clone(), abar]
-    );
-}
-
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::circuits::{
         add_merkle_path_variables, compute_merkle_root, AccElemVars,
     };
     use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::merkle_tree::{PersistentMerkleTree, BASE_KEY};
+    use crate::anon_xfr::merkle_tree::{PersistentMerkleTree, BASE_KEY, generate_path_keys, MerkleTree, Path};
     use crate::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, Zero};
+    use algebra::groups::{Scalar, Zero, One, ScalarArithmetic};
     use crypto::basics::hash::rescue::RescueInstance;
     use parking_lot::RwLock;
     use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
@@ -1238,6 +777,459 @@ mod tests {
     use storage::db::{RocksDB, TempRocksDB};
     use storage::state::{RocksChainState, RocksState};
     use storage::store::RocksStore;
+
+
+    #[test]
+    pub fn test_generate_path_keys() {
+        let keys = generate_path_keys(vec![Path::Right, Path::Left, Path::Middle]);
+        assert_eq!(
+            keys,
+            vec!["abar:root:", "abar:root:r", "abar:root:rl", "abar:root:rlm"]
+        );
+    }
+
+    #[test]
+    pub fn test_tree() {
+        let hash = RescueInstance::new();
+
+        let mut mt = MerkleTree::new();
+        assert_eq!(
+            mt.root_hash,
+            hash.rescue_hash(&[
+                BLSScalar::zero(),
+                BLSScalar::zero(),
+                BLSScalar::zero(),
+                BLSScalar::zero()
+            ])[0]
+        );
+
+        let uid = mt
+            .add_new_leaf(
+                BLSScalar::one(),
+                AnonBlindAssetRecord {
+                    amount_type_commitment: Default::default(),
+                    public_key: Default::default(),
+                },
+            )
+            .unwrap();
+        assert_eq!(uid, 0u64);
+        assert_eq!(mt.get_committed_count(), 0);
+
+        let first_hash = mt.root_hash.get_scalar();
+
+        let uid2 = mt
+            .add_new_leaf(
+                BLSScalar::zero(),
+                AnonBlindAssetRecord {
+                    amount_type_commitment: Default::default(),
+                    public_key: Default::default(),
+                },
+            )
+            .unwrap();
+        assert_eq!(uid2, 1u64);
+        assert_eq!(first_hash, mt.root_hash.get_scalar());
+        assert_eq!(mt.get_committed_count(), 0);
+
+        assert_eq!(mt.commit().unwrap(), 1);
+        assert_ne!(mt.root_hash.get_scalar(), first_hash);
+        assert_eq!(mt.get_committed_count(), 2);
+        assert_eq!(mt.get_uncommitted_count(), 0);
+        let first_commit_hash = mt.root_hash;
+
+        let uid3 = mt
+            .add_new_leaf(
+                BLSScalar::one().add(&BLSScalar::one()),
+                AnonBlindAssetRecord {
+                    amount_type_commitment: Default::default(),
+                    public_key: Default::default(),
+                },
+            )
+            .unwrap();
+        assert_eq!(uid3, 2u64);
+        assert_eq!(first_commit_hash, mt.root_hash);
+        assert_eq!(mt.get_committed_count(), 2);
+
+        let leaf_info = mt.get_mt_leaf_info(0).unwrap();
+        assert_eq!(leaf_info.root, first_commit_hash);
+        assert_eq!(leaf_info.root_version, 1);
+        assert_eq!(leaf_info.uid, 0);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 1u8);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 0u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
+
+        let leaf_info = mt.get_mt_leaf_info(1).unwrap();
+        assert_eq!(leaf_info.root, first_commit_hash);
+        assert_eq!(leaf_info.root_version, 1);
+        assert_eq!(leaf_info.uid, 1);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 0u8);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 0u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
+
+        assert!(mt.get_mt_leaf_info(2).is_err());
+
+        assert_eq!(mt.commit().unwrap(), 2);
+        let leaf_info = mt.get_mt_leaf_info(2).unwrap();
+        assert_eq!(leaf_info.root, mt.root_hash);
+        assert_eq!(leaf_info.root_version, 2);
+        assert_eq!(leaf_info.uid, 2);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 0u8);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 1u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
+    }
+
+    #[test]
+    fn test_get_path() {
+        let zero_path = MerkleTree::get_path_from_uid(0);
+        assert_eq!(zero_path[0], Path::Left);
+        assert_eq!(zero_path[1], Path::Left);
+        assert_eq!(zero_path[2], Path::Left);
+        assert_eq!(zero_path[40], Path::Left);
+
+        let one_path = MerkleTree::get_path_from_uid(1);
+        assert_eq!(
+            one_path,
+            vec![
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Middle
+            ]
+        );
+
+        let two_path = MerkleTree::get_path_from_uid(2);
+        assert_eq!(
+            two_path,
+            vec![
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Right
+            ]
+        );
+
+        let three_path = MerkleTree::get_path_from_uid(3);
+        assert_eq!(
+            three_path,
+            vec![
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Middle,
+                Path::Left
+            ]
+        );
+
+        let four_path = MerkleTree::get_path_from_uid(4);
+        assert_eq!(
+            four_path,
+            vec![
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Middle,
+                Path::Middle
+            ]
+        );
+
+        let five_path = MerkleTree::get_path_from_uid(5);
+        assert_eq!(
+            five_path,
+            vec![
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Left,
+                Path::Middle,
+                Path::Right
+            ]
+        );
+    }
+
+    #[test]
+    fn test_abar_proof() {
+        use crate::anon_xfr::circuits::add_merkle_path_variables;
+        use crate::anon_xfr::circuits::compute_merkle_root;
+        use crate::anon_xfr::circuits::AccElemVars;
+        use crate::anon_xfr::keys::AXfrKeyPair;
+        use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
+        use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
+        use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaChaRng;
+
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+        let abar = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+
+        let mut mt = MerkleTree::new();
+        let uid = mt.add_abar(&abar).unwrap();
+
+        assert_ne!(mt.leaf_lookup.get(&uid), Option::from(&abar));
+        assert_eq!(mt.get_owned_abars_uids(abar.public_key.clone()).len(), 0);
+        assert_eq!(mt.get_owned_abars(abar.public_key.clone()).len(), 0);
+        let _ver = mt.commit().unwrap();
+
+        assert_eq!(mt.leaf_lookup.get(&uid), Option::from(&abar));
+        assert_eq!(mt.get_owned_abars_uids(abar.public_key.clone()), vec![uid]);
+        assert_eq!(
+            mt.get_owned_abars(abar.public_key.clone()),
+            vec![abar.clone()]
+        );
+
+        let mut cs = TurboPlonkConstraintSystem::new();
+        let uid_var = cs.new_variable(BLSScalar::from_u64(uid));
+        let comm_var = cs.new_variable(abar.amount_type_commitment);
+        let pk_var = cs.new_point_variable(Point::new(
+            abar.public_key.0.point_ref().get_x(),
+            abar.public_key.0.point_ref().get_y(),
+        ));
+        let elem = AccElemVars {
+            uid: uid_var,
+            commitment: comm_var,
+            pub_key_x: pk_var.get_x(),
+            pub_key_y: pk_var.get_y(),
+        };
+
+        let leaf_info = mt.get_mt_leaf_info(uid).unwrap();
+        let path_vars = add_merkle_path_variables(&mut cs, leaf_info.path.clone());
+        let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
+
+        // Check Merkle root correctness
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_ok());
+
+        let hash = RescueInstance::new();
+        let zero = BLSScalar::zero();
+        let pk_hash = hash.rescue_hash(&[
+            key_pair.pub_key().as_jubjub_point().get_x(),
+            key_pair.pub_key().as_jubjub_point().get_y(),
+            zero,
+            zero,
+        ])[0];
+        let mut node = hash.rescue_hash(&[
+            BLSScalar::from_u64(uid),
+            abar.amount_type_commitment,
+            pk_hash,
+            zero,
+        ])[0];
+        let mut depth = 0;
+        leaf_info
+            .path
+            .nodes
+            .iter()
+            .map(|n| {
+                if n.is_left_child == 1u8 {
+                    node = hash.rescue_hash(&[node, n.siblings1, n.siblings2, zero])[0];
+                } else if n.is_right_child == 1u8 {
+                    node = hash.rescue_hash(&[n.siblings1, n.siblings2, node, zero])[0];
+                } else {
+                    node = hash.rescue_hash(&[n.siblings1, node, n.siblings2, zero])[0];
+                }
+                depth += 1;
+            })
+            .last();
+
+        assert_eq!(witness[root_var], node);
+        assert_eq!(witness[root_var], mt.version[&leaf_info.root_version]);
+
+        let uid2 = mt.add_abar(&abar).unwrap();
+        let _ver = mt.commit().unwrap();
+        let mut list = mt.get_owned_abars_uids(abar.public_key.clone());
+        list.sort_unstable();
+        assert_eq!(list, vec![uid, uid2]);
+        assert_eq!(
+            mt.get_owned_abars(abar.public_key.clone()),
+            vec![abar.clone(), abar]
+        );
+    }
+
 
     #[test]
     fn test_persistent_merkle_tree() {
@@ -1377,6 +1369,29 @@ mod tests {
         assert_eq!(mt.entry_count, 4);
     }
 
+    #[test]
+    fn test_init_tree() {
+        let path = thread::current().name().unwrap().to_owned();
+
+        let fdb = TempRocksDB::open(path).expect("failed to open db");
+
+        let cs = Arc::new(RwLock::new(RocksChainState::new(
+            fdb,
+            "test_db".to_string(),
+        )));
+        let mut state = RocksState::new(cs);
+
+        build_tree(&mut state);
+        build_tree(&mut state);
+    }
+
+    #[allow(dead_code)]
+    fn build_tree(state: &mut RocksState<TempRocksDB>) {
+
+        let store = RocksStore::new("my_store", state);
+        let _mt = PersistentMerkleTree::new(store).unwrap();
+    }
+
     #[allow(dead_code)]
     fn build_and_save_dummy_tree(path: String) -> Result<()> {
         let fdb = RocksDB::open(path).expect("failed to open db");
@@ -1425,4 +1440,6 @@ mod tests {
 
         Ok(())
     }
+
+
 }
