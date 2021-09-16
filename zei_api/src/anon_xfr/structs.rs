@@ -106,7 +106,7 @@ impl AnonBlindAssetRecord {
 pub struct AXfrProof {
     pub snark_proof: SnarkProof,
     pub merkle_root: BLSScalar,
-    pub merkle_root_version: u64,
+    pub merkle_root_version: usize,
 }
 
 /// MT PATH, merkle root value, leaf identifier
@@ -114,7 +114,7 @@ pub struct AXfrProof {
 pub struct MTLeafInfo {
     pub path: MTPath,
     pub root: BLSScalar,
-    pub root_version: u64,
+    pub root_version: usize,
     pub uid: u64,
 }
 
