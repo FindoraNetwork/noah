@@ -454,16 +454,10 @@ mod tests {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
         let key_pair = AXfrKeyPair::generate(&mut prng);
-        let mut abar = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
-        };
 
-        let _ = mt.add_abar(&abar)?;
-        mt.commit()?;
 
         for _i in 0..n-1{
-            abar = AnonBlindAssetRecord {
+            let mut abar = AnonBlindAssetRecord {
                 amount_type_commitment: BLSScalar::random(&mut prng),
                 public_key: key_pair.pub_key(),
             };
@@ -488,7 +482,9 @@ mod tests {
         let one = BLSScalar::one();
         let two = one.add(&one);
 
-        let amount = 10u64;
+        //let amount = 10u64;
+        let mut rng = ChaChaRng::from_entropy();
+        let amount = rng.next_u64() % 101;
         let asset_type = AssetType::from_identical_byte(0);
 
         // simulate input abar
