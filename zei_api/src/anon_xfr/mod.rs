@@ -481,11 +481,8 @@ mod tests {
     fn test_new_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        /*let user_params =
-            UserParams::from_file_if_exists(1, 1, Some(1), DEFAULT_BP_NUM_GENS, None)
-                .unwrap();*/
-
-        let user_params = UserParams::new_max_degree_poly_com(1,1,Some(1), DEFAULT_BP_NUM_GENS, 1<<20);
+        let user_params = UserParams::new_max_degree_poly_com(1, 1, Some(41), DEFAULT_BP_NUM_GENS, 1<<20)
+                .unwrap();
 
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
