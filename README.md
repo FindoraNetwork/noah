@@ -274,3 +274,8 @@ by
 ```
 zei = { git = "ssh://git@github.com/findoraorg/zei" , branch = "refactor/api-module"}
 ```
+
+
+## Licensing
+
+The primary license for Zei is the Business Source License 1.1 (`BUSL-1.1`), see [`LICENSE`](./LICENSE).
