@@ -481,12 +481,13 @@ mod tests {
     fn test_new_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let user_params = UserParams::new_max_degree_poly_com(1, 1, Some(41), DEFAULT_BP_NUM_GENS, 1<<20)
-                .unwrap();
-
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
-        let two = one.add(&one);
+        //let user_params = UserParams::new_max_degree_poly_com(1, 1, Some(41), DEFAULT_BP_NUM_GENS, 1<<12)
+                //.unwrap();
+        let user_params = UserParams::new(1, 1, Some(41), DEFAULT_BP_NUM_GENS);
+        //let user_params = UserParams::new_max_degree_poly_com(1, 1, Some(41), DEFAULT_BP_NUM_GENS, 1<<12);
+        //let zero = BLSScalar::zero();
+        //let one = BLSScalar::one();
+        //let two = one.add(&one);
 
         let amount = 10u64;
         //let mut rng = ChaChaRng::from_entropy();
@@ -504,26 +505,26 @@ mod tests {
         let owner_memo = oabar.get_owner_memo().unwrap();
 
         // simulate merklee tree state
-        let rand_pk_in = rand_keypair_in.pub_key();
+        //let rand_pk_in = rand_keypair_in.pub_key();
         //let mt = MerkleTree::new();
         let mut mt = build_new_merkle_tree(5).unwrap();
 
-        let hash = RescueInstance::new();
-        let rand_pk_in_jj = rand_pk_in.as_jubjub_point();
-        let pk_in_hash = hash.rescue_hash(&[
-            rand_pk_in_jj.get_x(),
-            rand_pk_in_jj.get_y(),
-            zero,
-            zero,
-        ])[0];
-        let leaf = hash.rescue_hash(&[
-            /*uid=*/ two,
-            oabar.compute_commitment(),
-            pk_in_hash,
-            zero,
-        ])[0];
-        let merkle_root = hash
-            .rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
+        //let hash = RescueInstance::new();
+        //let rand_pk_in_jj = rand_pk_in.as_jubjub_point();
+        // let pk_in_hash = hash.rescue_hash(&[
+        //     rand_pk_in_jj.get_x(),
+        //     rand_pk_in_jj.get_y(),
+        //     zero,
+        //     zero,
+        // ])[0];
+        // let leaf = hash.rescue_hash(&[
+        //     /*uid=*/ two,
+        //     oabar.compute_commitment(),
+        //     pk_in_hash,
+        //     zero,
+        // ])[0];
+        //let merkle_root = hash
+            //.rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
         /*let mt_leaf_info = MTLeafInfo {
             path: MTPath { nodes: vec![node] },
             root: merkle_root,
@@ -550,7 +551,7 @@ mod tests {
                 &dec_key_in,
             )
             .unwrap()
-            .mt_leaf_info(mt_leaf_info)
+            .mt_leaf_info(mt_leaf_info.clone())
             .build()
             .unwrap();
             assert_eq!(amount, oabar_in.get_amount());
@@ -574,7 +575,7 @@ mod tests {
                 &[keypair_in],
             )
             .unwrap();
-            (body, merkle_root, key_pairs)
+             (body, mt_leaf_info.root.clone(), key_pairs)
         };
         {
             // owner scope
