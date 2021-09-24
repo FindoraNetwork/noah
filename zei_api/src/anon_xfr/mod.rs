@@ -482,9 +482,9 @@ mod tests {
     fn test_new_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        println!("{:?}", SystemTime::now());
+        //println!("{:?}", SystemTime::now());
         let user_params = UserParams::from_file_if_exists(1, 1, Some(41), DEFAULT_BP_NUM_GENS, None).unwrap();
-        println!("{:?}", SystemTime::now());
+        //println!("{:?}", SystemTime::now());
 
         let amount = 10u64;
         let asset_type = AssetType::from_identical_byte(10);
