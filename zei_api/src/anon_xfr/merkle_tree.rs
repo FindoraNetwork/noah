@@ -232,7 +232,6 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
             })
             .collect::<Result<Vec<MTNode>>>()?;
 
-        nodes.reverse();
         Ok(MTLeafInfo {
             path: MTPath { nodes },
             root: self.get_current_root_hash().unwrap(),
