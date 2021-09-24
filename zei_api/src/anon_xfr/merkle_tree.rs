@@ -173,7 +173,6 @@ impl MerkleTree {
             }
         }
 
-        info.path.nodes.reverse();
         Ok(info)
     }
 
@@ -858,6 +857,7 @@ fn test_abar_proof() {
         .path
         .nodes
         .iter()
+        .rev()
         .map(|n| {
             if n.is_left_child == 1u8 {
                 node = hash.rescue_hash(&[node, n.siblings1, n.siblings2, zero])[0];

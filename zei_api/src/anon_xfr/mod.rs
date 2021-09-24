@@ -476,23 +476,18 @@ mod tests {
         Ok(mt)
     }
 
+
     //new test with actual merkle tree
     #[test]
     fn test_new_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        //let user_params = UserParams::new_max_degree_poly_com(1, 1, Some(41), DEFAULT_BP_NUM_GENS, 1<<12)
-                //.unwrap();
-        let user_params = UserParams::new(1, 1, Some(41), DEFAULT_BP_NUM_GENS);
-        //let user_params = UserParams::new_max_degree_poly_com(1, 1, Some(41), DEFAULT_BP_NUM_GENS, 1<<12);
-        //let zero = BLSScalar::zero();
-        //let one = BLSScalar::one();
-        //let two = one.add(&one);
+        println!("{:?}", SystemTime::now());
+        let user_params = UserParams::from_file_if_exists(1, 1, Some(41), DEFAULT_BP_NUM_GENS, None).unwrap();
+        println!("{:?}", SystemTime::now());
 
         let amount = 10u64;
-        //let mut rng = ChaChaRng::from_entropy();
-        //let amount = rng.next_u64() % 101;
-        let asset_type = AssetType::from_identical_byte(0);
+        let asset_type = AssetType::from_identical_byte(10);
 
         // simulate input abar
         let (oabar, keypair_in, dec_key_in, _) =
@@ -504,44 +499,20 @@ mod tests {
 
         let owner_memo = oabar.get_owner_memo().unwrap();
 
-        // simulate merklee tree state
-        //let rand_pk_in = rand_keypair_in.pub_key();
-        //let mt = MerkleTree::new();
         let mut mt = build_new_merkle_tree(5).unwrap();
 
-        //let hash = RescueInstance::new();
-        //let rand_pk_in_jj = rand_pk_in.as_jubjub_point();
-        // let pk_in_hash = hash.rescue_hash(&[
-        //     rand_pk_in_jj.get_x(),
-        //     rand_pk_in_jj.get_y(),
-        //     zero,
-        //     zero,
-        // ])[0];
-        // let leaf = hash.rescue_hash(&[
-        //     /*uid=*/ two,
-        //     oabar.compute_commitment(),
-        //     pk_in_hash,
-        //     zero,
-        // ])[0];
-        //let merkle_root = hash
-            //.rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
-        /*let mt_leaf_info = MTLeafInfo {
-            path: MTPath { nodes: vec![node] },
-            root: merkle_root,
-            uid: 2,
-            root_version: 0,
-        };*/
         let abar = AnonBlindAssetRecord::from_oabar(&oabar);
         let uid = mt.add_abar(&abar).unwrap();
         let _ = mt.commit();
         let mt_leaf_info = mt.get_mt_leaf_info(uid).unwrap();
+        assert_eq!(mt.get_latest_hash(), mt_leaf_info.root);
 
         // output keys
         let keypair_out = AXfrKeyPair::generate(&mut prng);
         let dec_key_out = XSecretKey::new(&mut prng);
         let enc_key_out = XPublicKey::from(&dec_key_out);
 
-        let (body, merkle_root, key_pairs) = {
+        let (body, _merkle_root, key_pairs) = {
             // prover scope
             // 1. open abar
             let oabar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
@@ -550,10 +521,10 @@ mod tests {
                 &keypair_in,
                 &dec_key_in,
             )
-            .unwrap()
-            .mt_leaf_info(mt_leaf_info.clone())
-            .build()
-            .unwrap();
+                .unwrap()
+                .mt_leaf_info(mt_leaf_info.clone())
+                .build()
+                .unwrap();
             assert_eq!(amount, oabar_in.get_amount());
             assert_eq!(asset_type, oabar_in.get_asset_type());
             assert_eq!(keypair_in.pub_key(), oabar_in.pub_key);
@@ -574,8 +545,8 @@ mod tests {
                 &[oabar_out],
                 &[keypair_in],
             )
-            .unwrap();
-             (body, mt_leaf_info.root.clone(), key_pairs)
+                .unwrap();
+            (body, mt_leaf_info.root.clone(), key_pairs)
         };
         {
             // owner scope
@@ -585,9 +556,9 @@ mod tests {
                 &keypair_out,
                 &dec_key_out,
             )
-            .unwrap()
-            .build()
-            .unwrap();
+                .unwrap()
+                .build()
+                .unwrap();
             let rand_pk = keypair_out
                 .pub_key()
                 .randomize(&oabar.get_key_rand_factor());
@@ -596,9 +567,55 @@ mod tests {
             assert_eq!(rand_pk, body.outputs[0].public_key);
         }
         {
+            let mut hash = {
+                let hasher = RescueInstance::new();
+                let pk_hash = hasher.rescue_hash(&[
+                    abar.public_key.0.point_ref().get_x(),
+                    abar.public_key.0.point_ref().get_y(),
+                    BLSScalar::zero(),
+                    BLSScalar::zero(),
+                ])[0];
+
+                hasher.rescue_hash(&[
+                    BLSScalar::from_u64(uid),
+                    abar.amount_type_commitment,
+                    pk_hash,
+                    BLSScalar::zero(),
+                ])[0]
+            };
+            let hasher = RescueInstance::new();
+            for i in mt_leaf_info.path.nodes.iter().rev() {
+                if i.is_left_child == 1u8 {
+                    hash = hasher.rescue_hash(&[
+                        hash,
+                        i.siblings1,
+                        i.siblings2,
+                        BLSScalar::zero()
+                    ])[0];
+                } else if i.is_right_child == 1u8 {
+                    hash = hasher.rescue_hash(&[
+                        i.siblings1,
+                        i.siblings2,
+                        hash,
+                        BLSScalar::zero()
+                    ])[0];
+                } else {
+                    hash = hasher.rescue_hash(&[
+                        i.siblings1,
+                        hash,
+                        i.siblings2,
+                        BLSScalar::zero()
+                    ])[0];
+                }
+            }
+            assert_eq!(hash, mt.get_latest_hash());
+        }
+        {
             // verifier scope
             let verifier_params = NodeParams::from(user_params);
-            assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
+            let t = verify_anon_xfr_body(&verifier_params, &body, &mt.get_latest_hash());
+            println!("{:?}", t);
+            assert!(t.is_ok());
 
             let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
