@@ -230,7 +230,7 @@ If you want your project to point to a specific branch of zei do the following:
 - Edit `Cargo.toml` and replace the line (assume the branch name is _refactor/api-module_)
 
 ```toml
-zei = { git = "ssh://git@github.com/findoraorg/zei"}
+zei = { git = "ssh://git@github.com/FindoraNetwork/zei"}
 ```
 
 by
