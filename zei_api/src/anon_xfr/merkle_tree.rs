@@ -8,16 +8,15 @@ use ruc::{Result, RucResult};
 use std::borrow::Borrow;
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
-use storage::db::IRocksDB;
-use storage::store::store_rocks::{IRocksStore, RStated};
-use storage::store::RocksStore;
+use storage::db::MerkleDB;
+use storage::store::{PrefixedStore, Stated, Store};
 use utils::serialization::ZeiFromToBytes;
 
 // const HASH_SIZE: i32 = 32;             // assuming we are storing SHA256 hash of abar
 // const MAX_KEYS: u64 = u64::MAX;
 const TREE_DEPTH: usize = 41; // ceil(log(u64::MAX, 3))
 const BASE_KEY: &str = "abar:root:";
-const ENTRY_COUNT_KEY: &str = "abar:entry_count:";
+const ENTRY_COUNT_KEY: &str = "abar:entrycount:";
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Path {
@@ -37,8 +36,8 @@ pub enum Path {
 ///     use storage::db::TempRocksDB;
 ///     use std::sync::Arc;
 ///     use parking_lot::RwLock;
-///     use storage::state::{RocksChainState, RocksState};
-///     use storage::store::RocksStore;
+///     use storage::state::{ChainState, State};
+///     use storage::store::PrefixedStore;
 ///     use zei::anon_xfr::merkle_tree::PersistentMerkleTree;
 ///     use algebra::bls12_381::BLSScalar;
 ///     use algebra::groups::Zero;
@@ -50,12 +49,13 @@ pub enum Path {
 ///
 ///         let path = thread::current().name().unwrap().to_owned();
 ///         let fdb = TempRocksDB::open(path).expect("failed to open db");
-///         let cs = Arc::new(RwLock::new(RocksChainState::new(
+///         let cs = Arc::new(RwLock::new(ChainState::new(
 ///             fdb,
 ///             "test_db".to_string(),
+///             0,
 ///         )));
-///         let mut state = RocksState::new(cs);
-///         let mut store = RocksStore::new("my_store", &mut state);
+///         let mut state = State::new(cs);
+///         let mut store = PrefixedStore::new("my_store", &mut state);
 ///         let mut mt = PersistentMerkleTree::new(store).unwrap();
 ///
 ///         mt.get_current_root_hash();
@@ -73,15 +73,15 @@ pub enum Path {
 ///
 ///
 
-pub struct PersistentMerkleTree<'a, D: IRocksDB> {
+pub struct PersistentMerkleTree<'a, D: MerkleDB> {
     entry_count: u64,
     version: u64,
-    store: RocksStore<'a, D>,
+    store: PrefixedStore<'a, D>,
 }
 
-impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
+impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
     // Generates a new PersistentMerkleTree based on a sessioned KV store
-    pub fn new(mut store: RocksStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>> {
+    pub fn new(mut store: PrefixedStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>> {
         let mut entry_count = 0;
         let mut version = 0;
         match store.get(BASE_KEY.as_bytes()).unwrap() {
@@ -93,8 +93,12 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
                     BLSScalar::zero(),
                     BLSScalar::zero(),
                 ])[0];
-                store.set(BASE_KEY.as_bytes(), zero_hash.zei_to_bytes());
-                store.set(ENTRY_COUNT_KEY.as_bytes(), 0u64.to_be_bytes().to_vec());
+                store
+                    .set(BASE_KEY.as_bytes(), zero_hash.zei_to_bytes())
+                    .unwrap();
+                store
+                    .set(ENTRY_COUNT_KEY.as_bytes(), 0u64.to_be_bytes().to_vec())
+                    .unwrap();
             }
             Some(_) => {
                 // TODO: In the case that a pre-existing tree is loaded, calculate the entry-count.
@@ -106,9 +110,9 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
                             bytes[6], bytes[7],
                         ];
                         entry_count = u64::from_be_bytes(array);
-                        version = store.state().height().c(d!())?;
+                        version = store.height().c(d!())?;
                     }
-                    None => Err(eg!("entry count key not found in Store"))?,
+                    None => return Err(eg!("entry count key not found in Store")),
                 };
             }
         };
@@ -134,47 +138,36 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
         cache.set(leaf, hash.zei_to_bytes());
 
         // 3. update hash of all ancestors of the new leaf
-        ancestors
-            .iter()
-            .rev()
-            .map(|node_key| {
-                let parse_hash = |key: &str| -> Result<BLSScalar> {
-                    if let Some(b) = cache.get(key) {
-                        return BLSScalar::zei_from_bytes(b.as_slice());
-                    }
-                    match self.get(key.as_bytes()).unwrap() {
-                        Some(b) => BLSScalar::zei_from_bytes(b.as_slice()),
-                        None => Ok(BLSScalar::zero()),
-                    }
-                };
-                let left_child_hash =
-                    parse_hash(format!("{}{}", node_key, "l").as_str())?;
-                let middle_child_hash =
-                    parse_hash(format!("{}{}", node_key, "m").as_str())?;
-                let right_child_hash =
-                    parse_hash(format!("{}{}", node_key, "r").as_str())?;
+        for node_key in ancestors.iter().rev() {
+            let parse_hash = |key: &str| -> Result<BLSScalar> {
+                if let Some(b) = cache.get(key) {
+                    return BLSScalar::zei_from_bytes(b.as_slice());
+                }
+                match self.get(key.as_bytes()).unwrap() {
+                    Some(b) => BLSScalar::zei_from_bytes(b.as_slice()),
+                    None => Ok(BLSScalar::zero()),
+                }
+            };
+            let left_child_hash = parse_hash(format!("{}{}", node_key, "l").as_str())?;
+            let middle_child_hash = parse_hash(format!("{}{}", node_key, "m").as_str())?;
+            let right_child_hash = parse_hash(format!("{}{}", node_key, "r").as_str())?;
 
-                let hasher = RescueInstance::new();
-                let hash = hasher.rescue_hash(&[
-                    left_child_hash,
-                    middle_child_hash,
-                    right_child_hash,
-                    BLSScalar::zero(),
-                ])[0];
-                cache.set(node_key, BLSScalar::zei_to_bytes(&hash));
-                Ok(())
-            })
-            .collect::<Result<()>>()?;
+            let hasher = RescueInstance::new();
+            let hash = hasher.rescue_hash(&[
+                left_child_hash,
+                middle_child_hash,
+                right_child_hash,
+                BLSScalar::zero(),
+            ])[0];
+            cache.set(node_key, BLSScalar::zei_to_bytes(&hash));
+        }
 
         self.entry_count += 1;
         cache.set(ENTRY_COUNT_KEY, self.entry_count.to_be_bytes().to_vec());
 
-        let _ = cache
-            .iter()
-            .map(|(k, v)| {
-                self.store.set(k.as_bytes(), v.to_vec());
-            })
-            .collect::<()>();
+        for (k, v) in cache.iter() {
+            self.store.set(k.as_bytes(), v.to_vec())?;
+        }
         Ok(uid)
     }
 
@@ -184,17 +177,14 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
 
         let mut previous = keys.first().unwrap();
 
-        let mut nodes: Vec<MTNode> = keys
+        let nodes: Vec<MTNode> = keys
             .iter()
             .skip(1)
             .map(|key| {
                 // if current node is not present in store then it is not a valid uid to generate
-                match self.store.get(key.as_bytes()).unwrap() {
-                    None => {
-                        return Err(eg!("uid not found in tree, cannot generate proof"))
-                    }
-                    Some(_) => {}
-                };
+                if !self.store.exists(key.as_bytes()).unwrap() {
+                    return Err(eg!("uid not found in tree, cannot generate proof"));
+                }
 
                 let direction = key.chars().last();
                 let mut node = MTNode {
@@ -267,7 +257,8 @@ impl<'a, D: IRocksDB> PersistentMerkleTree<'a, D> {
 
     #[allow(dead_code)]
     pub fn commit(&mut self) -> Result<u64> {
-        self.version = self.store.state_mut().commit(self.version + 1).c(d!())?;
+        let (_, ver) = self.store.state_mut().commit(self.version + 1).c(d!())?;
+        self.version = ver;
         Ok(self.version)
     }
 
@@ -282,9 +273,9 @@ struct Cache {
 
 impl Cache {
     fn new() -> Cache {
-        return Cache {
+        Cache {
             store: HashMap::new(),
-        };
+        }
     }
     fn set(&mut self, key: &str, val: Vec<u8>) {
         self.store.insert(key.to_string(), val);
@@ -714,7 +705,7 @@ impl Node {
 }
 
 fn generate_path_keys(path_stream: Vec<Path>) -> Vec<String> {
-    let mut key = BASE_KEY.clone().to_string();
+    let mut key = BASE_KEY.to_owned();
     let mut keys: Vec<String> = path_stream
         .into_iter()
         .map(|path| {
@@ -723,7 +714,7 @@ fn generate_path_keys(path_stream: Vec<Path>) -> Vec<String> {
         })
         .collect();
 
-    keys.insert(0, BASE_KEY.clone().to_string());
+    keys.insert(0, BASE_KEY.to_owned());
     keys
 }
 
@@ -740,7 +731,7 @@ pub fn get_path_from_uid(mut uid: u64) -> Vec<Path> {
     let mut count = 0;
     while count < TREE_DEPTH {
         let rem = uid % 3;
-        uid = uid / 3;
+        uid /= 3;
 
         match rem {
             0 => path.push(Path::Left),
@@ -760,10 +751,12 @@ mod tests {
         add_merkle_path_variables, compute_merkle_root, AccElemVars,
     };
     use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::merkle_tree::{PersistentMerkleTree, BASE_KEY, generate_path_keys, MerkleTree, Path};
+    use crate::anon_xfr::merkle_tree::{
+        generate_path_keys, MerkleTree, Path, PersistentMerkleTree, BASE_KEY,
+    };
     use crate::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, Zero, One, ScalarArithmetic};
+    use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
     use parking_lot::RwLock;
     use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
@@ -774,9 +767,8 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
     use storage::db::{RocksDB, TempRocksDB};
-    use storage::state::{RocksChainState, RocksState};
-    use storage::store::RocksStore;
-
+    use storage::state::{ChainState, State};
+    use storage::store::PrefixedStore;
 
     #[test]
     pub fn test_generate_path_keys() {
@@ -1229,19 +1221,15 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_persistent_merkle_tree() {
         let hash = RescueInstance::new();
 
         let path = thread::current().name().unwrap().to_owned();
         let fdb = TempRocksDB::open(path).expect("failed to open db");
-        let cs = Arc::new(RwLock::new(RocksChainState::new(
-            fdb,
-            "test_db".to_string(),
-        )));
-        let mut state = RocksState::new(cs);
-        let store = RocksStore::new("my_store", &mut state);
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+        let mut state = State::new(cs);
+        let store = PrefixedStore::new("mystore", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         assert_eq!(
@@ -1268,7 +1256,7 @@ mod tests {
             ])[0]
         );
 
-        let mut key = BASE_KEY.clone().to_owned();
+        let mut key = BASE_KEY.to_owned();
         for _t in 1..42 {
             key.push('l');
             let res = mt.get(key.as_bytes());
@@ -1306,12 +1294,9 @@ mod tests {
     fn test_persistant_merkle_tree_proof_commitment() {
         let path = thread::current().name().unwrap().to_owned();
         let fdb = TempRocksDB::open(path).expect("failed to open db");
-        let cs = Arc::new(RwLock::new(RocksChainState::new(
-            fdb,
-            "test_db".to_string(),
-        )));
-        let mut state = RocksState::new(cs);
-        let store = RocksStore::new("my_store", &mut state);
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+        let mut state = State::new(cs);
+        let store = PrefixedStore::new("mystore", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -1327,10 +1312,10 @@ mod tests {
 
         let mut cs = TurboPlonkConstraintSystem::new();
         let uid_var = cs.new_variable(BLSScalar::from_u64(0));
-        let comm_var = cs.new_variable(abar.clone().amount_type_commitment);
+        let comm_var = cs.new_variable(abar.amount_type_commitment);
         let pk_var = cs.new_point_variable(Point::new(
-            abar.clone().public_key.0.point_ref().get_x(),
-            abar.clone().public_key.0.point_ref().get_y(),
+            abar.public_key.0.point_ref().get_x(),
+            abar.public_key.0.point_ref().get_y(),
         ));
         let elem = AccElemVars {
             uid: uid_var,
@@ -1339,7 +1324,7 @@ mod tests {
             pub_key_y: pk_var.get_y(),
         };
 
-        let path_vars = add_merkle_path_variables(&mut cs, proof.path.clone());
+        let path_vars = add_merkle_path_variables(&mut cs, proof.path);
         let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
 
         // Check Merkle root correctness
@@ -1355,13 +1340,10 @@ mod tests {
         let path = thread::current().name().unwrap().to_owned();
         let _ = build_and_save_dummy_tree(path.clone()).unwrap();
 
-        let fdb = TempRocksDB::open(path.clone()).expect("failed to open db");
-        let cs = Arc::new(RwLock::new(RocksChainState::new(
-            fdb,
-            "test_db".to_string(),
-        )));
-        let mut state = RocksState::new(cs);
-        let store = RocksStore::new("my_store", &mut state);
+        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+        let mut state = State::new(cs);
+        let store = PrefixedStore::new("mystore", &mut state);
         let mt = PersistentMerkleTree::new(store).unwrap();
 
         assert_eq!(mt.version, 4);
@@ -1374,20 +1356,16 @@ mod tests {
 
         let fdb = TempRocksDB::open(path).expect("failed to open db");
 
-        let cs = Arc::new(RwLock::new(RocksChainState::new(
-            fdb,
-            "test_db".to_string(),
-        )));
-        let mut state = RocksState::new(cs);
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+        let mut state = State::new(cs);
 
         build_tree(&mut state);
         build_tree(&mut state);
     }
 
     #[allow(dead_code)]
-    fn build_tree(state: &mut RocksState<TempRocksDB>) {
-
-        let store = RocksStore::new("my_store", state);
+    fn build_tree(state: &mut State<TempRocksDB>) {
+        let store = PrefixedStore::new("mystore", state);
         let _mt = PersistentMerkleTree::new(store).unwrap();
     }
 
@@ -1395,12 +1373,9 @@ mod tests {
     fn build_and_save_dummy_tree(path: String) -> Result<()> {
         let fdb = RocksDB::open(path).expect("failed to open db");
 
-        let cs = Arc::new(RwLock::new(RocksChainState::new(
-            fdb,
-            "test_db".to_string(),
-        )));
-        let mut state = RocksState::new(cs);
-        let store = RocksStore::new("my_store", &mut state);
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+        let mut state = State::new(cs);
+        let store = PrefixedStore::new("mystore", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -1439,6 +1414,4 @@ mod tests {
 
         Ok(())
     }
-
-
 }
