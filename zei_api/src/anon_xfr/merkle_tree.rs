@@ -177,7 +177,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         let mut previous = keys.first().unwrap();
 
-        let mut nodes: Vec<MTNode> = keys
+        let nodes: Vec<MTNode> = keys
             .iter()
             .skip(1)
             .map(|key| {
@@ -1340,7 +1340,7 @@ mod tests {
         let path = thread::current().name().unwrap().to_owned();
         let _ = build_and_save_dummy_tree(path.clone()).unwrap();
 
-        let fdb = TempRocksDB::open(path.clone()).expect("failed to open db");
+        let fdb = TempRocksDB::open(path).expect("failed to open db");
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs);
         let store = PrefixedStore::new("mystore", &mut state);
