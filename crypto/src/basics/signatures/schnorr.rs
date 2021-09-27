@@ -30,7 +30,7 @@ pub struct Signature<G, S> {
     s: S,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 struct SecretKey<S>(S);
 
 impl<S: Scalar> SecretKey<S> {
@@ -84,7 +84,7 @@ impl<G: Group> ZeiFromToBytes for PublicKey<G> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KeyPair<G, S> {
     sec_key: SecretKey<S>,
     pub pub_key: PublicKey<G>,
@@ -112,6 +112,26 @@ impl<G: Group> KeyPair<G, G::S> {
             pub_key: self.pub_key.randomize(factor),
             sec_key: self.sec_key.randomize(factor),
         }
+    }
+}
+
+impl<G: Group> ZeiFromToBytes for KeyPair<G, G::S> {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(self.get_secret_scalar().to_bytes().as_slice());
+        vec.extend_from_slice(self.pub_key.zei_to_bytes().as_slice());
+        vec
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+        let alpha = G::S::from_bytes(&bytes[0..G::S::bytes_len()]).c(d!())?;
+        // Public key
+        let u = PublicKey::zei_from_bytes(&bytes[G::S::bytes_len()..]).c(d!())?;
+
+        Ok(KeyPair {
+            sec_key: SecretKey(alpha),
+            pub_key: u,
+        })
     }
 }
 

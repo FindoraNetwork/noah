@@ -26,6 +26,7 @@ use utils::errors::ZeiError;
 pub mod bar_to_from_abar;
 pub(crate) mod circuits;
 pub mod keys;
+pub mod merkle_tree;
 pub(crate) mod proofs;
 pub mod structs;
 
@@ -120,13 +121,15 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
         .map(|output| output.owner_memo.clone().c(d!(ZeiError::ParameterError)))
         .collect();
 
+    let mt_info_temp = inputs[0].mt_leaf_info.as_ref().unwrap();
     Ok((
         AXfrBody {
             inputs: nullifiers_and_signing_keys,
             outputs: out_abars,
             proof: AXfrProof {
                 snark_proof: proof,
-                merkle_root: inputs[0].mt_leaf_info.as_ref().unwrap().root,
+                merkle_root: mt_info_temp.root,
+                merkle_root_version: mt_info_temp.root_version,
             },
             owner_memos: out_memos.c(d!())?,
         },
@@ -297,8 +300,8 @@ fn nullifier(
 mod tests {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
-        AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
-        OpenAnonBlindAssetRecordBuilder,
+        AXfrNote, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
+        OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
     };
     use crate::anon_xfr::{gen_anon_xfr_body, verify_anon_xfr_body};
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
@@ -366,6 +369,7 @@ mod tests {
             path: MTPath { nodes: vec![node] },
             root: merkle_root,
             uid: 2,
+            root_version: 0,
         };
 
         // output keys
@@ -373,7 +377,7 @@ mod tests {
         let dec_key_out = XSecretKey::new(&mut prng);
         let enc_key_out = XPublicKey::from(&dec_key_out);
 
-        let (body, merkle_root) = {
+        let (body, merkle_root, key_pairs) = {
             // prover scope
             // 1. open abar
             let oabar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
@@ -399,7 +403,7 @@ mod tests {
                 .build()
                 .unwrap();
 
-            let (body, _) = gen_anon_xfr_body(
+            let (body, key_pairs) = gen_anon_xfr_body(
                 &mut prng,
                 &user_params,
                 &[oabar_in],
@@ -407,7 +411,7 @@ mod tests {
                 &[keypair_in],
             )
             .unwrap();
-            (body, merkle_root)
+            (body, merkle_root, key_pairs)
         };
         {
             // owner scope
@@ -430,7 +434,10 @@ mod tests {
         {
             // verifier scope
             let verifier_params = NodeParams::from(user_params);
-            assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok())
+            assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
+
+            let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
+            assert!(note.verify().is_ok())
         }
     }
 
@@ -546,6 +553,7 @@ mod tests {
                         },
                         root: merkle_root,
                         uid: uid as u64,
+                        root_version: 0,
                     };
                     let open_abar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
                         &in_abars[uid],

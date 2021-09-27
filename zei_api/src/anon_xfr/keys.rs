@@ -1,17 +1,27 @@
-use algebra::jubjub::{JubjubPoint, JubjubScalar};
+use algebra::groups::Group;
+use algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
 use crypto::basics::signatures::schnorr;
+use crypto::basics::signatures::schnorr::{KeyPair, PublicKey};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use utils::errors::ZeiError;
+use utils::serialization::ZeiFromToBytes;
+use wasm_bindgen::prelude::*;
+
+const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
+const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
 
 /// Public key used to address an Anonymous records and verify transaction spending it
+#[wasm_bindgen]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
 /// Keypair associated with an Anonymous records. It is used to spending it.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[wasm_bindgen]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct AXfrKeyPair(pub(crate) schnorr::KeyPair<JubjubPoint, JubjubScalar>);
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct AXfrSignature(pub(crate) schnorr::Signature<JubjubPoint, JubjubScalar>);
 
 impl AXfrKeyPair {
@@ -26,7 +36,7 @@ impl AXfrKeyPair {
     }
 
     /// Return public key
-    pub(crate) fn pub_key(&self) -> AXfrPubKey {
+    pub fn pub_key(&self) -> AXfrPubKey {
         AXfrPubKey(self.0.pub_key.clone())
     }
 
@@ -37,6 +47,23 @@ impl AXfrKeyPair {
 
     pub fn sign(&self, msg: &[u8]) -> AXfrSignature {
         AXfrSignature(self.0.sign(msg))
+    }
+}
+
+impl ZeiFromToBytes for AXfrKeyPair {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        self.0.zei_to_bytes()
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != (AXFR_SECRET_KEY_LENGTH + AXFR_PUBLIC_KEY_LENGTH) {
+            Err(eg!(ZeiError::DeserializationError))
+        } else {
+            let keypair: KeyPair<JubjubPoint, JubjubScalar> =
+                schnorr::KeyPair::zei_from_bytes(bytes).c(d!(""))?;
+
+            Ok(AXfrKeyPair(keypair))
+        }
     }
 }
 
@@ -55,7 +82,59 @@ impl AXfrPubKey {
     }
 
     /// Signature verification function
-    pub fn verify(&self, msg: &[u8], sig: AXfrSignature) -> Result<()> {
+    pub fn verify(&self, msg: &[u8], sig: &AXfrSignature) -> Result<()> {
         self.0.verify(msg, &sig.0).c(d!())
+    }
+}
+
+impl ZeiFromToBytes for AXfrPubKey {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        self.0.zei_to_bytes()
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != AXFR_PUBLIC_KEY_LENGTH {
+            Err(eg!(ZeiError::DeserializationError))
+        } else {
+            let point: JubjubPoint = JubjubPoint::zei_from_bytes(bytes)
+                .c(d!("error in deserializing JubJub point"))?;
+            Ok(AXfrPubKey {
+                0: PublicKey::from_point(point),
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
+    use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaChaRng;
+    use utils::serialization::ZeiFromToBytes;
+
+    #[test]
+    fn test_axfr_pub_key_serialization() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+
+        let pub_key: AXfrPubKey = keypair.pub_key();
+
+        let bytes = pub_key.zei_to_bytes();
+        assert_ne!(bytes.len(), 0);
+
+        let reformed_pub_key = AXfrPubKey::zei_from_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(pub_key, reformed_pub_key);
+    }
+
+    #[test]
+    fn test_axfr_key_pair_serialization() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+
+        let bytes: Vec<u8> = keypair.zei_to_bytes();
+        assert_ne!(bytes.len(), 0);
+
+        let reformed_key_pair = AXfrKeyPair::zei_from_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(keypair, reformed_key_pair);
     }
 }
