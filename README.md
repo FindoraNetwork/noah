@@ -203,7 +203,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.zei]
-version = "v0.1.4c"
+version = "v0.1.4d"
 ```
 
 Then, in your library or executable source, add:
@@ -230,13 +230,13 @@ If you want your project to point to a specific branch of zei do the following:
 - Edit `Cargo.toml` and replace the line (assume the branch name is _refactor/api-module_)
 
 ```toml
-zei = { git = "ssh://git@github.com/FindoraNetwork/zei"}
+zei = { git = "https://github.com/FindoraNetwork/zei"}
 ```
 
 by
 
 ```toml
-zei = { git = "ssh://git@github.com/FindoraNetwork/zei", tag = "v0.1.4c" }
+zei = { git = "https://github.com/FindoraNetwork/zei", tag = "v0.1.4d" }
 ```
 
 
