@@ -8,7 +8,7 @@ use ruc::{Result, RucResult};
 use std::borrow::Borrow;
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
-use storage::db::MerkleDB;
+use storage::db::RocksDB;
 use storage::store::{PrefixedStore, Stated, Store};
 use utils::serialization::ZeiFromToBytes;
 
@@ -79,7 +79,7 @@ pub struct PersistentMerkleTree<'a, D: MerkleDB> {
     store: PrefixedStore<'a, D>,
 }
 
-impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
+impl<'a, D: RocksDB> PersistentMerkleTree<'a, D> {
     // Generates a new PersistentMerkleTree based on a sessioned KV store
     pub fn new(mut store: PrefixedStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>> {
         let mut entry_count = 0;
