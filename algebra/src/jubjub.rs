@@ -14,6 +14,7 @@ use ruc::*;
 use std::convert::TryInto;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 use std::hash::{Hash, Hasher};
+use std::cmp::Ordering;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
@@ -34,15 +35,22 @@ impl Default for JubjubScalar {
 
 impl Hash for JubjubPoint {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(self.0.to_string().as_bytes())
-    }
-
-    fn hash_slice<H: Hasher>(data: &[Self], state: &mut H) where Self: Sized {
-        for d in data.into_iter() {
-            state.write(d.0.to_string().as_bytes())
-        }
+        self.0.to_string().as_bytes().hash(state)
     }
 }
+
+impl Ord for JubjubPoint {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.to_string().as_bytes().cmp(&other.0.to_string().as_bytes())
+    }
+}
+
+impl PartialOrd for JubjubPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 pub const JUBJUB_SCALAR_LEN: usize = 32;
 
 impl One for JubjubScalar {
