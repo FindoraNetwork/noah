@@ -153,52 +153,92 @@ mod tests {
     use crypto::basics::commitments::rescue::HashCommitment;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use rand::RngCore;
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_single_asset() {
         // single asset type
         let zero = BLSScalar::zero();
-        // (n, m) = (3, 6)
-        let inputs = vec![
-            (/*amount=*/ 30, /*asset_type=*/ zero),
-            (20, zero),
-            (10, zero),
-        ];
-        let outputs = vec![
-            (5, zero),
-            (15, zero),
-            (22, zero),
-            (11, zero),
-            (0, zero),
-            (7, zero),
-        ];
+
+        let mut rng = ChaChaRng::from_entropy();
+        let mut total_input = 50 + rng.next_u64() % 50;
+        let mut total_output= total_input;
+
+        let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
+        for _i in 1..3{
+            let rnd_amount = rng.next_u64();
+            let  amount = rnd_amount % total_input;
+            inputs.push((amount , zero));
+            total_input -= amount;
+        }
+        inputs.push((total_input, zero));
+
+        let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
+        for _i in 1..6{
+            let rnd_amount = rng.next_u64();
+            let amount = rnd_amount % total_output;
+            outputs.push((amount , zero));
+            total_output -= amount;
+        }
+        outputs.push((total_output, zero));
+
         test_anon_xfr_proof(inputs, outputs);
+
     }
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_single_asset() {
         let zero = BLSScalar::zero();
         // (n, m) = (3, 3)
-        let inputs = vec![(30, zero), (20, zero), (0, zero)];
-        let outputs = vec![(5, zero), (17, zero), (28, zero)];
+
+        let mut rng = ChaChaRng::from_entropy();
+        let mut total_input = 50 + rng.next_u64() % 50;
+
+        let mut total_output= total_input;
+
+        let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
+
+        let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
+
+        for _i in 1..3{
+            let  amount = rng.next_u64() % total_input;
+            inputs.push((amount , zero));
+            total_input -= amount;
+
+            let  amount_out = rng.next_u64() % total_output;
+            outputs.push((amount_out , zero));
+            total_output -= amount_out;
+        }
+
+        inputs.push((total_input, zero));
+        outputs.push((total_output, zero));
+
         test_anon_xfr_proof(outputs, inputs);
+
     }
 
     #[test]
     fn test_anon_multi_xfr_proof_1in_2out_single_asset() {
         let zero = BLSScalar::zero();
         // (n, m) = (1, 2)
-        let inputs = vec![(30, zero)];
-        let outputs = vec![(13, zero), (17, zero)];
+        let mut rng = ChaChaRng::from_entropy();
+        let total_input = 50 + rng.next_u64() % 50;
+        let inputs = vec![(total_input, zero)];
+        let amount = rng.next_u64() % total_input;
+        let outputs = vec![(amount , zero), (total_input - amount, zero)];
         test_anon_xfr_proof(inputs.to_vec(), outputs.to_vec());
+
     }
 
     #[test]
     fn test_anon_multi_xfr_proof_2in_1out_single_asset() {
         let zero = BLSScalar::zero();
-        let inputs = vec![(30, zero)];
-        let outputs = vec![(13, zero), (17, zero)];
         // (n, m) = (2, 1)
+        let mut rng = ChaChaRng::from_entropy();
+        let total_output = 50 + rng.next_u64() % 50;
+        let amount = rng.next_u64() % total_output;
+        let inputs = vec![(amount , zero), (total_output - amount, zero)];
+        let outputs = vec![(total_output, zero)];
         test_anon_xfr_proof(outputs, inputs);
     }
 
@@ -206,9 +246,13 @@ mod tests {
     fn test_anon_multi_xfr_proof_1in_1out_single_asset() {
         let zero = BLSScalar::zero();
         // (n, m) = (1, 1)
-        let inputs = vec![(10, zero)];
-        let outputs = vec![(10, zero)];
+
+        let mut rng = ChaChaRng::from_entropy();
+        let amount = 50 + rng.next_u64() % 50;
+        let inputs = vec![(amount, zero)];
+        let outputs = vec![(amount, zero)];
         test_anon_xfr_proof(outputs, inputs);
+
     }
 
     #[test]
@@ -217,20 +261,36 @@ mod tests {
         // multiple asset types
         // (n, m) = (3, 6)
         let one = BLSScalar::one();
+
+        let mut rng = ChaChaRng::from_entropy();
+        let total_input_zero = 50 + rng.next_u64() % 50;
+        let amount_zero = rng.next_u64() % total_input_zero;
+        let total_input_one = 50 + rng.next_u64() % 50;
+
+        let mut total_output_zero = total_input_zero;
+        let mut total_output_one = total_input_one;
+
         let inputs = vec![
-            (/*amount=*/ 50, /*asset_type=*/ zero),
-            (60, one),
-            (20, zero),
+            (/*amount=*/ amount_zero, /*asset_type=*/ zero),
+            (total_input_one, one),
+            (total_input_zero - amount_zero, zero),
         ];
-        let outputs = vec![
-            (19, one),
-            (15, zero),
-            (1, one),
-            (35, zero),
-            (20, zero),
-            (40, one),
-        ];
+
+        let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
+
+        for _i in 1..3{
+            let  amount_one = rng.next_u64() % total_output_one;
+            let  amount_zero = rng.next_u64() % total_output_zero;
+            outputs.push((amount_one,one));
+            outputs.push((amount_zero,zero));
+            total_output_one -= amount_one;
+            total_output_zero -= amount_zero;
+        }
+        outputs.push((total_output_one,one));
+        outputs.push((total_output_zero,zero));
+
         test_anon_xfr_proof(inputs, outputs);
+
     }
 
     #[test]
@@ -238,9 +298,21 @@ mod tests {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         // (n, m) = (3, 3)
-        let inputs = vec![(23, zero), (20, one), (7, zero)];
-        let outputs = vec![(5, one), (30, zero), (15, one)];
+
+        let mut rng = ChaChaRng::from_entropy();
+
+        let total_input_zero = 50 + rng.next_u64() % 50;
+        let amount_zero = rng.next_u64() % total_input_zero;
+        let total_input_one = 50 + rng.next_u64() % 50;
+        let amount_one = rng.next_u64() % total_input_one;
+
+
+        let inputs = vec![(amount_zero, zero), (total_input_one, one), (total_input_zero - amount_zero, zero)];
+
+        let outputs = vec![(amount_one, one), (total_input_zero, zero), (total_input_one - amount_one, one)];
+
         test_anon_xfr_proof(outputs, inputs);
+
     }
 
     fn test_anon_xfr_proof(
@@ -323,6 +395,8 @@ mod tests {
                 &proof
             )
             .is_ok());
+
+            //This is a case of negative test for a bad hash commitment
             let bad_hash_comm = BLSScalar::one();
             assert!(verify_eq_committed_vals(
                 &node_params,
@@ -331,6 +405,8 @@ mod tests {
                 &proof
             )
             .is_err());
+
+            //This is a case for of negative test for a bad pedersen commitment
             let bad_ped_comm = ped_comm.add(&JubjubPoint::get_base());
             assert!(verify_eq_committed_vals(
                 &node_params,
