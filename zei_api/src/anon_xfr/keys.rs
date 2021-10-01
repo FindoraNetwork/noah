@@ -13,7 +13,7 @@ const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
 
 /// Public key used to address an Anonymous records and verify transaction spending it
 #[wasm_bindgen]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
 pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
 /// Keypair associated with an Anonymous records. It is used to spending it.
