@@ -870,7 +870,6 @@ mod tests {
         assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
     }
 
-
     #[test]
     fn test_get_path() {
         let zero_path = MerkleTree::get_path_from_uid(0);

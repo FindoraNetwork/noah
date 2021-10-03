@@ -299,6 +299,7 @@ fn nullifier(
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::keys::AXfrKeyPair;
+    use crate::anon_xfr::merkle_tree::MerkleTree;
     use crate::anon_xfr::structs::{
         AXfrNote, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
         OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
@@ -306,8 +307,6 @@ mod tests {
     use crate::anon_xfr::{gen_anon_xfr_body, verify_anon_xfr_body};
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use crate::xfr::structs::AssetType;
-    use crate::anon_xfr::merkle_tree::MerkleTree;
-    use ruc::*;
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
@@ -316,9 +315,8 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rand_core::{CryptoRng, RngCore};
+    use ruc::*;
     use utils::errors::ZeiError;
-    
-
 
     #[test]
     fn test_anon_xfr() {
@@ -446,10 +444,9 @@ mod tests {
     }
 
     // outputs &mut merkle tree (wrap it in an option merkle tree, not req)
-    fn build_new_merkle_tree(n: i32) -> Result<MerkleTree>{
+    fn build_new_merkle_tree(n: i32) -> Result<MerkleTree> {
         // add 6/7 abar and populate and then retrieve values
-        let mut mt = MerkleTree::new(); 
-        
+        let mut mt = MerkleTree::new();
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
@@ -463,12 +460,12 @@ mod tests {
         let _ = mt.add_abar(&abar)?;
         mt.commit()?;
 
-        for _i in 0..n-1{
+        for _i in 0..n - 1 {
             abar = AnonBlindAssetRecord {
                 amount_type_commitment: BLSScalar::random(&mut prng),
                 public_key: key_pair.pub_key(),
             };
-    
+
             let _ = mt.add_abar(&abar)?;
             mt.commit()?;
         }
@@ -476,14 +473,15 @@ mod tests {
         Ok(mt)
     }
 
-
     //new test with actual merkle tree
     #[test]
     fn test_new_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
         //println!("{:?}", SystemTime::now());
-        let user_params = UserParams::from_file_if_exists(1, 1, Some(41), DEFAULT_BP_NUM_GENS, None).unwrap();
+        let user_params =
+            UserParams::from_file_if_exists(1, 1, Some(41), DEFAULT_BP_NUM_GENS, None)
+                .unwrap();
         //println!("{:?}", SystemTime::now());
 
         let amount = 10u64;
@@ -521,10 +519,10 @@ mod tests {
                 &keypair_in,
                 &dec_key_in,
             )
-                .unwrap()
-                .mt_leaf_info(mt_leaf_info.clone())
-                .build()
-                .unwrap();
+            .unwrap()
+            .mt_leaf_info(mt_leaf_info.clone())
+            .build()
+            .unwrap();
             assert_eq!(amount, oabar_in.get_amount());
             assert_eq!(asset_type, oabar_in.get_asset_type());
             assert_eq!(keypair_in.pub_key(), oabar_in.pub_key);
@@ -545,7 +543,7 @@ mod tests {
                 &[oabar_out],
                 &[keypair_in],
             )
-                .unwrap();
+            .unwrap();
             (body, mt_leaf_info.root.clone(), key_pairs)
         };
         {
@@ -556,9 +554,9 @@ mod tests {
                 &keypair_out,
                 &dec_key_out,
             )
-                .unwrap()
-                .build()
-                .unwrap();
+            .unwrap()
+            .build()
+            .unwrap();
             let rand_pk = keypair_out
                 .pub_key()
                 .randomize(&oabar.get_key_rand_factor());
@@ -590,21 +588,21 @@ mod tests {
                         hash,
                         i.siblings1,
                         i.siblings2,
-                        BLSScalar::zero()
+                        BLSScalar::zero(),
                     ])[0];
                 } else if i.is_right_child == 1u8 {
                     hash = hasher.rescue_hash(&[
                         i.siblings1,
                         i.siblings2,
                         hash,
-                        BLSScalar::zero()
+                        BLSScalar::zero(),
                     ])[0];
                 } else {
                     hash = hasher.rescue_hash(&[
                         i.siblings1,
                         hash,
                         i.siblings2,
-                        BLSScalar::zero()
+                        BLSScalar::zero(),
                     ])[0];
                 }
             }
@@ -621,7 +619,7 @@ mod tests {
             assert!(note.verify().is_ok())
         }
     }
-/*
+    /*
     //new test with actual merkle tree with different amount
     #[test]
     fn test_2_new_anon_xfr() {

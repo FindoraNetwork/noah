@@ -11,10 +11,10 @@ use jubjub::{AffinePoint, ExtendedPoint, Fr};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use std::convert::TryInto;
-use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
-use std::hash::{Hash, Hasher};
 use std::cmp::Ordering;
+use std::convert::TryInto;
+use std::hash::{Hash, Hasher};
+use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
@@ -41,7 +41,10 @@ impl Hash for JubjubPoint {
 
 impl Ord for JubjubPoint {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0.to_string().as_bytes().cmp(&other.0.to_string().as_bytes())
+        self.0
+            .to_string()
+            .as_bytes()
+            .cmp(&other.0.to_string().as_bytes())
     }
 }
 
