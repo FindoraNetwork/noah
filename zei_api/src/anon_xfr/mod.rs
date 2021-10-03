@@ -306,6 +306,8 @@ mod tests {
     use crate::anon_xfr::{gen_anon_xfr_body, verify_anon_xfr_body};
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use crate::xfr::structs::AssetType;
+    use crate::anon_xfr::merkle_tree::MerkleTree;
+    use ruc::*;
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
@@ -315,6 +317,8 @@ mod tests {
     use rand_core::SeedableRng;
     use rand_core::{CryptoRng, RngCore};
     use utils::errors::ZeiError;
+    
+
 
     #[test]
     fn test_anon_xfr() {
@@ -440,6 +444,306 @@ mod tests {
             assert!(note.verify().is_ok())
         }
     }
+
+    // outputs &mut merkle tree (wrap it in an option merkle tree, not req)
+    fn build_new_merkle_tree(n: i32) -> Result<MerkleTree>{
+        // add 6/7 abar and populate and then retrieve values
+        let mut mt = MerkleTree::new(); 
+        
+
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let key_pair = AXfrKeyPair::generate(&mut prng);
+
+        let mut abar = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+
+        let _ = mt.add_abar(&abar)?;
+        mt.commit()?;
+
+        for _i in 0..n-1{
+            abar = AnonBlindAssetRecord {
+                amount_type_commitment: BLSScalar::random(&mut prng),
+                public_key: key_pair.pub_key(),
+            };
+    
+            let _ = mt.add_abar(&abar)?;
+            mt.commit()?;
+        }
+
+        Ok(mt)
+    }
+
+
+    //new test with actual merkle tree
+    #[test]
+    fn test_new_anon_xfr() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+        //println!("{:?}", SystemTime::now());
+        let user_params = UserParams::from_file_if_exists(1, 1, Some(41), DEFAULT_BP_NUM_GENS, None).unwrap();
+        //println!("{:?}", SystemTime::now());
+
+        let amount = 10u64;
+        let asset_type = AssetType::from_identical_byte(10);
+
+        // simulate input abar
+        let (oabar, keypair_in, dec_key_in, _) =
+            gen_oabar_and_keys(&mut prng, amount, asset_type);
+        let abar = AnonBlindAssetRecord::from_oabar(&oabar);
+        assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
+        let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
+        assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
+
+        let owner_memo = oabar.get_owner_memo().unwrap();
+
+        let mut mt = build_new_merkle_tree(5).unwrap();
+
+        let abar = AnonBlindAssetRecord::from_oabar(&oabar);
+        let uid = mt.add_abar(&abar).unwrap();
+        let _ = mt.commit();
+        let mt_leaf_info = mt.get_mt_leaf_info(uid).unwrap();
+        assert_eq!(mt.get_latest_hash(), mt_leaf_info.root);
+
+        // output keys
+        let keypair_out = AXfrKeyPair::generate(&mut prng);
+        let dec_key_out = XSecretKey::new(&mut prng);
+        let enc_key_out = XPublicKey::from(&dec_key_out);
+
+        let (body, _merkle_root, key_pairs) = {
+            // prover scope
+            // 1. open abar
+            let oabar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
+                &abar,
+                owner_memo,
+                &keypair_in,
+                &dec_key_in,
+            )
+                .unwrap()
+                .mt_leaf_info(mt_leaf_info.clone())
+                .build()
+                .unwrap();
+            assert_eq!(amount, oabar_in.get_amount());
+            assert_eq!(asset_type, oabar_in.get_asset_type());
+            assert_eq!(keypair_in.pub_key(), oabar_in.pub_key);
+
+            let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
+                .amount(amount)
+                .asset_type(asset_type)
+                .pub_key(keypair_out.pub_key())
+                .finalize(&mut prng, &enc_key_out)
+                .unwrap()
+                .build()
+                .unwrap();
+
+            let (body, key_pairs) = gen_anon_xfr_body(
+                &mut prng,
+                &user_params,
+                &[oabar_in],
+                &[oabar_out],
+                &[keypair_in],
+            )
+                .unwrap();
+            (body, mt_leaf_info.root.clone(), key_pairs)
+        };
+        {
+            // owner scope
+            let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
+                &body.outputs[0],
+                body.owner_memos[0].clone(),
+                &keypair_out,
+                &dec_key_out,
+            )
+                .unwrap()
+                .build()
+                .unwrap();
+            let rand_pk = keypair_out
+                .pub_key()
+                .randomize(&oabar.get_key_rand_factor());
+            assert_eq!(amount, oabar.get_amount());
+            assert_eq!(asset_type, oabar.get_asset_type());
+            assert_eq!(rand_pk, body.outputs[0].public_key);
+        }
+        {
+            let mut hash = {
+                let hasher = RescueInstance::new();
+                let pk_hash = hasher.rescue_hash(&[
+                    abar.public_key.0.point_ref().get_x(),
+                    abar.public_key.0.point_ref().get_y(),
+                    BLSScalar::zero(),
+                    BLSScalar::zero(),
+                ])[0];
+
+                hasher.rescue_hash(&[
+                    BLSScalar::from_u64(uid),
+                    abar.amount_type_commitment,
+                    pk_hash,
+                    BLSScalar::zero(),
+                ])[0]
+            };
+            let hasher = RescueInstance::new();
+            for i in mt_leaf_info.path.nodes.iter().rev() {
+                if i.is_left_child == 1u8 {
+                    hash = hasher.rescue_hash(&[
+                        hash,
+                        i.siblings1,
+                        i.siblings2,
+                        BLSScalar::zero()
+                    ])[0];
+                } else if i.is_right_child == 1u8 {
+                    hash = hasher.rescue_hash(&[
+                        i.siblings1,
+                        i.siblings2,
+                        hash,
+                        BLSScalar::zero()
+                    ])[0];
+                } else {
+                    hash = hasher.rescue_hash(&[
+                        i.siblings1,
+                        hash,
+                        i.siblings2,
+                        BLSScalar::zero()
+                    ])[0];
+                }
+            }
+            assert_eq!(hash, mt.get_latest_hash());
+        }
+        {
+            // verifier scope
+            let verifier_params = NodeParams::from(user_params);
+            let t = verify_anon_xfr_body(&verifier_params, &body, &mt.get_latest_hash());
+            println!("{:?}", t);
+            assert!(t.is_ok());
+
+            let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
+            assert!(note.verify().is_ok())
+        }
+    }
+/*
+    //new test with actual merkle tree with different amount
+    #[test]
+    fn test_2_new_anon_xfr() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let user_params =
+            UserParams::from_file_if_exists(1, 1, Some(1), DEFAULT_BP_NUM_GENS, None)
+                .unwrap();
+
+        let zero = BLSScalar::zero();
+        let one = BLSScalar::one();
+        let two = one.add(&one);
+
+        let amount = 20u64;
+        let asset_type = AssetType::from_identical_byte(0);
+
+        // simulate input abar
+        let (oabar, keypair_in, dec_key_in, _) =
+            gen_oabar_and_keys(&mut prng, amount, asset_type);
+        let abar = AnonBlindAssetRecord::from_oabar(&oabar);
+        assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
+        let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
+        assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
+
+        let owner_memo = oabar.get_owner_memo().unwrap();
+
+        // simulate merklee tree state
+        let rand_pk_in = rand_keypair_in.pub_key();
+        //let mt = MerkleTree::new();
+        let mut mt = build_new_merkle_tree();
+
+        let hash = RescueInstance::new();
+        let rand_pk_in_jj = rand_pk_in.as_jubjub_point();
+        let pk_in_hash = hash.rescue_hash(&[
+            rand_pk_in_jj.get_x(),
+            rand_pk_in_jj.get_y(),
+            zero,
+            zero,
+        ])[0];
+        let leaf = hash.rescue_hash(&[
+            /*uid=*/ two,
+            oabar.compute_commitment(),
+            pk_in_hash,
+            zero,
+        ])[0];
+        let merkle_root = hash
+            .rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
+        let mt_leaf_info = MTLeafInfo {
+            path: MTPath { nodes: vec![node] },
+            root: merkle_root,
+            uid: 2,
+            root_version: 0,
+        };
+
+        // output keys
+        let keypair_out = AXfrKeyPair::generate(&mut prng);
+        let dec_key_out = XSecretKey::new(&mut prng);
+        let enc_key_out = XPublicKey::from(&dec_key_out);
+
+        let (body, merkle_root, key_pairs) = {
+            // prover scope
+            // 1. open abar
+            let oabar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
+                &abar,
+                owner_memo,
+                &keypair_in,
+                &dec_key_in,
+            )
+            .unwrap()
+            .mt_leaf_info(mt_leaf_info)
+            .build()
+            .unwrap();
+            assert_eq!(amount, oabar_in.get_amount());
+            assert_eq!(asset_type, oabar_in.get_asset_type());
+            assert_eq!(keypair_in.pub_key(), oabar_in.pub_key);
+
+            let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
+                .amount(amount)
+                .asset_type(asset_type)
+                .pub_key(keypair_out.pub_key())
+                .finalize(&mut prng, &enc_key_out)
+                .unwrap()
+                .build()
+                .unwrap();
+
+            let (body, key_pairs) = gen_anon_xfr_body(
+                &mut prng,
+                &user_params,
+                &[oabar_in],
+                &[oabar_out],
+                &[keypair_in],
+            )
+            .unwrap();
+            (body, merkle_root, key_pairs)
+        };
+        {
+            // owner scope
+            let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
+                &body.outputs[0],
+                body.owner_memos[0].clone(),
+                &keypair_out,
+                &dec_key_out,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+            let rand_pk = keypair_out
+                .pub_key()
+                .randomize(&oabar.get_key_rand_factor());
+            assert_eq!(amount, oabar.get_amount());
+            assert_eq!(asset_type, oabar.get_asset_type());
+            assert_eq!(rand_pk, body.outputs[0].public_key);
+        }
+        {
+            // verifier scope
+            let verifier_params = NodeParams::from(user_params);
+            assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
+
+            let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
+            assert!(note.verify().is_ok())
+        }
+    }*/
 
     #[test]
     fn test_anon_xfr_multi_assets() {

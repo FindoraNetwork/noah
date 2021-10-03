@@ -435,7 +435,6 @@ impl MerkleTree {
             }
         }
 
-        info.path.nodes.reverse();
         Ok(info)
     }
 
@@ -870,6 +869,7 @@ mod tests {
         assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
         assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
     }
+
 
     #[test]
     fn test_get_path() {
