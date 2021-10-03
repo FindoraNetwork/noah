@@ -1,6 +1,6 @@
-![alt text](https://github.com/eianio/zei/raw/master/zei_logo.png)
+![](https://tokei.rs/b1/github/FindoraNetwork/zei)
 
-**Zei: Findora's Cryptographic Library**
+#**Zei: Findora's Cryptographic Library**
 
 Zei is a library that provide tools to create and verify public transaction
 with confidential data.
@@ -42,28 +42,28 @@ Support:
 
 Benchmarks are available for XfrNote operations. To run them all:
 
-```
-> cargo bench
+```shell
+cargo bench
 ```
 
-The report is available at `target/criterion/report/ndex.html`.
+The report is available at `target/criterion/report/index.html`.
 
 To run a specific benchmark:
 
-```
-> cargo bench --bench {xfr_batch | xfr_{note|body}_{noidtracking|idtracking}_{assettracking|noassettracking}_{singleasset|multiasset}}_{time|cycles}
+```shell
+cargo bench --bench {xfr_batch | xfr_{note|body}_{noidtracking|idtracking}_{assettracking|noassettracking}_{singleasset|multiasset}}_{time|cycles}
 ```
 
 For example to run the benchmark for xfr notes with identity tracking, and no asset tracking for a single asset, run:
 
-```
-> cargo bench --bench xfr_note_idtracking_noassettracking_singleasset_time
+```shell
+cargo bench --bench xfr_note_idtracking_noassettracking_singleasset_time
 ```
 
 The benchmarks involving batch verification can be run with:
 
-```
-> cargo bench --bench xfr_note_batch_time
+```shell
+cargo bench --bench xfr_note_batch_time
 ```
 
 Note that not all the combinations are implemented yet. So far the benchmarks available are
@@ -82,47 +82,34 @@ Note that not all the combinations are implemented yet. So far the benchmarks av
 
 Run the following script and select option 1)
 
-```
-> curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-We need to use rust nightly.
-
-```
-> rustup default nightly
+```shell
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 ## Git
 
-We use special hooks before commiting. To enable these hooks, copy them to the `.git`
+We use special hooks before committing. To enable these hooks, copy them to the `.git`
 directory:
 
+```shell
+cp hooks/pre-commit .git/hooks/
 ```
-> cp hooks/pre-commit .git/hooks/
-```
-
-## IDE
-
-We recommend using [CLion by Jetrains](https://www.jetbrains.com/clion/download/).
-During the installation choose the Rust plugin.
-Debugging and testing Rust code should work by default.
-More information available in this [tutorial](https://blog.jetbrains.com/clion/2019/10/debugging-rust-code-in-clion/).
 
 ## Tests
 
 The tests generate some parameters which are stored in the directory `zei_api/data`.
 If the tests fail, try first to remove the `*.bin` files in this directory and launch the tests again.
 
-We recommend to use the option `--release` for tests faster execution.
+We recommend using the option `--release` for tests faster execution.
 
 Run all the tests:
-```
-> cargo test --all --release
+```shell
+cargo test --all --release
 ```
 
 Run only the documentation tests:
-```
-> cargo test --doc --release
+```shell
+cargo test --doc --release
 ```
 
 ### Test coverage
@@ -132,32 +119,22 @@ Note that Tarpaulin only supports x86_64 processors running Linux.
 
 Install Tarpaulin:
 
-```
-> cargo install cargo-tarpaulin
+```shell
+cargo install cargo-tarpaulin
 ```
 
 Run Tarpaulin, using a timeout of 120 seconds.
 
-```
-> cargo tarpaulin --timeout 120
-...
-[INFO tarpaulin] Coverage Results:
-|| Tested/Total Lines:
-|| src/algebra/bls12_381.rs: 186/226
-|| src/algebra/bn.rs: 92/124
-|| src/algebra/groups.rs: 21/21
-|| src/algebra/ristretto.rs: 127/165
-|| src/algebra/utils.rs: 7/8
-|| src/basic_crypto/elgamal.rs: 112/114
-...
+```shell
+cargo tarpaulin --timeout 120
 ```
 
 ## Generate and read the documentation
 
 ### Standard
 
-```
-> cargo doc --open
+```shell
+cargo doc --open
 ```
 
 ### Visualize dependencies
@@ -168,27 +145,14 @@ This tool allows to visualizes crates' dependencies as a tree.
 
 To install:
 
-```
-> cargo install cargo-tree
+```shell
+cargo install cargo-tree
 ```
 
 To run:
 
-```
-> cargo tree
-
-zei v0.0.1 (/home/philippe/repositories/findora/zei)
-├── aes-ctr v0.3.0
-│   ├── aes-soft v0.3.3
-│   │   ├── block-cipher-trait v0.6.2
-│   │   │   └── generic-array v0.12.3
-│   │   │       └── typenum v1.11.2
-│   │   ├── byteorder v1.3.2
-│   │   └── opaque-debug v0.2.3
-│   │   [dev-dependencies]
-│   │   └── block-cipher-trait v0.6.2 (*)
-│   ├── ctr v0.3.2
-...
+```shell
+cargo tree
 ```
 
 #### Cargo deps
@@ -199,20 +163,20 @@ First you need to install graphviz.
 
 For ubuntu:
 
-```
-> sudo apt install graphviz
+```shell
+sudo apt install graphviz
 ```
 
 Then install cargo-deps:
 
-```
-> cargo install cargo-deps
+```shell
+cargo install cargo-deps
 ```
 
 Generate the graph of dependencies as an image:
 
-```
-> cargo deps --no-transitive-deps | dot -Tpng > graph.png
+```shell
+cargo deps --no-transitive-deps | dot -Tpng > graph.png
 ```
 
 ![graph-dependencies](doc/dependencies.png)
@@ -222,15 +186,15 @@ Generate the graph of dependencies as an image:
 Use the following command to install rustfmt, the tool that allows to format the code
 according to some agreed standard defined in `rustfmt.toml`.
 
-```
-> rustup component add rustfmt --toolchain nightly
-> rustup self update
+```shell
+rustup component add rustfmt
+rustup self update
 ```
 
 Then to format your code run
 
-```
-> cargo fmt
+```shell
+cargo fmt
 ```
 
 # Use of zei library
@@ -239,7 +203,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.zei]
-version = "0.0.3"
+version = "v0.1.4d"
 ```
 
 Then, in your library or executable source, add:
@@ -265,12 +229,17 @@ If you want your project to point to a specific branch of zei do the following:
 
 - Edit `Cargo.toml` and replace the line (assume the branch name is _refactor/api-module_)
 
-```
-zei = { git = "ssh://git@github.com/findoraorg/zei"}
+```toml
+zei = { git = "https://github.com/FindoraNetwork/zei"}
 ```
 
 by
 
+```toml
+zei = { git = "https://github.com/FindoraNetwork/zei", tag = "v0.1.4d" }
 ```
-zei = { git = "ssh://git@github.com/findoraorg/zei" , branch = "refactor/api-module"}
-```
+
+
+## Licensing
+
+The primary license for Zei is the Business Source License 1.1 (`BUSL-1.1`), see [`LICENSE`](./LICENSE).

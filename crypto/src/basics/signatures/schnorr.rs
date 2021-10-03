@@ -43,7 +43,7 @@ impl<S: Scalar> SecretKey<S> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash, Ord, PartialOrd)]
 pub struct PublicKey<G>(G);
 
 impl<G: Group> PublicKey<G> {

@@ -13,6 +13,8 @@ use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use std::convert::TryInto;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
+use std::hash::{Hash, Hasher};
+use std::cmp::Ordering;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
@@ -28,6 +30,24 @@ impl Default for JubjubPoint {
 impl Default for JubjubScalar {
     fn default() -> Self {
         JubjubScalar::zero()
+    }
+}
+
+impl Hash for JubjubPoint {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_string().as_bytes().hash(state)
+    }
+}
+
+impl Ord for JubjubPoint {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.to_string().as_bytes().cmp(&other.0.to_string().as_bytes())
+    }
+}
+
+impl PartialOrd for JubjubPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
