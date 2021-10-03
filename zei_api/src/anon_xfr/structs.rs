@@ -14,6 +14,7 @@ use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use serde::Serialize;
 use utils::errors::ZeiError;
+use wasm_bindgen::prelude::*;
 
 pub type Nullifier = BLSScalar;
 pub type Commitment = BLSScalar;
@@ -24,6 +25,7 @@ pub type BlindFactor = BLSScalar;
 /// * `siblings2` - the 2nd sibling of the tree node
 /// * `is_left_child` - indicates whether the tree node is the left child of its parent
 /// * `is_right_child` - indicates whether the tree node is the right child of its parent
+#[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTNode {
     pub siblings1: BLSScalar,
@@ -85,6 +87,7 @@ pub struct AXfrBody {
 }
 
 /// Asset record to be published
+#[wasm_bindgen]
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AnonBlindAssetRecord {
     pub amount_type_commitment: Commitment,

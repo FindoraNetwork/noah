@@ -56,6 +56,7 @@ impl PartialEq for XPublicKey {
 
 impl Eq for XPublicKey {}
 
+#[wasm_bindgen]
 #[derive(Clone)]
 pub struct XSecretKey {
     pub(crate) key: x25519_dalek::StaticSecret,

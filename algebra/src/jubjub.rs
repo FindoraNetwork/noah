@@ -18,7 +18,7 @@ use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct JubjubPoint(pub(crate) ExtendedPoint);
 
 impl Default for JubjubPoint {

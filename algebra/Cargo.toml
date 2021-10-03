@@ -23,6 +23,7 @@ digest = "0.9"
 jubjub = "0.4.0"
 bls12_381 = "0.2.0"
 ruc = { git = "https://github.com/FindoraNetwork/RUC.git", branch = "master" }
+wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 
 [features]
 default = ["std", "u64_backend"]
