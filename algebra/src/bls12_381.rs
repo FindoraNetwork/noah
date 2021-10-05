@@ -386,6 +386,13 @@ mod bls12_381_groups_test {
     use crate::groups::{Group, Scalar};
     use crate::pairing::Pairing;
 
+    use crate::groups::GroupArithmetic;
+    use rand_chacha::ChaChaRng;
+    use rand_core::SeedableRng;
+    use rand_core::RngCore;
+    use group::Curve;
+
+
     #[test]
     fn test_scalar_ops() {
         test_scalar_operations::<super::BLSScalar>();
@@ -417,4 +424,145 @@ mod bls12_381_groups_test {
         let expected_base = Bls12381::pairing(&BLSG1::get_base(), &BLSG2::get_base());
         assert_eq!(base_bls_gt, expected_base);
     }
+
+    #[test]
+    fn bilinear_properties(){
+
+
+        let identity_g1 = BLSG1::get_identity();
+        let identity_g2  = BLSG2::get_identity();
+        let identity_gt_computed = Bls12381::pairing(&identity_g1, &identity_g2);
+        let identity_gt = BLSGt::get_identity();
+        assert_eq!(identity_gt, identity_gt_computed);
+
+        let mut rng = ChaChaRng::from_entropy();
+
+        let s1 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
+        let s2 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
+
+        let base_g1 = BLSG1::get_base();
+        let base_g2 = BLSG2::get_base();
+
+        let s1_base_g1 = base_g1.mul(&s1);
+        let s2_base_g2 = base_g2.mul(&s2);
+
+        let gt_mapped_element = Bls12381::pairing(&s1_base_g1, &s2_base_g2);
+
+        let gt_base_computed = Bls12381::pairing(&base_g1,&base_g2);
+        let base_gt = BLSGt::get_base();
+        assert_eq!(base_gt, gt_base_computed);
+
+        assert_eq!(gt_mapped_element, Bls12381::pairing(&base_g1, &s2_base_g2).mul(&s1));
+        assert_eq!(gt_mapped_element, Bls12381::pairing(&s1_base_g1, &base_g2).mul(&s2));
+
+        assert_eq!(gt_mapped_element, gt_base_computed.mul(&s1).mul(&s2));
+        assert_eq!(gt_mapped_element, gt_base_computed.mul(&s2).mul(&s1));
+
+    }
+
+    #[test]
+    fn math_respresentation_of_points_g1(){
+
+
+        let mut prng = ChaChaRng::from_entropy();
+
+        let g1 = BLSG1::get_base();
+        let s1 = BLSScalar::from_u32(50 + prng.next_u32() % 50);
+
+        let g1 = g1.mul(&s1);
+
+        let g1_prime =  BLSG1::get_random_base(&mut prng);
+
+        //This is the projective representation of g1
+        let g1_projective = g1.0;
+        let g1_prime_projective = g1_prime.0;
+
+        //This is the affine representation of g1_prime
+        let g1_prime_affine = bls12_381::G1Affine::from(g1_prime_projective);
+
+        let g1_pr_plus_g1_prime_pr = g1_projective.add(&g1_prime_projective);
+
+        //These two operations correspond to summation of points,
+        // one in projective form and the other in affine form
+
+        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
+
+        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.to_affine());
+        assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
+
+    }
+
+    #[test]
+    fn math_respresentation_of_points_g2(){
+
+
+        let mut prng = ChaChaRng::from_entropy();
+
+        let g1 = BLSG2::get_base();
+        let s1 = BLSScalar::from_u32(50 + prng.next_u32() % 50);
+
+        let g1 = g1.mul(&s1);
+
+        let g1_prime =  BLSG2::get_random_base(&mut prng);
+
+        //This is the projective representation of g1
+        let g1_projective = g1.0;
+        let g1_prime_projective = g1_prime.0;
+
+        //This is the affine representation of g1_prime
+        let g1_prime_affine = bls12_381::G2Affine::from(g1_prime_projective);
+
+        let g1_pr_plus_g1_prime_pr = g1_projective.add(&g1_prime_projective);
+
+        //These two operations correspond to summation of points,
+        // one in projective form and the other in affine form
+
+        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
+
+        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.to_affine());
+        assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
+
+    }
+
+    #[test]
+    fn test_serialization_of_points(){
+
+        let g1 = BLSG1::get_base();
+
+        let g1_bytes = g1.to_compressed_bytes();
+        let is_compressed = g1_bytes[0] & 1u8 << 7;
+        assert_eq!(is_compressed, 128);
+
+        let is_infinity = g1_bytes[0] & 1u8 << 6;
+
+        assert_eq!(is_infinity, 0);
+
+        //I need to test the last property but I am not sure how to do it
+        //I mean I do not able to access some private elements og the structures in
+        //g1.rs, I will really appreciate if you give me some tips about it
+
+        // The most-significant three bits of a $\mathbb{G}\_1$ or $\mathbb{G}\_2$
+        //   encoding should be masked away before the coordinate(s) are interpreted.
+        //   These bits are used to unambiguously represent the underlying element:
+        // * The most significant bit, when set, indicates that the point is in
+        //   compressed form. Otherwise, the point is in uncompressed form.
+        // * The second-most significant bit indicates that the point is at infinity.
+        //   If this bit is set, the remaining bits of the group element's encoding
+        //   should be set to zero.
+        // * The third-most significant bit is set if (and only if) this point is in
+        //   compressed form _and_ it is not the point at infinity _and_ its
+        //   y-coordinate is the lexicographically largest of the two associated with
+        //   the encoded x-coordinate.
+
+        //I have tried somethings like this
+        //let _lex = g1_bytes[0] & 1 << 5;
+        //let g1_affine = g1.0.to_affine();
+        //g1_affine.y.lexicographically_largest() .y.lexicographically_largest();
+
+
+    }
+
 }
+

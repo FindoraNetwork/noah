@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use utils::shift_u8_vec;
 
+
 pub trait GroupArithmetic {
     type S: Scalar;
     fn mul(&self, scalar: &Self::S) -> Self;
@@ -175,16 +176,59 @@ pub(crate) mod group_tests {
         let d = S::from_u32(100);
         assert_eq!(c, d);
 
+        let mut x = S::from_u32(0);
+        x.add_assign(&a);
+        x.add_assign(&b);
+        assert_eq!(x, d);
+
+
         let a = S::from_u32(10);
         let b = S::from_u32(40);
         let c = a.mul(&b);
         let d = S::from_u32(400);
         assert_eq!(c, d);
 
+        let mut x = S::from_u32(1);
+        x.mul_assign(&a);
+        x.mul_assign(&b);
+        assert_eq!(x, d);
+
+
         let a = S::from_u32(0xFFFFFFFF);
         let b = S::from_u32(1);
         let c = a.add(&b);
         let d = S::from_u64(0x100000000);
+        assert_eq!(c, d);
+
+        let a = S::from_u32(0xFFFFFFFF);
+        let b = S::from_u32(1);
+        let c = a.mul(&b);
+        let d = S::from_u32(0xFFFFFFFF);
+        assert_eq!(c, d);
+
+
+        let a = S::from_u32(40);
+        let b = S::from_u32(60);
+        let c = b.sub(&a);
+        let d = S::from_u32(20);
+        assert_eq!(c, d);
+
+        let mut x = S::from_u32(120);
+        x.sub_assign(&b);
+        x.sub_assign(&a);
+        assert_eq!(x, d);
+
+
+        let a = S::from_u32(40);
+        let b = a.neg();
+        let c = b.add(&a);
+        let d = S::from_u32(0);
+        assert_eq!(c, d);
+
+        let a = S::from_u32(40);
+        let b = a.inv().unwrap();
+        let c = b.mul(&a);
+        let d = S::from_u32(1);
         assert_eq!(c, d);
 
         let a = S::from_u32(3);
