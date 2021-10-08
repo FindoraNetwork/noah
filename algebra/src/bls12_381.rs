@@ -461,7 +461,7 @@ mod bls12_381_groups_test {
     }
 
     #[test]
-    fn math_respresentation_of_points_g1(){
+    fn curve_points_respresentation_of_g1(){
 
 
         let mut prng = ChaChaRng::from_entropy();
@@ -494,7 +494,7 @@ mod bls12_381_groups_test {
     }
 
     #[test]
-    fn math_respresentation_of_points_g2(){
+    fn curve_points_respresentation_of_g2(){
 
 
         let mut prng = ChaChaRng::from_entropy();
@@ -538,28 +538,6 @@ mod bls12_381_groups_test {
         let is_infinity = g1_bytes[0] & 1u8 << 6;
 
         assert_eq!(is_infinity, 0);
-
-        //I need to test the last property but I am not sure how to do it
-        //I mean I do not able to access some private elements og the structures in
-        //g1.rs, I will really appreciate if you give me some tips about it
-
-        // The most-significant three bits of a $\mathbb{G}\_1$ or $\mathbb{G}\_2$
-        //   encoding should be masked away before the coordinate(s) are interpreted.
-        //   These bits are used to unambiguously represent the underlying element:
-        // * The most significant bit, when set, indicates that the point is in
-        //   compressed form. Otherwise, the point is in uncompressed form.
-        // * The second-most significant bit indicates that the point is at infinity.
-        //   If this bit is set, the remaining bits of the group element's encoding
-        //   should be set to zero.
-        // * The third-most significant bit is set if (and only if) this point is in
-        //   compressed form _and_ it is not the point at infinity _and_ its
-        //   y-coordinate is the lexicographically largest of the two associated with
-        //   the encoded x-coordinate.
-
-        //I have tried somethings like this
-        //let _lex = g1_bytes[0] & 1 << 5;
-        //let g1_affine = g1.0.to_affine();
-        //g1_affine.y.lexicographically_largest() .y.lexicographically_largest();
 
 
     }
