@@ -330,7 +330,9 @@ mod tests {
         let one = BLSScalar::one();
         let two = one.add(&one);
 
-        let amount = 10u64;
+        //let amount = 10u64;
+        let amount = 1 + prng.next_u64() % 100;
+
         let asset_type = AssetType::from_identical_byte(0);
 
         // simulate input abar
