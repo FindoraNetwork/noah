@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use utils::shift_u8_vec;
 
-
 pub trait GroupArithmetic {
     type S: Scalar;
     fn mul(&self, scalar: &Self::S) -> Self;
@@ -181,7 +180,6 @@ pub(crate) mod group_tests {
         x.add_assign(&b);
         assert_eq!(x, d);
 
-
         let a = S::from_u32(10);
         let b = S::from_u32(40);
         let c = a.mul(&b);
@@ -192,7 +190,6 @@ pub(crate) mod group_tests {
         x.mul_assign(&a);
         x.mul_assign(&b);
         assert_eq!(x, d);
-
 
         let a = S::from_u32(0xFFFFFFFF);
         let b = S::from_u32(1);
@@ -206,7 +203,6 @@ pub(crate) mod group_tests {
         let d = S::from_u32(0xFFFFFFFF);
         assert_eq!(c, d);
 
-
         let a = S::from_u32(40);
         let b = S::from_u32(60);
         let c = b.sub(&a);
@@ -217,7 +213,6 @@ pub(crate) mod group_tests {
         x.sub_assign(&b);
         x.sub_assign(&a);
         assert_eq!(x, d);
-
 
         let a = S::from_u32(40);
         let b = a.neg();

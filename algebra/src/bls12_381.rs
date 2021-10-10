@@ -389,11 +389,10 @@ mod bls12_381_groups_test {
     use crate::pairing::Pairing;
 
     use crate::groups::GroupArithmetic;
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use rand_core::RngCore;
     use group::Curve;
-
+    use rand_chacha::ChaChaRng;
+    use rand_core::RngCore;
+    use rand_core::SeedableRng;
 
     #[test]
     fn test_scalar_ops() {
@@ -428,11 +427,9 @@ mod bls12_381_groups_test {
     }
 
     #[test]
-    fn bilinear_properties(){
-
-
+    fn bilinear_properties() {
         let identity_g1 = BLSG1::get_identity();
-        let identity_g2  = BLSG2::get_identity();
+        let identity_g2 = BLSG2::get_identity();
         let identity_gt_computed = Bls12381::pairing(&identity_g1, &identity_g2);
         let identity_gt = BLSGt::get_identity();
         assert_eq!(identity_gt, identity_gt_computed);
@@ -450,22 +447,25 @@ mod bls12_381_groups_test {
 
         let gt_mapped_element = Bls12381::pairing(&s1_base_g1, &s2_base_g2);
 
-        let gt_base_computed = Bls12381::pairing(&base_g1,&base_g2);
+        let gt_base_computed = Bls12381::pairing(&base_g1, &base_g2);
         let base_gt = BLSGt::get_base();
         assert_eq!(base_gt, gt_base_computed);
 
-        assert_eq!(gt_mapped_element, Bls12381::pairing(&base_g1, &s2_base_g2).mul(&s1));
-        assert_eq!(gt_mapped_element, Bls12381::pairing(&s1_base_g1, &base_g2).mul(&s2));
+        assert_eq!(
+            gt_mapped_element,
+            Bls12381::pairing(&base_g1, &s2_base_g2).mul(&s1)
+        );
+        assert_eq!(
+            gt_mapped_element,
+            Bls12381::pairing(&s1_base_g1, &base_g2).mul(&s2)
+        );
 
         assert_eq!(gt_mapped_element, gt_base_computed.mul(&s1).mul(&s2));
         assert_eq!(gt_mapped_element, gt_base_computed.mul(&s2).mul(&s1));
-
     }
 
     #[test]
-    fn curve_points_respresentation_of_g1(){
-
-
+    fn curve_points_respresentation_of_g1() {
         let mut prng = ChaChaRng::from_entropy();
 
         let g1 = BLSG1::get_base();
@@ -473,7 +473,7 @@ mod bls12_381_groups_test {
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime =  BLSG1::get_random_base(&mut prng);
+        let g1_prime = BLSG1::get_random_base(&mut prng);
 
         //This is the projective representation of g1
         let g1_projective = g1.0;
@@ -490,15 +490,13 @@ mod bls12_381_groups_test {
         let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.to_affine());
+        let g1_pr_plus_g1_prime_af =
+            g1_projective.add_mixed(&g1_prime_projective.to_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
-
     }
 
     #[test]
-    fn curve_points_respresentation_of_g2(){
-
-
+    fn curve_points_respresentation_of_g2() {
         let mut prng = ChaChaRng::from_entropy();
 
         let g1 = BLSG2::get_base();
@@ -506,7 +504,7 @@ mod bls12_381_groups_test {
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime =  BLSG2::get_random_base(&mut prng);
+        let g1_prime = BLSG2::get_random_base(&mut prng);
 
         //This is the projective representation of g1
         let g1_projective = g1.0;
@@ -523,14 +521,13 @@ mod bls12_381_groups_test {
         let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.to_affine());
+        let g1_pr_plus_g1_prime_af =
+            g1_projective.add_mixed(&g1_prime_projective.to_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
-
     }
 
     #[test]
-    fn test_serialization_of_points(){
-
+    fn test_serialization_of_points() {
         let g1 = BLSG1::get_base();
 
         let g1_bytes = g1.to_compressed_bytes();
@@ -540,9 +537,5 @@ mod bls12_381_groups_test {
         let is_infinity = g1_bytes[0] & 1u8 << 6;
 
         assert_eq!(is_infinity, 0);
-
-
     }
-
 }
-

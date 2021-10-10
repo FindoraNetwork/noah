@@ -151,9 +151,9 @@ mod tests {
     use algebra::jubjub::{JubjubPoint, JubjubScalar};
     use crypto::basics::commitments::pedersen::PedersenGens;
     use crypto::basics::commitments::rescue::HashCommitment;
+    use rand::RngCore;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use rand::RngCore;
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_single_asset() {
@@ -162,28 +162,27 @@ mod tests {
 
         let mut rng = ChaChaRng::from_entropy();
         let mut total_input = 50 + rng.next_u64() % 50;
-        let mut total_output= total_input;
+        let mut total_output = total_input;
 
         let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
-        for _i in 1..3{
+        for _i in 1..3 {
             let rnd_amount = rng.next_u64();
-            let  amount = rnd_amount % total_input;
-            inputs.push((amount , zero));
+            let amount = rnd_amount % total_input;
+            inputs.push((amount, zero));
             total_input -= amount;
         }
         inputs.push((total_input, zero));
 
         let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
-        for _i in 1..6{
+        for _i in 1..6 {
             let rnd_amount = rng.next_u64();
             let amount = rnd_amount % total_output;
-            outputs.push((amount , zero));
+            outputs.push((amount, zero));
             total_output -= amount;
         }
         outputs.push((total_output, zero));
 
         test_anon_xfr_proof(inputs, outputs);
-
     }
 
     #[test]
@@ -194,19 +193,19 @@ mod tests {
         let mut rng = ChaChaRng::from_entropy();
         let mut total_input = 50 + rng.next_u64() % 50;
 
-        let mut total_output= total_input;
+        let mut total_output = total_input;
 
         let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
 
         let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
 
-        for _i in 1..3{
-            let  amount = rng.next_u64() % total_input;
-            inputs.push((amount , zero));
+        for _i in 1..3 {
+            let amount = rng.next_u64() % total_input;
+            inputs.push((amount, zero));
             total_input -= amount;
 
-            let  amount_out = rng.next_u64() % total_output;
-            outputs.push((amount_out , zero));
+            let amount_out = rng.next_u64() % total_output;
+            outputs.push((amount_out, zero));
             total_output -= amount_out;
         }
 
@@ -214,7 +213,6 @@ mod tests {
         outputs.push((total_output, zero));
 
         test_anon_xfr_proof(outputs, inputs);
-
     }
 
     #[test]
@@ -225,9 +223,8 @@ mod tests {
         let total_input = 50 + rng.next_u64() % 50;
         let inputs = vec![(total_input, zero)];
         let amount = rng.next_u64() % total_input;
-        let outputs = vec![(amount , zero), (total_input - amount, zero)];
+        let outputs = vec![(amount, zero), (total_input - amount, zero)];
         test_anon_xfr_proof(inputs.to_vec(), outputs.to_vec());
-
     }
 
     #[test]
@@ -237,7 +234,7 @@ mod tests {
         let mut rng = ChaChaRng::from_entropy();
         let total_output = 50 + rng.next_u64() % 50;
         let amount = rng.next_u64() % total_output;
-        let inputs = vec![(amount , zero), (total_output - amount, zero)];
+        let inputs = vec![(amount, zero), (total_output - amount, zero)];
         let outputs = vec![(total_output, zero)];
         test_anon_xfr_proof(outputs, inputs);
     }
@@ -252,7 +249,6 @@ mod tests {
         let inputs = vec![(amount, zero)];
         let outputs = vec![(amount, zero)];
         test_anon_xfr_proof(outputs, inputs);
-
     }
 
     #[test]
@@ -278,19 +274,18 @@ mod tests {
 
         let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
 
-        for _i in 1..3{
-            let  amount_one = rng.next_u64() % total_output_one;
-            let  amount_zero = rng.next_u64() % total_output_zero;
-            outputs.push((amount_one,one));
-            outputs.push((amount_zero,zero));
+        for _i in 1..3 {
+            let amount_one = rng.next_u64() % total_output_one;
+            let amount_zero = rng.next_u64() % total_output_zero;
+            outputs.push((amount_one, one));
+            outputs.push((amount_zero, zero));
             total_output_one -= amount_one;
             total_output_zero -= amount_zero;
         }
-        outputs.push((total_output_one,one));
-        outputs.push((total_output_zero,zero));
+        outputs.push((total_output_one, one));
+        outputs.push((total_output_zero, zero));
 
         test_anon_xfr_proof(inputs, outputs);
-
     }
 
     #[test]
@@ -306,13 +301,19 @@ mod tests {
         let total_input_one = 50 + rng.next_u64() % 50;
         let amount_one = rng.next_u64() % total_input_one;
 
+        let inputs = vec![
+            (amount_zero, zero),
+            (total_input_one, one),
+            (total_input_zero - amount_zero, zero),
+        ];
 
-        let inputs = vec![(amount_zero, zero), (total_input_one, one), (total_input_zero - amount_zero, zero)];
-
-        let outputs = vec![(amount_one, one), (total_input_zero, zero), (total_input_one - amount_one, one)];
+        let outputs = vec![
+            (amount_one, one),
+            (total_input_zero, zero),
+            (total_input_one - amount_one, one),
+        ];
 
         test_anon_xfr_proof(outputs, inputs);
-
     }
 
     fn test_anon_xfr_proof(
