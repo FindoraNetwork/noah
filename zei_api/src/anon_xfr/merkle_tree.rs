@@ -9,7 +9,7 @@ use std::borrow::Borrow;
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 use storage::db::MerkleDB;
-use storage::store::{PrefixedStore, Stated, Store};
+use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
 use utils::serialization::ZeiFromToBytes;
 
 // const HASH_SIZE: i32 = 32;             // assuming we are storing SHA256 hash of abar
@@ -262,6 +262,117 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         Ok(self.version)
     }
 
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        self.store.get(key)
+    }
+}
+
+#[allow(dead_code)]
+pub struct ImmutablePersistentMerkleTree<'a, D: MerkleDB> {
+    entry_count: u64,
+    version: u64,
+    store: ImmutablePrefixedStore<'a, D>,
+}
+
+impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
+    // Generates a new PersistentMerkleTree based on a sessioned KV store
+    pub fn new(
+        store: ImmutablePrefixedStore<'a, D>,
+    ) -> Result<ImmutablePersistentMerkleTree<'a, D>> {
+        let mut entry_count = 0;
+        let mut version = 0;
+        match store.get(BASE_KEY.as_bytes()).unwrap() {
+            Some(_) => {
+                // TODO: In the case that a pre-existing tree is loaded, calculate the entry-count.
+                let ecb = store.get(ENTRY_COUNT_KEY.as_bytes()).unwrap();
+                match ecb {
+                    Some(bytes) => {
+                        let array: [u8; 8] = [
+                            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5],
+                            bytes[6], bytes[7],
+                        ];
+                        entry_count = u64::from_be_bytes(array);
+                        version = store.height().c(d!())?;
+                    }
+                    None => return Err(eg!("entry count key not found in Store")),
+                };
+            }
+            _ => {}
+        };
+        Ok(ImmutablePersistentMerkleTree {
+            entry_count,
+            version,
+            store,
+        })
+    }
+
+    pub fn generate_proof(&self, id: u64) -> Result<MTLeafInfo> {
+        let path = get_path_from_uid(id);
+        let keys = generate_path_keys(path);
+
+        let mut previous = keys.first().unwrap();
+
+        let nodes: Vec<MTNode> = keys
+            .iter()
+            .skip(1)
+            .map(|key| {
+                // if current node is not present in store then it is not a valid uid to generate
+                if !self.store.exists(key.as_bytes()).unwrap() {
+                    return Err(eg!("uid not found in tree, cannot generate proof"));
+                }
+
+                let direction = key.chars().last();
+                let mut node = MTNode {
+                    siblings1: Default::default(),
+                    siblings2: Default::default(),
+                    is_left_child: 1,
+                    is_right_child: 0,
+                };
+                let sib1_key;
+                let sib2_key;
+                match direction {
+                    Some('l') => {
+                        sib1_key = format!("{}{}", previous, "m");
+                        sib2_key = format!("{}{}", previous, "r");
+                    }
+                    Some('m') => {
+                        sib1_key = format!("{}{}", previous, "l");
+                        sib2_key = format!("{}{}", previous, "r");
+                    }
+                    Some('r') => {
+                        sib1_key = format!("{}{}", previous, "l");
+                        sib2_key = format!("{}{}", previous, "m");
+                    }
+                    _ => return Err(eg!("incorrect key")),
+                };
+                if let Some(b) = self.store.get(sib1_key.as_bytes()).unwrap() {
+                    node.siblings1 = BLSScalar::zei_from_bytes(b.as_slice())?;
+                }
+                if let Some(b) = self.store.get(sib2_key.as_bytes()).unwrap() {
+                    node.siblings2 = BLSScalar::zei_from_bytes(b.as_slice())?;
+                }
+
+                previous = key;
+                Ok(node)
+            })
+            .collect::<Result<Vec<MTNode>>>()?;
+
+        Ok(MTLeafInfo {
+            path: MTPath { nodes },
+            root: self.get_current_root_hash().unwrap(),
+            root_version: 0,
+            uid: id,
+        })
+    }
+
+    pub fn get_current_root_hash(&self) -> Result<BLSScalar> {
+        match self.store.get(BASE_KEY.as_bytes()).unwrap() {
+            Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
+            None => Err(eg!("root hash key not found")),
+        }
+    }
+
+    #[allow(dead_code)]
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         self.store.get(key)
     }
