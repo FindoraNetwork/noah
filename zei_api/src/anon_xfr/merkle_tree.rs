@@ -1338,7 +1338,7 @@ mod tests {
         let path = thread::current().name().unwrap().to_owned();
         let fdb = TempRocksDB::open(path).expect("failed to open db");
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-        let mut state = State::new(cs);
+        let mut state = State::new(cs, false);
         let store = PrefixedStore::new("mystore", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
@@ -1405,7 +1405,7 @@ mod tests {
         let path = thread::current().name().unwrap().to_owned();
         let fdb = TempRocksDB::open(path).expect("failed to open db");
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-        let mut state = State::new(cs);
+        let mut state = State::new(cs, false);
         let store = PrefixedStore::new("mystore", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
@@ -1452,7 +1452,7 @@ mod tests {
 
         let fdb = TempRocksDB::open(path).expect("failed to open db");
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-        let mut state = State::new(cs);
+        let mut state = State::new(cs, false);
         let store = PrefixedStore::new("mystore", &mut state);
         let mt = PersistentMerkleTree::new(store).unwrap();
 
@@ -1467,7 +1467,7 @@ mod tests {
         let fdb = TempRocksDB::open(path).expect("failed to open db");
 
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-        let mut state = State::new(cs);
+        let mut state = State::new(cs, false);
 
         build_tree(&mut state);
         build_tree(&mut state);
@@ -1484,7 +1484,7 @@ mod tests {
         let fdb = RocksDB::open(path).expect("failed to open db");
 
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-        let mut state = State::new(cs);
+        let mut state = State::new(cs, false);
         let store = PrefixedStore::new("mystore", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 

@@ -60,7 +60,7 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
     record: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
-) -> Result<BarToAbarBody> {
+) -> Result<(BarToAbarBody, JubjubScalar)> {
     let (open_abar, proof) =
         bar_to_abar(prng, params, record, abar_pubkey, enc_key).c(d!())?;
     let body = BarToAbarBody {
@@ -69,7 +69,7 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
         proof,
         memo: open_abar.owner_memo.unwrap(),
     };
-    Ok(body)
+    Ok((body, open_abar.key_rand_factor))
 }
 
 /// Generate BlindAssetRecord To AnonymousBlindAssetRecord conversion note: body + spending input signature
@@ -82,7 +82,7 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
 ) -> Result<BarToAbarNote> {
-    let body =
+    let (body, _r) =
         gen_bar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
