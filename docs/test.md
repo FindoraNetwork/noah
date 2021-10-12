@@ -1,10 +1,10 @@
-#List of test Zei library
-##zei_api
-###anon_xfr
-####bar_to_from_abar.rs
+# List of test Zei library
+## zei_api
+### anon_xfr
+#### bar_to_from_abar.rs
 - test_bar_to_abar.
 - test_bar_to_abar_xfr_note.
-####circuits.rs
+#### circuits.rs
 - test_elgamal_hybrid_encrypt_cs
 - test_asset_mixing
 - test_eq_committed_vals_cs
@@ -15,10 +15,10 @@
 - test_add_merkle_path_variables
 - test_build_multi_xfr_cs
 - test_xfr_cs
-####keys.rs
+#### keys.rs
 - test_axfr_pub_key_serialization
 - test_axfr_key_pair_serialization
-####merkle_tree.rs
+#### merkle_tree.rs
 - test_generate_path_keys
 - test_tree
 - test_get_path
@@ -29,7 +29,7 @@
 - test_init_tree
 - build_tree
 - build_and_save_dummy_tree
-####proof.rs
+#### proof.rs
 - itest_anon_multi_xfr_proof_3in_6out_single_asset
 - test_anon_multi_xfr_proof_3in_3out_single_asset
 - test_anon_multi_xfr_proof_1in_2out_single_asset
@@ -39,13 +39,13 @@
 - test_anon_multi_xfr_proof_3in_3out_multi_asset
 - test_anon_xfr_proof
 - test_eq_committed_vals_proof
-##api
-####solvency.rs
+## api
+#### solvency.rs
 - test_solvency_correctness
 - test_solvency_soundness
 - test_solvency_ser_de
-##xfr
-####asset_record.rs
+## xfr
+#### asset_record.rs
 - do_test_build_open_asset_record
 - test_build_open_asset_record
 - do_test_open_asset_record
@@ -55,7 +55,7 @@
 - open_blind_asset_record_error
 - proofs.rs
 - verify_identity_proofs_structure
-####test.rs
+#### test.rs
 - test_transfer_not_confidential
 - test_transfer_confidential_amount_plain_asset
 - test_transfer_confidential_asset_plain_amount
@@ -95,15 +95,15 @@
 - signature_message_pack_serialization
 - serialize_and_deserialize_as_json
 - serialize_and_deserialize_elgamal
-###setup.rs
+### setup.rs
 - test_params_serialization
 
 
-##poly_iops
+## poly_iops
 
 
-##algebra
-###groups.rs
+## algebra
+### groups.rs
 - Test_scalar_operations 
 
 ####Scalar operations
@@ -112,7 +112,7 @@ but we also need to test "add_assign", "mul_assign", "sub", "sub_assign", "inv" 
 all these methods are defined in group.rs, This is a generic test for a scalar field, so 
 it works for test scalar operations in files bls12_381.rs, jubjub.rs and ristreto.rs.
 
-###bls12_381.rs
+### bls12_381.rs
 - test_scalar_ops
 - scalar_deser
 - scalar_from_to_bytes
@@ -123,7 +123,7 @@ it works for test scalar operations in files bls12_381.rs, jubjub.rs and ristret
 - test_serialization_of_points
 
 
-####Bilinear properties.
+#### Bilinear properties.
 This file implements the operation over the curve BLS12-381 whose is a firendly pairing
 elliptic curve. A pairing consists of three groups \mathbb{G}_1, \mathbb{G}_2 and \mathbb{G}_T 
 and a bilinear map e: \mathbb{G}_1 X \mathbb{G}_2 \longrightarrow \mathbb{G_T}, such that for 
@@ -133,14 +133,14 @@ e(P, Q + Q') = e(P, Q) * e(P, Q')
 From which it follows that for scalars a,b
 e([a]P, [b]Q) = e(P, [b]Q)^a = e([a],Q)^b =e(P,Q)^{ab} = e([b]P,[a]Q)
 
-####Identity mapping
+#### Identity mapping
 In a paring the following statement is true
 
 $$e( I_{\mathbb{G}_1}, I_{\mathbb{G}_2} ) = I_{\mathbb{G}_T}$$
 
 where $I_\mathbb{G}$ is the indentity element in the corresponding group $\mathbb{G}$.
 
-####Generator mapping
+#### Generator mapping
 Also it is hold that
 
 $$e( \alpha_{\mathbb{G}1}, \alpha_{\mathbb{G}2} ) = \alpha_{\mathbb{G}_T}$$
@@ -163,7 +163,7 @@ pub fn add_mixed(&self, rhs: &G1Affine) -> G1Projective {
 sums a $\mathbb{G}_1$ element in affine representation to a $\mathbb{G}_1$ element in a projective representation and the outcome is returned in projective representaion. In a similar manner [g2.rs](http://g2.rs) implement the equivalent operation for  elements in $\mathbb{G}_2$ group.
 
 
-###Byte curve point representation.
+### Byte curve point representation.
 
 ##### BLS12-381 serialization
 
