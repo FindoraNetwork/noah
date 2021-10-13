@@ -99,6 +99,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 store
                     .set(ENTRY_COUNT_KEY.as_bytes(), 0u64.to_be_bytes().to_vec())
                     .unwrap();
+                store.state_mut().commit(0).c(d!())?;
             }
             Some(_) => {
                 // TODO: In the case that a pre-existing tree is loaded, calculate the entry-count.
