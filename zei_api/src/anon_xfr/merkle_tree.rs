@@ -329,7 +329,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                 let mut node = MTNode {
                     siblings1: Default::default(),
                     siblings2: Default::default(),
-                    is_left_child: 1,
+                    is_left_child: 0,
                     is_right_child: 0,
                 };
                 let sib1_key;
@@ -338,6 +338,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                     Some('l') => {
                         sib1_key = format!("{}{}", previous, "m");
                         sib2_key = format!("{}{}", previous, "r");
+                        node.is_left_child = 1;
                     }
                     Some('m') => {
                         sib1_key = format!("{}{}", previous, "l");
@@ -346,6 +347,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                     Some('r') => {
                         sib1_key = format!("{}{}", previous, "l");
                         sib2_key = format!("{}{}", previous, "m");
+                        node.is_right_child = 1;
                     }
                     _ => return Err(eg!("incorrect key")),
                 };
@@ -364,7 +366,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         Ok(MTLeafInfo {
             path: MTPath { nodes },
             root: self.get_current_root_hash().unwrap(),
-            root_version: 0,
+            root_version: 1,
             uid: id,
         })
     }
@@ -865,9 +867,7 @@ mod tests {
         add_merkle_path_variables, compute_merkle_root, AccElemVars,
     };
     use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::merkle_tree::{
-        generate_path_keys, MerkleTree, Path, PersistentMerkleTree, BASE_KEY,
-    };
+    use crate::anon_xfr::merkle_tree::{generate_path_keys, MerkleTree, Path, PersistentMerkleTree, BASE_KEY, ImmutablePersistentMerkleTree};
     use crate::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
@@ -882,7 +882,7 @@ mod tests {
     use std::thread;
     use storage::db::{RocksDB, TempRocksDB};
     use storage::state::{ChainState, State};
-    use storage::store::PrefixedStore;
+    use storage::store::{ImmutablePrefixedStore, PrefixedStore};
 
     #[test]
     pub fn test_generate_path_keys() {
@@ -1539,6 +1539,7 @@ mod tests {
         let store = PrefixedStore::new("mystore", &mut state);
         let mut pmt = PersistentMerkleTree::new(store).unwrap();
 
+
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
         let abar0 = AnonBlindAssetRecord {
@@ -1592,6 +1593,17 @@ mod tests {
         for i in 0..14 {
             assert_eq!(
                 pmt.generate_proof(i).unwrap(),
+                mt.get_mt_leaf_info(i).unwrap()
+            );
+        }
+
+
+        let immutable_store = ImmutablePrefixedStore::new("my_store", &state);
+        let ipmt = ImmutablePersistentMerkleTree::new(immutable_store).unwrap();
+
+        for i in 0..14 {
+            assert_eq!(
+                ipmt.generate_proof(i).unwrap(),
                 mt.get_mt_leaf_info(i).unwrap()
             );
         }
