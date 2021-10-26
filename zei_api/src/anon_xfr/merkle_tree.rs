@@ -191,15 +191,17 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 let mut node = MTNode {
                     siblings1: Default::default(),
                     siblings2: Default::default(),
-                    is_left_child: 1,
+                    is_left_child: 0,
                     is_right_child: 0,
                 };
                 let sib1_key;
                 let sib2_key;
+
                 match direction {
                     Some('l') => {
                         sib1_key = format!("{}{}", previous, "m");
                         sib2_key = format!("{}{}", previous, "r");
+                        node.is_left_child = 1;
                     }
                     Some('m') => {
                         sib1_key = format!("{}{}", previous, "l");
@@ -208,6 +210,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                     Some('r') => {
                         sib1_key = format!("{}{}", previous, "l");
                         sib2_key = format!("{}{}", previous, "m");
+                        node.is_right_child = 1;
                     }
                     _ => return Err(eg!("incorrect key")),
                 };
@@ -226,7 +229,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         Ok(MTLeafInfo {
             path: MTPath { nodes },
             root: self.get_current_root_hash().unwrap(),
-            root_version: 0,
+            root_version: 1,
             uid: id,
         })
     }
@@ -1524,5 +1527,73 @@ mod tests {
         mt.commit()?;
 
         Ok(())
+    }
+
+    #[test]
+    pub fn test_merkle_proofs() {
+        let path = thread::current().name().unwrap().to_owned();
+        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+        let mut state = State::new(cs, false);
+
+        let store = PrefixedStore::new("mystore", &mut state);
+        let mut pmt = PersistentMerkleTree::new(store).unwrap();
+
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+        let abar0 = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+        let abar1 = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+        let abar2 = AnonBlindAssetRecord {
+            amount_type_commitment: BLSScalar::random(&mut prng),
+            public_key: key_pair.pub_key(),
+        };
+
+        pmt.add_abar(&abar0).unwrap();
+        pmt.add_abar(&abar1).unwrap();
+        pmt.add_abar(&abar2).unwrap();
+        pmt.add_abar(&abar0).unwrap();
+        pmt.add_abar(&abar1).unwrap();
+        pmt.add_abar(&abar2).unwrap();
+        pmt.add_abar(&abar0).unwrap();
+        pmt.add_abar(&abar1).unwrap();
+        pmt.add_abar(&abar2).unwrap();
+        pmt.add_abar(&abar0).unwrap();
+        pmt.add_abar(&abar1).unwrap();
+        pmt.add_abar(&abar2).unwrap();
+        pmt.add_abar(&abar0).unwrap();
+        pmt.add_abar(&abar1).unwrap();
+        pmt.add_abar(&abar2).unwrap();
+        pmt.commit().unwrap();
+
+        let mut mt = MerkleTree::new();
+        let _ = mt.add_abar(&abar0).unwrap();
+        let _ = mt.add_abar(&abar1).unwrap();
+        let _ = mt.add_abar(&abar2).unwrap();
+        let _ = mt.add_abar(&abar0).unwrap();
+        let _ = mt.add_abar(&abar1).unwrap();
+        let _ = mt.add_abar(&abar2).unwrap();
+        let _ = mt.add_abar(&abar0).unwrap();
+        let _ = mt.add_abar(&abar1).unwrap();
+        let _ = mt.add_abar(&abar2).unwrap();
+        let _ = mt.add_abar(&abar0).unwrap();
+        let _ = mt.add_abar(&abar1).unwrap();
+        let _ = mt.add_abar(&abar2).unwrap();
+        let _ = mt.add_abar(&abar0).unwrap();
+        let _ = mt.add_abar(&abar1).unwrap();
+        let _ = mt.add_abar(&abar2).unwrap();
+        mt.commit().unwrap();
+
+        for i in 0..14 {
+            assert_eq!(
+                pmt.generate_proof(i).unwrap(),
+                mt.get_mt_leaf_info(i).unwrap()
+            );
+        }
     }
 }
