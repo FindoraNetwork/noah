@@ -967,9 +967,9 @@ mod tests {
         assert_eq!(leaf_info.root, first_commit_hash);
         assert_eq!(leaf_info.root_version, 1);
         assert_eq!(leaf_info.uid, 1);
-        assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 0u8);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 1u8);
         assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 0u8);
-        assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 0u8);
         assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
 
         assert!(mt.get_mt_leaf_info(2).is_err());
@@ -979,10 +979,10 @@ mod tests {
         assert_eq!(leaf_info.root, mt.root_hash);
         assert_eq!(leaf_info.root_version, 2);
         assert_eq!(leaf_info.uid, 2);
-        assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 0u8);
-        assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 1u8);
-        assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 1u8);
-        assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 0u8);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_left_child, 1u8);
+        assert_eq!(leaf_info.path.nodes.first().unwrap().is_right_child, 0u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_left_child, 0u8);
+        assert_eq!(leaf_info.path.nodes.last().unwrap().is_right_child, 1u8);
     }
 
     #[test]
