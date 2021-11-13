@@ -6,7 +6,7 @@ use merlin::Transcript;
 use utils::errors::ZeiError;
 
 /// The purpose of the code below is to implement the inner product pairing proof system
-/// described in https://eprint.iacr.org/2019/1177.pdf
+/// described in <https://eprint.iacr.org/2019/1177.pdf>
 
 #[allow(dead_code)]
 pub struct OPProof<P: Pairing> {

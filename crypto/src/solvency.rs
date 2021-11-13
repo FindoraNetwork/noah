@@ -186,9 +186,8 @@ pub fn prove_solvency(
 /// a public value is not a key in the conversion table).
 /// bp_gens should have enough generators.
 /// # Example
-/// ```
 /// // See zei::crypto::solvency::prove_solvency
-/// ```
+/// 
 #[allow(clippy::too_many_arguments)] // TODO (fernando) simplify this signature
 pub fn verify_solvency(
     bp_gens: &BulletproofGens,

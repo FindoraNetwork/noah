@@ -82,10 +82,12 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
     }
 
     /// The equation is
-    /// q1*w1 + q2*w2 + q3*w3 + q4*w4 + qm1(w1*w2) + qm2(w3*w4) + qc + PI
-    /// + q_ecc*[w1*w2*w3*w4*wo]
-    /// + q_hash_1 * w1^5 + q_hash_2 * w2^5 + q_hash_3 * w3^5 + q_hash_4 * w4^5
-    /// - qo * wo = 0
+    /// ```
+    ///     q1*w1 + q2*w2 + q3*w3 + q4*w4 + qm1(w1*w2) + qm2(w3*w4) + qc + PI
+    ///     + q_ecc*[w1*w2*w3*w4*wo]
+    ///     + q_hash_1 * w1^5 + q_hash_2 * w2^5 + q_hash_3 * w3^5 + q_hash_4 * w4^5
+    ///     - qo * wo = 0
+    /// ```
     fn eval_gate_func(
         &self,
         wire_vals: &[&F],
@@ -383,15 +385,15 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
     }
 
     /// Boolean constrain `var` by adding a multiplication gate:
-    /// witness[`var`] * witness[`var`] = witness[`var`]
+    /// `witness[var] * witness[var] = witness[var]`
     pub fn insert_boolean_gate(&mut self, var: VarIndex) {
         self.insert_mul_gate(var, var, var);
     }
 
-    /// Enforce a range constraint: 0 < witness[`var`] < 2^`n_bits`:
-    /// 1. Transform witness[`var`] into a binary vector and boolean constrain the binary vector.
+    /// Enforce a range constraint: `0 < witness[var] < 2^n_bits`:
+    /// 1. Transform `witness[var]` into a binary vector and boolean constrain the binary vector.
     /// 2. Adding a set of linear combination constraints showing that the binary vector is a binary
-    /// representation of witness[`var`].
+    /// representation of `witness[var]`.
     /// 3. Return witness indices of the binary vector. The binary vector is in little endian form.
     pub fn range_check(&mut self, var: VarIndex, n_bits: usize) -> Vec<VarIndex> {
         assert!(var < self.num_vars, "var index out of bound");

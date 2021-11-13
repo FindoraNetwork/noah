@@ -426,7 +426,7 @@ pub struct MerkleTree {
 /// proof.
 ///
 /// Usage:
-///     ```
+/// ```
 ///
 ///     use zei::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
 ///     use zei::anon_xfr::merkle_tree::MerkleTree;

@@ -274,7 +274,6 @@ pub fn gpsig_verify<P: Pairing>(
 /// This algorithm is run by the Group Manager.
 /// * `sig` - signature
 /// * `gp_sk` - group secret key
-/// ```
 pub fn gpsig_open<P: Pairing>(
     sig: &GroupSignature<P>,
     gp_sk: &GroupSecretKey<P>,
