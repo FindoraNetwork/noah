@@ -3,7 +3,7 @@ use crate::anon_xfr::circuits::{
 };
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
-use crate::anon_xfr::structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord, MTLeafInfo, MTPath, MTNode};
+use crate::anon_xfr::structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
@@ -20,7 +20,6 @@ use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use std::collections::HashMap;
-use accumulators::merkle_tree::Proof;
 use utils::errors::ZeiError;
 
 pub mod bar_to_from_abar;
@@ -296,23 +295,7 @@ fn nullifier(
     )
 }
 
-pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
-    MTLeafInfo{
-        path: MTPath {
-            nodes: proof.nodes.iter().map(|e| {
-                MTNode{
-                    siblings1: e.siblings1,
-                    siblings2: e.siblings2,
-                    is_left_child: e.is_left_child,
-                    is_right_child: e.is_right_child,
-                }
-            }).collect()
-        },
-        root: proof.root,
-        root_version: proof.root_version,
-        uid: proof.uid
-    }
-}
+
 
 pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
     let hash = RescueInstance::new();
@@ -336,7 +319,7 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
 mod tests {
     use std::sync::{Arc};
     use std::thread;
-    use accumulators::merkle_tree::PersistentMerkleTree;
+    use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
     use crate::anon_xfr::{
         hash_abar,
         keys::AXfrKeyPair,
@@ -345,7 +328,7 @@ mod tests {
             OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
         }
     };
-    use crate::anon_xfr::{create_mt_leaf_info, gen_anon_xfr_body, verify_anon_xfr_body};
+    use crate::anon_xfr::{gen_anon_xfr_body, verify_anon_xfr_body};
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use crate::xfr::structs::AssetType;
     use algebra::bls12_381::BLSScalar;
@@ -362,6 +345,24 @@ mod tests {
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
     use utils::errors::ZeiError;
+
+    pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
+        MTLeafInfo{
+            path: MTPath {
+                nodes: proof.nodes.iter().map(|e| {
+                    MTNode{
+                        siblings1: e.siblings1,
+                        siblings2: e.siblings2,
+                        is_left_child: e.is_left_child,
+                        is_right_child: e.is_right_child,
+                    }
+                }).collect()
+            },
+            root: proof.root,
+            root_version: proof.root_version,
+            uid: proof.uid
+        }
+    }
 
     #[test]
     fn test_anon_xfr() {
