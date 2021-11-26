@@ -7,13 +7,14 @@ use crate::anon_xfr::structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAn
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
-use algebra::groups::{Scalar, ScalarArithmetic};
+use algebra::groups::{Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
 use crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key,
     //hybrid_encrypt_with_x25519_key,
     XSecretKey,
 };
+use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::prf::PRF;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
@@ -313,15 +314,36 @@ pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
     }
 }
 
+pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
+    let hash = RescueInstance::new();
+
+    let pk_hash = hash.rescue_hash(&[
+        abar.public_key.0.point_ref().get_x(),
+        abar.public_key.0.point_ref().get_y(),
+        BLSScalar::zero(),
+        BLSScalar::zero(),
+    ])[0];
+
+    hash.rescue_hash(&[
+        BLSScalar::from_u64(uid),
+        abar.amount_type_commitment,
+        pk_hash,
+        BLSScalar::zero(),
+    ])[0]
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc};
     use std::thread;
     use accumulators::merkle_tree::PersistentMerkleTree;
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::structs::{
-        AXfrNote, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
-        OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
+    use crate::anon_xfr::{
+        hash_abar,
+        keys::AXfrKeyPair,
+        structs::{
+            AXfrNote, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
+            OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
+        }
     };
     use crate::anon_xfr::{create_mt_leaf_info, gen_anon_xfr_body, verify_anon_xfr_body};
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
@@ -466,24 +488,6 @@ mod tests {
             let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
         }
-    }
-
-    fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
-        let hash = RescueInstance::new();
-
-        let pk_hash = hash.rescue_hash(&[
-            abar.public_key.0.point_ref().get_x(),
-            abar.public_key.0.point_ref().get_y(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-        ])[0];
-
-        hash.rescue_hash(&[
-            BLSScalar::from_u64(uid),
-            abar.amount_type_commitment,
-            pk_hash,
-            BLSScalar::zero(),
-        ])[0]
     }
 
     // outputs &mut merkle tree (wrap it in an option merkle tree, not req)
