@@ -3,9 +3,7 @@ use crate::anon_xfr::circuits::{
 };
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
-use crate::anon_xfr::structs::{
-    AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord,
-};
+use crate::anon_xfr::structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord, MTLeafInfo, MTPath, MTNode};
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
@@ -21,14 +19,15 @@ use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use std::collections::HashMap;
+use accumulators::merkle_tree::Proof;
 use utils::errors::ZeiError;
 
 pub mod bar_to_from_abar;
 pub(crate) mod circuits;
 pub mod keys;
-pub mod merkle_tree;
 pub(crate) mod proofs;
 pub mod structs;
+mod merkle_tree_test;
 
 /// Build a anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
@@ -296,15 +295,35 @@ fn nullifier(
     )
 }
 
+pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
+    MTLeafInfo{
+        path: MTPath {
+            nodes: proof.nodes.iter().map(|e| {
+                MTNode{
+                    siblings1: e.siblings1,
+                    siblings2: e.siblings2,
+                    is_left_child: e.is_left_child,
+                    is_right_child: e.is_right_child,
+                }
+            }).collect()
+        },
+        root: proof.root,
+        root_version: proof.root_version,
+        uid: proof.uid
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc};
+    use std::thread;
+    use accumulators::merkle_tree::PersistentMerkleTree;
     use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::merkle_tree::MerkleTree;
     use crate::anon_xfr::structs::{
         AXfrNote, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
         OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
     };
-    use crate::anon_xfr::{gen_anon_xfr_body, verify_anon_xfr_body};
+    use crate::anon_xfr::{create_mt_leaf_info, gen_anon_xfr_body, verify_anon_xfr_body};
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use crate::xfr::structs::AssetType;
     use algebra::bls12_381::BLSScalar;
@@ -312,10 +331,14 @@ mod tests {
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use itertools::Itertools;
+    use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rand_core::{CryptoRng, RngCore};
     use ruc::*;
+    use storage::db::TempRocksDB;
+    use storage::state::{ChainState, State};
+    use storage::store::PrefixedStore;
     use utils::errors::ZeiError;
 
     #[test]
@@ -445,10 +468,27 @@ mod tests {
         }
     }
 
+    fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
+        let hash = RescueInstance::new();
+
+        let pk_hash = hash.rescue_hash(&[
+            abar.public_key.0.point_ref().get_x(),
+            abar.public_key.0.point_ref().get_y(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+        ])[0];
+
+        hash.rescue_hash(&[
+            BLSScalar::from_u64(uid),
+            abar.amount_type_commitment,
+            pk_hash,
+            BLSScalar::zero(),
+        ])[0]
+    }
+
     // outputs &mut merkle tree (wrap it in an option merkle tree, not req)
-    fn build_new_merkle_tree(n: i32) -> Result<MerkleTree> {
+    fn build_new_merkle_tree(n: i32,  mt: &mut PersistentMerkleTree<TempRocksDB>) -> Result<()> {
         // add 6/7 abar and populate and then retrieve values
-        let mut mt = MerkleTree::new();
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
@@ -459,7 +499,7 @@ mod tests {
             public_key: key_pair.pub_key(),
         };
 
-        let _ = mt.add_abar(&abar)?;
+        let _ = mt.add_commitment_hash(hash_abar(mt.entry_count(), &abar))?;
         mt.commit()?;
 
         for _i in 0..n - 1 {
@@ -468,17 +508,27 @@ mod tests {
                 public_key: key_pair.pub_key(),
             };
 
-            let _ = mt.add_abar(&abar)?;
+            let _ = mt.add_commitment_hash(hash_abar(mt.entry_count(), &abar))?;
             mt.commit()?;
         }
 
-        Ok(mt)
+        Ok(())
     }
 
     //new test with actual merkle tree
     #[test]
     fn test_new_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let path = thread::current().name().unwrap().to_owned();
+        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let cs = Arc::new(RwLock::new(ChainState::new(
+            fdb,
+            "test_db".to_string(),
+            0,
+        )));
+        let mut state = State::new(cs, false);
+        let store = PrefixedStore::new("my_store", &mut state);
 
         //println!("{:?}", SystemTime::now());
         let user_params =
@@ -499,13 +549,14 @@ mod tests {
 
         let owner_memo = oabar.get_owner_memo().unwrap();
 
-        let mut mt = build_new_merkle_tree(5).unwrap();
+        let mut mt = PersistentMerkleTree::new(store).unwrap();
+        build_new_merkle_tree(5, &mut mt).unwrap();
 
         let abar = AnonBlindAssetRecord::from_oabar(&oabar);
-        let uid = mt.add_abar(&abar).unwrap();
+        let uid = mt.add_commitment_hash(hash_abar(mt.entry_count(), &abar)).unwrap();
         let _ = mt.commit();
-        let mt_leaf_info = mt.get_mt_leaf_info(uid).unwrap();
-        assert_eq!(mt.get_latest_hash(), mt_leaf_info.root);
+        let mt_proof = mt.generate_proof(uid).unwrap();
+        assert_eq!(mt.get_current_root_hash().unwrap(), mt_proof.root);
 
         // output keys
         let keypair_out = AXfrKeyPair::generate(&mut prng);
@@ -522,7 +573,7 @@ mod tests {
                 &dec_key_in,
             )
             .unwrap()
-            .mt_leaf_info(mt_leaf_info.clone())
+            .mt_leaf_info(create_mt_leaf_info(mt_proof.clone()))
             .build()
             .unwrap();
             assert_eq!(amount, oabar_in.get_amount());
@@ -546,7 +597,7 @@ mod tests {
                 &[keypair_in],
             )
             .unwrap();
-            (body, mt_leaf_info.root.clone(), key_pairs)
+            (body, mt_proof.root.clone(), key_pairs)
         };
         {
             // owner scope
@@ -584,7 +635,7 @@ mod tests {
                 ])[0]
             };
             let hasher = RescueInstance::new();
-            for i in mt_leaf_info.path.nodes.iter().rev() {
+            for i in mt_proof.nodes.iter().rev() {
                 if i.is_left_child == 1u8 {
                     hash = hasher.rescue_hash(&[
                         hash,
@@ -608,12 +659,12 @@ mod tests {
                     ])[0];
                 }
             }
-            assert_eq!(hash, mt.get_latest_hash());
+            assert_eq!(hash, mt.get_current_root_hash().unwrap());
         }
         {
             // verifier scope
             let verifier_params = NodeParams::from(user_params);
-            let t = verify_anon_xfr_body(&verifier_params, &body, &mt.get_latest_hash());
+            let t = verify_anon_xfr_body(&verifier_params, &body, &mt.get_current_root_hash().unwrap());
             println!("{:?}", t);
             assert!(t.is_ok());
 
