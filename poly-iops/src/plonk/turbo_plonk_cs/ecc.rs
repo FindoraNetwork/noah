@@ -325,7 +325,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
 
     /// Fixed-base scalar multiplication with precomputed bases.
     /// To compute `s[G]` from base point G and secret scalar s, we set
-    /// ```
+    /// ```text
     /// bases0 = [identity]_{i=0..n-1},
     /// bases1 = [4^i * G]_{i=0..n-1},
     /// bases2 = [2 * 4^i * G]_{i=0..n-1}

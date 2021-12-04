@@ -82,7 +82,7 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
     }
 
     /// The equation is
-    /// ```
+    /// ```text
     ///     q1*w1 + q2*w2 + q3*w3 + q4*w4 + qm1(w1*w2) + qm2(w3*w4) + qc + PI
     ///     + q_ecc*[w1*w2*w3*w4*wo]
     ///     + q_hash_1 * w1^5 + q_hash_2 * w2^5 + q_hash_3 * w3^5 + q_hash_4 * w4^5

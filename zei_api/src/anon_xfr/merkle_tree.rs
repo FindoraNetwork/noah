@@ -29,7 +29,7 @@ pub enum Path {
 /// PersistentMerkleTree is a 3-ary merkle tree
 ///
 /// Usage:
-///    ```
+///    ```text
 ///
 ///     use std::collections::HashMap;
 ///     use std::thread;
