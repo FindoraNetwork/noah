@@ -3,7 +3,7 @@ use crate::{
     errors::AlgebraError,
     groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero},
 };
-use ark_ec::ProjectiveCurve;
+use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ed_on_bls12_381::{
     EdwardsAffine as AffinePoint, EdwardsProjective as ExtendedPoint, Fr,
 };
@@ -204,7 +204,7 @@ impl Eq for JubjubPoint {}
 impl JubjubPoint {
     #[inline]
     pub fn mul_by_cofactor(&self) -> Self {
-        Self(self.0.into_affine().scale_by_cofactor())
+        Self(self.0.into_affine().mul_by_cofactor_to_projective())
     }
 }
 
