@@ -66,7 +66,7 @@ pub fn gpsig_sign<R: CryptoRng + RngCore, B: AsRef<[u8]>>(
 /// * `sig` - group signature
 /// * `msg` - message
 /// # Example
-/// ```
+/// ```text
 /// // See zei::api::gp_sig::gpsig_sign
 /// ```
 pub fn gpsig_verify<B: AsRef<[u8]>>(

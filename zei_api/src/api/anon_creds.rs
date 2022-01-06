@@ -405,9 +405,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
 /// * `reveal_map` - indicates position of each attribute to prove
 /// * `cac` - List of ciphertext and the corresponding proof
 /// # Example
-/// ```
-///  // see zei::api::anon_creds::ac_confidential_open_commitment;
-/// ```
+/// see zei::api::anon_creds::ac_confidential_open_commitment;
 pub fn ac_confidential_verify(
     issuer_pk: &ACIssuerPublicKey,
     enc_key: &AttributeEncKey,
