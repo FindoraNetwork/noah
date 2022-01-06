@@ -3,7 +3,7 @@ use crate::commitments::pcs::{
 };
 use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
-use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Pairing};
+use algebra::groups::{Group, GroupArithmetic, One, Pairing, Scalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;

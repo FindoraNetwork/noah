@@ -3,7 +3,7 @@
  */
 use crate::{
     errors::AlgebraError,
-    groups::{scalar_to_radix_2_power_w, Group, Scalar}
+    groups::{scalar_to_radix_2_power_w, Group, Scalar},
 };
 use ruc::*;
 

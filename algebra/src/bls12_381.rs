@@ -1,7 +1,10 @@
 use crate::{
     errors::AlgebraError,
-    groups::{Group, GroupArithmetic, One, Pairing, Scalar as ZeiScalar, ScalarArithmetic, Zero},
-    jubjub::JubjubScalar
+    groups::{
+        Group, GroupArithmetic, One, Pairing, Scalar as ZeiScalar, ScalarArithmetic,
+        Zero,
+    },
+    jubjub::JubjubScalar,
 };
 use ark_bls12_381::{
     fr::FrParameters, Bls12_381 as Bls12381pairing, Fq12Parameters, Fr, G1Affine,
@@ -497,7 +500,7 @@ mod bls12_381_groups_test {
         bls12_381::{BLSGt, BLSScalar, Bls12381, BLSG1, BLSG2},
         groups::{
             group_tests::{test_scalar_operations, test_scalar_serialization},
-            Group, GroupArithmetic, Scalar,Pairing
+            Group, GroupArithmetic, Pairing, Scalar,
         },
     };
     use ark_bls12_381::{G1Affine, G2Affine};

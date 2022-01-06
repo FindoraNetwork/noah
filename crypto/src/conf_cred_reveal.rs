@@ -4,7 +4,7 @@ use crate::anon_creds::{
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic, Pairing};
+use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -359,7 +359,7 @@ pub(crate) mod test_helper {
     use crate::conf_cred_reveal::{
         ac_confidential_open_commitment, ac_confidential_open_verify,
     };
-    use algebra::groups::{Group, Scalar, Pairing};
+    use algebra::groups::{Group, Pairing, Scalar};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use utils::errors::ZeiError;

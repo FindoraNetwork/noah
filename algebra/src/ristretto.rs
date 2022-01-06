@@ -1,11 +1,11 @@
 use crate::{
     errors::AlgebraError,
     groups::{Group, GroupArithmetic},
-    groups::{One, Scalar as ZeiScalar, ScalarArithmetic, Zero}
+    groups::{One, Scalar as ZeiScalar, ScalarArithmetic, Zero},
 };
 use ark_std::{
+    ops::{AddAssign, MulAssign, SubAssign},
     rand::{CryptoRng, RngCore},
-    ops::{AddAssign, MulAssign, SubAssign}
 };
 use byteorder::ByteOrder;
 use curve25519_dalek::{
@@ -13,7 +13,7 @@ use curve25519_dalek::{
     edwards::{CompressedEdwardsY as CEY, EdwardsPoint},
     ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint},
     scalar::Scalar,
-    traits::Identity
+    traits::Identity,
 };
 use digest::{generic_array::typenum::U64, Digest};
 use ruc::*;

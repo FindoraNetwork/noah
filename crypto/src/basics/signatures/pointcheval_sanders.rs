@@ -19,7 +19,7 @@ key is a tuple of elements rather than a single element in G2. A tuple of messag
 Given the above properties, Pointcheval-Sanders signatures are suitable for anonymous credentials and group signatures.
 */
 
-use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic, Pairing};
+use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;

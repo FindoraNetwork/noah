@@ -1,7 +1,7 @@
 use crate::{
     bls12_381::BLSScalar,
     errors::AlgebraError,
-    groups::{Group, One, Scalar, ScalarArithmetic, Zero,GroupArithmetic}
+    groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero},
 };
 use ark_ec::ProjectiveCurve;
 use ark_ed_on_bls12_381::{
@@ -16,7 +16,7 @@ use ark_std::{
     rand::{CryptoRng, RngCore},
     One as ArkOne, UniformRand, Zero as ArkZero,
 };
-use digest::{Digest, generic_array::typenum::U64};
+use digest::{generic_array::typenum::U64, Digest};
 use rand_chacha::ChaCha20Rng;
 use ruc::*;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
@@ -300,11 +300,11 @@ impl JubjubPoint {
 #[cfg(test)]
 mod jubjub_groups_test {
     use crate::{
-        jubjub::{JubjubPoint, JubjubScalar},
         groups::{
             group_tests::{test_scalar_operations, test_scalar_serialization},
-            Group, GroupArithmetic, Scalar, ScalarArithmetic
-        }
+            Group, GroupArithmetic, Scalar, ScalarArithmetic,
+        },
+        jubjub::{JubjubPoint, JubjubScalar},
     };
     use ark_std::rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;

@@ -4,7 +4,7 @@ use crate::{
     jubjub::{JubjubPoint, JubjubScalar},
     ristretto::{
         CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
-    }
+    },
 };
 use ruc::*;
 use serde::Serializer;

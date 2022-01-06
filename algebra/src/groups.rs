@@ -1,11 +1,9 @@
 use ark_std::{
     borrow::Borrow,
+    fmt::Debug,
     rand::{CryptoRng, RngCore},
-    fmt::Debug
 };
-use digest::{
-    generic_array::typenum::U64, Digest
-};
+use digest::{generic_array::typenum::U64, Digest};
 use ruc::err::*;
 use serde::{Deserialize, Serialize};
 use utils::shift_u8_vec;
