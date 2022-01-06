@@ -62,8 +62,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
             command: test
-            args: "--workspace \
-                   --all-features"
+            args: "--workspace"
 
       - name: Test assembly on nightly
         env:
@@ -71,6 +70,5 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
             command: test
-            args: "--workspace \
-                   --all-features"
+            args: "--workspace"
         if: matrix.rust == 'nightly'
