@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! not_matches {
-   ($expression:expr, $( $pattern:pat )|+ $( if $guard: expr )?) => {
+   ($expression:expr, $( $pattern:pat_param )|+ $( if $guard: expr )?) => {
         match $expression {
             $( $pattern )|+ $( if $guard )? => false,
             _ => true

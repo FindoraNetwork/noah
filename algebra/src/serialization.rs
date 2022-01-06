@@ -1,8 +1,10 @@
-use crate::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
-use crate::groups::{Group, Scalar};
-use crate::jubjub::{JubjubPoint, JubjubScalar};
-use crate::ristretto::{
-    CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
+use crate::{
+    bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2},
+    groups::{Group, Scalar},
+    jubjub::{JubjubPoint, JubjubScalar},
+    ristretto::{
+        CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
+    }
 };
 use ruc::*;
 use serde::Serializer;
@@ -29,20 +31,24 @@ to_from_bytes_scalar!(JubjubScalar);
 to_from_bytes_scalar!(BLSScalar);
 
 impl ZeiFromToBytes for CompressedRistretto {
+    #[inline]
     fn zei_to_bytes(&self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
+    #[inline]
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(CompressedRistretto(
+        Ok(Self(
             curve25519_dalek::ristretto::CompressedRistretto::from_slice(bytes),
         ))
     }
 }
 
 impl ZeiFromToBytes for CompressedEdwardsY {
+    #[inline]
     fn zei_to_bytes(&self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
+    #[inline]
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(CompressedEdwardsY(
             curve25519_dalek::edwards::CompressedEdwardsY::from_slice(bytes),

@@ -1,6 +1,4 @@
-use algebra::groups::{Group, Scalar, ScalarArithmetic};
-use algebra::multi_exp::MultiExp;
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, Scalar, ScalarArithmetic, Pairing};
 use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;

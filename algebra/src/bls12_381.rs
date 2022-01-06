@@ -1,44 +1,51 @@
-use crate::errors::AlgebraError;
-use crate::groups::GroupArithmetic;
-use crate::groups::{Group, One, Scalar as ZeiScalar, ScalarArithmetic, Zero};
-use crate::jubjub::JubjubScalar;
-use crate::pairing::Pairing;
-use bls12_381::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt, Scalar};
-use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
-use digest::generic_array::typenum::U64;
-use digest::Digest;
-use ff::{Field, PrimeField};
-use group::Group as _;
+use crate::{
+    errors::AlgebraError,
+    groups::{Group, GroupArithmetic, One, Pairing, Scalar as ZeiScalar, ScalarArithmetic, Zero},
+    jubjub::JubjubScalar
+};
+use ark_bls12_381::{
+    fr::FrParameters, Bls12_381 as Bls12381pairing, Fq12Parameters, Fr, G1Affine,
+    G1Projective, G2Affine, G2Projective,
+};
+use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
+use ark_ff::{BigInteger, FftField, FftParameters, Field, Fp12, PrimeField};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::{
+    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+    rand::{CryptoRng, RngCore},
+    result::Result as StdResult,
+    str::FromStr,
+    One as ArkOne, UniformRand, Zero as ArkZero,
+};
+use digest::{generic_array::typenum::U64, Digest};
 use rand_chacha::ChaCha20Rng;
-use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-
-use std::result::Result as StdResult;
-use std::str::FromStr;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 use wasm_bindgen::prelude::*;
-
-pub type Bls12381field = Scalar;
 
 pub const BLS_SCALAR_LEN: usize = 32;
 
 #[wasm_bindgen]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct BLSScalar(Bls12381field);
+#[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
+pub struct BLSScalar(Fr);
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSG1(pub(crate) G1Projective);
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSG2(pub(crate) G2Projective);
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct BLSGt(pub(crate) Gt);
+pub struct BLSGt(pub(crate) Fp12<Fq12Parameters>);
 
 impl FromStr for BLSScalar {
     type Err = AlgebraError;
 
-    fn from_str(string: &str) -> StdResult<BLSScalar, AlgebraError> {
-        Ok(BLSScalar(
-            Scalar::from_str(string).ok_or(AlgebraError::DeserializationError)?,
-        ))
+    fn from_str(string: &str) -> StdResult<Self, AlgebraError> {
+        let res = Fr::from_str(string);
+
+        if res.is_ok() {
+            Ok(Self(res.unwrap()))
+        } else {
+            Err(AlgebraError::DeserializationError)
+        }
     }
 }
 
@@ -49,75 +56,83 @@ impl From<&JubjubScalar> for BLSScalar {
     }
 }
 
-impl Default for BLSScalar {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
 impl BLSScalar {
-    pub fn new(elem: Scalar) -> Self {
+    #[inline]
+    pub fn new(elem: Fr) -> Self {
         Self(elem)
     }
 
-    pub fn get_scalar(&self) -> Scalar {
+    #[inline]
+    pub fn get_scalar(&self) -> Fr {
         self.0
     }
 }
 
 impl One for BLSScalar {
-    fn one() -> BLSScalar {
-        BLSScalar(Scalar::one())
+    #[inline]
+    fn one() -> Self {
+        BLSScalar(Fr::one())
     }
 }
 
 impl Zero for BLSScalar {
-    fn zero() -> BLSScalar {
-        BLSScalar(Scalar::zero())
+    #[inline]
+    fn zero() -> Self {
+        Self(Fr::zero())
     }
 
+    #[inline]
     fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
 }
 
 impl ScalarArithmetic for BLSScalar {
-    fn add(&self, b: &BLSScalar) -> BLSScalar {
-        BLSScalar(self.0.add(&b.0))
+    #[inline]
+    fn add(&self, b: &Self) -> Self {
+        Self(self.0.add(&b.0))
     }
 
-    fn add_assign(&mut self, b: &BLSScalar) {
+    #[inline]
+    fn add_assign(&mut self, b: &Self) {
         (self.0).add_assign(&b.0);
     }
 
-    fn mul(&self, b: &BLSScalar) -> BLSScalar {
-        BLSScalar(self.0.mul(&b.0))
+    #[inline]
+    fn mul(&self, b: &Self) -> Self {
+        Self(self.0.mul(&b.0))
     }
 
-    fn mul_assign(&mut self, b: &BLSScalar) {
+    #[inline]
+    fn mul_assign(&mut self, b: &Self) {
         (self.0).mul_assign(&b.0);
     }
 
-    fn sub(&self, b: &BLSScalar) -> BLSScalar {
-        BLSScalar(self.0.sub(&b.0))
+    #[inline]
+    fn sub(&self, b: &Self) -> Self {
+        Self(self.0.sub(&b.0))
     }
 
-    fn sub_assign(&mut self, b: &BLSScalar) {
+    #[inline]
+    fn sub_assign(&mut self, b: &Self) {
         (self.0).sub_assign(&b.0);
     }
 
-    fn inv(&self) -> Result<BLSScalar> {
-        let a = self.0.invert();
+    #[inline]
+    fn inv(&self) -> Result<Self> {
+        let a = self.0.inverse();
         if bool::from(a.is_none()) {
             return Err(eg!(AlgebraError::GroupInversionError));
         }
-        Ok(BLSScalar(a.unwrap()))
+        Ok(Self(a.unwrap()))
     }
 
+    #[inline]
     fn neg(&self) -> Self {
         Self(self.0.neg())
     }
 
+    #[inline]
     fn pow(&self, exponent: &[u64]) -> Self {
         let len = exponent.len();
         let mut array = [0u64; 4];
@@ -127,20 +142,23 @@ impl ScalarArithmetic for BLSScalar {
 }
 
 impl ZeiScalar for BLSScalar {
-    // scalar generation
-    fn random<R: CryptoRng + RngCore>(rng: &mut R) -> BLSScalar {
-        BLSScalar(Scalar::random(rng))
+    #[inline]
+    fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        Self(Fr::rand(rng))
     }
 
-    fn from_u32(value: u32) -> BLSScalar {
+    #[inline]
+    fn from_u32(value: u32) -> Self {
         Self::from_u64(value as u64)
     }
 
-    fn from_u64(value: u64) -> BLSScalar {
-        BLSScalar(bls12_381::Scalar::from(value))
+    #[inline]
+    fn from_u64(value: u64) -> Self {
+        Self(Fr::from(value))
     }
 
-    fn from_hash<D>(hash: D) -> BLSScalar
+    #[inline]
+    fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default,
     {
@@ -148,10 +166,12 @@ impl ZeiScalar for BLSScalar {
         Self::random(&mut prng)
     }
 
+    #[inline]
     fn multiplicative_generator() -> Self {
-        BLSScalar(Scalar::multiplicative_generator())
+        Self(Fr::multiplicative_generator())
     }
-    // scalar field size
+
+    #[inline]
     fn get_field_size_lsf_bytes() -> Vec<u8> {
         [
             0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x5b, 0xfe, 0xff,
@@ -161,8 +181,9 @@ impl ZeiScalar for BLSScalar {
         .to_vec()
     }
 
+    #[inline]
     fn get_little_endian_u64(&self) -> Vec<u64> {
-        let a = self.0.to_bytes();
+        let a = self.0.into_repr().to_bytes_le();
         let a1 = u8_le_slice_to_u64(&a[0..8]);
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
@@ -170,151 +191,189 @@ impl ZeiScalar for BLSScalar {
         vec![a1, a2, a3, a4]
     }
 
+    #[inline]
     fn bytes_len() -> usize {
         BLS_SCALAR_LEN
     }
-    //scalar serialization
+
+    #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_bytes().to_vec()
+        self.0.into_repr().to_bytes_le()
     }
 
-    fn from_bytes(bytes: &[u8]) -> Result<BLSScalar> {
-        if bytes.len() != BLS_SCALAR_LEN {
-            return Err(eg!(AlgebraError::ParameterError));
-        }
-        let mut array = [0u8; 32];
-        array.copy_from_slice(bytes);
-        let scalar = bls12_381::Scalar::from_bytes(&array);
-        if bool::from(scalar.is_none()) {
-            return Err(eg!(AlgebraError::SerializationError));
-        }
-        Ok(BLSScalar(scalar.unwrap()))
-    }
-
-    fn from_le_bytes(bytes: &[u8]) -> Result<BLSScalar> {
+    #[inline]
+    fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
             return Err(eg!(AlgebraError::DeserializationError));
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
-        Self::from_bytes(&array).c(d!())
+        Self::from_le_bytes(&array).c(d!())
+    }
+
+    #[inline]
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(Self(Fr::from_le_bytes_mod_order(bytes)))
     }
 }
 
 impl Group for BLSG1 {
     const COMPRESSED_LEN: usize = 48;
 
-    fn get_identity() -> BLSG1 {
-        BLSG1(bls12_381::G1Projective::identity())
-    }
-    fn get_base() -> BLSG1 {
-        BLSG1(bls12_381::G1Projective::generator())
+    #[inline]
+    fn get_identity() -> Self {
+        Self(G1Projective::zero())
     }
 
-    /// Pick a random base/generator inside BLSG1
-    /// Note that BLSG1 is of prime order q = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
-    /// and thus any scalar sampled at random (except 0 which only happens with very low probability) will be coprime with q.
-    fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> BLSG1 {
+    #[inline]
+    fn get_base() -> Self {
+        Self(G1Projective::prime_subgroup_generator())
+    }
+
+    #[inline]
+    fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         Self::get_base().mul(&BLSScalar::random(prng))
     }
 
-    // compression/serialization helpers
+    #[inline]
     fn to_compressed_bytes(&self) -> Vec<u8> {
-        let affine = G1Affine::from(&self.0);
-        affine.to_compressed().to_vec()
-    }
-    fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG1> {
-        let mut array = [0u8; Self::COMPRESSED_LEN];
-        array.copy_from_slice(bytes);
-        let affine = bls12_381::G1Affine::from_compressed(&array);
-        if bool::from(affine.is_none()) {
-            return Err(eg!(AlgebraError::DeserializationError));
-        }
-        let projective = G1Projective::from(affine.unwrap());
-        Ok(BLSG1(projective))
+        let affine = G1Affine::from(self.0);
+        let mut buf = Vec::new();
+        affine.serialize(&mut buf).unwrap();
+
+        buf
     }
 
-    fn from_hash<D>(hash: D) -> BLSG1
+    #[inline]
+    fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut reader = ark_std::io::BufReader::new(bytes);
+
+        let affine = G1Affine::deserialize(&mut reader);
+
+        if affine.is_ok() {
+            Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
+        } else {
+            Err(eg!(AlgebraError::DeserializationError))
+        }
+    }
+
+    #[inline]
+    fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
-        BLSG1(bls12_381::G1Projective::random(&mut prng))
+        Self(G1Projective::rand(&mut prng))
+    }
+
+    #[inline]
+    fn vartime_multi_exp(scalars: &[&Self::S], points: &[&Self]) -> Self {
+        let scalars_raw = scalars
+            .iter()
+            .map(|r| r.0.into_repr())
+            .collect::<Vec<<FrParameters as FftParameters>::BigInt>>();
+        let points_raw = G1Projective::batch_normalization_into_affine(
+            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
+        );
+
+        Self(ark_ec::msm::VariableBase::msm(&points_raw, &scalars_raw))
     }
 }
 
 impl GroupArithmetic for BLSG1 {
     type S = BLSScalar;
-    //arithmetic
-    fn mul(&self, other: &BLSScalar) -> BLSG1 {
-        BLSG1(self.0.mul(&other.0))
+
+    #[inline]
+    fn add(&self, other: &Self) -> Self {
+        Self(self.0.add(&other.0))
     }
-    fn add(&self, other: &Self) -> BLSG1 {
-        BLSG1(self.0.add(&other.0))
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
     }
-    fn sub(&self, other: &Self) -> BLSG1 {
-        BLSG1(self.0.sub(&other.0))
+
+    #[inline]
+    fn mul(&self, other: &BLSScalar) -> Self {
+        Self(self.0.mul(&other.0.into_repr()))
     }
-    fn double(&self) -> BLSG1 {
-        BLSG1(self.0.double())
+
+    #[inline]
+    fn sub(&self, other: &Self) -> Self {
+        Self(self.0.sub(&other.0))
     }
 }
 
 impl Group for BLSG2 {
     const COMPRESSED_LEN: usize = 96;
 
-    fn get_identity() -> BLSG2 {
-        BLSG2(G2Projective::identity())
-    }
-    fn get_base() -> BLSG2 {
-        BLSG2(G2Projective::generator())
+    #[inline]
+    fn get_identity() -> Self {
+        Self(G2Projective::zero())
     }
 
-    /// Pick a random base/generator inside BLSG2
-    /// Note that BLSG2 is of prime order q = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
-    /// and thus any scalar sampled at random (except 0 which only happens with very low probability) will be coprime with q.
-    fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> BLSG2 {
+    #[inline]
+    fn get_base() -> Self {
+        Self(G2Projective::prime_subgroup_generator())
+    }
+
+    #[inline]
+    fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         Self::get_base().mul(&BLSScalar::random(prng))
     }
 
+    #[inline]
     fn to_compressed_bytes(&self) -> Vec<u8> {
-        let affine = G2Affine::from(&self.0);
-        affine.to_compressed().to_vec()
+        let mut buf = Vec::new();
+        self.0.serialize(&mut buf).unwrap();
+
+        buf
     }
 
-    fn from_compressed_bytes(bytes: &[u8]) -> Result<BLSG2> {
-        let mut array = [0u8; Self::COMPRESSED_LEN];
-        array.copy_from_slice(bytes);
-        let affine = bls12_381::G2Affine::from_compressed(&array);
-        if bool::from(affine.is_none()) {
-            return Err(eg!(AlgebraError::DeserializationError));
+    #[inline]
+    fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut reader = ark_std::io::BufReader::new(bytes);
+
+        let affine = G2Affine::deserialize(&mut reader);
+
+        if affine.is_ok() {
+            Ok(Self(affine.unwrap().into_projective()))
+        } else {
+            Err(eg!(AlgebraError::DeserializationError))
         }
-        let projective = G2Projective::from(affine.unwrap());
-        Ok(BLSG2(projective))
     }
-    fn from_hash<D>(hash: D) -> BLSG2
+
+    #[inline]
+    fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
-        BLSG2(G2Projective::random(&mut prng))
+        Self(G2Projective::rand(&mut prng))
     }
 }
 
 impl GroupArithmetic for BLSG2 {
     type S = BLSScalar;
-    //arithmetic
-    fn mul(&self, other: &BLSScalar) -> BLSG2 {
-        BLSG2(self.0.mul(&other.0))
+
+    #[inline]
+    fn add(&self, other: &Self) -> Self {
+        Self(self.0.add(&other.0))
     }
-    fn add(&self, other: &Self) -> BLSG2 {
-        BLSG2(self.0.add(&other.0))
+
+    #[inline]
+    fn mul(&self, other: &BLSScalar) -> Self {
+        Self(self.0.mul(&other.0.into_repr()))
     }
-    fn sub(&self, other: &Self) -> BLSG2 {
-        BLSG2(self.0.sub(&other.0))
+
+    #[inline]
+    fn sub(&self, other: &Self) -> Self {
+        Self(self.0.sub(&other.0))
     }
-    fn double(&self) -> BLSG2 {
-        BLSG2(self.0.double())
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
     }
 }
 
@@ -326,73 +385,128 @@ impl Pairing for Bls12381 {
     type G2 = BLSG2;
     type Gt = BLSGt;
 
+    #[inline]
     fn pairing(a: &Self::G1, b: &Self::G2) -> Self::Gt {
-        BLSGt(pairing(&G1Affine::from(a.0), &G2Affine::from(b.0)))
+        BLSGt(Bls12381pairing::pairing(a.0, b.0))
     }
 }
 
 impl GroupArithmetic for BLSGt {
     type S = BLSScalar;
-    fn mul(&self, scalar: &BLSScalar) -> Self {
-        let r = self.0.mul(scalar.0);
-        BLSGt(r)
-    }
+
+    #[inline]
     fn add(&self, other: &Self) -> Self {
-        let r = self.0.add(other.0);
-        BLSGt(r)
+        let r = self.0.mul(other.0);
+        Self(r)
     }
+
+    #[inline]
+    fn mul(&self, scalar: &BLSScalar) -> Self {
+        let mut acc = Self::get_identity();
+
+        // This is a simple double-and-add implementation of group element
+        // multiplication, moving from most significant to least
+        // significant bit of the scalar.
+        //
+        // We skip the leading bit because it's always unset for Fq
+        // elements.
+        for bit in scalar
+            .0
+            .into_repr()
+            .to_bytes_le()
+            .iter()
+            .rev()
+            .flat_map(|byte| (0..8).rev().map(move |i| ((byte >> i) & 1u8) == 1u8))
+            .skip(1)
+        {
+            acc = acc.double();
+            if bit {
+                acc = acc.add(self)
+            }
+        }
+
+        acc
+    }
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.mul(&self.0))
+    }
+
+    #[inline]
     fn sub(&self, other: &Self) -> Self {
-        BLSGt(self.0.sub(&other.0))
-    }
-    fn double(&self) -> BLSGt {
-        BLSGt(self.0.double())
+        let mut other_inverse = other.0.clone();
+        other_inverse.conjugate();
+
+        Self(self.0.mul(&other_inverse))
     }
 }
 
 impl Group for BLSGt {
     const COMPRESSED_LEN: usize = 576;
 
-    fn get_identity() -> BLSGt {
-        BLSGt(Gt::identity())
+    #[inline]
+    fn get_identity() -> Self {
+        Self(Fp12::<Fq12Parameters>::one())
     }
 
+    #[inline]
     fn get_base() -> Self {
-        BLSGt(Gt::generator())
+        Bls12381::pairing(&BLSG1::get_base(), &BLSG2::get_base())
     }
 
-    // TODO: Implement
+    #[inline]
+    fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+        Self::get_base().mul(&BLSScalar::random(prng))
+    }
+
+    #[inline]
     fn to_compressed_bytes(&self) -> Vec<u8> {
-        unimplemented!()
+        let mut buf = Vec::new();
+        self.0.serialize(&mut buf).unwrap();
+
+        buf
     }
 
-    // TODO: Implement
-    fn from_compressed_bytes(_bytes: &[u8]) -> Result<Self> {
-        unimplemented!()
+    #[inline]
+    fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut reader = ark_std::io::BufReader::new(bytes);
+
+        let res = Fp12::<Fq12Parameters>::deserialize(&mut reader);
+
+        if res.is_ok() {
+            Ok(Self(res.unwrap()))
+        } else {
+            Err(eg!(AlgebraError::DeserializationError))
+        }
     }
 
+    #[inline]
     fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
-        BLSGt(Gt::random(&mut prng))
+        Self(Fp12::<Fq12Parameters>::rand(&mut prng))
     }
 }
 
 #[cfg(test)]
 mod bls12_381_groups_test {
-    use crate::bls12_381::{BLSGt, BLSScalar, Bls12381, BLSG1, BLSG2};
-    use crate::groups::group_tests::{
-        test_scalar_operations, test_scalar_serialization,
+    use crate::{
+        bls12_381::{BLSGt, BLSScalar, Bls12381, BLSG1, BLSG2},
+        groups::{
+            group_tests::{test_scalar_operations, test_scalar_serialization},
+            Group, GroupArithmetic, Scalar,Pairing
+        },
     };
-    use crate::groups::{Group, Scalar};
-    use crate::pairing::Pairing;
-
-    use crate::groups::GroupArithmetic;
-    use group::Curve;
-    use rand_chacha::ChaChaRng;
-    use rand_core::RngCore;
-    use rand_core::SeedableRng;
+    use ark_bls12_381::{G1Affine, G2Affine};
+    use ark_ec::ProjectiveCurve;
+    use ark_std::{
+        ops::Add,
+        rand::{RngCore, SeedableRng},
+    };
+    use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_scalar_ops() {
@@ -420,7 +534,6 @@ mod bls12_381_groups_test {
 
     #[test]
     fn hard_coded_group_elements() {
-        // BLSGt
         let base_bls_gt = BLSGt::get_base();
         let expected_base = Bls12381::pairing(&BLSG1::get_base(), &BLSG2::get_base());
         assert_eq!(base_bls_gt, expected_base);
@@ -434,7 +547,7 @@ mod bls12_381_groups_test {
         let identity_gt = BLSGt::get_identity();
         assert_eq!(identity_gt, identity_gt_computed);
 
-        let mut rng = ChaChaRng::from_entropy();
+        let mut rng = ChaCha20Rng::from_entropy();
 
         let s1 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
         let s2 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
@@ -466,76 +579,81 @@ mod bls12_381_groups_test {
 
     #[test]
     fn curve_points_respresentation_of_g1() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut rng = ChaCha20Rng::from_entropy();
 
         let g1 = BLSG1::get_base();
-        let s1 = BLSScalar::from_u32(50 + prng.next_u32() % 50);
+        let s1 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = BLSG1::get_random_base(&mut prng);
+        let g1_prime = BLSG1::get_random_base(&mut rng);
 
-        //This is the projective representation of g1
+        // This is the projective representation of g1
         let g1_projective = g1.0;
         let g1_prime_projective = g1_prime.0;
 
-        //This is the affine representation of g1_prime
-        let g1_prime_affine = bls12_381::G1Affine::from(g1_prime_projective);
+        // This is the affine representation of g1_prime
+        let g1_prime_affine = G1Affine::from(g1_prime_projective);
 
         let g1_pr_plus_g1_prime_pr = g1_projective.add(&g1_prime_projective);
 
-        //These two operations correspond to summation of points,
+        // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-
         let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
         let g1_pr_plus_g1_prime_af =
-            g1_projective.add_mixed(&g1_prime_projective.to_affine());
+            g1_projective.add_mixed(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 
     #[test]
     fn curve_points_respresentation_of_g2() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut rng = ChaCha20Rng::from_entropy();
 
         let g1 = BLSG2::get_base();
-        let s1 = BLSScalar::from_u32(50 + prng.next_u32() % 50);
+        let s1 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = BLSG2::get_random_base(&mut prng);
+        let g1_prime = BLSG2::get_random_base(&mut rng);
 
-        //This is the projective representation of g1
+        // This is the projective representation of g1
         let g1_projective = g1.0;
         let g1_prime_projective = g1_prime.0;
 
-        //This is the affine representation of g1_prime
-        let g1_prime_affine = bls12_381::G2Affine::from(g1_prime_projective);
+        // This is the affine representation of g1_prime
+        let g1_prime_affine = G2Affine::from(g1_prime_projective);
 
         let g1_pr_plus_g1_prime_pr = g1_projective.add(&g1_prime_projective);
 
-        //These two operations correspond to summation of points,
+        // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-
         let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
         let g1_pr_plus_g1_prime_af =
-            g1_projective.add_mixed(&g1_prime_projective.to_affine());
+            g1_projective.add_mixed(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 
     #[test]
     fn test_serialization_of_points() {
-        let g1 = BLSG1::get_base();
+        let mut rng = ChaCha20Rng::from_entropy();
 
+        let g1 = BLSG1::get_random_base(&mut rng);
         let g1_bytes = g1.to_compressed_bytes();
-        let is_compressed = g1_bytes[0] & 1u8 << 7;
-        assert_eq!(is_compressed, 128);
+        let g1_recovered = BLSG1::from_compressed_bytes(&g1_bytes).unwrap();
+        assert_eq!(g1, g1_recovered);
 
-        let is_infinity = g1_bytes[0] & 1u8 << 6;
+        let g2 = BLSG2::get_random_base(&mut rng);
+        let g2_bytes = g2.to_compressed_bytes();
+        let g2_recovered = BLSG2::from_compressed_bytes(&g2_bytes).unwrap();
+        assert_eq!(g2, g2_recovered);
 
-        assert_eq!(is_infinity, 0);
+        let gt = BLSGt::get_random_base(&mut rng);
+        let gt_bytes = gt.to_compressed_bytes();
+        let gt_recovered = BLSGt::from_compressed_bytes(&gt_bytes).unwrap();
+        assert_eq!(gt, gt_recovered);
     }
 }

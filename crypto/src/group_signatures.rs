@@ -5,8 +5,7 @@ use crate::basics::elgamal::{
 use crate::basics::signatures::pointcheval_sanders::{
     ps_gen_keys, ps_randomize_sig, ps_sign_scalar, PSPublicKey, PSSecretKey, PSSignature,
 };
-use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic, Pairing};
 use ruc::*;
 use utils::errors::ZeiError;
 

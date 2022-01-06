@@ -3,9 +3,7 @@ use crate::commitments::pcs::{
 };
 use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
-use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic};
-use algebra::multi_exp::MultiExp;
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Pairing};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -342,8 +340,7 @@ mod tests_kzg_impl {
         KZGCommitmentScheme, KZGCommitmentSchemeBLS,
     };
     use crate::commitments::pcs::{HomomorphicPolyComElem, PolyComScheme};
-    use algebra::groups::Group;
-    use algebra::pairing::Pairing;
+    use algebra::groups::{Group, Pairing};
 
     use crate::polynomials::field_polynomial::FpPolynomial;
     use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};

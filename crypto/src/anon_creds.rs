@@ -79,9 +79,7 @@ in the credentials by
 */
 
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-use algebra::multi_exp::MultiExp;
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic, Pairing};
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};

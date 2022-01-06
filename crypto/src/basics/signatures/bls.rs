@@ -1,5 +1,4 @@
-use algebra::groups::{Group, GroupArithmetic, Scalar};
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Scalar, Pairing};
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;

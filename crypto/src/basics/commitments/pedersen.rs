@@ -44,9 +44,7 @@ impl<G: Group> PedersenGens<G> {
         scalars.push(blinding);
         let bases = self.bases.iter().collect_vec();
         // we use naive multi exp it gives us constant time, and we don't lose when |values| is small
-        Ok(algebra::multi_exp::MultiExp::naive_multi_exp(
-            scalars, bases,
-        ))
+        Ok(G::naive_multi_exp(scalars, bases))
     }
 }
 
