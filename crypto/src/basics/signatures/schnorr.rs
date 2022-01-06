@@ -4,7 +4,7 @@
 //! Currently this scheme is deterministic and the multi-signature is implemented in a naive way:
 //! a multi-signature is the list of simple Schnorr signatures.
 //! In the future we might implement a more sophisticated scheme that produces short multi-signatures
-//! See MuSig => https://eprint.iacr.org/2018/068.pdf and  MuSig-DN => https://eprint.iacr.org/2020/1057
+//! See MuSig => <https://eprint.iacr.org/2018/068.pdf> and  MuSig-DN => <https://eprint.iacr.org/2020/1057>
 //!
 //! At a high level the scheme works as follows:
 //! * `key_gen()` => sample a random scalar `x` and compute `X=g^x` where `g` is some group generator. Return return the key pair `(x,X)`

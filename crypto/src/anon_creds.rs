@@ -1,7 +1,7 @@
 /*
 This file implements anonymous credentials based on the signature scheme of
 David Pointcheval and Olivier Sanders. Short Randomizable Signatures. CT RSA 2015.
-https://eprint.iacr.org/2015/525.pdf. Details are described below:
+<https://eprint.iacr.org/2015/525.pdf>. Details are described below:
 
 Credential issuers can issue credentials for a set of n attributes by providing a signature
 on this attributes for a given user.

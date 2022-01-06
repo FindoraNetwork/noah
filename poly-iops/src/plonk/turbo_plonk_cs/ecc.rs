@@ -166,7 +166,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
         self.size += 1;
     }
 
-    /// Given two elliptic curve point variables [P1] and [P2], returns [P1] + [P2]
+    /// Given two elliptic curve point variables `[P1]` and `[P2]`, returns `[P1] + [P2]`
     pub fn ecc_add(
         &mut self,
         p1_var: &PointVar,
@@ -306,7 +306,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
     }
 
     ///  Fixed-base scalar multiplication:
-    ///  Given a base point [G] and an `n_bits`-bit secret scalar s, returns s * [G].
+    ///  Given a base point `[G]` and an `n_bits`-bit secret scalar `s`, returns `s * [G]`.
     /// `n_bits` should be a positive even number.
     pub fn scalar_mul(
         &mut self,
@@ -324,14 +324,19 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
     }
 
     /// Fixed-base scalar multiplication with precomputed bases.
-    /// To compute s[G] from base point G and secret scalar s, we set
+    /// To compute `s[G]` from base point G and secret scalar s, we set
+    /// ```text
     /// bases0 = [identity]_{i=0..n-1},
     /// bases1 = [4^i * G]_{i=0..n-1},
     /// bases2 = [2 * 4^i * G]_{i=0..n-1}
     /// bases3 = [3 * 4^i * G]_{i=0..n-1}
-    /// The binary representation of the secret scalar s: [b0, ..., b_{2*n-1}]
-    /// Then s[G] = \sum_{i=0..n-1} (b_{2*i} + 2 * b_{2*i+1}) * [4^i * G]
+    /// ```
+    /// The binary representation of the secret scalar s: `[b0, ..., b_{2*n-1}]`
+    /// Then 
+    /// ```text
+    /// s[G] = \sum_{i=0..n-1} (b_{2*i} + 2 * b_{2*i+1}) * [4^i * G]
     ///           = \sum_{i=0..n-1} bases_{b_{2*i} + 2 * b_{2*i+1}}[i]
+    /// ```
     pub fn scalar_mul_with_bases(
         &mut self,
         bases1: &[JubjubPoint],

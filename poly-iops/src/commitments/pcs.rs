@@ -237,7 +237,7 @@ pub trait PolyComScheme {
     }
 
     /// Verify batch eval proof
-    /// Optimized according to Sec 4.1 in https://eprint.iacr.org/2020/081.pdf
+    /// Optimized according to Sec 4.1 in <https://eprint.iacr.org/2020/081.pdf>
     /// Saves |points| G1 exps
     #[allow(non_snake_case)]
     #[allow(clippy::too_many_arguments)]

@@ -522,9 +522,7 @@ pub type ProverParams<PCS> = PlonkProverParams<
 /// Before invoking preprocess_prover(), the constraint system `cs` should pad the number of
 /// constraints to a power of two.
 /// # Example
-/// ```
-/// // See plonk::prover::prover
-/// ```
+/// See plonk::prover::prover
 #[allow(non_snake_case)]
 pub fn preprocess_prover<
     PCS: PolyComScheme,
@@ -629,9 +627,7 @@ pub fn preprocess_prover<
 /// Before invoking preprocess_verifier(), the constraint system `cs` should pad the number of
 /// constraints to a power of two.
 /// # Example
-/// ```
-/// // See plonk::prover::prover
-/// ```
+/// See plonk::prover::prover
 pub fn preprocess_verifier<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
