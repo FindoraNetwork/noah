@@ -2,7 +2,7 @@
 name = "poly-iops"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
-edition = "2018"
+edition = "2021"
 description = "Zei PLONK Poly-IOP protocol"
 
 [lib]

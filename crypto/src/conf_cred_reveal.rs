@@ -4,8 +4,7 @@ use crate::anon_creds::{
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -360,8 +359,7 @@ pub(crate) mod test_helper {
     use crate::conf_cred_reveal::{
         ac_confidential_open_commitment, ac_confidential_open_verify,
     };
-    use algebra::groups::{Group, Scalar};
-    use algebra::pairing::Pairing;
+    use algebra::groups::{Group, Pairing, Scalar};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use utils::errors::ZeiError;
@@ -580,8 +578,7 @@ mod test_bls12_381 {
 mod test_serialization {
 
     use algebra::bls12_381::Bls12381;
-    use algebra::groups::Group;
-    use algebra::pairing::Pairing;
+    use algebra::groups::{Group, Pairing};
 
     use super::test_helper::byte_slice_to_scalar;
     use crate::anon_creds::{ac_commit, ac_sign};

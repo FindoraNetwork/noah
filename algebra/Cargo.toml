@@ -2,7 +2,7 @@
 name = "algebra"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
-edition = "2018"
+edition = "2021"
 description = "Zei algebra commons"
 
 [lib]
@@ -12,24 +12,32 @@ crate-type = ["rlib"]
 [dependencies]
 utils = {path = "../utils" }
 byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] }
-rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
-rand = { version = "0.7", default-features = false, optional = true }
-rand_chacha = "0.2"
 curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
 serde = "1.0"
-group = "0.7.0"
-ff = "0.7.0"
 digest = "0.9"
-jubjub = "0.4.0"
-bls12_381 = "0.2.0"
 ruc = "0.6.2"
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 
+ark-ed-on-bls12-381 = { version = "^0.3.0",  default-features = false }
+ark-bls12-381 = { version = "^0.3.0", default-features = false, features = ["curve"] }
+ark-ec = { version = "^0.3.0", default-features = false }
+ark-ff = { version = "^0.3.0", default-features = false, features = [ "asm" ]  }
+ark-std = { version = "^0.3.0", default-features = false }
+ark-serialize = { version = "^0.3.0", default-features = false }
+rand_chacha = { version = "0.2", default-features = false }
+
 [features]
-default = ["std", "u64_backend"]
+default = ["std", "parallel", "u64_backend"]
 std = ["curve25519-dalek/std"]
 alloc = ["curve25519-dalek/alloc"]
-nightly = ["curve25519-dalek/nightly", "rand/nightly"]
+nightly = ["curve25519-dalek/nightly"]
 u64_backend = ["curve25519-dalek/u64_backend"]
 u32_backend = ["curve25519-dalek/u32_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
+parallel = ["ark-ec/parallel", "ark-ff/parallel"]
+asm = [ "ark-ff/asm" ]
+
+[[bench]]
+name = "msm"
+path = "benches/msm.rs"
+harness = false 

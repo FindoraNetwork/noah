@@ -2,7 +2,7 @@
 name = "crypto"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
-edition = "2018"
+edition = "2021"
 description = "Zei Cryptographic Primitives and Protocols"
 
 [lib]

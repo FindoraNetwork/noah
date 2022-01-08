@@ -2,7 +2,7 @@
 name = "zei"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
-edition = "2018"
+edition = "2021"
 description = "Zei Platform Interface"
 
 [[bin]]
@@ -58,7 +58,7 @@ nightly = ["curve25519-dalek/nightly", "rand/nightly"]
 u64_backend = ["curve25519-dalek/u64_backend"]
 u32_backend = ["curve25519-dalek/u32_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-
+asm = [ "algebra/asm" ]
 
 [[bench]]
 name = "xfr_note_idtracking_assettracking_singleasset_time"
