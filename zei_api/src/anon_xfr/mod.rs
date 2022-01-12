@@ -24,6 +24,7 @@ use ruc::*;
 use std::collections::HashMap;
 use utils::errors::ZeiError;
 
+mod abar_to_bar;
 pub mod bar_to_from_abar;
 pub(crate) mod circuits;
 pub mod keys;

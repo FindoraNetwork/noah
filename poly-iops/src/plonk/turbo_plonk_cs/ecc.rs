@@ -332,7 +332,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
     /// bases3 = [3 * 4^i * G]_{i=0..n-1}
     /// ```
     /// The binary representation of the secret scalar s: `[b0, ..., b_{2*n-1}]`
-    /// Then 
+    /// Then
     /// ```text
     /// s[G] = \sum_{i=0..n-1} (b_{2*i} + 2 * b_{2*i+1}) * [4^i * G]
     ///           = \sum_{i=0..n-1} bases_{b_{2*i} + 2 * b_{2*i+1}}[i]

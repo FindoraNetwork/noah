@@ -39,13 +39,6 @@ pub struct BarToAbarBody {
     pub memo: OwnerMemo,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AbarToBarBody {
-    pub input: AnonBlindAssetRecord,
-    pub output: BlindAssetRecord,
-    pub proof: ConvertBarAbarProof,
-}
-
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct BarToAbarNote {
     pub body: BarToAbarBody,
