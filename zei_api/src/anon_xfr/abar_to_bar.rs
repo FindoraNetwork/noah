@@ -271,7 +271,10 @@ pub fn verify_abar_to_bar_note(params: &NodeParams, note: &AbarToBarNote) -> Res
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
 
-    note.body.input.public_key.verify(msg.as_slice(), &note.signature)?;
+    note.body
+        .input
+        .public_key
+        .verify(msg.as_slice(), &note.signature)?;
 
     verify_abar_to_bar_body(params, &note.body)
 }
@@ -288,10 +291,10 @@ mod test {
         sig::XfrKeyPair,
         structs::{AssetType, XfrAmount, XfrAssetType::NonConfidential},
     };
-    use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-    use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
     use algebra::groups::Scalar;
     use algebra::jubjub::JubjubScalar;
+    use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 
     #[test]
     fn test_abar_to_bar() {
@@ -312,9 +315,14 @@ mod test {
             .unwrap();
 
         let mut note = gen_abar_to_bar_note(
-                &mut prng, &params, &oabar,
-                oabar.key_rand_factor, address, keypair
-        ).unwrap();
+            &mut prng,
+            &params,
+            &oabar,
+            oabar.key_rand_factor,
+            address,
+            keypair,
+        )
+        .unwrap();
 
         assert_eq!(note.body.output.amount, XfrAmount::NonConfidential(1234u64));
         assert_eq!(
@@ -353,9 +361,14 @@ mod test {
             .unwrap();
 
         let note = gen_abar_to_bar_note(
-            &mut prng, &params, &oabar,
-            JubjubScalar::from_u64(12341234u64), address, keypair
-        ).unwrap();
+            &mut prng,
+            &params,
+            &oabar,
+            JubjubScalar::from_u64(12341234u64),
+            address,
+            keypair,
+        )
+        .unwrap();
 
         assert_eq!(note.body.output.amount, XfrAmount::NonConfidential(1234u64));
         assert_eq!(
