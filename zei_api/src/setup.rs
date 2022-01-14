@@ -125,9 +125,6 @@ impl UserParams {
         tree_depth: Option<usize>,
         bp_num_gens: usize,
     ) -> UserParams {
-        let dummy_fee_type = BLSScalar::zero();
-        let dummy_fee_func = |_, _| 0u32;
-
         let (cs, n_constraints) = match tree_depth {
             Some(depth) => {
                 build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
@@ -160,9 +157,6 @@ impl UserParams {
         bp_num_gens: usize,
         max_degree_poly_com: usize,
     ) -> UserParams {
-        let dummy_fee_type = BLSScalar::zero();
-        let dummy_fee_func = |_, _| 0u32;
-
         let (cs, /*n_constrains*/ _) = match tree_depth {
             Some(depth) => {
                 build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
