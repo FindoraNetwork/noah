@@ -1,5 +1,4 @@
-use algebra::groups::{Group, GroupArithmetic, Scalar};
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar};
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -192,7 +191,7 @@ mod tests {
         let signature = super::bls_sign::<Bls12381, _>(&sk, message);
 
         pnk!(super::bls_verify(&pk, message, &signature));
-        err_eq!(
+        msg_eq!(
             ZeiError::SignatureError,
             super::bls_verify(&pk, b"wrong message", &signature).unwrap_err()
         )
@@ -246,7 +245,7 @@ mod tests {
 
         let messages = [&message1[..], &message2[..], &new_message3[..]];
 
-        err_eq!(
+        msg_eq!(
             ZeiError::SignatureError,
             super::bls_batch_verify(&keys, &messages, &sigs).unwrap_err()
         );

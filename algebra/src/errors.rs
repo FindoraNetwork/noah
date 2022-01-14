@@ -1,4 +1,4 @@
-use std::{error, fmt};
+use ark_std::{error, fmt};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AlgebraError {
@@ -16,7 +16,7 @@ pub enum AlgebraError {
 }
 
 impl fmt::Display for AlgebraError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             AlgebraError::ArgumentVerificationError => {
                 "Proof(argument) not valid for statement"

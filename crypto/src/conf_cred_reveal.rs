@@ -4,8 +4,7 @@ use crate::anon_creds::{
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -360,8 +359,7 @@ pub(crate) mod test_helper {
     use crate::conf_cred_reveal::{
         ac_confidential_open_commitment, ac_confidential_open_verify,
     };
-    use algebra::groups::{Group, Scalar};
-    use algebra::pairing::Pairing;
+    use algebra::groups::{Group, Pairing, Scalar};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use utils::errors::ZeiError;
@@ -451,7 +449,7 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_message,
         );
-        err_eq!(
+        msg_eq!(
             ZeiError::IdentityRevealVerifyError,
             vrfy.unwrap_err(),
             "proof should fail, reveal map doesn't match"
@@ -468,7 +466,7 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_message,
         );
-        err_eq!(
+        msg_eq!(
             ZeiError::ParameterError,
             vrfy.unwrap_err(),
             "proof should fail, bitmap length does not match number of attributes"
@@ -485,7 +483,7 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_message,
         );
-        err_eq!(
+        msg_eq!(
             ZeiError::IdentityRevealVerifyError,
             vrfy.unwrap_err(),
             "proof should fail, bad ac issuer public key"
@@ -503,7 +501,7 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_message,
         );
-        err_eq!(
+        msg_eq!(
             ZeiError::IdentityRevealVerifyError,
             vrfy.unwrap_err(),
             "proof should fail, bad encryption key"
@@ -520,7 +518,7 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             wrong_message,
         );
-        err_eq!(
+        msg_eq!(
             ZeiError::IdentityRevealVerifyError,
             vrfy.unwrap_err(),
             "proof should fail, bad sok message"
@@ -580,8 +578,7 @@ mod test_bls12_381 {
 mod test_serialization {
 
     use algebra::bls12_381::Bls12381;
-    use algebra::groups::Group;
-    use algebra::pairing::Pairing;
+    use algebra::groups::{Group, Pairing};
 
     use super::test_helper::byte_slice_to_scalar;
     use crate::anon_creds::{ac_commit, ac_sign};

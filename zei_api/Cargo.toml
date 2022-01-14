@@ -2,7 +2,7 @@
 name = "zei"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
-edition = "2018"
+edition = "2021"
 description = "Zei Platform Interface"
 
 [[bin]]
@@ -36,14 +36,13 @@ wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 poly-iops = { path = "../poly-iops" }
 structopt = "0.3.17"
 bincode = "1.3.1"
-ruc = "0.6.2"
+ruc = "1.0"
 parking_lot = "0.11.1"
 
 [dev-dependencies]
 accumulators = { path = "../accumulators" }
 bit-array = "0.4.3"
 criterion = "0.3.1"
-criterion-cycles-per-byte = "0.1.1"
 lazy_static = "1.4.0"
 rand = { version = "0.7", default-features = false }
 serde_json = "1.0"
@@ -58,7 +57,7 @@ nightly = ["curve25519-dalek/nightly", "rand/nightly"]
 u64_backend = ["curve25519-dalek/u64_backend"]
 u32_backend = ["curve25519-dalek/u32_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-
+asm = [ "algebra/asm" ]
 
 [[bench]]
 name = "xfr_note_idtracking_assettracking_singleasset_time"

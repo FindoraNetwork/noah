@@ -1,9 +1,11 @@
-use digest::generic_array::typenum::U64;
-use digest::Digest;
-use rand_core::{CryptoRng, RngCore};
+use ark_std::{
+    borrow::Borrow,
+    fmt::Debug,
+    rand::{CryptoRng, RngCore},
+};
+use digest::{generic_array::typenum::U64, Digest};
 use ruc::err::*;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 use utils::shift_u8_vec;
 
 pub trait GroupArithmetic {
@@ -34,6 +36,7 @@ pub trait ScalarArithmetic: Clone + One + Zero + Sized {
     fn neg(&self) -> Self {
         Self::zero().sub(self)
     }
+
     /// exponent form: least significant limb first, with u64 limbs
     fn pow(&self, exponent: &[u64]) -> Self {
         let mut base = self.clone();
@@ -56,17 +59,15 @@ pub trait ScalarArithmetic: Clone + One + Zero + Sized {
 pub trait Scalar:
     Copy + Debug + PartialEq + Eq + ScalarArithmetic + Serialize + for<'de> Deserialize<'de>
 {
-    // generation
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
     fn from_u32(value: u32) -> Self;
     fn from_u64(value: u64) -> Self;
     fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default;
-    // multiplicative generator of r-1 order, that is also a quadratic nonresidue
-    fn multiplicative_generator() -> Self;
 
-    // field size
+    // multiplicative generator of order r, which is also a quadratic nonresidue
+    fn multiplicative_generator() -> Self;
     fn get_field_size_lsf_bytes() -> Vec<u8>;
     fn field_size_minus_one_half() -> Vec<u8> {
         let mut q_minus_1_half_le = Self::get_field_size_lsf_bytes();
@@ -76,7 +77,6 @@ pub trait Scalar:
     }
     fn get_little_endian_u64(&self) -> Vec<u64>;
     fn bytes_len() -> usize;
-    // serialization
     fn to_bytes(&self) -> Vec<u8>;
     fn from_bytes(bytes: &[u8]) -> Result<Self>;
     fn from_le_bytes(bytes: &[u8]) -> Result<Self>;
@@ -96,23 +96,55 @@ pub trait Group:
 
     fn get_identity() -> Self;
     fn get_base() -> Self;
+    fn get_random_base<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
 
-    /// Pick a random base/generator inside the group
-    /// The generic algorithm consists of the following steps:
-    /// 1. pick a fix generator g
-    /// 2. sample a random scalar x
-    /// 3. check that gcd(x,q)=1 where q is the order of the group
-    /// 4. return g^x
-    fn get_random_base<R: CryptoRng + RngCore>(_prng: &mut R) -> Self {
-        panic!("Not implemented.");
-    } // TODO ticket #445 (redmine)
-
-    // compression/serialization helpers
     fn to_compressed_bytes(&self) -> Vec<u8>;
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self>;
     fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default;
+
+    fn naive_multi_exp<I, H>(scalars: I, points: H) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Borrow<Self::S>,
+        H: IntoIterator,
+        H::Item: Borrow<Self>,
+    {
+        let mut r = Self::get_identity();
+        for (s, p) in scalars.into_iter().zip(points.into_iter()) {
+            r = r.add(&p.borrow().mul(s.borrow()))
+        }
+        r
+    }
+
+    #[inline]
+    fn multi_exp<I, H>(scalars: I, points: H) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Borrow<Self::S>,
+        H: IntoIterator,
+        H::Item: Borrow<Self>,
+    {
+        Self::naive_multi_exp(scalars, points)
+    }
+
+    #[inline]
+    fn vartime_multi_exp(scalars: &[&Self::S], points: &[&Self]) -> Self {
+        if scalars.is_empty() {
+            Self::get_identity()
+        } else {
+            crate::multi_exp::pippenger(scalars, points).unwrap()
+        }
+    }
+}
+
+pub trait Pairing {
+    type ScalarField: Scalar;
+    type G1: Group<S = Self::ScalarField>;
+    type G2: Group<S = Self::ScalarField>;
+    type Gt: Group<S = Self::ScalarField>;
+    fn pairing(a: &Self::G1, b: &Self::G2) -> Self::Gt;
 }
 
 pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
@@ -126,9 +158,8 @@ pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
 
     let mut carry = 0u64;
     let mut digits = vec![];
-    //let mut digits_count = scalar64.len()*64/w; //upper bound
+
     let mut i = 0;
-    //for i in 0..digits_count {
     loop {
         // Construct a buffer of bits of the scalar, starting at `bit_offset`.
         let bit_offset = i * w;
@@ -139,6 +170,7 @@ pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
             break;
         }
         let is_last = u64_idx == scalar64.len() - 1;
+
         // Read the bits from the scalar
         let bit_buf = if bit_idx < 64 - w || is_last {
             // This window's bits are contained in a single u64,

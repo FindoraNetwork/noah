@@ -2,7 +2,7 @@
 name = "crypto"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
-edition = "2018"
+edition = "2021"
 description = "Zei Cryptographic Primitives and Protocols"
 
 [lib]
@@ -27,7 +27,7 @@ serde_derive = "1.0"
 sha2 = "0.9.0"
 utils = {path = "../utils" }
 x25519-dalek = "1.1"
-ruc = "0.6.2"
+ruc = "1.0"
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 
 [dev-dependencies]

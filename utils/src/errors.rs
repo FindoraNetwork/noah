@@ -1,4 +1,3 @@
-//use ed25519_dalek::SignatureError;
 use std::{error, fmt};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -132,11 +131,3 @@ impl fmt::Display for ZeiError {
 }
 
 impl error::Error for ZeiError {}
-
-/*
-impl From<SignatureError> for ZeiError {
-  fn from(_error: SignatureError) -> Self {
-    ZeiError::SignatureError
-  }
-}
-*/

@@ -1,62 +1,13 @@
 /*
  * Based on dalek-cryptography/curve25519-dalek implementation of Pippenger algorithm for multi-exponentiations
  */
-use crate::errors::AlgebraError;
-use crate::groups::{scalar_to_radix_2_power_w, Group, Scalar};
+use crate::{
+    errors::AlgebraError,
+    groups::{scalar_to_radix_2_power_w, Group, Scalar},
+};
 use ruc::*;
-use std::borrow::Borrow;
 
-pub trait MultiExp: Group {
-    fn naive_multi_exp<I, H>(scalars: I, points: H) -> Self
-    where
-        I: IntoIterator,
-        I::Item: Borrow<Self::S>,
-        H: IntoIterator,
-        H::Item: Borrow<Self>;
-    fn multi_exp<I, H>(scalars: I, points: H) -> Self
-    where
-        I: IntoIterator,
-        I::Item: Borrow<Self::S>,
-        H: IntoIterator,
-        H::Item: Borrow<Self>;
-    fn vartime_multi_exp(scalars: &[&Self::S], points: &[&Self]) -> Self;
-}
-
-impl<G: Group> MultiExp for G {
-    fn naive_multi_exp<I, H>(scalars: I, points: H) -> Self
-    where
-        I: IntoIterator,
-        I::Item: Borrow<Self::S>,
-        H: IntoIterator,
-        H::Item: Borrow<Self>,
-    {
-        let mut r = Self::get_identity();
-        for (s, p) in scalars.into_iter().zip(points.into_iter()) {
-            r = r.add(&p.borrow().mul(s.borrow()))
-        }
-        r
-    }
-
-    fn multi_exp<I, H>(scalars: I, points: H) -> Self
-    where
-        I: IntoIterator,
-        I::Item: Borrow<Self::S>,
-        H: IntoIterator,
-        H::Item: Borrow<Self>,
-    {
-        Self::naive_multi_exp(scalars, points)
-    }
-
-    fn vartime_multi_exp(scalars: &[&G::S], points: &[&G]) -> Self {
-        if scalars.is_empty() {
-            Self::get_identity()
-        } else {
-            pippenger::<G>(scalars, points).unwrap()
-        }
-    }
-}
-
-fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
+pub fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
     let size = scalars.len();
 
     if size == 0 {
@@ -126,7 +77,6 @@ fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
 mod tests {
     use crate::bls12_381::{BLSGt, BLSG1, BLSG2};
     use crate::groups::{Group, Scalar};
-    use crate::multi_exp::MultiExp;
     use crate::ristretto::RistrettoPoint;
 
     #[test]
@@ -147,7 +97,6 @@ mod tests {
     }
 
     fn run_multiexp_test<G: Group>() {
-        // Empty list of scalars
         let g = G::vartime_multi_exp(&[], &[]);
         assert_eq!(g, G::get_identity());
 
@@ -171,7 +120,7 @@ mod tests {
         let g1 = G::get_base();
         let g2 = g1.add(&g1);
         let g3 = g1.mul(&Scalar::from_u32(500));
-        let thousand = G::S::from_u32(1000);
+        let thousand = Scalar::from_u32(1000);
         let two = Scalar::from_u32(2);
         let three = Scalar::from_u32(3);
         let g = G::vartime_multi_exp(&[&thousand, &two, &three], &[&g1, &g2, &g3]);
