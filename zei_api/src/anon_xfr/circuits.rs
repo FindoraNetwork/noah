@@ -1,5 +1,6 @@
 use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
+use crate::xfr::structs::AssetType;
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
@@ -642,6 +643,124 @@ fn asset_mixing(
     }
 }
 
+
+/// Enforce asset_mixing_with_fees constraints:
+/// Inputs = [(type_in_1, v_in_1), ..., (type_in_n, v_in_n)], `values {v_in_i}` are guaranteed to be positive.
+/// Outputs = [(type_out_1, v_out_1), ..., (type_out_m, v_out_m)], `values {v_out_j}` are guaranteed to be positive.
+/// Fee parameters = `fee_type` and `fee_calculating func`
+///
+/// Goal:
+/// - Prove that for every asset type except `fee_type`, the corresponding inputs sum equals the corresponding outputs sum.
+/// - Prove that for every asset type that equals `fee_type`, the inputs sum = the outputs sum + fee
+/// - Prove that at least one input is of type `fee_type`
+///
+/// The circuit:
+/// 1. Compute [sum_in_1, ..., sum_in_n] from inputs, where `sum_in_i = \sum_{j : type_in_j == type_in_i} v_in_j`
+///    Note: If there are two inputs with the same asset type, then their `sum_in_i` would be the same.
+/// 2. Similarly, compute [sum_out_1, ..., sum_out_m] from outputs.
+/// 3. Enumerate pair `(i \in [n], j \in [m])`, check that: `(type_in_i != type_out_j) \lor (sum_in_i == sum_out_j)`
+///
+fn asset_mixing_with_fees(
+    cs: &mut TurboPlonkCS,
+    inputs: &[(VarIndex, VarIndex)],
+    outputs: &[(VarIndex, VarIndex)],
+    fee_type: AssetType,
+    fee_calculating_func: &dyn Fn(u32, u32) -> u32,
+) {
+    // Compute the `sum_in_i`
+    let inputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = inputs
+        .iter()
+        .map(|input| {
+            let zero_var = cs.zero_var();
+            let sum_var = inputs.iter().fold(zero_var, |sum, other_input| {
+                let adder = match_select(
+                    cs,
+                    input.0,       // asset_type
+                    other_input.0, // asset_type
+                    other_input.1,
+                ); // amount
+                cs.add(sum, adder)
+            });
+            (input.0, sum_var)
+        })
+        .collect();
+
+    // Compute the `sum_out_i`
+    let outputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = outputs
+        .iter()
+        .map(|output| {
+            let zero_var = cs.zero_var();
+            let sum_var = outputs.iter().fold(zero_var, |sum, other_output| {
+                let adder = match_select(
+                    cs,
+                    output.0,       // asset_type
+                    other_output.0, // asset_type
+                    other_output.1,
+                ); // amount
+                cs.add(sum, adder)
+            });
+            (output.0, sum_var)
+        })
+        .collect();
+
+    // Initialize a constant value `fee_type_scalar_val`
+    let fee_type_scalar: BLSScalar = fee_type.as_scalar();
+    let fee_type_scalar_val = cs.new_variable(fee_type_scalar);
+    cs.insert_constant_gate(fee_type_scalar_val, fee_type_scalar);
+
+    // Calculate the fee
+    let fee = BLSScalar::from_u32(fee_calculating_func(inputs.len() as u32, outputs.len() as u32));
+    let fee_var = cs.new_variable(fee);
+    cs.insert_constant_gate(fee_var, fee);
+
+    // At least one input type is `fee_type` by checking `flag = 0`
+    // and also check that the amount is matching
+    let mut flag = cs.one_var();
+    for (input_type, input_sum) in inputs_type_sum_amounts {
+        let (is_fee_type, is_not_fee_type) = cs.is_equal_or_not_equal(input_type, fee_type_scalar_val);
+        flag = cs.mul(flag, is_not_fee_type);
+
+        for &(output_type, output_sum) in &outputs_type_sum_amounts {
+            let type_matched = cs.is_equal(input_type, output_type);
+            let diff = cs.sub(input_sum, output_sum);
+            let zero_var = cs.zero_var();
+
+            // enforce `type_matched` * `is_not_fee_type` * (input_sum - output_sum) == 0,
+            // which guarantees that (`input_type` != `output_type`) \lor (`input_type` == fee_type) \lor (`input_sum` == `output_sum`)
+            let type_matched_and_is_not_fee_type = cs.mul(type_matched, is_not_fee_type);
+            cs.insert_mul_gate(type_matched_and_is_not_fee_type, diff, zero_var);
+
+            // enforce `type_matched` * `is_fee_type` * (input_sum - output_sum - fee) == 0,
+            let type_matched_and_is_fee_type = cs.mul(type_matched, is_fee_type);
+            let diff_minus_fee = cs.sub(diff, fee_var);
+            cs.insert_mul_gate(type_matched_and_is_fee_type, diff_minus_fee, zero_var)
+        }
+    }
+    cs.insert_constant_gate(flag, BLSScalar::zero());
+
+    // check that every input type appears in the set of output types
+    for &(input_type, _) in inputs {
+        // \prod_j (input_type - output_type_j) == 0
+        let mut product = cs.one_var();
+        for &(output_type, _) in outputs {
+            let diff = cs.sub(input_type, output_type);
+            product = cs.mul(product, diff);
+        }
+        cs.insert_constant_gate(product, BLSScalar::zero());
+    }
+
+    // check that every output type appears in the set of input types
+    for &(output_type, _) in outputs {
+        // \prod_i (input_type_i - output_type) == 0
+        let mut product = cs.one_var();
+        for &(input_type, _) in inputs {
+            let diff = cs.sub(input_type, output_type);
+            product = cs.mul(product, diff);
+        }
+        cs.insert_constant_gate(product, BLSScalar::zero());
+    }
+}
+
 // If `type1` == `type2`, returns a variable that equals `val`, otherwise returns a zero variable
 fn match_select(
     cs: &mut TurboPlonkCS,
@@ -1031,6 +1150,184 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
         asset_mixing(&mut cs, &inputs, &outputs);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+    }
+
+    #[test]
+    fn test_asset_mixing_with_fees() {
+        // Fee type
+        let fee_type = BLSScalar::from_u32(1234u32);
+
+        // Fee function
+        // base fee 5, every input 1, every output 2
+        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
+
+        // The error path
+        let mut cs = TurboPlonkConstraintSystem::new();
+        let zero = BLSScalar::zero();
+        let one = BLSScalar::one();
+        let two = one.add(&one);
+        // asset_types = (0, 2)
+        let in_types = [cs.new_variable(zero), cs.new_variable(two)];
+        // amoutns = (60, 100)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        // asset_types = (2, 2)
+        let out_types = [cs.new_variable(two), cs.new_variable(two)];
+        // amoutns = (40, 10)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(40)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing_with_fees(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+
+        // The happy path
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (0, 2, 1, 2)
+        let in_types = [
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(two),
+        ];
+        // amounts = (60, 100, 10, 50)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        // asset_types = (2, 1, 1, 2, 0, 0, 2)
+        let out_types = [
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(zero),
+            cs.new_variable(zero),
+            cs.new_variable(two),
+        ];
+        // amounts = (40, 9, 1, 80, 50, 10, 30)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(40)),
+            cs.new_variable(BLSScalar::from_u32(9)),
+            cs.new_variable(BLSScalar::from_u32(1)),
+            cs.new_variable(BLSScalar::from_u32(80)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(30)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing_with_fees(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_ok());
+
+        // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (1, 0, 1, 2)
+        let in_types = [
+            cs.new_variable(one),
+            cs.new_variable(zero),
+            cs.new_variable(one),
+            cs.new_variable(two),
+        ];
+        // amounts = (10, 5, 5, 10)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(5)),
+            cs.new_variable(BLSScalar::from_u32(5)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+        // asset_types = (0, 1, 0)
+        let out_types = [
+            cs.new_variable(zero),
+            cs.new_variable(one),
+            cs.new_variable(zero),
+        ];
+        // amounts = (1, 15, 4)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(1)),
+            cs.new_variable(BLSScalar::from_u32(15)),
+            cs.new_variable(BLSScalar::from_u32(4)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+        asset_mixing_with_fees(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (1, 0, 1)
+        let in_types = [
+            cs.new_variable(one),
+            cs.new_variable(zero),
+            cs.new_variable(one),
+        ];
+        // amounts = (10, 5, 5)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(5)),
+            cs.new_variable(BLSScalar::from_u32(5)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+        // asset_types = (0, 1, 2)
+        let out_types = [
+            cs.new_variable(zero),
+            cs.new_variable(one),
+            cs.new_variable(two),
+        ];
+        // amounts = (5, 15, 4)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(5)),
+            cs.new_variable(BLSScalar::from_u32(15)),
+            cs.new_variable(BLSScalar::from_u32(4)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+        asset_mixing_with_fees(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }

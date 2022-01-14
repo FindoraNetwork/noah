@@ -512,6 +512,48 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
         diff_is_zero
     }
 
+    // Returns a boolean variable that equals 1 if and only if `left_var` != `right_var`
+    pub fn is_not_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
+        let diff = self.sub(left_var, right_var);
+        // set `inv_diff` = `diff`^{-1} when `diff` != 0, otherwise we can set `inv_diff` to arbirary value since `diff` * `inv_diff` will always be 0 when `diff` == 0
+        let inv_diff_scalar = self.witness[diff].inv().unwrap_or_else(|_| F::zero());
+        let inv_diff = self.new_variable(inv_diff_scalar);
+
+        // `diff_is_zero` = 1 - `diff` * `inv_diff`
+        // `diff_is_zero` will be 1 when `diff` == 0, and `diff_is_zero` will be 0 when `diff != 0` and `inv_diff` == `diff`^{-1}
+        let mul_var = self.mul(diff, inv_diff);
+        let one_var = self.one_var();
+        let diff_is_zero = self.sub(one_var, mul_var);
+
+        // enforce `diff` * `diff_is_zero` == 0
+        // without this constraint, a malicious prover can set `diff_is_zero` to arbitrary value when `diff` != 0
+        let zero_var = self.zero_var();
+        self.insert_mul_gate(diff, diff_is_zero, zero_var);
+
+        mul_var
+    }
+
+    // Returns two boolean variables that equals (1, 0) if and only if `left_var` == `right_var` and (0, 1) otherwise
+    pub fn is_equal_or_not_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> (VarIndex, VarIndex) {
+        let diff = self.sub(left_var, right_var);
+        // set `inv_diff` = `diff`^{-1} when `diff` != 0, otherwise we can set `inv_diff` to arbirary value since `diff` * `inv_diff` will always be 0 when `diff` == 0
+        let inv_diff_scalar = self.witness[diff].inv().unwrap_or_else(|_| F::zero());
+        let inv_diff = self.new_variable(inv_diff_scalar);
+
+        // `diff_is_zero` = 1 - `diff` * `inv_diff`
+        // `diff_is_zero` will be 1 when `diff` == 0, and `diff_is_zero` will be 0 when `diff != 0` and `inv_diff` == `diff`^{-1}
+        let mul_var = self.mul(diff, inv_diff);
+        let one_var = self.one_var();
+        let diff_is_zero = self.sub(one_var, mul_var);
+
+        // enforce `diff` * `diff_is_zero` == 0
+        // without this constraint, a malicious prover can set `diff_is_zero` to arbitrary value when `diff` != 0
+        let zero_var = self.zero_var();
+        self.insert_mul_gate(diff, diff_is_zero, zero_var);
+
+        (diff_is_zero, mul_var)
+    }
+
     /// Insert a constant constraint: wo = constant
     pub fn insert_constant_gate(&mut self, var: VarIndex, constant: F) {
         assert!(var < self.num_vars, "variable index out of bound");
