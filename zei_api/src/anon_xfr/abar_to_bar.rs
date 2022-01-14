@@ -46,6 +46,7 @@ pub struct ConvertAbarBarProof {
 
 /// abar_to_bar functions generates the new BAR and the proof given the Open ABAR and the receiver
 /// public key.
+#[allow(dead_code)]
 pub(crate) fn abar_to_bar<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
@@ -117,6 +118,7 @@ pub(crate) fn abar_to_bar<R: CryptoRng + RngCore>(
 }
 
 /// Verifies the proof with the input and output
+#[allow(dead_code)]
 pub fn verify_abar_to_bar(
     params: &NodeParams,
     abar: &AnonBlindAssetRecord,
@@ -208,6 +210,7 @@ pub struct AbarToBarBody {
 
 /// This function generates the AbarToBarBody from the Open ABAR, the receiver address and the signing
 /// key pair.
+#[allow(dead_code)]
 pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
@@ -225,6 +228,7 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
 }
 
 // Verifies the body
+#[allow(dead_code)]
 pub fn verify_abar_to_bar_body(params: &NodeParams, body: &AbarToBarBody) -> Result<()> {
     verify_abar_to_bar(params, &body.input, &body.output, &body.proof)
 }
@@ -266,6 +270,7 @@ fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
 }
 
 // Verifies the note
+#[allow(dead_code)]
 pub fn verify_abar_to_bar_note(params: &NodeParams, note: &AbarToBarNote) -> Result<()> {
     let msg = bincode::serialize(&note.body)
         .map_err(|_| ZeiError::SerializationError)
