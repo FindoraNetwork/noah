@@ -1,7 +1,7 @@
 //The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs_with_fees,
-    AMultiXfrWitness, TurboPlonkCS, TREE_DEPTH,
+    build_eq_committed_vals_cs, build_multi_xfr_cs_with_fees, AMultiXfrWitness,
+    TurboPlonkCS, TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Zero;

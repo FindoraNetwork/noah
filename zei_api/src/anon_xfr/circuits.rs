@@ -828,25 +828,24 @@ fn asset_mixing_with_fees(
     let fee_var = cs.new_variable(fee);
     cs.insert_constant_gate(fee_var, fee);
 
-    // At least one input type is `fee_type` by checking `flag_exists_fee_type = 0`
+    // At least one input type is `fee_type` by checking `flag_no_fee_type = 0`
     // and also check that the amount is matching
     // and also check that every input type appears in the set of output types (except if the fee has used up)
-    let mut flag_exists_fee_type = cs.one_var();
+    let mut flag_no_fee_type = cs.one_var();
     for (input_type, input_sum) in inputs_type_sum_amounts {
         let (is_fee_type, is_not_fee_type) =
             cs.is_equal_or_not_equal(input_type, fee_type_val);
-        flag_exists_fee_type = cs.mul(flag_exists_fee_type, is_not_fee_type);
+        flag_no_fee_type = cs.mul(flag_no_fee_type, is_not_fee_type);
 
         let zero_var = cs.zero_var();
 
-        // If there is at least one output that is of the same type as the input, then `flags_exists_matching_output = 0`
-        // Otherwise, `flags_exists_matching_output = 1`.
-        let mut flag_exists_matching_output = cs.one_var();
+        // If there is at least one output that is of the same type as the input, then `flag_no_matching_output = 0`
+        // Otherwise, `flag_no_matching_output = 1`.
+        let mut flag_no_matching_output = cs.one_var();
         for &(output_type, output_sum) in &outputs_type_sum_amounts {
             let (type_matched, type_not_matched) =
                 cs.is_equal_or_not_equal(input_type, output_type);
-            flag_exists_matching_output =
-                cs.mul(flag_exists_matching_output, type_not_matched);
+            flag_no_matching_output = cs.mul(flag_no_matching_output, type_not_matched);
             let diff = cs.sub(input_sum, output_sum);
 
             // enforce `type_matched` * `is_not_fee_type` * (input_sum - output_sum) == 0,
@@ -860,15 +859,15 @@ fn asset_mixing_with_fees(
             cs.insert_mul_gate(type_matched_and_is_fee_type, diff_minus_fee, zero_var)
         }
 
-        // If it is not the fee type, then `flags_exists_matching_output` must be 0
-        cs.insert_mul_gate(is_not_fee_type, flag_exists_matching_output, zero_var);
+        // If it is not the fee type, then `flag_no_matching_output` must be 0
+        cs.insert_mul_gate(is_not_fee_type, flag_no_matching_output, zero_var);
 
-        // Otherwise, `flags_exists_matching_output * (input_sum - fee_var) = 0`
+        // Otherwise, `flag_no_matching_output * (input_sum - fee_var) = 0`
         let input_minus_fee = cs.sub(input_sum, fee_var);
-        let condition = cs.mul(is_fee_type, flag_exists_matching_output);
+        let condition = cs.mul(is_fee_type, flag_no_matching_output);
         cs.insert_mul_gate(condition, input_minus_fee, zero_var)
     }
-    cs.insert_constant_gate(flag_exists_fee_type, BLSScalar::zero());
+    cs.insert_constant_gate(flag_no_fee_type, BLSScalar::zero());
 
     // check that every output type appears in the set of input types
     for &(output_type, _) in outputs {
