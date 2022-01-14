@@ -504,7 +504,11 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
     }
 
     // Returns two boolean variables that equals (1, 0) if and only if `left_var` == `right_var` and (0, 1) otherwise
-    pub fn is_equal_or_not_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> (VarIndex, VarIndex) {
+    pub fn is_equal_or_not_equal(
+        &mut self,
+        left_var: VarIndex,
+        right_var: VarIndex,
+    ) -> (VarIndex, VarIndex) {
         let diff = self.sub(left_var, right_var);
         // set `inv_diff` = `diff`^{-1} when `diff` != 0, otherwise we can set `inv_diff` to arbirary value since `diff` * `inv_diff` will always be 0 when `diff` == 0
         let inv_diff_scalar = self.witness[diff].inv().unwrap_or_else(|_| F::zero());
