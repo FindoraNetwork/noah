@@ -1,7 +1,7 @@
 //The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs_with_fees, AMultiXfrWitness,
-    TurboPlonkCS, TREE_DEPTH,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, TurboPlonkCS,
+    TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Zero;
@@ -129,16 +129,12 @@ impl UserParams {
         let dummy_fee_func = |_, _| 0u32;
 
         let (cs, n_constraints) = match tree_depth {
-            Some(depth) => build_multi_xfr_cs_with_fees(
-                AMultiXfrWitness::fake(n_payers, n_payees, depth),
-                dummy_fee_type,
-                &dummy_fee_func,
-            ),
-            None => build_multi_xfr_cs_with_fees(
-                AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
-                dummy_fee_type,
-                &dummy_fee_func,
-            ),
+            Some(depth) => {
+                build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
+            }
+            None => build_multi_xfr_cs(AMultiXfrWitness::fake(
+                n_payers, n_payees, TREE_DEPTH,
+            )),
         };
 
         let pcs = KZGCommitmentScheme::new(
@@ -168,16 +164,12 @@ impl UserParams {
         let dummy_fee_func = |_, _| 0u32;
 
         let (cs, /*n_constrains*/ _) = match tree_depth {
-            Some(depth) => build_multi_xfr_cs_with_fees(
-                AMultiXfrWitness::fake(n_payers, n_payees, depth),
-                dummy_fee_type,
-                &dummy_fee_func,
-            ),
-            None => build_multi_xfr_cs_with_fees(
-                AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
-                dummy_fee_type,
-                &dummy_fee_func,
-            ),
+            Some(depth) => {
+                build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
+            }
+            None => build_multi_xfr_cs(AMultiXfrWitness::fake(
+                n_payers, n_payees, TREE_DEPTH,
+            )),
         };
 
         let max_degree_poly_com = max_degree_poly_com.next_power_of_two();
