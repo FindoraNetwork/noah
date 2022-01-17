@@ -1288,8 +1288,8 @@ pub(crate) mod tests {
         let one = BLSScalar::one();
         let two = one.add(&one);
 
-        // The minimal transaction that pays sufficient fee
-        // The happy path
+        // Test case 1: success
+        // A minimalist transaction that pays sufficient fee
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
@@ -1305,8 +1305,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
-        // The minimal transaction that pays too much fee
-        // The error path
+        // Test case 2: error
+        // A minimalist transaction that pays too much fee
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
@@ -1322,8 +1322,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
-        // The minimal transaction that pays insufficient fee
-        // The error path
+        // Test case 3: error
+        // A minimalist transaction that pays insufficient fee
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
@@ -1339,7 +1339,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
-        // The error path
+        // Test case 4: error
+        // A classical case when the non-fee elements are wrong, but the fee is paid correctly
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (0, 2, 1234)
         let in_types = [
@@ -1382,7 +1383,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
-        // The happy path, where the amount is now matching
+        // Test case 5: success
+        // A classical case when the non-fee elements and fee are both correct
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (0, 2, 1234)
         let in_types = [
@@ -1403,7 +1405,7 @@ pub(crate) mod tests {
             .collect();
 
         // asset_types = (2, 0)
-        let out_types = [cs.new_variable(two), cs.new_variable(two)];
+        let out_types = [cs.new_variable(two), cs.new_variable(zero)];
         // amounts = (100, 60)
         let out_amounts = [
             cs.new_variable(BLSScalar::from_u32(100)),
@@ -1423,9 +1425,10 @@ pub(crate) mod tests {
             &fee_calculating_func,
         );
         let witness = cs.get_and_clear_witness();
-        assert!(cs.verify_witness(&witness, &[]).is_err());
+        assert!(cs.verify_witness(&witness, &[]).is_ok());
 
-        // The happy path, with exact amount of fees
+        // Test case 6: success
+        // More assets, with the exact fee
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
@@ -1485,7 +1488,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
-        // The happy path, with more than enough fees, but are spent properly
+        // Test case 7: success
+        // More assets, with more than enough fees, but are spent properly
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
@@ -1547,7 +1551,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
-        // The error path, with more than enough fees, but are not spent properly
+        // Test case 8: error
+        // More assets, with more than enough fees, but are not spent properly
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
@@ -1582,7 +1587,7 @@ pub(crate) mod tests {
             cs.new_variable(two),
             cs.new_variable(fee_type),
         ];
-        // amounts = (40, 9, 1, 80, 50, 10, 30, 100)
+        // amounts = (40, 9, 1, 80, 50, 10, 30, 10)
         let out_amounts = [
             cs.new_variable(BLSScalar::from_u32(40)),
             cs.new_variable(BLSScalar::from_u32(9)),
@@ -1609,7 +1614,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
-        // The error path, with insufficient fees, case 1: no output of the fee type
+        // Test case 9: error
+        // More assets, with insufficient fees, case 1: no output of the fee type
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
@@ -1643,7 +1649,7 @@ pub(crate) mod tests {
             cs.new_variable(zero),
             cs.new_variable(two),
         ];
-        // amounts = (40, 9, 1, 80, 50, 10, 30, 100)
+        // amounts = (40, 9, 1, 80, 50, 10, 30)
         let out_amounts = [
             cs.new_variable(BLSScalar::from_u32(40)),
             cs.new_variable(BLSScalar::from_u32(9)),
@@ -1669,7 +1675,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
-        // The error path, with insufficient fees, case 2: with output of the fee type
+        // Test case 10: error
+        // More assets, with insufficient fees, case 2: with output of the fee type
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
@@ -1704,7 +1711,7 @@ pub(crate) mod tests {
             cs.new_variable(two),
             cs.new_variable(fee_type),
         ];
-        // amounts = (40, 9, 1, 80, 50, 10, 30, 100)
+        // amounts = (40, 9, 1, 80, 50, 10, 30, 2)
         let out_amounts = [
             cs.new_variable(BLSScalar::from_u32(40)),
             cs.new_variable(BLSScalar::from_u32(9)),
@@ -1731,7 +1738,8 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
-        // The error path, with insufficient fees, case 3: with output of the fee type, fees not exact
+        // Test case 11: error
+        // More assets, with insufficient fees, case 3: with output of the fee type, fees not exact
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
@@ -1766,7 +1774,7 @@ pub(crate) mod tests {
             cs.new_variable(two),
             cs.new_variable(fee_type),
         ];
-        // amounts = (40, 9, 1, 80, 50, 10, 30, 100)
+        // amounts = (40, 9, 1, 80, 50, 10, 30, 2)
         let out_amounts = [
             cs.new_variable(BLSScalar::from_u32(40)),
             cs.new_variable(BLSScalar::from_u32(9)),
@@ -1793,7 +1801,9 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
+        // Test case 12: error
         // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
+        // Missing output for an input type.
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (1, 0, 1, 2)
         let in_types = [
@@ -1841,6 +1851,9 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
+        // Test case 13: error
+        // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
+        // Missing input for an output type.
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (1, 0, 1)
         let in_types = [
