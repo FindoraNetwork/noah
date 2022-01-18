@@ -1,7 +1,8 @@
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, build_multi_xfr_cs_with_fees, AMultiXfrPubInputs, AMultiXfrWitness,
 };
 use crate::setup::{NodeParams, UserParams};
+use algebra::groups::Scalar;
 use algebra::bls12_381::BLSScalar;
 use algebra::jubjub::JubjubPoint;
 use crypto::basics::commitments::pedersen::PedersenGens;
@@ -18,6 +19,45 @@ const N_OUTPUTS_TRANSCRIPT: &[u8] = b"Number of output ABARs";
 const EQ_COMM_TRANSCRIPT: &[u8] = b"Equal committed values proof";
 
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
+
+/// I generates the plonk proof for a multi-inputs/outputs anonymous transaction.
+/// * `rng` - pseudo-random generator.
+/// * `params` - System params
+/// * `secret_inputs` - input to generate witness of the constraint system
+
+#[allow(dead_code)]
+pub(crate) fn prove_xfr_with_fees<R: CryptoRng + RngCore>(
+    rng: &mut R,
+    params: &UserParams,
+    secret_inputs: AMultiXfrWitness,
+) -> Result<AXfrPlonkPf> {
+    let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
+    transcript.append_u64(
+        N_INPUTS_TRANSCRIPT,
+        secret_inputs.payers_secrets.len() as u64,
+    );
+    transcript.append_u64(
+        N_OUTPUTS_TRANSCRIPT,
+        secret_inputs.payees_secrets.len() as u64,
+    );
+
+    let fee_type = BLSScalar::from_u32(000u32);
+    
+    let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
+
+    let (mut cs, _) = build_multi_xfr_cs_with_fees(secret_inputs, fee_type, &fee_calculating_func);
+    let witness = cs.get_and_clear_witness();
+
+    prover(
+        rng,
+        &mut transcript,
+        &params.pcs,
+        &params.cs,
+        &params.prover_params,
+        &witness,
+    )
+    .c(d!(ZeiError::AXfrProofError))
+}
 
 /// I generates the plonk proof for a multi-inputs/outputs anonymous transaction.
 /// * `rng` - pseudo-random generator.
@@ -143,7 +183,7 @@ mod tests {
     use crate::anon_xfr::circuits::tests::new_multi_xfr_witness_for_test;
     use crate::anon_xfr::circuits::AMultiXfrPubInputs;
     use crate::anon_xfr::proofs::{
-        prove_eq_committed_vals, prove_xfr, verify_eq_committed_vals, verify_xfr,
+        prove_eq_committed_vals, prove_xfr, prove_xfr_with_fees, verify_eq_committed_vals, verify_xfr,
     };
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use algebra::bls12_381::BLSScalar;
@@ -289,6 +329,34 @@ mod tests {
     }
 
     #[test]
+    fn test_anon_multi_xfr_proof_3in_3out_multi_asset_with_fees() {
+        let zero = BLSScalar::zero();
+        let one = BLSScalar::one();
+        // (n, m) = (3, 3)
+
+        let mut rng = ChaChaRng::from_entropy();
+
+        let total_input_zero = 50 + rng.next_u64() % 50;
+        let amount_zero = rng.next_u64() % total_input_zero;
+        let total_input_one = 50 + rng.next_u64() % 50;
+        let amount_one = rng.next_u64() % total_input_one;
+
+        let inputs = vec![
+            (amount_zero, zero),
+            (total_input_one, one),
+            (total_input_zero - amount_zero, zero),
+        ];
+
+        let outputs = vec![
+            (amount_one, one),
+            (total_input_zero, zero),
+            (total_input_one - amount_one, one),
+        ];
+
+        test_anon_xfr_proof_with_fees(outputs, inputs);
+    }
+
+    #[test]
     fn test_anon_multi_xfr_proof_3in_3out_multi_asset() {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
@@ -314,6 +382,42 @@ mod tests {
         ];
 
         test_anon_xfr_proof(outputs, inputs);
+    }
+
+    #[allow(dead_code)]
+    fn test_anon_xfr_proof_with_fees(
+        inputs: Vec<(u64, BLSScalar)>,
+        outputs: Vec<(u64, BLSScalar)>,
+    ) {
+        let n_payers = inputs.len();
+        let n_payees = outputs.len();
+
+        // build cs
+        let secret_inputs =
+            new_multi_xfr_witness_for_test(inputs.to_vec(), outputs.to_vec(), [0u8; 32]);
+        let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
+        let params = UserParams::from_file_if_exists(
+            n_payers,
+            n_payees,
+            Some(1),
+            DEFAULT_BP_NUM_GENS,
+            None,
+        )
+        .unwrap();
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let proof = prove_xfr_with_fees(&mut prng, &params, secret_inputs).unwrap();
+
+        // A bad proof should fail the verification
+        let bad_secret_inputs =
+            new_multi_xfr_witness_for_test(inputs, outputs, [1u8; 32]);
+        let bad_proof = prove_xfr_with_fees(&mut prng, &params, bad_secret_inputs).unwrap();
+
+        // verify good witness
+        let node_params = NodeParams::from(params);
+        assert!(verify_xfr(&node_params, &pub_inputs, &proof).is_ok());
+
+        // verify bad witness
+        assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
     }
 
     fn test_anon_xfr_proof(

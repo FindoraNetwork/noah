@@ -290,6 +290,7 @@ pub(crate) fn build_multi_xfr_cs(
     (cs, n_constraints)
 }
 
+
 /// Returns the constraint system (and associated number of constraints) for a multi-inputs/outputs transaction.
 /// This one also takes fee parameters as input.
 #[allow(dead_code)]
