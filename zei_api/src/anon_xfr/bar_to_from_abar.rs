@@ -12,12 +12,16 @@ use crate::xfr::structs::{
 };
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{GroupArithmetic, Scalar, ScalarArithmetic, Zero};
-use algebra::jubjub::{JubjubPoint, JubjubScalar};
+use algebra::jubjub::JubjubScalar;
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use crypto::basics::commitments::pedersen::PedersenGens;
+use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::hybrid_encryption::XPublicKey;
-use crypto::pc_eq_groups::{prove_pair_to_vector_pc, Proof as PCEqProof};
-use merlin::Transcript;
+use crypto::pc_eq_rescue_split_verifier_zk_part::{
+    prove_pc_eq_rescue_split_verifier_zk_part,
+    verify_pc_eq_rescue_split_verifier_zk_part, ZKPartProof,
+};
+use num_bigint::BigUint;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
@@ -26,8 +30,7 @@ pub const TWO_POW_32: u64 = 1 << 32;
 
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ConvertBarAbarProof {
-    commitment_amount_asset_type: JubjubPoint,
-    commitment_eq_proof: PCEqProof<RistrettoPoint, JubjubPoint>,
+    commitment_eq_proof: ZKPartProof,
     pc_rescue_commitments_eq_proof: AXfrPlonkPf,
 }
 
@@ -127,63 +130,69 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     fee: u64,
 ) -> Result<(OpenAnonBlindAssetRecord, ConvertBarAbarProof)> {
     let obar_amount = obar.amount - fee;
-    // 1. compute commitments under jubjub
-    let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
-    let pc_gens_ristretto =
+
+    let pc_gens =
         PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
-    let blind = JubjubScalar::random(prng);
-    let asset_type_scalar: JubjubScalar = obar.asset_type.as_scalar();
-    let commitment_amount_asset_type = pc_gens_jubjub
-        .commit(
-            &[JubjubScalar::from_u64(obar_amount), asset_type_scalar],
-            &blind,
-        )
+
+    // 1. Construct ABAR.
+    let oabar = OpenAnonBlindAssetRecordBuilder::new()
+        .amount(obar_amount)
+        .asset_type(obar.asset_type)
+        .pub_key(*abar_pubkey)
+        .finalize(prng, &enc_key)
+        .c(d!())?
+        .build()
         .c(d!())?;
 
-    let ristretto_amount_blind = obar.amount_blinds.0.add(
+    // 2. Reconstruct the points.
+    let x = RistrettoScalar::from_u64(obar_amount);
+    let y: RistrettoScalar = obar.asset_type.as_scalar();
+    let gamma = obar.amount_blinds.0.add(
         &obar
             .amount_blinds
             .1
             .mul(&RistrettoScalar::from_u64(TWO_POW_32)),
     );
-    // 2. compute proof of equality of commitments
-    let mut transcript = Transcript::new(b"Commitment Equality Proof");
-    let commitment_eq_proof = prove_pair_to_vector_pc(
-        prng,
-        &mut transcript,
-        (&obar_amount.to_le_bytes(), &asset_type_scalar.to_bytes()),
-        (&ristretto_amount_blind, &obar.type_blind),
-        &blind,
-        &pc_gens_ristretto,
-        &pc_gens_jubjub,
-    )
-    .c(d!())?;
+    let delta = obar.type_blind;
+    let point_p = pc_gens.commit(&[x], &gamma).c(d!())?;
+    let point_q = pc_gens.commit(&[y], &delta).c(d!())?;
 
-    // 3. compute ABAR
-    let oabar = OpenAnonBlindAssetRecordBuilder::new()
-        .amount(obar_amount)
-        .asset_type(obar.asset_type)
-        .pub_key(abar_pubkey.clone())
-        .finalize(prng, &enc_key)
-        .c(d!())?
-        .build()
+    let z_randomizer = oabar.blind;
+    let z_instance = RescueInstance::<BLSScalar>::new();
+
+    let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
+    let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
+
+    let z = z_instance.rescue_hash(&[
+        z_randomizer,
+        x_in_bls12_381,
+        y_in_bls12_381,
+        BLSScalar::zero(),
+    ])[0];
+
+    // 2. compute the ZK part of the proof
+    let (commitment_eq_proof, non_zk_state, beta) =
+        prove_pc_eq_rescue_split_verifier_zk_part(
+            prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
+        )
         .c(d!())?;
-    // 4. prove abar correctness
+
+    // 3. prove abar correctness
     let pc_rescue_commitments_eq_proof = prove_eq_committed_vals(
         prng,
         params,
-        BLSScalar::from_u64(obar_amount),
-        BLSScalar::from(&asset_type_scalar),
-        BLSScalar::from(&blind),
+        x_in_bls12_381,
+        y_in_bls12_381,
         oabar.blind,
-        &pc_gens_jubjub,
+        &commitment_eq_proof,
+        &non_zk_state,
+        &beta,
     )
     .c(d!())?;
 
     Ok((
         oabar,
         ConvertBarAbarProof {
-            commitment_amount_asset_type,
             commitment_eq_proof,
             pc_rescue_commitments_eq_proof,
         },
@@ -197,9 +206,8 @@ pub(crate) fn verify_bar_to_abar(
     proof: &ConvertBarAbarProof,
     fee: u64,
 ) -> Result<()> {
-    let pc_gens_rist =
+    let pc_gens =
         PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
-    let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
 
     // 1. get commitments
     // 1.1 reconstruct total amount commitment from bar object
@@ -216,10 +224,10 @@ pub(crate) fn verify_bar_to_abar(
             // fake commitment
             let (l, h) = utils::u64_to_u32_pair(amount - fee);
             (
-                pc_gens_rist
+                pc_gens
                     .commit(&[RistrettoScalar::from_u32(l)], &RistrettoScalar::zero())
                     .c(d!())?,
-                pc_gens_rist
+                pc_gens
                     .commit(&[RistrettoScalar::from_u32(h)], &RistrettoScalar::zero())
                     .c(d!())?,
             )
@@ -235,23 +243,18 @@ pub(crate) fn verify_bar_to_abar(
             .c(d!())?,
         XfrAssetType::NonConfidential(a) => {
             // fake commitment
-            pc_gens_rist
+            pc_gens
                 .commit(&[a.as_scalar()], &RistrettoScalar::zero())
                 .c(d!())?
         }
     };
 
-    // 1.3 get vector commitment of amount and asset type over jubjub pedersen generators
-    let com_amount_asset_type = &proof.commitment_amount_asset_type;
-
     // 2. verify equality of commited values
-    let mut transcript = Transcript::new(b"Commitment Equality Proof");
-    crypto::pc_eq_groups::verify_pair_to_vector_pc(
-        &mut transcript,
-        (&com_amount, &com_asset_type),
-        com_amount_asset_type,
-        &pc_gens_rist,
-        &pc_gens_jubjub,
+    let beta = verify_pc_eq_rescue_split_verifier_zk_part(
+        &pc_gens,
+        &com_amount,
+        &com_asset_type,
+        &abar.amount_type_commitment,
         &proof.commitment_eq_proof,
     )
     .c(d!())?;
@@ -260,8 +263,9 @@ pub(crate) fn verify_bar_to_abar(
     verify_eq_committed_vals(
         params,
         abar.amount_type_commitment,
-        com_amount_asset_type,
+        &proof.commitment_eq_proof,
         &proof.pc_rescue_commitments_eq_proof,
+        &beta,
     )
     .c(d!())
 }

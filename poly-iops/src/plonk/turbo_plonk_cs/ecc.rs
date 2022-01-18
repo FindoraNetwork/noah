@@ -78,7 +78,7 @@ fn compute_base_multiples(base: JubjubPoint, n: usize) -> Vec<Vec<JubjubPoint>> 
     for i in 0..n {
         let point2 = point.double();
         let point3 = point2.add(&point);
-        bases[0].push(point.clone());
+        bases[0].push(point);
         bases[2].push(point3);
         if i < n - 1 {
             point = point2.double();
@@ -206,9 +206,9 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
         let y = self.select(point0_var.1, point1_var.1, bit);
         let res_point_var = PointVar(x, y);
         if self.witness[bit].is_zero() {
-            ExtendedPointVar(res_point_var, point0.1.clone())
+            ExtendedPointVar(res_point_var, point0.1)
         } else {
-            ExtendedPointVar(res_point_var, point1.1.clone())
+            ExtendedPointVar(res_point_var, point1.1)
         }
     }
 
@@ -240,9 +240,9 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
         let p_out_ext: JubjubPoint =
             match (self.witness[b0_var] == one, self.witness[b1_var] == one) {
                 (false, false) => JubjubPoint::get_identity(),
-                (true, false) => G1.clone(),
-                (false, true) => G2.clone(),
-                (true, true) => G3.clone(),
+                (true, false) => *G1,
+                (false, true) => *G2,
+                (true, true) => *G3,
             };
         let p_out_var = self.new_point_variable(Point::from(&p_out_ext));
 

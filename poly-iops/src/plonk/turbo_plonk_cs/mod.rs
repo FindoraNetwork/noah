@@ -3,7 +3,6 @@
 /// The gates for elliptic curve operations and Rescue cipher/hash functions are implemented
 /// in ecc.rs and rescue.rs, respectively.
 pub mod ecc;
-
 pub mod rescue;
 
 use crate::plonk::errors::PlonkError;
@@ -564,27 +563,27 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
         self.size += diff;
     }
 
-    fn push_add_selectors(&mut self, q1: F, q2: F, q3: F, q4: F) {
+    pub fn push_add_selectors(&mut self, q1: F, q2: F, q3: F, q4: F) {
         self.selectors[0].push(q1);
         self.selectors[1].push(q2);
         self.selectors[2].push(q3);
         self.selectors[3].push(q4);
     }
 
-    fn push_mul_selectors(&mut self, q_mul12: F, q_mul34: F) {
+    pub fn push_mul_selectors(&mut self, q_mul12: F, q_mul34: F) {
         self.selectors[4].push(q_mul12);
         self.selectors[5].push(q_mul34);
     }
 
-    fn push_constant_selector(&mut self, q_c: F) {
+    pub fn push_constant_selector(&mut self, q_c: F) {
         self.selectors[6].push(q_c);
     }
 
-    fn push_ecc_selector(&mut self, q_ecc: F) {
+    pub fn push_ecc_selector(&mut self, q_ecc: F) {
         self.selectors[7].push(q_ecc);
     }
 
-    fn push_rescue_selectors(
+    pub fn push_rescue_selectors(
         &mut self,
         q_hash_1: F,
         q_hash_2: F,
@@ -597,7 +596,7 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
         self.selectors[11].push(q_hash_4);
     }
 
-    fn push_out_selector(&mut self, q_out: F) {
+    pub fn push_out_selector(&mut self, q_out: F) {
         self.selectors[12].push(q_out);
     }
 

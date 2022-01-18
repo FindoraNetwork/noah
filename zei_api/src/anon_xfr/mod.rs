@@ -605,7 +605,7 @@ mod tests {
                 &[keypair_in],
             )
             .unwrap();
-            (body, mt_proof.root.clone(), key_pairs)
+            (body, mt_proof.root, key_pairs)
         };
         {
             // owner scope

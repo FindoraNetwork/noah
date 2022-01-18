@@ -7,6 +7,7 @@ members = [
  "utils",
  "zei_api",
 ]
+resolver = "2"
 
 [patch.crates-io]
 ark-ec = { git = "https://github.com/FindoraNetwork/ark-algebra" }
@@ -15,6 +16,7 @@ ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra" }
 ark-std = { git = "https://github.com/FindoraNetwork/ark-std" }
 ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
 ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
+curve25519-dalek = { git = "https://github.com/FindoraNetwork/curve25519-dalek" }
 
 [profile.release]
 opt-level = 3

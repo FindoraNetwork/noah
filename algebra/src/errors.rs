@@ -3,6 +3,7 @@ use ark_std::{error, fmt};
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AlgebraError {
     ArgumentVerificationError,
+    BitConversionError,
     CommitmentInputError,
     CommitmentVerificationError,
     DecompressElementError,
@@ -21,6 +22,7 @@ impl fmt::Display for AlgebraError {
             AlgebraError::ArgumentVerificationError => {
                 "Proof(argument) not valid for statement"
             }
+            AlgebraError::BitConversionError => "Bit conversion is not valid",
             AlgebraError::CommitmentInputError => {
                 "The number of messages to be committed is invalid"
             }
@@ -47,6 +49,7 @@ impl error::Error for AlgebraError {
             AlgebraError::ArgumentVerificationError => {
                 "Proof(argument) not valid for statement"
             }
+            AlgebraError::BitConversionError => "Bit conversion is not valid",
             AlgebraError::CommitmentInputError => {
                 "The number of messages to be committed is invalid"
             }

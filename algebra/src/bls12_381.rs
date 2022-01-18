@@ -21,6 +21,7 @@ use ark_std::{
     One as ArkOne, UniformRand, Zero as ArkZero,
 };
 use digest::{generic_array::typenum::U64, Digest};
+use num_bigint::BigUint;
 use rand_chacha::ChaCha20Rng;
 use ruc::*;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
@@ -59,6 +60,18 @@ impl From<&JubjubScalar> for BLSScalar {
     }
 }
 
+impl Into<BigUint> for &BLSScalar {
+    fn into(self) -> BigUint {
+        self.get_scalar().into_repr().into()
+    }
+}
+
+impl From<&BigUint> for BLSScalar {
+    fn from(src: &BigUint) -> Self {
+        Self(Fr::from(src.clone()))
+    }
+}
+
 impl BLSScalar {
     #[inline]
     pub fn new(elem: Fr) -> Self {
@@ -68,6 +81,17 @@ impl BLSScalar {
     #[inline]
     pub fn get_scalar(&self) -> Fr {
         self.0
+    }
+
+    #[inline]
+    pub fn from_le_bits(bits: &[bool]) -> Result<Self> {
+        let res = Fr::from_repr(<Fr as PrimeField>::BigInt::from_bits_le(bits));
+
+        if let Some(fr) = res {
+            Ok(Self(fr))
+        } else {
+            Err(eg!(AlgebraError::BitConversionError))
+        }
     }
 }
 
@@ -124,7 +148,7 @@ impl ScalarArithmetic for BLSScalar {
     #[inline]
     fn inv(&self) -> Result<Self> {
         let a = self.0.inverse();
-        if bool::from(a.is_none()) {
+        if a.is_none() {
             return Err(eg!(AlgebraError::GroupInversionError));
         }
         Ok(Self(a.unwrap()))
@@ -438,7 +462,7 @@ impl GroupArithmetic for BLSGt {
 
     #[inline]
     fn sub(&self, other: &Self) -> Self {
-        let mut other_inverse = other.0.clone();
+        let mut other_inverse = other.0;
         other_inverse.conjugate();
 
         Self(self.0.mul(&other_inverse))

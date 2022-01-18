@@ -49,7 +49,7 @@ impl AXfrKeyPair {
 
     /// Return public key
     pub fn pub_key(&self) -> AXfrPubKey {
-        AXfrPubKey(self.0.pub_key.clone())
+        AXfrPubKey(self.0.pub_key)
     }
 
     /// Return secret key scalar value

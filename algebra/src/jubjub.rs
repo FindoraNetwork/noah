@@ -48,7 +48,7 @@ impl Ord for JubjubPoint {
         self.0
             .to_string()
             .as_bytes()
-            .cmp(&other.0.to_string().as_bytes())
+            .cmp(other.0.to_string().as_bytes())
     }
 }
 
@@ -114,7 +114,7 @@ impl ScalarArithmetic for JubjubScalar {
     #[inline]
     fn inv(&self) -> Result<Self> {
         let a = self.0.inverse();
-        if bool::from(a.is_none()) {
+        if a.is_none() {
             return Err(eg!(AlgebraError::GroupInversionError));
         }
         Ok(Self(a.unwrap()))
@@ -185,7 +185,7 @@ impl Scalar for JubjubScalar {
         if bytes.len() != JUBJUB_SCALAR_LEN {
             return Err(eg!(AlgebraError::ParameterError));
         }
-        Ok(Self(Fr::from_le_bytes_mod_order(&bytes)))
+        Ok(Self(Fr::from_le_bytes_mod_order(bytes)))
     }
 
     #[inline]
@@ -240,8 +240,8 @@ impl Group for JubjubPoint {
 
         let affine = AffinePoint::deserialize(&mut reader);
 
-        if affine.is_ok() {
-            Ok(Self(ExtendedPoint::from(affine.unwrap()))) // safe unwrap
+        if let Ok(affine) = affine {
+            Ok(Self(ExtendedPoint::from(affine))) // safe unwrap
         } else {
             Err(eg!(AlgebraError::DecompressElementError))
         }
