@@ -1,3 +1,4 @@
+use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use algebra::groups::Group;
 use algebra::ristretto::RistrettoPoint;
 use digest::Digest;
@@ -55,6 +56,15 @@ impl From<bulletproofs::PedersenGens> for PedersenGens<RistrettoPoint> {
                 RistrettoPoint(bp_pc_gens.B),
                 RistrettoPoint(bp_pc_gens.B_blinding),
             ],
+        }
+    }
+}
+
+impl Into<RistrettoPedersenGens> for PedersenGens<RistrettoPoint> {
+    fn into(self) -> RistrettoPedersenGens {
+        RistrettoPedersenGens {
+            B: self.bases[0],
+            B_blinding: self.bases[1],
         }
     }
 }

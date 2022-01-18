@@ -493,6 +493,22 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
 
     // Returns a boolean variable that equals 1 if and only if `left_var` == `right_var`
     pub fn is_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
+        let (is_equal, _) = self.is_equal_or_not_equal(left_var, right_var);
+        is_equal
+    }
+
+    // Returns a boolean variable that equals 1 if and only if `left_var` != `right_var`
+    pub fn is_not_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
+        let (_, is_not_equal) = self.is_equal_or_not_equal(left_var, right_var);
+        is_not_equal
+    }
+
+    // Returns two boolean variables that equals (1, 0) if and only if `left_var` == `right_var` and (0, 1) otherwise
+    pub fn is_equal_or_not_equal(
+        &mut self,
+        left_var: VarIndex,
+        right_var: VarIndex,
+    ) -> (VarIndex, VarIndex) {
         let diff = self.sub(left_var, right_var);
         // set `inv_diff` = `diff`^{-1} when `diff` != 0, otherwise we can set `inv_diff` to arbirary value since `diff` * `inv_diff` will always be 0 when `diff` == 0
         let inv_diff_scalar = self.witness[diff].inv().unwrap_or_else(|_| F::zero());
@@ -509,7 +525,7 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
         let zero_var = self.zero_var();
         self.insert_mul_gate(diff, diff_is_zero, zero_var);
 
-        diff_is_zero
+        (diff_is_zero, mul_var)
     }
 
     /// Insert a constant constraint: wo = constant

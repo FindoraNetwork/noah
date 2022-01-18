@@ -22,9 +22,7 @@ use algebra::{
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
 use crypto::{
-    basics::commitments::{
-        pedersen::PedersenGens, ristretto_pedersen::RistrettoPedersenGens,
-    },
+    basics::commitments::pedersen::PedersenGens,
     pc_eq_groups::{prove_pair_to_vector_pc, Proof as PCEqProof},
 };
 use merlin::Transcript;
@@ -58,7 +56,6 @@ pub(crate) fn abar_to_bar<R: CryptoRng + RngCore>(
     let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
     let pc_gens_ristretto =
         PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
-    let pc_gens = RistrettoPedersenGens::from(bulletproofs::PedersenGens::default());
 
     let art = AssetRecordTemplate::with_no_asset_tracing(
         oabar.amount,
@@ -66,7 +63,8 @@ pub(crate) fn abar_to_bar<R: CryptoRng + RngCore>(
         NonConfidentialAmount_NonConfidentialAssetType,
         *bar_pubkey,
     );
-    let (obar, _, _) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
+    let (obar, _, _) =
+        build_open_asset_record(prng, &pc_gens_ristretto.clone().into(), &art, vec![]);
 
     // 1. commitments
     let commitment_amount_asset_type = pc_gens_jubjub
@@ -204,7 +202,7 @@ pub struct AbarToBarBody {
     pub input: AnonBlindAssetRecord,
     /// The new BAR to be created
     pub output: BlindAssetRecord,
-    /// The ZKP for the coversion
+    /// The ZKP for the conversion
     pub proof: ConvertAbarBarProof,
 }
 

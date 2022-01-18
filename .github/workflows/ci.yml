@@ -38,7 +38,6 @@ jobs:
       matrix:
         rust:
           - stable
-          - nightly
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -57,18 +56,11 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-            command: test
-            args: "--workspace"
 
-      - name: Test assembly on nightly
+      - name: Test
         env:
           RUSTFLAGS: -C target-cpu=native
         uses: actions-rs/cargo@v1
         with:
             command: test
             args: "--workspace"
-        if: matrix.rust == 'nightly'
