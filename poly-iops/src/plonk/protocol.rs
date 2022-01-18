@@ -330,7 +330,7 @@ pub mod prover {
     /// Polynomial Commitement parameters must be shared between prover and verifier.
     /// # Example
     /// See plonk::prover::prover
-   pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
+    pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         transcript: &mut Transcript,
         pcs: &PCS,
         cs: &CS,
