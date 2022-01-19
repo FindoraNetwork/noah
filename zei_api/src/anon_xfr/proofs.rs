@@ -356,14 +356,25 @@ mod tests {
         let zero = BLSScalar::zero();
         // (n, m) = (2, 1)
         let mut rng = ChaChaRng::from_entropy();
-        let total_output = 50 + rng.next_u64() % 50;
-        let amount = rng.next_u64() % total_output;
-        let inputs = vec![(amount, zero), (total_output - amount, zero)];
-        let outputs = vec![(total_output, zero)];
+        //let total_output = 50 + rng.next_u64() % 50;
+        //let amount = rng.next_u64() % total_output;
+
+        //This time we need one input equal to the output, besides the input for fees
+        let amount = 50 + rng.next_u64() % 50; // a random number in [50, 100)
+
+        //Base fee 5 + 1 * (inputs) + 2 * (outputs)
+        let fees_input = 5 + 2 + 1 * 2;
+
+        //let outputs = vec![(total_output, zero)];
+        let outputs = vec![(amount, zero)];
+        //let inputs = vec![(amount, zero), (total_output - amount, zero)];
+        let inputs = vec![(amount, zero), (fees_input, zero)];
+
         test_anon_xfr_proof_with_fees(outputs, inputs);
     }
 
     #[test]
+    //This is going to be deprecated since we need to have at least one input for fees
     fn test_anon_multi_xfr_proof_1in_1out_single_asset() {
         let zero = BLSScalar::zero();
         // (n, m) = (1, 1)
