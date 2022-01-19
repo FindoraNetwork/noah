@@ -245,7 +245,7 @@ pub struct AbarToBarNote {
 
 /// Generates a conversion note with the input, output, proof and signature.
 #[allow(dead_code)]
-fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
+pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
     record: &OpenAnonBlindAssetRecord,
