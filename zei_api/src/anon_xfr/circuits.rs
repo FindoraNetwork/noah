@@ -2249,6 +2249,8 @@ pub(crate) mod tests {
         let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [0u8; 32]);
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
 
+        let x = 2u32;
+        let y = 2u32;
         let fee_type = BLSScalar::from_u32(000u32);
     
         let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
