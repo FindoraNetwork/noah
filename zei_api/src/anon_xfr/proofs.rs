@@ -41,9 +41,6 @@ pub(crate) fn prove_xfr_with_fees<R: CryptoRng + RngCore>(
         secret_inputs.payees_secrets.len() as u64,
     );
 
-    let x = 2u32;
-    let y = 2u32;
-
     let fee_type = BLSScalar::from_u32(000u32);
     
     let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
