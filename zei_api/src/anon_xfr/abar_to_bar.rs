@@ -1,9 +1,5 @@
-use crate::anon_xfr::{
-    bar_to_from_abar::TWO_POW_32,
-    keys::{AXfrKeyPair, AXfrSignature},
-    proofs::{prove_eq_committed_vals, verify_eq_committed_vals, AXfrPlonkPf},
-    structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
-};
+use std::ptr::null;
+use crate::anon_xfr::{bar_to_from_abar::TWO_POW_32, keys::{AXfrKeyPair, AXfrSignature}, nullifier, proofs::{prove_eq_committed_vals, verify_eq_committed_vals, AXfrPlonkPf}, structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord}};
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::{
     asset_record::{
@@ -200,6 +196,8 @@ pub fn verify_abar_to_bar(
 pub struct AbarToBarBody {
     /// ABAR being spent
     pub input: AnonBlindAssetRecord,
+    /// nullifier for signing key
+    pub nullifier: BLSScalar,
     /// The new BAR to be created
     pub output: BlindAssetRecord,
     /// The ZKP for the conversion
@@ -211,15 +209,25 @@ pub struct AbarToBarBody {
 #[allow(dead_code)]
 pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
+    input_keypair: AXfrKeyPair,
     params: &UserParams,
+    uid: u64,
     record: &OpenAnonBlindAssetRecord,
     address: XfrPublicKey,
 ) -> Result<AbarToBarBody> {
     // build input witness infos
     let (obar, proof) = abar_to_bar(prng, params, record, &address).c(d!())?;
 
+    let nullifier = nullifier(
+        &input_keypair,
+        record.amount,
+        &record.asset_type,
+        uid,
+    );
+
     Ok(AbarToBarBody {
         input: AnonBlindAssetRecord::from_oabar(&record),
+        nullifier,
         output: obar.blind_asset_record.clone(),
         proof,
     })
@@ -248,13 +256,14 @@ pub struct AbarToBarNote {
 pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
+    uid: u64,
     record: &OpenAnonBlindAssetRecord,
     randomizer: JubjubScalar,
     address: XfrPublicKey,
     input_keypair: AXfrKeyPair,
 ) -> Result<AbarToBarNote> {
     // generate body
-    let body = gen_abar_to_bar_body(prng, params, record, address).c(d!())?;
+    let body = gen_abar_to_bar_body(prng, input_keypair, params, uid, record, address).c(d!())?;
 
     // serialize and sign
     let msg = bincode::serialize(&body)
@@ -320,6 +329,7 @@ mod test {
         let mut note = gen_abar_to_bar_note(
             &mut prng,
             &params,
+            0u64,
             &oabar,
             oabar.key_rand_factor,
             address,
@@ -366,6 +376,7 @@ mod test {
         let note = gen_abar_to_bar_note(
             &mut prng,
             &params,
+            0u64,
             &oabar,
             JubjubScalar::from_u64(12341234u64),
             address,

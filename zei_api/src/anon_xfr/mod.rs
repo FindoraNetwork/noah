@@ -289,7 +289,7 @@ fn nullifier(
     let pub_key_y = pub_key_point.get_y();
 
     // TODO From<u128> for ZeiScalar and do let uid_amount = BLSScalar::from(amount as u128 + ((uid as u128) << 64));
-    let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::from_u32(1));
+    let pow_2_64 = BLSScalar::from_u64(u64::MAX()).add(&BLSScalar::from_u32(1));
     let uid_shifted = BLSScalar::from_u64(uid).mul(&pow_2_64);
     let uid_amount = uid_shifted.add(&BLSScalar::from_u64(amount));
     PRF::new().eval(
