@@ -2,7 +2,7 @@ use crate::anon_xfr::circuits::{
     AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret,
 };
 use crate::anon_xfr::keys::AXfrKeyPair;
-use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
+use crate::anon_xfr::proofs::{prove_xfr, prove_xfr_with_fees, verify_xfr};
 use crate::anon_xfr::structs::{
     AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord,
 };
@@ -105,7 +105,8 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
         payers_secrets,
         payees_secrets,
     };
-    let proof = prove_xfr(prng, params, secret_inputs).c(d!())?;
+    //let proof = prove_xfr(prng, params, secret_inputs).c(d!())?;
+    let proof = prove_xfr_with_fees(prng, params, secret_inputs).c(d!())?;
 
     let diversified_key_pairs = rand_input_keypairs
         .iter()

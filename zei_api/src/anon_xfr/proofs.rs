@@ -296,14 +296,16 @@ mod tests {
         let mut total_output = total_input;
 
         let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
+        //Base fee 5 + 1 * (inputs) + 2 * (outputs)
+        let fees_input = 5 + 1 * 3 + 2 * 3;
 
         let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
 
-        for _i in 1..3 {
-            let amount = rng.next_u64() % total_input;
-            inputs.push((amount, zero));
-            total_input -= amount;
+        let amount = rng.next_u64() % total_input;
+        inputs.push((amount, zero));
+        total_input -= amount;
 
+        for _i in 1..2 {
             let amount_out = rng.next_u64() % total_output;
             outputs.push((amount_out, zero));
             total_output -= amount_out;
@@ -311,6 +313,7 @@ mod tests {
 
         inputs.push((total_input, zero));
         outputs.push((total_output, zero));
+        inputs.push((fees_input, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
