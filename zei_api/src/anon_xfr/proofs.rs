@@ -331,11 +331,22 @@ mod tests {
     fn test_anon_multi_xfr_proof_1in_2out_single_asset_with_fees() {
         let zero = BLSScalar::zero();
         // (n, m) = (1, 2)
-        let mut rng = ChaChaRng::from_entropy();
-        let total_input = 50 + rng.next_u64() % 50;
+        //let rng = ChaChaRng::from_entropy();
+        /*let total_input = 50 + rng.next_u64() % 50;
         let inputs = vec![(total_input, zero)];
         let amount = rng.next_u64() % total_input;
-        let outputs = vec![(amount, zero), (total_input - amount, zero)];
+        let outputs = vec![(amount, zero), (total_input - amount, zero)];*/
+
+        
+        //This time we need one input equal to the output, besides the input for fees
+        let amount = 0; // a random number in [50, 100)
+        //Base fee 5 + 1 * (inputs) + 2 * (outputs)
+        let fees_input = 5 + 1 * 1 + 2 * 2;
+
+        //let outputs = vec![(total_output, zero)];
+        let outputs = vec![(amount, zero), (amount, zero)];
+        //let inputs = vec![(amount, zero), (total_output - amount, zero)];
+        let inputs = vec![(fees_input, zero)];
         test_anon_xfr_proof_with_fees(inputs.to_vec(), outputs.to_vec());
     }
 
