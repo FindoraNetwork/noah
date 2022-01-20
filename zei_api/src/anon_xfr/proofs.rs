@@ -348,6 +348,7 @@ mod tests {
         let amount = rng.next_u64() % total_output;
         let inputs = vec![(amount, zero), (total_output - amount, zero)];
         let outputs = vec![(total_output, zero)];
+        //test_anon_xfr_proof(outputs, inputs);
         test_anon_xfr_proof(outputs, inputs);
     }
 
@@ -370,7 +371,9 @@ mod tests {
         //let inputs = vec![(amount, zero), (total_output - amount, zero)];
         let inputs = vec![(amount, zero), (fees_input, zero)];
 
-        test_anon_xfr_proof_with_fees(outputs, inputs);
+        //test_anon_xfr_proof_with_fees(outputs, inputs);
+        //This fix the error we were putting the parameters in the wrong way
+        test_anon_xfr_proof_with_fees(inputs, outputs);
     }
 
     #[test]
