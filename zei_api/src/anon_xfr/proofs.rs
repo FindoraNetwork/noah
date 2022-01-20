@@ -282,7 +282,7 @@ mod tests {
         inputs.push((total_input, zero));
         outputs.push((total_output, zero));
 
-        test_anon_xfr_proof(outputs, inputs);
+        test_anon_xfr_proof(inputs, outputs);
     }
 
     #[test]
@@ -312,7 +312,7 @@ mod tests {
         inputs.push((total_input, zero));
         outputs.push((total_output, zero));
 
-        test_anon_xfr_proof_with_fees(outputs, inputs);
+        test_anon_xfr_proof_with_fees(inputs, outputs);
     }
 
     #[test]
@@ -349,7 +349,7 @@ mod tests {
         let inputs = vec![(amount, zero), (total_output - amount, zero)];
         let outputs = vec![(total_output, zero)];
         //test_anon_xfr_proof(outputs, inputs);
-        test_anon_xfr_proof(outputs, inputs);
+        test_anon_xfr_proof(inputs, outputs);
     }
 
     #[test]
@@ -386,7 +386,7 @@ mod tests {
         let amount = 50 + rng.next_u64() % 50;
         let inputs = vec![(amount, zero)];
         let outputs = vec![(amount, zero)];
-        test_anon_xfr_proof(outputs, inputs);
+        test_anon_xfr_proof(inputs, outputs);
     }
 
     #[test]
@@ -398,7 +398,7 @@ mod tests {
         let amount = 50 + rng.next_u64() % 50;
         let inputs = vec![(amount, zero)];
         let outputs = vec![(amount, zero)];
-        test_anon_xfr_proof_with_fees(outputs, inputs);
+        test_anon_xfr_proof_with_fees(inputs, outputs);
     }
 
     #[test]

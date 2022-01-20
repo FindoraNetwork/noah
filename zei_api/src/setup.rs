@@ -157,6 +157,9 @@ impl UserParams {
         bp_num_gens: usize,
     ) -> UserParams {
 
+        let _x = 2u32;
+        let _y = 2u32;
+
         let fee_type = BLSScalar::from_u32(000u32);
     
         let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
@@ -227,6 +230,9 @@ impl UserParams {
         bp_num_gens: usize,
         max_degree_poly_com: usize,
     ) -> UserParams {
+
+        let _x = 2u32;
+        let _y = 2u32;
 
         let fee_type = BLSScalar::from_u32(000u32);
     
