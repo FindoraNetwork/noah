@@ -235,13 +235,14 @@ mod tests {
         let mut total_output = total_input;
 
         let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
-        for _i in 1..3 {
+        for _i in 1..2 {
             let rnd_amount = rng.next_u64();
             let amount = rnd_amount % total_input;
             inputs.push((amount, zero));
             total_input -= amount;
         }
         inputs.push((total_input, zero));
+
 
         let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
         for _i in 1..6 {
@@ -251,6 +252,10 @@ mod tests {
             total_output -= amount;
         }
         outputs.push((total_output, zero));
+
+        //
+        let fee_amount =  5 + (inputs.len() + 1) /*inputs*/ + (2 * outputs.len())/*outputs*/;
+        inputs.push((fee_amount as u64, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
@@ -296,24 +301,24 @@ mod tests {
         let mut total_output = total_input;
 
         let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
-        //Base fee 5 + 1 * (inputs) + 2 * (outputs)
-        let fees_input = 5 + 1 * 3 + 2 * 3;
-
         let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
 
         let amount = rng.next_u64() % total_input;
         inputs.push((amount, zero));
         total_input -= amount;
-
-        for _i in 1..2 {
-            let amount_out = rng.next_u64() % total_output;
-            outputs.push((amount_out, zero));
-            total_output -= amount_out;
-        }
-
         inputs.push((total_input, zero));
+
+
+
+        let amount_out = rng.next_u64() % total_output;
+        outputs.push((amount_out, zero));
+        total_output -= amount_out;
         outputs.push((total_output, zero));
-        inputs.push((fees_input, zero));
+
+        //input for fees
+        //Base fee 5 + 1 * (inputs) + 2 * (outputs)
+        let fees_input = 5 + (1 * inputs.len() + 1)  + 2 * outputs.len();
+        inputs.push((fees_input as u64, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
@@ -408,10 +413,10 @@ mod tests {
         let zero = BLSScalar::zero();
         // (n, m) = (1, 1)
 
-        let mut rng = ChaChaRng::from_entropy();
-        let amount = 50 + rng.next_u64() % 50;
-        let inputs = vec![(amount, zero)];
-        let outputs = vec![(amount, zero)];
+        //let mut rng = ChaChaRng::from_entropy();
+        let fee_amount = 5 + 1 + 2;
+        let inputs = vec![(fee_amount, zero)];
+        let outputs = vec![(0, zero)];
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
 
@@ -453,41 +458,7 @@ mod tests {
     }
 
     #[test]
-    fn test_anon_multi_xfr_proof_3in_6out_multi_asset_with_fees() {
-        let zero = BLSScalar::zero();
-        // multiple asset types
-        // (n, m) = (3, 6)
-        let one = BLSScalar::one();
 
-        let mut rng = ChaChaRng::from_entropy();
-        let total_input_zero = 50 + rng.next_u64() % 50;
-        let amount_zero = rng.next_u64() % total_input_zero;
-        let total_input_one = 50 + rng.next_u64() % 50;
-
-        let mut total_output_zero = total_input_zero;
-        let mut total_output_one = total_input_one;
-
-        let inputs = vec![
-            (/*amount=*/ amount_zero, /*asset_type=*/ zero),
-            (total_input_one, one),
-            (total_input_zero - amount_zero, zero),
-        ];
-
-        let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
-
-        for _i in 1..3 {
-            let amount_one = rng.next_u64() % total_output_one;
-            let amount_zero = rng.next_u64() % total_output_zero;
-            outputs.push((amount_one, one));
-            outputs.push((amount_zero, zero));
-            total_output_one -= amount_one;
-            total_output_zero -= amount_zero;
-        }
-        outputs.push((total_output_one, one));
-        outputs.push((total_output_zero, zero));
-
-        test_anon_xfr_proof_with_fees(inputs, outputs);
-    }
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_multi_asset_with_fees() {
@@ -495,26 +466,35 @@ mod tests {
         let one = BLSScalar::one();
         // (n, m) = (3, 3)
 
-        let mut rng = ChaChaRng::from_entropy();
+        let input_1 = 20u64;
+        let input_2 = 52u64;
 
-        let total_input_zero = 50 + rng.next_u64() % 50;
-        let amount_zero = rng.next_u64() % total_input_zero;
-        let total_input_one = 50 + rng.next_u64() % 50;
-        let amount_one = rng.next_u64() % total_input_one;
+
+        let output_1 = 17u64;
+        let output_2 = 52u64;
+        let output_3 = 3u64;
+
+        //Here we should put the abstract definition of the fee calculating function as
+        //a parameter, otherwise we will modify this calculation every time we modify
+        //the generic fee calculating function or any of the factors in the linear combination
+        //now we have C_0 = 5, c_1 = 1 and c_2 = 2, so fee_calculation function is
+        //c_0 + c_1 (number_inputs) + c2 =(number_output)
+
+        let input_fees = 5 + (3 * 1) + (3 * 2);
 
         let inputs = vec![
-            (amount_zero, zero),
-            (total_input_one, one),
-            (total_input_zero - amount_zero, zero),
+            (input_1, zero),
+            (input_2, one),
+            (input_fees, zero),
         ];
 
         let outputs = vec![
-            (amount_one, one),
-            (total_input_zero, zero),
-            (total_input_one - amount_one, one),
+            (output_1, zero),
+            (output_2, one),
+            (output_3, zero),
         ];
 
-        test_anon_xfr_proof_with_fees(outputs, inputs);
+        test_anon_xfr_proof_with_fees(inputs, outputs);
     }
 
     #[test]
