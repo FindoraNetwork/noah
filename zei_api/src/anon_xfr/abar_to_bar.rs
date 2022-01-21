@@ -1,4 +1,3 @@
-use std::ptr::null;
 use crate::anon_xfr::{bar_to_from_abar::TWO_POW_32, keys::{AXfrKeyPair, AXfrSignature}, nullifier, proofs::{prove_eq_committed_vals, verify_eq_committed_vals, AXfrPlonkPf}, structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord}};
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::{
@@ -260,10 +259,10 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     record: &OpenAnonBlindAssetRecord,
     randomizer: JubjubScalar,
     address: XfrPublicKey,
-    input_keypair: AXfrKeyPair,
+    input_keypair: &AXfrKeyPair,
 ) -> Result<AbarToBarNote> {
     // generate body
-    let body = gen_abar_to_bar_body(prng, input_keypair, params, uid, record, address).c(d!())?;
+    let body = gen_abar_to_bar_body(prng, input_keypair.clone(), params, uid, record, address).c(d!())?;
 
     // serialize and sign
     let msg = bincode::serialize(&body)
