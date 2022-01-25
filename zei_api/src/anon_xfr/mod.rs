@@ -2,7 +2,8 @@ use crate::anon_xfr::circuits::{
     AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret,
 };
 use crate::anon_xfr::keys::AXfrKeyPair;
-use crate::anon_xfr::proofs::{prove_xfr, prove_xfr_with_fees, verify_xfr};
+//use crate::anon_xfr::proofs::{prove_xfr, prove_xfr_with_fees, verify_xfr};
+use crate::anon_xfr::proofs::{prove_xfr_with_fees, verify_xfr};
 use crate::anon_xfr::structs::{
     AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord,
 };
