@@ -195,7 +195,7 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 
-
+    /* 
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_single_asset() {
         // single asset type
@@ -224,7 +224,7 @@ mod tests {
         outputs.push((total_output, zero));
 
         test_anon_xfr_proof(inputs, outputs);
-    }
+    }*/
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_single_asset_with_fees() {
@@ -322,7 +322,7 @@ mod tests {
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-
+    /* 
     #[test]
     fn test_anon_multi_xfr_proof_1in_2out_single_asset() {
         let zero = BLSScalar::zero();
@@ -333,7 +333,7 @@ mod tests {
         let amount = rng.next_u64() % total_input;
         let outputs = vec![(amount, zero), (total_input - amount, zero)];
         test_anon_xfr_proof(inputs.to_vec(), outputs.to_vec());
-    }
+    }*/
 
     #[test]
     fn test_anon_multi_xfr_proof_1in_2out_single_asset_with_fees() {
@@ -350,7 +350,7 @@ mod tests {
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-
+    /* 
     #[test]
     fn test_anon_multi_xfr_proof_2in_1out_single_asset() {
         let zero = BLSScalar::zero();
@@ -362,7 +362,7 @@ mod tests {
         let outputs = vec![(total_output, zero)];
         //test_anon_xfr_proof(outputs, inputs);
         test_anon_xfr_proof(inputs, outputs);
-    }
+    }*/
 
     #[test]
     fn test_anon_multi_xfr_proof_2in_1out_single_asset_with_fees() {
@@ -382,7 +382,7 @@ mod tests {
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-
+    /* 
     #[test]
     fn test_anon_multi_xfr_proof_1in_1out_single_asset() {
         let zero = BLSScalar::zero();
@@ -393,7 +393,7 @@ mod tests {
         let inputs = vec![(amount, zero)];
         let outputs = vec![(amount, zero)];
         test_anon_xfr_proof(inputs, outputs);
-    }
+    }*/
 
     #[test]
     //This is going to be deprecated since we need to have at least one input for fees
@@ -407,7 +407,7 @@ mod tests {
         let outputs = vec![(0, zero)];
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-
+    /* 
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_multi_asset() {
         let zero = BLSScalar::zero();
@@ -455,7 +455,8 @@ mod tests {
 
 
         test_anon_xfr_proof(inputs, outputs);
-    }
+    }*/
+
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_multi_asset_with_fees() {
         let zero = BLSScalar::zero();
@@ -506,11 +507,45 @@ mod tests {
         test_anon_xfr_proof_with_fees (inputs, outputs);
     }
 
-
-
-
+    // dummy new test
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_multi_asset_with_fees() {
+        let zero = BLSScalar::zero();
+        let one = BLSScalar::one();
+        // (n, m) = (3, 3)
+
+        let input_1 = 20u64;
+        let input_2 = 52u64;
+
+
+        let output_1 = 17u64;
+        let output_2 = 3u64;
+        let output_3 = 52u64;
+
+
+        //let input_fees = 5 + (3 * 1) + (3 * 2);
+
+        let mut inputs = vec![
+            (input_1, zero),
+            (input_2, one),
+        ];
+
+        let outputs = vec![
+            (output_1, zero),
+            (output_2, zero),
+            (output_3, one),
+        ];
+
+        let fee_amount = compute_fees (inputs.len() as u64 + 1 ,outputs.len() as u64);
+        inputs.push((fee_amount, zero));
+
+        test_anon_xfr_proof_with_fees(inputs, outputs);
+    }
+     
+    //original test
+    
+    #[test]
+    fn test_anon_multi_xfr_proof_3in_3out_multi_asset_with_fees_old() {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         // (n, m) = (3, 3)
@@ -537,8 +572,8 @@ mod tests {
             (output_3, zero),
         ];
 
-        let input_fee = (compute_fees(inputs.len() as u64 + 1, outputs.len() as u64), zero);
-        inputs.push( input_fee);
+        let fee_amount = compute_fees (inputs.len() as u64 + 1 ,outputs.len() as u64);
+        inputs.push((fee_amount, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
@@ -619,7 +654,7 @@ mod tests {
         // verify bad witness
         assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
     }
-
+    
     fn test_anon_xfr_proof(
         inputs: Vec<(u64, BLSScalar)>,
         outputs: Vec<(u64, BLSScalar)>,
