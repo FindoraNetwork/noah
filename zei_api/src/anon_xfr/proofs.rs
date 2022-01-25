@@ -65,6 +65,7 @@ pub(crate) fn prove_xfr_with_fees<R: CryptoRng + RngCore>(
 /// * `rng` - pseudo-random generator.
 /// * `params` - System params
 /// * `secret_inputs` - input to generate witness of the constraint system
+#[allow(dead_code)]
 pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &UserParams,

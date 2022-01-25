@@ -188,6 +188,7 @@ impl AMultiXfrPubInputs {
 /// Returns the constraint system (and associated number of constraints) for a multi-inputs/outputs transaction.
 /// A prover can provide honest `secret_inputs` and obtain the cs witness by calling `cs.get_and_clear_witness()`.
 /// One provide an empty secret_inputs to get the constraint system `cs` for verification only.
+#[allow(dead_code)]
 pub(crate) fn build_multi_xfr_cs(
     secret_inputs: AMultiXfrWitness,
 ) -> (TurboPlonkCS, usize) {
@@ -679,6 +680,7 @@ fn nullify(
 /// 3. Enumerate pair (i \in [n], j \in [m]), check that: (type_in_i != type_out_j) \lor (sum_in_i == sum_out_j)
 ///
 /// This function assumes that the inputs and outputs have been correctly bounded.
+#[allow(dead_code)]
 fn asset_mixing(
     cs: &mut TurboPlonkCS,
     inputs: &[(VarIndex, VarIndex)],
