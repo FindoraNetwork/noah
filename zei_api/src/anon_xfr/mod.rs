@@ -1,6 +1,7 @@
 use crate::anon_xfr::circuits::{
     AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret,
 };
+use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
 use crate::anon_xfr::structs::{
@@ -179,14 +180,13 @@ fn check_inputs(
     Ok(())
 }
 
-#[allow(dead_code)]
 /// Check that for each asset type total input amount == total output amount
 /// and for FRA, total input amount == total output amount + fees for fra
-fn check_asset_amount_with_fees(
+fn check_asset_amount(
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
 ) -> Result<()> {
-    let fee_asset_type = AssetType::from_identical_byte(0);
+    let fee_asset_type = FEE_TYPE;
     let mut balances = HashMap::new();
 
     for record in inputs.iter() {
@@ -205,7 +205,7 @@ fn check_asset_amount_with_fees(
         }
     }
 
-    let fee_amount = (5 + inputs.len() + outputs.len() * 2) as i128;
+    let fee_amount = FEE_CALCULATING_FUNC(inputs.len(), outputs.len());
 
     for (&asset_type, &sum) in balances.iter() {
         if asset_type != fee_asset_type {
@@ -216,39 +216,6 @@ fn check_asset_amount_with_fees(
             if sum != fee_amount {
                 return Err(eg!(ZeiError::XfrCreationAssetAmountError));
             }
-        }
-    }
-
-    Ok(())
-}
-
-#[allow(dead_code)]
-/// Check that for each asset type total input amount == total output amount
-fn check_asset_amount(
-    inputs: &[OpenAnonBlindAssetRecord],
-    outputs: &[OpenAnonBlindAssetRecord],
-) -> Result<()> {
-    let mut balances = HashMap::new();
-
-    for record in inputs.iter() {
-        if let Some(x) = balances.get_mut(&record.asset_type) {
-            *x += record.amount as i128;
-        } else {
-            balances.insert(record.asset_type, record.amount as i128);
-        }
-    }
-
-    for record in outputs.iter() {
-        if let Some(x) = balances.get_mut(&record.asset_type) {
-            *x -= record.amount as i128;
-        } else {
-            balances.insert(record.asset_type, -(record.amount as i128));
-        }
-    }
-
-    for (_, &sum) in balances.iter() {
-        if sum != 0i128 {
-            return Err(eg!(ZeiError::XfrCreationAssetAmountError));
         }
     }
 
