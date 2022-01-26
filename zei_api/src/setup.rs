@@ -4,6 +4,8 @@ use crate::anon_xfr::circuits::{
     TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
+
+use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use algebra::groups::Zero;
 use algebra::jubjub::JubjubPoint;
 use bulletproofs::BulletproofGens;
@@ -126,12 +128,16 @@ impl UserParams {
         bp_num_gens: usize,
     ) -> UserParams {
         let (cs, n_constraints) = match tree_depth {
-            Some(depth) => {
-                build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
-            }
-            None => build_multi_xfr_cs(AMultiXfrWitness::fake(
-                n_payers, n_payees, TREE_DEPTH,
-            )),
+            Some(depth) => build_multi_xfr_cs(
+                AMultiXfrWitness::fake(n_payers, n_payees, depth),
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
+            ),
+            None => build_multi_xfr_cs(
+                AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
+            ),
         };
 
         let pcs = KZGCommitmentScheme::new(
@@ -148,8 +154,6 @@ impl UserParams {
         }
     }
 
-    //This function is the same that new, but max_degree_poly_com allows to set the size of the CRS
-    //the parameter max_degree_poly_com is padded to the minimum power of two grater than it.
     pub fn new_max_degree_poly_com(
         n_payers: usize,
         n_payees: usize,
@@ -158,12 +162,16 @@ impl UserParams {
         max_degree_poly_com: usize,
     ) -> UserParams {
         let (cs, /*n_constrains*/ _) = match tree_depth {
-            Some(depth) => {
-                build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
-            }
-            None => build_multi_xfr_cs(AMultiXfrWitness::fake(
-                n_payers, n_payees, TREE_DEPTH,
-            )),
+            Some(depth) => build_multi_xfr_cs(
+                AMultiXfrWitness::fake(n_payers, n_payees, depth),
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
+            ),
+            None => build_multi_xfr_cs(
+                AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
+            ),
         };
 
         let max_degree_poly_com = max_degree_poly_com.next_power_of_two();
@@ -183,6 +191,7 @@ impl UserParams {
     }
 
     pub fn eq_committed_vals_params() -> UserParams {
+        // TODO: Replace with the new algorithm
         let zero = BLSScalar::zero();
         let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
         let (cs, n_constraints) =
