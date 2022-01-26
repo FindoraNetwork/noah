@@ -72,7 +72,7 @@ pub fn prove_pc_eq_rescue_split_verifier_zk_part<R: CryptoRng + RngCore>(
     let mut proof = ZKPartProof::default();
     let mut non_zk_state = NonZKState::default();
     let mut transcript =
-        Transcript::new(b"edersen Eq Rescure Split Verifier -- ZK Verifier Part");
+        Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
 
     // 1. sample a, b, c, d
     let a = RistrettoScalar::random(rng);
