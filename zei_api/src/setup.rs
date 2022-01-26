@@ -5,7 +5,7 @@ use crate::anon_xfr::circuits::{
 };
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::Zero;
-use algebra::jubjub::JubjubPoint;
+use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use bulletproofs::BulletproofGens;
 use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
@@ -186,7 +186,9 @@ impl UserParams {
         let zero = BLSScalar::zero();
         let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
         let (cs, n_constraints) =
-            build_eq_committed_vals_cs(zero, zero, zero, zero, &pc_gens_jubjub);
+            build_eq_committed_vals_cs(zero, zero, zero, zero,
+                                       0, JubjubScalar::zero(),
+                                       JubjubScalar::zero(),&pc_gens_jubjub);
         let pcs = KZGCommitmentScheme::new(
             n_constraints + 2,
             &mut ChaChaRng::from_seed([0u8; 32]),

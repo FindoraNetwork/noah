@@ -317,9 +317,24 @@ fn verify<G: Group>(
     let left = sig.R.add(&pk.0.mul(&c));
     let right = g.mul(&sig.s);
 
+    println!();
+    println!();
+    println!("==================================================");
+    println!("left - {:?}", left);
+    println!("right- {:?}", right);
+
+
     if left == right {
+        println!("Signature matching");
+        println!("==================================================");
+        println!();
+        println!();
         Ok(())
     } else {
+        println!("Signature error");
+        println!("==================================================");
+        println!();
+        println!();
         Err(eg!(ZeiError::SignatureError))
     }
 }
@@ -359,8 +374,8 @@ mod schnorr_sigs {
         use utils::serialization::ZeiFromToBytes;
 
         fn check_schnorr<G: Group>() {
-            let seed = [0_u8; 32];
-            let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+            let _seed = [0_u8; 32];
+            let mut prng = rand_chacha::ChaChaRng::from_entropy();
 
             let key_pair: KeyPair<G, G::S> = KeyPair::generate(&mut prng);
 

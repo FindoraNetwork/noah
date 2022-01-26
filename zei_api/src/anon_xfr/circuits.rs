@@ -404,6 +404,9 @@ pub(crate) fn build_eq_committed_vals_cs(
     asset_type: BLSScalar,
     blind_pc: BLSScalar,
     blind_hash: BLSScalar,
+    uid: u64,
+    sec_key: JubjubScalar,
+    diversifier: JubjubScalar,
     pc_gens: &PedersenGens<JubjubPoint>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboPlonkConstraintSystem::new();
@@ -412,6 +415,19 @@ pub(crate) fn build_eq_committed_vals_cs(
     let at_var = cs.new_variable(asset_type);
     let blind_pc_var = cs.new_variable(blind_pc);
     let blind_hash_var = cs.new_variable(blind_hash);
+    let uid_var = cs.new_variable(BLSScalar::from_u64(uid));
+    let sk_var = cs.new_variable(BLSScalar::from(&sec_key));
+    let diversifier_var = cs.new_variable(BLSScalar::from(&diversifier));
+
+    let base = JubjubPoint::get_base();
+    let pow_2_64 = BLSScalar::from_u64(u64::MAX).add(&BLSScalar::one());
+    let zero = BLSScalar::zero();
+    let one = BLSScalar::one();
+    let (pk_var, pk_point) = cs.scalar_mul(base.clone(), payer.sec_key, SK_LEN);
+    let pk_x = pk_var.get_x();
+    let pk_y = pk_var.get_y();// prove knowledge of diversifier: pk_sign = pk^{diversifier}
+    let (pk_sign_var, _) =
+        cs.var_base_scalar_mul(pk_var, pk_point, diversifier_var, SK_LEN);
 
     // pedersen commitment
     let (point1_var, point1) =
@@ -439,9 +455,27 @@ pub(crate) fn build_eq_committed_vals_cs(
         zero_var,
     ]))[0];
 
+    // prove pre-image of the nullifier
+    // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
+    let uid_amount = cs.linear_combine(
+        &[uid_var, amount_var, zero_var, zero_var],
+        pow_2_64,
+        one,
+        zero,
+        zero,
+    );
+    let nullifier_input_vars = NullifierInputVars {
+        uid_amount,
+        asset_type: at_var,
+        pub_key_x: pk_x,
+        pub_key_y: pk_y,
+    };
+    let nullifier_var = nullify(&mut cs, sk_var, nullifier_input_vars);
+
     // prepare public inputs
     cs.prepare_io_variable(rescue_comm_var);
     cs.prepare_io_point_variable(ped_comm_ext.into_point_var());
+    cs.prepare_io_variable(nullifier_var);
 
     // pad the number of constraints to power of two
     cs.pad();

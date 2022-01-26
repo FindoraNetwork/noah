@@ -3,7 +3,7 @@ use crate::anon_xfr::circuits::{
 };
 use crate::setup::{NodeParams, UserParams};
 use algebra::bls12_381::BLSScalar;
-use algebra::jubjub::JubjubPoint;
+use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use crypto::basics::commitments::pedersen::PedersenGens;
 use merlin::Transcript;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
@@ -11,6 +11,7 @@ use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
+use crate::anon_xfr::keys::AXfrKeyPair;
 
 const ANON_XFR_TRANSCRIPT: &[u8] = b"Anon Xfr";
 const N_INPUTS_TRANSCRIPT: &[u8] = b"Number of input ABARs";
@@ -93,13 +94,16 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     params: &UserParams,
     amount: BLSScalar,
     asset_type: BLSScalar,
+    uid: u64,
+    anon_keypair: &AXfrKeyPair,
+    diversifier: JubjubScalar,
     blind_pc: BLSScalar,
     blind_hash: BLSScalar,
     pc_gens: &PedersenGens<JubjubPoint>,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
     let (mut cs, _) =
-        build_eq_committed_vals_cs(amount, asset_type, blind_pc, blind_hash, pc_gens);
+        build_eq_committed_vals_cs(amount, asset_type, blind_pc, blind_hash, uid, anon_keypair.get_secret_scalar(), diversifier, pc_gens);
     let witness = cs.get_and_clear_witness();
 
     prover(
@@ -121,12 +125,13 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
 /// * Returns Ok() if the verification succeeds, returns an error otherwise.
 pub(crate) fn verify_eq_committed_vals(
     params: &NodeParams,
+    nullifier: BLSScalar,
     hash_comm: BLSScalar,
     ped_comm: &JubjubPoint,
     proof: &AXfrPlonkPf,
 ) -> Result<()> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let online_inputs = vec![hash_comm, ped_comm.get_x(), ped_comm.get_y()];
+    let online_inputs = vec![hash_comm, ped_comm.get_x(), ped_comm.get_y(), nullifier];
     verifier(
         &mut transcript,
         &params.pcs,

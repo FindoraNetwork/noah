@@ -24,6 +24,7 @@ use merlin::Transcript;
 use rand_chacha::rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
+use crate::anon_xfr::circuits::PayerSecret;
 
 /*
        Conversion Proof
@@ -35,6 +36,7 @@ pub struct ConvertAbarBarProof {
     commitment_amount_asset_type: JubjubPoint,
     commitment_eq_proof: PCEqProof<RistrettoPoint, JubjubPoint>,
     pc_rescue_commitments_eq_proof: AXfrPlonkPf,
+    SpendingPlonkProof: AXfrPlonkPf
 }
 
 /// abar_to_bar functions generates the new BAR and the proof given the Open ABAR and the receiver
@@ -100,12 +102,15 @@ pub(crate) fn abar_to_bar<R: CryptoRng + RngCore>(
     )
     .c(d!())?;
 
+
+
     Ok((
         obar,
         ConvertAbarBarProof {
             commitment_amount_asset_type,
             commitment_eq_proof,
             pc_rescue_commitments_eq_proof,
+            SpendingPlonkProof: ()
         },
     ))
 }
@@ -114,6 +119,7 @@ pub(crate) fn abar_to_bar<R: CryptoRng + RngCore>(
 #[allow(dead_code)]
 pub fn verify_abar_to_bar(
     params: &NodeParams,
+    nullifier: &BLSScalar,
     abar: &AnonBlindAssetRecord,
     bar: &BlindAssetRecord,
     proof: &ConvertAbarBarProof,
@@ -181,6 +187,7 @@ pub fn verify_abar_to_bar(
     verify_eq_committed_vals(
         params,
         abar.amount_type_commitment,
+        nullifier,
         com_amount_asset_type,
         &proof.pc_rescue_commitments_eq_proof,
     )
