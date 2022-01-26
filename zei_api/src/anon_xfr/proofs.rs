@@ -4,9 +4,12 @@ use crate::anon_xfr::circuits::{
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::setup::{NodeParams, UserParams};
 use algebra::bls12_381::BLSScalar;
-use algebra::jubjub::JubjubPoint;
-use crypto::basics::commitments::pedersen::PedersenGens;
+use algebra::groups::Scalar;
+use algebra::ristretto::RistrettoScalar;
+use crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
+use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use merlin::Transcript;
+use num_bigint::BigUint;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
 use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
 use rand_core::{CryptoRng, RngCore};
@@ -97,13 +100,20 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     params: &UserParams,
     amount: BLSScalar,
     asset_type: BLSScalar,
-    blind_pc: BLSScalar,
     blind_hash: BLSScalar,
-    pc_gens: &PedersenGens<JubjubPoint>,
+    proof: &ZKPartProof,
+    non_zk_state: &NonZKState,
+    beta: &RistrettoScalar,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let (mut cs, _) =
-        build_eq_committed_vals_cs(amount, asset_type, blind_pc, blind_hash, pc_gens);
+    let (mut cs, _) = build_eq_committed_vals_cs(
+        amount,
+        asset_type,
+        blind_hash,
+        proof,
+        non_zk_state,
+        beta,
+    );
     let witness = cs.get_and_clear_witness();
 
     prover(
@@ -126,11 +136,20 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
 pub(crate) fn verify_eq_committed_vals(
     params: &NodeParams,
     hash_comm: BLSScalar,
-    ped_comm: &JubjubPoint,
+    proof_zk_part: &ZKPartProof,
     proof: &AXfrPlonkPf,
+    beta: &RistrettoScalar,
 ) -> Result<()> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let online_inputs = vec![hash_comm, ped_comm.get_x(), ped_comm.get_y()];
+    let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
+    online_inputs.push(hash_comm);
+    online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
+    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+    let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof_zk_part.s_1.to_bytes()));
+    let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof_zk_part.s_2.to_bytes()));
+    online_inputs.extend_from_slice(&beta_sim_fr.limbs);
+    online_inputs.extend_from_slice(&s1_sim_fr.limbs);
+    online_inputs.extend_from_slice(&s2_sim_fr.limbs);
     verifier(
         &mut transcript,
         &params.pcs,
@@ -147,15 +166,10 @@ mod tests {
     use crate::anon_xfr::circuits::tests::new_multi_xfr_witness_for_test;
     use crate::anon_xfr::circuits::AMultiXfrPubInputs;
     use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
-    use crate::anon_xfr::proofs::{
-        prove_eq_committed_vals, prove_xfr, verify_eq_committed_vals, verify_xfr,
-    };
+    use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Group, GroupArithmetic, One, Scalar};
-    use algebra::jubjub::{JubjubPoint, JubjubScalar};
-    use crypto::basics::commitments::pedersen::PedersenGens;
-    use crypto::basics::commitments::rescue::HashCommitment;
+    use algebra::groups::One;
     use rand::RngCore;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -340,73 +354,5 @@ mod tests {
 
         // verify bad witness
         assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
-    }
-
-    #[test]
-    fn test_eq_committed_vals_proof() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let params = UserParams::eq_committed_vals_params();
-        let (proof, hash_comm, ped_comm) = {
-            // prover scope
-            // compute Rescue commitment
-            let comm = HashCommitment::new();
-            let amount = BLSScalar::from_u32(71);
-            let asset_type = BLSScalar::from_u32(52);
-            let blind_hash = BLSScalar::random(&mut prng);
-            let hash_comm = comm.commit(&blind_hash, &[amount, asset_type]).unwrap(); // safe unwrap
-
-            // compute Pedersen commitment
-            let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
-            let amount_jj = JubjubScalar::from_u32(71);
-            let at_jj = JubjubScalar::from_u32(52);
-            let blind_pc = JubjubScalar::random(&mut prng);
-            let ped_comm = pc_gens_jubjub
-                .commit(&[amount_jj, at_jj], &blind_pc)
-                .unwrap(); // safe unwrap
-
-            // compute the proof
-            let proof = prove_eq_committed_vals(
-                &mut prng,
-                &params,
-                amount,
-                asset_type,
-                BLSScalar::from(&blind_pc),
-                blind_hash,
-                &pc_gens_jubjub,
-            )
-            .unwrap(); // safe unwrap
-            (proof, hash_comm, ped_comm)
-        };
-        {
-            // verifier scope
-            let node_params = NodeParams::from(params);
-            assert!(verify_eq_committed_vals(
-                &node_params,
-                hash_comm,
-                &ped_comm,
-                &proof
-            )
-            .is_ok());
-
-            //This is a case of negative test for a bad hash commitment
-            let bad_hash_comm = BLSScalar::one();
-            assert!(verify_eq_committed_vals(
-                &node_params,
-                bad_hash_comm,
-                &ped_comm,
-                &proof
-            )
-            .is_err());
-
-            //This is a case for of negative test for a bad pedersen commitment
-            let bad_ped_comm = ped_comm.add(&JubjubPoint::get_base());
-            assert!(verify_eq_committed_vals(
-                &node_params,
-                hash_comm,
-                &bad_ped_comm,
-                &proof
-            )
-            .is_err());
-        }
     }
 }

@@ -25,6 +25,7 @@ ark-ff = { version = "^0.3.0", default-features = false, features = [ "asm" ]  }
 ark-std = { version = "^0.3.0", default-features = false }
 ark-serialize = { version = "^0.3.0", default-features = false }
 rand_chacha = { version = "0.2", default-features = false }
+num-bigint = { version = "0.3" }
 
 [features]
 default = ["std", "parallel", "u64_backend"]

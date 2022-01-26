@@ -7,10 +7,10 @@ use algebra::bls12_381::BLSScalar;
 
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use algebra::groups::Zero;
-use algebra::jubjub::JubjubPoint;
+use algebra::ristretto::RistrettoScalar;
 use bulletproofs::BulletproofGens;
-use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use poly_iops::commitments::kzg_poly_com::{
     KZGCommitmentScheme, KZGCommitmentSchemeBLS,
 };
@@ -193,9 +193,11 @@ impl UserParams {
     pub fn eq_committed_vals_params() -> UserParams {
         // TODO: Replace with the new algorithm
         let zero = BLSScalar::zero();
-        let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
+        let proof = ZKPartProof::default();
+        let non_zk_state = NonZKState::default();
+        let beta = RistrettoScalar::zero();
         let (cs, n_constraints) =
-            build_eq_committed_vals_cs(zero, zero, zero, zero, &pc_gens_jubjub);
+            build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
         let pcs = KZGCommitmentScheme::new(
             n_constraints + 2,
             &mut ChaChaRng::from_seed([0u8; 32]),

@@ -22,8 +22,8 @@ fn main() {
         scalars.push(BLSScalar::random(&mut prng));
     }
 
-    let points_ptr = points.iter().map(|r| r).collect::<Vec<&BLSG1>>();
-    let scalars_ptr = scalars.iter().map(|r| r).collect::<Vec<&BLSScalar>>();
+    let points_ptr = points.iter().collect::<Vec<&BLSG1>>();
+    let scalars_ptr = scalars.iter().collect::<Vec<&BLSScalar>>();
 
     let start = Instant::now();
     let _ = BLSG1::vartime_multi_exp(&scalars_ptr, &points_ptr);
