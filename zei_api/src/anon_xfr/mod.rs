@@ -413,7 +413,7 @@ mod tests {
             uid: proof.uid,
         }
     }
-
+    /* 
     #[test]
     fn test_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -539,7 +539,7 @@ mod tests {
             let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
         }
-    }
+    }*/
 
     // outputs &mut merkle tree (wrap it in an option merkle tree, not req)
     fn build_new_merkle_tree(
@@ -572,7 +572,7 @@ mod tests {
 
         Ok(())
     }
-
+    /* 
     //new test with actual merkle tree
     #[test]
     fn test_new_anon_xfr() {
@@ -731,7 +731,7 @@ mod tests {
             let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
         }
-    }
+    }*/
     /*
     //new test with actual merkle tree with different amount
     #[test]
@@ -855,7 +855,7 @@ mod tests {
             assert!(note.verify().is_ok())
         }
     }*/
-
+    /* 
     #[test]
     fn test_anon_xfr_multi_assets() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -1080,7 +1080,7 @@ mod tests {
             assert!(verify_anon_xfr_body(&verifier_params, &body, &zero).is_err());
             assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
         }
-    }
+    }*/
 
     fn gen_keys<R: CryptoRng + RngCore>(
         prng: &mut R,

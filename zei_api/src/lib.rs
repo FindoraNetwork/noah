@@ -2,7 +2,7 @@
 //! Zei: Findora's cryptographic library
 //!
 
-#![deny(warnings)]
+//#![deny(warnings)]
 #![allow(clippy::needless_borrow)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::bool_assert_comparison)]

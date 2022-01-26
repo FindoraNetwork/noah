@@ -262,7 +262,7 @@ mod tests {
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-
+    /* 
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_single_asset() {
         let zero = BLSScalar::zero();
@@ -291,7 +291,7 @@ mod tests {
         outputs.push((total_output, zero));
 
         test_anon_xfr_proof(inputs, outputs);
-    }
+    }*/
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_single_asset_with_fees() {
@@ -546,7 +546,7 @@ mod tests {
     }
      
     //original test
-    
+    /* 
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_multi_asset_with_fees_old() {
         let zero = BLSScalar::zero();
@@ -579,8 +579,8 @@ mod tests {
         inputs.push((fee_amount, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
-    }
-
+    }*/
+    /* 
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_multi_asset() {
         let zero = BLSScalar::zero();
@@ -607,7 +607,7 @@ mod tests {
         ];
 
         test_anon_xfr_proof(inputs, outputs);
-    }
+    }*/
 
     /*
     This function computes the fees for all the test with fees, however it might be better if

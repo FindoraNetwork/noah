@@ -2146,7 +2146,7 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }
-
+    /* 
     #[test]
     fn test_build_multi_xfr_cs() {
         // single-asset xfr: good witness
@@ -2183,7 +2183,7 @@ pub(crate) mod tests {
         // multi-assets xfr: bad witness
         outputs[0].0 = 18;
         test_xfr_cs(inputs, outputs, false);
-    }
+    }*/
 
     #[test]
     fn test_build_multi_xfr_cs_with_fees() {
