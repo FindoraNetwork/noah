@@ -205,7 +205,7 @@ fn check_asset_amount(
         }
     }
 
-    let fee_amount = FEE_CALCULATING_FUNC(inputs.len(), outputs.len());
+    let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32, outputs.len() as u32);
 
     for (&asset_type, &sum) in balances.iter() {
         if asset_type != fee_asset_type {
@@ -213,7 +213,7 @@ fn check_asset_amount(
                 return Err(eg!(ZeiError::XfrCreationAssetAmountError));
             }
         } else {
-            if sum != fee_amount {
+            if sum != fee_amount.into() {
                 return Err(eg!(ZeiError::XfrCreationAssetAmountError));
             }
         }
@@ -328,13 +328,19 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, RwLock};
-    use std::thread;
+    use crate::anon_xfr::{
+        gen_anon_xfr_body, hash_abar,
+        keys::AXfrKeyPair,
+        structs::{
+            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
+            OpenAnonBlindAssetRecordBuilder,
+        },
+        verify_anon_xfr_body,
+    };
     use itertools::Itertools;
-    use crate::anon_xfr::{gen_anon_xfr_body, hash_abar, keys::AXfrKeyPair, structs::{
-        AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
-        OpenAnonBlindAssetRecordBuilder,
-    }, verify_anon_xfr_body};
+    use parking_lot::lock_api::RwLock;
+    use std::sync::Arc;
+    use std::thread;
 
     use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
@@ -348,13 +354,14 @@ mod tests {
     use rand_core::{CryptoRng, RngCore};
     use ruc::*;
 
+    use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
+    use crate::anon_xfr::structs::AXfrNote;
+    use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
+    use crypto::basics::hash::rescue::RescueInstance;
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
-    use crypto::basics::hash::rescue::RescueInstance;
-    use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
-    use crate::anon_xfr::structs::AXfrNote;
-    use crate::setup::{DEFAULT_BP_NUM_GENS, NodeParams, UserParams};
+    use utils::errors::ZeiError;
 
     pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
         MTLeafInfo {
@@ -389,8 +396,7 @@ mod tests {
         let two = one.add(&one);
 
         let asset_type = FEE_TYPE;
-        let fee_amount = FEE_CALCULATING_FUNC(1u32, 1u32);
-
+        let fee_amount = FEE_CALCULATING_FUNC(1u32, 1u32) as u64;
 
         let output_amount = 1 + prng.next_u64() % 100;
         let input_amount = output_amount + fee_amount;
@@ -513,7 +519,6 @@ mod tests {
         // add 6/7 abar and populate and then retrieve values
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-
         let key_pair = AXfrKeyPair::generate(&mut prng);
 
         let mut abar = AnonBlindAssetRecord {
@@ -552,7 +557,7 @@ mod tests {
             UserParams::from_file_if_exists(1, 1, Some(41), DEFAULT_BP_NUM_GENS, None)
                 .unwrap();
 
-        let fee_amount = FEE_CALCULATING_FUNC(1, 1);
+        let fee_amount = FEE_CALCULATING_FUNC(1, 1) as u64;
         let output_amount = 10u64;
         let input_amount = output_amount + fee_amount;
         let asset_type = FEE_TYPE;
@@ -714,7 +719,7 @@ mod tests {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
 
-        let fee_amount = FEE_CALCULATING_FUNC(3, 3);
+        let fee_amount = FEE_CALCULATING_FUNC(3, 3) as u64;
 
         // simulate input abars
         let amounts_in = vec![10u64 + fee_amount, 20u64, 30u64];
@@ -782,11 +787,8 @@ mod tests {
         // output keys, amounts, asset_types
         let (keypairs_out, dec_keys_out, enc_keys_out) = gen_keys(&mut prng, n_payees);
         let amounts_out = vec![5u64, 5u64, 50u64];
-        let asset_types_out = vec![
-            FEE_TYPE,
-            FEE_TYPE,
-            AssetType::from_identical_byte(1),
-        ];
+        let asset_types_out =
+            vec![FEE_TYPE, FEE_TYPE, AssetType::from_identical_byte(1)];
         let mut outputs = vec![];
         for i in 0..n_payees {
             outputs.push(
