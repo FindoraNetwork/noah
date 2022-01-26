@@ -2,8 +2,7 @@ use crate::anon_xfr::circuits::{
     AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret,
 };
 use crate::anon_xfr::keys::AXfrKeyPair;
-//use crate::anon_xfr::proofs::{prove_xfr, prove_xfr_with_fees, verify_xfr};
-use crate::anon_xfr::proofs::{prove_xfr_with_fees, verify_xfr};
+use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
 use crate::anon_xfr::structs::{
     AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord,
 };
@@ -15,7 +14,6 @@ use algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key,
-    //hybrid_encrypt_with_x25519_key,
     XSecretKey,
 };
 use crypto::basics::prf::PRF;
@@ -31,6 +29,7 @@ pub mod keys;
 mod merkle_tree_test;
 pub(crate) mod proofs;
 pub mod structs;
+pub mod config;
 
 /// Build an anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
@@ -106,8 +105,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
         payers_secrets,
         payees_secrets,
     };
-    //let proof = prove_xfr(prng, params, secret_inputs).c(d!())?;
-    let proof = prove_xfr_with_fees(prng, params, secret_inputs).c(d!())?;
+    let proof = prove_xfr(prng, params, secret_inputs).c(d!())?;
 
     let diversified_key_pairs = rand_input_keypairs
         .iter()

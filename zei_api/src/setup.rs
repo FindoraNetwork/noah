@@ -1,6 +1,6 @@
 //The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs_with_fees, AMultiXfrWitness,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness,
     TurboPlonkCS, TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
@@ -22,6 +22,7 @@ use std::fs;
 use std::path::PathBuf;
 use utils::errors::ZeiError;
 use utils::save_to_file;
+use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 
 //Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]
@@ -120,57 +121,22 @@ impl Default for PublicParams {
 }
 
 impl UserParams {
-    /*pub fn new(
-        n_payers: usize,
-        n_payees: usize,
-        tree_depth: Option<usize>,
-        bp_num_gens: usize,
-    ) -> UserParams {
-        let (cs, n_constraints) = match tree_depth {
-            Some(depth) => {
-                build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
-            }
-            None => build_multi_xfr_cs(AMultiXfrWitness::fake(
-                n_payers, n_payees, TREE_DEPTH,
-            )),
-        };
-
-        let pcs = KZGCommitmentScheme::new(
-            n_constraints + 2,
-            &mut ChaChaRng::from_seed([0u8; 32]),
-        );
-
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
-        UserParams {
-            bp_params: PublicParams::new(bp_num_gens),
-            pcs,
-            cs,
-            prover_params,
-        }
-    }*/
-
     pub fn new(
         n_payers: usize,
         n_payees: usize,
         tree_depth: Option<usize>,
         bp_num_gens: usize,
     ) -> UserParams {
-        let _x = 2u32;
-        let _y = 2u32;
-
-        let fee_type = BLSScalar::from_u32(000u32);
-
-        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
         let (cs, n_constraints) = match tree_depth {
-            Some(depth) => build_multi_xfr_cs_with_fees(
+            Some(depth) => build_multi_xfr_cs(
                 AMultiXfrWitness::fake(n_payers, n_payees, depth),
-                fee_type,
-                &fee_calculating_func,
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
             ),
-            None => build_multi_xfr_cs_with_fees(
+            None => build_multi_xfr_cs(
                 AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
-                fee_type,
-                &fee_calculating_func,
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
             ),
         };
 
@@ -188,42 +154,6 @@ impl UserParams {
         }
     }
 
-    //This function is the same that new, but max_degree_poly_com allows to set the size of the CRS
-    //the parameter max_degree_poly_com is padded to the minimum power of two grater than it.
-    /*pub fn new_max_degree_poly_com(
-        n_payers: usize,
-        n_payees: usize,
-        tree_depth: Option<usize>,
-        bp_num_gens: usize,
-        max_degree_poly_com: usize,
-    ) -> UserParams {
-
-
-        let (cs, /*n_constrains*/ _) = match tree_depth {
-            Some(depth) => {
-                build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
-            }
-            None => build_multi_xfr_cs(AMultiXfrWitness::fake(
-                n_payers, n_payees, TREE_DEPTH,
-            )),
-        };
-
-        let max_degree_poly_com = max_degree_poly_com.next_power_of_two();
-
-        let pcs = KZGCommitmentScheme::new(
-            max_degree_poly_com + 2,
-            &mut ChaChaRng::from_seed([0u8; 32]),
-        );
-
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
-        UserParams {
-            bp_params: PublicParams::new(bp_num_gens),
-            pcs,
-            cs,
-            prover_params,
-        }
-    }*/
-
     pub fn new_max_degree_poly_com(
         n_payers: usize,
         n_payees: usize,
@@ -231,22 +161,16 @@ impl UserParams {
         bp_num_gens: usize,
         max_degree_poly_com: usize,
     ) -> UserParams {
-        let _x = 2u32;
-        let _y = 2u32;
-
-        let fee_type = BLSScalar::from_u32(000u32);
-
-        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
         let (cs, /*n_constrains*/ _) = match tree_depth {
-            Some(depth) => build_multi_xfr_cs_with_fees(
+            Some(depth) => build_multi_xfr_cs(
                 AMultiXfrWitness::fake(n_payers, n_payees, depth),
-                fee_type,
-                &fee_calculating_func,
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
             ),
-            None => build_multi_xfr_cs_with_fees(
+            None => build_multi_xfr_cs(
                 AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
-                fee_type,
-                &fee_calculating_func,
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
             ),
         };
 
@@ -267,6 +191,7 @@ impl UserParams {
     }
 
     pub fn eq_committed_vals_params() -> UserParams {
+        // TODO: Replace with the new algorithm
         let zero = BLSScalar::zero();
         let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
         let (cs, n_constraints) =
