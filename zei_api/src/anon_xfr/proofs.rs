@@ -165,13 +165,13 @@ pub(crate) fn verify_eq_committed_vals(
 mod tests {
     use crate::anon_xfr::circuits::tests::new_multi_xfr_witness_for_test;
     use crate::anon_xfr::circuits::AMultiXfrPubInputs;
-    use algebra::bls12_381::BLSScalar;
-    use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
     use crate::anon_xfr::proofs::{
         prove_eq_committed_vals, prove_xfr, verify_eq_committed_vals, verify_xfr,
     };
-    use algebra::groups::{Group, GroupArithmetic, One, Zero, Scalar};
+    use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
+    use algebra::bls12_381::BLSScalar;
+    use algebra::groups::{Group, GroupArithmetic, One, Scalar, Zero};
     use rand::RngCore;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
