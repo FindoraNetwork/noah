@@ -1,10 +1,11 @@
 //The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness,
-    TurboPlonkCS, TREE_DEPTH,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, TurboPlonkCS,
+    TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::Scalar;
+
+use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use algebra::groups::Zero;
 use algebra::jubjub::JubjubPoint;
 use bulletproofs::BulletproofGens;
@@ -22,7 +23,6 @@ use std::fs;
 use std::path::PathBuf;
 use utils::errors::ZeiError;
 use utils::save_to_file;
-use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 
 //Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]

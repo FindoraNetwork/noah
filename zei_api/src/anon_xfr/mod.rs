@@ -13,8 +13,7 @@ use algebra::groups::{Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::hybrid_encryption::{
-    hybrid_decrypt_with_x25519_secret_key,
-    XSecretKey,
+    hybrid_decrypt_with_x25519_secret_key, XSecretKey,
 };
 use crypto::basics::prf::PRF;
 use itertools::Itertools;
@@ -25,11 +24,11 @@ use utils::errors::ZeiError;
 
 pub mod bar_to_from_abar;
 pub(crate) mod circuits;
+pub mod config;
 pub mod keys;
 mod merkle_tree_test;
 pub(crate) mod proofs;
 pub mod structs;
-pub mod config;
 
 /// Build an anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
@@ -362,34 +361,29 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
 
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::{gen_anon_xfr_body, verify_anon_xfr_body};
+
     use crate::anon_xfr::{
         hash_abar,
         keys::AXfrKeyPair,
         structs::{
-            AXfrNote, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
-            OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
+            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
+            OpenAnonBlindAssetRecordBuilder,
         },
     };
-    use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
+
     use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
-    use crypto::basics::hash::rescue::RescueInstance;
+    use algebra::groups::Scalar;
+
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-    use itertools::Itertools;
-    use parking_lot::RwLock;
+
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rand_core::{CryptoRng, RngCore};
     use ruc::*;
-    use std::sync::Arc;
-    use std::thread;
+
     use storage::db::TempRocksDB;
-    use storage::state::{ChainState, State};
-    use storage::store::PrefixedStore;
-    use utils::errors::ZeiError;
 
     pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
         MTLeafInfo {

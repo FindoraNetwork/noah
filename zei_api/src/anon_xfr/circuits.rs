@@ -1014,13 +1014,7 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1058,13 +1052,7 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
@@ -1119,13 +1107,7 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
@@ -1182,13 +1164,7 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
@@ -1245,13 +1221,7 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1306,13 +1276,7 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1369,13 +1333,7 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1432,13 +1390,7 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1482,13 +1434,7 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1530,13 +1476,7 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-        asset_mixing(
-            &mut cs,
-            &inputs,
-            &outputs,
-            fee_type,
-            &fee_calculating_func,
-        );
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }

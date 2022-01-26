@@ -1,6 +1,5 @@
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs,
-    AMultiXfrPubInputs, AMultiXfrWitness,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness,
 };
 use crate::setup::{NodeParams, UserParams};
 use algebra::bls12_381::BLSScalar;
@@ -45,8 +44,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
 
     let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
 
-    let (mut cs, _) =
-        build_multi_xfr_cs(secret_inputs, fee_type, &fee_calculating_func);
+    let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &fee_calculating_func);
     let witness = cs.get_and_clear_witness();
 
     prover(
@@ -151,8 +149,7 @@ mod tests {
     use crate::anon_xfr::circuits::tests::new_multi_xfr_witness_for_test;
     use crate::anon_xfr::circuits::AMultiXfrPubInputs;
     use crate::anon_xfr::proofs::{
-        prove_eq_committed_vals, prove_xfr,
-        verify_eq_committed_vals, verify_xfr,
+        prove_eq_committed_vals, prove_xfr, verify_eq_committed_vals, verify_xfr,
     };
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use algebra::bls12_381::BLSScalar;
@@ -361,8 +358,7 @@ mod tests {
         // A bad proof should fail the verification
         let bad_secret_inputs =
             new_multi_xfr_witness_for_test(inputs, outputs, [1u8; 32]);
-        let bad_proof =
-            prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
+        let bad_proof = prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
 
         // verify good witness
         let node_params = NodeParams::from(params);
