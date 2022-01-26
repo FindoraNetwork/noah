@@ -183,7 +183,7 @@ pub fn verify_pc_eq_rescue_split_verifier_zk_part(
 ) -> Result<RistrettoScalar> {
     // 1. Fiat-Shamir transform
     let mut transcript =
-        Transcript::new(b"edersen Eq Rescure Split Verifier -- ZK Verifier Part");
+        Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
 
     transcript.append_message(
         b"PC base",
