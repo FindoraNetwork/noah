@@ -291,7 +291,6 @@ pub(crate) fn build_multi_xfr_cs(
     (cs, n_constraints)
 }
 
-
 /// Returns the constraint system (and associated number of constraints) for a multi-inputs/outputs transaction.
 /// This one also takes fee parameters as input.
 #[allow(dead_code)]
@@ -2146,7 +2145,7 @@ pub(crate) mod tests {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }
-    /* 
+    /*
     #[test]
     fn test_build_multi_xfr_cs() {
         // single-asset xfr: good witness
@@ -2252,11 +2251,12 @@ pub(crate) mod tests {
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
 
         let fee_type = BLSScalar::from_u32(000u32);
-    
+
         let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
 
         // check the constraints
-        let (mut cs, _) = build_multi_xfr_cs_with_fees(secret_inputs, fee_type, &fee_calculating_func);
+        let (mut cs, _) =
+            build_multi_xfr_cs_with_fees(secret_inputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         let online_inputs = pub_inputs.to_vec();
         let verify = cs.verify_witness(&witness, &online_inputs);

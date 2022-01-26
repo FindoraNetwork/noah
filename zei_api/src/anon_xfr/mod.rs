@@ -184,7 +184,7 @@ fn check_inputs(
 
 #[allow(dead_code)]
 /// Check that for each asset type total input amount == total output amount
-/// and for FRA, total input amount == total output amount + fees for fra 
+/// and for FRA, total input amount == total output amount + fees for fra
 fn check_asset_amount_with_fees(
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
@@ -211,13 +211,12 @@ fn check_asset_amount_with_fees(
     let fee_amount = (5 + inputs.len() + outputs.len() * 2) as i128;
 
     for (&asset_type, &sum) in balances.iter() {
-        if asset_type != fee_asset_type{
+        if asset_type != fee_asset_type {
             if sum != 0i128 {
                 return Err(eg!(ZeiError::XfrCreationAssetAmountError));
             }
-        }
-        else {
-            if sum != fee_amount{
+        } else {
+            if sum != fee_amount {
                 return Err(eg!(ZeiError::XfrCreationAssetAmountError));
             }
         }
@@ -413,7 +412,7 @@ mod tests {
             uid: proof.uid,
         }
     }
-    /* 
+    /*
     #[test]
     fn test_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -572,7 +571,7 @@ mod tests {
 
         Ok(())
     }
-    /* 
+    /*
     //new test with actual merkle tree
     #[test]
     fn test_new_anon_xfr() {
@@ -855,7 +854,7 @@ mod tests {
             assert!(note.verify().is_ok())
         }
     }*/
-    /* 
+    /*
     #[test]
     fn test_anon_xfr_multi_assets() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);

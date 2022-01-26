@@ -1,10 +1,11 @@
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, build_multi_xfr_cs_with_fees, AMultiXfrPubInputs, AMultiXfrWitness,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, build_multi_xfr_cs_with_fees,
+    AMultiXfrPubInputs, AMultiXfrWitness,
 };
 use crate::setup::{NodeParams, UserParams};
 //use algebra::groups::{Scalar, Zero};
-use algebra::groups::{Zero};
 use algebra::bls12_381::BLSScalar;
+use algebra::groups::Zero;
 use algebra::jubjub::JubjubPoint;
 use crypto::basics::commitments::pedersen::PedersenGens;
 use merlin::Transcript;
@@ -44,10 +45,11 @@ pub(crate) fn prove_xfr_with_fees<R: CryptoRng + RngCore>(
 
     //let fee_type = BLSScalar::from_u32(000u32);
     let fee_type = BLSScalar::zero();
-    
+
     let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
 
-    let (mut cs, _) = build_multi_xfr_cs_with_fees(secret_inputs, fee_type, &fee_calculating_func);
+    let (mut cs, _) =
+        build_multi_xfr_cs_with_fees(secret_inputs, fee_type, &fee_calculating_func);
     let witness = cs.get_and_clear_witness();
 
     prover(
@@ -186,7 +188,8 @@ mod tests {
     use crate::anon_xfr::circuits::tests::new_multi_xfr_witness_for_test;
     use crate::anon_xfr::circuits::AMultiXfrPubInputs;
     use crate::anon_xfr::proofs::{
-        prove_eq_committed_vals, prove_xfr, prove_xfr_with_fees, verify_eq_committed_vals, verify_xfr,
+        prove_eq_committed_vals, prove_xfr, prove_xfr_with_fees,
+        verify_eq_committed_vals, verify_xfr,
     };
     use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
     use algebra::bls12_381::BLSScalar;
@@ -198,7 +201,7 @@ mod tests {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 
-    /* 
+    /*
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_single_asset() {
         // single asset type
@@ -246,7 +249,6 @@ mod tests {
         total_input -= amount;
         inputs.push((total_input, zero));
 
-
         let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
         for _i in 1..6 {
             let rnd_amount = rng.next_u64();
@@ -256,13 +258,12 @@ mod tests {
         }
         outputs.push((total_output, zero));
 
-
-        let fee_amount = compute_fees (inputs.len() as u64 + 1 ,outputs.len() as u64);
+        let fee_amount = compute_fees(inputs.len() as u64 + 1, outputs.len() as u64);
         inputs.push((fee_amount, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-    /* 
+    /*
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_single_asset() {
         let zero = BLSScalar::zero();
@@ -311,8 +312,6 @@ mod tests {
         total_input -= amount;
         inputs.push((total_input, zero));
 
-
-
         let amount_out = rng.next_u64() % total_output;
         outputs.push((amount_out, zero));
         total_output -= amount_out;
@@ -320,12 +319,12 @@ mod tests {
 
         //input for fees
         //Base fee 5 + 1 * (inputs) + 2 * (outputs)
-        let fee_amount = compute_fees (inputs.len() as u64 + 1 ,outputs.len() as u64);
+        let fee_amount = compute_fees(inputs.len() as u64 + 1, outputs.len() as u64);
         inputs.push((fee_amount, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-    /* 
+    /*
     #[test]
     fn test_anon_multi_xfr_proof_1in_2out_single_asset() {
         let zero = BLSScalar::zero();
@@ -347,13 +346,13 @@ mod tests {
         let outputs = vec![(amount, zero), (amount, zero)];
 
         //Base fee 5 + 1 * (inputs) + 2 * (outputs)
-        let fee_amount = compute_fees(1 ,outputs.len() as u64);
+        let fee_amount = compute_fees(1, outputs.len() as u64);
 
         let inputs = vec![(fee_amount, zero)];
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-    /* 
+    /*
     #[test]
     fn test_anon_multi_xfr_proof_2in_1out_single_asset() {
         let zero = BLSScalar::zero();
@@ -376,16 +375,15 @@ mod tests {
         //This time we need one input equal to the output, besides the input for fees
         let amount = 50 + rng.next_u64() % 50; // a random number in [50, 100)
 
-
         let outputs = vec![(amount, zero)];
         let mut inputs = vec![(amount, zero)];
 
-        let fee_amount = compute_fees (inputs.len() as u64 + 1 ,outputs.len() as u64);
+        let fee_amount = compute_fees(inputs.len() as u64 + 1, outputs.len() as u64);
         inputs.push((fee_amount, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-    /* 
+    /*
     #[test]
     fn test_anon_multi_xfr_proof_1in_1out_single_asset() {
         let zero = BLSScalar::zero();
@@ -410,7 +408,7 @@ mod tests {
         let outputs = vec![(0, zero)];
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-    /* 
+    /*
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_multi_asset() {
         let zero = BLSScalar::zero();
@@ -476,10 +474,7 @@ mod tests {
         let mut total_output_zero = total_input_zero;
         let mut total_output_one = total_input_one;*/
 
-        let mut inputs = vec![
-            (/*amount=*/ 40, /*asset_type=*/ zero),
-            (80, one),
-        ];
+        let mut inputs = vec![(/*amount=*/ 40, /*asset_type=*/ zero), (80, one)];
 
         /*let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
 
@@ -501,13 +496,12 @@ mod tests {
             (20, one),
             (20, one),
             (40, one),
-
         ];
 
-        let fee_amount = compute_fees (inputs.len() as u64 + 1 ,outputs.len() as u64);
+        let fee_amount = compute_fees(inputs.len() as u64 + 1, outputs.len() as u64);
         inputs.push((fee_amount, zero));
 
-        test_anon_xfr_proof_with_fees (inputs, outputs);
+        test_anon_xfr_proof_with_fees(inputs, outputs);
     }
 
     // dummy new test
@@ -520,33 +514,24 @@ mod tests {
         let input_1 = 20u64;
         let input_2 = 52u64;
 
-
         let output_1 = 17u64;
         let output_2 = 3u64;
         let output_3 = 52u64;
 
-
         //let input_fees = 5 + (3 * 1) + (3 * 2);
 
-        let mut inputs = vec![
-            (input_1, zero),
-            (input_2, one),
-        ];
+        let mut inputs = vec![(input_1, zero), (input_2, one)];
 
-        let outputs = vec![
-            (output_1, zero),
-            (output_2, zero),
-            (output_3, one),
-        ];
+        let outputs = vec![(output_1, zero), (output_2, zero), (output_3, one)];
 
-        let fee_amount = compute_fees (inputs.len() as u64 + 1 ,outputs.len() as u64);
+        let fee_amount = compute_fees(inputs.len() as u64 + 1, outputs.len() as u64);
         inputs.push((fee_amount, zero));
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }
-     
+
     //original test
-    /* 
+    /*
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_multi_asset_with_fees_old() {
         let zero = BLSScalar::zero();
@@ -580,7 +565,7 @@ mod tests {
 
         test_anon_xfr_proof_with_fees(inputs, outputs);
     }*/
-    /* 
+    /*
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_multi_asset() {
         let zero = BLSScalar::zero();
@@ -617,7 +602,7 @@ mod tests {
     c_0 + c_1 * inputs + c_2 * outputs
     where c_0 = 5; c_1 = 1 and c_2 = 2
     */
-    fn compute_fees(num_inputs:u64, num_outputs:u64) -> u64{
+    fn compute_fees(num_inputs: u64, num_outputs: u64) -> u64 {
         //let fee_calculating_func = |x: u64, y: u64| 5 + x + 2 * y;
         5 + num_inputs + 2 * num_outputs
     }
@@ -648,7 +633,8 @@ mod tests {
         // A bad proof should fail the verification
         let bad_secret_inputs =
             new_multi_xfr_witness_for_test(inputs, outputs, [1u8; 32]);
-        let bad_proof = prove_xfr_with_fees(&mut prng, &params, bad_secret_inputs).unwrap();
+        let bad_proof =
+            prove_xfr_with_fees(&mut prng, &params, bad_secret_inputs).unwrap();
 
         // verify good witness
         let node_params = NodeParams::from(params);
@@ -657,7 +643,7 @@ mod tests {
         // verify bad witness
         assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
     }
-    
+
     fn test_anon_xfr_proof(
         inputs: Vec<(u64, BLSScalar)>,
         outputs: Vec<(u64, BLSScalar)>,
