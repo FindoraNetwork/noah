@@ -1726,7 +1726,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_build_multi_xfr_cs_with_fees() {
+    fn test_build_multi_xfr_cs() {
         // Fee type
         let fee_type = BLSScalar::from_u32(1234u32);
 
