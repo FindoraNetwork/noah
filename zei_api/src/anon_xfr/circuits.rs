@@ -570,7 +570,7 @@ fn add_payees_secrets(
         .collect()
 }
 
-struct PayerSecretVars {
+pub struct PayerSecretVars {
     pub sec_key: VarIndex,
     pub diversifier: VarIndex,
     pub uid: VarIndex,
@@ -587,7 +587,7 @@ struct PayeeSecretVars {
 }
 
 // cs variables for a Merkle node
-pub(crate) struct MerkleNodeVars {
+pub struct MerkleNodeVars {
     pub siblings1: VarIndex,
     pub siblings2: VarIndex,
     pub is_left_child: VarIndex,
@@ -595,7 +595,7 @@ pub(crate) struct MerkleNodeVars {
 }
 
 // cs variables for a merkle authentication path
-pub(crate) struct MerklePathVars {
+pub struct MerklePathVars {
     pub nodes: Vec<MerkleNodeVars>,
 }
 
@@ -608,7 +608,7 @@ pub(crate) struct AccElemVars {
 }
 
 // cs variables for the nullifier PRF inputs
-struct NullifierInputVars {
+pub(crate) struct NullifierInputVars {
     pub uid_amount: VarIndex,
     pub asset_type: VarIndex,
     pub pub_key_x: VarIndex,
@@ -708,7 +708,7 @@ pub(crate) fn compute_merkle_root(
 
 // Add the commitment constraints to the constraint system:
 // comm = commit(blinding, amount, asset_type)
-fn commit(
+pub fn commit(
     cs: &mut TurboPlonkCS,
     blinding_var: VarIndex,
     amount_var: VarIndex,
@@ -724,7 +724,7 @@ fn commit(
 // Let perm : Fp^w -> Fp^w be a public permutation.
 // Given secret key `key`, set initial state `s_key` := (0 || ... || 0 || key), the PRF output is:
 // PRF^p(key, (m1, ..., mw)) = perm(s_key \xor (m1 || ... || mw))[0]
-fn nullify(
+pub(crate) fn nullify(
     cs: &mut TurboPlonkCS,
     sk_var: VarIndex,
     nullifier_input_vars: NullifierInputVars,
