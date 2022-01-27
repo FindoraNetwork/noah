@@ -2,7 +2,6 @@
        Zei library - 2022 Findora Foundation
 */
 
-
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
@@ -15,12 +14,10 @@ use algebra::{
 };
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use poly_iops::{
-    commitments::kzg_poly_com::{
-        KZGCommitmentScheme, KZGCommitmentSchemeBLS,
-    },
+    commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
     plonk::{
         plonk_setup::preprocess_prover,
-        protocol::prover::{PlonkPf, prover, verifier},
+        protocol::prover::{prover, verifier, PlonkPf},
         turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex},
     },
 };
@@ -28,25 +25,22 @@ use utils::errors::ZeiError;
 
 use crate::anon_xfr::{
     circuits::{
-        AccElemVars, add_merkle_path_variables, commit, compute_merkle_root, NullifierInputVars,
-        nullify, PayerSecret, PayerSecretVars, TurboPlonkCS,
+        add_merkle_path_variables, commit, compute_merkle_root, nullify, AccElemVars,
+        NullifierInputVars, PayerSecret, PayerSecretVars, TurboPlonkCS,
     },
     keys::{AXfrKeyPair, AXfrPubKey},
-    nullifier, structs::{
-        MTNode, MTPath, Nullifier,
-        OpenAnonBlindAssetRecord,
-    },
+    nullifier,
+    structs::{MTNode, MTPath, Nullifier, OpenAnonBlindAssetRecord},
 };
-use crate::setup::{DEFAULT_BP_NUM_GENS, NodeParams, PublicParams, UserParams};
+use crate::setup::{NodeParams, PublicParams, UserParams, DEFAULT_BP_NUM_GENS};
 use crate::xfr::{
     asset_record::{
-        AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
         build_open_asset_record,
+        AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
     },
     sig::XfrPublicKey,
     structs::{
-        AssetRecordTemplate, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
-        TracerMemo,
+        AssetRecordTemplate, BlindAssetRecord, OpenAssetRecord, OwnerMemo, TracerMemo,
     },
 };
 
@@ -117,7 +111,6 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
         path: mt_leaf_info.path.clone(),
         blind: input.blind,
     };
-
 
     let pc_gens = RistrettoPedersenGens::default();
     let art = AssetRecordTemplate::with_no_asset_tracing(
@@ -221,7 +214,6 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     params: &UserParams,
     payers_secret: PayerSecret,
 ) -> Result<Abar2BarPlonkProof> {
-
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
 
     let (mut cs, _) = build_abar_to_bar_cs(payers_secret);
@@ -235,7 +227,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
         &params.prover_params,
         &witness,
     )
-        .c(d!(ZeiError::AXfrProofError))
+    .c(d!(ZeiError::AXfrProofError))
 }
 
 ///
@@ -401,7 +393,10 @@ mod tests {
 
     use crate::anon_xfr::abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body};
     use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::structs::{AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder};
+    use crate::anon_xfr::structs::{
+        AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
+        OpenAnonBlindAssetRecordBuilder,
+    };
     use crate::setup::{NodeParams, UserParams};
     use crate::xfr::sig::XfrKeyPair;
     use crate::xfr::structs::AssetType;
@@ -458,21 +453,12 @@ mod tests {
             uid: 0,
         });
 
-        let (body, _, _) = gen_abar_to_bar_body(
-            &mut prng,
-            &params,
-            oabar,
-            sender,
-            recv.pub_key,
-        ).unwrap();
+        let (body, _, _) =
+            gen_abar_to_bar_body(&mut prng, &params, oabar, sender, recv.pub_key)
+                .unwrap();
 
         let node_params = NodeParams::from(params);
-        verify_abar_to_bar_body(
-            &node_params,
-            &body,
-            &proof.root,
-        ).unwrap();
-
+        verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
     }
 
     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
