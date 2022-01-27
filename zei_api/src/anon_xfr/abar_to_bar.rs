@@ -2,27 +2,6 @@
        Zei library - 2022 Findora Foundation
 */
 
-use merlin::Transcript;
-use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::*;
-
-use algebra::{
-    bls12_381::BLSScalar,
-    groups::{Group, One, Scalar, ScalarArithmetic, Zero},
-    jubjub::{JubjubPoint, JubjubScalar},
-};
-use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use poly_iops::{
-    commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
-    plonk::{
-        plonk_setup::preprocess_prover,
-        protocol::prover::{prover, verifier, PlonkPf},
-        turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex},
-    },
-};
-use utils::errors::ZeiError;
-
 use crate::anon_xfr::{
     circuits::{
         add_merkle_path_variables, commit, compute_merkle_root, nullify, AccElemVars,
@@ -43,6 +22,25 @@ use crate::xfr::{
         AssetRecordTemplate, BlindAssetRecord, OpenAssetRecord, OwnerMemo, TracerMemo,
     },
 };
+use algebra::{
+    bls12_381::BLSScalar,
+    groups::{Group, One, Scalar, ScalarArithmetic, Zero},
+    jubjub::{JubjubPoint, JubjubScalar},
+};
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+use merlin::Transcript;
+use poly_iops::{
+    commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
+    plonk::{
+        plonk_setup::preprocess_prover,
+        protocol::prover::{prover, verifier, PlonkPf},
+        turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex},
+    },
+};
+use rand_chacha::ChaChaRng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
+use ruc::*;
+use utils::errors::ZeiError;
 
 const SK_LEN: usize = 252;
 // secret key size (in bits)
@@ -377,20 +375,17 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 mod tests {
     use std::sync::Arc;
     use std::thread;
-
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
-
     use accumulators::merkle_tree::PersistentMerkleTree;
-    use algebra::bls12_381::BLSScalar;
+    use algebra::bls12_381::{BLSScalar};
     use algebra::groups::{Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-
     use crate::anon_xfr::abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
@@ -403,7 +398,7 @@ mod tests {
 
     #[test]
     fn test_abar_to_bar_conversion() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_seed([5u8; 32]);
         let params = UserParams::abar_to_bar_params(41);
 
         let recv = XfrKeyPair::generate(&mut prng);
@@ -459,6 +454,16 @@ mod tests {
 
         let node_params = NodeParams::from(params);
         verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
+
+        assert!(verify_abar_to_bar_body(&node_params, &body, &BLSScalar::random(&mut prng)).is_err());
+
+        let mut body_wrong_nullifier = body.clone();
+        body_wrong_nullifier.input.0 = BLSScalar::random(&mut prng);
+        assert!(verify_abar_to_bar_body(&node_params, &body_wrong_nullifier, &proof.root).is_err());
+
+        let mut body_wrong_pubkey = body.clone();
+        body_wrong_pubkey.input.1 = AXfrKeyPair::generate(&mut prng).pub_key();
+        assert!(verify_abar_to_bar_body(&node_params, &body_wrong_pubkey, &proof.root).is_err());
     }
 
     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
