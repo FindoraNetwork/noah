@@ -13,13 +13,8 @@ use crate::anon_xfr::{
 };
 use crate::setup::{NodeParams, PublicParams, UserParams, DEFAULT_BP_NUM_GENS};
 use crate::xfr::{
-    asset_record::{
-        build_open_asset_record,
-        AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-    },
-    sig::XfrPublicKey,
     structs::{
-        AssetRecordTemplate, BlindAssetRecord, OpenAssetRecord, OwnerMemo, TracerMemo,
+        BlindAssetRecord, OpenAssetRecord,
     },
 };
 use algebra::{
@@ -27,7 +22,6 @@ use algebra::{
     groups::{Group, One, Scalar, ScalarArithmetic, Zero},
     jubjub::{JubjubPoint, JubjubScalar},
 };
-use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use merlin::Transcript;
 use poly_iops::{
     commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
@@ -72,16 +66,22 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     params: &UserParams,
     input: OpenAnonBlindAssetRecord,
     input_keypair: AXfrKeyPair,
-    address: XfrPublicKey,
+    obar: &OpenAssetRecord,
 ) -> Result<(
     AbarToBarBody,
     AXfrKeyPair,
-    (OpenAssetRecord, Vec<TracerMemo>, Option<OwnerMemo>),
 )> {
     // 1. check input correctness
     if input.mt_leaf_info.is_none() || input_keypair.pub_key() != input.pub_key {
         return Err(eg!(ZeiError::ParameterError));
     }
+    if obar.asset_type != input.asset_type {
+        return Err(eg!(ZeiError::AbarToBarParamsError));
+    }
+    if obar.amount != input.amount {
+        return Err(eg!(ZeiError::AbarToBarParamsError))
+    }
+
 
     // 2. randomize input key pair with open_abar rand key
     let rand_input_keypair = input_keypair.randomize(&input.key_rand_factor);
@@ -110,16 +110,6 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
         blind: input.blind,
     };
 
-    let pc_gens = RistrettoPedersenGens::default();
-    let art = AssetRecordTemplate::with_no_asset_tracing(
-        input.amount,
-        input.asset_type,
-        NonConfidentialAmount_NonConfidentialAssetType,
-        address.clone(),
-    );
-    let (oar, tracer_memos, owner_memo) =
-        build_open_asset_record(prng, &pc_gens, &art, vec![]);
-
     let mut proof = abar_to_bar(prng, params, payers_secret).c(d!())?;
     let diversified_key_pair = rand_input_keypair.randomize(&diversifier);
 
@@ -130,11 +120,10 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     Ok((
         AbarToBarBody {
             input: nullifier_and_signing_key,
-            output: oar.blind_asset_record.clone(),
+            output: obar.blind_asset_record.clone(),
             proof,
         },
         diversified_key_pair,
-        (oar, tracer_memos, owner_memo),
     ))
 }
 
@@ -384,6 +373,7 @@ mod tests {
     use accumulators::merkle_tree::PersistentMerkleTree;
     use algebra::bls12_381::{BLSScalar};
     use algebra::groups::{Scalar, Zero};
+    use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use crate::anon_xfr::abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body};
@@ -393,8 +383,10 @@ mod tests {
         OpenAnonBlindAssetRecordBuilder,
     };
     use crate::setup::{NodeParams, UserParams};
+    use crate::xfr::asset_record::AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
+    use crate::xfr::asset_record::build_open_asset_record;
     use crate::xfr::sig::XfrKeyPair;
-    use crate::xfr::structs::AssetType;
+    use crate::xfr::structs::{AssetRecordTemplate, AssetType};
 
     #[test]
     fn test_abar_to_bar_conversion() {
@@ -448,8 +440,23 @@ mod tests {
             uid: 0,
         });
 
-        let (body, _, _) =
-            gen_abar_to_bar_body(&mut prng, &params, oabar, sender, recv.pub_key)
+        let pc_gens = RistrettoPedersenGens::default();
+        let art = AssetRecordTemplate::with_no_asset_tracing(
+            oabar.amount,
+            oabar.asset_type,
+            NonConfidentialAmount_NonConfidentialAssetType,
+            recv.pub_key,
+        );
+
+        let (obar, _, _) = build_open_asset_record(
+            &mut prng,
+            &pc_gens,
+            &art,
+            vec![]
+        );
+
+        let (body, _) =
+            gen_abar_to_bar_body(&mut prng, &params, oabar, sender, &obar)
                 .unwrap();
 
         let node_params = NodeParams::from(params);
