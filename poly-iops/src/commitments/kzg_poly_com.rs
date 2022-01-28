@@ -39,7 +39,7 @@ use utils::errors::ZeiError;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KZGCommitment<G> {
-    value: G,
+    pub value: G,
 }
 impl<'a, G> ToBytes for KZGCommitment<G>
 where
@@ -140,8 +140,8 @@ impl<G: Group> ToBytes for KZGEvalProof<G> {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KZGCommitmentScheme<P: Pairing> {
-    public_parameter_group_1: Vec<P::G1>,
-    public_parameter_group_2: Vec<P::G2>,
+    pub public_parameter_group_1: Vec<P::G1>,
+    pub public_parameter_group_2: Vec<P::G2>,
 }
 
 impl<P: Pairing> KZGCommitmentScheme<P> {
