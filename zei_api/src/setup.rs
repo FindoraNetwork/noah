@@ -18,7 +18,7 @@ use ruc::*;
 use serde::Deserialize;
 use utils::errors::ZeiError;
 
-//Shared by all members of the ledger
+// Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]
 pub struct PublicParams {
     pub bp_gens: BulletproofGens,
@@ -144,7 +144,16 @@ impl From<UserParams> for NodeParams {
 
 #[cfg(test)]
 mod test {
+    use crate::anon_xfr::parameters::SRS;
     use crate::setup::UserParams;
+    use algebra::bls12_381::{BLSScalar, BLSG1};
+    use algebra::groups::{Group, GroupArithmetic, One, ScalarArithmetic};
+    use itertools::Itertools;
+    use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
+    use poly_iops::commitments::pcs::PolyComScheme;
+    use poly_iops::polynomials::field_polynomial::FpPolynomial;
+    use ruc::RucResult;
+    use utils::errors::ZeiError;
 
     #[test]
     fn test_params_serialization() {
@@ -154,5 +163,29 @@ mod test {
         let params_de: UserParams = bincode::deserialize(&v).unwrap();
         let v2 = bincode::serialize(&params_de).unwrap();
         assert_eq!(v, v2);
+    }
+
+    #[test]
+    fn test_crs_commit() {
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+            .c(d!(ZeiError::DeserializationError))
+            .unwrap();
+        let one = BLSScalar::one();
+        let two = one.add(&one);
+        let three = two.add(&one);
+        let six = three.add(&three);
+
+        let fq_poly = FpPolynomial::from_coefs(vec![two, three, six]);
+        let (commitment, open) = pcs.commit(fq_poly).unwrap();
+
+        let coefs_poly_blsscalar = open.get_coefs_ref().iter().collect_vec();
+        let mut expected_committed_value = BLSG1::get_identity();
+
+        // Doing the multiexp by hand
+        for (i, coef) in coefs_poly_blsscalar.iter().enumerate() {
+            let g_i = pcs.public_parameter_group_1[i].clone();
+            expected_committed_value = expected_committed_value.add(&g_i.mul(&coef));
+        }
+        assert_eq!(expected_committed_value, commitment.value);
     }
 }
