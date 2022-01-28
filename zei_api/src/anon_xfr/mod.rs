@@ -288,7 +288,7 @@ pub fn decrypt_memo(
     Ok((amount, asset_type, blind, rand))
 }
 
-fn nullifier(
+pub fn nullifier(
     key_pair: &AXfrKeyPair,
     amount: u64,
     asset_type: &AssetType,
