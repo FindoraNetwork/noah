@@ -370,7 +370,7 @@ mod tests {
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
-    use accumulators::merkle_tree::PersistentMerkleTree;
+    use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
     use algebra::bls12_381::{BLSScalar};
     use algebra::groups::{Scalar, Zero};
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
@@ -385,8 +385,8 @@ mod tests {
     use crate::setup::{NodeParams, UserParams};
     use crate::xfr::asset_record::AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
     use crate::xfr::asset_record::build_open_asset_record;
-    use crate::xfr::sig::XfrKeyPair;
-    use crate::xfr::structs::{AssetRecordTemplate, AssetType};
+    use crate::xfr::sig::{XfrKeyPair, XfrPublicKey};
+    use crate::xfr::structs::{AssetRecordTemplate, AssetType, OpenAssetRecord};
 
     #[test]
     fn test_abar_to_bar_conversion() {
@@ -422,42 +422,20 @@ mod tests {
         mt.commit().unwrap();
         let proof = mt.generate_proof(0).unwrap();
 
-        oabar.update_mt_leaf_info(MTLeafInfo {
-            path: MTPath {
-                nodes: proof
-                    .nodes
-                    .iter()
-                    .map(|e| MTNode {
-                        siblings1: e.siblings1,
-                        siblings2: e.siblings2,
-                        is_left_child: e.is_left_child,
-                        is_right_child: e.is_right_child,
-                    })
-                    .collect(),
-            },
-            root: proof.root,
-            root_version: proof.root_version,
-            uid: 0,
-        });
-
-        let pc_gens = RistrettoPedersenGens::default();
-        let art = AssetRecordTemplate::with_no_asset_tracing(
-            oabar.amount,
-            oabar.asset_type,
-            NonConfidentialAmount_NonConfidentialAssetType,
-            recv.pub_key,
-        );
-
-        let (obar, _, _) = build_open_asset_record(
-            &mut prng,
-            &pc_gens,
-            &art,
-            vec![]
-        );
+        oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone()));
 
         let (body, _) =
-            gen_abar_to_bar_body(&mut prng, &params, oabar, sender, &obar)
-                .unwrap();
+            gen_abar_to_bar_body(
+                &mut prng,
+                &params,
+                oabar.clone(),
+                sender,
+                &build_sample_obar(
+                    oabar.amount.clone(),
+                    oabar.asset_type.clone(),
+                    recv.pub_key,
+                )
+            ).unwrap();
 
         let node_params = NodeParams::from(params);
         verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
@@ -489,5 +467,43 @@ mod tests {
             pk_hash,
             BLSScalar::zero(),
         ])[0]
+    }
+
+    fn build_mt_leaf_info_from_proof(proof: Proof) -> MTLeafInfo {
+        return MTLeafInfo{
+            path: MTPath {
+                nodes: proof
+                    .nodes
+                    .iter()
+                    .map(|e| MTNode {
+                        siblings1: e.siblings1,
+                        siblings2: e.siblings2,
+                        is_left_child: e.is_left_child,
+                        is_right_child: e.is_right_child,
+                    })
+                    .collect(),
+            },
+            root: proof.root,
+            root_version: proof.root_version,
+            uid: 0,
+        }
+    }
+
+    fn build_sample_obar(amount: u64, asset_type: AssetType, pub_key: XfrPublicKey) -> OpenAssetRecord {
+        let mut prng = ChaChaRng::from_seed([89u8; 32]);
+        let pc_gens = RistrettoPedersenGens::default();
+        let art = AssetRecordTemplate::with_no_asset_tracing(
+            amount,
+            asset_type,
+            NonConfidentialAmount_NonConfidentialAssetType,
+            pub_key,
+        );
+        let (obar, _, _) = build_open_asset_record(
+            &mut prng,
+            &pc_gens,
+            &art,
+            vec![]
+        );
+        return obar
     }
 }
