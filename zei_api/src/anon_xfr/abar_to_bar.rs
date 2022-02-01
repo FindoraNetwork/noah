@@ -11,12 +11,8 @@ use crate::anon_xfr::{
     nullifier,
     structs::{MTNode, MTPath, Nullifier, OpenAnonBlindAssetRecord},
 };
-use crate::setup::{NodeParams, PublicParams, UserParams, DEFAULT_BP_NUM_GENS};
-use crate::xfr::{
-    structs::{
-        BlindAssetRecord, OpenAssetRecord,
-    },
-};
+use crate::setup::{NodeParams, PublicParams, UserParams};
+use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
 use algebra::{
     bls12_381::BLSScalar,
     groups::{Group, One, Scalar, ScalarArithmetic, Zero},
@@ -67,10 +63,7 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     input: OpenAnonBlindAssetRecord,
     input_keypair: AXfrKeyPair,
     obar: &OpenAssetRecord,
-) -> Result<(
-    AbarToBarBody,
-    AXfrKeyPair,
-)> {
+) -> Result<(AbarToBarBody, AXfrKeyPair)> {
     // 1. check input correctness
     if input.mt_leaf_info.is_none() || input_keypair.pub_key() != input.pub_key {
         return Err(eg!(ZeiError::ParameterError));
@@ -79,9 +72,8 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
         return Err(eg!(ZeiError::AbarToBarParamsError));
     }
     if obar.amount != input.amount {
-        return Err(eg!(ZeiError::AbarToBarParamsError))
+        return Err(eg!(ZeiError::AbarToBarParamsError));
     }
-
 
     // 2. randomize input key pair with open_abar rand key
     let rand_input_keypair = input_keypair.randomize(&input.key_rand_factor);
@@ -249,7 +241,7 @@ impl UserParams {
 
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
         UserParams {
-            bp_params: PublicParams::new(DEFAULT_BP_NUM_GENS),
+            bp_params: PublicParams::new(),
             pcs,
             cs,
             prover_params,
@@ -361,21 +353,8 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
     }
 }
 
+#[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::thread;
-    use parking_lot::RwLock;
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use storage::db::TempRocksDB;
-    use storage::state::{ChainState, State};
-    use storage::store::PrefixedStore;
-    use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
-    use algebra::bls12_381::{BLSScalar};
-    use algebra::groups::{Scalar, Zero};
-    use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-    use crypto::basics::hash::rescue::RescueInstance;
-    use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use crate::anon_xfr::abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
@@ -383,10 +362,24 @@ mod tests {
         OpenAnonBlindAssetRecordBuilder,
     };
     use crate::setup::{NodeParams, UserParams};
-    use crate::xfr::asset_record::AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
     use crate::xfr::asset_record::build_open_asset_record;
+    use crate::xfr::asset_record::AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
     use crate::xfr::sig::{XfrKeyPair, XfrPublicKey};
     use crate::xfr::structs::{AssetRecordTemplate, AssetType, OpenAssetRecord};
+    use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
+    use algebra::bls12_381::BLSScalar;
+    use algebra::groups::{Scalar, Zero};
+    use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+    use crypto::basics::hash::rescue::RescueInstance;
+    use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use parking_lot::RwLock;
+    use rand_chacha::ChaChaRng;
+    use rand_core::SeedableRng;
+    use std::sync::Arc;
+    use std::thread;
+    use storage::db::TempRocksDB;
+    use storage::state::{ChainState, State};
+    use storage::store::PrefixedStore;
 
     #[test]
     fn test_abar_to_bar_conversion() {
@@ -424,31 +417,44 @@ mod tests {
 
         oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone()));
 
-        let (body, _) =
-            gen_abar_to_bar_body(
-                &mut prng,
-                &params,
-                oabar.clone(),
-                sender,
-                &build_sample_obar(
-                    oabar.amount.clone(),
-                    oabar.asset_type.clone(),
-                    recv.pub_key,
-                )
-            ).unwrap();
+        let (body, _) = gen_abar_to_bar_body(
+            &mut prng,
+            &params,
+            oabar.clone(),
+            sender,
+            &build_sample_obar(
+                oabar.amount.clone(),
+                oabar.asset_type.clone(),
+                recv.pub_key,
+            ),
+        )
+        .unwrap();
 
         let node_params = NodeParams::from(params);
         verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
 
-        assert!(verify_abar_to_bar_body(&node_params, &body, &BLSScalar::random(&mut prng)).is_err());
+        assert!(verify_abar_to_bar_body(
+            &node_params,
+            &body,
+            &BLSScalar::random(&mut prng)
+        )
+        .is_err());
 
         let mut body_wrong_nullifier = body.clone();
         body_wrong_nullifier.input.0 = BLSScalar::random(&mut prng);
-        assert!(verify_abar_to_bar_body(&node_params, &body_wrong_nullifier, &proof.root).is_err());
+        assert!(verify_abar_to_bar_body(
+            &node_params,
+            &body_wrong_nullifier,
+            &proof.root
+        )
+        .is_err());
 
         let mut body_wrong_pubkey = body.clone();
         body_wrong_pubkey.input.1 = AXfrKeyPair::generate(&mut prng).pub_key();
-        assert!(verify_abar_to_bar_body(&node_params, &body_wrong_pubkey, &proof.root).is_err());
+        assert!(
+            verify_abar_to_bar_body(&node_params, &body_wrong_pubkey, &proof.root)
+                .is_err()
+        );
     }
 
     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
@@ -470,7 +476,7 @@ mod tests {
     }
 
     fn build_mt_leaf_info_from_proof(proof: Proof) -> MTLeafInfo {
-        return MTLeafInfo{
+        return MTLeafInfo {
             path: MTPath {
                 nodes: proof
                     .nodes
@@ -486,10 +492,14 @@ mod tests {
             root: proof.root,
             root_version: proof.root_version,
             uid: 0,
-        }
+        };
     }
 
-    fn build_sample_obar(amount: u64, asset_type: AssetType, pub_key: XfrPublicKey) -> OpenAssetRecord {
+    fn build_sample_obar(
+        amount: u64,
+        asset_type: AssetType,
+        pub_key: XfrPublicKey,
+    ) -> OpenAssetRecord {
         let mut prng = ChaChaRng::from_seed([89u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
         let art = AssetRecordTemplate::with_no_asset_tracing(
@@ -498,12 +508,7 @@ mod tests {
             NonConfidentialAmount_NonConfidentialAssetType,
             pub_key,
         );
-        let (obar, _, _) = build_open_asset_record(
-            &mut prng,
-            &pc_gens,
-            &art,
-            vec![]
-        );
-        return obar
+        let (obar, _, _) = build_open_asset_record(&mut prng, &pc_gens, &art, vec![]);
+        return obar;
     }
 }

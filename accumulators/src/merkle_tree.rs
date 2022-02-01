@@ -27,7 +27,6 @@ pub enum Path {
 ///
 /// Usage:
 ///    ```
-///
 ///     use std::collections::HashMap;
 ///     use std::thread;
 ///     use storage::db::TempRocksDB;
