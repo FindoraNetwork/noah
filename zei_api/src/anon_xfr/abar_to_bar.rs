@@ -2,6 +2,7 @@
        Zei library - 2022 Findora Foundation
 */
 
+use crate::anon_xfr::keys::AXfrSignature;
 use crate::anon_xfr::{
     circuits::{
         add_merkle_path_variables, commit, compute_merkle_root, nullify, AccElemVars,
@@ -39,6 +40,39 @@ const COMMON_SEED: [u8; 32] = [0u8; 32];
 const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"Abar to Bar Conversion";
 
 pub type Abar2BarPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
+
+/*
+       Conversion Note
+*/
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AbarToBarNote {
+    pub body: AbarToBarBody,
+    pub signature: AXfrSignature,
+}
+
+pub fn generate_abar_to_bar_note(
+    body: AbarToBarBody,
+    randomized_keypair: AXfrKeyPair,
+) -> Result<AbarToBarNote> {
+    let msg = bincode::serialize(&body).c(d!(ZeiError::SerializationError))?;
+
+    let note = AbarToBarNote {
+        body,
+        signature: randomized_keypair.sign(&msg),
+    };
+    Ok(note)
+}
+
+pub fn verify_abar_to_bar_note(
+    params: &NodeParams,
+    note: &AbarToBarNote,
+    merkle_root: &BLSScalar,
+) -> Result<()> {
+    let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+    note.body.input.1.verify(&msg, &note.signature).c(d!())?;
+
+    verify_abar_to_bar_body(params, &note.body, merkle_root).c(d!())
+}
 
 /*
        Conversion Body
@@ -140,6 +174,13 @@ pub struct ConvertAbarBarProof {
     spending_plonk_proof: Abar2BarPlonkProof,
     merkle_root: BLSScalar,
     merkle_root_version: usize,
+}
+
+impl ConvertAbarBarProof {
+    #[allow(dead_code)]
+    fn get_merkle_root_version(&self) -> usize {
+        return self.merkle_root_version;
+    }
 }
 
 /// abar_to_bar functions generates the new BAR and the proof given the Open ABAR and the receiver
