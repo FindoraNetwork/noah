@@ -7,7 +7,7 @@ use rand_core::SeedableRng;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use utils::save_to_file;
-use zei::setup::{PublicParams, UserParams};
+use zei::setup::{NodeParams, PublicParams, UserParams};
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -16,6 +16,20 @@ use zei::setup::{PublicParams, UserParams};
 )]
 enum Actions {
     User {
+        n_payers: usize,
+        n_payees: usize,
+        tree_depth: usize,
+        out_filename: PathBuf,
+    },
+
+    Node {
+        n_payers: usize,
+        n_payees: usize,
+        tree_depth: usize,
+        out_filename: PathBuf,
+    },
+
+    VK {
         n_payers: usize,
         n_payees: usize,
         tree_depth: usize,
@@ -51,6 +65,22 @@ fn main() {
         } => {
             gen_user_params(n_payers, n_payees, tree_depth, out_filename);
         }
+        Node {
+            n_payers,
+            n_payees,
+            tree_depth,
+            out_filename,
+        } => {
+            gen_node_params(n_payers, n_payees, tree_depth, out_filename);
+        },
+        VK {
+            n_payers,
+            n_payees,
+            tree_depth,
+            out_filename,
+        } => {
+            gen_vk(n_payers, n_payees, tree_depth, out_filename);
+        },
         BP {
             gens_capacity,
             party_capacity,
@@ -61,7 +91,6 @@ fn main() {
         KZG { size, out_filename } => {
             gen_params_kzg(size, out_filename);
         }
-
         PublicParams { out_filename } => gen_public_params(out_filename),
     };
 }
@@ -83,9 +112,53 @@ fn gen_user_params(
         Some(tree_depth)
     };
 
-    let user_params = UserParams::new(n_payers, n_payees, tree_dept_option);
+    let user_params = UserParams::new(n_payers, n_payees, tree_dept_option).unwrap();
     let user_params_ser = bincode::serialize(&user_params).unwrap();
     save_to_file(&user_params_ser, out_filename);
+}
+
+fn gen_node_params(
+    n_payers: usize,
+    n_payees: usize,
+    tree_depth: usize,
+    out_filename: PathBuf,
+) {
+    println!(
+        "Generating 'Node Parameters' for {} payers, {} payees and with tree depth={}...",
+        n_payers, n_payees, tree_depth
+    );
+
+    let tree_dept_option = if tree_depth == 0 {
+        None
+    } else {
+        Some(tree_depth)
+    };
+
+    let node_params = NodeParams::create(n_payers, n_payees, tree_dept_option).unwrap();
+    let node_params_ser = bincode::serialize(&node_params).unwrap();
+    save_to_file(&node_params_ser, out_filename);
+}
+
+fn gen_vk(
+    n_payers: usize,
+    n_payees: usize,
+    tree_depth: usize,
+    out_filename: PathBuf,
+) {
+    println!(
+        "Generating 'Node Parameters' for {} payers, {} payees and with tree depth={}...",
+        n_payers, n_payees, tree_depth
+    );
+
+    let tree_dept_option = if tree_depth == 0 {
+        None
+    } else {
+        Some(tree_depth)
+    };
+
+    let node_params = NodeParams::create(n_payers, n_payees, tree_dept_option).unwrap();
+    let node_params_ser = bincode::serialize(&node_params.verifier_params).unwrap();
+    save_to_file(&node_params_ser, out_filename);
 }
 
 fn gen_params_bp(gens_capacity: usize, party_capacity: usize, out_filename: PathBuf) {
@@ -96,6 +169,7 @@ fn gen_params_bp(gens_capacity: usize, party_capacity: usize, out_filename: Path
 }
 
 fn gen_params_kzg(size: usize, out_filename: PathBuf) {
+    println!("Warning: The KZG parameters should come from a setup ceremony instead of generated here.");
     println!("Generating KZG parameters of size {} ...", size);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pcs = KZGCommitmentSchemeBLS::new(size, &mut prng);

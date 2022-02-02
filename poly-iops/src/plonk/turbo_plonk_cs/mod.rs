@@ -24,6 +24,7 @@ pub struct TurboPlonkConstraintSystem<F> {
     pub size: usize,
     pub public_vars_constraint_indices: Vec<CsIndex>,
     pub public_vars_witness_indices: Vec<VarIndex>,
+    pub verifier_only: bool,
     // A private witness for the circuit, cleared after computing a proof
     witness: Vec<F>,
     // A reserved variable that maps to value zero
@@ -88,7 +89,6 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
     ///     - qo * wo = 0
     /// ```
     fn eval_gate_func(
-        &self,
         wire_vals: &[&F],
         sel_vals: &[&F],
         pub_input: &F,
@@ -133,7 +133,7 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
 
     /// The coefficients are
     /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1*w2*w3*w4*wo, w1^5, w2^5, w3^5, w4^5, -w4)
-    fn eval_selector_multipliers(&self, wire_vals: &[&F]) -> Result<Vec<F>> {
+    fn eval_selector_multipliers(wire_vals: &[&F]) -> Result<Vec<F>> {
         if wire_vals.len() < N_WIRES_PER_GATE {
             return Err(eg!(PlonkError::FuncParamsError));
         }
@@ -158,6 +158,21 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
             wire_vals[3].pow(five),
             wire_vals[4].neg(),
         ])
+    }
+
+    fn shrink_to_verifier_only(&self) -> Result<Self> {
+        Ok(Self {
+            selectors: vec![],
+            wiring: [vec![]; N_WIRES_PER_GATE],
+            num_vars: self.num_vars,
+            size: self.size,
+            public_vars_constraint_indices: vec![],
+            public_vars_witness_indices: vec![],
+            verifier_only: true,
+            witness: vec![],
+            zero_var: None,
+            one_var: None
+        })
     }
 }
 

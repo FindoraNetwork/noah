@@ -88,7 +88,6 @@ pub trait ConstraintSystem {
 
     /// Evaluate the constraint equation given public input and the values of the wires and the selectors.
     fn eval_gate_func(
-        &self,
         wire_vals: &[&Self::Field],
         sel_vals: &[&Self::Field],
         pub_input: &Self::Field,
@@ -97,9 +96,12 @@ pub trait ConstraintSystem {
     /// Given the wires values of a gate, evaluate the coefficients of the selectors in the
     /// constraint equation.
     fn eval_selector_multipliers(
-        &self,
         wire_vals: &[&Self::Field],
     ) -> Result<Vec<Self::Field>>;
+
+    fn shrink_to_verifier_only(&self) -> Result<Self> {
+        Ok(self.clone())
+    }
 }
 
 #[allow(non_snake_case)]
@@ -160,7 +162,6 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
 
     /// The equation is wl * ql + wr * qr + wl * wr * qm - wo * qo + qc + PI  = 0.
     fn eval_gate_func(
-        &self,
         wire_vals: &[&Self::Field],
         sel_vals: &[&Self::Field],
         pub_input: &Self::Field,
@@ -178,7 +179,6 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
 
     /// The coefficients are (wl, wr, wl * wr, -wo, 1).
     fn eval_selector_multipliers(
-        &self,
         wire_vals: &[&Self::Field],
     ) -> Result<Vec<Self::Field>> {
         if wire_vals.len() < 3 {

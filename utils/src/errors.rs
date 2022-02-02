@@ -47,6 +47,8 @@ pub enum ZeiError {
     R1CSProofError,
     NoMemoInAssetTracerMemo,
     BogusAssetTracerMemo,
+    MissingSRSError,
+    MissingVerifierParamsError,
 }
 
 impl fmt::Display for ZeiError {
@@ -126,6 +128,8 @@ impl fmt::Display for ZeiError {
                   ZeiError::R1CSProofError => { "Could not create R1CSProof" }
                   ZeiError::NoMemoInAssetTracerMemo => { "Cannot decrypt asset tracer memo, try brute force decoding" }
                   ZeiError::BogusAssetTracerMemo => { "AssetTracerMemo decryption yields inconsistent data, try brute force decoding" }
+                    ZeiError::MissingSRSError => { "The Zei library is compiled without SRS, which prevents proof generation" }
+                    ZeiError::MissingVerifierParamsError => { "The program is loading verifier parameters that are not hardcoded. Such parameters must be created first." }
                 })
     }
 }

@@ -332,6 +332,13 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             Err(eg!(PolyComSchemeError::PCSProveEvalError))
         }
     }
+
+    fn shrink_to_verifier_only(&self) -> Result<Self> {
+        Ok(Self {
+            public_parameter_group_1: vec![self.public_parameter_group_1[0]],
+            public_parameter_group_2: vec![self.public_parameter_group_2[0], self.public_parameter_group_2[1]]
+        })
+    }
 }
 
 #[cfg(test)]

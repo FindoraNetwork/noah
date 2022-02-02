@@ -1,4 +1,4 @@
-//The Public Setup needed for Proofs
+// The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
     build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, TurboPlonkCS,
     TREE_DEPTH,
@@ -6,7 +6,7 @@ use crate::anon_xfr::circuits::{
 use algebra::bls12_381::BLSScalar;
 
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
-use crate::anon_xfr::parameters::{RISTRETTO_SRS, SRS};
+use crate::parameters::{RISTRETTO_SRS, SRS};
 use algebra::groups::Zero;
 use algebra::ristretto::RistrettoScalar;
 use bulletproofs::BulletproofGens;
@@ -35,11 +35,12 @@ pub struct UserParams {
     pub prover_params: ProverParams<KZGCommitmentSchemeBLS>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct NodeParams {
     pub bp_params: PublicParams,
     pub pcs: KZGCommitmentSchemeBLS,
     pub cs: TurboPlonkCS,
-    pub verifier_params: VerifierParams<KZGCommitmentSchemeBLS>,
+    pub verifier_params: VerifierParams<KZGCommitmentSchemeBLS>
 }
 
 pub const BULLET_PROOF_RANGE: usize = 32;
@@ -72,7 +73,9 @@ impl UserParams {
         n_payers: usize,
         n_payees: usize,
         tree_depth: Option<usize>,
-    ) -> UserParams {
+    ) -> Result<UserParams> {
+        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+
         let (cs, _) = match tree_depth {
             Some(depth) => build_multi_xfr_cs(
                 AMultiXfrWitness::fake(n_payers, n_payees, depth),
@@ -86,20 +89,20 @@ impl UserParams {
             ),
         };
 
-        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
-            .c(d!(ZeiError::DeserializationError))
-            .unwrap();
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&srs)
+            .c(d!(ZeiError::DeserializationError))?;
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
 
-        UserParams {
+        Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
             cs,
             prover_params,
-        }
+        })
     }
 
-    pub fn eq_committed_vals_params() -> UserParams {
+    pub fn eq_committed_vals_params() -> Result<UserParams> {
+        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let zero = BLSScalar::zero();
         let proof = ZKPartProof::default();
         let non_zk_state = NonZKState::default();
@@ -107,27 +110,41 @@ impl UserParams {
         let (cs, _) =
             build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
 
-        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&srs)
             .c(d!(ZeiError::DeserializationError))
             .unwrap();
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
-        UserParams {
+        Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
             cs,
             prover_params,
-        }
+        })
     }
 }
 
 impl NodeParams {
-    pub fn new(
-        tree_depth: Option<usize>,
+    pub fn create(
         n_payers: usize,
         n_payees: usize,
+        tree_depth: Option<usize>,
     ) -> Result<NodeParams> {
-        let user_params = UserParams::new(n_payers, n_payees, tree_depth);
+        let user_params = UserParams::new(n_payers, n_payees, tree_depth)?;
         Ok(Self::from(user_params))
+    }
+
+    pub fn load(
+        n_payers: usize,
+        n_payees: usize,
+        tree_depth: Option<usize>,
+    ) -> Result<NodeParams> {
+        let tree_depth = tree_depth.unwrap_or(TREE_DEPTH);
+
+        if tree_depth != TREE_DEPTH || n_payees > 6 || n_payers > 6 {
+            Err(SimpleError::new(d!(ZeiError::MissingVerifierParamsError), None).into())
+        } else {
+            Self::create(n_payers, n_payees, Some(tree_depth))
+        }
     }
 }
 
@@ -137,14 +154,14 @@ impl From<UserParams> for NodeParams {
             bp_params: params.bp_params,
             pcs: params.pcs,
             cs: params.cs,
-            verifier_params: params.prover_params.get_verifier_params(),
+            verifier_params: params.prover_params.get_verifier_params()
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::parameters::SRS;
+    use crate::parameters::SRS;
     use crate::setup::UserParams;
     use algebra::bls12_381::{BLSScalar, BLSG1};
     use algebra::groups::{Group, GroupArithmetic, One, ScalarArithmetic};

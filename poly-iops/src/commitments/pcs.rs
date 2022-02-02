@@ -331,6 +331,10 @@ pub trait PolyComScheme {
             }
         }
     }
+
+    fn shrink_to_verifier_only(&self) -> Result<Self> {
+        Ok(self.clone())
+    }
 }
 
 /// Uses a Binding Polynomial commitment scheme and transforms it into a Binding and Hiding Polynomial Commitment Scheme

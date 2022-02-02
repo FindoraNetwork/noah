@@ -383,7 +383,6 @@ pub mod prover {
         let perms_eval_beta_as_ref: Vec<&PCS::Field> =
             proof.perms_eval_beta.iter().collect();
         let C_L = linearization_commitment::<PCS, CS>(
-            cs,
             cs_params,
             &proof.C_Sigma,
             &witness_polys_eval_beta_as_ref[..],

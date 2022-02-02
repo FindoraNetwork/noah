@@ -39,6 +39,7 @@ ruc = "1.0"
 num-integer = { version = "0.1.43" }
 num-traits = { version = "0.2.12" }
 num-bigint = { version = "0.3.0", features = ["rand"] }
+lazy_static = "1.4"
 
 [dev-dependencies]
 accumulators = { path = "../accumulators" }
@@ -60,6 +61,7 @@ u64_backend = ["curve25519-dalek/u64_backend"]
 u32_backend = ["curve25519-dalek/u32_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 asm = [ "algebra/asm" ]
+no_srs = []
 
 [[bench]]
 name = "xfr_note_idtracking_assettracking_singleasset_time"

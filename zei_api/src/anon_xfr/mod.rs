@@ -5,13 +5,13 @@ use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
 use crate::anon_xfr::structs::{
-    AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord,
+    AnonBlindAssetRecord, AXfrBody, AXfrProof, OpenAnonBlindAssetRecord,
 };
 use crate::setup::{NodeParams, UserParams};
-use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
-use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
+use crate::xfr::structs::{ASSET_TYPE_LENGTH, AssetType, OwnerMemo};
+use algebra::bls12_381::{BLS_SCALAR_LEN, BLSScalar};
 use algebra::groups::{Scalar, ScalarArithmetic, Zero};
-use algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
+use algebra::jubjub::{JUBJUB_SCALAR_LEN, JubjubScalar};
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key, XSecretKey,
@@ -28,7 +28,6 @@ pub(crate) mod circuits;
 pub mod config;
 pub mod keys;
 mod merkle_tree_test;
-pub mod parameters;
 pub(crate) mod proofs;
 pub mod structs;
 

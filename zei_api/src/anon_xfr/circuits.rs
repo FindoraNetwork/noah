@@ -25,7 +25,7 @@ pub type TurboPlonkCS = TurboPlonkConstraintSystem<BLSScalar>;
 const SK_LEN: usize = 252; // secret key size (in bits)
 const JUBJUB_SCALAR_BIT_LEN: usize = 252; // jubjub scalar size (in bits)
 const AMOUNT_LEN: usize = 64; // amount value size (in bits)
-pub const TREE_DEPTH: usize = 20; // Depth of the Merkle Tree
+pub const TREE_DEPTH: usize = 41; // Depth of the Merkle Tree
 
 #[derive(Debug, Clone)]
 pub(crate) struct PayerSecret {

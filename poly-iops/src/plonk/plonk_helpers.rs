@@ -392,7 +392,6 @@ pub(super) fn linearization_commitment<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
 >(
-    cs: &CS,
     params: &VerifierParams<PCS>,
     C_Sigma: &PCS::Commitment,
     witness_polys_eval_beta: &[&PCS::Field],
@@ -400,8 +399,7 @@ pub(super) fn linearization_commitment<
     Sigma_eval_g_beta: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
 ) -> PCS::Commitment {
-    let w = cs
-        .eval_selector_multipliers(witness_polys_eval_beta)
+    let w = CS::eval_selector_multipliers(witness_polys_eval_beta)
         .unwrap(); // safe unwrap
     linearization::<PCS::Field, PCS::Commitment>(
         &w,
