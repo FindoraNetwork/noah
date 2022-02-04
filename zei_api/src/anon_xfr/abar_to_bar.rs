@@ -10,8 +10,8 @@ use crate::anon_xfr::{
     },
     keys::{AXfrKeyPair, AXfrPubKey},
     nullifier,
+    parameters::SRS,
     structs::{MTNode, MTPath, Nullifier, OpenAnonBlindAssetRecord},
-    parameters::{SRS}
 };
 use crate::setup::{NodeParams, PublicParams, UserParams};
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
@@ -22,7 +22,7 @@ use algebra::{
 };
 use merlin::Transcript;
 use poly_iops::{
-    commitments::kzg_poly_com::{KZGCommitmentSchemeBLS},
+    commitments::kzg_poly_com::KZGCommitmentSchemeBLS,
     plonk::{
         plonk_setup::preprocess_prover,
         protocol::prover::{prover, verifier, PlonkPf},
