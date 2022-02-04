@@ -178,7 +178,7 @@ pub struct ConvertAbarBarProof {
 
 impl ConvertAbarBarProof {
     #[allow(dead_code)]
-    fn get_merkle_root_version(&self) -> usize {
+    pub fn get_merkle_root_version(&self) -> usize {
         return self.merkle_root_version;
     }
 }
