@@ -11,6 +11,7 @@ use crate::anon_xfr::{
     keys::{AXfrKeyPair, AXfrPubKey},
     nullifier,
     structs::{MTNode, MTPath, Nullifier, OpenAnonBlindAssetRecord},
+    parameters::{SRS}
 };
 use crate::setup::{NodeParams, PublicParams, UserParams};
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
@@ -21,15 +22,14 @@ use algebra::{
 };
 use merlin::Transcript;
 use poly_iops::{
-    commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
+    commitments::kzg_poly_com::{KZGCommitmentSchemeBLS},
     plonk::{
         plonk_setup::preprocess_prover,
         protocol::prover::{prover, verifier, PlonkPf},
         turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex},
     },
 };
-use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
 
@@ -274,11 +274,10 @@ impl UserParams {
             blind: bls_zero,
         };
 
-        let (cs, n_constraints) = build_abar_to_bar_cs(payer_secret);
-        let pcs = KZGCommitmentScheme::new(
-            n_constraints + 2,
-            &mut ChaChaRng::from_seed([0u8; 32]),
-        );
+        let (cs, _) = build_abar_to_bar_cs(payer_secret);
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+            .c(d!(ZeiError::DeserializationError))
+            .unwrap();
 
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
         UserParams {
