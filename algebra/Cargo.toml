@@ -28,7 +28,7 @@ rand_chacha = { version = "0.2", default-features = false }
 num-bigint = { version = "0.3" }
 
 [features]
-default = ["std", "parallel", "u64_backend"]
+default = ["std", "u64_backend"]
 std = ["curve25519-dalek/std"]
 alloc = ["curve25519-dalek/alloc"]
 nightly = ["curve25519-dalek/nightly"]
