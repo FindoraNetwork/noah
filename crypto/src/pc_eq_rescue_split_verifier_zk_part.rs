@@ -142,7 +142,10 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     );
     transcript.append_message(b"Point P", &point_p.to_compressed_bytes());
     transcript.append_message(b"Point Q", &point_q.to_compressed_bytes());
-    transcript.append_message(b"Auxiliary information (Rescue commitment z, or a nullifier)", &aux_info.to_bytes());
+    transcript.append_message(
+        b"Auxiliary information (Rescue commitment z, or a nullifier)",
+        &aux_info.to_bytes(),
+    );
     transcript
         .append_message(b"Non-ZK verifier state commitment comm", &comm.to_bytes());
     transcript.append_message(b"Point R", &point_r.to_compressed_bytes());
@@ -195,7 +198,10 @@ pub fn verify_pc_eq_rescue_external(
     );
     transcript.append_message(b"Point P", &point_p.to_compressed_bytes());
     transcript.append_message(b"Point Q", &point_q.to_compressed_bytes());
-    transcript.append_message(b"Auxiliary information (Rescue commitment z, or a nullifier)", &aux_info.to_bytes());
+    transcript.append_message(
+        b"Auxiliary information (Rescue commitment z, or a nullifier)",
+        &aux_info.to_bytes(),
+    );
     transcript.append_message(
         b"Non-ZK verifier state commitment comm",
         &zk_part_proof.non_zk_part_state_commitment.to_bytes(),
@@ -235,8 +241,7 @@ mod test {
     use crate::basics::commitments::pedersen::PedersenGens;
     use crate::basics::hash::rescue::RescueInstance;
     use crate::pc_eq_rescue_split_verifier_zk_part::{
-        prove_pc_eq_rescue_external,
-        verify_pc_eq_rescue_external,
+        prove_pc_eq_rescue_external, verify_pc_eq_rescue_external,
     };
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, Zero};
@@ -280,10 +285,9 @@ mod test {
             )
             .unwrap();
 
-            let _ = verify_pc_eq_rescue_external(
-                &pc_gens, &point_p, &point_q, &z, &proof,
-            )
-            .unwrap();
+            let _ =
+                verify_pc_eq_rescue_external(&pc_gens, &point_p, &point_q, &z, &proof)
+                    .unwrap();
         }
     }
 }
