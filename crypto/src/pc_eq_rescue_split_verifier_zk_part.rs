@@ -55,7 +55,7 @@ impl ZKPartProof {
 }
 
 #[allow(unused)]
-pub fn prove_pc_eq_rescue_split_verifier_zk_part<R: CryptoRng + RngCore>(
+pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     rng: &mut R,
     x: &RistrettoScalar,
     gamma: &RistrettoScalar,
@@ -64,7 +64,7 @@ pub fn prove_pc_eq_rescue_split_verifier_zk_part<R: CryptoRng + RngCore>(
     pc_gens: &PedersenGens<RistrettoPoint>,
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
-    z: &BLSScalar,
+    aux_info: &BLSScalar,
 ) -> Result<(ZKPartProof, NonZKState, RistrettoScalar)> {
     assert_eq!(NUM_OF_LIMBS, 6);
     assert_eq!(BIT_PER_LIMB, 43);
@@ -142,7 +142,7 @@ pub fn prove_pc_eq_rescue_split_verifier_zk_part<R: CryptoRng + RngCore>(
     );
     transcript.append_message(b"Point P", &point_p.to_compressed_bytes());
     transcript.append_message(b"Point Q", &point_q.to_compressed_bytes());
-    transcript.append_message(b"Rescue commitment z", &z.to_bytes());
+    transcript.append_message(b"Auxiliary information (Rescue commitment z, or a nullifier)", &aux_info.to_bytes());
     transcript
         .append_message(b"Non-ZK verifier state commitment comm", &comm.to_bytes());
     transcript.append_message(b"Point R", &point_r.to_compressed_bytes());
@@ -174,11 +174,11 @@ pub fn prove_pc_eq_rescue_split_verifier_zk_part<R: CryptoRng + RngCore>(
 }
 
 #[allow(unused)]
-pub fn verify_pc_eq_rescue_split_verifier_zk_part(
+pub fn verify_pc_eq_rescue_external(
     pc_gens: &PedersenGens<RistrettoPoint>,
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
-    z: &BLSScalar,
+    aux_info: &BLSScalar,
     zk_part_proof: &ZKPartProof,
 ) -> Result<RistrettoScalar> {
     // 1. Fiat-Shamir transform
@@ -195,7 +195,7 @@ pub fn verify_pc_eq_rescue_split_verifier_zk_part(
     );
     transcript.append_message(b"Point P", &point_p.to_compressed_bytes());
     transcript.append_message(b"Point Q", &point_q.to_compressed_bytes());
-    transcript.append_message(b"Rescue commitment z", &z.to_bytes());
+    transcript.append_message(b"Auxiliary information (Rescue commitment z, or a nullifier)", &aux_info.to_bytes());
     transcript.append_message(
         b"Non-ZK verifier state commitment comm",
         &zk_part_proof.non_zk_part_state_commitment.to_bytes(),
@@ -235,8 +235,8 @@ mod test {
     use crate::basics::commitments::pedersen::PedersenGens;
     use crate::basics::hash::rescue::RescueInstance;
     use crate::pc_eq_rescue_split_verifier_zk_part::{
-        prove_pc_eq_rescue_split_verifier_zk_part,
-        verify_pc_eq_rescue_split_verifier_zk_part,
+        prove_pc_eq_rescue_external,
+        verify_pc_eq_rescue_external,
     };
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, Zero};
@@ -275,12 +275,12 @@ mod test {
                 BLSScalar::zero(),
             ])[0];
 
-            let (proof, _, _) = prove_pc_eq_rescue_split_verifier_zk_part(
+            let (proof, _, _) = prove_pc_eq_rescue_external(
                 &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
             )
             .unwrap();
 
-            let _ = verify_pc_eq_rescue_split_verifier_zk_part(
+            let _ = verify_pc_eq_rescue_external(
                 &pc_gens, &point_p, &point_q, &z, &proof,
             )
             .unwrap();

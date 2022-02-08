@@ -18,8 +18,7 @@ use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::hybrid_encryption::XPublicKey;
 use crypto::pc_eq_rescue_split_verifier_zk_part::{
-    prove_pc_eq_rescue_split_verifier_zk_part,
-    verify_pc_eq_rescue_split_verifier_zk_part, ZKPartProof,
+    prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
 };
 use num_bigint::BigUint;
 use rand_core::{CryptoRng, RngCore};
@@ -42,13 +41,6 @@ pub struct BarToAbarBody {
     pub memo: OwnerMemo,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AbarToBarBody {
-    pub input: AnonBlindAssetRecord,
-    pub output: BlindAssetRecord,
-    pub proof: ConvertBarAbarProof,
-}
-
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct BarToAbarNote {
     pub body: BarToAbarBody,
@@ -63,10 +55,9 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
     record: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
-    fee: u64,
 ) -> Result<(BarToAbarBody, JubjubScalar)> {
     let (open_abar, proof) =
-        bar_to_abar(prng, params, record, abar_pubkey, enc_key, fee).c(d!())?;
+        bar_to_abar(prng, params, record, abar_pubkey, enc_key).c(d!())?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
         output: AnonBlindAssetRecord::from_oabar(&open_abar),
@@ -85,11 +76,9 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     bar_keypair: &XfrKeyPair,
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
-    fee: u64,
 ) -> Result<BarToAbarNote> {
     let (body, _r) =
-        gen_bar_to_abar_body(prng, params, record, &abar_pubkey, enc_key, fee)
-            .c(d!())?;
+        gen_bar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
@@ -100,12 +89,8 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
 
 /// Verifies BlindAssetRecord To AnonymousBlindAssetRecord conversion body
 /// Warning: This function doesn't check that input owner has signed the body
-pub fn verify_bar_to_abar_body(
-    params: &NodeParams,
-    body: &BarToAbarBody,
-    fee: u64,
-) -> Result<()> {
-    verify_bar_to_abar(params, &body.input, &body.output, &body.proof, fee).c(d!())
+pub fn verify_bar_to_abar_body(params: &NodeParams, body: &BarToAbarBody) -> Result<()> {
+    verify_bar_to_abar(params, &body.input, &body.output, &body.proof).c(d!())
 }
 
 /// Verifies BlindAssetRecord To AnonymousBlindAssetRecord conversion note by verifying proof of conversion
@@ -114,9 +99,8 @@ pub fn verify_bar_to_abar_note(
     params: &NodeParams,
     note: &BarToAbarNote,
     bar_pub_key: &XfrPublicKey,
-    fee: u64,
 ) -> Result<()> {
-    verify_bar_to_abar_body(params, &note.body, fee).c(d!())?;
+    verify_bar_to_abar_body(params, &note.body).c(d!())?;
     let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
     bar_pub_key.verify(&msg, &note.signature).c(d!())
 }
@@ -127,16 +111,15 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     obar: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
-    fee: u64,
 ) -> Result<(OpenAnonBlindAssetRecord, ConvertBarAbarProof)> {
-    let obar_amount = obar.amount - fee;
+    let oabar_amount = obar.amount;
 
     let pc_gens =
         PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
 
     // 1. Construct ABAR.
     let oabar = OpenAnonBlindAssetRecordBuilder::new()
-        .amount(obar_amount)
+        .amount(oabar_amount)
         .asset_type(obar.asset_type)
         .pub_key(*abar_pubkey)
         .finalize(prng, &enc_key)
@@ -145,7 +128,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         .c(d!())?;
 
     // 2. Reconstruct the points.
-    let x = RistrettoScalar::from_u64(obar_amount);
+    let x = RistrettoScalar::from_u64(oabar_amount);
     let y: RistrettoScalar = obar.asset_type.as_scalar();
     let gamma = obar.amount_blinds.0.add(
         &obar
@@ -170,12 +153,11 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         BLSScalar::zero(),
     ])[0];
 
-    // 3. compute the ZK part of the proof
-    let (commitment_eq_proof, non_zk_state, beta) =
-        prove_pc_eq_rescue_split_verifier_zk_part(
-            prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
-        )
-        .c(d!())?;
+    // 3. compute the non-ZK part of the proof
+    let (commitment_eq_proof, non_zk_state, beta) = prove_pc_eq_rescue_external(
+        prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
+    )
+    .c(d!())?;
 
     // 4. prove abar correctness
     let pc_rescue_commitments_eq_proof = prove_eq_committed_vals(
@@ -204,7 +186,6 @@ pub(crate) fn verify_bar_to_abar(
     bar: &BlindAssetRecord,
     abar: &AnonBlindAssetRecord,
     proof: &ConvertBarAbarProof,
-    fee: u64,
 ) -> Result<()> {
     let pc_gens =
         PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
@@ -222,7 +203,7 @@ pub(crate) fn verify_bar_to_abar(
         ),
         XfrAmount::NonConfidential(amount) => {
             // fake commitment
-            let (l, h) = utils::u64_to_u32_pair(amount - fee);
+            let (l, h) = utils::u64_to_u32_pair(amount);
             (
                 pc_gens
                     .commit(&[RistrettoScalar::from_u32(l)], &RistrettoScalar::zero())
@@ -249,8 +230,8 @@ pub(crate) fn verify_bar_to_abar(
         }
     };
 
-    // 2. verify equality of commited values
-    let beta = verify_pc_eq_rescue_split_verifier_zk_part(
+    // 2. verify equality of committed values
+    let beta = verify_pc_eq_rescue_external(
         &pc_gens,
         &com_amount,
         &com_asset_type,
@@ -272,9 +253,7 @@ pub(crate) fn verify_bar_to_abar(
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::bar_to_from_abar::{
-        gen_bar_to_abar_note, verify_bar_to_abar_note,
-    };
+    use crate::anon_xfr::bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
         AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
@@ -334,7 +313,6 @@ mod test {
             &obar,
             &abar_keypair.pub_key(),
             &enc_key,
-            0,
         )
         .unwrap();
         let abar_conf = AnonBlindAssetRecord::from_oabar(&oabar_conf);
@@ -354,7 +332,6 @@ mod test {
             &obar,
             &abar_keypair.pub_key(),
             &enc_key,
-            0,
         )
         .unwrap();
         let abar_non_conf = AnonBlindAssetRecord::from_oabar(&oabar_non_conf);
@@ -367,7 +344,6 @@ mod test {
             &bar_conf,
             &abar_conf,
             &proof_conf,
-            0
         )
         .is_ok());
         // non confidential case
@@ -376,7 +352,6 @@ mod test {
             &bar_non_conf,
             &abar_non_conf,
             &proof_non_conf,
-            0
         )
         .is_ok());
     }
@@ -408,7 +383,6 @@ mod test {
             &bar_keypair,
             &abar_keypair.pub_key(),
             &enc_key,
-            0,
         )
         .unwrap();
 
@@ -431,8 +405,7 @@ mod test {
 
         let node_params = NodeParams::from(params);
         assert!(
-            verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key, 0)
-                .is_ok()
+            verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key).is_ok()
         );
 
         let mut note = note;
@@ -440,54 +413,7 @@ mod test {
         let bad_sig = bar_keypair.sign(message);
         note.signature = bad_sig;
         assert!(
-            verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key, 0)
-                .is_err()
+            verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key).is_err()
         )
-    }
-
-    #[test]
-    fn test_bar_to_abar_with_fee() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let params = UserParams::eq_committed_vals_params();
-        let pc_gens = RistrettoPedersenGens::default();
-
-        let key = XfrKeyPair::generate(&mut prng);
-        let (bar, memo) = build_bar(
-            &key.pub_key,
-            &mut prng,
-            &pc_gens,
-            10_000_000u64,
-            AssetType::from_identical_byte(0),
-            AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-        );
-        let oar = open_blind_asset_record(&bar, &memo, &key).unwrap();
-
-        let axfr_key_pair = AXfrKeyPair::generate(&mut prng);
-        let dec_key = XSecretKey::new(&mut prng);
-        let note = gen_bar_to_abar_note(
-            &mut prng,
-            &params,
-            &oar,
-            &key,
-            &axfr_key_pair.pub_key(),
-            &XPublicKey::from(&dec_key),
-            1000,
-        )
-        .unwrap();
-
-        verify_bar_to_abar_note(&NodeParams::from(params), &note, &key.pub_key, 1000)
-            .unwrap();
-
-        let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
-            &note.body.output,
-            note.body.memo,
-            &axfr_key_pair,
-            &dec_key,
-        )
-        .unwrap()
-        .build()
-        .unwrap();
-
-        assert_eq!(oabar.amount, oar.amount - 1_000);
     }
 }

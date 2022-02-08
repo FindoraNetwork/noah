@@ -1,7 +1,3 @@
-/*
-       Zei library - 2022 Findora Foundation
-*/
-
 use crate::anon_xfr::keys::AXfrSignature;
 use crate::anon_xfr::{
     circuits::{
@@ -10,168 +6,55 @@ use crate::anon_xfr::{
     },
     keys::{AXfrKeyPair, AXfrPubKey},
     nullifier,
-    parameters::SRS,
-    structs::{MTNode, MTPath, Nullifier, OpenAnonBlindAssetRecord},
+    structs::{Nullifier, OpenAnonBlindAssetRecord},
 };
-use crate::setup::{NodeParams, PublicParams, UserParams};
-use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
+use crate::setup::{NodeParams, UserParams};
+use crate::xfr::asset_record::{build_open_asset_record, AssetRecordType};
+use crate::xfr::sig::XfrPublicKey;
+use crate::xfr::structs::{
+    AssetRecordTemplate, BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
+};
+use algebra::groups::GroupArithmetic;
+use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use algebra::{
     bls12_381::BLSScalar,
-    groups::{Group, One, Scalar, ScalarArithmetic, Zero},
+    groups::{Group, One as ArkOne, Scalar, ScalarArithmetic, Zero as ArkZero},
     jubjub::{JubjubPoint, JubjubScalar},
 };
+use crypto::basics::commitments::pedersen::PedersenGens;
+use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+use crypto::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
+use crypto::pc_eq_rescue_split_verifier_zk_part::{
+    prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
+};
 use merlin::Transcript;
+use num_bigint::BigUint;
+use num_traits::{One, Zero};
+use poly_iops::plonk::field_simulation::SimFrVar;
+use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
 use poly_iops::{
     commitments::kzg_poly_com::KZGCommitmentSchemeBLS,
     plonk::{
-        plonk_setup::preprocess_prover,
         protocol::prover::{prover, verifier, PlonkPf},
         turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex},
     },
 };
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use std::ops::{AddAssign, Shl};
 use utils::errors::ZeiError;
 
-const SK_LEN: usize = 252;
-// secret key size (in bits)
-const COMMON_SEED: [u8; 32] = [0u8; 32];
-
-const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"Abar to Bar Conversion";
-
 pub type Abar2BarPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
+pub const TWO_POW_32: u64 = 1 << 32;
+const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"Abar to Bar Conversion";
+const SK_LEN: usize = 252;
 
-/*
-       Conversion Note
-*/
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AbarToBarNote {
-    pub body: AbarToBarBody,
-    pub signature: AXfrSignature,
-}
-
-pub fn generate_abar_to_bar_note(
-    body: AbarToBarBody,
-    randomized_keypair: AXfrKeyPair,
-) -> Result<AbarToBarNote> {
-    let msg = bincode::serialize(&body).c(d!(ZeiError::SerializationError))?;
-
-    let note = AbarToBarNote {
-        body,
-        signature: randomized_keypair.sign(&msg),
-    };
-    Ok(note)
-}
-
-pub fn verify_abar_to_bar_note(
-    params: &NodeParams,
-    note: &AbarToBarNote,
-    merkle_root: &BLSScalar,
-) -> Result<()> {
-    let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
-    note.body.input.1.verify(&msg, &note.signature).c(d!())?;
-
-    verify_abar_to_bar_body(params, &note.body, merkle_root).c(d!())
-}
-
-/*
-       Conversion Body
-*/
-/// AbarToBarBody has the input, the output and the proof related to the conversion.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AbarToBarBody {
-    /// input ABARS being spent
-    pub input: (Nullifier, AXfrPubKey),
-    /// The new BAR to be created
-    pub output: BlindAssetRecord,
-    /// The ZKP for the conversion
-    pub proof: ConvertAbarBarProof,
-}
-
-/// This function generates the AbarToBarBody from the Open ABARs, the receiver address and the signing
-/// key pair.
-#[allow(dead_code)]
-pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
-    prng: &mut R,
-    params: &UserParams,
-    input: OpenAnonBlindAssetRecord,
-    input_keypair: AXfrKeyPair,
-    obar: &OpenAssetRecord,
-) -> Result<(AbarToBarBody, AXfrKeyPair)> {
-    // 1. check input correctness
-    if input.mt_leaf_info.is_none() || input_keypair.pub_key() != input.pub_key {
-        return Err(eg!(ZeiError::ParameterError));
-    }
-    if obar.asset_type != input.asset_type {
-        return Err(eg!(ZeiError::AbarToBarParamsError));
-    }
-    if obar.amount != input.amount {
-        return Err(eg!(ZeiError::AbarToBarParamsError));
-    }
-
-    // 2. randomize input key pair with open_abar rand key
-    let rand_input_keypair = input_keypair.randomize(&input.key_rand_factor);
-
-    // 3. build input witness infos
-    let diversifier = JubjubScalar::random(prng);
-    let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
-    let nullifier_and_signing_key = (
-        nullifier(
-            &rand_input_keypair,
-            input.amount,
-            &input.asset_type,
-            mt_leaf_info.uid,
-        ),
-        rand_input_keypair.pub_key().randomize(&diversifier),
-    );
-
-    // 4. build proof
-    let payers_secret = PayerSecret {
-        sec_key: rand_input_keypair.get_secret_scalar(),
-        diversifier,
-        uid: mt_leaf_info.uid,
-        amount: input.amount,
-        asset_type: input.asset_type.as_scalar(),
-        path: mt_leaf_info.path.clone(),
-        blind: input.blind,
-    };
-
-    let mut proof = abar_to_bar(prng, params, payers_secret).c(d!())?;
-    let diversified_key_pair = rand_input_keypair.randomize(&diversifier);
-
-    let mt_info_temp = input.mt_leaf_info.as_ref().unwrap();
-    proof.merkle_root = mt_info_temp.root;
-    proof.merkle_root_version = mt_info_temp.root_version;
-
-    Ok((
-        AbarToBarBody {
-            input: nullifier_and_signing_key,
-            output: obar.blind_asset_record.clone(),
-            proof,
-        },
-        diversified_key_pair,
-    ))
-}
-
-// Verifies the body
-#[allow(dead_code)]
-pub fn verify_abar_to_bar_body(
-    params: &NodeParams,
-    body: &AbarToBarBody,
-    merkle_root: &BLSScalar,
-) -> Result<()> {
-    verify_abar_to_bar(params, &body.input, &body.proof, merkle_root)
-}
-
-/*
-       Conversion Proof
-*/
 /// ConvertAbarBarProof is a struct to hold various aspects of a ZKP to prove equality, spendability
 /// and conversion of an ABAR to a BAR on the chain.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ConvertAbarBarProof {
-    // TODO: BLS Ristretto equality proof
-    spending_plonk_proof: Abar2BarPlonkProof,
+    commitment_eq_proof: ZKPartProof,
+    spending_proof: Abar2BarPlonkProof,
     merkle_root: BLSScalar,
     merkle_root_version: usize,
 }
@@ -183,41 +66,265 @@ impl ConvertAbarBarProof {
     }
 }
 
-/// abar_to_bar functions generates the new BAR and the proof given the Open ABAR and the receiver
-/// public key.
+/// AbarToBarBody has the input, the output and the proof related to the conversion.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AbarToBarBody {
+    /// input ABAR being spent
+    pub input: (Nullifier, AXfrPubKey),
+    /// The new BAR to be created
+    pub output: BlindAssetRecord,
+    /// The ZKP for the conversion
+    pub proof: ConvertAbarBarProof,
+    /// The owner memo
+    pub memo: Option<OwnerMemo>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AbarToBarNote {
+    pub body: AbarToBarBody,
+    pub signature: AXfrSignature,
+}
+
+/// This function generates the AbarToBarBody from the Open ABARs, the receiver address and the signing
+/// key pair.
 #[allow(dead_code)]
-pub(crate) fn abar_to_bar<R: CryptoRng + RngCore>(
+pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
-    input: PayerSecret,
-) -> Result<ConvertAbarBarProof> {
-    let spending_plonk_proof = prove_abar_to_bar(prng, params, input).c(d!())?;
+    oabar: &OpenAnonBlindAssetRecord,
+    abar_keypair: &AXfrKeyPair,
+    bar_pub_key: &XfrPublicKey,
+    asset_record_type: AssetRecordType,
+) -> Result<(AbarToBarBody, AXfrKeyPair)> {
+    if oabar.mt_leaf_info.is_none() || abar_keypair.pub_key() != oabar.pub_key {
+        return Err(eg!(ZeiError::ParameterError));
+    }
 
-    Ok(ConvertAbarBarProof {
-        spending_plonk_proof,
-        merkle_root: Default::default(),
-        merkle_root_version: 0,
-    })
+    let obar_amount = oabar.amount;
+    let obar_type = oabar.asset_type;
+
+    let pc_gens = RistrettoPedersenGens::default();
+    let art = AssetRecordTemplate::with_no_asset_tracing(
+        obar_amount,
+        obar_type,
+        asset_record_type,
+        bar_pub_key.clone(),
+    );
+    let (obar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
+
+    // 2. randomize input key pair with open_abar rand key
+    let rand_input_keypair = abar_keypair.randomize(&oabar.key_rand_factor);
+
+    // 3. build input witness info
+    let diversifier = JubjubScalar::random(prng);
+    let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
+    let nullifier_and_signing_key = (
+        nullifier(
+            &rand_input_keypair,
+            oabar.amount,
+            &oabar.asset_type,
+            mt_leaf_info.uid,
+        ),
+        rand_input_keypair.pub_key().randomize(&diversifier),
+    );
+
+    // 4. Construct the equality proof
+    let x = RistrettoScalar::from_u64(oabar.amount);
+    let y: RistrettoScalar = oabar.asset_type.as_scalar();
+    let gamma = obar.amount_blinds.0.add(
+        &obar
+            .amount_blinds
+            .1
+            .mul(&RistrettoScalar::from_u64(TWO_POW_32)),
+    );
+    let delta = obar.type_blind;
+
+    let pc_gens =
+        PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+
+    let point_p = pc_gens.commit(&[x], &gamma).c(d!())?;
+    let point_q = pc_gens.commit(&[y], &delta).c(d!())?;
+
+    let nullifier = nullifier_and_signing_key.0;
+
+    // 5. compute the non-ZK part of the proof
+    let (commitment_eq_proof, non_zk_state, beta) = prove_pc_eq_rescue_external(
+        prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &nullifier,
+    )
+    .c(d!())?;
+
+    // 4. build the plonk proof
+    let payers_secret = PayerSecret {
+        sec_key: rand_input_keypair.get_secret_scalar(),
+        diversifier,
+        uid: mt_leaf_info.uid,
+        amount: oabar.amount,
+        asset_type: oabar.asset_type.as_scalar(),
+        path: mt_leaf_info.path.clone(),
+        blind: oabar.blind,
+    };
+
+    let spending_proof = prove_abar_to_bar_spending(
+        prng,
+        params,
+        payers_secret,
+        &commitment_eq_proof,
+        &non_zk_state,
+        &beta,
+    )
+    .c(d!())?;
+
+    let diversified_key_pair = rand_input_keypair.randomize(&diversifier);
+
+    let mt_info_temp = oabar.mt_leaf_info.as_ref().unwrap();
+    let convert_proof = ConvertAbarBarProof {
+        commitment_eq_proof,
+        spending_proof,
+        merkle_root: mt_info_temp.root,
+        merkle_root_version: mt_info_temp.root_version,
+    };
+
+    Ok((
+        AbarToBarBody {
+            input: nullifier_and_signing_key,
+            output: obar.blind_asset_record.clone(),
+            proof: convert_proof,
+            memo: owner_memo,
+        },
+        diversified_key_pair,
+    ))
+}
+
+pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    params: &UserParams,
+    record: &OpenAnonBlindAssetRecord,
+    abar_keypair: &AXfrKeyPair,
+    bar_pub_key: &XfrPublicKey,
+    asset_record_type: AssetRecordType,
+) -> Result<AbarToBarNote> {
+    let (body, randomized_keypair) = gen_abar_to_bar_body(
+        prng,
+        params,
+        record,
+        abar_keypair,
+        bar_pub_key,
+        asset_record_type,
+    )
+    .c(d!())?;
+    let msg = bincode::serialize(&body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+    let signature = randomized_keypair.sign(&msg);
+    let note = AbarToBarNote { body, signature };
+    Ok(note)
+}
+
+// Verifies the body
+#[allow(dead_code)]
+pub fn verify_abar_to_bar_body(
+    params: &NodeParams,
+    body: &AbarToBarBody,
+    merkle_root: &BLSScalar,
+) -> Result<()> {
+    verify_abar_to_bar(params, &body, merkle_root)
+}
+
+pub fn verify_abar_to_bar_note(
+    params: &NodeParams,
+    note: &AbarToBarNote,
+    merkle_root: &BLSScalar,
+) -> Result<()> {
+    verify_abar_to_bar_body(params, &note.body, merkle_root).c(d!())?;
+    let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+    note.body.input.1.verify(&msg, &note.signature).c(d!())
 }
 
 /// Verifies the proof with the input and output
 #[allow(dead_code)]
 pub fn verify_abar_to_bar(
     params: &NodeParams,
-    input: &(Nullifier, AXfrPubKey),
-    proof: &ConvertAbarBarProof,
+    body: &AbarToBarBody,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
-    if *merkle_root != proof.merkle_root {
+    if *merkle_root != body.proof.merkle_root {
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
+    let bar = body.output.clone();
+    let pc_gens =
+        PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+
+    // 1. get commitments
+    // 1.1 reconstruct total amount commitment from bar object
+    let (com_low, com_high) = match bar.amount {
+        XfrAmount::Confidential((low, high)) => (
+            low.decompress()
+                .ok_or(ZeiError::DecompressElementError)
+                .c(d!())?,
+            high.decompress()
+                .ok_or(ZeiError::DecompressElementError)
+                .c(d!())?,
+        ),
+        XfrAmount::NonConfidential(amount) => {
+            // fake commitment
+            let (l, h) = utils::u64_to_u32_pair(amount);
+            (
+                pc_gens
+                    .commit(&[RistrettoScalar::from_u32(l)], &RistrettoScalar::zero())
+                    .c(d!())?,
+                pc_gens
+                    .commit(&[RistrettoScalar::from_u32(h)], &RistrettoScalar::zero())
+                    .c(d!())?,
+            )
+        }
+    };
+
+    // 1.2 get asset type commitment
+    let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from_u64(TWO_POW_32)));
+    let com_asset_type = match bar.asset_type {
+        XfrAssetType::Confidential(a) => a
+            .decompress()
+            .ok_or(ZeiError::DecompressElementError)
+            .c(d!())?,
+        XfrAssetType::NonConfidential(a) => {
+            // fake commitment
+            pc_gens
+                .commit(&[a.as_scalar()], &RistrettoScalar::zero())
+                .c(d!())?
+        }
+    };
+
+    let input = body.input;
+    let proof = body.proof.clone();
+
+    // 2. verify equality of committed values
+    let beta = verify_pc_eq_rescue_external(
+        &pc_gens,
+        &com_amount,
+        &com_asset_type,
+        &input.0,
+        &proof.commitment_eq_proof,
+    )
+    .c(d!())?;
+
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
     let mut online_inputs = vec![];
+
     online_inputs.push(input.clone().0);
     online_inputs.push(input.clone().1.as_jubjub_point().get_x());
     online_inputs.push(input.clone().1.as_jubjub_point().get_y());
     online_inputs.push(merkle_root.clone());
+
+    let proof_zk_part = proof.commitment_eq_proof;
+
+    online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
+    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+    let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof_zk_part.s_1.to_bytes()));
+    let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof_zk_part.s_2.to_bytes()));
+    online_inputs.extend_from_slice(&beta_sim_fr.limbs);
+    online_inputs.extend_from_slice(&s1_sim_fr.limbs);
+    online_inputs.extend_from_slice(&s2_sim_fr.limbs);
 
     verifier(
         &mut transcript,
@@ -225,18 +332,21 @@ pub fn verify_abar_to_bar(
         &params.cs,
         &params.verifier_params,
         &online_inputs,
-        &proof.spending_plonk_proof,
+        &proof.spending_proof,
     )
 }
 
-fn prove_abar_to_bar<R: CryptoRng + RngCore>(
+fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &UserParams,
     payers_secret: PayerSecret,
+    proof: &ZKPartProof,
+    non_zk_state: &NonZKState,
+    beta: &RistrettoScalar,
 ) -> Result<Abar2BarPlonkProof> {
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
 
-    let (mut cs, _) = build_abar_to_bar_cs(payers_secret);
+    let (mut cs, _) = build_abar_to_bar_cs(payers_secret, proof, non_zk_state, beta);
     let witness = cs.get_and_clear_witness();
 
     prover(
@@ -251,49 +361,15 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 }
 
 ///
-///        User params for abar_to_bar
-///
-///
-impl UserParams {
-    pub fn abar_to_bar_params(tree_depth: usize) -> UserParams {
-        let bls_zero = BLSScalar::zero();
-        let jubjub_zero = JubjubScalar::zero();
-        let node = MTNode {
-            siblings1: bls_zero,
-            siblings2: bls_zero,
-            is_left_child: 0,
-            is_right_child: 0,
-        };
-        let payer_secret = PayerSecret {
-            sec_key: jubjub_zero,
-            diversifier: jubjub_zero,
-            uid: 0,
-            amount: 0,
-            asset_type: bls_zero,
-            path: MTPath::new(vec![node; tree_depth]),
-            blind: bls_zero,
-        };
-
-        let (cs, _) = build_abar_to_bar_cs(payer_secret);
-        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
-            .c(d!(ZeiError::DeserializationError))
-            .unwrap();
-
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
-        UserParams {
-            bp_params: PublicParams::new(),
-            pcs,
-            cs,
-            prover_params,
-        }
-    }
-}
-
-///
 ///        Constraint System for abar_to_bar
 ///
 ///
-fn build_abar_to_bar_cs(payers_secret: PayerSecret) -> (TurboPlonkCS, usize) {
+pub fn build_abar_to_bar_cs(
+    payers_secret: PayerSecret,
+    proof: &ZKPartProof,
+    non_zk_state: &NonZKState,
+    beta: &RistrettoScalar,
+) -> (TurboPlonkCS, usize) {
     let mut cs = TurboPlonkConstraintSystem::new();
     let payers_secrets = add_payers_secret(&mut cs, payers_secret);
 
@@ -303,6 +379,11 @@ fn build_abar_to_bar_cs(payers_secret: PayerSecret) -> (TurboPlonkCS, usize) {
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
+    let step_1 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB));
+    let step_2 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 2));
+    let step_3 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 3));
+    let step_4 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 4));
+    let step_5 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 5));
 
     // prove knowledge of payer's secret key: pk = base^{sk}
     let (pk_var, pk_point) = cs.scalar_mul(base, payers_secrets.sec_key, SK_LEN);
@@ -358,12 +439,189 @@ fn build_abar_to_bar_cs(payers_secret: PayerSecret) -> (TurboPlonkCS, usize) {
         root_var = Some(tmp_root_var);
     }
 
+    // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2
+    let x_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.x.to_bytes()));
+    let y_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.y.to_bytes()));
+    let a_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.a.to_bytes()));
+    let b_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.b.to_bytes()));
+    let comm = proof.non_zk_part_state_commitment;
+    let r = non_zk_state.r;
+    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+    let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_1.to_bytes()));
+    let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_2.to_bytes()));
+
+    let x_sim_fr_var =
+        SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
+    let y_sim_fr_var =
+        SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
+    let a_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
+    let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
+    let comm_var = cs.new_variable(comm);
+    let r_var = cs.new_variable(r);
+    let beta_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &beta_sim_fr);
+    let s1_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s1_sim_fr);
+    let s2_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s2_sim_fr);
+
+    // 3. Merge the limbs for x, y, a, b
+    let mut all_limbs = Vec::with_capacity(4 * NUM_OF_LIMBS);
+    all_limbs.extend_from_slice(&x_sim_fr.limbs);
+    all_limbs.extend_from_slice(&y_sim_fr.limbs);
+    all_limbs.extend_from_slice(&a_sim_fr.limbs);
+    all_limbs.extend_from_slice(&b_sim_fr.limbs);
+
+    let mut all_limbs_var = Vec::with_capacity(4 * NUM_OF_LIMBS);
+    all_limbs_var.extend_from_slice(&x_sim_fr_var.var);
+    all_limbs_var.extend_from_slice(&y_sim_fr_var.var);
+    all_limbs_var.extend_from_slice(&a_sim_fr_var.var);
+    all_limbs_var.extend_from_slice(&b_sim_fr_var.var);
+
+    let mut compressed_limbs = Vec::with_capacity(5);
+    let mut compressed_limbs_var = Vec::with_capacity(5);
+    for (limbs, limbs_var) in all_limbs.chunks(5).zip(all_limbs_var.chunks(5)) {
+        let mut sum = BigUint::zero();
+        for (i, limb) in limbs.iter().enumerate() {
+            sum.add_assign(
+                <&BLSScalar as Into<BigUint>>::into(limb).shl(BIT_PER_LIMB * i),
+            );
+        }
+        compressed_limbs.push(BLSScalar::from(&sum));
+
+        let mut sum_var = {
+            let first_var = *limbs_var.get(0).unwrap_or(&zero_var);
+            let second_var = *limbs_var.get(1).unwrap_or(&zero_var);
+            let third_var = *limbs_var.get(2).unwrap_or(&zero_var);
+            let fourth_var = *limbs_var.get(3).unwrap_or(&zero_var);
+
+            cs.linear_combine(
+                &[first_var, second_var, third_var, fourth_var],
+                one,
+                step_1,
+                step_2,
+                step_3,
+            )
+        };
+
+        if limbs.len() == 5 {
+            let fifth_var = *limbs_var.get(4).unwrap_or(&zero_var);
+            sum_var = cs.linear_combine(
+                &[sum_var, fifth_var, zero_var, zero_var],
+                one,
+                step_4,
+                zero,
+                zero,
+            );
+        }
+
+        compressed_limbs_var.push(sum_var);
+    }
+
+    // 4. Open the non-ZK verifier state
+    {
+        let h1_var = cs.rescue_hash(&StateVar::new([
+            compressed_limbs_var[0],
+            compressed_limbs_var[1],
+            compressed_limbs_var[2],
+            compressed_limbs_var[3],
+        ]))[0];
+
+        let h2_var = cs.rescue_hash(&StateVar::new([
+            h1_var,
+            compressed_limbs_var[4],
+            r_var,
+            zero_var,
+        ]))[0];
+        cs.equal(h2_var, comm_var);
+    }
+
+    // 5. Perform the check in field simulation
+    {
+        let beta_x_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &x_sim_fr_var);
+        let beta_y_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &y_sim_fr_var);
+
+        let s_1_minus_a_sim_fr_var = s1_sim_fr_var.sub(&mut cs, &a_sim_fr_var);
+        let s_2_minus_b_sim_fr_var = s2_sim_fr_var.sub(&mut cs, &b_sim_fr_var);
+
+        let first_eqn = beta_x_sim_fr_mul_var.sub(&mut cs, &s_1_minus_a_sim_fr_var);
+        let second_eqn = beta_y_sim_fr_mul_var.sub(&mut cs, &s_2_minus_b_sim_fr_var);
+
+        first_eqn.enforce_zero(&mut cs);
+        second_eqn.enforce_zero(&mut cs);
+    }
+
+    // 6. Check x = amount_var and y = at_var
+    {
+        let mut x_in_bls12_381 = cs.linear_combine(
+            &[
+                x_sim_fr_var.var[0],
+                x_sim_fr_var.var[1],
+                x_sim_fr_var.var[2],
+                x_sim_fr_var.var[3],
+            ],
+            one,
+            step_1,
+            step_2,
+            step_3,
+        );
+        x_in_bls12_381 = cs.linear_combine(
+            &[
+                x_in_bls12_381,
+                x_sim_fr_var.var[4],
+                x_sim_fr_var.var[5],
+                zero_var,
+            ],
+            one,
+            step_4,
+            step_5,
+            zero,
+        );
+
+        let mut y_in_bls12_381 = cs.linear_combine(
+            &[
+                y_sim_fr_var.var[0],
+                y_sim_fr_var.var[1],
+                y_sim_fr_var.var[2],
+                y_sim_fr_var.var[3],
+            ],
+            one,
+            step_1,
+            step_2,
+            step_3,
+        );
+        y_in_bls12_381 = cs.linear_combine(
+            &[
+                y_in_bls12_381,
+                y_sim_fr_var.var[4],
+                y_sim_fr_var.var[5],
+                zero_var,
+            ],
+            one,
+            step_4,
+            step_5,
+            zero,
+        );
+
+        cs.equal(x_in_bls12_381, payers_secrets.amount);
+        cs.equal(y_in_bls12_381, payers_secrets.asset_type);
+    }
+
     // prepare public inputs variables
     cs.prepare_io_variable(nullifier_var);
     cs.prepare_io_point_variable(pk_sign_var);
 
-    // prepare the publc input for merkle_root
+    // prepare the public input for merkle_root
     cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
+
+    cs.prepare_io_variable(comm_var);
+
+    for i in 0..NUM_OF_LIMBS {
+        cs.prepare_io_variable(beta_sim_fr_var.var[i]);
+    }
+    for i in 0..NUM_OF_LIMBS {
+        cs.prepare_io_variable(s1_sim_fr_var.var[i]);
+    }
+    for i in 0..NUM_OF_LIMBS {
+        cs.prepare_io_variable(s2_sim_fr_var.var[i]);
+    }
 
     // pad the number of constraints to power of two
     cs.pad();
@@ -402,14 +660,12 @@ mod tests {
         OpenAnonBlindAssetRecordBuilder,
     };
     use crate::setup::{NodeParams, UserParams};
-    use crate::xfr::asset_record::build_open_asset_record;
-    use crate::xfr::asset_record::AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
-    use crate::xfr::sig::{XfrKeyPair, XfrPublicKey};
-    use crate::xfr::structs::{AssetRecordTemplate, AssetType, OpenAssetRecord};
+    use crate::xfr::asset_record::AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
+    use crate::xfr::sig::XfrKeyPair;
+    use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, Zero};
-    use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use parking_lot::RwLock;
@@ -460,13 +716,10 @@ mod tests {
         let (body, _) = gen_abar_to_bar_body(
             &mut prng,
             &params,
-            oabar.clone(),
-            sender,
-            &build_sample_obar(
-                oabar.amount.clone(),
-                oabar.asset_type.clone(),
-                recv.pub_key,
-            ),
+            &oabar.clone(),
+            &sender,
+            &recv.pub_key,
+            ConfidentialAmount_ConfidentialAssetType,
         )
         .unwrap();
 
@@ -476,7 +729,7 @@ mod tests {
         assert!(verify_abar_to_bar_body(
             &node_params,
             &body,
-            &BLSScalar::random(&mut prng)
+            &BLSScalar::random(&mut prng),
         )
         .is_err());
 
@@ -485,7 +738,7 @@ mod tests {
         assert!(verify_abar_to_bar_body(
             &node_params,
             &body_wrong_nullifier,
-            &proof.root
+            &proof.root,
         )
         .is_err());
 
@@ -533,22 +786,5 @@ mod tests {
             root_version: proof.root_version,
             uid: 0,
         };
-    }
-
-    fn build_sample_obar(
-        amount: u64,
-        asset_type: AssetType,
-        pub_key: XfrPublicKey,
-    ) -> OpenAssetRecord {
-        let mut prng = ChaChaRng::from_seed([89u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
-        let art = AssetRecordTemplate::with_no_asset_tracing(
-            amount,
-            asset_type,
-            NonConfidentialAmount_NonConfidentialAssetType,
-            pub_key,
-        );
-        let (obar, _, _) = build_open_asset_record(&mut prng, &pc_gens, &art, vec![]);
-        return obar;
     }
 }

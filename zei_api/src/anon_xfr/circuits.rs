@@ -28,7 +28,7 @@ const AMOUNT_LEN: usize = 64; // amount value size (in bits)
 pub const TREE_DEPTH: usize = 20; // Depth of the Merkle Tree
 
 #[derive(Debug, Clone)]
-pub(crate) struct PayerSecret {
+pub struct PayerSecret {
     pub sec_key: JubjubScalar,
     pub diversifier: JubjubScalar, // key randomizer for the signature verification key
     pub amount: u64,
@@ -39,7 +39,7 @@ pub(crate) struct PayerSecret {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct PayeeSecret {
+pub struct PayeeSecret {
     pub amount: u64,
     pub blind: BlindFactor,
     pub asset_type: BLSScalar,
@@ -493,7 +493,6 @@ pub(crate) fn build_eq_committed_vals_cs(
     }
 
     // 7. Rescue commitment
-    let zero_var = cs.zero_var();
     let rescue_comm_var = cs.rescue_hash(&StateVar::new([
         blind_hash_var,
         amount_var,
@@ -927,7 +926,7 @@ pub(crate) mod tests {
     use crypto::basics::commitments::rescue::HashCommitment;
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::prf::PRF;
-    use crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_split_verifier_zk_part;
+    use crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external;
     use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
     use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use rand_chacha::ChaChaRng;
@@ -1692,7 +1691,7 @@ pub(crate) mod tests {
         ])[0];
 
         // 2. compute the ZK part of the proof
-        let (proof, non_zk_state, beta) = prove_pc_eq_rescue_split_verifier_zk_part(
+        let (proof, non_zk_state, beta) = prove_pc_eq_rescue_external(
             &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
         )
         .unwrap();
