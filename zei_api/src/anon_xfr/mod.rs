@@ -23,7 +23,8 @@ use ruc::*;
 use std::collections::HashMap;
 use utils::errors::ZeiError;
 
-pub mod bar_to_from_abar;
+pub mod abar_to_bar;
+pub mod bar_to_abar;
 pub(crate) mod circuits;
 pub mod config;
 pub mod keys;
