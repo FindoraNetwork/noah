@@ -190,7 +190,7 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
     pub fn new() -> TurboPlonkConstraintSystem<F> {
         let selectors: Vec<Vec<F>> =
             std::iter::repeat(vec![]).take(N_SELECTORS).collect();
-        TurboPlonkConstraintSystem {
+        let mut cs = TurboPlonkConstraintSystem {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
             num_vars: 0,
@@ -200,7 +200,10 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
             witness: vec![],
             zero_var: None,
             one_var: None,
-        }
+        };
+        let _ = cs.zero_var();
+        let _ = cs.one_var();
+        cs
     }
 
     pub fn zero_var(&mut self) -> VarIndex {
