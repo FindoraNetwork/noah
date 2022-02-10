@@ -678,7 +678,7 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
 mod test {
     use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, ScalarArithmetic};
+    use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
     use ruc::*;
 
     type F = BLSScalar;
@@ -686,29 +686,65 @@ mod test {
     fn test_select() {
         let mut cs = TurboPlonkConstraintSystem::new();
         let num: Vec<F> = (0..4).map(|x| F::from_u32(x as u32)).collect();
-        cs.new_variable(num[0]); // bit0 = 0
-        cs.new_variable(num[1]); // bit1 = 1
-        cs.new_variable(num[2]); // var0
-        cs.new_variable(num[3]); // var1
+        let index_0 = cs.new_variable(num[0]); // bit0 = 0 -- Variable index 2
+        let index_1 = cs.new_variable(num[1]); // bit1 = 1 -- Variable index 3
+        let index_2 = cs.new_variable(num[2]); // var0     -- Variable index 4
+        let index_3 = cs.new_variable(num[3]); // var1     -- Variable index 5
 
         // select(var0, var1, bit0)
-        let a_idx = cs.select(2, 3, 0);
+        let a_idx = cs.select(index_2, index_3, index_0);
         assert_eq!(cs.witness[a_idx], num[2]);
         // select(var0, var1, bit1)
-        let b_idx = cs.select(2, 3, 1);
+        let b_idx = cs.select(index_2, index_3, index_1);
         assert_eq!(cs.witness[b_idx], num[3]);
 
         assert!(cs
-            .verify_witness(&[num[0], num[1], num[2], num[3], num[2], num[3]], &[])
+            .verify_witness(
+                &[
+                    F::zero(),
+                    F::one(),
+                    num[0],
+                    num[1],
+                    num[2],
+                    num[3],
+                    num[2],
+                    num[3]
+                ],
+                &[]
+            )
             .is_ok());
 
         // Set bit0 = 1 and bit1 = 0
         assert!(cs
-            .verify_witness(&[num[1], num[0], num[2], num[3], num[3], num[2]], &[])
+            .verify_witness(
+                &[
+                    F::zero(),
+                    F::one(),
+                    num[1],
+                    num[0],
+                    num[2],
+                    num[3],
+                    num[3],
+                    num[2]
+                ],
+                &[]
+            )
             .is_ok());
 
         assert!(cs
-            .verify_witness(&[num[0], num[1], num[2], num[3], num[3], num[2]], &[])
+            .verify_witness(
+                &[
+                    F::zero(),
+                    F::one(),
+                    num[0],
+                    num[1],
+                    num[2],
+                    num[3],
+                    num[3],
+                    num[2]
+                ],
+                &[]
+            )
             .is_err());
     }
 
@@ -843,12 +879,19 @@ mod test {
         // The witness: [a, b, c, d, e, f] = [1, 2, 3, 1, 7, 6]
         let variables = vec![num[1], num[2], num[3], num[1], num[7], num[6]];
         cs.add_variables(&variables);
-        cs.insert_boolean_gate(0);
-        cs.insert_add_gate(0, 1, 2);
-        cs.insert_lc_gate(&[0, 1, 2, 3], 4, num[1], num[1], num[1], num[1]);
-        cs.insert_mul_gate(1, 2, 5);
-        cs.range_check(4, 3);
-        cs.range_check(5, 3);
+        cs.insert_boolean_gate(0 + 2); // add 2 because when init, has 2 default variable
+        cs.insert_add_gate(0 + 2, 1 + 2, 2 + 2);
+        cs.insert_lc_gate(
+            &[0 + 2, 1 + 2, 2 + 2, 3 + 2],
+            4 + 2,
+            num[1],
+            num[1],
+            num[1],
+            num[1],
+        );
+        cs.insert_mul_gate(1 + 2, 2 + 2, 5 + 2);
+        cs.range_check(4 + 2, 3);
+        cs.range_check(5 + 2, 3);
 
         let twelve = num[8].add(&num[4]);
         // Good witness: [1, 2, 3, 1, 7, 6], e_binary_le = [1, 1, 1], f_binary_le = [0, 1, 1]
@@ -859,8 +902,20 @@ mod test {
         // [0, 2, 2, 1, 5, 4], e_binary_le = [1, 0, 1], f_binary_le = [0, 0, 1]
         let verify = cs.verify_witness(
             &[
-                num[0], num[2], num[2], num[1], num[5], num[4], num[1], num[0], num[1],
-                num[0], num[0], num[1],
+                F::zero(),
+                F::one(),
+                num[0],
+                num[2],
+                num[2],
+                num[1],
+                num[5],
+                num[4],
+                num[1],
+                num[0],
+                num[1],
+                num[0],
+                num[0],
+                num[1],
             ],
             &[],
         );
@@ -870,8 +925,20 @@ mod test {
         assert!(cs
             .verify_witness(
                 &[
-                    num[2], num[0], num[2], num[1], num[5], num[0], num[1], num[0],
-                    num[1], num[0], num[0], num[0]
+                    F::zero(),
+                    F::one(),
+                    num[2],
+                    num[0],
+                    num[2],
+                    num[1],
+                    num[5],
+                    num[0],
+                    num[1],
+                    num[0],
+                    num[1],
+                    num[0],
+                    num[0],
+                    num[0]
                 ],
                 &[]
             )
@@ -880,8 +947,20 @@ mod test {
         assert!(cs
             .verify_witness(
                 &[
-                    num[1], num[1], num[1], num[2], num[5], num[1], num[1], num[0],
-                    num[1], num[1], num[0], num[0]
+                    F::zero(),
+                    F::one(),
+                    num[1],
+                    num[1],
+                    num[1],
+                    num[2],
+                    num[5],
+                    num[1],
+                    num[1],
+                    num[0],
+                    num[1],
+                    num[1],
+                    num[0],
+                    num[0]
                 ],
                 &[]
             )
@@ -890,8 +969,20 @@ mod test {
         assert!(cs
             .verify_witness(
                 &[
-                    num[1], num[1], num[2], num[2], num[5], num[2], num[1], num[0],
-                    num[1], num[0], num[1], num[0]
+                    F::zero(),
+                    F::one(),
+                    num[1],
+                    num[1],
+                    num[2],
+                    num[2],
+                    num[5],
+                    num[2],
+                    num[1],
+                    num[0],
+                    num[1],
+                    num[0],
+                    num[1],
+                    num[0]
                 ],
                 &[]
             )
@@ -900,8 +991,20 @@ mod test {
         assert!(cs
             .verify_witness(
                 &[
-                    num[1], num[1], num[2], num[2], num[6], num[1], num[0], num[1],
-                    num[1], num[1], num[0], num[0]
+                    F::zero(),
+                    F::one(),
+                    num[1],
+                    num[1],
+                    num[2],
+                    num[2],
+                    num[6],
+                    num[1],
+                    num[0],
+                    num[1],
+                    num[1],
+                    num[1],
+                    num[0],
+                    num[0]
                 ],
                 &[]
             )
@@ -910,8 +1013,20 @@ mod test {
         assert!(cs
             .verify_witness(
                 &[
-                    num[1], num[2], num[3], num[2], num[8], num[6], num[1], num[1],
-                    num[1], num[0], num[1], num[1]
+                    F::zero(),
+                    F::one(),
+                    num[1],
+                    num[2],
+                    num[3],
+                    num[2],
+                    num[8],
+                    num[6],
+                    num[1],
+                    num[1],
+                    num[1],
+                    num[0],
+                    num[1],
+                    num[1]
                 ],
                 &[]
             )
@@ -920,8 +1035,20 @@ mod test {
         assert!(cs
             .verify_witness(
                 &[
-                    num[0], num[3], num[4], num[0], num[7], twelve, num[1], num[1],
-                    num[1], num[1], num[1], num[1]
+                    F::zero(),
+                    F::one(),
+                    num[0],
+                    num[3],
+                    num[4],
+                    num[0],
+                    num[7],
+                    twelve,
+                    num[1],
+                    num[1],
+                    num[1],
+                    num[1],
+                    num[1],
+                    num[1]
                 ],
                 &[]
             )
@@ -992,14 +1119,14 @@ mod turbo_plonk_proofs_test {
             four,
             twenty_five,
         ]);
-        cs.insert_add_gate(0, 1, 4);
-        cs.insert_add_gate(2, 3, 5);
-        cs.insert_mul_gate(4, 5, 6);
-        cs.insert_mul_gate(0, 7, 8);
-        cs.insert_add_gate(6, 8, 9);
-        cs.insert_constant_gate(3, four);
-        cs.prepare_io_variable(1);
-        cs.prepare_io_variable(7);
+        cs.insert_add_gate(0 + 2, 1 + 2, 4 + 2);
+        cs.insert_add_gate(2 + 2, 3 + 2, 5 + 2);
+        cs.insert_mul_gate(4 + 2, 5 + 2, 6 + 2);
+        cs.insert_mul_gate(0 + 2, 7 + 2, 8 + 2);
+        cs.insert_add_gate(6 + 2, 8 + 2, 9 + 2);
+        cs.insert_constant_gate(3 + 2, four);
+        cs.prepare_io_variable(1 + 2);
+        cs.prepare_io_variable(7 + 2);
         cs.pad();
 
         let mut online_vars = [two, four];
@@ -1028,11 +1155,16 @@ mod turbo_plonk_proofs_test {
         // The secret inputs: [a, b] = [1, 2]
         cs.new_variable(num[1]);
         cs.new_variable(num[2]);
-        cs.insert_boolean_gate(0);
-        let c_idx = cs.add(0, 1);
-        let d_idx = cs.mul(0, 1);
-        let e_idx =
-            cs.linear_combine(&[0, 1, c_idx, d_idx], num[2], num[3], num[1], num[1]);
+        cs.insert_boolean_gate(0 + 2);
+        let c_idx = cs.add(0 + 2, 1 + 2);
+        let d_idx = cs.mul(0 + 2, 1 + 2);
+        let e_idx = cs.linear_combine(
+            &[0 + 2, 1 + 2, c_idx, d_idx],
+            num[2],
+            num[3],
+            num[1],
+            num[1],
+        );
         cs.range_check(e_idx, 4);
         cs.pad();
 
