@@ -7,9 +7,7 @@ mod tests {
     use crate::anon_xfr::structs::{
         AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord,
     };
-    use accumulators::merkle_tree::{
-        generate_path_keys, get_path_from_uid, Path, PersistentMerkleTree, BASE_KEY,
-    };
+    use accumulators::merkle_tree::PersistentMerkleTree;
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
@@ -26,269 +24,6 @@ mod tests {
     use storage::store::PrefixedStore;
 
     #[test]
-    pub fn test_generate_path_keys() {
-        let keys = generate_path_keys(vec![Path::Right, Path::Left, Path::Middle]);
-        assert_eq!(
-            keys,
-            vec![
-                "dense_merkle_tree:root:",
-                "dense_merkle_tree:root:r",
-                "dense_merkle_tree:root:rl",
-                "dense_merkle_tree:root:rlm"
-            ]
-        );
-    }
-
-    #[test]
-    fn test_get_path() {
-        let zero_path = get_path_from_uid(0);
-        assert_eq!(zero_path[0], Path::Left);
-        assert_eq!(zero_path[1], Path::Left);
-        assert_eq!(zero_path[2], Path::Left);
-        assert_eq!(zero_path[40], Path::Left);
-
-        let one_path = get_path_from_uid(1);
-        assert_eq!(
-            one_path,
-            vec![
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Middle
-            ]
-        );
-
-        let two_path = get_path_from_uid(2);
-        assert_eq!(
-            two_path,
-            vec![
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Right
-            ]
-        );
-
-        let three_path = get_path_from_uid(3);
-        assert_eq!(
-            three_path,
-            vec![
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Middle,
-                Path::Left
-            ]
-        );
-
-        let four_path = get_path_from_uid(4);
-        assert_eq!(
-            four_path,
-            vec![
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Middle,
-                Path::Middle
-            ]
-        );
-
-        let five_path = get_path_from_uid(5);
-        assert_eq!(
-            five_path,
-            vec![
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Left,
-                Path::Middle,
-                Path::Right
-            ]
-        );
-    }
-
-    #[test]
     fn test_persistent_merkle_tree() {
         let hash = RescueInstance::new();
 
@@ -299,15 +34,7 @@ mod tests {
         let store = PrefixedStore::new("mystore", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-        assert_eq!(
-            mt.get_current_root_hash().unwrap(),
-            hash.rescue_hash(&[
-                BLSScalar::zero(),
-                BLSScalar::zero(),
-                BLSScalar::zero(),
-                BLSScalar::zero()
-            ])[0]
-        );
+        assert_eq!(mt.get_current_root_hash().unwrap(), BLSScalar::zero(),);
 
         let abar =
             AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
@@ -325,34 +52,13 @@ mod tests {
             ])[0]
         );
 
-        let mut key = BASE_KEY.to_owned();
-        for _t in 1..42 {
-            key.push('l');
-            let res = mt.get(key.as_bytes());
-            assert!(res.is_ok());
-            assert!(res.unwrap().is_some());
-            // println!("{}       {} {:#?}", t, key, res.unwrap().unwrap());
-        }
+        assert!(mt
+            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
+            .is_ok());
 
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
-        let key2 = "dense_merkle_tree:root:llllllllllllllllllllllllllllllllllllllllm";
-        let mut res = mt.get(key2.as_bytes());
-        assert!(res.is_ok());
-        assert!(res.unwrap().is_some());
-
-        let key3 = "dense_merkle_tree:root:llllllllllllllllllllllllllllllllllllllllr";
-        res = mt.get(key3.as_bytes());
-        assert!(res.is_ok());
-        assert!(res.unwrap().is_none());
-
-        assert!(mt
-            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
-            .is_ok());
-        res = mt.get(key3.as_bytes());
-        assert!(res.is_ok());
-        assert!(res.unwrap().is_some());
 
         assert!(mt.generate_proof(0).is_ok());
         assert!(mt.generate_proof(1).is_ok());

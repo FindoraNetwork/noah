@@ -553,7 +553,7 @@ mod tests {
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);
 
-        let user_params = UserParams::new(1, 1, Some(41));
+        let user_params = UserParams::new(1, 1, Some(40));
 
         let fee_amount = FEE_CALCULATING_FUNC(1, 1) as u64;
         let output_amount = 10u64;
