@@ -12,17 +12,13 @@ use utils::serialization::ZeiFromToBytes;
 // 3^0 + 3^1 + 3^2 + ... 3^40 < 2^64 (u64 can include all leaf & ancestor)
 // store max is 3^40 = 12157665459056928801
 // sid   max is 2^64 = 18446744073709551616
-const TREE_DEPTH: usize = 40;
+pub const TREE_DEPTH: usize = 40;
+// 6078832729528464400 = 3^0 + 3^1 + 3^2 + ... 3^39, if change TREE_DEPTH, MUST update.
+const LEAF_START: u64 = 6078832729528464400;
 
 const KEY_PAD: [u8; 4] = [0, 0, 0, 0];
 const ROOT_KEY: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // KEY_PAD + 0u64
 const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
-
-// 6078832729528464400 = 3^0 + 3^1 + 3^2 + ... 3^39
-const LEAF_START: u64 = 6078832729528464400;
-
-//const BASE_KEY: &str = "dense_merkle_tree:root:";
-//const ENTRY_COUNT_KEY: &str = "dense_merkle_tree:entrycount:";
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Path {
@@ -35,7 +31,7 @@ pub enum Path {
 /// PersistentMerkleTree is a 3-ary merkle tree
 ///
 /// Usage:
-///    ```
+///    ```ignore
 ///     use std::collections::HashMap;
 ///     use std::thread;
 ///     use storage::db::TempRocksDB;
