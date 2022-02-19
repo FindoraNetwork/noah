@@ -115,7 +115,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 }
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
-                match self.get(&store_key).unwrap() {
+                match self.get(&store_key)? {
                     Some(b) => BLSScalar::zei_from_bytes(b.as_slice()),
                     None => Ok(BLSScalar::zero()),
                 }
@@ -161,11 +161,12 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         let nodes: Vec<ProofNode> = keys[0..TREE_DEPTH]
             .iter()
+            .rev()
             .map(|(key, path)| {
                 // if current node is not present in store then it is not a valid uid to generate
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
-                if !self.store.exists(&store_key).unwrap() {
+                if !self.store.exists(&store_key)? {
                     return Err(eg!("uid not found in tree, cannot generate proof"));
                 }
 
@@ -189,12 +190,12 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 };
                 let mut store_key1 = KEY_PAD.to_vec();
                 store_key1.extend(sib1.to_be_bytes());
-                if let Some(b) = self.store.get(&store_key1).unwrap() {
+                if let Some(b) = self.store.get(&store_key1)? {
                     node.siblings1 = BLSScalar::zei_from_bytes(b.as_slice())?;
                 }
                 let mut store_key2 = KEY_PAD.to_vec();
                 store_key2.extend(sib2.to_be_bytes());
-                if let Some(b) = self.store.get(&store_key2).unwrap() {
+                if let Some(b) = self.store.get(&store_key2)? {
                     node.siblings2 = BLSScalar::zei_from_bytes(b.as_slice())?;
                 }
 
@@ -204,14 +205,14 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         Ok(Proof {
             nodes: nodes,
-            root: self.get_current_root_hash().unwrap(),
+            root: self.get_current_root_hash()?,
             root_version: 1,
             uid: id,
         })
     }
 
     pub fn get_current_root_hash(&self) -> Result<BLSScalar> {
-        match self.store.get(&ROOT_KEY).unwrap() {
+        match self.store.get(&ROOT_KEY)? {
             Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
             None => Err(eg!("root hash key not found")),
         }
@@ -294,7 +295,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                 // if current node is not present in store then it is not a valid uid to generate
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
-                if !self.store.exists(&store_key).unwrap() {
+                if !self.store.exists(&store_key)? {
                     return Err(eg!("uid not found in tree, cannot generate proof"));
                 }
 
@@ -318,12 +319,12 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                 };
                 let mut store_key1 = KEY_PAD.to_vec();
                 store_key1.extend(sib1.to_be_bytes());
-                if let Some(b) = self.store.get(&store_key1).unwrap() {
+                if let Some(b) = self.store.get(&store_key1)? {
                     node.siblings1 = BLSScalar::zei_from_bytes(b.as_slice())?;
                 }
                 let mut store_key2 = KEY_PAD.to_vec();
                 store_key2.extend(sib2.to_be_bytes());
-                if let Some(b) = self.store.get(&store_key2).unwrap() {
+                if let Some(b) = self.store.get(&store_key2)? {
                     node.siblings2 = BLSScalar::zei_from_bytes(b.as_slice())?;
                 }
 
@@ -333,7 +334,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
 
         Ok(Proof {
             nodes: nodes,
-            root: self.get_current_root_hash().unwrap(),
+            root: self.get_current_root_hash()?,
             root_version: 1,
             uid: id,
         })
