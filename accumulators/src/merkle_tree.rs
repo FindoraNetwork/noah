@@ -20,13 +20,6 @@ const KEY_PAD: [u8; 4] = [0, 0, 0, 0];
 const ROOT_KEY: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // KEY_PAD + 0u64
 const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Path {
-    Left,
-    Middle,
-    Right,
-}
-
 ///
 /// PersistentMerkleTree is a 3-ary merkle tree
 ///
@@ -64,7 +57,6 @@ pub enum Path {
 ///     mt.generate_proof(0);
 ///
 /// ```
-
 pub struct PersistentMerkleTree<'a, D: MerkleDB> {
     entry_count: u64,
     version: u64,
@@ -72,7 +64,7 @@ pub struct PersistentMerkleTree<'a, D: MerkleDB> {
 }
 
 impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
-    // Generates a new PersistentMerkleTree based on a sessioned KV store
+    /// Generates a new PersistentMerkleTree based on a sessioned KV store
     pub fn new(mut store: PrefixedStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>> {
         let mut entry_count = 0;
         let mut version = 0;
@@ -97,6 +89,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         })
     }
 
+    /// add a new leaf and return the leaf uid.
     pub fn add_commitment_hash(&mut self, hash: BLSScalar) -> Result<u64> {
         let mut cache = Cache::new();
         // 1. generate keys of ancestors for update in tree
@@ -115,24 +108,24 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 }
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
-                match self.get(&store_key)? {
+                match self.store.get(&store_key)? {
                     Some(b) => BLSScalar::zei_from_bytes(b.as_slice()),
                     None => Ok(BLSScalar::zero()),
                 }
             };
 
             let (sib0, sib1, sib2) = match path {
-                Path::Left => (
+                TreePath::Left => (
                     parse_hash(*node_key)?,
                     parse_hash(node_key + 1)?,
                     parse_hash(node_key + 2)?,
                 ),
-                Path::Middle => (
+                TreePath::Middle => (
                     parse_hash(node_key - 1)?,
                     parse_hash(*node_key)?,
                     parse_hash(node_key + 1)?,
                 ),
-                Path::Right => (
+                TreePath::Right => (
                     parse_hash(node_key - 2)?,
                     parse_hash(node_key - 1)?,
                     parse_hash(*node_key)?,
@@ -156,12 +149,21 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         Ok(uid)
     }
 
+    /// generate leaf's merkle proof by uid.
     pub fn generate_proof(&self, id: u64) -> Result<Proof> {
+        self.generate_proof_with_depth(id, TREE_DEPTH)
+    }
+
+    /// generate leaf's merkle proof by uid and the depth.
+    pub fn generate_proof_with_depth(&self, id: u64, depth: usize) -> Result<Proof> {
+        if depth > TREE_DEPTH || id > 3u64.pow(depth as u32) {
+            return Err(eg!("tree depth is invalid for generate proof"));
+        }
+
         let keys = get_path_keys(id);
 
-        let nodes: Vec<ProofNode> = keys[0..TREE_DEPTH]
+        let nodes: Vec<ProofNode> = keys[0..depth]
             .iter()
-            .rev()
             .map(|(key, path)| {
                 // if current node is not present in store then it is not a valid uid to generate
                 let mut store_key = KEY_PAD.to_vec();
@@ -173,20 +175,13 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 let mut node = ProofNode {
                     siblings1: Default::default(),
                     siblings2: Default::default(),
-                    is_left_child: 0,
-                    is_right_child: 0,
+                    path: *path,
                 };
 
                 let (sib1, sib2) = match path {
-                    Path::Left => {
-                        node.is_left_child = 1;
-                        (key + 1, key + 2)
-                    }
-                    Path::Middle => (key - 1, key + 1),
-                    Path::Right => {
-                        node.is_right_child = 1;
-                        (key - 2, key - 1)
-                    }
+                    TreePath::Left => (key + 1, key + 2),
+                    TreePath::Middle => (key - 1, key + 1),
+                    TreePath::Right => (key - 2, key - 1),
                 };
                 let mut store_key1 = KEY_PAD.to_vec();
                 store_key1.extend(sib1.to_be_bytes());
@@ -205,45 +200,48 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         Ok(Proof {
             nodes: nodes,
-            root: self.get_current_root_hash()?,
+            root: self.get_root_with_depth(depth)?,
             root_version: 1,
             uid: id,
         })
     }
 
-    pub fn get_current_root_hash(&self) -> Result<BLSScalar> {
-        match self.store.get(&ROOT_KEY)? {
+    /// get tree current root.
+    pub fn get_root(&self) -> Result<BLSScalar> {
+        self.get_root_with_depth(TREE_DEPTH)
+    }
+
+    /// get tree root by depth.
+    pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
+        let mut pos = 0u64;
+        for i in 0..(TREE_DEPTH - depth) {
+            pos += 3u64.pow(i as u32);
+        }
+        let mut store_key = KEY_PAD.to_vec();
+        store_key.extend(pos.to_be_bytes());
+
+        match self.store.get(&store_key)? {
             Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
             None => Err(eg!("root hash key not found")),
         }
     }
 
-    // fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
-    //     let hash = RescueInstance::new();
-    //
-    //     let pk_hash = hash.rescue_hash(&[
-    //         abar.public_key.0.point_ref().get_x(),
-    //         abar.public_key.0.point_ref().get_y(),
-    //         BLSScalar::zero(),
-    //         BLSScalar::zero(),
-    //     ])[0];
-    //
-    //     hash.rescue_hash(&[
-    //         BLSScalar::from_u64(uid),
-    //         abar.amount_type_commitment,
-    //         pk_hash,
-    //         BLSScalar::zero(),
-    //     ])[0]
-    // }
-
+    /// commit to store and add the tree version.
     pub fn commit(&mut self) -> Result<u64> {
         let (_, ver) = self.store.state_mut().commit(self.version + 1).c(d!())?;
         self.version = ver;
         Ok(self.version)
     }
 
-    pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        self.store.get(key)
+    /// get leaf hash by uid.
+    pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
+        let mut store_key = KEY_PAD.to_vec();
+        store_key.extend(uid.to_be_bytes());
+
+        match self.store.get(&store_key)? {
+            Some(hash) => Ok(Some(BLSScalar::zei_from_bytes(hash.as_slice())?)),
+            None => Ok(None),
+        }
     }
 
     pub fn version(&self) -> u64 {
@@ -286,7 +284,17 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         })
     }
 
+    /// generate leaf's merkle proof by uid.
     pub fn generate_proof(&self, id: u64) -> Result<Proof> {
+        self.generate_proof_with_depth(id, TREE_DEPTH)
+    }
+
+    /// generate leaf's merkle proof by uid and the depth.
+    pub fn generate_proof_with_depth(&self, id: u64, depth: usize) -> Result<Proof> {
+        if depth > TREE_DEPTH || id > 3u64.pow(depth as u32) {
+            return Err(eg!("tree depth is invalid for generate proof"));
+        }
+
         let keys = get_path_keys(id);
 
         let nodes: Vec<ProofNode> = keys[0..TREE_DEPTH]
@@ -302,20 +310,13 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                 let mut node = ProofNode {
                     siblings1: Default::default(),
                     siblings2: Default::default(),
-                    is_left_child: 0,
-                    is_right_child: 0,
+                    path: *path,
                 };
 
                 let (sib1, sib2) = match path {
-                    Path::Left => {
-                        node.is_left_child = 1;
-                        (key + 1, key + 2)
-                    }
-                    Path::Middle => (key - 1, key + 1),
-                    Path::Right => {
-                        node.is_right_child = 1;
-                        (key - 2, key - 1)
-                    }
+                    TreePath::Left => (key + 1, key + 2),
+                    TreePath::Middle => (key - 1, key + 1),
+                    TreePath::Right => (key - 2, key - 1),
                 };
                 let mut store_key1 = KEY_PAD.to_vec();
                 store_key1.extend(sib1.to_be_bytes());
@@ -334,37 +335,91 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
 
         Ok(Proof {
             nodes: nodes,
-            root: self.get_current_root_hash()?,
+            root: self.get_root_with_depth(depth)?,
             root_version: 1,
             uid: id,
         })
     }
 
-    pub fn get_current_root_hash(&self) -> Result<BLSScalar> {
-        match self.store.get(&ROOT_KEY)? {
+    /// get tree current root.
+    pub fn get_root(&self) -> Result<BLSScalar> {
+        self.get_root_with_depth(TREE_DEPTH)
+    }
+
+    /// get tree root by depth.
+    pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
+        let mut pos = 0u64;
+        for i in 0..(TREE_DEPTH - depth) {
+            pos += 3u64.pow(i as u32);
+        }
+        let mut store_key = KEY_PAD.to_vec();
+        store_key.extend(pos.to_be_bytes());
+
+        match self.store.get(&store_key)? {
             Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
             None => Err(eg!("root hash key not found")),
         }
     }
 
-    pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        self.store.get(key)
+    /// get leaf hash by uid.
+    pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
+        let mut store_key = KEY_PAD.to_vec();
+        store_key.extend(uid.to_be_bytes());
+
+        match self.store.get(&store_key)? {
+            Some(hash) => Ok(Some(BLSScalar::zei_from_bytes(hash.as_slice())?)),
+            None => Ok(None),
+        }
     }
 }
 
+/// verify merkle proof.
+pub fn verify(leaf: BLSScalar, proof: &Proof) -> bool {
+    let hasher = RescueInstance::new();
+    let mut next = leaf;
+    for node in proof.nodes.iter() {
+        let (s1, s2, s3) = match node.path {
+            TreePath::Left => (next, node.siblings1, node.siblings2),
+            TreePath::Middle => (node.siblings1, next, node.siblings2),
+            TreePath::Right => (node.siblings1, node.siblings2, next),
+        };
+        let hash = hasher.rescue_hash(&[s1, s2, s3, BLSScalar::zero()])[0];
+        next = hash
+    }
+    next == proof.root
+}
+
+/// PersistentMerkleTree Proof.
 #[derive(Clone)]
 pub struct Proof {
+    /// proof nodes, from lower(leaf) to upper.
     pub nodes: Vec<ProofNode>,
+    /// current root.
     pub root: BLSScalar,
+    /// current root version.
     pub root_version: usize,
+    /// leaf's uid.
     pub uid: u64,
 }
+
+/// PersistentMerkleTree Proof Node, 3-ary merkle tree,
+/// so every leaf has two siblings and own position.
 #[derive(Clone, Debug)]
 pub struct ProofNode {
+    /// siblings 1.
     pub siblings1: BLSScalar,
+    /// siblings 2.
     pub siblings2: BLSScalar,
-    pub is_left_child: u8,
-    pub is_right_child: u8,
+    /// representative the own position in the branch.
+    pub path: TreePath,
+}
+
+/// leaf position in the branch of the tree.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum TreePath {
+    Left,
+    Middle,
+    Right,
 }
 
 struct Cache {
@@ -388,7 +443,7 @@ impl Cache {
     }
 }
 
-fn get_path_keys(uid: u64) -> Vec<(u64, Path)> {
+fn get_path_keys(uid: u64) -> Vec<(u64, TreePath)> {
     let mut keys = vec![];
     let mut key = LEAF_START + uid;
 
@@ -396,15 +451,15 @@ fn get_path_keys(uid: u64) -> Vec<(u64, Path)> {
         let rem = key % 3;
         match rem {
             1 => {
-                keys.push((key, Path::Left));
+                keys.push((key, TreePath::Left));
                 key = key / 3;
             }
             2 => {
-                keys.push((key, Path::Middle));
+                keys.push((key, TreePath::Middle));
                 key = key / 3;
             }
             0 => {
-                keys.push((key, Path::Right));
+                keys.push((key, TreePath::Right));
                 key = if key != 0 { key / 3 - 1 } else { 0 };
             }
             _ => {}

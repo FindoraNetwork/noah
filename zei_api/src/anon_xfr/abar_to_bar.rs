@@ -663,7 +663,7 @@ mod tests {
     use crate::xfr::asset_record::AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
     use crate::xfr::sig::XfrKeyPair;
     use crate::xfr::structs::AssetType;
-    use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
+    use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
@@ -777,8 +777,8 @@ mod tests {
                     .map(|e| MTNode {
                         siblings1: e.siblings1,
                         siblings2: e.siblings2,
-                        is_left_child: e.is_left_child,
-                        is_right_child: e.is_right_child,
+                        is_left_child: (e.path == TreePath::Left) as u8,
+                        is_right_child: (e.path == TreePath::Right) as u8,
                     })
                     .collect(),
             },

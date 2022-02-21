@@ -7,7 +7,7 @@ mod tests {
     use crate::anon_xfr::structs::{
         AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord,
     };
-    use accumulators::merkle_tree::PersistentMerkleTree;
+    use accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
@@ -34,7 +34,7 @@ mod tests {
         let store = PrefixedStore::new("mystore", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-        assert_eq!(mt.get_current_root_hash().unwrap(), BLSScalar::zero(),);
+        assert_eq!(mt.get_root().unwrap(), BLSScalar::zero(),);
 
         let abar =
             AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
@@ -43,7 +43,7 @@ mod tests {
             .is_ok());
 
         assert_ne!(
-            mt.get_current_root_hash().unwrap(),
+            mt.get_root().unwrap(),
             hash.rescue_hash(&[
                 BLSScalar::zero(),
                 BLSScalar::zero(),
@@ -114,8 +114,8 @@ mod tests {
                     .map(|e| MTNode {
                         siblings1: e.siblings1,
                         siblings2: e.siblings2,
-                        is_left_child: e.is_left_child,
-                        is_right_child: e.is_right_child,
+                        is_left_child: (e.path == TreePath::Left) as u8,
+                        is_right_child: (e.path == TreePath::Right) as u8,
                     })
                     .collect(),
             },
@@ -125,7 +125,7 @@ mod tests {
         // Check Merkle root correctness
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
-        assert_eq!(witness[root_var], mt.get_current_root_hash().unwrap());
+        assert_eq!(witness[root_var], mt.get_root().unwrap());
 
         let _ = mt.commit();
     }
