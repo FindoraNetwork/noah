@@ -49,6 +49,7 @@ pub enum ZeiError {
     BogusAssetTracerMemo,
     MissingSRSError,
     MissingVerifierParamsError,
+    AbarToBarParamsError,
 }
 
 impl fmt::Display for ZeiError {
@@ -58,6 +59,7 @@ impl fmt::Display for ZeiError {
       ZeiError::AXfrVerifierParamsError => "Could not preprocess anonymous transfer verifier",
       ZeiError::AXfrVerificationError => "Invalid AXfrBody for merkle root",
       ZeiError::AXfrProofError => "Could not create anonymous transfer proof",
+            ZeiError::AbarToBarParamsError => "Could not preprocess Abr2Bar conversion prover",
                   ZeiError::ArgumentVerificationError => "Proof(argument) not valid for statement",
                   ZeiError::CommitmentInputError => "The number of messages to be committed is invalid",
                   ZeiError::CommitmentVerificationError => "Commitment verification failed",

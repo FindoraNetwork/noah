@@ -28,8 +28,8 @@ rand_chacha = { version = "0.2", default-features = false }
 num-bigint = { version = "0.3" }
 
 [features]
-default = ["std", "parallel", "u64_backend"]
-std = ["curve25519-dalek/std"]
+default = ["std", "u64_backend"]
+std = ["curve25519-dalek/std", "ark-ed-on-bls12-381/std", "ark-bls12-381/std", "ark-ec/std", "ark-std/std", "ark-ff/std", "ark-serialize/std"]
 alloc = ["curve25519-dalek/alloc"]
 nightly = ["curve25519-dalek/nightly"]
 u64_backend = ["curve25519-dalek/u64_backend"]
