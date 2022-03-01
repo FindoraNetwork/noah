@@ -176,7 +176,7 @@ impl AMultiXfrPubInputs {
             pk_hash,
             zero,
         ])[0];
-        for path_node in payer.path.nodes.iter().rev() {
+        for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
                 (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
                 (0, 0) => vec![path_node.siblings1, node, path_node.siblings2, zero],
@@ -691,7 +691,7 @@ pub(crate) fn compute_merkle_root(
     let mut node_var =
         cs.rescue_hash(&StateVar::new([uid, commitment, pk_hash_var, zero_var]))[0];
 
-    for path_node in path_vars.nodes.iter().rev() {
+    for path_node in path_vars.nodes.iter() {
         let input_var = sort(
             cs,
             node_var,
@@ -1871,7 +1871,7 @@ pub(crate) mod tests {
                 [0];
 
         // compute the constraints
-        let path = MTPath::new(vec![path_node1, path_node2]);
+        let path = MTPath::new(vec![path_node2, path_node1]);
         let path_vars = add_merkle_path_variables(&mut cs, path);
         let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
 
