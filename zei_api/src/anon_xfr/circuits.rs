@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use algebra::bls12_381::BLSScalar;
@@ -18,6 +17,7 @@ use poly_iops::plonk::field_simulation::SimFrVar;
 use poly_iops::plonk::turbo_plonk_cs::ecc::PointVar;
 use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
 use poly_iops::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
+use std::collections::HashMap;
 use std::ops::{AddAssign, Shl};
 
 pub type TurboPlonkCS = TurboPlonkConstraintSystem<BLSScalar>;
@@ -767,14 +767,13 @@ fn asset_mixing(
     fee_type: BLSScalar,
     fee_calculating_func: &dyn Fn(u32, u32) -> u32,
 ) {
-
     let mut inputs_type_sum_amounts = HashMap::new();
 
-    for input in inputs.iter(){
+    for input in inputs.iter() {
         let zero_var = cs.zero_var();
-        if  inputs_type_sum_amounts.contains_key(&input.0) {
+        if inputs_type_sum_amounts.contains_key(&input.0) {
             continue;
-        }else {
+        } else {
             let sum_var = inputs.iter().fold(zero_var, |sum, other_input| {
                 let adder = match_select(
                     cs,
@@ -788,14 +787,13 @@ fn asset_mixing(
         }
     }
 
-
     let mut outputs_type_sum_amounts = HashMap::new();
 
-    for output in outputs.iter(){
+    for output in outputs.iter() {
         let zero_var = cs.zero_var();
         if outputs_type_sum_amounts.contains_key(&output.0) {
             continue;
-        }else {
+        } else {
             let sum_var = outputs.iter().fold(zero_var, |sum, other_output| {
                 let adder = match_select(
                     cs,
@@ -808,7 +806,6 @@ fn asset_mixing(
             outputs_type_sum_amounts.insert(output.0, sum_var);
         }
     }
-
 
     // Initialize a constant value `fee_type_val`
     let fee_type_val = cs.new_variable(fee_type);
