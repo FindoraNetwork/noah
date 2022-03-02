@@ -344,7 +344,7 @@ mod tests {
     use std::thread;
 
     use crate::xfr::structs::AssetType;
-    use accumulators::merkle_tree::{PersistentMerkleTree, Proof};
+    use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
 
@@ -373,8 +373,8 @@ mod tests {
                     .map(|e| MTNode {
                         siblings1: e.siblings1,
                         siblings2: e.siblings2,
-                        is_left_child: e.is_left_child,
-                        is_right_child: e.is_right_child,
+                        is_left_child: (e.path == TreePath::Left) as u8,
+                        is_right_child: (e.path == TreePath::Right) as u8,
                     })
                     .collect(),
             },
@@ -552,7 +552,7 @@ mod tests {
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);
 
-        let user_params = UserParams::new(1, 1, Some(41));
+        let user_params = UserParams::new(1, 1, Some(40));
 
         let fee_amount = FEE_CALCULATING_FUNC(1, 1) as u64;
         let output_amount = 10u64;
@@ -578,7 +578,7 @@ mod tests {
             .unwrap();
         let _ = mt.commit();
         let mt_proof = mt.generate_proof(uid).unwrap();
-        assert_eq!(mt.get_current_root_hash().unwrap(), mt_proof.root);
+        assert_eq!(mt.get_root().unwrap(), mt_proof.root);
 
         // output keys
         let keypair_out = AXfrKeyPair::generate(&mut prng);
@@ -657,40 +657,21 @@ mod tests {
                 ])[0]
             };
             let hasher = RescueInstance::new();
-            for i in mt_proof.nodes.iter().rev() {
-                if i.is_left_child == 1u8 {
-                    hash = hasher.rescue_hash(&[
-                        hash,
-                        i.siblings1,
-                        i.siblings2,
-                        BLSScalar::zero(),
-                    ])[0];
-                } else if i.is_right_child == 1u8 {
-                    hash = hasher.rescue_hash(&[
-                        i.siblings1,
-                        i.siblings2,
-                        hash,
-                        BLSScalar::zero(),
-                    ])[0];
-                } else {
-                    hash = hasher.rescue_hash(&[
-                        i.siblings1,
-                        hash,
-                        i.siblings2,
-                        BLSScalar::zero(),
-                    ])[0];
-                }
+            for i in mt_proof.nodes.iter() {
+                let (s1, s2, s3) = match i.path {
+                    TreePath::Left => (hash, i.siblings1, i.siblings2),
+                    TreePath::Middle => (i.siblings1, hash, i.siblings2),
+                    TreePath::Right => (i.siblings1, i.siblings2, hash),
+                };
+                hash = hasher.rescue_hash(&[s1, s2, s3, BLSScalar::zero()])[0];
             }
-            assert_eq!(hash, mt.get_current_root_hash().unwrap());
+            assert_eq!(hash, mt.get_root().unwrap());
         }
         {
             // verifier scope
             let verifier_params = NodeParams::from(user_params);
-            let t = verify_anon_xfr_body(
-                &verifier_params,
-                &body,
-                &mt.get_current_root_hash().unwrap(),
-            );
+            let t =
+                verify_anon_xfr_body(&verifier_params, &body, &mt.get_root().unwrap());
             println!("{:?}", t);
             assert!(t.is_ok());
 
