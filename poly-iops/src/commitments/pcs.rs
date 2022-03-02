@@ -67,7 +67,7 @@ pub type OptionParams<'a, PCS> = Option<
 >;
 
 /// Trait for homomorphic polynomial commitment schemes
-pub trait PolyComScheme {
+pub trait PolyComScheme: Sized {
     /// Type of prime field
     type Field: Scalar;
 
@@ -332,9 +332,7 @@ pub trait PolyComScheme {
         }
     }
 
-    fn shrink_to_verifier_only(&self) -> Result<Self> {
-        Ok(self.clone())
-    }
+    fn shrink_to_verifier_only(&self) -> Result<Self>;
 }
 
 /// Uses a Binding Polynomial commitment scheme and transforms it into a Binding and Hiding Polynomial Commitment Scheme

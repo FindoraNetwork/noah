@@ -7,7 +7,10 @@ use rand_core::SeedableRng;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use utils::save_to_file;
-use zei::setup::{NodeParams, PublicParams, UserParams};
+use zei::anon_xfr::TREE_DEPTH;
+use zei::setup::{NodeParams, PublicParams, UserParams, PRECOMPUTED_PARTY_NUMBER};
+
+use rayon::prelude::*;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -30,10 +33,7 @@ enum Actions {
     },
 
     VK {
-        n_payers: usize,
-        n_payees: usize,
-        tree_depth: usize,
-        out_filename: PathBuf,
+        directory: PathBuf,
     },
 
     BP {
@@ -72,15 +72,10 @@ fn main() {
             out_filename,
         } => {
             gen_node_params(n_payers, n_payees, tree_depth, out_filename);
-        },
-        VK {
-            n_payers,
-            n_payees,
-            tree_depth,
-            out_filename,
-        } => {
-            gen_vk(n_payers, n_payees, tree_depth, out_filename);
-        },
+        }
+        VK { directory } => {
+            gen_vk(directory);
+        }
         BP {
             gens_capacity,
             party_capacity,
@@ -139,26 +134,42 @@ fn gen_node_params(
     save_to_file(&node_params_ser, out_filename);
 }
 
-fn gen_vk(
-    n_payers: usize,
-    n_payees: usize,
-    tree_depth: usize,
-    out_filename: PathBuf,
-) {
+fn gen_vk(directory: PathBuf) {
     println!(
-        "Generating 'Node Parameters' for {} payers, {} payees and with tree depth={}...",
-        n_payers, n_payees, tree_depth
+        "Generating 'Node Compressed Parameters' for 1..{} payers, 1..{} payees ...",
+        PRECOMPUTED_PARTY_NUMBER, PRECOMPUTED_PARTY_NUMBER
     );
 
-    let tree_dept_option = if tree_depth == 0 {
-        None
-    } else {
-        Some(tree_depth)
-    };
+    //let mut specials = vec![];
+    let node_params = NodeParams::create(1, 1, Some(TREE_DEPTH)).unwrap();
+    let (common, _) = node_params.split().unwrap();
+    let common_ser = bincode::serialize(&common).unwrap();
+    let mut common_path = directory.clone();
+    common_path.push("vk-common.bin");
+    save_to_file(&common_ser, common_path);
 
-    let node_params = NodeParams::create(n_payers, n_payees, tree_dept_option).unwrap();
-    let node_params_ser = bincode::serialize(&node_params.verifier_params).unwrap();
-    save_to_file(&node_params_ser, out_filename);
+    //let mut need_common = true;
+    let is: Vec<usize> = (1..=PRECOMPUTED_PARTY_NUMBER).map(|i| i).collect();
+    let specials: Vec<Vec<Vec<u8>>> = is
+        .par_iter()
+        .map(|i| {
+            let js: Vec<usize> = (1..=PRECOMPUTED_PARTY_NUMBER).map(|j| j).collect();
+            js.par_iter()
+                .map(|j| {
+                    println!("generateing {} payers & {} payees", i, j);
+                    let node_params =
+                        NodeParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
+                    let (_, special) = node_params.split().unwrap();
+                    bincode::serialize(&special).unwrap()
+                })
+                .collect()
+        })
+        .collect();
+
+    let specials_ser = bincode::serialize(&specials).unwrap();
+    let mut specials_path = directory.clone();
+    specials_path.push("vk-specials.bin");
+    save_to_file(&specials_ser, specials_path);
 }
 
 fn gen_params_bp(gens_capacity: usize, party_capacity: usize, out_filename: PathBuf) {

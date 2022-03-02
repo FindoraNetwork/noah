@@ -13,9 +13,6 @@
 extern crate utils;
 
 #[macro_use]
-extern crate lazy_static;
-
-#[macro_use]
 extern crate itertools;
 
 #[macro_use]
@@ -24,10 +21,10 @@ extern crate core;
 
 pub mod anon_xfr;
 pub mod api;
+pub mod parameters;
 pub mod serialization;
 pub mod setup;
 pub mod xfr;
-pub mod parameters;
 
-pub use utils::errors;
 pub use algebra::ristretto;
+pub use utils::errors;

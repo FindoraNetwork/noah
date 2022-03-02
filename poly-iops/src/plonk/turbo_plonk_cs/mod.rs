@@ -58,7 +58,7 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
         }
     }
 
-    fn n_wires_per_gate(&self) -> usize {
+    fn n_wires_per_gate() -> usize {
         N_WIRES_PER_GATE
     }
 
@@ -88,11 +88,7 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
     ///     + q_hash_1 * w1^5 + q_hash_2 * w2^5 + q_hash_3 * w3^5 + q_hash_4 * w4^5
     ///     - qo * wo = 0
     /// ```
-    fn eval_gate_func(
-        wire_vals: &[&F],
-        sel_vals: &[&F],
-        pub_input: &F,
-    ) -> Result<F> {
+    fn eval_gate_func(wire_vals: &[&F], sel_vals: &[&F], pub_input: &F) -> Result<F> {
         if wire_vals.len() != N_WIRES_PER_GATE || sel_vals.len() != N_SELECTORS {
             return Err(eg!(PlonkError::FuncParamsError));
         }
@@ -160,10 +156,14 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
         ])
     }
 
+    fn is_verifier_only(&self) -> bool {
+        self.verifier_only
+    }
+
     fn shrink_to_verifier_only(&self) -> Result<Self> {
         Ok(Self {
             selectors: vec![],
-            wiring: [vec![]; N_WIRES_PER_GATE],
+            wiring: [vec![], vec![], vec![], vec![], vec![]], // N_WIRES_PER_GATE = 5
             num_vars: self.num_vars,
             size: self.size,
             public_vars_constraint_indices: vec![],
@@ -171,7 +171,7 @@ impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
             verifier_only: true,
             witness: vec![],
             zero_var: None,
-            one_var: None
+            one_var: None,
         })
     }
 }
@@ -212,6 +212,7 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
             size: 0,
             public_vars_constraint_indices: vec![],
             public_vars_witness_indices: vec![],
+            verifier_only: false,
             witness: vec![],
             zero_var: None,
             one_var: None,
@@ -667,8 +668,7 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
             let sel_vals: Vec<&F> = (0..self.num_selectors())
                 .map(|i| &self.selectors[i][cs_index])
                 .collect();
-            let eval_gate = self
-                .eval_gate_func(&wire_vals, &sel_vals, &public_online)
+            let eval_gate = Self::eval_gate_func(&wire_vals, &sel_vals, &public_online)
                 .c(d!("wrong func params for eval_gate_func()"))?;
             if eval_gate != F::zero() {
                 return Err(eg!(format!(
@@ -1075,7 +1075,7 @@ mod test {
 mod turbo_plonk_proofs_test {
     use crate::commitments::kzg_poly_com::KZGCommitmentScheme;
     use crate::commitments::pcs::PolyComScheme;
-    use crate::plonk::plonk_setup::preprocess_prover;
+    use crate::plonk::plonk_setup::{preprocess_prover, ConstraintSystem};
     use crate::plonk::protocol::prover::{prover, verifier};
     use crate::plonk::turbo_plonk_cs::rescue::State;
     use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
@@ -1259,6 +1259,30 @@ mod turbo_plonk_proofs_test {
             &mut transcript,
             pcs,
             cs,
+            verifier_params_ref,
+            online_vars,
+            &proof
+        )
+        .is_ok());
+
+        let prover_cs = cs.shrink_to_verifier_only().unwrap();
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(prover(
+            prng,
+            &mut transcript,
+            pcs,
+            &prover_cs,
+            &prover_params,
+            witness
+        )
+        .is_err());
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(verifier(
+            &mut transcript,
+            pcs,
+            &prover_cs,
             verifier_params_ref,
             online_vars,
             &proof

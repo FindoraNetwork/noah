@@ -9,7 +9,7 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 use ruc::*;
 
 /// Trait for Turbo PLONK constraint systems.
-pub trait ConstraintSystem {
+pub trait ConstraintSystem: Sized {
     type Field: Scalar;
     /// Return the number of constraints in the system.
     /// `size should divide q-1 where q is the size of the prime field.
@@ -29,7 +29,7 @@ pub trait ConstraintSystem {
     fn quot_eval_dom_size(&self) -> usize;
 
     /// Return the number of wires in a single gate.
-    fn n_wires_per_gate(&self) -> usize;
+    fn n_wires_per_gate() -> usize;
 
     /// Return the number of selectors.
     fn num_selectors(&self) -> usize;
@@ -37,7 +37,7 @@ pub trait ConstraintSystem {
     /// Compute the permutation implied by the copy constraints.
     fn compute_permutation(&self) -> Vec<usize> {
         let n = self.size();
-        let n_wires_per_gate = self.n_wires_per_gate();
+        let n_wires_per_gate = Self::n_wires_per_gate();
         let mut perm = vec![0usize; n_wires_per_gate * n];
         let mut marked = vec![false; self.num_vars()];
         let mut v = Vec::with_capacity(n_wires_per_gate * n);
@@ -74,7 +74,7 @@ pub trait ConstraintSystem {
     /// Map the witnesses into the wires of the circuit.
     /// The (i * size + j)-th output element is the value of the i-th wire on the j-th gate.
     fn extend_witness(&self, witness: &[Self::Field]) -> Vec<Self::Field> {
-        let mut extended = Vec::with_capacity(self.n_wires_per_gate() * self.size());
+        let mut extended = Vec::with_capacity(Self::n_wires_per_gate() * self.size());
         for wire_slice in self.wiring().iter() {
             for index in wire_slice.iter() {
                 extended.push(witness[*index]);
@@ -95,13 +95,12 @@ pub trait ConstraintSystem {
 
     /// Given the wires values of a gate, evaluate the coefficients of the selectors in the
     /// constraint equation.
-    fn eval_selector_multipliers(
-        wire_vals: &[&Self::Field],
-    ) -> Result<Vec<Self::Field>>;
+    fn eval_selector_multipliers(wire_vals: &[&Self::Field])
+        -> Result<Vec<Self::Field>>;
 
-    fn shrink_to_verifier_only(&self) -> Result<Self> {
-        Ok(self.clone())
-    }
+    fn is_verifier_only(&self) -> bool;
+
+    fn shrink_to_verifier_only(&self) -> Result<Self>;
 }
 
 #[allow(non_snake_case)]
@@ -112,6 +111,7 @@ pub struct PlonkConstraintSystem<F> {
     pub size: usize,
     pub public_vars_constraint_indices: Vec<usize>,
     pub public_vars_witness_indices: Vec<usize>,
+    pub verifier_only: bool,
 }
 
 impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
@@ -137,7 +137,7 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
         }
     }
 
-    fn n_wires_per_gate(&self) -> usize {
+    fn n_wires_per_gate() -> usize {
         3
     }
 
@@ -192,6 +192,22 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
             F::one(),
         ])
     }
+
+    fn is_verifier_only(&self) -> bool {
+        self.verifier_only
+    }
+
+    fn shrink_to_verifier_only(&self) -> Result<Self> {
+        Ok(PlonkConstraintSystem {
+            selectors: vec![],
+            wiring: [vec![], vec![], vec![]], // 3-n_wires_per_gate
+            num_vars: self.num_vars,
+            size: self.size,
+            public_vars_constraint_indices: vec![],
+            public_vars_witness_indices: vec![],
+            verifier_only: true,
+        })
+    }
 }
 
 impl<F: Scalar> PlonkConstraintSystem<F> {
@@ -203,6 +219,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
             size: 0,
             public_vars_constraint_indices: vec![],
             public_vars_witness_indices: vec![],
+            verifier_only: false,
         }
     }
 
@@ -533,7 +550,7 @@ pub fn preprocess_prover<
     prg_seed: [u8; 32],
 ) -> Result<ProverParams<PCS>> {
     let mut prng = ChaChaRng::from_seed(prg_seed);
-    let n_wires_per_gate = cs.n_wires_per_gate();
+    let n_wires_per_gate = CS::n_wires_per_gate();
     let n = cs.size();
     let m = cs.quot_eval_dom_size();
     let factor = m / n;
@@ -662,6 +679,7 @@ mod test {
             size: 3,
             public_vars_constraint_indices: vec![],
             public_vars_witness_indices: vec![],
+            verifier_only: false,
         };
         let perm = cs.compute_permutation();
         assert_eq!(perm, vec![0, 1, 3, 7, 5, 4, 6, 2, 8]);
