@@ -201,7 +201,7 @@ impl NodeParams {
                     let specials: Vec<Vec<Vec<u8>>> =
                         bincode::deserialize(s_bytes).unwrap();
                     let special: NodeParamsSplitSpecial =
-                        bincode::deserialize(&specials[n_payers][n_payees])
+                        bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
                             .c(d!(ZeiError::DeserializationError))?;
                     Ok(NodeParams {
                         bp_params: common.bp_params,

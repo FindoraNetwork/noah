@@ -4,6 +4,7 @@ use bulletproofs::BulletproofGens;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use utils::save_to_file;
@@ -150,21 +151,32 @@ fn gen_vk(directory: PathBuf) {
 
     //let mut need_common = true;
     let is: Vec<usize> = (1..=PRECOMPUTED_PARTY_NUMBER).map(|i| i).collect();
-    let specials: Vec<Vec<Vec<u8>>> = is
+    let mut bytes: HashMap<usize, Vec<Vec<u8>>> = is
         .par_iter()
         .map(|i| {
             let js: Vec<usize> = (1..=PRECOMPUTED_PARTY_NUMBER).map(|j| j).collect();
-            js.par_iter()
+            let mut bytes: HashMap<usize, Vec<u8>> = js
+                .par_iter()
                 .map(|j| {
                     println!("generateing {} payers & {} payees", i, j);
                     let node_params =
                         NodeParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     let (_, special) = node_params.split().unwrap();
-                    bincode::serialize(&special).unwrap()
+                    (*j, bincode::serialize(&special).unwrap())
                 })
-                .collect()
+                .collect();
+            let mut ordered = vec![];
+            for i in 1..=PRECOMPUTED_PARTY_NUMBER {
+                ordered.push(bytes.remove(&i).unwrap())
+            }
+            (*i, ordered)
         })
         .collect();
+
+    let mut specials = vec![];
+    for i in 1..=PRECOMPUTED_PARTY_NUMBER {
+        specials.push(bytes.remove(&i).unwrap())
+    }
 
     let specials_ser = bincode::serialize(&specials).unwrap();
     let mut specials_path = directory.clone();
