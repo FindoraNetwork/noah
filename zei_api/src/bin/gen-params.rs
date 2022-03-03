@@ -53,6 +53,7 @@ enum Actions {
     },
 }
 
+// cargo run --release --features="parallel" --bin gen-params
 #[allow(dead_code)]
 fn main() {
     use Actions::*;
@@ -135,6 +136,7 @@ fn gen_node_params(
     save_to_file(&node_params_ser, out_filename);
 }
 
+// cargo run --release --features="parallel" --bin gen-params vk "./parameters"
 fn gen_vk(directory: PathBuf) {
     println!(
         "Generating 'Node Compressed Parameters' for 1..{} payers, 1..{} payees ...",
