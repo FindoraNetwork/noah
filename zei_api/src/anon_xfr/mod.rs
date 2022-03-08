@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use utils::errors::ZeiError;
 
 pub mod abar_to_bar;
+pub mod anon_fee;
 pub mod bar_to_abar;
 pub(crate) mod circuits;
 pub mod config;
@@ -32,7 +33,6 @@ mod merkle_tree_test;
 pub mod parameters;
 pub(crate) mod proofs;
 pub mod structs;
-pub mod anon_fee;
 
 /// Build an anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
