@@ -32,6 +32,7 @@ mod merkle_tree_test;
 pub mod parameters;
 pub(crate) mod proofs;
 pub mod structs;
+pub mod anon_fee;
 
 /// Build an anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
