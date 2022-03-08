@@ -1,4 +1,5 @@
 pub mod errors;
+pub mod field_simulation;
 #[allow(non_snake_case)]
 pub(crate) mod plonk_helpers;
 #[allow(non_snake_case)]

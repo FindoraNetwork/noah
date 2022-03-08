@@ -1,7 +1,7 @@
 /*
 This file implements anonymous credentials based on the signature scheme of
 David Pointcheval and Olivier Sanders. Short Randomizable Signatures. CT RSA 2015.
-https://eprint.iacr.org/2015/525.pdf. Details are described below:
+<https://eprint.iacr.org/2015/525.pdf>. Details are described below:
 
 Credential issuers can issue credentials for a set of n attributes by providing a signature
 on this attributes for a given user.
@@ -79,9 +79,7 @@ in the credentials by
 */
 
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-use algebra::multi_exp::MultiExp;
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};

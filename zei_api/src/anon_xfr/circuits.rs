@@ -1,15 +1,23 @@
 use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
+use algebra::groups::{
+    Group, GroupArithmetic, One as ArkOne, Scalar, ScalarArithmetic, Zero as ArkZero,
+};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
-use crypto::basics::commitments::pedersen::PedersenGens;
+use algebra::ristretto::RistrettoScalar;
 use crypto::basics::commitments::rescue::HashCommitment as CommScheme;
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::prf::PRF;
+use crypto::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
+use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
+use num_bigint::BigUint;
+use num_traits::{One, Zero};
+use poly_iops::plonk::field_simulation::SimFrVar;
 use poly_iops::plonk::turbo_plonk_cs::ecc::PointVar;
 use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
 use poly_iops::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
+use std::ops::{AddAssign, Shl};
 
 pub type TurboPlonkCS = TurboPlonkConstraintSystem<BLSScalar>;
 
@@ -20,7 +28,7 @@ const AMOUNT_LEN: usize = 64; // amount value size (in bits)
 pub const TREE_DEPTH: usize = 20; // Depth of the Merkle Tree
 
 #[derive(Debug, Clone)]
-pub(crate) struct PayerSecret {
+pub struct PayerSecret {
     pub sec_key: JubjubScalar,
     pub diversifier: JubjubScalar, // key randomizer for the signature verification key
     pub amount: u64,
@@ -31,7 +39,7 @@ pub(crate) struct PayerSecret {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct PayeeSecret {
+pub struct PayeeSecret {
     pub amount: u64,
     pub blind: BlindFactor,
     pub asset_type: BLSScalar,
@@ -168,7 +176,7 @@ impl AMultiXfrPubInputs {
             pk_hash,
             zero,
         ])[0];
-        for path_node in payer.path.nodes.iter().rev() {
+        for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
                 (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
                 (0, 0) => vec![path_node.siblings1, node, path_node.siblings2, zero],
@@ -188,8 +196,11 @@ impl AMultiXfrPubInputs {
 /// Returns the constraint system (and associated number of constraints) for a multi-inputs/outputs transaction.
 /// A prover can provide honest `secret_inputs` and obtain the cs witness by calling `cs.get_and_clear_witness()`.
 /// One provide an empty secret_inputs to get the constraint system `cs` for verification only.
+/// This one also takes fee parameters as input.
 pub(crate) fn build_multi_xfr_cs(
     secret_inputs: AMultiXfrWitness,
+    fee_type: BLSScalar,
+    fee_calculating_func: &dyn Fn(u32, u32) -> u32,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(secret_inputs.payers_secrets.len(), 0);
     assert_ne!(secret_inputs.payees_secrets.len(), 0);
@@ -206,7 +217,7 @@ pub(crate) fn build_multi_xfr_cs(
     let mut root_var: Option<VarIndex> = None;
     for payer in &payers_secrets {
         // prove knowledge of payer's secret key: pk = base^{sk}
-        let (pk_var, pk_point) = cs.scalar_mul(base.clone(), payer.sec_key, SK_LEN);
+        let (pk_var, pk_point) = cs.scalar_mul(base, payer.sec_key, SK_LEN);
         let pk_x = pk_var.get_x();
         let pk_y = pk_var.get_y();
 
@@ -281,7 +292,7 @@ pub(crate) fn build_multi_xfr_cs(
         .into_iter()
         .map(|payee| (payee.asset_type, payee.amount))
         .collect();
-    asset_mixing(&mut cs, &inputs, &outputs);
+    asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
 
     // pad the number of constraints to power of two
     cs.pad();
@@ -295,36 +306,193 @@ pub(crate) fn build_multi_xfr_cs(
 pub(crate) fn build_eq_committed_vals_cs(
     amount: BLSScalar,
     asset_type: BLSScalar,
-    blind_pc: BLSScalar,
     blind_hash: BLSScalar,
-    pc_gens: &PedersenGens<JubjubPoint>,
+    proof: &ZKPartProof,
+    non_zk_state: &NonZKState,
+    beta: &RistrettoScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboPlonkConstraintSystem::new();
-    // add secret inputs
+    let zero_var = cs.zero_var();
+
+    let zero = BLSScalar::zero();
+    let one = BLSScalar::one();
+    let step_1 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB));
+    let step_2 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 2));
+    let step_3 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 3));
+    let step_4 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 4));
+    let step_5 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 5));
+
+    // 1. Input Ristretto commitment data
     let amount_var = cs.new_variable(amount);
     let at_var = cs.new_variable(asset_type);
-    let blind_pc_var = cs.new_variable(blind_pc);
     let blind_hash_var = cs.new_variable(blind_hash);
 
-    // pedersen commitment
-    let (point1_var, point1) =
-        cs.scalar_mul(pc_gens.get_base(0).unwrap().clone(), amount_var, AMOUNT_LEN); // safe unwrap
-    let (point2_var, point2) = cs.scalar_mul(
-        pc_gens.get_base(1).unwrap().clone(),
-        at_var,
-        JUBJUB_SCALAR_BIT_LEN,
-    ); // safe unwrap
-    let (point3_var, point3) = cs.scalar_mul(
-        pc_gens.get_blinding_base().clone(),
-        blind_pc_var,
-        JUBJUB_SCALAR_BIT_LEN,
-    );
-    let tmp_ext = cs.ecc_add(&point1_var, &point2_var, &point1, &point2);
-    let ped_comm_ext =
-        cs.ecc_add(&point3_var, tmp_ext.get_var(), &point3, tmp_ext.get_point());
+    // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2
+    let x_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.x.to_bytes()));
+    let y_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.y.to_bytes()));
+    let a_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.a.to_bytes()));
+    let b_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.b.to_bytes()));
+    let comm = proof.non_zk_part_state_commitment;
+    let r = non_zk_state.r;
+    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+    let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_1.to_bytes()));
+    let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_2.to_bytes()));
 
-    // rescue commitment
-    let zero_var = cs.zero_var();
+    let x_sim_fr_var =
+        SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
+    let y_sim_fr_var =
+        SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
+    let a_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
+    let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
+    let comm_var = cs.new_variable(comm);
+    let r_var = cs.new_variable(r);
+    let beta_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &beta_sim_fr);
+    let s1_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s1_sim_fr);
+    let s2_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s2_sim_fr);
+
+    // 3. Merge the limbs for x, y, a, b
+    let mut all_limbs = Vec::with_capacity(4 * NUM_OF_LIMBS);
+    all_limbs.extend_from_slice(&x_sim_fr.limbs);
+    all_limbs.extend_from_slice(&y_sim_fr.limbs);
+    all_limbs.extend_from_slice(&a_sim_fr.limbs);
+    all_limbs.extend_from_slice(&b_sim_fr.limbs);
+
+    let mut all_limbs_var = Vec::with_capacity(4 * NUM_OF_LIMBS);
+    all_limbs_var.extend_from_slice(&x_sim_fr_var.var);
+    all_limbs_var.extend_from_slice(&y_sim_fr_var.var);
+    all_limbs_var.extend_from_slice(&a_sim_fr_var.var);
+    all_limbs_var.extend_from_slice(&b_sim_fr_var.var);
+
+    let mut compressed_limbs = Vec::with_capacity(5);
+    let mut compressed_limbs_var = Vec::with_capacity(5);
+    for (limbs, limbs_var) in all_limbs.chunks(5).zip(all_limbs_var.chunks(5)) {
+        let mut sum = BigUint::zero();
+        for (i, limb) in limbs.iter().enumerate() {
+            sum.add_assign(
+                <&BLSScalar as Into<BigUint>>::into(limb).shl(BIT_PER_LIMB * i),
+            );
+        }
+        compressed_limbs.push(BLSScalar::from(&sum));
+
+        let mut sum_var = {
+            let first_var = *limbs_var.get(0).unwrap_or(&zero_var);
+            let second_var = *limbs_var.get(1).unwrap_or(&zero_var);
+            let third_var = *limbs_var.get(2).unwrap_or(&zero_var);
+            let fourth_var = *limbs_var.get(3).unwrap_or(&zero_var);
+
+            cs.linear_combine(
+                &[first_var, second_var, third_var, fourth_var],
+                one,
+                step_1,
+                step_2,
+                step_3,
+            )
+        };
+
+        if limbs.len() == 5 {
+            let fifth_var = *limbs_var.get(4).unwrap_or(&zero_var);
+            sum_var = cs.linear_combine(
+                &[sum_var, fifth_var, zero_var, zero_var],
+                one,
+                step_4,
+                zero,
+                zero,
+            );
+        }
+
+        compressed_limbs_var.push(sum_var);
+    }
+
+    // 4. Open the non-ZK verifier state
+    {
+        let h1_var = cs.rescue_hash(&StateVar::new([
+            compressed_limbs_var[0],
+            compressed_limbs_var[1],
+            compressed_limbs_var[2],
+            compressed_limbs_var[3],
+        ]))[0];
+
+        let h2_var = cs.rescue_hash(&StateVar::new([
+            h1_var,
+            compressed_limbs_var[4],
+            r_var,
+            zero_var,
+        ]))[0];
+        cs.equal(h2_var, comm_var);
+    }
+
+    // 5. Perform the check in field simulation
+    {
+        let beta_x_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &x_sim_fr_var);
+        let beta_y_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &y_sim_fr_var);
+
+        let s_1_minus_a_sim_fr_var = s1_sim_fr_var.sub(&mut cs, &a_sim_fr_var);
+        let s_2_minus_b_sim_fr_var = s2_sim_fr_var.sub(&mut cs, &b_sim_fr_var);
+
+        let first_eqn = beta_x_sim_fr_mul_var.sub(&mut cs, &s_1_minus_a_sim_fr_var);
+        let second_eqn = beta_y_sim_fr_mul_var.sub(&mut cs, &s_2_minus_b_sim_fr_var);
+
+        first_eqn.enforce_zero(&mut cs);
+        second_eqn.enforce_zero(&mut cs);
+    }
+
+    // 6. Check x = amount_var and y = at_var
+    {
+        let mut x_in_bls12_381 = cs.linear_combine(
+            &[
+                x_sim_fr_var.var[0],
+                x_sim_fr_var.var[1],
+                x_sim_fr_var.var[2],
+                x_sim_fr_var.var[3],
+            ],
+            one,
+            step_1,
+            step_2,
+            step_3,
+        );
+        x_in_bls12_381 = cs.linear_combine(
+            &[
+                x_in_bls12_381,
+                x_sim_fr_var.var[4],
+                x_sim_fr_var.var[5],
+                zero_var,
+            ],
+            one,
+            step_4,
+            step_5,
+            zero,
+        );
+
+        let mut y_in_bls12_381 = cs.linear_combine(
+            &[
+                y_sim_fr_var.var[0],
+                y_sim_fr_var.var[1],
+                y_sim_fr_var.var[2],
+                y_sim_fr_var.var[3],
+            ],
+            one,
+            step_1,
+            step_2,
+            step_3,
+        );
+        y_in_bls12_381 = cs.linear_combine(
+            &[
+                y_in_bls12_381,
+                y_sim_fr_var.var[4],
+                y_sim_fr_var.var[5],
+                zero_var,
+            ],
+            one,
+            step_4,
+            step_5,
+            zero,
+        );
+
+        cs.equal(x_in_bls12_381, amount_var);
+        cs.equal(y_in_bls12_381, at_var);
+    }
+
+    // 7. Rescue commitment
     let rescue_comm_var = cs.rescue_hash(&StateVar::new([
         blind_hash_var,
         amount_var,
@@ -334,7 +502,17 @@ pub(crate) fn build_eq_committed_vals_cs(
 
     // prepare public inputs
     cs.prepare_io_variable(rescue_comm_var);
-    cs.prepare_io_point_variable(ped_comm_ext.into_point_var());
+    cs.prepare_io_variable(comm_var);
+
+    for i in 0..NUM_OF_LIMBS {
+        cs.prepare_io_variable(beta_sim_fr_var.var[i]);
+    }
+    for i in 0..NUM_OF_LIMBS {
+        cs.prepare_io_variable(s1_sim_fr_var.var[i]);
+    }
+    for i in 0..NUM_OF_LIMBS {
+        cs.prepare_io_variable(s2_sim_fr_var.var[i]);
+    }
 
     // pad the number of constraints to power of two
     cs.pad();
@@ -391,7 +569,7 @@ fn add_payees_secrets(
         .collect()
 }
 
-struct PayerSecretVars {
+pub struct PayerSecretVars {
     pub sec_key: VarIndex,
     pub diversifier: VarIndex,
     pub uid: VarIndex,
@@ -408,7 +586,7 @@ struct PayeeSecretVars {
 }
 
 // cs variables for a Merkle node
-struct MerkleNodeVars {
+pub struct MerkleNodeVars {
     pub siblings1: VarIndex,
     pub siblings2: VarIndex,
     pub is_left_child: VarIndex,
@@ -416,12 +594,12 @@ struct MerkleNodeVars {
 }
 
 // cs variables for a merkle authentication path
-struct MerklePathVars {
+pub struct MerklePathVars {
     pub nodes: Vec<MerkleNodeVars>,
 }
 
 // cs variables for an accumulated element
-struct AccElemVars {
+pub(crate) struct AccElemVars {
     pub uid: VarIndex,
     pub commitment: VarIndex,
     pub pub_key_x: VarIndex,
@@ -429,7 +607,7 @@ struct AccElemVars {
 }
 
 // cs variables for the nullifier PRF inputs
-struct NullifierInputVars {
+pub(crate) struct NullifierInputVars {
     pub uid_amount: VarIndex,
     pub asset_type: VarIndex,
     pub pub_key_x: VarIndex,
@@ -438,11 +616,16 @@ struct NullifierInputVars {
 
 // cs variables for ElGamal ciphertexts
 pub struct ElGamalHybridCtextVars {
-    pub e1: PointVar,              // r*G
+    #[allow(dead_code)]
+    pub e1: PointVar, // r*G
+    #[allow(dead_code)]
     pub symm_ctxts: Vec<VarIndex>, // ctr-mode ciphertext
 }
 
-fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
+pub(crate) fn add_merkle_path_variables(
+    cs: &mut TurboPlonkCS,
+    path: MTPath,
+) -> MerklePathVars {
     let path_vars: Vec<MerkleNodeVars> = path
         .nodes
         .into_iter()
@@ -494,7 +677,7 @@ fn sort(
     StateVar::new([left, mid, right, cs.zero_var()])
 }
 
-fn compute_merkle_root(
+pub(crate) fn compute_merkle_root(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
@@ -508,7 +691,7 @@ fn compute_merkle_root(
     let mut node_var =
         cs.rescue_hash(&StateVar::new([uid, commitment, pk_hash_var, zero_var]))[0];
 
-    for path_node in path_vars.nodes.iter().rev() {
+    for path_node in path_vars.nodes.iter() {
         let input_var = sort(
             cs,
             node_var,
@@ -524,7 +707,7 @@ fn compute_merkle_root(
 
 // Add the commitment constraints to the constraint system:
 // comm = commit(blinding, amount, asset_type)
-fn commit(
+pub fn commit(
     cs: &mut TurboPlonkCS,
     blinding_var: VarIndex,
     amount_var: VarIndex,
@@ -540,7 +723,7 @@ fn commit(
 // Let perm : Fp^w -> Fp^w be a public permutation.
 // Given secret key `key`, set initial state `s_key` := (0 || ... || 0 || key), the PRF output is:
 // PRF^p(key, (m1, ..., mw)) = perm(s_key \xor (m1 || ... || mw))[0]
-fn nullify(
+pub(crate) fn nullify(
     cs: &mut TurboPlonkCS,
     sk_var: VarIndex,
     nullifier_input_vars: NullifierInputVars,
@@ -556,19 +739,35 @@ fn nullify(
     cs.rescue_hash(&input_var)[0]
 }
 
-/// Enforce asset_mixing constraints:
-/// Inputs = [(type_in_1, v_in_1), ..., (type_in_n, v_in_n)], values {v_in_i} are guaranteed to be positive.
-/// Outputs = [(type_out_1, v_out_1), ..., (type_out_m, v_out_m)], values {v_out_j} are guaranteed to be positive.
-/// Goal: Prove that for every asset type, the corresponding inputs sum equals the corresponding outputs sum.
+/// Enforce asset_mixing_with_fees constraints:
+/// Inputs = [(type_in_1, v_in_1), ..., (type_in_n, v_in_n)], `values {v_in_i}` are guaranteed to be positive.
+/// Outputs = [(type_out_1, v_out_1), ..., (type_out_m, v_out_m)], `values {v_out_j}` are guaranteed to be positive.
+/// Fee parameters = `fee_type` and `fee_calculating func`
+///
+/// Goal:
+/// - Prove that for every asset type except `fee_type`, the corresponding inputs sum equals the corresponding outputs sum.
+/// - Prove that for every asset type that equals `fee_type`, the inputs sum = the outputs sum + fee
+/// - Prove that at least one input is of type `fee_type`
+///
 /// The circuit:
-/// 1. Compute [sum_in_1, ..., sum_in_n] from inputs, where sum_in_i = \sum_{j : type_in_j == type_in_i} v_in_j
+/// 1. Compute [sum_in_1, ..., sum_in_n] from inputs, where `sum_in_i = \sum_{j : type_in_j == type_in_i} v_in_j`
+///    Note: If there are two inputs with the same asset type, then their `sum_in_i` would be the same.
 /// 2. Similarly, compute [sum_out_1, ..., sum_out_m] from outputs.
-/// 3. Enumerate pair (i \in [n], j \in [m]), check that: (type_in_i != type_out_j) \lor (sum_in_i == sum_out_j)
+/// 3. Enumerate pair `(i \in [n], j \in [m])`, check that:
+///         `(type_in_i == fee_type) \lor (type_in_i != type_out_j) \lor (sum_in_i == sum_out_j)`
+///         `(type_in_i != fee_type) \lor (type_in_i != type_out_j) \lor (sum_in_i == sum_out_j + fee)`
+/// 4. Ensure that except the fee type, all the input type has also shown up as an output type.
+/// 5. Ensure that for the fee type, if there is no output fee type, then the input must provide the exact fee.
+///
+/// This function assumes that the inputs and outputs have been correctly bounded.
 fn asset_mixing(
     cs: &mut TurboPlonkCS,
     inputs: &[(VarIndex, VarIndex)],
     outputs: &[(VarIndex, VarIndex)],
+    fee_type: BLSScalar,
+    fee_calculating_func: &dyn Fn(u32, u32) -> u32,
 ) {
+    // Compute the `sum_in_i`
     let inputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = inputs
         .iter()
         .map(|input| {
@@ -586,6 +785,7 @@ fn asset_mixing(
         })
         .collect();
 
+    // Compute the `sum_out_i`
     let outputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = outputs
         .iter()
         .map(|output| {
@@ -603,27 +803,58 @@ fn asset_mixing(
         })
         .collect();
 
-    for (input_type, input_sum) in inputs_type_sum_amounts {
-        for &(output_type, output_sum) in &outputs_type_sum_amounts {
-            let type_matched = cs.is_equal(input_type, output_type);
-            // enforce `type_matched` * (input_sum - output_sum) == 0, which guarantees that
-            // (`input_type` != `output_type`) \lor (`input_sum` == `output_sum`)
-            let zero_var = cs.zero_var();
-            let diff = cs.sub(input_sum, output_sum);
-            cs.insert_mul_gate(type_matched, diff, zero_var);
-        }
-    }
+    // Initialize a constant value `fee_type_val`
+    let fee_type_val = cs.new_variable(fee_type);
+    cs.insert_constant_gate(fee_type_val, fee_type);
 
-    // check that every input type appears in the set of output types
-    for &(input_type, _) in inputs {
-        // \prod_j (input_type - output_type_j) == 0
-        let mut product = cs.one_var();
-        for &(output_type, _) in outputs {
-            let diff = cs.sub(input_type, output_type);
-            product = cs.mul(product, diff);
+    // Calculate the fee
+    let fee = BLSScalar::from_u32(fee_calculating_func(
+        inputs.len() as u32,
+        outputs.len() as u32,
+    ));
+    let fee_var = cs.new_variable(fee);
+    cs.insert_constant_gate(fee_var, fee);
+
+    // At least one input type is `fee_type` by checking `flag_no_fee_type = 0`
+    // and also check that the amount is matching
+    // and also check that every input type appears in the set of output types (except if the fee has used up)
+    let mut flag_no_fee_type = cs.one_var();
+    for (input_type, input_sum) in inputs_type_sum_amounts {
+        let (is_fee_type, is_not_fee_type) =
+            cs.is_equal_or_not_equal(input_type, fee_type_val);
+        flag_no_fee_type = cs.mul(flag_no_fee_type, is_not_fee_type);
+
+        let zero_var = cs.zero_var();
+
+        // If there is at least one output that is of the same type as the input, then `flag_no_matching_output = 0`
+        // Otherwise, `flag_no_matching_output = 1`.
+        let mut flag_no_matching_output = cs.one_var();
+        for &(output_type, output_sum) in &outputs_type_sum_amounts {
+            let (type_matched, type_not_matched) =
+                cs.is_equal_or_not_equal(input_type, output_type);
+            flag_no_matching_output = cs.mul(flag_no_matching_output, type_not_matched);
+            let diff = cs.sub(input_sum, output_sum);
+
+            // enforce `type_matched` * `is_not_fee_type` * (input_sum - output_sum) == 0,
+            // which guarantees that (`input_type` != `output_type`) \lor (`input_type` == fee_type) \lor (`input_sum` == `output_sum`)
+            let type_matched_and_is_not_fee_type = cs.mul(type_matched, is_not_fee_type);
+            cs.insert_mul_gate(type_matched_and_is_not_fee_type, diff, zero_var);
+
+            // enforce `type_matched` * `is_fee_type` * (input_sum - output_sum - fee) == 0,
+            let type_matched_and_is_fee_type = cs.mul(type_matched, is_fee_type);
+            let diff_minus_fee = cs.sub(diff, fee_var);
+            cs.insert_mul_gate(type_matched_and_is_fee_type, diff_minus_fee, zero_var)
         }
-        cs.insert_constant_gate(product, BLSScalar::zero());
+
+        // If it is not the fee type, then `flag_no_matching_output` must be 0
+        cs.insert_mul_gate(is_not_fee_type, flag_no_matching_output, zero_var);
+
+        // Otherwise, `flag_no_matching_output * (input_sum - fee_var) = 0`
+        let input_minus_fee = cs.sub(input_sum, fee_var);
+        let condition = cs.mul(is_fee_type, flag_no_matching_output);
+        cs.insert_mul_gate(condition, input_minus_fee, zero_var)
     }
+    cs.insert_constant_gate(flag_no_fee_type, BLSScalar::zero());
 
     // check that every output type appears in the set of input types
     for &(output_type, _) in outputs {
@@ -690,10 +921,12 @@ pub(crate) mod tests {
     use super::*;
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{One, Scalar, Zero};
+    use algebra::ristretto::RistrettoPoint;
     use crypto::basics::commitments::pedersen::PedersenGens;
     use crypto::basics::commitments::rescue::HashCommitment;
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::prf::PRF;
+    use crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external;
     use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
     use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use rand_chacha::ChaChaRng;
@@ -735,7 +968,7 @@ pub(crate) mod tests {
                 }
             })
             .collect();
-        // compute the merkle leafs and update the merkle paths if there are more than 1 payers
+        // compute the merkle leaves and update the merkle paths if there are more than 1 payers
         if n_payers > 1 {
             let hash = RescueInstance::new();
             let comm = CommScheme::new();
@@ -861,17 +1094,83 @@ pub(crate) mod tests {
 
     #[test]
     fn test_asset_mixing() {
-        // The error path
-        let mut cs = TurboPlonkConstraintSystem::new();
+        // Fee type
+        let fee_type = BLSScalar::from_u32(1234u32);
+
+        // Fee function
+        // base fee 5, every input 1, every output 2
+        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
+
+        // Constants
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         let two = one.add(&one);
-        // asset_types = (0, 2)
-        let in_types = [cs.new_variable(zero), cs.new_variable(two)];
-        // amoutns = (60, 100)
+
+        // Test case 1: success
+        // A minimalist transaction that pays sufficient fee
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (1234)
+        let in_types = [cs.new_variable(fee_type)];
+        // amounts = (5 + 1)
+        let in_amounts = [cs.new_variable(BLSScalar::from_u32(5 + 1))];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_ok());
+
+        // Test case 2: error
+        // A minimalist transaction that pays too much fee
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (1234)
+        let in_types = [cs.new_variable(fee_type)];
+        // amounts = (5 + 1 + 1)
+        let in_amounts = [cs.new_variable(BLSScalar::from_u32(5 + 1 + 1))];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+
+        // Test case 3: error
+        // A minimalist transaction that pays insufficient fee
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (1234)
+        let in_types = [cs.new_variable(fee_type)];
+        // amounts = (5 + 1 - 1)
+        let in_amounts = [cs.new_variable(BLSScalar::from_u32(5 + 1 - 1))];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+
+        // Test case 4: error
+        // A classical case when the non-fee elements are wrong, but the fee is paid correctly
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (0, 2, 1234)
+        let in_types = [
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (60, 100, 5 + 3 + 2 * 2)
         let in_amounts = [
             cs.new_variable(BLSScalar::from_u32(60)),
             cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(5 + 3 + 2 * 2)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -881,7 +1180,7 @@ pub(crate) mod tests {
 
         // asset_types = (2, 2)
         let out_types = [cs.new_variable(two), cs.new_variable(two)];
-        // amoutns = (40, 10)
+        // amounts = (40, 10)
         let out_amounts = [
             cs.new_variable(BLSScalar::from_u32(40)),
             cs.new_variable(BLSScalar::from_u32(10)),
@@ -892,25 +1191,66 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs);
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
-        // The happy path
+        // Test case 5: success
+        // A classical case when the non-fee elements and fee are both correct
         let mut cs = TurboPlonkConstraintSystem::new();
-        // asset_types = (0, 2, 1, 2)
+        // asset_types = (0, 2, 1234)
+        let in_types = [
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (60, 100, 5 + 3 + 2 * 2)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(5 + 3 + 2 * 2)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        // asset_types = (2, 0)
+        let out_types = [cs.new_variable(two), cs.new_variable(zero)];
+        // amounts = (100, 60)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(60)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_ok());
+
+        // Test case 6: success
+        // More assets, with the exact fee
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
             cs.new_variable(two),
             cs.new_variable(one),
             cs.new_variable(two),
+            cs.new_variable(fee_type),
         ];
-        // amounts = (60, 100, 10, 50)
+        // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 7)
         let in_amounts = [
             cs.new_variable(BLSScalar::from_u32(60)),
             cs.new_variable(BLSScalar::from_u32(100)),
             cs.new_variable(BLSScalar::from_u32(10)),
             cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 7)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -944,11 +1284,296 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs);
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
+        // Test case 7: success
+        // More assets, with more than enough fees, but are spent properly
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (0, 2, 1, 2, 1234)
+        let in_types = [
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 8 + 100)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 8 + 100)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        // asset_types = (2, 1, 1, 2, 0, 0, 2, 1234)
+        let out_types = [
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(zero),
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (40, 9, 1, 80, 50, 10, 30, 100)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(40)),
+            cs.new_variable(BLSScalar::from_u32(9)),
+            cs.new_variable(BLSScalar::from_u32(1)),
+            cs.new_variable(BLSScalar::from_u32(80)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(30)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_ok());
+
+        // Test case 8: error
+        // More assets, with more than enough fees, but are not spent properly
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (0, 2, 1, 2, 1234)
+        let in_types = [
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 8 + 100)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 8 + 100)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        // asset_types = (2, 1, 1, 2, 0, 0, 2, 1234)
+        let out_types = [
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(zero),
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (40, 9, 1, 80, 50, 10, 30, 10)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(40)),
+            cs.new_variable(BLSScalar::from_u32(9)),
+            cs.new_variable(BLSScalar::from_u32(1)),
+            cs.new_variable(BLSScalar::from_u32(80)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(30)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+
+        // Test case 9: error
+        // More assets, with insufficient fees, case 1: no output of the fee type
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (0, 2, 1, 2, 1234)
+        let in_types = [
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 7 - 2)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 7 - 2)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        // asset_types = (2, 1, 1, 2, 0, 0, 2)
+        let out_types = [
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(zero),
+            cs.new_variable(zero),
+            cs.new_variable(two),
+        ];
+        // amounts = (40, 9, 1, 80, 50, 10, 30)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(40)),
+            cs.new_variable(BLSScalar::from_u32(9)),
+            cs.new_variable(BLSScalar::from_u32(1)),
+            cs.new_variable(BLSScalar::from_u32(80)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(30)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+
+        // Test case 10: error
+        // More assets, with insufficient fees, case 2: with output of the fee type
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (0, 2, 1, 2, 1234)
+        let in_types = [
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 8)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 8)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        // asset_types = (2, 1, 1, 2, 0, 0, 2, 1234)
+        let out_types = [
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(zero),
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (40, 9, 1, 80, 50, 10, 30, 2)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(40)),
+            cs.new_variable(BLSScalar::from_u32(9)),
+            cs.new_variable(BLSScalar::from_u32(1)),
+            cs.new_variable(BLSScalar::from_u32(80)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(30)),
+            cs.new_variable(BLSScalar::from_u32(2)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+
+        // Test case 11: error
+        // More assets, with insufficient fees, case 3: with output of the fee type, fees not exact
+        let mut cs = TurboPlonkConstraintSystem::new();
+        // asset_types = (0, 2, 1, 2, 1234)
+        let in_types = [
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 8)
+        let in_amounts = [
+            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 8 + 1)),
+        ];
+        let inputs: Vec<(VarIndex, VarIndex)> = in_types
+            .iter()
+            .zip(in_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        // asset_types = (2, 1, 1, 2, 0, 0, 2, 1234)
+        let out_types = [
+            cs.new_variable(two),
+            cs.new_variable(one),
+            cs.new_variable(one),
+            cs.new_variable(two),
+            cs.new_variable(zero),
+            cs.new_variable(zero),
+            cs.new_variable(two),
+            cs.new_variable(fee_type),
+        ];
+        // amounts = (40, 9, 1, 80, 50, 10, 30, 2)
+        let out_amounts = [
+            cs.new_variable(BLSScalar::from_u32(40)),
+            cs.new_variable(BLSScalar::from_u32(9)),
+            cs.new_variable(BLSScalar::from_u32(1)),
+            cs.new_variable(BLSScalar::from_u32(80)),
+            cs.new_variable(BLSScalar::from_u32(50)),
+            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from_u32(30)),
+            cs.new_variable(BLSScalar::from_u32(2)),
+        ];
+        let outputs: Vec<(VarIndex, VarIndex)> = out_types
+            .iter()
+            .zip(out_amounts.iter())
+            .map(|(&asset_type, &amount)| (asset_type, amount))
+            .collect();
+
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness, &[]).is_err());
+
+        // Test case 12: error
         // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
+        // Missing output for an input type.
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (1, 0, 1, 2)
         let in_types = [
@@ -986,10 +1611,13 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-        asset_mixing(&mut cs, &inputs, &outputs);
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
+        // Test case 13: error
+        // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
+        // Missing input for an output type.
         let mut cs = TurboPlonkConstraintSystem::new();
         // asset_types = (1, 0, 1)
         let in_types = [
@@ -1025,45 +1653,74 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-        asset_mixing(&mut cs, &inputs, &outputs);
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }
 
     #[test]
     fn test_eq_committed_vals_cs() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        // compute Rescue commitment
-        let comm = HashCommitment::new();
+        let mut rng = ChaChaRng::from_seed([0u8; 32]);
+        let pc_gens =
+            PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+
+        // 1. compute the parameters
         let amount = BLSScalar::from_u32(71);
         let asset_type = BLSScalar::from_u32(52);
-        let blind_hash = BLSScalar::random(&mut prng);
-        let hash_comm = comm.commit(&blind_hash, &[amount, asset_type]).unwrap();
 
-        // compute Pedersen commitment
-        let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
-        let amount_jj = JubjubScalar::from_u32(71);
-        let at_jj = JubjubScalar::from_u32(52);
-        let blind_pc = JubjubScalar::random(&mut prng);
-        let ped_comm = pc_gens_jubjub
-            .commit(&[amount_jj, at_jj], &blind_pc)
-            .unwrap(); // safe unwrap
+        let x = RistrettoScalar::from_le_bytes(&amount.to_bytes()).unwrap();
+        let y = RistrettoScalar::from_le_bytes(&asset_type.to_bytes()).unwrap();
+
+        let gamma = RistrettoScalar::random(&mut rng);
+        let delta = RistrettoScalar::random(&mut rng);
+
+        let point_p = pc_gens.commit(&[x], &gamma).unwrap();
+        let point_q = pc_gens.commit(&[y], &delta).unwrap();
+
+        let z_randomizer = BLSScalar::random(&mut rng);
+        let z_instance = RescueInstance::<BLSScalar>::new();
+
+        let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
+        let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
+
+        let z = z_instance.rescue_hash(&[
+            z_randomizer,
+            x_in_bls12_381,
+            y_in_bls12_381,
+            BLSScalar::zero(),
+        ])[0];
+
+        // 2. compute the ZK part of the proof
+        let (proof, non_zk_state, beta) = prove_pc_eq_rescue_external(
+            &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
+        )
+        .unwrap();
 
         // compute cs
         let (mut cs, _) = build_eq_committed_vals_cs(
             amount,
             asset_type,
-            BLSScalar::from(&blind_pc),
-            blind_hash,
-            &pc_gens_jubjub,
+            z_randomizer,
+            &proof,
+            &non_zk_state,
+            &beta,
         );
         let witness = cs.get_and_clear_witness();
-        let mut pub_inputs = vec![hash_comm, ped_comm.get_x(), ped_comm.get_y()];
+
+        let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
+        online_inputs.push(z);
+        online_inputs.push(proof.non_zk_part_state_commitment);
+        let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+        let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_1.to_bytes()));
+        let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_2.to_bytes()));
+        online_inputs.extend_from_slice(&beta_sim_fr.limbs);
+        online_inputs.extend_from_slice(&s1_sim_fr.limbs);
+        online_inputs.extend_from_slice(&s2_sim_fr.limbs);
 
         // Check the constraints
-        assert!(cs.verify_witness(&witness, &pub_inputs).is_ok());
-        pub_inputs[0].add_assign(&BLSScalar::one());
-        assert!(cs.verify_witness(&witness, &pub_inputs).is_err());
+        assert!(cs.verify_witness(&witness, &online_inputs).is_ok());
+        online_inputs[0].add_assign(&BLSScalar::one());
+        assert!(cs.verify_witness(&witness, &online_inputs).is_err());
     }
 
     #[test]
@@ -1214,7 +1871,7 @@ pub(crate) mod tests {
                 [0];
 
         // compute the constraints
-        let path = MTPath::new(vec![path_node1, path_node2]);
+        let path = MTPath::new(vec![path_node2, path_node1]);
         let path_vars = add_merkle_path_variables(&mut cs, path);
         let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
 
@@ -1276,26 +1933,39 @@ pub(crate) mod tests {
 
     #[test]
     fn test_build_multi_xfr_cs() {
+        // Fee type
+        let fee_type = BLSScalar::from_u32(1234u32);
+
+        // Fee function
+        // base fee 5, every input 1, every output 2
+        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
+
         // single-asset xfr: good witness
         let zero = BLSScalar::zero();
         let inputs = vec![
             (/*amount=*/ 30, /*asset_type=*/ zero),
-            (20, zero),
-            (10, zero),
+            (30, zero),
+            (5 + 3 + 2 * 3, fee_type),
         ];
         let mut outputs = vec![(19, zero), (17, zero), (24, zero)];
-        test_xfr_cs(inputs.to_vec(), outputs.to_vec(), true);
+        test_xfr_cs(
+            inputs.to_vec(),
+            outputs.to_vec(),
+            true,
+            fee_type,
+            &fee_calculating_func,
+        );
 
         // single-asset xfr: bad witness
-        outputs[0].0 = 18;
-        test_xfr_cs(inputs, outputs, false);
+        outputs[2].0 = 5 + 3 + 2 * 3 - 1;
+        test_xfr_cs(inputs, outputs, false, fee_type, &fee_calculating_func);
 
         // multi-assets xfr: good witness
         let one = BLSScalar::one();
         let inputs = vec![
-            (/*amount=*/ 50, /*asset_type=*/ zero),
+            (/*amount=*/ 70, /*asset_type=*/ zero),
             (60, one),
-            (20, zero),
+            (5 + 3 + 2 * 7 + 100, fee_type),
         ];
         let mut outputs = vec![
             (19, one),
@@ -1304,24 +1974,34 @@ pub(crate) mod tests {
             (35, zero),
             (20, zero),
             (40, one),
+            (100, fee_type),
         ];
-        test_xfr_cs(inputs.to_vec(), outputs.to_vec(), true);
+        test_xfr_cs(
+            inputs.to_vec(),
+            outputs.to_vec(),
+            true,
+            fee_type,
+            &fee_calculating_func,
+        );
 
         // multi-assets xfr: bad witness
-        outputs[0].0 = 18;
-        test_xfr_cs(inputs, outputs, false);
+        outputs[2].0 = 5 + 3 + 2 * 7 + 100 - 1;
+        test_xfr_cs(inputs, outputs, false, fee_type, &fee_calculating_func);
     }
 
     fn test_xfr_cs(
         inputs: Vec<(u64, BLSScalar)>,
         outputs: Vec<(u64, BLSScalar)>,
         witness_is_valid: bool,
+        fee_type: BLSScalar,
+        fee_calculating_func: &dyn Fn(u32, u32) -> u32,
     ) {
         let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [0u8; 32]);
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
 
         // check the constraints
-        let (mut cs, _) = build_multi_xfr_cs(secret_inputs);
+        let (mut cs, _) =
+            build_multi_xfr_cs(secret_inputs, fee_type, fee_calculating_func);
         let witness = cs.get_and_clear_witness();
         let online_inputs = pub_inputs.to_vec();
         let verify = cs.verify_witness(&witness, &online_inputs);

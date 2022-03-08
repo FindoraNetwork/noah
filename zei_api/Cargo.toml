@@ -2,7 +2,7 @@
 name = "zei"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
-edition = "2018"
+edition = "2021"
 description = "Zei Platform Interface"
 
 [[bin]]
@@ -15,7 +15,6 @@ crate-type = ["rlib"]
 
 [dependencies]
 algebra = { path = "../algebra" }
-boolinator = "2.4.0"
 bulletproofs = { package = "bulletproofs", git = "https://github.com/FindoraNetwork/bp", branch = "batch_verification", features = ["yoloproofs"] }
 crypto = { path = "../crypto" }
 curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
@@ -37,15 +36,20 @@ poly-iops = { path = "../poly-iops" }
 structopt = "0.3.17"
 bincode = "1.3.1"
 ruc = "1.0"
+num-integer = { version = "0.1.43" }
+num-traits = { version = "0.2.12" }
+num-bigint = { version = "0.3.0", features = ["rand"] }
 
 [dev-dependencies]
+accumulators = { path = "../accumulators" }
 bit-array = "0.4.3"
 criterion = "0.3.1"
 lazy_static = "1.4.0"
 rand = { version = "0.7", default-features = false }
 serde_json = "1.0"
 typenum = "1.11.2"
-bench-utils = { path = "../bench-utils" }
+storage = { git = "https://github.com/FindoraNetwork/storage.git", tag = "v0.1.4" }
+parking_lot = "0.11.1"
 
 [features]
 default = ["std", "u64_backend"]
@@ -55,7 +59,7 @@ nightly = ["curve25519-dalek/nightly", "rand/nightly"]
 u64_backend = ["curve25519-dalek/u64_backend"]
 u32_backend = ["curve25519-dalek/u32_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-
+asm = [ "algebra/asm" ]
 
 [[bench]]
 name = "xfr_note_idtracking_assettracking_singleasset_time"

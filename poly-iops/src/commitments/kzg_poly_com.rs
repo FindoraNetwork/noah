@@ -3,9 +3,7 @@ use crate::commitments::pcs::{
 };
 use crate::polynomials::field_polynomial::FpPolynomial;
 use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
-use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic};
-use algebra::multi_exp::MultiExp;
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, One, Pairing, Scalar, ScalarArithmetic};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -41,7 +39,7 @@ use utils::errors::ZeiError;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KZGCommitment<G> {
-    value: G,
+    pub value: G,
 }
 impl<'a, G> ToBytes for KZGCommitment<G>
 where
@@ -142,8 +140,8 @@ impl<G: Group> ToBytes for KZGEvalProof<G> {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KZGCommitmentScheme<P: Pairing> {
-    public_parameter_group_1: Vec<P::G1>,
-    public_parameter_group_2: Vec<P::G2>,
+    pub public_parameter_group_1: Vec<P::G1>,
+    pub public_parameter_group_2: Vec<P::G2>,
 }
 
 impl<P: Pairing> KZGCommitmentScheme<P> {
@@ -161,6 +159,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
         let mut elem_g1 = P::G1::get_base();
 
         for _ in 0..max_degree + 1 {
+            //for _ in 0..max_degree + 1 {
             public_parameter_group_1.push(elem_g1.clone());
             elem_g1 = elem_g1.mul(&s);
         }
@@ -341,8 +340,7 @@ mod tests_kzg_impl {
         KZGCommitmentScheme, KZGCommitmentSchemeBLS,
     };
     use crate::commitments::pcs::{HomomorphicPolyComElem, PolyComScheme};
-    use algebra::groups::Group;
-    use algebra::pairing::Pairing;
+    use algebra::groups::{Group, Pairing};
 
     use crate::polynomials::field_polynomial::FpPolynomial;
     use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
@@ -386,6 +384,16 @@ mod tests_kzg_impl {
             elem_next_group_2_target_recomputed,
             elem_next_group_2_target
         );
+    }
+
+    //This test is only for check the size of the CRS which is n + 3
+    //it's g1, g2, s[g2] and s[g1],...,s^n[g1]
+    fn _generation_of_crs<P: Pairing>() {
+        let n = 1 << 5;
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let kzg_scheme = KZGCommitmentScheme::<P>::new(n, &mut prng);
+        assert_eq!(kzg_scheme.public_parameter_group_1.len(), n + 1);
+        assert_eq!(kzg_scheme.public_parameter_group_2.len(), 2);
     }
 
     #[test]
@@ -437,6 +445,11 @@ mod tests_kzg_impl {
     #[test]
     fn test_public_parameters() {
         _check_public_parameters_generation::<Bls12381>();
+    }
+
+    #[test]
+    fn test_generation_of_crs() {
+        _generation_of_crs::<Bls12381>();
     }
 
     #[test]

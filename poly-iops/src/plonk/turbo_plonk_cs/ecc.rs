@@ -78,7 +78,7 @@ fn compute_base_multiples(base: JubjubPoint, n: usize) -> Vec<Vec<JubjubPoint>> 
     for i in 0..n {
         let point2 = point.double();
         let point3 = point2.add(&point);
-        bases[0].push(point.clone());
+        bases[0].push(point);
         bases[2].push(point3);
         if i < n - 1 {
             point = point2.double();
@@ -166,7 +166,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
         self.size += 1;
     }
 
-    /// Given two elliptic curve point variables [P1] and [P2], returns [P1] + [P2]
+    /// Given two elliptic curve point variables `[P1]` and `[P2]`, returns `[P1] + [P2]`
     pub fn ecc_add(
         &mut self,
         p1_var: &PointVar,
@@ -206,9 +206,9 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
         let y = self.select(point0_var.1, point1_var.1, bit);
         let res_point_var = PointVar(x, y);
         if self.witness[bit].is_zero() {
-            ExtendedPointVar(res_point_var, point0.1.clone())
+            ExtendedPointVar(res_point_var, point0.1)
         } else {
-            ExtendedPointVar(res_point_var, point1.1.clone())
+            ExtendedPointVar(res_point_var, point1.1)
         }
     }
 
@@ -240,9 +240,9 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
         let p_out_ext: JubjubPoint =
             match (self.witness[b0_var] == one, self.witness[b1_var] == one) {
                 (false, false) => JubjubPoint::get_identity(),
-                (true, false) => G1.clone(),
-                (false, true) => G2.clone(),
-                (true, true) => G3.clone(),
+                (true, false) => *G1,
+                (false, true) => *G2,
+                (true, true) => *G3,
             };
         let p_out_var = self.new_point_variable(Point::from(&p_out_ext));
 
@@ -306,7 +306,7 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
     }
 
     ///  Fixed-base scalar multiplication:
-    ///  Given a base point [G] and an `n_bits`-bit secret scalar s, returns s * [G].
+    ///  Given a base point `[G]` and an `n_bits`-bit secret scalar `s`, returns `s * [G]`.
     /// `n_bits` should be a positive even number.
     pub fn scalar_mul(
         &mut self,
@@ -324,14 +324,19 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
     }
 
     /// Fixed-base scalar multiplication with precomputed bases.
-    /// To compute s[G] from base point G and secret scalar s, we set
+    /// To compute `s[G]` from base point G and secret scalar s, we set
+    /// ```text
     /// bases0 = [identity]_{i=0..n-1},
     /// bases1 = [4^i * G]_{i=0..n-1},
     /// bases2 = [2 * 4^i * G]_{i=0..n-1}
     /// bases3 = [3 * 4^i * G]_{i=0..n-1}
-    /// The binary representation of the secret scalar s: [b0, ..., b_{2*n-1}]
-    /// Then s[G] = \sum_{i=0..n-1} (b_{2*i} + 2 * b_{2*i+1}) * [4^i * G]
+    /// ```
+    /// The binary representation of the secret scalar s: `[b0, ..., b_{2*n-1}]`
+    /// Then
+    /// ```text
+    /// s[G] = \sum_{i=0..n-1} (b_{2*i} + 2 * b_{2*i+1}) * [4^i * G]
     ///           = \sum_{i=0..n-1} bases_{b_{2*i} + 2 * b_{2*i+1}}[i]
+    /// ```
     pub fn scalar_mul_with_bases(
         &mut self,
         bases1: &[JubjubPoint],

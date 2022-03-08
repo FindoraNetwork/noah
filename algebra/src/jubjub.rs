@@ -1,103 +1,144 @@
-use crate::bls12_381::BLSScalar;
-use crate::errors::AlgebraError;
-use crate::groups::GroupArithmetic;
-use crate::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
-use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
-use digest::generic_array::typenum::U64;
-use digest::Digest;
-use ff::Field;
-use group::Group as _;
-use jubjub::{AffinePoint, ExtendedPoint, Fr};
+use crate::{
+    bls12_381::BLSScalar,
+    errors::AlgebraError,
+    groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero},
+};
+use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ed_on_bls12_381::{
+    EdwardsAffine as AffinePoint, EdwardsProjective as ExtendedPoint, Fr,
+};
+use ark_ff::{BigInteger, Field, PrimeField};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+    ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
+    rand::{CryptoRng, RngCore},
+    One as ArkOne, UniformRand, Zero as ArkZero,
+};
+use digest::{generic_array::typenum::U64, Digest};
 use rand_chacha::ChaCha20Rng;
-use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use std::convert::TryInto;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
 pub struct JubjubScalar(pub(crate) Fr);
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct JubjubPoint(pub(crate) ExtendedPoint);
 
 impl Default for JubjubPoint {
+    #[inline]
     fn default() -> Self {
-        JubjubPoint::get_base()
+        // Note: Arkworks-rs library's deafult is point of infinity,
+        // here we use the base point.
+        Self::get_base()
     }
 }
 
-impl Default for JubjubScalar {
-    fn default() -> Self {
-        JubjubScalar::zero()
+impl Hash for JubjubPoint {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_string().as_bytes().hash(state)
+    }
+}
+
+impl Ord for JubjubPoint {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0
+            .to_string()
+            .as_bytes()
+            .cmp(other.0.to_string().as_bytes())
+    }
+}
+
+impl PartialOrd for JubjubPoint {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
 pub const JUBJUB_SCALAR_LEN: usize = 32;
 
 impl One for JubjubScalar {
-    fn one() -> JubjubScalar {
-        JubjubScalar(Fr::one())
+    #[inline]
+    fn one() -> Self {
+        Self(Fr::one())
     }
 }
 
 impl Zero for JubjubScalar {
-    fn zero() -> JubjubScalar {
-        JubjubScalar(Fr::zero())
+    #[inline]
+    fn zero() -> Self {
+        Self(Fr::zero())
     }
 
+    #[inline]
     fn is_zero(&self) -> bool {
         self.0.eq(&Fr::zero())
     }
 }
 
 impl ScalarArithmetic for JubjubScalar {
-    fn add(&self, b: &JubjubScalar) -> JubjubScalar {
-        JubjubScalar(self.0.add(&b.0))
+    #[inline]
+    fn add(&self, b: &Self) -> Self {
+        Self(self.0.add(&b.0))
     }
 
-    fn add_assign(&mut self, b: &JubjubScalar) {
+    #[inline]
+    fn add_assign(&mut self, b: &Self) {
         (self.0).add_assign(&b.0);
     }
 
-    fn mul(&self, b: &JubjubScalar) -> JubjubScalar {
-        JubjubScalar(self.0.mul(&b.0))
+    #[inline]
+    fn mul(&self, b: &Self) -> Self {
+        Self(self.0.mul(&b.0))
     }
 
-    fn mul_assign(&mut self, b: &JubjubScalar) {
+    #[inline]
+    fn mul_assign(&mut self, b: &Self) {
         (self.0).mul_assign(&b.0);
     }
 
-    fn sub(&self, b: &JubjubScalar) -> JubjubScalar {
-        JubjubScalar(self.0.sub(&b.0))
+    #[inline]
+    fn sub(&self, b: &Self) -> Self {
+        Self(self.0.sub(&b.0))
     }
 
-    fn sub_assign(&mut self, b: &JubjubScalar) {
+    #[inline]
+    fn sub_assign(&mut self, b: &Self) {
         (self.0).sub_assign(&b.0);
     }
 
-    fn inv(&self) -> Result<JubjubScalar> {
-        let a = self.0.invert();
-        if bool::from(a.is_none()) {
+    #[inline]
+    fn inv(&self) -> Result<Self> {
+        let a = self.0.inverse();
+        if a.is_none() {
             return Err(eg!(AlgebraError::GroupInversionError));
         }
-        Ok(JubjubScalar(a.unwrap()))
+        Ok(Self(a.unwrap()))
     }
 }
 
 impl Scalar for JubjubScalar {
-    // scalar generation
-    fn random<R: CryptoRng + RngCore>(rng: &mut R) -> JubjubScalar {
-        JubjubScalar(Fr::random(rng))
+    #[inline]
+    fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        Self(Fr::rand(rng))
     }
 
-    fn from_u32(value: u32) -> JubjubScalar {
+    #[inline]
+    fn from_u32(value: u32) -> Self {
         Self::from_u64(value as u64)
     }
 
-    fn from_u64(value: u64) -> JubjubScalar {
-        JubjubScalar(Fr::from(value))
+    #[inline]
+    fn from_u64(value: u64) -> Self {
+        Self(Fr::from(value))
     }
 
-    fn from_hash<D>(hash: D) -> JubjubScalar
+    #[inline]
+    fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default,
     {
@@ -105,11 +146,12 @@ impl Scalar for JubjubScalar {
         Self::random(&mut prng)
     }
 
+    #[inline]
     fn multiplicative_generator() -> Self {
         Self::from_u64(6)
     }
 
-    // scalar field size
+    #[inline]
     fn get_field_size_lsf_bytes() -> Vec<u8> {
         [
             183, 44, 247, 214, 94, 14, 151, 208, 130, 16, 200, 204, 147, 32, 104, 166,
@@ -118,8 +160,9 @@ impl Scalar for JubjubScalar {
         .to_vec()
     }
 
+    #[inline]
     fn get_little_endian_u64(&self) -> Vec<u64> {
-        let a = self.0.to_bytes();
+        let a = self.0.into_repr().to_bytes_le();
         let a1 = u8_le_slice_to_u64(&a[0..8]);
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
@@ -127,28 +170,26 @@ impl Scalar for JubjubScalar {
         vec![a1, a2, a3, a4]
     }
 
+    #[inline]
     fn bytes_len() -> usize {
         JUBJUB_SCALAR_LEN
     }
-    //scalar serialization
+
+    #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        (self.0).to_bytes().to_vec()
+        (self.0).into_repr().to_bytes_le()
     }
 
-    fn from_bytes(bytes: &[u8]) -> Result<JubjubScalar> {
+    #[inline]
+    fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != JUBJUB_SCALAR_LEN {
             return Err(eg!(AlgebraError::ParameterError));
         }
-        let mut array = [0u8; 32];
-        array.copy_from_slice(bytes);
-        let scalar = Fr::from_bytes(&array);
-        if bool::from(scalar.is_none()) {
-            return Err(eg!(AlgebraError::SerializationError));
-        }
-        Ok(JubjubScalar(scalar.unwrap()))
+        Ok(Self(Fr::from_le_bytes_mod_order(bytes)))
     }
 
-    fn from_le_bytes(bytes: &[u8]) -> Result<JubjubScalar> {
+    #[inline]
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
             return Err(eg!(AlgebraError::DeserializationError));
         }
@@ -161,86 +202,112 @@ impl Scalar for JubjubScalar {
 impl Eq for JubjubPoint {}
 
 impl JubjubPoint {
-    pub fn mul_by_cofactor(&self) -> JubjubPoint {
-        JubjubPoint(self.0.mul_by_cofactor())
+    #[inline]
+    pub fn mul_by_cofactor(&self) -> Self {
+        Self(self.0.into_affine().mul_by_cofactor_to_projective())
     }
 }
 
 impl Group for JubjubPoint {
     const COMPRESSED_LEN: usize = 32;
 
-    fn get_identity() -> JubjubPoint {
-        JubjubPoint(ExtendedPoint::identity())
+    #[inline]
+    fn get_identity() -> Self {
+        Self(ExtendedPoint::zero())
     }
 
-    fn get_base() -> JubjubPoint {
-        JubjubPoint(ExtendedPoint::generator().mul_by_cofactor())
+    #[inline]
+    fn get_base() -> Self {
+        Self(ExtendedPoint::prime_subgroup_generator())
     }
 
+    #[inline]
+    fn get_random_base<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        Self(ExtendedPoint::rand(rng))
+    }
+
+    #[inline]
     fn to_compressed_bytes(&self) -> Vec<u8> {
-        AffinePoint::from(&self.0).to_bytes().to_vec()
+        let mut buf = Vec::new();
+        self.0.serialize(&mut buf).unwrap();
+
+        buf
     }
 
+    #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = AffinePoint::from_bytes(
-            bytes[..Self::COMPRESSED_LEN]
-                .try_into()
-                .map_err(|_| eg!(AlgebraError::DecompressElementError))?,
-        );
-        if affine.is_some().into() {
-            Ok(JubjubPoint(ExtendedPoint::from(affine.unwrap()))) // safe unwrap
+        let mut reader = ark_std::io::BufReader::new(bytes);
+
+        let affine = AffinePoint::deserialize(&mut reader);
+
+        if let Ok(affine) = affine {
+            Ok(Self(ExtendedPoint::from(affine))) // safe unwrap
         } else {
             Err(eg!(AlgebraError::DecompressElementError))
         }
     }
 
-    fn from_hash<D>(hash: D) -> JubjubPoint
+    #[inline]
+    fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
-        JubjubPoint(ExtendedPoint::random(&mut prng).mul_by_cofactor())
+        let point = UniformRand::rand(&mut prng);
+        Self(point)
     }
 }
 
 impl GroupArithmetic for JubjubPoint {
     type S = JubjubScalar;
-    //arithmetic
-    fn mul(&self, scalar: &JubjubScalar) -> JubjubPoint {
-        JubjubPoint(self.0 * scalar.0)
+
+    #[inline]
+    fn mul(&self, scalar: &JubjubScalar) -> Self {
+        Self(self.0.mul(&scalar.0.into_repr()))
     }
-    fn add(&self, other: &Self) -> JubjubPoint {
-        JubjubPoint(self.0 + other.0)
+
+    #[inline]
+    fn add(&self, other: &Self) -> Self {
+        Self(self.0 + other.0)
     }
-    fn sub(&self, other: &Self) -> JubjubPoint {
-        JubjubPoint(self.0 - other.0)
+
+    #[inline]
+    fn sub(&self, other: &Self) -> Self {
+        Self(self.0 - other.0)
     }
-    fn double(&self) -> JubjubPoint {
-        JubjubPoint(self.0.double())
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
     }
 }
 
 impl JubjubPoint {
     /// Get the x-coordinate of the Jubjub affine point.
+    #[inline]
     pub fn get_x(&self) -> BLSScalar {
-        let affine_point = AffinePoint::from(&self.0);
-        BLSScalar::new(affine_point.get_u())
+        let affine_point = AffinePoint::from(self.0);
+        BLSScalar::new(affine_point.x)
     }
     /// Get the y-coordinate of the Jubjub affine point.
+    #[inline]
     pub fn get_y(&self) -> BLSScalar {
-        let affine_point = AffinePoint::from(&self.0);
-        BLSScalar::new(affine_point.get_v())
+        let affine_point = AffinePoint::from(self.0);
+        BLSScalar::new(affine_point.y)
     }
 }
 
 #[cfg(test)]
 mod jubjub_groups_test {
-    use crate::groups::group_tests::{
-        test_scalar_operations, test_scalar_serialization,
+    use crate::{
+        groups::{
+            group_tests::{test_scalar_operations, test_scalar_serialization},
+            Group, GroupArithmetic, Scalar, ScalarArithmetic,
+        },
+        jubjub::{JubjubPoint, JubjubScalar},
     };
-    use crate::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-    use crate::jubjub::{JubjubPoint, JubjubScalar};
-    use rand_core::SeedableRng;
+    use ark_std::rand::SeedableRng;
+    use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_scalar_ops() {
@@ -269,9 +336,7 @@ mod jubjub_groups_test {
 
     #[test]
     fn schnorr_identification_protocol() {
-        // PRNG
-        let seed = [0_u8; 32];
-        let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
+        let mut rng = ChaCha20Rng::from_entropy();
 
         // Private key
         let alpha = JubjubScalar::random(&mut rng);

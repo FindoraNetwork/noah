@@ -1,28 +1,27 @@
-//The Public Setup needed for Proofs
+// The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, TurboPlonkCS,
-    TREE_DEPTH,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayerSecret,
+    TurboPlonkCS, TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
+
+use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
+use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
+use crate::anon_xfr::parameters::{RISTRETTO_SRS, SRS};
+use crate::anon_xfr::structs::{MTNode, MTPath};
 use algebra::groups::Zero;
-use algebra::jubjub::JubjubPoint;
+use algebra::jubjub::JubjubScalar;
+use algebra::ristretto::RistrettoScalar;
 use bulletproofs::BulletproofGens;
-use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use poly_iops::commitments::kzg_poly_com::{
-    KZGCommitmentScheme, KZGCommitmentSchemeBLS,
-};
+use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
+use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
 use poly_iops::plonk::plonk_setup::{preprocess_prover, ProverParams, VerifierParams};
-use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
 use ruc::*;
 use serde::Deserialize;
-use std::fs;
-use std::path::PathBuf;
 use utils::errors::ZeiError;
-use utils::save_to_file;
 
-//Shared by all members of the ledger
+// Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]
 pub struct PublicParams {
     pub bp_gens: BulletproofGens,
@@ -47,62 +46,15 @@ pub struct NodeParams {
 }
 
 pub const BULLET_PROOF_RANGE: usize = 32;
-
-pub const DEFAULT_BP_NUM_GENS: usize = 256;
-
 pub const MAX_PARTY_NUMBER: usize = 128;
-
 const COMMON_SEED: [u8; 32] = [0u8; 32];
 
-fn from_file<T: for<'de> Deserialize<'de>>(filename: &str) -> Result<T> {
-    let contents = fs::read(filename).c(d!(ZeiError::ParameterError))?;
-    bincode::deserialize(&contents).c(d!(ZeiError::DeserializationError))
-}
-
-#[allow(clippy::new_without_default)]
 impl PublicParams {
-    pub fn new(bp_num_gens: usize) -> PublicParams {
-        //Create a new BulletproofGens generators
-        let range_generators =
-            BulletproofGens::new(BULLET_PROOF_RANGE, MAX_PARTY_NUMBER);
-        let circuit_generators = BulletproofGens::new(bp_num_gens, 1);
-        // Pedersen commitment parameters
-        let pc_gens = RistrettoPedersenGens::default();
-
-        PublicParams {
-            bp_gens: range_generators,
-            bp_circuit_gens: circuit_generators,
-            pc_gens,
-            range_proof_bits: BULLET_PROOF_RANGE,
-        }
-    }
-
-    pub fn from_file(filename: &str) -> Result<PublicParams> {
-        from_file::<PublicParams>(filename).c(d!())
-    }
-
-    /// Generate the parameters from a file if it exists.
-    /// The filename is derived from some internal path and the values of `bp_num_gens`
-    /// Otherwise it generates the parameters and store them on disk so that these parameters can be retrieved later.
-    /// * `bp_num_gens` - number of generators for the circuit.
-    /// * `path` - name of the file where the parameters are stored. If set to None, a hardcoded filename will be used.
-    /// * `returns` the public parameters
-    ///
-    pub fn from_file_if_exists(
-        bp_num_gens: usize,
-        path: Option<String>,
-    ) -> PublicParams {
-        let default_filename = format!("public_params_{}.bin", bp_num_gens);
-        let default_filename = compute_full_path_from_root(&default_filename);
-        let full_filename = path.unwrap_or(default_filename);
-
-        let public_params = Self::from_file(&full_filename).unwrap_or_else(|_| {
-            let res = Self::new(bp_num_gens);
-            let res_ser = bincode::serialize(&res).unwrap(); // safe unwrap PublicParam serialization tested
-            save_to_file(&res_ser, PathBuf::from(full_filename));
-            res
-        });
-        public_params
+    pub fn new() -> PublicParams {
+        let pp: PublicParams = bincode::deserialize(&RISTRETTO_SRS)
+            .c(d!(ZeiError::DeserializationError))
+            .unwrap();
+        pp
     }
 
     /// Has no effect if new_size.next_power_of_two() is less or equal than current capacity
@@ -114,7 +66,7 @@ impl PublicParams {
 
 impl Default for PublicParams {
     fn default() -> Self {
-        PublicParams::new(DEFAULT_BP_NUM_GENS)
+        PublicParams::new()
     }
 }
 
@@ -123,23 +75,27 @@ impl UserParams {
         n_payers: usize,
         n_payees: usize,
         tree_depth: Option<usize>,
-        bp_num_gens: usize,
     ) -> UserParams {
-        let (cs, n_constraints) = match tree_depth {
-            Some(depth) => {
-                build_multi_xfr_cs(AMultiXfrWitness::fake(n_payers, n_payees, depth))
-            }
-            None => build_multi_xfr_cs(AMultiXfrWitness::fake(
-                n_payers, n_payees, TREE_DEPTH,
-            )),
+        let (cs, _) = match tree_depth {
+            Some(depth) => build_multi_xfr_cs(
+                AMultiXfrWitness::fake(n_payers, n_payees, depth),
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
+            ),
+            None => build_multi_xfr_cs(
+                AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
+                FEE_TYPE.as_scalar(),
+                &FEE_CALCULATING_FUNC,
+            ),
         };
-        let pcs = KZGCommitmentScheme::new(
-            n_constraints + 2,
-            &mut ChaChaRng::from_seed([0u8; 32]),
-        );
+
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+            .c(d!(ZeiError::DeserializationError))
+            .unwrap();
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+
         UserParams {
-            bp_params: PublicParams::new(bp_num_gens),
+            bp_params: PublicParams::new(),
             pcs,
             cs,
             prover_params,
@@ -148,58 +104,60 @@ impl UserParams {
 
     pub fn eq_committed_vals_params() -> UserParams {
         let zero = BLSScalar::zero();
-        let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
-        let (cs, n_constraints) =
-            build_eq_committed_vals_cs(zero, zero, zero, zero, &pc_gens_jubjub);
-        let pcs = KZGCommitmentScheme::new(
-            n_constraints + 2,
-            &mut ChaChaRng::from_seed([0u8; 32]),
-        );
+        let proof = ZKPartProof::default();
+        let non_zk_state = NonZKState::default();
+        let beta = RistrettoScalar::zero();
+        let (cs, _) =
+            build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
+
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+            .c(d!(ZeiError::DeserializationError))
+            .unwrap();
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
         UserParams {
-            bp_params: PublicParams::new(DEFAULT_BP_NUM_GENS),
+            bp_params: PublicParams::new(),
             pcs,
             cs,
             prover_params,
         }
     }
 
-    pub fn from_file(filename: &str) -> Result<UserParams> {
-        from_file::<UserParams>(filename).c(d!())
-    }
+    pub fn abar_to_bar_params(tree_depth: usize) -> UserParams {
+        let bls_zero = BLSScalar::zero();
+        let jubjub_zero = JubjubScalar::zero();
 
-    /// Generate the parameters from a file if it exists.
-    /// The filename is derived from some internal path and the values of `n_payers`,`n_payees`,`tree_depth`and `bp_num_gens`.
-    /// Otherwise it generates the parameters and store them on disk so that these parameters can be retrieved later.
-    /// * `n_payers` - number of payers
-    /// * `n_payees` - number of payeers
-    /// * `tree_depth` - depth of the merkle tree
-    /// * `bp_num_gens` - number of BP generators for the circuit
-    /// * `path` - path to retrieve the file. If set to None, a default value will be used
-    /// * `returns` the parameters for the user
-    pub fn from_file_if_exists(
-        n_payers: usize,
-        n_payees: usize,
-        tree_depth: Option<usize>,
-        bp_num_gens: usize,
-        path: Option<String>,
-    ) -> Result<UserParams> {
-        let default_filename = compute_full_path_from_root(&format!(
-            "user_params_{}_{}_{}_{}.bin",
-            n_payers,
-            n_payees,
-            tree_depth.unwrap_or(0_usize),
-            bp_num_gens
-        ));
-        let full_filename = path.unwrap_or(default_filename);
+        let proof = ZKPartProof::default();
+        let non_zk_state = NonZKState::default();
+        let beta = RistrettoScalar::zero();
 
-        let user_params = Self::from_file(&full_filename).or_else(|_| {
-            let res = Self::new(n_payers, n_payees, tree_depth, bp_num_gens);
-            let val = bincode::serialize(&res).unwrap();
-            save_to_file(&val, PathBuf::from(full_filename));
-            Ok(res)
-        });
-        user_params
+        let node = MTNode {
+            siblings1: bls_zero,
+            siblings2: bls_zero,
+            is_left_child: 0,
+            is_right_child: 0,
+        };
+        let payer_secret = PayerSecret {
+            sec_key: jubjub_zero,
+            diversifier: jubjub_zero,
+            uid: 0,
+            amount: 0,
+            asset_type: bls_zero,
+            path: MTPath::new(vec![node; tree_depth]),
+            blind: bls_zero,
+        };
+
+        let (cs, _) = build_abar_to_bar_cs(payer_secret, &proof, &non_zk_state, &beta);
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+            .c(d!(ZeiError::DeserializationError))
+            .unwrap();
+
+        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+        UserParams {
+            bp_params: PublicParams::new(),
+            pcs,
+            cs,
+            prover_params,
+        }
     }
 }
 
@@ -208,9 +166,8 @@ impl NodeParams {
         tree_depth: Option<usize>,
         n_payers: usize,
         n_payees: usize,
-        bp_num_gens: usize,
     ) -> Result<NodeParams> {
-        let user_params = UserParams::new(n_payers, n_payees, tree_depth, bp_num_gens);
+        let user_params = UserParams::new(n_payers, n_payees, tree_depth);
         Ok(Self::from(user_params))
     }
 }
@@ -226,28 +183,50 @@ impl From<UserParams> for NodeParams {
     }
 }
 
-fn compute_full_path_from_root(filename: &str) -> String {
-    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push("data");
-    d.push(filename);
-    let path = d.to_str().unwrap();
-    path.to_string()
-}
-
 #[cfg(test)]
 mod test {
-    use crate::setup::{UserParams, DEFAULT_BP_NUM_GENS};
+    use crate::anon_xfr::parameters::SRS;
+    use crate::setup::UserParams;
+    use algebra::bls12_381::{BLSScalar, BLSG1};
+    use algebra::groups::{Group, GroupArithmetic, One, ScalarArithmetic};
+    use itertools::Itertools;
+    use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
+    use poly_iops::commitments::pcs::PolyComScheme;
+    use poly_iops::polynomials::field_polynomial::FpPolynomial;
+    use ruc::RucResult;
+    use utils::errors::ZeiError;
 
     #[test]
     fn test_params_serialization() {
-        let params =
-            UserParams::from_file_if_exists(1, 1, Some(1), DEFAULT_BP_NUM_GENS, None)
-                .unwrap();
+        let params = UserParams::new(1, 1, Some(1));
 
         let v = bincode::serialize(&params).unwrap();
         let params_de: UserParams = bincode::deserialize(&v).unwrap();
-
         let v2 = bincode::serialize(&params_de).unwrap();
         assert_eq!(v, v2);
+    }
+
+    #[test]
+    fn test_crs_commit() {
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+            .c(d!(ZeiError::DeserializationError))
+            .unwrap();
+        let one = BLSScalar::one();
+        let two = one.add(&one);
+        let three = two.add(&one);
+        let six = three.add(&three);
+
+        let fq_poly = FpPolynomial::from_coefs(vec![two, three, six]);
+        let (commitment, open) = pcs.commit(fq_poly).unwrap();
+
+        let coefs_poly_blsscalar = open.get_coefs_ref().iter().collect_vec();
+        let mut expected_committed_value = BLSG1::get_identity();
+
+        // Doing the multiexp by hand
+        for (i, coef) in coefs_poly_blsscalar.iter().enumerate() {
+            let g_i = pcs.public_parameter_group_1[i].clone();
+            expected_committed_value = expected_committed_value.add(&g_i.mul(&coef));
+        }
+        assert_eq!(expected_committed_value, commitment.value);
     }
 }

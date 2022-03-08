@@ -329,9 +329,7 @@ pub mod prover {
     /// State of the transcript must match prover state of the transcript
     /// Polynomial Commitement parameters must be shared between prover and verifier.
     /// # Example
-    /// ```
-    /// // See plonk::prover::prover
-    /// ```
+    /// See plonk::prover::prover
     pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         transcript: &mut Transcript,
         pcs: &PCS,

@@ -1,4 +1,3 @@
-//use ed25519_dalek::SignatureError;
 use std::{error, fmt};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -48,6 +47,7 @@ pub enum ZeiError {
     R1CSProofError,
     NoMemoInAssetTracerMemo,
     BogusAssetTracerMemo,
+    AbarToBarParamsError,
 }
 
 impl fmt::Display for ZeiError {
@@ -57,6 +57,7 @@ impl fmt::Display for ZeiError {
       ZeiError::AXfrVerifierParamsError => "Could not preprocess anonymous transfer verifier",
       ZeiError::AXfrVerificationError => "Invalid AXfrBody for merkle root",
       ZeiError::AXfrProofError => "Could not create anonymous transfer proof",
+            ZeiError::AbarToBarParamsError => "Could not preprocess Abr2Bar conversion prover",
                   ZeiError::ArgumentVerificationError => "Proof(argument) not valid for statement",
                   ZeiError::CommitmentInputError => "The number of messages to be committed is invalid",
                   ZeiError::CommitmentVerificationError => "Commitment verification failed",
@@ -132,11 +133,3 @@ impl fmt::Display for ZeiError {
 }
 
 impl error::Error for ZeiError {}
-
-/*
-impl From<SignatureError> for ZeiError {
-  fn from(_error: SignatureError) -> Self {
-    ZeiError::SignatureError
-  }
-}
-*/

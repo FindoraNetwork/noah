@@ -7,3 +7,38 @@ members = [
  "utils",
  "zei_api",
 ]
+resolver = "2"
+
+[patch.crates-io]
+ark-ec = { git = "https://github.com/FindoraNetwork/ark-algebra" }
+ark-ff = { git = "https://github.com/FindoraNetwork/ark-algebra" }
+ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra" }
+ark-std = { git = "https://github.com/FindoraNetwork/ark-std" }
+ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
+ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
+curve25519-dalek = { git = "https://github.com/FindoraNetwork/curve25519-dalek" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+incremental = true
+panic = 'abort'
+
+[profile.bench]
+opt-level = 3
+debug = false
+rpath = false
+lto = "thin"
+incremental = true
+debug-assertions = false
+
+[profile.dev]
+opt-level = 0
+panic = 'abort'
+
+[profile.test]
+opt-level = 3
+lto = "thin"
+incremental = true
+debug-assertions = true
+debug = true

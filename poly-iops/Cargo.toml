@@ -2,7 +2,7 @@
 name = "poly-iops"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
-edition = "2018"
+edition = "2021"
 description = "Zei PLONK Poly-IOP protocol"
 
 [lib]
@@ -31,3 +31,4 @@ ruc = "1.0"
 
 [dev-dependencies]
 serde_json = "1.0"
+num-bigint = { version = "0.3", features = ["rand"] }

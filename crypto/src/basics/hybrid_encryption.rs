@@ -12,7 +12,9 @@ use serde::Serializer;
 use sha2::Digest;
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
+use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct XPublicKey {
     pub(crate) key: x25519_dalek::PublicKey,
@@ -54,6 +56,7 @@ impl PartialEq for XPublicKey {
 
 impl Eq for XPublicKey {}
 
+#[wasm_bindgen]
 #[derive(Clone)]
 pub struct XSecretKey {
     pub(crate) key: x25519_dalek::StaticSecret,

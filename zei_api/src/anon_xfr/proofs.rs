@@ -1,11 +1,15 @@
 use crate::anon_xfr::circuits::{
     build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness,
 };
+use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::setup::{NodeParams, UserParams};
 use algebra::bls12_381::BLSScalar;
-use algebra::jubjub::JubjubPoint;
-use crypto::basics::commitments::pedersen::PedersenGens;
+use algebra::groups::Scalar;
+use algebra::ristretto::RistrettoScalar;
+use crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
+use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use merlin::Transcript;
+use num_bigint::BigUint;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
 use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
 use rand_core::{CryptoRng, RngCore};
@@ -38,7 +42,10 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
         secret_inputs.payees_secrets.len() as u64,
     );
 
-    let (mut cs, _) = build_multi_xfr_cs(secret_inputs);
+    let fee_type = FEE_TYPE.as_scalar();
+    let fee_calculating_func = FEE_CALCULATING_FUNC;
+
+    let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &fee_calculating_func);
     let witness = cs.get_and_clear_witness();
 
     prover(
@@ -93,13 +100,20 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     params: &UserParams,
     amount: BLSScalar,
     asset_type: BLSScalar,
-    blind_pc: BLSScalar,
     blind_hash: BLSScalar,
-    pc_gens: &PedersenGens<JubjubPoint>,
+    proof: &ZKPartProof,
+    non_zk_state: &NonZKState,
+    beta: &RistrettoScalar,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let (mut cs, _) =
-        build_eq_committed_vals_cs(amount, asset_type, blind_pc, blind_hash, pc_gens);
+    let (mut cs, _) = build_eq_committed_vals_cs(
+        amount,
+        asset_type,
+        blind_hash,
+        proof,
+        non_zk_state,
+        beta,
+    );
     let witness = cs.get_and_clear_witness();
 
     prover(
@@ -122,11 +136,20 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
 pub(crate) fn verify_eq_committed_vals(
     params: &NodeParams,
     hash_comm: BLSScalar,
-    ped_comm: &JubjubPoint,
+    proof_zk_part: &ZKPartProof,
     proof: &AXfrPlonkPf,
+    beta: &RistrettoScalar,
 ) -> Result<()> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let online_inputs = vec![hash_comm, ped_comm.get_x(), ped_comm.get_y()];
+    let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
+    online_inputs.push(hash_comm);
+    online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
+    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+    let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof_zk_part.s_1.to_bytes()));
+    let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof_zk_part.s_2.to_bytes()));
+    online_inputs.extend_from_slice(&beta_sim_fr.limbs);
+    online_inputs.extend_from_slice(&s1_sim_fr.limbs);
+    online_inputs.extend_from_slice(&s2_sim_fr.limbs);
     verifier(
         &mut transcript,
         &params.pcs,
@@ -142,105 +165,160 @@ pub(crate) fn verify_eq_committed_vals(
 mod tests {
     use crate::anon_xfr::circuits::tests::new_multi_xfr_witness_for_test;
     use crate::anon_xfr::circuits::AMultiXfrPubInputs;
-    use crate::anon_xfr::proofs::{
-        prove_eq_committed_vals, prove_xfr, verify_eq_committed_vals, verify_xfr,
-    };
-    use crate::setup::{NodeParams, UserParams, DEFAULT_BP_NUM_GENS};
+    use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
+    use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
+    use crate::setup::{NodeParams, UserParams};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Group, GroupArithmetic, One, Scalar, Zero};
-    use algebra::jubjub::{JubjubPoint, JubjubScalar};
-    use crypto::basics::commitments::pedersen::PedersenGens;
-    use crypto::basics::commitments::rescue::HashCommitment;
+    use algebra::groups::One;
+    use rand::RngCore;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_single_asset() {
         // single asset type
-        let zero = BLSScalar::zero();
-        // (n, m) = (3, 6)
-        let inputs = vec![
-            (/*amount=*/ 30, /*asset_type=*/ zero),
-            (20, zero),
-            (10, zero),
-        ];
-        let outputs = vec![
-            (5, zero),
-            (15, zero),
-            (22, zero),
-            (11, zero),
-            (0, zero),
-            (7, zero),
-        ];
+        let fee_type = FEE_TYPE.as_scalar();
+
+        let mut rng = ChaChaRng::from_entropy();
+        let mut total_input = 50 + rng.next_u64() % 50;
+        let mut total_output = total_input;
+
+        let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
+
+        let rnd_amount = rng.next_u64();
+        let amount = rnd_amount % total_input;
+        inputs.push((amount, fee_type));
+        total_input -= amount;
+        inputs.push((total_input, fee_type));
+
+        let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
+        for _i in 1..6 {
+            let rnd_amount = rng.next_u64();
+            let amount = rnd_amount % total_output;
+            outputs.push((amount, fee_type));
+            total_output -= amount;
+        }
+        outputs.push((total_output, fee_type));
+
+        let fee_amount =
+            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        inputs.push((fee_amount, fee_type));
+
         test_anon_xfr_proof(inputs, outputs);
     }
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_single_asset() {
-        let zero = BLSScalar::zero();
+        let fee_type = FEE_TYPE.as_scalar();
         // (n, m) = (3, 3)
-        let inputs = vec![(30, zero), (20, zero), (0, zero)];
-        let outputs = vec![(5, zero), (17, zero), (28, zero)];
-        test_anon_xfr_proof(outputs, inputs);
+
+        let mut rng = ChaChaRng::from_entropy();
+        let mut total_input = 50 + rng.next_u64() % 50;
+
+        let mut total_output = total_input;
+
+        let mut inputs: Vec<(u64, BLSScalar)> = Vec::new();
+        let mut outputs: Vec<(u64, BLSScalar)> = Vec::new();
+
+        let amount = rng.next_u64() % total_input;
+        inputs.push((amount, fee_type));
+        total_input -= amount;
+        inputs.push((total_input, fee_type));
+
+        let amount_out = rng.next_u64() % total_output;
+        outputs.push((amount_out, fee_type));
+        total_output -= amount_out;
+        outputs.push((total_output, fee_type));
+
+        // input for fees
+        let fee_amount =
+            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        inputs.push((fee_amount, fee_type));
+
+        test_anon_xfr_proof(inputs, outputs);
     }
 
     #[test]
     fn test_anon_multi_xfr_proof_1in_2out_single_asset() {
-        let zero = BLSScalar::zero();
+        let fee_type = FEE_TYPE.as_scalar();
         // (n, m) = (1, 2)
-        let inputs = vec![(30, zero)];
-        let outputs = vec![(13, zero), (17, zero)];
-        test_anon_xfr_proof(inputs.to_vec(), outputs.to_vec());
+
+        let amount = 0; // a random number in [50, 100)
+        let outputs = vec![(amount, fee_type), (amount, fee_type)];
+
+        let fee_amount = FEE_CALCULATING_FUNC(1, outputs.len() as u32) as u64;
+
+        let inputs = vec![(fee_amount, fee_type)];
+
+        test_anon_xfr_proof(inputs, outputs);
     }
 
     #[test]
     fn test_anon_multi_xfr_proof_2in_1out_single_asset() {
-        let zero = BLSScalar::zero();
-        let inputs = vec![(30, zero)];
-        let outputs = vec![(13, zero), (17, zero)];
+        let fee_type = FEE_TYPE.as_scalar();
         // (n, m) = (2, 1)
-        test_anon_xfr_proof(outputs, inputs);
-    }
+        let mut rng = ChaChaRng::from_entropy();
 
-    #[test]
-    fn test_anon_multi_xfr_proof_1in_1out_single_asset() {
-        let zero = BLSScalar::zero();
-        // (n, m) = (1, 1)
-        let inputs = vec![(10, zero)];
-        let outputs = vec![(10, zero)];
-        test_anon_xfr_proof(outputs, inputs);
+        //This time we need one input equal to the output, besides the input for fees
+        let amount = 50 + rng.next_u64() % 50; // a random number in [50, 100)
+
+        let outputs = vec![(amount, fee_type)];
+        let mut inputs = vec![(amount, fee_type)];
+
+        let fee_amount =
+            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        inputs.push((fee_amount, fee_type));
+
+        test_anon_xfr_proof(inputs, outputs);
     }
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_multi_asset() {
-        let zero = BLSScalar::zero();
+        let fee_type = FEE_TYPE.as_scalar();
         // multiple asset types
         // (n, m) = (3, 6)
         let one = BLSScalar::one();
-        let inputs = vec![
-            (/*amount=*/ 50, /*asset_type=*/ zero),
-            (60, one),
-            (20, zero),
-        ];
+
+        let mut inputs = vec![(/*amount=*/ 40, /*asset_type=*/ fee_type), (80, one)];
+
         let outputs = vec![
-            (19, one),
-            (15, zero),
-            (1, one),
-            (35, zero),
-            (20, zero),
+            (5, fee_type),
+            (10, fee_type),
+            (25, fee_type),
+            (20, one),
+            (20, one),
             (40, one),
         ];
+
+        let fee_amount =
+            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        inputs.push((fee_amount, fee_type));
+
         test_anon_xfr_proof(inputs, outputs);
     }
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_3out_multi_asset() {
-        let zero = BLSScalar::zero();
+        let fee_type = FEE_TYPE.as_scalar();
         let one = BLSScalar::one();
         // (n, m) = (3, 3)
-        let inputs = vec![(23, zero), (20, one), (7, zero)];
-        let outputs = vec![(5, one), (30, zero), (15, one)];
-        test_anon_xfr_proof(outputs, inputs);
+
+        let input_1 = 20u64;
+        let input_2 = 52u64;
+
+        let output_1 = 17u64;
+        let output_2 = 3u64;
+        let output_3 = 52u64;
+
+        let mut inputs = vec![(input_1, fee_type), (input_2, one)];
+
+        let outputs = vec![(output_1, fee_type), (output_2, fee_type), (output_3, one)];
+
+        let fee_amount =
+            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        inputs.push((fee_amount, fee_type));
+
+        test_anon_xfr_proof(inputs, outputs);
     }
 
     fn test_anon_xfr_proof(
@@ -254,14 +332,7 @@ mod tests {
         let secret_inputs =
             new_multi_xfr_witness_for_test(inputs.to_vec(), outputs.to_vec(), [0u8; 32]);
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
-        let params = UserParams::from_file_if_exists(
-            n_payers,
-            n_payees,
-            Some(1),
-            DEFAULT_BP_NUM_GENS,
-            None,
-        )
-        .unwrap();
+        let params = UserParams::new(n_payers, n_payees, Some(1));
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let proof = prove_xfr(&mut prng, &params, secret_inputs).unwrap();
 
@@ -276,69 +347,5 @@ mod tests {
 
         // verify bad witness
         assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
-    }
-
-    #[test]
-    fn test_eq_committed_vals_proof() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let params = UserParams::eq_committed_vals_params();
-        let (proof, hash_comm, ped_comm) = {
-            // prover scope
-            // compute Rescue commitment
-            let comm = HashCommitment::new();
-            let amount = BLSScalar::from_u32(71);
-            let asset_type = BLSScalar::from_u32(52);
-            let blind_hash = BLSScalar::random(&mut prng);
-            let hash_comm = comm.commit(&blind_hash, &[amount, asset_type]).unwrap(); // safe unwrap
-
-            // compute Pedersen commitment
-            let pc_gens_jubjub = PedersenGens::<JubjubPoint>::new(2);
-            let amount_jj = JubjubScalar::from_u32(71);
-            let at_jj = JubjubScalar::from_u32(52);
-            let blind_pc = JubjubScalar::random(&mut prng);
-            let ped_comm = pc_gens_jubjub
-                .commit(&[amount_jj, at_jj], &blind_pc)
-                .unwrap(); // safe unwrap
-
-            // compute the proof
-            let proof = prove_eq_committed_vals(
-                &mut prng,
-                &params,
-                amount,
-                asset_type,
-                BLSScalar::from(&blind_pc),
-                blind_hash,
-                &pc_gens_jubjub,
-            )
-            .unwrap(); // safe unwrap
-            (proof, hash_comm, ped_comm)
-        };
-        {
-            // verifier scope
-            let node_params = NodeParams::from(params);
-            assert!(verify_eq_committed_vals(
-                &node_params,
-                hash_comm,
-                &ped_comm,
-                &proof
-            )
-            .is_ok());
-            let bad_hash_comm = BLSScalar::one();
-            assert!(verify_eq_committed_vals(
-                &node_params,
-                bad_hash_comm,
-                &ped_comm,
-                &proof
-            )
-            .is_err());
-            let bad_ped_comm = ped_comm.add(&JubjubPoint::get_base());
-            assert!(verify_eq_committed_vals(
-                &node_params,
-                hash_comm,
-                &bad_ped_comm,
-                &proof
-            )
-            .is_err());
-        }
     }
 }

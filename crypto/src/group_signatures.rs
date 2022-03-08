@@ -5,8 +5,7 @@ use crate::basics::elgamal::{
 use crate::basics::signatures::pointcheval_sanders::{
     ps_gen_keys, ps_randomize_sig, ps_sign_scalar, PSPublicKey, PSSecretKey, PSSignature,
 };
-use algebra::groups::{Group, GroupArithmetic, Scalar, ScalarArithmetic};
-use algebra::pairing::Pairing;
+use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
 use ruc::*;
 use utils::errors::ZeiError;
 
@@ -274,7 +273,6 @@ pub fn gpsig_verify<P: Pairing>(
 /// This algorithm is run by the Group Manager.
 /// * `sig` - signature
 /// * `gp_sk` - group secret key
-/// ```
 pub fn gpsig_open<P: Pairing>(
     sig: &GroupSignature<P>,
     gp_sk: &GroupSecretKey<P>,

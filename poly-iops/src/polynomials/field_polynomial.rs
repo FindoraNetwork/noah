@@ -106,9 +106,7 @@ impl<F: Scalar> FpPolynomial<F> {
 
     /// Builds a polynomial from its zeroes/roots given as reference.
     /// # Example
-    /// ```
-    /// // see from_zeroes
-    /// ```
+    /// see from_zeroes
     pub fn from_zeroes_ref(zeroes: &[&F]) -> Self {
         let mut r = Self::one();
         for root in zeroes.iter() {
@@ -122,8 +120,8 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 
     /// Returns None if x is repeated
-    /// Returns Some(poly) where poly(x[i]) = y[i]
-    /// Returns Some(0) if x.len() == 0
+    /// Returns `Some(poly)` where `poly(x[i]) = y[i]`
+    /// Returns `Some(0)` if `x.len() == 0`
     /// # Example:
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
