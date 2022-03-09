@@ -3,7 +3,7 @@ use crate::anon_xfr::circuits::{
 };
 use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
 use crate::anon_xfr::{
-    check_asset_amount, check_roots,
+    check_asset_amount,
     keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature},
     nullifier,
     structs::{AXfrProof, AnonBlindAssetRecord, Nullifier, OpenAnonBlindAssetRecord},
@@ -78,8 +78,11 @@ pub fn gen_anon_fee_body<R: CryptoRng + RngCore>(
     if input.pub_key.ne(input_keypair.pub_key().borrow()) {
         return Err(eg!(ZeiError::ParameterError));
     }
-    check_asset_amount(vec![input.clone()].as_slice(), vec![output.clone()].as_slice()).c(d!())?;
-    check_roots(vec![input.clone()].as_slice()).c(d!())?;
+    check_asset_amount(
+        vec![input.clone()].as_slice(),
+        vec![output.clone()].as_slice(),
+    )
+    .c(d!())?;
 
     let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
     let rand_input_keypair = input_keypair.randomize(&input.key_rand_factor);
@@ -139,7 +142,7 @@ pub fn gen_anon_fee_body<R: CryptoRng + RngCore>(
 /// * `body` - Transfer structure to verify
 /// * `accumulator` - candidate state of the accumulator. It must match body.proof.merkle_root, otherwise it returns ZeiError::AXfrVerification Error.
 #[allow(unused_variables)]
-pub fn verify_anon_xfr_body(
+pub fn verify_anon_fee_body(
     params: &NodeParams,
     body: &AnonFeeBody,
     merkle_root: &BLSScalar,
@@ -156,4 +159,119 @@ pub fn verify_anon_xfr_body(
 
     verify_xfr(params, &pub_inputs, &body.proof.snark_proof)
         .c(d!(ZeiError::AXfrVerificationError))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::thread;
+    use parking_lot::RwLock;
+    use rand_chacha::ChaChaRng;
+    use rand_core::{CryptoRng, RngCore, SeedableRng};
+    use storage::db::TempRocksDB;
+    use storage::state::{ChainState, State};
+    use storage::store::PrefixedStore;
+    use accumulators::merkle_tree::PersistentMerkleTree;
+    use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
+    use crate::anon_xfr::hash_abar;
+    use crate::anon_xfr::anon_fee::{AnonFeeNote, gen_anon_fee_body, verify_anon_fee_body};
+    use crate::anon_xfr::keys::AXfrKeyPair;
+    use crate::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder};
+    use crate::anon_xfr::tests::create_mt_leaf_info;
+    use crate::setup::{NodeParams, UserParams};
+    use crate::xfr::structs::AssetType;
+
+    #[test]
+    fn test_anon_fee_happy_path() {
+
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let user_params = UserParams::new(1, 1, Some(40));
+
+
+        let asset_type = FEE_TYPE;
+        let fee_amount = FEE_CALCULATING_FUNC(1u32, 1u32) as u64;
+
+        let output_amount = 1 + prng.next_u64() % 100;
+        let input_amount = output_amount + fee_amount;
+
+        // simulate input abar
+        let (mut oabar, keypair_in, _dec_key_in, _) =
+            gen_oabar_and_keys(&mut prng, input_amount, asset_type);
+        let abar = AnonBlindAssetRecord::from_oabar(&oabar);
+        assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
+        let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
+        assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
+        let _owner_memo = oabar.get_owner_memo().unwrap();
+
+
+        let path = thread::current().name().unwrap().to_owned();
+        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+        let mut state = State::new(cs, false);
+
+        let store = PrefixedStore::new("mystore", &mut state);
+        let mut pmt = PersistentMerkleTree::new(store).unwrap();
+
+        let id = pmt.add_commitment_hash(hash_abar(pmt.entry_count(), &abar)).unwrap();
+        assert!(pmt.commit().is_ok());
+        let proof = pmt.generate_proof(id).unwrap();
+        let mt_leaf_info = create_mt_leaf_info(proof);
+        oabar.update_mt_leaf_info(mt_leaf_info);
+
+        // output keys
+        let keypair_out = AXfrKeyPair::generate(&mut prng);
+        let dec_key_out = XSecretKey::new(&mut prng);
+        let enc_key_out = XPublicKey::from(&dec_key_out);
+
+        let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
+            .amount(output_amount)
+            .asset_type(asset_type)
+            .pub_key(keypair_out.pub_key())
+            .finalize(&mut prng, &enc_key_out)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let (body, key_pairs) = gen_anon_fee_body(
+            &mut prng,
+            &user_params,
+            &oabar,
+            &oabar_out,
+            &keypair_in,
+        )
+            .unwrap();
+
+        // verifier scope
+        let verifier_params = NodeParams::from(user_params);
+        assert!(verify_anon_fee_body(&verifier_params, &body, &pmt.get_root().unwrap()).is_ok());
+
+        let note = AnonFeeNote::generate_note_from_body(body, key_pairs).unwrap();
+        assert!(note.verify_signatures().is_ok())
+    }
+
+
+    fn gen_oabar_and_keys<R: CryptoRng + RngCore>(
+        prng: &mut R,
+        amount: u64,
+        asset_type: AssetType,
+    ) -> (
+        OpenAnonBlindAssetRecord,
+        AXfrKeyPair,
+        XSecretKey,
+        XPublicKey,
+    ) {
+        let keypair = AXfrKeyPair::generate(prng);
+        let dec_key = XSecretKey::new(prng);
+        let enc_key = XPublicKey::from(&dec_key);
+        let oabar = OpenAnonBlindAssetRecordBuilder::new()
+            .amount(amount)
+            .asset_type(asset_type)
+            .pub_key(keypair.pub_key())
+            .finalize(prng, &enc_key)
+            .unwrap()
+            .build()
+            .unwrap();
+        (oabar, keypair, dec_key, enc_key)
+    }
 }
