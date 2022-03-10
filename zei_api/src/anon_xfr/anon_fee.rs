@@ -163,33 +163,35 @@ pub fn verify_anon_fee_body(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::thread;
-    use parking_lot::RwLock;
-    use rand_chacha::ChaChaRng;
-    use rand_core::{CryptoRng, RngCore, SeedableRng};
-    use storage::db::TempRocksDB;
-    use storage::state::{ChainState, State};
-    use storage::store::PrefixedStore;
+    use crate::anon_xfr::anon_fee::{
+        gen_anon_fee_body, verify_anon_fee_body, AnonFeeNote,
+    };
+    use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
+    use crate::anon_xfr::hash_abar;
+    use crate::anon_xfr::keys::AXfrKeyPair;
+    use crate::anon_xfr::structs::{
+        AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
+    };
+    use crate::anon_xfr::tests::create_mt_leaf_info;
+    use crate::setup::{NodeParams, UserParams};
+    use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::PersistentMerkleTree;
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::Scalar;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-    use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
-    use crate::anon_xfr::hash_abar;
-    use crate::anon_xfr::anon_fee::{AnonFeeNote, gen_anon_fee_body, verify_anon_fee_body};
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder};
-    use crate::anon_xfr::tests::create_mt_leaf_info;
-    use crate::setup::{NodeParams, UserParams};
-    use crate::xfr::structs::AssetType;
+    use parking_lot::RwLock;
+    use rand_chacha::ChaChaRng;
+    use rand_core::{CryptoRng, RngCore, SeedableRng};
+    use std::sync::Arc;
+    use std::thread;
+    use storage::db::TempRocksDB;
+    use storage::state::{ChainState, State};
+    use storage::store::PrefixedStore;
 
     #[test]
     fn test_anon_fee_happy_path() {
-
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let user_params = UserParams::new(1, 1, Some(40));
-
 
         let asset_type = FEE_TYPE;
         let fee_amount = FEE_CALCULATING_FUNC(1u32, 1u32) as u64;
@@ -206,7 +208,6 @@ mod tests {
         assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
         let _owner_memo = oabar.get_owner_memo().unwrap();
 
-
         let path = thread::current().name().unwrap().to_owned();
         let fdb = TempRocksDB::open(path).expect("failed to open db");
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
@@ -215,7 +216,9 @@ mod tests {
         let store = PrefixedStore::new("mystore", &mut state);
         let mut pmt = PersistentMerkleTree::new(store).unwrap();
 
-        let id = pmt.add_commitment_hash(hash_abar(pmt.entry_count(), &abar)).unwrap();
+        let id = pmt
+            .add_commitment_hash(hash_abar(pmt.entry_count(), &abar))
+            .unwrap();
         assert!(pmt.commit().is_ok());
         let proof = pmt.generate_proof(id).unwrap();
         let mt_leaf_info = create_mt_leaf_info(proof);
@@ -235,30 +238,39 @@ mod tests {
             .build()
             .unwrap();
 
-        let (body, key_pairs) = gen_anon_fee_body(
-            &mut prng,
-            &user_params,
-            &oabar,
-            &oabar_out,
-            &keypair_in,
-        )
-            .unwrap();
+        let (body, key_pairs) =
+            gen_anon_fee_body(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in)
+                .unwrap();
 
         {
             // verifier scope
             let verifier_params = NodeParams::from(user_params);
-            assert!(verify_anon_fee_body(&verifier_params, &body, &pmt.get_root().unwrap()).is_ok());
-            assert!(verify_anon_fee_body(&verifier_params, &body, &BLSScalar::from_u64(123u64)).is_err());
+            assert!(verify_anon_fee_body(
+                &verifier_params,
+                &body,
+                &pmt.get_root().unwrap()
+            )
+            .is_ok());
+            assert!(verify_anon_fee_body(
+                &verifier_params,
+                &body,
+                &BLSScalar::from_u64(123u64)
+            )
+            .is_err());
 
-            let bad_user_params = UserParams::new(2,1,Some(40));
+            let bad_user_params = UserParams::new(2, 1, Some(40));
             let bad_verifier_params = NodeParams::from(bad_user_params);
-            assert!(verify_anon_fee_body(&bad_verifier_params, &body, &pmt.get_root().unwrap()).is_err());
+            assert!(verify_anon_fee_body(
+                &bad_verifier_params,
+                &body,
+                &pmt.get_root().unwrap()
+            )
+            .is_err());
 
             let note = AnonFeeNote::generate_note_from_body(body, key_pairs).unwrap();
             assert!(note.verify_signatures().is_ok());
         }
         {
-
             let user_params = UserParams::new(1, 1, Some(40));
             let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
                 .amount(output_amount + 1)
@@ -275,7 +287,8 @@ mod tests {
                 &oabar,
                 &oabar_out,
                 &keypair_in,
-            ).is_err());
+            )
+            .is_err());
         }
         {
             let user_params = UserParams::new(1, 1, Some(40));
@@ -294,7 +307,8 @@ mod tests {
                 &oabar,
                 &oabar_out,
                 &keypair_in,
-            ).is_err());
+            )
+            .is_err());
         }
     }
 
@@ -303,7 +317,6 @@ mod tests {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let user_params = UserParams::new(1, 1, Some(40));
 
-
         let asset_type = FEE_TYPE;
         let fee_amount = FEE_CALCULATING_FUNC(1u32, 1u32) as u64;
 
@@ -311,14 +324,16 @@ mod tests {
         let input_amount = output_amount + fee_amount;
 
         // simulate input abar
-        let (mut oabar, keypair_in, _dec_key_in, _) =
-            gen_oabar_and_keys(&mut prng, input_amount, AssetType::from_identical_byte(3u8));
+        let (mut oabar, keypair_in, _dec_key_in, _) = gen_oabar_and_keys(
+            &mut prng,
+            input_amount,
+            AssetType::from_identical_byte(3u8),
+        );
         let abar = AnonBlindAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
         let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
         assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
         let _owner_memo = oabar.get_owner_memo().unwrap();
-
 
         let path = thread::current().name().unwrap().to_owned();
         let fdb = TempRocksDB::open(path).expect("failed to open db");
@@ -328,7 +343,9 @@ mod tests {
         let store = PrefixedStore::new("mystore", &mut state);
         let mut pmt = PersistentMerkleTree::new(store).unwrap();
 
-        let id = pmt.add_commitment_hash(hash_abar(pmt.entry_count(), &abar)).unwrap();
+        let id = pmt
+            .add_commitment_hash(hash_abar(pmt.entry_count(), &abar))
+            .unwrap();
         assert!(pmt.commit().is_ok());
         let proof = pmt.generate_proof(id).unwrap();
         let mt_leaf_info = create_mt_leaf_info(proof);
@@ -354,9 +371,9 @@ mod tests {
             &oabar,
             &oabar_out,
             &keypair_in,
-        ).is_err());
+        )
+        .is_err());
     }
-
 
     fn gen_oabar_and_keys<R: CryptoRng + RngCore>(
         prng: &mut R,
