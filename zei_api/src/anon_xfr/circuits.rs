@@ -22,10 +22,10 @@ use std::ops::{AddAssign, Shl};
 pub type TurboPlonkCS = TurboPlonkConstraintSystem<BLSScalar>;
 
 // TODO: Move these constants to another file.
-const SK_LEN: usize = 252; // secret key size (in bits)
+pub(crate) const SK_LEN: usize = 252; // secret key size (in bits)
 const JUBJUB_SCALAR_BIT_LEN: usize = 252; // jubjub scalar size (in bits)
-const AMOUNT_LEN: usize = 64; // amount value size (in bits)
-pub const TREE_DEPTH: usize = 20; // Depth of the Merkle Tree
+pub(crate) const AMOUNT_LEN: usize = 64; // amount value size (in bits)
+pub const TREE_DEPTH: usize = 40; // Depth of the Merkle Tree
 
 #[derive(Debug, Clone)]
 pub struct PayerSecret {
@@ -210,7 +210,7 @@ pub(crate) fn build_multi_xfr_cs(
     let payees_secrets = add_payees_secrets(&mut cs, &secret_inputs.payees_secrets);
 
     let base = JubjubPoint::get_base();
-    let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::one());
+    let pow_2_64 = BLSScalar::from_u64(u64::MAX).add(&BLSScalar::one());
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
@@ -521,7 +521,7 @@ pub(crate) fn build_eq_committed_vals_cs(
     (cs, n_constraints)
 }
 
-fn add_payers_secrets(
+pub(crate) fn add_payers_secrets(
     cs: &mut TurboPlonkCS,
     secrets: &[PayerSecret],
 ) -> Vec<PayerSecretVars> {
@@ -550,7 +550,7 @@ fn add_payers_secrets(
         .collect()
 }
 
-fn add_payees_secrets(
+pub(crate) fn add_payees_secrets(
     cs: &mut TurboPlonkCS,
     secrets: &[PayeeSecret],
 ) -> Vec<PayeeSecretVars> {
@@ -579,7 +579,7 @@ pub struct PayerSecretVars {
     pub blind: VarIndex,
 }
 
-struct PayeeSecretVars {
+pub(crate) struct PayeeSecretVars {
     pub amount: VarIndex,
     pub blind: VarIndex,
     pub asset_type: VarIndex,

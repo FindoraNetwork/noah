@@ -1,11 +1,12 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayerSecret,
-    TurboPlonkCS, TREE_DEPTH,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret,
+    PayerSecret, TurboPlonkCS, TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
 
 use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
+use crate::anon_xfr::anon_fee::build_anon_fee_cs;
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::parameters::{RISTRETTO_SRS, SRS};
 use crate::anon_xfr::structs::{MTNode, MTPath};
@@ -147,6 +148,46 @@ impl UserParams {
         };
 
         let (cs, _) = build_abar_to_bar_cs(payer_secret, &proof, &non_zk_state, &beta);
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+            .c(d!(ZeiError::DeserializationError))
+            .unwrap();
+
+        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+        UserParams {
+            bp_params: PublicParams::new(),
+            pcs,
+            cs,
+            prover_params,
+        }
+    }
+
+    pub fn anon_fee_params(tree_depth: usize) -> UserParams {
+        let bls_zero = BLSScalar::zero();
+        let jubjub_zero = JubjubScalar::zero();
+
+        let node = MTNode {
+            siblings1: bls_zero,
+            siblings2: bls_zero,
+            is_left_child: 0,
+            is_right_child: 0,
+        };
+        let payer_secret = PayerSecret {
+            sec_key: jubjub_zero,
+            diversifier: jubjub_zero,
+            uid: 0,
+            amount: 0,
+            asset_type: bls_zero,
+            path: MTPath::new(vec![node; tree_depth]),
+            blind: bls_zero,
+        };
+        let payee_secret = PayeeSecret {
+            amount: 0,
+            blind: Default::default(),
+            asset_type: Default::default(),
+        };
+        let (cs, _) =
+            build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
+
         let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
             .c(d!(ZeiError::DeserializationError))
             .unwrap();
