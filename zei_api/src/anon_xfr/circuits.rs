@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use algebra::bls12_381::BLSScalar;
@@ -18,6 +17,7 @@ use poly_iops::plonk::field_simulation::SimFrVar;
 use poly_iops::plonk::turbo_plonk_cs::ecc::PointVar;
 use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
 use poly_iops::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
+use std::collections::HashSet;
 use std::ops::{AddAssign, Shl};
 
 pub type TurboPlonkCS = TurboPlonkConstraintSystem<BLSScalar>;
@@ -767,8 +767,6 @@ fn asset_mixing(
     fee_type: BLSScalar,
     fee_calculating_func: &dyn Fn(u32, u32) -> u32,
 ) {
-
-
     let mut input_checked = HashSet::new();
     // Compute the `sum_in_i`
     let inputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = inputs
@@ -814,8 +812,6 @@ fn asset_mixing(
             None
         })
         .collect();
-
-    
 
     // Initialize a constant value `fee_type_val`
     let fee_type_val = cs.new_variable(fee_type);
