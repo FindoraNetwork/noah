@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use algebra::bls12_381::BLSScalar;
@@ -751,7 +752,6 @@ pub(crate) fn nullify(
 ///
 /// The circuit:
 /// 1. Compute [sum_in_1, ..., sum_in_n] from inputs, where `sum_in_i = \sum_{j : type_in_j == type_in_i} v_in_j`
-///    Note: If there are two inputs with the same asset type, then their `sum_in_i` would be the same.
 /// 2. Similarly, compute [sum_out_1, ..., sum_out_m] from outputs.
 /// 3. Enumerate pair `(i \in [n], j \in [m])`, check that:
 ///         `(type_in_i == fee_type) \lor (type_in_i != type_out_j) \lor (sum_in_i == sum_out_j)`
@@ -767,41 +767,55 @@ fn asset_mixing(
     fee_type: BLSScalar,
     fee_calculating_func: &dyn Fn(u32, u32) -> u32,
 ) {
+
+
+    let mut input_checked = HashSet::new();
     // Compute the `sum_in_i`
     let inputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = inputs
         .iter()
-        .map(|input| {
-            let zero_var = cs.zero_var();
-            let sum_var = inputs.iter().fold(zero_var, |sum, other_input| {
-                let adder = match_select(
-                    cs,
-                    input.0,       // asset_type
-                    other_input.0, // asset_type
-                    other_input.1,
-                ); // amount
-                cs.add(sum, adder)
-            });
-            (input.0, sum_var)
+        .filter_map(|input| {
+            if !input_checked.contains(&input.0) {
+                input_checked.insert(&input.0);
+                let zero_var = cs.zero_var();
+                let sum_var = inputs.iter().fold(zero_var, |sum, other_input| {
+                    let adder = match_select(
+                        cs,
+                        input.0,       // asset_type
+                        other_input.0, // asset_type
+                        other_input.1,
+                    ); // amount
+                    cs.add(sum, adder)
+                });
+                return Option::from((input.0, sum_var));
+            }
+            None
         })
         .collect();
 
-    // Compute the `sum_out_i`
+    let mut output_checked = HashSet::new();
+    // Compute the `sum_in_i`
     let outputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = outputs
         .iter()
-        .map(|output| {
-            let zero_var = cs.zero_var();
-            let sum_var = outputs.iter().fold(zero_var, |sum, other_output| {
-                let adder = match_select(
-                    cs,
-                    output.0,       // asset_type
-                    other_output.0, // asset_type
-                    other_output.1,
-                ); // amount
-                cs.add(sum, adder)
-            });
-            (output.0, sum_var)
+        .filter_map(|output| {
+            if !output_checked.contains(&output.0) {
+                output_checked.insert(&output.0);
+                let zero_var = cs.zero_var();
+                let sum_var = outputs.iter().fold(zero_var, |sum, other_output| {
+                    let adder = match_select(
+                        cs,
+                        output.0,       // asset_type
+                        other_output.0, // asset_type
+                        other_output.1,
+                    ); // amount
+                    cs.add(sum, adder)
+                });
+                return Option::from((output.0, sum_var));
+            }
+            None
         })
         .collect();
+
+    
 
     // Initialize a constant value `fee_type_val`
     let fee_type_val = cs.new_variable(fee_type);
@@ -819,7 +833,7 @@ fn asset_mixing(
     // and also check that the amount is matching
     // and also check that every input type appears in the set of output types (except if the fee has used up)
     let mut flag_no_fee_type = cs.one_var();
-    for (input_type, input_sum) in inputs_type_sum_amounts {
+    for &(input_type, input_sum) in inputs_type_sum_amounts.iter() {
         let (is_fee_type, is_not_fee_type) =
             cs.is_equal_or_not_equal(input_type, fee_type_val);
         flag_no_fee_type = cs.mul(flag_no_fee_type, is_not_fee_type);
@@ -829,7 +843,7 @@ fn asset_mixing(
         // If there is at least one output that is of the same type as the input, then `flag_no_matching_output = 0`
         // Otherwise, `flag_no_matching_output = 1`.
         let mut flag_no_matching_output = cs.one_var();
-        for &(output_type, output_sum) in &outputs_type_sum_amounts {
+        for &(output_type, output_sum) in outputs_type_sum_amounts.iter() {
             let (type_matched, type_not_matched) =
                 cs.is_equal_or_not_equal(input_type, output_type);
             flag_no_matching_output = cs.mul(flag_no_matching_output, type_not_matched);
