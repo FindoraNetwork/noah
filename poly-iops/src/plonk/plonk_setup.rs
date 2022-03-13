@@ -102,9 +102,7 @@ pub trait ConstraintSystem: Sized {
         false
     }
 
-    fn shrink_to_verifier_only(&self) -> Result<Self> {
-        Ok(self.clone())
-    }
+    fn shrink_to_verifier_only(&self) -> Result<Self>;
 }
 
 #[allow(non_snake_case)]
