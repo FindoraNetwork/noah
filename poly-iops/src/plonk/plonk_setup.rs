@@ -98,15 +98,19 @@ pub trait ConstraintSystem: Sized {
     fn eval_selector_multipliers(wire_vals: &[&Self::Field])
         -> Result<Vec<Self::Field>>;
 
-    fn is_verifier_only(&self) -> bool;
+    fn is_verifier_only(&self) -> bool {
+        false
+    }
 
-    fn shrink_to_verifier_only(&self) -> Result<Self>;
+    fn shrink_to_verifier_only(&self) -> Result<Self> {
+        Ok(self.clone())
+    }
 }
 
 #[allow(non_snake_case)]
 pub struct PlonkConstraintSystem<F> {
     pub selectors: Vec<Vec<F>>,
-    pub wiring: [Vec<usize>; 3], // left, right, output, each of size `size
+    pub wiring: [Vec<usize>; 3], // left, right, output, each of size `size`
     pub num_vars: usize,
     pub size: usize,
     pub public_vars_constraint_indices: Vec<usize>,
@@ -142,14 +146,17 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
     }
 
     fn num_selectors(&self) -> usize {
+        assert_eq!(self.verifier_only, false);
         self.selectors.len()
     }
 
     fn public_vars_constraint_indices(&self) -> &[usize] {
+        assert_eq!(self.verifier_only, false);
         &self.public_vars_constraint_indices
     }
 
     fn public_vars_witness_indices(&self) -> &[usize] {
+        assert_eq!(self.verifier_only, false);
         &self.public_vars_witness_indices
     }
 
@@ -229,6 +236,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
         right_var_index: usize,
         out_var_index: usize,
     ) {
+        assert_eq!(self.verifier_only, false);
         self.insert_add_gate_with_inputs_multiplier(
             left_var_index,
             right_var_index,
@@ -245,6 +253,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
         left_var_multiplier: F,
         right_var_multiplier: F,
     ) {
+        assert_eq!(self.verifier_only, false);
         assert!(
             left_var_index < self.num_vars,
             "Variable index out of Constraint System bound"
@@ -274,6 +283,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
         right_var_index: usize,
         out_var_index: usize,
     ) {
+        assert_eq!(self.verifier_only, false);
         self.insert_mul_gate_with_input_multiplier(
             left_var_index,
             right_var_index,
@@ -289,6 +299,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
         out_var_index: usize,
         in_vars_multiplier: F,
     ) {
+        assert_eq!(self.verifier_only, false);
         assert!(
             left_var_index < self.num_vars,
             "Variable index out of Constraint System bound"
@@ -313,6 +324,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
     }
 
     pub fn insert_boolean_gate(&mut self, var_index: usize) {
+        assert_eq!(self.verifier_only, false);
         assert!(
             var_index < self.num_vars,
             "Variable index out of Constraint System bound"
@@ -330,6 +342,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
 
     /// Insert a constant in the constraint system
     pub fn insert_constant(&mut self, var_index: usize, constant: F) {
+        assert_eq!(self.verifier_only, false);
         assert!(
             var_index < self.num_vars,
             "Variable index out of Constraint System bound"
@@ -347,6 +360,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
 
     /// Insert constraint of a public IO value to be decided online
     pub fn prepare_io_variable(&mut self, var_index: usize) {
+        assert_eq!(self.verifier_only, false);
         self.public_vars_constraint_indices.push(self.size);
         self.public_vars_witness_indices.push(var_index);
         self.insert_constant(var_index, F::zero());
@@ -354,6 +368,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
 
     /// Insert a dummy constraint in the constraint system
     pub fn insert_dummy(&mut self) {
+        assert_eq!(self.verifier_only, false);
         self.selectors[0].push(F::zero());
         self.selectors[1].push(F::zero());
         self.selectors[2].push(F::zero());
@@ -367,6 +382,7 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
 
     /// Pad the number of constraints to a power of two.
     pub fn pad(&mut self) {
+        assert_eq!(self.verifier_only, false);
         let n = self.size.next_power_of_two();
         let diff = n - self.size();
         let zeroes_scalar = vec![F::zero(); diff];
@@ -383,16 +399,19 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
     }
 
     fn get_left_witness_index(&self, cs_index: usize) -> usize {
+        assert_eq!(self.verifier_only, false);
         assert!(cs_index < self.size);
         self.wiring[0][cs_index] as usize
     }
 
     fn get_right_witness_index(&self, cs_index: usize) -> usize {
+        assert_eq!(self.verifier_only, false);
         assert!(cs_index < self.size);
         self.wiring[1][cs_index] as usize
     }
 
     fn get_out_witness_index(&self, cs_index: usize) -> usize {
+        assert_eq!(self.verifier_only, false);
         assert!(cs_index < self.size);
         self.wiring[2][cs_index] as usize
     }

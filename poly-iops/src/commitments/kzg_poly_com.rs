@@ -7,6 +7,7 @@ use algebra::groups::{Group, GroupArithmetic, One, Pairing, Scalar, ScalarArithm
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+
 /// Implementation of KZG polynomial commitment scheme
 /// https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf
 /// This polynomial scheme relies on a bilinear map e:G1 x G2 -> Gt,
