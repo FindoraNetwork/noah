@@ -7,16 +7,20 @@ use algebra::bls12_381::BLSScalar;
 
 use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
-use crate::anon_xfr::parameters::{RISTRETTO_SRS, SRS};
 use crate::anon_xfr::structs::{MTNode, MTPath};
+use crate::parameters::{
+    RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
+};
 use algebra::groups::Zero;
 use algebra::jubjub::JubjubScalar;
 use algebra::ristretto::RistrettoScalar;
 use bulletproofs::BulletproofGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
-use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
-use poly_iops::plonk::plonk_setup::{preprocess_prover, ProverParams, VerifierParams};
+use poly_iops::commitments::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme};
+use poly_iops::plonk::plonk_setup::{
+    preprocess_prover, ConstraintSystem, ProverParams, VerifierParams,
+};
 use ruc::*;
 use serde::Deserialize;
 use utils::errors::ZeiError;
@@ -38,6 +42,7 @@ pub struct UserParams {
     pub prover_params: ProverParams<KZGCommitmentSchemeBLS>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct NodeParams {
     pub bp_params: PublicParams,
     pub pcs: KZGCommitmentSchemeBLS,
@@ -45,9 +50,22 @@ pub struct NodeParams {
     pub verifier_params: VerifierParams<KZGCommitmentSchemeBLS>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct NodeParamsSplitCommon {
+    pub bp_params: PublicParams,
+    pub pcs: KZGCommitmentSchemeBLS,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct NodeParamsSplitSpecial {
+    pub cs: TurboPlonkCS,
+    pub verifier_params: VerifierParams<KZGCommitmentSchemeBLS>,
+}
+
 pub const BULLET_PROOF_RANGE: usize = 32;
 pub const MAX_PARTY_NUMBER: usize = 128;
 const COMMON_SEED: [u8; 32] = [0u8; 32];
+pub const PRECOMPUTED_PARTY_NUMBER: usize = 6;
 
 impl PublicParams {
     pub fn new() -> PublicParams {
@@ -75,7 +93,9 @@ impl UserParams {
         n_payers: usize,
         n_payees: usize,
         tree_depth: Option<usize>,
-    ) -> UserParams {
+    ) -> Result<UserParams> {
+        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+
         let (cs, _) = match tree_depth {
             Some(depth) => build_multi_xfr_cs(
                 AMultiXfrWitness::fake(n_payers, n_payees, depth),
@@ -89,20 +109,20 @@ impl UserParams {
             ),
         };
 
-        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
-            .c(d!(ZeiError::DeserializationError))
-            .unwrap();
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+        let pcs: KZGCommitmentSchemeBLS =
+            bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
+        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
 
-        UserParams {
+        Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
             cs,
             prover_params,
-        }
+        })
     }
 
-    pub fn eq_committed_vals_params() -> UserParams {
+    pub fn eq_committed_vals_params() -> Result<UserParams> {
+        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let zero = BLSScalar::zero();
         let proof = ZKPartProof::default();
         let non_zk_state = NonZKState::default();
@@ -110,19 +130,18 @@ impl UserParams {
         let (cs, _) =
             build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
 
-        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
-            .c(d!(ZeiError::DeserializationError))
-            .unwrap();
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
-        UserParams {
+        let pcs: KZGCommitmentSchemeBLS =
+            bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
+        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
+        Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
             cs,
             prover_params,
-        }
+        })
     }
 
-    pub fn abar_to_bar_params(tree_depth: usize) -> UserParams {
+    pub fn abar_to_bar_params(tree_depth: usize) -> Result<UserParams> {
         let bls_zero = BLSScalar::zero();
         let jubjub_zero = JubjubScalar::zero();
 
@@ -147,28 +166,79 @@ impl UserParams {
         };
 
         let (cs, _) = build_abar_to_bar_cs(payer_secret, &proof, &non_zk_state, &beta);
-        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
-            .c(d!(ZeiError::DeserializationError))
-            .unwrap();
+        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let pcs: KZGCommitmentSchemeBLS =
+            bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
 
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
-        UserParams {
+        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
+        Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
             cs,
             prover_params,
-        }
+        })
     }
 }
 
 impl NodeParams {
-    pub fn new(
-        tree_depth: Option<usize>,
+    pub fn create(
         n_payers: usize,
         n_payees: usize,
+        tree_depth: Option<usize>,
     ) -> Result<NodeParams> {
-        let user_params = UserParams::new(n_payers, n_payees, tree_depth);
+        let user_params = UserParams::new(n_payers, n_payees, tree_depth)?;
         Ok(Self::from(user_params))
+    }
+
+    pub fn load(n_payers: usize, n_payees: usize) -> Result<NodeParams> {
+        if n_payees > PRECOMPUTED_PARTY_NUMBER || n_payers > PRECOMPUTED_PARTY_NUMBER {
+            Err(SimpleError::new(d!(ZeiError::MissingVerifierParamsError), None).into())
+        } else {
+            match (VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS) {
+                (Some(c_bytes), Some(s_bytes)) => {
+                    let common: NodeParamsSplitCommon = bincode::deserialize(c_bytes)
+                        .c(d!(ZeiError::DeserializationError))?;
+                    let specials: Vec<Vec<Vec<u8>>> =
+                        bincode::deserialize(s_bytes).unwrap();
+                    let special: NodeParamsSplitSpecial =
+                        bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
+                            .c(d!(ZeiError::DeserializationError))?;
+                    Ok(NodeParams {
+                        bp_params: common.bp_params,
+                        pcs: common.pcs,
+                        cs: special.cs,
+                        verifier_params: special.verifier_params,
+                    })
+                }
+                _ => Err(SimpleError::new(
+                    d!(ZeiError::MissingVerifierParamsError),
+                    None,
+                )
+                .into()),
+            }
+        }
+    }
+
+    pub fn shrink(self) -> Result<NodeParams> {
+        Ok(NodeParams {
+            bp_params: self.bp_params,
+            pcs: self.pcs.shrink_to_verifier_only()?,
+            cs: self.cs.shrink_to_verifier_only()?,
+            verifier_params: self.verifier_params,
+        })
+    }
+
+    pub fn split(self) -> Result<(NodeParamsSplitCommon, NodeParamsSplitSpecial)> {
+        Ok((
+            NodeParamsSplitCommon {
+                bp_params: self.bp_params,
+                pcs: self.pcs.shrink_to_verifier_only()?,
+            },
+            NodeParamsSplitSpecial {
+                cs: self.cs.shrink_to_verifier_only()?,
+                verifier_params: self.verifier_params,
+            },
+        ))
     }
 }
 
@@ -185,8 +255,8 @@ impl From<UserParams> for NodeParams {
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::parameters::SRS;
-    use crate::setup::UserParams;
+    use crate::parameters::SRS;
+    use crate::setup::{NodeParams, UserParams};
     use algebra::bls12_381::{BLSScalar, BLSG1};
     use algebra::groups::{Group, GroupArithmetic, One, ScalarArithmetic};
     use itertools::Itertools;
@@ -198,7 +268,7 @@ mod test {
 
     #[test]
     fn test_params_serialization() {
-        let params = UserParams::new(1, 1, Some(1));
+        let params = UserParams::new(1, 1, Some(1)).unwrap();
 
         let v = bincode::serialize(&params).unwrap();
         let params_de: UserParams = bincode::deserialize(&v).unwrap();
@@ -207,8 +277,20 @@ mod test {
     }
 
     #[test]
+    fn test_vk_params_serialization() {
+        let params = NodeParams::create(3, 3, Some(40))
+            .unwrap()
+            .shrink()
+            .unwrap();
+        let v = bincode::serialize(&params).unwrap();
+        let params_de: NodeParams = bincode::deserialize(&v).unwrap();
+        let v2 = bincode::serialize(&params_de).unwrap();
+        assert_eq!(v, v2);
+    }
+
+    #[test]
     fn test_crs_commit() {
-        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS)
+        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS.unwrap())
             .c(d!(ZeiError::DeserializationError))
             .unwrap();
         let one = BLSScalar::one();

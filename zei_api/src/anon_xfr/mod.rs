@@ -29,9 +29,9 @@ pub(crate) mod circuits;
 pub mod config;
 pub mod keys;
 mod merkle_tree_test;
-pub mod parameters;
 pub(crate) mod proofs;
 pub mod structs;
+pub use circuits::TREE_DEPTH;
 
 /// Build an anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
@@ -337,7 +337,7 @@ mod tests {
             AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
             OpenAnonBlindAssetRecordBuilder,
         },
-        verify_anon_xfr_body,
+        verify_anon_xfr_body, TREE_DEPTH,
     };
     use itertools::Itertools;
     use parking_lot::lock_api::RwLock;
@@ -389,7 +389,7 @@ mod tests {
     fn test_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let user_params = UserParams::new(1, 1, Some(1));
+        let user_params = UserParams::new(1, 1, Some(1)).unwrap();
 
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
@@ -553,7 +553,7 @@ mod tests {
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);
 
-        let user_params = UserParams::new(1, 1, Some(40));
+        let user_params = UserParams::new(1, 1, Some(TREE_DEPTH)).unwrap();
 
         let fee_amount = FEE_CALCULATING_FUNC(1, 1) as u64;
         let output_amount = 10u64;
@@ -676,6 +676,12 @@ mod tests {
             println!("{:?}", t);
             assert!(t.is_ok());
 
+            let vk1 = verifier_params.shrink().unwrap();
+            assert!(verify_anon_xfr_body(&vk1, &body, &mt.get_root().unwrap()).is_ok());
+
+            let vk2 = NodeParams::load(1, 1).unwrap();
+            assert!(verify_anon_xfr_body(&vk2, &body, &mt.get_root().unwrap()).is_ok());
+
             let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
         }
@@ -686,7 +692,7 @@ mod tests {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let n_payers = 3;
         let n_payees = 3;
-        let user_params = UserParams::new(n_payers, n_payees, Some(1));
+        let user_params = UserParams::new(n_payers, n_payees, Some(1)).unwrap();
 
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();

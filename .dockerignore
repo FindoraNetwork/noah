@@ -1,8 +1,0 @@
-.dockerignore
-.DS_Store
-.git
-.gitignore
-target
-Dockerfile
-Jenkinsfile
-zcash-bn-fork
