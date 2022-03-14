@@ -9,7 +9,8 @@ use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::structs::{MTNode, MTPath};
 use crate::parameters::{
-    RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
+    ABAR_TO_BAR_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS, RISTRETTO_SRS, SRS,
+    VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
 use algebra::groups::Zero;
 use algebra::jubjub::JubjubScalar;
@@ -190,6 +191,7 @@ impl NodeParams {
         Ok(Self::from(user_params))
     }
 
+    /// anon transfer verifier parameters.
     pub fn load(n_payers: usize, n_payees: usize) -> Result<NodeParams> {
         if n_payees > PRECOMPUTED_PARTY_NUMBER || n_payers > PRECOMPUTED_PARTY_NUMBER {
             Err(SimpleError::new(d!(ZeiError::MissingVerifierParamsError), None).into())
@@ -216,6 +218,26 @@ impl NodeParams {
                 )
                 .into()),
             }
+        }
+    }
+
+    /// abar to bar transfer verifier parameters.
+    pub fn abar_to_bar_params() -> Result<NodeParams> {
+        if let Some(bytes) = ABAR_TO_BAR_VERIFIER_PARAMS {
+            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+        } else {
+            let user_params = UserParams::abar_to_bar_params(TREE_DEPTH)?;
+            Ok(NodeParams::from(user_params))
+        }
+    }
+
+    /// bar to abar transfer verifier parameters.
+    pub fn bar_to_abar_params() -> Result<NodeParams> {
+        if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
+            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+        } else {
+            let user_params = UserParams::eq_committed_vals_params()?;
+            Ok(NodeParams::from(user_params))
         }
     }
 

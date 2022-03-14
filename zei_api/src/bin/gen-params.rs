@@ -1,4 +1,5 @@
 #![allow(clippy::upper_case_acronyms)]
+#![allow(non_camel_case_types)]
 
 use bulletproofs::BulletproofGens;
 use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
@@ -34,6 +35,14 @@ enum Actions {
     },
 
     VK {
+        directory: PathBuf,
+    },
+
+    ABAR_TO_BAR {
+        directory: PathBuf,
+    },
+
+    BAR_TO_ABAR {
         directory: PathBuf,
     },
 
@@ -77,6 +86,12 @@ fn main() {
         }
         VK { directory } => {
             gen_vk(directory);
+        }
+        ABAR_TO_BAR { directory } => {
+            gen_abar_to_bar(directory);
+        }
+        BAR_TO_ABAR { directory } => {
+            gen_bar_to_abar(directory);
         }
         BP {
             gens_capacity,
@@ -184,6 +199,28 @@ fn gen_vk(directory: PathBuf) {
     let mut specials_path = directory.clone();
     specials_path.push("vk-specials.bin");
     save_to_file(&specials_ser, specials_path);
+}
+
+// cargo run --release --features="parallel" --bin gen-params abar-to-bar "./parameters"
+fn gen_abar_to_bar(mut path: PathBuf) {
+    println!("Generating 'Node Compressed Parameters' ABAR TO BAR ...");
+
+    let user_params = UserParams::abar_to_bar_params(TREE_DEPTH).unwrap();
+    let node_params = NodeParams::from(user_params).shrink().unwrap();
+    let bytes = bincode::serialize(&node_params).unwrap();
+    path.push("abar-to-bar-vk.bin");
+    save_to_file(&bytes, path);
+}
+
+// cargo run --release --features="parallel" --bin gen-params bar-to-abar "./parameters"
+fn gen_bar_to_abar(mut path: PathBuf) {
+    println!("Generating 'Node Compressed Parameters' BAR TO ABAR ...");
+
+    let user_params = UserParams::eq_committed_vals_params().unwrap();
+    let node_params = NodeParams::from(user_params).shrink().unwrap();
+    let bytes = bincode::serialize(&node_params).unwrap();
+    path.push("bar-to-abar-vk.bin");
+    save_to_file(&bytes, path);
 }
 
 fn gen_params_bp(gens_capacity: usize, party_capacity: usize, out_filename: PathBuf) {
