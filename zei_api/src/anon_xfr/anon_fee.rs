@@ -431,7 +431,6 @@ mod tests {
             )
             .is_err());
 
-
             let note = AnonFeeNote::generate_note_from_body(body, key_pairs).unwrap();
             assert!(note.verify_signatures().is_ok());
         }
