@@ -46,6 +46,10 @@ enum Actions {
         directory: PathBuf,
     },
 
+    ANON_FEE {
+        directory: PathBuf,
+    },
+
     BP {
         gens_capacity: usize,
         party_capacity: usize,
@@ -92,6 +96,9 @@ fn main() {
         }
         BAR_TO_ABAR { directory } => {
             gen_bar_to_abar(directory);
+        }
+        ANON_FEE { directory } => {
+            gen_anon_fee(directory);
         }
         BP {
             gens_capacity,
@@ -220,6 +227,17 @@ fn gen_bar_to_abar(mut path: PathBuf) {
     let node_params = NodeParams::from(user_params).shrink().unwrap();
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("bar-to-abar-vk.bin");
+    save_to_file(&bytes, path);
+}
+
+// cargo run --release --features="parallel" --bin gen-params anon-fee "./parameters"
+fn gen_anon_fee(mut path: PathBuf) {
+    println!("Generating 'Node Compressed Parameters' ANON FEE ...");
+
+    let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
+    let node_params = NodeParams::from(user_params).shrink().unwrap();
+    let bytes = bincode::serialize(&node_params).unwrap();
+    path.push("anon-fee-vk.bin");
     save_to_file(&bytes, path);
 }
 

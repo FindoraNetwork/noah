@@ -62,6 +62,7 @@ impl fmt::Display for ZeiError {
             AXfrVerificationError => "Invalid AXfrBody for merkle root",
             AXfrProofError => "Could not create anonymous transfer proof",
             AbarToBarParamsError => "Could not preprocess Abr2Bar conversion prover",
+            AnonFeeProofError => "Could not create anonymous transfer proof",
             ArgumentVerificationError => "Proof not valid for statement",
             CommitmentInputError => "The number of messages to be committed is invalid",
             CommitmentVerificationError => "Commitment verification failed",

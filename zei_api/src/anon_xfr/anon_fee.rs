@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn test_anon_fee_happy_path() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let user_params = UserParams::anon_fee_params(TREE_DEPTH);
+        let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
 
         let output_amount = 1 + prng.next_u64() % 100;
         let input_amount = output_amount + ANON_FEE_MIN;
@@ -431,20 +431,12 @@ mod tests {
             )
             .is_err());
 
-            let bad_user_params = UserParams::new(2, 1, Some(40));
-            let bad_verifier_params = NodeParams::from(bad_user_params);
-            assert!(verify_anon_fee_body(
-                &bad_verifier_params,
-                &body,
-                &pmt.get_root().unwrap()
-            )
-            .is_err());
 
             let note = AnonFeeNote::generate_note_from_body(body, key_pairs).unwrap();
             assert!(note.verify_signatures().is_ok());
         }
         {
-            let user_params = UserParams::new(1, 1, Some(40));
+            let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
             let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
                 .amount(output_amount + 1)
                 .asset_type(FEE_TYPE)
@@ -464,7 +456,7 @@ mod tests {
             .is_err());
         }
         {
-            let user_params = UserParams::new(1, 1, Some(40));
+            let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
             let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
                 .amount(output_amount)
                 .asset_type(AssetType::from_identical_byte(4u8))
@@ -488,7 +480,7 @@ mod tests {
     #[test]
     fn test_anon_fee_bad_input() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let user_params = UserParams::anon_fee_params(TREE_DEPTH);
+        let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
 
         let output_amount = 1 + prng.next_u64() % 100;
         let input_amount = output_amount + ANON_FEE_MIN;
