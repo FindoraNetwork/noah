@@ -680,7 +680,7 @@ mod tests {
     #[test]
     fn test_abar_to_bar_conversion() {
         let mut prng = ChaChaRng::from_seed([5u8; 32]);
-        let params = UserParams::abar_to_bar_params(40);
+        let params = UserParams::abar_to_bar_params(40).unwrap();
 
         let recv = XfrKeyPair::generate(&mut prng);
         let sender = AXfrKeyPair::generate(&mut prng);
@@ -723,7 +723,7 @@ mod tests {
         )
         .unwrap();
 
-        let node_params = NodeParams::from(params);
+        let node_params = NodeParams::abar_to_bar_params().unwrap();
         verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
 
         assert!(verify_abar_to_bar_body(

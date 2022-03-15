@@ -136,7 +136,7 @@ pub(super) fn Sigma_polynomial<
     witness: &[PCS::Field],
     challenges: &PlonkChallenges<PCS::Field>,
 ) -> FpPolynomial<PCS::Field> {
-    let n_wires_per_gate = cs.n_wires_per_gate();
+    let n_wires_per_gate = CS::n_wires_per_gate();
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
     let mut sigma_values = vec![];
     let perm = cs.compute_permutation();
@@ -265,11 +265,11 @@ pub(super) fn Quotient_polynomial<
             .iter()
             .map(|poly_coset_evals| &poly_coset_evals[point])
             .collect();
-        let term1 = cs.eval_gate_func(&wire_vals, &sel_vals, &IO_coset_evals[point])?;
+        let term1 = CS::eval_gate_func(&wire_vals, &sel_vals, &IO_coset_evals[point])?;
 
         // alpha * [\Sigma(X)\prod_j (fj(X) + gamma * kj * X + delta)]
         let mut term2 = alpha.mul(&Sigma_coset_evals[point]);
-        for j in 0..cs.n_wires_per_gate() {
+        for j in 0..CS::n_wires_per_gate() {
             let tmp = witness_polys_coset_evals[j][point]
                 .add(&delta)
                 .add(&gamma.mul(&k[j].mul(&params.coset_quot[point])));
@@ -362,7 +362,6 @@ pub(super) fn linearization_polynomial_opening<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
 >(
-    cs: &CS,
     params: &ProverParams<PCS>,
     Sigma: &PCS::Opening,
     witness_polys_eval_beta: &[&PCS::Field],
@@ -370,15 +369,13 @@ pub(super) fn linearization_polynomial_opening<
     Sigma_eval_g_beta: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
 ) -> PCS::Opening {
-    let w = cs
-        .eval_selector_multipliers(witness_polys_eval_beta)
-        .unwrap(); // safe unwrap
+    let w = CS::eval_selector_multipliers(witness_polys_eval_beta).unwrap(); // safe unwrap
     linearization::<PCS::Field, PCS::Opening>(
         &w,
         params.group.len(),
         &params.selectors,
         &params.verifier_params.k,
-        &params.extended_permutations[cs.n_wires_per_gate() - 1],
+        &params.extended_permutations[CS::n_wires_per_gate() - 1],
         Sigma,
         witness_polys_eval_beta,
         perms_eval_beta,
@@ -392,7 +389,6 @@ pub(super) fn linearization_commitment<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
 >(
-    cs: &CS,
     params: &VerifierParams<PCS>,
     C_Sigma: &PCS::Commitment,
     witness_polys_eval_beta: &[&PCS::Field],
@@ -400,15 +396,13 @@ pub(super) fn linearization_commitment<
     Sigma_eval_g_beta: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
 ) -> PCS::Commitment {
-    let w = cs
-        .eval_selector_multipliers(witness_polys_eval_beta)
-        .unwrap(); // safe unwrap
+    let w = CS::eval_selector_multipliers(witness_polys_eval_beta).unwrap(); // safe unwrap
     linearization::<PCS::Field, PCS::Commitment>(
         &w,
         params.cs_size,
         &params.selectors,
         &params.k,
-        &params.extended_permutations[cs.n_wires_per_gate() - 1],
+        &params.extended_permutations[CS::n_wires_per_gate() - 1],
         C_Sigma,
         witness_polys_eval_beta,
         perms_eval_beta,

@@ -296,7 +296,7 @@ mod test {
         let dec_key = XSecretKey::new(&mut prng);
         let enc_key = XPublicKey::from(&dec_key);
         // proving
-        let params = UserParams::eq_committed_vals_params();
+        let params = UserParams::eq_committed_vals_params().unwrap();
         // confidential case
         let (bar_conf, memo) = build_bar(
             &bar_keypair.pub_key,
@@ -337,7 +337,7 @@ mod test {
         let abar_non_conf = AnonBlindAssetRecord::from_oabar(&oabar_non_conf);
 
         // verifications
-        let node_params = NodeParams::from(params);
+        let node_params = NodeParams::bar_to_abar_params().unwrap();
         // confidential case
         assert!(super::verify_bar_to_abar(
             &node_params,
@@ -375,7 +375,7 @@ mod test {
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         );
         let obar = open_blind_asset_record(&bar, &memo, &bar_keypair).unwrap();
-        let params = UserParams::eq_committed_vals_params();
+        let params = UserParams::eq_committed_vals_params().unwrap();
         let note = gen_bar_to_abar_note(
             &mut prng,
             &params,
