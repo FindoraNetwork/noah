@@ -1,16 +1,17 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayerSecret,
-    TurboPlonkCS, TREE_DEPTH,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret,
+    PayerSecret, TurboPlonkCS, TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
 
 use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
+use crate::anon_xfr::anon_fee::build_anon_fee_cs;
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::structs::{MTNode, MTPath};
 use crate::parameters::{
-    ABAR_TO_BAR_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS, RISTRETTO_SRS, SRS,
-    VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
+    ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
+    RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
 use algebra::groups::Zero;
 use algebra::jubjub::JubjubScalar;
@@ -179,6 +180,46 @@ impl UserParams {
             prover_params,
         })
     }
+
+    pub fn anon_fee_params(tree_depth: usize) -> Result<UserParams> {
+        let bls_zero = BLSScalar::zero();
+        let jubjub_zero = JubjubScalar::zero();
+
+        let node = MTNode {
+            siblings1: bls_zero,
+            siblings2: bls_zero,
+            is_left_child: 0,
+            is_right_child: 0,
+        };
+        let payer_secret = PayerSecret {
+            sec_key: jubjub_zero,
+            diversifier: jubjub_zero,
+            uid: 0,
+            amount: 0,
+            asset_type: bls_zero,
+            path: MTPath::new(vec![node; tree_depth]),
+            blind: bls_zero,
+        };
+        let payee_secret = PayeeSecret {
+            amount: 0,
+            blind: Default::default(),
+            asset_type: Default::default(),
+        };
+        let (cs, _) =
+            build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
+
+        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let pcs: KZGCommitmentSchemeBLS =
+            bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
+
+        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+        Ok(UserParams {
+            bp_params: PublicParams::new(),
+            pcs,
+            cs,
+            prover_params,
+        })
+    }
 }
 
 impl NodeParams {
@@ -237,6 +278,16 @@ impl NodeParams {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
             let user_params = UserParams::eq_committed_vals_params()?;
+            Ok(NodeParams::from(user_params))
+        }
+    }
+
+    /// anon_fee verifier parameters.
+    pub fn anon_fee_params() -> Result<NodeParams> {
+        if let Some(bytes) = ANON_FEE_VERIFIER_PARAMS {
+            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+        } else {
+            let user_params = UserParams::anon_fee_params(TREE_DEPTH)?;
             Ok(NodeParams::from(user_params))
         }
     }

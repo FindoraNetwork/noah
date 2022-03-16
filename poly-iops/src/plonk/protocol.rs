@@ -141,7 +141,6 @@ pub mod prover {
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
     /// let three = two.add(&one);
-
     /// let common_seed = [0u8; 32];
     /// let proof = {
     /// // witness 1 + 2 = 3
