@@ -10,8 +10,10 @@ use crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
 use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use merlin::Transcript;
 use num_bigint::BigUint;
-use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
-use poly_iops::plonk::protocol::prover::{prover, verifier, PlonkPf};
+use poly_iops::{
+    commitments::kzg_poly_com::KZGCommitmentSchemeBLS,
+    plonk::{prover::prover, setup::PlonkPf, verifier::verifier},
+};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;

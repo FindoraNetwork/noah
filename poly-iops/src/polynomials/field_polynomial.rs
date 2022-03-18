@@ -204,7 +204,11 @@ impl<F: Scalar> FpPolynomial<F> {
     /// assert_eq!(poly.degree(), 0)
     /// ```
     pub fn degree(&self) -> usize {
-        self.coefs.len() - 1
+        if self.coefs.len() == 0 {
+            0
+        } else {
+            self.coefs.len() - 1
+        }
     }
 
     /// Tests if polynomial is the zero polynomial

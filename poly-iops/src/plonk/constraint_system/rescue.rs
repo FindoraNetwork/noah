@@ -1,13 +1,18 @@
-use crate::ioputils::u8_lsf_slice_to_u64_lsf_le_vec;
-use crate::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
-use algebra::bls12_381::BLSScalar;
-use algebra::groups::{One, ScalarArithmetic, Zero};
+use algebra::{
+    bls12_381::BLSScalar,
+    groups::{One, ScalarArithmetic, Zero},
+};
 use crypto::basics::hash::rescue::RescueInstance;
+
+use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
+use crate::utils::u8_lsf_slice_to_u64_lsf_le_vec;
 
 // state size
 const WIDTH: usize = 4;
+
 // # of rounds
 const NR: usize = 12;
+
 // alpha^{-1} mod (q-1) = 20974350070050476191779096203274386335076221000211055129041463479975432473805;
 // least significant u8limb first
 const ALPHA_INV: [u8; 32] = [
@@ -18,6 +23,7 @@ const ALPHA_INV: [u8; 32] = [
 
 #[derive(Clone)]
 pub struct StateVar(Vec<VarIndex>); // StateVar.0.len() == WIDTH
+
 #[derive(Clone)]
 pub struct State(Vec<BLSScalar>); // State.0.len() == WIDTH
 
@@ -55,7 +61,7 @@ impl StateVar {
     }
 }
 
-impl TurboPlonkConstraintSystem<BLSScalar> {
+impl TurboConstraintSystem<BLSScalar> {
     /// Create a rescue state variable.
     pub fn new_rescue_state_variable(&mut self, state: State) -> StateVar {
         let vars: Vec<VarIndex> = state
@@ -400,14 +406,16 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::turbo_plonk_cs::rescue::State;
-    use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, Zero};
+    use algebra::{
+        bls12_381::BLSScalar,
+        groups::{Scalar, Zero},
+    };
     use crypto::basics::hash::rescue::{RescueCtr, RescueInstance};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use ruc::*;
+
+    use crate::plonk::constraint_system::{rescue::State, TurboConstraintSystem};
 
     type F = BLSScalar;
 
@@ -415,7 +423,7 @@ mod test {
     fn test_rescue_hash() {
         let hash = RescueInstance::new();
         // use BLS12-381 field
-        let mut cs = TurboPlonkConstraintSystem::<BLSScalar>::new();
+        let mut cs = TurboConstraintSystem::<BLSScalar>::new();
         let input_vec = [
             BLSScalar::from_u32(11),
             BLSScalar::from_u32(171),
@@ -447,7 +455,7 @@ mod test {
     #[test]
     fn test_rescue_cipher() {
         let cipher = RescueInstance::new();
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let key_vec = vec![
             BLSScalar::random(&mut prng),
@@ -490,7 +498,7 @@ mod test {
 
     #[test]
     fn test_rescue_ctr() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let key_vec = vec![
             BLSScalar::random(&mut prng),

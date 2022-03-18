@@ -2,22 +2,18 @@
 /// arithmetic/boolean/range gates that will be used in Anonymous transfer.
 /// The gates for elliptic curve operations and Rescue cipher/hash functions are implemented
 /// in ecc.rs and rescue.rs, respectively.
-pub mod ecc;
-pub mod rescue;
-
-use crate::plonk::errors::PlonkError;
-use crate::plonk::plonk_setup::ConstraintSystem;
 use algebra::groups::Scalar;
 use ruc::*;
 
-pub type VarIndex = usize; // Variable index
-pub type CsIndex = usize; // Constraint index
+use crate::plonk::errors::PlonkError;
+
+use super::{ConstraintSystem, CsIndex, VarIndex};
 
 pub const N_WIRES_PER_GATE: usize = 5;
 pub const N_SELECTORS: usize = 13;
 
 #[derive(Serialize, Deserialize)]
-pub struct TurboPlonkConstraintSystem<F> {
+pub struct TurboConstraintSystem<F> {
     pub selectors: Vec<Vec<F>>,
     pub wiring: [Vec<VarIndex>; N_WIRES_PER_GATE],
     pub num_vars: usize,
@@ -26,14 +22,14 @@ pub struct TurboPlonkConstraintSystem<F> {
     pub public_vars_witness_indices: Vec<VarIndex>,
     pub verifier_only: bool,
     // A private witness for the circuit, cleared after computing a proof
-    witness: Vec<F>,
+    pub witness: Vec<F>,
     // A reserved variable that maps to value zero
     zero_var: Option<VarIndex>,
     // A reserved variable that maps to value one
     one_var: Option<VarIndex>,
 }
 
-impl<F: Scalar> ConstraintSystem for TurboPlonkConstraintSystem<F> {
+impl<F: Scalar> ConstraintSystem for TurboConstraintSystem<F> {
     type Field = F;
 
     fn size(&self) -> usize {
@@ -194,18 +190,18 @@ fn compute_binary_le<F: Scalar>(bytes: &[u8]) -> Vec<F> {
     res
 }
 
-impl<F: Scalar> Default for TurboPlonkConstraintSystem<F> {
+impl<F: Scalar> Default for TurboConstraintSystem<F> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F: Scalar> TurboPlonkConstraintSystem<F> {
+impl<F: Scalar> TurboConstraintSystem<F> {
     /// Create a TurboPLONK constraint system with a certain field size.
-    pub fn new() -> TurboPlonkConstraintSystem<F> {
+    pub fn new() -> TurboConstraintSystem<F> {
         let selectors: Vec<Vec<F>> =
             std::iter::repeat(vec![]).take(N_SELECTORS).collect();
-        let mut cs = TurboPlonkConstraintSystem {
+        let mut cs = TurboConstraintSystem {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
             num_vars: 0,
@@ -691,15 +687,30 @@ impl<F: Scalar> TurboPlonkConstraintSystem<F> {
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
+    use algebra::{
+        bls12_381::BLSScalar,
+        groups::{Group, One, Scalar, ScalarArithmetic, Zero},
+        jubjub::JubjubPoint,
+    };
+    use merlin::Transcript;
+    use rand_chacha::ChaChaRng;
+    use rand_core::{CryptoRng, RngCore, SeedableRng};
     use ruc::*;
+    use std::str::FromStr;
+
+    use crate::commitments::{kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme};
+    use crate::plonk::{
+        constraint_system::{rescue::State, ConstraintSystem, TurboConstraintSystem},
+        prover::prover,
+        setup::preprocess_prover,
+        verifier::verifier,
+    };
 
     type F = BLSScalar;
+
     #[test]
     fn test_select() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let num: Vec<F> = (0..4).map(|x| F::from_u32(x as u32)).collect();
         let index_0 = cs.new_variable(num[0]); // bit0 = 0 -- Variable index 2
         let index_1 = cs.new_variable(num[1]); // bit1 = 1 -- Variable index 3
@@ -765,7 +776,7 @@ mod test {
 
     #[test]
     fn test_sub_and_equal() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let zero = F::from_u32(0);
         let one = F::from_u32(1);
         let two = one.add(&one);
@@ -788,7 +799,7 @@ mod test {
 
     #[test]
     fn test_is_equal() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let zero = F::from_u32(0);
         let one = F::from_u32(1);
         let two = one.add(&one);
@@ -809,7 +820,7 @@ mod test {
 
     #[test]
     fn test_turbo_plonk_circuit_1() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let num: Vec<F> = (0..6).map(|x| F::from_u32(x as u32)).collect();
 
         // The circuit description:
@@ -881,7 +892,7 @@ mod test {
 
     #[test]
     fn test_turbo_plonk_circuit_2() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let num: Vec<F> = (0..9).map(|x| F::from_u32(x as u32)).collect();
 
         // The circuit description:
@@ -1069,23 +1080,6 @@ mod test {
             )
             .is_err());
     }
-}
-
-#[cfg(test)]
-mod turbo_plonk_proofs_test {
-    use crate::commitments::kzg_poly_com::KZGCommitmentScheme;
-    use crate::commitments::pcs::PolyComScheme;
-    use crate::plonk::plonk_setup::{preprocess_prover, ConstraintSystem};
-    use crate::plonk::protocol::prover::{prover, verifier};
-    use crate::plonk::turbo_plonk_cs::rescue::State;
-    use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
-    use algebra::jubjub::JubjubPoint;
-    use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
-    use rand_core::{CryptoRng, RngCore, SeedableRng};
-    use std::str::FromStr;
 
     #[test]
     fn test_turbo_plonk_kzg() {
@@ -1121,7 +1115,7 @@ mod turbo_plonk_proofs_test {
         // circuit (x_0 + y0) * (x_2 + 4) + x_0 * y1;
         // y0, y1 are online variables
         // witness (1 + 2) * (3 + 4) + 1 * 4 = 25
-        let mut cs = TurboPlonkConstraintSystem::<PCS::Field>::new();
+        let mut cs = TurboConstraintSystem::<PCS::Field>::new();
         cs.add_variables(&[
             one,
             two,
@@ -1157,7 +1151,7 @@ mod turbo_plonk_proofs_test {
         pcs: &PCS,
         prng: &mut R,
     ) {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let num: Vec<PCS::Field> =
             (0..9).map(|x| PCS::Field::from_u32(x as u32)).collect();
 
@@ -1195,7 +1189,7 @@ mod turbo_plonk_proofs_test {
         pcs: &PCS,
         prng: &mut R,
     ) {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
 
         // Compute secret scalar and public base point.
         let scalar_bytes: [u8; 32] = [
@@ -1222,7 +1216,7 @@ mod turbo_plonk_proofs_test {
         prng: &mut R,
     ) {
         let zero_vec = [PCS::Field::zero(); 4];
-        let mut cs = TurboPlonkConstraintSystem::<PCS::Field>::new();
+        let mut cs = TurboConstraintSystem::<PCS::Field>::new();
         // Prove the knowledge of hash pre-image.
         let input_state = State::new(zero_vec);
         let input_var = cs.new_hash_input_variable(input_state);
@@ -1242,7 +1236,7 @@ mod turbo_plonk_proofs_test {
     fn check_turbo_plonk_proof<PCS: PolyComScheme, R: CryptoRng + RngCore>(
         pcs: &PCS,
         prng: &mut R,
-        cs: &TurboPlonkConstraintSystem<PCS::Field>,
+        cs: &TurboConstraintSystem<PCS::Field>,
         witness: &[PCS::Field],
         online_vars: &[PCS::Field],
     ) {
