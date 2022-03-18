@@ -5,7 +5,7 @@
 ![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/FindoraNetwork/zei)
 ![License](https://img.shields.io/badge/license-BUSL--1.1-lightgreen)
 
-#**Zei: Findora's Cryptographic Library**
+**Zei: Findora's Cryptographic Library**
 
 Zei is a library that provide tools to create and verify public transaction
 with confidential data.
@@ -31,7 +31,7 @@ Support:
     decryption of an Elgamal ciphertexts correctly opens a pedersen commitment.
     Use in transfers that allow tracking amounts and asset type without publicly
     revealing these values.
-  - Dlog: Simple proof of knowlege of discrete logarithms over generic groups.
+  - Dlog: Simple proof of knowledge of discrete logarithms over generic groups.
 - Xfr multi-input multi-output UTXO transfers
   - Plain: XfrNote reveal amount and asset type
   - Confidential amount and/or asset type: XfrNote hides amount and/or asset type
@@ -40,47 +40,7 @@ Support:
   - Tracking policies: Allow tracking of amount, asset type, and/or identity
     of asset holders. That is, confidential Xfrs need to provide ciphertexts of
     amount/asset_type and/or identity and prove that this are correctly formed.
-
-# Benchmarks
-
-## Use the benchmarks
-
-Benchmarks are available for XfrNote operations. To run them all:
-
-```shell
-cargo bench
-```
-
-The report is available at `target/criterion/report/index.html`.
-
-To run a specific benchmark:
-
-```shell
-cargo bench --bench {xfr_batch | xfr_{note|body}_{noidtracking|idtracking}_{assettracking|noassettracking}_{singleasset|multiasset}}_{time|cycles}
-```
-
-For example to run the benchmark for xfr notes with identity tracking, and no asset tracking for a single asset, run:
-
-```shell
-cargo bench --bench xfr_note_idtracking_noassettracking_singleasset_time
-```
-
-The benchmarks involving batch verification can be run with:
-
-```shell
-cargo bench --bench xfr_note_batch_time
-```
-
-Note that not all the combinations are implemented yet. So far the benchmarks available are
-(replace `time`by `cycles` if you want the # of cpu cycles instead of seconds):
-
-- `xfr_note_noidtracking_noassettracking_singleasset_time`
-- `xfr_note_idtracking_noassettracking_singleasset_time`
-- `xfr_note_idtracking_assettracking_multiasset_time`
-- `xfr_note_idtracking_assettracking_singleasset_time`
-- `xfr_body_idtracking_assettracking_singleasset_time`
-- `xfr_note_batch_time`
-
+  
 ## Licensing
 
 The primary license for Zei is the Business Source License 1.1 (`BUSL-1.1`), see [`LICENSE`](./LICENSE).
