@@ -30,13 +30,16 @@ use crypto::pc_eq_rescue_split_verifier_zk_part::{
 use merlin::Transcript;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
-use poly_iops::plonk::field_simulation::SimFrVar;
-use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
 use poly_iops::{
     commitments::kzg_poly_com::KZGCommitmentSchemeBLS,
     plonk::{
-        protocol::prover::{prover, verifier, PlonkPf},
-        turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex},
+        constraint_system::{
+            field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem,
+            VarIndex,
+        },
+        prover::prover,
+        setup::PlonkPf,
+        verifier::verifier,
     },
 };
 use rand_core::{CryptoRng, RngCore};
@@ -370,7 +373,7 @@ pub fn build_abar_to_bar_cs(
     non_zk_state: &NonZKState,
     beta: &RistrettoScalar,
 ) -> (TurboPlonkCS, usize) {
-    let mut cs = TurboPlonkConstraintSystem::new();
+    let mut cs = TurboConstraintSystem::new();
     let payers_secrets = add_payers_secret(&mut cs, payers_secret);
 
     let base = JubjubPoint::get_base();
