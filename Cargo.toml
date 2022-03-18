@@ -1,7 +1,7 @@
 [workspace]
 members = [
+ "accumulators",
  "algebra",
- "bench-utils",
  "crypto",
  "poly-iops",
  "utils",
@@ -33,7 +33,11 @@ incremental = true
 debug-assertions = false
 
 [profile.dev]
-opt-level = 0
+opt-level = 3
+lto = "thin"
+incremental = true
+debug-assertions = true
+debug = true
 panic = 'abort'
 
 [profile.test]
