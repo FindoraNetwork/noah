@@ -1,5 +1,6 @@
 [workspace]
 members = [
+ "accumulators",
  "algebra",
  "crypto",
  "poly-iops",

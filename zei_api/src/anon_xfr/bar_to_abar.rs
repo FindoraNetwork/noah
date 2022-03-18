@@ -337,7 +337,7 @@ mod test {
         let abar_non_conf = AnonBlindAssetRecord::from_oabar(&oabar_non_conf);
 
         // verifications
-        let node_params = NodeParams::from(params);
+        let node_params = NodeParams::bar_to_abar_params().unwrap();
         // confidential case
         assert!(super::verify_bar_to_abar(
             &node_params,

@@ -723,7 +723,7 @@ mod tests {
         )
         .unwrap();
 
-        let node_params = NodeParams::from(params);
+        let node_params = NodeParams::abar_to_bar_params().unwrap();
         verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
 
         assert!(verify_abar_to_bar_body(
