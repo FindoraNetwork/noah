@@ -18,7 +18,6 @@ pub mod bp_circuits;
 pub mod bp_range_proofs;
 pub mod chaum_pedersen;
 pub mod conf_cred_reveal;
-pub mod dlog;
 pub mod group_signatures;
 pub mod merkle_tree;
 // pub mod inner_product_pairing; // TODO back in when BlsGt is serializable
