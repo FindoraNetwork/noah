@@ -1,10 +1,10 @@
-use crate::commitments::pcs::ToBytes;
-use crate::commitments::transcript::PolyComTranscript;
-use crate::plonk::plonk_setup::PlonkVerifierParams;
 use algebra::groups::Scalar;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
+
+use crate::commitments::{pcs::ToBytes, transcript::PolyComTranscript};
+use crate::plonk::setup::PlonkVerifierParams;
 
 pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(
     transcript: &mut Transcript,

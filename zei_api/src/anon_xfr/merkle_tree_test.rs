@@ -12,8 +12,7 @@ mod tests {
     use algebra::groups::{Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
     use parking_lot::RwLock;
-    use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
-    use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
+    use poly_iops::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use ruc::*;
@@ -91,7 +90,7 @@ mod tests {
 
         let proof = mt.generate_proof(0).unwrap();
 
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let uid_var = cs.new_variable(BLSScalar::from_u64(0));
         let comm_var = cs.new_variable(abar.amount_type_commitment);
         let pk_var = cs.new_point_variable(Point::new(

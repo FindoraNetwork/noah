@@ -8,8 +8,7 @@ use crypto::basics::commitments::rescue;
 use crypto::basics::hybrid_encryption::{
     hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
 };
-use poly_iops::commitments::kzg_poly_com::KZGCommitmentScheme;
-use poly_iops::plonk::protocol::prover::PlonkPf;
+use poly_iops::{commitments::kzg_poly_com::KZGCommitmentScheme, plonk::setup::PlonkPf};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use serde::Serialize;
