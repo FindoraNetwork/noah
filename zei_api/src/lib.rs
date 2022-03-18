@@ -21,9 +21,10 @@ extern crate core;
 
 pub mod anon_xfr;
 pub mod api;
+pub mod parameters;
 pub mod serialization;
 pub mod setup;
 pub mod xfr;
-pub use utils::errors;
 
 pub use algebra::ristretto;
+pub use utils::errors;

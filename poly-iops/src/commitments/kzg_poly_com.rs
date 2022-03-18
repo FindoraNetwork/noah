@@ -7,6 +7,7 @@ use algebra::groups::{Group, GroupArithmetic, One, Pairing, Scalar, ScalarArithm
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+
 /// Implementation of KZG polynomial commitment scheme
 /// https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf
 /// This polynomial scheme relies on a bilinear map e:G1 x G2 -> Gt,
@@ -332,6 +333,16 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             Err(eg!(PolyComSchemeError::PCSProveEvalError))
         }
     }
+
+    fn shrink_to_verifier_only(&self) -> Result<Self> {
+        Ok(Self {
+            public_parameter_group_1: vec![self.public_parameter_group_1[0].clone()],
+            public_parameter_group_2: vec![
+                self.public_parameter_group_2[0].clone(),
+                self.public_parameter_group_2[1].clone(),
+            ],
+        })
+    }
 }
 
 #[cfg(test)]
@@ -512,6 +523,17 @@ mod tests_kzg_impl {
         assert_eq!(value, seven);
 
         let res = pcs.verify_eval(
+            &mut not_needed_transcript,
+            &commitment_value,
+            degree,
+            &point,
+            &value,
+            &proof,
+        );
+        pnk!(res);
+
+        let new_pcs = pcs.shrink_to_verifier_only().unwrap();
+        let res = new_pcs.verify_eval(
             &mut not_needed_transcript,
             &commitment_value,
             degree,

@@ -141,7 +141,6 @@ pub mod prover {
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
     /// let three = two.add(&one);
-
     /// let common_seed = [0u8; 32];
     /// let proof = {
     /// // witness 1 + 2 = 3
@@ -169,6 +168,10 @@ pub mod prover {
         params: &ProverParams<PCS>,
         witness: &[PCS::Field],
     ) -> Result<PlonkPf<PCS>> {
+        if cs.is_verifier_only() {
+            return Err(eg!(PlonkError::FuncParamsError));
+        }
+
         let online_values: Vec<PCS::Field> = cs
             .public_vars_witness_indices()
             .iter()
@@ -189,7 +192,7 @@ pub mod prover {
 
         // 1. build witness polynomials, hide them and commit
         let root = &params.verifier_params.root;
-        let n_wires_per_gate = cs.n_wires_per_gate();
+        let n_wires_per_gate = CS::n_wires_per_gate();
         let mut witness_openings = vec![];
         let mut C_witness_polys = vec![];
         for i in 0..n_wires_per_gate {
@@ -267,7 +270,6 @@ pub mod prover {
             witness_polys_eval_beta.iter().collect();
         let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();
         let O_L = linearization_polynomial_opening::<PCS, CS>(
-            cs,
             params,
             &O_Sigma,
             &witness_polys_eval_beta_as_ref[..],
@@ -290,7 +292,7 @@ pub mod prover {
                 params
                     .extended_permutations
                     .iter()
-                    .take(cs.n_wires_per_gate() - 1),
+                    .take(CS::n_wires_per_gate() - 1),
             )
             .collect();
         let O_q_combined = combine_q_polys(&O_q_polys, &beta, n_constraints + 2);
@@ -383,7 +385,6 @@ pub mod prover {
         let perms_eval_beta_as_ref: Vec<&PCS::Field> =
             proof.perms_eval_beta.iter().collect();
         let C_L = linearization_commitment::<PCS, CS>(
-            cs,
             cs_params,
             &proof.C_Sigma,
             &witness_polys_eval_beta_as_ref[..],
@@ -412,7 +413,7 @@ pub mod prover {
                 cs_params
                     .extended_permutations
                     .iter()
-                    .take(cs.n_wires_per_gate() - 1),
+                    .take(CS::n_wires_per_gate() - 1),
             )
             .collect();
         let C_q_combined =
@@ -420,7 +421,7 @@ pub mod prover {
         commitments.push(&C_q_combined);
         commitments.push(&C_L);
         commitments.push(&proof.C_Sigma);
-        let mut points = vec![*beta; 2 * cs.n_wires_per_gate() + 1];
+        let mut points = vec![*beta; 2 * CS::n_wires_per_gate() + 1];
         points.push(g_beta);
         let mut values: Vec<PCS::Field> = proof
             .witness_polys_eval_beta
