@@ -1,112 +1,11 @@
-use crate::commitments::pcs::PolyComScheme;
-use crate::ioputils::u8_lsf_slice_to_u64_lsf_le_vec;
-use crate::plonk::errors::PlonkError;
-use crate::plonk::plonk_helpers::{build_group, compute_lagrange_constant};
-use crate::polynomials::field_polynomial::{primitive_nth_root_of_unity, FpPolynomial};
-use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
-use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use algebra::groups::Scalar;
 use ruc::*;
 
-/// Trait for Turbo PLONK constraint systems.
-pub trait ConstraintSystem: Sized {
-    type Field: Scalar;
-    /// Return the number of constraints in the system.
-    /// `size should divide q-1 where q is the size of the prime field.
-    /// This enables finding a multiplicative subgroup with order `size.
-    fn size(&self) -> usize;
+use crate::plonk::errors::PlonkError;
 
-    /// Return number of variables in the constrain system
-    fn num_vars(&self) -> usize;
+use super::ConstraintSystem;
 
-    /// Return the wiring of the constrain system
-    fn wiring(&self) -> &[Vec<usize>];
-
-    /// Return the size of the evaluation domain for computing the quotient polynomial.
-    /// `quot_eval_dom_size divides q-1 where q is the size of the prime field.
-    /// `quot_eval_dom_size is larger than the degree of the quotient polynomial.
-    /// `quot_eval_dom_size is a multiple of 'size'.
-    fn quot_eval_dom_size(&self) -> usize;
-
-    /// Return the number of wires in a single gate.
-    fn n_wires_per_gate() -> usize;
-
-    /// Return the number of selectors.
-    fn num_selectors(&self) -> usize;
-
-    /// Compute the permutation implied by the copy constraints.
-    fn compute_permutation(&self) -> Vec<usize> {
-        let n = self.size();
-        let n_wires_per_gate = Self::n_wires_per_gate();
-        let mut perm = vec![0usize; n_wires_per_gate * n];
-        let mut marked = vec![false; self.num_vars()];
-        let mut v = Vec::with_capacity(n_wires_per_gate * n);
-        for wire_slice in self.wiring().iter() {
-            v.extend_from_slice(wire_slice);
-        }
-        // form a cycle for each variable value
-        // marked variables already processd
-        // for each unmarked variable, find all position where this variable occurs to form a cycle.
-        for (i, value) in v.iter().enumerate() {
-            if marked[*value as usize] {
-                continue;
-            }
-            let first = i;
-            let mut prev = i;
-            for (j, current_value) in v[i + 1..].iter().enumerate() {
-                if current_value == value {
-                    perm[prev] = i + 1 + j; //current index in v
-                    prev = i + 1 + j;
-                }
-            }
-            perm[prev] = first;
-            marked[*value as usize] = true
-        }
-        perm
-    }
-
-    /// Compute the indices of the constraints related to public inputs.
-    fn public_vars_constraint_indices(&self) -> &[usize];
-
-    /// Compute the indices of the witnesses related to public inputs.
-    fn public_vars_witness_indices(&self) -> &[usize];
-
-    /// Map the witnesses into the wires of the circuit.
-    /// The (i * size + j)-th output element is the value of the i-th wire on the j-th gate.
-    fn extend_witness(&self, witness: &[Self::Field]) -> Vec<Self::Field> {
-        let mut extended = Vec::with_capacity(Self::n_wires_per_gate() * self.size());
-        for wire_slice in self.wiring().iter() {
-            for index in wire_slice.iter() {
-                extended.push(witness[*index]);
-            }
-        }
-        extended
-    }
-
-    /// Borrow the (index)-th selector vector.
-    fn selector(&self, index: usize) -> Result<&[Self::Field]>;
-
-    /// Evaluate the constraint equation given public input and the values of the wires and the selectors.
-    fn eval_gate_func(
-        wire_vals: &[&Self::Field],
-        sel_vals: &[&Self::Field],
-        pub_input: &Self::Field,
-    ) -> Result<Self::Field>;
-
-    /// Given the wires values of a gate, evaluate the coefficients of the selectors in the
-    /// constraint equation.
-    fn eval_selector_multipliers(wire_vals: &[&Self::Field])
-        -> Result<Vec<Self::Field>>;
-
-    fn is_verifier_only(&self) -> bool {
-        false
-    }
-
-    fn shrink_to_verifier_only(&self) -> Result<Self>;
-}
-
-#[allow(non_snake_case)]
-pub struct PlonkConstraintSystem<F> {
+pub struct StandardConstraintSystem<F> {
     pub selectors: Vec<Vec<F>>,
     pub wiring: [Vec<usize>; 3], // left, right, output, each of size `size`
     pub num_vars: usize,
@@ -116,7 +15,7 @@ pub struct PlonkConstraintSystem<F> {
     pub verifier_only: bool,
 }
 
-impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
+impl<F: Scalar> ConstraintSystem for StandardConstraintSystem<F> {
     type Field = F;
 
     fn size(&self) -> usize {
@@ -203,7 +102,7 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
     }
 
     fn shrink_to_verifier_only(&self) -> Result<Self> {
-        Ok(PlonkConstraintSystem {
+        Ok(StandardConstraintSystem {
             selectors: vec![],
             wiring: [vec![], vec![], vec![]], // 3-n_wires_per_gate
             num_vars: self.num_vars,
@@ -215,9 +114,9 @@ impl<F: Scalar> ConstraintSystem for PlonkConstraintSystem<F> {
     }
 }
 
-impl<F: Scalar> PlonkConstraintSystem<F> {
-    pub fn new(num_vars: usize) -> PlonkConstraintSystem<F> {
-        PlonkConstraintSystem {
+impl<F: Scalar> StandardConstraintSystem<F> {
+    pub fn new(num_vars: usize) -> StandardConstraintSystem<F> {
+        StandardConstraintSystem {
             selectors: vec![vec![], vec![], vec![], vec![], vec![]], // q_L, q_R, q_M, q_O, q_C
             wiring: [vec![], vec![], vec![]],
             num_vars,
@@ -461,235 +360,29 @@ impl<F: Scalar> PlonkConstraintSystem<F> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(non_snake_case)]
-pub struct PlonkProverParams<O, C, F> {
-    pub(crate) selectors: Vec<O>,
-    // perm1, perm2, ..., perm_{n_wires_per_gate}
-    pub(crate) extended_permutations: Vec<O>,
-    pub(crate) verifier_params: PlonkVerifierParams<C, F>,
-    pub(crate) group: Vec<F>,
-    // The evaluation domain for computing the quotient polynomial
-    pub(crate) coset_quot: Vec<F>,
-    pub(crate) root_m: F,
-    pub(crate) L1: FpPolynomial<F>, // first lagrange basis
-    pub(crate) Z_H: FpPolynomial<F>,
-    pub(crate) selectors_coset_evals: Vec<Vec<F>>,
-    pub(crate) perms_coset_evals: Vec<Vec<F>>,
-    pub(crate) L1_coset_evals: Vec<F>,
-    pub(crate) Z_H_inv_coset_evals: Vec<F>,
-}
-
-impl<O, C, F> PlonkProverParams<O, C, F> {
-    pub fn get_verifier_params(self) -> PlonkVerifierParams<C, F> {
-        self.verifier_params
-    }
-
-    pub fn get_verifier_params_ref(&self) -> &PlonkVerifierParams<C, F> {
-        &self.verifier_params
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(non_snake_case)]
-pub struct PlonkVerifierParams<C, F> {
-    pub(crate) selectors: Vec<C>,
-    pub(crate) extended_permutations: Vec<C>,
-    pub(crate) k: Vec<F>,
-    pub(crate) root: F,
-    pub(crate) cs_size: usize,
-    pub(crate) public_vars_constraint_indices: Vec<usize>,
-    pub(crate) lagrange_constants: Vec<F>,
-}
-
-pub type VerifierParams<PCS> = PlonkVerifierParams<
-    <PCS as PolyComScheme>::Commitment,
-    <PCS as PolyComScheme>::Field,
->;
-
-pub fn perm_values<F: Scalar>(group: &[F], perm: &[usize], k: &[F]) -> Vec<F> {
-    let n = group.len();
-    perm.iter()
-        .map(|pi| {
-            for (i, ki) in k.iter().enumerate().skip(1) {
-                if *pi < (i + 1) * n && *pi >= i * n {
-                    return ki.mul(&group[pi % n]);
-                }
-            }
-            group[pi % n]
-        })
-        .collect()
-}
-
-// Compute `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
-pub fn choose_ks<R: CryptoRng + RngCore, F: Scalar>(
-    prng: &mut R,
-    n_wires_per_gate: usize,
-) -> Vec<F> {
-    let mut k = vec![F::one()];
-    let q_minus_1_half_lsf = F::field_size_minus_one_half();
-    let q_minus_1_half_u64_lims_le = u8_lsf_slice_to_u64_lsf_le_vec(&q_minus_1_half_lsf);
-
-    for _ in 1..n_wires_per_gate {
-        loop {
-            let ki = F::random(prng);
-            if ki == F::zero() {
-                continue;
-            }
-            if k.iter().all(|x| x != &ki)
-                && ki.pow(&q_minus_1_half_u64_lims_le) != F::one()
-            {
-                k.push(ki);
-                break;
-            }
-        }
-    }
-    k
-}
-
-pub type ProverParams<PCS> = PlonkProverParams<
-    <PCS as PolyComScheme>::Opening,
-    <PCS as PolyComScheme>::Commitment,
-    <PCS as PolyComScheme>::Field,
->;
-/// Precompute the prover parameters.
-/// Before invoking preprocess_prover(), the constraint system `cs` should pad the number of
-/// constraints to a power of two.
-/// # Example
-/// See plonk::prover::prover
-#[allow(non_snake_case)]
-pub fn preprocess_prover<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
-    cs: &CS,
-    pcs: &PCS,
-    prg_seed: [u8; 32],
-) -> Result<ProverParams<PCS>> {
-    let mut prng = ChaChaRng::from_seed(prg_seed);
-    let n_wires_per_gate = CS::n_wires_per_gate();
-    let n = cs.size();
-    let m = cs.quot_eval_dom_size();
-    let factor = m / n;
-    if n * factor != m {
-        return Err(eg!(PlonkError::SetupError));
-    }
-    // Compute evaluation domains.
-    let root_m = primitive_nth_root_of_unity::<PCS::Field>(m)
-        .c(d!(PlonkError::GroupNotFound(m)))?;
-    let group_m = build_group(&root_m, m)?;
-    let root = group_m[factor % m];
-    let group = build_group(&root, n)?;
-    // TODO: we can fix the set k for different circuits.
-    let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
-    let coset_quot = group_m.iter().map(|x| k[1].mul(x)).collect();
-
-    // Compute the openings, commitments, and point evaluations of the permutation polynomials.
-    let perm = cs.compute_permutation();
-    let mut p_values = Vec::with_capacity(n_wires_per_gate * n);
-    for i in 0..n_wires_per_gate {
-        p_values.extend(perm_values(&group, &perm[i * n..(i + 1) * n], &k));
-    }
-    let mut perms_coset_evals = vec![vec![]; n_wires_per_gate];
-    let mut prover_extended_perms = vec![];
-    let mut verifier_extended_perms = vec![];
-    for i in 0..n_wires_per_gate {
-        let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n]);
-        perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
-        let (C_perm, O_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
-        prover_extended_perms.push(O_perm);
-        verifier_extended_perms.push(C_perm);
-    }
-
-    // Compute the openings, commitments, and point evaluations of the selector polynomials.
-    let mut selectors_coset_evals = vec![vec![]; cs.num_selectors()];
-    let mut prover_selectors = vec![];
-    let mut verifier_selectors = vec![];
-    for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
-        let q = FpPolynomial::ffti(&root, cs.selector(i)?);
-        selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
-        let (C_q, O_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
-        prover_selectors.push(O_q);
-        verifier_selectors.push(C_q);
-    }
-
-    // Compute polynomials L1, Z_H, and point evaluations of L1 and Z_H^{-1}.
-    let L1 = FpPolynomial::from_zeroes(&group[1..]);
-    let L1_coset_evals = L1.coset_fft_with_unity_root(&root_m, m, &k[1]);
-    let mut Z_H_coefs = vec![PCS::Field::zero(); n + 1];
-    Z_H_coefs[0] = PCS::Field::one().neg();
-    Z_H_coefs[n] = PCS::Field::one();
-    let Z_H = FpPolynomial::from_coefs(Z_H_coefs);
-    let Z_H_inv_coset_evals = Z_H
-        .coset_fft_with_unity_root(&root_m, m, &k[1])
-        .into_iter()
-        .map(|x| x.inv().unwrap())
-        .collect();
-
-    let mut lagrange_constants = vec![];
-    for constraint_index in cs.public_vars_constraint_indices().iter() {
-        lagrange_constants.push(compute_lagrange_constant(&group, *constraint_index));
-    }
-
-    let verifier_params = PlonkVerifierParams {
-        selectors: verifier_selectors,
-        extended_permutations: verifier_extended_perms,
-        k,
-        root,
-        cs_size: n,
-        public_vars_constraint_indices: cs.public_vars_constraint_indices().to_vec(),
-        lagrange_constants,
-    };
-
-    Ok(PlonkProverParams {
-        selectors: prover_selectors,
-        extended_permutations: prover_extended_perms,
-        verifier_params,
-        group,
-        coset_quot,
-        root_m,
-        L1,
-        Z_H,
-        selectors_coset_evals,
-        perms_coset_evals,
-        L1_coset_evals,
-        Z_H_inv_coset_evals,
-    })
-}
-
-/// Precompute the verifier parameters.
-/// Before invoking preprocess_verifier(), the constraint system `cs` should pad the number of
-/// constraints to a power of two.
-/// # Example
-/// See plonk::prover::prover
-pub fn preprocess_verifier<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
-    cs: &CS,
-    pcs: &PCS,
-    prg_seed: [u8; 32],
-) -> Result<VerifierParams<PCS>> {
-    let prover_params = preprocess_prover(cs, pcs, prg_seed).c(d!())?;
-    Ok(prover_params.verifier_params)
-}
-
 #[cfg(test)]
 mod test {
-    use crate::ioputils::u8_lsf_slice_to_u64_lsf_le_vec;
-    use crate::plonk::plonk_setup::{
-        choose_ks, ConstraintSystem, PlonkConstraintSystem,
+    use algebra::{
+        bls12_381::{BLSScalar, Bls12381},
+        groups::{One, ScalarArithmetic, Zero},
     };
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
+    use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+
+    use crate::commitments::kzg_poly_com::KZGCommitmentScheme;
+    use crate::plonk::{
+        constraint_system::{standard::StandardConstraintSystem, ConstraintSystem},
+        prover::prover,
+        setup::{preprocess_prover, preprocess_verifier, PlonkPf},
+        verifier::verifier,
+    };
 
     type F = BLSScalar;
 
     #[test]
-    fn test_permutation() {
-        let cs = PlonkConstraintSystem::<F> {
+    fn test_standard_permutation() {
+        let cs = StandardConstraintSystem::<F> {
             selectors: vec![vec![], vec![], vec![], vec![]],
             wiring: [vec![0, 1, 3], vec![3, 2, 2], vec![4, 3, 5]],
             num_vars: 6,
@@ -703,28 +396,8 @@ mod test {
     }
 
     #[test]
-    fn test_choose_ks() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let m = 8;
-        let k = choose_ks::<_, F>(&mut prng, m);
-        let q_minus_one_half = F::field_size_minus_one_half();
-        let q_minus_one_half_u64 = u8_lsf_slice_to_u64_lsf_le_vec(&q_minus_one_half);
-        assert_eq!(k[0], F::one());
-        assert!(k.iter().skip(1).all(|x| *x != F::zero()));
-        assert!(k
-            .iter()
-            .skip(1)
-            .all(|x| x.pow(&q_minus_one_half_u64) != F::one()));
-        for i in 1..m {
-            for j in 0..i {
-                assert_ne!(k[i], k[j]);
-            }
-        }
-    }
-
-    #[test]
-    fn test_circuit_cs() {
-        let mut cs = PlonkConstraintSystem::<F>::new(3);
+    fn test_standard_circuit_cs() {
+        let mut cs = StandardConstraintSystem::<F>::new(3);
         let zero = F::zero();
         let one = F::one();
         // no constrains, every witness is valid
@@ -740,7 +413,7 @@ mod test {
         assert!(cs.verify_witness(&[zero, zero, zero], &[]).is_ok());
         assert!(cs.verify_witness(&[zero, one, one], &[]).is_err());
 
-        let mut cs = PlonkConstraintSystem::<F>::new(4);
+        let mut cs = StandardConstraintSystem::<F>::new(4);
         // no constrains, every witness is valid
         assert!(cs.verify_witness(&[zero, zero, zero, zero], &[]).is_ok());
         // x + y = w
@@ -754,5 +427,194 @@ mod test {
         let three = two.add(&one);
         assert!(cs.verify_witness(&[two, one, three, two], &[]).is_err());
         assert!(cs.verify_witness(&[two, one, three, three], &[]).is_ok());
+    }
+
+    #[test]
+    fn test_standard_plonk_kzg() {
+        let mut prng = ChaChaRng::from_seed([1u8; 32]);
+        let pcs = KZGCommitmentScheme::new(30, &mut prng);
+
+        // circuit (x_0 + x_1) * (x_2 + x_3) + x_0;
+        let mut cs = StandardConstraintSystem::new(8);
+        let one = F::one();
+        let two = one.add(&one);
+        let three = two.add(&one);
+        let four = two.add(&two);
+        let seven = four.add(&three);
+        let twenty_one = seven.mul(&three);
+        let twenty_two = twenty_one.add(&one);
+        // witness (1+2) * (3+4) + 1= 22
+        let witness = [one, two, three, four, three, seven, twenty_one, twenty_two];
+
+        cs.insert_add_gate(0, 1, 4);
+        cs.insert_add_gate(2, 3, 5);
+        cs.insert_mul_gate(4, 5, 6);
+        cs.insert_add_gate(0, 6, 7);
+        cs.pad();
+
+        let common_seed = [0u8; 32];
+        let proof = {
+            assert!(cs.verify_witness(&witness, &[]).is_ok());
+            let prover_params = preprocess_prover(&cs, &pcs, common_seed).unwrap();
+            let mut transcript = Transcript::new(b"TestPlonk");
+            prover(
+                &mut prng,
+                &mut transcript,
+                &pcs,
+                &cs,
+                &prover_params,
+                &witness,
+            )
+            .unwrap()
+        };
+        // test serialization
+        let proof_json = serde_json::to_string(&proof).unwrap();
+        let proof_de: PlonkPf<KZGCommitmentScheme<Bls12381>> =
+            serde_json::from_str(&proof_json).unwrap();
+        assert_eq!(proof, proof_de);
+        {
+            let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
+            let mut transcript = Transcript::new(b"TestPlonk");
+            assert!(
+                verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof)
+                    .is_ok()
+            )
+        }
+    }
+
+    #[test]
+    fn test_standard_plonk_with_constants_wires() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let pcs = KZGCommitmentScheme::new(64, &mut prng);
+        type F = BLSScalar;
+
+        let one = F::one();
+        let two = one.add(&one);
+        let three = two.add(&one);
+        let four = two.add(&two);
+        let seven = four.add(&three);
+        let twenty_one = seven.mul(&three);
+        let twenty_five = twenty_one.add(&four);
+
+        // circuit (x_0 + 2) * (x_2 + x_3) + x_0*4;
+        let mut cs = StandardConstraintSystem::new(10);
+
+        // witness (1+2) * (3+4) + 1*4= 25
+        let witness = [
+            one,
+            two,
+            three,
+            four,
+            three,
+            seven,
+            twenty_one,
+            four,
+            four,
+            twenty_five,
+        ];
+        cs.insert_add_gate(0, 1, 4);
+        cs.insert_add_gate(2, 3, 5);
+        cs.insert_mul_gate(4, 5, 6);
+        cs.insert_mul_gate(0, 7, 8);
+        cs.insert_add_gate(6, 8, 9);
+        cs.insert_constant(1, two);
+        cs.insert_constant(7, four);
+        cs.pad();
+
+        let common_seed = [0u8; 32];
+        let proof = {
+            assert!(cs.verify_witness(&witness, &[]).is_ok());
+            let prover_params = preprocess_prover(&cs, &pcs, common_seed).unwrap();
+            let mut transcript = Transcript::new(b"TestPlonk");
+            prover(
+                &mut prng,
+                &mut transcript,
+                &pcs,
+                &cs,
+                &prover_params,
+                &witness,
+            )
+            .unwrap()
+        };
+
+        {
+            let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
+            let mut transcript = Transcript::new(b"TestPlonk");
+            assert!(
+                verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof)
+                    .is_ok()
+            )
+        }
+    }
+
+    #[test]
+    fn test_standard_plonk_with_public_online_values() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let pcs = KZGCommitmentScheme::new(64, &mut prng);
+        type F = BLSScalar;
+        let one = F::one();
+        let two = one.add(&one);
+        let three = two.add(&one);
+        let four = two.add(&two);
+        let seven = four.add(&three);
+        let twenty_one = seven.mul(&three);
+        let twenty_five = twenty_one.add(&four);
+
+        // circuit (x_0 + y0) * (x_2 + 4) + x_0*y1;
+        let mut cs = StandardConstraintSystem::new(10);
+
+        // witness (1+2) * (3+4) + 1*4= 25
+        let witness = [
+            one,
+            two,
+            three,
+            four,
+            three,
+            seven,
+            twenty_one,
+            four,
+            four,
+            twenty_five,
+        ];
+        cs.insert_add_gate(0, 1, 4);
+        cs.insert_add_gate(2, 3, 5);
+        cs.insert_mul_gate(4, 5, 6);
+        cs.insert_mul_gate(0, 7, 8);
+        cs.insert_add_gate(6, 8, 9);
+        cs.insert_constant(3, four);
+        cs.prepare_io_variable(1);
+        cs.prepare_io_variable(7);
+        cs.pad();
+
+        let online_vars = [two, four];
+
+        let common_seed = [0u8; 32];
+        let proof = {
+            assert!(cs.verify_witness(&witness, &online_vars).is_ok());
+            let prover_params = preprocess_prover(&cs, &pcs, common_seed).unwrap();
+            let mut transcript = Transcript::new(b"TestPlonk");
+            prover(
+                &mut prng,
+                &mut transcript,
+                &pcs,
+                &cs,
+                &prover_params,
+                &witness,
+            )
+            .unwrap()
+        };
+        {
+            let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
+            let mut transcript = Transcript::new(b"TestPlonk");
+            assert!(verifier(
+                &mut transcript,
+                &pcs,
+                &cs,
+                &verifier_params,
+                &online_vars,
+                &proof
+            )
+            .is_ok())
+        }
     }
 }

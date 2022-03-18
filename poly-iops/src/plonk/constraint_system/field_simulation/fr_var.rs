@@ -1,7 +1,7 @@
-use crate::plonk::field_simulation::SimFrMulVar;
-use crate::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
-use algebra::bls12_381::BLSScalar;
-use algebra::groups::{One as ArkOne, ScalarArithmetic, Zero as ArkZero};
+use algebra::{
+    bls12_381::BLSScalar,
+    groups::{One as ArkOne, ScalarArithmetic, Zero as ArkZero},
+};
 use crypto::field_simulation::{
     ristretto_scalar_field_sub_pad_in_limbs, SimFr, BIT_PER_LIMB, NUM_OF_LIMBS,
     NUM_OF_LIMBS_MUL,
@@ -10,8 +10,12 @@ use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use std::cmp::{max, min};
 
+use crate::plonk::constraint_system::{
+    field_simulation::SimFrMulVar, TurboConstraintSystem, VarIndex,
+};
+
 /// `SimFrVar` is the variable for `SimFr` in
-/// `TurboPlonkConstraintSystem<BLSScalar>`
+/// `TurboConstraintSystem<BLSScalar>`
 #[derive(Clone)]
 pub struct SimFrVar {
     pub val: SimFr,
@@ -19,7 +23,7 @@ pub struct SimFrVar {
 }
 
 impl SimFrVar {
-    pub fn new(cs: &mut TurboPlonkConstraintSystem<BLSScalar>) -> Self {
+    pub fn new(cs: &mut TurboConstraintSystem<BLSScalar>) -> Self {
         Self {
             val: SimFr::default(),
             var: [cs.zero_var(); NUM_OF_LIMBS],
@@ -28,7 +32,7 @@ impl SimFrVar {
 
     pub fn sub(
         &self,
-        cs: &mut TurboPlonkConstraintSystem<BLSScalar>,
+        cs: &mut TurboConstraintSystem<BLSScalar>,
         other: &SimFrVar,
     ) -> SimFrVar {
         let mut res = SimFrVar::new(cs);
@@ -67,7 +71,7 @@ impl SimFrVar {
 
     pub fn mul(
         &self,
-        cs: &mut TurboPlonkConstraintSystem<BLSScalar>,
+        cs: &mut TurboConstraintSystem<BLSScalar>,
         other: &SimFrVar,
     ) -> SimFrMulVar {
         let mut res = SimFrMulVar::new(cs);
@@ -118,7 +122,7 @@ impl SimFrVar {
     }
 
     pub fn alloc_constant(
-        cs: &mut TurboPlonkConstraintSystem<BLSScalar>,
+        cs: &mut TurboConstraintSystem<BLSScalar>,
         val: &SimFr,
     ) -> Self {
         let mut res = Self::new(cs);
@@ -131,7 +135,7 @@ impl SimFrVar {
     }
 
     pub fn alloc_witness(
-        cs: &mut TurboPlonkConstraintSystem<BLSScalar>,
+        cs: &mut TurboConstraintSystem<BLSScalar>,
         val: &SimFr,
     ) -> Self {
         assert!(val.num_of_additions_over_normal_form.is_zero());
@@ -147,7 +151,7 @@ impl SimFrVar {
     }
 
     pub fn alloc_witness_bounded_total_bits(
-        cs: &mut TurboPlonkConstraintSystem<BLSScalar>,
+        cs: &mut TurboConstraintSystem<BLSScalar>,
         val: &SimFr,
         total_bits: usize,
     ) -> Self {
@@ -177,8 +181,6 @@ impl SimFrVar {
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::field_simulation::{SimFrMulVar, SimFrVar};
-    use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
     use algebra::bls12_381::BLSScalar;
     use crypto::field_simulation::{
         ristretto_scalar_field_in_biguint, SimFr, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
@@ -189,7 +191,12 @@ mod test {
     use rand_core::SeedableRng;
     use std::ops::Shl;
 
-    fn test_sim_fr_equality(cs: TurboPlonkConstraintSystem<BLSScalar>, val: &SimFrVar) {
+    use crate::plonk::constraint_system::{
+        field_simulation::{SimFrMulVar, SimFrVar},
+        TurboConstraintSystem,
+    };
+
+    fn test_sim_fr_equality(cs: TurboConstraintSystem<BLSScalar>, val: &SimFrVar) {
         let mut cs = cs;
         for i in 0..NUM_OF_LIMBS {
             cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
@@ -200,7 +207,7 @@ mod test {
     }
 
     fn test_sim_fr_mul_equality(
-        cs: TurboPlonkConstraintSystem<BLSScalar>,
+        cs: TurboConstraintSystem<BLSScalar>,
         val: &SimFrMulVar,
     ) {
         let mut cs = cs;
@@ -222,7 +229,7 @@ mod test {
             let a_sim_fr = SimFr::from(&a);
 
             {
-                let mut cs = TurboPlonkConstraintSystem::<BLSScalar>::new();
+                let mut cs = TurboConstraintSystem::<BLSScalar>::new();
                 let a_sim_fr_var = SimFrVar::alloc_constant(&mut cs, &a_sim_fr);
                 test_sim_fr_equality(cs, &a_sim_fr_var);
             }
@@ -239,7 +246,7 @@ mod test {
             let a_sim_fr = SimFr::from(&a);
 
             {
-                let mut cs = TurboPlonkConstraintSystem::<BLSScalar>::new();
+                let mut cs = TurboConstraintSystem::<BLSScalar>::new();
                 let a_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
                 test_sim_fr_equality(cs, &a_sim_fr_var);
             }
@@ -259,7 +266,7 @@ mod test {
             let b_sim_fr = SimFr::from(&b);
 
             {
-                let mut cs = TurboPlonkConstraintSystem::<BLSScalar>::new();
+                let mut cs = TurboConstraintSystem::<BLSScalar>::new();
 
                 let a_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
                 let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
@@ -283,7 +290,7 @@ mod test {
             let b_sim_fr = SimFr::from(&b);
 
             {
-                let mut cs = TurboPlonkConstraintSystem::<BLSScalar>::new();
+                let mut cs = TurboConstraintSystem::<BLSScalar>::new();
 
                 let a_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
                 let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
@@ -303,7 +310,7 @@ mod test {
             let a_sim_fr = SimFr::from(&a);
 
             {
-                let mut cs = TurboPlonkConstraintSystem::<BLSScalar>::new();
+                let mut cs = TurboConstraintSystem::<BLSScalar>::new();
 
                 let a_sim_fr_var =
                     SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
@@ -319,7 +326,7 @@ mod test {
         let a_sim_fr = SimFr::from(&a);
 
         {
-            let mut cs = TurboPlonkConstraintSystem::<BLSScalar>::new();
+            let mut cs = TurboConstraintSystem::<BLSScalar>::new();
 
             let a_sim_fr_var =
                 SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);

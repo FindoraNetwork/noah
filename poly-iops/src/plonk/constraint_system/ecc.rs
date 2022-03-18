@@ -1,14 +1,22 @@
-use crate::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
-use algebra::bls12_381::BLSScalar;
-use algebra::groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero};
-use algebra::jubjub::JubjubPoint;
+use algebra::{
+    bls12_381::BLSScalar,
+    groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero},
+    jubjub::JubjubPoint,
+};
+
+use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
 
 type F = BLSScalar;
 
+/// represents a curve point in Affine form
 #[derive(Clone)]
-pub struct Point(F, F); // represents a curve point in Affine form
-pub struct PointVar(VarIndex, VarIndex); // The witness indices for x/y-coordinates of a point
-pub struct ExtendedPointVar(PointVar, JubjubPoint); // PointVar plus the corresponding Jubjub point
+pub struct Point(F, F);
+
+/// The witness indices for x/y-coordinates of a point
+pub struct PointVar(VarIndex, VarIndex);
+
+/// PointVar plus the corresponding Jubjub point
+pub struct ExtendedPointVar(PointVar, JubjubPoint);
 
 impl ExtendedPointVar {
     pub fn get_var(&self) -> &PointVar {
@@ -23,6 +31,7 @@ impl ExtendedPointVar {
         self.0
     }
 }
+
 impl Point {
     pub fn new(x: F, y: F) -> Point {
         Point(x, y)
@@ -88,7 +97,7 @@ fn compute_base_multiples(base: JubjubPoint, n: usize) -> Vec<Vec<JubjubPoint>> 
     bases
 }
 
-impl TurboPlonkConstraintSystem<BLSScalar> {
+impl TurboConstraintSystem<BLSScalar> {
     /// Create variables for a point.
     pub fn new_point_variable(&mut self, point: Point) -> PointVar {
         let x = self.new_variable(point.0);
@@ -376,17 +385,22 @@ impl TurboPlonkConstraintSystem<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::turbo_plonk_cs::ecc::{Point, PointVar};
-    use crate::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Group, GroupArithmetic, One, Scalar, Zero};
-    use algebra::jubjub::{JubjubPoint, JubjubScalar};
+    use algebra::{
+        bls12_381::BLSScalar,
+        groups::{Group, GroupArithmetic, One, Scalar, Zero},
+        jubjub::{JubjubPoint, JubjubScalar},
+    };
     use ruc::*;
+
+    use crate::plonk::constraint_system::{
+        ecc::{Point, PointVar},
+        TurboConstraintSystem,
+    };
 
     #[test]
     fn test_ecc_add() {
         // use BLS12-381 field
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let p1_ext = JubjubPoint::get_base();
         let p2_ext = p1_ext.double();
         let p3_ext = p1_ext.add(&p2_ext);
@@ -422,7 +436,7 @@ mod test {
     #[test]
     fn test_scalar_mul() {
         // use BLS12-381 field
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
 
         // compute secret scalar
         let scalar_bytes = [
@@ -451,7 +465,7 @@ mod test {
     #[test]
     fn test_scalar_mul_with_zero_scalar() {
         // use BLS12-381 field
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let base_ext = JubjubPoint::get_base();
         let base_point = Point::from(&base_ext);
         let scalar_var = cs.new_variable(BLSScalar::zero());
@@ -470,7 +484,7 @@ mod test {
 
     #[test]
     fn test_var_base_scalar_mul() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
 
         // compute secret scalar
         let scalar_bytes = [
