@@ -1,7 +1,7 @@
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
 use crate::bp_circuits::solvency::solvency;
-use algebra::groups::{Scalar as _, ScalarArithmetic};
+use algebra::traits::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
@@ -24,7 +24,7 @@ use utils::errors::ZeiError;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// use utils::errors::ZeiError;
 /// use algebra::ristretto::{CompressedRistretto, RistrettoScalar};
-/// use algebra::groups::Scalar;
+/// use algebra::traits::Scalar;
 /// use crypto::bp_circuits::cloak::{CloakValue, CloakCommitment};
 /// use crypto::solvency::{verify_solvency, prove_solvency};
 /// use bulletproofs::{BulletproofGens};
@@ -285,7 +285,7 @@ fn padd_values(values: &mut Vec<CloakValue>, types: &[Scalar]) {
 mod test {
     use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crate::bp_circuits::cloak::CloakValue;
-    use algebra::groups::Scalar;
+    use algebra::traits::Scalar;
     use algebra::ristretto::RistrettoScalar;
     use bulletproofs::BulletproofGens;
     use rand_chacha::ChaChaRng;
@@ -337,9 +337,7 @@ mod test {
             hidden_assets_coms.push(asset.commit(pc_gens, blinds));
         }
         let mut hidden_liabilities_coms = vec![];
-        for (liability, blinds) in
-            hidden_liability_set.iter().zip(liabilities_blinds.iter())
-        {
+        for (liability, blinds) in hidden_liability_set.iter().zip(liabilities_blinds.iter()) {
             hidden_liabilities_coms.push(liability.commit(pc_gens, blinds));
         }
 
@@ -521,14 +519,8 @@ mod test {
             CloakValue::new(RistrettoScalar::from_u32(80), RistrettoScalar::from_u32(1)), // 80, total 200
         ];
         let greater = [
-            CloakValue::new(
-                RistrettoScalar::from_u32(100),
-                RistrettoScalar::from_u32(2),
-            ), // 200
-            CloakValue::new(
-                RistrettoScalar::from_u32(100),
-                RistrettoScalar::from_u32(3),
-            ), // 300, total 500
+            CloakValue::new(RistrettoScalar::from_u32(100), RistrettoScalar::from_u32(2)), // 200
+            CloakValue::new(RistrettoScalar::from_u32(100), RistrettoScalar::from_u32(3)), // 300, total 500
         ];
 
         let asset_hidden = [
@@ -539,10 +531,7 @@ mod test {
             CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)), // 10, total 200
         ];
         let smaller = [
-            CloakValue::new(
-                RistrettoScalar::from_u32(499),
-                RistrettoScalar::from_u32(1),
-            ), // 499
+            CloakValue::new(RistrettoScalar::from_u32(499), RistrettoScalar::from_u32(1)), // 499
         ];
 
         let pc_gens = RistrettoPedersenGens::default();

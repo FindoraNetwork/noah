@@ -7,12 +7,11 @@
 */
 
 use crate::api::anon_creds::{
-    ac_reveal, ac_verify, ACIssuerPublicKey, ACRevealSig, ACUserSecretKey, Attr,
-    Credential,
+    ac_reveal, ac_verify, ACIssuerPublicKey, ACRevealSig, ACUserSecretKey, Attr, Credential,
 };
 use crate::api::gp_sig::{
-    gpsig_join_cert, gpsig_open, gpsig_verify, GroupPublicKey, GroupSecretKey,
-    GroupSignature, JoinCert, TagKey,
+    gpsig_join_cert, gpsig_open, gpsig_verify, GroupPublicKey, GroupSecretKey, GroupSignature,
+    JoinCert, TagKey,
 };
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};

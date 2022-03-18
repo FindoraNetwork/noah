@@ -9,7 +9,7 @@
 */
 
 use crate::bp_circuits::cloak::{allocate_cloak_vector, CloakValue, CloakVariable};
-use algebra::groups::{Scalar as _, ScalarArithmetic};
+use algebra::traits::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::{LinearCombination, RandomizableConstraintSystem};
 use ruc::*;
@@ -109,8 +109,8 @@ pub fn solvency<CS: RandomizableConstraintSystem>(
         None => None,
     };
 
-    let num_gates_range_proof = super::gadgets::range_proof_64(cs, diff_var, diff_value)
-        .c(d!(ZeiError::R1CSProofError))?;
+    let num_gates_range_proof =
+        super::gadgets::range_proof_64(cs, diff_var, diff_value).c(d!(ZeiError::R1CSProofError))?;
 
     Ok(num_gates_asset + num_gates_lia + num_gates_range_proof)
 }
@@ -161,17 +161,12 @@ fn aggregate<CS: RandomizableConstraintSystem>(
         total = total + out;
     }
     // prove addition of same flavor
-    let n_mix = super::gadgets::cloak_merge_gadget(
-        cs,
-        &sorted_vars[..],
-        &mid_vars[..],
-        &added_vars[..],
-    )
-    .c(d!(ZeiError::R1CSProofError))?;
-    // prove first shuffle
-    let n_shuffle1 =
-        super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars)
+    let n_mix =
+        super::gadgets::cloak_merge_gadget(cs, &sorted_vars[..], &mid_vars[..], &added_vars[..])
             .c(d!(ZeiError::R1CSProofError))?;
+    // prove first shuffle
+    let n_shuffle1 = super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars)
+        .c(d!(ZeiError::R1CSProofError))?;
     // prove second shiffled (zeroed values places at the end of the list)
     let n_shuffle2 = super::gadgets::cloak_shuffle_gadget(cs, added_vars, trimmed_vars)
         .c(d!(ZeiError::R1CSProofError))?;
@@ -246,7 +241,7 @@ fn trim(values: &[CloakValue]) -> Vec<CloakValue> {
 #[cfg(test)]
 mod test {
     use crate::bp_circuits::cloak::{CloakCommitment, CloakValue, CloakVariable};
-    use algebra::groups::Scalar;
+    use algebra::traits::Scalar;
     use algebra::ristretto::RistrettoScalar;
     use bulletproofs::r1cs::{Prover, Verifier};
     use bulletproofs::{BulletproofGens, PedersenGens};
@@ -349,10 +344,8 @@ mod test {
                 )
             })
             .collect();
-        let asset_com: Vec<CloakCommitment> =
-            asset_com_vars.iter().map(|(com, _)| *com).collect();
-        let asset_var: Vec<CloakVariable> =
-            asset_com_vars.iter().map(|(_, var)| *var).collect();
+        let asset_com: Vec<CloakCommitment> = asset_com_vars.iter().map(|(com, _)| *com).collect();
+        let asset_var: Vec<CloakVariable> = asset_com_vars.iter().map(|(_, var)| *var).collect();
 
         let lia_com_vars: Vec<(CloakCommitment, CloakVariable)> = liability_set
             .iter()
@@ -366,10 +359,8 @@ mod test {
                 )
             })
             .collect();
-        let lia_com: Vec<CloakCommitment> =
-            lia_com_vars.iter().map(|(com, _)| *com).collect();
-        let lia_var: Vec<CloakVariable> =
-            lia_com_vars.iter().map(|(_, var)| *var).collect();
+        let lia_com: Vec<CloakCommitment> = lia_com_vars.iter().map(|(com, _)| *com).collect();
+        let lia_var: Vec<CloakVariable> = lia_com_vars.iter().map(|(_, var)| *var).collect();
 
         let num_left_wires = super::solvency(
             &mut prover,

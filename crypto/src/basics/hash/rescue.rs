@@ -27,7 +27,7 @@
 //   - K_r'= instance.M * S-box-inv(K_{r-1}) + key_injection_r'
 //   - key_injection_r = instance.K * key_injection_r' + instance.C
 //   - K_r = instance.M * S-box(K_r') + key_injection_r, used in second step of round r
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use itertools::Itertools;
 
 #[allow(non_snake_case)]

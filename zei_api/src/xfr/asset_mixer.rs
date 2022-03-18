@@ -1,5 +1,5 @@
 use crate::setup::PublicParams;
-use algebra::groups::Scalar as _;
+use algebra::traits::Scalar as _;
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::r1cs::{batch_verify, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
@@ -28,7 +28,7 @@ impl Eq for AssetMixProof {}
 /// ```
 /// use algebra::ristretto::RistrettoScalar;
 /// use zei::xfr::asset_mixer::prove_asset_mixing;
-/// use algebra::groups::Scalar;
+/// use algebra::traits::Scalar;
 /// let input = [
 ///            (60u64, RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(10000), RistrettoScalar::from_u32(200000)),
 ///            (100u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10001), RistrettoScalar::from_u32(200001)),
@@ -130,7 +130,7 @@ pub struct AssetMixingInstance<'a> {
 /// # Example
 /// ```
 /// use algebra::ristretto::{RistrettoScalar, CompressedRistretto};
-/// use algebra::groups::Scalar;
+/// use algebra::traits::Scalar;
 /// use zei::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
@@ -192,8 +192,7 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     for (instance, transcript) in instances.iter().zip(transcripts.iter_mut()) {
         let mut verifier = Verifier::new(transcript);
         prepare_asset_mixer_verifier(&mut verifier, instance).c(d!())?;
-        let circuit_size =
-            asset_mix_num_generators(instance.inputs.len(), instance.outputs.len());
+        let circuit_size = asset_mix_num_generators(instance.inputs.len(), instance.outputs.len());
         if circuit_size > max_circuit_size {
             max_circuit_size = circuit_size;
         }
@@ -276,7 +275,7 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
 mod test {
     use crate::setup::PublicParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
-    use algebra::groups::Scalar;
+    use algebra::traits::Scalar;
     use algebra::ristretto::{CompressedRistretto, RistrettoScalar};
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use rand_chacha::ChaChaRng;

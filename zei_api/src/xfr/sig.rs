@@ -1,5 +1,5 @@
 use algebra::{
-    groups::Scalar as _,
+    traits::Scalar as _,
     ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar},
 };
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey, Signature, Verifier};
@@ -178,10 +178,8 @@ impl ZeiFromToBytes for XfrKeyPair {
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(XfrKeyPair {
-            sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH])
-                .c(d!())?,
-            pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..])
-                .c(d!())?,
+            sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH]).c(d!())?,
+            pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..]).c(d!())?,
         })
     }
 }

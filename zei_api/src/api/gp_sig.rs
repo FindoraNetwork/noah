@@ -1,27 +1,25 @@
-use algebra::bls12_381::{Bls12381, BLSG1};
+use algebra::bls12_381::{BLSPairingEngine, BLSG1};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 
 /// The public key of the group manager
-pub type GroupPublicKey = crypto::group_signatures::GroupPublicKey<Bls12381>;
+pub type GroupPublicKey = crypto::group_signatures::GroupPublicKey<BLSPairingEngine>;
 
 /// The secret key of the group manager
-pub type GroupSecretKey = crypto::group_signatures::GroupSecretKey<Bls12381>;
+pub type GroupSecretKey = crypto::group_signatures::GroupSecretKey<BLSPairingEngine>;
 
 /// A group signature
-pub type GroupSignature = crypto::group_signatures::GroupSignature<Bls12381>;
+pub type GroupSignature = crypto::group_signatures::GroupSignature<BLSPairingEngine>;
 
 /// Generates the private and public parameters for the Group manager.
 /// * `prng` - source of randomness
 /// * `returns` - a group public key and a group secret key
-pub fn gpsig_setup<R: CryptoRng + RngCore>(
-    prng: &mut R,
-) -> (GroupPublicKey, GroupSecretKey) {
-    crypto::group_signatures::gpsig_setup::<R, Bls12381>(prng)
+pub fn gpsig_setup<R: CryptoRng + RngCore>(prng: &mut R) -> (GroupPublicKey, GroupSecretKey) {
+    crypto::group_signatures::gpsig_setup::<R, BLSPairingEngine>(prng)
 }
 
 /// Group membership certificate
-pub type JoinCert = crypto::group_signatures::JoinCert<Bls12381>;
+pub type JoinCert = crypto::group_signatures::JoinCert<BLSPairingEngine>;
 pub type TagKey = crypto::group_signatures::TagKey<BLSG1>;
 
 /// Produces a join certificate for a new user.

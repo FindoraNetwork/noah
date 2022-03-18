@@ -1,4 +1,4 @@
-use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar};
+use algebra::traits::{Group, GroupArithmetic, Pairing, Scalar};
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -89,9 +89,7 @@ pub fn bls_batch_verify<P: Pairing, B: AsRef<[u8]>>(
 }
 
 /// signature aggregation for (possibly) different messages
-pub fn bls_add_signatures<P: Pairing>(
-    signatures: &[BlsSignature<P>],
-) -> BlsSignature<P> {
+pub fn bls_add_signatures<P: Pairing>(signatures: &[BlsSignature<P>]) -> BlsSignature<P> {
     let mut sig = P::G2::get_identity();
     for s in signatures {
         sig = sig.add(&s.0);
@@ -176,7 +174,7 @@ impl<S> AsRef<S> for BlsSecretKey<S> {
 
 #[cfg(test)]
 mod tests {
-    use algebra::bls12_381::Bls12381;
+    use algebra::bls12_381::BLSPairingEngine;
     use rand_core::SeedableRng;
     use ruc::*;
     use utils::errors::ZeiError;
@@ -184,11 +182,11 @@ mod tests {
     #[test]
     fn bls_signatures() {
         let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
-        let (sk, pk) = super::bls_gen_keys::<_, Bls12381>(&mut prng);
+        let (sk, pk) = super::bls_gen_keys::<_, BLSPairingEngine>(&mut prng);
 
         let message = b"this is a message";
 
-        let signature = super::bls_sign::<Bls12381, _>(&sk, message);
+        let signature = super::bls_sign::<BLSPairingEngine, _>(&sk, message);
 
         pnk!(super::bls_verify(&pk, message, &signature));
         msg_eq!(
@@ -200,9 +198,9 @@ mod tests {
     #[test]
     fn bls_aggregated_signatures() {
         let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
-        let (sk1, pk1) = super::bls_gen_keys::<_, Bls12381>(&mut prng);
-        let (sk2, pk2) = super::bls_gen_keys::<_, Bls12381>(&mut prng);
-        let (sk3, pk3) = super::bls_gen_keys::<_, Bls12381>(&mut prng);
+        let (sk1, pk1) = super::bls_gen_keys::<_, BLSPairingEngine>(&mut prng);
+        let (sk2, pk2) = super::bls_gen_keys::<_, BLSPairingEngine>(&mut prng);
+        let (sk3, pk3) = super::bls_gen_keys::<_, BLSPairingEngine>(&mut prng);
 
         let message = b"this is a message";
 
@@ -212,10 +210,8 @@ mod tests {
 
         let keys = [&pk1, &pk2, &pk3];
 
-        let agg_signature = super::bls_aggregate::<Bls12381>(
-            &keys,
-            &[&signature1, &signature2, &signature3],
-        );
+        let agg_signature =
+            super::bls_aggregate::<BLSPairingEngine>(&keys, &[&signature1, &signature2, &signature3]);
 
         pnk!(super::bls_verify_aggregated(&keys, message, &agg_signature));
     }
@@ -223,17 +219,17 @@ mod tests {
     #[test]
     fn bls_batching() {
         let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
-        let (sk1, pk1) = super::bls_gen_keys::<_, Bls12381>(&mut prng);
-        let (sk2, pk2) = super::bls_gen_keys::<_, Bls12381>(&mut prng);
-        let (sk3, pk3) = super::bls_gen_keys::<_, Bls12381>(&mut prng);
+        let (sk1, pk1) = super::bls_gen_keys::<_, BLSPairingEngine>(&mut prng);
+        let (sk2, pk2) = super::bls_gen_keys::<_, BLSPairingEngine>(&mut prng);
+        let (sk3, pk3) = super::bls_gen_keys::<_, BLSPairingEngine>(&mut prng);
 
         let message1 = b"this is a message";
         let message2 = b"this is another message";
         let message3 = b"this is an additional message";
 
-        let signature1 = super::bls_sign::<Bls12381, _>(&sk1, message1);
-        let signature2 = super::bls_sign::<Bls12381, _>(&sk2, message2);
-        let signature3 = super::bls_sign::<Bls12381, _>(&sk3, message3);
+        let signature1 = super::bls_sign::<BLSPairingEngine, _>(&sk1, message1);
+        let signature2 = super::bls_sign::<BLSPairingEngine, _>(&sk2, message2);
+        let signature3 = super::bls_sign::<BLSPairingEngine, _>(&sk3, message3);
 
         let keys = [pk1, pk2, pk3];
         let messages = [message1.as_ref(), message2.as_ref(), message3.as_ref()];

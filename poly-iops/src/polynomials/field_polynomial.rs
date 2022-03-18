@@ -1,4 +1,4 @@
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use num_bigint::{BigUint, ToBigUint};
 use num_integer::Integer;
 use num_traits::Zero;
@@ -18,7 +18,7 @@ impl<F> FpPolynomial<F> {
 
 impl<F: Scalar> FpPolynomial<F> {
     pub fn get_field_size(&self) -> Vec<u8> {
-        F::get_field_size_lsf_bytes()
+        F::get_field_size_le_bytes()
     }
 
     /// Returns the always zero polynomial
@@ -26,7 +26,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One};
+    /// use algebra::traits::{Zero, One};
     /// let poly = FpPolynomial::<BLSScalar>::zero();
     /// let zero = BLSScalar::zero();
     /// assert_eq!(poly.degree(), 0);
@@ -42,7 +42,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One};
+    /// use algebra::traits::{Zero, One};
     /// let poly = FpPolynomial::<BLSScalar>::one();
     /// let one = BLSScalar::one();
     /// assert_eq!(poly.degree(), 0);
@@ -59,7 +59,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -86,7 +86,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -126,7 +126,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -168,15 +168,12 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// use rand::thread_rng;
     /// let poly = FpPolynomial::<BLSScalar>::random(&mut thread_rng(), 10);
     /// assert!(poly.degree() <= 10)
     /// ```
-    pub fn random<R: CryptoRng + RngCore>(
-        prng: &mut R,
-        degree: usize,
-    ) -> FpPolynomial<F> {
+    pub fn random<R: CryptoRng + RngCore>(prng: &mut R, degree: usize) -> FpPolynomial<F> {
         let mut coefs = Vec::with_capacity(degree + 1);
         for _ in 0..degree + 1 {
             coefs.push(F::random(prng));
@@ -197,7 +194,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One};
+    /// use algebra::traits::{Zero, One};
     /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::one(); 10]);
     /// assert_eq!(poly.degree(), 9);
     /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::zero(); 10]);
@@ -216,7 +213,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One};
+    /// use algebra::traits::{Zero, One};
     /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::one(); 10]);
     /// assert!(!poly.is_zero());
     /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::zero(); 10]);
@@ -232,7 +229,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -267,7 +264,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -312,7 +309,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -336,7 +333,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -379,7 +376,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -401,7 +398,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let minus_one = one.neg();
@@ -420,7 +417,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let minus_one = one.neg();
@@ -441,7 +438,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let poly1 = FpPolynomial::from_coefs(vec![zero, one]);
@@ -466,7 +463,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let poly1 = FpPolynomial::from_coefs(vec![zero, one]);
@@ -490,7 +487,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let mut two = one;
@@ -519,7 +516,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -544,7 +541,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -564,7 +561,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
@@ -584,7 +581,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let poly = FpPolynomial::from_coefs(vec![zero, one, one]);
@@ -603,7 +600,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -627,7 +624,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -648,7 +645,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -672,7 +669,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -693,7 +690,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let mut poly = FpPolynomial::from_coefs(vec![one, one, one]);
@@ -742,7 +739,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use poly_iops::polynomials::field_polynomial::FpPolynomial;
     /// use algebra::bls12_381::BLSScalar;
-    /// use algebra::groups::{Zero, One, ScalarArithmetic};
+    /// use algebra::traits::{Zero, One, ScalarArithmetic};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -792,12 +789,7 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 
     /// Compute the DFT of the polynomial on the set k * <root>.
-    pub fn coset_fft_with_unity_root(
-        &self,
-        root: &F,
-        num_points: usize,
-        k: &F,
-    ) -> Vec<F> {
+    pub fn coset_fft_with_unity_root(&self, root: &F, num_points: usize, k: &F) -> Vec<F> {
         self.mul_var(k).fft_with_unity_root(root, num_points)
     }
 
@@ -898,8 +890,7 @@ fn recursive_fft<F: Scalar>(coefs: &[&F], root: &F) -> Vec<F> {
 }
 
 pub fn primitive_nth_root_of_unity<F: Scalar>(num_points: usize) -> Option<F> {
-    let q_minus_one =
-        BigUint::from_bytes_le(F::get_field_size_lsf_bytes().as_slice()).sub(1u64);
+    let q_minus_one = BigUint::from_bytes_le(F::get_field_size_le_bytes().as_slice()).sub(1u64);
     let (exp, r) = q_minus_one.div_rem(&num_points.to_biguint().unwrap());
     if !r.is_zero() {
         None
@@ -951,7 +942,7 @@ pub fn recursive_ifft<F: Scalar>(values: &[&F], root: &F) -> Vec<F> {
 mod test {
     use crate::polynomials::field_polynomial::FpPolynomial;
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
+    use algebra::traits::{One, Scalar, ScalarArithmetic, Zero};
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
 

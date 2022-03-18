@@ -19,11 +19,7 @@ impl Default for RistrettoPedersenGens {
     }
 }
 impl RistrettoPedersenGens {
-    pub fn commit(
-        &self,
-        value: RistrettoScalar,
-        blinding: RistrettoScalar,
-    ) -> RistrettoPoint {
+    pub fn commit(&self, value: RistrettoScalar, blinding: RistrettoScalar) -> RistrettoPoint {
         RistrettoPoint(
             curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(
                 &[value.0, blinding.0],

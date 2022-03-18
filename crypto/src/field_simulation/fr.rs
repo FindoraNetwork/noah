@@ -3,7 +3,7 @@ use crate::field_simulation::{
     ristretto_scalar_field_sub_pad_in_limbs, SimFrMul, BIT_PER_LIMB, NUM_OF_LIMBS,
 };
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::{ScalarArithmetic, Zero as ArkZero};
+use algebra::traits::{ScalarArithmetic, Zero as ArkZero};
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{One, Zero};

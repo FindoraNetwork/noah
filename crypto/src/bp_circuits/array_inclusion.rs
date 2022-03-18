@@ -25,7 +25,7 @@ pub fn array_membership<CS: ConstraintSystem>(
 #[cfg(test)]
 mod test {
     use super::array_membership;
-    use algebra::groups::Scalar as _;
+    use algebra::traits::Scalar as _;
     use algebra::ristretto::RistrettoScalar as Scalar;
     use bulletproofs::r1cs::{Prover, Verifier};
     use bulletproofs::{BulletproofGens, PedersenGens};

@@ -1,4 +1,4 @@
-use algebra::groups::ScalarArithmetic;
+use algebra::traits::ScalarArithmetic;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -9,9 +9,8 @@ use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{
-        combine_q_polys, hide_polynomial, linearization_polynomial_opening,
-        public_vars_polynomial, quotient_polynomial, sigma_polynomial,
-        split_q_and_commit, PlonkChallenges,
+        combine_q_polys, hide_polynomial, linearization_polynomial_opening, public_vars_polynomial,
+        quotient_polynomial, sigma_polynomial, split_q_and_commit, PlonkChallenges,
     },
     setup::{PlonkPf, PlonkProof, ProverParams},
     transcript::{
@@ -39,7 +38,7 @@ use crate::polynomials::field_polynomial::FpPolynomial;
 /// use merlin::Transcript;
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
-/// use algebra::{bls12_381::BLSScalar, groups::{One, ScalarArithmetic}};
+/// use algebra::{bls12_381::BLSScalar, traits::{One, ScalarArithmetic}};
 ///
 /// let mut prng = ChaChaRng::from_seed([1u8; 32]);
 /// let pcs = KZGCommitmentScheme::new(20, &mut prng);
@@ -100,11 +99,7 @@ pub fn prover<
         .map(|index| witness[*index])
         .collect();
     // Init transcript
-    transcript_init_plonk::<_, PCS::Field>(
-        transcript,
-        &params.verifier_params,
-        &online_values,
-    );
+    transcript_init_plonk::<_, PCS::Field>(transcript, &params.verifier_params, &online_values);
     let mut challenges = PlonkChallenges::new();
     let n_constraints = cs.size();
 
@@ -135,8 +130,7 @@ pub fn prover<
     challenges.insert_gamma_delta(gamma, delta).unwrap(); // safe unwrap
 
     // 3. build sigma, hide it and commit
-    let mut Sigma =
-        sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
+    let mut Sigma = sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
     hide_polynomial(prng, &mut Sigma, 2, n_constraints);
     let (C_Sigma, O_Sigma) = pcs.commit(Sigma).c(d!(PlonkError::CommitmentError))?;
     transcript.append_commitment::<PCS::Commitment>(&C_Sigma);
@@ -152,15 +146,8 @@ pub fn prover<
         .map(|open| pcs.polynomial_from_opening_ref(open))
         .collect();
     let Sigma = pcs.polynomial_from_opening_ref(&O_Sigma);
-    let Q = quotient_polynomial::<PCS, CS>(
-        cs,
-        params,
-        &witness_polys,
-        &Sigma,
-        &challenges,
-        &IO,
-    )
-    .c(d!())?;
+    let Q = quotient_polynomial::<PCS, CS>(cs, params, &witness_polys, &Sigma, &challenges, &IO)
+        .c(d!())?;
     let (C_q_polys, O_q_polys) =
         split_q_and_commit(pcs, &Q, n_wires_per_gate, n_constraints + 2).c(d!())?;
     for C_q in C_q_polys.iter() {
@@ -188,8 +175,7 @@ pub fn prover<
 
     challenges.insert_beta(beta).unwrap();
     //  b). build linearization polynomial r_beta(X), and eval at beta
-    let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> =
-        witness_polys_eval_beta.iter().collect();
+    let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> = witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();
     let O_L = linearization_polynomial_opening::<PCS, CS>(
         params,

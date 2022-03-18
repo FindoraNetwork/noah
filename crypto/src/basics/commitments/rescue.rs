@@ -10,7 +10,7 @@
 // 1. Check whether commitment == rescue(rand, m_1, ..., m_n, 0^{r+c-n-1})[0]
 use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use ruc::*;
 use utils::errors::ZeiError;
 
@@ -71,7 +71,7 @@ mod test {
     use crate::basics::commitments::rescue::HashCommitment;
     use crate::basics::hash::rescue::RescueInstance;
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::Scalar;
+    use algebra::traits::Scalar;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 
@@ -95,8 +95,7 @@ mod test {
         let hash = RescueInstance::<BLSScalar>::new();
         assert_eq!(
             commitment,
-            hash.rescue_hash(&[blind_scalar, msgs[0], msgs[1], BLSScalar::from_u32(0)])
-                [0]
+            hash.rescue_hash(&[blind_scalar, msgs[0], msgs[1], BLSScalar::from_u32(0)])[0]
         );
 
         // correct opening

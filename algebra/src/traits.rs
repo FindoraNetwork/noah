@@ -1,42 +1,78 @@
+use crate::errors::AlgebraError;
 use ark_std::{
-    borrow::Borrow,
     fmt::Debug,
+    ops::{Add, AddAssign, Mul, MulAssign},
     rand::{CryptoRng, RngCore},
+    One, Zero,
 };
 use digest::{generic_array::typenum::U64, Digest};
 use ruc::err::*;
 use serde::{Deserialize, Serialize};
+use std::ops::{Neg, Sub, SubAssign};
 use utils::shift_u8_vec;
-use crate::errors::AlgebraError;
 
-pub trait GroupArithmetic {
-    type S: Scalar;
-    fn mul(&self, scalar: &Self::S) -> Self;
-    fn add(&self, other: &Self) -> Self;
-    fn sub(&self, other: &Self) -> Self;
-    fn double(&self) -> Self;
-}
+/// The trait for scalars
+pub trait Scalar:
+    Copy
+    + Debug
+    + PartialEq
+    + Eq
+    + Serialize
+    + for<'de> Deserialize<'de>
+    + Clone
+    + One
+    + Zero
+    + Sized
+    + Add<Self, Output = Self>
+    + Mul<Self, Output = Self>
+    + for<'a> Add<&'a Self, Output = Self>
+    + for<'a> AddAssign<&'a Self>
+    + for<'a> Mul<&'a Self, Output = Self>
+    + for<'a> MulAssign<&'a Self>
+    + for<'a> Sub<&'a Self, Output = Self>
+    + for<'a> SubAssign<&'a Self>
+    + From<u32>
+    + From<u64>
+    + Neg<Output = Self>
+{
+    /// Return a random scalar
+    fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
 
-pub trait One {
-    fn one() -> Self;
-}
+    /// Sample a scalar based on a hash value
+    fn from_hash<D>(hash: D) -> Self
+    where
+        D: Digest<OutputSize = U64> + Default;
 
-pub trait Zero {
-    fn zero() -> Self;
-    fn is_zero(&self) -> bool;
-}
+    /// Return multiplicative generator of order r,
+    /// which is also required to be a quadratic nonresidue
+    fn multiplicative_generator() -> Self;
 
-pub trait ScalarArithmetic: Clone + One + Zero + Sized {
-    fn add(&self, b: &Self) -> Self;
-    fn add_assign(&mut self, b: &Self);
-    fn mul(&self, b: &Self) -> Self;
-    fn mul_assign(&mut self, b: &Self);
-    fn sub(&self, b: &Self) -> Self;
-    fn sub_assign(&mut self, b: &Self);
-    fn inv(&self) -> Result<Self>;
-    fn neg(&self) -> Self {
-        Self::zero().sub(self)
+    /// Return the little-endian byte representations of the field size
+    fn get_field_size_le_bytes() -> Vec<u8>;
+
+    /// Return the little-endian byte representation of `(field_size - 1) / 2`,
+    /// assuming that `field_size` is odd
+    fn field_size_minus_one_half() -> Vec<u8> {
+        let mut q_minus_1_half_le = Self::get_field_size_le_bytes();
+        // divide by 2 by shifting, first bit is one since F is odd prime
+        shift_u8_vec(&mut q_minus_1_half_le);
+        q_minus_1_half_le
     }
+
+    /// Return a representation of the scalar as a vector of u64 in the little-endian order
+    fn get_little_endian_u64(&self) -> Vec<u64>;
+
+    /// Return the len of the byte representation
+    fn bytes_len() -> usize;
+
+    /// Convert to bytes
+    fn to_bytes(&self) -> Vec<u8>;
+
+    /// Convert from bytes
+    fn from_bytes(bytes: &[u8]) -> Result<Self>;
+
+    /// Return the modular inverse of the scalar if it exists
+    fn inv(&self) -> Result<Self>;
 
     /// exponent form: least significant limb first, with u64 limbs
     fn pow(&self, exponent: &[u64]) -> Self {
@@ -57,81 +93,54 @@ pub trait ScalarArithmetic: Clone + One + Zero + Sized {
     }
 }
 
-pub trait Scalar:
-    Copy + Debug + PartialEq + Eq + ScalarArithmetic + Serialize + for<'de> Deserialize<'de>
-{
-    fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
-    fn from_u32(value: u32) -> Self;
-    fn from_u64(value: u64) -> Self;
-    fn from_hash<D>(hash: D) -> Self
-    where
-        D: Digest<OutputSize = U64> + Default;
-
-    // multiplicative generator of order r, which is also a quadratic nonresidue
-    fn multiplicative_generator() -> Self;
-    fn get_field_size_lsf_bytes() -> Vec<u8>;
-    fn field_size_minus_one_half() -> Vec<u8> {
-        let mut q_minus_1_half_le = Self::get_field_size_lsf_bytes();
-        // divide by 2 by shifting, first bit is one since F is odd prime
-        shift_u8_vec(&mut q_minus_1_half_le);
-        q_minus_1_half_le
-    }
-    fn get_little_endian_u64(&self) -> Vec<u64>;
-    fn bytes_len() -> usize;
-    fn to_bytes(&self) -> Vec<u8>;
-    fn from_bytes(bytes: &[u8]) -> Result<Self>;
-    fn from_le_bytes(bytes: &[u8]) -> Result<Self>;
-}
-
+/// The trait for group elements
 pub trait Group:
     Debug
+    + Copy
     + Sized
     + PartialEq
     + Eq
     + Clone
-    + GroupArithmetic
+    + for<'a> Add<&'a Self, Output = Self>
+    + for<'a> Mul<&'a Self::ScalarType, Output = Self>
+    + for<'a> Sub<&'a Self, Output = Self>
+    + for<'a> AddAssign<&'a Self>
+    + for<'a> SubAssign<&'a Self>
     + Serialize
     + for<'de> Deserialize<'de>
 {
+    /// The scalar type
+    type ScalarType: Scalar;
+
+    /// The number of bytes for a compressed representation of a group element
     const COMPRESSED_LEN: usize;
 
-    fn get_identity() -> Self;
-    fn get_base() -> Self;
-    fn get_random_base<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
+    /// Return the doubling of the group element
+    fn double(&self) -> Self;
 
+    /// Return the identity element (i.e., 0 * G)
+    fn get_identity() -> Self;
+
+    /// Return the base element (i.e., 1 * G)
+    fn get_base() -> Self;
+
+    /// Return a random element
+    fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self;
+
+    /// Convert to bytes in the compressed representation
     fn to_compressed_bytes(&self) -> Vec<u8>;
+
+    /// Convert from bytes in the compressed representation
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self>;
+
+    /// Sample a group element based on a hash value
     fn from_hash<D>(hash: D) -> Self
     where
         D: Digest<OutputSize = U64> + Default;
 
-    fn naive_multi_exp<I, H>(scalars: I, points: H) -> Self
-    where
-        I: IntoIterator,
-        I::Item: Borrow<Self::S>,
-        H: IntoIterator,
-        H::Item: Borrow<Self>,
-    {
-        let mut r = Self::get_identity();
-        for (s, p) in scalars.into_iter().zip(points.into_iter()) {
-            r = r.add(&p.borrow().mul(s.borrow()))
-        }
-        r
-    }
-
+    /// Compute the multiscalar multiplication
     #[inline]
-    fn multi_exp<I, H>(scalars: I, points: H) -> Self
-    where
-        I: IntoIterator,
-        I::Item: Borrow<Self::S>,
-        H: IntoIterator,
-        H::Item: Borrow<Self>,
-    {
-        Self::naive_multi_exp(scalars, points)
-    }
-
-    #[inline]
-    fn vartime_multi_exp(scalars: &[&Self::S], points: &[&Self]) -> Self {
+    fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
         if scalars.is_empty() {
             Self::get_identity()
         } else {
@@ -140,16 +149,28 @@ pub trait Group:
     }
 }
 
+/// The trait for a pair of groups for pairing
 pub trait Pairing {
+    /// The scalar type
     type ScalarField: Scalar;
-    type G1: Group<S = Self::ScalarField>;
-    type G2: Group<S = Self::ScalarField>;
-    type Gt: Group<S = Self::ScalarField>;
+
+    /// The first group
+    type G1: Group<ScalarType = Self::ScalarField>;
+
+    /// The second group
+    type G2: Group<ScalarType = Self::ScalarField>;
+
+    /// The target group
+    type Gt: Group<ScalarType = Self::ScalarField>;
+
+    /// The pairing operation
     fn pairing(a: &Self::G1, b: &Self::G2) -> Self::Gt;
 }
 
+/// Convert the scalar into a vector of small chunks, each of size `w`
 pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
-    if *scalar == S::from_u32(0) {
+    assert!(w <= 7);
+    if *scalar == S::from(0u32) {
         return vec![0i8];
     }
     let scalar64 = scalar.get_little_endian_u64();
@@ -197,8 +218,8 @@ pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
     digits
 }
 
-
-pub fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
+/// Run the pippenger algorithm to compute multiscalar multiplication
+pub fn pippenger<G: Group>(scalars: &[&G::ScalarType], elems: &[&G]) -> Result<G> {
     let size = scalars.len();
 
     if size == 0 {
@@ -216,7 +237,7 @@ pub fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
     let two_power_w: usize = 1 << w;
     let digits_vec: Vec<Vec<i8>> = scalars
         .iter()
-        .map(|s| scalar_to_radix_2_power_w::<G::S>(s, w))
+        .map(|s| scalar_to_radix_2_power_w::<G::ScalarType>(s, w))
         .collect();
 
     let mut digits_count = 0;
@@ -241,11 +262,11 @@ pub fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
             let digit = digits[index];
             if digit > 0 {
                 let b_index = (digit - 1) as usize;
-                buckets[b_index] = buckets[b_index].add(elem);
+                buckets[b_index].add_assign(elem);
             }
             if digit < 0 {
                 let b_index = (-(digit + 1)) as usize;
-                buckets[b_index] = buckets[b_index].sub(elem);
+                buckets[b_index].sub_assign(elem);
             }
         }
         let mut intermediate_sum = buckets[buckets.len() - 1].clone();
@@ -257,7 +278,7 @@ pub fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
         sum
     });
 
-    let two_power_w_int = Scalar::from_u64(two_power_w as u64);
+    let two_power_w_int = G::ScalarType::from(two_power_w as u64);
     // This unwrap is safe as the list of scalars is non empty at this point.
     let hi_col = cols.next().unwrap();
     let res = cols.fold(hi_col, |total, p| total.mul(&two_power_w_int).add(&p));
@@ -266,94 +287,94 @@ pub fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
 
 #[cfg(test)]
 pub(crate) mod group_tests {
-    use crate::groups::{scalar_to_radix_2_power_w, Scalar};
+    use crate::traits::{scalar_to_radix_2_power_w, Scalar};
 
     pub(crate) fn test_scalar_operations<S: Scalar>() {
-        let a = S::from_u32(40);
-        let b = S::from_u32(60);
+        let a = S::from(40u32);
+        let b = S::from(60u32);
         let c = a.add(&b);
-        let d = S::from_u32(100);
+        let d = S::from(100u32);
         assert_eq!(c, d);
 
-        let mut x = S::from_u32(0);
+        let mut x = S::from(0u32);
         x.add_assign(&a);
         x.add_assign(&b);
         assert_eq!(x, d);
 
-        let a = S::from_u32(10);
-        let b = S::from_u32(40);
+        let a = S::from(10u32);
+        let b = S::from(40u32);
         let c = a.mul(&b);
-        let d = S::from_u32(400);
+        let d = S::from(400u32);
         assert_eq!(c, d);
 
-        let mut x = S::from_u32(1);
+        let mut x = S::from(1u32);
         x.mul_assign(&a);
         x.mul_assign(&b);
         assert_eq!(x, d);
 
-        let a = S::from_u32(0xFFFFFFFF);
-        let b = S::from_u32(1);
+        let a = S::from(0xFFFFFFFFu32);
+        let b = S::from(1u32);
         let c = a.add(&b);
-        let d = S::from_u64(0x100000000);
+        let d = S::from(0x100000000u64);
         assert_eq!(c, d);
 
-        let a = S::from_u32(0xFFFFFFFF);
-        let b = S::from_u32(1);
+        let a = S::from(0xFFFFFFFFu32);
+        let b = S::from(1u32);
         let c = a.mul(&b);
-        let d = S::from_u32(0xFFFFFFFF);
+        let d = S::from(0xFFFFFFFFu32);
         assert_eq!(c, d);
 
-        let a = S::from_u32(40);
-        let b = S::from_u32(60);
+        let a = S::from(40u32);
+        let b = S::from(60u32);
         let c = b.sub(&a);
-        let d = S::from_u32(20);
+        let d = S::from(20u32);
         assert_eq!(c, d);
 
-        let mut x = S::from_u32(120);
+        let mut x = S::from(120u32);
         x.sub_assign(&b);
         x.sub_assign(&a);
         assert_eq!(x, d);
 
-        let a = S::from_u32(40);
+        let a = S::from(40u32);
         let b = a.neg();
         let c = b.add(&a);
-        let d = S::from_u32(0);
+        let d = S::from(0u32);
         assert_eq!(c, d);
 
-        let a = S::from_u32(40);
+        let a = S::from(40u32);
         let b = a.inv().unwrap();
         let c = b.mul(&a);
-        let d = S::from_u32(1);
+        let d = S::from(1u32);
         assert_eq!(c, d);
 
-        let a = S::from_u32(3);
+        let a = S::from(3u32);
         let b = vec![20];
         let c = a.pow(&b[..]);
-        let d = S::from_u64(3486784401);
+        let d = S::from(3486784401u64);
         assert_eq!(c, d);
     }
 
     pub(crate) fn test_scalar_serialization<S: Scalar>() {
-        let a = S::from_u32(100);
+        let a = S::from(100u32);
         let bytes = a.to_bytes();
         let b = S::from_bytes(bytes.as_slice()).unwrap();
         assert_eq!(a, b);
     }
 
     pub(crate) fn test_to_radix<S: Scalar>() {
-        let int = S::from_u32(41);
+        let int = S::from(41u32);
         let w = 2;
         let r = scalar_to_radix_2_power_w(&int, w);
         let expected = [1i8, -2, -1, 1]; // 41 = 1 + -2*4 + -1*16 + 64
         assert_eq!(r.as_slice(), expected.as_ref());
 
-        let int = S::from_u32(0);
+        let int = S::from(0u32);
         let w = 2;
         let r = scalar_to_radix_2_power_w(&int, w);
         let expected = [0i8];
         assert_eq!(expected.as_ref(), r.as_slice());
 
-        let int = S::from_u32(1000);
+        let int = S::from(1000u32);
         let w = 6;
         let r = scalar_to_radix_2_power_w(&int, w);
         let expected = [-24, 16];
@@ -364,8 +385,8 @@ pub(crate) mod group_tests {
 #[cfg(test)]
 mod multi_exp_tests {
     use crate::bls12_381::{BLSGt, BLSG1, BLSG2};
-    use crate::groups::{Group, Scalar};
     use crate::ristretto::RistrettoPoint;
+    use crate::traits::Group;
 
     #[test]
     fn test_multiexp_ristretto() {
@@ -385,34 +406,34 @@ mod multi_exp_tests {
     }
 
     fn run_multiexp_test<G: Group>() {
-        let g = G::vartime_multi_exp(&[], &[]);
+        let g = G::multi_exp(&[], &[]);
         assert_eq!(g, G::get_identity());
 
         let g1 = G::get_base();
-        let zero = G::S::from_u32(0);
-        let g = G::vartime_multi_exp(&[&zero], &[&g1]);
+        let zero = G::ScalarType::from(0u32);
+        let g = G::multi_exp(&[&zero], &[&g1]);
         assert_eq!(g, G::get_identity());
 
         let g1 = G::get_base();
-        let one = Scalar::from_u32(1);
-        let g = G::vartime_multi_exp(&[&one], &[&g1]);
+        let one = G::ScalarType::from(1u32);
+        let g = G::multi_exp(&[&one], &[&g1]);
         assert_eq!(g, G::get_base());
 
         let g1 = G::get_base();
         let g1p = G::get_base();
-        let one = Scalar::from_u32(1);
-        let zero = Scalar::from_u32(0);
-        let g = G::vartime_multi_exp(&[&one, &zero], &[&g1, &g1p]);
+        let one = G::ScalarType::from(1u32);
+        let zero = G::ScalarType::from(0u32);
+        let g = G::multi_exp(&[&one, &zero], &[&g1, &g1p]);
         assert_eq!(g, G::get_base());
 
         let g1 = G::get_base();
         let g2 = g1.add(&g1);
-        let g3 = g1.mul(&Scalar::from_u32(500));
-        let thousand = Scalar::from_u32(1000);
-        let two = Scalar::from_u32(2);
-        let three = Scalar::from_u32(3);
-        let g = G::vartime_multi_exp(&[&thousand, &two, &three], &[&g1, &g2, &g3]);
-        let expected = G::get_base().mul(&Scalar::from_u32(1000 + 4 + 1500));
+        let g3 = g1.mul(&G::ScalarType::from(500u32));
+        let thousand = G::ScalarType::from(1000u32);
+        let two = G::ScalarType::from(2u32);
+        let three = G::ScalarType::from(3u32);
+        let g = G::multi_exp(&[&thousand, &two, &three], &[&g1, &g2, &g3]);
+        let expected = G::get_base().mul(&G::ScalarType::from((1000 + 4 + 1500) as u32));
         assert_eq!(g, expected);
     }
 }

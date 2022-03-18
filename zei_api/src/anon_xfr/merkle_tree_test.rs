@@ -1,15 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::circuits::{
-        add_merkle_path_variables, compute_merkle_root, AccElemVars,
-    };
+    use crate::anon_xfr::circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
         AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord,
     };
     use accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, Zero};
+    use algebra::traits::{Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
     use parking_lot::RwLock;
     use poly_iops::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
@@ -35,8 +33,7 @@ mod tests {
 
         assert_eq!(mt.get_root().unwrap(), BLSScalar::zero(),);
 
-        let abar =
-            AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
+        let abar = AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());

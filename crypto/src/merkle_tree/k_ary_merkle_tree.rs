@@ -102,9 +102,7 @@ fn create_k_merkle_node<S: Copy + Debug, H: MTHash<S = S>>(
         .collect();
 
     let value: S = match level {
-        0 => {
-            hash.digest_root(elements.len(), values_vec.iter().collect_vec().as_slice())
-        }
+        0 => hash.digest_root(elements.len(), values_vec.iter().collect_vec().as_slice()),
         _ => hash.digest(values_vec.iter().collect_vec().as_slice()),
     };
 
@@ -165,11 +163,7 @@ fn prove_node<S: Copy + PartialEq + Eq + Debug>(
 /// `element` - element to be tested
 /// `path` - elements from the leaf to the root and their location at each level
 /// `returns` Ok() if the verification is successful, an error otherwise
-pub fn kmt_verify<S, H>(
-    root: &KMerkleRoot<S>,
-    element: &S,
-    path: &KMTPath<S>,
-) -> Result<()>
+pub fn kmt_verify<S, H>(root: &KMerkleRoot<S>, element: &S, path: &KMTPath<S>) -> Result<()>
 where
     S: Copy + PartialEq + Eq,
     H: MTHash<S = S>,
@@ -215,7 +209,7 @@ mod test {
     use super::*;
     use crate::basics::hash::mimc::MiMCHash;
     use crate::merkle_tree::binary_merkle_tree::mt_build;
-    use algebra::groups::{Scalar as _, ScalarArithmetic};
+    use algebra::traits::{Scalar as _, ScalarArithmetic};
     use algebra::ristretto::RistrettoScalar as Scalar;
 
     #[test]
@@ -242,8 +236,8 @@ mod test {
         let k_merkle_tree = k_mt_build::<Scalar, MiMCHash>(&elements[..], 3).unwrap();
         let k_merkle_root = k_merkle_tree.get_root();
         let k_merkle_root_bytes_expected: [u8; 32] = [
-            131, 67, 191, 251, 189, 176, 78, 250, 36, 176, 46, 156, 15, 60, 78, 245,
-            211, 223, 183, 127, 173, 76, 54, 75, 131, 216, 238, 50, 52, 25, 242, 11,
+            131, 67, 191, 251, 189, 176, 78, 250, 36, 176, 46, 156, 15, 60, 78, 245, 211, 223, 183,
+            127, 173, 76, 54, 75, 131, 216, 238, 50, 52, 25, 242, 11,
         ];
         assert_eq!(
             &k_merkle_root.value.to_bytes(),
@@ -275,11 +269,8 @@ mod test {
             let b = kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &e, &path);
             assert_eq!(true, b.is_ok());
 
-            let b = kmt_verify::<Scalar, MiMCHash>(
-                &k_merkle_root,
-                &e.add(&Scalar::from_u64(1)),
-                &path,
-            );
+            let b =
+                kmt_verify::<Scalar, MiMCHash>(&k_merkle_root, &e.add(&Scalar::from_u64(1)), &path);
             assert_eq!(false, b.is_ok());
 
             k_merkle_root.size = size * 2;

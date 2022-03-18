@@ -1,8 +1,6 @@
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use crate::sigma::{
-    sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
-};
-use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
+use crate::sigma::{sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript};
+use algebra::traits::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoPoint;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
@@ -70,8 +68,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(
     let blinding_factor1 = com1.1;
     let blinding_factor2 = com2.1;
     let identity = RistrettoPoint::get_identity();
-    let (elems, lhs_matrix, _) =
-        init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
+    let (elems, lhs_matrix, _) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
     let secrets = [value, blinding_factor1, blinding_factor2];
     let proof = sigma_prove(
         transcript,
@@ -108,8 +105,7 @@ pub fn chaum_pedersen_verify_eq_scalars<R: CryptoRng + RngCore>(
     proof: &ChaumPedersenProof,
 ) -> Vec<Scalar> {
     let identity = RistrettoPoint::get_identity();
-    let (elems, lhs_matrix, rhs_vec) =
-        init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
+    let (elems, lhs_matrix, rhs_vec) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
 
     let sigma_proof = SigmaProof {
         commitments: vec![proof.c3, proof.c4],
@@ -139,8 +135,7 @@ pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(
     proof: &ChaumPedersenProof,
 ) -> Result<()> {
     let identity = RistrettoPoint::get_identity();
-    let (elems, lhs_matrix, rhs_vec) =
-        init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
+    let (elems, lhs_matrix, rhs_vec) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
 
     let sigma_proof = SigmaProof {
         commitments: vec![proof.c3, proof.c4],

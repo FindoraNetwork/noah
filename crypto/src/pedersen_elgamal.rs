@@ -1,7 +1,7 @@
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::basics::elgamal::{ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
+use algebra::traits::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoPoint;
 use algebra::ristretto::RistrettoScalar as Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
@@ -206,13 +206,7 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(
     assert_eq!(n, commitments.len());
 
     let pc_gens = RistrettoPedersenGens::default();
-    init_pedersen_elgamal_aggregate(
-        transcript,
-        &pc_gens,
-        public_key,
-        ctexts,
-        commitments,
-    );
+    init_pedersen_elgamal_aggregate(transcript, &pc_gens, public_key, ctexts, commitments);
 
     // 1. compute x vector
     let x = get_linear_combination_scalars(transcript, n);
@@ -240,9 +234,7 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(
         e2: lc_e2,
     };
     // 3. call proof
-    pedersen_elgamal_eq_prove(
-        transcript, prng, &lc_m, &lc_r, public_key, &lc_ctext, &lc_c,
-    )
+    pedersen_elgamal_eq_prove(transcript, prng, &lc_m, &lc_r, public_key, &lc_ctext, &lc_c)
 }
 
 pub struct PedersenElGamalProofInstance<'a> {
@@ -370,7 +362,7 @@ mod test {
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
         PedersenElGamalProofInstance,
     };
-    use algebra::groups::Scalar as _;
+    use algebra::traits::Scalar as _;
     use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
     use itertools::Itertools;
     use merlin::Transcript;
@@ -795,8 +787,7 @@ mod test {
             .unwrap();
 
         let mut de = Deserializer::new(&vec[..]);
-        let proof_de: PedersenElGamalEqProof =
-            Deserialize::deserialize(&mut de).unwrap();
+        let proof_de: PedersenElGamalEqProof = Deserialize::deserialize(&mut de).unwrap();
         assert_eq!(proof, proof_de);
     }
 }

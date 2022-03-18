@@ -11,7 +11,7 @@
 // 3. Return s_0.
 use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 
 pub struct PRF<S>(RescueInstance<S>);
 
@@ -56,7 +56,7 @@ mod test {
     use crate::basics::hash::rescue::RescueInstance;
     use crate::basics::prf::PRF;
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, ScalarArithmetic};
+    use algebra::traits::{Scalar, ScalarArithmetic};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 

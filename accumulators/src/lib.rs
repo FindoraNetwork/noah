@@ -4,7 +4,7 @@ pub mod merkle_tree;
 mod tests {
     use crate::merkle_tree::{verify, PersistentMerkleTree};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::One;
+    use algebra::traits::One;
     use parking_lot::RwLock;
     use std::sync::Arc;
     use std::thread;

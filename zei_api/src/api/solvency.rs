@@ -3,7 +3,7 @@ use crate::xfr::{
     sig::XfrKeyPair,
     structs::{AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo},
 };
-use algebra::groups::{GroupArithmetic, Scalar as _, ScalarArithmetic};
+use algebra::traits::{GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::BulletproofGens;
@@ -65,9 +65,7 @@ impl fmt::Display for SolvencyAuditStage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match self {
             SolvencyAuditStage::RecordCollection => "Record Collection",
-            SolvencyAuditStage::LiabilitiesVerification => {
-                "Liability Records Verification"
-            }
+            SolvencyAuditStage::LiabilitiesVerification => "Liability Records Verification",
             SolvencyAuditStage::LiabilitiesVerified => "Liabilitiy Records Verified",
             SolvencyAuditStage::ReadyForProof => "Ready for Proof",
         })
@@ -188,12 +186,8 @@ impl SolvencyAudit {
         let mut liability_oars = vec![];
         for (i, rec) in self.assets.iter().enumerate() {
             asset_oars.push(
-                open_blind_asset_record(
-                    &rec,
-                    owner_memos_for_assets[i],
-                    keypairs_for_assets[i],
-                )
-                .c(d!())?,
+                open_blind_asset_record(&rec, owner_memos_for_assets[i], keypairs_for_assets[i])
+                    .c(d!())?,
             );
         }
         for (i, rec) in self.liabilities.iter().enumerate() {
@@ -293,16 +287,14 @@ impl SolvencyAudit {
 
     fn get_hidden_record_blinds(record: &OpenAssetRecord) -> CloakValue {
         let (amount_blind_lo, amount_blind_hi) = record.amount_blinds;
-        let amount_blind =
-            amount_blind_lo.add(&amount_blind_hi.mul(&Scalar::from_u64(1u64 << 32)));
+        let amount_blind = amount_blind_lo.add(&amount_blind_hi.mul(&Scalar::from_u64(1u64 << 32)));
         CloakValue::new(amount_blind, record.type_blind)
     }
 
     fn get_hidden_record_commitments(record: &BlindAssetRecord) -> CloakCommitment {
         let pc_gens = RistrettoPedersenGens::default();
         let amount_com = if record.amount.is_confidential() {
-            let (amount_com_lo, amount_com_hi) =
-                record.amount.get_commitments().unwrap();
+            let (amount_com_lo, amount_com_hi) = record.amount.get_commitments().unwrap();
             (amount_com_lo.decompress().unwrap().add(
                 &amount_com_hi
                     .decompress()
@@ -413,9 +405,7 @@ impl SolvencyVerifier {
 #[cfg(test)]
 mod test {
     use crate::{
-        api::solvency::{
-            SolvencyAudit, SolvencyProver, SolvencyRecordType, SolvencyVerifier,
-        },
+        api::solvency::{SolvencyAudit, SolvencyProver, SolvencyRecordType, SolvencyVerifier},
         xfr::{
             asset_record::{build_blind_asset_record, AssetRecordType},
             sig::{XfrKeyPair, XfrPublicKey},
@@ -436,9 +426,7 @@ mod test {
         asset_type: AssetType,
         ar_type: AssetRecordType,
     ) -> (BlindAssetRecord, Option<OwnerMemo>) {
-        let ar = AssetRecordTemplate::with_no_asset_tracing(
-            amt, asset_type, ar_type, *pubkey,
-        );
+        let ar = AssetRecordTemplate::with_no_asset_tracing(amt, asset_type, ar_type, *pubkey);
         let (bar, _, memo) = build_blind_asset_record(prng, &pc_gens, &ar, vec![]);
         (bar, memo)
     }

@@ -1,6 +1,6 @@
 use algebra::{
     bls12_381::BLSScalar,
-    groups::{One, ScalarArithmetic, Zero},
+    traits::{One, ScalarArithmetic, Zero},
 };
 use crypto::basics::hash::rescue::RescueInstance;
 
@@ -16,9 +16,8 @@ const NR: usize = 12;
 // alpha^{-1} mod (q-1) = 20974350070050476191779096203274386335076221000211055129041463479975432473805;
 // least significant u8limb first
 const ALPHA_INV: [u8; 32] = [
-    0xCD, 0xCC, 0xCC, 0xCC, 0x32, 0x33, 0x33, 0x33, 0x99, 0xF1, 0x98, 0x99, 0x67, 0x0E,
-    0x7F, 0x21, 0x02, 0xF0, 0x73, 0x9D, 0x69, 0x56, 0x4A, 0xE1, 0x1C, 0x32, 0x72, 0xDD,
-    0xBA, 0x0F, 0x5F, 0x2E,
+    0xCD, 0xCC, 0xCC, 0xCC, 0x32, 0x33, 0x33, 0x33, 0x99, 0xF1, 0x98, 0x99, 0x67, 0x0E, 0x7F, 0x21,
+    0x02, 0xF0, 0x73, 0x9D, 0x69, 0x56, 0x4A, 0xE1, 0x1C, 0x32, 0x72, 0xDD, 0xBA, 0x0F, 0x5F, 0x2E,
 ];
 
 #[derive(Clone)]
@@ -86,10 +85,8 @@ impl TurboConstraintSystem<BLSScalar> {
         let zero = BLSScalar::zero();
         let zero_vec = vec![zero, zero, zero, zero];
         let keys = hash.key_scheduling(&zero_vec[..]);
-        let keys_states: Vec<State> =
-            keys.iter().map(|key| State::from(&key[..])).collect();
-        let mds_states: Vec<State> =
-            hash.MDS.iter().map(|mi| State::from(&mi[..])).collect();
+        let keys_states: Vec<State> = keys.iter().map(|key| State::from(&key[..])).collect();
+        let mds_states: Vec<State> = hash.MDS.iter().map(|mi| State::from(&mi[..])).collect();
         self.rescue_hash_with_keys(input_var, &mds_states, &keys_states)
     }
 
@@ -120,14 +117,9 @@ impl TurboConstraintSystem<BLSScalar> {
     /// * `key_var` - the state variable representing the cipher key.
     /// * `input_var` - the state variable representing the block cipher input.
     /// * Returns the state variable representing the block cipher output.
-    pub fn rescue_cipher(
-        &mut self,
-        key_var: &StateVar,
-        input_var: &StateVar,
-    ) -> StateVar {
+    pub fn rescue_cipher(&mut self, key_var: &StateVar, input_var: &StateVar) -> StateVar {
         let cipher = RescueInstance::new();
-        let mds_states: Vec<State> =
-            cipher.MDS.iter().map(|mi| State::from(&mi[..])).collect();
+        let mds_states: Vec<State> = cipher.MDS.iter().map(|mi| State::from(&mi[..])).collect();
         let keys_vars = self.key_scheduling(&cipher, &mds_states, key_var);
         self.rescue_cipher_with_keys(input_var, &keys_vars, &mds_states)
     }
@@ -188,16 +180,10 @@ impl TurboConstraintSystem<BLSScalar> {
     /// * `key_vars` - the symmetric key variables
     /// * `data_vars` - the variables for the data to be encrypted
     /// * Returns the variables that map to the ciphertext
-    pub fn rescue_ctr(
-        &mut self,
-        key_vars: Vec<VarIndex>,
-        data_vars: &[VarIndex],
-    ) -> Vec<VarIndex> {
+    pub fn rescue_ctr(&mut self, key_vars: Vec<VarIndex>, data_vars: &[VarIndex]) -> Vec<VarIndex> {
         let cipher = RescueInstance::new();
-        let mds_states: Vec<State> =
-            cipher.MDS.iter().map(|m| State::from(&m[..])).collect();
-        let round_keys_vars =
-            self.key_scheduling(&cipher, &mds_states, &StateVar(key_vars));
+        let mds_states: Vec<State> = cipher.MDS.iter().map(|m| State::from(&m[..])).collect();
+        let round_keys_vars = self.key_scheduling(&cipher, &mds_states, &StateVar(key_vars));
 
         let zero_var = self.zero_var();
         let one = BLSScalar::one();
@@ -208,11 +194,7 @@ impl TurboConstraintSystem<BLSScalar> {
             input_vars.extend(vec![zero_var; WIDTH - 1]);
             nonce_var = self.add_constant(nonce_var, &one);
             let keystream = self
-                .rescue_cipher_with_keys(
-                    &StateVar(input_vars),
-                    &round_keys_vars,
-                    &mds_states,
-                )
+                .rescue_cipher_with_keys(&StateVar(input_vars), &round_keys_vars, &mds_states)
                 .0;
             let len = block.len();
             for (&data, &mask) in block.iter().zip(keystream.iter()).take(len) {
@@ -222,11 +204,7 @@ impl TurboConstraintSystem<BLSScalar> {
         ctexts
     }
 
-    fn add_state(
-        &mut self,
-        left_state_var: &StateVar,
-        right_state_var: &StateVar,
-    ) -> StateVar {
+    fn add_state(&mut self, left_state_var: &StateVar, right_state_var: &StateVar) -> StateVar {
         let vars: Vec<VarIndex> = left_state_var
             .0
             .iter()
@@ -236,11 +214,7 @@ impl TurboConstraintSystem<BLSScalar> {
         StateVar(vars)
     }
 
-    fn add_constant_state(
-        &mut self,
-        state_var: &StateVar,
-        constant: &State,
-    ) -> StateVar {
+    fn add_constant_state(&mut self, state_var: &StateVar, constant: &State) -> StateVar {
         let vars: Vec<VarIndex> = state_var
             .0
             .iter()
@@ -250,38 +224,20 @@ impl TurboConstraintSystem<BLSScalar> {
         StateVar(vars)
     }
 
-    fn linear_op(
-        &mut self,
-        state_var: &StateVar,
-        mds: &[State],
-        key: &State,
-    ) -> StateVar {
+    fn linear_op(&mut self, state_var: &StateVar, mds: &[State], key: &State) -> StateVar {
         assert_eq!(mds.len(), WIDTH);
         // vars[i] = key[i] + \sum_{j=0..WIDTH-1} mds[i][j] * state_var[j]
         let vars: Vec<VarIndex> = (0..WIDTH)
-            .map(|i| {
-                self.add_linear_op_constraint(&state_var.0[..], &mds[i].0[..], &key.0[i])
-            })
+            .map(|i| self.add_linear_op_constraint(&state_var.0[..], &mds[i].0[..], &key.0[i]))
             .collect();
         StateVar(vars)
     }
 
-    fn non_linear_op(
-        &mut self,
-        state_var: &StateVar,
-        mds: &[State],
-        key: &State,
-    ) -> StateVar {
+    fn non_linear_op(&mut self, state_var: &StateVar, mds: &[State], key: &State) -> StateVar {
         assert_eq!(mds.len(), WIDTH);
         // vars[i] = key[i] + \sum_{j=0..WIDTH-1} mds[i][j] * state_var[j]^5
         let vars: Vec<VarIndex> = (0..WIDTH)
-            .map(|i| {
-                self.add_non_linear_op_constraint(
-                    &state_var.0[..],
-                    &mds[i].0[..],
-                    &key.0[i],
-                )
-            })
+            .map(|i| self.add_non_linear_op_constraint(&state_var.0[..], &mds[i].0[..], &key.0[i]))
             .collect();
         StateVar(vars)
     }
@@ -408,7 +364,7 @@ impl TurboConstraintSystem<BLSScalar> {
 mod test {
     use algebra::{
         bls12_381::BLSScalar,
-        groups::{Scalar, Zero},
+        traits::{Scalar, Zero},
     };
     use crypto::basics::hash::rescue::{RescueCtr, RescueInstance};
     use rand_chacha::ChaChaRng;
@@ -435,8 +391,7 @@ mod test {
         let out_var = cs.rescue_hash(&input_var)[0];
 
         // Check consistency between witness[input_var] and input_state
-        let witness_input: Vec<F> =
-            input_var.0.iter().map(|&var| cs.witness[var]).collect();
+        let witness_input: Vec<F> = input_var.0.iter().map(|&var| cs.witness[var]).collect();
         assert_eq!(witness_input, input_state.0);
 
         // Check consistency between witness[out_var] and rescue_out_state[0]
@@ -474,8 +429,7 @@ mod test {
         let out_var = cs.rescue_cipher(&key_var, &input_var);
 
         // Check consistency between witness[input_var] and input_vec
-        let witness_input: Vec<F> =
-            input_var.0.iter().map(|&var| cs.witness[var]).collect();
+        let witness_input: Vec<F> = input_var.0.iter().map(|&var| cs.witness[var]).collect();
         assert_eq!(witness_input, input_vec);
 
         // Check consistency between witness[key_var] and key_vec
@@ -483,8 +437,7 @@ mod test {
         assert_eq!(witness_key, key_vec);
 
         // Check consistency between witness[out_var] and rescue cipher output
-        let witness_output: Vec<F> =
-            out_var.0.iter().map(|&var| cs.witness[var]).collect();
+        let witness_output: Vec<F> = out_var.0.iter().map(|&var| cs.witness[var]).collect();
         assert_eq!(witness_output, cipher.rescue(&input_vec, &key_vec));
 
         // Check good witness

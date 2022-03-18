@@ -1,4 +1,4 @@
-use algebra::groups::Group;
+use algebra::traits::Group;
 use algebra::ristretto::RistrettoPoint;
 use digest::Digest;
 use itertools::Itertools;
@@ -36,15 +36,14 @@ impl<G: Group> PedersenGens<G> {
     }
 
     /// commit
-    pub fn commit(&self, values: &[G::S], blinding: &G::S) -> Result<G> {
+    pub fn commit(&self, values: &[G::ScalarType], blinding: &G::ScalarType) -> Result<G> {
         if values.len() != self.bases.len() - 1 {
             return Err(eg!(ZeiError::ParameterError));
         }
         let mut scalars = values.iter().collect_vec();
         scalars.push(blinding);
         let bases = self.bases.iter().collect_vec();
-        // we use naive multi exp it gives us constant time, and we don't lose when |values| is small
-        Ok(G::naive_multi_exp(scalars, bases))
+        Ok(G::multi_exp(&*scalars, bases))
     }
 }
 

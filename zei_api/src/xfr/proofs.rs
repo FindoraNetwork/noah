@@ -5,20 +5,17 @@ use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::RecordDataEncKey;
 use crate::xfr::lib::XfrNotePoliciesRef;
 use crate::xfr::structs::{
-    AssetRecord, BlindAssetRecord, OpenAssetRecord, TracerMemo, TracingPolicies,
-    XfrAmount, XfrAssetType, XfrBody, XfrRangeProof,
+    AssetRecord, BlindAssetRecord, OpenAssetRecord, TracerMemo, TracingPolicies, XfrAmount,
+    XfrAssetType, XfrBody, XfrRangeProof,
 };
-use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
-use algebra::ristretto::{
-    CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar,
-};
+use algebra::traits::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
+use algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar};
 use bulletproofs::RangeProof;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::basics::elgamal::ElGamalCiphertext;
 use crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
 use crypto::chaum_pedersen::{
-    chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq,
-    ChaumPedersenProofX,
+    chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq, ChaumPedersenProofX,
 };
 use crypto::pedersen_elgamal::{
     pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
@@ -77,8 +74,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
     for (record, memo) in records_memos {
         let open_record = &record.open_asset_record;
         let (low, high) = u64_to_u32_pair(open_record.amount);
-        if let XfrAmount::Confidential((com_low, com_high)) =
-            open_record.blind_asset_record.amount
+        if let XfrAmount::Confidential((com_low, com_high)) = open_record.blind_asset_record.amount
         {
             let (lock_amount_low, lock_amount_high) = memo
                 .lock_amount
@@ -101,9 +97,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
                     .c(d!(ZeiError::DecompressElementError))?,
             );
         }
-        if let XfrAssetType::Confidential(com) =
-            open_record.blind_asset_record.asset_type
-        {
+        if let XfrAssetType::Confidential(com) = open_record.blind_asset_record.asset_type {
             let lock_asset_type = memo
                 .lock_asset_type
                 .as_ref()
@@ -186,8 +180,7 @@ impl<'a> BarMemosPoliciesCollection<'a> {
     }
 
     pub fn check(&self) -> Result<()> {
-        if self.policies.len() != self.bars.len() || self.bars.len() != self.memos.len()
-        {
+        if self.policies.len() != self.bars.len() || self.bars.len() != self.memos.len() {
             Err(eg!(ZeiError::ParameterError))
         } else {
             Ok(())
@@ -312,8 +305,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
             .zip(output_reveal_policies.iter()),
     ) {
         let records_map =
-            collect_records_memos_by_key(xfr_body, input_policies, output_policies)
-                .c(d!())?;
+            collect_records_memos_by_key(xfr_body, input_policies, output_policies).c(d!())?;
         let m = records_map.len();
         if m != xfr_body
             .proofs
@@ -346,13 +338,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
         }
     }
     let mut transcript = Transcript::new(b"AssetTracingProofs");
-    pedersen_elgamal_batch_aggregate_eq_verify(
-        &mut transcript,
-        prng,
-        pc_gens,
-        &instances,
-    )
-    .c(d!())
+    pedersen_elgamal_batch_aggregate_eq_verify(&mut transcript, prng, pc_gens, &instances).c(d!())
 }
 
 #[derive(Default)]
@@ -404,9 +390,7 @@ fn verify_identity_proofs(
     // if no policies, memos and proofs should be empty
     if n == 0 {
         // all memos must be empty
-        if !memos.iter().all(|vec| vec.is_empty())
-            || !proofs.iter().all(|vec| vec.is_empty())
-        {
+        if !memos.iter().all(|vec| vec.is_empty()) || !proofs.iter().all(|vec| vec.is_empty()) {
             return Err(eg!(ZeiError::XfrVerifyAssetTracingIdentityError));
         }
     } else if n != memos.len() {
@@ -428,8 +412,8 @@ fn verify_identity_proofs(
             let enc_keys = &policy.enc_keys.attrs_enc_key;
             match (&policy.identity_tracing, proof) {
                 (Some(policy), Some(proof)) => {
-                    let sig_com = sig_commitment
-                        .c(d!(ZeiError::XfrVerifyAssetTracingIdentityError))?;
+                    let sig_com =
+                        sig_commitment.c(d!(ZeiError::XfrVerifyAssetTracingIdentityError))?;
                     ac_confidential_verify(
                         &policy.cred_issuer_pub_key,
                         enc_keys,
@@ -483,9 +467,7 @@ fn extract_ciphertext_and_commitments(
         }
 
         // 2 asset type
-        if asset_tracer_memo.lock_asset_type.is_none()
-            && record.asset_type.is_confidential()
-        {
+        if asset_tracer_memo.lock_asset_type.is_none() && record.asset_type.is_confidential() {
             return Err(eg!(ZeiError::InconsistentStructureError)); // There should be a lock for the asset type
         }
         if let Some(lock_type) = &asset_tracer_memo.lock_asset_type {
@@ -513,8 +495,7 @@ pub(crate) fn range_proof(
     outputs: &[&OpenAssetRecord],
 ) -> Result<XfrRangeProof> {
     let num_output = outputs.len();
-    let upper_power2 =
-        min_greater_equal_power_of_two((2 * (num_output + 1)) as u32) as usize;
+    let upper_power2 = min_greater_equal_power_of_two((2 * (num_output + 1)) as u32) as usize;
     if upper_power2 > MAX_PARTY_NUMBER {
         return Err(eg!(ZeiError::RangeProofProveError));
     }
@@ -595,14 +576,11 @@ pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
     )],
 ) -> Result<()> {
     let mut transcripts = vec![Transcript::new(b"Zei Range Proof"); instances.len()];
-    let proofs: Vec<&RangeProof> =
-        instances.iter().map(|(_, _, pf)| &pf.range_proof).collect();
+    let proofs: Vec<&RangeProof> = instances.iter().map(|(_, _, pf)| &pf.range_proof).collect();
     let mut commitments = vec![];
     for (input, output, proof) in instances {
-        commitments.push(
-            extract_value_commitments(input.as_slice(), output.as_slice(), proof)
-                .c(d!())?,
-        );
+        commitments
+            .push(extract_value_commitments(input.as_slice(), output.as_slice(), proof).c(d!())?);
     }
     let value_commitments = commitments.iter().map(|c| c.as_slice()).collect_vec();
     batch_verify_ranges(
@@ -623,8 +601,7 @@ fn extract_value_commitments(
     proof: &XfrRangeProof,
 ) -> Result<Vec<CompressedRistretto>> {
     let num_output = outputs.len();
-    let upper_power2 =
-        min_greater_equal_power_of_two((2 * num_output + 2) as u32) as usize;
+    let upper_power2 = min_greater_equal_power_of_two((2 * num_output + 2) as u32) as usize;
     let pow2_32 = Scalar::from_u64(POW_2_32);
 
     let mut commitments = Vec::with_capacity(upper_power2);
@@ -645,8 +622,7 @@ fn extract_value_commitments(
                 let (low, high) = u64_to_u32_pair(amount);
                 let pc_gens = RistrettoPedersenGens::default();
                 let com_low = pc_gens.commit(Scalar::from_u32(low), Scalar::from_u32(0));
-                let com_high =
-                    pc_gens.commit(Scalar::from_u32(high), Scalar::from_u32(0));
+                let com_high = pc_gens.commit(Scalar::from_u32(high), Scalar::from_u32(0));
                 (com_low, com_high)
             }
         };
@@ -665,8 +641,7 @@ fn extract_value_commitments(
                 let (low, high) = u64_to_u32_pair(amount);
                 let pc_gens = RistrettoPedersenGens::default();
                 let com_low = pc_gens.commit(Scalar::from_u32(low), Scalar::from_u32(0));
-                let com_high =
-                    pc_gens.commit(Scalar::from_u32(high), Scalar::from_u32(0));
+                let com_high = pc_gens.commit(Scalar::from_u32(high), Scalar::from_u32(0));
                 (com_low, com_high)
             }
         };
@@ -723,9 +698,7 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
 
     for x in open_inputs.iter().chain(open_outputs) {
         let commitment = match x.blind_asset_record.asset_type {
-            XfrAssetType::Confidential(com) => {
-                com.decompress().c(d!(ZeiError::ParameterError))?
-            }
+            XfrAssetType::Confidential(com) => com.decompress().c(d!(ZeiError::ParameterError))?,
             XfrAssetType::NonConfidential(asset_type) => {
                 pc_gens.commit(asset_type.as_scalar(), x.type_blind)
             }
@@ -762,9 +735,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
             .iter()
             .chain(outputs.iter())
             .map(|x| match x.asset_type {
-                XfrAssetType::Confidential(com) => {
-                    com.decompress().c(d!(ZeiError::ParameterError))
-                }
+                XfrAssetType::Confidential(com) => com.decompress().c(d!(ZeiError::ParameterError)),
                 XfrAssetType::NonConfidential(asset_type) => {
                     Ok(pc_gens.commit(asset_type.as_scalar(), Scalar::from_u32(0)))
                 }
@@ -772,21 +743,14 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
             .collect();
         proof_instances.push((instance_commitments.c(d!())?, *proof));
     }
-    chaum_pedersen_batch_verify_multiple_eq(
-        &mut transcript,
-        prng,
-        &pc_gens,
-        &proof_instances,
-    )
-    .c(d!(ZeiError::XfrVerifyConfidentialAssetError))
+    chaum_pedersen_batch_verify_multiple_eq(&mut transcript, prng, &pc_gens, &proof_instances)
+        .c(d!(ZeiError::XfrVerifyConfidentialAssetError))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::xfr::proofs::verify_identity_proofs;
-    use crate::xfr::structs::{
-        AssetTracerKeyPair, TracerMemo, TracingPolicies, TracingPolicy,
-    };
+    use crate::xfr::structs::{AssetTracerKeyPair, TracerMemo, TracingPolicies, TracingPolicy};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use ruc::*;

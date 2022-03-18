@@ -1,18 +1,14 @@
-use crate::{
-    errors::AlgebraError,
-    groups::{Group, GroupArithmetic},
-    groups::{One, Scalar as ZeiScalar, ScalarArithmetic, Zero},
-};
+use crate::{errors::AlgebraError, traits::Group, traits::Scalar};
 use ark_std::{
-    ops::{AddAssign, MulAssign, SubAssign},
+    ops::*,
     rand::{CryptoRng, RngCore},
+    One, Zero,
 };
 use byteorder::ByteOrder;
 use curve25519_dalek::{
     constants::{ED25519_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT},
     edwards::{CompressedEdwardsY as CEY, EdwardsPoint},
     ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint},
-    scalar::Scalar,
     traits::Identity,
 };
 use digest::{generic_array::typenum::U64, Digest};
@@ -21,95 +17,140 @@ use ruc::*;
 /// The number of bytes for a scalar value over BLS12-381
 pub const RISTRETTO_SCALAR_LEN: usize = 32;
 
+/// The wrapped struct for `curve25519_dalek::scalar::Scalar`
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct RistrettoScalar(pub Scalar);
+pub struct RistrettoScalar(pub curve25519_dalek::scalar::Scalar);
 
+/// The wrapped struct for `curve25519_dalek::ristretto::CompressedRistretto`
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CompressedRistretto(pub CR);
 
+/// The wrapped struct for `curve25519_dalek::edwards::CompressedEdwardsY`
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CompressedEdwardsY(pub curve25519_dalek::edwards::CompressedEdwardsY);
 
+/// The wrapped struct for `curve25519_dalek::ristretto::RistrettoPoint`
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoPoint(pub RPoint);
 
 impl From<u128> for RistrettoScalar {
     #[inline]
     fn from(x: u128) -> Self {
-        Self(Scalar::from(x))
+        Self(curve25519_dalek::scalar::Scalar::from(x))
     }
 }
 
 impl One for RistrettoScalar {
     #[inline]
     fn one() -> Self {
-        Self(Scalar::one())
+        Self(curve25519_dalek::scalar::Scalar::one())
     }
 }
 
 impl Zero for RistrettoScalar {
     #[inline]
     fn zero() -> Self {
-        Self(Scalar::zero())
+        Self(curve25519_dalek::scalar::Scalar::zero())
     }
 
     #[inline]
     fn is_zero(&self) -> bool {
-        self.0.eq(&Scalar::zero())
+        self.0.eq(&curve25519_dalek::scalar::Scalar::zero())
     }
 }
 
-impl ScalarArithmetic for RistrettoScalar {
-    #[inline]
-    fn add(&self, b: &Self) -> Self {
-        Self(self.0 + b.0)
-    }
+impl Add for RistrettoScalar {
+    type Output = RistrettoScalar;
 
     #[inline]
-    fn add_assign(&mut self, b: &Self) {
-        (self.0).add_assign(&b.0);
-    }
-
-    #[inline]
-    fn mul(&self, b: &Self) -> Self {
-        Self(self.0 * b.0)
-    }
-
-    #[inline]
-    fn mul_assign(&mut self, b: &Self) {
-        (self.0).mul_assign(&b.0);
-    }
-
-    #[inline]
-    fn sub(&self, b: &Self) -> Self {
-        Self(self.0 - b.0)
-    }
-
-    #[inline]
-    fn sub_assign(&mut self, b: &Self) {
-        (self.0).sub_assign(&b.0);
-    }
-
-    #[inline]
-    fn inv(&self) -> Result<Self> {
-        Ok(Self(self.0.invert()))
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
     }
 }
 
-impl ZeiScalar for RistrettoScalar {
+impl Mul for RistrettoScalar {
+    type Output = RistrettoScalar;
+
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(self.0 * rhs.0)
+    }
+}
+
+impl<'a> Add<&'a RistrettoScalar> for RistrettoScalar {
+    type Output = RistrettoScalar;
+
+    #[inline]
+    fn add(self, rhs: &Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl<'a> AddAssign<&'a RistrettoScalar> for RistrettoScalar {
+    #[inline]
+    fn add_assign(&mut self, rhs: &Self) {
+        (self.0).add_assign(&rhs.0);
+    }
+}
+
+impl<'a> Sub<&'a RistrettoScalar> for RistrettoScalar {
+    type Output = RistrettoScalar;
+
+    #[inline]
+    fn sub(self, rhs: &Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl<'a> SubAssign<&'a RistrettoScalar> for RistrettoScalar {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &Self) {
+        (self.0).sub_assign(&rhs.0);
+    }
+}
+
+impl<'a> Mul<&'a RistrettoScalar> for RistrettoScalar {
+    type Output = RistrettoScalar;
+
+    #[inline]
+    fn mul(self, rhs: &Self) -> Self::Output {
+        Self(self.0 * rhs.0)
+    }
+}
+
+impl<'a> MulAssign<&'a RistrettoScalar> for RistrettoScalar {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &Self) {
+        (self.0).mul_assign(&rhs.0);
+    }
+}
+
+impl Neg for RistrettoScalar {
+    type Output = RistrettoScalar;
+
+    #[inline]
+    fn neg(self) -> Self::Output {
+        Self(self.0.neg())
+    }
+}
+
+impl From<u32> for RistrettoScalar {
+    #[inline]
+    fn from(value: u32) -> Self {
+        Self(curve25519_dalek::scalar::Scalar::from(value))
+    }
+}
+
+impl From<u64> for RistrettoScalar {
+    fn from(value: u64) -> Self {
+        Self(curve25519_dalek::scalar::Scalar::from(value))
+    }
+}
+
+impl Scalar for RistrettoScalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
-        Self(Scalar::random(rng))
-    }
-
-    #[inline]
-    fn from_u32(x: u32) -> Self {
-        Self(Scalar::from(x))
-    }
-
-    #[inline]
-    fn from_u64(x: u64) -> Self {
-        Self(Scalar::from(x))
+        Self(curve25519_dalek::scalar::Scalar::random(rng))
     }
 
     #[inline]
@@ -117,21 +158,21 @@ impl ZeiScalar for RistrettoScalar {
     where
         D: Digest<OutputSize = U64> + Default,
     {
-        Self(Scalar::from_hash(hash))
+        Self(curve25519_dalek::scalar::Scalar::from_hash(hash))
     }
 
     #[inline]
     fn multiplicative_generator() -> Self {
-        Self(Scalar::from(2u8))
+        Self(curve25519_dalek::scalar::Scalar::from(2u8))
     }
 
     #[inline]
-    // Ristretto scalar field size: 2**252 + 27742317777372353535851937790883648493
-    fn get_field_size_lsf_bytes() -> Vec<u8> {
+    fn get_field_size_le_bytes() -> Vec<u8> {
+        // Ristretto scalar field size: 2**252 + 27742317777372353535851937790883648493
         [
-            0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2,
-            0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+            0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9,
+            0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x10,
         ]
         .to_vec()
     }
@@ -150,34 +191,27 @@ impl ZeiScalar for RistrettoScalar {
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        let mut v = vec![];
-        v.extend_from_slice(self.0.as_bytes());
-        v
+        self.0.as_bytes().to_vec()
     }
 
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != RISTRETTO_SCALAR_LEN {
-            return Err(eg!(AlgebraError::ParameterError));
-        }
-        let mut array = [0u8; RISTRETTO_SCALAR_LEN];
-        array.copy_from_slice(bytes);
-        Ok(Self(Scalar::from_bits(array)))
-    }
-
-    #[inline]
-    fn from_le_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
             return Err(eg!(AlgebraError::DeserializationError));
         }
-        let mut array = vec![0u8; Self::bytes_len()];
+        let mut array = [0u8; RISTRETTO_SCALAR_LEN];
         array[0..bytes.len()].copy_from_slice(bytes);
-        Self::from_bytes(&array)
+        Ok(Self(curve25519_dalek::scalar::Scalar::from_bits(array)))
+    }
+
+    #[inline]
+    fn inv(&self) -> Result<Self> {
+        Ok(Self(self.0.invert()))
     }
 }
 
 impl RistrettoScalar {
-    /// returns a tuple of (r, g^r)
+    /// Return a tuple of (r, g^r)
     /// where r is a random `RistrettoScalar`, and g is the `ED25519_BASEPOINT_POINT`
     #[inline]
     pub fn random_scalar_with_compressed_edwards<R: CryptoRng + RngCore>(
@@ -190,6 +224,7 @@ impl RistrettoScalar {
 }
 
 impl RistrettoPoint {
+    /// Compress the point and output `CompressedRistretto`
     #[inline]
     pub fn compress(&self) -> CompressedRistretto {
         CompressedRistretto(self.0.compress())
@@ -197,10 +232,13 @@ impl RistrettoPoint {
 }
 
 impl CompressedRistretto {
+    /// Recover the point from the `CompressedRistretto`
     #[inline]
     pub fn decompress(&self) -> Option<RistrettoPoint> {
         self.0.decompress().map(RistrettoPoint)
     }
+
+    /// Return the `CompressedRistretto` for the identity point
     #[inline]
     pub fn identity() -> Self {
         Self(CR::identity())
@@ -208,18 +246,19 @@ impl CompressedRistretto {
 }
 
 impl CompressedEdwardsY {
-    /// builds a `CompressedEdwardsY` from slice of bytes
+    /// Build a `CompressedEdwardsY` from slice of bytes
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Self {
         Self(CEY::from_slice(bytes))
     }
 
+    /// Recover the point from the `CompressedEdwardsY`
     #[inline]
     pub fn decompress(&self) -> Option<EdwardsPoint> {
         self.0.decompress()
     }
 
-    /// returns compressed edwards point of (`ED25519_BASEPOINT_POINT` ^ s)
+    /// Return compressed edwards point of (`ED25519_BASEPOINT_POINT` ^ s)
     #[inline]
     pub fn scalar_mul_basepoint(s: &RistrettoScalar) -> Self {
         Self((s.0 * ED25519_BASEPOINT_POINT).compress())
@@ -227,7 +266,13 @@ impl CompressedEdwardsY {
 }
 
 impl Group for RistrettoPoint {
+    type ScalarType = RistrettoScalar;
     const COMPRESSED_LEN: usize = 32;
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0 + self.0)
+    }
 
     #[inline]
     fn get_identity() -> Self {
@@ -240,8 +285,8 @@ impl Group for RistrettoPoint {
     }
 
     #[inline]
-    fn get_random_base<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
-        Self(RISTRETTO_BASEPOINT_POINT * Scalar::random(rng))
+    fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        Self(RISTRETTO_BASEPOINT_POINT * curve25519_dalek::scalar::Scalar::random(rng))
     }
 
     #[inline]
@@ -269,35 +314,50 @@ impl Group for RistrettoPoint {
     }
 }
 
-impl GroupArithmetic for RistrettoPoint {
-    type S = RistrettoScalar;
+impl<'a> Add<&'a RistrettoPoint> for RistrettoPoint {
+    type Output = RistrettoPoint;
 
     #[inline]
-    fn add(&self, other: &Self) -> Self {
-        Self(self.0 + other.0)
+    fn add(self, rhs: &Self) -> Self::Output {
+        Self(self.0 + rhs.0)
     }
+}
+
+impl<'a> Sub<&'a RistrettoPoint> for RistrettoPoint {
+    type Output = RistrettoPoint;
 
     #[inline]
-    fn sub(&self, other: &Self) -> Self {
-        Self(self.0 - other.0)
+    fn sub(self, rhs: &Self) -> Self::Output {
+        Self(self.0 - rhs.0)
     }
+}
+
+impl<'a> Mul<&'a RistrettoScalar> for RistrettoPoint {
+    type Output = RistrettoPoint;
 
     #[inline]
-    fn mul(&self, scalar: &RistrettoScalar) -> Self {
-        Self(self.0 * scalar.0)
+    fn mul(self, rhs: &RistrettoScalar) -> Self::Output {
+        Self(self.0 * rhs.0)
     }
+}
 
+impl<'a> AddAssign<&'a RistrettoPoint> for RistrettoPoint {
     #[inline]
-    fn double(&self) -> Self {
-        Self(self.0 + self.0)
+    fn add_assign(&mut self, rhs: &RistrettoPoint) {
+        self.0.add_assign(&rhs.0)
+    }
+}
+
+impl<'a> SubAssign<&'a RistrettoPoint> for RistrettoPoint {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &'a RistrettoPoint) {
+        self.0.sub_assign(&rhs.0)
     }
 }
 
 #[cfg(test)]
 mod ristretto_group_test {
-    use crate::groups::group_tests::{
-        test_scalar_operations, test_scalar_serialization,
-    };
+    use crate::traits::group_tests::{test_scalar_operations, test_scalar_serialization};
 
     #[test]
     fn scalar_ops() {
@@ -309,6 +369,6 @@ mod ristretto_group_test {
     }
     #[test]
     fn scalar_to_radix() {
-        crate::groups::group_tests::test_to_radix::<super::RistrettoScalar>();
+        crate::traits::group_tests::test_to_radix::<super::RistrettoScalar>();
     }
 }

@@ -1,4 +1,4 @@
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
@@ -14,7 +14,7 @@ pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(
     transcript.append_message(b"New Domain", b"PLONK");
     // TODO hash all this in preprocessing step
     transcript.append_u64(b"CS size", params.cs_size as u64);
-    transcript.append_message(b"field size", &F::get_field_size_lsf_bytes());
+    transcript.append_message(b"field size", &F::get_field_size_le_bytes());
     for q in params.selectors.iter() {
         transcript.append_commitment(q);
     }

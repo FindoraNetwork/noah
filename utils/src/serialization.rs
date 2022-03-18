@@ -88,10 +88,7 @@ pub mod zei_obj_serde {
     impl<'de> Visitor<'de> for BytesVisitor {
         type Value = Vec<u8>;
 
-        fn expecting(
-            &self,
-            formatter: &mut ::core::fmt::Formatter,
-        ) -> core::fmt::Result {
+        fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> core::fmt::Result {
             formatter.write_str("a valid ZeiFromTo Object")
         }
 
@@ -120,10 +117,7 @@ pub mod zei_obj_serde {
         }
     }
 
-    pub fn serialize<S, T>(
-        obj: &T,
-        serializer: S,
-    ) -> core::result::Result<S::Ok, S::Error>
+    pub fn serialize<S, T>(obj: &T, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
         T: ZeiFromToBytes,

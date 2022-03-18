@@ -2,12 +2,12 @@ use crate::api::anon_creds::{Attr, AttributeCiphertext};
 use crate::xfr::structs::{AssetTracerDecKeys, AssetTracerEncKeys, TracerMemo};
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLSG1};
-use algebra::groups::{Group, GroupArithmetic, Scalar as ZeiScalar};
+use algebra::traits::{Group, GroupArithmetic, Scalar as ZeiScalar};
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::basics::elgamal::{
-    elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, ElGamalCiphertext,
-    ElGamalDecKey, ElGamalEncKey,
+    elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, ElGamalCiphertext, ElGamalDecKey,
+    ElGamalEncKey,
 };
 use crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key,
@@ -37,24 +37,23 @@ impl TracerMemo {
     ) -> Self {
         let mut plaintext = vec![];
         let pc_gens = RistrettoPedersenGens::default();
-        let lock_amount =
-            amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
-                plaintext.extend_from_slice(&amount_low.to_be_bytes());
-                plaintext.extend_from_slice(&amount_high.to_be_bytes());
-                let ctext_amount_low = elgamal_encrypt(
-                    &pc_gens.B,
-                    &Scalar::from_u32(amount_low),
-                    blind_low,
-                    &tracer_enc_key.record_data_enc_key,
-                );
-                let ctext_amount_high = elgamal_encrypt(
-                    &pc_gens.B,
-                    &Scalar::from_u32(amount_high),
-                    blind_high,
-                    &tracer_enc_key.record_data_enc_key,
-                );
-                (ctext_amount_low, ctext_amount_high)
-            });
+        let lock_amount = amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
+            plaintext.extend_from_slice(&amount_low.to_be_bytes());
+            plaintext.extend_from_slice(&amount_high.to_be_bytes());
+            let ctext_amount_low = elgamal_encrypt(
+                &pc_gens.B,
+                &Scalar::from_u32(amount_low),
+                blind_low,
+                &tracer_enc_key.record_data_enc_key,
+            );
+            let ctext_amount_high = elgamal_encrypt(
+                &pc_gens.B,
+                &Scalar::from_u32(amount_high),
+                blind_high,
+                &tracer_enc_key.record_data_enc_key,
+            );
+            (ctext_amount_low, ctext_amount_high)
+        });
 
         let lock_asset_type = asset_type_info.map(|(asset_type, blind)| {
             plaintext.extend_from_slice(&asset_type.0);
@@ -69,11 +68,8 @@ impl TracerMemo {
         for (attr, _) in attrs_info.iter() {
             plaintext.extend_from_slice(&attr.to_be_bytes())
         }
-        let lock_info = hybrid_encrypt_with_x25519_key(
-            prng,
-            &tracer_enc_key.lock_info_enc_key,
-            &plaintext,
-        );
+        let lock_info =
+            hybrid_encrypt_with_x25519_key(prng, &tracer_enc_key.lock_info_enc_key, &plaintext);
 
         TracerMemo {
             enc_key: tracer_enc_key.clone(),
@@ -87,10 +83,8 @@ impl TracerMemo {
     /// Decrypts the asset tracer memo:
     /// Returns ZeiError:BogusAssetTracerMemo in case decrypted values are inconsistents
     pub fn decrypt(&self, dec_key: &AssetTracerDecKeys) -> Result<DecryptedAssetMemo> {
-        let mut plaintext = hybrid_decrypt_with_x25519_secret_key(
-            &self.lock_info,
-            &dec_key.lock_info_dec_key,
-        );
+        let mut plaintext =
+            hybrid_decrypt_with_x25519_secret_key(&self.lock_info, &dec_key.lock_info_dec_key);
 
         // decrypt and sanitize amount
         let amount = if self.lock_amount.is_some() {
@@ -147,11 +141,7 @@ impl TracerMemo {
     /// Check if the amount encrypted in self.lock_amount is expected
     /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
     /// Otherwise, if decrypted amount is not expected amount, return Err(ZeiError::AssetTracingExtractionError), else Ok(())
-    pub fn verify_amount(
-        &self,
-        dec_key: &ElGamalDecKey<Scalar>,
-        expected: u64,
-    ) -> Result<()> {
+    pub fn verify_amount(&self, dec_key: &ElGamalDecKey<Scalar>, expected: u64) -> Result<()> {
         let (low, high) = u64_to_u32_pair(expected);
         if let Some((ctext_low, ctext_high)) = self.lock_amount.as_ref() {
             let decrypted_low = elgamal_decrypt_elem(ctext_low, dec_key);
@@ -190,10 +180,7 @@ impl TracerMemo {
     /// Decrypt amount in self.lock_amount via brute force check taking 2^33 Ristretto additions in the worst case.
     /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
     /// Otherwise, return Scalar representing the amount
-    pub fn extract_amount_brute_force(
-        &self,
-        dec_key: &ElGamalDecKey<Scalar>,
-    ) -> Result<u64> {
+    pub fn extract_amount_brute_force(&self, dec_key: &ElGamalDecKey<Scalar>) -> Result<u64> {
         if let Some((ctext_low, ctext_high)) = self.lock_amount.as_ref() {
             let base = RistrettoPoint::get_base();
             let decrypted_low = elgamal_decrypt(&base, ctext_low, dec_key).c(d!())?;
@@ -237,9 +224,7 @@ impl TracerMemo {
             return Err(eg!(ZeiError::ParameterError));
         }
         let mut result = vec![];
-        for (ctext, expected) in
-            self.lock_attributes.iter().zip(expected_attributes.iter())
-        {
+        for (ctext, expected) in self.lock_attributes.iter().zip(expected_attributes.iter()) {
             let scalar_attr = BLSScalar::from_u32(*expected);
             let elem = elgamal_decrypt_elem(ctext, dec_key);
             if elem != BLSG1::get_base().mul(&scalar_attr) {
@@ -272,7 +257,7 @@ impl TracerMemo {
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use algebra::bls12_381::{BLSScalar, BLSG1};
-    use algebra::groups::{Group, Scalar as ZeiScalar};
+    use algebra::traits::{Group, Scalar as ZeiScalar};
     use algebra::ristretto::RistrettoScalar as Scalar;
     use crypto::basics::elgamal::elgamal_encrypt;
     use rand_chacha::ChaChaRng;
@@ -428,42 +413,27 @@ mod tests {
         );
         msg_eq!(
             ZeiError::ParameterError,
-            memo.verify_identity_attributes(
-                &tracer_keys.dec_key.attrs_dec_key,
-                &[1u32, 2, 3, 4]
-            )
-            .unwrap_err(),
+            memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32, 2, 3, 4])
+                .unwrap_err(),
         );
         assert_eq!(
-            memo.verify_identity_attributes(
-                &tracer_keys.dec_key.attrs_dec_key,
-                &[1u32, 2, 4]
-            )
-            .unwrap(),
+            memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32, 2, 4])
+                .unwrap(),
             vec![true, true, false]
         );
         assert_eq!(
-            memo.verify_identity_attributes(
-                &tracer_keys.dec_key.attrs_dec_key,
-                &[4u32, 2, 3]
-            )
-            .unwrap(),
+            memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[4u32, 2, 3])
+                .unwrap(),
             vec![false, true, true]
         );
         assert_eq!(
-            memo.verify_identity_attributes(
-                &tracer_keys.dec_key.attrs_dec_key,
-                &[1u32, 2, 3]
-            )
-            .unwrap(),
+            memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32, 2, 3])
+                .unwrap(),
             vec![true, true, true]
         );
         assert_eq!(
-            memo.verify_identity_attributes(
-                &tracer_keys.dec_key.attrs_dec_key,
-                &[3u32, 1, 2]
-            )
-            .unwrap(),
+            memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[3u32, 1, 2])
+                .unwrap(),
             vec![false, false, false]
         );
 

@@ -17,8 +17,7 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(
     for level in (1..path_len).rev() {
         let (b, sibling) = path[path_len - level - 1];
         let (b, node_copy, b_x_node) = cs.multiply(b.into(), node);
-        let (not_b, sibling_copy, not_b_x_sibling) =
-            cs.multiply(one - b, sibling.into());
+        let (not_b, sibling_copy, not_b_x_sibling) = cs.multiply(one - b, sibling.into());
 
         let (_, _, b_x_sibling) = cs.multiply(b.into(), sibling_copy.into());
         let (_, _, not_b_x_node) = cs.multiply(not_b.into(), node_copy.into());
@@ -64,10 +63,8 @@ pub fn merkle_verify_mimc<CS: ConstraintSystem>(
 #[cfg(test)]
 mod test {
     use crate::basics::hash::mimc::MiMCHash;
-    use crate::merkle_tree::binary_merkle_tree::{
-        mt_build, mt_prove, mt_verify, PathDirection,
-    };
-    use algebra::groups::Scalar as _;
+    use crate::merkle_tree::binary_merkle_tree::{mt_build, mt_prove, mt_verify, PathDirection};
+    use algebra::traits::Scalar as _;
     use algebra::ristretto::CompressedRistretto;
     use algebra::ristretto::RistrettoScalar as Scalar;
     use bulletproofs::r1cs::{Prover, Variable, Verifier};
@@ -117,16 +114,15 @@ mod test {
                         curve25519_dalek::scalar::Scalar::random(&mut prng),
                     ),
                 };
-                let (com_s, var_s) = prover
-                    .commit(s.0, curve25519_dalek::scalar::Scalar::random(&mut prng));
+                let (com_s, var_s) =
+                    prover.commit(s.0, curve25519_dalek::scalar::Scalar::random(&mut prng));
                 (
                     (CompressedRistretto(com_b), CompressedRistretto(com_s)),
                     (var_b, var_s),
                 )
             })
             .collect();
-        let var_path: Vec<(Variable, Variable)> =
-            com_var_path.iter().map(|(_, y)| *y).collect();
+        let var_path: Vec<(Variable, Variable)> = com_var_path.iter().map(|(_, y)| *y).collect();
         super::merkle_verify_mimc(
             &mut prover,
             var_elem,

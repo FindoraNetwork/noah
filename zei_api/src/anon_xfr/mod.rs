@@ -1,6 +1,4 @@
-use crate::anon_xfr::circuits::{
-    AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret,
-};
+use crate::anon_xfr::circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret};
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
@@ -10,12 +8,10 @@ use crate::anon_xfr::structs::{
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
-use algebra::groups::{Scalar, ScalarArithmetic, Zero};
+use algebra::traits::{Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
 use crypto::basics::hash::rescue::RescueInstance;
-use crypto::basics::hybrid_encryption::{
-    hybrid_decrypt_with_x25519_secret_key, XSecretKey,
-};
+use crypto::basics::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
 use crypto::basics::prf::PRF;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
@@ -163,15 +159,11 @@ pub fn verify_anon_xfr_body(
         payees_commitments,
         merkle_root: *merkle_root,
     };
-    verify_xfr(params, &pub_inputs, &body.proof.snark_proof)
-        .c(d!(ZeiError::AXfrVerificationError))
+    verify_xfr(params, &pub_inputs, &body.proof.snark_proof).c(d!(ZeiError::AXfrVerificationError))
 }
 
 /// Check that inputs have mt witness and keypair matched pubkey
-fn check_inputs(
-    inputs: &[OpenAnonBlindAssetRecord],
-    keypairs: &[AXfrKeyPair],
-) -> Result<()> {
+fn check_inputs(inputs: &[OpenAnonBlindAssetRecord], keypairs: &[AXfrKeyPair]) -> Result<()> {
     if inputs.len() != keypairs.len() {
         return Err(eg!(ZeiError::ParameterError));
     }
@@ -348,7 +340,7 @@ mod tests {
     use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
+    use algebra::traits::{One, Scalar, ScalarArithmetic, Zero};
 
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
 
@@ -422,20 +414,16 @@ mod tests {
         };
         let hash = RescueInstance::new();
         let rand_pk_in_jj = rand_pk_in.as_jubjub_point();
-        let pk_in_hash = hash.rescue_hash(&[
-            rand_pk_in_jj.get_x(),
-            rand_pk_in_jj.get_y(),
-            zero,
-            zero,
-        ])[0];
+        let pk_in_hash =
+            hash.rescue_hash(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])[0];
         let leaf = hash.rescue_hash(&[
             /*uid=*/ two,
             oabar.compute_commitment(),
             pk_in_hash,
             zero,
         ])[0];
-        let merkle_root = hash
-            .rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
+        let merkle_root =
+            hash.rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
         let mt_leaf_info = MTLeafInfo {
             path: MTPath { nodes: vec![node] },
             root: merkle_root,
@@ -513,10 +501,7 @@ mod tests {
     }
 
     // outputs &mut merkle tree (wrap it in an option merkle tree, not req)
-    fn build_new_merkle_tree(
-        n: i32,
-        mt: &mut PersistentMerkleTree<TempRocksDB>,
-    ) -> Result<()> {
+    fn build_new_merkle_tree(n: i32, mt: &mut PersistentMerkleTree<TempRocksDB>) -> Result<()> {
         // add 6/7 abar and populate and then retrieve values
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -672,8 +657,7 @@ mod tests {
         {
             // verifier scope
             let verifier_params = NodeParams::from(user_params);
-            let t =
-                verify_anon_xfr_body(&verifier_params, &body, &mt.get_root().unwrap());
+            let t = verify_anon_xfr_body(&verifier_params, &body, &mt.get_root().unwrap());
             println!("{:?}", t);
             assert!(t.is_ok());
 
@@ -728,12 +712,9 @@ mod tests {
             .enumerate()
             .map(|(uid, in_abar)| {
                 let rand_pk_in_jj = in_abar.public_key.as_jubjub_point();
-                let pk_in_hash = hash.rescue_hash(&[
-                    rand_pk_in_jj.get_x(),
-                    rand_pk_in_jj.get_y(),
-                    zero,
-                    zero,
-                ])[0];
+                let pk_in_hash =
+                    hash.rescue_hash(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])
+                        [0];
                 hash.rescue_hash(&[
                     BLSScalar::from_u32(uid as u32),
                     in_abar.amount_type_commitment,
@@ -766,8 +747,7 @@ mod tests {
         // output keys, amounts, asset_types
         let (keypairs_out, dec_keys_out, enc_keys_out) = gen_keys(&mut prng, n_payees);
         let amounts_out = vec![5u64, 5u64, 50u64];
-        let asset_types_out =
-            vec![FEE_TYPE, FEE_TYPE, AssetType::from_identical_byte(1)];
+        let asset_types_out = vec![FEE_TYPE, FEE_TYPE, AssetType::from_identical_byte(1)];
         let mut outputs = vec![];
         for i in 0..n_payees {
             outputs.push(
@@ -826,19 +806,12 @@ mod tests {
             // empty inputs/outputs
             msg_eq!(
                 ZeiError::AXfrProverParamsError,
-                gen_anon_xfr_body(&mut prng, &user_params, &[], &open_abars_out, &[])
-                    .unwrap_err(),
+                gen_anon_xfr_body(&mut prng, &user_params, &[], &open_abars_out, &[]).unwrap_err(),
             );
             msg_eq!(
                 ZeiError::AXfrProverParamsError,
-                gen_anon_xfr_body(
-                    &mut prng,
-                    &user_params,
-                    &open_abars_in,
-                    &[],
-                    &in_keypairs
-                )
-                .unwrap_err(),
+                gen_anon_xfr_body(&mut prng, &user_params, &open_abars_in, &[], &in_keypairs)
+                    .unwrap_err(),
             );
             // invalid inputs/outputs
             open_abars_in[0].amount += 1;
@@ -910,13 +883,10 @@ mod tests {
         prng: &mut R,
         n: usize,
     ) -> (Vec<AXfrKeyPair>, Vec<XSecretKey>, Vec<XPublicKey>) {
-        let keypairs_in: Vec<AXfrKeyPair> =
-            (0..n).map(|_| AXfrKeyPair::generate(prng)).collect();
+        let keypairs_in: Vec<AXfrKeyPair> = (0..n).map(|_| AXfrKeyPair::generate(prng)).collect();
 
-        let dec_keys_in: Vec<XSecretKey> =
-            (0..n).map(|_| XSecretKey::new(prng)).collect();
-        let enc_keys_in: Vec<XPublicKey> =
-            dec_keys_in.iter().map(XPublicKey::from).collect();
+        let dec_keys_in: Vec<XSecretKey> = (0..n).map(|_| XSecretKey::new(prng)).collect();
+        let enc_keys_in: Vec<XPublicKey> = dec_keys_in.iter().map(XPublicKey::from).collect();
         (keypairs_in, dec_keys_in, enc_keys_in)
     }
 

@@ -1,3 +1,4 @@
+//! The crate for algebra for the Zei library, which unifies the interfaces of different curves
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unused_import_braces, unused_qualifications, trivial_casts)]
 #![deny(trivial_numeric_casts, private_in_public)]
@@ -28,8 +29,8 @@ pub mod bls12_381;
 /// Module for error handling
 pub mod errors;
 
-/// Module for group traits
-pub mod groups;
+/// Module for traits
+pub mod traits;
 
 /// Module for the Jubjub curve
 pub mod jubjub;

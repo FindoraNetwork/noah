@@ -59,10 +59,7 @@ where
 /// * `tree` - merkle tree data structure
 /// * `index` - location of the leaf, 0 being the index of the most left one
 /// * `returns` - the value of the root node and the proof
-pub fn mt_prove<S>(
-    tree: &MerkleTree<S>,
-    index: usize,
-) -> Result<(S, Vec<(PathDirection, S)>)>
+pub fn mt_prove<S>(tree: &MerkleTree<S>, index: usize) -> Result<(S, Vec<(PathDirection, S)>)>
 where
     S: Copy + PartialEq + Eq + Debug,
 {
@@ -77,11 +74,7 @@ where
 /// `element` - element to be tested
 /// `proof` - proof that the element is a leaf of the merkle tree defined by its root.
 /// `returns` Ok() if the verification is successful, an error otherwise
-pub fn mt_verify<S, H>(
-    root: &MerkleRoot<S>,
-    element: &S,
-    path: &[(PathDirection, S)],
-) -> Result<()>
+pub fn mt_verify<S, H>(root: &MerkleRoot<S>, element: &S, path: &[(PathDirection, S)]) -> Result<()>
 where
     S: Copy + PartialEq + Eq,
     H: MTHash<S = S>,
@@ -155,8 +148,7 @@ fn prove_node<S: Copy + PartialEq + Eq + Debug>(
 
     // From now one the unwrap are safe as we assume the tree is complete.
     if index < size / 2 {
-        let (elem, mut v) =
-            prove_node(node.left.as_ref().unwrap().as_ref(), index, size / 2);
+        let (elem, mut v) = prove_node(node.left.as_ref().unwrap().as_ref(), index, size / 2);
         v.push((PathDirection::LEFT, node.right.as_ref().unwrap().value));
         return (elem, v);
     }
@@ -177,7 +169,7 @@ fn is_power_two(n: usize) -> bool {
 mod test {
     use super::*;
     use crate::basics::hash::mimc::MiMCHash;
-    use algebra::groups::{Scalar as _, ScalarArithmetic};
+    use algebra::traits::{Scalar as _, ScalarArithmetic};
     use algebra::ristretto::RistrettoScalar as Scalar;
 
     #[test]

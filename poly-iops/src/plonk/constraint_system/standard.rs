@@ -1,4 +1,4 @@
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use ruc::*;
 
 use crate::plonk::errors::PlonkError;
@@ -82,9 +82,7 @@ impl<F: Scalar> ConstraintSystem for StandardConstraintSystem<F> {
     }
 
     /// The coefficients are (wl, wr, wl * wr, -wo, 1).
-    fn eval_selector_multipliers(
-        wire_vals: &[&Self::Field],
-    ) -> Result<Vec<Self::Field>> {
+    fn eval_selector_multipliers(wire_vals: &[&Self::Field]) -> Result<Vec<Self::Field>> {
         if wire_vals.len() < 3 {
             return Err(eg!(PlonkError::FuncParamsError));
         }
@@ -363,8 +361,8 @@ impl<F: Scalar> StandardConstraintSystem<F> {
 #[cfg(test)]
 mod test {
     use algebra::{
-        bls12_381::{BLSScalar, Bls12381},
-        groups::{One, ScalarArithmetic, Zero},
+        bls12_381::{BLSScalar, BLSPairingEngine},
+        traits::{One, ScalarArithmetic, Zero},
     };
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
@@ -469,16 +467,13 @@ mod test {
         };
         // test serialization
         let proof_json = serde_json::to_string(&proof).unwrap();
-        let proof_de: PlonkPf<KZGCommitmentScheme<Bls12381>> =
+        let proof_de: PlonkPf<KZGCommitmentScheme<BLSPairingEngine>> =
             serde_json::from_str(&proof_json).unwrap();
         assert_eq!(proof, proof_de);
         {
             let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
             let mut transcript = Transcript::new(b"TestPlonk");
-            assert!(
-                verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof)
-                    .is_ok()
-            )
+            assert!(verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof).is_ok())
         }
     }
 
@@ -540,10 +535,7 @@ mod test {
         {
             let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
             let mut transcript = Transcript::new(b"TestPlonk");
-            assert!(
-                verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof)
-                    .is_ok()
-            )
+            assert!(verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof).is_ok())
         }
     }
 

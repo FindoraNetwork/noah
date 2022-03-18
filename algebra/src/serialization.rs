@@ -1,10 +1,8 @@
 use crate::{
     bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2},
-    groups::{Group, Scalar},
     jubjub::{JubjubPoint, JubjubScalar},
-    ristretto::{
-        CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
-    },
+    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
+    traits::{Group, Scalar},
 };
 use ruc::*;
 use serde::Serializer;

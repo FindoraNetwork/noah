@@ -1,11 +1,11 @@
 use crate::basics::elgamal::{
-    elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext,
-    ElGamalDecKey, ElGamalEncKey,
+    elgamal_decrypt_elem, elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalDecKey,
+    ElGamalEncKey,
 };
 use crate::basics::signatures::pointcheval_sanders::{
     ps_gen_keys, ps_randomize_sig, ps_sign_scalar, PSPublicKey, PSSecretKey, PSSignature,
 };
-use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
+use algebra::traits::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
 use ruc::*;
 use utils::errors::ZeiError;
 
@@ -273,10 +273,7 @@ pub fn gpsig_verify<P: Pairing>(
 /// This algorithm is run by the Group Manager.
 /// * `sig` - signature
 /// * `gp_sk` - group secret key
-pub fn gpsig_open<P: Pairing>(
-    sig: &GroupSignature<P>,
-    gp_sk: &GroupSecretKey<P>,
-) -> TagKey<P::G1> {
+pub fn gpsig_open<P: Pairing>(sig: &GroupSignature<P>, gp_sk: &GroupSecretKey<P>) -> TagKey<P::G1> {
     TagKey(elgamal_decrypt_elem(&sig.enc, &gp_sk.dec_key))
 }
 
@@ -284,8 +281,8 @@ pub fn gpsig_open<P: Pairing>(
 
 mod tests {
     use super::{gpsig_join_cert, gpsig_open, gpsig_setup, gpsig_sign, gpsig_verify};
-    use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
-    use algebra::groups::{Group, GroupArithmetic};
+    use algebra::bls12_381::{BLSScalar, BLSPairingEngine, BLSG1, BLSG2};
+    use algebra::traits::{Group, GroupArithmetic};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use utils::errors::ZeiError;
@@ -293,7 +290,7 @@ mod tests {
     #[test]
     fn group_manager_keys_are_consistent() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let (gpk, msk) = gpsig_setup::<_, Bls12381>(&mut prng);
+        let (gpk, msk) = gpsig_setup::<_, BLSPairingEngine>(&mut prng);
 
         // Check the signature keys
         let pub_sig_key = &gpk.ver_key;
@@ -316,7 +313,7 @@ mod tests {
     #[test]
     fn group_signatures_are_computed_correctly() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let (gpk, msk) = gpsig_setup::<_, Bls12381>(&mut prng);
+        let (gpk, msk) = gpsig_setup::<_, BLSPairingEngine>(&mut prng);
 
         // Correct signature
         let (join_cert, _) = gpsig_join_cert(&mut prng, &msk);
@@ -341,7 +338,7 @@ mod tests {
     #[test]
     fn user_identity_can_be_recovered_by_group_manager() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let (gpk, msk) = gpsig_setup::<_, Bls12381>(&mut prng);
+        let (gpk, msk) = gpsig_setup::<_, BLSPairingEngine>(&mut prng);
 
         let (join_cert, tag_key) = gpsig_join_cert(&mut prng, &msk);
         let sig = gpsig_sign(&mut prng, &gpk, &join_cert, b"Some message");

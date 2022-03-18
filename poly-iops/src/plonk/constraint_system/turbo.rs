@@ -2,7 +2,7 @@
 /// arithmetic/boolean/range gates that will be used in Anonymous transfer.
 /// The gates for elliptic curve operations and Rescue cipher/hash functions are implemented
 /// in ecc.rs and rescue.rs, respectively.
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use ruc::*;
 
 use crate::plonk::errors::PlonkError;
@@ -199,8 +199,7 @@ impl<F: Scalar> Default for TurboConstraintSystem<F> {
 impl<F: Scalar> TurboConstraintSystem<F> {
     /// Create a TurboPLONK constraint system with a certain field size.
     pub fn new() -> TurboConstraintSystem<F> {
-        let selectors: Vec<Vec<F>> =
-            std::iter::repeat(vec![]).take(N_SELECTORS).collect();
+        let selectors: Vec<Vec<F>> = std::iter::repeat(vec![]).take(N_SELECTORS).collect();
         let mut cs = TurboConstraintSystem {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
@@ -265,12 +264,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.size += 1;
     }
 
-    pub fn insert_add_gate(
-        &mut self,
-        left_var: VarIndex,
-        right_var: VarIndex,
-        out_var: VarIndex,
-    ) {
+    pub fn insert_add_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
         self.insert_lc_gate(
             &[left_var, right_var, 0, 0],
             out_var,
@@ -281,12 +275,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         );
     }
 
-    pub fn insert_sub_gate(
-        &mut self,
-        left_var: VarIndex,
-        right_var: VarIndex,
-        out_var: VarIndex,
-    ) {
+    pub fn insert_sub_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
         self.insert_lc_gate(
             &[left_var, right_var, 0, 0],
             out_var,
@@ -297,12 +286,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         );
     }
 
-    pub fn insert_mul_gate(
-        &mut self,
-        left_var: VarIndex,
-        right_var: VarIndex,
-        out_var: VarIndex,
-    ) {
+    pub fn insert_mul_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
         assert!(left_var < self.num_vars, "left_var index out of bound");
         assert!(right_var < self.num_vars, "right_var index out of bound");
         assert!(out_var < self.num_vars, "out_var index out of bound");
@@ -366,8 +350,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
     pub fn add(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
         assert!(left_var < self.num_vars, "left_var index out of bound");
         assert!(right_var < self.num_vars, "right_var index out of bound");
-        let out_var =
-            self.new_variable(self.witness[left_var].add(&self.witness[right_var]));
+        let out_var = self.new_variable(self.witness[left_var].add(&self.witness[right_var]));
         self.insert_add_gate(left_var, right_var, out_var);
         out_var
     }
@@ -376,8 +359,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
     pub fn sub(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
         assert!(left_var < self.num_vars, "left_var index out of bound");
         assert!(right_var < self.num_vars, "right_var index out of bound");
-        let out_var =
-            self.new_variable(self.witness[left_var].sub(&self.witness[right_var]));
+        let out_var = self.new_variable(self.witness[left_var].sub(&self.witness[right_var]));
         self.insert_sub_gate(left_var, right_var, out_var);
         out_var
     }
@@ -392,8 +374,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
     pub fn mul(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
         assert!(left_var < self.num_vars, "left_var index out of bound");
         assert!(right_var < self.num_vars, "right_var index out of bound");
-        let out_var =
-            self.new_variable(self.witness[left_var].mul(&self.witness[right_var]));
+        let out_var = self.new_variable(self.witness[left_var].mul(&self.witness[right_var]));
         self.insert_mul_gate(left_var, right_var, out_var);
         out_var
     }
@@ -451,17 +432,8 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         }
         let zero = F::zero();
         match (n_bits - 1) - 3 * m {
-            1 => {
-                self.insert_lc_gate(&[acc, b[0], 0, 0], var, bin[1], bin[0], zero, zero)
-            }
-            2 => self.insert_lc_gate(
-                &[acc, b[1], b[0], 0],
-                var,
-                bin[2],
-                bin[1],
-                bin[0],
-                zero,
-            ),
+            1 => self.insert_lc_gate(&[acc, b[0], 0, 0], var, bin[1], bin[0], zero, zero),
+            2 => self.insert_lc_gate(&[acc, b[1], b[0], 0], var, bin[2], bin[1], bin[0], zero),
             _ => self.insert_lc_gate(
                 &[acc, b[2], b[1], b[0]],
                 var,
@@ -598,13 +570,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.selectors[7].push(q_ecc);
     }
 
-    pub fn push_rescue_selectors(
-        &mut self,
-        q_hash_1: F,
-        q_hash_2: F,
-        q_hash_3: F,
-        q_hash_4: F,
-    ) {
+    pub fn push_rescue_selectors(&mut self, q_hash_1: F, q_hash_2: F, q_hash_3: F, q_hash_4: F) {
         self.selectors[8].push(q_hash_1);
         self.selectors[9].push(q_hash_2);
         self.selectors[10].push(q_hash_3);
@@ -689,7 +655,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
 mod test {
     use algebra::{
         bls12_381::BLSScalar,
-        groups::{Group, One, Scalar, ScalarArithmetic, Zero},
+        traits::{Group, One, Scalar, ScalarArithmetic, Zero},
         jubjub::JubjubPoint,
     };
     use merlin::Transcript;
@@ -833,8 +799,7 @@ mod test {
         cs.new_variable(num[1]);
         let c_idx = cs.add(0, 1);
         let d_idx = cs.mul(0, 1);
-        let e_idx =
-            cs.linear_combine(&[0, 1, c_idx, d_idx], num[1], num[1], num[1], num[1]);
+        let e_idx = cs.linear_combine(&[0, 1, c_idx, d_idx], num[1], num[1], num[1], num[1]);
 
         cs.range_check(e_idx, 3);
 
@@ -1152,8 +1117,7 @@ mod test {
         prng: &mut R,
     ) {
         let mut cs = TurboConstraintSystem::new();
-        let num: Vec<PCS::Field> =
-            (0..9).map(|x| PCS::Field::from_u32(x as u32)).collect();
+        let num: Vec<PCS::Field> = (0..9).map(|x| PCS::Field::from_u32(x as u32)).collect();
 
         // The circuit description:
         // 1. a \in {0, 1}
@@ -1182,10 +1146,7 @@ mod test {
         check_turbo_plonk_proof(pcs, prng, &cs, &witness, &[]);
     }
 
-    fn test_turbo_plonk_ecc_gates<
-        PCS: PolyComScheme<Field = BLSScalar>,
-        R: CryptoRng + RngCore,
-    >(
+    fn test_turbo_plonk_ecc_gates<PCS: PolyComScheme<Field = BLSScalar>, R: CryptoRng + RngCore>(
         pcs: &PCS,
         prng: &mut R,
     ) {
@@ -1193,8 +1154,8 @@ mod test {
 
         // Compute secret scalar and public base point.
         let scalar_bytes: [u8; 32] = [
-            47, 113, 87, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
+            47, 113, 87, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
         ];
         let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
         let base_ext = JubjubPoint::get_base();
@@ -1225,9 +1186,9 @@ mod test {
         cs.pad();
 
         let online_vars = [PCS::Field::from_str(
-      "52184923318241479436224725218017640784400243367974222506608059144773855444730",
-    )
-    .unwrap()];
+            "52184923318241479436224725218017640784400243367974222506608059144773855444730",
+        )
+        .unwrap()];
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &online_vars).is_ok());
         check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &online_vars[..]);
@@ -1245,8 +1206,7 @@ mod test {
         let verifier_params_ref = &prover_params.verifier_params;
 
         let mut transcript = Transcript::new(b"TestTurboPlonk");
-        let proof =
-            prover(prng, &mut transcript, pcs, cs, &prover_params, witness).unwrap();
+        let proof = prover(prng, &mut transcript, pcs, cs, &prover_params, witness).unwrap();
 
         let mut transcript = Transcript::new(b"TestTurboPlonk");
         assert!(verifier(

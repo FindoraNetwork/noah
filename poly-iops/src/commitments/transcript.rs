@@ -1,5 +1,5 @@
 use crate::commitments::pcs::{PolyComScheme, ToBytes};
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use merlin::Transcript;
 use rand_core::SeedableRng;
 

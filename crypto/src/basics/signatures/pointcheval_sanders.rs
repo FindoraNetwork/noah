@@ -19,7 +19,7 @@ key is a tuple of elements rather than a single element in G2. A tuple of messag
 Given the above properties, Pointcheval-Sanders signatures are suitable for anonymous credentials and group signatures.
 */
 
-use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
+use algebra::traits::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -48,10 +48,10 @@ pub struct PSSignature<G1> {
 /// #Example
 /// ```
 ///
-/// use algebra::bls12_381::Bls12381;
+/// use algebra::bls12_381::BLSPairingEngine;
 /// use crypto::basics::signatures::pointcheval_sanders::ps_gen_keys;
 /// use rand::thread_rng;
-/// let keys = ps_gen_keys::<_,Bls12381>(&mut thread_rng());
+/// let keys = ps_gen_keys::<_,BLSPairingEngine>(&mut thread_rng());
 /// ```
 pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
     prng: &mut R,
@@ -73,10 +73,10 @@ pub fn ps_gen_keys<R: CryptoRng + RngCore, P: Pairing>(
 /// ```
 ///
 /// use crypto::basics::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_bytes};
-/// use algebra::bls12_381::Bls12381;
+/// use algebra::bls12_381::BLSPairingEngine;
 /// use rand::thread_rng;
-/// let (_, sk) = ps_gen_keys::<_,Bls12381>(&mut thread_rng());
-/// let sig = ps_sign_bytes::<_, Bls12381>(&mut thread_rng(), &sk, b"this is a message");
+/// let (_, sk) = ps_gen_keys::<_,BLSPairingEngine>(&mut thread_rng());
+/// let sig = ps_sign_bytes::<_, BLSPairingEngine>(&mut thread_rng(), &sk, b"this is a message");
 /// ```
 pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: Pairing>(
     prng: &mut R,
@@ -91,12 +91,12 @@ pub fn ps_sign_bytes<R: CryptoRng + RngCore, P: Pairing>(
 /// #Example
 /// ```
 ///
-/// use algebra::bls12_381::{BLSScalar, Bls12381};
-/// use algebra::groups::Scalar;
+/// use algebra::bls12_381::{BLSScalar, BLSPairingEngine};
+/// use algebra::traits::Scalar;
 /// use crypto::basics::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar};
 /// use rand::thread_rng;
-/// let (_, sk) = ps_gen_keys::<_, Bls12381>(&mut thread_rng());
-/// let sig = ps_sign_scalar::<_, Bls12381>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100u32));
+/// let (_, sk) = ps_gen_keys::<_, BLSPairingEngine>(&mut thread_rng());
+/// let sig = ps_sign_scalar::<_, BLSPairingEngine>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100u32));
 /// ```
 pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(
     prng: &mut R,
@@ -115,14 +115,14 @@ pub fn ps_sign_scalar<R: CryptoRng + RngCore, P: Pairing>(
 /// ```
 /// use crypto::basics::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_bytes, ps_verify_sig_bytes};
 /// use utils::{errors::ZeiError, msg_eq};
-/// use algebra::bls12_381::Bls12381;
+/// use algebra::bls12_381::BLSPairingEngine;
 /// use rand::thread_rng;
 /// use ruc::err::*;
 ///
-/// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut thread_rng());
-/// let sig = ps_sign_bytes::<_, Bls12381>(&mut thread_rng(), &sk, b"this is a message");
-/// assert!(ps_verify_sig_bytes::<Bls12381>(&pk, b"this is a message", &sig).is_ok());
-/// msg_eq!(ZeiError::SignatureError, ps_verify_sig_bytes::<Bls12381>(&pk, b"this is ANOTHER message", &sig).unwrap_err());
+/// let (pk, sk) = ps_gen_keys::<_, BLSPairingEngine>(&mut thread_rng());
+/// let sig = ps_sign_bytes::<_, BLSPairingEngine>(&mut thread_rng(), &sk, b"this is a message");
+/// assert!(ps_verify_sig_bytes::<BLSPairingEngine>(&pk, b"this is a message", &sig).is_ok());
+/// msg_eq!(ZeiError::SignatureError, ps_verify_sig_bytes::<BLSPairingEngine>(&pk, b"this is ANOTHER message", &sig).unwrap_err());
 /// ```
 pub fn ps_verify_sig_bytes<P: Pairing>(
     pk: &PSPublicKey<P::G2>,
@@ -137,16 +137,16 @@ pub fn ps_verify_sig_bytes<P: Pairing>(
 /// #Example
 /// ```
 /// use crypto::basics::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar};
-/// use algebra::bls12_381::{BLSScalar, Bls12381};
-/// use algebra::groups::Scalar;
+/// use algebra::bls12_381::{BLSScalar, BLSPairingEngine};
+/// use algebra::traits::Scalar;
 /// use rand::thread_rng;
 /// use utils::{errors::ZeiError, msg_eq};
 /// use ruc::err::*;
 ///
-/// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut thread_rng());
-/// let sig = ps_sign_scalar::<_, Bls12381>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100));
-/// assert!(ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(100), &sig).is_ok());
-/// msg_eq!(ZeiError::SignatureError, ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(333), &sig).unwrap_err());
+/// let (pk, sk) = ps_gen_keys::<_, BLSPairingEngine>(&mut thread_rng());
+/// let sig = ps_sign_scalar::<_, BLSPairingEngine>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100));
+/// assert!(ps_verify_sig_scalar::<BLSPairingEngine>(&pk, &BLSScalar::from_u32(100), &sig).is_ok());
+/// msg_eq!(ZeiError::SignatureError, ps_verify_sig_scalar::<BLSPairingEngine>(&pk, &BLSScalar::from_u32(333), &sig).unwrap_err());
 /// ```
 pub fn ps_verify_sig_scalar<P: Pairing>(
     pk: &PSPublicKey<P::G2>,
@@ -168,13 +168,13 @@ pub fn ps_verify_sig_scalar<P: Pairing>(
 ///
 /// ```
 /// use crypto::basics::signatures::pointcheval_sanders::{ps_gen_keys, ps_sign_scalar, ps_verify_sig_scalar, ps_randomize_sig};
-/// use algebra::bls12_381::{BLSScalar, Bls12381};
-/// use algebra::groups::Scalar;
+/// use algebra::bls12_381::{BLSScalar, BLSPairingEngine};
+/// use algebra::traits::Scalar;
 /// use rand::thread_rng;
-/// let (pk, sk) = ps_gen_keys::<_, Bls12381>(&mut thread_rng());
-/// let sig = ps_sign_scalar::<_, Bls12381>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100));
-/// let (_,rand_sig) = ps_randomize_sig::<_, Bls12381>(&mut thread_rng(), &sig);
-/// assert!(ps_verify_sig_scalar::<Bls12381>(&pk, &BLSScalar::from_u32(100), &rand_sig).is_ok());
+/// let (pk, sk) = ps_gen_keys::<_, BLSPairingEngine>(&mut thread_rng());
+/// let sig = ps_sign_scalar::<_, BLSPairingEngine>(&mut thread_rng(), &sk, &BLSScalar::from_u32(100));
+/// let (_,rand_sig) = ps_randomize_sig::<_, BLSPairingEngine>(&mut thread_rng(), &sig);
+/// assert!(ps_verify_sig_scalar::<BLSPairingEngine>(&pk, &BLSScalar::from_u32(100), &rand_sig).is_ok());
 /// ```
 pub fn ps_randomize_sig<R: RngCore + CryptoRng, P: Pairing>(
     prng: &mut R,

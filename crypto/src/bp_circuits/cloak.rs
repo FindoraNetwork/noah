@@ -40,7 +40,7 @@ match on each list. On each product the elements are shifted by a random challen
 */
 
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use algebra::groups::{Scalar as _, ScalarArithmetic};
+use algebra::traits::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::r1cs::{
     ConstraintSystem, Prover, RandomizableConstraintSystem, Variable, Verifier,
@@ -84,11 +84,7 @@ impl CloakValue {
             },
         )
     }
-    pub fn commit(
-        &self,
-        pc_gens: &RistrettoPedersenGens,
-        blinds: &CloakValue,
-    ) -> CloakCommitment {
+    pub fn commit(&self, pc_gens: &RistrettoPedersenGens, blinds: &CloakValue) -> CloakCommitment {
         CloakCommitment {
             amount: pc_gens.commit(self.amount, blinds.amount).compress(),
             asset_type: pc_gens
@@ -114,10 +110,7 @@ pub struct CloakCommitment {
 
 impl CloakCommitment {
     /// Verifier produce circuit variables corresponding to this commitment
-    pub fn commit_verifier(
-        &self,
-        verifier: &mut Verifier<&mut Transcript>,
-    ) -> CloakVariable {
+    pub fn commit_verifier(&self, verifier: &mut Verifier<&mut Transcript>) -> CloakVariable {
         CloakVariable {
             amount: verifier.commit(self.amount.0),
             asset_type: verifier.commit(self.asset_type.0),
@@ -146,27 +139,22 @@ pub fn cloak<CS: RandomizableConstraintSystem>(
     let mut n_gates = 0;
 
     // sort and merge values by type
-    let (n, mut merged_input_vars) =
-        sort_and_merge(cs, input_vars, input_values).c(d!())?;
-    let (m, mut merged_output_vars) =
-        sort_and_merge(cs, output_vars, output_values).c(d!())?;
+    let (n, mut merged_input_vars) = sort_and_merge(cs, input_vars, input_values).c(d!())?;
+    let (m, mut merged_output_vars) = sort_and_merge(cs, output_vars, output_values).c(d!())?;
 
     n_gates += n + m;
 
     // pad input or output to be of same length
     let pad_value = input_values.map(|_| Scalar::from_u32(0));
     if input_len < output_len {
-        pad(cs, output_len, &mut merged_input_vars, pad_value)
-            .c(d!(ZeiError::R1CSProofError))?;
+        pad(cs, output_len, &mut merged_input_vars, pad_value).c(d!(ZeiError::R1CSProofError))?;
     } else {
-        pad(cs, input_len, &mut merged_output_vars, pad_value)
-            .c(d!(ZeiError::R1CSProofError))?;
+        pad(cs, input_len, &mut merged_output_vars, pad_value).c(d!(ZeiError::R1CSProofError))?;
     }
 
     // do a proof of shuffle
-    n_gates +=
-        super::gadgets::cloak_shuffle_gadget(cs, merged_input_vars, merged_output_vars)
-            .c(d!(ZeiError::R1CSProofError))?;
+    n_gates += super::gadgets::cloak_shuffle_gadget(cs, merged_input_vars, merged_output_vars)
+        .c(d!(ZeiError::R1CSProofError))?;
 
     // final range proof:
     for (i, out) in output_vars.iter().enumerate() {
@@ -283,19 +271,13 @@ pub(super) fn sort_and_merge<CS: RandomizableConstraintSystem>(
     )
     .c(d!())?;
     let merged_vars =
-        allocate_cloak_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len)
-            .c(d!())?;
+        allocate_cloak_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len).c(d!())?;
 
+    n_gates += super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())
+        .c(d!(ZeiError::R1CSProofError))?;
     n_gates +=
-        super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())
+        super::gadgets::cloak_merge_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars)
             .c(d!(ZeiError::R1CSProofError))?;
-    n_gates += super::gadgets::cloak_merge_gadget(
-        cs,
-        &sorted_vars,
-        &intermediate_vars,
-        &merged_vars,
-    )
-    .c(d!(ZeiError::R1CSProofError))?;
 
     Ok((n_gates, merged_vars))
 }
@@ -336,7 +318,7 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
 #[cfg(test)]
 pub mod tests {
     use crate::bp_circuits::cloak::{CloakCommitment, CloakValue};
-    use algebra::groups::{Scalar, ScalarArithmetic};
+    use algebra::traits::{Scalar, ScalarArithmetic};
     use algebra::ristretto::RistrettoScalar;
     use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
     use bulletproofs::{BulletproofGens, PedersenGens};

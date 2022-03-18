@@ -1,5 +1,5 @@
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::Zero;
+use algebra::traits::Zero;
 use crypto::basics::hash::rescue::RescueInstance;
 use ruc::*;
 use std::collections::hash_map::Iter;
@@ -71,8 +71,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         if let Some(bytes) = store.get(&ENTRY_COUNT_KEY)? {
             let array: [u8; 8] = [
-                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
-                bytes[7],
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
             ];
             entry_count = u64::from_be_bytes(array);
             version = store.height().c(d!())?;
@@ -270,8 +269,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
 
         if let Some(bytes) = store.get(&ENTRY_COUNT_KEY)? {
             let array: [u8; 8] = [
-                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
-                bytes[7],
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
             ];
             entry_count = u64::from_be_bytes(array);
             version = store.height().c(d!())?;
@@ -476,9 +474,7 @@ mod tests {
     fn test_merkle_tree_path() {
         let first_keys = get_path_keys(0);
         let mut first_sum = 0u64;
-        for (i, (key, path)) in
-            first_keys[0..first_keys.len() - 1].iter().rev().enumerate()
-        {
+        for (i, (key, path)) in first_keys[0..first_keys.len() - 1].iter().rev().enumerate() {
             first_sum += 3u64.pow(i as u32);
             assert_eq!(*key, first_sum);
             assert_eq!(*path, TreePath::Left);

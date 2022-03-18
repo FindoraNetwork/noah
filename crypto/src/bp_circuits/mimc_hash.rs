@@ -89,7 +89,7 @@ mod test {
     use super::*;
     use crate::basics::hash::mimc::{mimc_f, mimc_feistel, MiMCHash};
     use crate::basics::hash::MTHash;
-    use algebra::groups::Scalar as _;
+    use algebra::traits::Scalar as _;
     use algebra::ristretto::RistrettoScalar as Scalar;
     use bulletproofs::r1cs::Verifier;
     use bulletproofs::{BulletproofGens, PedersenGens};
@@ -103,8 +103,7 @@ mod test {
 
         let scalar_x = Scalar::from_u32(2);
         let scalar_c = Scalar::from_u32(0);
-        let (cx, x) =
-            prover.commit(scalar_x.0, curve25519_dalek::scalar::Scalar::from(10u8));
+        let (cx, x) = prover.commit(scalar_x.0, curve25519_dalek::scalar::Scalar::from(10u8));
         let (out, num_left_wires) = super::mimc_func(&mut prover, x.into(), scalar_c);
 
         let expected_output = mimc_f(&scalar_x, &scalar_c);
@@ -119,8 +118,7 @@ mod test {
         let mut verifier = Verifier::new(&mut verifier_transcript);
 
         let ver_x = verifier.commit(cx);
-        let (ver_out, num_left_wires) =
-            super::mimc_func(&mut verifier, ver_x.into(), scalar_c);
+        let (ver_out, num_left_wires) = super::mimc_func(&mut verifier, ver_x.into(), scalar_c);
         let expected = verifier.allocate(Some(expected_output.0)).unwrap();
         verifier.constrain(ver_out - expected);
         let bp_gens = BulletproofGens::new((num_left_wires + 1).next_power_of_two(), 1);
@@ -140,13 +138,10 @@ mod test {
             Scalar::from_u32(8),
             Scalar::from_u32(0),
         ];
-        let (expected_output_x, expected_output_y) =
-            mimc_feistel(&scalar_x, &scalar_y, &scalar_c);
+        let (expected_output_x, expected_output_y) = mimc_feistel(&scalar_x, &scalar_y, &scalar_c);
 
-        let (cx, x) =
-            prover.commit(scalar_x.0, curve25519_dalek::scalar::Scalar::from(10u8));
-        let (cy, y) =
-            prover.commit(scalar_y.0, curve25519_dalek::scalar::Scalar::from(11u8));
+        let (cx, x) = prover.commit(scalar_x.0, curve25519_dalek::scalar::Scalar::from(10u8));
+        let (cy, y) = prover.commit(scalar_y.0, curve25519_dalek::scalar::Scalar::from(11u8));
         let (outx, outy, num_left_wires) =
             super::feistel_network(&mut prover, x.into(), y.into(), &scalar_c);
         let expected_x = prover.allocate(Some(expected_output_x.0)).unwrap();
@@ -180,14 +175,11 @@ mod test {
 
         let scalar_x = Scalar::from_u32(10);
         let scalar_y = Scalar::from_u32(20);
-        let (cx, x) =
-            prover.commit(scalar_x.0, curve25519_dalek::scalar::Scalar::from(10u8));
-        let (cy, y) =
-            prover.commit(scalar_y.0, curve25519_dalek::scalar::Scalar::from(11u8));
+        let (cx, x) = prover.commit(scalar_x.0, curve25519_dalek::scalar::Scalar::from(10u8));
+        let (cy, y) = prover.commit(scalar_y.0, curve25519_dalek::scalar::Scalar::from(11u8));
         let hasher = MiMCHash::new(1);
         let real_hash = hasher.digest(&[&scalar_x, &scalar_y]);
-        let (ch, h) =
-            prover.commit(real_hash.0, curve25519_dalek::scalar::Scalar::from(12u8));
+        let (ch, h) = prover.commit(real_hash.0, curve25519_dalek::scalar::Scalar::from(12u8));
         let num_left_wires = super::hash_proof(&mut prover, x, y, h).unwrap();
         let bp_gens = BulletproofGens::new((num_left_wires + 2).next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
@@ -197,8 +189,7 @@ mod test {
         let ver_x = verifier.commit(cx);
         let ver_y = verifier.commit(cy);
         let ver_h = verifier.commit(ch);
-        let num_left_wires =
-            super::hash_proof(&mut verifier, ver_x, ver_y, ver_h).unwrap();
+        let num_left_wires = super::hash_proof(&mut verifier, ver_x, ver_y, ver_h).unwrap();
         let bp_gens = BulletproofGens::new((num_left_wires + 2).next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
     }
