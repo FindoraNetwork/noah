@@ -1,5 +1,5 @@
 use crate::basics::hash::rescue::{RescueCtr, RescueInstance};
-use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
+use algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
 use algebra::groups::{Group, GroupArithmetic, Scalar};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use algebra::ristretto::RistrettoPoint;
@@ -87,10 +87,10 @@ impl ZeiFromToBytes for ElGamalHybridCiphertext<JubjubPoint, BLSScalar> {
         let mut symm_ctxts = vec![];
         while pos < bytes.len() {
             symm_ctxts.push(
-                BLSScalar::zei_from_bytes(&bytes[pos..pos + BLS_SCALAR_LEN])
+                BLSScalar::zei_from_bytes(&bytes[pos..pos + BLS12_381_SCALAR_LEN])
                     .c(d!(ZeiError::DeserializationError))?,
             );
-            pos += BLS_SCALAR_LEN;
+            pos += BLS12_381_SCALAR_LEN;
         }
         Ok(ElGamalHybridCiphertext { e1, symm_ctxts })
     }

@@ -10,9 +10,6 @@
 **/release
 **/*.rs.bk
 .*.sw*
-
-utilities/target
-
 Cargo.lock
 
 #zei_api

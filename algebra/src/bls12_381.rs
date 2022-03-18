@@ -27,15 +27,27 @@ use ruc::*;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 use wasm_bindgen::prelude::*;
 
-pub const BLS_SCALAR_LEN: usize = 32;
+/// The number of bytes for a scalar value over BLS12-381
+pub const BLS12_381_SCALAR_LEN: usize = 32;
 
+/// The wrapped struct for `ark_bls12_381::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
 pub struct BLSScalar(Fr);
+
+/// The wrapped struct for `ark_bls12_381::G1Projective`
+#[wasm_bindgen]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSG1(pub(crate) G1Projective);
+
+/// The wrapped struct for `ark_bls12_381::G2Projective`
+#[wasm_bindgen]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSG2(pub(crate) G2Projective);
+
+/// The wrapped struct for `Fp12<ark_bls12_381::Fq12Parameters>`,
+/// which is the pairing result
+#[wasm_bindgen]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSGt(pub(crate) Fp12<Fq12Parameters>);
 
@@ -220,7 +232,7 @@ impl ZeiScalar for BLSScalar {
 
     #[inline]
     fn bytes_len() -> usize {
-        BLS_SCALAR_LEN
+        BLS12_381_SCALAR_LEN
     }
 
     #[inline]

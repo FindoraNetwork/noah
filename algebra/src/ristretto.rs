@@ -18,6 +18,7 @@ use curve25519_dalek::{
 use digest::{generic_array::typenum::U64, Digest};
 use ruc::*;
 
+/// The number of bytes for a scalar value over BLS12-381
 pub const RISTRETTO_SCALAR_LEN: usize = 32;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]

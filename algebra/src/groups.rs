@@ -7,6 +7,7 @@ use digest::{generic_array::typenum::U64, Digest};
 use ruc::err::*;
 use serde::{Deserialize, Serialize};
 use utils::shift_u8_vec;
+use crate::errors::AlgebraError;
 
 pub trait GroupArithmetic {
     type S: Scalar;
@@ -134,7 +135,7 @@ pub trait Group:
         if scalars.is_empty() {
             Self::get_identity()
         } else {
-            crate::multi_exp::pippenger(scalars, points).unwrap()
+            pippenger(scalars, points).unwrap()
         }
     }
 }
@@ -184,7 +185,7 @@ pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
         let coef = carry + (bit_buf & window_mask); // coef = [0, 2^r)
 
         // Recenter coefficients from [0,2^w) to [-2^w/2, 2^w/2)
-        carry = (coef + (radix / 2) as u64) >> w;
+        carry = (coef + (radix / 2)) >> w;
         digits.push(((coef as i64) - (carry << w) as i64) as i8);
         i += 1;
     }
@@ -194,6 +195,73 @@ pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
         digits.pop();
     }
     digits
+}
+
+
+pub fn pippenger<G: Group>(scalars: &[&G::S], elems: &[&G]) -> Result<G> {
+    let size = scalars.len();
+
+    if size == 0 {
+        return Err(eg!(AlgebraError::ParameterError));
+    }
+
+    let w = if size < 500 {
+        6
+    } else if size < 800 {
+        7
+    } else {
+        8
+    };
+
+    let two_power_w: usize = 1 << w;
+    let digits_vec: Vec<Vec<i8>> = scalars
+        .iter()
+        .map(|s| scalar_to_radix_2_power_w::<G::S>(s, w))
+        .collect();
+
+    let mut digits_count = 0;
+    for digits in digits_vec.iter() {
+        if digits.len() > digits_count {
+            digits_count = digits.len();
+        }
+    }
+
+    // init all the buckets
+    let mut buckets: Vec<_> = (0..two_power_w / 2).map(|_| G::get_identity()).collect();
+
+    let mut cols = (0..digits_count).rev().map(|index| {
+        // empty each bucket
+        for b in buckets.iter_mut() {
+            *b = G::get_identity();
+        }
+        for (digits, elem) in digits_vec.iter().zip(elems) {
+            if index >= digits.len() {
+                continue;
+            }
+            let digit = digits[index];
+            if digit > 0 {
+                let b_index = (digit - 1) as usize;
+                buckets[b_index] = buckets[b_index].add(elem);
+            }
+            if digit < 0 {
+                let b_index = (-(digit + 1)) as usize;
+                buckets[b_index] = buckets[b_index].sub(elem);
+            }
+        }
+        let mut intermediate_sum = buckets[buckets.len() - 1].clone();
+        let mut sum = buckets[buckets.len() - 1].clone();
+        for i in (0..buckets.len() - 1).rev() {
+            intermediate_sum = intermediate_sum.add(&buckets[i]);
+            sum = sum.add(&intermediate_sum);
+        }
+        sum
+    });
+
+    let two_power_w_int = Scalar::from_u64(two_power_w as u64);
+    // This unwrap is safe as the list of scalars is non empty at this point.
+    let hi_col = cols.next().unwrap();
+    let res = cols.fold(hi_col, |total, p| total.mul(&two_power_w_int).add(&p));
+    Ok(res)
 }
 
 #[cfg(test)]
@@ -290,5 +358,61 @@ pub(crate) mod group_tests {
         let r = scalar_to_radix_2_power_w(&int, w);
         let expected = [-24, 16];
         assert_eq!(expected.as_ref(), r.as_slice());
+    }
+}
+
+#[cfg(test)]
+mod multi_exp_tests {
+    use crate::bls12_381::{BLSGt, BLSG1, BLSG2};
+    use crate::groups::{Group, Scalar};
+    use crate::ristretto::RistrettoPoint;
+
+    #[test]
+    fn test_multiexp_ristretto() {
+        run_multiexp_test::<RistrettoPoint>();
+    }
+    #[test]
+    fn test_multiexp_blsg1() {
+        run_multiexp_test::<BLSG1>();
+    }
+    #[test]
+    fn test_multiexp_blsg2() {
+        run_multiexp_test::<BLSG2>();
+    }
+    #[test]
+    fn test_multiexp_blsgt() {
+        run_multiexp_test::<BLSGt>();
+    }
+
+    fn run_multiexp_test<G: Group>() {
+        let g = G::vartime_multi_exp(&[], &[]);
+        assert_eq!(g, G::get_identity());
+
+        let g1 = G::get_base();
+        let zero = G::S::from_u32(0);
+        let g = G::vartime_multi_exp(&[&zero], &[&g1]);
+        assert_eq!(g, G::get_identity());
+
+        let g1 = G::get_base();
+        let one = Scalar::from_u32(1);
+        let g = G::vartime_multi_exp(&[&one], &[&g1]);
+        assert_eq!(g, G::get_base());
+
+        let g1 = G::get_base();
+        let g1p = G::get_base();
+        let one = Scalar::from_u32(1);
+        let zero = Scalar::from_u32(0);
+        let g = G::vartime_multi_exp(&[&one, &zero], &[&g1, &g1p]);
+        assert_eq!(g, G::get_base());
+
+        let g1 = G::get_base();
+        let g2 = g1.add(&g1);
+        let g3 = g1.mul(&Scalar::from_u32(500));
+        let thousand = Scalar::from_u32(1000);
+        let two = Scalar::from_u32(2);
+        let three = Scalar::from_u32(3);
+        let g = G::vartime_multi_exp(&[&thousand, &two, &three], &[&g1, &g2, &g3]);
+        let expected = G::get_base().mul(&Scalar::from_u32(1000 + 4 + 1500));
+        assert_eq!(g, expected);
     }
 }

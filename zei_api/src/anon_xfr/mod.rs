@@ -9,7 +9,7 @@ use crate::anon_xfr::structs::{
 };
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
-use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
+use algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
 use algebra::groups::{Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
 use crypto::basics::hash::rescue::RescueInstance;
@@ -259,7 +259,7 @@ pub fn decrypt_memo(
     abar: &AnonBlindAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar, JubjubScalar)> {
     let plaintext = hybrid_decrypt_with_x25519_secret_key(&memo.lock, dec_key);
-    if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS_SCALAR_LEN + JUBJUB_SCALAR_LEN {
+    if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN + JUBJUB_SCALAR_LEN {
         return Err(eg!(ZeiError::ParameterError));
     }
     let amount = utils::u8_le_slice_to_u64(&plaintext[0..8]);
@@ -268,9 +268,9 @@ pub fn decrypt_memo(
     asset_type_array.copy_from_slice(&plaintext[i..i + ASSET_TYPE_LENGTH]);
     let asset_type = AssetType(asset_type_array);
     i += ASSET_TYPE_LENGTH;
-    let blind = BLSScalar::from_bytes(&plaintext[i..i + BLS_SCALAR_LEN])
+    let blind = BLSScalar::from_bytes(&plaintext[i..i + BLS12_381_SCALAR_LEN])
         .c(d!(ZeiError::ParameterError))?;
-    i += BLS_SCALAR_LEN;
+    i += BLS12_381_SCALAR_LEN;
     let rand = JubjubScalar::from_bytes(&plaintext[i..i + JUBJUB_SCALAR_LEN])
         .c(d!(ZeiError::ParameterError))?;
     // verify abar's commitment
