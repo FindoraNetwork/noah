@@ -372,10 +372,7 @@ mod jubjub_groups_test {
             Group, Scalar,
         },
     };
-    use ark_std::{
-        ops::*,
-        rand::SeedableRng
-    };
+    use ark_std::{ops::*, rand::SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
     #[test]

@@ -7,9 +7,9 @@ use crate::setup::{NodeParams, UserParams};
 use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSignature};
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType};
 use algebra::bls12_381::BLSScalar;
-use algebra::traits::{GroupArithmetic, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::JubjubScalar;
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+use algebra::{ops::*, traits::Scalar, Zero};
 use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::hybrid_encryption::XPublicKey;
@@ -123,12 +123,10 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     // 2. Reconstruct the points.
     let x = RistrettoScalar::from(oabar_amount);
     let y: RistrettoScalar = obar.asset_type.as_scalar();
-    let gamma = obar.amount_blinds.0.add(
-        &obar
-            .amount_blinds
-            .1
-            .mul(&RistrettoScalar::from(TWO_POW_32)),
-    );
+    let gamma = obar
+        .amount_blinds
+        .0
+        .add(&obar.amount_blinds.1.mul(&RistrettoScalar::from(TWO_POW_32)));
     let delta = obar.type_blind;
     let point_p = pc_gens.commit(&[x], &gamma).c(d!())?;
     let point_q = pc_gens.commit(&[y], &delta).c(d!())?;

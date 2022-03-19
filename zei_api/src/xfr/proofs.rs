@@ -8,8 +8,8 @@ use crate::xfr::structs::{
     AssetRecord, BlindAssetRecord, OpenAssetRecord, TracerMemo, TracingPolicies, XfrAmount,
     XfrAssetType, XfrBody, XfrRangeProof,
 };
-use algebra::traits::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar};
+use algebra::{ops::*, traits::Group, Zero};
 use bulletproofs::RangeProof;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::basics::elgamal::ElGamalCiphertext;
@@ -560,10 +560,10 @@ pub(crate) fn range_proof(
     })
 }
 fn add_blindings(oar: &[&OpenAssetRecord]) -> (Scalar, Scalar) {
-    oar.iter().fold(
-        (Scalar::zero(), Scalar::zero()),
-        |(low, high), x| (low.add(&x.amount_blinds.0), high.add(&x.amount_blinds.1)),
-    )
+    oar.iter()
+        .fold((Scalar::zero(), Scalar::zero()), |(low, high), x| {
+            (low.add(&x.amount_blinds.0), high.add(&x.amount_blinds.1))
+        })
 }
 
 pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(

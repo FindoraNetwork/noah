@@ -9,10 +9,10 @@ use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
 use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use algebra::bls12_381::BLSG1;
-use algebra::traits::{Group, Scalar as ZeiScalar};
 use algebra::ristretto::{
     CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar,
 };
+use algebra::traits::{Group, Scalar as ZeiScalar};
 use bulletproofs::RangeProof;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::basics::elgamal::elgamal_key_gen;
@@ -79,11 +79,11 @@ impl AssetTypeZeiRepr {
         // JubjubScalar, BlsScalar and RistrettoScalar have length MIN_SCALAR_LENGTH
         // but in case anther scalar length is larger then we can set to 0 high order bytes
         if MIN_SCALAR_LENGTH == S::bytes_len() {
-            return S::from_le_bytes(&self.0).unwrap(); //safe unwrap
+            return S::from_bytes(&self.0).unwrap(); //safe unwrap
         }
         let mut v = vec![0u8; S::bytes_len()];
         v[0..ASSET_TYPE_ZEI_REPR_LENGTH].copy_from_slice(&self.0);
-        S::from_le_bytes(&v).unwrap()
+        S::from_bytes(&v).unwrap()
     }
 }
 /// A Transfer note: contains a transfer body and a (multi)signature

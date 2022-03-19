@@ -1,5 +1,4 @@
 use crate::setup::PublicParams;
-use algebra::traits::Scalar as _;
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
 use bulletproofs::r1cs::{batch_verify, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
@@ -28,21 +27,21 @@ impl Eq for AssetMixProof {}
 /// ```
 /// use algebra::ristretto::RistrettoScalar;
 /// use zei::xfr::asset_mixer::prove_asset_mixing;
-/// use algebra::traits::Scalar;
+/// use algebra::{Zero, traits::Scalar};
 /// let input = [
-///            (60u64, RistrettoScalar::zero(), RistrettoScalar::from(10000), RistrettoScalar::from(200000)),
-///            (100u64, RistrettoScalar::from(2), RistrettoScalar::from(10001), RistrettoScalar::from(200001)),
-///            (10u64, RistrettoScalar::from(1), RistrettoScalar::from(10002), RistrettoScalar::from(200002)),
-///            (50u64, RistrettoScalar::from(2), RistrettoScalar::from(10003), RistrettoScalar::from(200003)),
+///            (60u64, RistrettoScalar::zero(), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
+///            (100u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10001u32), RistrettoScalar::from(200001u32)),
+///            (10u64, RistrettoScalar::from(1u32), RistrettoScalar::from(10002u32), RistrettoScalar::from(200002u32)),
+///            (50u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10003u32), RistrettoScalar::from(200003u32)),
 ///            ];
 /// let output = [
-///            (40u64, RistrettoScalar::from(2), RistrettoScalar::from(10004), RistrettoScalar::from(200004)),
-///            (9u64, RistrettoScalar::from(1), RistrettoScalar::from(10005), RistrettoScalar::from(200005)),
-///            (1u64, RistrettoScalar::from(1), RistrettoScalar::from(10006), RistrettoScalar::from(200006)),
-///            (80u64, RistrettoScalar::from(2), RistrettoScalar::from(10007), RistrettoScalar::from(200007)),
-///            (50u64, RistrettoScalar::zero(), RistrettoScalar::from(10008), RistrettoScalar::from(200008)),
-///            (10u64, RistrettoScalar::zero(), RistrettoScalar::from(10009), RistrettoScalar::from(200009)),
-///            (30u64, RistrettoScalar::from(2), RistrettoScalar::from(10010), RistrettoScalar::from(200010)),
+///            (40u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10004u32), RistrettoScalar::from(200004u32)),
+///            (9u64, RistrettoScalar::from(1u32), RistrettoScalar::from(10005u32), RistrettoScalar::from(200005u32)),
+///            (1u64, RistrettoScalar::from(1u32), RistrettoScalar::from(10006u32), RistrettoScalar::from(200006u32)),
+///            (80u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10007u32), RistrettoScalar::from(200007u32)),
+///            (50u64, RistrettoScalar::zero(), RistrettoScalar::from(10008u32), RistrettoScalar::from(200008u32)),
+///            (10u64, RistrettoScalar::zero(), RistrettoScalar::from(10009u32), RistrettoScalar::from(200009u32)),
+///            (30u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10010u32), RistrettoScalar::from(200010u32)),
 ///        ];
 ///
 /// let proof = prove_asset_mixing(&input, &output).unwrap();
@@ -138,19 +137,19 @@ pub struct AssetMixingInstance<'a> {
 /// use zei::setup::PublicParams;
 /// use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 /// let input = [
-///            (60u64, RistrettoScalar::from(0), RistrettoScalar::from(10000), RistrettoScalar::from(200000)),
-///            (100u64, RistrettoScalar::from(2), RistrettoScalar::from(10001), RistrettoScalar::from(200001)),
-///            (10u64, RistrettoScalar::from(1), RistrettoScalar::from(10002), RistrettoScalar::from(200002)),
-///            (50u64, RistrettoScalar::from(2), RistrettoScalar::from(10003), RistrettoScalar::from(200003)),
+///            (60u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
+///            (100u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10001u32), RistrettoScalar::from(200001u32)),
+///            (10u64, RistrettoScalar::from(1u32), RistrettoScalar::from(10002u32), RistrettoScalar::from(200002u32)),
+///            (50u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10003u32), RistrettoScalar::from(200003u32)),
 ///            ];
 /// let output = [
-///            (40u64, RistrettoScalar::from(2), RistrettoScalar::from(10004), RistrettoScalar::from(200004)),
-///            (9u64, RistrettoScalar::from(1), RistrettoScalar::from(10005), RistrettoScalar::from(200005)),
-///            (1u64, RistrettoScalar::from(1), RistrettoScalar::from(10006), RistrettoScalar::from(200006)),
-///            (80u64, RistrettoScalar::from(2), RistrettoScalar::from(10007), RistrettoScalar::from(200007)),
-///            (50u64, RistrettoScalar::from(0), RistrettoScalar::from(10008), RistrettoScalar::from(200008)),
-///            (10u64, RistrettoScalar::from(0), RistrettoScalar::from(10009), RistrettoScalar::from(200009)),
-///            (30u64, RistrettoScalar::from(2), RistrettoScalar::from(10010), RistrettoScalar::from(200010)),
+///            (40u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10004u32), RistrettoScalar::from(200004u32)),
+///            (9u64, RistrettoScalar::from(1u32), RistrettoScalar::from(10005u32), RistrettoScalar::from(200005u32)),
+///            (1u64, RistrettoScalar::from(1u32), RistrettoScalar::from(10006u32), RistrettoScalar::from(200006u32)),
+///            (80u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10007u32), RistrettoScalar::from(200007u32)),
+///            (50u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10008u32), RistrettoScalar::from(200008u32)),
+///            (10u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10009u32), RistrettoScalar::from(200009u32)),
+///            (30u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10010u32), RistrettoScalar::from(200010u32)),
 ///        ];
 ///
 /// let proof = prove_asset_mixing(&input, &output).unwrap();
@@ -275,7 +274,6 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
 mod test {
     use crate::setup::PublicParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
-    use algebra::traits::Scalar;
     use algebra::ristretto::{CompressedRistretto, RistrettoScalar};
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use rand_chacha::ChaChaRng;
@@ -290,29 +288,29 @@ mod test {
         let input = [
             (
                 60u64,
-                RistrettoScalar::from(0),
-                RistrettoScalar::from(10000),
-                RistrettoScalar::from(200000),
+                RistrettoScalar::from(0u32),
+                RistrettoScalar::from(10000u32),
+                RistrettoScalar::from(200000u32),
             ),
             (
                 100u64,
-                RistrettoScalar::from(2),
-                RistrettoScalar::from(10001),
-                RistrettoScalar::from(200001),
+                RistrettoScalar::from(2u32),
+                RistrettoScalar::from(10001u32),
+                RistrettoScalar::from(200001u32),
             ),
         ];
         let output = [
             (
                 40u64,
-                RistrettoScalar::from(2),
-                RistrettoScalar::from(10004),
-                RistrettoScalar::from(200004),
+                RistrettoScalar::from(2u32),
+                RistrettoScalar::from(10004u32),
+                RistrettoScalar::from(200004u32),
             ),
             (
                 10u64,
-                RistrettoScalar::from(2),
-                RistrettoScalar::from(10004),
-                RistrettoScalar::from(200004),
+                RistrettoScalar::from(2u32),
+                RistrettoScalar::from(10004u32),
+                RistrettoScalar::from(200004u32),
             ),
         ];
         let proof_result = super::prove_asset_mixing(&input, &output);
@@ -320,9 +318,9 @@ mod test {
 
         let output = [(
             40u64,
-            RistrettoScalar::from(2),
-            RistrettoScalar::from(10004),
-            RistrettoScalar::from(200004),
+            RistrettoScalar::from(2u32),
+            RistrettoScalar::from(10004u32),
+            RistrettoScalar::from(200004u32),
         )];
         let proof_result = super::prove_asset_mixing(&input, &output);
         assert!(proof_result.is_err());
@@ -330,71 +328,71 @@ mod test {
         let input = [
             (
                 60u64,
-                RistrettoScalar::from(0),
-                RistrettoScalar::from(10000),
-                RistrettoScalar::from(200000),
+                RistrettoScalar::from(0u32),
+                RistrettoScalar::from(10000u32),
+                RistrettoScalar::from(200000u32),
             ),
             (
                 100u64,
-                RistrettoScalar::from(2),
-                RistrettoScalar::from(10001),
-                RistrettoScalar::from(200001),
+                RistrettoScalar::from(2u32),
+                RistrettoScalar::from(10001u32),
+                RistrettoScalar::from(200001u32),
             ),
             (
                 10u64,
-                RistrettoScalar::from(1),
-                RistrettoScalar::from(10002),
-                RistrettoScalar::from(200002),
+                RistrettoScalar::from(1u32),
+                RistrettoScalar::from(10002u32),
+                RistrettoScalar::from(200002u32),
             ),
             (
                 50u64,
-                RistrettoScalar::from(2),
-                RistrettoScalar::from(10003),
-                RistrettoScalar::from(200003),
+                RistrettoScalar::from(2u32),
+                RistrettoScalar::from(10003u32),
+                RistrettoScalar::from(200003u32),
             ),
         ];
         let output = [
             (
                 40u64,
-                RistrettoScalar::from(2),
-                RistrettoScalar::from(10004),
-                RistrettoScalar::from(200004),
+                RistrettoScalar::from(2u32),
+                RistrettoScalar::from(10004u32),
+                RistrettoScalar::from(200004u32),
             ),
             (
                 9u64,
-                RistrettoScalar::from(1),
-                RistrettoScalar::from(10005),
-                RistrettoScalar::from(200005),
+                RistrettoScalar::from(1u32),
+                RistrettoScalar::from(10005u32),
+                RistrettoScalar::from(200005u32),
             ),
             (
                 1u64,
-                RistrettoScalar::from(1),
-                RistrettoScalar::from(10006),
-                RistrettoScalar::from(200006),
+                RistrettoScalar::from(1u32),
+                RistrettoScalar::from(10006u32),
+                RistrettoScalar::from(200006u32),
             ),
             (
                 80u64,
-                RistrettoScalar::from(2),
-                RistrettoScalar::from(10007),
-                RistrettoScalar::from(200007),
+                RistrettoScalar::from(2u32),
+                RistrettoScalar::from(10007u32),
+                RistrettoScalar::from(200007u32),
             ),
             (
                 50u64,
-                RistrettoScalar::from(0),
-                RistrettoScalar::from(10008),
-                RistrettoScalar::from(200008),
+                RistrettoScalar::from(0u32),
+                RistrettoScalar::from(10008u32),
+                RistrettoScalar::from(200008u32),
             ),
             (
                 10u64,
-                RistrettoScalar::from(0),
-                RistrettoScalar::from(10009),
-                RistrettoScalar::from(200009),
+                RistrettoScalar::from(0u32),
+                RistrettoScalar::from(10009u32),
+                RistrettoScalar::from(200009u32),
             ),
             (
                 30u64,
-                RistrettoScalar::from(2),
-                RistrettoScalar::from(10010),
-                RistrettoScalar::from(200010),
+                RistrettoScalar::from(2u32),
+                RistrettoScalar::from(10010u32),
+                RistrettoScalar::from(200010u32),
             ),
         ];
 

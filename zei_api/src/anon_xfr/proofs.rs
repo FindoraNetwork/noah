@@ -4,8 +4,8 @@ use crate::anon_xfr::circuits::{
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::setup::{NodeParams, UserParams};
 use algebra::bls12_381::BLSScalar;
-use algebra::traits::Scalar;
 use algebra::ristretto::RistrettoScalar;
+use algebra::traits::Scalar;
 use crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
 use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use merlin::Transcript;
@@ -165,7 +165,7 @@ mod tests {
     use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
     use crate::setup::{NodeParams, UserParams};
     use algebra::bls12_381::BLSScalar;
-    use algebra::traits::One;
+    use algebra::One;
     use rand::RngCore;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;

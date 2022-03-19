@@ -9,8 +9,8 @@ use crate::xfr::proofs::{
 };
 use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use crate::xfr::structs::*;
-use algebra::traits::{GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
+use algebra::{ops::*, Zero};
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};

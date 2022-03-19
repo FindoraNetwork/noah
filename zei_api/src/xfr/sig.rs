@@ -1,6 +1,6 @@
 use algebra::{
-    traits::Scalar as _,
     ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar},
+    traits::Scalar as _,
 };
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey, Signature, Verifier};
 use itertools::Itertools;

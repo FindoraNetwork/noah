@@ -7,8 +7,8 @@ use crate::xfr::structs::{
     AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
     TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
 };
-use algebra::traits::Zero;
 use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::Zero;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -599,7 +599,6 @@ mod test {
         TracingPolicy, XfrAmount, XfrAssetType,
     };
     use crate::xfr::tests::{create_xfr, gen_key_pair_vec};
-    use algebra::traits::Scalar as _;
     use algebra::ristretto::RistrettoScalar as Scalar;
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use itertools::Itertools;

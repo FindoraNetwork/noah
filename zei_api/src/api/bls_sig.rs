@@ -24,7 +24,8 @@ pub fn bls_verify<B: AsRef<[u8]>>(
     message: &B,
     signature: &BlsSignature,
 ) -> Result<()> {
-    crypto::basics::signatures::bls::bls_verify::<BLSPairingEngine, B>(ver_key, message, signature).c(d!())
+    crypto::basics::signatures::bls::bls_verify::<BLSPairingEngine, B>(ver_key, message, signature)
+        .c(d!())
 }
 
 /// aggregate signature (for a single common message)
@@ -52,8 +53,10 @@ pub fn bls_batch_verify<B: AsRef<[u8]>>(
     messages: &[B],
     signatures: &[BlsSignature],
 ) -> Result<()> {
-    crypto::basics::signatures::bls::bls_batch_verify::<BLSPairingEngine, B>(ver_keys, messages, signatures)
-        .c(d!())
+    crypto::basics::signatures::bls::bls_batch_verify::<BLSPairingEngine, B>(
+        ver_keys, messages, signatures,
+    )
+    .c(d!())
 }
 
 /// signature aggregation for (possibly) different messages

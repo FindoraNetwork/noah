@@ -12,8 +12,8 @@ use crate::xfr::structs::{
     IdentityRevealPolicy, TracerMemo, TracingPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote,
     ASSET_TYPE_LENGTH,
 };
-use algebra::traits::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::traits::Scalar as _;
 use crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
 use crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
 use ruc::*;
@@ -234,7 +234,7 @@ fn do_transfer_tests_single_asset(
         _ => XfrAssetType::Confidential(
             pc_gens
                 .commit(
-                    Scalar::from(10),
+                    Scalar::from(10u32),
                     old_output1.open_asset_record.type_blind,
                 )
                 .compress(),
@@ -289,10 +289,7 @@ fn do_transfer_tests_single_asset(
         }
         _ => XfrAssetType::Confidential(
             pc_gens
-                .commit(
-                    Scalar::from(10),
-                    old_input1.open_asset_record.type_blind,
-                )
+                .commit(Scalar::from(10u32), old_input1.open_asset_record.type_blind)
                 .compress(),
         ),
     };
@@ -830,8 +827,8 @@ mod asset_tracing {
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, TracingPolicies};
     use algebra::bls12_381::BLSScalar;
-    use algebra::traits::GroupArithmetic;
     use algebra::jubjub::JubjubScalar;
+    use algebra::ops::*;
     use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crypto::basics::elgamal::ElGamalCiphertext;
@@ -840,8 +837,8 @@ mod asset_tracing {
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
 
     fn create_wrong_proof() -> PedersenElGamalEqProof {
-        let m = Scalar::from(10);
-        let r = Scalar::from(7657);
+        let m = Scalar::from(10u32);
+        let r = Scalar::from(7657u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
 

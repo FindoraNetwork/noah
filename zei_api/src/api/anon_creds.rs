@@ -1,5 +1,5 @@
-use algebra::bls12_381::{BLSScalar, BLSPairingEngine, BLSG1, BLSG2};
-use algebra::traits::{Group, Scalar};
+use algebra::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1, BLSG2};
+use algebra::traits::Group;
 use crypto::anon_creds::{ACCommitOutput, Attribute};
 use crypto::basics::elgamal::elgamal_key_gen;
 use itertools::Itertools;
@@ -90,8 +90,13 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
     attrs: &[Attr],
 ) -> Result<ACSignature> {
     let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from(*x)).collect();
-    crypto::anon_creds::ac_sign::<_, BLSPairingEngine>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
-        .c(d!())
+    crypto::anon_creds::ac_sign::<_, BLSPairingEngine>(
+        prng,
+        issuer_sk,
+        user_pk,
+        attrs_scalar.as_slice(),
+    )
+    .c(d!())
 }
 
 /// Produces opening key for credential commitment creation and attribute opening
@@ -187,7 +192,8 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
-    crypto::anon_creds::ac_commit_with_key::<_, BLSPairingEngine>(prng, user_sk, &c, key, msg).c(d!())
+    crypto::anon_creds::ac_commit_with_key::<_, BLSPairingEngine>(prng, user_sk, &c, key, msg)
+        .c(d!())
 }
 
 /// Verifies that the underlying credential is valid and that the commitment was issued using the
@@ -198,8 +204,13 @@ pub fn ac_verify_commitment(
     sok: &ACPoK,
     msg: &[u8],
 ) -> Result<()> {
-    crypto::anon_creds::ac_verify_commitment::<BLSPairingEngine>(issuer_pub_key, sig_commitment, sok, msg)
-        .c(d!())
+    crypto::anon_creds::ac_verify_commitment::<BLSPairingEngine>(
+        issuer_pub_key,
+        sig_commitment,
+        sok,
+        msg,
+    )
+    .c(d!())
 }
 
 /// Produces a AttrsRevealProof for a committed credential produced using key. bitmap indicates which attributes are revealed
@@ -239,8 +250,10 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
-    crypto::anon_creds::ac_open_commitment::<_, BLSPairingEngine>(prng, user_sk, &c, key, reveal_map)
-        .c(d!())
+    crypto::anon_creds::ac_open_commitment::<_, BLSPairingEngine>(
+        prng, user_sk, &c, key, reveal_map,
+    )
+    .c(d!())
 }
 
 /// Produces a ACRevealSig for a credential. ACRevealSig includes new commitment to the credential,

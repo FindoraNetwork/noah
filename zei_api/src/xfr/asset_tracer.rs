@@ -2,8 +2,8 @@ use crate::api::anon_creds::{Attr, AttributeCiphertext};
 use crate::xfr::structs::{AssetTracerDecKeys, AssetTracerEncKeys, TracerMemo};
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLSG1};
-use algebra::traits::{Group, GroupArithmetic, Scalar as ZeiScalar};
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+use algebra::{ops::*, traits::Group};
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::basics::elgamal::{
     elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, ElGamalCiphertext, ElGamalDecKey,
@@ -257,8 +257,8 @@ impl TracerMemo {
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use algebra::bls12_381::{BLSScalar, BLSG1};
-    use algebra::traits::{Group, Scalar as ZeiScalar};
     use algebra::ristretto::RistrettoScalar as Scalar;
+    use algebra::traits::Group;
     use crypto::basics::elgamal::elgamal_encrypt;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -281,12 +281,7 @@ mod tests {
         let memo = TracerMemo::new(
             &mut prng,
             &tracer_keys.enc_key,
-            Some((
-                low,
-                high,
-                &Scalar::from(191919u32),
-                &Scalar::from(2222u32),
-            )),
+            Some((low, high, &Scalar::from(191919u32), &Scalar::from(2222u32))),
             None,
             &[],
         );

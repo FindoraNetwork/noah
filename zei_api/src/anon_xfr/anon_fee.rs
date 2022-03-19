@@ -14,8 +14,12 @@ use crate::anon_xfr::{
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::OwnerMemo;
 use algebra::bls12_381::BLSScalar;
-use algebra::traits::{Group, One, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
+use algebra::{
+    ops::*,
+    traits::{Group, Scalar},
+    One, Zero,
+};
 use merlin::Transcript;
 use poly_iops::plonk::{
     constraint_system::{TurboConstraintSystem, VarIndex},
@@ -350,7 +354,6 @@ mod tests {
     use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::{PersistentMerkleTree, TREE_DEPTH};
     use algebra::bls12_381::BLSScalar;
-    use algebra::traits::Scalar;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
@@ -418,8 +421,7 @@ mod tests {
                 verify_anon_fee_body(&verifier_params, &body, &pmt.get_root().unwrap()).is_ok()
             );
             assert!(
-                verify_anon_fee_body(&verifier_params, &body, &BLSScalar::from(123u64))
-                    .is_err()
+                verify_anon_fee_body(&verifier_params, &body, &BLSScalar::from(123u64)).is_err()
             );
 
             let note = AnonFeeNote::generate_note_from_body(body, key_pairs).unwrap();

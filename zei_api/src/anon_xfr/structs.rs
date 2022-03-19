@@ -1,9 +1,9 @@
 use crate::anon_xfr::decrypt_memo;
 use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature};
 use crate::xfr::structs::{AssetType, OwnerMemo};
-use algebra::bls12_381::{BLSScalar, BLSPairingEngine};
-use algebra::traits::{Scalar, Zero};
+use algebra::bls12_381::{BLSPairingEngine, BLSScalar};
 use algebra::jubjub::JubjubScalar;
+use algebra::{traits::Scalar, Zero};
 use crypto::basics::commitments::rescue;
 use crypto::basics::hybrid_encryption::{hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey};
 use poly_iops::{commitments::kzg_poly_com::KZGCommitmentScheme, plonk::setup::PlonkPf};
@@ -174,10 +174,7 @@ impl OpenAnonBlindAssetRecord {
         rescue::HashCommitment::new()
             .commit(
                 &self.blind,
-                &[
-                    BLSScalar::from(self.amount),
-                    self.asset_type.as_scalar(),
-                ],
+                &[BLSScalar::from(self.amount), self.asset_type.as_scalar()],
             )
             .unwrap()
         // safe unwrap

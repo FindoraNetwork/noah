@@ -8,8 +8,8 @@ use crate::anon_xfr::structs::{
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
-use algebra::traits::{Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
+use algebra::{ops::*, traits::Scalar, Zero};
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
 use crypto::basics::prf::PRF;
@@ -294,7 +294,7 @@ pub fn nullifier(
     let pub_key_y = pub_key_point.get_y();
 
     // TODO From<u128> for ZeiScalar and do let uid_amount = BLSScalar::from(amount as u128 + ((uid as u128) << 64));
-    let pow_2_64 = BLSScalar::from(u64::max_value()).add(&BLSScalar::from(1));
+    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
     let uid_shifted = BLSScalar::from(uid).mul(&pow_2_64);
     let uid_amount = uid_shifted.add(&BLSScalar::from(amount));
     PRF::new().eval(
@@ -340,7 +340,7 @@ mod tests {
     use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use algebra::bls12_381::BLSScalar;
-    use algebra::traits::{One, Scalar, ScalarArithmetic, Zero};
+    use algebra::{ops::*, traits::Scalar, One, Zero};
 
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
 

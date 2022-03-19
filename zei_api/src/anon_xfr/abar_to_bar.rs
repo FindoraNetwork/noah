@@ -14,12 +14,13 @@ use crate::xfr::sig::XfrPublicKey;
 use crate::xfr::structs::{
     AssetRecordTemplate, BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
 };
-use algebra::traits::GroupArithmetic;
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use algebra::{
     bls12_381::BLSScalar,
-    traits::{Group, One as ArkOne, Scalar, ScalarArithmetic, Zero as ArkZero},
     jubjub::{JubjubPoint, JubjubScalar},
+    ops::*,
+    traits::{Group, Scalar},
+    One, Zero,
 };
 use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
@@ -29,7 +30,6 @@ use crypto::pc_eq_rescue_split_verifier_zk_part::{
 };
 use merlin::Transcript;
 use num_bigint::BigUint;
-use num_traits::{One, Zero};
 use poly_iops::{
     commitments::kzg_poly_com::KZGCommitmentSchemeBLS,
     plonk::{
@@ -133,12 +133,10 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     // 4. Construct the equality proof
     let x = RistrettoScalar::from(oabar.amount);
     let y: RistrettoScalar = oabar.asset_type.as_scalar();
-    let gamma = obar.amount_blinds.0.add(
-        &obar
-            .amount_blinds
-            .1
-            .mul(&RistrettoScalar::from(TWO_POW_32)),
-    );
+    let gamma = obar
+        .amount_blinds
+        .0
+        .add(&obar.amount_blinds.1.mul(&RistrettoScalar::from(TWO_POW_32)));
     let delta = obar.type_blind;
 
     let pc_gens = PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
@@ -660,7 +658,7 @@ mod tests {
     use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use algebra::bls12_381::BLSScalar;
-    use algebra::traits::{Scalar, Zero};
+    use algebra::{traits::Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use parking_lot::RwLock;

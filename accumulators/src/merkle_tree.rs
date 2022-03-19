@@ -1,6 +1,4 @@
-use algebra::{
-    Zero, bls12_381::BLSScalar
-};
+use algebra::{bls12_381::BLSScalar, Zero};
 use crypto::basics::hash::rescue::RescueInstance;
 use ruc::*;
 use std::collections::hash_map::Iter;

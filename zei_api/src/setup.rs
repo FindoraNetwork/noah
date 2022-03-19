@@ -13,9 +13,9 @@ use crate::parameters::{
     ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
     RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
-use algebra::traits::Zero;
 use algebra::jubjub::JubjubScalar;
 use algebra::ristretto::RistrettoScalar;
+use algebra::Zero;
 use bulletproofs::BulletproofGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
@@ -323,7 +323,7 @@ mod test {
     use crate::parameters::SRS;
     use crate::setup::{NodeParams, UserParams};
     use algebra::bls12_381::{BLSScalar, BLSG1};
-    use algebra::traits::{Group, GroupArithmetic, One, ScalarArithmetic};
+    use algebra::{ops::*, traits::Group, One};
     use itertools::Itertools;
     use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
     use poly_iops::commitments::pcs::PolyComScheme;

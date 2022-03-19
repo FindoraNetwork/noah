@@ -1,5 +1,5 @@
-use algebra::traits::Group;
 use algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
+use algebra::traits::Group;
 use crypto::basics::signatures::schnorr;
 use crypto::basics::signatures::schnorr::{KeyPair, PublicKey};
 use rand_core::{CryptoRng, RngCore};
