@@ -1,11 +1,12 @@
 use crate::basics::commitments::pedersen::PedersenGens;
 use crate::basics::hash::rescue::RescueInstance;
 use crate::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
-use algebra::bls12_381::BLSScalar;
-use algebra::groups::{
-    Group, GroupArithmetic, Scalar, ScalarArithmetic, Zero as ArkZero,
-};
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+use algebra::{
+    bls12_381::BLSScalar,
+    ops::*,
+    traits::{Group, Scalar},
+};
 use merlin::Transcript;
 use num_bigint::BigUint;
 use num_traits::Zero;
@@ -71,8 +72,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
 
     let mut proof = ZKPartProof::default();
     let mut non_zk_state = NonZKState::default();
-    let mut transcript =
-        Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
+    let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
 
     // 1. sample a, b, c, d
     let a = RistrettoScalar::random(rng);
@@ -146,8 +146,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
         b"Auxiliary information (Rescue commitment z, or a nullifier)",
         &aux_info.to_bytes(),
     );
-    transcript
-        .append_message(b"Non-ZK verifier state commitment comm", &comm.to_bytes());
+    transcript.append_message(b"Non-ZK verifier state commitment comm", &comm.to_bytes());
     transcript.append_message(b"Point R", &point_r.to_compressed_bytes());
     transcript.append_message(b"Point S", &point_s.to_compressed_bytes());
 
@@ -185,8 +184,7 @@ pub fn verify_pc_eq_rescue_external(
     zk_part_proof: &ZKPartProof,
 ) -> Result<RistrettoScalar> {
     // 1. Fiat-Shamir transform
-    let mut transcript =
-        Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
+    let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
 
     transcript.append_message(
         b"PC base",
@@ -243,9 +241,8 @@ mod test {
     use crate::pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external,
     };
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, Zero};
     use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+    use algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
     use num_bigint::BigUint;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -260,9 +257,8 @@ mod test {
             let y = RistrettoScalar::random(&mut rng);
             let delta = RistrettoScalar::random(&mut rng);
 
-            let pc_gens = PedersenGens::<RistrettoPoint>::from(
-                bulletproofs::PedersenGens::default(),
-            );
+            let pc_gens =
+                PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
 
             let point_p = pc_gens.commit(&[x], &gamma).unwrap();
             let point_q = pc_gens.commit(&[y], &delta).unwrap();
@@ -285,9 +281,7 @@ mod test {
             )
             .unwrap();
 
-            let _ =
-                verify_pc_eq_rescue_external(&pc_gens, &point_p, &point_q, &z, &proof)
-                    .unwrap();
+            let _ = verify_pc_eq_rescue_external(&pc_gens, &point_p, &point_q, &z, &proof).unwrap();
         }
     }
 }

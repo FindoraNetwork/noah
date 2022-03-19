@@ -14,12 +14,13 @@ use crate::xfr::sig::XfrPublicKey;
 use crate::xfr::structs::{
     AssetRecordTemplate, BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
 };
-use algebra::groups::GroupArithmetic;
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use algebra::{
     bls12_381::BLSScalar,
-    groups::{Group, One as ArkOne, Scalar, ScalarArithmetic, Zero as ArkZero},
     jubjub::{JubjubPoint, JubjubScalar},
+    ops::*,
+    traits::{Group, Scalar},
+    One, Zero,
 };
 use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
@@ -29,13 +30,11 @@ use crypto::pc_eq_rescue_split_verifier_zk_part::{
 };
 use merlin::Transcript;
 use num_bigint::BigUint;
-use num_traits::{One, Zero};
 use poly_iops::{
     commitments::kzg_poly_com::KZGCommitmentSchemeBLS,
     plonk::{
         constraint_system::{
-            field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem,
-            VarIndex,
+            field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
         },
         prover::prover,
         setup::PlonkPf,
@@ -132,18 +131,15 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     );
 
     // 4. Construct the equality proof
-    let x = RistrettoScalar::from_u64(oabar.amount);
+    let x = RistrettoScalar::from(oabar.amount);
     let y: RistrettoScalar = oabar.asset_type.as_scalar();
-    let gamma = obar.amount_blinds.0.add(
-        &obar
-            .amount_blinds
-            .1
-            .mul(&RistrettoScalar::from_u64(TWO_POW_32)),
-    );
+    let gamma = obar
+        .amount_blinds
+        .0
+        .add(&obar.amount_blinds.1.mul(&RistrettoScalar::from(TWO_POW_32)));
     let delta = obar.type_blind;
 
-    let pc_gens =
-        PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+    let pc_gens = PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
 
     let point_p = pc_gens.commit(&[x], &gamma).c(d!())?;
     let point_q = pc_gens.commit(&[y], &delta).c(d!())?;
@@ -255,8 +251,7 @@ pub fn verify_abar_to_bar(
     }
 
     let bar = body.output.clone();
-    let pc_gens =
-        PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+    let pc_gens = PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
 
     // 1. get commitments
     // 1.1 reconstruct total amount commitment from bar object
@@ -274,17 +269,17 @@ pub fn verify_abar_to_bar(
             let (l, h) = utils::u64_to_u32_pair(amount);
             (
                 pc_gens
-                    .commit(&[RistrettoScalar::from_u32(l)], &RistrettoScalar::zero())
+                    .commit(&[RistrettoScalar::from(l)], &RistrettoScalar::zero())
                     .c(d!())?,
                 pc_gens
-                    .commit(&[RistrettoScalar::from_u32(h)], &RistrettoScalar::zero())
+                    .commit(&[RistrettoScalar::from(h)], &RistrettoScalar::zero())
                     .c(d!())?,
             )
         }
     };
 
     // 1.2 get asset type commitment
-    let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from_u64(TWO_POW_32)));
+    let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
     let com_asset_type = match bar.asset_type {
         XfrAssetType::Confidential(a) => a
             .decompress()
@@ -377,7 +372,7 @@ pub fn build_abar_to_bar_cs(
     let payers_secrets = add_payers_secret(&mut cs, payers_secret);
 
     let base = JubjubPoint::get_base();
-    let pow_2_64 = BLSScalar::from_u64(u64::MAX).add(&BLSScalar::one());
+    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
@@ -453,10 +448,8 @@ pub fn build_abar_to_bar_cs(
     let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_1.to_bytes()));
     let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_2.to_bytes()));
 
-    let x_sim_fr_var =
-        SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
-    let y_sim_fr_var =
-        SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
+    let x_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
+    let y_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
     let a_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
     let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
     let comm_var = cs.new_variable(comm);
@@ -483,9 +476,7 @@ pub fn build_abar_to_bar_cs(
     for (limbs, limbs_var) in all_limbs.chunks(5).zip(all_limbs_var.chunks(5)) {
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
-            sum.add_assign(
-                <&BLSScalar as Into<BigUint>>::into(limb).shl(BIT_PER_LIMB * i),
-            );
+            sum.add_assign(<&BLSScalar as Into<BigUint>>::into(limb).shl(BIT_PER_LIMB * i));
         }
         compressed_limbs.push(BLSScalar::from(&sum));
 
@@ -638,8 +629,8 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
     let bls_diversifier = BLSScalar::from(&secret.diversifier);
     let sec_key = cs.new_variable(bls_sk);
     let diversifier = cs.new_variable(bls_diversifier);
-    let uid = cs.new_variable(BLSScalar::from_u64(secret.uid));
-    let amount = cs.new_variable(BLSScalar::from_u64(secret.amount));
+    let uid = cs.new_variable(BLSScalar::from(secret.uid));
+    let amount = cs.new_variable(BLSScalar::from(secret.amount));
     let blind = cs.new_variable(secret.blind);
     let path = add_merkle_path_variables(cs, secret.path.clone());
     let asset_type = cs.new_variable(secret.asset_type);
@@ -659,8 +650,7 @@ mod tests {
     use crate::anon_xfr::abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
-        AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
-        OpenAnonBlindAssetRecordBuilder,
+        AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
     };
     use crate::setup::{NodeParams, UserParams};
     use crate::xfr::asset_record::AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
@@ -668,7 +658,7 @@ mod tests {
     use crate::xfr::structs::AssetType;
     use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, Zero};
+    use algebra::{traits::Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use parking_lot::RwLock;
@@ -729,28 +719,19 @@ mod tests {
         let node_params = NodeParams::abar_to_bar_params().unwrap();
         verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
 
-        assert!(verify_abar_to_bar_body(
-            &node_params,
-            &body,
-            &BLSScalar::random(&mut prng),
-        )
-        .is_err());
+        assert!(
+            verify_abar_to_bar_body(&node_params, &body, &BLSScalar::random(&mut prng),).is_err()
+        );
 
         let mut body_wrong_nullifier = body.clone();
         body_wrong_nullifier.input.0 = BLSScalar::random(&mut prng);
-        assert!(verify_abar_to_bar_body(
-            &node_params,
-            &body_wrong_nullifier,
-            &proof.root,
-        )
-        .is_err());
+        assert!(
+            verify_abar_to_bar_body(&node_params, &body_wrong_nullifier, &proof.root,).is_err()
+        );
 
         let mut body_wrong_pubkey = body.clone();
         body_wrong_pubkey.input.1 = AXfrKeyPair::generate(&mut prng).pub_key();
-        assert!(
-            verify_abar_to_bar_body(&node_params, &body_wrong_pubkey, &proof.root)
-                .is_err()
-        );
+        assert!(verify_abar_to_bar_body(&node_params, &body_wrong_pubkey, &proof.root).is_err());
     }
 
     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
@@ -764,7 +745,7 @@ mod tests {
         ])[0];
 
         hash.rescue_hash(&[
-            BLSScalar::from_u64(uid),
+            BLSScalar::from(uid),
             abar.amount_type_commitment,
             pk_hash,
             BLSScalar::zero(),

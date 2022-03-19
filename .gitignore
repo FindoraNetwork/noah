@@ -10,11 +10,4 @@
 **/release
 **/*.rs.bk
 .*.sw*
-
-utilities/target
-
 Cargo.lock
-
-#zei_api
-zei_api/data/*.bin
-zei_api/PROTOCOL.html

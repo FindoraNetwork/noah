@@ -1,5 +1,5 @@
-use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1, BLSG2};
-use algebra::groups::{Group, Scalar};
+use algebra::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1, BLSG2};
+use algebra::traits::Group;
 use crypto::anon_creds::{ACCommitOutput, Attribute};
 use crypto::basics::elgamal::elgamal_key_gen;
 use itertools::Itertools;
@@ -48,7 +48,7 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(
     prng: &mut R,
     num_attrs: usize,
 ) -> (ACIssuerPublicKey, ACIssuerSecretKey) {
-    crypto::anon_creds::ac_keygen_issuer::<_, Bls12381>(prng, num_attrs)
+    crypto::anon_creds::ac_keygen_issuer::<_, BLSPairingEngine>(prng, num_attrs)
 }
 
 /// Generates a credential user key pair for a given credential issuer
@@ -66,7 +66,7 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(
     prng: &mut R,
     issuer_pk: &ACIssuerPublicKey,
 ) -> (ACUserPublicKey, ACUserSecretKey) {
-    crypto::anon_creds::ac_user_key_gen::<_, Bls12381>(prng, issuer_pk)
+    crypto::anon_creds::ac_user_key_gen::<_, BLSPairingEngine>(prng, issuer_pk)
 }
 
 /// Computes a credential signature for a set of attributes.
@@ -75,7 +75,7 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
 /// use algebra::bls12_381::BLSScalar;
-/// use algebra::groups::Scalar;
+/// use algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -89,9 +89,8 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
     user_pk: &ACUserPublicKey,
     attrs: &[Attr],
 ) -> Result<ACSignature> {
-    let attrs_scalar: Vec<BLSScalar> =
-        attrs.iter().map(|x| BLSScalar::from_u32(*x)).collect();
-    crypto::anon_creds::ac_sign::<_, Bls12381>(
+    let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from(*x)).collect();
+    crypto::anon_creds::ac_sign::<_, BLSPairingEngine>(
         prng,
         issuer_sk,
         user_pk,
@@ -110,7 +109,7 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
 /// let com_key = ac_keygen_commitment::<ChaChaRng>(&mut prng);
 /// ```
 pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmentKey {
-    crypto::anon_creds::ac_commitment_key_gen::<_, Bls12381>(prng)
+    crypto::anon_creds::ac_commitment_key_gen::<_, BLSPairingEngine>(prng)
 }
 
 /// Compute a commitment to a credential signature with a binding message, returning the opening key.
@@ -120,7 +119,7 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, Credential};
 /// use algebra::bls12_381::BLSScalar;
-/// use algebra::groups::Scalar;
+/// use algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -141,17 +140,17 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
     user_sk: &ACUserSecretKey,
     credential: &Credential,
     msg: &[u8],
-) -> Result<ACCommitOutput<Bls12381>> {
+) -> Result<ACCommitOutput<BLSPairingEngine>> {
     let c = crypto::anon_creds::Credential {
         signature: credential.signature.clone(),
         attributes: credential
             .attributes
             .iter()
-            .map(|x| BLSScalar::from_u32(*x))
+            .map(|x| BLSScalar::from(*x))
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
-    crypto::anon_creds::ac_commit::<_, Bls12381>(prng, user_sk, &c, msg).c(d!())
+    crypto::anon_creds::ac_commit::<_, BLSPairingEngine>(prng, user_sk, &c, msg).c(d!())
 }
 
 /// Produces a AttrsRevealProof, bitmap indicates which attributes are revealed
@@ -161,7 +160,7 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
 /// use rand_chacha::ChaChaRng;
 /// use zei::api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, ac_keygen_commitment, ac_commit_with_key, Credential};
 /// use algebra::bls12_381::BLSScalar;
-/// use algebra::groups::Scalar;
+/// use algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -183,17 +182,17 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
     credential: &Credential,
     key: &ACCommitmentKey,
     msg: &[u8],
-) -> Result<ACCommitOutput<Bls12381>> {
+) -> Result<ACCommitOutput<BLSPairingEngine>> {
     let c = crypto::anon_creds::Credential {
         signature: credential.signature.clone(),
         attributes: credential
             .attributes
             .iter()
-            .map(|x| BLSScalar::from_u32(*x))
+            .map(|x| BLSScalar::from(*x))
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
-    crypto::anon_creds::ac_commit_with_key::<_, Bls12381>(prng, user_sk, &c, key, msg)
+    crypto::anon_creds::ac_commit_with_key::<_, BLSPairingEngine>(prng, user_sk, &c, key, msg)
         .c(d!())
 }
 
@@ -205,7 +204,7 @@ pub fn ac_verify_commitment(
     sok: &ACPoK,
     msg: &[u8],
 ) -> Result<()> {
-    crypto::anon_creds::ac_verify_commitment::<Bls12381>(
+    crypto::anon_creds::ac_verify_commitment::<BLSPairingEngine>(
         issuer_pub_key,
         sig_commitment,
         sok,
@@ -247,11 +246,11 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
         attributes: credential
             .attributes
             .iter()
-            .map(|a| BLSScalar::from_u32(*a))
+            .map(|a| BLSScalar::from(*a))
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
-    crypto::anon_creds::ac_open_commitment::<_, Bls12381>(
+    crypto::anon_creds::ac_open_commitment::<_, BLSPairingEngine>(
         prng, user_sk, &c, key, reveal_map,
     )
     .c(d!())
@@ -272,19 +271,18 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
         attributes: credential
             .attributes
             .iter()
-            .map(|a| BLSScalar::from_u32(*a))
+            .map(|a| BLSScalar::from(*a))
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
-    crypto::anon_creds::ac_reveal::<_, Bls12381>(prng, user_sk, &c, reveal_bitmap)
-        .c(d!())
+    crypto::anon_creds::ac_reveal::<_, BLSPairingEngine>(prng, user_sk, &c, reveal_bitmap).c(d!())
 }
 /// Verifies an anonymous credential reveal proof.
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use algebra::groups::Scalar;
+/// use algebra::traits::Scalar;
 /// use algebra::bls12_381::BLSScalar;
 /// use zei::api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_verify, ac_reveal, Credential};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -316,12 +314,12 @@ pub fn ac_verify(
     let attrs_scalar: Vec<Attribute<S>> = attrs
         .iter()
         .map(|attr| match attr {
-            Some(x) => Attribute::Revealed(BLSScalar::from_u32(*x)),
+            Some(x) => Attribute::Revealed(BLSScalar::from(*x)),
             None => Attribute::Hidden(None),
         })
         .collect();
 
-    crypto::anon_creds::ac_verify::<Bls12381>(
+    crypto::anon_creds::ac_verify::<BLSPairingEngine>(
         issuer_pub_key,
         attrs_scalar.as_slice(),
         &sig_commitment,
@@ -353,7 +351,7 @@ pub type ConfidentialAC = crypto::conf_cred_reveal::ConfidentialAC<G1, G2, S>;
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
 /// use algebra::bls12_381::{BLSScalar, BLSG1};
-/// use algebra::groups::Group;
+/// use algebra::traits::Group;
 /// use zei::api::anon_creds::Credential;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (issuer_pk, issuer_sk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, 3);
@@ -383,14 +381,14 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
     let attrs_scalar = credential
         .attributes
         .iter()
-        .map(|x| BLSScalar::from_u32(*x))
+        .map(|x| BLSScalar::from(*x))
         .collect_vec();
     let c = crypto::anon_creds::Credential {
         signature: credential.signature.clone(),
         attributes: attrs_scalar,
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
-    crypto::conf_cred_reveal::ac_confidential_open_commitment::<R, Bls12381>(
+    crypto::conf_cred_reveal::ac_confidential_open_commitment::<R, BLSPairingEngine>(
         prng, user_sk, &c, key, reveal_map, enc_key, msg,
     )
     .c(d!())
@@ -415,7 +413,7 @@ pub fn ac_confidential_verify(
     cac_proof: &ACConfidentialRevealProof,
     msg: &[u8],
 ) -> Result<()> {
-    crypto::conf_cred_reveal::ac_confidential_open_verify::<Bls12381>(
+    crypto::conf_cred_reveal::ac_confidential_open_verify::<BLSPairingEngine>(
         issuer_pk,
         enc_key,
         reveal_map,

@@ -40,8 +40,11 @@ match on each list. On each product the elements are shifted by a random challen
 */
 
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use algebra::groups::{Scalar as _, ScalarArithmetic};
-use algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
+use algebra::{
+    ops::*,
+    ristretto::{CompressedRistretto, RistrettoScalar as Scalar},
+    Zero,
+};
 use bulletproofs::r1cs::{
     ConstraintSystem, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
@@ -84,11 +87,7 @@ impl CloakValue {
             },
         )
     }
-    pub fn commit(
-        &self,
-        pc_gens: &RistrettoPedersenGens,
-        blinds: &CloakValue,
-    ) -> CloakCommitment {
+    pub fn commit(&self, pc_gens: &RistrettoPedersenGens, blinds: &CloakValue) -> CloakCommitment {
         CloakCommitment {
             amount: pc_gens.commit(self.amount, blinds.amount).compress(),
             asset_type: pc_gens
@@ -114,10 +113,7 @@ pub struct CloakCommitment {
 
 impl CloakCommitment {
     /// Verifier produce circuit variables corresponding to this commitment
-    pub fn commit_verifier(
-        &self,
-        verifier: &mut Verifier<&mut Transcript>,
-    ) -> CloakVariable {
+    pub fn commit_verifier(&self, verifier: &mut Verifier<&mut Transcript>) -> CloakVariable {
         CloakVariable {
             amount: verifier.commit(self.amount.0),
             asset_type: verifier.commit(self.asset_type.0),
@@ -146,27 +142,22 @@ pub fn cloak<CS: RandomizableConstraintSystem>(
     let mut n_gates = 0;
 
     // sort and merge values by type
-    let (n, mut merged_input_vars) =
-        sort_and_merge(cs, input_vars, input_values).c(d!())?;
-    let (m, mut merged_output_vars) =
-        sort_and_merge(cs, output_vars, output_values).c(d!())?;
+    let (n, mut merged_input_vars) = sort_and_merge(cs, input_vars, input_values).c(d!())?;
+    let (m, mut merged_output_vars) = sort_and_merge(cs, output_vars, output_values).c(d!())?;
 
     n_gates += n + m;
 
     // pad input or output to be of same length
-    let pad_value = input_values.map(|_| Scalar::from_u32(0));
+    let pad_value = input_values.map(|_| Scalar::zero());
     if input_len < output_len {
-        pad(cs, output_len, &mut merged_input_vars, pad_value)
-            .c(d!(ZeiError::R1CSProofError))?;
+        pad(cs, output_len, &mut merged_input_vars, pad_value).c(d!(ZeiError::R1CSProofError))?;
     } else {
-        pad(cs, input_len, &mut merged_output_vars, pad_value)
-            .c(d!(ZeiError::R1CSProofError))?;
+        pad(cs, input_len, &mut merged_output_vars, pad_value).c(d!(ZeiError::R1CSProofError))?;
     }
 
     // do a proof of shuffle
-    n_gates +=
-        super::gadgets::cloak_shuffle_gadget(cs, merged_input_vars, merged_output_vars)
-            .c(d!(ZeiError::R1CSProofError))?;
+    n_gates += super::gadgets::cloak_shuffle_gadget(cs, merged_input_vars, merged_output_vars)
+        .c(d!(ZeiError::R1CSProofError))?;
 
     // final range proof:
     for (i, out) in output_vars.iter().enumerate() {
@@ -239,7 +230,7 @@ pub(super) fn merge(sorted: &[CloakValue]) -> (Vec<CloakValue>, Vec<CloakValue>)
     }
     for value in sorted[1..].iter() {
         if value.asset_type == prev.asset_type {
-            merged.push(CloakValue::new(Scalar::from_u32(0), Scalar::from_u32(0)));
+            merged.push(CloakValue::new(Scalar::zero(), Scalar::zero()));
             intermediate.push(CloakValue::new(
                 prev.amount.add(&value.amount),
                 value.asset_type,
@@ -283,19 +274,13 @@ pub(super) fn sort_and_merge<CS: RandomizableConstraintSystem>(
     )
     .c(d!())?;
     let merged_vars =
-        allocate_cloak_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len)
-            .c(d!())?;
+        allocate_cloak_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len).c(d!())?;
 
+    n_gates += super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())
+        .c(d!(ZeiError::R1CSProofError))?;
     n_gates +=
-        super::gadgets::cloak_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())
+        super::gadgets::cloak_merge_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars)
             .c(d!(ZeiError::R1CSProofError))?;
-    n_gates += super::gadgets::cloak_merge_gadget(
-        cs,
-        &sorted_vars,
-        &intermediate_vars,
-        &merged_vars,
-    )
-    .c(d!(ZeiError::R1CSProofError))?;
 
     Ok((n_gates, merged_vars))
 }
@@ -336,8 +321,7 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
 #[cfg(test)]
 pub mod tests {
     use crate::bp_circuits::cloak::{CloakCommitment, CloakValue};
-    use algebra::groups::{Scalar, ScalarArithmetic};
-    use algebra::ristretto::RistrettoScalar;
+    use algebra::{ops::*, ristretto::RistrettoScalar, traits::Scalar, Zero};
     use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
     use bulletproofs::{BulletproofGens, PedersenGens};
     use itertools::Itertools;
@@ -349,29 +333,29 @@ pub mod tests {
     // Taken from https://github.com/stellar/slingshot/tree/main/cloak
     fn yuan(q: u64) -> CloakValue {
         CloakValue {
-            amount: RistrettoScalar::from_u64(q),
-            asset_type: RistrettoScalar::from_u64(888u64),
+            amount: RistrettoScalar::from(q),
+            asset_type: RistrettoScalar::from(888u64),
         }
     }
 
     fn peso(q: u64) -> CloakValue {
         CloakValue {
-            amount: RistrettoScalar::from_u64(q),
-            asset_type: RistrettoScalar::from_u64(666u64),
+            amount: RistrettoScalar::from(q),
+            asset_type: RistrettoScalar::from(666u64),
         }
     }
 
     fn euro(q: u64) -> CloakValue {
         CloakValue {
-            amount: RistrettoScalar::from_u64(q),
-            asset_type: RistrettoScalar::from_u64(444u64),
+            amount: RistrettoScalar::from(q),
+            asset_type: RistrettoScalar::from(444u64),
         }
     }
 
     fn zero() -> CloakValue {
         CloakValue {
-            amount: RistrettoScalar::from_u32(0),
-            asset_type: RistrettoScalar::from_u32(0),
+            amount: RistrettoScalar::zero(),
+            asset_type: RistrettoScalar::zero(),
         }
     }
 
@@ -382,24 +366,24 @@ pub mod tests {
     #[test]
     fn merge() {
         let values = vec![
-            CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
-            CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
-            CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(3)),
-            CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
-            CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
-            CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
-            CloakValue::new(RistrettoScalar::from_u32(10), RistrettoScalar::from_u32(1)),
+            CloakValue::new(RistrettoScalar::from(30u32), RistrettoScalar::from(3u32)),
+            CloakValue::new(RistrettoScalar::from(30u32), RistrettoScalar::from(3u32)),
+            CloakValue::new(RistrettoScalar::from(30u32), RistrettoScalar::from(3u32)),
+            CloakValue::new(RistrettoScalar::from(20u32), RistrettoScalar::from(2u32)),
+            CloakValue::new(RistrettoScalar::from(10u32), RistrettoScalar::from(1u32)),
+            CloakValue::new(RistrettoScalar::from(10u32), RistrettoScalar::from(1u32)),
+            CloakValue::new(RistrettoScalar::from(10u32), RistrettoScalar::from(1u32)),
         ];
 
         let (_, added) = super::merge(&values);
         let expected = vec![
-            CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-            CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-            CloakValue::new(RistrettoScalar::from_u32(90), RistrettoScalar::from_u32(3)),
-            CloakValue::new(RistrettoScalar::from_u32(20), RistrettoScalar::from_u32(2)),
-            CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-            CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-            CloakValue::new(RistrettoScalar::from_u32(30), RistrettoScalar::from_u32(1)),
+            CloakValue::new(RistrettoScalar::zero(), RistrettoScalar::zero()),
+            CloakValue::new(RistrettoScalar::zero(), RistrettoScalar::zero()),
+            CloakValue::new(RistrettoScalar::from(90u32), RistrettoScalar::from(3u32)),
+            CloakValue::new(RistrettoScalar::from(20u32), RistrettoScalar::from(2u32)),
+            CloakValue::new(RistrettoScalar::zero(), RistrettoScalar::zero()),
+            CloakValue::new(RistrettoScalar::zero(), RistrettoScalar::zero()),
+            CloakValue::new(RistrettoScalar::from(30u32), RistrettoScalar::from(1u32)),
         ];
 
         assert_eq!(&added[..], &expected[..]);
@@ -479,7 +463,7 @@ pub mod tests {
     }
 
     fn test_range_proof(in1: RistrettoScalar, in2: RistrettoScalar, pass: bool) {
-        let asset_type0 = RistrettoScalar::from_u32(0);
+        let asset_type0 = RistrettoScalar::zero();
 
         let v_in_1 = CloakValue::new(in1, asset_type0);
         let v_in_2 = CloakValue::new(in2, asset_type0);
@@ -495,15 +479,15 @@ pub mod tests {
     fn range_proofs() {
         // Range proof verifies
         test_range_proof(
-            RistrettoScalar::from_u64(u64::MAX - 1),
-            RistrettoScalar::from_u32(1),
+            RistrettoScalar::from(u64::MAX - 1),
+            RistrettoScalar::from(1u32),
             true,
         );
 
         // Range proof does not verifies due to overflow in output
         test_range_proof(
-            RistrettoScalar::from_u64(u64::MAX),
-            RistrettoScalar::from_u32(1),
+            RistrettoScalar::from(u64::MAX),
+            RistrettoScalar::from(1u32),
             false,
         );
     }

@@ -1,5 +1,5 @@
-use algebra::groups::Group;
 use algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
+use algebra::traits::Group;
 use crypto::basics::signatures::schnorr;
 use crypto::basics::signatures::schnorr::{KeyPair, PublicKey};
 use rand_core::{CryptoRng, RngCore};
@@ -14,17 +14,7 @@ const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
 /// Public key used to address an Anonymous records and verify transaction spending it
 #[wasm_bindgen]
 #[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    Default,
-    Hash,
-    Ord,
-    PartialOrd,
-    Copy,
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash, Ord, PartialOrd, Copy,
 )]
 pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
 
@@ -108,8 +98,8 @@ impl ZeiFromToBytes for AXfrPubKey {
         if bytes.len() != AXFR_PUBLIC_KEY_LENGTH {
             Err(eg!(ZeiError::DeserializationError))
         } else {
-            let point: JubjubPoint = JubjubPoint::zei_from_bytes(bytes)
-                .c(d!("error in deserializing JubJub point"))?;
+            let point: JubjubPoint =
+                JubjubPoint::zei_from_bytes(bytes).c(d!("error in deserializing JubJub point"))?;
             Ok(AXfrPubKey {
                 0: PublicKey::from_point(point),
             })

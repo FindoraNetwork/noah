@@ -4,8 +4,8 @@ use crate::anon_xfr::circuits::{
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::setup::{NodeParams, UserParams};
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::Scalar;
 use algebra::ristretto::RistrettoScalar;
+use algebra::traits::Scalar;
 use crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
 use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use merlin::Transcript;
@@ -108,14 +108,8 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     beta: &RistrettoScalar,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let (mut cs, _) = build_eq_committed_vals_cs(
-        amount,
-        asset_type,
-        blind_hash,
-        proof,
-        non_zk_state,
-        beta,
-    );
+    let (mut cs, _) =
+        build_eq_committed_vals_cs(amount, asset_type, blind_hash, proof, non_zk_state, beta);
     let witness = cs.get_and_clear_witness();
 
     prover(
@@ -171,7 +165,7 @@ mod tests {
     use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
     use crate::setup::{NodeParams, UserParams};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::One;
+    use algebra::One;
     use rand::RngCore;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -202,8 +196,7 @@ mod tests {
         }
         outputs.push((total_output, fee_type));
 
-        let fee_amount =
-            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
         inputs.push((fee_amount, fee_type));
 
         test_anon_xfr_proof(inputs, outputs);
@@ -233,8 +226,7 @@ mod tests {
         outputs.push((total_output, fee_type));
 
         // input for fees
-        let fee_amount =
-            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
         inputs.push((fee_amount, fee_type));
 
         test_anon_xfr_proof(inputs, outputs);
@@ -267,8 +259,7 @@ mod tests {
         let outputs = vec![(amount, fee_type)];
         let mut inputs = vec![(amount, fee_type)];
 
-        let fee_amount =
-            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
         inputs.push((fee_amount, fee_type));
 
         test_anon_xfr_proof(inputs, outputs);
@@ -292,8 +283,7 @@ mod tests {
             (40, one),
         ];
 
-        let fee_amount =
-            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
         inputs.push((fee_amount, fee_type));
 
         test_anon_xfr_proof(inputs, outputs);
@@ -316,17 +306,13 @@ mod tests {
 
         let outputs = vec![(output_1, fee_type), (output_2, fee_type), (output_3, one)];
 
-        let fee_amount =
-            FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
         inputs.push((fee_amount, fee_type));
 
         test_anon_xfr_proof(inputs, outputs);
     }
 
-    fn test_anon_xfr_proof(
-        inputs: Vec<(u64, BLSScalar)>,
-        outputs: Vec<(u64, BLSScalar)>,
-    ) {
+    fn test_anon_xfr_proof(inputs: Vec<(u64, BLSScalar)>, outputs: Vec<(u64, BLSScalar)>) {
         let n_payers = inputs.len();
         let n_payees = outputs.len();
 
@@ -339,8 +325,7 @@ mod tests {
         let proof = prove_xfr(&mut prng, &params, secret_inputs).unwrap();
 
         // A bad proof should fail the verification
-        let bad_secret_inputs =
-            new_multi_xfr_witness_for_test(inputs, outputs, [1u8; 32]);
+        let bad_secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [1u8; 32]);
         let bad_proof = prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
 
         // verify good witness

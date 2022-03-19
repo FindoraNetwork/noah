@@ -1,42 +1,50 @@
 use crate::{
     errors::AlgebraError,
-    groups::{
-        Group, GroupArithmetic, One, Pairing, Scalar as ZeiScalar, ScalarArithmetic,
-        Zero,
-    },
     jubjub::JubjubScalar,
+    traits::{Group, Pairing, Scalar},
 };
 use ark_bls12_381::{
-    fr::FrParameters, Bls12_381 as Bls12381pairing, Fq12Parameters, Fr, G1Affine,
-    G1Projective, G2Affine, G2Projective,
+    fr::FrParameters, Bls12_381 as Bls12381pairing, Fq12Parameters, Fr, G1Affine, G1Projective,
+    G2Affine, G2Projective,
 };
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{BigInteger, FftField, FftParameters, Field, Fp12, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
-    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+    ops::*,
     rand::{CryptoRng, RngCore},
     result::Result as StdResult,
     str::FromStr,
-    One as ArkOne, UniformRand, Zero as ArkZero,
+    One, UniformRand, Zero,
 };
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
-use rand_chacha::ChaCha20Rng;
 use ruc::*;
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 use wasm_bindgen::prelude::*;
 
-pub const BLS_SCALAR_LEN: usize = 32;
+/// The number of bytes for a scalar value over BLS12-381
+pub const BLS12_381_SCALAR_LEN: usize = 32;
 
+/// The wrapped struct for `ark_bls12_381::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
-pub struct BLSScalar(Fr);
-#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct BLSScalar(pub(crate) Fr);
+
+/// The wrapped struct for `ark_bls12_381::G1Projective`
+#[wasm_bindgen]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct BLSG1(pub(crate) G1Projective);
-#[derive(Clone, PartialEq, Eq, Debug)]
+
+/// The wrapped struct for `ark_bls12_381::G2Projective`
+#[wasm_bindgen]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct BLSG2(pub(crate) G2Projective);
-#[derive(Clone, PartialEq, Eq, Debug)]
+
+/// The wrapped struct for `Fp12<ark_bls12_381::Fq12Parameters>`,
+/// which is the pairing result
+#[wasm_bindgen]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct BLSGt(pub(crate) Fp12<Fq12Parameters>);
 
 impl FromStr for BLSScalar {
@@ -62,36 +70,13 @@ impl From<&JubjubScalar> for BLSScalar {
 
 impl Into<BigUint> for &BLSScalar {
     fn into(self) -> BigUint {
-        self.get_scalar().into_repr().into()
+        self.0.into_repr().into()
     }
 }
 
 impl From<&BigUint> for BLSScalar {
     fn from(src: &BigUint) -> Self {
         Self(Fr::from(src.clone()))
-    }
-}
-
-impl BLSScalar {
-    #[inline]
-    pub fn new(elem: Fr) -> Self {
-        Self(elem)
-    }
-
-    #[inline]
-    pub fn get_scalar(&self) -> Fr {
-        self.0
-    }
-
-    #[inline]
-    pub fn from_le_bits(bits: &[bool]) -> Result<Self> {
-        let res = Fr::from_repr(<Fr as PrimeField>::BigInt::from_bits_le(bits));
-
-        if let Some(fr) = res {
-            Ok(Self(fr))
-        } else {
-            Err(eg!(AlgebraError::BitConversionError))
-        }
     }
 }
 
@@ -114,74 +99,99 @@ impl Zero for BLSScalar {
     }
 }
 
-impl ScalarArithmetic for BLSScalar {
-    #[inline]
-    fn add(&self, b: &Self) -> Self {
-        Self(self.0.add(&b.0))
-    }
+impl Add for BLSScalar {
+    type Output = BLSScalar;
 
     #[inline]
-    fn add_assign(&mut self, b: &Self) {
-        (self.0).add_assign(&b.0);
-    }
-
-    #[inline]
-    fn mul(&self, b: &Self) -> Self {
-        Self(self.0.mul(&b.0))
-    }
-
-    #[inline]
-    fn mul_assign(&mut self, b: &Self) {
-        (self.0).mul_assign(&b.0);
-    }
-
-    #[inline]
-    fn sub(&self, b: &Self) -> Self {
-        Self(self.0.sub(&b.0))
-    }
-
-    #[inline]
-    fn sub_assign(&mut self, b: &Self) {
-        (self.0).sub_assign(&b.0);
-    }
-
-    #[inline]
-    fn inv(&self) -> Result<Self> {
-        let a = self.0.inverse();
-        if a.is_none() {
-            return Err(eg!(AlgebraError::GroupInversionError));
-        }
-        Ok(Self(a.unwrap()))
-    }
-
-    #[inline]
-    fn neg(&self) -> Self {
-        Self(self.0.neg())
-    }
-
-    #[inline]
-    fn pow(&self, exponent: &[u64]) -> Self {
-        let len = exponent.len();
-        let mut array = [0u64; 4];
-        array[..len].copy_from_slice(exponent);
-        Self(self.0.pow(&array))
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0.add(&rhs.0))
     }
 }
 
-impl ZeiScalar for BLSScalar {
+impl Mul for BLSScalar {
+    type Output = BLSScalar;
+
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(self.0.mul(&rhs.0))
+    }
+}
+
+impl<'a> Add<&'a BLSScalar> for BLSScalar {
+    type Output = BLSScalar;
+
+    #[inline]
+    fn add(self, rhs: &Self) -> Self::Output {
+        Self(self.0.add(&rhs.0))
+    }
+}
+
+impl<'a> AddAssign<&'a BLSScalar> for BLSScalar {
+    #[inline]
+    fn add_assign(&mut self, rhs: &Self) {
+        (self.0).add_assign(&rhs.0);
+    }
+}
+
+impl<'a> Sub<&'a BLSScalar> for BLSScalar {
+    type Output = BLSScalar;
+
+    #[inline]
+    fn sub(self, rhs: &Self) -> Self::Output {
+        Self(self.0.sub(&rhs.0))
+    }
+}
+
+impl<'a> SubAssign<&'a BLSScalar> for BLSScalar {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &Self) {
+        (self.0).sub_assign(&rhs.0);
+    }
+}
+
+impl<'a> Mul<&'a BLSScalar> for BLSScalar {
+    type Output = BLSScalar;
+
+    #[inline]
+    fn mul(self, rhs: &Self) -> Self::Output {
+        Self(self.0.mul(&rhs.0))
+    }
+}
+
+impl<'a> MulAssign<&'a BLSScalar> for BLSScalar {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &Self) {
+        (self.0).mul_assign(&rhs.0);
+    }
+}
+
+impl Neg for BLSScalar {
+    type Output = BLSScalar;
+
+    #[inline]
+    fn neg(self) -> Self {
+        Self(self.0.neg())
+    }
+}
+
+impl From<u32> for BLSScalar {
+    #[inline]
+    fn from(value: u32) -> Self {
+        Self::from(value as u64)
+    }
+}
+
+impl From<u64> for BLSScalar {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self(Fr::from(value))
+    }
+}
+
+impl Scalar for BLSScalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         Self(Fr::rand(rng))
-    }
-
-    #[inline]
-    fn from_u32(value: u32) -> Self {
-        Self::from_u64(value as u64)
-    }
-
-    #[inline]
-    fn from_u64(value: u64) -> Self {
-        Self(Fr::from(value))
     }
 
     #[inline]
@@ -189,7 +199,7 @@ impl ZeiScalar for BLSScalar {
     where
         D: Digest<OutputSize = U64> + Default,
     {
-        let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
+        let mut prng = derive_prng_from_hash::<D>(hash);
         Self::random(&mut prng)
     }
 
@@ -199,11 +209,11 @@ impl ZeiScalar for BLSScalar {
     }
 
     #[inline]
-    fn get_field_size_lsf_bytes() -> Vec<u8> {
+    fn get_field_size_le_bytes() -> Vec<u8> {
         [
-            0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x5b, 0xfe, 0xff,
-            0x02, 0xa4, 0xbd, 0x53, 0x05, 0xd8, 0xa1, 0x09, 0x08, 0xd8, 0x39, 0x33,
-            0x48, 0x7d, 0x9d, 0x29, 0x53, 0xa7, 0xed, 0x73,
+            0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x5b, 0xfe, 0xff, 0x02, 0xa4,
+            0xbd, 0x53, 0x05, 0xd8, 0xa1, 0x09, 0x08, 0xd8, 0x39, 0x33, 0x48, 0x7d, 0x9d, 0x29,
+            0x53, 0xa7, 0xed, 0x73,
         ]
         .to_vec()
     }
@@ -220,7 +230,7 @@ impl ZeiScalar for BLSScalar {
 
     #[inline]
     fn bytes_len() -> usize {
-        BLS_SCALAR_LEN
+        BLS12_381_SCALAR_LEN
     }
 
     #[inline]
@@ -235,17 +245,35 @@ impl ZeiScalar for BLSScalar {
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
-        Self::from_le_bytes(&array).c(d!())
+        Ok(Self(Fr::from_le_bytes_mod_order(bytes)))
     }
 
     #[inline]
-    fn from_le_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(Self(Fr::from_le_bytes_mod_order(bytes)))
+    fn inv(&self) -> Result<Self> {
+        let a = self.0.inverse();
+        if a.is_none() {
+            return Err(eg!(AlgebraError::GroupInversionError));
+        }
+        Ok(Self(a.unwrap()))
+    }
+
+    #[inline]
+    fn pow(&self, exponent: &[u64]) -> Self {
+        let len = exponent.len();
+        let mut array = [0u64; 4];
+        array[..len].copy_from_slice(exponent);
+        Self(self.0.pow(&array))
     }
 }
 
 impl Group for BLSG1 {
+    type ScalarType = BLSScalar;
     const COMPRESSED_LEN: usize = 48;
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
+    }
 
     #[inline]
     fn get_identity() -> Self {
@@ -258,7 +286,7 @@ impl Group for BLSG1 {
     }
 
     #[inline]
-    fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+    fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         Self::get_base().mul(&BLSScalar::random(prng))
     }
 
@@ -289,12 +317,12 @@ impl Group for BLSG1 {
     where
         D: Digest<OutputSize = U64> + Default,
     {
-        let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
+        let mut prng = derive_prng_from_hash::<D>(hash);
         Self(G1Projective::rand(&mut prng))
     }
 
     #[inline]
-    fn vartime_multi_exp(scalars: &[&Self::S], points: &[&Self]) -> Self {
+    fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
         let scalars_raw = scalars
             .iter()
             .map(|r| r.0.into_repr())
@@ -307,32 +335,55 @@ impl Group for BLSG1 {
     }
 }
 
-impl GroupArithmetic for BLSG1 {
-    type S = BLSScalar;
+impl<'a> Add<&'a BLSG1> for BLSG1 {
+    type Output = BLSG1;
 
     #[inline]
-    fn add(&self, other: &Self) -> Self {
-        Self(self.0.add(&other.0))
+    fn add(self, rhs: &Self) -> Self::Output {
+        Self(self.0.add(&rhs.0))
     }
+}
+
+impl<'a> Sub<&'a BLSG1> for BLSG1 {
+    type Output = BLSG1;
+
+    #[inline]
+    fn sub(self, rhs: &Self) -> Self::Output {
+        Self(self.0.sub(&rhs.0))
+    }
+}
+
+impl<'a> Mul<&'a BLSScalar> for BLSG1 {
+    type Output = BLSG1;
+
+    #[inline]
+    fn mul(self, rhs: &BLSScalar) -> Self::Output {
+        Self(self.0.mul(&rhs.0.into_repr()))
+    }
+}
+
+impl<'a> AddAssign<&'a BLSG1> for BLSG1 {
+    #[inline]
+    fn add_assign(&mut self, rhs: &'a BLSG1) {
+        self.0.add_assign(&rhs.0)
+    }
+}
+
+impl<'a> SubAssign<&'a BLSG1> for BLSG1 {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &'a BLSG1) {
+        self.0.sub_assign(&rhs.0)
+    }
+}
+
+impl Group for BLSG2 {
+    type ScalarType = BLSScalar;
+    const COMPRESSED_LEN: usize = 96;
 
     #[inline]
     fn double(&self) -> Self {
         Self(self.0.double())
     }
-
-    #[inline]
-    fn mul(&self, other: &BLSScalar) -> Self {
-        Self(self.0.mul(&other.0.into_repr()))
-    }
-
-    #[inline]
-    fn sub(&self, other: &Self) -> Self {
-        Self(self.0.sub(&other.0))
-    }
-}
-
-impl Group for BLSG2 {
-    const COMPRESSED_LEN: usize = 96;
 
     #[inline]
     fn get_identity() -> Self {
@@ -345,7 +396,7 @@ impl Group for BLSG2 {
     }
 
     #[inline]
-    fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+    fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         Self::get_base().mul(&BLSScalar::random(prng))
     }
 
@@ -375,38 +426,56 @@ impl Group for BLSG2 {
     where
         D: Digest<OutputSize = U64> + Default,
     {
-        let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
+        let mut prng = derive_prng_from_hash::<D>(hash);
         Self(G2Projective::rand(&mut prng))
     }
 }
 
-impl GroupArithmetic for BLSG2 {
-    type S = BLSScalar;
+impl<'a> Add<&'a BLSG2> for BLSG2 {
+    type Output = BLSG2;
 
     #[inline]
-    fn add(&self, other: &Self) -> Self {
-        Self(self.0.add(&other.0))
-    }
-
-    #[inline]
-    fn mul(&self, other: &BLSScalar) -> Self {
-        Self(self.0.mul(&other.0.into_repr()))
-    }
-
-    #[inline]
-    fn sub(&self, other: &Self) -> Self {
-        Self(self.0.sub(&other.0))
-    }
-
-    #[inline]
-    fn double(&self) -> Self {
-        Self(self.0.double())
+    fn add(self, rhs: &'a Self) -> Self::Output {
+        Self(self.0.add(&rhs.0))
     }
 }
 
-pub struct Bls12381;
+impl<'a> Sub<&'a BLSG2> for BLSG2 {
+    type Output = BLSG2;
 
-impl Pairing for Bls12381 {
+    #[inline]
+    fn sub(self, rhs: &'a Self) -> Self::Output {
+        Self(self.0.sub(&rhs.0))
+    }
+}
+
+impl<'a> Mul<&'a BLSScalar> for BLSG2 {
+    type Output = BLSG2;
+
+    #[inline]
+    fn mul(self, rhs: &'a BLSScalar) -> Self::Output {
+        Self(self.0.mul(&rhs.0.into_repr()))
+    }
+}
+
+impl<'a> AddAssign<&'a BLSG2> for BLSG2 {
+    #[inline]
+    fn add_assign(&mut self, rhs: &BLSG2) {
+        self.0.add_assign(&rhs.0)
+    }
+}
+
+impl<'a> SubAssign<&'a BLSG2> for BLSG2 {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &BLSG2) {
+        self.0.sub_assign(&rhs.0)
+    }
+}
+
+/// The pairing engine for BLS12-381
+pub struct BLSPairingEngine;
+
+impl Pairing for BLSPairingEngine {
     type ScalarField = BLSScalar;
     type G1 = BLSG1;
     type G2 = BLSG2;
@@ -418,17 +487,31 @@ impl Pairing for Bls12381 {
     }
 }
 
-impl GroupArithmetic for BLSGt {
-    type S = BLSScalar;
+impl<'a> Add<&'a BLSGt> for BLSGt {
+    type Output = BLSGt;
 
     #[inline]
-    fn add(&self, other: &Self) -> Self {
-        let r = self.0.mul(other.0);
-        Self(r)
+    fn add(self, rhs: &'a BLSGt) -> Self::Output {
+        Self(self.0.mul(&rhs.0))
     }
+}
+
+impl<'a> Sub<&'a BLSGt> for BLSGt {
+    type Output = BLSGt;
 
     #[inline]
-    fn mul(&self, scalar: &BLSScalar) -> Self {
+    fn sub(self, rhs: &'a BLSGt) -> Self::Output {
+        let mut rhs_inverse = rhs.0.clone();
+        rhs_inverse.conjugate();
+
+        Self(self.0.mul(&rhs_inverse))
+    }
+}
+
+impl<'a> Mul<&'a BLSScalar> for BLSGt {
+    type Output = BLSGt;
+
+    fn mul(self, rhs: &'a BLSScalar) -> Self::Output {
         let mut acc = Self::get_identity();
 
         // This is a simple double-and-add implementation of group element
@@ -437,7 +520,7 @@ impl GroupArithmetic for BLSGt {
         //
         // We skip the leading bit because it's always unset for Fq
         // elements.
-        for bit in scalar
+        for bit in rhs
             .0
             .into_repr()
             .to_bytes_le()
@@ -448,29 +531,40 @@ impl GroupArithmetic for BLSGt {
         {
             acc = acc.double();
             if bit {
-                acc = acc.add(self)
+                acc = acc.add(&self)
             }
         }
 
         acc
     }
+}
+
+impl<'a> AddAssign<&'a BLSGt> for BLSGt {
+    #[inline]
+    fn add_assign(&mut self, rhs: &'a BLSGt) {
+        self.0.mul_assign(&rhs.0)
+    }
+}
+
+impl<'a> SubAssign<&'a BLSGt> for BLSGt {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &'a BLSGt) {
+        let mut rhs_inverse = rhs.0.clone();
+        rhs_inverse.conjugate();
+
+        self.0.mul_assign(&rhs_inverse)
+    }
+}
+
+impl Group for BLSGt {
+    type ScalarType = BLSScalar;
+
+    const COMPRESSED_LEN: usize = 576;
 
     #[inline]
     fn double(&self) -> Self {
         Self(self.0.mul(&self.0))
     }
-
-    #[inline]
-    fn sub(&self, other: &Self) -> Self {
-        let mut other_inverse = other.0;
-        other_inverse.conjugate();
-
-        Self(self.0.mul(&other_inverse))
-    }
-}
-
-impl Group for BLSGt {
-    const COMPRESSED_LEN: usize = 576;
 
     #[inline]
     fn get_identity() -> Self {
@@ -479,11 +573,11 @@ impl Group for BLSGt {
 
     #[inline]
     fn get_base() -> Self {
-        Bls12381::pairing(&BLSG1::get_base(), &BLSG2::get_base())
+        BLSPairingEngine::pairing(&BLSG1::get_base(), &BLSG2::get_base())
     }
 
     #[inline]
-    fn get_random_base<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+    fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         Self::get_base().mul(&BLSScalar::random(prng))
     }
 
@@ -513,7 +607,7 @@ impl Group for BLSGt {
     where
         D: Digest<OutputSize = U64> + Default,
     {
-        let mut prng = derive_prng_from_hash::<D, ChaCha20Rng>(hash);
+        let mut prng = derive_prng_from_hash::<D>(hash);
         Self(Fp12::<Fq12Parameters>::rand(&mut prng))
     }
 }
@@ -521,37 +615,37 @@ impl Group for BLSGt {
 #[cfg(test)]
 mod bls12_381_groups_test {
     use crate::{
-        bls12_381::{BLSGt, BLSScalar, Bls12381, BLSG1, BLSG2},
-        groups::{
+        bls12_381::{BLSGt, BLSPairingEngine, BLSScalar, BLSG1, BLSG2},
+        traits::{
             group_tests::{test_scalar_operations, test_scalar_serialization},
-            Group, GroupArithmetic, Pairing, Scalar,
+            Group, Pairing, Scalar,
         },
     };
     use ark_bls12_381::{G1Affine, G2Affine};
     use ark_ec::ProjectiveCurve;
     use ark_std::{
-        ops::Add,
+        ops::*,
         rand::{RngCore, SeedableRng},
     };
     use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_scalar_ops() {
-        test_scalar_operations::<super::BLSScalar>();
+        test_scalar_operations::<BLSScalar>();
     }
 
     #[test]
     fn scalar_deser() {
-        test_scalar_serialization::<super::BLSScalar>();
+        test_scalar_serialization::<BLSScalar>();
     }
 
     #[test]
     fn scalar_from_to_bytes() {
-        let small_value = BLSScalar::from_u32(165747);
+        let small_value = BLSScalar::from(165747u32);
         let small_value_bytes = small_value.to_bytes();
         let expected_small_value_bytes: [u8; 32] = [
-            115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
+            115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0,
         ];
         assert_eq!(small_value_bytes, expected_small_value_bytes);
 
@@ -562,7 +656,7 @@ mod bls12_381_groups_test {
     #[test]
     fn hard_coded_group_elements() {
         let base_bls_gt = BLSGt::get_base();
-        let expected_base = Bls12381::pairing(&BLSG1::get_base(), &BLSG2::get_base());
+        let expected_base = BLSPairingEngine::pairing(&BLSG1::get_base(), &BLSG2::get_base());
         assert_eq!(base_bls_gt, expected_base);
     }
 
@@ -570,14 +664,14 @@ mod bls12_381_groups_test {
     fn bilinear_properties() {
         let identity_g1 = BLSG1::get_identity();
         let identity_g2 = BLSG2::get_identity();
-        let identity_gt_computed = Bls12381::pairing(&identity_g1, &identity_g2);
+        let identity_gt_computed = BLSPairingEngine::pairing(&identity_g1, &identity_g2);
         let identity_gt = BLSGt::get_identity();
         assert_eq!(identity_gt, identity_gt_computed);
 
         let mut rng = ChaCha20Rng::from_entropy();
 
-        let s1 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
-        let s2 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + rng.next_u32() % 50);
+        let s2 = BLSScalar::from(50 + rng.next_u32() % 50);
 
         let base_g1 = BLSG1::get_base();
         let base_g2 = BLSG2::get_base();
@@ -585,19 +679,19 @@ mod bls12_381_groups_test {
         let s1_base_g1 = base_g1.mul(&s1);
         let s2_base_g2 = base_g2.mul(&s2);
 
-        let gt_mapped_element = Bls12381::pairing(&s1_base_g1, &s2_base_g2);
+        let gt_mapped_element = BLSPairingEngine::pairing(&s1_base_g1, &s2_base_g2);
 
-        let gt_base_computed = Bls12381::pairing(&base_g1, &base_g2);
+        let gt_base_computed = BLSPairingEngine::pairing(&base_g1, &base_g2);
         let base_gt = BLSGt::get_base();
         assert_eq!(base_gt, gt_base_computed);
 
         assert_eq!(
             gt_mapped_element,
-            Bls12381::pairing(&base_g1, &s2_base_g2).mul(&s1)
+            BLSPairingEngine::pairing(&base_g1, &s2_base_g2).mul(&s1)
         );
         assert_eq!(
             gt_mapped_element,
-            Bls12381::pairing(&s1_base_g1, &base_g2).mul(&s2)
+            BLSPairingEngine::pairing(&s1_base_g1, &base_g2).mul(&s2)
         );
 
         assert_eq!(gt_mapped_element, gt_base_computed.mul(&s1).mul(&s2));
@@ -609,11 +703,11 @@ mod bls12_381_groups_test {
         let mut rng = ChaCha20Rng::from_entropy();
 
         let g1 = BLSG1::get_base();
-        let s1 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + rng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = BLSG1::get_random_base(&mut rng);
+        let g1_prime = BLSG1::random(&mut rng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -629,8 +723,7 @@ mod bls12_381_groups_test {
         let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af =
-            g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 
@@ -639,11 +732,11 @@ mod bls12_381_groups_test {
         let mut rng = ChaCha20Rng::from_entropy();
 
         let g1 = BLSG2::get_base();
-        let s1 = BLSScalar::from_u32(50 + rng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + rng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = BLSG2::get_random_base(&mut rng);
+        let g1_prime = BLSG2::random(&mut rng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -659,8 +752,7 @@ mod bls12_381_groups_test {
         let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af =
-            g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 
@@ -668,17 +760,17 @@ mod bls12_381_groups_test {
     fn test_serialization_of_points() {
         let mut rng = ChaCha20Rng::from_entropy();
 
-        let g1 = BLSG1::get_random_base(&mut rng);
+        let g1 = BLSG1::random(&mut rng);
         let g1_bytes = g1.to_compressed_bytes();
         let g1_recovered = BLSG1::from_compressed_bytes(&g1_bytes).unwrap();
         assert_eq!(g1, g1_recovered);
 
-        let g2 = BLSG2::get_random_base(&mut rng);
+        let g2 = BLSG2::random(&mut rng);
         let g2_bytes = g2.to_compressed_bytes();
         let g2_recovered = BLSG2::from_compressed_bytes(&g2_bytes).unwrap();
         assert_eq!(g2, g2_recovered);
 
-        let gt = BLSGt::get_random_base(&mut rng);
+        let gt = BLSGt::random(&mut rng);
         let gt_bytes = gt.to_compressed_bytes();
         let gt_recovered = BLSGt::from_compressed_bytes(&gt_bytes).unwrap();
         assert_eq!(gt, gt_recovered);

@@ -1,4 +1,4 @@
-use algebra::groups::ScalarArithmetic;
+use algebra::ops::*;
 use merlin::Transcript;
 use ruc::*;
 
@@ -7,8 +7,8 @@ use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{
-        combine_q_polys, derive_q_eval_beta, eval_public_var_poly,
-        linearization_commitment, PlonkChallenges,
+        combine_q_polys, derive_q_eval_beta, eval_public_var_poly, linearization_commitment,
+        PlonkChallenges,
     },
     setup::{PlonkPf, VerifierParams},
     transcript::{
@@ -65,17 +65,13 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     transcript.append_field_elem(&proof.Sigma_eval_g_beta);
     transcript.append_field_elem(&proof.L_eval_beta);
 
-    let public_vars_eval_beta = eval_public_var_poly::<PCS>(
-        cs_params,
-        public_values,
-        challenges.get_beta().unwrap(),
-    );
+    let public_vars_eval_beta =
+        eval_public_var_poly::<PCS>(cs_params, public_values, challenges.get_beta().unwrap());
 
     // 4. derive linearization polynomial commitment
     let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> =
         proof.witness_polys_eval_beta.iter().collect();
-    let perms_eval_beta_as_ref: Vec<&PCS::Field> =
-        proof.perms_eval_beta.iter().collect();
+    let perms_eval_beta_as_ref: Vec<&PCS::Field> = proof.perms_eval_beta.iter().collect();
     let C_L = linearization_commitment::<PCS, CS>(
         cs_params,
         &proof.C_Sigma,
@@ -104,8 +100,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
                 .take(CS::n_wires_per_gate() - 1),
         )
         .collect();
-    let C_q_combined =
-        combine_q_polys(&proof.C_q_polys[..], &beta, cs_params.cs_size + 2);
+    let C_q_combined = combine_q_polys(&proof.C_q_polys[..], &beta, cs_params.cs_size + 2);
     commitments.push(&C_q_combined);
     commitments.push(&C_L);
     commitments.push(&proof.C_Sigma);

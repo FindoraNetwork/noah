@@ -101,7 +101,7 @@ fn to_inner_product<P: Pairing>(A: &[P::G1],
   let mut new_B = B.to_vec();
   new_B.extend_from_slice(D);
   let r = transcript.get_challenge::<P::ScalarField>();
-  let mut r_to_i_prev = P::ScalarField::from_u32(1);
+  let mut r_to_i_prev = P::ScalarField::from(1);
   for (a, c) in A.iter().zip(C.iter()) {
     let r_to_i = r_to_i_prev.mul(&r);
     new_A.push(a.mul(&r_to_i));

@@ -114,12 +114,7 @@ fn main() {
     };
 }
 
-fn gen_user_params(
-    n_payers: usize,
-    n_payees: usize,
-    tree_depth: usize,
-    out_filename: PathBuf,
-) {
+fn gen_user_params(n_payers: usize, n_payees: usize, tree_depth: usize, out_filename: PathBuf) {
     println!(
         "Generating 'User Parameters' for {} payers, {} payees and with tree depth={}...",
         n_payers, n_payees, tree_depth
@@ -136,12 +131,7 @@ fn gen_user_params(
     save_to_file(&user_params_ser, out_filename);
 }
 
-fn gen_node_params(
-    n_payers: usize,
-    n_payees: usize,
-    tree_depth: usize,
-    out_filename: PathBuf,
-) {
+fn gen_node_params(n_payers: usize, n_payees: usize, tree_depth: usize, out_filename: PathBuf) {
     println!(
         "Generating 'Node Parameters' for {} payers, {} payees and with tree depth={}...",
         n_payers, n_payees, tree_depth
@@ -183,8 +173,7 @@ fn gen_vk(directory: PathBuf) {
                 .par_iter()
                 .map(|j| {
                     println!("generateing {} payers & {} payees", i, j);
-                    let node_params =
-                        NodeParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
+                    let node_params = NodeParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
                 })
@@ -249,7 +238,9 @@ fn gen_params_bp(gens_capacity: usize, party_capacity: usize, out_filename: Path
 }
 
 fn gen_params_kzg(size: usize, out_filename: PathBuf) {
-    println!("Warning: The KZG parameters should come from a setup ceremony instead of generated here.");
+    println!(
+        "Warning: The KZG parameters should come from a setup ceremony instead of generated here."
+    );
     println!("Generating KZG parameters of size {} ...", size);
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let pcs = KZGCommitmentSchemeBLS::new(size, &mut prng);

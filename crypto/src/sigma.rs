@@ -1,4 +1,7 @@
-use algebra::groups::{Group, Pairing, Scalar, ScalarArithmetic};
+use algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+};
 use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;
@@ -10,7 +13,7 @@ pub trait SigmaTranscript {
     fn init_sigma<G: Group>(
         &mut self,
         instance_name: &'static [u8],
-        public_scalars: &[&G::S],
+        public_scalars: &[&G::ScalarType],
         public_elems: &[&G],
     );
     fn append_group_element<G: Group>(&mut self, label: &'static [u8], elem: &G);
@@ -34,7 +37,7 @@ impl SigmaTranscript for Transcript {
     fn init_sigma<G: Group>(
         &mut self,
         instance_name: &'static [u8],
-        public_scalars: &[&G::S],
+        public_scalars: &[&G::ScalarType],
         public_elems: &[&G],
     ) {
         self.append_message(
@@ -100,10 +103,7 @@ fn init_sigma_protocol<G: Group>(transcript: &mut Transcript, elems: &[&G]) {
     transcript.init_sigma(b"New Sigma Protocol", &[], elems);
 }
 
-fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(
-    prng: &mut R,
-    n: usize,
-) -> Vec<S> {
+fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R, n: usize) -> Vec<S> {
     let mut r = vec![];
     for _ in 0..n {
         r.push(S::random(prng));
@@ -113,7 +113,7 @@ fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(
 
 fn compute_proof_commitments<G: Group>(
     transcript: &mut Transcript,
-    blindings: &[G::S],
+    blindings: &[G::ScalarType],
     elems: &[&G],
     lhs_matrix: &[Vec<usize>],
 ) -> Vec<G> {
@@ -144,18 +144,14 @@ pub fn sigma_prove<R: CryptoRng + RngCore, G: Group>(
     prng: &mut R,
     elems: &[&G],              // public elements of the proofs
     lhs_matrix: &[Vec<usize>], // each row defines a lhs of a constraint
-    secret_scalars: &[&G::S],
-) -> SigmaProof<G::S, G> {
+    secret_scalars: &[&G::ScalarType],
+) -> SigmaProof<G::ScalarType, G> {
     init_sigma_protocol::<G>(transcript, elems);
-    let blindings = sample_blindings::<_, G::S>(prng, secret_scalars.len());
-    let proof_commitments = compute_proof_commitments::<G>(
-        transcript,
-        blindings.as_slice(),
-        elems,
-        lhs_matrix,
-    );
+    let blindings = sample_blindings::<_, G::ScalarType>(prng, secret_scalars.len());
+    let proof_commitments =
+        compute_proof_commitments::<G>(transcript, blindings.as_slice(), elems, lhs_matrix);
 
-    let challenge = transcript.get_challenge::<G::S>();
+    let challenge = transcript.get_challenge::<G::ScalarType>();
 
     let mut responses = vec![];
 
@@ -181,7 +177,7 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar>(
     // rows are merged using a random linear combination
     // this functions collects the scalars factors for each element in order to apply a single
     // multiexponentiation to verify all equations
-    let mut s = vec![S::from_u32(0); n_elems + rhs.len()]; // n elements + m proof commitments
+    let mut s = vec![S::from(0u32); n_elems + rhs.len()]; // n elements + m proof commitments
     let mut alphas = vec![]; // linear combination scalars
                              // find in the matrix each element and multiply corresponding response by alpha
     for (j, row) in matrix.iter().enumerate() {
@@ -215,8 +211,8 @@ pub fn sigma_verify_scalars<R: CryptoRng + RngCore, G: Group>(
     elems: &[&G],
     lhs_matrix: &[Vec<usize>],
     rhs_vec: &[usize],
-    proof: &SigmaProof<G::S, G>,
-) -> Vec<G::S> {
+    proof: &SigmaProof<G::ScalarType, G>,
+) -> Vec<G::ScalarType> {
     assert_eq!(lhs_matrix.len(), rhs_vec.len());
     assert_eq!(rhs_vec.len(), proof.commitments.len());
 
@@ -224,7 +220,7 @@ pub fn sigma_verify_scalars<R: CryptoRng + RngCore, G: Group>(
     for c in proof.commitments.iter() {
         transcript.append_proof_commitment(c);
     }
-    let challenge = transcript.get_challenge::<G::S>();
+    let challenge = transcript.get_challenge::<G::ScalarType>();
     collect_multi_exp_scalars(
         prng,
         elems.len(),
@@ -243,7 +239,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
     elems: &[&G],
     lhs_matrix: &[Vec<usize>],
     rhs_vec: &[usize],
-    proof: &SigmaProof<G::S, G>,
+    proof: &SigmaProof<G::ScalarType, G>,
 ) -> Result<()> {
     let multi_exp_scalars =
         sigma_verify_scalars(transcript, prng, elems, lhs_matrix, rhs_vec, proof);
@@ -256,7 +252,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
     for e in proof.commitments.iter() {
         me_elems.push(e);
     }
-    let result = G::vartime_multi_exp(scalars_as_ref.as_slice(), me_elems.as_slice());
+    let result = G::multi_exp(scalars_as_ref.as_slice(), me_elems.as_slice());
     if result != G::get_identity() {
         Err(eg!(ZeiError::ZKProofVerificationError))
     } else {
@@ -266,8 +262,8 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
 
 #[cfg(test)]
 mod tests {
-    use algebra::groups::{Group, GroupArithmetic, Scalar as _};
     use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+    use algebra::{ops::*, traits::Group, Zero};
     use merlin::Transcript;
     use rand_core::SeedableRng;
 
@@ -275,7 +271,7 @@ mod tests {
     #[allow(non_snake_case)]
     fn test_sigma() {
         let G = RistrettoPoint::get_base();
-        let secret = Scalar::from_u32(10);
+        let secret = Scalar::from(10u32);
         let H = G.mul(&secret);
 
         let mut prover_transcript = Transcript::new(b"Test");
@@ -323,7 +319,7 @@ mod tests {
 
         // test2: two contrains, two secrets
         // 1) H = secret * G, 2) H2 = secret2 * G
-        let secret2 = Scalar::from_u32(20);
+        let secret2 = Scalar::from(20u32);
         let H2 = G.mul(&secret2);
         let zero = RistrettoPoint::get_identity();
         let elems: &[&RistrettoPoint] = &[&zero, &G, &H, &H2];
@@ -383,9 +379,9 @@ mod tests {
         .is_err());
 
         // test3: two constarains, 5 secrets
-        let secret3 = Scalar::from_u32(30);
-        let secret4 = Scalar::from_u32(40);
-        let secret5 = Scalar::from_u32(50);
+        let secret3 = Scalar::from(30u32);
+        let secret4 = Scalar::from(40u32);
+        let secret5 = Scalar::from(50u32);
         let Z1 = G.mul(&secret).add(&H.mul(&secret2));
         let Z2 = G.mul(&secret3).add(&H.mul(&secret4)).add(&H2.mul(&secret5));
 
@@ -393,13 +389,7 @@ mod tests {
         let matrix: &[Vec<usize>] = &[vec![1, 2, 0, 0, 0], vec![0, 0, 1, 2, 3]];
         let rhs_vec = &[4, 5];
         let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &secret5];
-        let proof = super::sigma_prove(
-            &mut prover_transcript,
-            &mut prng,
-            elems,
-            matrix,
-            secrets,
-        );
+        let proof = super::sigma_prove(&mut prover_transcript, &mut prng, elems, matrix, secrets);
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,
@@ -410,15 +400,8 @@ mod tests {
         )
         .is_ok());
 
-        let secrets: &[&Scalar] =
-            &[&secret, &secret2, &secret3, &secret4, &Scalar::from_u32(0)]; // bad secrets
-        let proof = super::sigma_prove(
-            &mut prover_transcript,
-            &mut prng,
-            elems,
-            matrix,
-            secrets,
-        );
+        let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::zero()]; // bad secrets
+        let proof = super::sigma_prove(&mut prover_transcript, &mut prng, elems, matrix, secrets);
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,

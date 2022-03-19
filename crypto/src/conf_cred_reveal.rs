@@ -1,18 +1,20 @@
 use crate::anon_creds::{
-    ac_do_challenge_check_commitment, ac_randomize, ACCommitment, ACIssuerPublicKey,
-    ACKey, ACPoK, ACUserSecretKey, Attribute, Credential, SOK_LABEL,
+    ac_do_challenge_check_commitment, ac_randomize, ACCommitment, ACIssuerPublicKey, ACKey, ACPoK,
+    ACUserSecretKey, Attribute, Credential, SOK_LABEL,
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::groups::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
+use algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use utils::errors::ZeiError;
 
 const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
-const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] =
-    b"Confidential AC Reveal PoK New Instance";
+const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"Confidential AC Reveal PoK New Instance";
 
 trait CACTranscript: SigmaTranscriptPairing {
     fn cac_init<P: Pairing>(
@@ -22,16 +24,10 @@ trait CACTranscript: SigmaTranscriptPairing {
         sig_commitment: &ACCommitment<P::G1>,
         ctexts: &[ElGamalCiphertext<P::G1>],
     );
-    fn append_issuer_pk<P: Pairing>(
-        &mut self,
-        ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
-    );
+    fn append_issuer_pk<P: Pairing>(&mut self, ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>);
     fn append_encryption_key<P: Pairing>(&mut self, key: &ElGamalEncKey<P::G1>);
     fn append_ciphertext<P: Pairing>(&mut self, ctext: &ElGamalCiphertext<P::G1>);
-    fn append_ac_sig_commitment<P: Pairing>(
-        &mut self,
-        ac_sig_commitment: &ACCommitment<P::G1>,
-    );
+    fn append_ac_sig_commitment<P: Pairing>(&mut self, ac_sig_commitment: &ACCommitment<P::G1>);
 }
 
 impl CACTranscript for Transcript {
@@ -52,10 +48,7 @@ impl CACTranscript for Transcript {
             self.append_ciphertext::<P>(ctext);
         }
     }
-    fn append_issuer_pk<P: Pairing>(
-        &mut self,
-        ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
-    ) {
+    fn append_issuer_pk<P: Pairing>(&mut self, ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>) {
         self.append_group_element(b"issuer_pk.G2", &ac_issuer_pk.gen2);
         self.append_group_element(b"issuer_pk.Z1", &ac_issuer_pk.zz1);
         self.append_group_element(b"issuer_pk.Z2", &ac_issuer_pk.zz2);
@@ -71,10 +64,7 @@ impl CACTranscript for Transcript {
         self.append_group_element(b"ctext.e1", &ctext.e1);
         self.append_group_element(b"ctext.e2", &ctext.e2);
     }
-    fn append_ac_sig_commitment<P: Pairing>(
-        &mut self,
-        sig_commitment: &ACCommitment<P::G1>,
-    ) {
+    fn append_ac_sig_commitment<P: Pairing>(&mut self, sig_commitment: &ACCommitment<P::G1>) {
         self.append_group_element(b"sigma1", &sig_commitment.0.sigma1);
         self.append_group_element(b"sigma2", &sig_commitment.0.sigma2);
     }
@@ -228,8 +218,7 @@ pub(crate) fn ac_confidential_sok_prove<R: CryptoRng + RngCore, P: Pairing>(
         commitment = commitment.add(&elem);
         if let Attribute::Revealed(_) = attr {
             let r_rand = P::ScalarField::random(prng);
-            let ctext_com =
-                elgamal_encrypt(&P::G1::get_base(), &r_attr, &r_rand, enc_key);
+            let ctext_com = elgamal_encrypt(&P::G1::get_base(), &r_attr, &r_rand, enc_key);
             transcript.append_proof_commitment(&ctext_com.e1);
             transcript.append_proof_commitment(&ctext_com.e2);
             ctext_coms.push(ctext_com);
@@ -245,11 +234,11 @@ pub(crate) fn ac_confidential_sok_prove<R: CryptoRng + RngCore, P: Pairing>(
     for (attr_enum, r_attr) in attrs.iter().zip(r_attrs.iter()) {
         match attr_enum {
             Attribute::Hidden(Some(attr)) => {
-                let response_attr = challenge.mul(attr).add(r_attr);
+                let response_attr = challenge.mul(*attr).add(r_attr);
                 response_attrs.push(response_attr);
             }
             Attribute::Revealed(attr) => {
-                let response_attr = challenge.mul(attr).add(r_attr);
+                let response_attr = challenge.mul(*attr).add(r_attr);
                 response_attrs.push(response_attr);
             }
             _ => {}
@@ -352,14 +341,11 @@ fn verify_ciphertext<P: Pairing>(
 #[cfg(test)]
 pub(crate) mod test_helper {
     use crate::anon_creds::{
-        ac_commit, ac_keygen_issuer, ac_sign, ac_user_key_gen, ac_verify_commitment,
-        Credential,
+        ac_commit, ac_keygen_issuer, ac_sign, ac_user_key_gen, ac_verify_commitment, Credential,
     };
     use crate::basics::elgamal::elgamal_key_gen;
-    use crate::conf_cred_reveal::{
-        ac_confidential_open_commitment, ac_confidential_open_verify,
-    };
-    use algebra::groups::{Group, Pairing, Scalar};
+    use crate::conf_cred_reveal::{ac_confidential_open_commitment, ac_confidential_open_verify};
+    use algebra::traits::{Group, Pairing, Scalar};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use utils::errors::ZeiError;
@@ -386,29 +372,22 @@ pub(crate) mod test_helper {
             attrs.push(byte_slice_to_scalar(format!("attr{}!", i).as_bytes()));
         }
 
-        let ac_sig =
-            ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]).unwrap();
+        let ac_sig = ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]).unwrap();
         let credential = Credential {
             signature: ac_sig,
             attributes: attrs,
             issuer_pub_key: issuer_pk.clone(),
         };
-        let output =
-            ac_commit::<_, P>(&mut prng, &user_sk, &credential, credential_addr)
-                .unwrap();
+        let output = ac_commit::<_, P>(&mut prng, &user_sk, &credential, credential_addr).unwrap();
 
         let sig_commitment = output.0;
         let sok = output.1;
         let key = output.2.unwrap(); // safe unwrap()
 
         // 1. Verify commitment
-        assert!(ac_verify_commitment::<P>(
-            &issuer_pk,
-            &sig_commitment,
-            &sok,
-            credential_addr
-        )
-        .is_ok());
+        assert!(
+            ac_verify_commitment::<P>(&issuer_pk, &sig_commitment, &sok, credential_addr).is_ok()
+        );
         let conf_reveal_proof = ac_confidential_open_commitment::<_, P>(
             &mut prng,
             &user_sk,
@@ -490,8 +469,7 @@ pub(crate) mod test_helper {
         );
 
         // Wrong encryption public key
-        let (_, another_enc_key) =
-            elgamal_key_gen::<_, P::G1>(&mut prng, &P::G1::get_base());
+        let (_, another_enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng, &P::G1::get_base());
         let vrfy = ac_confidential_open_verify::<P>(
             &issuer_pk,
             &another_enc_key,
@@ -529,46 +507,46 @@ pub(crate) mod test_helper {
 #[cfg(test)]
 mod test_bls12_381 {
     use crate::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
-    use algebra::bls12_381::Bls12381;
+    use algebra::bls12_381::BLSPairingEngine;
 
     #[test]
     fn confidential_reveal_one_attr_hidden() {
-        test_confidential_ac_reveal::<Bls12381>(&[false]);
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[false]);
     }
 
     #[test]
     fn confidential_reveal_one_attr_revealed() {
-        test_confidential_ac_reveal::<Bls12381>(&[true]);
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[true]);
     }
 
     #[test]
     fn confidential_reveal_two_attr_hidden_first() {
-        test_confidential_ac_reveal::<Bls12381>(&[false, false]);
-        test_confidential_ac_reveal::<Bls12381>(&[false, true]);
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[false, false]);
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[false, true]);
     }
 
     #[test]
     fn confidential_reveal_two_attr_revealed_first() {
-        test_confidential_ac_reveal::<Bls12381>(&[true, false]);
-        test_confidential_ac_reveal::<Bls12381>(&[true, true]);
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[true, false]);
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[true, true]);
     }
 
     #[test]
     fn confidential_reveal_ten_attr_all_hidden() {
-        test_confidential_ac_reveal::<Bls12381>(&[false; 10]);
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[false; 10]);
     }
 
     #[test]
     fn confidential_reveal_ten_attr_all_revealed() {
-        test_confidential_ac_reveal::<Bls12381>(&[true; 10]);
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[true; 10]);
     }
 
     #[test]
     fn confidential_reveal_ten_attr_half_revealed() {
-        test_confidential_ac_reveal::<Bls12381>(&[
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[
             true, false, true, false, true, false, true, false, true, false,
         ]);
-        test_confidential_ac_reveal::<Bls12381>(&[
+        test_confidential_ac_reveal::<BLSPairingEngine>(&[
             false, true, false, true, false, true, false, true, false, true,
         ]);
     }
@@ -577,8 +555,8 @@ mod test_bls12_381 {
 #[cfg(test)]
 mod test_serialization {
 
-    use algebra::bls12_381::Bls12381;
-    use algebra::groups::{Group, Pairing};
+    use algebra::bls12_381::BLSPairingEngine;
+    use algebra::traits::{Group, Pairing};
 
     use super::test_helper::byte_slice_to_scalar;
     use crate::anon_creds::{ac_commit, ac_sign};
@@ -608,16 +586,14 @@ mod test_serialization {
             attrs.push(byte_slice_to_scalar(format!("attr{}!", i).as_bytes()));
         }
 
-        let ac_sig =
-            ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]).unwrap();
+        let ac_sig = ac_sign::<_, P>(&mut prng, &issuer_sk, &user_pk, &attrs[..]).unwrap();
         let credential = Credential {
             signature: ac_sig,
             attributes: attrs,
             issuer_pub_key: issuer_pk,
         };
 
-        let output =
-            ac_commit::<_, P>(&mut prng, &user_sk, &credential, b"an address").unwrap();
+        let output = ac_commit::<_, P>(&mut prng, &user_sk, &credential, b"an address").unwrap();
         let key = output.2.unwrap(); // Safe unwrap()
         let conf_reveal_proof = ac_confidential_open_commitment::<_, P>(
             &mut prng,
@@ -656,11 +632,11 @@ mod test_serialization {
 
     #[test]
     fn to_json_bls() {
-        to_json::<Bls12381>();
+        to_json::<BLSPairingEngine>();
     }
 
     #[test]
     fn to_msg_pack_bls() {
-        to_msg_pack::<Bls12381>();
+        to_msg_pack::<BLSPairingEngine>();
     }
 }

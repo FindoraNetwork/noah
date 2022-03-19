@@ -8,20 +8,17 @@ pub(crate) mod examples {
     use utils::msg_eq;
     use wasm_bindgen::__rt::std::collections::HashMap;
     use zei::api::anon_creds;
-    use zei::api::anon_creds::{
-        ac_commit, ac_sign, ac_verify_commitment, Attr, Credential,
-    };
+    use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Attr, Credential};
     use zei::setup::PublicParams;
     use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
     use zei::xfr::lib::{
-        gen_xfr_note, trace_assets_brute_force, RecordData, XfrNotePolicies,
-        XfrNotePoliciesRef,
+        gen_xfr_note, trace_assets_brute_force, RecordData, XfrNotePolicies, XfrNotePoliciesRef,
     };
     use zei::xfr::lib::{trace_assets, verify_xfr_note};
     use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
     use zei::xfr::structs::{
-        AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType,
-        IdentityRevealPolicy, TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
+        AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, IdentityRevealPolicy,
+        TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
     };
     use zei::xfr::test_utils::{
         conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
@@ -56,19 +53,15 @@ pub(crate) mod examples {
         let recv_pub_key = recv_keypair.pub_key;
 
         // 1.2. fake blind_asset_record from ledger
-        let bar = non_conf_blind_asset_record_from_ledger(
-            &sender_keypair.pub_key,
-            amount,
-            ASSET1_TYPE,
-        );
+        let bar =
+            non_conf_blind_asset_record_from_ledger(&sender_keypair.pub_key, amount, ASSET1_TYPE);
 
         // 2. Prepare input AssetRecord
         // 2.1 user opens blind asset record, it is not confidential so no memo was received
         let oar = open_blind_asset_record(&bar, &None, &sender_keypair).unwrap();
 
         // 2.2. build AssetRecord from oar
-        let sender_asset_record =
-            AssetRecord::from_open_asset_record_no_asset_tracing(oar);
+        let sender_asset_record = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
         // 3. Prepare output AssetRecord
         // 3.1. build output asset_record template
@@ -80,8 +73,7 @@ pub(crate) mod examples {
         );
         // 3.3 build output asset record
         let recv_asset_record =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template)
-                .unwrap(); // do not attach identity tracking fields
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap(); // do not attach identity tracking fields
 
         // 4. create xfr_note
         let xfr_note = gen_xfr_note(
@@ -95,18 +87,13 @@ pub(crate) mod examples {
         let policies = XfrNotePolicies::empty_policies(1, 1);
         let policies_ref = policies.to_ref();
         // 5. Validator verifies xfr_note
-        assert!(
-            verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).is_ok()
-        ); // there are no policies associated with this xfr note
+        assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).is_ok()); // there are no policies associated with this xfr note
 
         //6. receiver retrieves his BlindAssetRecord and opens it
         let recv_bar = &xfr_note.body.outputs[0];
-        let recv_open_asset_record = open_blind_asset_record(
-            recv_bar,
-            &xfr_note.body.owners_memos[0],
-            &recv_keypair,
-        )
-        .unwrap();
+        let recv_open_asset_record =
+            open_blind_asset_record(recv_bar, &xfr_note.body.owners_memos[0], &recv_keypair)
+                .unwrap();
 
         assert_eq!(recv_open_asset_record.asset_type, ASSET1_TYPE);
         assert_eq!(recv_open_asset_record.amount, amount);
@@ -128,19 +115,15 @@ pub(crate) mod examples {
         let recv_pub_key = recv_keypair.pub_key;
 
         // 1.2. fake blind_asset_record from ledger
-        let bar = non_conf_blind_asset_record_from_ledger(
-            &sender_keypair.pub_key,
-            amount,
-            ASSET1_TYPE,
-        );
+        let bar =
+            non_conf_blind_asset_record_from_ledger(&sender_keypair.pub_key, amount, ASSET1_TYPE);
 
         // 2. Prepare input AssetRecord
         // 2.1 user opens blind asset record, it is not confidential so no memo was received
         let oar = open_blind_asset_record(&bar, &None, &sender_keypair).unwrap();
 
         // 2.2. build AssetRecord from oar
-        let sender_asset_record =
-            AssetRecord::from_open_asset_record_no_asset_tracing(oar);
+        let sender_asset_record = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
         // 3. Prepare output AssetRecord
         // 3.1. build output asset_record template
@@ -152,8 +135,7 @@ pub(crate) mod examples {
         );
         // 3.3 build output asset record
         let recv_asset_record =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template)
-                .unwrap(); // do not attach identity tracking fields
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap(); // do not attach identity tracking fields
 
         // 4. create xfr_note
         let xfr_note = gen_xfr_note(
@@ -166,18 +148,13 @@ pub(crate) mod examples {
         let policies = XfrNotePolicies::empty_policies(1, 1);
         let policies_ref = policies.to_ref();
         // 5. Validator verifies xfr_note
-        assert!(
-            verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).is_ok()
-        ); // there are no policies associated with this xfr note
+        assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).is_ok()); // there are no policies associated with this xfr note
 
         //6. receiver retrieves his BlindAssetRecord and opens it
         let recv_bar = &xfr_note.body.outputs[0];
-        let recv_open_asset_record = open_blind_asset_record(
-            recv_bar,
-            &xfr_note.body.owners_memos[0],
-            &recv_keypair,
-        )
-        .unwrap();
+        let recv_open_asset_record =
+            open_blind_asset_record(recv_bar, &xfr_note.body.owners_memos[0], &recv_keypair)
+                .unwrap();
 
         assert!(&xfr_note.body.owners_memos[0].is_some());
         assert!(&xfr_note.body.outputs[0].amount.is_confidential());
@@ -215,41 +192,31 @@ pub(crate) mod examples {
         };
 
         // 1.2. fake input blind_asset_record with associated policy
-        let (bar_in1, memo1) = conf_blind_asset_record_from_ledger(
-            &sender1_keypair.pub_key,
-            amount_in1,
-            ASSET1_TYPE,
-        );
-        let (bar_in2, memo2) = conf_blind_asset_record_from_ledger(
-            &sender2_keypair.pub_key,
-            amount_in2,
-            ASSET1_TYPE,
-        );
+        let (bar_in1, memo1) =
+            conf_blind_asset_record_from_ledger(&sender1_keypair.pub_key, amount_in1, ASSET1_TYPE);
+        let (bar_in2, memo2) =
+            conf_blind_asset_record_from_ledger(&sender2_keypair.pub_key, amount_in2, ASSET1_TYPE);
 
         // 2. Build inputs
         // open blind asset record
-        let oar_in1 =
-            open_blind_asset_record(&bar_in1, &Some(memo1), &sender1_keypair).unwrap();
-        let oar_in2 =
-            open_blind_asset_record(&bar_in2, &Some(memo2), &sender2_keypair).unwrap();
+        let oar_in1 = open_blind_asset_record(&bar_in1, &Some(memo1), &sender1_keypair).unwrap();
+        let oar_in2 = open_blind_asset_record(&bar_in2, &Some(memo2), &sender2_keypair).unwrap();
         // create inputs from open asset record and policies
         let policies = TracingPolicies::from_policy(policy);
         let no_policy = TracingPolicies::new();
 
-        let ar_in1 =
-            AssetRecord::from_open_asset_record_with_asset_tracing_but_no_identity(
-                &mut prng,
-                oar_in1,
-                policies.clone(),
-            )
-            .unwrap();
-        let ar_in2 =
-            AssetRecord::from_open_asset_record_with_asset_tracing_but_no_identity(
-                &mut prng,
-                oar_in2,
-                policies.clone(),
-            )
-            .unwrap();
+        let ar_in1 = AssetRecord::from_open_asset_record_with_asset_tracing_but_no_identity(
+            &mut prng,
+            oar_in1,
+            policies.clone(),
+        )
+        .unwrap();
+        let ar_in2 = AssetRecord::from_open_asset_record_with_asset_tracing_but_no_identity(
+            &mut prng,
+            oar_in2,
+            policies.clone(),
+        )
+        .unwrap();
 
         // 3. Prepare output AssetRecord
         // 3.1. build output asset_record template
@@ -267,11 +234,9 @@ pub(crate) mod examples {
         );
         // 3.3 build output asset record
         let ar_out1 =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template_out1)
-                .unwrap(); // do not attach identity tracking fields
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template_out1).unwrap(); // do not attach identity tracking fields
         let ar_out2 =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template_out2)
-                .unwrap(); // do not attach identity tracking fields
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template_out2).unwrap(); // do not attach identity tracking fields
 
         // 4. create xfr_note
         let xfr_note = gen_xfr_note(
@@ -293,12 +258,9 @@ pub(crate) mod examples {
 
         //6. receives retrieves his BlindAssetRecord and opens it
         let recv_bar1 = &xfr_note.body.outputs[0];
-        let recv_open_asset_record1 = open_blind_asset_record(
-            recv_bar1,
-            &xfr_note.body.owners_memos[0],
-            &recv1_keypair,
-        )
-        .unwrap();
+        let recv_open_asset_record1 =
+            open_blind_asset_record(recv_bar1, &xfr_note.body.owners_memos[0], &recv1_keypair)
+                .unwrap();
 
         assert!(&xfr_note.body.owners_memos[0].is_some());
         assert!(&xfr_note.body.outputs[0].amount.is_confidential());
@@ -311,12 +273,9 @@ pub(crate) mod examples {
         );
 
         let recv_bar2 = &xfr_note.body.outputs[1];
-        let recv_open_asset_record2 = open_blind_asset_record(
-            recv_bar2,
-            &xfr_note.body.owners_memos[1],
-            &recv2_keypair,
-        )
-        .unwrap();
+        let recv_open_asset_record2 =
+            open_blind_asset_record(recv_bar2, &xfr_note.body.owners_memos[1], &recv2_keypair)
+                .unwrap();
 
         assert!(&xfr_note.body.owners_memos[1].is_some());
         assert!(&xfr_note.body.outputs[1].amount.is_confidential());
@@ -386,8 +345,8 @@ pub(crate) mod examples {
         // 1.4 Define issuer tracing policy
         let asset_tracing_policy = TracingPolicy {
             enc_keys: asset_tracing_key_pair.enc_key.clone(), // publicly available
-            asset_tracing: true, // encrypt record info to asset issuer
-            identity_tracing: None, // no identity tracking
+            asset_tracing: true,                              // encrypt record info to asset issuer
+            identity_tracing: None,                           // no identity tracking
         };
 
         let policies = TracingPolicies::from_policy(asset_tracing_policy);
@@ -402,8 +361,7 @@ pub(crate) mod examples {
         );
         let oar = open_blind_asset_record(&bar, &None, &sender1_keypair).unwrap();
         // 2.2. build AssetRecord from oar
-        let input_asset_record =
-            AssetRecord::from_open_asset_record_no_asset_tracing(oar);
+        let input_asset_record = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
         // 3. Prepare output AssetRecord
         // 3.2. build output asset_record template
@@ -424,11 +382,9 @@ pub(crate) mod examples {
 
         // 3.3
         let output_asset_record1 =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template1)
-                .unwrap();
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template1).unwrap();
         let output_asset_record2 =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template2)
-                .unwrap();
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template2).unwrap();
 
         // 4. create xfr_note
         let xfr_note = gen_xfr_note(
@@ -451,12 +407,9 @@ pub(crate) mod examples {
         //6. receiver retrieved his BlindAssetRecord
         //6. receives retrieves his BlindAssetRecord and opens it
         let recv_bar1 = &xfr_note.body.outputs[0];
-        let recv_open_asset_record1 = open_blind_asset_record(
-            recv_bar1,
-            &xfr_note.body.owners_memos[0],
-            &recv1_keypair,
-        )
-        .unwrap();
+        let recv_open_asset_record1 =
+            open_blind_asset_record(recv_bar1, &xfr_note.body.owners_memos[0], &recv1_keypair)
+                .unwrap();
 
         assert!(&xfr_note.body.owners_memos[0].is_some());
         assert!(&xfr_note.body.outputs[0].amount.is_confidential());
@@ -469,12 +422,9 @@ pub(crate) mod examples {
         );
 
         let recv_bar2 = &xfr_note.body.outputs[1];
-        let recv_open_asset_record2 = open_blind_asset_record(
-            recv_bar2,
-            &xfr_note.body.owners_memos[1],
-            &recv2_keypair,
-        )
-        .unwrap();
+        let recv_open_asset_record2 =
+            open_blind_asset_record(recv_bar2, &xfr_note.body.owners_memos[1], &recv2_keypair)
+                .unwrap();
 
         assert!(&xfr_note.body.owners_memos[1].is_some());
         assert!(&xfr_note.body.outputs[1].amount.is_confidential());
@@ -523,8 +473,7 @@ pub(crate) mod examples {
 
     #[test]
     #[allow(non_snake_case)]
-    fn xfr_note_confidential_two_inputs_one_output_asset_tracing_and_identity_tracking_on_inputs(
-    ) {
+    fn xfr_note_confidential_two_inputs_one_output_asset_tracing_and_identity_tracking_on_inputs() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = PublicParams::default();
         let mut AIR: HashMap<&[u8], _> = HashMap::new();
@@ -541,12 +490,9 @@ pub(crate) mod examples {
         let recv1_pub_key = recv1_keypair.pub_key;
 
         // 1.2 Credential keys
-        let (cred_issuer_pk, cred_issuer_sk) =
-            anon_creds::ac_keygen_issuer(&mut prng, 4);
-        let (user1_ac_pk, user1_ac_sk) =
-            anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-        let (user2_ac_pk, user2_ac_sk) =
-            anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
+        let (user1_ac_pk, user1_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user2_ac_pk, user2_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
         // 1.3 setup policy
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -556,7 +502,7 @@ pub(crate) mod examples {
         };
         let policy = TracingPolicy {
             enc_keys: tracer_keys.enc_key.clone(),
-            asset_tracing: true, // do asset tracing
+            asset_tracing: true,                      // do asset tracing
             identity_tracing: Some(id_policy_policy), // do not trace identity
         };
         let policies = TracingPolicies::from_policy(policy);
@@ -565,10 +511,8 @@ pub(crate) mod examples {
         // 2.1 credential issuance:
         let user1_attr = vec![1u32, 2u32, 3u32, 4u32];
         let user2_attr = vec![11u32, 22u32, 33u32, 44u32];
-        let cred_sig_user1 =
-            ac_sign(&mut prng, &cred_issuer_sk, &user1_ac_pk, &user1_attr);
-        let cred_sig_user2 =
-            ac_sign(&mut prng, &cred_issuer_sk, &user2_ac_pk, &user2_attr);
+        let cred_sig_user1 = ac_sign(&mut prng, &cred_issuer_sk, &user1_ac_pk, &user1_attr);
+        let cred_sig_user2 = ac_sign(&mut prng, &cred_issuer_sk, &user2_ac_pk, &user2_attr);
         let credential_user1 = Credential {
             signature: cred_sig_user1.unwrap(),
             attributes: user1_attr,
@@ -616,17 +560,11 @@ pub(crate) mod examples {
 
         // 3. Prepare input AssetRecord
         // 3.1 get blind asset records "from ledger" and open them
-        let (bar1, memo1) = conf_blind_asset_record_from_ledger(
-            &user1_keypair.pub_key,
-            amount_in1,
-            ASSET1_TYPE,
-        );
+        let (bar1, memo1) =
+            conf_blind_asset_record_from_ledger(&user1_keypair.pub_key, amount_in1, ASSET1_TYPE);
         let oar1 = open_blind_asset_record(&bar1, &Some(memo1), &user1_keypair).unwrap();
-        let (bar2, memo2) = conf_blind_asset_record_from_ledger(
-            &user2_keypair.pub_key,
-            amount_in2,
-            ASSET1_TYPE,
-        );
+        let (bar2, memo2) =
+            conf_blind_asset_record_from_ledger(&user2_keypair.pub_key, amount_in2, ASSET1_TYPE);
         let oar2 = open_blind_asset_record(&bar2, &Some(memo2), &user2_keypair).unwrap();
 
         // 3.2. build AssetRecord from oar
@@ -660,8 +598,7 @@ pub(crate) mod examples {
         );
         // 3.3
         let output_asset_record =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template)
-                .unwrap();
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap();
 
         // 4. create xfr_note
         let xfr_note = gen_xfr_note(
@@ -687,12 +624,9 @@ pub(crate) mod examples {
 
         //6. receiver retrieved his BlindAssetRecord
         let recv_bar1 = &xfr_note.body.outputs[0];
-        let recv_open_asset_record1 = open_blind_asset_record(
-            recv_bar1,
-            &xfr_note.body.owners_memos[0],
-            &recv1_keypair,
-        )
-        .unwrap();
+        let recv_open_asset_record1 =
+            open_blind_asset_record(recv_bar1, &xfr_note.body.owners_memos[0], &recv1_keypair)
+                .unwrap();
 
         assert!(&xfr_note.body.owners_memos[0].is_some());
         assert!(&xfr_note.body.outputs[0].amount.is_confidential());
@@ -742,8 +676,8 @@ pub(crate) mod examples {
 
     #[test]
     #[allow(non_snake_case)]
-    fn xfr_note_confidential_one_input_two_outputs_asset_tracing_and_identity_tracking_on_outputs(
-    ) {
+    fn xfr_note_confidential_one_input_two_outputs_asset_tracing_and_identity_tracking_on_outputs()
+    {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = PublicParams::default();
         let mut AIR: HashMap<&[u8], _> = HashMap::new();
@@ -760,8 +694,7 @@ pub(crate) mod examples {
         let recv_user2_pub_key = recv_user2_keypair.pub_key;
 
         // 1.2 Credential keys
-        let (cred_issuer_pk, cred_issuer_sk) =
-            anon_creds::ac_keygen_issuer(&mut prng, 4);
+        let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
         let (recv_user1_ac_pk, recv_user1_ac_sk) =
             anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         let (recv_user2_ac_pk, recv_user2_ac_sk) =
@@ -775,7 +708,7 @@ pub(crate) mod examples {
         };
         let policy = TracingPolicy {
             enc_keys: tracer_keys.enc_key.clone(),
-            asset_tracing: true, // do asset tracing
+            asset_tracing: true,                      // do asset tracing
             identity_tracing: Some(id_policy_policy), // do not trace identity
         };
         let policies = TracingPolicies::from_policy(policy);
@@ -835,17 +768,12 @@ pub(crate) mod examples {
 
         // 3. Prepare input AssetRecord
         // 3.1 get blind asset records "from ledger" and open them
-        let (bar1, memo1) = conf_blind_asset_record_from_ledger(
-            &sender_user_pubkey,
-            amount_in1,
-            ASSET1_TYPE,
-        );
-        let oar1 =
-            open_blind_asset_record(&bar1, &Some(memo1), &sender_user_keypair).unwrap();
+        let (bar1, memo1) =
+            conf_blind_asset_record_from_ledger(&sender_user_pubkey, amount_in1, ASSET1_TYPE);
+        let oar1 = open_blind_asset_record(&bar1, &Some(memo1), &sender_user_keypair).unwrap();
 
         // 3.2. build AssetRecord from oar
-        let input_asset_record1 =
-            AssetRecord::from_open_asset_record_no_asset_tracing(oar1);
+        let input_asset_record1 = AssetRecord::from_open_asset_record_no_asset_tracing(oar1);
 
         // 4. Prepare output AssetRecord
         // 3.1. build output asset_record template
@@ -1002,8 +930,7 @@ pub(crate) mod examples {
         let amount_asset2_out3 = 50;
         let amount_asset3_out4 = 75;
         // credential keys
-        let (cred_issuer_pk, cred_issuer_sk) =
-            anon_creds::ac_keygen_issuer(&mut prng, 4);
+        let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
 
         // asset tracing keys
         let asset1_tracing_key = AssetTracerKeyPair::generate(&mut prng);
@@ -1013,17 +940,13 @@ pub(crate) mod examples {
         let user1_key_pair1 = XfrKeyPair::generate(&mut prng);
         let user1_key_pair2 = XfrKeyPair::generate(&mut prng);
         let user1_key_pair3 = XfrKeyPair::generate(&mut prng);
-        let (user1_ac_pk, user1_ac_sk) =
-            anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user1_ac_pk, user1_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         let user2_key_pair1 = XfrKeyPair::generate(&mut prng);
-        let (user2_ac_pk, user2_ac_sk) =
-            anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user2_ac_pk, user2_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         let user3_key_pair1 = XfrKeyPair::generate(&mut prng);
-        let (user3_ac_pk, user3_ac_sk) =
-            anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user3_ac_pk, user3_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         let user4_key_pair1 = XfrKeyPair::generate(&mut prng);
-        let (user4_ac_pk, user4_ac_sk) =
-            anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user4_ac_pk, user4_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
         //2.1 generate credential for each of the 4 users
         let user1_attrs = vec![0u32, 1, 2, 3];
@@ -1151,20 +1074,18 @@ pub(crate) mod examples {
             reveal_map: vec![true, true, false, true],
         }; // revealing attr1 , attr2 and attr4
 
-        let asset_tracing_policy_asset1_input =
-            TracingPolicies::from_policy(TracingPolicy {
-                // use in asset 1 when it is an input of a Xfr
-                enc_keys: asset1_tracing_key.enc_key.clone(), // publicly available
-                asset_tracing: true, // encrypt record info to asset issuer
-                identity_tracing: Some(id_tracing_policy1), // no identity tracking
-            });
-        let asset_tracing_policy_asset2_output =
-            TracingPolicies::from_policy(TracingPolicy {
-                // use in asset 2 when it is an output of a Xfr
-                enc_keys: asset2_tracing_key.enc_key.clone(), // publicly available
-                asset_tracing: true, // encrypt record info to asset issuer
-                identity_tracing: Some(id_tracing_policy2), // no identity tracking
-            });
+        let asset_tracing_policy_asset1_input = TracingPolicies::from_policy(TracingPolicy {
+            // use in asset 1 when it is an input of a Xfr
+            enc_keys: asset1_tracing_key.enc_key.clone(), // publicly available
+            asset_tracing: true,                          // encrypt record info to asset issuer
+            identity_tracing: Some(id_tracing_policy1),   // no identity tracking
+        });
+        let asset_tracing_policy_asset2_output = TracingPolicies::from_policy(TracingPolicy {
+            // use in asset 2 when it is an output of a Xfr
+            enc_keys: asset2_tracing_key.enc_key.clone(), // publicly available
+            asset_tracing: true,                          // encrypt record info to asset issuer
+            identity_tracing: Some(id_tracing_policy2),   // no identity tracking
+        });
 
         // 2. Prepare inputs
         // 2.1 get "from ledger" blind asset records
@@ -1185,14 +1106,11 @@ pub(crate) mod examples {
         );
         // 2.2 open asset records
         let oar_user1_addr1 =
-            open_blind_asset_record(&bar_user1_addr1, &Some(memo1), &user1_key_pair1)
-                .unwrap();
+            open_blind_asset_record(&bar_user1_addr1, &Some(memo1), &user1_key_pair1).unwrap();
         let oar_user1_addr2 =
-            open_blind_asset_record(&bar_user1_addr2, &Some(memo2), &user1_key_pair2)
-                .unwrap();
+            open_blind_asset_record(&bar_user1_addr2, &Some(memo2), &user1_key_pair2).unwrap();
         let oar_user1_addr3 =
-            open_blind_asset_record(&bar_user1_addr3, &Some(memo3), &user1_key_pair3)
-                .unwrap();
+            open_blind_asset_record(&bar_user1_addr3, &Some(memo3), &user1_key_pair3).unwrap();
         // 2.3 prepare inputs
         let ar_in1 = AssetRecord::from_open_asset_record_with_tracing(
             &mut prng,
@@ -1203,10 +1121,8 @@ pub(crate) mod examples {
             &commitment_user1_addr1_key.unwrap(),
         )
         .unwrap();
-        let ar_in2 =
-            AssetRecord::from_open_asset_record_no_asset_tracing(oar_user1_addr2);
-        let ar_in3 =
-            AssetRecord::from_open_asset_record_no_asset_tracing(oar_user1_addr3);
+        let ar_in2 = AssetRecord::from_open_asset_record_no_asset_tracing(oar_user1_addr2);
+        let ar_in3 = AssetRecord::from_open_asset_record_no_asset_tracing(oar_user1_addr3);
 
         // 3. Prepare outputs
 
@@ -1240,12 +1156,10 @@ pub(crate) mod examples {
         );
 
         let output_asset_record1 =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template1)
-                .unwrap();
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template1).unwrap();
 
         let output_asset_record2 =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template2)
-                .unwrap();
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template2).unwrap();
 
         let output_asset_record3 = AssetRecord::from_template_with_identity_tracing(
             &mut prng,
@@ -1257,8 +1171,7 @@ pub(crate) mod examples {
         .unwrap();
 
         let output_asset_record4 =
-            AssetRecord::from_template_no_identity_tracing(&mut prng, &template4)
-                .unwrap();
+            AssetRecord::from_template_no_identity_tracing(&mut prng, &template4).unwrap();
 
         // 4. create xfr_note
         let xfr_note = gen_xfr_note(
@@ -1276,23 +1189,18 @@ pub(crate) mod examples {
 
         // 5. Verify xfr_note
         let no_policy = TracingPolicies::new();
-        let input1_credential_commitment =
-            &AIR[xfr_note.body.inputs[0].public_key.as_bytes()];
-        let input_policies =
-            vec![&asset_tracing_policy_asset1_input, &no_policy, &no_policy];
-        let inputs_sig_commitments =
-            vec![Some(input1_credential_commitment), None, None];
+        let input1_credential_commitment = &AIR[xfr_note.body.inputs[0].public_key.as_bytes()];
+        let input_policies = vec![&asset_tracing_policy_asset1_input, &no_policy, &no_policy];
+        let inputs_sig_commitments = vec![Some(input1_credential_commitment), None, None];
 
-        let output3_credential_commitment =
-            &AIR[xfr_note.body.outputs[2].public_key.as_bytes()];
+        let output3_credential_commitment = &AIR[xfr_note.body.outputs[2].public_key.as_bytes()];
         let output_policies = vec![
             &no_policy,
             &no_policy,
             &asset_tracing_policy_asset2_output,
             &no_policy,
         ];
-        let output_sig_commitments =
-            vec![None, None, Some(output3_credential_commitment), None];
+        let output_sig_commitments = vec![None, None, Some(output3_credential_commitment), None];
 
         let policies = XfrNotePoliciesRef::new(
             input_policies,

@@ -1,9 +1,11 @@
-use crate::commitments::pcs::{
-    HomomorphicPolyComElem, PolyComScheme, PolyComSchemeError, ToBytes,
-};
+use crate::commitments::pcs::{HomomorphicPolyComElem, PolyComScheme, PolyComSchemeError, ToBytes};
 use crate::polynomials::field_polynomial::FpPolynomial;
-use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
-use algebra::groups::{Group, GroupArithmetic, One, Pairing, Scalar, ScalarArithmetic};
+use algebra::{
+    bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+    One,
+};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -149,10 +151,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
     /// Creates a new instance of a KZG polynomial commitment scheme
     /// `max_degree` - max degree of the polynomial
     /// `prng` - pseudo-random generator
-    pub fn new<R: CryptoRng + RngCore>(
-        max_degree: usize,
-        prng: &mut R,
-    ) -> KZGCommitmentScheme<P> {
+    pub fn new<R: CryptoRng + RngCore>(max_degree: usize, prng: &mut R) -> KZGCommitmentScheme<P> {
         let s = P::ScalarField::random(prng);
 
         let mut public_parameter_group_1: Vec<P::G1> = Vec::new();
@@ -193,7 +192,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
         }
     }
 }
-pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<Bls12381>;
+pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
 impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
     type Field = BLSScalar;
     type Commitment = KZGCommitment<BLSG1>;
@@ -216,7 +215,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             [0..pol_degree + 1]
             .iter()
             .collect();
-        let commitment_value = BLSG1::vartime_multi_exp(
+        let commitment_value = BLSG1::multi_exp(
             &coefs_poly_bls_scalar_ref[..],
             &pub_param_group_1_as_ref[..],
         );
@@ -247,17 +246,11 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         c
     }
 
-    fn polynomial_from_opening_ref(
-        &self,
-        opening: &Self::Opening,
-    ) -> FpPolynomial<Self::Field> {
+    fn polynomial_from_opening_ref(&self, opening: &Self::Opening) -> FpPolynomial<Self::Field> {
         (*opening).clone()
     }
 
-    fn polynomial_from_opening(
-        &self,
-        opening: Self::Opening,
-    ) -> FpPolynomial<Self::Field> {
+    fn polynomial_from_opening(&self, opening: Self::Opening) -> FpPolynomial<Self::Field> {
         opening
     }
 
@@ -282,8 +275,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         // Negation must happen in Fq
         let point_neg = x.neg();
 
-        let divisor_polynomial =
-            FpPolynomial::from_coefs(vec![point_neg, Self::Field::one()]); // X-x
+        let divisor_polynomial = FpPolynomial::from_coefs(vec![point_neg, Self::Field::one()]); // X-x
         let (quotient_polynomial, remainder_polynomial) =
             f_eval_polynomial.div_rem(&divisor_polynomial); // P(X)-P(x) / (X-x)
 
@@ -318,10 +310,10 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 
         // e(g1^{P(X)-P(x)},g2)
         let left_pairing_eval =
-            algebra::bls12_381::Bls12381::pairing(&C.value.sub(&g1_0.mul(y)), &g2_0);
+            algebra::bls12_381::BLSPairingEngine::pairing(&C.value.sub(&g1_0.mul(y)), &g2_0);
 
         // e(g1^{Q(X)},g1^{X-x})
-        let right_pairing_eval = algebra::bls12_381::Bls12381::pairing(
+        let right_pairing_eval = algebra::bls12_381::BLSPairingEngine::pairing(
             &proof.0,
             &x_minus_point_group_element_group_2,
         );
@@ -347,15 +339,16 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 
 #[cfg(test)]
 mod tests_kzg_impl {
-    use crate::commitments::kzg_poly_com::{
-        KZGCommitmentScheme, KZGCommitmentSchemeBLS,
-    };
+    use crate::commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
     use crate::commitments::pcs::{HomomorphicPolyComElem, PolyComScheme};
-    use algebra::groups::{Group, Pairing};
+    use algebra::{
+        ops::*,
+        traits::{Group, Pairing},
+        One,
+    };
 
     use crate::polynomials::field_polynomial::FpPolynomial;
-    use algebra::bls12_381::{BLSScalar, Bls12381, BLSG1};
-    use algebra::groups::{GroupArithmetic, One, ScalarArithmetic};
+    use algebra::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1};
     use itertools::Itertools;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
@@ -373,10 +366,8 @@ mod tests_kzg_impl {
         for i in 0..param_size - 1 {
             let elem_first_group_1 = kzg_scheme.public_parameter_group_1[i].clone();
             let elem_next_group_1 = kzg_scheme.public_parameter_group_1[i + 1].clone();
-            let elem_next_group_1_target =
-                P::pairing(&elem_next_group_1, &P::G2::get_base());
-            let elem_next_group_1_target_recomputed =
-                P::pairing(&elem_first_group_1, &g2_power1);
+            let elem_next_group_1_target = P::pairing(&elem_next_group_1, &P::G2::get_base());
+            let elem_next_group_1_target_recomputed = P::pairing(&elem_first_group_1, &g2_power1);
             assert_eq!(
                 elem_next_group_1_target_recomputed,
                 elem_next_group_1_target
@@ -386,10 +377,8 @@ mod tests_kzg_impl {
         // Check parameters for G2
         let elem_first_group_2 = kzg_scheme.public_parameter_group_2[0].clone();
         let elem_second_group_2 = kzg_scheme.public_parameter_group_2[1].clone();
-        let elem_next_group_2_target =
-            P::pairing(&P::G1::get_base(), &elem_second_group_2);
-        let elem_next_group_2_target_recomputed =
-            P::pairing(&g1_power1, &elem_first_group_2);
+        let elem_next_group_2_target = P::pairing(&P::G1::get_base(), &elem_second_group_2);
+        let elem_next_group_2_target_recomputed = P::pairing(&g1_power1, &elem_first_group_2);
 
         assert_eq!(
             elem_next_group_2_target_recomputed,
@@ -436,8 +425,7 @@ mod tests_kzg_impl {
         let minus_three = three.neg();
         let minus_six = six.neg();
         // Negating the coefficients of the polynomial
-        let poly1_neg =
-            FpPolynomial::from_coefs(vec![minus_two, minus_three, minus_six]);
+        let poly1_neg = FpPolynomial::from_coefs(vec![minus_two, minus_three, minus_six]);
         let (commitment_poly1_neg, _) = pcs.commit(poly1_neg).unwrap();
         let commitment_poly1_neg_hom = commitment1.inv();
         assert_eq!(commitment_poly1_neg_hom.value, commitment_poly1_neg.value);
@@ -455,12 +443,12 @@ mod tests_kzg_impl {
 
     #[test]
     fn test_public_parameters() {
-        _check_public_parameters_generation::<Bls12381>();
+        _check_public_parameters_generation::<BLSPairingEngine>();
     }
 
     #[test]
     fn test_generation_of_crs() {
-        _generation_of_crs::<Bls12381>();
+        _generation_of_crs::<BLSPairingEngine>();
     }
 
     #[test]

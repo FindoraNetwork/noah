@@ -10,7 +10,7 @@
 // 1. Check whether commitment == rescue(rand, m_1, ..., m_n, 0^{r+c-n-1})[0]
 use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use ruc::*;
 use utils::errors::ZeiError;
 
@@ -32,7 +32,7 @@ impl<S: Scalar> HashCommitment<S> {
         input_vec.extend(msgs.to_vec());
         // Pad zeroes
         input_vec.extend(vec![
-            S::from_u32(0);
+            S::zero();
             self.hash.rate + self.hash.capacity - msgs.len() - 1
         ]);
         Ok(self.hash.rescue_hash(&input_vec)[0])
@@ -70,8 +70,8 @@ impl HashCommitment<BLSScalar> {
 mod test {
     use crate::basics::commitments::rescue::HashCommitment;
     use crate::basics::hash::rescue::RescueInstance;
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::Scalar;
+    use algebra::traits::Scalar;
+    use algebra::{bls12_381::BLSScalar, Zero};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 
@@ -82,11 +82,11 @@ mod test {
         let blind_scalar = BLSScalar::random(&mut prng);
         // wrong number of input messages
         assert!(hash_comm
-            .commit(&blind_scalar, &[BLSScalar::from_u32(0)])
+            .commit(&blind_scalar, &[BLSScalar::zero()])
             .is_err());
 
         // the commitment is successful
-        let mut msgs = [BLSScalar::from_u32(1), BLSScalar::from_u32(2)];
+        let mut msgs = [BLSScalar::from(1u32), BLSScalar::from(2u32)];
         let comm = hash_comm.commit(&blind_scalar, &msgs);
         assert!(comm.is_ok());
         let commitment = comm.unwrap(); // safe unwrap
@@ -95,8 +95,7 @@ mod test {
         let hash = RescueInstance::<BLSScalar>::new();
         assert_eq!(
             commitment,
-            hash.rescue_hash(&[blind_scalar, msgs[0], msgs[1], BLSScalar::from_u32(0)])
-                [0]
+            hash.rescue_hash(&[blind_scalar, msgs[0], msgs[1], BLSScalar::zero()])[0]
         );
 
         // correct opening
@@ -104,11 +103,11 @@ mod test {
 
         // wrong blinding randomness
         assert!(hash_comm
-            .verify(&msgs, &BLSScalar::from_u32(0), &commitment)
+            .verify(&msgs, &BLSScalar::zero(), &commitment)
             .is_err());
 
         // wrong messages
-        msgs[0] = BLSScalar::from_u32(0);
+        msgs[0] = BLSScalar::zero();
         assert!(hash_comm.verify(&msgs, &blind_scalar, &commitment).is_err());
     }
 }

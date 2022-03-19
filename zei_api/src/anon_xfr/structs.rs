@@ -1,13 +1,11 @@
 use crate::anon_xfr::decrypt_memo;
 use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature};
 use crate::xfr::structs::{AssetType, OwnerMemo};
-use algebra::bls12_381::{BLSScalar, Bls12381};
-use algebra::groups::{Scalar, Zero};
+use algebra::bls12_381::{BLSPairingEngine, BLSScalar};
 use algebra::jubjub::JubjubScalar;
+use algebra::{traits::Scalar, Zero};
 use crypto::basics::commitments::rescue;
-use crypto::basics::hybrid_encryption::{
-    hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
-};
+use crypto::basics::hybrid_encryption::{hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey};
 use poly_iops::{commitments::kzg_poly_com::KZGCommitmentScheme, plonk::setup::PlonkPf};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -33,7 +31,7 @@ pub struct MTNode {
     pub is_right_child: u8,
 }
 
-pub type SnarkProof = PlonkPf<KZGCommitmentScheme<Bls12381>>;
+pub type SnarkProof = PlonkPf<KZGCommitmentScheme<BLSPairingEngine>>;
 
 // AXfrNote is a wrapper over AXfrBody with signatures and verification.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
@@ -43,10 +41,7 @@ pub struct AXfrNote {
 }
 
 impl AXfrNote {
-    pub fn generate_note_from_body(
-        body: AXfrBody,
-        keypairs: Vec<AXfrKeyPair>,
-    ) -> Result<AXfrNote> {
+    pub fn generate_note_from_body(body: AXfrBody, keypairs: Vec<AXfrKeyPair>) -> Result<AXfrNote> {
         let mut signatures: Vec<AXfrSignature> = Vec::new();
         let msg: Vec<u8> = bincode::serialize(&body)
             .map_err(|_| ZeiError::SerializationError)
@@ -179,10 +174,7 @@ impl OpenAnonBlindAssetRecord {
         rescue::HashCommitment::new()
             .commit(
                 &self.blind,
-                &[
-                    BLSScalar::from_u64(self.amount),
-                    self.asset_type.as_scalar(),
-                ],
+                &[BLSScalar::from(self.amount), self.asset_type.as_scalar()],
             )
             .unwrap()
         // safe unwrap

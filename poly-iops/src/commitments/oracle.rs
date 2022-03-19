@@ -1,5 +1,5 @@
 use crate::polynomials::field_polynomial::FpPolynomial;
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 
 pub trait PolynomialOracle {
     type Field: Scalar;

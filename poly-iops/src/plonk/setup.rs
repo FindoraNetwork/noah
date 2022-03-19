@@ -1,4 +1,4 @@
-use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
+use algebra::{ops::*, traits::Scalar, One, Zero};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use ruc::*;
@@ -73,10 +73,8 @@ pub struct PlonkVerifierParams<C, F> {
     pub(crate) lagrange_constants: Vec<F>,
 }
 
-pub type VerifierParams<PCS> = PlonkVerifierParams<
-    <PCS as PolyComScheme>::Commitment,
-    <PCS as PolyComScheme>::Field,
->;
+pub type VerifierParams<PCS> =
+    PlonkVerifierParams<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
 
 pub fn perm_values<F: Scalar>(group: &[F], perm: &[usize], k: &[F]) -> Vec<F> {
     let n = group.len();
@@ -107,9 +105,7 @@ pub fn choose_ks<R: CryptoRng + RngCore, F: Scalar>(
             if ki == F::zero() {
                 continue;
             }
-            if k.iter().all(|x| x != &ki)
-                && ki.pow(&q_minus_1_half_u64_lims_le) != F::one()
-            {
+            if k.iter().all(|x| x != &ki) && ki.pow(&q_minus_1_half_u64_lims_le) != F::one() {
                 k.push(ki);
                 break;
             }
@@ -130,10 +126,7 @@ pub type ProverParams<PCS> = PlonkProverParams<
 /// # Example
 /// See plonk::prover::prover
 #[allow(non_snake_case)]
-pub fn preprocess_prover<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
+pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
     prg_seed: [u8; 32],
@@ -147,8 +140,8 @@ pub fn preprocess_prover<
         return Err(eg!(PlonkError::SetupError));
     }
     // Compute evaluation domains.
-    let root_m = primitive_nth_root_of_unity::<PCS::Field>(m)
-        .c(d!(PlonkError::GroupNotFound(m)))?;
+    let root_m =
+        primitive_nth_root_of_unity::<PCS::Field>(m).c(d!(PlonkError::GroupNotFound(m)))?;
     let group_m = build_group(&root_m, m)?;
     let root = group_m[factor % m];
     let group = build_group(&root, n)?;
@@ -234,10 +227,7 @@ pub fn preprocess_prover<
 /// constraints to a power of two.
 /// # Example
 /// See plonk::prover::prover
-pub fn preprocess_verifier<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
+pub fn preprocess_verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
     prg_seed: [u8; 32],
@@ -248,10 +238,7 @@ pub fn preprocess_verifier<
 
 #[cfg(test)]
 mod test {
-    use algebra::{
-        bls12_381::BLSScalar,
-        groups::{One, Scalar, ScalarArithmetic, Zero},
-    };
+    use algebra::{bls12_381::BLSScalar, traits::Scalar, One, Zero};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 

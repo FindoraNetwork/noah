@@ -1,15 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::circuits::{
-        add_merkle_path_variables, compute_merkle_root, AccElemVars,
-    };
+    use crate::anon_xfr::circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
         AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord,
     };
     use accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, Zero};
+    use algebra::{traits::Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
     use parking_lot::RwLock;
     use poly_iops::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
@@ -35,8 +33,7 @@ mod tests {
 
         assert_eq!(mt.get_root().unwrap(), BLSScalar::zero(),);
 
-        let abar =
-            AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
+        let abar = AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
@@ -91,7 +88,7 @@ mod tests {
         let proof = mt.generate_proof(0).unwrap();
 
         let mut cs = TurboConstraintSystem::new();
-        let uid_var = cs.new_variable(BLSScalar::from_u64(0));
+        let uid_var = cs.new_variable(BLSScalar::from(0u32));
         let comm_var = cs.new_variable(abar.amount_type_commitment);
         let pk_var = cs.new_point_variable(Point::new(
             abar.public_key.0.point_ref().get_x(),
@@ -280,7 +277,7 @@ mod tests {
         ])[0];
 
         hash.rescue_hash(&[
-            BLSScalar::from_u64(uid),
+            BLSScalar::from(uid),
             abar.amount_type_commitment,
             pk_hash,
             BLSScalar::zero(),

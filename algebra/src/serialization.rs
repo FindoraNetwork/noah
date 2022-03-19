@@ -1,10 +1,8 @@
 use crate::{
     bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2},
-    groups::{Group, Scalar},
     jubjub::{JubjubPoint, JubjubScalar},
-    ristretto::{
-        CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
-    },
+    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
+    traits::{Group, Scalar},
 };
 use ruc::*;
 use serde::Serializer;
@@ -12,7 +10,7 @@ use utils::serialization::ZeiFromToBytes;
 
 macro_rules! to_from_bytes_scalar {
     ($t:ident) => {
-        impl utils::serialization::ZeiFromToBytes for $t {
+        impl ZeiFromToBytes for $t {
             fn zei_to_bytes(&self) -> Vec<u8> {
                 let mut v = vec![];
                 v.extend_from_slice(&self.to_bytes()[..]);
@@ -64,7 +62,7 @@ serialize_deserialize!(BLSScalar);
 
 macro_rules! to_from_bytes_group {
     ($g:ident) => {
-        impl utils::serialization::ZeiFromToBytes for $g {
+        impl ZeiFromToBytes for $g {
             fn zei_to_bytes(&self) -> Vec<u8> {
                 self.to_compressed_bytes()
             }
