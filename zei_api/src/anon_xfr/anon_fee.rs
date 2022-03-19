@@ -420,7 +420,7 @@ mod tests {
 
         {
             // verifier scope
-            let verifier_params = NodeParams::from(user_params);
+            let verifier_params = NodeParams::anon_fee_params().unwrap();
             assert!(verify_anon_fee_body(
                 &verifier_params,
                 &body,
