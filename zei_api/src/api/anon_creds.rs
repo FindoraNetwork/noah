@@ -89,7 +89,7 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
     user_pk: &ACUserPublicKey,
     attrs: &[Attr],
 ) -> Result<ACSignature> {
-    let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from_u32(*x)).collect();
+    let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from(*x)).collect();
     crypto::anon_creds::ac_sign::<_, BLSPairingEngine>(prng, issuer_sk, user_pk, attrs_scalar.as_slice())
         .c(d!())
 }
@@ -141,7 +141,7 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
         attributes: credential
             .attributes
             .iter()
-            .map(|x| BLSScalar::from_u32(*x))
+            .map(|x| BLSScalar::from(*x))
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
@@ -183,7 +183,7 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
         attributes: credential
             .attributes
             .iter()
-            .map(|x| BLSScalar::from_u32(*x))
+            .map(|x| BLSScalar::from(*x))
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
@@ -235,7 +235,7 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
         attributes: credential
             .attributes
             .iter()
-            .map(|a| BLSScalar::from_u32(*a))
+            .map(|a| BLSScalar::from(*a))
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
@@ -258,7 +258,7 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
         attributes: credential
             .attributes
             .iter()
-            .map(|a| BLSScalar::from_u32(*a))
+            .map(|a| BLSScalar::from(*a))
             .collect_vec(),
         issuer_pub_key: credential.issuer_pub_key.clone(),
     };
@@ -301,7 +301,7 @@ pub fn ac_verify(
     let attrs_scalar: Vec<Attribute<S>> = attrs
         .iter()
         .map(|attr| match attr {
-            Some(x) => Attribute::Revealed(BLSScalar::from_u32(*x)),
+            Some(x) => Attribute::Revealed(BLSScalar::from(*x)),
             None => Attribute::Hidden(None),
         })
         .collect();
@@ -368,7 +368,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
     let attrs_scalar = credential
         .attributes
         .iter()
-        .map(|x| BLSScalar::from_u32(*x))
+        .map(|x| BLSScalar::from(*x))
         .collect_vec();
     let c = crypto::anon_creds::Credential {
         signature: credential.signature.clone(),

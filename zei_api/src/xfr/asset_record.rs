@@ -661,10 +661,10 @@ mod test {
         if confidential_amount {
             let (low, high) = u64_to_u32_pair(amount);
             let commitment_low = pc_gens
-                .commit(Scalar::from_u32(low), open_ar.amount_blinds.0)
+                .commit(Scalar::from(low), open_ar.amount_blinds.0)
                 .compress();
             let commitment_high = pc_gens
-                .commit(Scalar::from_u32(high), open_ar.amount_blinds.1)
+                .commit(Scalar::from(high), open_ar.amount_blinds.1)
                 .compress();
             expected_bar_amount = XfrAmount::Confidential((commitment_low, commitment_high));
         } else {
@@ -799,10 +799,10 @@ mod test {
         if confidential_amount {
             let (low, high) = u64_to_u32_pair(open_ar.amount);
             let commitment_low = pc_gens
-                .commit(Scalar::from_u32(low), open_ar.amount_blinds.0)
+                .commit(Scalar::from(low), open_ar.amount_blinds.0)
                 .compress();
             let commitment_high = pc_gens
-                .commit(Scalar::from_u32(high), open_ar.amount_blinds.1)
+                .commit(Scalar::from(high), open_ar.amount_blinds.1)
                 .compress();
             let derived_commitment = (commitment_low, commitment_high);
             assert_eq!(

@@ -1,4 +1,4 @@
-use algebra::traits::ScalarArithmetic;
+use algebra::ops::*;
 use merlin::Transcript;
 use ruc::*;
 

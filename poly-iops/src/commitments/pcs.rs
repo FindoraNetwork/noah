@@ -1,12 +1,11 @@
 use crate::commitments::transcript::PolyComTranscript;
-use merlin::Transcript;
-use std::fmt::Debug;
-
 use crate::polynomials::field_polynomial::FpPolynomial;
-use algebra::traits::{One, Scalar, ScalarArithmetic, Zero};
+use algebra::{ops::*, traits::Scalar, One, Zero};
 use custom_error::custom_error;
+use merlin::Transcript;
 use ruc::*;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 custom_error! {#[derive(PartialEq)] pub PolyComSchemeError
     PCSProveEvalError  = "It is not possible to compute the proof as F(x) != y.",
@@ -293,7 +292,7 @@ pub trait PolyComScheme: Sized {
         points: &[Self::Field],
         params: Option<BatchEvalParams<Self::Commitment, Self::Field>>,
     ) {
-        transcript.append_message(b"field size", &Self::Field::get_field_size_lsf_bytes());
+        transcript.append_message(b"field size", &Self::Field::get_field_size_le_bytes());
         transcript.append_u64(b"max_degree", max_degree as u64);
         for point in points.iter() {
             transcript.append_field_elem(point);
@@ -357,8 +356,7 @@ mod test {
     use crate::commitments::kzg_poly_com::KZGCommitmentScheme;
     use crate::commitments::pcs::{BatchEvalParams, PolyComScheme};
     use crate::polynomials::field_polynomial::FpPolynomial;
-    use algebra::bls12_381::BLSScalar;
-    use algebra::traits::{One, Scalar, ScalarArithmetic, Zero};
+    use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One, Zero};
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;

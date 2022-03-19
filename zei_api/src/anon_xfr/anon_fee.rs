@@ -226,7 +226,7 @@ pub(crate) fn build_anon_fee_cs(
     let payees_secrets = add_payees_secrets(&mut cs, vec![payee_secret].as_slice());
 
     let base = JubjubPoint::get_base();
-    let pow_2_64 = BLSScalar::from_u64(u64::MAX).add(&BLSScalar::one());
+    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
@@ -301,7 +301,7 @@ pub(crate) fn build_anon_fee_cs(
     cs.equal(fee_type_val, payers_secrets[0].asset_type);
     cs.equal(payers_secrets[0].asset_type, payees_secrets[0].asset_type);
 
-    let fee_var = cs.new_variable(BLSScalar::from_u64(ANON_FEE_MIN));
+    let fee_var = cs.new_variable(BLSScalar::from(ANON_FEE_MIN));
     let output_amount_var = cs.add(payees_secrets[0].amount, fee_var);
     cs.equal(payers_secrets[0].amount, output_amount_var);
 
@@ -418,7 +418,7 @@ mod tests {
                 verify_anon_fee_body(&verifier_params, &body, &pmt.get_root().unwrap()).is_ok()
             );
             assert!(
-                verify_anon_fee_body(&verifier_params, &body, &BLSScalar::from_u64(123u64))
+                verify_anon_fee_body(&verifier_params, &body, &BLSScalar::from(123u64))
                     .is_err()
             );
 

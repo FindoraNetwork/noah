@@ -80,7 +80,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
                 .lock_amount
                 .as_ref()
                 .c(d!(ZeiError::InconsistentStructureError))?;
-            m.push(Scalar::from_u32(low));
+            m.push(Scalar::from(low));
             r.push(open_record.amount_blinds.0);
             ctexts.push(lock_amount_low.clone()); // TODO avoid this clone
             commitments.push(
@@ -88,7 +88,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
                     .decompress()
                     .c(d!(ZeiError::DecompressElementError))?,
             );
-            m.push(Scalar::from_u32(high));
+            m.push(Scalar::from(high));
             r.push(open_record.amount_blinds.1);
             ctexts.push(lock_amount_high.clone()); // TODO avoid this clone
             commitments.push(
@@ -561,7 +561,7 @@ pub(crate) fn range_proof(
 }
 fn add_blindings(oar: &[&OpenAssetRecord]) -> (Scalar, Scalar) {
     oar.iter().fold(
-        (Scalar::from_u32(0), Scalar::from_u32(0)),
+        (Scalar::zero(), Scalar::zero()),
         |(low, high), x| (low.add(&x.amount_blinds.0), high.add(&x.amount_blinds.1)),
     )
 }
@@ -602,7 +602,7 @@ fn extract_value_commitments(
 ) -> Result<Vec<CompressedRistretto>> {
     let num_output = outputs.len();
     let upper_power2 = min_greater_equal_power_of_two((2 * num_output + 2) as u32) as usize;
-    let pow2_32 = Scalar::from_u64(POW_2_32);
+    let pow2_32 = Scalar::from(POW_2_32);
 
     let mut commitments = Vec::with_capacity(upper_power2);
     // 1. verify proof commitment to transfer's input - output amounts match proof commitments
@@ -621,8 +621,8 @@ fn extract_value_commitments(
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
                 let pc_gens = RistrettoPedersenGens::default();
-                let com_low = pc_gens.commit(Scalar::from_u32(low), Scalar::from_u32(0));
-                let com_high = pc_gens.commit(Scalar::from_u32(high), Scalar::from_u32(0));
+                let com_low = pc_gens.commit(Scalar::from(low), Scalar::zero());
+                let com_high = pc_gens.commit(Scalar::from(high), Scalar::zero());
                 (com_low, com_high)
             }
         };
@@ -640,8 +640,8 @@ fn extract_value_commitments(
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
                 let pc_gens = RistrettoPedersenGens::default();
-                let com_low = pc_gens.commit(Scalar::from_u32(low), Scalar::from_u32(0));
-                let com_high = pc_gens.commit(Scalar::from_u32(high), Scalar::from_u32(0));
+                let com_low = pc_gens.commit(Scalar::from(low), Scalar::zero());
+                let com_high = pc_gens.commit(Scalar::from(high), Scalar::zero());
                 (com_low, com_high)
             }
         };
@@ -737,7 +737,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
             .map(|x| match x.asset_type {
                 XfrAssetType::Confidential(com) => com.decompress().c(d!(ZeiError::ParameterError)),
                 XfrAssetType::NonConfidential(asset_type) => {
-                    Ok(pc_gens.commit(asset_type.as_scalar(), Scalar::from_u32(0)))
+                    Ok(pc_gens.commit(asset_type.as_scalar(), Scalar::zero()))
                 }
             })
             .collect();

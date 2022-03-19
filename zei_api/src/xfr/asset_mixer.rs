@@ -30,19 +30,19 @@ impl Eq for AssetMixProof {}
 /// use zei::xfr::asset_mixer::prove_asset_mixing;
 /// use algebra::traits::Scalar;
 /// let input = [
-///            (60u64, RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(10000), RistrettoScalar::from_u32(200000)),
-///            (100u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10001), RistrettoScalar::from_u32(200001)),
-///            (10u64, RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(10002), RistrettoScalar::from_u32(200002)),
-///            (50u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10003), RistrettoScalar::from_u32(200003)),
+///            (60u64, RistrettoScalar::zero(), RistrettoScalar::from(10000), RistrettoScalar::from(200000)),
+///            (100u64, RistrettoScalar::from(2), RistrettoScalar::from(10001), RistrettoScalar::from(200001)),
+///            (10u64, RistrettoScalar::from(1), RistrettoScalar::from(10002), RistrettoScalar::from(200002)),
+///            (50u64, RistrettoScalar::from(2), RistrettoScalar::from(10003), RistrettoScalar::from(200003)),
 ///            ];
 /// let output = [
-///            (40u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10004), RistrettoScalar::from_u32(200004)),
-///            (9u64, RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(10005), RistrettoScalar::from_u32(200005)),
-///            (1u64, RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(10006), RistrettoScalar::from_u32(200006)),
-///            (80u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10007), RistrettoScalar::from_u32(200007)),
-///            (50u64, RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(10008), RistrettoScalar::from_u32(200008)),
-///            (10u64, RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(10009), RistrettoScalar::from_u32(200009)),
-///            (30u64, RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(10010), RistrettoScalar::from_u32(200010)),
+///            (40u64, RistrettoScalar::from(2), RistrettoScalar::from(10004), RistrettoScalar::from(200004)),
+///            (9u64, RistrettoScalar::from(1), RistrettoScalar::from(10005), RistrettoScalar::from(200005)),
+///            (1u64, RistrettoScalar::from(1), RistrettoScalar::from(10006), RistrettoScalar::from(200006)),
+///            (80u64, RistrettoScalar::from(2), RistrettoScalar::from(10007), RistrettoScalar::from(200007)),
+///            (50u64, RistrettoScalar::zero(), RistrettoScalar::from(10008), RistrettoScalar::from(200008)),
+///            (10u64, RistrettoScalar::zero(), RistrettoScalar::from(10009), RistrettoScalar::from(200009)),
+///            (30u64, RistrettoScalar::from(2), RistrettoScalar::from(10010), RistrettoScalar::from(200010)),
 ///        ];
 ///
 /// let proof = prove_asset_mixing(&input, &output).unwrap();
@@ -61,7 +61,7 @@ pub fn prove_asset_mixing(
         let values = list
             .iter()
             .map(|(amount, asset_type, _, _)| CloakValue {
-                amount: Scalar::from_u64(*amount),
+                amount: Scalar::from(*amount),
                 asset_type: *asset_type,
             })
             .collect();
@@ -138,19 +138,19 @@ pub struct AssetMixingInstance<'a> {
 /// use zei::setup::PublicParams;
 /// use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 /// let input = [
-///            (60u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10000), RistrettoScalar::from_u64(200000)),
-///            (100u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10001), RistrettoScalar::from_u64(200001)),
-///            (10u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10002), RistrettoScalar::from_u64(200002)),
-///            (50u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10003), RistrettoScalar::from_u64(200003)),
+///            (60u64, RistrettoScalar::from(0), RistrettoScalar::from(10000), RistrettoScalar::from(200000)),
+///            (100u64, RistrettoScalar::from(2), RistrettoScalar::from(10001), RistrettoScalar::from(200001)),
+///            (10u64, RistrettoScalar::from(1), RistrettoScalar::from(10002), RistrettoScalar::from(200002)),
+///            (50u64, RistrettoScalar::from(2), RistrettoScalar::from(10003), RistrettoScalar::from(200003)),
 ///            ];
 /// let output = [
-///            (40u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10004), RistrettoScalar::from_u64(200004)),
-///            (9u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10005), RistrettoScalar::from_u64(200005)),
-///            (1u64, RistrettoScalar::from_u64(1), RistrettoScalar::from_u64(10006), RistrettoScalar::from_u64(200006)),
-///            (80u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10007), RistrettoScalar::from_u64(200007)),
-///            (50u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10008), RistrettoScalar::from_u64(200008)),
-///            (10u64, RistrettoScalar::from_u64(0), RistrettoScalar::from_u64(10009), RistrettoScalar::from_u64(200009)),
-///            (30u64, RistrettoScalar::from_u64(2), RistrettoScalar::from_u64(10010), RistrettoScalar::from_u64(200010)),
+///            (40u64, RistrettoScalar::from(2), RistrettoScalar::from(10004), RistrettoScalar::from(200004)),
+///            (9u64, RistrettoScalar::from(1), RistrettoScalar::from(10005), RistrettoScalar::from(200005)),
+///            (1u64, RistrettoScalar::from(1), RistrettoScalar::from(10006), RistrettoScalar::from(200006)),
+///            (80u64, RistrettoScalar::from(2), RistrettoScalar::from(10007), RistrettoScalar::from(200007)),
+///            (50u64, RistrettoScalar::from(0), RistrettoScalar::from(10008), RistrettoScalar::from(200008)),
+///            (10u64, RistrettoScalar::from(0), RistrettoScalar::from(10009), RistrettoScalar::from(200009)),
+///            (30u64, RistrettoScalar::from(2), RistrettoScalar::from(10010), RistrettoScalar::from(200010)),
 ///        ];
 ///
 /// let proof = prove_asset_mixing(&input, &output).unwrap();
@@ -158,14 +158,14 @@ pub struct AssetMixingInstance<'a> {
 /// let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
 ///      input.iter()
 ///           .map(|(amount, typ, blind_a, blind_typ)| {
-///             (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a).compress(),
+///             (pc_gens.commit(RistrettoScalar::from(*amount), *blind_a).compress(),
 ///              pc_gens.commit(*typ, *blind_typ).compress())
 ///           })
 ///           .collect();
 ///    let output_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
 ///      output.iter()
 ///            .map(|(amount, typ, blind_a, blind_typ)| {
-///              (pc_gens.commit(RistrettoScalar::from_u64(*amount), *blind_a).compress(),
+///              (pc_gens.commit(RistrettoScalar::from(*amount), *blind_a).compress(),
 ///               pc_gens.commit(*typ, *blind_typ).compress())
 ///            })
 ///            .collect();
@@ -290,29 +290,29 @@ mod test {
         let input = [
             (
                 60u64,
-                RistrettoScalar::from_u64(0),
-                RistrettoScalar::from_u64(10000),
-                RistrettoScalar::from_u64(200000),
+                RistrettoScalar::from(0),
+                RistrettoScalar::from(10000),
+                RistrettoScalar::from(200000),
             ),
             (
                 100u64,
-                RistrettoScalar::from_u64(2),
-                RistrettoScalar::from_u64(10001),
-                RistrettoScalar::from_u64(200001),
+                RistrettoScalar::from(2),
+                RistrettoScalar::from(10001),
+                RistrettoScalar::from(200001),
             ),
         ];
         let output = [
             (
                 40u64,
-                RistrettoScalar::from_u64(2),
-                RistrettoScalar::from_u64(10004),
-                RistrettoScalar::from_u64(200004),
+                RistrettoScalar::from(2),
+                RistrettoScalar::from(10004),
+                RistrettoScalar::from(200004),
             ),
             (
                 10u64,
-                RistrettoScalar::from_u64(2),
-                RistrettoScalar::from_u64(10004),
-                RistrettoScalar::from_u64(200004),
+                RistrettoScalar::from(2),
+                RistrettoScalar::from(10004),
+                RistrettoScalar::from(200004),
             ),
         ];
         let proof_result = super::prove_asset_mixing(&input, &output);
@@ -320,9 +320,9 @@ mod test {
 
         let output = [(
             40u64,
-            RistrettoScalar::from_u64(2),
-            RistrettoScalar::from_u64(10004),
-            RistrettoScalar::from_u64(200004),
+            RistrettoScalar::from(2),
+            RistrettoScalar::from(10004),
+            RistrettoScalar::from(200004),
         )];
         let proof_result = super::prove_asset_mixing(&input, &output);
         assert!(proof_result.is_err());
@@ -330,71 +330,71 @@ mod test {
         let input = [
             (
                 60u64,
-                RistrettoScalar::from_u64(0),
-                RistrettoScalar::from_u64(10000),
-                RistrettoScalar::from_u64(200000),
+                RistrettoScalar::from(0),
+                RistrettoScalar::from(10000),
+                RistrettoScalar::from(200000),
             ),
             (
                 100u64,
-                RistrettoScalar::from_u64(2),
-                RistrettoScalar::from_u64(10001),
-                RistrettoScalar::from_u64(200001),
+                RistrettoScalar::from(2),
+                RistrettoScalar::from(10001),
+                RistrettoScalar::from(200001),
             ),
             (
                 10u64,
-                RistrettoScalar::from_u64(1),
-                RistrettoScalar::from_u64(10002),
-                RistrettoScalar::from_u64(200002),
+                RistrettoScalar::from(1),
+                RistrettoScalar::from(10002),
+                RistrettoScalar::from(200002),
             ),
             (
                 50u64,
-                RistrettoScalar::from_u64(2),
-                RistrettoScalar::from_u64(10003),
-                RistrettoScalar::from_u64(200003),
+                RistrettoScalar::from(2),
+                RistrettoScalar::from(10003),
+                RistrettoScalar::from(200003),
             ),
         ];
         let output = [
             (
                 40u64,
-                RistrettoScalar::from_u64(2),
-                RistrettoScalar::from_u64(10004),
-                RistrettoScalar::from_u64(200004),
+                RistrettoScalar::from(2),
+                RistrettoScalar::from(10004),
+                RistrettoScalar::from(200004),
             ),
             (
                 9u64,
-                RistrettoScalar::from_u64(1),
-                RistrettoScalar::from_u64(10005),
-                RistrettoScalar::from_u64(200005),
+                RistrettoScalar::from(1),
+                RistrettoScalar::from(10005),
+                RistrettoScalar::from(200005),
             ),
             (
                 1u64,
-                RistrettoScalar::from_u64(1),
-                RistrettoScalar::from_u64(10006),
-                RistrettoScalar::from_u64(200006),
+                RistrettoScalar::from(1),
+                RistrettoScalar::from(10006),
+                RistrettoScalar::from(200006),
             ),
             (
                 80u64,
-                RistrettoScalar::from_u64(2),
-                RistrettoScalar::from_u64(10007),
-                RistrettoScalar::from_u64(200007),
+                RistrettoScalar::from(2),
+                RistrettoScalar::from(10007),
+                RistrettoScalar::from(200007),
             ),
             (
                 50u64,
-                RistrettoScalar::from_u64(0),
-                RistrettoScalar::from_u64(10008),
-                RistrettoScalar::from_u64(200008),
+                RistrettoScalar::from(0),
+                RistrettoScalar::from(10008),
+                RistrettoScalar::from(200008),
             ),
             (
                 10u64,
-                RistrettoScalar::from_u64(0),
-                RistrettoScalar::from_u64(10009),
-                RistrettoScalar::from_u64(200009),
+                RistrettoScalar::from(0),
+                RistrettoScalar::from(10009),
+                RistrettoScalar::from(200009),
             ),
             (
                 30u64,
-                RistrettoScalar::from_u64(2),
-                RistrettoScalar::from_u64(10010),
-                RistrettoScalar::from_u64(200010),
+                RistrettoScalar::from(2),
+                RistrettoScalar::from(10010),
+                RistrettoScalar::from(200010),
             ),
         ];
 
@@ -405,7 +405,7 @@ mod test {
             .map(|(amount, typ, blind_a, blind_typ)| {
                 (
                     pc_gens
-                        .commit(RistrettoScalar::from_u64(*amount), *blind_a)
+                        .commit(RistrettoScalar::from(*amount), *blind_a)
                         .compress(),
                     pc_gens.commit(*typ, *blind_typ).compress(),
                 )
@@ -416,7 +416,7 @@ mod test {
             .map(|(amount, typ, blind_a, blind_typ)| {
                 (
                     pc_gens
-                        .commit(RistrettoScalar::from_u64(*amount), *blind_a)
+                        .commit(RistrettoScalar::from(*amount), *blind_a)
                         .compress(),
                     pc_gens.commit(*typ, *blind_typ).compress(),
                 )

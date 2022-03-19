@@ -203,10 +203,10 @@ impl XfrAmount {
     ) -> Self {
         let (amount_lo, amount_hi) = utils::u64_to_u32_pair(amount);
         let comm_lo = pc_gens
-            .commit(Scalar::from_u32(amount_lo), *blind_lo)
+            .commit(Scalar::from(amount_lo), *blind_lo)
             .compress();
         let comm_hi = pc_gens
-            .commit(Scalar::from_u32(amount_hi), *blind_hi)
+            .commit(Scalar::from(amount_hi), *blind_hi)
             .compress();
         XfrAmount::Confidential((comm_lo, comm_hi))
     }

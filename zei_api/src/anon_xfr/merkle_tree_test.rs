@@ -88,7 +88,7 @@ mod tests {
         let proof = mt.generate_proof(0).unwrap();
 
         let mut cs = TurboConstraintSystem::new();
-        let uid_var = cs.new_variable(BLSScalar::from_u64(0));
+        let uid_var = cs.new_variable(BLSScalar::from(0));
         let comm_var = cs.new_variable(abar.amount_type_commitment);
         let pk_var = cs.new_point_variable(Point::new(
             abar.public_key.0.point_ref().get_x(),
@@ -277,7 +277,7 @@ mod tests {
         ])[0];
 
         hash.rescue_hash(&[
-            BLSScalar::from_u64(uid),
+            BLSScalar::from(uid),
             abar.amount_type_commitment,
             pk_hash,
             BLSScalar::zero(),

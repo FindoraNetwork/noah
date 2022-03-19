@@ -121,13 +121,13 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         .c(d!())?;
 
     // 2. Reconstruct the points.
-    let x = RistrettoScalar::from_u64(oabar_amount);
+    let x = RistrettoScalar::from(oabar_amount);
     let y: RistrettoScalar = obar.asset_type.as_scalar();
     let gamma = obar.amount_blinds.0.add(
         &obar
             .amount_blinds
             .1
-            .mul(&RistrettoScalar::from_u64(TWO_POW_32)),
+            .mul(&RistrettoScalar::from(TWO_POW_32)),
     );
     let delta = obar.type_blind;
     let point_p = pc_gens.commit(&[x], &gamma).c(d!())?;
@@ -198,17 +198,17 @@ pub(crate) fn verify_bar_to_abar(
             let (l, h) = utils::u64_to_u32_pair(amount);
             (
                 pc_gens
-                    .commit(&[RistrettoScalar::from_u32(l)], &RistrettoScalar::zero())
+                    .commit(&[RistrettoScalar::from(l)], &RistrettoScalar::zero())
                     .c(d!())?,
                 pc_gens
-                    .commit(&[RistrettoScalar::from_u32(h)], &RistrettoScalar::zero())
+                    .commit(&[RistrettoScalar::from(h)], &RistrettoScalar::zero())
                     .c(d!())?,
             )
         }
     };
 
     // 1.2 get asset type commitment
-    let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from_u64(TWO_POW_32)));
+    let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
     let com_asset_type = match bar.asset_type {
         XfrAssetType::Confidential(a) => a
             .decompress()

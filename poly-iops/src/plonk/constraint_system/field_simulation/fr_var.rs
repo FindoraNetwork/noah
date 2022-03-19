@@ -1,7 +1,4 @@
-use algebra::{
-    bls12_381::BLSScalar,
-    traits::{One as ArkOne, ScalarArithmetic, Zero as ArkZero},
-};
+use algebra::{bls12_381::BLSScalar, ops::*};
 use crypto::field_simulation::{
     ristretto_scalar_field_sub_pad_in_limbs, SimFr, BIT_PER_LIMB, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };

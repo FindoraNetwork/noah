@@ -1,9 +1,12 @@
 use crate::basics::commitments::pedersen::PedersenGens;
 use crate::basics::hash::rescue::RescueInstance;
 use crate::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
-use algebra::bls12_381::BLSScalar;
-use algebra::traits::{Group, GroupArithmetic, Scalar, ScalarArithmetic, Zero as ArkZero};
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+use algebra::{
+    bls12_381::BLSScalar,
+    ops::*,
+    traits::{Group, Scalar},
+};
 use merlin::Transcript;
 use num_bigint::BigUint;
 use num_traits::Zero;
@@ -238,9 +241,8 @@ mod test {
     use crate::pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external,
     };
-    use algebra::bls12_381::BLSScalar;
-    use algebra::traits::{Scalar, Zero};
     use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+    use algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
     use num_bigint::BigUint;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;

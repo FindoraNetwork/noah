@@ -1,7 +1,4 @@
-use algebra::{
-    bls12_381::BLSScalar,
-    traits::{One, Scalar, ScalarArithmetic, Zero as ArkZero},
-};
+use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One};
 use crypto::field_simulation::{
     ristretto_scalar_field_in_biguint, ristretto_scalar_field_in_limbs,
     ristretto_scalar_field_sub_pad_in_limbs, SimFr, SimFrMul, BIT_PER_LIMB, NUM_OF_GROUPS,
@@ -92,7 +89,7 @@ impl SimFrMulVar {
         assert!(rem.is_zero());
 
         // For safety, make sure `k` is not too big.
-        assert!(k.lt(&r_biguint.shl(5)));
+        assert!(k.lt(&r_biguint.shl(5u32)));
 
         let r_limbs = ristretto_scalar_field_in_limbs().to_vec();
         let k_limbs = SimFr::from(&k).limbs.to_vec();

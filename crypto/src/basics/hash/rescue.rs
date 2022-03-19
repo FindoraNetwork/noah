@@ -59,7 +59,7 @@ impl<S: Scalar> RescueInstance<S> {
     fn pad_input_to_state_size(&self, input: &[S]) -> RescueState<S> {
         let mut r = input.to_vec();
         while r.len() != self.state_size() {
-            r.push(Scalar::from_u32(0));
+            r.push(S::zero());
         }
         r
     }
@@ -120,13 +120,13 @@ impl<S: Scalar> RescueInstance<S> {
 
     /// Initiate Rescue hash function. Produces `keys` for each round.
     pub fn hash_init(&self) -> Vec<RoundSubKey<S>> {
-        let key = vec![S::from_u32(0); self.state_size()];
+        let key = vec![S::zero(); self.state_size()];
         self.key_scheduling(&key)
     }
 
     /// Compute hash sampling the rounds' keys online
     pub fn rescue_hash(&self, input: &[S]) -> RescueState<S> {
-        let key = vec![S::from_u32(0); self.state_size()];
+        let key = vec![S::zero(); self.state_size()];
         self.rescue(input, &key)
     }
 

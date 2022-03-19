@@ -1,11 +1,15 @@
 use crate::basics::hash::rescue::{RescueCtr, RescueInstance};
-use algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
-use algebra::traits::{Group, GroupArithmetic, Scalar};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use algebra::ristretto::RistrettoPoint;
+use algebra::traits::{Group, Scalar};
+use algebra::{
+    bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
+    hash::{Hash, Hasher},
+    ops::*,
+    Zero,
+};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use std::hash::{Hash, Hasher};
 use utils::errors::ZeiError;
 use utils::serialization::ZeiFromToBytes;
 
@@ -129,7 +133,7 @@ fn apply_keystream_from_seed(
     is_encrypt: bool,
 ) -> Vec<BLSScalar> {
     let rescue = RescueInstance::new();
-    let zero = BLSScalar::from_u32(0);
+    let zero = BLSScalar::zero();
     let input = [seed.get_x(), seed.get_y(), zero, zero];
     let key = rescue.rescue_hash(&input);
     let mut cipher = RescueCtr::new(&key, zero);
@@ -194,7 +198,7 @@ pub fn elgamal_decrypt_as_scalar<G: Group>(
     ctext: &ElGamalCiphertext<G>,
     sec_key: &ElGamalDecKey<G::ScalarType>,
 ) -> Result<G::ScalarType> {
-    Ok(G::ScalarType::from_u64(
+    Ok(G::ScalarType::from(
         elgamal_decrypt(base, ctext, sec_key).c(d!())?,
     ))
 }
@@ -213,7 +217,7 @@ pub fn elgamal_decrypt_hinted<G: Group>(
 }
 
 fn brute_force<G: Group>(base: &G, encoded: &G, lower_bound: u64, upper_bound: u64) -> Result<u64> {
-    let mut b = base.mul(&G::ScalarType::from_u64(lower_bound));
+    let mut b = base.mul(&G::ScalarType::from(lower_bound));
     for i in lower_bound..upper_bound {
         if b == *encoded {
             return Ok(i);
@@ -229,9 +233,9 @@ mod elgamal_test {
         ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey, ElGamalHybridCiphertext,
     };
     use algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
-    use algebra::traits::{Group, Scalar};
     use algebra::jubjub::{JubjubPoint, JubjubScalar};
     use algebra::ristretto::RistrettoPoint;
+    use algebra::traits::{Group, Scalar};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
@@ -246,12 +250,12 @@ mod elgamal_test {
 
         let (secret_key, public_key) = super::elgamal_key_gen::<_, G>(&mut prng, &base);
 
-        let m = G::ScalarType::from_u32(100u32);
+        let m = G::ScalarType::from(100u32);
         let r = G::ScalarType::random(&mut prng);
         let ctext = super::elgamal_encrypt::<G>(&base, &m, &r, &public_key);
         pnk!(super::elgamal_verify::<G>(&base, &m, &ctext, &secret_key));
 
-        let wrong_m = G::ScalarType::from_u32(99u32);
+        let wrong_m = G::ScalarType::from(99u32);
         let err = super::elgamal_verify(&base, &wrong_m, &ctext, &secret_key)
             .err()
             .unwrap();
@@ -265,7 +269,7 @@ mod elgamal_test {
         let (secret_key, public_key) = super::elgamal_key_gen::<_, G>(&mut prng, &base);
 
         let mu32 = 100u32;
-        let m = G::ScalarType::from_u32(mu32);
+        let m = G::ScalarType::from(mu32);
         let r = G::ScalarType::random(&mut prng);
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         pnk!(super::elgamal_verify(&base, &m, &ctext, &secret_key));
@@ -289,7 +293,7 @@ mod elgamal_test {
             .unwrap();
         msg_eq!(ZeiError::ElGamalDecryptionError, err);
 
-        let m = G::ScalarType::from_u64(u64::max_value());
+        let m = G::ScalarType::from(u64::max_value());
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
         pnk!(super::elgamal_verify(&base, &m, &ctext, &secret_key));
 
@@ -315,7 +319,7 @@ mod elgamal_test {
         assert_eq!(public_key, pk_de);
 
         //ciphertext serialization
-        let m = G::ScalarType::from_u32(100u32);
+        let m = G::ScalarType::from(100u32);
         let r = G::ScalarType::random(&mut prng);
 
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
@@ -350,7 +354,7 @@ mod elgamal_test {
         assert_eq!(public_key, pk_de);
 
         //ciphertext serialization
-        let m = G::ScalarType::from_u32(100u32);
+        let m = G::ScalarType::from(100u32);
         let r = G::ScalarType::random(&mut prng);
 
         let ctext = super::elgamal_encrypt(&base, &m, &r, &public_key);
@@ -408,11 +412,11 @@ mod elgamal_test {
         // encrypt and decrypt
         let (sec_key, pub_key) = super::elgamal_key_gen::<_, JubjubPoint>(&mut prng, &base);
         let m = vec![
-            BLSScalar::from_u32(100u32),
-            BLSScalar::from_u32(200u32),
-            BLSScalar::from_u32(300u32),
-            BLSScalar::from_u32(400u32),
-            BLSScalar::from_u64(u64::max_value()),
+            BLSScalar::from(100u32),
+            BLSScalar::from(200u32),
+            BLSScalar::from(300u32),
+            BLSScalar::from(400u32),
+            BLSScalar::from(u64::max_value()),
         ];
         let r = JubjubScalar::random(&mut prng);
         let ctext = super::elgamal_hybrid_encrypt(&base, &pub_key, &r, &m);

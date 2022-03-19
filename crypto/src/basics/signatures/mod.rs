@@ -2,7 +2,6 @@ use rand_core::{CryptoRng, RngCore};
 use ruc::err::*;
 
 pub mod bls;
-pub mod pointcheval_sanders;
 pub mod schnorr;
 
 pub trait Signature {

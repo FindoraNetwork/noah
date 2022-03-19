@@ -343,7 +343,7 @@ fn gen_xfr_proofs_multi_asset(
     outputs: &[&OpenAssetRecord],
     xfr_type: XfrType,
 ) -> Result<AssetTypeAndAmountProof> {
-    let pow2_32 = Scalar::from_u64(POW_2_32);
+    let pow2_32 = Scalar::from(POW_2_32);
 
     let mut ins = vec![];
 
@@ -802,7 +802,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
     fn process_bars(
         bars: &[BlindAssetRecord],
     ) -> Result<Vec<(CompressedRistretto, CompressedRistretto)>> {
-        let pow2_32 = Scalar::from_u64(POW_2_32);
+        let pow2_32 = Scalar::from(POW_2_32);
         bars.iter()
             .map(|x| {
                 let (com_amount_low, com_amount_high) = match x.amount {
@@ -814,8 +814,8 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
                         let pc_gens = RistrettoPedersenGens::default();
                         let (low, high) = u64_to_u32_pair(amount);
                         (
-                            Ok(pc_gens.commit(Scalar::from_u32(low), Scalar::from_u32(0))),
-                            Ok(pc_gens.commit(Scalar::from_u32(high), Scalar::from_u32(0))),
+                            Ok(pc_gens.commit(Scalar::from(low), Scalar::zero())),
+                            Ok(pc_gens.commit(Scalar::from(high), Scalar::zero())),
                         )
                     }
                 };
@@ -829,7 +829,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
                             XfrAssetType::NonConfidential(asset_type) => {
                                 let pc_gens = RistrettoPedersenGens::default();
                                 pc_gens
-                                    .commit(asset_type.as_scalar(), Scalar::from_u32(0))
+                                    .commit(asset_type.as_scalar(), Scalar::zero())
                                     .compress()
                             }
                         };

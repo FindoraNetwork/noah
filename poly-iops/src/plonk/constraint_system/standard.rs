@@ -361,8 +361,9 @@ impl<F: Scalar> StandardConstraintSystem<F> {
 #[cfg(test)]
 mod test {
     use algebra::{
-        bls12_381::{BLSScalar, BLSPairingEngine},
-        traits::{One, ScalarArithmetic, Zero},
+        bls12_381::{BLSPairingEngine, BLSScalar},
+        ops::*,
+        One, Zero,
     };
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;

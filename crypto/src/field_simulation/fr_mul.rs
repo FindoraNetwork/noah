@@ -3,12 +3,10 @@ use crate::field_simulation::{
     ristretto_scalar_field_sub_pad_in_biguint, ristretto_scalar_field_sub_pad_in_limbs, SimFr,
     BIT_PER_LIMB, NUM_OF_GROUPS, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
-use algebra::bls12_381::BLSScalar;
-use algebra::traits::{Scalar, ScalarArithmetic, Zero as ArkZero};
+use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar};
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::Zero;
-use std::ops::{AddAssign, MulAssign, Shl, Shr, Sub};
 
 /// `SimFrMul` is the intermediate representation for
 /// the product of two simulated Ristretto scalar field elements
@@ -98,7 +96,7 @@ impl SimFrMul {
         // compute `k`
         let (k, rem) = cur_val.div_rem(&r_biguint);
         assert!(rem.is_zero());
-        assert!(k <= r_biguint.shl(5));
+        assert!(k <= r_biguint.shl(5u32));
 
         // compute the limbs for `k * r`
         let r_limbs = ristretto_scalar_field_in_limbs().to_vec();

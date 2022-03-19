@@ -4,7 +4,10 @@ use crate::anon_creds::{
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::traits::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
+use algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -231,11 +234,11 @@ pub(crate) fn ac_confidential_sok_prove<R: CryptoRng + RngCore, P: Pairing>(
     for (attr_enum, r_attr) in attrs.iter().zip(r_attrs.iter()) {
         match attr_enum {
             Attribute::Hidden(Some(attr)) => {
-                let response_attr = challenge.mul(attr).add(r_attr);
+                let response_attr = challenge.mul(*attr).add(r_attr);
                 response_attrs.push(response_attr);
             }
             Attribute::Revealed(attr) => {
-                let response_attr = challenge.mul(attr).add(r_attr);
+                let response_attr = challenge.mul(*attr).add(r_attr);
                 response_attrs.push(response_attr);
             }
             _ => {}

@@ -1,4 +1,4 @@
-use algebra::traits::ScalarArithmetic;
+use algebra::ops::*;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -38,7 +38,7 @@ use crate::polynomials::field_polynomial::FpPolynomial;
 /// use merlin::Transcript;
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
-/// use algebra::{bls12_381::BLSScalar, traits::{One, ScalarArithmetic}};
+/// use algebra::{bls12_381::BLSScalar, One, ops::*};
 ///
 /// let mut prng = ChaChaRng::from_seed([1u8; 32]);
 /// let pcs = KZGCommitmentScheme::new(20, &mut prng);

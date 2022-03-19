@@ -2,8 +2,8 @@ use aes::{
     cipher::{generic_array::GenericArray, NewCipher, StreamCipher},
     Aes256Ctr,
 };
-use algebra::traits::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::traits::Scalar as _;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use rand_core::{CryptoRng, RngCore};

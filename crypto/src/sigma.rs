@@ -1,4 +1,7 @@
-use algebra::traits::{Group, Pairing, Scalar, ScalarArithmetic};
+use algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+};
 use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;
@@ -174,7 +177,7 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar>(
     // rows are merged using a random linear combination
     // this functions collects the scalars factors for each element in order to apply a single
     // multiexponentiation to verify all equations
-    let mut s = vec![S::from_u32(0); n_elems + rhs.len()]; // n elements + m proof commitments
+    let mut s = vec![S::from(0u32); n_elems + rhs.len()]; // n elements + m proof commitments
     let mut alphas = vec![]; // linear combination scalars
                              // find in the matrix each element and multiply corresponding response by alpha
     for (j, row) in matrix.iter().enumerate() {
@@ -259,8 +262,8 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
 
 #[cfg(test)]
 mod tests {
-    use algebra::traits::{Group, GroupArithmetic, Scalar as _};
     use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+    use algebra::{ops::*, traits::Group, Zero};
     use merlin::Transcript;
     use rand_core::SeedableRng;
 
@@ -268,7 +271,7 @@ mod tests {
     #[allow(non_snake_case)]
     fn test_sigma() {
         let G = RistrettoPoint::get_base();
-        let secret = Scalar::from_u32(10);
+        let secret = Scalar::from(10u32);
         let H = G.mul(&secret);
 
         let mut prover_transcript = Transcript::new(b"Test");
@@ -316,7 +319,7 @@ mod tests {
 
         // test2: two contrains, two secrets
         // 1) H = secret * G, 2) H2 = secret2 * G
-        let secret2 = Scalar::from_u32(20);
+        let secret2 = Scalar::from(20u32);
         let H2 = G.mul(&secret2);
         let zero = RistrettoPoint::get_identity();
         let elems: &[&RistrettoPoint] = &[&zero, &G, &H, &H2];
@@ -376,9 +379,9 @@ mod tests {
         .is_err());
 
         // test3: two constarains, 5 secrets
-        let secret3 = Scalar::from_u32(30);
-        let secret4 = Scalar::from_u32(40);
-        let secret5 = Scalar::from_u32(50);
+        let secret3 = Scalar::from(30u32);
+        let secret4 = Scalar::from(40u32);
+        let secret5 = Scalar::from(50u32);
         let Z1 = G.mul(&secret).add(&H.mul(&secret2));
         let Z2 = G.mul(&secret3).add(&H.mul(&secret4)).add(&H2.mul(&secret5));
 
@@ -397,7 +400,7 @@ mod tests {
         )
         .is_ok());
 
-        let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::from_u32(0)]; // bad secrets
+        let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::zero()]; // bad secrets
         let proof = super::sigma_prove(&mut prover_transcript, &mut prng, elems, matrix, secrets);
         assert!(super::sigma_verify(
             &mut verifier_transcript,

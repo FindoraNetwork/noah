@@ -125,10 +125,10 @@ impl AMultiXfrPubInputs {
                 let pk_point = base.mul(&sec.sec_key);
                 let pk_sign = AXfrPubKey::from_jubjub_point(pk_point.mul(&sec.diversifier));
 
-                let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::one());
+                let pow_2_64 = BLSScalar::from(u64::max_value()).add(&BLSScalar::one());
                 let uid_amount = pow_2_64
-                    .mul(&BLSScalar::from_u64(sec.uid))
-                    .add(&BLSScalar::from_u64(sec.amount));
+                    .mul(&BLSScalar::from(sec.uid))
+                    .add(&BLSScalar::from(sec.amount));
                 let nullifier = prf.eval(
                     &BLSScalar::from(&sec.sec_key),
                     &[
@@ -150,7 +150,7 @@ impl AMultiXfrPubInputs {
             .map(|sec| {
                 comm.commit(
                     &sec.blind,
-                    &[BLSScalar::from_u64(sec.amount), sec.asset_type],
+                    &[BLSScalar::from(sec.amount), sec.asset_type],
                 )
                 .unwrap()
             })
@@ -165,11 +165,11 @@ impl AMultiXfrPubInputs {
         let commitment = comm
             .commit(
                 &payer.blind,
-                &[BLSScalar::from_u64(payer.amount), payer.asset_type],
+                &[BLSScalar::from(payer.amount), payer.asset_type],
             )
             .unwrap();
         let mut node =
-            hash.rescue_hash(&[BLSScalar::from_u64(payer.uid), commitment, pk_hash, zero])[0];
+            hash.rescue_hash(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0];
         for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
                 (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
@@ -204,7 +204,7 @@ pub(crate) fn build_multi_xfr_cs(
     let payees_secrets = add_payees_secrets(&mut cs, &secret_inputs.payees_secrets);
 
     let base = JubjubPoint::get_base();
-    let pow_2_64 = BLSScalar::from_u64(u64::MAX).add(&BLSScalar::one());
+    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
@@ -519,8 +519,8 @@ pub(crate) fn add_payers_secrets(
             let bls_diversifier = BLSScalar::from(&secret.diversifier);
             let sec_key = cs.new_variable(bls_sk);
             let diversifier = cs.new_variable(bls_diversifier);
-            let uid = cs.new_variable(BLSScalar::from_u64(secret.uid));
-            let amount = cs.new_variable(BLSScalar::from_u64(secret.amount));
+            let uid = cs.new_variable(BLSScalar::from(secret.uid));
+            let amount = cs.new_variable(BLSScalar::from(secret.amount));
             let blind = cs.new_variable(secret.blind);
             let path = add_merkle_path_variables(cs, secret.path.clone());
             let asset_type = cs.new_variable(secret.asset_type);
@@ -544,7 +544,7 @@ pub(crate) fn add_payees_secrets(
     secrets
         .iter()
         .map(|secret| {
-            let amount = cs.new_variable(BLSScalar::from_u64(secret.amount));
+            let amount = cs.new_variable(BLSScalar::from(secret.amount));
             let blind = cs.new_variable(secret.blind);
             let asset_type = cs.new_variable(secret.asset_type);
             PayeeSecretVars {
@@ -616,8 +616,8 @@ pub(crate) fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> 
         .map(|node| MerkleNodeVars {
             siblings1: cs.new_variable(node.siblings1),
             siblings2: cs.new_variable(node.siblings2),
-            is_left_child: cs.new_variable(BLSScalar::from_u32(node.is_left_child as u32)),
-            is_right_child: cs.new_variable(BLSScalar::from_u32(node.is_right_child as u32)),
+            is_left_child: cs.new_variable(BLSScalar::from(node.is_left_child as u32)),
+            is_right_child: cs.new_variable(BLSScalar::from(node.is_right_child as u32)),
         })
         .collect();
     // Boolean-constrain `is_left_child` and `is_right_child`
@@ -787,7 +787,7 @@ fn asset_mixing(
     cs.insert_constant_gate(fee_type_val, fee_type);
 
     // Calculate the fee
-    let fee = BLSScalar::from_u32(fee_calculating_func(
+    let fee = BLSScalar::from(fee_calculating_func(
         inputs.len() as u32,
         outputs.len() as u32,
     ));
@@ -959,10 +959,10 @@ pub(crate) mod tests {
                     let commitment = comm
                         .commit(
                             &payer.blind,
-                            &[BLSScalar::from_u64(payer.amount), payer.asset_type],
+                            &[BLSScalar::from(payer.amount), payer.asset_type],
                         )
                         .unwrap();
-                    hash.rescue_hash(&[BLSScalar::from_u64(payer.uid), commitment, pk_hash, zero])
+                    hash.rescue_hash(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])
                         [0]
                 })
                 .collect();
@@ -1009,7 +1009,7 @@ pub(crate) mod tests {
         let mut data_vars = vec![];
         let mut data = vec![];
         for i in 0..10 {
-            data.push(BLSScalar::from_u32(i as u32));
+            data.push(BLSScalar::from(i as u32));
             data_vars.push(cs.new_variable(data[i]));
         }
         let r = JubjubScalar::random(&mut prng);
@@ -1047,7 +1047,7 @@ pub(crate) mod tests {
         assert!(cs.verify_witness(&witness, &public_inputs).is_err());
 
         let mut bad_symm_ctxts = ctxts.symm_ctxts;
-        bad_symm_ctxts[0] = BLSScalar::from_u32(1);
+        bad_symm_ctxts[0] = BLSScalar::from(1);
         let mut public_inputs = vec![pub_key.get_point().get_x(), pub_key.get_point().get_y()];
         public_inputs.extend(vec![ctxts.e1.get_x(), ctxts.e1.get_y()]);
         public_inputs.extend(bad_symm_ctxts);
@@ -1057,7 +1057,7 @@ pub(crate) mod tests {
     #[test]
     fn test_asset_mixing() {
         // Fee type
-        let fee_type = BLSScalar::from_u32(1234u32);
+        let fee_type = BLSScalar::from(1234u32);
 
         // Fee function
         // base fee 5, every input 1, every output 2
@@ -1074,7 +1074,7 @@ pub(crate) mod tests {
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1)
-        let in_amounts = [cs.new_variable(BLSScalar::from_u32(5 + 1))];
+        let in_amounts = [cs.new_variable(BLSScalar::from(5 + 1))];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
             .zip(in_amounts.iter())
@@ -1091,7 +1091,7 @@ pub(crate) mod tests {
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1 + 1)
-        let in_amounts = [cs.new_variable(BLSScalar::from_u32(5 + 1 + 1))];
+        let in_amounts = [cs.new_variable(BLSScalar::from(5 + 1 + 1))];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
             .zip(in_amounts.iter())
@@ -1108,7 +1108,7 @@ pub(crate) mod tests {
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1 - 1)
-        let in_amounts = [cs.new_variable(BLSScalar::from_u32(5 + 1 - 1))];
+        let in_amounts = [cs.new_variable(BLSScalar::from(5 + 1 - 1))];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
             .zip(in_amounts.iter())
@@ -1130,9 +1130,9 @@ pub(crate) mod tests {
         ];
         // amounts = (60, 100, 5 + 3 + 2 * 2)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(60)),
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(5 + 3 + 2 * 2)),
+            cs.new_variable(BLSScalar::from(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(5 + 3 + 2 * 2)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1144,8 +1144,8 @@ pub(crate) mod tests {
         let out_types = [cs.new_variable(two), cs.new_variable(two)];
         // amounts = (40, 10)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(40)),
-            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from(40)),
+            cs.new_variable(BLSScalar::from(10)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1168,9 +1168,9 @@ pub(crate) mod tests {
         ];
         // amounts = (60, 100, 5 + 3 + 2 * 2)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(60)),
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(5 + 3 + 2 * 2)),
+            cs.new_variable(BLSScalar::from(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(5 + 3 + 2 * 2)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1182,8 +1182,8 @@ pub(crate) mod tests {
         let out_types = [cs.new_variable(two), cs.new_variable(zero)];
         // amounts = (100, 60)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(60)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1208,11 +1208,11 @@ pub(crate) mod tests {
         ];
         // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 7)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(60)),
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 7)),
+            cs.new_variable(BLSScalar::from(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(5 + 5 + 2 * 7)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1232,13 +1232,13 @@ pub(crate) mod tests {
         ];
         // amounts = (40, 9, 1, 80, 50, 10, 30)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(40)),
-            cs.new_variable(BLSScalar::from_u32(9)),
-            cs.new_variable(BLSScalar::from_u32(1)),
-            cs.new_variable(BLSScalar::from_u32(80)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(30)),
+            cs.new_variable(BLSScalar::from(40)),
+            cs.new_variable(BLSScalar::from(9)),
+            cs.new_variable(BLSScalar::from(1)),
+            cs.new_variable(BLSScalar::from(80)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(30)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1263,11 +1263,11 @@ pub(crate) mod tests {
         ];
         // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 8 + 100)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(60)),
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 8 + 100)),
+            cs.new_variable(BLSScalar::from(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(5 + 5 + 2 * 8 + 100)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1288,14 +1288,14 @@ pub(crate) mod tests {
         ];
         // amounts = (40, 9, 1, 80, 50, 10, 30, 100)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(40)),
-            cs.new_variable(BLSScalar::from_u32(9)),
-            cs.new_variable(BLSScalar::from_u32(1)),
-            cs.new_variable(BLSScalar::from_u32(80)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(30)),
-            cs.new_variable(BLSScalar::from_u32(100)),
+            cs.new_variable(BLSScalar::from(40)),
+            cs.new_variable(BLSScalar::from(9)),
+            cs.new_variable(BLSScalar::from(1)),
+            cs.new_variable(BLSScalar::from(80)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(30)),
+            cs.new_variable(BLSScalar::from(100)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1320,11 +1320,11 @@ pub(crate) mod tests {
         ];
         // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 8 + 100)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(60)),
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 8 + 100)),
+            cs.new_variable(BLSScalar::from(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(5 + 5 + 2 * 8 + 100)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1345,14 +1345,14 @@ pub(crate) mod tests {
         ];
         // amounts = (40, 9, 1, 80, 50, 10, 30, 10)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(40)),
-            cs.new_variable(BLSScalar::from_u32(9)),
-            cs.new_variable(BLSScalar::from_u32(1)),
-            cs.new_variable(BLSScalar::from_u32(80)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(30)),
-            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from(40)),
+            cs.new_variable(BLSScalar::from(9)),
+            cs.new_variable(BLSScalar::from(1)),
+            cs.new_variable(BLSScalar::from(80)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(30)),
+            cs.new_variable(BLSScalar::from(10)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1377,11 +1377,11 @@ pub(crate) mod tests {
         ];
         // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 7 - 2)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(60)),
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 7 - 2)),
+            cs.new_variable(BLSScalar::from(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(5 + 5 + 2 * 7 - 2)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1401,13 +1401,13 @@ pub(crate) mod tests {
         ];
         // amounts = (40, 9, 1, 80, 50, 10, 30)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(40)),
-            cs.new_variable(BLSScalar::from_u32(9)),
-            cs.new_variable(BLSScalar::from_u32(1)),
-            cs.new_variable(BLSScalar::from_u32(80)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(30)),
+            cs.new_variable(BLSScalar::from(40)),
+            cs.new_variable(BLSScalar::from(9)),
+            cs.new_variable(BLSScalar::from(1)),
+            cs.new_variable(BLSScalar::from(80)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(30)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1432,11 +1432,11 @@ pub(crate) mod tests {
         ];
         // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 8)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(60)),
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 8)),
+            cs.new_variable(BLSScalar::from(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(5 + 5 + 2 * 8)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1457,14 +1457,14 @@ pub(crate) mod tests {
         ];
         // amounts = (40, 9, 1, 80, 50, 10, 30, 2)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(40)),
-            cs.new_variable(BLSScalar::from_u32(9)),
-            cs.new_variable(BLSScalar::from_u32(1)),
-            cs.new_variable(BLSScalar::from_u32(80)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(30)),
-            cs.new_variable(BLSScalar::from_u32(2)),
+            cs.new_variable(BLSScalar::from(40)),
+            cs.new_variable(BLSScalar::from(9)),
+            cs.new_variable(BLSScalar::from(1)),
+            cs.new_variable(BLSScalar::from(80)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(30)),
+            cs.new_variable(BLSScalar::from(2)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1489,11 +1489,11 @@ pub(crate) mod tests {
         ];
         // amounts = (60, 100, 10, 50, 5 + 5 + 2 * 8)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(60)),
-            cs.new_variable(BLSScalar::from_u32(100)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(5 + 5 + 2 * 8 + 1)),
+            cs.new_variable(BLSScalar::from(60)),
+            cs.new_variable(BLSScalar::from(100)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(5 + 5 + 2 * 8 + 1)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1514,14 +1514,14 @@ pub(crate) mod tests {
         ];
         // amounts = (40, 9, 1, 80, 50, 10, 30, 2)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(40)),
-            cs.new_variable(BLSScalar::from_u32(9)),
-            cs.new_variable(BLSScalar::from_u32(1)),
-            cs.new_variable(BLSScalar::from_u32(80)),
-            cs.new_variable(BLSScalar::from_u32(50)),
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(30)),
-            cs.new_variable(BLSScalar::from_u32(2)),
+            cs.new_variable(BLSScalar::from(40)),
+            cs.new_variable(BLSScalar::from(9)),
+            cs.new_variable(BLSScalar::from(1)),
+            cs.new_variable(BLSScalar::from(80)),
+            cs.new_variable(BLSScalar::from(50)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(30)),
+            cs.new_variable(BLSScalar::from(2)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1546,10 +1546,10 @@ pub(crate) mod tests {
         ];
         // amounts = (10, 5, 5, 10)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(5)),
-            cs.new_variable(BLSScalar::from_u32(5)),
-            cs.new_variable(BLSScalar::from_u32(10)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(5)),
+            cs.new_variable(BLSScalar::from(5)),
+            cs.new_variable(BLSScalar::from(10)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1564,9 +1564,9 @@ pub(crate) mod tests {
         ];
         // amounts = (1, 15, 4)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(1)),
-            cs.new_variable(BLSScalar::from_u32(15)),
-            cs.new_variable(BLSScalar::from_u32(4)),
+            cs.new_variable(BLSScalar::from(1)),
+            cs.new_variable(BLSScalar::from(15)),
+            cs.new_variable(BLSScalar::from(4)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1589,9 +1589,9 @@ pub(crate) mod tests {
         ];
         // amounts = (10, 5, 5)
         let in_amounts = [
-            cs.new_variable(BLSScalar::from_u32(10)),
-            cs.new_variable(BLSScalar::from_u32(5)),
-            cs.new_variable(BLSScalar::from_u32(5)),
+            cs.new_variable(BLSScalar::from(10)),
+            cs.new_variable(BLSScalar::from(5)),
+            cs.new_variable(BLSScalar::from(5)),
         ];
         let inputs: Vec<(VarIndex, VarIndex)> = in_types
             .iter()
@@ -1606,9 +1606,9 @@ pub(crate) mod tests {
         ];
         // amounts = (5, 15, 4)
         let out_amounts = [
-            cs.new_variable(BLSScalar::from_u32(5)),
-            cs.new_variable(BLSScalar::from_u32(15)),
-            cs.new_variable(BLSScalar::from_u32(4)),
+            cs.new_variable(BLSScalar::from(5)),
+            cs.new_variable(BLSScalar::from(15)),
+            cs.new_variable(BLSScalar::from(4)),
         ];
         let outputs: Vec<(VarIndex, VarIndex)> = out_types
             .iter()
@@ -1626,8 +1626,8 @@ pub(crate) mod tests {
         let pc_gens = PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
 
         // 1. compute the parameters
-        let amount = BLSScalar::from_u32(71);
-        let asset_type = BLSScalar::from_u32(52);
+        let amount = BLSScalar::from(71);
+        let asset_type = BLSScalar::from(52);
 
         let x = RistrettoScalar::from_le_bytes(&amount.to_bytes()).unwrap();
         let y = RistrettoScalar::from_le_bytes(&asset_type.to_bytes()).unwrap();
@@ -1687,8 +1687,8 @@ pub(crate) mod tests {
     #[test]
     fn test_commit() {
         let mut cs = TurboConstraintSystem::new();
-        let amount = BLSScalar::from_u32(7);
-        let asset_type = BLSScalar::from_u32(5);
+        let amount = BLSScalar::from(7);
+        let asset_type = BLSScalar::from(5);
         let comm = HashCommitment::new();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let blind = BLSScalar::random(&mut prng);
@@ -1748,7 +1748,7 @@ pub(crate) mod tests {
     #[test]
     fn test_sort() {
         let mut cs = TurboConstraintSystem::new();
-        let num: Vec<BLSScalar> = (0..5).map(|x| BLSScalar::from_u32(x as u32)).collect();
+        let num: Vec<BLSScalar> = (0..5).map(|x| BLSScalar::from(x as u32)).collect();
         let node_var = cs.new_variable(num[2]);
         let sib1_var = cs.new_variable(num[3]);
         let sib2_var = cs.new_variable(num[4]);
@@ -1887,7 +1887,7 @@ pub(crate) mod tests {
     #[test]
     fn test_build_multi_xfr_cs() {
         // Fee type
-        let fee_type = BLSScalar::from_u32(1234u32);
+        let fee_type = BLSScalar::from(1234u32);
 
         // Fee function
         // base fee 5, every input 1, every output 2

@@ -131,13 +131,13 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     );
 
     // 4. Construct the equality proof
-    let x = RistrettoScalar::from_u64(oabar.amount);
+    let x = RistrettoScalar::from(oabar.amount);
     let y: RistrettoScalar = oabar.asset_type.as_scalar();
     let gamma = obar.amount_blinds.0.add(
         &obar
             .amount_blinds
             .1
-            .mul(&RistrettoScalar::from_u64(TWO_POW_32)),
+            .mul(&RistrettoScalar::from(TWO_POW_32)),
     );
     let delta = obar.type_blind;
 
@@ -271,17 +271,17 @@ pub fn verify_abar_to_bar(
             let (l, h) = utils::u64_to_u32_pair(amount);
             (
                 pc_gens
-                    .commit(&[RistrettoScalar::from_u32(l)], &RistrettoScalar::zero())
+                    .commit(&[RistrettoScalar::from(l)], &RistrettoScalar::zero())
                     .c(d!())?,
                 pc_gens
-                    .commit(&[RistrettoScalar::from_u32(h)], &RistrettoScalar::zero())
+                    .commit(&[RistrettoScalar::from(h)], &RistrettoScalar::zero())
                     .c(d!())?,
             )
         }
     };
 
     // 1.2 get asset type commitment
-    let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from_u64(TWO_POW_32)));
+    let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
     let com_asset_type = match bar.asset_type {
         XfrAssetType::Confidential(a) => a
             .decompress()
@@ -374,7 +374,7 @@ pub fn build_abar_to_bar_cs(
     let payers_secrets = add_payers_secret(&mut cs, payers_secret);
 
     let base = JubjubPoint::get_base();
-    let pow_2_64 = BLSScalar::from_u64(u64::MAX).add(&BLSScalar::one());
+    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
@@ -631,8 +631,8 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
     let bls_diversifier = BLSScalar::from(&secret.diversifier);
     let sec_key = cs.new_variable(bls_sk);
     let diversifier = cs.new_variable(bls_diversifier);
-    let uid = cs.new_variable(BLSScalar::from_u64(secret.uid));
-    let amount = cs.new_variable(BLSScalar::from_u64(secret.amount));
+    let uid = cs.new_variable(BLSScalar::from(secret.uid));
+    let amount = cs.new_variable(BLSScalar::from(secret.amount));
     let blind = cs.new_variable(secret.blind);
     let path = add_merkle_path_variables(cs, secret.path.clone());
     let asset_type = cs.new_variable(secret.asset_type);
@@ -747,7 +747,7 @@ mod tests {
         ])[0];
 
         hash.rescue_hash(&[
-            BLSScalar::from_u64(uid),
+            BLSScalar::from(uid),
             abar.amount_type_commitment,
             pk_hash,
             BLSScalar::zero(),

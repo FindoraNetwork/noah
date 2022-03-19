@@ -1,5 +1,5 @@
 use crate::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
-use algebra::traits::{Group, Scalar as ZeiScalar, ScalarArithmetic};
+use algebra::{ops::*, traits::Group, Zero};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -79,7 +79,7 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
     let lc_secret: G::ScalarType = dlogs
         .iter()
         .zip(x.iter())
-        .fold(G::ScalarType::from_u32(0), |lc, (s, x)| lc.add(&s.mul(x)));
+        .fold(G::ScalarType::zero(), |lc, (s, x)| lc.add(&s.mul(x)));
 
     prove_knowledge_dlog(transcript, prng, base, &lc_point, &lc_secret)
 }
@@ -115,8 +115,12 @@ mod test {
         prove_knowledge_dlog, prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog,
         verify_proof_of_knowledge_dlog,
     };
-    use algebra::traits::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
-    use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+    use algebra::{
+        ops::*,
+        ristretto::{RistrettoPoint, RistrettoScalar as Scalar},
+        traits::{Group, Scalar as _},
+        One,
+    };
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -130,7 +134,7 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"test");
         let base = RistrettoPoint::get_base();
         let scalar = Scalar::random(&mut csprng);
-        let scalar2 = scalar.add(&Scalar::from_u32(1));
+        let scalar2 = scalar.add(&Scalar::one());
         let point = base.mul(&scalar);
 
         let proof =

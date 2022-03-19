@@ -11,7 +11,10 @@
 //! * `sign(m,sk)` => sample a random scalar `r` and compute `R=g^r`. Compute scalars `c=H(X,R,m)` and `s=r+cx`. Return `(R,s)`
 //! * `verify(m,pk,sig)` => parse `sig` as `(R,s)`. Compute `c=H(X,R,m)`. Check that `R.X^c == g^s`.
 
-use algebra::traits::{Group, Scalar, ScalarArithmetic};
+use algebra::{
+    ops::*,
+    traits::{Group, Scalar},
+};
 use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
@@ -228,7 +231,10 @@ fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G::Sca
 /// * `secret_key` - Schnorr secret key.
 /// * `returns` - pseudo-random scalar
 #[allow(non_snake_case)]
-fn deterministic_scalar_gen<G: Group>(message: &[u8], secret_key: &SecretKey<G::ScalarType>) -> G::ScalarType {
+fn deterministic_scalar_gen<G: Group>(
+    message: &[u8],
+    secret_key: &SecretKey<G::ScalarType>,
+) -> G::ScalarType {
     let mut hasher = Sha512::new();
 
     let ALGORITHM_DESC = b"ZeiSchnorrAlgorithm";
@@ -246,7 +252,10 @@ fn deterministic_scalar_gen<G: Group>(message: &[u8], secret_key: &SecretKey<G::
 /// * `signing_key` - key pair. Having both public and private key makes the signature computation more efficient
 /// * `message` - sequence of bytes to be signed
 /// * `returns` - a Schnorr signature
-fn sign<G: Group>(signing_key: &KeyPair<G, G::ScalarType>, msg: &[u8]) -> Signature<G, G::ScalarType> {
+fn sign<G: Group>(
+    signing_key: &KeyPair<G, G::ScalarType>,
+    msg: &[u8],
+) -> Signature<G, G::ScalarType> {
     let mut transcript = Transcript::new(b"schnorr_sig");
 
     let g = G::get_base();
@@ -288,7 +297,11 @@ pub fn multisig_sign<G: Group>(
 /// * `sig` - signature
 /// * `returns` - Nothing if the verification succeeds, an error otherwise
 #[allow(non_snake_case)]
-fn verify<G: Group>(pk: &PublicKey<G>, msg: &[u8], sig: &Signature<G, G::ScalarType>) -> Result<()> {
+fn verify<G: Group>(
+    pk: &PublicKey<G>,
+    msg: &[u8],
+    sig: &Signature<G, G::ScalarType>,
+) -> Result<()> {
     let mut transcript = Transcript::new(b"schnorr_sig");
 
     let g = G::get_base();
@@ -333,11 +346,10 @@ pub fn multisig_verify<G: Group>(
 mod schnorr_sigs {
 
     mod schnorr_simple_sig {
-
         use crate::basics::signatures::schnorr::{KeyPair, PublicKey, Signature};
-        use algebra::traits::{Group, GroupArithmetic, One};
         use algebra::jubjub::JubjubPoint;
         use algebra::ristretto::RistrettoPoint;
+        use algebra::{traits::Group, One};
         use rand_chacha::rand_core::SeedableRng;
         use utils::serialization::ZeiFromToBytes;
 
@@ -357,7 +369,7 @@ mod schnorr_sigs {
 
             let wrong_sig = Signature {
                 R: G::get_identity(),
-                s: <G as GroupArithmetic>::ScalarType::one(),
+                s: G::ScalarType::one(),
             };
             let res = public_key.verify(message, &wrong_sig);
             assert!(res.is_err());
@@ -413,10 +425,9 @@ mod schnorr_sigs {
         use crate::basics::signatures::schnorr::{
             multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature,
         };
-        use algebra::traits::{Group, GroupArithmetic, One};
-
         use algebra::jubjub::JubjubPoint;
         use algebra::ristretto::RistrettoPoint;
+        use algebra::{traits::Group, One};
         use rand_chacha::rand_core::SeedableRng;
         use utils::errors::ZeiError;
 
@@ -444,7 +455,7 @@ mod schnorr_sigs {
             let wrong_msig: MultiSignature<G> = MultiSignature(vec![
                 Signature {
                     R: G::get_identity(),
-                    s: <G as GroupArithmetic>::ScalarType::one()
+                    s: G::ScalarType::one()
                 };
                 3
             ]);

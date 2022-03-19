@@ -79,7 +79,11 @@ in the credentials by
 */
 
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::traits::{Group, GroupArithmetic, Pairing, Scalar, ScalarArithmetic};
+use algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+    One,
+};
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
@@ -223,8 +227,8 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore, P: Pairing>(
 ) {
     let x = P::ScalarField::random(prng);
     let z = P::ScalarField::random(prng);
-    let gen1: P::G1 = P::G1::get_random_base(prng);
-    let gen2 = P::G2::get_random_base(prng);
+    let gen1: P::G1 = P::G1::random(prng);
+    let gen2 = P::G2::random(prng);
     let mut y = vec![];
     let mut yy2 = vec![];
     for _ in 0..num_attrs {
@@ -404,7 +408,7 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(
 ) -> Result<()> {
     // p = X_2*c - proof_commitment + &G2 * r_t + Z2 * r_sk + \sum r_attr_i * Y2_i;
 
-    let minus_one: P::ScalarField = P::ScalarField::from_u32(1).neg();
+    let minus_one: P::ScalarField = P::ScalarField::one().neg();
     let mut scalars = vec![
         &pok.response_t,  // G2
         challenge,        //X2
@@ -631,7 +635,7 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
     for attr_enum in attrs {
         if let Attribute::Hidden(Some(attr)) = attr_enum {
             let gamma = gamma_iter.next().unwrap(); // safe unwrap()
-            let resp_attr_i = challenge.mul(attr).add(gamma);
+            let resp_attr_i = challenge.mul(*attr).add(gamma);
             response_attrs.push(resp_attr_i);
         }
     }
@@ -838,7 +842,7 @@ pub(crate) mod credentials_tests {
         assert_eq!(user_keys.1, user_sec_key_de);
 
         // reveal proof containing signature and pok
-        let attrs = vec![P::ScalarField::from_u32(10); num_attributes];
+        let attrs = vec![P::ScalarField::from(10u32); num_attributes];
         let sig = super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, attrs.as_slice())
             .unwrap();
         let credential = Credential {
@@ -915,7 +919,7 @@ pub(crate) mod credentials_tests {
         assert_eq!(user_keys.1, user_priv_key_de);
 
         // reveal proof containing signature and pok
-        let attrs = vec![P::ScalarField::from_u32(10); num_attributes];
+        let attrs = vec![P::ScalarField::from(10u32); num_attributes];
         let sig = super::ac_sign::<_, P>(&mut prng, &issuer_keys.1, &user_keys.0, attrs.as_slice())
             .unwrap();
         let credential = Credential {

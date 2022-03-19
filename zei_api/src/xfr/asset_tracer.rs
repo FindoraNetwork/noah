@@ -42,13 +42,13 @@ impl TracerMemo {
             plaintext.extend_from_slice(&amount_high.to_be_bytes());
             let ctext_amount_low = elgamal_encrypt(
                 &pc_gens.B,
-                &Scalar::from_u32(amount_low),
+                &Scalar::from(amount_low),
                 blind_low,
                 &tracer_enc_key.record_data_enc_key,
             );
             let ctext_amount_high = elgamal_encrypt(
                 &pc_gens.B,
-                &Scalar::from_u32(amount_high),
+                &Scalar::from(amount_high),
                 blind_high,
                 &tracer_enc_key.record_data_enc_key,
             );
@@ -147,8 +147,8 @@ impl TracerMemo {
             let decrypted_low = elgamal_decrypt_elem(ctext_low, dec_key);
             let decrypted_high = elgamal_decrypt_elem(ctext_high, dec_key);
             let base = RistrettoPoint::get_base();
-            if base.mul(&Scalar::from_u32(low)) != decrypted_low
-                || base.mul(&Scalar::from_u32(high)) != decrypted_high
+            if base.mul(&Scalar::from(low)) != decrypted_low
+                || base.mul(&Scalar::from(high)) != decrypted_high
             {
                 Err(eg!(ZeiError::AssetTracingExtractionError))
             } else {
@@ -225,7 +225,7 @@ impl TracerMemo {
         }
         let mut result = vec![];
         for (ctext, expected) in self.lock_attributes.iter().zip(expected_attributes.iter()) {
-            let scalar_attr = BLSScalar::from_u32(*expected);
+            let scalar_attr = BLSScalar::from(*expected);
             let elem = elgamal_decrypt_elem(ctext, dec_key);
             if elem != BLSG1::get_base().mul(&scalar_attr) {
                 result.push(false);
@@ -284,8 +284,8 @@ mod tests {
             Some((
                 low,
                 high,
-                &Scalar::from_u32(191919u32),
-                &Scalar::from_u32(2222u32),
+                &Scalar::from(191919u32),
+                &Scalar::from(2222u32),
             )),
             None,
             &[],
@@ -313,7 +313,7 @@ mod tests {
             &mut prng,
             &tracer_keys.enc_key,
             None,
-            Some((&asset_type, &Scalar::from_u32(191919u32))),
+            Some((&asset_type, &Scalar::from(191919u32))),
             &[],
         );
 
@@ -385,13 +385,13 @@ mod tests {
         let attrs_and_ctexts = attrs
             .iter()
             .map(|x| {
-                let scalar = BLSScalar::from_u32(*x);
+                let scalar = BLSScalar::from(*x);
                 (
                     *x,
                     elgamal_encrypt(
                         &base,
                         &scalar,
-                        &BLSScalar::from_u32(1000u32),
+                        &BLSScalar::from(1000u32),
                         &tracer_keys.enc_key.attrs_enc_key,
                     ),
                 )

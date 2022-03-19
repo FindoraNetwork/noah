@@ -1,4 +1,7 @@
-use algebra::traits::{Group, GroupArithmetic, Pairing, Scalar};
+use algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+};
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -210,8 +213,10 @@ mod tests {
 
         let keys = [&pk1, &pk2, &pk3];
 
-        let agg_signature =
-            super::bls_aggregate::<BLSPairingEngine>(&keys, &[&signature1, &signature2, &signature3]);
+        let agg_signature = super::bls_aggregate::<BLSPairingEngine>(
+            &keys,
+            &[&signature1, &signature2, &signature3],
+        );
 
         pnk!(super::bls_verify_aggregated(&keys, message, &agg_signature));
     }

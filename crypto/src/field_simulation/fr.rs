@@ -3,11 +3,9 @@ use crate::field_simulation::{
     ristretto_scalar_field_sub_pad_in_limbs, SimFrMul, BIT_PER_LIMB, NUM_OF_LIMBS,
 };
 use algebra::bls12_381::BLSScalar;
-use algebra::traits::{ScalarArithmetic, Zero as ArkZero};
+use algebra::{ops::*, One, Zero};
 use num_bigint::BigUint;
 use num_integer::Integer;
-use num_traits::{One, Zero};
-use std::ops::{Add, AddAssign, Mul, MulAssign, Shl, Sub};
 
 /// `SimFr` is the simulated Ristretto scalar field element
 /// over BLS12-381 scalar field.

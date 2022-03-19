@@ -15,7 +15,7 @@
 use crate::commitments::pcs::{HidingPCS, HomomorphicPolyComElem, PolyComScheme, ShiftPCS};
 use crate::commitments::transcript::PolyComTranscript;
 use crate::polynomials::field_polynomial::FpPolynomial;
-use algebra::traits::{Scalar, ScalarArithmetic, Zero};
+use algebra::{ops::*, traits::Scalar, Zero};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -101,7 +101,7 @@ pub fn prove_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>(
 
     let c = transcript.get_challenge_field_elem::<PCS::Field>(ZK_EVAL_CHALLENGE);
 
-    let mut response = c.mul(&blind);
+    let mut response = c.mul(blind);
     response.add_assign(&alpha_blind);
 
     transcript.append_field_elem(&response);

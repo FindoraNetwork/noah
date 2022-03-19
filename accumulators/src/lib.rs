@@ -3,8 +3,9 @@ pub mod merkle_tree;
 #[cfg(test)]
 mod tests {
     use crate::merkle_tree::{verify, PersistentMerkleTree};
-    use algebra::bls12_381::BLSScalar;
-    use algebra::traits::One;
+    use algebra::{
+        One, bls12_381::BLSScalar
+    };
     use parking_lot::RwLock;
     use std::sync::Arc;
     use std::thread;

@@ -167,8 +167,8 @@ impl RescueCtr<BLSScalar> {
 #[cfg(test)]
 mod test {
     use crate::basics::hash::rescue::{RescueCtr, RescueInstance};
-    use algebra::bls12_381::BLSScalar;
     use algebra::traits::Scalar;
+    use algebra::{bls12_381::BLSScalar, One, Zero};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use std::str::FromStr;
@@ -235,10 +235,10 @@ mod test {
     fn rescue_hash_consistency() {
         let hash = RescueInstance::<BLSScalar>::new();
         let zero_vec = [
-            BLSScalar::from_u32(0),
-            BLSScalar::from_u32(0),
-            BLSScalar::from_u32(0),
-            BLSScalar::from_u32(0),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
         ];
         let keys = hash.key_scheduling(&zero_vec);
         let hash_state = hash.rescue_with_round_keys(&zero_vec, &keys);
@@ -252,16 +252,16 @@ mod test {
 
         // Use some non-zero seed and plaintext
         let seed = [
-            BLSScalar::from_u32(17),
-            BLSScalar::from_u32(212),
-            BLSScalar::from_u32(131),
-            BLSScalar::from_u32(5179),
+            BLSScalar::from(17u32),
+            BLSScalar::from(212u32),
+            BLSScalar::from(131u32),
+            BLSScalar::from(5179u32),
         ];
         let input_vec = [
-            BLSScalar::from_u32(34121),
-            BLSScalar::from_u32(65179),
-            BLSScalar::from_u32(19189),
-            BLSScalar::from_u32(0),
+            BLSScalar::from(34121u32),
+            BLSScalar::from(65179u32),
+            BLSScalar::from(19189u32),
+            BLSScalar::zero(),
         ];
         let keys = hash.key_scheduling(&seed);
         let hash_state = hash.rescue_with_round_keys(&input_vec, &keys);
@@ -274,10 +274,10 @@ mod test {
     fn test_rescue_hash() {
         let hash = RescueInstance::<BLSScalar>::new();
         let zero_vec = [
-            BLSScalar::from_u32(0),
-            BLSScalar::from_u32(0),
-            BLSScalar::from_u32(0),
-            BLSScalar::from_u32(0),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
         ];
         let expected_output = vec![
             BLSScalar::from_str(H0).unwrap(),
@@ -296,7 +296,7 @@ mod test {
             BLSScalar::from_str(IN0).unwrap(),
             BLSScalar::from_str(IN1).unwrap(),
             BLSScalar::from_str(IN2).unwrap(),
-            BLSScalar::from_u32(0),
+            BLSScalar::zero(),
         ];
         let expected_output = vec![
             BLSScalar::from_str(OUT0).unwrap(),
@@ -314,8 +314,8 @@ mod test {
     #[test]
     fn test_rescue_ctr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let zero = BLSScalar::from_u32(0);
-        let one = BLSScalar::from_u32(1);
+        let zero = BLSScalar::zero();
+        let one = BLSScalar::one();
         let key = [
             BLSScalar::random(&mut prng),
             BLSScalar::random(&mut prng),

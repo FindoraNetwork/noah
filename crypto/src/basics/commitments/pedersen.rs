@@ -1,5 +1,5 @@
-use algebra::traits::Group;
 use algebra::ristretto::RistrettoPoint;
+use algebra::traits::Group;
 use digest::Digest;
 use itertools::Itertools;
 use ruc::*;
@@ -43,7 +43,7 @@ impl<G: Group> PedersenGens<G> {
         let mut scalars = values.iter().collect_vec();
         scalars.push(blinding);
         let bases = self.bases.iter().collect_vec();
-        Ok(G::multi_exp(&*scalars, bases))
+        Ok(G::multi_exp(&*scalars, &bases))
     }
 }
 

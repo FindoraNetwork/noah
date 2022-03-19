@@ -175,7 +175,7 @@ impl OpenAnonBlindAssetRecord {
             .commit(
                 &self.blind,
                 &[
-                    BLSScalar::from_u64(self.amount),
+                    BLSScalar::from(self.amount),
                     self.asset_type.as_scalar(),
                 ],
             )

@@ -269,7 +269,7 @@ pub fn decrypt_memo(
     // verify abar's commitment
     crypto::basics::commitments::rescue::HashCommitment::new()
         .verify(
-            &[BLSScalar::from_u64(amount), asset_type.as_scalar()],
+            &[BLSScalar::from(amount), asset_type.as_scalar()],
             &blind,
             &abar.amount_type_commitment,
         )
@@ -294,9 +294,9 @@ pub fn nullifier(
     let pub_key_y = pub_key_point.get_y();
 
     // TODO From<u128> for ZeiScalar and do let uid_amount = BLSScalar::from(amount as u128 + ((uid as u128) << 64));
-    let pow_2_64 = BLSScalar::from_u64(u64::max_value()).add(&BLSScalar::from_u32(1));
-    let uid_shifted = BLSScalar::from_u64(uid).mul(&pow_2_64);
-    let uid_amount = uid_shifted.add(&BLSScalar::from_u64(amount));
+    let pow_2_64 = BLSScalar::from(u64::max_value()).add(&BLSScalar::from(1));
+    let uid_shifted = BLSScalar::from(uid).mul(&pow_2_64);
+    let uid_amount = uid_shifted.add(&BLSScalar::from(amount));
     PRF::new().eval(
         &BLSScalar::from(&key_pair.get_secret_scalar()),
         &[uid_amount, asset_type.as_scalar(), pub_key_x, pub_key_y],
@@ -314,7 +314,7 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
     ])[0];
 
     hash.rescue_hash(&[
-        BLSScalar::from_u64(uid),
+        BLSScalar::from(uid),
         abar.amount_type_commitment,
         pk_hash,
         BLSScalar::zero(),
@@ -637,7 +637,7 @@ mod tests {
                 ])[0];
 
                 hasher.rescue_hash(&[
-                    BLSScalar::from_u64(uid),
+                    BLSScalar::from(uid),
                     abar.amount_type_commitment,
                     pk_hash,
                     BLSScalar::zero(),
@@ -716,7 +716,7 @@ mod tests {
                     hash.rescue_hash(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])
                         [0];
                 hash.rescue_hash(&[
-                    BLSScalar::from_u32(uid as u32),
+                    BLSScalar::from(uid as u32),
                     in_abar.amount_type_commitment,
                     pk_in_hash,
                     zero,

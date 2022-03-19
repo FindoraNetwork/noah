@@ -1,7 +1,9 @@
 use algebra::{
     bls12_381::BLSScalar,
-    traits::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero},
     jubjub::JubjubPoint,
+    ops::*,
+    traits::{Group, Scalar},
+    One, Zero,
 };
 
 use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
@@ -380,8 +382,10 @@ impl TurboConstraintSystem<BLSScalar> {
 mod test {
     use algebra::{
         bls12_381::BLSScalar,
-        traits::{Group, GroupArithmetic, One, Scalar, Zero},
         jubjub::{JubjubPoint, JubjubScalar},
+        ops::*,
+        traits::{Group, Scalar},
+        One, Zero,
     };
     use ruc::*;
 

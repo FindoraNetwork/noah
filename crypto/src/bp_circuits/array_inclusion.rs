@@ -25,8 +25,7 @@ pub fn array_membership<CS: ConstraintSystem>(
 #[cfg(test)]
 mod test {
     use super::array_membership;
-    use algebra::traits::Scalar as _;
-    use algebra::ristretto::RistrettoScalar as Scalar;
+    use algebra::{ristretto::RistrettoScalar as Scalar, Zero};
     use bulletproofs::r1cs::{Prover, Verifier};
     use bulletproofs::{BulletproofGens, PedersenGens};
     use merlin::Transcript;
@@ -35,13 +34,13 @@ mod test {
     fn test_membership() {
         let pc_gens = PedersenGens::default();
         let set = [
-            Scalar::from_u32(0),
-            Scalar::from_u32(10),
-            Scalar::from_u32(30),
-            Scalar::from_u32(40),
-            Scalar::from_u32(50),
-            Scalar::from_u32(60),
-            Scalar::from_u32(70),
+            Scalar::zero(),
+            Scalar::from(10u32),
+            Scalar::from(30u32),
+            Scalar::from(40u32),
+            Scalar::from(50u32),
+            Scalar::from(60u32),
+            Scalar::from(70u32),
         ];
 
         let mut prover_transcript = Transcript::new(b"TransactionTest");
@@ -60,13 +59,13 @@ mod test {
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
 
         let set = [
-            Scalar::from_u32(0),
-            Scalar::from_u32(10),
-            Scalar::from_u32(30),
-            Scalar::from_u32(40),
-            Scalar::from_u32(556756756u32),
-            Scalar::from_u32(60),
-            Scalar::from_u32(70),
+            Scalar::zero(),
+            Scalar::from(10u32),
+            Scalar::from(30u32),
+            Scalar::from(40u32),
+            Scalar::from(556756756u32),
+            Scalar::from(60u32),
+            Scalar::from(70u32),
         ];
         let mut verifier_transcript = Transcript::new(b"TransactionTest");
         let mut verifier = Verifier::new(&mut verifier_transcript);

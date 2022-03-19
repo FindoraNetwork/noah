@@ -171,10 +171,10 @@ fn do_transfer_tests_single_asset(
         | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
             let (low, high) = u64_to_u32_pair(total_amount + 1);
             let commitment_low = pc_gens
-                .commit(Scalar::from_u32(low), Scalar::random(&mut prng))
+                .commit(Scalar::from(low), Scalar::random(&mut prng))
                 .compress();
             let commitment_high = pc_gens
-                .commit(Scalar::from_u32(high), Scalar::random(&mut prng))
+                .commit(Scalar::from(high), Scalar::random(&mut prng))
                 .compress();
             xfr_note.body.outputs[3].amount =
                 XfrAmount::Confidential((commitment_low, commitment_high));
@@ -234,7 +234,7 @@ fn do_transfer_tests_single_asset(
         _ => XfrAssetType::Confidential(
             pc_gens
                 .commit(
-                    Scalar::from_u32(10),
+                    Scalar::from(10),
                     old_output1.open_asset_record.type_blind,
                 )
                 .compress(),
@@ -290,7 +290,7 @@ fn do_transfer_tests_single_asset(
         _ => XfrAssetType::Confidential(
             pc_gens
                 .commit(
-                    Scalar::from_u32(10),
+                    Scalar::from(10),
                     old_input1.open_asset_record.type_blind,
                 )
                 .compress(),
@@ -840,8 +840,8 @@ mod asset_tracing {
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
 
     fn create_wrong_proof() -> PedersenElGamalEqProof {
-        let m = Scalar::from_u32(10);
-        let r = Scalar::from_u32(7657);
+        let m = Scalar::from(10);
+        let r = Scalar::from(7657);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
 

@@ -88,25 +88,25 @@ impl<F: Scalar> ConstraintSystem for TurboConstraintSystem<F> {
         if wire_vals.len() != N_WIRES_PER_GATE || sel_vals.len() != N_SELECTORS {
             return Err(eg!(PlonkError::FuncParamsError));
         }
-        let add1 = sel_vals[0].mul(&wire_vals[0]);
-        let add2 = sel_vals[1].mul(&wire_vals[1]);
-        let add3 = sel_vals[2].mul(&wire_vals[2]);
-        let add4 = sel_vals[3].mul(&wire_vals[3]);
-        let mul1 = sel_vals[4].mul(&wire_vals[0].mul(&wire_vals[1]));
-        let mul2 = sel_vals[5].mul(&wire_vals[2].mul(&wire_vals[3]));
+        let add1 = sel_vals[0].mul(wire_vals[0]);
+        let add2 = sel_vals[1].mul(wire_vals[1]);
+        let add3 = sel_vals[2].mul(wire_vals[2]);
+        let add4 = sel_vals[3].mul(wire_vals[3]);
+        let mul1 = sel_vals[4].mul(wire_vals[0].mul(wire_vals[1]));
+        let mul2 = sel_vals[5].mul(wire_vals[2].mul(wire_vals[3]));
         let constant = sel_vals[6].add(pub_input);
         let ecc = sel_vals[7]
-            .mul(&wire_vals[0])
-            .mul(&wire_vals[1])
-            .mul(&wire_vals[2])
-            .mul(&wire_vals[3])
-            .mul(&wire_vals[4]);
+            .mul(wire_vals[0])
+            .mul(wire_vals[1])
+            .mul(wire_vals[2])
+            .mul(wire_vals[3])
+            .mul(wire_vals[4]);
         let five = &[5u64];
-        let hash1 = sel_vals[8].mul(&wire_vals[0].pow(five));
-        let hash2 = sel_vals[9].mul(&wire_vals[1].pow(five));
-        let hash3 = sel_vals[10].mul(&wire_vals[2].pow(five));
-        let hash4 = sel_vals[11].mul(&wire_vals[3].pow(five));
-        let out = sel_vals[12].mul(&wire_vals[4]);
+        let hash1 = sel_vals[8].mul(wire_vals[0].pow(five));
+        let hash2 = sel_vals[9].mul(wire_vals[1].pow(five));
+        let hash3 = sel_vals[10].mul(wire_vals[2].pow(five));
+        let hash4 = sel_vals[11].mul(wire_vals[3].pow(five));
+        let out = sel_vals[12].mul(wire_vals[4]);
         let mut r = add1;
         r.add_assign(&add2);
         r.add_assign(&add3);
@@ -655,8 +655,10 @@ impl<F: Scalar> TurboConstraintSystem<F> {
 mod test {
     use algebra::{
         bls12_381::BLSScalar,
-        traits::{Group, One, Scalar, ScalarArithmetic, Zero},
         jubjub::JubjubPoint,
+        ops::*,
+        traits::{Group, Scalar},
+        One, Zero,
     };
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
@@ -677,7 +679,7 @@ mod test {
     #[test]
     fn test_select() {
         let mut cs = TurboConstraintSystem::new();
-        let num: Vec<F> = (0..4).map(|x| F::from_u32(x as u32)).collect();
+        let num: Vec<F> = (0..4).map(|x| F::from(x as u32)).collect();
         let index_0 = cs.new_variable(num[0]); // bit0 = 0 -- Variable index 2
         let index_1 = cs.new_variable(num[1]); // bit1 = 1 -- Variable index 3
         let index_2 = cs.new_variable(num[2]); // var0     -- Variable index 4
@@ -743,8 +745,8 @@ mod test {
     #[test]
     fn test_sub_and_equal() {
         let mut cs = TurboConstraintSystem::new();
-        let zero = F::from_u32(0);
-        let one = F::from_u32(1);
+        let zero = F::zero();
+        let one = F::one();
         let two = one.add(&one);
         let three = two.add(&one);
         cs.new_variable(zero);
@@ -766,8 +768,8 @@ mod test {
     #[test]
     fn test_is_equal() {
         let mut cs = TurboConstraintSystem::new();
-        let zero = F::from_u32(0);
-        let one = F::from_u32(1);
+        let zero = F::zero();
+        let one = F::one();
         let two = one.add(&one);
         cs.new_variable(one);
         cs.new_variable(two);
@@ -787,7 +789,7 @@ mod test {
     #[test]
     fn test_turbo_plonk_circuit_1() {
         let mut cs = TurboConstraintSystem::new();
-        let num: Vec<F> = (0..6).map(|x| F::from_u32(x as u32)).collect();
+        let num: Vec<F> = (0..6).map(|x| F::from(x as u32)).collect();
 
         // The circuit description:
         // 1. c = add(a, b)
@@ -858,7 +860,7 @@ mod test {
     #[test]
     fn test_turbo_plonk_circuit_2() {
         let mut cs = TurboConstraintSystem::new();
-        let num: Vec<F> = (0..9).map(|x| F::from_u32(x as u32)).collect();
+        let num: Vec<F> = (0..9).map(|x| F::from(x as u32)).collect();
 
         // The circuit description:
         // 1. a \in {0, 1}
@@ -1117,7 +1119,7 @@ mod test {
         prng: &mut R,
     ) {
         let mut cs = TurboConstraintSystem::new();
-        let num: Vec<PCS::Field> = (0..9).map(|x| PCS::Field::from_u32(x as u32)).collect();
+        let num: Vec<PCS::Field> = (0..9).map(|x| PCS::Field::from(x as u32)).collect();
 
         // The circuit description:
         // 1. a \in {0, 1}

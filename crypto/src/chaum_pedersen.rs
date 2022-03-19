@@ -1,8 +1,12 @@
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::sigma::{sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use algebra::traits::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoPoint;
 use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::{
+    ops::*,
+    traits::{Group, Scalar as _},
+    One, Zero,
+};
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
@@ -162,14 +166,14 @@ fn get_fake_zero_commitment() -> RistrettoPoint {
 
 // Obtain the blinding used in the get_fake_zero_commitment
 fn get_fake_zero_commitment_blinding() -> Scalar {
-    Scalar::from_u32(0)
+    Scalar::zero()
 }
 
 fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<Scalar> {
     if n == 0 {
         return vec![];
     }
-    let mut r = vec![Scalar::from_u32(1)];
+    let mut r = vec![Scalar::one()];
     for _ in 1..n {
         r.push(transcript.get_challenge::<Scalar>());
     }
@@ -208,7 +212,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     }
     let lc_scalars = get_lc_scalars(transcript, commitments.len() - 2);
     let mut d = RistrettoPoint::get_identity();
-    let mut z = Scalar::from_u32(0u32);
+    let mut z = Scalar::zero();
     let c0 = &commitments[0];
     let r0 = &blinding_factors[0];
     for (ai, ri, ci) in izip!(
@@ -231,7 +235,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
         transcript,
         prng,
         pc_gens,
-        &Scalar::from_u32(0),
+        &Scalar::zero(),
         (&d, &z),
         (
             &get_fake_zero_commitment(),
@@ -384,8 +388,8 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
     let multi_exp_len_bound = 2 + 7 * instances.len();
     let mut all_scalars = Vec::with_capacity(multi_exp_len_bound);
     let mut all_elems = Vec::with_capacity(multi_exp_len_bound);
-    all_scalars.push(Scalar::from_u32(0));
-    all_scalars.push(Scalar::from_u32(0));
+    all_scalars.push(Scalar::zero());
+    all_scalars.push(Scalar::zero());
     all_elems.push(pc_gens.B);
     all_elems.push(pc_gens.B_blinding);
     for (commitments, proof) in instances {
@@ -442,10 +446,10 @@ mod test {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
-        let value1 = Scalar::from_u64(16);
-        let value2 = Scalar::from_u64(32);
-        let bf1 = Scalar::from_u64(10);
-        let bf2 = Scalar::from_u64(100);
+        let value1 = Scalar::from(16u32);
+        let value2 = Scalar::from(32u32);
+        let bf1 = Scalar::from(10u32);
+        let bf2 = Scalar::from(100u32);
         let c1 = pc_gens.commit(value1, bf1);
         let c2 = pc_gens.commit(value2, bf2);
 
@@ -524,11 +528,11 @@ mod test {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
-        let value1 = Scalar::from_u32(16);
-        let value2 = Scalar::from_u32(32);
-        let bf1 = Scalar::from_u32(10);
-        let bf2 = Scalar::from_u32(100);
-        let bf3 = Scalar::from_u32(1000);
+        let value1 = Scalar::from(16u32);
+        let value2 = Scalar::from(32u32);
+        let bf1 = Scalar::from(10u32);
+        let bf2 = Scalar::from(100u32);
+        let bf3 = Scalar::from(1000u32);
         let c1 = pc_gens.commit(value1, bf1);
         let c2 = pc_gens.commit(value2, bf2);
         let c3 = pc_gens.commit(value1, bf3);
@@ -591,10 +595,10 @@ mod test {
     fn test_chaum_pedersen_multiple_eq_proof_using_two() {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
-        let value1 = Scalar::from_u32(16);
-        let value2 = Scalar::from_u32(32);
-        let bf1 = Scalar::from_u32(10);
-        let bf2 = Scalar::from_u32(100);
+        let value1 = Scalar::from(16u32);
+        let value2 = Scalar::from(32u32);
+        let bf1 = Scalar::from(10u32);
+        let bf2 = Scalar::from(100u32);
         let pc_gens = RistrettoPedersenGens::default();
         let c1 = pc_gens.commit(value1, bf1);
         let c2 = pc_gens.commit(value2, bf2);

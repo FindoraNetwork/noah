@@ -1,4 +1,4 @@
-use algebra::traits::{One, Scalar, ScalarArithmetic, Zero};
+use algebra::{ops::*, traits::Scalar, One, Zero};
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use ruc::*;
@@ -238,10 +238,7 @@ pub fn preprocess_verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
 
 #[cfg(test)]
 mod test {
-    use algebra::{
-        bls12_381::BLSScalar,
-        traits::{One, Scalar, ScalarArithmetic, Zero},
-    };
+    use algebra::{bls12_381::BLSScalar, traits::Scalar, One, Zero};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 

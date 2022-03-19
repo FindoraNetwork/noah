@@ -1,4 +1,4 @@
-use algebra::traits::{One, Scalar, ScalarArithmetic, Zero};
+use algebra::{ops::*, traits::Scalar, One, Zero};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -238,7 +238,7 @@ pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field
     // Compute the evaluations of the quotient polynomial on the coset.
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
     let alpha = challenges.get_alpha().unwrap();
-    let alpha_sq = alpha.mul(&alpha);
+    let alpha_sq = alpha.mul(alpha);
     let mut quot_coset_evals = vec![];
 
     for point in 0..m {
@@ -257,7 +257,7 @@ pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field
         let mut term2 = alpha.mul(&sigma_coset_evals[point]);
         for j in 0..CS::n_wires_per_gate() {
             let tmp = witness_polys_coset_evals[j][point]
-                .add(&delta)
+                .add(delta)
                 .add(&gamma.mul(&k[j].mul(&params.coset_quot[point])));
             term2.mul_assign(&tmp);
         }
@@ -269,7 +269,7 @@ pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field
             .zip(params.perms_coset_evals.iter())
         {
             let tmp = &w_poly_coset_evals[point]
-                .add(&delta)
+                .add(delta)
                 .add(&gamma.mul(&perm_coset_evals[point]));
             term3.mul_assign(&tmp);
         }
@@ -415,7 +415,7 @@ pub(super) fn eval_public_var_poly<PCS: PolyComScheme>(
         let den = eval_point.sub(&root_to_j);
         let den_inv = den.inv().unwrap();
         let lagrange_i = lagrange_constant.mul(&num.mul(&den_inv));
-        eval.add_assign(&lagrange_i.mul(&public_value));
+        eval.add_assign(&lagrange_i.mul(public_value));
     }
     eval
 }
@@ -456,7 +456,7 @@ fn compute_sigma_scalar_in_l<F: Scalar>(
     }
 
     // 2. alpha^2*(beta^n - 1) / (beta - 1)
-    let alpha_sq = alpha.mul(&alpha);
+    let alpha_sq = alpha.mul(alpha);
     let beta_pow_n = beta.pow(&[n as u64]);
     let l1_eval_beta = beta_pow_n
         .sub(&F::one())
@@ -480,13 +480,13 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let alpha = challenges.get_alpha().unwrap();
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
 
-    let term0 = proof.L_eval_beta.add(&public_vars_eval_beta);
+    let term0 = proof.L_eval_beta.add(public_vars_eval_beta);
     let mut term1 = alpha.mul(&proof.Sigma_eval_g_beta);
     let n_wires_per_gate = &proof.witness_polys_eval_beta.len();
     for i in 0..n_wires_per_gate - 1 {
         let b = proof.witness_polys_eval_beta[i]
             .add(&gamma.mul(&proof.perms_eval_beta[i]))
-            .add(&delta);
+            .add(delta);
         term1.mul_assign(&b);
     }
     term1.mul_assign(&proof.witness_polys_eval_beta[n_wires_per_gate - 1].add(delta));
@@ -495,8 +495,8 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let beta_n = beta.pow(&[params.cs_size as u64]);
     let z_h_eval_beta = beta_n.sub(&one);
     let beta_minus_one = beta.sub(&one);
-    let first_lagrange_eval_beta = z_h_eval_beta.mul(&beta_minus_one.inv().unwrap());
-    let term2 = first_lagrange_eval_beta.mul(&alpha.mul(&alpha));
+    let first_lagrange_eval_beta = z_h_eval_beta.mul(beta_minus_one.inv().unwrap());
+    let term2 = first_lagrange_eval_beta.mul(alpha.mul(alpha));
 
     let term1_plus_term2 = term1.add(&term2);
 
@@ -548,10 +548,7 @@ pub(crate) fn combine_q_polys<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar 
 
 #[cfg(test)]
 mod test {
-    use algebra::{
-        bls12_381::BLSScalar,
-        traits::{One, ScalarArithmetic, Zero},
-    };
+    use algebra::{bls12_381::BLSScalar, ops::*, One, Zero};
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
 

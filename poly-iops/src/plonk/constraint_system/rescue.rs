@@ -1,7 +1,4 @@
-use algebra::{
-    bls12_381::BLSScalar,
-    traits::{One, ScalarArithmetic, Zero},
-};
+use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One, Zero};
 use crypto::basics::hash::rescue::RescueInstance;
 
 use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
@@ -362,10 +359,7 @@ impl TurboConstraintSystem<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-    use algebra::{
-        bls12_381::BLSScalar,
-        traits::{Scalar, Zero},
-    };
+    use algebra::{bls12_381::BLSScalar, traits::Scalar, One, Zero};
     use crypto::basics::hash::rescue::{RescueCtr, RescueInstance};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -381,10 +375,10 @@ mod test {
         // use BLS12-381 field
         let mut cs = TurboConstraintSystem::<BLSScalar>::new();
         let input_vec = [
-            BLSScalar::from_u32(11),
-            BLSScalar::from_u32(171),
-            BLSScalar::from_u32(273),
-            BLSScalar::from_u32(0),
+            BLSScalar::from(11u32),
+            BLSScalar::from(171u32),
+            BLSScalar::from(273u32),
+            BLSScalar::zero(),
         ];
         let input_state = State::from(&input_vec[..]);
         let input_var = cs.new_hash_input_variable(input_state.clone());
@@ -463,7 +457,7 @@ mod test {
         let mut data_vars = vec![];
         let mut data = vec![];
         for i in 0..10 {
-            data.push(BLSScalar::from_u32(i as u32));
+            data.push(BLSScalar::from(i as u32));
             data_vars.push(cs.new_variable(data[i]));
         }
 
@@ -479,7 +473,7 @@ mod test {
 
         // check constraints
         assert!(cs.verify_witness(&witness, &[]).is_ok());
-        witness[ctxts_vars[0]] = BLSScalar::from_u32(1);
+        witness[ctxts_vars[0]] = BLSScalar::one();
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }
 }

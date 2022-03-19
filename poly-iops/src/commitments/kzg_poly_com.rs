@@ -1,7 +1,11 @@
 use crate::commitments::pcs::{HomomorphicPolyComElem, PolyComScheme, PolyComSchemeError, ToBytes};
 use crate::polynomials::field_polynomial::FpPolynomial;
-use algebra::bls12_381::{BLSScalar, BLSPairingEngine, BLSG1};
-use algebra::traits::{Group, GroupArithmetic, One, Pairing, Scalar, ScalarArithmetic};
+use algebra::{
+    bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+    One,
+};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -309,8 +313,10 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             algebra::bls12_381::BLSPairingEngine::pairing(&C.value.sub(&g1_0.mul(y)), &g2_0);
 
         // e(g1^{Q(X)},g1^{X-x})
-        let right_pairing_eval =
-            algebra::bls12_381::BLSPairingEngine::pairing(&proof.0, &x_minus_point_group_element_group_2);
+        let right_pairing_eval = algebra::bls12_381::BLSPairingEngine::pairing(
+            &proof.0,
+            &x_minus_point_group_element_group_2,
+        );
 
         // e(g1^{P(X)-P(x)},g2) == e(g1^{Q(X)},g2^{X-v})
         if left_pairing_eval == right_pairing_eval {
@@ -335,11 +341,14 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 mod tests_kzg_impl {
     use crate::commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
     use crate::commitments::pcs::{HomomorphicPolyComElem, PolyComScheme};
-    use algebra::traits::{Group, Pairing};
+    use algebra::{
+        ops::*,
+        traits::{Group, Pairing},
+        One,
+    };
 
     use crate::polynomials::field_polynomial::FpPolynomial;
-    use algebra::bls12_381::{BLSScalar, BLSPairingEngine, BLSG1};
-    use algebra::traits::{GroupArithmetic, One, ScalarArithmetic};
+    use algebra::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1};
     use itertools::Itertools;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
