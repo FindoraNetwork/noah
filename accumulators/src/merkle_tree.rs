@@ -374,10 +374,14 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
     }
 
     /// get the tree version
-    pub fn version(&self) -> u64 { self.version }
+    pub fn version(&self) -> u64 {
+        self.version
+    }
 
     /// get the number of entries
-    pub fn entry_count(&self) -> u64 { self.entry_count }
+    pub fn entry_count(&self) -> u64 {
+        self.entry_count
+    }
 }
 
 /// verify merkle proof.

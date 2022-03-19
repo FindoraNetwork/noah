@@ -352,7 +352,6 @@ mod tests {
     use crate::anon_xfr::tests::create_mt_leaf_info;
     use crate::setup::{NodeParams, UserParams};
     use crate::xfr::structs::AssetType;
-    use zei_accumulators::merkle_tree::{PersistentMerkleTree, TREE_DEPTH};
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::{CryptoRng, RngCore, SeedableRng};
@@ -361,6 +360,7 @@ mod tests {
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
+    use zei_accumulators::merkle_tree::{PersistentMerkleTree, TREE_DEPTH};
     use zei_algebra::bls12_381::BLSScalar;
     use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
 
