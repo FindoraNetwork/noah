@@ -256,11 +256,7 @@ impl NodeParams {
                         verifier_params: special.verifier_params,
                     })
                 }
-                _ => Err(SimpleError::new(
-                    d!(ZeiError::MissingVerifierParamsError),
-                    None,
-                )
-                .into()),
+                _ => Self::create(n_payers, n_payees, None),
             }
         }
     }
