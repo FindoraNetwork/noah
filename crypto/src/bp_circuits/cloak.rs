@@ -40,17 +40,17 @@ match on each list. On each product the elements are shifted by a random challen
 */
 
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use algebra::{
-    ops::*,
-    ristretto::{CompressedRistretto, RistrettoScalar as Scalar},
-    Zero,
-};
 use bulletproofs::r1cs::{
     ConstraintSystem, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
 use merlin::Transcript;
 use ruc::*;
-use utils::errors::ZeiError;
+use zei_algebra::{
+    ops::*,
+    ristretto::{CompressedRistretto, RistrettoScalar as Scalar},
+    Zero,
+};
+use zei_utils::errors::ZeiError;
 
 /// Represent AssetRecord amount and asset type
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -321,7 +321,6 @@ pub(crate) fn allocate_cloak_vector<CS: ConstraintSystem>(
 #[cfg(test)]
 pub mod tests {
     use crate::bp_circuits::cloak::{CloakCommitment, CloakValue};
-    use algebra::{ops::*, ristretto::RistrettoScalar, traits::Scalar, Zero};
     use bulletproofs::r1cs::{Prover, R1CSProof, Verifier};
     use bulletproofs::{BulletproofGens, PedersenGens};
     use itertools::Itertools;
@@ -329,6 +328,7 @@ pub mod tests {
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use zei_algebra::{ops::*, ristretto::RistrettoScalar, traits::Scalar, Zero};
 
     // Taken from https://github.com/stellar/slingshot/tree/main/cloak
     fn yuan(q: u64) -> CloakValue {

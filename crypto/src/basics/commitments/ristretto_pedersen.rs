@@ -1,6 +1,6 @@
-use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use bulletproofs::PedersenGens;
 use curve25519_dalek::traits::MultiscalarMul;
+use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

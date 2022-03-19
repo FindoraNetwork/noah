@@ -1,17 +1,17 @@
 [package]
-name = "crypto"
+name = "zei-crypto"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2021"
 description = "Zei Cryptographic Primitives and Protocols"
 
 [lib]
-name = "crypto"
+name = "zei_crypto"
 crate-type = ["rlib"]
 
 [dependencies]
-algebra = { path = "../algebra" }
-utils = {path = "../utils" }
+zei-algebra = { path = "../algebra" }
+zei-utils = {path = "../utils" }
 aes = { version = "0.7.5", features = ["ctr"]}
 bulletproofs = { package = "bulletproofs", git = "https://github.com/FindoraNetwork/bp", branch = "batch_verification", features = ["yoloproofs"] }
 curve25519-dalek = { version =  "3.0.0", features = ["serde"] }

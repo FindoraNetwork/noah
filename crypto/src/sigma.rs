@@ -1,13 +1,13 @@
-use algebra::{
-    ops::*,
-    traits::{Group, Pairing, Scalar},
-};
 use digest::Digest;
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use utils::errors::ZeiError;
+use zei_algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+};
+use zei_utils::errors::ZeiError;
 
 pub trait SigmaTranscript {
     fn init_sigma<G: Group>(
@@ -262,10 +262,10 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
 
 #[cfg(test)]
 mod tests {
-    use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
-    use algebra::{ops::*, traits::Group, Zero};
     use merlin::Transcript;
     use rand_core::SeedableRng;
+    use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+    use zei_algebra::{ops::*, traits::Group, Zero};
 
     #[test]
     #[allow(non_snake_case)]

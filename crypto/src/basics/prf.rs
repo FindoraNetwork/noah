@@ -10,8 +10,8 @@
 //      2.2 Permute the state: s := p(s)
 // 3. Return s_0.
 use crate::basics::hash::rescue::RescueInstance;
-use algebra::bls12_381::BLSScalar;
-use algebra::traits::Scalar;
+use zei_algebra::bls12_381::BLSScalar;
+use zei_algebra::traits::Scalar;
 
 pub struct PRF<S>(RescueInstance<S>);
 
@@ -55,9 +55,9 @@ impl PRF<BLSScalar> {
 mod test {
     use crate::basics::hash::rescue::RescueInstance;
     use crate::basics::prf::PRF;
-    use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use zei_algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar};
 
     #[test]
     fn test_prf_consistency() {

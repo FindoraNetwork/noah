@@ -1,19 +1,19 @@
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::basics::elgamal::{ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use algebra::ristretto::RistrettoPoint;
-use algebra::ristretto::RistrettoScalar as Scalar;
-use algebra::{
-    ops::*,
-    traits::{Group, Scalar as _},
-    One, Zero,
-};
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use utils::errors::ZeiError;
-use utils::serialization;
+use zei_algebra::ristretto::RistrettoPoint;
+use zei_algebra::ristretto::RistrettoScalar as Scalar;
+use zei_algebra::{
+    ops::*,
+    traits::{Group, Scalar as _},
+    One, Zero,
+};
+use zei_utils::errors::ZeiError;
+use zei_utils::serialization;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PedersenElGamalEqProof {
@@ -366,7 +366,6 @@ mod test {
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
         PedersenElGamalProofInstance,
     };
-    use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
     use itertools::Itertools;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
@@ -375,7 +374,8 @@ mod test {
     use ruc::*;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
-    use utils::errors::ZeiError;
+    use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+    use zei_utils::errors::ZeiError;
 
     #[test]
     fn good_proof_verify() {

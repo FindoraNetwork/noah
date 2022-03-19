@@ -10,7 +10,7 @@ extern crate itertools;
 extern crate serde_derive;
 
 #[macro_use]
-extern crate utils;
+extern crate zei_utils;
 
 pub mod anon_creds;
 pub mod basics;

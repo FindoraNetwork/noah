@@ -3,10 +3,10 @@ use crate::field_simulation::{
     ristretto_scalar_field_sub_pad_in_biguint, ristretto_scalar_field_sub_pad_in_limbs, SimFr,
     BIT_PER_LIMB, NUM_OF_GROUPS, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
-use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar};
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::Zero;
+use zei_algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar};
 
 /// `SimFrMul` is the intermediate representation for
 /// the product of two simulated Ristretto scalar field elements

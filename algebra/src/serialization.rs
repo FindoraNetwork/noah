@@ -6,7 +6,7 @@ use crate::{
 };
 use ruc::*;
 use serde::Serializer;
-use utils::serialization::ZeiFromToBytes;
+use zei_utils::serialization::ZeiFromToBytes;
 
 macro_rules! to_from_bytes_scalar {
     ($t:ident) => {
@@ -18,7 +18,7 @@ macro_rules! to_from_bytes_scalar {
             }
             fn zei_from_bytes(bytes: &[u8]) -> Result<$t> {
                 $t::from_bytes(bytes)
-                    .map_err(|_| eg!(utils::errors::ZeiError::DeserializationError))
+                    .map_err(|_| eg!(zei_utils::errors::ZeiError::DeserializationError))
             }
         }
     };
@@ -68,7 +68,7 @@ macro_rules! to_from_bytes_group {
             }
             fn zei_from_bytes(bytes: &[u8]) -> Result<$g> {
                 $g::from_compressed_bytes(bytes)
-                    .map_err(|_| eg!(utils::errors::ZeiError::SerializationError))
+                    .map_err(|_| eg!(zei_utils::errors::ZeiError::SerializationError))
             }
         }
     };

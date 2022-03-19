@@ -32,7 +32,7 @@ macro_rules! serialize_deserialize {
                 S: Serializer,
             {
                 if serializer.is_human_readable() {
-                    serializer.serialize_str(&utils::b64enc(&self.zei_to_bytes()))
+                    serializer.serialize_str(&zei_utils::b64enc(&self.zei_to_bytes()))
                 } else {
                     serializer.serialize_bytes(&self.zei_to_bytes())
                 }
@@ -46,10 +46,10 @@ macro_rules! serialize_deserialize {
             {
                 let bytes = if deserializer.is_human_readable() {
                     deserializer
-                        .deserialize_str(utils::serialization::zei_obj_serde::BytesVisitor)?
+                        .deserialize_str(zei_utils::serialization::zei_obj_serde::BytesVisitor)?
                 } else {
                     deserializer
-                        .deserialize_bytes(utils::serialization::zei_obj_serde::BytesVisitor)?
+                        .deserialize_bytes(zei_utils::serialization::zei_obj_serde::BytesVisitor)?
                 };
                 $t::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
             }

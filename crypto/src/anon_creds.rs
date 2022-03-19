@@ -79,16 +79,16 @@ in the credentials by
 */
 
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::{
-    ops::*,
-    traits::{Group, Pairing, Scalar},
-    One,
-};
 use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use utils::errors::ZeiError;
+use zei_algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+    One,
+};
+use zei_utils::errors::ZeiError;
 
 pub(crate) const AC_REVEAL_PROOF_DOMAIN: &[u8] = b"AC Reveal PoK";
 pub(crate) const AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Reveal PoK Instance";
@@ -454,7 +454,7 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(
 #[allow(clippy::type_complexity)]
 pub fn ac_open_commitment<
     R: CryptoRng + RngCore,
-    P: Pairing<ScalarField = algebra::bls12_381::BLSScalar>,
+    P: Pairing<ScalarField = zei_algebra::bls12_381::BLSScalar>,
 >(
     prng: &mut R,
     user_sk: &ACUserSecretKey<P::ScalarField>,
@@ -667,11 +667,11 @@ fn ac_verify_final_check<P: Pairing>(
 #[cfg(test)]
 pub(crate) mod credentials_tests {
     use super::*;
-    use algebra::bls12_381::BLSPairingEngine;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
     use serde::{Deserialize, Serialize};
+    use zei_algebra::bls12_381::BLSPairingEngine;
     extern crate typenum;
     use typenum::U8;
 

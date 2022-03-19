@@ -17,7 +17,7 @@ use ark_std::{
 use digest::{generic_array::typenum::U64, Digest};
 use ruc::*;
 use std::ops::Neg;
-use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
+use zei_utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 /// The number of bytes for a scalar value over Jubjub
 pub const JUBJUB_SCALAR_LEN: usize = 32;

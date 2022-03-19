@@ -20,8 +20,8 @@ use ark_std::{
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use ruc::*;
-use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 use wasm_bindgen::prelude::*;
+use zei_utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 /// The number of bytes for a scalar value over BLS12-381
 pub const BLS12_381_SCALAR_LEN: usize = 32;

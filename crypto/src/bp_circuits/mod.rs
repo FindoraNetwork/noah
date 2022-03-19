@@ -1,2 +1,2 @@
-mod gadgets;
 pub mod cloak;
+mod gadgets;

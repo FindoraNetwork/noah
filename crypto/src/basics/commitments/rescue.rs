@@ -9,10 +9,10 @@
 // Opening verification: verify(m_1, ..., m_n, rand, commitment)
 // 1. Check whether commitment == rescue(rand, m_1, ..., m_n, 0^{r+c-n-1})[0]
 use crate::basics::hash::rescue::RescueInstance;
-use algebra::bls12_381::BLSScalar;
-use algebra::traits::Scalar;
 use ruc::*;
-use utils::errors::ZeiError;
+use zei_algebra::bls12_381::BLSScalar;
+use zei_algebra::traits::Scalar;
+use zei_utils::errors::ZeiError;
 
 pub struct HashCommitment<S> {
     hash: RescueInstance<S>,
@@ -70,10 +70,10 @@ impl HashCommitment<BLSScalar> {
 mod test {
     use crate::basics::commitments::rescue::HashCommitment;
     use crate::basics::hash::rescue::RescueInstance;
-    use algebra::traits::Scalar;
-    use algebra::{bls12_381::BLSScalar, Zero};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use zei_algebra::traits::Scalar;
+    use zei_algebra::{bls12_381::BLSScalar, Zero};
 
     #[test]
     fn test_hash_commitment() {

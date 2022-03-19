@@ -2,17 +2,17 @@ use aes::{
     cipher::{generic_array::GenericArray, NewCipher, StreamCipher},
     Aes256Ctr,
 };
-use algebra::ristretto::RistrettoScalar as Scalar;
-use algebra::traits::Scalar as _;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use serde::Serializer;
 use sha2::Digest;
-use utils::errors::ZeiError;
-use utils::serialization::ZeiFromToBytes;
 use wasm_bindgen::prelude::*;
+use zei_algebra::ristretto::RistrettoScalar as Scalar;
+use zei_algebra::traits::Scalar as _;
+use zei_utils::errors::ZeiError;
+use zei_utils::serialization::ZeiFromToBytes;
 
 #[wasm_bindgen]
 #[derive(Debug, Clone)]

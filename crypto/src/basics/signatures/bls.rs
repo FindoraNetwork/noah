@@ -1,11 +1,11 @@
-use algebra::{
-    ops::*,
-    traits::{Group, Pairing, Scalar},
-};
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use utils::errors::ZeiError;
+use zei_algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+};
+use zei_utils::errors::ZeiError;
 
 type HashFnc = sha2::Sha512;
 
@@ -177,10 +177,10 @@ impl<S> AsRef<S> for BlsSecretKey<S> {
 
 #[cfg(test)]
 mod tests {
-    use algebra::bls12_381::BLSPairingEngine;
     use rand_core::SeedableRng;
     use ruc::*;
-    use utils::errors::ZeiError;
+    use zei_algebra::bls12_381::BLSPairingEngine;
+    use zei_utils::errors::ZeiError;
 
     #[test]
     fn bls_signatures() {

@@ -2,10 +2,10 @@ use crate::field_simulation::{
     ristretto_scalar_field_in_biguint, ristretto_scalar_field_sub_pad_in_biguint,
     ristretto_scalar_field_sub_pad_in_limbs, SimFrMul, BIT_PER_LIMB, NUM_OF_LIMBS,
 };
-use algebra::bls12_381::BLSScalar;
-use algebra::{ops::*, One, Zero};
 use num_bigint::BigUint;
 use num_integer::Integer;
+use zei_algebra::bls12_381::BLSScalar;
+use zei_algebra::{ops::*, One, Zero};
 
 /// `SimFr` is the simulated Ristretto scalar field element
 /// over BLS12-381 scalar field.

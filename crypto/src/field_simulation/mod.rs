@@ -1,6 +1,6 @@
-use algebra::bls12_381::BLSScalar;
 use core::str::FromStr;
 use num_bigint::BigUint;
+use zei_algebra::bls12_381::BLSScalar;
 
 pub const NUM_OF_LIMBS: usize = 6;
 pub const BIT_PER_LIMB: usize = 43;

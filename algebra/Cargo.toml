@@ -1,16 +1,16 @@
 [package]
-name = "algebra"
+name = "zei-algebra"
+description = "Zei algebra library"
 version = "0.1.4"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2021"
-description = "Zei algebra commons"
 
 [lib]
-name = "algebra"
+name = "zei_algebra"
 crate-type = ["rlib"]
 
 [dependencies]
-utils = {path = "../utils" }
+zei-utils = {path = "../utils" }
 byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] }
 curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
 serde = "1.0"

@@ -1,6 +1,6 @@
 use super::rescue::{RescueCtr, RescueInstance};
-use algebra::bls12_381::BLSScalar;
 use std::str::FromStr;
+use zei_algebra::bls12_381::BLSScalar;
 
 // # of rounds
 const NR: usize = 12;
@@ -167,11 +167,11 @@ impl RescueCtr<BLSScalar> {
 #[cfg(test)]
 mod test {
     use crate::basics::hash::rescue::{RescueCtr, RescueInstance};
-    use algebra::traits::Scalar;
-    use algebra::{bls12_381::BLSScalar, One, Zero};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use std::str::FromStr;
+    use zei_algebra::traits::Scalar;
+    use zei_algebra::{bls12_381::BLSScalar, One, Zero};
 
     // Hash output on zero inputs
     const H0: &str =

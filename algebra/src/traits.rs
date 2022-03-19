@@ -9,7 +9,7 @@ use digest::{generic_array::typenum::U64, Digest};
 use ruc::err::*;
 use serde::{Deserialize, Serialize};
 use std::ops::{Neg, Sub, SubAssign};
-use utils::shift_u8_vec;
+use zei_utils::shift_u8_vec;
 
 /// The trait for scalars
 pub trait Scalar:

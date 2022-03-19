@@ -1,9 +1,9 @@
-use algebra::ristretto::RistrettoPoint;
-use algebra::traits::Group;
 use digest::Digest;
 use itertools::Itertools;
 use ruc::*;
-use utils::errors::ZeiError;
+use zei_algebra::ristretto::RistrettoPoint;
+use zei_algebra::traits::Group;
+use zei_utils::errors::ZeiError;
 
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

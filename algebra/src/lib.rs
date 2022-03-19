@@ -21,7 +21,7 @@
 )]
 
 #[macro_use]
-extern crate utils;
+extern crate zei_utils;
 
 /// Module for the BLS12-381 curve
 pub mod bls12_381;

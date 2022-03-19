@@ -11,10 +11,6 @@
 //! * `sign(m,sk)` => sample a random scalar `r` and compute `R=g^r`. Compute scalars `c=H(X,R,m)` and `s=r+cx`. Return `(R,s)`
 //! * `verify(m,pk,sig)` => parse `sig` as `(R,s)`. Compute `c=H(X,R,m)`. Check that `R.X^c == g^s`.
 
-use algebra::{
-    ops::*,
-    traits::{Group, Scalar},
-};
 use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
@@ -22,8 +18,12 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 use ruc::*;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
-use utils::errors::ZeiError;
-use utils::serialization::ZeiFromToBytes;
+use zei_algebra::{
+    ops::*,
+    traits::{Group, Scalar},
+};
+use zei_utils::errors::ZeiError;
+use zei_utils::serialization::ZeiFromToBytes;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(non_snake_case)]
@@ -347,11 +347,11 @@ mod schnorr_sigs {
 
     mod schnorr_simple_sig {
         use crate::basics::signatures::schnorr::{KeyPair, PublicKey, Signature};
-        use algebra::jubjub::JubjubPoint;
-        use algebra::ristretto::RistrettoPoint;
-        use algebra::{traits::Group, One};
         use rand_chacha::rand_core::SeedableRng;
-        use utils::serialization::ZeiFromToBytes;
+        use zei_algebra::jubjub::JubjubPoint;
+        use zei_algebra::ristretto::RistrettoPoint;
+        use zei_algebra::{traits::Group, One};
+        use zei_utils::serialization::ZeiFromToBytes;
 
         fn check_schnorr<G: Group>() {
             let seed = [0_u8; 32];
@@ -425,11 +425,11 @@ mod schnorr_sigs {
         use crate::basics::signatures::schnorr::{
             multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature,
         };
-        use algebra::jubjub::JubjubPoint;
-        use algebra::ristretto::RistrettoPoint;
-        use algebra::{traits::Group, One};
         use rand_chacha::rand_core::SeedableRng;
-        use utils::errors::ZeiError;
+        use zei_algebra::jubjub::JubjubPoint;
+        use zei_algebra::ristretto::RistrettoPoint;
+        use zei_algebra::{traits::Group, One};
+        use zei_utils::errors::ZeiError;
 
         fn check_schnorr_multisig<G: Group>() {
             let seed = [0_u8; 32];

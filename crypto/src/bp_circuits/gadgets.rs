@@ -1,12 +1,12 @@
 use crate::bp_circuits::cloak::CloakVariable;
-use algebra::ristretto::RistrettoScalar as Scalar;
-use algebra::{ops::*, traits::Scalar as _, One};
 use bulletproofs::r1cs::{
     ConstraintSystem, LinearCombination, R1CSError, RandomizableConstraintSystem,
     RandomizedConstraintSystem, Variable,
 };
 use ruc::*;
 use std::iter;
+use zei_algebra::ristretto::RistrettoScalar as Scalar;
+use zei_algebra::{ops::*, traits::Scalar as _, One};
 
 pub(crate) fn cloak_merge_gadget<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
@@ -223,11 +223,11 @@ mod test {
     use crate::bp_circuits::cloak::{
         allocate_cloak_vector, CloakCommitment, CloakValue, CloakVariable,
     };
-    use algebra::ristretto::RistrettoScalar;
-    use algebra::Zero;
     use bulletproofs::r1cs::{Prover, Verifier};
     use bulletproofs::{BulletproofGens, PedersenGens};
     use merlin::Transcript;
+    use zei_algebra::ristretto::RistrettoScalar;
+    use zei_algebra::Zero;
 
     #[test]
     fn test_cloak_merge() {

@@ -4,14 +4,14 @@ use crate::anon_creds::{
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use algebra::{
-    ops::*,
-    traits::{Group, Pairing, Scalar},
-};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use utils::errors::ZeiError;
+use zei_algebra::{
+    ops::*,
+    traits::{Group, Pairing, Scalar},
+};
+use zei_utils::errors::ZeiError;
 
 const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
 const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"Confidential AC Reveal PoK New Instance";
@@ -345,10 +345,10 @@ pub(crate) mod test_helper {
     };
     use crate::basics::elgamal::elgamal_key_gen;
     use crate::conf_cred_reveal::{ac_confidential_open_commitment, ac_confidential_open_verify};
-    use algebra::traits::{Group, Pairing, Scalar};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use utils::errors::ZeiError;
+    use zei_algebra::traits::{Group, Pairing, Scalar};
+    use zei_utils::errors::ZeiError;
 
     pub(super) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
         use digest::Digest;
@@ -507,7 +507,7 @@ pub(crate) mod test_helper {
 #[cfg(test)]
 mod test_bls12_381 {
     use crate::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
-    use algebra::bls12_381::BLSPairingEngine;
+    use zei_algebra::bls12_381::BLSPairingEngine;
 
     #[test]
     fn confidential_reveal_one_attr_hidden() {
@@ -555,8 +555,8 @@ mod test_bls12_381 {
 #[cfg(test)]
 mod test_serialization {
 
-    use algebra::bls12_381::BLSPairingEngine;
-    use algebra::traits::{Group, Pairing};
+    use zei_algebra::bls12_381::BLSPairingEngine;
+    use zei_algebra::traits::{Group, Pairing};
 
     use super::test_helper::byte_slice_to_scalar;
     use crate::anon_creds::{ac_commit, ac_sign};

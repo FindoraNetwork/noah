@@ -3,9 +3,9 @@ members = [
  "accumulators",
  "algebra",
  "crypto",
- "poly-iops",
+ "plonk",
  "utils",
- "zei_api",
+ "api",
 ]
 resolver = "2"
 

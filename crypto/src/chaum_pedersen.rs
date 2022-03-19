@@ -1,17 +1,17 @@
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::sigma::{sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use algebra::ristretto::RistrettoPoint;
-use algebra::ristretto::RistrettoScalar as Scalar;
-use algebra::{
-    ops::*,
-    traits::{Group, Scalar as _},
-    One, Zero,
-};
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
-use utils::errors::ZeiError;
+use zei_algebra::ristretto::RistrettoPoint;
+use zei_algebra::ristretto::RistrettoScalar as Scalar;
+use zei_algebra::{
+    ops::*,
+    traits::{Group, Scalar as _},
+    One, Zero,
+};
+use zei_utils::errors::ZeiError;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
@@ -230,7 +230,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     // proving knowledge of the discrete logarithm of 'z' given Z=g^z
     // However in this implementation it is convenient to have several Chaum-Pedersen proofs
     //  because these proofs can be batched.
-    // See for example zei_api/src/xfr/proofs.rs:batch_verify_confidential_asset
+    // See for example api/src/api/proofs.rs:batch_verify_confidential_asset
     let proof_zero = chaum_pedersen_prove_eq(
         transcript,
         prng,
