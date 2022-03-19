@@ -1,19 +1,28 @@
 [package]
-name = "accumulators"
-version = "0.1.0"
-authors = ["Findora <engineering@findora.org>"]
-edition = "2021"
-description = "Zei accumulators commons"
+name = 'zei-accumulators'
+version = '0.1.0'
+authors = ['Findora <engineering@findora.org>']
+edition = '2021'
+description = 'Zei accumulators commons'
 
 [lib]
-name = "accumulators"
-crate-type = ["rlib"]
+name = 'zei_accumulators'
+crate-type = ['rlib']
 
 [dependencies]
-zei-algebra = { path = "../algebra" }
-zei-crypto = { path = "../crypto" }
-itertools = "0.8.0"
-storage = { git = "https://github.com/FindoraNetwork/storage.git", tag = "v0.1.4" }
-ruc = "1.0"
-zei-utils = { path = "../utils" }
-parking_lot = "0.11.2"
+itertools = '0.8.0'
+ruc = '1.0'
+parking_lot = '0.11.2'
+
+[dependencies.zei-algebra]
+path = '../algebra'
+
+[dependencies.zei-crypto]
+path = '../crypto'
+
+[dependencies.zei-utils]
+path = '../utils'
+
+[dependencies.storage]
+git = 'https://github.com/FindoraNetwork/storage.git'
+tag = 'v0.1.4'

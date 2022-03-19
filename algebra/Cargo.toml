@@ -1,44 +1,94 @@
+[[bench]]
+name = 'msm'
+path = 'benches/msm.rs'
+harness = false
+
 [package]
-name = "zei-algebra"
-description = "Zei algebra library"
-version = "0.1.4"
-authors = ["Findora <engineering@findora.org>"]
-edition = "2021"
+name = 'zei-algebra'
+description = 'Zei algebra library'
+version = '0.1.4'
+authors = ['Findora <engineering@findora.org>']
+edition = '2021'
 
 [lib]
-name = "zei_algebra"
-crate-type = ["rlib"]
+name = 'zei_algebra'
+crate-type = ['rlib']
 
 [dependencies]
-zei-utils = {path = "../utils" }
-byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] }
-curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
-serde = "1.0"
-digest = "0.9"
-ruc = "1.0"
-wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
+serde = '1.0'
+digest = '0.9'
+ruc = '1.0'
 
-ark-ed-on-bls12-381 = { version = "^0.3.0",  default-features = false }
-ark-bls12-381 = { version = "^0.3.0", default-features = false, features = ["curve"] }
-ark-ec = { version = "^0.3.0", default-features = false }
-ark-ff = { version = "^0.3.0", default-features = false, features = [ "asm" ]  }
-ark-std = { version = "^0.3.0", default-features = false }
-ark-serialize = { version = "^0.3.0", default-features = false }
-rand_chacha = { version = "0.2", default-features = false }
-num-bigint = { version = "0.3" }
+[dependencies.zei-utils]
+path = '../utils'
+
+[dependencies.byteorder]
+version = '^1.2.3'
+default-features = false
+features = ['i128']
+
+[dependencies.curve25519-dalek]
+version = '3.0.0'
+features = ['serde']
+
+[dependencies.wasm-bindgen]
+version = '0.2.50'
+features = ['serde-serialize']
+
+[dependencies.ark-ed-on-bls12-381]
+version = '^0.3.0'
+default-features = false
+
+[dependencies.ark-bls12-381]
+version = '^0.3.0'
+default-features = false
+features = ['curve']
+
+[dependencies.ark-ec]
+version = '^0.3.0'
+default-features = false
+
+[dependencies.ark-ff]
+version = '^0.3.0'
+default-features = false
+features = ['asm']
+
+[dependencies.ark-std]
+version = '^0.3.0'
+default-features = false
+
+[dependencies.ark-serialize]
+version = '^0.3.0'
+default-features = false
+
+[dependencies.rand_chacha]
+version = '0.2'
+default-features = false
+
+[dependencies.num-bigint]
+version = '0.3'
 
 [features]
-default = ["std", "u64_backend"]
-std = ["curve25519-dalek/std", "ark-ed-on-bls12-381/std", "ark-bls12-381/std", "ark-ec/std", "ark-std/std", "ark-ff/std", "ark-serialize/std"]
-alloc = ["curve25519-dalek/alloc"]
-nightly = ["curve25519-dalek/nightly"]
-u64_backend = ["curve25519-dalek/u64_backend"]
-u32_backend = ["curve25519-dalek/u32_backend"]
-avx2_backend = ["curve25519-dalek/avx2_backend"]
-parallel = ["ark-ec/parallel", "ark-ff/parallel"]
-asm = [ "ark-ff/asm" ]
-
-[[bench]]
-name = "msm"
-path = "benches/msm.rs"
-harness = false 
+default = [
+    'std',
+    'u64_backend',
+]
+std = [
+    'curve25519-dalek/std',
+    'ark-ed-on-bls12-381/std',
+    'ark-bls12-381/std',
+    'ark-ec/std',
+    'ark-std/std',
+    'ark-ff/std',
+    'ark-serialize/std',
+]
+alloc = ['curve25519-dalek/alloc']
+nightly = ['curve25519-dalek/nightly']
+u64_backend = ['curve25519-dalek/u64_backend']
+u32_backend = ['curve25519-dalek/u32_backend']
+avx2_backend = ['curve25519-dalek/avx2_backend']
+parallel = [
+    'ark-ec/parallel',
+    'ark-ff/parallel',
+]
+asm = ['ark-ff/asm']
