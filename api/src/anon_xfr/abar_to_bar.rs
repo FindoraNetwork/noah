@@ -656,7 +656,7 @@ mod tests {
     use crate::xfr::asset_record::AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
     use crate::xfr::sig::XfrKeyPair;
     use crate::xfr::structs::AssetType;
-    use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
+    use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;

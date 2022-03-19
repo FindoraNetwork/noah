@@ -11,6 +11,7 @@ use zei_utils::serialization::ZeiFromToBytes;
 // 3^0 + 3^1 + 3^2 + ... 3^40 < 2^64 (u64 can include all leaf & ancestor)
 // store max num is 3^40 = 12157665459056928801 (max uid = 3^40 - 1)
 // sid   max num is 2^64 = 18446744073709551616 (max uid = 2^64 - 1)
+/// The depth of the Merkle tree
 pub const TREE_DEPTH: usize = 40;
 // 6078832729528464400 = 3^0 + 3^1 + 3^2 + ... 3^39, if change TREE_DEPTH, MUST update.
 const LEAF_START: u64 = 6078832729528464400;
@@ -31,7 +32,7 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 ///     use parking_lot::RwLock;
 ///     use storage::state::{ChainState, State};
 ///     use storage::store::PrefixedStore;
-///     use accumulators::merkle_tree::PersistentMerkleTree;
+///     use zei_accumulators::merkle_tree::PersistentMerkleTree;
 ///     use zei_algebra::bls12_381::BLSScalar;
 ///     use zei_algebra::groups::Zero;
 ///     use zei_zei_crypto::basics::hash::rescue::RescueInstance;
@@ -204,12 +205,12 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         })
     }
 
-    /// get tree current root.
+    /// get tree current root
     pub fn get_root(&self) -> Result<BLSScalar> {
         self.get_root_with_depth(TREE_DEPTH)
     }
 
-    /// get tree root by depth.
+    /// get tree root by depth
     pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
         let mut pos = 0u64;
         for i in 0..(TREE_DEPTH - depth) {
@@ -224,14 +225,14 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         }
     }
 
-    /// commit to store and add the tree version.
+    /// commit to store and add the tree version
     pub fn commit(&mut self) -> Result<u64> {
         let (_, ver) = self.store.state_mut().commit(self.version + 1).c(d!())?;
         self.version = ver;
         Ok(self.version)
     }
 
-    /// get leaf hash by uid.
+    /// get leaf hash by uid
     pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(uid.to_be_bytes());
@@ -242,16 +243,19 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         }
     }
 
+    /// get the tree version
     pub fn version(&self) -> u64 {
         self.version
     }
 
+    /// get the number of entries
     pub fn entry_count(&self) -> u64 {
         self.entry_count
     }
 }
 
-#[allow(dead_code)]
+/// The struct for an immutable, persistent Merkle tree,
+/// used to store the records in anonymous payment
 pub struct ImmutablePersistentMerkleTree<'a, D: MerkleDB> {
     entry_count: u64,
     version: u64,
@@ -259,7 +263,7 @@ pub struct ImmutablePersistentMerkleTree<'a, D: MerkleDB> {
 }
 
 impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
-    // Generates a new PersistentMerkleTree based on a sessioned KV store
+    /// generate a new PersistentMerkleTree based on a sessioned KV store
     pub fn new(
         store: ImmutablePrefixedStore<'a, D>,
     ) -> Result<ImmutablePersistentMerkleTree<'a, D>> {
@@ -281,12 +285,12 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         })
     }
 
-    /// generate leaf's merkle proof by uid.
+    /// generate leaf's merkle proof by uid
     pub fn generate_proof(&self, id: u64) -> Result<Proof> {
         self.generate_proof_with_depth(id, TREE_DEPTH)
     }
 
-    /// generate leaf's merkle proof by uid and the depth.
+    /// generate leaf's merkle proof by uid and the depth
     pub fn generate_proof_with_depth(&self, id: u64, depth: usize) -> Result<Proof> {
         if depth > TREE_DEPTH || id > 3u64.pow(depth as u32) {
             return Err(eg!("tree depth is invalid for generate proof"));
@@ -338,12 +342,12 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         })
     }
 
-    /// get tree current root.
+    /// get tree current root
     pub fn get_root(&self) -> Result<BLSScalar> {
         self.get_root_with_depth(TREE_DEPTH)
     }
 
-    /// get tree root by depth.
+    /// get tree root by depth
     pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
         let mut pos = 0u64;
         for i in 0..(TREE_DEPTH - depth) {
@@ -358,7 +362,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         }
     }
 
-    /// get leaf hash by uid.
+    /// get leaf hash by uid
     pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(uid.to_be_bytes());
@@ -368,6 +372,12 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
             None => Ok(None),
         }
     }
+
+    /// get the tree version
+    pub fn version(&self) -> u64 { self.version }
+
+    /// get the number of entries
+    pub fn entry_count(&self) -> u64 { self.entry_count }
 }
 
 /// verify merkle proof.
@@ -414,8 +424,11 @@ pub struct ProofNode {
 /// leaf position in the branch of the tree.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TreePath {
+    /// the left direction
     Left,
+    /// the current position
     Middle,
+    /// the right direction
     Right,
 }
 

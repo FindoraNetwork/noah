@@ -5,7 +5,7 @@ mod tests {
     use crate::anon_xfr::structs::{
         AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord,
     };
-    use accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
+    use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;

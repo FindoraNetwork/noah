@@ -1,22 +1,36 @@
 [package]
-name = "zei-utils"
-version = "0.1.4"
-authors = ["Findora <engineering@findora.org>"]
-edition = "2021"
-description = "Zei utility functions"
+name = 'zei-utils'
+version = '0.1.4'
+authors = ['Findora <engineering@findora.org>']
+edition = '2021'
+description = 'Zei utility functions'
 
 [lib]
-name = "zei_utils"
-crate-type = ["rlib"]
+name = 'zei_utils'
+crate-type = ['rlib']
 
 [dependencies]
-base64 = "0.10"
-bulletproofs = { package = "bulletproofs", git = "https://github.com/FindoraNetwork/bp", branch = "batch_verification", features = ["yoloproofs"] }
-curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
-x25519-dalek = "1.1"
-serde = "1.0"
-sha2 = "0.9.0"
-digest = "0.9"
-rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
-ruc = "1.0"
-rand_chacha = { version = "0.2", default-features = false }
+base64 = '0.10'
+x25519-dalek = '1.1'
+serde = '1.0'
+digest = '0.9'
+ruc = '1.0'
+
+[dependencies.bulletproofs]
+package = 'bulletproofs'
+git = 'https://github.com/FindoraNetwork/bp'
+branch = 'batch_verification'
+features = ['yoloproofs']
+
+[dependencies.curve25519-dalek]
+version = '3.0.0'
+features = ['serde']
+
+[dependencies.rand_core]
+version = '0.5'
+default-features = false
+features = ['alloc']
+
+[dependencies.rand_chacha]
+version = '0.2'
+default-features = false

@@ -338,7 +338,7 @@ mod tests {
     use std::thread;
 
     use crate::xfr::structs::AssetType;
-    use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
+    use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use zei_algebra::bls12_381::BLSScalar;
     use zei_algebra::{ops::*, traits::Scalar, One, Zero};
 
