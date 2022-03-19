@@ -14,7 +14,7 @@ aes = { version = "0.7.5", features = ["ctr"]}
 algebra = { path = "../algebra" }
 bulletproofs = { package = "bulletproofs", git = "https://github.com/FindoraNetwork/bp", branch = "batch_verification", features = ["yoloproofs"] }
 curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
-digest = "0.9"
+digest = "0.10"
 ed25519-dalek = "1.0.0"
 itertools = "0.8.0"
 merlin = "2.0"

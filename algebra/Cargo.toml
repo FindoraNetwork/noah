@@ -14,7 +14,7 @@ utils = {path = "../utils" }
 byteorder = { version = "^1.2.3", default-features = false, features = ["i128"] }
 curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
 serde = "1.0"
-digest = "0.9"
+digest = "0.10"
 ruc = "1.0"
 wasm-bindgen = { version = "0.2.50", features = ["serde-serialize"]  }
 
