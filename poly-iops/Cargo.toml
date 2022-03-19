@@ -23,7 +23,7 @@ num-integer = "0.1.43"
 num-traits = "0.2.12"
 rand = "0.7.3"
 rand_chacha = "0.2.1"
-rand_core = "0.5.1"
+rand_core = "0.6.3"
 ruc = "1.0"
 serde = { version = "1.0.115", features = ["derive"] }
 serde_derive = "1.0.115"
