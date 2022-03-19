@@ -21,7 +21,7 @@ crypto = { path = "../crypto" }
 curve25519-dalek = { version =  "3.0.0", features = ["serde"] }
 digest = "0.9"
 ed25519-dalek = "1.0.0"
-itertools = "0.8.0"
+itertools = "0.10.3"
 linear-map = "1.2.0"
 merlin = "2.0"
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }

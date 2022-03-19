@@ -12,7 +12,7 @@ crate-type = ["rlib"]
 [dependencies]
 algebra = { path = "../algebra" }
 crypto = { path = "../crypto" }
-itertools = "0.8.0"
+itertools = "0.10.3"
 storage = { git = "https://github.com/FindoraNetwork/storage.git", tag = "v0.1.4" }
 ruc = "1.0"
 utils = { path = "../utils" }
