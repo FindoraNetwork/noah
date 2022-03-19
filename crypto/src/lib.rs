@@ -18,7 +18,6 @@ pub mod bp_circuits;
 pub mod bp_range_proofs;
 pub mod chaum_pedersen;
 pub mod conf_cred_reveal;
-pub mod dlog;
 pub mod field_simulation;
 pub mod pc_eq_rescue_split_verifier_zk_part;
 pub mod pedersen_elgamal;
