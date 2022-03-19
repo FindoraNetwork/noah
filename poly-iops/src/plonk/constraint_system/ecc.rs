@@ -1,7 +1,9 @@
 use algebra::{
     bls12_381::BLSScalar,
-    groups::{Group, GroupArithmetic, One, Scalar, ScalarArithmetic, Zero},
     jubjub::JubjubPoint,
+    ops::*,
+    traits::{Group, Scalar},
+    One, Zero,
 };
 
 use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
@@ -72,9 +74,8 @@ impl PointVar {
 
 /// `d = -(10240/10241)` in little-endian byte order
 const EDWARDS_D: [u8; 32] = [
-    0xb1, 0x3e, 0x34, 0xd6, 0xd6, 0x5f, 0x06, 0x01, 0x26, 0x9d, 0x57, 0x37, 0x6d, 0x7f,
-    0x2d, 0x29, 0xd4, 0x7f, 0xbd, 0xe6, 0x07, 0x92, 0xfd, 0xf5, 0x48, 0x2b, 0xfa, 0x4b,
-    0xe7, 0x18, 0x93, 0x2a,
+    0xb1, 0x3e, 0x34, 0xd6, 0xd6, 0x5f, 0x06, 0x01, 0x26, 0x9d, 0x57, 0x37, 0x6d, 0x7f, 0x2d, 0x29,
+    0xd4, 0x7f, 0xbd, 0xe6, 0x07, 0x92, 0xfd, 0xf5, 0x48, 0x2b, 0xfa, 0x4b, 0xe7, 0x18, 0x93, 0x2a,
 ];
 
 /// Given a base point [G] and a scalar s, denote as s[G] the scalar multiplication
@@ -122,12 +123,7 @@ impl TurboConstraintSystem<BLSScalar> {
     /// y3 = x1 * x2 + y1 * y2 + d * x1 * y1 * x2 * y2 * y3
     /// wirings: w1 = x1, w2 = x2, w3 = y1, w4 = y2, w_out = y3
     /// selectors: qm1 = 1, qm2 = 1, q_ecc = d, qo = 1
-    fn insert_ecc_add_gate(
-        &mut self,
-        p1_var: &PointVar,
-        p2_var: &PointVar,
-        p_out_var: &PointVar,
-    ) {
+    fn insert_ecc_add_gate(&mut self, p1_var: &PointVar, p2_var: &PointVar, p_out_var: &PointVar) {
         assert!(p1_var.0 < self.num_vars, "p1.x variable index out of bound");
         assert!(p1_var.1 < self.num_vars, "p1.y variable index out of bound");
         assert!(p2_var.0 < self.num_vars, "p2.x variable index out of bound");
@@ -376,8 +372,7 @@ impl TurboConstraintSystem<BLSScalar> {
                 b_scalar_var[2 * i],
                 b_scalar_var[2 * i + 1],
             );
-            p_var_ext =
-                self.ecc_add(&p_var_ext.0, &tmp_var_ext.0, &p_var_ext.1, &tmp_var_ext.1);
+            p_var_ext = self.ecc_add(&p_var_ext.0, &tmp_var_ext.0, &p_var_ext.1, &tmp_var_ext.1);
         }
         (p_var_ext.0, p_var_ext.1)
     }
@@ -387,8 +382,10 @@ impl TurboConstraintSystem<BLSScalar> {
 mod test {
     use algebra::{
         bls12_381::BLSScalar,
-        groups::{Group, GroupArithmetic, One, Scalar, Zero},
         jubjub::{JubjubPoint, JubjubScalar},
+        ops::*,
+        traits::{Group, Scalar},
+        One, Zero,
     };
     use ruc::*;
 
@@ -440,8 +437,8 @@ mod test {
 
         // compute secret scalar
         let scalar_bytes = [
-            17, 144, 47, 113, 34, 14, 11, 207, 13, 116, 200, 201, 17, 33, 101, 116, 0,
-            59, 51, 1, 2, 39, 13, 56, 69, 175, 41, 111, 134, 180, 0, 0,
+            17, 144, 47, 113, 34, 14, 11, 207, 13, 116, 200, 201, 17, 33, 101, 116, 0, 59, 51, 1,
+            2, 39, 13, 56, 69, 175, 41, 111, 134, 180, 0, 0,
         ];
         let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
         let jubjub_scalar = JubjubScalar::from_bytes(&scalar_bytes).unwrap(); // safe unwrap
@@ -488,8 +485,8 @@ mod test {
 
         // compute secret scalar
         let scalar_bytes = [
-            17, 144, 47, 113, 34, 14, 11, 207, 13, 116, 200, 201, 17, 33, 101, 116, 0,
-            59, 51, 1, 2, 39, 13, 56, 69, 175, 41, 111, 134, 180, 0, 0,
+            17, 144, 47, 113, 34, 14, 11, 207, 13, 116, 200, 201, 17, 33, 101, 116, 0, 59, 51, 1,
+            2, 39, 13, 56, 69, 175, 41, 111, 134, 180, 0, 0,
         ];
         let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
         let jubjub_scalar = JubjubScalar::from_bytes(&scalar_bytes).unwrap(); // safe unwrap
@@ -503,8 +500,7 @@ mod test {
 
         // check that the output point is consistent
         let expected_point = var_base.mul(&jubjub_scalar);
-        let (res, res_point) =
-            cs.var_base_scalar_mul(base_var, var_base, scalar_var, 256);
+        let (res, res_point) = cs.var_base_scalar_mul(base_var, var_base, scalar_var, 256);
         assert_eq!(res_point, expected_point);
         assert_eq!(cs.witness[res.0], expected_point.get_x());
         assert_eq!(cs.witness[res.1], expected_point.get_y());

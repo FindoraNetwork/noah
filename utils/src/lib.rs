@@ -6,7 +6,8 @@ pub mod macros;
 pub mod serialization;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
 use ruc::*;
 use std::fs::File;
 use std::io::Write;
@@ -44,13 +45,11 @@ macro_rules! serialize_deserialize {
                 D: serde::Deserializer<'de>,
             {
                 let bytes = if deserializer.is_human_readable() {
-                    deserializer.deserialize_str(
-                        utils::serialization::zei_obj_serde::BytesVisitor,
-                    )?
+                    deserializer
+                        .deserialize_str(utils::serialization::zei_obj_serde::BytesVisitor)?
                 } else {
-                    deserializer.deserialize_bytes(
-                        utils::serialization::zei_obj_serde::BytesVisitor,
-                    )?
+                    deserializer
+                        .deserialize_bytes(utils::serialization::zei_obj_serde::BytesVisitor)?
                 };
                 $t::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
             }
@@ -102,16 +101,15 @@ pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>> {
     base64::decode_config(input, base64::URL_SAFE).c(d!())
 }
 
-pub fn derive_prng_from_hash<D, R>(hash: D) -> R
+pub fn derive_prng_from_hash<D>(hash: D) -> ChaCha20Rng
 where
     D: Digest<OutputSize = U64> + Default,
-    R: CryptoRng + RngCore + SeedableRng<Seed = [u8; 32]>,
 {
     const SEED_SIZE: usize = 32;
     let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
     let result = hash.finalize();
     seed.copy_from_slice(&result[0..SEED_SIZE]);
-    R::from_seed(seed)
+    ChaCha20Rng::from_seed(seed)
 }
 
 /// I shift a big integer (represented as a littleendian bytes vector) by one bit.

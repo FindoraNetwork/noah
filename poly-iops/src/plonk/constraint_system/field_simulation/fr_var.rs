@@ -1,10 +1,6 @@
-use algebra::{
-    bls12_381::BLSScalar,
-    groups::{One as ArkOne, ScalarArithmetic, Zero as ArkZero},
-};
+use algebra::{bls12_381::BLSScalar, ops::*};
 use crypto::field_simulation::{
-    ristretto_scalar_field_sub_pad_in_limbs, SimFr, BIT_PER_LIMB, NUM_OF_LIMBS,
-    NUM_OF_LIMBS_MUL,
+    ristretto_scalar_field_sub_pad_in_limbs, SimFr, BIT_PER_LIMB, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
@@ -30,11 +26,7 @@ impl SimFrVar {
         }
     }
 
-    pub fn sub(
-        &self,
-        cs: &mut TurboConstraintSystem<BLSScalar>,
-        other: &SimFrVar,
-    ) -> SimFrVar {
+    pub fn sub(&self, cs: &mut TurboConstraintSystem<BLSScalar>, other: &SimFrVar) -> SimFrVar {
         let mut res = SimFrVar::new(cs);
         res.val = &self.val - &other.val;
 
@@ -69,11 +61,7 @@ impl SimFrVar {
         res
     }
 
-    pub fn mul(
-        &self,
-        cs: &mut TurboConstraintSystem<BLSScalar>,
-        other: &SimFrVar,
-    ) -> SimFrMulVar {
+    pub fn mul(&self, cs: &mut TurboConstraintSystem<BLSScalar>, other: &SimFrVar) -> SimFrMulVar {
         let mut res = SimFrMulVar::new(cs);
         res.val = &self.val * &other.val;
 
@@ -91,8 +79,8 @@ impl SimFrVar {
             let mut prior_res_val = BLSScalar::zero();
             let mut prior_res = cs.zero_var();
             for left in left_array {
-                let res_val = prior_res_val
-                    .add(&self.val.limbs[left].mul(&other.val.limbs[i - left]));
+                let res_val =
+                    prior_res_val.add(&self.val.limbs[left].mul(&other.val.limbs[i - left]));
                 let res = cs.new_variable(res_val);
 
                 // The following gate represents
@@ -121,10 +109,7 @@ impl SimFrVar {
         res
     }
 
-    pub fn alloc_constant(
-        cs: &mut TurboConstraintSystem<BLSScalar>,
-        val: &SimFr,
-    ) -> Self {
+    pub fn alloc_constant(cs: &mut TurboConstraintSystem<BLSScalar>, val: &SimFr) -> Self {
         let mut res = Self::new(cs);
         res.val = val.clone();
         for i in 0..NUM_OF_LIMBS {
@@ -134,10 +119,7 @@ impl SimFrVar {
         res
     }
 
-    pub fn alloc_witness(
-        cs: &mut TurboConstraintSystem<BLSScalar>,
-        val: &SimFr,
-    ) -> Self {
+    pub fn alloc_witness(cs: &mut TurboConstraintSystem<BLSScalar>, val: &SimFr) -> Self {
         assert!(val.num_of_additions_over_normal_form.is_zero());
 
         let mut res = Self::new(cs);
@@ -206,10 +188,7 @@ mod test {
         assert!(cs.verify_witness(&witness[..], &[]).is_ok());
     }
 
-    fn test_sim_fr_mul_equality(
-        cs: TurboConstraintSystem<BLSScalar>,
-        val: &SimFrMulVar,
-    ) {
+    fn test_sim_fr_mul_equality(cs: TurboConstraintSystem<BLSScalar>, val: &SimFrMulVar) {
         let mut cs = cs;
         for i in 0..NUM_OF_LIMBS_MUL {
             cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
@@ -328,8 +307,7 @@ mod test {
         {
             let mut cs = TurboConstraintSystem::<BLSScalar>::new();
 
-            let a_sim_fr_var =
-                SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+            let a_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
             test_sim_fr_equality(cs, &a_sim_fr_var);
         }
     }

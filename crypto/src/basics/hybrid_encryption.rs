@@ -2,8 +2,8 @@ use aes::{
     cipher::{generic_array::GenericArray, NewCipher, StreamCipher},
     Aes256Ctr,
 };
-use algebra::groups::Scalar as _;
 use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::traits::Scalar as _;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use rand_core::{CryptoRng, RngCore};
@@ -156,10 +156,7 @@ pub fn hybrid_decrypt_with_x25519_secret_key(
     ctext: &ZeiHybridCipher,
     sec_key: &XSecretKey,
 ) -> Vec<u8> {
-    let key = symmetric_key_from_x25519_secret_key(
-        &sec_key.key,
-        &ctext.ephemeral_public_key.key,
-    );
+    let key = symmetric_key_from_x25519_secret_key(&sec_key.key, &ctext.ephemeral_public_key.key);
     symmetric_decrypt_fresh_key(&key, &ctext.ciphertext)
 }
 
@@ -304,8 +301,7 @@ mod test {
         let msg = b"this is another message";
 
         let cipherbox = hybrid_encrypt_with_sign_key(&mut prng, &key_pair.public, msg);
-        let plaintext =
-            hybrid_decrypt_with_ed25519_secret_key(&cipherbox, &key_pair.secret);
+        let plaintext = hybrid_decrypt_with_ed25519_secret_key(&cipherbox, &key_pair.secret);
         assert_eq!(msg, plaintext.as_slice());
     }
 }

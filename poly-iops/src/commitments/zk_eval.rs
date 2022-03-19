@@ -12,12 +12,10 @@
  6) Verifier check proof using C_XS and accepts if S(z) - alpha(z) = y*c (in the field)
 */
 
-use crate::commitments::pcs::{
-    HidingPCS, HomomorphicPolyComElem, PolyComScheme, ShiftPCS,
-};
+use crate::commitments::pcs::{HidingPCS, HomomorphicPolyComElem, PolyComScheme, ShiftPCS};
 use crate::commitments::transcript::PolyComTranscript;
 use crate::polynomials::field_polynomial::FpPolynomial;
-use algebra::groups::{Scalar, ScalarArithmetic, Zero};
+use algebra::{ops::*, traits::Scalar, Zero};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -42,8 +40,7 @@ fn init_non_hiding_poly_zk_eval_transcript<PCS: PolyComScheme>(
     point: &PCS::Field,
     eval: &PCS::Field,
 ) {
-    transcript
-        .append_message(b"Domain Separator", b"New Non-Hiding Poly ZK-Eval Protocol");
+    transcript.append_message(b"Domain Separator", b"New Non-Hiding Poly ZK-Eval Protocol");
     transcript_append_params::<PCS>(transcript, degree, commitment, point, eval);
 }
 
@@ -54,7 +51,7 @@ fn transcript_append_params<PCS: PolyComScheme>(
     point: &PCS::Field,
     eval: &PCS::Field,
 ) {
-    transcript.append_message(b"field size", &PCS::Field::get_field_size_lsf_bytes());
+    transcript.append_message(b"field size", &PCS::Field::get_field_size_le_bytes());
     transcript.append_u64(b"degree", degree as u64);
     transcript.append_commitment::<PCS::Commitment>(commitment);
     transcript.append_field_elem(point);
@@ -104,7 +101,7 @@ pub fn prove_zk_eval<R: CryptoRng + RngCore, PCS: PolyComScheme>(
 
     let c = transcript.get_challenge_field_elem::<PCS::Field>(ZK_EVAL_CHALLENGE);
 
-    let mut response = c.mul(&blind);
+    let mut response = c.mul(blind);
     response.add_assign(&alpha_blind);
 
     transcript.append_field_elem(&response);

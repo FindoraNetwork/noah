@@ -11,7 +11,7 @@
 // 3. Return s_0.
 use crate::basics::hash::rescue::RescueInstance;
 use algebra::bls12_381::BLSScalar;
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 
 pub struct PRF<S>(RescueInstance<S>);
 
@@ -21,7 +21,7 @@ impl<S: Scalar> PRF<S> {
     /// * `msgs` - PRF inputs
     pub fn eval(&self, key: &S, msgs: &[S]) -> S {
         let width = self.0.state_size();
-        let mut state = vec![S::from_u32(0); width];
+        let mut state = vec![S::zero(); width];
         state[width - 1] = *key;
         // Each round can absorb `width` messages, so it takes \ceil{n/width} rounds to absorb all of
         // the n messages
@@ -55,8 +55,7 @@ impl PRF<BLSScalar> {
 mod test {
     use crate::basics::hash::rescue::RescueInstance;
     use crate::basics::prf::PRF;
-    use algebra::bls12_381::BLSScalar;
-    use algebra::groups::{Scalar, ScalarArithmetic};
+    use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
 
@@ -66,10 +65,10 @@ mod test {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let key = BLSScalar::random(&mut prng);
         let mut input = vec![
-            BLSScalar::from_u32(1),
-            BLSScalar::from_u32(2),
-            BLSScalar::from_u32(3),
-            BLSScalar::from_u32(4),
+            BLSScalar::from(1u32),
+            BLSScalar::from(2u32),
+            BLSScalar::from(3u32),
+            BLSScalar::from(4u32),
         ];
         let output = prf.eval(&key, &input);
 
@@ -81,20 +80,20 @@ mod test {
         assert_eq!(output, expected_output[0]);
 
         input = vec![
-            BLSScalar::from_u32(1),
-            BLSScalar::from_u32(2),
-            BLSScalar::from_u32(3),
-            BLSScalar::from_u32(4),
-            BLSScalar::from_u32(5),
+            BLSScalar::from(1u32),
+            BLSScalar::from(2u32),
+            BLSScalar::from(3u32),
+            BLSScalar::from(4u32),
+            BLSScalar::from(5u32),
         ];
         let output = prf.eval(&key, &input);
 
         // the first sponge round
         let mut state = vec![
-            BLSScalar::from_u32(1),
-            BLSScalar::from_u32(2),
-            BLSScalar::from_u32(3),
-            BLSScalar::from_u32(4).add(&key),
+            BLSScalar::from(1u32),
+            BLSScalar::from(2u32),
+            BLSScalar::from(3u32),
+            BLSScalar::from(4u32).add(&key),
         ];
         state = hash.rescue_hash(&state);
         // the second sponge round

@@ -1,4 +1,4 @@
-use algebra::groups::Scalar;
+use algebra::traits::Scalar;
 use ruc::*;
 
 pub mod ecc;
@@ -101,8 +101,7 @@ pub trait ConstraintSystem: Sized {
 
     /// Given the wires values of a gate, evaluate the coefficients of the selectors in the
     /// constraint equation.
-    fn eval_selector_multipliers(wire_vals: &[&Self::Field])
-        -> Result<Vec<Self::Field>>;
+    fn eval_selector_multipliers(wire_vals: &[&Self::Field]) -> Result<Vec<Self::Field>>;
 
     fn is_verifier_only(&self) -> bool {
         false

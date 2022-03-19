@@ -1,7 +1,7 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret,
-    PayerSecret, TurboPlonkCS, TREE_DEPTH,
+    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret,
+    TurboPlonkCS, TREE_DEPTH,
 };
 use algebra::bls12_381::BLSScalar;
 
@@ -13,9 +13,9 @@ use crate::parameters::{
     ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
     RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
-use algebra::groups::Zero;
 use algebra::jubjub::JubjubScalar;
 use algebra::ristretto::RistrettoScalar;
+use algebra::Zero;
 use bulletproofs::BulletproofGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
@@ -94,11 +94,7 @@ impl Default for PublicParams {
 }
 
 impl UserParams {
-    pub fn new(
-        n_payers: usize,
-        n_payees: usize,
-        tree_depth: Option<usize>,
-    ) -> Result<UserParams> {
+    pub fn new(n_payers: usize, n_payees: usize, tree_depth: Option<usize>) -> Result<UserParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
 
         let (cs, _) = match tree_depth {
@@ -132,8 +128,7 @@ impl UserParams {
         let proof = ZKPartProof::default();
         let non_zk_state = NonZKState::default();
         let beta = RistrettoScalar::zero();
-        let (cs, _) =
-            build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
+        let (cs, _) = build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
 
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
@@ -208,8 +203,7 @@ impl UserParams {
             blind: Default::default(),
             asset_type: Default::default(),
         };
-        let (cs, _) =
-            build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
+        let (cs, _) = build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
 
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs: KZGCommitmentSchemeBLS =
@@ -242,10 +236,9 @@ impl NodeParams {
         } else {
             match (VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS) {
                 (Some(c_bytes), Some(s_bytes)) => {
-                    let common: NodeParamsSplitCommon = bincode::deserialize(c_bytes)
-                        .c(d!(ZeiError::DeserializationError))?;
-                    let specials: Vec<Vec<Vec<u8>>> =
-                        bincode::deserialize(s_bytes).unwrap();
+                    let common: NodeParamsSplitCommon =
+                        bincode::deserialize(c_bytes).c(d!(ZeiError::DeserializationError))?;
+                    let specials: Vec<Vec<Vec<u8>>> = bincode::deserialize(s_bytes).unwrap();
                     let special: NodeParamsSplitSpecial =
                         bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
                             .c(d!(ZeiError::DeserializationError))?;
@@ -330,7 +323,7 @@ mod test {
     use crate::parameters::SRS;
     use crate::setup::{NodeParams, UserParams};
     use algebra::bls12_381::{BLSScalar, BLSG1};
-    use algebra::groups::{Group, GroupArithmetic, One, ScalarArithmetic};
+    use algebra::{ops::*, traits::Group, One};
     use itertools::Itertools;
     use poly_iops::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
     use poly_iops::commitments::pcs::PolyComScheme;

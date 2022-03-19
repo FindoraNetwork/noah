@@ -1,11 +1,8 @@
-use algebra::{
-    bls12_381::BLSScalar,
-    groups::{One, Scalar, ScalarArithmetic, Zero as ArkZero},
-};
+use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One};
 use crypto::field_simulation::{
     ristretto_scalar_field_in_biguint, ristretto_scalar_field_in_limbs,
-    ristretto_scalar_field_sub_pad_in_limbs, SimFr, SimFrMul, BIT_PER_LIMB,
-    NUM_OF_GROUPS, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
+    ristretto_scalar_field_sub_pad_in_limbs, SimFr, SimFrMul, BIT_PER_LIMB, NUM_OF_GROUPS,
+    NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
 use num_bigint::BigUint;
 use num_integer::Integer;
@@ -35,11 +32,7 @@ impl SimFrMulVar {
         }
     }
 
-    pub fn sub(
-        &self,
-        cs: &mut TurboConstraintSystem<BLSScalar>,
-        other: &SimFrVar,
-    ) -> SimFrMulVar {
+    pub fn sub(&self, cs: &mut TurboConstraintSystem<BLSScalar>, other: &SimFrVar) -> SimFrMulVar {
         let mut res = self.clone();
         res.val = &self.val - &other.val;
 
@@ -96,7 +89,7 @@ impl SimFrMulVar {
         assert!(rem.is_zero());
 
         // For safety, make sure `k` is not too big.
-        assert!(k.lt(&r_biguint.shl(5)));
+        assert!(k.lt(&r_biguint.shl(5u32)));
 
         let r_limbs = ristretto_scalar_field_in_limbs().to_vec();
         let k_limbs = SimFr::from(&k).limbs.to_vec();
@@ -162,8 +155,7 @@ impl SimFrMulVar {
 
         for i in 0..NUM_OF_GROUPS {
             if i * 2 + 1 < NUM_OF_LIMBS_MUL {
-                let res =
-                    self.val.limbs[2 * i].add(&self.val.limbs[2 * i + 1].mul(&step));
+                let res = self.val.limbs[2 * i].add(&self.val.limbs[2 * i + 1].mul(&step));
                 left_group.push(res);
 
                 let var = cs.linear_combine(
@@ -214,10 +206,7 @@ impl SimFrMulVar {
         for (
             group_id,
             (
-                (
-                    ((left_group_limb, right_group_limb), left_group_limb_var),
-                    right_group_limb_var,
-                ),
+                (((left_group_limb, right_group_limb), left_group_limb_var), right_group_limb_var),
                 num_limbs_in_this_group,
             ),
         ) in left_group
@@ -229,9 +218,7 @@ impl SimFrMulVar {
             .enumerate()
         {
             let pad = BigUint::from(1u32).shl(
-                (num_limbs_in_this_group + 1) * BIT_PER_LIMB
-                    + num_limbs_in_this_group
-                    + surfeit,
+                (num_limbs_in_this_group + 1) * BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
             let pad_limb = BLSScalar::from(&pad);
             assert!(pad > <&BLSScalar as Into<BigUint>>::into(right_group_limb));
@@ -242,21 +229,17 @@ impl SimFrMulVar {
                 .add(&pad_limb)
                 .sub(&right_group_limb);
             let carry_biguint: BigUint = (&carry).into();
-            carry = BLSScalar::from(
-                &carry_biguint.shr(num_limbs_in_this_group * BIT_PER_LIMB),
-            );
+            carry = BLSScalar::from(&carry_biguint.shr(num_limbs_in_this_group * BIT_PER_LIMB));
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
 
             let carry_var = cs.new_variable(carry);
 
-            let (new_accumulated_extra, remainder_biguint) = accumulated_extra.div_rem(
-                &BigUint::from(1u64).shl(BIT_PER_LIMB * num_limbs_in_this_group),
-            );
+            let (new_accumulated_extra, remainder_biguint) = accumulated_extra
+                .div_rem(&BigUint::from(1u64).shl(BIT_PER_LIMB * num_limbs_in_this_group));
             let remainder = BLSScalar::from(&remainder_biguint);
 
-            let carry_shift = (&BigUint::from(1u32)
-                .shl(BIT_PER_LIMB * num_limbs_in_this_group))
-                .into();
+            let carry_shift =
+                (&BigUint::from(1u32).shl(BIT_PER_LIMB * num_limbs_in_this_group)).into();
             {
                 // The following gate represents
                 // - left_group_limb - carry_in + right_group_limb_var
@@ -364,11 +347,9 @@ mod test {
         let ab_fr = &a * &b;
         let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
         let ab_reduced_manipulated = SimFr::from(&ab_fr_reduced_manipulated);
-        let ab_reduced_manipulated_val =
-            SimFrVar::alloc_witness(&mut cs, &ab_reduced_manipulated);
+        let ab_reduced_manipulated_val = SimFrVar::alloc_witness(&mut cs, &ab_reduced_manipulated);
 
-        let zero_supposed_manipulated =
-            ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);
+        let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);
         zero_supposed_manipulated.enforce_zero(&mut cs);
     }
 }

@@ -1,6 +1,6 @@
 use crate::bp_circuits::cloak::CloakVariable;
-use algebra::groups::{Scalar as _, ScalarArithmetic};
 use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::{ops::*, traits::Scalar as _, One};
 use bulletproofs::r1cs::{
     ConstraintSystem, LinearCombination, R1CSError, RandomizableConstraintSystem,
     RandomizedConstraintSystem, Variable,
@@ -84,8 +84,7 @@ pub(super) fn cloak_shuffle_gadget<CS: RandomizableConstraintSystem>(
     let l = input.len();
     if l != permuted.len() {
         return Err(eg!(R1CSError::GadgetError {
-            description: "list shuffle error, input and output list differ in length"
-                .to_string(),
+            description: "list shuffle error, input and output list differ in length".to_string(),
         }));
     }
     if l == 0 {
@@ -135,8 +134,7 @@ pub(super) fn list_shuffle<CS: RandomizedConstraintSystem>(
     let l = input.len();
     if l != permuted.len() {
         return Err(eg!(R1CSError::GadgetError {
-            description: "list shuffle error, input and output list differ in length"
-                .to_string(),
+            description: "list shuffle error, input and output list differ in length".to_string(),
         }));
     }
     if l == 0 {
@@ -150,8 +148,7 @@ pub(super) fn list_shuffle<CS: RandomizedConstraintSystem>(
     let challenge = cs.challenge_scalar(b"shuffle challenge");
 
     // Make last x multiplier for i = l-1 and l-2
-    let (_, _, last_mulx_out) =
-        cs.multiply(input[l - 1] - challenge, input[l - 2] - challenge);
+    let (_, _, last_mulx_out) = cs.multiply(input[l - 1] - challenge, input[l - 2] - challenge);
 
     // Make multipliers for x from i == [0, l-3]
     let first_mulx_out = (0..l - 2).rev().fold(last_mulx_out, |prev_out, i| {
@@ -182,7 +179,7 @@ pub fn range_proof_64<CS: ConstraintSystem>(
     mut var: LinearCombination,
     value: Option<Scalar>,
 ) -> Result<usize> {
-    let mut exp_2 = Scalar::from_u32(1);
+    let mut exp_2 = Scalar::one();
     let n_usize = 64usize;
     let value_bytes = value.as_ref().map(|v| v.to_bytes());
     for i in 0..n_usize {
@@ -195,10 +192,7 @@ pub fn range_proof_64<CS: ConstraintSystem>(
                     return Err(eg!(R1CSError::FormatError));
                 }
                 let bit = ((bytes[index] >> (i & 7)) & 1u8) as i8;
-                let assignment = (
-                    Scalar::from_u32(1 - bit as u32),
-                    Scalar::from_u32(bit as u32),
-                );
+                let assignment = (Scalar::from(1 - bit as u32), Scalar::from(bit as u32));
                 cs.allocate_multiplier(Some(assignment).map(|(a, b)| (a.0, b.0)))
             }
             None => cs.allocate_multiplier(None),
@@ -229,8 +223,8 @@ mod test {
     use crate::bp_circuits::cloak::{
         allocate_cloak_vector, CloakCommitment, CloakValue, CloakVariable,
     };
-    use algebra::groups::Scalar;
     use algebra::ristretto::RistrettoScalar;
+    use algebra::Zero;
     use bulletproofs::r1cs::{Prover, Verifier};
     use bulletproofs::{BulletproofGens, PedersenGens};
     use merlin::Transcript;
@@ -240,63 +234,50 @@ mod test {
         let pc_gens = PedersenGens::default();
 
         let sorted_values = vec![
-            CloakValue::new(RistrettoScalar::from_u32(1), RistrettoScalar::from_u32(10)),
-            CloakValue::new(RistrettoScalar::from_u32(3), RistrettoScalar::from_u32(10)),
-            CloakValue::new(RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(11)),
-            CloakValue::new(RistrettoScalar::from_u32(5), RistrettoScalar::from_u32(11)),
-            CloakValue::new(RistrettoScalar::from_u32(4), RistrettoScalar::from_u32(12)),
+            CloakValue::new(RistrettoScalar::from(1u32), RistrettoScalar::from(10u32)),
+            CloakValue::new(RistrettoScalar::from(3u32), RistrettoScalar::from(10u32)),
+            CloakValue::new(RistrettoScalar::from(2u32), RistrettoScalar::from(11u32)),
+            CloakValue::new(RistrettoScalar::from(5u32), RistrettoScalar::from(11u32)),
+            CloakValue::new(RistrettoScalar::from(4u32), RistrettoScalar::from(12u32)),
         ];
 
         let mid_values = vec![
-            CloakValue::new(RistrettoScalar::from_u32(4), RistrettoScalar::from_u32(10)),
-            CloakValue::new(RistrettoScalar::from_u32(2), RistrettoScalar::from_u32(11)),
-            CloakValue::new(RistrettoScalar::from_u32(7), RistrettoScalar::from_u32(11)),
+            CloakValue::new(RistrettoScalar::from(4u32), RistrettoScalar::from(10u32)),
+            CloakValue::new(RistrettoScalar::from(2u32), RistrettoScalar::from(11u32)),
+            CloakValue::new(RistrettoScalar::from(7u32), RistrettoScalar::from(11u32)),
         ];
         let out_values = vec![
-            CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(10)),
-            CloakValue::new(RistrettoScalar::from_u32(4), RistrettoScalar::from_u32(10)),
-            CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(11)),
-            CloakValue::new(RistrettoScalar::from_u32(7), RistrettoScalar::from_u32(11)),
-            CloakValue::new(RistrettoScalar::from_u32(4), RistrettoScalar::from_u32(12)),
+            CloakValue::new(RistrettoScalar::zero(), RistrettoScalar::from(10u32)),
+            CloakValue::new(RistrettoScalar::from(4u32), RistrettoScalar::from(10u32)),
+            CloakValue::new(RistrettoScalar::zero(), RistrettoScalar::from(11u32)),
+            CloakValue::new(RistrettoScalar::from(7u32), RistrettoScalar::from(11u32)),
+            CloakValue::new(RistrettoScalar::from(4u32), RistrettoScalar::from(12u32)),
         ];
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
-        let sorted = allocate_cloak_vector(
-            &mut prover,
-            Some(&sorted_values),
-            sorted_values.len(),
-        )
-        .unwrap();
-        let mid =
-            allocate_cloak_vector(&mut prover, Some(&mid_values), mid_values.len())
-                .unwrap();
+        let sorted =
+            allocate_cloak_vector(&mut prover, Some(&sorted_values), sorted_values.len()).unwrap();
+        let mid = allocate_cloak_vector(&mut prover, Some(&mid_values), mid_values.len()).unwrap();
         let added =
-            allocate_cloak_vector(&mut prover, Some(&out_values), out_values.len())
-                .unwrap();
+            allocate_cloak_vector(&mut prover, Some(&out_values), out_values.len()).unwrap();
         let num_wires =
-            super::cloak_merge_gadget(&mut prover, &sorted[..], &mid[..], &added[..])
-                .unwrap();
+            super::cloak_merge_gadget(&mut prover, &sorted[..], &mid[..], &added[..]).unwrap();
         let bp_gens = BulletproofGens::new(
-            (num_wires + 2 * (sorted.len() + mid.len() + added.len()))
-                .next_power_of_two(),
+            (num_wires + 2 * (sorted.len() + mid.len() + added.len())).next_power_of_two(),
             1,
         );
         let proof = prover.prove(&bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
         let mut verifier = Verifier::new(&mut verifier_transcript);
-        let sorted =
-            allocate_cloak_vector(&mut verifier, None, sorted_values.len()).unwrap();
+        let sorted = allocate_cloak_vector(&mut verifier, None, sorted_values.len()).unwrap();
         let mid = allocate_cloak_vector(&mut verifier, None, mid_values.len()).unwrap();
-        let added =
-            allocate_cloak_vector(&mut verifier, None, out_values.len()).unwrap();
+        let added = allocate_cloak_vector(&mut verifier, None, out_values.len()).unwrap();
         let num_wires =
-            super::cloak_merge_gadget(&mut verifier, &sorted[..], &mid[..], &added[..])
-                .unwrap();
+            super::cloak_merge_gadget(&mut verifier, &sorted[..], &mid[..], &added[..]).unwrap();
         let bp_gens = BulletproofGens::new(
-            (num_wires + 2 * (sorted.len() + mid.len() + added.len()))
-                .next_power_of_two(),
+            (num_wires + 2 * (sorted.len() + mid.len() + added.len())).next_power_of_two(),
             1,
         );
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
@@ -309,28 +290,17 @@ mod test {
             .map(|value| {
                 value.commit_prover(
                     &mut prover,
-                    &CloakValue::new(
-                        RistrettoScalar::from_u32(1),
-                        RistrettoScalar::from_u32(2),
-                    ),
+                    &CloakValue::new(RistrettoScalar::from(1u32), RistrettoScalar::from(2u32)),
                 )
             })
             .collect();
-        let mid =
-            allocate_cloak_vector(&mut prover, Some(&mid_values), mid_values.len())
-                .unwrap();
+        let mid = allocate_cloak_vector(&mut prover, Some(&mid_values), mid_values.len()).unwrap();
         let added =
-            allocate_cloak_vector(&mut prover, Some(&out_values), out_values.len())
-                .unwrap();
+            allocate_cloak_vector(&mut prover, Some(&out_values), out_values.len()).unwrap();
         let sorted_vars: Vec<CloakVariable> =
             sorted_coms_vars.iter().map(|(_, var)| *var).collect();
-        let num_wires = super::cloak_merge_gadget(
-            &mut prover,
-            &sorted_vars[..],
-            &mid[..],
-            &added[..],
-        )
-        .unwrap();
+        let num_wires =
+            super::cloak_merge_gadget(&mut prover, &sorted_vars[..], &mid[..], &added[..]).unwrap();
         let num_wires = num_wires + added.len() + mid.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
@@ -344,15 +314,10 @@ mod test {
             .map(|com| com.commit_verifier(&mut verifier))
             .collect();
         let mid = allocate_cloak_vector(&mut verifier, None, mid_values.len()).unwrap();
-        let added =
-            allocate_cloak_vector(&mut verifier, None, out_values.len()).unwrap();
-        let num_wires = super::cloak_merge_gadget(
-            &mut verifier,
-            &sorted_vars[..],
-            &mid[..],
-            &added[..],
-        )
-        .unwrap();
+        let added = allocate_cloak_vector(&mut verifier, None, out_values.len()).unwrap();
+        let num_wires =
+            super::cloak_merge_gadget(&mut verifier, &sorted_vars[..], &mid[..], &added[..])
+                .unwrap();
         let num_wires = num_wires + added.len() + mid.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
@@ -362,120 +327,65 @@ mod test {
     fn test_shuffle() {
         let pc_gens = PedersenGens::default();
         let input_values = vec![
-            CloakValue::new(
-                RistrettoScalar::from_u32(10),
-                RistrettoScalar::from_u32(10),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(20),
-                RistrettoScalar::from_u32(20),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(30),
-                RistrettoScalar::from_u32(30),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(40),
-                RistrettoScalar::from_u32(40),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(50),
-                RistrettoScalar::from_u32(50),
-            ),
+            CloakValue::new(RistrettoScalar::from(10u32), RistrettoScalar::from(10u32)),
+            CloakValue::new(RistrettoScalar::from(20u32), RistrettoScalar::from(20u32)),
+            CloakValue::new(RistrettoScalar::from(30u32), RistrettoScalar::from(30u32)),
+            CloakValue::new(RistrettoScalar::from(40u32), RistrettoScalar::from(40u32)),
+            CloakValue::new(RistrettoScalar::from(50u32), RistrettoScalar::from(50u32)),
         ];
 
         let shuffled_values = vec![
-            CloakValue::new(
-                RistrettoScalar::from_u32(20),
-                RistrettoScalar::from_u32(20),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(40),
-                RistrettoScalar::from_u32(40),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(10),
-                RistrettoScalar::from_u32(10),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(50),
-                RistrettoScalar::from_u32(50),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(30),
-                RistrettoScalar::from_u32(30),
-            ),
+            CloakValue::new(RistrettoScalar::from(20u32), RistrettoScalar::from(20u32)),
+            CloakValue::new(RistrettoScalar::from(40u32), RistrettoScalar::from(40u32)),
+            CloakValue::new(RistrettoScalar::from(10u32), RistrettoScalar::from(10u32)),
+            CloakValue::new(RistrettoScalar::from(50u32), RistrettoScalar::from(50u32)),
+            CloakValue::new(RistrettoScalar::from(30u32), RistrettoScalar::from(30u32)),
         ];
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
         let input =
-            allocate_cloak_vector(&mut prover, Some(&input_values), input_values.len())
+            allocate_cloak_vector(&mut prover, Some(&input_values), input_values.len()).unwrap();
+        let shuffled =
+            allocate_cloak_vector(&mut prover, Some(&shuffled_values), shuffled_values.len())
                 .unwrap();
-        let shuffled = allocate_cloak_vector(
-            &mut prover,
-            Some(&shuffled_values),
-            shuffled_values.len(),
-        )
-        .unwrap();
         let num_wires =
-            super::cloak_shuffle_gadget(&mut prover, input.to_vec(), shuffled.to_vec())
-                .unwrap();
+            super::cloak_shuffle_gadget(&mut prover, input.to_vec(), shuffled.to_vec()).unwrap();
         let num_wires = num_wires + input.len() + shuffled.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
         let mut verifier = Verifier::new(&mut verifier_transcript);
-        let input =
-            allocate_cloak_vector(&mut verifier, None, input_values.len()).unwrap();
-        let shuffled =
-            allocate_cloak_vector(&mut verifier, None, shuffled_values.len()).unwrap();
-        super::cloak_shuffle_gadget(&mut verifier, input.to_vec(), shuffled.to_vec())
-            .unwrap();
+        let input = allocate_cloak_vector(&mut verifier, None, input_values.len()).unwrap();
+        let shuffled = allocate_cloak_vector(&mut verifier, None, shuffled_values.len()).unwrap();
+        super::cloak_shuffle_gadget(&mut verifier, input.to_vec(), shuffled.to_vec()).unwrap();
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
 
         let bad_shuffle_values = vec![
-            CloakValue::new(RistrettoScalar::from_u32(0), RistrettoScalar::from_u32(0)),
-            CloakValue::new(
-                RistrettoScalar::from_u32(40),
-                RistrettoScalar::from_u32(40),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(10),
-                RistrettoScalar::from_u32(10),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(50),
-                RistrettoScalar::from_u32(50),
-            ),
-            CloakValue::new(
-                RistrettoScalar::from_u32(30),
-                RistrettoScalar::from_u32(30),
-            ),
+            CloakValue::new(RistrettoScalar::zero(), RistrettoScalar::zero()),
+            CloakValue::new(RistrettoScalar::from(40u32), RistrettoScalar::from(40u32)),
+            CloakValue::new(RistrettoScalar::from(10u32), RistrettoScalar::from(10u32)),
+            CloakValue::new(RistrettoScalar::from(50u32), RistrettoScalar::from(50u32)),
+            CloakValue::new(RistrettoScalar::from(30u32), RistrettoScalar::from(30u32)),
         ];
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
         let input = allocate_cloak_vector(&mut prover, Some(&input_values), 0).unwrap();
-        let bad_shuffle =
-            allocate_cloak_vector(&mut prover, Some(&bad_shuffle_values), 0).unwrap();
+        let bad_shuffle = allocate_cloak_vector(&mut prover, Some(&bad_shuffle_values), 0).unwrap();
         let num_wires =
-            super::cloak_shuffle_gadget(&mut prover, input.to_vec(), bad_shuffle)
-                .unwrap();
+            super::cloak_shuffle_gadget(&mut prover, input.to_vec(), bad_shuffle).unwrap();
         let num_wires = num_wires + input.len() + shuffled.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
         let mut verifier = Verifier::new(&mut verifier_transcript);
-        let input =
-            allocate_cloak_vector(&mut verifier, None, input_values.len()).unwrap();
+        let input = allocate_cloak_vector(&mut verifier, None, input_values.len()).unwrap();
         let bad_shuffle =
-            allocate_cloak_vector(&mut verifier, None, bad_shuffle_values.len())
-                .unwrap();
-        super::cloak_shuffle_gadget(&mut verifier, input.to_vec(), bad_shuffle.to_vec())
-            .unwrap();
+            allocate_cloak_vector(&mut verifier, None, bad_shuffle_values.len()).unwrap();
+        super::cloak_shuffle_gadget(&mut verifier, input.to_vec(), bad_shuffle.to_vec()).unwrap();
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_err());
     }
 }

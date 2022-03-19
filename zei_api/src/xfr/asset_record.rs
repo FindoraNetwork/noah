@@ -1,14 +1,14 @@
 use crate::api::anon_creds::{
-    ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr,
-    AttributeCiphertext, ConfidentialAC, Credential,
+    ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
+    ConfidentialAC, Credential,
 };
 use crate::xfr::sig::{XfrKeyPair, XfrPublicKey};
 use crate::xfr::structs::{
-    AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord,
-    OwnerMemo, TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
+    AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
+    TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
 };
-use algebra::groups::Zero;
 use algebra::ristretto::RistrettoScalar as Scalar;
+use algebra::Zero;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -31,15 +31,9 @@ impl AssetRecordType {
     pub fn get_flags(self) -> (bool, bool) {
         // confidential amount, confidential asset type
         match self {
-            AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => {
-                (false, false)
-            }
-            AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
-                (true, false)
-            }
-            AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => {
-                (false, true)
-            }
+            AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => (false, false),
+            AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => (true, false),
+            AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => (false, true),
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType => (true, true),
         }
     }
@@ -68,15 +62,9 @@ impl AssetRecordType {
 
     pub fn from_flags(conf_amt: bool, conf_type: bool) -> Self {
         match (conf_amt, conf_type) {
-            (false, false) => {
-                AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
-            }
-            (true, false) => {
-                AssetRecordType::ConfidentialAmount_NonConfidentialAssetType
-            }
-            (false, true) => {
-                AssetRecordType::NonConfidentialAmount_ConfidentialAssetType
-            }
+            (false, false) => AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
+            (true, false) => AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
+            (false, true) => AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
             (true, true) => AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         }
     }
@@ -99,9 +87,7 @@ impl AssetRecord {
     /// Build a record input from OpenAssetRecord with an associated policy that has no identity tracing
     /// Important: It assumes that RecordInput will be used as an input to xfr_note_gen and not as an output
     /// since OpenAsset record was recovered from a BlindAsset record. This means owner_memo field is be None.
-    pub fn from_open_asset_record_with_asset_tracing_but_no_identity<
-        R: CryptoRng + RngCore,
-    >(
+    pub fn from_open_asset_record_with_asset_tracing_but_no_identity<R: CryptoRng + RngCore>(
         prng: &mut R,
         oar: OpenAssetRecord,
         asset_tracing_policies: TracingPolicies,
@@ -114,25 +100,29 @@ impl AssetRecord {
                 return Err(eg!(ZeiError::ParameterError)); // should use from_open_asset_record_with_identity_tracing method
             }
 
-            let (amount_info, asset_type_info) =
-                if asset_tracing_policy.asset_tracing {
-                    let amount_info = match oar.get_record_type() {
-          AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
-          | AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => None,
-          _ => {
-            let amount = u64_to_u32_pair(oar.amount);
-            Some((amount.0, amount.1, &oar.amount_blinds.0, &oar.amount_blinds.1))
-          }
-        };
-                    let asset_type_info = match oar.get_record_type() {
-          AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
-          | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
-          _ => Some((&oar.asset_type, &oar.type_blind)),
-        };
-                    (amount_info, asset_type_info)
-                } else {
-                    (None, None)
+            let (amount_info, asset_type_info) = if asset_tracing_policy.asset_tracing {
+                let amount_info = match oar.get_record_type() {
+                    AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
+                    | AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => None,
+                    _ => {
+                        let amount = u64_to_u32_pair(oar.amount);
+                        Some((
+                            amount.0,
+                            amount.1,
+                            &oar.amount_blinds.0,
+                            &oar.amount_blinds.1,
+                        ))
+                    }
                 };
+                let asset_type_info = match oar.get_record_type() {
+                    AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
+                    | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
+                    _ => Some((&oar.asset_type, &oar.type_blind)),
+                };
+                (amount_info, asset_type_info)
+            } else {
+                (None, None)
+            };
             let asset_tracer_memo = TracerMemo::new(
                 prng,
                 &asset_tracing_policy.enc_keys,
@@ -168,54 +158,57 @@ impl AssetRecord {
         let mut identity_proofs = vec![];
         for asset_tracing_policy in asset_tracing_policies.get_policies().iter() {
             // 1. compute tracer_memo
-            let (amount_info, asset_type_info) =
-                if asset_tracing_policy.asset_tracing {
-                    let amount_info = match oar.get_record_type() {
-          AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
-          | AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => None,
-          _ => {
-            let amount = u64_to_u32_pair(oar.amount);
-            Some((amount.0, amount.1, &oar.amount_blinds.0, &oar.amount_blinds.1))
-          }
-        };
-                    let asset_type_info = match oar.get_record_type() {
-          AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
-          | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
-          _ => Some((&oar.asset_type, &oar.type_blind)),
-        };
-                    (amount_info, asset_type_info)
-                } else {
-                    (None, None)
-                };
-
-            let (attrs_and_ctexts, proof) =
-                match asset_tracing_policy.identity_tracing.as_ref() {
-                    Some(id_policy) => {
-                        // 1. check for inconsistency errors
-                        if credential.issuer_pub_key != id_policy.cred_issuer_pub_key {
-                            return Err(eg!(ZeiError::ParameterError));
-                        }
-                        let (attrs_ctext, proof) = ac_confidential_open_commitment(
-                            prng,
-                            credential_sec_key,
-                            credential,
-                            credential_commitment_key,
-                            &asset_tracing_policy.enc_keys.attrs_enc_key,
-                            id_policy.reveal_map.as_slice(),
-                            &[],
-                        )
-                        .c(d!())?
-                        .get_fields();
-                        let attrs = credential
-                            .get_revealed_attributes(id_policy.reveal_map.as_slice())
-                            .c(d!())?;
-                        let attrs_and_ctexts: Vec<(Attr, AttributeCiphertext)> =
-                            attrs.into_iter().zip(attrs_ctext).collect();
-
-                        (attrs_and_ctexts, Some(proof))
+            let (amount_info, asset_type_info) = if asset_tracing_policy.asset_tracing {
+                let amount_info = match oar.get_record_type() {
+                    AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
+                    | AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => None,
+                    _ => {
+                        let amount = u64_to_u32_pair(oar.amount);
+                        Some((
+                            amount.0,
+                            amount.1,
+                            &oar.amount_blinds.0,
+                            &oar.amount_blinds.1,
+                        ))
                     }
-                    None => (vec![], None),
                 };
+                let asset_type_info = match oar.get_record_type() {
+                    AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
+                    | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => None,
+                    _ => Some((&oar.asset_type, &oar.type_blind)),
+                };
+                (amount_info, asset_type_info)
+            } else {
+                (None, None)
+            };
+
+            let (attrs_and_ctexts, proof) = match asset_tracing_policy.identity_tracing.as_ref() {
+                Some(id_policy) => {
+                    // 1. check for inconsistency errors
+                    if credential.issuer_pub_key != id_policy.cred_issuer_pub_key {
+                        return Err(eg!(ZeiError::ParameterError));
+                    }
+                    let (attrs_ctext, proof) = ac_confidential_open_commitment(
+                        prng,
+                        credential_sec_key,
+                        credential,
+                        credential_commitment_key,
+                        &asset_tracing_policy.enc_keys.attrs_enc_key,
+                        id_policy.reveal_map.as_slice(),
+                        &[],
+                    )
+                    .c(d!())?
+                    .get_fields();
+                    let attrs = credential
+                        .get_revealed_attributes(id_policy.reveal_map.as_slice())
+                        .c(d!())?;
+                    let attrs_and_ctexts: Vec<(Attr, AttributeCiphertext)> =
+                        attrs.into_iter().zip(attrs_ctext).collect();
+
+                    (attrs_and_ctexts, Some(proof))
+                }
+                None => (vec![], None),
+            };
             let asset_tracer_memo = TracerMemo::new(
                 prng,
                 &asset_tracing_policy.enc_keys,
@@ -239,19 +232,14 @@ impl AssetRecord {
         prng: &mut R,
         template: &AssetRecordTemplate,
     ) -> Result<AssetRecord> {
-        let empty_id_proofs_and_ctext =
-            vec![(None, vec![]); template.asset_tracing_policies.len()];
+        let empty_id_proofs_and_ctext = vec![(None, vec![]); template.asset_tracing_policies.len()];
         for policy in template.asset_tracing_policies.get_policies().iter() {
             if policy.identity_tracing.is_some() {
                 return Err(eg!(ZeiError::ParameterError));
             }
         }
-        build_record_input_from_template(
-            prng,
-            &template,
-            empty_id_proofs_and_ctext.as_slice(),
-        )
-        .c(d!())
+        build_record_input_from_template(prng, &template, empty_id_proofs_and_ctext.as_slice())
+            .c(d!())
     }
 
     pub fn from_template_with_identity_tracing<R: CryptoRng + RngCore>(
@@ -261,35 +249,32 @@ impl AssetRecord {
         credential: &Credential,
         credential_key: &ACCommitmentKey,
     ) -> Result<AssetRecord> {
-        let mut id_proofs_and_attrs =
-            Vec::with_capacity(template.asset_tracing_policies.len());
+        let mut id_proofs_and_attrs = Vec::with_capacity(template.asset_tracing_policies.len());
         for policy in template.asset_tracing_policies.get_policies().iter() {
-            let (conf_id, attrs) =
-                if let Some(reveal_policy) = policy.identity_tracing.as_ref() {
-                    (
-                        Some(
-                            ac_confidential_open_commitment(
-                                prng,
-                                credential_user_sec_key,
-                                credential,
-                                credential_key,
-                                &policy.enc_keys.attrs_enc_key,
-                                &reveal_policy.reveal_map,
-                                &[],
-                            )
-                            .c(d!())?,
-                        ),
-                        credential
-                            .get_revealed_attributes(reveal_policy.reveal_map.as_slice())
-                            .c(d!())?,
-                    )
-                } else {
-                    (None, vec![])
-                };
+            let (conf_id, attrs) = if let Some(reveal_policy) = policy.identity_tracing.as_ref() {
+                (
+                    Some(
+                        ac_confidential_open_commitment(
+                            prng,
+                            credential_user_sec_key,
+                            credential,
+                            credential_key,
+                            &policy.enc_keys.attrs_enc_key,
+                            &reveal_policy.reveal_map,
+                            &[],
+                        )
+                        .c(d!())?,
+                    ),
+                    credential
+                        .get_revealed_attributes(reveal_policy.reveal_map.as_slice())
+                        .c(d!())?,
+                )
+            } else {
+                (None, vec![])
+            };
             id_proofs_and_attrs.push((conf_id, attrs));
         }
-        build_record_input_from_template(prng, &template, id_proofs_and_attrs.as_slice())
-            .c(d!())
+        build_record_input_from_template(prng, &template, id_proofs_and_attrs.as_slice()).c(d!())
     }
 }
 
@@ -350,12 +335,9 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
             ),
 
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
-                let (owner_memo, amount_blinds) = OwnerMemo::from_amount(
-                    prng,
-                    asset_record.amount,
-                    &asset_record.public_key,
-                )
-                .unwrap(); // safe unwrap
+                let (owner_memo, amount_blinds) =
+                    OwnerMemo::from_amount(prng, asset_record.amount, &asset_record.public_key)
+                        .unwrap(); // safe unwrap
 
                 (
                     XfrAmount::from_blinds(
@@ -381,11 +363,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 
                 (
                     XfrAmount::NonConfidential(asset_record.amount),
-                    XfrAssetType::from_blind(
-                        &pc_gens,
-                        &asset_record.asset_type,
-                        &asset_type_blind,
-                    ),
+                    XfrAssetType::from_blind(&pc_gens, &asset_record.asset_type, &asset_type_blind),
                     (Scalar::zero(), Scalar::zero()),
                     asset_type_blind,
                     Some(owner_memo),
@@ -408,11 +386,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
                         &amount_blinds.0,
                         &amount_blinds.1,
                     ),
-                    XfrAssetType::from_blind(
-                        &pc_gens,
-                        &asset_record.asset_type,
-                        &asset_type_blind,
-                    ),
+                    XfrAssetType::from_blind(&pc_gens, &asset_record.asset_type, &asset_type_blind),
                     amount_blinds,
                     asset_type_blind,
                     Some(owner_memo),
@@ -434,8 +408,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
         if policy.asset_tracing {
             if asset_record.asset_record_type.is_confidential_amount() {
                 let (amount_lo, amount_hi) = utils::u64_to_u32_pair(asset_record.amount);
-                amount_info =
-                    Some((amount_lo, amount_hi, &amount_blinds.0, &amount_blinds.1));
+                amount_info = Some((amount_lo, amount_hi, &amount_blinds.0, &amount_blinds.1));
             }
             if asset_record.asset_record_type.is_confidential_asset_type() {
                 asset_type_info = Some((&asset_record.asset_type, &asset_type_blind));
@@ -543,8 +516,7 @@ pub fn open_blind_asset_record(
         AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => {
             let owner_memo = owner_memo.as_ref().c(d!(ZeiError::ParameterError))?;
             let asset_type = owner_memo.decrypt_asset_type(&keypair).c(d!())?;
-            let asset_type_blind =
-                owner_memo.derive_asset_type_blind(&keypair).c(d!())?;
+            let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair).c(d!())?;
             (
                 input.amount.get_amount().c(d!(ZeiError::ParameterError))?,
                 asset_type,
@@ -558,8 +530,7 @@ pub fn open_blind_asset_record(
             let (amount, asset_type) =
                 owner_memo.decrypt_amount_and_asset_type(&keypair).c(d!())?;
             let amount_blinds = owner_memo.derive_amount_blinds(&keypair).c(d!())?;
-            let asset_type_blind =
-                owner_memo.derive_asset_type_blind(&keypair).c(d!())?;
+            let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair).c(d!())?;
 
             (amount, asset_type, amount_blinds, asset_type_blind)
         }
@@ -599,8 +570,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
             (None, _) => (vec![], None),
             (Some(conf_ac), attrs) => {
                 let (c, p) = conf_ac.clone().get_fields();
-                let attrs_and_ctexts =
-                    attrs.iter().zip(c).map(|(a, c)| (*a, c)).collect();
+                let attrs_and_ctexts = attrs.iter().zip(c).map(|(a, c)| (*a, c)).collect();
                 (attrs_and_ctexts, Some(p))
             }
         };
@@ -621,17 +591,14 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
 
 #[cfg(test)]
 mod test {
-    use super::{
-        build_blind_asset_record, build_open_asset_record, open_blind_asset_record,
-    };
+    use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
     use crate::xfr::asset_record::AssetRecordType;
     use crate::xfr::sig::XfrKeyPair;
     use crate::xfr::structs::{
-        AssetRecordTemplate, AssetTracerKeyPair, AssetType, OpenAssetRecord,
-        TracingPolicies, TracingPolicy, XfrAmount, XfrAssetType,
+        AssetRecordTemplate, AssetTracerKeyPair, AssetType, OpenAssetRecord, TracingPolicies,
+        TracingPolicy, XfrAmount, XfrAssetType,
     };
     use crate::xfr::tests::{create_xfr, gen_key_pair_vec};
-    use algebra::groups::Scalar as _;
     use algebra::ristretto::RistrettoScalar as Scalar;
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use itertools::Itertools;
@@ -640,10 +607,7 @@ mod test {
     use rand_core::SeedableRng;
     use utils::u64_to_u32_pair;
 
-    fn do_test_build_open_asset_record(
-        record_type: AssetRecordType,
-        asset_tracing: bool,
-    ) {
+    fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracing: bool) {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
@@ -696,13 +660,12 @@ mod test {
         if confidential_amount {
             let (low, high) = u64_to_u32_pair(amount);
             let commitment_low = pc_gens
-                .commit(Scalar::from_u32(low), open_ar.amount_blinds.0)
+                .commit(Scalar::from(low), open_ar.amount_blinds.0)
                 .compress();
             let commitment_high = pc_gens
-                .commit(Scalar::from_u32(high), open_ar.amount_blinds.1)
+                .commit(Scalar::from(high), open_ar.amount_blinds.1)
                 .compress();
-            expected_bar_amount =
-                XfrAmount::Confidential((commitment_low, commitment_high));
+            expected_bar_amount = XfrAmount::Confidential((commitment_low, commitment_high));
         } else {
             expected_bar_amount = XfrAmount::NonConfidential(amount)
             //expected_bar_lock_amount_none = true;
@@ -835,10 +798,10 @@ mod test {
         if confidential_amount {
             let (low, high) = u64_to_u32_pair(open_ar.amount);
             let commitment_low = pc_gens
-                .commit(Scalar::from_u32(low), open_ar.amount_blinds.0)
+                .commit(Scalar::from(low), open_ar.amount_blinds.0)
                 .compress();
             let commitment_high = pc_gens
-                .commit(Scalar::from_u32(high), open_ar.amount_blinds.1)
+                .commit(Scalar::from(high), open_ar.amount_blinds.1)
                 .compress();
             let derived_commitment = (commitment_low, commitment_high);
             assert_eq!(
@@ -864,28 +827,14 @@ mod test {
 
     #[test]
     fn test_open_asset_record() {
-        do_test_open_asset_record(
-            AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-        );
-        do_test_open_asset_record(
-            AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
-        );
-        do_test_open_asset_record(
-            AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-        );
-        do_test_open_asset_record(
-            AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-        );
-        do_test_open_asset_record(
-            AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-        );
+        do_test_open_asset_record(AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType);
+        do_test_open_asset_record(AssetRecordType::NonConfidentialAmount_ConfidentialAssetType);
+        do_test_open_asset_record(AssetRecordType::ConfidentialAmount_NonConfidentialAssetType);
+        do_test_open_asset_record(AssetRecordType::ConfidentialAmount_ConfidentialAssetType);
+        do_test_open_asset_record(AssetRecordType::ConfidentialAmount_ConfidentialAssetType);
     }
 
-    fn build_and_open_blind_record(
-        record_type: AssetRecordType,
-        amt: u64,
-        asset_type: AssetType,
-    ) {
+    fn build_and_open_blind_record(record_type: AssetRecordType, amt: u64, asset_type: AssetType) {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
 
@@ -900,8 +849,7 @@ mod test {
         let (blind_rec, _asset_tracer_memo, owner_memo) =
             build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
 
-        let open_rec =
-            open_blind_asset_record(&blind_rec, &owner_memo, &keypair).unwrap();
+        let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &keypair).unwrap();
 
         assert_eq!(*open_rec.get_amount(), amt);
         assert_eq!(*open_rec.get_asset_type(), asset_type);

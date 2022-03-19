@@ -22,15 +22,14 @@ pub(crate) mod xfr_note_complex_variable_size {
         ) = setup_with_policies(n);
         let sender_key_pairs_ref = sender_key_pairs.iter().collect_vec();
 
-        let (ar_ins, output_asset_records) =
-            prepare_inputs_and_outputs_with_policies_single_asset(
-                sender_key_pairs_ref.as_slice(),
-                user_ac_sks,
-                credentials,
-                ac_commitment_keys,
-                Some(asset_tracing_policy_asset_input.clone()),
-                n,
-            );
+        let (ar_ins, output_asset_records) = prepare_inputs_and_outputs_with_policies_single_asset(
+            sender_key_pairs_ref.as_slice(),
+            user_ac_sks,
+            credentials,
+            ac_commitment_keys,
+            Some(asset_tracing_policy_asset_input.clone()),
+            n,
+        );
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let xfr_body = gen_xfr_body(

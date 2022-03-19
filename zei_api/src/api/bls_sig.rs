@@ -1,26 +1,21 @@
 // BLS Signatures
-use algebra::bls12_381::Bls12381;
+use algebra::bls12_381::BLSPairingEngine;
 use crypto::basics::signatures::{AggSignature, Signature};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 
-pub type BlsSecretKey = crypto::basics::signatures::bls::BlsSecretKey<Bls12381>;
-pub type BlsPublicKey = crypto::basics::signatures::bls::BlsPublicKey<Bls12381>;
-pub type BlsSignature = crypto::basics::signatures::bls::BlsSignature<Bls12381>;
+pub type BlsSecretKey = crypto::basics::signatures::bls::BlsSecretKey<BLSPairingEngine>;
+pub type BlsPublicKey = crypto::basics::signatures::bls::BlsPublicKey<BLSPairingEngine>;
+pub type BlsSignature = crypto::basics::signatures::bls::BlsSignature<BLSPairingEngine>;
 
 /// bls key generation function
-pub fn bls_gen_keys<R: CryptoRng + RngCore>(
-    prng: &mut R,
-) -> (BlsSecretKey, BlsPublicKey) {
-    crypto::basics::signatures::bls::bls_gen_keys::<_, Bls12381>(prng)
+pub fn bls_gen_keys<R: CryptoRng + RngCore>(prng: &mut R) -> (BlsSecretKey, BlsPublicKey) {
+    crypto::basics::signatures::bls::bls_gen_keys::<_, BLSPairingEngine>(prng)
 }
 
 /// bls signature function
-pub fn bls_sign<B: AsRef<[u8]>>(
-    signing_key: &BlsSecretKey,
-    message: &B,
-) -> BlsSignature {
-    crypto::basics::signatures::bls::bls_sign::<Bls12381, B>(signing_key, message)
+pub fn bls_sign<B: AsRef<[u8]>>(signing_key: &BlsSecretKey, message: &B) -> BlsSignature {
+    crypto::basics::signatures::bls::bls_sign::<BLSPairingEngine, B>(signing_key, message)
 }
 
 /// bls verification function
@@ -29,18 +24,13 @@ pub fn bls_verify<B: AsRef<[u8]>>(
     message: &B,
     signature: &BlsSignature,
 ) -> Result<()> {
-    crypto::basics::signatures::bls::bls_verify::<Bls12381, B>(
-        ver_key, message, signature,
-    )
-    .c(d!())
+    crypto::basics::signatures::bls::bls_verify::<BLSPairingEngine, B>(ver_key, message, signature)
+        .c(d!())
 }
 
 /// aggregate signature (for a single common message)
-pub fn bls_aggregate(
-    ver_keys: &[&BlsPublicKey],
-    signatures: &[&BlsSignature],
-) -> BlsSignature {
-    crypto::basics::signatures::bls::bls_aggregate::<Bls12381>(ver_keys, signatures)
+pub fn bls_aggregate(ver_keys: &[&BlsPublicKey], signatures: &[&BlsSignature]) -> BlsSignature {
+    crypto::basics::signatures::bls::bls_aggregate::<BLSPairingEngine>(ver_keys, signatures)
 }
 
 /// Verification of an aggregated signature for a common message
@@ -49,7 +39,7 @@ pub fn bls_verify_aggregated<B: AsRef<[u8]>>(
     message: &B,
     agg_signature: &BlsSignature,
 ) -> Result<()> {
-    crypto::basics::signatures::bls::bls_verify_aggregated::<Bls12381, B>(
+    crypto::basics::signatures::bls::bls_verify_aggregated::<BLSPairingEngine, B>(
         ver_keys,
         message,
         agg_signature,
@@ -63,7 +53,7 @@ pub fn bls_batch_verify<B: AsRef<[u8]>>(
     messages: &[B],
     signatures: &[BlsSignature],
 ) -> Result<()> {
-    crypto::basics::signatures::bls::bls_batch_verify::<Bls12381, B>(
+    crypto::basics::signatures::bls::bls_batch_verify::<BLSPairingEngine, B>(
         ver_keys, messages, signatures,
     )
     .c(d!())
@@ -71,7 +61,7 @@ pub fn bls_batch_verify<B: AsRef<[u8]>>(
 
 /// signature aggregation for (possibly) different messages
 pub fn bls_add_signatures(signatures: &[BlsSignature]) -> BlsSignature {
-    crypto::basics::signatures::bls::bls_add_signatures::<Bls12381>(signatures)
+    crypto::basics::signatures::bls::bls_add_signatures::<BLSPairingEngine>(signatures)
 }
 
 /// verification of an aggregated signatures for different messages
@@ -80,7 +70,7 @@ pub fn bls_batch_verify_added_signatures<B: AsRef<[u8]>>(
     messages: &[B],
     signature: &BlsSignature,
 ) -> Result<()> {
-    crypto::basics::signatures::bls::bls_batch_verify_added_signatures::<Bls12381, B>(
+    crypto::basics::signatures::bls::bls_batch_verify_added_signatures::<BLSPairingEngine, B>(
         ver_keys, messages, signature,
     )
     .c(d!())
@@ -98,11 +88,7 @@ impl Signature for Bls {
     fn sign<B: AsRef<[u8]>>(sk: &Self::SecretKey, msg: &B) -> Self::Signature {
         bls_sign(sk, msg)
     }
-    fn verify<B: AsRef<[u8]>>(
-        pk: &Self::PublicKey,
-        sig: &Self::Signature,
-        msg: &B,
-    ) -> Result<()> {
+    fn verify<B: AsRef<[u8]>>(pk: &Self::PublicKey, sig: &Self::Signature, msg: &B) -> Result<()> {
         bls_verify(pk, msg, sig).c(d!())
     }
 }

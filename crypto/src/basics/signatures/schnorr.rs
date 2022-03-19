@@ -11,7 +11,10 @@
 //! * `sign(m,sk)` => sample a random scalar `r` and compute `R=g^r`. Compute scalars `c=H(X,R,m)` and `s=r+cx`. Return `(R,s)`
 //! * `verify(m,pk,sig)` => parse `sig` as `(R,s)`. Compute `c=H(X,R,m)`. Check that `R.X^c == g^s`.
 
-use algebra::groups::{Group, Scalar, ScalarArithmetic};
+use algebra::{
+    ops::*,
+    traits::{Group, Scalar},
+};
 use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
@@ -44,23 +47,13 @@ impl<S: Scalar> SecretKey<S> {
 }
 
 #[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    Default,
-    Hash,
-    Ord,
-    PartialOrd,
-    Copy,
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash, Ord, PartialOrd, Copy,
 )]
 pub struct PublicKey<G>(G);
 
 impl<G: Group> PublicKey<G> {
     /// Randomize public key by `factor`
-    pub fn randomize(&self, factor: &G::S) -> PublicKey<G> {
+    pub fn randomize(&self, factor: &G::ScalarType) -> PublicKey<G> {
         PublicKey(self.0.mul(factor))
     }
 
@@ -77,7 +70,7 @@ impl<G: Group> PublicKey<G> {
     /// * `msg` - message
     /// * `sig` - signature
     /// * `returns` - Nothing if the verification succeeds, an error otherwise
-    pub fn verify(&self, msg: &[u8], sign: &Signature<G, G::S>) -> Result<()> {
+    pub fn verify(&self, msg: &[u8], sign: &Signature<G, G::ScalarType>) -> Result<()> {
         verify(self, msg, sign).c(d!())
     }
 }
@@ -102,24 +95,24 @@ pub struct KeyPair<G, S> {
     pub pub_key: PublicKey<G>,
 }
 
-impl<G: Group> KeyPair<G, G::S> {
+impl<G: Group> KeyPair<G, G::ScalarType> {
     /// Generate a schnorr keypair from `prng`
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         gen_keys(prng)
     }
     /// Return scalar representing secret key
-    pub fn get_secret_scalar(&self) -> G::S {
+    pub fn get_secret_scalar(&self) -> G::ScalarType {
         self.sec_key.scalar()
     }
     /// Computes a signature for `msg`.
     /// * `msg` - sequence of bytes to be signed
     /// * `returns` - a Schnorr signature
-    pub fn sign(&self, msg: &[u8]) -> Signature<G, G::S> {
+    pub fn sign(&self, msg: &[u8]) -> Signature<G, G::ScalarType> {
         sign(self, msg)
     }
 
     /// Randomize the keypair by `factor`
-    pub fn randomize(&self, factor: &G::S) -> Self {
+    pub fn randomize(&self, factor: &G::ScalarType) -> Self {
         KeyPair {
             pub_key: self.pub_key.randomize(factor),
             sec_key: self.sec_key.randomize(factor),
@@ -127,7 +120,7 @@ impl<G: Group> KeyPair<G, G::S> {
     }
 }
 
-impl<G: Group> ZeiFromToBytes for KeyPair<G, G::S> {
+impl<G: Group> ZeiFromToBytes for KeyPair<G, G::ScalarType> {
     fn zei_to_bytes(&self) -> Vec<u8> {
         let mut vec = vec![];
         vec.extend_from_slice(self.get_secret_scalar().to_bytes().as_slice());
@@ -136,9 +129,9 @@ impl<G: Group> ZeiFromToBytes for KeyPair<G, G::S> {
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        let alpha = G::S::from_bytes(&bytes[0..G::S::bytes_len()]).c(d!())?;
+        let alpha = G::ScalarType::from_bytes(&bytes[0..G::ScalarType::bytes_len()]).c(d!())?;
         // Public key
-        let u = PublicKey::zei_from_bytes(&bytes[G::S::bytes_len()..]).c(d!())?;
+        let u = PublicKey::zei_from_bytes(&bytes[G::ScalarType::bytes_len()..]).c(d!())?;
 
         Ok(KeyPair {
             sec_key: SecretKey(alpha),
@@ -181,7 +174,7 @@ impl SchnorrTranscript for Transcript {
 }
 
 #[allow(non_snake_case)]
-impl<G: Group> ZeiFromToBytes for Signature<G, G::S> {
+impl<G: Group> ZeiFromToBytes for Signature<G, G::ScalarType> {
     fn zei_to_bytes(&self) -> Vec<u8> {
         let mut v1 = self.R.to_compressed_bytes();
         let mut v2 = self.s.to_bytes();
@@ -189,13 +182,13 @@ impl<G: Group> ZeiFromToBytes for Signature<G, G::S> {
         v1
     }
 
-    fn zei_from_bytes(bytes_repr: &[u8]) -> Result<Signature<G, G::S>> {
+    fn zei_from_bytes(bytes_repr: &[u8]) -> Result<Signature<G, G::ScalarType>> {
         let R = G::from_compressed_bytes(&bytes_repr[..G::COMPRESSED_LEN]);
         if R.is_err() {
             return Err(eg!(ZeiError::ParameterError));
         }
         let R = R.unwrap(); // safe unwrap()
-        let s = G::S::from_bytes(&bytes_repr[G::COMPRESSED_LEN..]);
+        let s = G::ScalarType::from_bytes(&bytes_repr[G::COMPRESSED_LEN..]);
         match s {
             Ok(s) => Ok(Signature { R, s }),
             _ => Err(eg!(ZeiError::DeserializationError)),
@@ -205,14 +198,14 @@ impl<G: Group> ZeiFromToBytes for Signature<G, G::S> {
 
 /// In this naive implementation a multi signature is a list
 /// of  "simple" signatures.
-pub struct MultiSignature<G: Group>(Vec<Signature<G, G::S>>);
+pub struct MultiSignature<G: Group>(Vec<Signature<G, G::ScalarType>>);
 
 /// Generates a key pair for the Schnorr signature scheme
 /// * `prng` - pseudo-random generator
 /// * `returns` - a key pair
-fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G::S> {
+fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G::ScalarType> {
     // Private key
-    let alpha = G::S::random(prng);
+    let alpha = G::ScalarType::random(prng);
 
     // Public key
     let base = G::get_base();
@@ -240,8 +233,8 @@ fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G::S> 
 #[allow(non_snake_case)]
 fn deterministic_scalar_gen<G: Group>(
     message: &[u8],
-    secret_key: &SecretKey<G::S>,
-) -> G::S {
+    secret_key: &SecretKey<G::ScalarType>,
+) -> G::ScalarType {
     let mut hasher = Sha512::new();
 
     let ALGORITHM_DESC = b"ZeiSchnorrAlgorithm";
@@ -250,7 +243,7 @@ fn deterministic_scalar_gen<G: Group>(
     hasher.update(message);
     hasher.update(&secret_key.0.to_bytes());
 
-    G::S::from_hash(hasher)
+    G::ScalarType::from_hash(hasher)
 }
 
 #[allow(clippy::many_single_char_names)]
@@ -259,7 +252,10 @@ fn deterministic_scalar_gen<G: Group>(
 /// * `signing_key` - key pair. Having both public and private key makes the signature computation more efficient
 /// * `message` - sequence of bytes to be signed
 /// * `returns` - a Schnorr signature
-fn sign<G: Group>(signing_key: &KeyPair<G, G::S>, msg: &[u8]) -> Signature<G, G::S> {
+fn sign<G: Group>(
+    signing_key: &KeyPair<G, G::ScalarType>,
+    msg: &[u8],
+) -> Signature<G, G::ScalarType> {
     let mut transcript = Transcript::new(b"schnorr_sig");
 
     let g = G::get_base();
@@ -271,10 +267,10 @@ fn sign<G: Group>(signing_key: &KeyPair<G, G::S>, msg: &[u8]) -> Signature<G, G:
 
     transcript.update_transcript_with_sig_info::<G>(msg, pk, &R);
 
-    let c = transcript.compute_challenge::<G::S>();
+    let c = transcript.compute_challenge::<G::ScalarType>();
 
     let private_key = &(signing_key.sec_key);
-    let s: G::S = r.add(&c.mul(&private_key.0));
+    let s: G::ScalarType = r.add(&c.mul(&private_key.0));
 
     Signature { R, s }
 }
@@ -283,7 +279,7 @@ fn sign<G: Group>(signing_key: &KeyPair<G, G::S>, msg: &[u8]) -> Signature<G, G:
 /// * `signing_keys` - list of key pairs
 /// * `message` - message to be signed
 pub fn multisig_sign<G: Group>(
-    signing_keys: &[KeyPair<G, G::S>],
+    signing_keys: &[KeyPair<G, G::ScalarType>],
     message: &[u8],
 ) -> MultiSignature<G> {
     let mut signatures = vec![];
@@ -304,7 +300,7 @@ pub fn multisig_sign<G: Group>(
 fn verify<G: Group>(
     pk: &PublicKey<G>,
     msg: &[u8],
-    sig: &Signature<G, G::S>,
+    sig: &Signature<G, G::ScalarType>,
 ) -> Result<()> {
     let mut transcript = Transcript::new(b"schnorr_sig");
 
@@ -312,7 +308,7 @@ fn verify<G: Group>(
 
     transcript.update_transcript_with_sig_info(msg, pk, &sig.R);
 
-    let c = transcript.compute_challenge::<G::S>();
+    let c = transcript.compute_challenge::<G::ScalarType>();
 
     let left = sig.R.add(&pk.0.mul(&c));
     let right = g.mul(&sig.s);
@@ -350,11 +346,10 @@ pub fn multisig_verify<G: Group>(
 mod schnorr_sigs {
 
     mod schnorr_simple_sig {
-
         use crate::basics::signatures::schnorr::{KeyPair, PublicKey, Signature};
-        use algebra::groups::{Group, GroupArithmetic, One};
         use algebra::jubjub::JubjubPoint;
         use algebra::ristretto::RistrettoPoint;
+        use algebra::{traits::Group, One};
         use rand_chacha::rand_core::SeedableRng;
         use utils::serialization::ZeiFromToBytes;
 
@@ -362,7 +357,7 @@ mod schnorr_sigs {
             let seed = [0_u8; 32];
             let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
 
-            let key_pair: KeyPair<G, G::S> = KeyPair::generate(&mut prng);
+            let key_pair: KeyPair<G, G::ScalarType> = KeyPair::generate(&mut prng);
 
             let message = b"message";
 
@@ -374,7 +369,7 @@ mod schnorr_sigs {
 
             let wrong_sig = Signature {
                 R: G::get_identity(),
-                s: <G as GroupArithmetic>::S::one(),
+                s: G::ScalarType::one(),
             };
             let res = public_key.verify(message, &wrong_sig);
             assert!(res.is_err());
@@ -397,21 +392,19 @@ mod schnorr_sigs {
         fn check_from_to_bytes<G: Group>() {
             let seed = [0_u8; 32];
             let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-            let key_pair: KeyPair<G, G::S> = KeyPair::generate(&mut prng);
+            let key_pair: KeyPair<G, G::ScalarType> = KeyPair::generate(&mut prng);
             let message = b"message";
             let sig = key_pair.sign(message);
             let public_key = key_pair.pub_key;
 
             // Public key
             let public_key_bytes = public_key.zei_to_bytes();
-            let public_key_from_bytes =
-                PublicKey::zei_from_bytes(&public_key_bytes).unwrap();
+            let public_key_from_bytes = PublicKey::zei_from_bytes(&public_key_bytes).unwrap();
             assert_eq!(public_key, public_key_from_bytes);
 
             // Signature
             let signature_bytes = sig.zei_to_bytes();
-            let signature_from_bytes =
-                Signature::zei_from_bytes(&signature_bytes).unwrap();
+            let signature_from_bytes = Signature::zei_from_bytes(&signature_bytes).unwrap();
             assert_eq!(sig, signature_from_bytes);
         }
 
@@ -432,10 +425,9 @@ mod schnorr_sigs {
         use crate::basics::signatures::schnorr::{
             multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature,
         };
-        use algebra::groups::{Group, GroupArithmetic, One};
-
         use algebra::jubjub::JubjubPoint;
         use algebra::ristretto::RistrettoPoint;
+        use algebra::{traits::Group, One};
         use rand_chacha::rand_core::SeedableRng;
         use utils::errors::ZeiError;
 
@@ -447,7 +439,7 @@ mod schnorr_sigs {
             let mut key_pairs = vec![];
             let mut public_keys = vec![];
             for _ in 0..NUMBER_OF_KEYS {
-                let key_pair: KeyPair<G, G::S> = KeyPair::generate(&mut prng);
+                let key_pair: KeyPair<G, G::ScalarType> = KeyPair::generate(&mut prng);
                 let public_key = key_pair.pub_key.clone();
                 key_pairs.push(key_pair);
                 public_keys.push(public_key);
@@ -463,7 +455,7 @@ mod schnorr_sigs {
             let wrong_msig: MultiSignature<G> = MultiSignature(vec![
                 Signature {
                     R: G::get_identity(),
-                    s: <G as GroupArithmetic>::S::one()
+                    s: G::ScalarType::one()
                 };
                 3
             ]);

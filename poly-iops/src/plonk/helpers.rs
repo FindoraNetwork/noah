@@ -1,4 +1,4 @@
-use algebra::groups::{One, Scalar, ScalarArithmetic, Zero};
+use algebra::{ops::*, traits::Scalar, One, Zero};
 use itertools::Itertools;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -129,10 +129,7 @@ pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Scalar>(
 // Build polynomial Sigma, by interpolating
 // \Sigma(g^{i+1}) = \Sigma(g^i)\prod_{j=1}^{n_wires_per_gate}(fj(g^i) + \gamma*k_j*g^i +\delta)/(fj(g^i) + \gamma*perm_j(g^i) +\delta)
 // and setting \Sigma(1) = 1 for the base case
-pub(super) fn sigma_polynomial<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
+pub(super) fn sigma_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     params: &ProverParams<PCS>,
     witness: &[PCS::Field],
@@ -148,18 +145,15 @@ pub(super) fn sigma_polynomial<
     let group = &params.group[..];
 
     // computes permutation values
-    let p_of_x = |perm_value: usize,
-                  n: usize,
-                  group: &[PCS::Field],
-                  k: &[PCS::Field]|
-     -> PCS::Field {
-        for (i, ki) in k.iter().enumerate().skip(1) {
-            if perm_value < (i + 1) * n && perm_value >= i * n {
-                return ki.mul(&group[perm_value % n]);
+    let p_of_x =
+        |perm_value: usize, n: usize, group: &[PCS::Field], k: &[PCS::Field]| -> PCS::Field {
+            for (i, ki) in k.iter().enumerate().skip(1) {
+                if perm_value < (i + 1) * n && perm_value >= i * n {
+                    return ki.mul(&group[perm_value % n]);
+                }
             }
-        }
-        k[0].mul(&group[perm_value])
-    };
+            k[0].mul(&group[perm_value])
+        };
 
     let k = &params.verifier_params.k;
     for i in 0..n_constraints - 1 {
@@ -216,10 +210,7 @@ pub(super) fn sigma_polynomial<
 // The algorithm takes (n_wires_per_gate+2) deg-m ffts to compute the evaluations of
 // ({fj(X)}, IO(X), Sigma(X)}), O(m) ops to evaluate {Q(z)}_{z\in H'}, and 1 deg-m
 // ifft to recover Q(X).
-pub(super) fn quotient_polynomial<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
+pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     params: &ProverParams<PCS>,
     witness_polys: &[FpPolynomial<PCS::Field>],
@@ -247,7 +238,7 @@ pub(super) fn quotient_polynomial<
     // Compute the evaluations of the quotient polynomial on the coset.
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
     let alpha = challenges.get_alpha().unwrap();
-    let alpha_sq = alpha.mul(&alpha);
+    let alpha_sq = alpha.mul(alpha);
     let mut quot_coset_evals = vec![];
 
     for point in 0..m {
@@ -266,7 +257,7 @@ pub(super) fn quotient_polynomial<
         let mut term2 = alpha.mul(&sigma_coset_evals[point]);
         for j in 0..CS::n_wires_per_gate() {
             let tmp = witness_polys_coset_evals[j][point]
-                .add(&delta)
+                .add(delta)
                 .add(&gamma.mul(&k[j].mul(&params.coset_quot[point])));
             term2.mul_assign(&tmp);
         }
@@ -278,7 +269,7 @@ pub(super) fn quotient_polynomial<
             .zip(params.perms_coset_evals.iter())
         {
             let tmp = &w_poly_coset_evals[point]
-                .add(&delta)
+                .add(delta)
                 .add(&gamma.mul(&perm_coset_evals[point]));
             term3.mul_assign(&tmp);
         }
@@ -334,8 +325,7 @@ fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
 
     // 2. \Sigma(X) [ alpha * prod_{j=1..n_wires_per_gate} (fj(beta) + gamma * kj * beta + delta)
     //              + alpha^2 * L1(beta)]
-    let sigma_scalar =
-        compute_sigma_scalar_in_l(n, witness_polys_eval_beta, k, challenges);
+    let sigma_scalar = compute_sigma_scalar_in_l(n, witness_polys_eval_beta, k, challenges);
     l.op_assign(&sigma.exp(&sigma_scalar));
 
     // 3. - perm_{n_wires_per_gate}(X) [alpha * \Sigma(g*beta) * gamma
@@ -425,7 +415,7 @@ pub(super) fn eval_public_var_poly<PCS: PolyComScheme>(
         let den = eval_point.sub(&root_to_j);
         let den_inv = den.inv().unwrap();
         let lagrange_i = lagrange_constant.mul(&num.mul(&den_inv));
-        eval.add_assign(&lagrange_i.mul(&public_value));
+        eval.add_assign(&lagrange_i.mul(public_value));
     }
     eval
 }
@@ -466,7 +456,7 @@ fn compute_sigma_scalar_in_l<F: Scalar>(
     }
 
     // 2. alpha^2*(beta^n - 1) / (beta - 1)
-    let alpha_sq = alpha.mul(&alpha);
+    let alpha_sq = alpha.mul(alpha);
     let beta_pow_n = beta.pow(&[n as u64]);
     let l1_eval_beta = beta_pow_n
         .sub(&F::one())
@@ -490,13 +480,13 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let alpha = challenges.get_alpha().unwrap();
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
 
-    let term0 = proof.L_eval_beta.add(&public_vars_eval_beta);
+    let term0 = proof.L_eval_beta.add(public_vars_eval_beta);
     let mut term1 = alpha.mul(&proof.Sigma_eval_g_beta);
     let n_wires_per_gate = &proof.witness_polys_eval_beta.len();
     for i in 0..n_wires_per_gate - 1 {
         let b = proof.witness_polys_eval_beta[i]
             .add(&gamma.mul(&proof.perms_eval_beta[i]))
-            .add(&delta);
+            .add(delta);
         term1.mul_assign(&b);
     }
     term1.mul_assign(&proof.witness_polys_eval_beta[n_wires_per_gate - 1].add(delta));
@@ -505,8 +495,8 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let beta_n = beta.pow(&[params.cs_size as u64]);
     let z_h_eval_beta = beta_n.sub(&one);
     let beta_minus_one = beta.sub(&one);
-    let first_lagrange_eval_beta = z_h_eval_beta.mul(&beta_minus_one.inv().unwrap());
-    let term2 = first_lagrange_eval_beta.mul(&alpha.mul(&alpha));
+    let first_lagrange_eval_beta = z_h_eval_beta.mul(beta_minus_one.inv().unwrap());
+    let term2 = first_lagrange_eval_beta.mul(alpha.mul(alpha));
 
     let term1_plus_term2 = term1.add(&term2);
 
@@ -541,10 +531,7 @@ pub(crate) fn split_q_and_commit<PCS: PolyComScheme>(
 
 /// Given value \beta, and homomorphic polynomial commitments/openings {qi(X)}_{i=0..m-1},
 /// compute \sum_{i=0..m-1} \beta^{i*n} * qi(X)
-pub(crate) fn combine_q_polys<
-    F: Scalar,
-    PCSType: HomomorphicPolyComElem<Scalar = F> + Clone,
->(
+pub(crate) fn combine_q_polys<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F> + Clone>(
     q_polys: &[PCSType],
     beta: &F,
     n: usize,
@@ -561,16 +548,11 @@ pub(crate) fn combine_q_polys<
 
 #[cfg(test)]
 mod test {
-    use algebra::{
-        bls12_381::BLSScalar,
-        groups::{One, ScalarArithmetic, Zero},
-    };
+    use algebra::{bls12_381::BLSScalar, ops::*, One, Zero};
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
 
-    use crate::commitments::kzg_poly_com::{
-        KZGCommitmentScheme, KZGCommitmentSchemeBLS,
-    };
+    use crate::commitments::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
     use crate::plonk::{
         constraint_system::TurboConstraintSystem,
         helpers::{sigma_polynomial, PlonkChallenges},

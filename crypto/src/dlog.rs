@@ -1,5 +1,5 @@
 use crate::sigma::{sigma_prove, sigma_verify, SigmaProof, SigmaTranscript};
-use algebra::groups::{Group, Scalar as ZeiScalar, ScalarArithmetic};
+use algebra::{ops::*, traits::Group, Zero};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -22,8 +22,8 @@ pub fn prove_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
     prng: &mut R,
     base: &G,
     point: &G,
-    dlog: &G::S,
-) -> SigmaProof<G::S, G> {
+    dlog: &G::ScalarType,
+) -> SigmaProof<G::ScalarType, G> {
     /*! I compute a proof for the knowledge of dlog for point with respect to base*/
     let (elems, lhs_matrix, _) = init_pok_dlog::<G>(transcript, base, point);
     sigma_prove::<R, G>(
@@ -41,7 +41,7 @@ pub fn verify_proof_of_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
     prng: &mut R,
     base: &G,
     point: &G,
-    proof: &SigmaProof<G::S, G>,
+    proof: &SigmaProof<G::ScalarType, G>,
 ) -> Result<()> {
     let (elems, lhs_matrix, rhs_vec) = init_pok_dlog::<G>(transcript, base, point);
     sigma_verify(
@@ -61,25 +61,25 @@ pub fn prove_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
     prng: &mut R,
     base: &G,
     points: &[G],
-    dlogs: &[G::S],
-) -> SigmaProof<G::S, G> {
+    dlogs: &[G::ScalarType],
+) -> SigmaProof<G::ScalarType, G> {
     let mut public_elems = vec![base];
     let mut ref_points: Vec<&G> = points.iter().collect();
     public_elems.append(&mut ref_points);
     transcript.init_sigma(b"PoK Dlog Multiple", &[], public_elems.as_slice());
 
-    let x: Vec<G::S> = points
+    let x: Vec<G::ScalarType> = points
         .iter()
-        .map(|_| transcript.get_challenge::<G::S>())
+        .map(|_| transcript.get_challenge::<G::ScalarType>())
         .collect();
     let lc_point: G = points
         .iter()
         .zip(x.iter())
         .fold(G::get_identity(), |lc, (point, x)| lc.add(&point.mul(x)));
-    let lc_secret: G::S = dlogs
+    let lc_secret: G::ScalarType = dlogs
         .iter()
         .zip(x.iter())
-        .fold(G::S::from_u32(0), |lc, (s, x)| lc.add(&s.mul(x)));
+        .fold(G::ScalarType::zero(), |lc, (s, x)| lc.add(&s.mul(x)));
 
     prove_knowledge_dlog(transcript, prng, base, &lc_point, &lc_secret)
 }
@@ -90,16 +90,16 @@ pub fn verify_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
     prng: &mut R,
     base: &G,
     points: &[G],
-    proof: &SigmaProof<G::S, G>,
+    proof: &SigmaProof<G::ScalarType, G>,
 ) -> Result<()> {
     let mut public_elems = vec![base];
     let mut ref_points: Vec<&G> = points.iter().collect();
     public_elems.append(&mut ref_points);
     transcript.init_sigma(b"PoK Dlog Multiple", &[], public_elems.as_slice());
 
-    let x: Vec<G::S> = points
+    let x: Vec<G::ScalarType> = points
         .iter()
-        .map(|_| transcript.get_challenge::<G::S>())
+        .map(|_| transcript.get_challenge::<G::ScalarType>())
         .collect();
     let lc_point: G = points
         .iter()
@@ -112,11 +112,15 @@ pub fn verify_multiple_knowledge_dlog<R: CryptoRng + RngCore, G: Group>(
 #[cfg(test)]
 mod test {
     use super::{
-        prove_knowledge_dlog, prove_multiple_knowledge_dlog,
-        verify_multiple_knowledge_dlog, verify_proof_of_knowledge_dlog,
+        prove_knowledge_dlog, prove_multiple_knowledge_dlog, verify_multiple_knowledge_dlog,
+        verify_proof_of_knowledge_dlog,
     };
-    use algebra::groups::{Group, GroupArithmetic, Scalar as _, ScalarArithmetic};
-    use algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+    use algebra::{
+        ops::*,
+        ristretto::{RistrettoPoint, RistrettoScalar as Scalar},
+        traits::{Group, Scalar as _},
+        One,
+    };
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -130,16 +134,11 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"test");
         let base = RistrettoPoint::get_base();
         let scalar = Scalar::random(&mut csprng);
-        let scalar2 = scalar.add(&Scalar::from_u32(1));
+        let scalar2 = scalar.add(&Scalar::one());
         let point = base.mul(&scalar);
 
-        let proof = prove_knowledge_dlog(
-            &mut prover_transcript,
-            &mut csprng,
-            &base,
-            &point,
-            &scalar,
-        );
+        let proof =
+            prove_knowledge_dlog(&mut prover_transcript, &mut csprng, &base, &point, &scalar);
         assert!(verify_proof_of_knowledge_dlog(
             &mut verifier_transcript,
             &mut csprng,
@@ -149,13 +148,8 @@ mod test {
         )
         .is_ok());
 
-        let proof = prove_knowledge_dlog(
-            &mut prover_transcript,
-            &mut csprng,
-            &base,
-            &point,
-            &scalar2,
-        );
+        let proof =
+            prove_knowledge_dlog(&mut prover_transcript, &mut csprng, &base, &point, &scalar2);
         assert!(verify_proof_of_knowledge_dlog(
             &mut verifier_transcript,
             &mut csprng,

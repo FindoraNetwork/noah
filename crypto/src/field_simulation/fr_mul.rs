@@ -1,14 +1,12 @@
 use crate::field_simulation::{
     ristretto_scalar_field_in_biguint, ristretto_scalar_field_in_limbs,
-    ristretto_scalar_field_sub_pad_in_biguint, ristretto_scalar_field_sub_pad_in_limbs,
-    SimFr, BIT_PER_LIMB, NUM_OF_GROUPS, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
+    ristretto_scalar_field_sub_pad_in_biguint, ristretto_scalar_field_sub_pad_in_limbs, SimFr,
+    BIT_PER_LIMB, NUM_OF_GROUPS, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
-use algebra::bls12_381::BLSScalar;
-use algebra::groups::{Scalar, ScalarArithmetic, Zero as ArkZero};
+use algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar};
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::Zero;
-use std::ops::{AddAssign, MulAssign, Shl, Shr, Sub};
 
 /// `SimFrMul` is the intermediate representation for
 /// the product of two simulated Ristretto scalar field elements
@@ -64,10 +62,8 @@ impl Sub<&SimFr> for &SimFrMul {
                 .add(&r_limbs[i])
                 .sub(&rhs.limbs[i]);
         }
-        res.val =
-            &res.val + &r_biguint + &r_biguint + &r_biguint + &r_biguint - &rhs.val;
-        res.prod_of_num_of_additions =
-            &res.prod_of_num_of_additions + &BigUint::from(12u32);
+        res.val = &res.val + &r_biguint + &r_biguint + &r_biguint + &r_biguint - &rhs.val;
+        res.prod_of_num_of_additions = &res.prod_of_num_of_additions + &BigUint::from(12u32);
 
         res
     }
@@ -100,7 +96,7 @@ impl SimFrMul {
         // compute `k`
         let (k, rem) = cur_val.div_rem(&r_biguint);
         assert!(rem.is_zero());
-        assert!(k <= r_biguint.shl(5));
+        assert!(k <= r_biguint.shl(5u32));
 
         // compute the limbs for `k * r`
         let r_limbs = ristretto_scalar_field_in_limbs().to_vec();
@@ -142,17 +138,14 @@ impl SimFrMul {
 
         let mut carry_in = BLSScalar::zero();
         let mut accumulated_extra = BigUint::zero();
-        for (group_id, ((left_group_limb, right_group_limb), num_limbs_in_this_group)) in
-            left_group
-                .iter()
-                .zip(right_group.iter())
-                .zip(num_limbs_in_group.iter())
-                .enumerate()
+        for (group_id, ((left_group_limb, right_group_limb), num_limbs_in_this_group)) in left_group
+            .iter()
+            .zip(right_group.iter())
+            .zip(num_limbs_in_group.iter())
+            .enumerate()
         {
             let pad = BigUint::from(1u32).shl(
-                (num_limbs_in_this_group + 1) * BIT_PER_LIMB
-                    + num_limbs_in_this_group
-                    + surfeit,
+                (num_limbs_in_this_group + 1) * BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
             let pad_limb = BLSScalar::from(&pad);
             assert!(pad > <&BLSScalar as Into<BigUint>>::into(right_group_limb));
@@ -163,14 +156,11 @@ impl SimFrMul {
                 .add(&pad_limb)
                 .sub(&right_group_limb);
             let carry_biguint: BigUint = (&carry).into();
-            carry = BLSScalar::from(
-                &carry_biguint.shr(num_limbs_in_this_group * BIT_PER_LIMB),
-            );
+            carry = BLSScalar::from(&carry_biguint.shr(num_limbs_in_this_group * BIT_PER_LIMB));
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
 
-            let (new_accumulated_extra, remainder_biguint) = accumulated_extra.div_rem(
-                &BigUint::from(1u64).shl(BIT_PER_LIMB * num_limbs_in_this_group),
-            );
+            let (new_accumulated_extra, remainder_biguint) = accumulated_extra
+                .div_rem(&BigUint::from(1u64).shl(BIT_PER_LIMB * num_limbs_in_this_group));
             let remainder = BLSScalar::from(&remainder_biguint);
 
             let eqn_left = left_group_limb
@@ -179,10 +169,7 @@ impl SimFrMul {
                 .sub(&right_group_limb);
 
             let eqn_right = (&carry)
-                .mul(
-                    &(&BigUint::from(1u32).shl(BIT_PER_LIMB * num_limbs_in_this_group))
-                        .into(),
-                )
+                .mul(&(&BigUint::from(1u32).shl(BIT_PER_LIMB * num_limbs_in_this_group)).into())
                 .add(&remainder);
 
             assert_eq!(eqn_left, eqn_right);
