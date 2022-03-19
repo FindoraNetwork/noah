@@ -31,7 +31,8 @@ with confidential data.
     Use in transfers that allow tracking amounts and asset type without publicly
     revealing these values.
   - Dlog: Simple proof of knowlege of discrete logarithms over generic groups.
-  - Xfr multi-input multi-output UTXO transfers
+
+### Xfr multi-input multi-output UTXO transfers
     - Plain: XfrNote reveal amount and asset type
     - Confidential amount and/or asset type: XfrNote hides amount and/or asset type
     - AssetType mixing: Allows for multiple asset types in a confidential transaction
