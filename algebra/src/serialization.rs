@@ -3,7 +3,6 @@ use crate::{
     jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
-    serialize_deserialize,
 };
 use bulletproofs::r1cs::R1CSProof;
 use bulletproofs::RangeProof;
