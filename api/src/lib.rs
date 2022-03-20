@@ -10,9 +10,6 @@
 #![allow(clippy::many_single_char_names)]
 
 #[macro_use]
-extern crate zei_algebra;
-
-#[macro_use]
 extern crate serde_derive;
 extern crate core;
 

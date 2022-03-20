@@ -1,12 +1,9 @@
 use crate::api::anon_creds::{Attr, AttributeCiphertext};
 use crate::xfr::structs::{AssetTracerDecKeys, AssetTracerEncKeys, TracerMemo};
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
-use rand_core::{CryptoRng, RngCore};
 use zei_algebra::bls12_381::{BLSScalar, BLSG1};
 use zei_algebra::prelude::*;
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
-use zei_algebra::utils::{u64_to_u32_pair, u8_be_slice_to_u32};
-use zei_algebra::{ops::*, traits::Group};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::basics::elgamal::{
     elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, ElGamalCiphertext, ElGamalDecKey,
