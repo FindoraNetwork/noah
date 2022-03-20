@@ -25,7 +25,7 @@ ruc = '1.0'
 path = '../algebra'
 
 [dependencies.aes]
-version = '0.7.5'
+version = '0.8.1'
 features = ['ctr']
 
 [dependencies.bulletproofs]
