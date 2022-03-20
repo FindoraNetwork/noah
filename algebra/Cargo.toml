@@ -15,7 +15,7 @@ name = 'zei_algebra'
 crate-type = ['rlib']
 
 [dependencies]
-base64 = "0.10"
+base64 = "0.13"
 serde = '1.0'
 digest = '0.9'
 ruc = '1.0'
