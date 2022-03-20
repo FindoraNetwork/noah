@@ -7,13 +7,9 @@ use crate::xfr::structs::{
     AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
     TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
 };
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::ristretto::RistrettoScalar as Scalar;
-use zei_algebra::Zero;
+use zei_algebra::prelude::*;
+use zei_algebra::ristretto::RistrettoScalar;
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use zei_utils::errors::ZeiError;
-use zei_utils::{self, u64_to_u32_pair};
 
 /// AssetRecrod confidentiality flags. Indicated if amount and/or assettype should be confidential
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -318,8 +314,8 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>,
 ) -> (
     BlindAssetRecord,
-    (Scalar, Scalar),
-    Scalar,
+    (RistrettoScalar, RistrettoScalar),
+    RistrettoScalar,
     Vec<TracerMemo>,
     Option<OwnerMemo>,
 ) {
@@ -329,8 +325,8 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => (
                 XfrAmount::NonConfidential(asset_record.amount),
                 XfrAssetType::NonConfidential(asset_record.asset_type),
-                (Scalar::zero(), Scalar::zero()),
-                Scalar::zero(),
+                (RistrettoScalar::zero(), RistrettoScalar::zero()),
+                RistrettoScalar::zero(),
                 None,
             ),
 
@@ -348,7 +344,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
                     ),
                     XfrAssetType::NonConfidential(asset_record.asset_type),
                     amount_blinds,
-                    Scalar::zero(),
+                    RistrettoScalar::zero(),
                     Some(owner_memo),
                 )
             }
@@ -364,7 +360,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
                 (
                     XfrAmount::NonConfidential(asset_record.amount),
                     XfrAssetType::from_blind(&pc_gens, &asset_record.asset_type, &asset_type_blind),
-                    (Scalar::zero(), Scalar::zero()),
+                    (RistrettoScalar::zero(), RistrettoScalar::zero()),
                     asset_type_blind,
                     Some(owner_memo),
                 )
@@ -407,7 +403,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
         let mut asset_type_info = None;
         if policy.asset_tracing {
             if asset_record.asset_record_type.is_confidential_amount() {
-                let (amount_lo, amount_hi) = zei_utils::u64_to_u32_pair(asset_record.amount);
+                let (amount_lo, amount_hi) = u64_to_u32_pair(asset_record.amount);
                 amount_info = Some((amount_lo, amount_hi, &amount_blinds.0, &amount_blinds.1));
             }
             if asset_record.asset_record_type.is_confidential_asset_type() {
@@ -494,8 +490,8 @@ pub fn open_blind_asset_record(
                 .asset_type
                 .get_asset_type()
                 .c(d!(ZeiError::ParameterError))?,
-            (Scalar::zero(), Scalar::zero()),
-            Scalar::zero(),
+            (RistrettoScalar::zero(), RistrettoScalar::zero()),
+            RistrettoScalar::zero(),
         ),
 
         AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
@@ -509,7 +505,7 @@ pub fn open_blind_asset_record(
                     .get_asset_type()
                     .c(d!(ZeiError::ParameterError))?,
                 amount_blinds,
-                Scalar::zero(),
+                RistrettoScalar::zero(),
             )
         }
 
@@ -520,7 +516,7 @@ pub fn open_blind_asset_record(
             (
                 input.amount.get_amount().c(d!(ZeiError::ParameterError))?,
                 asset_type,
-                (Scalar::zero(), Scalar::zero()),
+                (RistrettoScalar::zero(), RistrettoScalar::zero()),
                 asset_type_blind,
             )
         }
@@ -599,13 +595,9 @@ mod test {
         TracingPolicy, XfrAmount, XfrAssetType,
     };
     use crate::xfr::tests::{create_xfr, gen_key_pair_vec};
-    use itertools::Itertools;
-    use rand::Rng;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use zei_algebra::ristretto::RistrettoScalar as Scalar;
+    use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
     use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-    use zei_utils::u64_to_u32_pair;
 
     fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracing: bool) {
         let mut prng: ChaChaRng;
@@ -660,10 +652,10 @@ mod test {
         if confidential_amount {
             let (low, high) = u64_to_u32_pair(amount);
             let commitment_low = pc_gens
-                .commit(Scalar::from(low), open_ar.amount_blinds.0)
+                .commit(RistrettoScalar::from(low), open_ar.amount_blinds.0)
                 .compress();
             let commitment_high = pc_gens
-                .commit(Scalar::from(high), open_ar.amount_blinds.1)
+                .commit(RistrettoScalar::from(high), open_ar.amount_blinds.1)
                 .compress();
             expected_bar_amount = XfrAmount::Confidential((commitment_low, commitment_high));
         } else {
@@ -798,10 +790,10 @@ mod test {
         if confidential_amount {
             let (low, high) = u64_to_u32_pair(open_ar.amount);
             let commitment_low = pc_gens
-                .commit(Scalar::from(low), open_ar.amount_blinds.0)
+                .commit(RistrettoScalar::from(low), open_ar.amount_blinds.0)
                 .compress();
             let commitment_high = pc_gens
-                .commit(Scalar::from(high), open_ar.amount_blinds.1)
+                .commit(RistrettoScalar::from(high), open_ar.amount_blinds.1)
                 .compress();
             let derived_commitment = (commitment_low, commitment_high);
             assert_eq!(

@@ -11,8 +11,8 @@
 use crate::basics::hash::rescue::RescueInstance;
 use ruc::*;
 use zei_algebra::bls12_381::BLSScalar;
+use zei_algebra::errors::ZeiError;
 use zei_algebra::traits::Scalar;
-use zei_utils::errors::ZeiError;
 
 pub struct HashCommitment<S> {
     hash: RescueInstance<S>,

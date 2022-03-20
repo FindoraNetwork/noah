@@ -1,15 +1,11 @@
-use crate::errors::AlgebraError;
-use ark_std::{
-    fmt::Debug,
-    ops::{Add, AddAssign, Mul, MulAssign},
+use crate::{
+    errors::AlgebraError,
+    prelude::*,
     rand::{CryptoRng, RngCore},
-    One, Zero,
 };
+use ark_std::fmt::Debug;
 use digest::{generic_array::typenum::U64, Digest};
-use ruc::err::*;
 use serde::{Deserialize, Serialize};
-use std::ops::{Neg, Sub, SubAssign};
-use zei_utils::shift_u8_vec;
 
 /// The trait for scalars
 pub trait Scalar:

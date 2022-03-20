@@ -1,8 +1,10 @@
 use crate::basics::hash::rescue::{RescueCtr, RescueInstance};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use zei_algebra::errors::ZeiError;
 use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
 use zei_algebra::ristretto::RistrettoPoint;
+use zei_algebra::serialization::ZeiFromToBytes;
 use zei_algebra::traits::{Group, Scalar};
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
@@ -10,8 +12,6 @@ use zei_algebra::{
     ops::*,
     Zero,
 };
-use zei_utils::errors::ZeiError;
-use zei_utils::serialization::ZeiFromToBytes;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElGamalEncKey<G>(pub G); //PK = sk*G
@@ -239,10 +239,10 @@ mod elgamal_test {
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use zei_algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
+    use zei_algebra::errors::ZeiError;
     use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
     use zei_algebra::ristretto::RistrettoPoint;
     use zei_algebra::traits::{Group, Scalar};
-    use zei_utils::errors::ZeiError;
 
     fn verification<G: Group>() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);

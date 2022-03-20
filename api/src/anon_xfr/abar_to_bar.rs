@@ -16,16 +16,11 @@ use crate::xfr::structs::{
 };
 use merlin::Transcript;
 use num_bigint::BigUint;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use std::ops::{AddAssign, Shl};
+use zei_algebra::prelude::*;
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use zei_algebra::{
     bls12_381::BLSScalar,
     jubjub::{JubjubPoint, JubjubScalar},
-    ops::*,
-    traits::{Group, Scalar},
-    One, Zero,
 };
 use zei_crypto::basics::commitments::pedersen::PedersenGens;
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
@@ -44,7 +39,6 @@ use zei_plonk::{
     },
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
-use zei_utils::errors::ZeiError;
 
 pub type Abar2BarPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
 pub const TWO_POW_32: u64 = 1 << 32;
@@ -266,7 +260,7 @@ pub fn verify_abar_to_bar(
         ),
         XfrAmount::NonConfidential(amount) => {
             // fake commitment
-            let (l, h) = zei_utils::u64_to_u32_pair(amount);
+            let (l, h) = u64_to_u32_pair(amount);
             (
                 pc_gens
                     .commit(&[RistrettoScalar::from(l)], &RistrettoScalar::zero())

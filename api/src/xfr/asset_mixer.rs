@@ -1,15 +1,13 @@
 use crate::setup::PublicParams;
 use bulletproofs::r1cs::{batch_verify, Prover, R1CSProof, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
-use itertools::Itertools;
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
 use wasm_bindgen::__rt::std::collections::HashSet;
-use zei_algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
+use zei_algebra::{
+    prelude::*,
+    ristretto::{CompressedRistretto, RistrettoScalar},
+};
 use zei_crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
-use zei_utils::errors::ZeiError;
-use zei_utils::serialization::zei_obj_serde;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
@@ -27,7 +25,7 @@ impl Eq for AssetMixProof {}
 /// ```
 /// use zei_algebra::ristretto::RistrettoScalar;
 /// use zei::xfr::asset_mixer::prove_asset_mixing;
-/// use zei_algebra::{Zero, traits::Scalar};
+/// use zei_algebra::prelude::*;
 /// let input = [
 ///            (60u64, RistrettoScalar::zero(), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
 ///            (100u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10001u32), RistrettoScalar::from(200001u32)),
@@ -48,19 +46,19 @@ impl Eq for AssetMixProof {}
 ///
 /// ```
 pub fn prove_asset_mixing(
-    inputs: &[(u64, Scalar, Scalar, Scalar)],
-    outputs: &[(u64, Scalar, Scalar, Scalar)],
+    inputs: &[(u64, RistrettoScalar, RistrettoScalar, RistrettoScalar)],
+    outputs: &[(u64, RistrettoScalar, RistrettoScalar, RistrettoScalar)],
 ) -> Result<AssetMixProof> {
     let pc_gens = PedersenGens::default();
     let mut prover_transcript = Transcript::new(b"AssetMixingProof");
     let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
     fn extract_values_and_blinds(
-        list: &[(u64, Scalar, Scalar, Scalar)],
+        list: &[(u64, RistrettoScalar, RistrettoScalar, RistrettoScalar)],
     ) -> (Vec<CloakValue>, Vec<CloakValue>) {
         let values = list
             .iter()
             .map(|(amount, asset_type, _, _)| CloakValue {
-                amount: Scalar::from(*amount),
+                amount: RistrettoScalar::from(*amount),
                 asset_type: *asset_type,
             })
             .collect();
@@ -129,11 +127,11 @@ pub struct AssetMixingInstance<'a> {
 /// # Example
 /// ```
 /// use zei_algebra::ristretto::{RistrettoScalar, CompressedRistretto};
-/// use zei_algebra::traits::Scalar;
+/// use zei_algebra::prelude::*;
 /// use zei::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
-/// use ruc::{*, err::*};
+/// use ruc::err::*;
 /// use zei::setup::PublicParams;
 /// use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 /// let input = [

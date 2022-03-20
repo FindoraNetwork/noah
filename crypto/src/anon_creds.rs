@@ -81,14 +81,7 @@ in the credentials by
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use itertools::Itertools;
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::{
-    ops::*,
-    traits::{Group, Pairing, Scalar},
-    One,
-};
-use zei_utils::errors::ZeiError;
+use zei_algebra::{prelude::*, traits::Pairing};
 
 pub(crate) const AC_REVEAL_PROOF_DOMAIN: &[u8] = b"AC Reveal PoK";
 pub(crate) const AC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Reveal PoK Instance";

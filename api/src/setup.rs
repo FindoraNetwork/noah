@@ -14,11 +14,10 @@ use crate::parameters::{
     RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
 use bulletproofs::BulletproofGens;
-use ruc::*;
 use serde::Deserialize;
 use zei_algebra::jubjub::JubjubScalar;
+use zei_algebra::prelude::*;
 use zei_algebra::ristretto::RistrettoScalar;
-use zei_algebra::Zero;
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use zei_plonk::{
@@ -28,7 +27,6 @@ use zei_plonk::{
     },
     poly_commit::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
 };
-use zei_utils::errors::ZeiError;
 
 // Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]
@@ -322,14 +320,11 @@ impl From<UserParams> for NodeParams {
 mod test {
     use crate::parameters::SRS;
     use crate::setup::{NodeParams, UserParams};
-    use itertools::Itertools;
-    use ruc::RucResult;
     use zei_algebra::bls12_381::{BLSScalar, BLSG1};
-    use zei_algebra::{ops::*, traits::Group, One};
+    use zei_algebra::prelude::*;
     use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
     use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
     use zei_plonk::poly_commit::pcs::PolyComScheme;
-    use zei_utils::errors::ZeiError;
 
     #[test]
     fn test_params_serialization() {

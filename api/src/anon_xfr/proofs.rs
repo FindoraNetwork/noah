@@ -5,18 +5,15 @@ use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::setup::{NodeParams, UserParams};
 use merlin::Transcript;
 use num_bigint::BigUint;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
 use zei_algebra::bls12_381::BLSScalar;
+use zei_algebra::prelude::*;
 use zei_algebra::ristretto::RistrettoScalar;
-use zei_algebra::traits::Scalar;
 use zei_crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
 use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use zei_plonk::{
     plonk::{prover::prover, setup::PlonkPf, verifier::verifier},
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
-use zei_utils::errors::ZeiError;
 
 const ANON_XFR_TRANSCRIPT: &[u8] = b"Anon Xfr";
 const N_INPUTS_TRANSCRIPT: &[u8] = b"Number of input ABARs";

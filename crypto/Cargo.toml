@@ -24,9 +24,6 @@ ruc = '1.0'
 [dependencies.zei-algebra]
 path = '../algebra'
 
-[dependencies.zei-utils]
-path = '../utils'
-
 [dependencies.aes]
 version = '0.7.5'
 features = ['ctr']

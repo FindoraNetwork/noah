@@ -1,8 +1,4 @@
-use crate::{
-    errors::AlgebraError,
-    jubjub::JubjubScalar,
-    traits::{Group, Pairing, Scalar},
-};
+use crate::{errors::AlgebraError, jubjub::JubjubScalar, prelude::*, traits::Pairing};
 use ark_bls12_381::{
     fr::FrParameters, Bls12_381 as Bls12381pairing, Fq12Parameters, Fr, G1Affine, G1Projective,
     G2Affine, G2Projective,
@@ -10,18 +6,10 @@ use ark_bls12_381::{
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{BigInteger, FftField, FftParameters, Field, Fp12, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{
-    ops::*,
-    rand::{CryptoRng, RngCore},
-    result::Result as StdResult,
-    str::FromStr,
-    One, UniformRand, Zero,
-};
+use ark_std::{result::Result as StdResult, str::FromStr};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
-use ruc::*;
 use wasm_bindgen::prelude::*;
-use zei_utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 
 /// The number of bytes for a scalar value over BLS12-381
 pub const BLS12_381_SCALAR_LEN: usize = 32;
@@ -616,17 +604,14 @@ impl Group for BLSGt {
 mod bls12_381_groups_test {
     use crate::{
         bls12_381::{BLSGt, BLSPairingEngine, BLSScalar, BLSG1, BLSG2},
+        prelude::*,
         traits::{
             group_tests::{test_scalar_operations, test_scalar_serialization},
-            Group, Pairing, Scalar,
+            Pairing,
         },
     };
     use ark_bls12_381::{G1Affine, G2Affine};
     use ark_ec::ProjectiveCurve;
-    use ark_std::{
-        ops::*,
-        rand::{RngCore, SeedableRng},
-    };
     use rand_chacha::ChaCha20Rng;
 
     #[test]

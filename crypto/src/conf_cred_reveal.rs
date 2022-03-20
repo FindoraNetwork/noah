@@ -5,13 +5,7 @@ use crate::anon_creds::{
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
 use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::{
-    ops::*,
-    traits::{Group, Pairing, Scalar},
-};
-use zei_utils::errors::ZeiError;
+use zei_algebra::{prelude::*, traits::Pairing};
 
 const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
 const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"Confidential AC Reveal PoK New Instance";
@@ -346,9 +340,8 @@ pub(crate) mod test_helper {
     use crate::basics::elgamal::elgamal_key_gen;
     use crate::conf_cred_reveal::{ac_confidential_open_commitment, ac_confidential_open_verify};
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use zei_algebra::traits::{Group, Pairing, Scalar};
-    use zei_utils::errors::ZeiError;
+    use zei_algebra::prelude::*;
+    use zei_algebra::traits::Pairing;
 
     pub(super) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
         use digest::Digest;

@@ -27,7 +27,7 @@ mod tests {
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
-    use zei_algebra::{bls12_381::BLSScalar, One};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn test_merkle_tree() {

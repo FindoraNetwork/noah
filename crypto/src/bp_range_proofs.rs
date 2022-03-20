@@ -2,11 +2,9 @@ use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use itertools::Itertools;
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
+use zei_algebra::prelude::*;
 use zei_algebra::ristretto::CompressedRistretto;
 use zei_algebra::ristretto::RistrettoScalar as Scalar;
-use zei_utils::errors::ZeiError;
 
 /// Gives a bulletproof range proof that values committed using  `blindings`
 /// are within [0..2^{`log_range_upper_bound`}-1].

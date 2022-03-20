@@ -7,19 +7,16 @@ use crate::setup::{NodeParams, UserParams};
 use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSignature};
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType};
 use num_bigint::BigUint;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
 use zei_algebra::bls12_381::BLSScalar;
 use zei_algebra::jubjub::JubjubScalar;
+use zei_algebra::prelude::*;
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
-use zei_algebra::{ops::*, traits::Scalar, Zero};
 use zei_crypto::basics::commitments::pedersen::PedersenGens;
 use zei_crypto::basics::hash::rescue::RescueInstance;
 use zei_crypto::basics::hybrid_encryption::XPublicKey;
 use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{
     prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
 };
-use zei_utils::errors::ZeiError;
 
 pub const TWO_POW_32: u64 = 1 << 32;
 
@@ -193,7 +190,7 @@ pub(crate) fn verify_bar_to_abar(
         ),
         XfrAmount::NonConfidential(amount) => {
             // fake commitment
-            let (l, h) = zei_utils::u64_to_u32_pair(amount);
+            let (l, h) = u64_to_u32_pair(amount);
             (
                 pc_gens
                     .commit(&[RistrettoScalar::from(l)], &RistrettoScalar::zero())

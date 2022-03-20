@@ -10,7 +10,7 @@ extern crate itertools;
 extern crate serde_derive;
 
 #[macro_use]
-extern crate zei_utils;
+extern crate zei_algebra;
 
 pub mod anon_creds;
 pub mod basics;

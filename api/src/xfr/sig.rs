@@ -1,17 +1,11 @@
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey, Signature, Verifier};
-use itertools::Itertools;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use std::{
-    cmp::Ordering,
-    hash::{Hash, Hasher},
-};
 use wasm_bindgen::prelude::*;
 use zei_algebra::{
-    ristretto::{CompressedEdwardsY, RistrettoScalar as Scalar},
-    traits::Scalar as _,
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+    prelude::*,
+    ristretto::{CompressedEdwardsY, RistrettoScalar},
 };
-use zei_utils::{errors::ZeiError, serialization::ZeiFromToBytes};
 
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 
@@ -124,13 +118,13 @@ impl XfrSecretKey {
         XfrSignature(sign)
     }
 
-    /// Returns SecretKey as a Scalar
-    pub(crate) fn as_scalar(&self) -> Scalar {
+    /// Returns SecretKey as a RistrettoScalar
+    pub(crate) fn as_scalar(&self) -> RistrettoScalar {
         let expanded: ExpandedSecretKey = (&self.0).into();
         // expanded.key is not public, thus extract it via serialization
         let mut key_bytes = vec![];
         key_bytes.extend_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
-        Scalar::from_bytes(&key_bytes).expect("Internal error, should never fail")
+        RistrettoScalar::from_bytes(&key_bytes).expect("Internal error, should never fail")
     }
 }
 
@@ -220,11 +214,9 @@ impl XfrMultiSig {
 #[cfg(test)]
 mod test {
     use crate::xfr::sig::{XfrKeyPair, XfrMultiSig};
-    use itertools::Itertools;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use ruc::err::*;
-    use zei_utils::errors::ZeiError::SignatureError;
+    use zei_algebra::prelude::*;
 
     #[test]
     fn signatures() {
@@ -248,7 +240,7 @@ mod test {
         let message = [10u8; 500];
         let sig = keypair.sign(&message);
         msg_eq!(
-            dbg!(SignatureError),
+            dbg!(ZeiError::SignatureError),
             dbg!(keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err()),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
@@ -256,7 +248,7 @@ mod test {
         //test again with secret key
         let sig = keypair.sec_key.sign(&message, &keypair.pub_key);
         msg_eq!(
-            SignatureError,
+            ZeiError::SignatureError,
             keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
@@ -265,7 +257,7 @@ mod test {
         // test with different keys
         let keypair = XfrKeyPair::generate(&mut prng);
         msg_eq!(
-            SignatureError,
+            ZeiError::SignatureError,
             keypair.pub_key.verify(&message, &sig).unwrap_err(),
             "Verifying sig on with a different key should have return Err(Signature Error)"
         );

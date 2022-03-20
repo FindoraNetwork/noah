@@ -3,11 +3,11 @@ use itertools::Itertools;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use zei_algebra::errors::ZeiError;
 use zei_algebra::{
     ops::*,
     traits::{Group, Pairing, Scalar},
 };
-use zei_utils::errors::ZeiError;
 
 pub trait SigmaTranscript {
     fn init_sigma<G: Group>(

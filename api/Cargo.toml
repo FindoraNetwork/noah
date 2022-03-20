@@ -17,7 +17,6 @@ crate-type = ['rlib']
 [dependencies]
 digest = '0.9'
 ed25519-dalek = '1.0.0'
-itertools = '0.10.0'
 linear-map = '1.2.0'
 merlin = '2.0'
 rand_chacha = '0.2'
@@ -34,9 +33,6 @@ path = '../algebra'
 
 [dependencies.zei-crypto]
 path = '../crypto'
-
-[dependencies.zei-utils]
-path = '../utils'
 
 [dependencies.zei-plonk]
 path = '../plonk'

@@ -1,23 +1,20 @@
-use crate::anon_xfr::circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret};
-use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
 use crate::anon_xfr::structs::{
     AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord,
 };
+use crate::anon_xfr::{
+    circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
+    config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+};
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
-use itertools::Itertools;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use std::collections::HashMap;
 use zei_algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
 use zei_algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
-use zei_algebra::{ops::*, traits::Scalar, Zero};
+use zei_algebra::{collections::HashMap, prelude::*};
 use zei_crypto::basics::hash::rescue::RescueInstance;
 use zei_crypto::basics::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
 use zei_crypto::basics::prf::PRF;
-use zei_utils::errors::ZeiError;
 
 pub mod abar_to_bar;
 pub mod anon_fee;
@@ -255,7 +252,7 @@ pub fn decrypt_memo(
     if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN + JUBJUB_SCALAR_LEN {
         return Err(eg!(ZeiError::ParameterError));
     }
-    let amount = zei_utils::u8_le_slice_to_u64(&plaintext[0..8]);
+    let amount = u8_le_slice_to_u64(&plaintext[0..8]);
     let mut i = 8;
     let mut asset_type_array = [0u8; ASSET_TYPE_LENGTH];
     asset_type_array.copy_from_slice(&plaintext[i..i + ASSET_TYPE_LENGTH]);
@@ -332,31 +329,23 @@ mod tests {
         },
         verify_anon_xfr_body, TREE_DEPTH,
     };
-    use itertools::Itertools;
     use parking_lot::lock_api::RwLock;
     use std::sync::Arc;
     use std::thread;
 
-    use crate::xfr::structs::AssetType;
-    use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::{ops::*, traits::Scalar, One, Zero};
-
-    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use rand_core::{CryptoRng, RngCore};
-    use ruc::*;
-
     use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
     use crate::anon_xfr::structs::AXfrNote;
     use crate::setup::{NodeParams, UserParams};
+    use crate::xfr::structs::AssetType;
+    use rand_chacha::ChaChaRng;
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
+    use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
+    use zei_algebra::bls12_381::BLSScalar;
+    use zei_algebra::prelude::*;
     use zei_crypto::basics::hash::rescue::RescueInstance;
-    use zei_utils::errors::ZeiError;
+    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
 
     pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
         MTLeafInfo {

@@ -1,9 +1,7 @@
 #![deny(warnings)]
 #[cfg(test)]
 pub(crate) mod examples {
-    use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
-    use ruc::*;
     use wasm_bindgen::__rt::std::collections::HashMap;
     use zei::api::anon_creds;
     use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Attr, Credential};
@@ -21,8 +19,7 @@ pub(crate) mod examples {
     use zei::xfr::test_utils::{
         conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
     };
-    use zei_utils::errors::ZeiError;
-    use zei_utils::msg_eq;
+    use zei_algebra::prelude::*;
 
     pub const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
     pub const ASSET2_TYPE: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
