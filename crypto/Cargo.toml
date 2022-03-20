@@ -64,7 +64,7 @@ features = ['rand']
 [dev-dependencies]
 bit-array = '0.4.3'
 lazy_static = '1.4.0'
-rmp-serde = '0.13.7'
+rmp-serde = '1.0.0'
 serde_json = '1.0'
 typenum = '1.11.2'
 
