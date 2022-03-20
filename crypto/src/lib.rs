@@ -9,9 +9,6 @@ extern crate itertools;
 #[macro_use]
 extern crate serde_derive;
 
-#[macro_use]
-extern crate zei_algebra;
-
 pub mod anon_creds;
 pub mod basics;
 pub mod bp_circuits;
