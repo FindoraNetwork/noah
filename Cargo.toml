@@ -4,7 +4,6 @@ members = [
  "algebra",
  "crypto",
  "plonk",
- "utils",
  "api",
 ]
 resolver = "2"

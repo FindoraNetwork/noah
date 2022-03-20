@@ -1,6 +1,3 @@
-use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
-
 use super::asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType};
 use super::lib::XfrNotePolicies;
 use super::sig::{XfrKeyPair, XfrPublicKey};
@@ -13,7 +10,8 @@ use crate::api::anon_creds;
 use crate::api::anon_creds::{
     ac_commit, ac_sign, ACCommitment, ACCommitmentKey, ACUserSecretKey, Credential,
 };
-use itertools::Itertools;
+use rand_chacha::ChaChaRng;
+use zei_algebra::prelude::*;
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 
 pub const ASSET_TYPE_1: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);

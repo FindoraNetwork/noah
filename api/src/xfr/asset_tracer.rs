@@ -1,11 +1,9 @@
 use crate::api::anon_creds::{Attr, AttributeCiphertext};
 use crate::xfr::structs::{AssetTracerDecKeys, AssetTracerEncKeys, TracerMemo};
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
 use zei_algebra::bls12_381::{BLSScalar, BLSG1};
-use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
-use zei_algebra::{ops::*, traits::Group};
+use zei_algebra::prelude::*;
+use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::basics::elgamal::{
     elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, ElGamalCiphertext, ElGamalDecKey,
@@ -14,11 +12,9 @@ use zei_crypto::basics::elgamal::{
 use zei_crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key,
 };
-use zei_utils::errors::ZeiError;
-use zei_utils::{u64_to_u32_pair, u8_be_slice_to_u32};
 
 pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
-pub type RecordDataDecKey = ElGamalDecKey<Scalar>;
+pub type RecordDataDecKey = ElGamalDecKey<RistrettoScalar>;
 pub type RecordDataCiphertext = ElGamalCiphertext<RistrettoPoint>;
 type DecryptedAssetMemo = (Option<u64>, Option<AssetType>, Vec<Attr>);
 
@@ -31,8 +27,8 @@ impl TracerMemo {
     pub fn new<R: CryptoRng + RngCore>(
         prng: &mut R,
         tracer_enc_key: &AssetTracerEncKeys,
-        amount_info: Option<(u32, u32, &Scalar, &Scalar)>,
-        asset_type_info: Option<(&AssetType, &Scalar)>,
+        amount_info: Option<(u32, u32, &RistrettoScalar, &RistrettoScalar)>,
+        asset_type_info: Option<(&AssetType, &RistrettoScalar)>,
         attrs_info: &[(Attr, AttributeCiphertext)],
     ) -> Self {
         let mut plaintext = vec![];
@@ -42,13 +38,13 @@ impl TracerMemo {
             plaintext.extend_from_slice(&amount_high.to_be_bytes());
             let ctext_amount_low = elgamal_encrypt(
                 &pc_gens.B,
-                &Scalar::from(amount_low),
+                &RistrettoScalar::from(amount_low),
                 blind_low,
                 &tracer_enc_key.record_data_enc_key,
             );
             let ctext_amount_high = elgamal_encrypt(
                 &pc_gens.B,
-                &Scalar::from(amount_high),
+                &RistrettoScalar::from(amount_high),
                 blind_high,
                 &tracer_enc_key.record_data_enc_key,
             );
@@ -141,14 +137,18 @@ impl TracerMemo {
     /// Check if the amount encrypted in self.lock_amount is expected
     /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
     /// Otherwise, if decrypted amount is not expected amount, return Err(ZeiError::AssetTracingExtractionError), else Ok(())
-    pub fn verify_amount(&self, dec_key: &ElGamalDecKey<Scalar>, expected: u64) -> Result<()> {
+    pub fn verify_amount(
+        &self,
+        dec_key: &ElGamalDecKey<RistrettoScalar>,
+        expected: u64,
+    ) -> Result<()> {
         let (low, high) = u64_to_u32_pair(expected);
         if let Some((ctext_low, ctext_high)) = self.lock_amount.as_ref() {
             let decrypted_low = elgamal_decrypt_elem(ctext_low, dec_key);
             let decrypted_high = elgamal_decrypt_elem(ctext_high, dec_key);
             let base = RistrettoPoint::get_base();
-            if base.mul(&Scalar::from(low)) != decrypted_low
-                || base.mul(&Scalar::from(high)) != decrypted_high
+            if base.mul(&RistrettoScalar::from(low)) != decrypted_low
+                || base.mul(&RistrettoScalar::from(high)) != decrypted_high
             {
                 Err(eg!(ZeiError::AssetTracingExtractionError))
             } else {
@@ -163,7 +163,7 @@ impl TracerMemo {
     // returns Err if lock_asset_type is None or the decrypted is not as expected, else returns Ok
     fn verify_asset_type(
         &self,
-        dec_key: &ElGamalDecKey<Scalar>,
+        dec_key: &ElGamalDecKey<RistrettoScalar>,
         expected: &AssetType,
     ) -> Result<()> {
         if let Some(ctext) = self.lock_asset_type.as_ref() {
@@ -179,8 +179,11 @@ impl TracerMemo {
 
     /// Decrypt amount in self.lock_amount via brute force check taking 2^33 Ristretto additions in the worst case.
     /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
-    /// Otherwise, return Scalar representing the amount
-    pub fn extract_amount_brute_force(&self, dec_key: &ElGamalDecKey<Scalar>) -> Result<u64> {
+    /// Otherwise, return RistrettoScalar representing the amount
+    pub fn extract_amount_brute_force(
+        &self,
+        dec_key: &ElGamalDecKey<RistrettoScalar>,
+    ) -> Result<u64> {
         if let Some((ctext_low, ctext_high)) = self.lock_amount.as_ref() {
             let base = RistrettoPoint::get_base();
             let decrypted_low = elgamal_decrypt(&base, ctext_low, dec_key).c(d!())?;
@@ -198,7 +201,7 @@ impl TracerMemo {
     /// else return the decrypted asset_type.
     pub fn extract_asset_type(
         &self,
-        dec_key: &ElGamalDecKey<Scalar>,
+        dec_key: &ElGamalDecKey<RistrettoScalar>,
         candidate_asset_types: &[AssetType],
     ) -> Result<AssetType> {
         if candidate_asset_types.is_empty() {
@@ -257,15 +260,12 @@ impl TracerMemo {
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use zei_algebra::bls12_381::{BLSScalar, BLSG1};
-    use zei_algebra::ristretto::RistrettoScalar as Scalar;
-    use zei_algebra::traits::Group;
+    use zei_algebra::{
+        bls12_381::{BLSScalar, BLSG1},
+        prelude::*,
+        ristretto::RistrettoScalar,
+    };
     use zei_crypto::basics::elgamal::elgamal_encrypt;
-
-    use itertools::Itertools;
-    use zei_utils::errors::ZeiError;
-    use zei_utils::u64_to_u32_pair;
 
     #[test]
     fn extract_amount_from_tracer_memo() {
@@ -281,7 +281,12 @@ mod tests {
         let memo = TracerMemo::new(
             &mut prng,
             &tracer_keys.enc_key,
-            Some((low, high, &Scalar::from(191919u32), &Scalar::from(2222u32))),
+            Some((
+                low,
+                high,
+                &RistrettoScalar::from(191919u32),
+                &RistrettoScalar::from(2222u32),
+            )),
             None,
             &[],
         );
@@ -308,7 +313,7 @@ mod tests {
             &mut prng,
             &tracer_keys.enc_key,
             None,
-            Some((&asset_type, &Scalar::from(191919u32))),
+            Some((&asset_type, &RistrettoScalar::from(191919u32))),
             &[],
         );
 

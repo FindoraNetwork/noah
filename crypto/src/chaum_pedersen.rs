@@ -2,25 +2,18 @@ use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::sigma::{sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript};
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
+use zei_algebra::prelude::*;
 use zei_algebra::ristretto::RistrettoPoint;
-use zei_algebra::ristretto::RistrettoScalar as Scalar;
-use zei_algebra::{
-    ops::*,
-    traits::{Group, Scalar as _},
-    One, Zero,
-};
-use zei_utils::errors::ZeiError;
+use zei_algebra::ristretto::RistrettoScalar;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
     /// A Chaum-Perdersen equality of commitment proof
     pub(crate) c3: RistrettoPoint,
     pub(crate) c4: RistrettoPoint,
-    pub(crate) z1: Scalar,
-    pub(crate) z2: Scalar,
-    pub(crate) z3: Scalar,
+    pub(crate) z1: RistrettoScalar,
+    pub(crate) z2: RistrettoScalar,
+    pub(crate) z3: RistrettoScalar,
 }
 
 /// A Chaum-Perdersen equality of multiple commitments proof
@@ -63,9 +56,9 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
     pc_gens: &RistrettoPedersenGens,
-    value: &Scalar,
-    com1: (&RistrettoPoint, &Scalar), // commitment and blinding
-    com2: (&RistrettoPoint, &Scalar), // commitment and blinding
+    value: &RistrettoScalar,
+    com1: (&RistrettoPoint, &RistrettoScalar), // commitment and blinding
+    com2: (&RistrettoPoint, &RistrettoScalar), // commitment and blinding
 ) -> ChaumPedersenProof {
     let c1 = com1.0;
     let c2 = com2.0;
@@ -107,7 +100,7 @@ pub fn chaum_pedersen_verify_eq_scalars<R: CryptoRng + RngCore>(
     c1: &RistrettoPoint,
     c2: &RistrettoPoint,
     proof: &ChaumPedersenProof,
-) -> Vec<Scalar> {
+) -> Vec<RistrettoScalar> {
     let identity = RistrettoPoint::get_identity();
     let (elems, lhs_matrix, rhs_vec) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
 
@@ -165,17 +158,17 @@ fn get_fake_zero_commitment() -> RistrettoPoint {
 }
 
 // Obtain the blinding used in the get_fake_zero_commitment
-fn get_fake_zero_commitment_blinding() -> Scalar {
-    Scalar::zero()
+fn get_fake_zero_commitment_blinding() -> RistrettoScalar {
+    RistrettoScalar::zero()
 }
 
-fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<Scalar> {
+fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<RistrettoScalar> {
     if n == 0 {
         return vec![];
     }
-    let mut r = vec![Scalar::one()];
+    let mut r = vec![RistrettoScalar::one()];
     for _ in 1..n {
-        r.push(transcript.get_challenge::<Scalar>());
+        r.push(transcript.get_challenge::<RistrettoScalar>());
     }
     r
 }
@@ -185,9 +178,9 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
     pc_gens: &RistrettoPedersenGens,
-    value: &Scalar,
+    value: &RistrettoScalar,
     commitments: &[RistrettoPoint],
-    blinding_factors: &[Scalar],
+    blinding_factors: &[RistrettoScalar],
 ) -> Result<ChaumPedersenProofX> {
     let n = commitments.len();
     if n != blinding_factors.len() || n < 2 {
@@ -212,7 +205,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     }
     let lc_scalars = get_lc_scalars(transcript, commitments.len() - 2);
     let mut d = RistrettoPoint::get_identity();
-    let mut z = Scalar::zero();
+    let mut z = RistrettoScalar::zero();
     let c0 = &commitments[0];
     let r0 = &blinding_factors[0];
     for (ai, ri, ci) in izip!(
@@ -235,7 +228,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
         transcript,
         prng,
         pc_gens,
-        &Scalar::zero(),
+        &RistrettoScalar::zero(),
         (&d, &z),
         (
             &get_fake_zero_commitment(),
@@ -268,7 +261,7 @@ pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
     pc_gens: &RistrettoPedersenGens,
     commitments: &[RistrettoPoint],
     proof: &ChaumPedersenProofX,
-) -> Result<(Vec<Scalar>, Option<RistrettoPoint>)> {
+) -> Result<(Vec<RistrettoScalar>, Option<RistrettoPoint>)> {
     init_chaum_pedersen_multiple(transcript, pc_gens, commitments);
     let c1_eq_c2_scalars = chaum_pedersen_verify_eq_scalars(
         transcript,
@@ -306,7 +299,7 @@ pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
         proof.zero.as_ref().unwrap(),
     ); //safe unwrap
 
-    let alpha = Scalar::random(prng);
+    let alpha = RistrettoScalar::random(prng);
 
     let mut result = c1_eq_c2_scalars;
     result[0] = result[0].add(&alpha.mul(&ci_scalars[0])); // aggregate B scalars
@@ -388,8 +381,8 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
     let multi_exp_len_bound = 2 + 7 * instances.len();
     let mut all_scalars = Vec::with_capacity(multi_exp_len_bound);
     let mut all_elems = Vec::with_capacity(multi_exp_len_bound);
-    all_scalars.push(Scalar::zero());
-    all_scalars.push(Scalar::zero());
+    all_scalars.push(RistrettoScalar::zero());
+    all_scalars.push(RistrettoScalar::zero());
     all_elems.push(pc_gens.B);
     all_elems.push(pc_gens.B_blinding);
     for (commitments, proof) in instances {
@@ -403,7 +396,7 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
         )
         .c(d!())?;
 
-        let alpha = Scalar::random(prng); // scale instance verification equation by random scalar
+        let alpha = RistrettoScalar::random(prng); // scale instance verification equation by random scalar
         all_scalars[0] = all_scalars[0].add(&instance_scalars[0].mul(&alpha)); // aggregate B
         all_scalars[1] = all_scalars[1].add(&instance_scalars[1].mul(&alpha)); // aggregate B_blinding
         all_scalars.push(instance_scalars[2].mul(&alpha));
@@ -439,17 +432,16 @@ mod test {
     use super::*;
     use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
 
     #[test]
     pub fn test_chaum_pedersen_equality_commitment() {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
-        let value1 = Scalar::from(16u32);
-        let value2 = Scalar::from(32u32);
-        let bf1 = Scalar::from(10u32);
-        let bf2 = Scalar::from(100u32);
+        let value1 = RistrettoScalar::from(16u32);
+        let value2 = RistrettoScalar::from(32u32);
+        let bf1 = RistrettoScalar::from(10u32);
+        let bf2 = RistrettoScalar::from(100u32);
         let c1 = pc_gens.commit(value1, bf1);
         let c2 = pc_gens.commit(value2, bf2);
 
@@ -528,11 +520,11 @@ mod test {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
-        let value1 = Scalar::from(16u32);
-        let value2 = Scalar::from(32u32);
-        let bf1 = Scalar::from(10u32);
-        let bf2 = Scalar::from(100u32);
-        let bf3 = Scalar::from(1000u32);
+        let value1 = RistrettoScalar::from(16u32);
+        let value2 = RistrettoScalar::from(32u32);
+        let bf1 = RistrettoScalar::from(10u32);
+        let bf2 = RistrettoScalar::from(100u32);
+        let bf3 = RistrettoScalar::from(1000u32);
         let c1 = pc_gens.commit(value1, bf1);
         let c2 = pc_gens.commit(value2, bf2);
         let c3 = pc_gens.commit(value1, bf3);
@@ -595,10 +587,10 @@ mod test {
     fn test_chaum_pedersen_multiple_eq_proof_using_two() {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
-        let value1 = Scalar::from(16u32);
-        let value2 = Scalar::from(32u32);
-        let bf1 = Scalar::from(10u32);
-        let bf2 = Scalar::from(100u32);
+        let value1 = RistrettoScalar::from(16u32);
+        let value2 = RistrettoScalar::from(32u32);
+        let bf1 = RistrettoScalar::from(10u32);
+        let bf2 = RistrettoScalar::from(100u32);
         let pc_gens = RistrettoPedersenGens::default();
         let c1 = pc_gens.commit(value1, bf1);
         let c2 = pc_gens.commit(value2, bf2);

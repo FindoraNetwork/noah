@@ -15,17 +15,23 @@ name = 'zei_algebra'
 crate-type = ['rlib']
 
 [dependencies]
+base64 = "0.10"
 serde = '1.0'
 digest = '0.9'
 ruc = '1.0'
-
-[dependencies.zei-utils]
-path = '../utils'
+x25519-dalek = '1.1'
+itertools = '0.10.0'
 
 [dependencies.byteorder]
 version = '^1.2.3'
 default-features = false
 features = ['i128']
+
+[dependencies.bulletproofs]
+package = 'bulletproofs'
+git = 'https://github.com/FindoraNetwork/bp'
+branch = 'batch_verification'
+features = ['yoloproofs']
 
 [dependencies.curve25519-dalek]
 version = '3.0.0'

@@ -3,18 +3,9 @@ use crate::basics::hash::rescue::RescueInstance;
 use crate::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
 use merlin::Transcript;
 use num_bigint::BigUint;
-use num_traits::Zero;
 use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::*;
-use std::ops::{AddAssign, Mul, Shl};
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
-use zei_algebra::{
-    bls12_381::BLSScalar,
-    ops::*,
-    traits::{Group, Scalar},
-};
-use zei_utils::errors::ZeiError;
+use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
 pub struct ZKPartProof {

@@ -5,7 +5,9 @@ use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use zei_algebra::{
     bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
+    fs,
     ops::*,
+    prelude::*,
     traits::{Group, Pairing, Scalar},
     One,
 };
@@ -37,8 +39,6 @@ use zei_algebra::{
 ///    The goal of this verification procedure is to check that indeed P(X)-y=Q(X)(X-x) using pairings
 ///    Check that e(C/g1^y,g2) == e(proof,g2^s/g2^x)
 ///
-use std::fs;
-use zei_utils::errors::ZeiError;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KZGCommitment<G> {

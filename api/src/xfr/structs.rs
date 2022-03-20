@@ -10,21 +10,17 @@ use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDat
 use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use bulletproofs::RangeProof;
 use digest::Digest;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
 use sha2::Sha512;
 use zei_algebra::bls12_381::BLSG1;
+use zei_algebra::prelude::*;
 use zei_algebra::ristretto::{
-    CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar,
+    CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
 };
-use zei_algebra::traits::{Group, Scalar as ZeiScalar};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::basics::elgamal::elgamal_key_gen;
 use zei_crypto::basics::hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCipher};
 use zei_crypto::chaum_pedersen::ChaumPedersenProofX;
 use zei_crypto::pedersen_elgamal::PedersenElGamalEqProof;
-use zei_utils::errors::ZeiError;
-use zei_utils::serialization;
 
 /// Asset Type identifier
 pub const ASSET_TYPE_LENGTH: usize = 32;
@@ -41,7 +37,7 @@ impl AssetType {
     }
 
     /// converts AssetType into a Scalar
-    pub fn as_scalar<S: ZeiScalar>(&self) -> S {
+    pub fn as_scalar<S: Scalar>(&self) -> S {
         let repr = AssetTypeZeiRepr::from(self);
         repr.as_scalar()
     }
@@ -74,7 +70,7 @@ impl<'a> From<&'a AssetType> for AssetTypeZeiRepr {
 }
 
 impl AssetTypeZeiRepr {
-    pub(crate) fn as_scalar<S: ZeiScalar>(&self) -> S {
+    pub(crate) fn as_scalar<S: Scalar>(&self) -> S {
         // interpret AssetTypeZeiRepr bytes as a little endian scalar that fits in S's representation
         // JubjubScalar, BlsScalar and RistrettoScalar have length MIN_SCALAR_LENGTH
         // but in case anther scalar length is larger then we can set to 0 high order bytes
@@ -198,15 +194,15 @@ impl XfrAmount {
     pub fn from_blinds(
         pc_gens: &RistrettoPedersenGens,
         amount: u64,
-        blind_lo: &Scalar,
-        blind_hi: &Scalar,
+        blind_lo: &RistrettoScalar,
+        blind_hi: &RistrettoScalar,
     ) -> Self {
-        let (amount_lo, amount_hi) = zei_utils::u64_to_u32_pair(amount);
+        let (amount_lo, amount_hi) = u64_to_u32_pair(amount);
         let comm_lo = pc_gens
-            .commit(Scalar::from(amount_lo), *blind_lo)
+            .commit(RistrettoScalar::from(amount_lo), *blind_lo)
             .compress();
         let comm_hi = pc_gens
-            .commit(Scalar::from(amount_hi), *blind_hi)
+            .commit(RistrettoScalar::from(amount_hi), *blind_hi)
             .compress();
         XfrAmount::Confidential((comm_lo, comm_hi))
     }
@@ -273,7 +269,7 @@ impl XfrAssetType {
     pub fn from_blind(
         pc_gens: &RistrettoPedersenGens,
         asset_type: &AssetType,
-        blind: &Scalar,
+        blind: &RistrettoScalar,
     ) -> Self {
         let comm_type = pc_gens.commit(asset_type.as_scalar(), *blind).compress();
         XfrAssetType::Confidential(comm_type)
@@ -404,8 +400,8 @@ impl OwnerMemo {
         prng: &mut R,
         amount: u64,
         pub_key: &XfrPublicKey,
-    ) -> Result<(Self, (Scalar, Scalar))> {
-        let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
+    ) -> Result<(Self, (RistrettoScalar, RistrettoScalar))> {
+        let (r, blind_share) = RistrettoScalar::random_scalar_with_compressed_edwards(prng);
         let shared_point =
             OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())
                 .c(d!())?;
@@ -426,8 +422,8 @@ impl OwnerMemo {
         prng: &mut R,
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
-    ) -> Result<(Self, Scalar)> {
-        let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
+    ) -> Result<(Self, RistrettoScalar)> {
+        let (r, blind_share) = RistrettoScalar::random_scalar_with_compressed_edwards(prng);
         let shared_point =
             OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())
                 .c(d!())?;
@@ -445,8 +441,8 @@ impl OwnerMemo {
         amount: u64,
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
-    ) -> Result<(Self, (Scalar, Scalar), Scalar)> {
-        let (r, blind_share) = Scalar::random_scalar_with_compressed_edwards(prng);
+    ) -> Result<(Self, (RistrettoScalar, RistrettoScalar), RistrettoScalar)> {
+        let (r, blind_share) = RistrettoScalar::random_scalar_with_compressed_edwards(prng);
         let shared_point =
             OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())
                 .c(d!())?;
@@ -512,7 +508,10 @@ impl OwnerMemo {
     }
 
     /// Returns the amount blind (blind_low, blind_high)
-    pub fn derive_amount_blinds(&self, keypair: &XfrKeyPair) -> Result<(Scalar, Scalar)> {
+    pub fn derive_amount_blinds(
+        &self,
+        keypair: &XfrKeyPair,
+    ) -> Result<(RistrettoScalar, RistrettoScalar)> {
         let shared_point =
             OwnerMemo::derive_shared_edwards_point(&keypair.sec_key.as_scalar(), &self.blind_share)
                 .c(d!())?;
@@ -520,7 +519,7 @@ impl OwnerMemo {
     }
 
     /// Returns the asset type blind
-    pub fn derive_asset_type_blind(&self, keypair: &XfrKeyPair) -> Result<Scalar> {
+    pub fn derive_asset_type_blind(&self, keypair: &XfrKeyPair) -> Result<RistrettoScalar> {
         let shared_point =
             OwnerMemo::derive_shared_edwards_point(&keypair.sec_key.as_scalar(), &self.blind_share)
                 .c(d!())?;
@@ -538,7 +537,7 @@ impl OwnerMemo {
     // Given a shared point, calculate the amount blinds
     // returns (amount_blind_low, amount_blind_high)
     // noted shared_point = PK ^ r = blind_share ^ sk = (g^sk) ^ r
-    fn calc_amount_blinds(shared_point: &CompressedEdwardsY) -> (Scalar, Scalar) {
+    fn calc_amount_blinds(shared_point: &CompressedEdwardsY) -> (RistrettoScalar, RistrettoScalar) {
         (
             OwnerMemo::hash_to_scalar(&shared_point, b"amount_low"),
             OwnerMemo::hash_to_scalar(&shared_point, b"amount_high"),
@@ -547,7 +546,7 @@ impl OwnerMemo {
 
     // Given a shared point, calculate the asset type blind
     // noted shared_point = PK ^ r = blind_share ^ sk = (g^sk) ^ r
-    fn calc_asset_type_blind(shared_point: &CompressedEdwardsY) -> Scalar {
+    fn calc_asset_type_blind(shared_point: &CompressedEdwardsY) -> RistrettoScalar {
         OwnerMemo::hash_to_scalar(&shared_point, b"asset_type")
     }
 
@@ -556,7 +555,7 @@ impl OwnerMemo {
     // during `OwnerMemo` decryption, point = blind_share = g^r, s = sk, where sk is the secret key
     // in both cases, returns g^(sk*r) in `CompressedEdwardsY` form
     fn derive_shared_edwards_point(
-        s: &Scalar,
+        s: &RistrettoScalar,
         point: &CompressedEdwardsY,
     ) -> Result<CompressedEdwardsY> {
         let shared_edwards_point =
@@ -564,12 +563,12 @@ impl OwnerMemo {
         Ok(CompressedEdwardsY(shared_edwards_point.compress()))
     }
 
-    // returns H(point || aux) as a Scalar
-    fn hash_to_scalar(point: &CompressedEdwardsY, aux: &'static [u8]) -> Scalar {
+    // returns H(point || aux) as a RistrettoScalar
+    fn hash_to_scalar(point: &CompressedEdwardsY, aux: &'static [u8]) -> RistrettoScalar {
         let mut hasher = Sha512::new();
         hasher.update(point.0.as_bytes());
         hasher.update(aux);
-        Scalar::from_hash(hasher)
+        RistrettoScalar::from_hash(hasher)
     }
 }
 
@@ -581,9 +580,9 @@ pub struct OpenAssetRecord {
     pub blind_asset_record: BlindAssetRecord, //TODO have a reference here, and lifetime parameter. We will avoid copying info unnecessarily.
     #[serde(with = "serde_str")]
     pub amount: u64,
-    pub amount_blinds: (Scalar, Scalar), // use Scalar::zero() if unneeded
+    pub amount_blinds: (RistrettoScalar, RistrettoScalar), // use RistrettoScalar::zero() if unneeded
     pub asset_type: AssetType,
-    pub type_blind: Scalar, // use Scalar::zero() if unneeded
+    pub type_blind: RistrettoScalar, // use RistrettoScalar::zero() if unneeded
 }
 
 impl OpenAssetRecord {
@@ -642,7 +641,7 @@ pub struct XfrProofs {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct XfrRangeProof {
-    #[serde(with = "serialization::zei_obj_serde")]
+    #[serde(with = "zei_obj_serde")]
     pub range_proof: RangeProof,
     pub xfr_diff_commitment_low: CompressedRistretto, //lower 32 bits transfer amount difference commitment
     pub xfr_diff_commitment_high: CompressedRistretto, //higher 32 bits transfer amount difference commitment

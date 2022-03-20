@@ -10,12 +10,6 @@
 #![allow(clippy::many_single_char_names)]
 
 #[macro_use]
-extern crate zei_utils;
-
-#[macro_use]
-extern crate itertools;
-
-#[macro_use]
 extern crate serde_derive;
 extern crate core;
 
@@ -26,5 +20,5 @@ pub mod serialization;
 pub mod setup;
 pub mod xfr;
 
+pub use zei_algebra::errors;
 pub use zei_algebra::ristretto;
-pub use zei_utils::errors;

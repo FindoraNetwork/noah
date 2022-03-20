@@ -1,106 +1,60 @@
 #![deny(warnings)]
 #![allow(clippy::upper_case_acronyms)]
 
-pub mod errors;
-pub mod macros;
-pub mod serialization;
+use crate::{fs::File, io::Write, path::PathBuf, prelude::*, rand::SeedableRng};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
-use ruc::*;
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
 
-#[macro_export]
-macro_rules! msg_eq {
-    ($zei_err: expr, $ruc_err: expr $(,)?) => {
-        assert!($ruc_err.msg_has_overloop(ruc::eg!($zei_err).as_ref()));
-    };
-    ($zei_err: expr, $ruc_err: expr, $msg: expr $(,)?) => {
-        assert!($ruc_err.msg_has_overloop(ruc::eg!($zei_err).as_ref()), $msg);
-    };
-}
-
-#[macro_export]
-macro_rules! serialize_deserialize {
-    ($t:ident) => {
-        impl serde::Serialize for $t {
-            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-            where
-                S: Serializer,
-            {
-                if serializer.is_human_readable() {
-                    serializer.serialize_str(&zei_utils::b64enc(&self.zei_to_bytes()))
-                } else {
-                    serializer.serialize_bytes(&self.zei_to_bytes())
-                }
-            }
-        }
-
-        impl<'de> serde::Deserialize<'de> for $t {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                let bytes = if deserializer.is_human_readable() {
-                    deserializer
-                        .deserialize_str(zei_utils::serialization::zei_obj_serde::BytesVisitor)?
-                } else {
-                    deserializer
-                        .deserialize_bytes(zei_utils::serialization::zei_obj_serde::BytesVisitor)?
-                };
-                $t::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
-            }
-        }
-    };
-}
-
-/// I convert a 8 byte array big-endian into a u64 (bigendian)
+/// convert an 8 byte array (big-endian) into a u64 (big-endian)
 pub fn u8_be_slice_to_u64(slice: &[u8]) -> u64 {
     let mut a = [0u8; 8];
     a.copy_from_slice(slice);
     u64::from_be_bytes(a)
 }
 
-/// I convert a 8 byte array little-endian into a u64 (bigendian)
+/// convert a 8 byte array (little-endian) into a u64 (big-endian)
 pub fn u8_le_slice_to_u64(slice: &[u8]) -> u64 {
     let mut a = [0u8; 8];
     a.copy_from_slice(slice);
     u64::from_le_bytes(a)
 }
 
-/// I convert a slice into a u32 (bigendian)
+/// convert a slice into a u32 (big-endian)
 pub fn u8_be_slice_to_u32(slice: &[u8]) -> u32 {
     let mut a = [0u8; 4];
     a.copy_from_slice(slice);
     u32::from_be_bytes(a)
 }
 
-/// I convert a slice into a u32 (littleendian)
+/// convert a slice into a u32 (little-endian)
 pub fn u8_le_slice_to_u32(slice: &[u8]) -> u32 {
     let mut a = [0u8; 4];
     a.copy_from_slice(slice);
     u32::from_le_bytes(a)
 }
 
-/// I compute the minimum power of two that is greater or equal to the input
+/// compute the minimum power of two that is greater or equal to the input
 pub fn min_greater_equal_power_of_two(n: u32) -> u32 {
     2.0f64.powi((n as f64).log2().ceil() as i32) as u32
 }
 
+/// convert u64 into a pair of u32
 pub fn u64_to_u32_pair(x: u64) -> (u32, u32) {
     ((x & 0xFFFF_FFFF) as u32, (x >> 32) as u32)
 }
 
+/// convert the input into the base64 encoding
 pub fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
     base64::encode_config(input, base64::URL_SAFE)
 }
+
+/// reconstruct from the base64 encoding
 pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>> {
     base64::decode_config(input, base64::URL_SAFE).c(d!())
 }
 
+/// derive a ChaCha20Rng PRNG from a digest from a hash function
 pub fn derive_prng_from_hash<D>(hash: D) -> ChaCha20Rng
 where
     D: Digest<OutputSize = U64> + Default,
@@ -112,7 +66,7 @@ where
     ChaCha20Rng::from_seed(seed)
 }
 
-/// I shift a big integer (represented as a littleendian bytes vector) by one bit.
+/// shift a big integer (represented as a little-endian bytes vector) by one bit.
 pub fn shift_u8_vec(r: &mut Vec<u8>) {
     let mut next = 0u8;
     for e in r.iter_mut().rev() {
@@ -122,6 +76,25 @@ pub fn shift_u8_vec(r: &mut Vec<u8>) {
     }
     if *r.last().unwrap() == 0 && r.len() > 1 {
         r.pop();
+    }
+}
+
+/// save parameters to a file
+pub fn save_to_file(params_ser: &[u8], out_filename: PathBuf) {
+    let filename = out_filename.to_str().unwrap();
+    let mut f = File::create(&filename).expect("Unable to create file");
+    f.write_all(params_ser).expect("Unable to write data");
+    println!("Public parameters written in file {}.", filename);
+}
+
+/// a short-hand macro for not matching an expression
+#[macro_export]
+macro_rules! not_matches {
+   ($expression:expr, $( $pattern:pat_param )|+ $( if $guard: expr )?) => {
+        match $expression {
+            $( $pattern )|+ $( if $guard )? => false,
+            _ => true
+        }
     }
 }
 
@@ -194,11 +167,13 @@ mod test {
             super::u64_to_u32_pair(0xFFFFFFFF00000000u64)
         );
     }
-}
 
-pub fn save_to_file(params_ser: &[u8], out_filename: PathBuf) {
-    let filename = out_filename.to_str().unwrap();
-    let mut f = File::create(&filename).expect("Unable to create file");
-    f.write_all(params_ser).expect("Unable to write data");
-    println!("Public parameters written in file {}.", filename);
+    #[test]
+    fn test_not_matches_macro() {
+        let foofoo = 'g';
+        assert!(not_matches!(foofoo, 'a'..='f'));
+
+        let barbar = Some(4);
+        assert!(not_matches!(barbar, Some(x) if x < 2));
+    }
 }

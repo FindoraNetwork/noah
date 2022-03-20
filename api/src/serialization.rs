@@ -3,36 +3,7 @@ use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use ed25519_dalek::{PublicKey, SecretKey};
 use ruc::*;
 use serde::Serializer;
-use zei_utils::errors::ZeiError;
-pub use zei_utils::serialization::ZeiFromToBytes;
-
-/*
-impl ZeiFromToBytes for AXfrPubKey {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    self.0.zei_to_bytes()
-  }
-
-  fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-    let point = JubjubGroup::zei_from_bytes(bytes).c(d!())?;
-    Ok(AXfrPubKey(point))
-  }
-}
-
-serialize_deserialize!(AXfrPubKey);
-
-impl ZeiFromToBytes for AXfrSecKey {
-  fn zei_to_bytes(&self) -> Vec<u8> {
-    self.0.zei_to_bytes()
-  }
-
-  fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-    let scalar = JubjubScalar::zei_from_bytes(bytes).c(d!())?;
-    Ok(AXfrSecKey(scalar))
-  }
-}
-
-serialize_deserialize!(AXfrSecKey);
-*/
+use zei_algebra::prelude::*;
 
 impl ZeiFromToBytes for AssetType {
     fn zei_to_bytes(&self) -> Vec<u8> {
@@ -49,8 +20,6 @@ impl ZeiFromToBytes for AssetType {
         }
     }
 }
-
-// serialize_deserialize!(AssetType);
 
 impl ZeiFromToBytes for XfrPublicKey {
     fn zei_to_bytes(&self) -> Vec<u8> {

@@ -12,24 +12,14 @@ use crate::xfr::structs::{
     IdentityRevealPolicy, TracerMemo, TracingPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote,
     ASSET_TYPE_LENGTH,
 };
-use ruc::*;
-use zei_algebra::ristretto::RistrettoScalar as Scalar;
-use zei_algebra::traits::Scalar as _;
-use zei_crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
-use zei_crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
-
-use itertools::Itertools;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
+use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use zei_utils::errors::ZeiError;
-use zei_utils::errors::ZeiError::{
-    XfrVerifyAssetTracingAssetAmountError, XfrVerifyAssetTracingIdentityError,
-};
-use zei_utils::u64_to_u32_pair;
+use zei_crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
+use zei_crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
 
 pub(crate) fn create_xfr(
     prng: &mut ChaChaRng,
@@ -171,10 +161,16 @@ fn do_transfer_tests_single_asset(
         | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
             let (low, high) = u64_to_u32_pair(total_amount + 1);
             let commitment_low = pc_gens
-                .commit(Scalar::from(low), Scalar::random(&mut prng))
+                .commit(
+                    RistrettoScalar::from(low),
+                    RistrettoScalar::random(&mut prng),
+                )
                 .compress();
             let commitment_high = pc_gens
-                .commit(Scalar::from(high), Scalar::random(&mut prng))
+                .commit(
+                    RistrettoScalar::from(high),
+                    RistrettoScalar::random(&mut prng),
+                )
                 .compress();
             xfr_note.body.outputs[3].amount =
                 XfrAmount::Confidential((commitment_low, commitment_high));
@@ -234,7 +230,7 @@ fn do_transfer_tests_single_asset(
         _ => XfrAssetType::Confidential(
             pc_gens
                 .commit(
-                    Scalar::from(10u32),
+                    RistrettoScalar::from(10u32),
                     old_output1.open_asset_record.type_blind,
                 )
                 .compress(),
@@ -289,7 +285,10 @@ fn do_transfer_tests_single_asset(
         }
         _ => XfrAssetType::Confidential(
             pc_gens
-                .commit(Scalar::from(10u32), old_input1.open_asset_record.type_blind)
+                .commit(
+                    RistrettoScalar::from(10u32),
+                    old_input1.open_asset_record.type_blind,
+                )
                 .compress(),
         ),
     };
@@ -301,7 +300,6 @@ fn do_transfer_tests_single_asset(
 }
 
 mod single_asset_no_tracing {
-
     use super::*;
     use crate::setup::PublicParams;
 
@@ -681,7 +679,6 @@ mod keys {
 }
 
 mod identity_tracing {
-
     //////////////////////////////////////////////////////////////////////////////////////////////////
     ////    Tests with identity tracing                                                          ////
     //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -783,7 +780,7 @@ mod identity_tracing {
             vec![None; 1],
         );
         msg_eq!(
-            XfrVerifyAssetTracingIdentityError,
+            ZeiError::XfrVerifyAssetTracingIdentityError,
             verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).unwrap_err(),
         );
 
@@ -815,7 +812,6 @@ mod identity_tracing {
 }
 
 mod asset_tracing {
-
     //////////////////////////////////////////////////////////////////////////////////////////////////
     ////    Tests with asset tracing                                                              ///
     //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -826,10 +822,11 @@ mod asset_tracing {
     };
     use crate::xfr::structs::XfrAmount::NonConfidential;
     use crate::xfr::structs::{AssetTracerKeyPair, TracingPolicies};
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::jubjub::JubjubScalar;
-    use zei_algebra::ops::*;
-    use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+    use zei_algebra::{
+        bls12_381::BLSScalar,
+        jubjub::JubjubScalar,
+        ristretto::{RistrettoPoint, RistrettoScalar},
+    };
     use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use zei_crypto::basics::elgamal::ElGamalCiphertext;
 
@@ -837,8 +834,8 @@ mod asset_tracing {
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
 
     fn create_wrong_proof() -> PedersenElGamalEqProof {
-        let m = Scalar::from(10u32);
-        let r = Scalar::from(7657u32);
+        let m = RistrettoScalar::from(10u32);
+        let r = RistrettoScalar::from(7657u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenGens::default();
 
@@ -1018,7 +1015,7 @@ mod asset_tracing {
             );
 
             msg_eq!(
-                XfrVerifyAssetTracingAssetAmountError,
+                ZeiError::XfrVerifyAssetTracingAssetAmountError,
                 verify_xfr_body(&mut prng, params, &new_xfr_body, &policies).unwrap_err(),
                 "Asset tracing verification fails as the ciphertext has been altered."
             );
@@ -1037,7 +1034,7 @@ mod asset_tracing {
         let check = verify_xfr_body(&mut prng, params, &new_xfr_body, &policies);
 
         msg_eq!(
-            XfrVerifyAssetTracingAssetAmountError,
+            ZeiError::XfrVerifyAssetTracingAssetAmountError,
             check.unwrap_err(),
             "Transfer should fail without proof."
         );
@@ -1059,7 +1056,7 @@ mod asset_tracing {
         let check = verify_xfr_body(&mut prng, params, &new_xfr_body, &policies);
 
         msg_eq!(
-            XfrVerifyAssetTracingAssetAmountError,
+            ZeiError::XfrVerifyAssetTracingAssetAmountError,
             check.unwrap_err(),
             "Transfer should fail as the proof is not correctly computed."
         );

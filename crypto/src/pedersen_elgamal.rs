@@ -5,15 +5,15 @@ use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use zei_algebra::errors::ZeiError;
 use zei_algebra::ristretto::RistrettoPoint;
 use zei_algebra::ristretto::RistrettoScalar as Scalar;
+use zei_algebra::serialization;
 use zei_algebra::{
     ops::*,
     traits::{Group, Scalar as _},
     One, Zero,
 };
-use zei_utils::errors::ZeiError;
-use zei_utils::serialization;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PedersenElGamalEqProof {
@@ -366,16 +366,13 @@ mod test {
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
         PedersenElGamalProofInstance,
     };
-    use itertools::Itertools;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
-    use ruc::*;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
+    use zei_algebra::prelude::*;
     use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
-    use zei_utils::errors::ZeiError;
 
     #[test]
     fn good_proof_verify() {

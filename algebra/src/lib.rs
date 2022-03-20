@@ -20,9 +20,6 @@
     clippy::upper_case_acronyms
 )]
 
-#[macro_use]
-extern crate zei_utils;
-
 /// Module for the BLS12-381 curve
 pub mod bls12_381;
 
@@ -41,4 +38,56 @@ pub mod ristretto;
 /// Module for serialization of scalars and group elements
 pub mod serialization;
 
-pub use ark_std::*;
+/// Module for utils
+pub mod utils;
+
+/// Module for prelude
+pub mod prelude;
+
+pub use ark_std::{
+    borrow, cmp, collections, fs, hash, io, ops, path, rand, One, UniformRand, Zero,
+};
+
+/// check if the error messages equal
+#[macro_export]
+macro_rules! msg_eq {
+    ($zei_err: expr, $ruc_err: expr $(,)?) => {
+        assert!($ruc_err.msg_has_overloop(ruc::eg!($zei_err).as_ref()));
+    };
+    ($zei_err: expr, $ruc_err: expr, $msg: expr $(,)?) => {
+        assert!($ruc_err.msg_has_overloop(ruc::eg!($zei_err).as_ref()), $msg);
+    };
+}
+
+/// implement serialization and deserialization
+#[macro_export]
+macro_rules! serialize_deserialize {
+    ($t:ident) => {
+        impl serde::Serialize for $t {
+            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                if serializer.is_human_readable() {
+                    serializer.serialize_str(&b64enc(&self.zei_to_bytes()))
+                } else {
+                    serializer.serialize_bytes(&self.zei_to_bytes())
+                }
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $t {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let bytes = if deserializer.is_human_readable() {
+                    deserializer.deserialize_str(zei_obj_serde::BytesVisitor)?
+                } else {
+                    deserializer.deserialize_bytes(zei_obj_serde::BytesVisitor)?
+                };
+                $t::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}

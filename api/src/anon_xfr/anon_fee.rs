@@ -14,22 +14,14 @@ use crate::anon_xfr::{
 use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::OwnerMemo;
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use std::borrow::Borrow;
 use zei_algebra::bls12_381::BLSScalar;
 use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
-use zei_algebra::{
-    ops::*,
-    traits::{Group, Scalar},
-    One, Zero,
-};
+use zei_algebra::prelude::*;
 use zei_plonk::plonk::{
     constraint_system::{TurboConstraintSystem, VarIndex},
     prover::prover,
     verifier::verifier,
 };
-use zei_utils::errors::ZeiError;
 
 const ANON_FEE_TRANSCRIPT: &[u8] = b"Anon Fee";
 pub const ANON_FEE_MIN: u64 = 20_000;

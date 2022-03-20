@@ -45,12 +45,12 @@ use bulletproofs::r1cs::{
 };
 use merlin::Transcript;
 use ruc::*;
+use zei_algebra::errors::ZeiError;
 use zei_algebra::{
     ops::*,
     ristretto::{CompressedRistretto, RistrettoScalar as Scalar},
     Zero,
 };
-use zei_utils::errors::ZeiError;
 
 /// Represent AssetRecord amount and asset type
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

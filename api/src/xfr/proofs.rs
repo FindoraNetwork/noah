@@ -9,13 +9,11 @@ use crate::xfr::structs::{
     XfrAssetType, XfrBody, XfrRangeProof,
 };
 use bulletproofs::RangeProof;
-use itertools::Itertools;
 use linear_map::LinearMap;
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar as Scalar};
-use zei_algebra::{ops::*, traits::Group, Zero};
+use zei_algebra::prelude::*;
+use zei_algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar};
+use zei_algebra::utils::{min_greater_equal_power_of_two, u64_to_u32_pair};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::basics::elgamal::ElGamalCiphertext;
 use zei_crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
@@ -26,8 +24,6 @@ use zei_crypto::pedersen_elgamal::{
     pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
     PedersenElGamalEqProof, PedersenElGamalProofInstance,
 };
-use zei_utils::errors::ZeiError;
-use zei_utils::{min_greater_equal_power_of_two, u64_to_u32_pair};
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
@@ -80,7 +76,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
                 .lock_amount
                 .as_ref()
                 .c(d!(ZeiError::InconsistentStructureError))?;
-            m.push(Scalar::from(low));
+            m.push(RistrettoScalar::from(low));
             r.push(open_record.amount_blinds.0);
             ctexts.push(lock_amount_low.clone()); // TODO avoid this clone
             commitments.push(
@@ -88,7 +84,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
                     .decompress()
                     .c(d!(ZeiError::DecompressElementError))?,
             );
-            m.push(Scalar::from(high));
+            m.push(RistrettoScalar::from(high));
             r.push(open_record.amount_blinds.1);
             ctexts.push(lock_amount_high.clone()); // TODO avoid this clone
             commitments.push(
@@ -537,7 +533,7 @@ pub(crate) fn range_proof(
     range_proof_blinds.push(xfr_blind_diff_low);
     range_proof_blinds.push(xfr_blind_diff_high);
     for _ in range_proof_blinds.len()..upper_power2 {
-        range_proof_blinds.push(Scalar::default());
+        range_proof_blinds.push(RistrettoScalar::default());
     }
 
     let mut transcript = Transcript::new(b"Zei Range Proof");
@@ -559,11 +555,11 @@ pub(crate) fn range_proof(
         xfr_diff_commitment_high: diff_com_high,
     })
 }
-fn add_blindings(oar: &[&OpenAssetRecord]) -> (Scalar, Scalar) {
-    oar.iter()
-        .fold((Scalar::zero(), Scalar::zero()), |(low, high), x| {
-            (low.add(&x.amount_blinds.0), high.add(&x.amount_blinds.1))
-        })
+fn add_blindings(oar: &[&OpenAssetRecord]) -> (RistrettoScalar, RistrettoScalar) {
+    oar.iter().fold(
+        (RistrettoScalar::zero(), RistrettoScalar::zero()),
+        |(low, high), x| (low.add(&x.amount_blinds.0), high.add(&x.amount_blinds.1)),
+    )
 }
 
 pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
@@ -602,7 +598,7 @@ fn extract_value_commitments(
 ) -> Result<Vec<CompressedRistretto>> {
     let num_output = outputs.len();
     let upper_power2 = min_greater_equal_power_of_two((2 * num_output + 2) as u32) as usize;
-    let pow2_32 = Scalar::from(POW_2_32);
+    let pow2_32 = RistrettoScalar::from(POW_2_32);
 
     let mut commitments = Vec::with_capacity(upper_power2);
     // 1. verify proof commitment to transfer's input - output amounts match proof commitments
@@ -621,8 +617,8 @@ fn extract_value_commitments(
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
                 let pc_gens = RistrettoPedersenGens::default();
-                let com_low = pc_gens.commit(Scalar::from(low), Scalar::zero());
-                let com_high = pc_gens.commit(Scalar::from(high), Scalar::zero());
+                let com_low = pc_gens.commit(RistrettoScalar::from(low), RistrettoScalar::zero());
+                let com_high = pc_gens.commit(RistrettoScalar::from(high), RistrettoScalar::zero());
                 (com_low, com_high)
             }
         };
@@ -640,8 +636,8 @@ fn extract_value_commitments(
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
                 let pc_gens = RistrettoPedersenGens::default();
-                let com_low = pc_gens.commit(Scalar::from(low), Scalar::zero());
-                let com_high = pc_gens.commit(Scalar::from(high), Scalar::zero());
+                let com_low = pc_gens.commit(RistrettoScalar::from(low), RistrettoScalar::zero());
+                let com_high = pc_gens.commit(RistrettoScalar::from(high), RistrettoScalar::zero());
                 (com_low, com_high)
             }
         };
@@ -650,7 +646,7 @@ fn extract_value_commitments(
 
         commitments.push(com_low.compress());
         commitments.push(com_high.compress());
-        //output_com.push(com_low + com_high * Scalar::from(0xFFFFFFFF as u64 + 1));
+        //output_com.push(com_low + com_high * RistrettoScalar::from(0xFFFFFFFF as u64 + 1));
     }
 
     // 3. derive input - output commitment, compare with proof struct low anc high commitments
@@ -737,7 +733,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
             .map(|x| match x.asset_type {
                 XfrAssetType::Confidential(com) => com.decompress().c(d!(ZeiError::ParameterError)),
                 XfrAssetType::NonConfidential(asset_type) => {
-                    Ok(pc_gens.commit(asset_type.as_scalar(), Scalar::zero()))
+                    Ok(pc_gens.commit(asset_type.as_scalar(), RistrettoScalar::zero()))
                 }
             })
             .collect();
@@ -753,8 +749,7 @@ mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, TracerMemo, TracingPolicies, TracingPolicy};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::*;
-    use zei_utils::errors::ZeiError;
+    use zei_algebra::prelude::*;
 
     #[test]
     fn verify_identity_proofs_structure() {

@@ -9,16 +9,10 @@ use crate::xfr::proofs::{
 };
 use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
 use crate::xfr::structs::*;
-use itertools::Itertools;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
 use serde::ser::Serialize;
-use std::collections::HashMap;
-use zei_algebra::ristretto::{CompressedRistretto, RistrettoScalar as Scalar};
-use zei_algebra::{ops::*, Zero};
+use zei_algebra::ristretto::{CompressedRistretto, RistrettoScalar};
+use zei_algebra::{collections::HashMap, prelude::*};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use zei_utils::errors::ZeiError;
-use zei_utils::u64_to_u32_pair;
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
@@ -106,13 +100,12 @@ impl XfrType {
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
-/// use rand_core::SeedableRng;
 /// use zei::xfr::sig::XfrKeyPair;
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use zei::xfr::asset_record::AssetRecordType;
 /// use zei::xfr::lib::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
-/// use itertools::Itertools;
-/// use ruc::{*, err::*};
+/// use zei_algebra::prelude::*;
+/// use ruc::err::*;
 /// use zei::setup::PublicParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -343,7 +336,7 @@ fn gen_xfr_proofs_multi_asset(
     outputs: &[&OpenAssetRecord],
     xfr_type: XfrType,
 ) -> Result<AssetTypeAndAmountProof> {
-    let pow2_32 = Scalar::from(POW_2_32);
+    let pow2_32 = RistrettoScalar::from(POW_2_32);
 
     let mut ins = vec![];
 
@@ -802,7 +795,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
     fn process_bars(
         bars: &[BlindAssetRecord],
     ) -> Result<Vec<(CompressedRistretto, CompressedRistretto)>> {
-        let pow2_32 = Scalar::from(POW_2_32);
+        let pow2_32 = RistrettoScalar::from(POW_2_32);
         bars.iter()
             .map(|x| {
                 let (com_amount_low, com_amount_high) = match x.amount {
@@ -814,8 +807,9 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
                         let pc_gens = RistrettoPedersenGens::default();
                         let (low, high) = u64_to_u32_pair(amount);
                         (
-                            Ok(pc_gens.commit(Scalar::from(low), Scalar::zero())),
-                            Ok(pc_gens.commit(Scalar::from(high), Scalar::zero())),
+                            Ok(pc_gens.commit(RistrettoScalar::from(low), RistrettoScalar::zero())),
+                            Ok(pc_gens
+                                .commit(RistrettoScalar::from(high), RistrettoScalar::zero())),
                         )
                     }
                 };
@@ -829,7 +823,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
                             XfrAssetType::NonConfidential(asset_type) => {
                                 let pc_gens = RistrettoPedersenGens::default();
                                 pc_gens
-                                    .commit(asset_type.as_scalar(), Scalar::zero())
+                                    .commit(asset_type.as_scalar(), RistrettoScalar::zero())
                                     .compress()
                             }
                         };

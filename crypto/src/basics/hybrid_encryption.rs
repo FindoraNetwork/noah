@@ -9,10 +9,11 @@ use ruc::*;
 use serde::Serializer;
 use sha2::Digest;
 use wasm_bindgen::prelude::*;
+use zei_algebra::errors::ZeiError;
+use zei_algebra::prelude::*;
 use zei_algebra::ristretto::RistrettoScalar as Scalar;
+use zei_algebra::serialization::ZeiFromToBytes;
 use zei_algebra::traits::Scalar as _;
-use zei_utils::errors::ZeiError;
-use zei_utils::serialization::ZeiFromToBytes;
 
 #[wasm_bindgen]
 #[derive(Debug, Clone)]

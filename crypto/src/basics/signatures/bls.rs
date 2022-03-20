@@ -1,11 +1,6 @@
 use digest::Digest;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::{
-    ops::*,
-    traits::{Group, Pairing, Scalar},
-};
-use zei_utils::errors::ZeiError;
+use zei_algebra::prelude::*;
+use zei_algebra::traits::Pairing;
 
 type HashFnc = sha2::Sha512;
 
@@ -149,38 +144,10 @@ pub fn bls_hash_pubkeys_to_scalars<P: Pairing>(
     scalars
 }
 
-/*
-impl<G> Into<G> for BlsPublicKey<G> {
-  fn into(self) -> G {
-    self.0
-  }
-}
-
-impl<G> AsRef<G> for BlsPublicKey<G> {
-  fn as_ref(&self) -> &G {
-    &self.0
-  }
-}
-
-impl<S> Into<S> for BlsSecretKey<S> {
-  fn into(self) -> S {
-    self.0
-  }
-}
-
-impl<S> AsRef<S> for BlsSecretKey<S> {
-  fn as_ref(&self) -> &S {
-    &self.0
-  }
-}
-*/
-
 #[cfg(test)]
 mod tests {
-    use rand_core::SeedableRng;
-    use ruc::*;
     use zei_algebra::bls12_381::BLSPairingEngine;
-    use zei_utils::errors::ZeiError;
+    use zei_algebra::prelude::*;
 
     #[test]
     fn bls_signatures() {
