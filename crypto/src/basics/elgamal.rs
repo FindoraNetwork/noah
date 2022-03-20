@@ -233,16 +233,13 @@ mod elgamal_test {
         ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey, ElGamalHybridCiphertext,
     };
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
-    use ruc::*;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
     use zei_algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
-    use zei_algebra::errors::ZeiError;
     use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
+    use zei_algebra::prelude::*;
     use zei_algebra::ristretto::RistrettoPoint;
-    use zei_algebra::traits::{Group, Scalar};
 
     fn verification<G: Group>() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);

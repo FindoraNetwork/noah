@@ -14,16 +14,9 @@
 use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::*;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
-use zei_algebra::errors::ZeiError;
-use zei_algebra::serialization::ZeiFromToBytes;
-use zei_algebra::{
-    ops::*,
-    traits::{Group, Scalar},
-};
+use zei_algebra::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(non_snake_case)]
@@ -421,15 +414,12 @@ mod schnorr_sigs {
 
     #[cfg(test)]
     mod schnorr_multisig {
-
         use crate::basics::signatures::schnorr::{
             multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature,
         };
-        use rand_chacha::rand_core::SeedableRng;
-        use zei_algebra::errors::ZeiError;
         use zei_algebra::jubjub::JubjubPoint;
+        use zei_algebra::prelude::*;
         use zei_algebra::ristretto::RistrettoPoint;
-        use zei_algebra::{traits::Group, One};
 
         fn check_schnorr_multisig<G: Group>() {
             let seed = [0_u8; 32];

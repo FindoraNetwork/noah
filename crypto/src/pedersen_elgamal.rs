@@ -366,15 +366,12 @@ mod test {
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
         PedersenElGamalProofInstance,
     };
-    use itertools::Itertools;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
-    use ruc::*;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
-    use zei_algebra::errors::ZeiError;
+    use zei_algebra::prelude::*;
     use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 
     #[test]
