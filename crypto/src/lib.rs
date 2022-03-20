@@ -17,5 +17,3 @@ pub mod chaum_pedersen;
 pub mod conf_cred_reveal;
 pub mod field_simulation;
 pub mod pc_eq_rescue_split_verifier_zk_part;
-pub mod pedersen_elgamal;
-pub mod sigma;

@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
-use zei_crypto::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
+use zei_crypto::basics::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
 
 pub(crate) fn create_xfr(
     prng: &mut ChaChaRng,

@@ -898,10 +898,9 @@ pub(crate) mod tests {
     use rand_core::SeedableRng;
     use ruc::*;
     use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::ristretto::RistrettoPoint;
     use zei_algebra::traits::Scalar;
-    use zei_crypto::basics::commitments::pedersen::PedersenGens;
     use zei_crypto::basics::commitments::rescue::HashCommitment;
+    use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use zei_crypto::basics::hash::rescue::RescueInstance;
     use zei_crypto::basics::prf::PRF;
     use zei_crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external;
@@ -1619,7 +1618,7 @@ pub(crate) mod tests {
     #[test]
     fn test_eq_committed_vals_cs() {
         let mut rng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+        let pc_gens = RistrettoPedersenGens::default();
 
         // 1. compute the parameters
         let amount = BLSScalar::from(71u32);
@@ -1631,8 +1630,8 @@ pub(crate) mod tests {
         let gamma = RistrettoScalar::random(&mut rng);
         let delta = RistrettoScalar::random(&mut rng);
 
-        let point_p = pc_gens.commit(&[x], &gamma).unwrap();
-        let point_q = pc_gens.commit(&[y], &delta).unwrap();
+        let point_p = pc_gens.commit(x, gamma);
+        let point_q = pc_gens.commit(y, delta);
 
         let z_randomizer = BLSScalar::random(&mut rng);
         let z_instance = RescueInstance::<BLSScalar>::new();

@@ -33,7 +33,6 @@ impl<S: Scalar> SecretKey<S> {
     fn randomize(&self, factor: &S) -> SecretKey<S> {
         SecretKey(self.0.mul(factor))
     }
-
     fn scalar(&self) -> S {
         self.0
     }
@@ -89,7 +88,7 @@ pub struct KeyPair<G, S> {
 }
 
 impl<G: Group> KeyPair<G, G::ScalarType> {
-    /// Generate a schnorr keypair from `prng`
+    /// Generate a Schnorr keypair from `prng`
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         gen_keys(prng)
     }

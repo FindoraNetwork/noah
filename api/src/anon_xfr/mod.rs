@@ -1,14 +1,14 @@
-use crate::anon_xfr::keys::AXfrKeyPair;
-use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
-use crate::anon_xfr::structs::{
-    AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord,
+use crate::{
+    anon_xfr::{
+        circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
+        config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+        keys::AXfrKeyPair,
+        proofs::{prove_xfr, verify_xfr},
+        structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
+    },
+    setup::{NodeParams, UserParams},
+    xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH},
 };
-use crate::anon_xfr::{
-    circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
-    config::{FEE_CALCULATING_FUNC, FEE_TYPE},
-};
-use crate::setup::{NodeParams, UserParams};
-use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use zei_algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
 use zei_algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
 use zei_algebra::{collections::HashMap, prelude::*};
