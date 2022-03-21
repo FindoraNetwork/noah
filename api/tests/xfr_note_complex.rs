@@ -2,11 +2,16 @@
 #[cfg(test)]
 pub(crate) mod xfr_note_complex_variable_size {
     use rand_chacha::ChaChaRng;
-    use zei::setup::PublicParams;
-    use zei::xfr::lib::{gen_xfr_body, verify_xfr_body, XfrNotePoliciesRef};
-    use zei::xfr::structs::TracingPolicies;
-    use zei::xfr::test_utils::{
-        prepare_inputs_and_outputs_with_policies_single_asset, setup_with_policies,
+    use zei::{
+        setup::PublicParams,
+        xfr::{
+            gen_xfr_body,
+            structs::TracingPolicies,
+            test_utils::{
+                prepare_inputs_and_outputs_with_policies_single_asset, setup_with_policies,
+            },
+            verify_xfr_body, XfrNotePoliciesRef,
+        },
     };
     use zei_algebra::prelude::*;
 

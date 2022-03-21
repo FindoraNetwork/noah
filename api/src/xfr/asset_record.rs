@@ -1,14 +1,15 @@
-use crate::api::anon_creds::{
+use crate::anon_creds::{
     ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
     ConfidentialAC, Credential,
 };
-use crate::xfr::sig::{XfrKeyPair, XfrPublicKey};
-use crate::xfr::structs::{
-    AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
-    TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
+use crate::xfr::{
+    sig::{XfrKeyPair, XfrPublicKey},
+    structs::{
+        AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
+        TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
+    },
 };
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::RistrettoScalar;
+use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 
 /// AssetRecrod confidentiality flags. Indicated if amount and/or assettype should be confidential
@@ -588,13 +589,15 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
 #[cfg(test)]
 mod test {
     use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
-    use crate::xfr::asset_record::AssetRecordType;
-    use crate::xfr::sig::XfrKeyPair;
-    use crate::xfr::structs::{
-        AssetRecordTemplate, AssetTracerKeyPair, AssetType, OpenAssetRecord, TracingPolicies,
-        TracingPolicy, XfrAmount, XfrAssetType,
+    use crate::xfr::{
+        asset_record::AssetRecordType,
+        sig::XfrKeyPair,
+        structs::{
+            AssetRecordTemplate, AssetTracerKeyPair, AssetType, OpenAssetRecord, TracingPolicies,
+            TracingPolicy, XfrAmount, XfrAssetType,
+        },
+        tests::{create_xfr, gen_key_pair_vec},
     };
-    use crate::xfr::tests::{create_xfr, gen_key_pair_vec};
     use rand_chacha::ChaChaRng;
     use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
     use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;

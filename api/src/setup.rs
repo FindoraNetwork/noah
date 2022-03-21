@@ -1,25 +1,27 @@
 // The Public Setup needed for Proofs
-use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret,
-    TurboPlonkCS, TREE_DEPTH,
+use crate::anon_xfr::{
+    abar_to_bar::build_abar_to_bar_cs,
+    anon_fee::build_anon_fee_cs,
+    circuits::{
+        build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret,
+        TurboPlonkCS, TREE_DEPTH,
+    },
+    config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+    structs::{MTNode, MTPath},
 };
-use zei_algebra::bls12_381::BLSScalar;
-
-use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
-use crate::anon_xfr::anon_fee::build_anon_fee_cs;
-use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
-use crate::anon_xfr::structs::{MTNode, MTPath};
 use crate::parameters::{
     ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
     RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
 use bulletproofs::BulletproofGens;
 use serde::Deserialize;
-use zei_algebra::jubjub::JubjubScalar;
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::RistrettoScalar;
-use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
+use zei_algebra::{
+    bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
+};
+use zei_crypto::{
+    basics::commitments::ristretto_pedersen::RistrettoPedersenGens,
+    pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
+};
 use zei_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,
@@ -320,11 +322,13 @@ impl From<UserParams> for NodeParams {
 mod test {
     use crate::parameters::SRS;
     use crate::setup::{NodeParams, UserParams};
-    use zei_algebra::bls12_381::{BLSScalar, BLSG1};
-    use zei_algebra::prelude::*;
-    use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
-    use zei_plonk::poly_commit::pcs::PolyComScheme;
+    use zei_algebra::{
+        bls12_381::{BLSScalar, BLSG1},
+        prelude::*,
+    };
+    use zei_plonk::poly_commit::{
+        field_polynomial::FpPolynomial, kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme,
+    };
 
     #[test]
     fn test_params_serialization() {

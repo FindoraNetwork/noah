@@ -4,11 +4,12 @@
 use bulletproofs::BulletproofGens;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
-use zei::anon_xfr::TREE_DEPTH;
-use zei::setup::{NodeParams, PublicParams, UserParams, PRECOMPUTED_PARTY_NUMBER};
+use zei::{
+    anon_xfr::TREE_DEPTH,
+    setup::{NodeParams, PublicParams, UserParams, PRECOMPUTED_PARTY_NUMBER},
+};
 use zei_plonk::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
 use zei_utils::save_to_file;
 

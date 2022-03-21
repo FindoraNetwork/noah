@@ -1,20 +1,23 @@
-use crate::{
-    anon_xfr::{
-        circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
-        config::{FEE_CALCULATING_FUNC, FEE_TYPE},
-        keys::AXfrKeyPair,
-        proofs::{prove_xfr, verify_xfr},
-        structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
-    },
-    setup::{NodeParams, UserParams},
-    xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH},
+use crate::anon_xfr::{
+    circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
+    config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+    keys::AXfrKeyPair,
+    proofs::{prove_xfr, verify_xfr},
+    structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
 };
-use zei_algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
-use zei_algebra::jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN};
-use zei_algebra::{collections::HashMap, prelude::*};
-use zei_crypto::basics::hash::rescue::RescueInstance;
-use zei_crypto::basics::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
-use zei_crypto::basics::prf::PRF;
+use crate::setup::{NodeParams, UserParams};
+use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
+use zei_algebra::{
+    bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
+    collections::HashMap,
+    jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN},
+    prelude::*,
+};
+use zei_crypto::basics::{
+    hash::rescue::RescueInstance,
+    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey},
+    prf::PRF,
+};
 
 pub mod abar_to_bar;
 pub mod anon_fee;
@@ -321,31 +324,31 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::{
+        config::{FEE_CALCULATING_FUNC, FEE_TYPE},
         gen_anon_xfr_body, hash_abar,
         keys::AXfrKeyPair,
         structs::{
-            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
+            AXfrNote, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
             OpenAnonBlindAssetRecordBuilder,
         },
         verify_anon_xfr_body, TREE_DEPTH,
     };
-    use parking_lot::lock_api::RwLock;
-    use std::sync::Arc;
-    use std::thread;
-
-    use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
-    use crate::anon_xfr::structs::AXfrNote;
     use crate::setup::{NodeParams, UserParams};
     use crate::xfr::structs::AssetType;
+    use parking_lot::lock_api::RwLock;
     use rand_chacha::ChaChaRng;
-    use storage::db::TempRocksDB;
-    use storage::state::{ChainState, State};
-    use storage::store::PrefixedStore;
+    use std::{sync::Arc, thread};
+    use storage::{
+        db::TempRocksDB,
+        state::{ChainState, State},
+        store::PrefixedStore,
+    };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::prelude::*;
-    use zei_crypto::basics::hash::rescue::RescueInstance;
-    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use zei_crypto::basics::{
+        hash::rescue::RescueInstance,
+        hybrid_encryption::{XPublicKey, XSecretKey},
+    };
 
     pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
         MTLeafInfo {

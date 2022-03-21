@@ -3,21 +3,23 @@
 pub(crate) mod examples {
     use rand_chacha::ChaChaRng;
     use wasm_bindgen::__rt::std::collections::HashMap;
-    use zei::api::anon_creds;
-    use zei::api::anon_creds::{ac_commit, ac_sign, ac_verify_commitment, Attr, Credential};
-    use zei::setup::PublicParams;
-    use zei::xfr::asset_record::{open_blind_asset_record, AssetRecordType};
-    use zei::xfr::lib::{
-        gen_xfr_note, trace_assets_brute_force, RecordData, XfrNotePolicies, XfrNotePoliciesRef,
-    };
-    use zei::xfr::lib::{trace_assets, verify_xfr_note};
-    use zei::xfr::sig::{XfrKeyPair, XfrPublicKey};
-    use zei::xfr::structs::{
-        AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, IdentityRevealPolicy,
-        TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
-    };
-    use zei::xfr::test_utils::{
-        conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
+    use zei::{
+        anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
+        setup::PublicParams,
+        xfr::{
+            asset_record::{open_blind_asset_record, AssetRecordType},
+            gen_xfr_note,
+            sig::{XfrKeyPair, XfrPublicKey},
+            structs::{
+                AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType,
+                IdentityRevealPolicy, TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
+            },
+            test_utils::{
+                conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
+            },
+            trace_assets, trace_assets_brute_force, verify_xfr_note, RecordData, XfrNotePolicies,
+            XfrNotePoliciesRef,
+        },
     };
     use zei_algebra::prelude::*;
 

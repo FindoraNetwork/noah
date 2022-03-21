@@ -1,6 +1,6 @@
 [[bin]]
 name = 'gen-params'
-path = 'src/bin/gen-params.rs'
+path = 'src/gen-params.rs'
 required-features = ['parallel']
 
 [package]

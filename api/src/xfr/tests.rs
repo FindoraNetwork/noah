@@ -1,25 +1,27 @@
-use crate::api::anon_creds;
-use crate::api::anon_creds::{ac_commit, ACCommitment, Credential};
+use crate::anon_creds::{self, ac_commit, ACCommitment, Credential};
 use crate::setup::PublicParams;
-use crate::xfr::asset_record::AssetRecordType;
-use crate::xfr::lib::{
+use crate::xfr::{
+    asset_record::AssetRecordType,
     batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
-    gen_xfr_note, verify_xfr_body, verify_xfr_note, XfrNotePolicies,
-};
-use crate::xfr::sig::XfrKeyPair;
-use crate::xfr::structs::{
-    AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerKeyPair, AssetType,
-    IdentityRevealPolicy, TracerMemo, TracingPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote,
-    ASSET_TYPE_LENGTH,
+    gen_xfr_note,
+    sig::XfrKeyPair,
+    structs::{
+        AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerKeyPair, AssetType,
+        IdentityRevealPolicy, TracerMemo, TracingPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote,
+        ASSET_TYPE_LENGTH,
+    },
+    verify_xfr_body, verify_xfr_note, XfrNotePolicies,
 };
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use zei_crypto::basics::elgamal::{elgamal_encrypt, elgamal_key_gen};
-use zei_crypto::basics::pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof};
+use zei_crypto::basics::{
+    commitments::ristretto_pedersen::RistrettoPedersenGens,
+    elgamal::{elgamal_encrypt, elgamal_key_gen},
+    pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
+};
 
 pub(crate) fn create_xfr(
     prng: &mut ChaChaRng,
@@ -464,7 +466,7 @@ mod single_asset_no_tracing {
 
 mod multi_asset_no_tracing {
     use super::*;
-    use crate::xfr::lib::XfrNotePolicies;
+    use crate::xfr::XfrNotePolicies;
 
     #[test]
     fn do_multiasset_transfer_tests() {
@@ -684,8 +686,7 @@ mod identity_tracing {
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
-    use crate::xfr::lib::XfrNotePoliciesRef;
-    use crate::xfr::structs::TracingPolicies;
+    use crate::xfr::{structs::TracingPolicies, XfrNotePoliciesRef};
 
     fn check_identity_tracing_for_asset_type(asset_record_type: AssetRecordType) {
         let mut prng: ChaChaRng;
@@ -817,18 +818,19 @@ mod asset_tracing {
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     use super::*;
-    use crate::xfr::lib::{
+    use crate::xfr::{
+        structs::XfrAmount::NonConfidential,
+        structs::{AssetTracerKeyPair, TracingPolicies},
         trace_assets, trace_assets_brute_force, XfrNotePolicies, XfrNotePoliciesRef,
     };
-    use crate::xfr::structs::XfrAmount::NonConfidential;
-    use crate::xfr::structs::{AssetTracerKeyPair, TracingPolicies};
     use zei_algebra::{
         bls12_381::BLSScalar,
         jubjub::JubjubScalar,
         ristretto::{RistrettoPoint, RistrettoScalar},
     };
-    use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-    use zei_crypto::basics::elgamal::ElGamalCiphertext;
+    use zei_crypto::basics::{
+        commitments::ristretto_pedersen::RistrettoPedersenGens, elgamal::ElGamalCiphertext,
+    };
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);

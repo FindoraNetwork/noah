@@ -1,31 +1,32 @@
-use crate::anon_xfr::keys::AXfrSignature;
 use crate::anon_xfr::{
     circuits::{
         add_merkle_path_variables, commit, compute_merkle_root, nullify, AccElemVars,
         NullifierInputVars, PayerSecret, PayerSecretVars, TurboPlonkCS,
     },
-    keys::{AXfrKeyPair, AXfrPubKey},
+    keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature},
     nullifier,
     structs::{Nullifier, OpenAnonBlindAssetRecord},
 };
 use crate::setup::{NodeParams, UserParams};
-use crate::xfr::asset_record::{build_open_asset_record, AssetRecordType};
-use crate::xfr::sig::XfrPublicKey;
-use crate::xfr::structs::{
-    AssetRecordTemplate, BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType,
+use crate::xfr::{
+    asset_record::{build_open_asset_record, AssetRecordType},
+    sig::XfrPublicKey,
+    structs::{AssetRecordTemplate, BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
 };
 use merlin::Transcript;
 use num_bigint::BigUint;
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::RistrettoScalar;
 use zei_algebra::{
     bls12_381::BLSScalar,
     jubjub::{JubjubPoint, JubjubScalar},
+    prelude::*,
+    ristretto::RistrettoScalar,
 };
-use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use zei_crypto::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
-use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{
-    prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
+use zei_crypto::{
+    basics::commitments::ristretto_pedersen::RistrettoPedersenGens,
+    field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
+    pc_eq_rescue_split_verifier_zk_part::{
+        prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
+    },
 };
 use zei_plonk::{
     plonk::{
@@ -634,28 +635,33 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body};
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::structs::{
-        AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
+    use crate::anon_xfr::{
+        abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body},
+        keys::AXfrKeyPair,
+        structs::{
+            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
+        },
     };
     use crate::setup::{NodeParams, UserParams};
-    use crate::xfr::asset_record::AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
-    use crate::xfr::sig::XfrKeyPair;
-    use crate::xfr::structs::AssetType;
+    use crate::xfr::{
+        asset_record::AssetRecordType::ConfidentialAmount_ConfidentialAssetType, sig::XfrKeyPair,
+        structs::AssetType,
+    };
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use std::sync::Arc;
-    use std::thread;
-    use storage::db::TempRocksDB;
-    use storage::state::{ChainState, State};
-    use storage::store::PrefixedStore;
+    use std::{sync::Arc, thread};
+    use storage::{
+        db::TempRocksDB,
+        state::{ChainState, State},
+        store::PrefixedStore,
+    };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::{traits::Scalar, Zero};
-    use zei_crypto::basics::hash::rescue::RescueInstance;
-    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
+    use zei_crypto::basics::{
+        hash::rescue::RescueInstance,
+        hybrid_encryption::{XPublicKey, XSecretKey},
+    };
 
     #[test]
     fn test_abar_to_bar_conversion() {

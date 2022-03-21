@@ -1,15 +1,17 @@
-use crate::anon_xfr::circuits::{
-    build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness,
+use crate::anon_xfr::{
+    circuits::{
+        build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness,
+    },
+    config::{FEE_CALCULATING_FUNC, FEE_TYPE},
 };
-use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::setup::{NodeParams, UserParams};
 use merlin::Transcript;
 use num_bigint::BigUint;
-use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::RistrettoScalar;
-use zei_crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
-use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
+use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
+use zei_crypto::{
+    field_simulation::{SimFr, NUM_OF_LIMBS},
+    pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
+};
 use zei_plonk::{
     plonk::{prover::prover, setup::PlonkPf, verifier::verifier},
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
@@ -156,16 +158,16 @@ pub(crate) fn verify_eq_committed_vals(
 
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::circuits::tests::new_multi_xfr_witness_for_test;
-    use crate::anon_xfr::circuits::AMultiXfrPubInputs;
-    use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
-    use crate::anon_xfr::proofs::{prove_xfr, verify_xfr};
+    use crate::anon_xfr::{
+        circuits::{tests::new_multi_xfr_witness_for_test, AMultiXfrPubInputs},
+        config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+        proofs::{prove_xfr, verify_xfr},
+    };
     use crate::setup::{NodeParams, UserParams};
     use rand::RngCore;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::One;
+    use zei_algebra::{bls12_381::BLSScalar, One};
 
     #[test]
     fn test_anon_multi_xfr_proof_3in_6out_single_asset() {
