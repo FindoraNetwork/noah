@@ -1,19 +1,17 @@
 use aes::{
-    cipher::{generic_array::GenericArray, NewCipher, StreamCipher},
-    Aes256Ctr,
+    cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher},
+    Aes256,
 };
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
 use serde::Serializer;
 use sha2::Digest;
 use wasm_bindgen::prelude::*;
 use zei_algebra::errors::ZeiError;
 use zei_algebra::prelude::*;
-use zei_algebra::ristretto::RistrettoScalar as Scalar;
-use zei_algebra::serialization::ZeiFromToBytes;
-use zei_algebra::traits::Scalar as _;
+use zei_algebra::ristretto::RistrettoScalar;
+
+type Aes256Ctr = ctr::Ctr64BE<Aes256>;
 
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
@@ -215,12 +213,12 @@ where
     symmetric_key_from_x25519_public_key(prng, &x_public_key)
 }
 
-fn sec_key_as_scalar(sk: &SecretKey) -> Scalar {
+fn sec_key_as_scalar(sk: &SecretKey) -> RistrettoScalar {
     let expanded: ExpandedSecretKey = sk.into();
     //expanded.key is not public, I need to extract it via serialization
     let mut key_bytes = [0u8; 32];
     key_bytes.copy_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
-    Scalar::from_bytes(&key_bytes).unwrap() // safe unwrap
+    RistrettoScalar::from_bytes(&key_bytes).unwrap() // safe unwrap
 }
 
 fn symmetric_key_from_x25519_secret_key(
