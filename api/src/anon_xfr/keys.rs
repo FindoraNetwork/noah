@@ -109,7 +109,7 @@ impl ZeiFromToBytes for AXfrPubKey {
 #[cfg(test)]
 mod test {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
-    use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
+    use rand_chacha::ChaChaRng;
     use zei_algebra::prelude::*;
 
     #[test]
