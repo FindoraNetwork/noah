@@ -1,4 +1,4 @@
-use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use itertools::Itertools;
 use merlin::Transcript;
@@ -10,7 +10,7 @@ use zei_algebra::ristretto::RistrettoScalar as Scalar;
 /// are within [0..2^{`log_range_upper_bound`}-1].
 pub fn prove_ranges(
     bp_gens: &BulletproofGens,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     transcript: &mut Transcript,
     values: &[u64],
     blindings: &[Scalar],
@@ -61,7 +61,7 @@ pub fn verify_ranges<R: CryptoRng + RngCore>(
 pub fn batch_verify_ranges<R: CryptoRng + RngCore>(
     prng: &mut R,
     bp_gens: &BulletproofGens,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     proofs: &[&RangeProof],
     transcripts: &mut [Transcript],
     commitments: &[&[CompressedRistretto]],

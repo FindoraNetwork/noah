@@ -17,9 +17,9 @@ use zei_algebra::{
     ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar},
     utils::{min_greater_equal_power_of_two, u64_to_u32_pair},
 };
+use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     basics::{
-        commitments::ristretto_pedersen::RistrettoPedersenGens,
         elgamal::ElGamalCiphertext,
         pedersen_elgamal::{
             pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
@@ -221,7 +221,7 @@ fn collect_bars_and_memos_by_keys<'a>(
 
 pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     xfr_bodies: &[&XfrBody],
     instances_policies: &[&XfrNotePoliciesRef],
 ) -> Result<()> {
@@ -284,7 +284,7 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
 
 fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     xfr_bodies: &[&XfrBody],
     input_reveal_policies: &[&[&TracingPolicies]],
     output_reveal_policies: &[&[&TracingPolicies]],
@@ -624,7 +624,7 @@ fn extract_value_commitments(
             ),
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
-                let pc_gens = RistrettoPedersenGens::default();
+                let pc_gens = RistrettoPedersenCommitment::default();
                 let com_low = pc_gens.commit(RistrettoScalar::from(low), RistrettoScalar::zero());
                 let com_high = pc_gens.commit(RistrettoScalar::from(high), RistrettoScalar::zero());
                 (com_low, com_high)
@@ -643,7 +643,7 @@ fn extract_value_commitments(
             ),
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
-                let pc_gens = RistrettoPedersenGens::default();
+                let pc_gens = RistrettoPedersenCommitment::default();
                 let com_low = pc_gens.commit(RistrettoScalar::from(low), RistrettoScalar::zero());
                 let com_high = pc_gens.commit(RistrettoScalar::from(high), RistrettoScalar::zero());
                 (com_low, com_high)
@@ -693,7 +693,7 @@ fn extract_value_commitments(
 /// I compute asset equality proof for confidential asset transfers
 pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     open_inputs: &[&OpenAssetRecord],
     open_outputs: &[&OpenAssetRecord],
 ) -> Result<ChaumPedersenProofX> {
@@ -725,7 +725,7 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
 
 pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     instances: &[(
         &Vec<BlindAssetRecord>,
         &Vec<BlindAssetRecord>,

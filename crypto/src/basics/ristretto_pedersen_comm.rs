@@ -4,21 +4,21 @@ use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RistrettoPedersenGens {
+pub struct RistrettoPedersenCommitment {
     pub B: RistrettoPoint,
     pub B_blinding: RistrettoPoint,
 }
 
-impl Default for RistrettoPedersenGens {
-    fn default() -> RistrettoPedersenGens {
+impl Default for RistrettoPedersenCommitment {
+    fn default() -> RistrettoPedersenCommitment {
         let pc_gens = PedersenGens::default();
-        RistrettoPedersenGens {
+        RistrettoPedersenCommitment {
             B: RistrettoPoint(pc_gens.B),
             B_blinding: RistrettoPoint(pc_gens.B_blinding),
         }
     }
 }
-impl RistrettoPedersenGens {
+impl RistrettoPedersenCommitment {
     pub fn commit(&self, value: RistrettoScalar, blinding: RistrettoScalar) -> RistrettoPoint {
         RistrettoPoint(
             curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(
@@ -29,17 +29,17 @@ impl RistrettoPedersenGens {
     }
 }
 
-impl From<PedersenGens> for RistrettoPedersenGens {
+impl From<PedersenGens> for RistrettoPedersenCommitment {
     fn from(gens: PedersenGens) -> Self {
-        RistrettoPedersenGens {
+        RistrettoPedersenCommitment {
             B: RistrettoPoint(gens.B),
             B_blinding: RistrettoPoint(gens.B_blinding),
         }
     }
 }
 
-impl From<&RistrettoPedersenGens> for PedersenGens {
-    fn from(rp: &RistrettoPedersenGens) -> Self {
+impl From<&RistrettoPedersenCommitment> for PedersenGens {
+    fn from(rp: &RistrettoPedersenCommitment) -> Self {
         PedersenGens {
             B: rp.B.0,
             B_blinding: rp.B_blinding.0,

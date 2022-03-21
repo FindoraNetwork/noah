@@ -10,9 +10,9 @@ use zei_algebra::{
     jubjub::JubjubScalar,
     prelude::*,
 };
-use zei_crypto::basics::{
-    commitments::rescue,
-    hybrid_encryption::{hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey},
+use zei_crypto::basics::hash::rescue::RescueInstance;
+use zei_crypto::basics::hybrid_encryption::{
+    hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
 };
 use zei_plonk::{plonk::setup::PlonkPf, poly_commit::kzg_poly_com::KZGCommitmentScheme};
 
@@ -174,13 +174,13 @@ impl OpenAnonBlindAssetRecord {
 
     /// computes record's amount||asset type commitment
     pub fn compute_commitment(&self) -> Commitment {
-        rescue::HashCommitment::new()
-            .commit(
-                &self.blind,
-                &[BLSScalar::from(self.amount), self.asset_type.as_scalar()],
-            )
-            .unwrap()
-        // safe unwrap
+        let hash = RescueInstance::new();
+        hash.rescue_hash(&[
+            self.blind,
+            BLSScalar::from(self.amount),
+            self.asset_type.as_scalar(),
+            BLSScalar::zero(),
+        ])[0]
     }
 }
 

@@ -266,14 +266,19 @@ pub fn decrypt_memo(
     i += BLS12_381_SCALAR_LEN;
     let rand = JubjubScalar::from_bytes(&plaintext[i..i + JUBJUB_SCALAR_LEN])
         .c(d!(ZeiError::ParameterError))?;
+
     // verify abar's commitment
-    zei_crypto::basics::commitments::rescue::HashCommitment::new()
-        .verify(
-            &[BLSScalar::from(amount), asset_type.as_scalar()],
-            &blind,
-            &abar.amount_type_commitment,
-        )
-        .c(d!())?;
+    let hash = RescueInstance::new();
+    let expected_commitment = hash.rescue_hash(&[
+        blind,
+        BLSScalar::from(amount),
+        asset_type.as_scalar(),
+        BLSScalar::zero(),
+    ])[0];
+    if expected_commitment != abar.amount_type_commitment {
+        return Err(eg!(ZeiError::CommitmentVerificationError));
+    }
+
     // verify abar's public key
     if key_pair.randomize(&rand).pub_key() != abar.public_key {
         return Err(eg!(ZeiError::InconsistentStructureError));

@@ -18,10 +18,8 @@ use serde::Deserialize;
 use zei_algebra::{
     bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
 };
-use zei_crypto::{
-    basics::commitments::ristretto_pedersen::RistrettoPedersenGens,
-    pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
-};
+use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use zei_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,
@@ -35,7 +33,7 @@ use zei_plonk::{
 pub struct PublicParams {
     pub bp_gens: BulletproofGens,
     pub bp_circuit_gens: BulletproofGens,
-    pub pc_gens: RistrettoPedersenGens,
+    pub pc_gens: RistrettoPedersenCommitment,
     pub range_proof_bits: usize,
 }
 

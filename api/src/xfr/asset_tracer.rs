@@ -7,8 +7,8 @@ use zei_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
+use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::basics::{
-    commitments::ristretto_pedersen::RistrettoPedersenGens,
     elgamal::{
         elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, ElGamalCiphertext, ElGamalDecKey,
         ElGamalEncKey,
@@ -35,7 +35,7 @@ impl TracerMemo {
         attrs_info: &[(Attr, AttributeCiphertext)],
     ) -> Self {
         let mut plaintext = vec![];
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
         let lock_amount = amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
             plaintext.extend_from_slice(&amount_low.to_be_bytes());
             plaintext.extend_from_slice(&amount_high.to_be_bytes());
