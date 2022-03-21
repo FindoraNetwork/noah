@@ -1,6 +1,5 @@
-use super::rescue::{RescueCtr, RescueInstance};
-use std::str::FromStr;
-use zei_algebra::bls12_381::BLSScalar;
+use super::rescue::RescueInstance;
+use zei_algebra::{bls12_381::BLSScalar, str::FromStr};
 
 // # of rounds
 const NR: usize = 12;
@@ -151,27 +150,10 @@ impl RescueInstance<BLSScalar> {
     }
 }
 
-impl RescueCtr<BLSScalar> {
-    // Create a ctr-mode instance from the secret key `key` and the initial counter `nonce`.
-    pub fn new(key: &[BLSScalar], nonce: BLSScalar) -> Self {
-        let cipher = RescueInstance::new();
-        let round_keys = cipher.key_scheduling(key);
-        Self {
-            round_keys,
-            nonce,
-            cipher,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use crate::basics::hash::rescue::{RescueCtr, RescueInstance};
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use std::str::FromStr;
-    use zei_algebra::traits::Scalar;
-    use zei_algebra::{bls12_381::BLSScalar, One, Zero};
+    use crate::basics::hash::rescue::RescueInstance;
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*, str::FromStr};
 
     // Hash output on zero inputs
     const H0: &str =
@@ -201,75 +183,6 @@ mod test {
     const OUT3: &str =
         "11841671251183135941416472468814974558690471402623537939181412432991452533485";
 
-    // A random input
-    const IN_CIPHER_0: &str =
-        "17047322336802935932966007034442804612620899178809238248872011064560235003714";
-    const IN_CIPHER_1: &str =
-        "2045333206533209083668612725439622118360198910432032235844388049409215095381";
-    const IN_CIPHER_2: &str =
-        "1642228842277729705860016938270236538607392160414102928978303153597069223721";
-    const IN_CIPHER_3: &str =
-        "48419811036094400223779862424201122839898117899462236227760442336438612701726";
-
-    // A random cipher key
-    const KEY0: &str =
-        "23251924544707311382291758084128319995502527926309628858518193057549428891074";
-    const KEY1: &str =
-        "36061817328448659066838422656238087102177513559336208519436493169840580462739";
-    const KEY2: &str =
-        "48702917103848154848521702847688693584523900615918095821362126424245826494713";
-    const KEY3: &str =
-        "15698057721419363988770047723026739897170462568163171281853217653643878723977";
-
-    // Cipher output on the random input and the random cipher key
-    const OUT_CIPHER_0: &str =
-        "5371231393178517404840883995935105926463670246247999128171111383365403545937";
-    const OUT_CIPHER_1: &str =
-        "38004649067166652603148575803198850531805576584746170907117206112588747351985";
-    const OUT_CIPHER_2: &str =
-        "41019147083216142191446223204064376892979855390919734149770647006552233340804";
-    const OUT_CIPHER_3: &str =
-        "44516252630166309349262106481347856899153840478794847950915811117572760286157";
-
-    #[test]
-    fn rescue_hash_consistency() {
-        let hash = RescueInstance::<BLSScalar>::new();
-        let zero_vec = [
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-        ];
-        let keys = hash.key_scheduling(&zero_vec);
-        let hash_state = hash.rescue_with_round_keys(&zero_vec, &keys);
-
-        let hash_state2 = hash.rescue_hash(&zero_vec);
-
-        assert_eq!(hash_state, hash_state2);
-
-        let hash_init_keys = hash.hash_init();
-        assert_eq!(hash_init_keys, keys);
-
-        // Use some non-zero seed and plaintext
-        let seed = [
-            BLSScalar::from(17u32),
-            BLSScalar::from(212u32),
-            BLSScalar::from(131u32),
-            BLSScalar::from(5179u32),
-        ];
-        let input_vec = [
-            BLSScalar::from(34121u32),
-            BLSScalar::from(65179u32),
-            BLSScalar::from(19189u32),
-            BLSScalar::zero(),
-        ];
-        let keys = hash.key_scheduling(&seed);
-        let hash_state = hash.rescue_with_round_keys(&input_vec, &keys);
-        let hash_state2 = hash.rescue(&input_vec, &seed);
-
-        assert_eq!(hash_state, hash_state2);
-    }
-
     #[test]
     fn test_rescue_hash() {
         let hash = RescueInstance::<BLSScalar>::new();
@@ -285,11 +198,8 @@ mod test {
             BLSScalar::from_str(H2).unwrap(),
             BLSScalar::from_str(H3).unwrap(),
         ];
-        let keys = hash.key_scheduling(&zero_vec);
-        let hash_state = hash.rescue_with_round_keys(&zero_vec, &keys);
-        let hash_state2 = hash.rescue_hash(&zero_vec);
+        let hash_state = hash.rescue(&zero_vec);
         assert_eq!(hash_state, expected_output);
-        assert_eq!(hash_state2, expected_output);
 
         // Use a random input
         let input_vec = [
@@ -304,70 +214,7 @@ mod test {
             BLSScalar::from_str(OUT2).unwrap(),
             BLSScalar::from_str(OUT3).unwrap(),
         ];
-        let keys = hash.key_scheduling(&zero_vec);
-        let hash_state = hash.rescue_with_round_keys(&input_vec, &keys);
-        let hash_state2 = hash.rescue_hash(&input_vec);
+        let hash_state = hash.rescue(&input_vec);
         assert_eq!(hash_state, expected_output);
-        assert_eq!(hash_state2, expected_output);
-    }
-
-    #[test]
-    fn test_rescue_ctr() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
-        let key = [
-            BLSScalar::random(&mut prng),
-            BLSScalar::random(&mut prng),
-            BLSScalar::random(&mut prng),
-            BLSScalar::random(&mut prng),
-        ];
-        let mut ctr_mode = RescueCtr::new(&key, zero);
-        let original_data = vec![one; 7];
-        let mut data = original_data.clone();
-        ctr_mode.add_keystream(&mut data);
-        assert_eq!(data.len(), 7);
-        let mut new_data = original_data.clone();
-        ctr_mode.add_keystream(&mut new_data);
-        // The new key stream is different from the previous key stream
-        assert_ne!(data, new_data);
-        // The keystream for each data block is distinct
-        for (i, a) in data.iter().chain(new_data.iter()).enumerate() {
-            for b in data.iter().chain(new_data.iter()).skip(i + 1) {
-                assert_ne!(*a, *b);
-            }
-        }
-
-        let mut ctr_mode = RescueCtr::new(&key, zero);
-        // decryptions are correct
-        ctr_mode.sub_keystream(&mut data);
-        assert_eq!(original_data, data);
-        ctr_mode.sub_keystream(&mut new_data);
-        assert_eq!(original_data, new_data);
-    }
-
-    #[test]
-    fn test_rescue_cipher() {
-        let cipher = RescueInstance::new();
-        let input_vec = [
-            BLSScalar::from_str(IN_CIPHER_0).unwrap(),
-            BLSScalar::from_str(IN_CIPHER_1).unwrap(),
-            BLSScalar::from_str(IN_CIPHER_2).unwrap(),
-            BLSScalar::from_str(IN_CIPHER_3).unwrap(),
-        ];
-        let key_vec = [
-            BLSScalar::from_str(KEY0).unwrap(),
-            BLSScalar::from_str(KEY1).unwrap(),
-            BLSScalar::from_str(KEY2).unwrap(),
-            BLSScalar::from_str(KEY3).unwrap(),
-        ];
-        let expected_output = vec![
-            BLSScalar::from_str(OUT_CIPHER_0).unwrap(),
-            BLSScalar::from_str(OUT_CIPHER_1).unwrap(),
-            BLSScalar::from_str(OUT_CIPHER_2).unwrap(),
-            BLSScalar::from_str(OUT_CIPHER_3).unwrap(),
-        ];
-        let output = cipher.rescue(&input_vec, &key_vec);
-        assert_eq!(output, expected_output);
     }
 }

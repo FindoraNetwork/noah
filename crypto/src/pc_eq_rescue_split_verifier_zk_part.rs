@@ -105,13 +105,13 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     // 4. compute comm, which is the commitment of the non-ZK verifier's state
     let comm_instance = RescueInstance::<BLSScalar>::new();
     let comm = {
-        let h1 = comm_instance.rescue_hash(&[
+        let h1 = comm_instance.rescue(&[
             compressed_limbs[0],
             compressed_limbs[1],
             compressed_limbs[2],
             compressed_limbs[3],
         ])[0];
-        comm_instance.rescue_hash(&[h1, compressed_limbs[4], r, BLSScalar::zero()])[0]
+        comm_instance.rescue(&[h1, compressed_limbs[4], r, BLSScalar::zero()])[0]
     };
     proof.non_zk_part_state_commitment = comm;
 
@@ -249,7 +249,7 @@ mod test {
             let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
             let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-            let z = z_instance.rescue_hash(&[
+            let z = z_instance.rescue(&[
                 z_randomizer,
                 x_in_bls12_381,
                 y_in_bls12_381,

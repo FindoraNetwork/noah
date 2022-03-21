@@ -136,7 +136,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
     let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-    let z = z_instance.rescue_hash(&[
+    let z = z_instance.rescue(&[
         z_randomizer,
         x_in_bls12_381,
         y_in_bls12_381,

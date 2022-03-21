@@ -338,12 +338,10 @@ pub fn multisig_verify<G: Group>(
 mod schnorr_sigs {
 
     mod schnorr_simple_sig {
-        use crate::basics::signatures::schnorr::{KeyPair, PublicKey, Signature};
-        use rand_chacha::rand_core::SeedableRng;
+        use crate::basics::schnorr::{KeyPair, PublicKey, Signature};
         use zei_algebra::jubjub::JubjubPoint;
+        use zei_algebra::prelude::*;
         use zei_algebra::ristretto::RistrettoPoint;
-        use zei_algebra::serialization::ZeiFromToBytes;
-        use zei_algebra::{traits::Group, One};
 
         fn check_schnorr<G: Group>() {
             let seed = [0_u8; 32];
@@ -413,7 +411,7 @@ mod schnorr_sigs {
 
     #[cfg(test)]
     mod schnorr_multisig {
-        use crate::basics::signatures::schnorr::{
+        use crate::basics::schnorr::{
             multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature,
         };
         use zei_algebra::jubjub::JubjubPoint;

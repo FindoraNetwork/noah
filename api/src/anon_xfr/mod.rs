@@ -269,7 +269,7 @@ pub fn decrypt_memo(
 
     // verify abar's commitment
     let hash = RescueInstance::new();
-    let expected_commitment = hash.rescue_hash(&[
+    let expected_commitment = hash.rescue(&[
         blind,
         BLSScalar::from(amount),
         asset_type.as_scalar(),
@@ -311,14 +311,14 @@ pub fn nullifier(
 pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
     let hash = RescueInstance::new();
 
-    let pk_hash = hash.rescue_hash(&[
+    let pk_hash = hash.rescue(&[
         abar.public_key.0.point_ref().get_x(),
         abar.public_key.0.point_ref().get_y(),
         BLSScalar::zero(),
         BLSScalar::zero(),
     ])[0];
 
-    hash.rescue_hash(&[
+    hash.rescue(&[
         BLSScalar::from(uid),
         abar.amount_type_commitment,
         pk_hash,
@@ -412,15 +412,14 @@ mod tests {
         let hash = RescueInstance::new();
         let rand_pk_in_jj = rand_pk_in.as_jubjub_point();
         let pk_in_hash =
-            hash.rescue_hash(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])[0];
-        let leaf = hash.rescue_hash(&[
+            hash.rescue(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])[0];
+        let leaf = hash.rescue(&[
             /*uid=*/ two,
             oabar.compute_commitment(),
             pk_in_hash,
             zero,
         ])[0];
-        let merkle_root =
-            hash.rescue_hash(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
+        let merkle_root = hash.rescue(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
         let mt_leaf_info = MTLeafInfo {
             path: MTPath { nodes: vec![node] },
             root: merkle_root,
@@ -626,14 +625,14 @@ mod tests {
         {
             let mut hash = {
                 let hasher = RescueInstance::new();
-                let pk_hash = hasher.rescue_hash(&[
+                let pk_hash = hasher.rescue(&[
                     abar.public_key.0.point_ref().get_x(),
                     abar.public_key.0.point_ref().get_y(),
                     BLSScalar::zero(),
                     BLSScalar::zero(),
                 ])[0];
 
-                hasher.rescue_hash(&[
+                hasher.rescue(&[
                     BLSScalar::from(uid),
                     abar.amount_type_commitment,
                     pk_hash,
@@ -647,7 +646,7 @@ mod tests {
                     TreePath::Middle => (i.siblings1, hash, i.siblings2),
                     TreePath::Right => (i.siblings1, i.siblings2, hash),
                 };
-                hash = hasher.rescue_hash(&[s1, s2, s3, BLSScalar::zero()])[0];
+                hash = hasher.rescue(&[s1, s2, s3, BLSScalar::zero()])[0];
             }
             assert_eq!(hash, mt.get_root().unwrap());
         }
@@ -710,9 +709,8 @@ mod tests {
             .map(|(uid, in_abar)| {
                 let rand_pk_in_jj = in_abar.public_key.as_jubjub_point();
                 let pk_in_hash =
-                    hash.rescue_hash(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])
-                        [0];
-                hash.rescue_hash(&[
+                    hash.rescue(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])[0];
+                hash.rescue(&[
                     BLSScalar::from(uid as u32),
                     in_abar.amount_type_commitment,
                     pk_in_hash,
@@ -739,7 +737,7 @@ mod tests {
             is_right_child: 1u8,
         };
         let nodes = vec![node0, node1, node2];
-        let merkle_root = hash.rescue_hash(&[leafs[0], leafs[1], leafs[2], zero])[0];
+        let merkle_root = hash.rescue(&[leafs[0], leafs[1], leafs[2], zero])[0];
 
         // output keys, amounts, asset_types
         let (keypairs_out, dec_keys_out, enc_keys_out) = gen_keys(&mut prng, n_payees);

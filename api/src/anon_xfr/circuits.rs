@@ -17,14 +17,13 @@ use zei_crypto::{
     pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
 };
 use zei_plonk::plonk::constraint_system::{
-    ecc::PointVar, field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
+    field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
 };
 
 pub type TurboPlonkCS = TurboConstraintSystem<BLSScalar>;
 
 // TODO: Move these constants to another file.
 pub(crate) const SK_LEN: usize = 252; // secret key size (in bits)
-const JUBJUB_SCALAR_BIT_LEN: usize = 252; // jubjub scalar size (in bits)
 pub(crate) const AMOUNT_LEN: usize = 64; // amount value size (in bits)
 
 // Depth of the Merkle Tree circuit. here <= accumulators::merkle_tree::TREE_DEPTH (40)
@@ -151,29 +150,28 @@ impl AMultiXfrPubInputs {
             .payees_secrets
             .iter()
             .map(|sec| {
-                hash.rescue_hash(&[sec.blind, BLSScalar::from(sec.amount), sec.asset_type, zero])[0]
+                hash.rescue(&[sec.blind, BLSScalar::from(sec.amount), sec.asset_type, zero])[0]
             })
             .collect();
 
         // merkle root
         let payer = &witness.payers_secrets[0];
         let pk_point = base.mul(&payer.sec_key);
-        let pk_hash = hash.rescue_hash(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
-        let commitment = hash.rescue_hash(&[
+        let pk_hash = hash.rescue(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
+        let commitment = hash.rescue(&[
             payer.blind,
             BLSScalar::from(payer.amount),
             payer.asset_type,
             zero,
         ])[0];
-        let mut node =
-            hash.rescue_hash(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0];
+        let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0];
         for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
                 (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
                 (0, 0) => vec![path_node.siblings1, node, path_node.siblings2, zero],
                 _ => vec![path_node.siblings1, path_node.siblings2, node, zero],
             };
-            node = hash.rescue_hash(&input)[0];
+            node = hash.rescue(&input)[0];
         }
 
         Self {
@@ -598,14 +596,6 @@ pub(crate) struct NullifierInputVars {
     pub pub_key_y: VarIndex,
 }
 
-// cs variables for ElGamal ciphertexts
-pub struct ElGamalHybridCtextVars {
-    #[allow(dead_code)]
-    pub e1: PointVar, // r*G
-    #[allow(dead_code)]
-    pub symm_ctxts: Vec<VarIndex>, // ctr-mode ciphertext
-}
-
 pub(crate) fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
     let path_vars: Vec<MerkleNodeVars> = path
         .nodes
@@ -854,43 +844,6 @@ fn match_select(
     cs.mul(is_equal_var, val)
 }
 
-#[allow(dead_code)]
-fn elgamal_hybrid_encrypt(
-    cs: &mut TurboPlonkCS,
-    base: JubjubPoint,
-    pk_var: PointVar,
-    pk_point: JubjubPoint,
-    rand_var: VarIndex,
-    data_vars: &[VarIndex],
-) -> ElGamalHybridCtextVars {
-    let (e1_var, _) = cs.scalar_mul(base, rand_var, JUBJUB_SCALAR_BIT_LEN);
-    let (e2_var, _) = cs.var_base_scalar_mul(
-        PointVar::new(pk_var.get_x(), pk_var.get_y()),
-        pk_point,
-        rand_var,
-        JUBJUB_SCALAR_BIT_LEN,
-    );
-    let zero_var = cs.zero_var();
-    let key_vars = cs.rescue_hash(&StateVar::new([
-        e2_var.get_x(),
-        e2_var.get_y(),
-        zero_var,
-        zero_var,
-    ]));
-    let symm_ctxts_vars = cs.rescue_ctr(key_vars, data_vars);
-
-    // prepare public inputs: the public key and the ciphertext
-    cs.prepare_io_point_variable(pk_var);
-    cs.prepare_io_point_variable(PointVar::new(e1_var.get_x(), e1_var.get_y()));
-    for &ctxt in &symm_ctxts_vars {
-        cs.prepare_io_variable(ctxt);
-    }
-    ElGamalHybridCtextVars {
-        e1: e1_var,
-        symm_ctxts: symm_ctxts_vars,
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -948,15 +901,14 @@ pub(crate) mod tests {
                 .iter()
                 .map(|payer| {
                     let pk_point = base.mul(&payer.sec_key);
-                    let pk_hash =
-                        hash.rescue_hash(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
-                    let commitment = hash.rescue_hash(&[
+                    let pk_hash = hash.rescue(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
+                    let commitment = hash.rescue(&[
                         payer.blind,
                         BLSScalar::from(payer.amount),
                         payer.asset_type,
                         zero,
                     ])[0];
-                    hash.rescue_hash(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0]
+                    hash.rescue(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0]
                 })
                 .collect();
             payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
@@ -986,65 +938,6 @@ pub(crate) mod tests {
             payers_secrets,
             payees_secrets,
         }
-    }
-
-    #[test]
-    fn test_elgamal_hybrid_encrypt_cs() {
-        let mut cs = TurboConstraintSystem::new();
-
-        // prepare inputs
-        let base = JubjubPoint::get_base();
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let (_, pub_key) =
-            zei_crypto::basics::elgamal::elgamal_key_gen::<_, JubjubPoint>(&mut prng, &base);
-        let pk_point = pub_key.get_point();
-        let pk_var = cs.new_point_variable(Point::from(&pk_point));
-        let mut data_vars = vec![];
-        let mut data = vec![];
-        for i in 0..10 {
-            data.push(BLSScalar::from(i as u32));
-            data_vars.push(cs.new_variable(data[i]));
-        }
-        let r = JubjubScalar::random(&mut prng);
-        let rand_var = cs.new_variable(BLSScalar::from(&r));
-
-        // encrypt
-        let ctxts = zei_crypto::basics::elgamal::elgamal_hybrid_encrypt(&base, &pub_key, &r, &data);
-        let ctxts_vars =
-            elgamal_hybrid_encrypt(&mut cs, base, pk_var, pk_point, rand_var, &data_vars);
-
-        // check that the ciphertext in the witness is correct
-        let witness = cs.get_and_clear_witness();
-        assert_eq!(ctxts.e1.get_x(), witness[ctxts_vars.e1.get_x()]);
-        assert_eq!(ctxts.e1.get_y(), witness[ctxts_vars.e1.get_y()]);
-        for (&ctxt, &ctxt_var) in ctxts.symm_ctxts.iter().zip(ctxts_vars.symm_ctxts.iter()) {
-            assert_eq!(ctxt, witness[ctxt_var]);
-        }
-
-        // check the constraint system
-        let mut public_inputs = vec![pub_key.get_point().get_x(), pub_key.get_point().get_y()];
-        public_inputs.extend(vec![ctxts.e1.get_x(), ctxts.e1.get_y()]);
-        public_inputs.extend(ctxts.symm_ctxts.clone());
-        assert!(cs.verify_witness(&witness, &public_inputs).is_ok());
-
-        let bad_pk_point = pub_key.get_point().double();
-        let mut public_inputs = vec![bad_pk_point.get_x(), bad_pk_point.get_y()];
-        public_inputs.extend(vec![ctxts.e1.get_x(), ctxts.e1.get_y()]);
-        public_inputs.extend(ctxts.symm_ctxts.clone());
-        assert!(cs.verify_witness(&witness, &public_inputs).is_err());
-
-        let bad_e1 = ctxts.e1.double();
-        let mut public_inputs = vec![pub_key.get_point().get_x(), pub_key.get_point().get_y()];
-        public_inputs.extend(vec![bad_e1.get_x(), bad_e1.get_y()]);
-        public_inputs.extend(ctxts.symm_ctxts.clone());
-        assert!(cs.verify_witness(&witness, &public_inputs).is_err());
-
-        let mut bad_symm_ctxts = ctxts.symm_ctxts;
-        bad_symm_ctxts[0] = BLSScalar::from(1u32);
-        let mut public_inputs = vec![pub_key.get_point().get_x(), pub_key.get_point().get_y()];
-        public_inputs.extend(vec![ctxts.e1.get_x(), ctxts.e1.get_y()]);
-        public_inputs.extend(bad_symm_ctxts);
-        assert!(cs.verify_witness(&witness, &public_inputs).is_err());
     }
 
     #[test]
@@ -1637,7 +1530,7 @@ pub(crate) mod tests {
         let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
         let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-        let z = z_instance.rescue_hash(&[
+        let z = z_instance.rescue(&[
             z_randomizer,
             x_in_bls12_381,
             y_in_bls12_381,
@@ -1685,7 +1578,7 @@ pub(crate) mod tests {
         let hash = RescueInstance::new();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let blind = BLSScalar::random(&mut prng);
-        let commitment = hash.rescue_hash(&[blind, amount, asset_type, BLSScalar::zero()])[0];
+        let commitment = hash.rescue(&[blind, amount, asset_type, BLSScalar::zero()])[0];
 
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);
@@ -1809,12 +1702,12 @@ pub(crate) mod tests {
         };
         // compute the root value
         let hash = RescueInstance::new();
-        let pk_hash = hash.rescue_hash(&[/*pk_x=*/ zero, /*pk_y=*/ one, zero, zero])[0];
-        let leaf = hash.rescue_hash(&[/*uid=*/ one, /*comm=*/ two, pk_hash, zero])[0];
+        let pk_hash = hash.rescue(&[/*pk_x=*/ zero, /*pk_y=*/ one, zero, zero])[0];
+        let leaf = hash.rescue(&[/*uid=*/ one, /*comm=*/ two, pk_hash, zero])[0];
         // leaf is the right child of node1
-        let node1 = hash.rescue_hash(&[path_node2.siblings1, path_node2.siblings2, leaf, zero])[0];
+        let node1 = hash.rescue(&[path_node2.siblings1, path_node2.siblings2, leaf, zero])[0];
         // node1 is the left child of the root
-        let root = hash.rescue_hash(&[node1, path_node1.siblings1, path_node1.siblings2, zero])[0];
+        let root = hash.rescue(&[node1, path_node1.siblings1, path_node1.siblings2, zero])[0];
 
         // compute the constraints
         let path = MTPath::new(vec![path_node2, path_node1]);

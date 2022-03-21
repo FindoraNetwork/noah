@@ -730,14 +730,14 @@ mod tests {
     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
         let hash = RescueInstance::new();
 
-        let pk_hash = hash.rescue_hash(&[
+        let pk_hash = hash.rescue(&[
             abar.public_key.0.point_ref().get_x(),
             abar.public_key.0.point_ref().get_y(),
             BLSScalar::zero(),
             BLSScalar::zero(),
         ])[0];
 
-        hash.rescue_hash(&[
+        hash.rescue(&[
             BLSScalar::from(uid),
             abar.amount_type_commitment,
             pk_hash,
