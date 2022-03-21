@@ -93,54 +93,12 @@ impl<S: Scalar> RescueInstance<S> {
         keys
     }
 
-    /// Compute rescue permutation using preprocessed round keys
-    pub fn rescue_with_round_keys(
-        &self,
-        input: &[S],
-        round_keys: &[RoundSubKey<S>],
-    ) -> RescueState<S> {
-        assert_eq!(input.len(), self.state_size());
-        let padded_input = self.pad_input_to_state_size(input);
-        let mut state = padded_input
-            .iter()
-            .zip(round_keys[0].iter())
-            .map(|(input, k0i)| input.add(k0i))
-            .collect_vec();
-
-        for (i, round_key) in round_keys.iter().skip(1).enumerate() {
-            if i % 2 == 0 {
-                Self::pow_vector(state.as_mut_slice(), &self.alpha_inv);
-            } else {
-                Self::pow_vector(state.as_mut_slice(), &[self.alpha]);
-            }
-            Self::linear_op(&self.MDS, state.as_mut_slice(), round_key);
-        }
-        state
-    }
-
-    /// Initiate Rescue hash function. Produces `keys` for each round.
-    pub fn hash_init(&self) -> Vec<RoundSubKey<S>> {
-        let key = vec![S::zero(); self.state_size()];
-        self.key_scheduling(&key)
-    }
-
     /// Compute hash sampling the rounds' keys online
-    pub fn rescue_hash(&self, input: &[S]) -> RescueState<S> {
-        let key = vec![S::zero(); self.state_size()];
-        self.rescue(input, &key)
-    }
-
-    /// Compute RESCUE permutation sampling the rounds' keys online
-    pub fn rescue(&self, input: &[S], key: &[S]) -> RescueState<S> {
+    pub fn rescue(&self, input: &[S]) -> RescueState<S> {
         assert_eq!(input.len(), self.state_size());
 
         // key_state = key + initial constants
-        let mut key_state: Vec<S> = self
-            .IC
-            .iter()
-            .zip(key.iter())
-            .map(|(ic, k)| ic.add(k))
-            .collect();
+        let mut key_state: Vec<S> = self.IC.clone();
         // key_injection = initial constants
         let mut key_injection = self.IC.clone();
 
@@ -201,49 +159,6 @@ impl<S: Scalar> RescueInstance<S> {
     fn pow_vector(vector: &mut [S], exponent: &[u64]) {
         for v in vector {
             *v = v.pow(exponent);
-        }
-    }
-}
-
-/// A counter mode encryption based on Rescue block ciphers.
-/// * `round_keys`: the round keys determined by the input secret key.
-/// * `nonce`: a counter.
-/// * `cipher`: the Rescue block cipher instance.
-pub struct RescueCtr<S> {
-    pub(super) round_keys: Vec<RoundSubKey<S>>,
-    pub(super) nonce: S,
-    pub(super) cipher: RescueInstance<S>,
-}
-
-impl<S: Scalar> RescueCtr<S> {
-    // Add keystream to the data.
-    pub fn add_keystream(&mut self, data: &mut [S]) {
-        self.apply_keystream(data, true);
-    }
-
-    // Subtract keystream to the data.
-    pub fn sub_keystream(&mut self, data: &mut [S]) {
-        self.apply_keystream(data, false);
-    }
-
-    fn apply_keystream(&mut self, data: &mut [S], is_add: bool) {
-        let zero = S::zero();
-        let one = S::one();
-        for block in data.chunks_mut(self.cipher.state_size()) {
-            let mut input_vec = vec![self.nonce];
-            input_vec.extend(vec![zero; self.cipher.state_size() - 1]);
-            let keystream = self
-                .cipher
-                .rescue_with_round_keys(&input_vec, &self.round_keys);
-            let len = block.len();
-            for (a, b) in block.iter_mut().zip(keystream.iter().take(len)) {
-                if is_add {
-                    a.add_assign(b);
-                } else {
-                    a.sub_assign(b);
-                }
-            }
-            self.nonce.add_assign(&one);
         }
     }
 }

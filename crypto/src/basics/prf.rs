@@ -33,7 +33,7 @@ impl<S: Scalar> PRF<S> {
             {
                 *state_j = state_j.add(msg_j);
             }
-            state = self.0.rescue_hash(&state);
+            state = self.0.rescue(&state);
         }
         state[0]
     }
@@ -75,7 +75,7 @@ mod test {
         let hash = RescueInstance::<BLSScalar>::new();
         // the first sponge round
         input[3] = input[3].add(&key);
-        let expected_output = hash.rescue_hash(&input);
+        let expected_output = hash.rescue(&input);
         // check output consistency
         assert_eq!(output, expected_output[0]);
 
@@ -95,10 +95,10 @@ mod test {
             BLSScalar::from(3u32),
             BLSScalar::from(4u32).add(&key),
         ];
-        state = hash.rescue_hash(&state);
+        state = hash.rescue(&state);
         // the second sponge round
         state[0] = state[0].add(&input[4]);
-        let expected_output = hash.rescue_hash(&state);
+        let expected_output = hash.rescue(&state);
         // check output consistency
         assert_eq!(output, expected_output[0]);
     }

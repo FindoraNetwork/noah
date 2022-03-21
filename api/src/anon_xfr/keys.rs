@@ -5,7 +5,7 @@ use zei_algebra::{
     jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN},
     prelude::*,
 };
-use zei_crypto::basics::signatures::schnorr::{self, KeyPair, PublicKey};
+use zei_crypto::basics::schnorr::{KeyPair, PublicKey, Signature};
 
 const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
 const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
@@ -15,20 +15,20 @@ const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash, Ord, PartialOrd, Copy,
 )]
-pub struct AXfrPubKey(pub(crate) schnorr::PublicKey<JubjubPoint>);
+pub struct AXfrPubKey(pub(crate) PublicKey<JubjubPoint>);
 
 /// Keypair associated with an Anonymous records. It is used to spending it.
 #[wasm_bindgen]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
-pub struct AXfrKeyPair(pub(crate) schnorr::KeyPair<JubjubPoint, JubjubScalar>);
+pub struct AXfrKeyPair(pub(crate) KeyPair<JubjubPoint, JubjubScalar>);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
-pub struct AXfrSignature(pub(crate) schnorr::Signature<JubjubPoint, JubjubScalar>);
+pub struct AXfrSignature(pub(crate) Signature<JubjubPoint, JubjubScalar>);
 
 impl AXfrKeyPair {
     /// Generate a new signature key pair
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> AXfrKeyPair {
-        AXfrKeyPair(schnorr::KeyPair::generate(prng))
+        AXfrKeyPair(KeyPair::generate(prng))
     }
 
     /// Multiply the secret key scalar by `factor` producing a new "randomized" KeyPair
@@ -61,7 +61,7 @@ impl ZeiFromToBytes for AXfrKeyPair {
             Err(eg!(ZeiError::DeserializationError))
         } else {
             let keypair: KeyPair<JubjubPoint, JubjubScalar> =
-                schnorr::KeyPair::zei_from_bytes(bytes).c(d!(""))?;
+                KeyPair::zei_from_bytes(bytes).c(d!(""))?;
 
             Ok(AXfrKeyPair(keypair))
         }
@@ -79,7 +79,7 @@ impl AXfrPubKey {
     }
 
     pub(crate) fn from_jubjub_point(point: JubjubPoint) -> AXfrPubKey {
-        AXfrPubKey(schnorr::PublicKey::from_point(point))
+        AXfrPubKey(PublicKey::from_point(point))
     }
 
     /// Signature verification function

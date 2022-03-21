@@ -1,16 +1,7 @@
-use crate::basics::hash::rescue::{RescueCtr, RescueInstance};
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::errors::ZeiError;
-use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
 use zei_algebra::ristretto::RistrettoPoint;
-use zei_algebra::serialization::ZeiFromToBytes;
-use zei_algebra::traits::{Group, Scalar};
 use zei_algebra::{
-    bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     hash::{Hash, Hasher},
-    ops::*,
-    Zero,
+    prelude::*,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,12 +34,6 @@ pub struct ElGamalCiphertext<G> {
     pub e2: G, //m*G + r*PK
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ElGamalHybridCiphertext<G, S> {
-    pub e1: G,              // r*G
-    pub symm_ctxts: Vec<S>, // ctr-mode ciphertext
-}
-
 impl Hash for ElGamalEncKey<RistrettoPoint> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_compressed_bytes().as_slice().hash(state);
@@ -69,81 +54,6 @@ impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint> {
             .c(d!(ZeiError::DeserializationError))?;
         Ok(ElGamalCiphertext { e1, e2 })
     }
-}
-
-impl ZeiFromToBytes for ElGamalHybridCiphertext<JubjubPoint, BLSScalar> {
-    fn zei_to_bytes(&self) -> Vec<u8> {
-        let mut v = vec![];
-        v.extend_from_slice(self.e1.zei_to_bytes().as_slice());
-        for s in self.symm_ctxts.iter() {
-            v.extend_from_slice(s.zei_to_bytes().as_slice());
-        }
-        v
-    }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        let e1 = JubjubPoint::zei_from_bytes(&bytes[0..JubjubPoint::COMPRESSED_LEN])
-            .c(d!(ZeiError::DeserializationError))?;
-        let mut pos = JubjubPoint::COMPRESSED_LEN;
-        let mut symm_ctxts = vec![];
-        while pos < bytes.len() {
-            symm_ctxts.push(
-                BLSScalar::zei_from_bytes(&bytes[pos..pos + BLS12_381_SCALAR_LEN])
-                    .c(d!(ZeiError::DeserializationError))?,
-            );
-            pos += BLS12_381_SCALAR_LEN;
-        }
-        Ok(ElGamalHybridCiphertext { e1, symm_ctxts })
-    }
-}
-
-/// I encrypt a plaintext vector `data` into an ElGamal ciphertext
-/// * `base`: a public curve base point
-/// * `pub_key`: ElGamal public key
-/// * `r`: encryption randomness
-/// * `data`: plaintext
-/// * Returns a ciphertext (r*G, E_ctr(k; data)), where E_ctr is a Rescue-based counter-mode encryption
-/// and k is a symmetric key derived from r * pub_key
-// TODO: Generalize to arbitrary group and scalar types
-pub fn elgamal_hybrid_encrypt(
-    base: &JubjubPoint,
-    pub_key: &ElGamalEncKey<JubjubPoint>,
-    r: &JubjubScalar,
-    data: &[BLSScalar],
-) -> ElGamalHybridCiphertext<JubjubPoint, BLSScalar> {
-    let e1 = base.mul(r);
-    let e2 = pub_key.0.mul(r);
-    let symm_ctxts = apply_keystream_from_seed(&e2, data, true);
-    ElGamalHybridCiphertext { e1, symm_ctxts }
-}
-
-/// I decrypt a ciphertext of the Elgamal hybrid encryption back to the plaintext vector.
-// TODO: Generalize to arbitrary group and scalar types
-pub fn elgamal_hybrid_decrypt(
-    sec_key: &ElGamalDecKey<JubjubScalar>,
-    ctext: &ElGamalHybridCiphertext<JubjubPoint, BLSScalar>,
-) -> Vec<BLSScalar> {
-    let e2 = ctext.e1.mul(&sec_key.0);
-    apply_keystream_from_seed(&e2, &ctext.symm_ctxts, false)
-}
-
-// Derive a symmetric key from `seed` and encrypt/decrypt the `data`.
-fn apply_keystream_from_seed(
-    seed: &JubjubPoint,
-    data: &[BLSScalar],
-    is_encrypt: bool,
-) -> Vec<BLSScalar> {
-    let rescue = RescueInstance::new();
-    let zero = BLSScalar::zero();
-    let input = [seed.get_x(), seed.get_y(), zero, zero];
-    let key = rescue.rescue_hash(&input);
-    let mut cipher = RescueCtr::new(&key, zero);
-    let mut result = data.to_vec();
-    if is_encrypt {
-        cipher.add_keystream(&mut result);
-    } else {
-        cipher.sub_keystream(&mut result);
-    }
-    result
 }
 
 /// I return an ElGamal ciphertext pair as (r*G, m*g + r*PK), where G is a curve base point
@@ -229,15 +139,13 @@ fn brute_force<G: Group>(base: &G, encoded: &G, lower_bound: u64, upper_bound: u
 
 #[cfg(test)]
 mod elgamal_test {
-    use crate::basics::elgamal::{
-        ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey, ElGamalHybridCiphertext,
-    };
+    use crate::basics::elgamal::{ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey};
     use rand_chacha::ChaChaRng;
     use rmp_serde::Deserializer;
     use serde::de::Deserialize;
     use serde::ser::Serialize;
-    use zei_algebra::bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2};
-    use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
+    use zei_algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
+    use zei_algebra::jubjub::JubjubPoint;
     use zei_algebra::prelude::*;
     use zei_algebra::ristretto::RistrettoPoint;
 
@@ -389,7 +297,6 @@ mod elgamal_test {
         serialize_to_json::<RistrettoPoint>();
         serialize_to_json::<BLSG1>();
         serialize_to_json::<BLSG2>();
-        // serialize_to_json::<BLSGt>(); TODO BLSGt is not serializable yet
         serialize_to_json::<JubjubPoint>();
     }
 
@@ -398,47 +305,6 @@ mod elgamal_test {
         serialize_to_message_pack::<RistrettoPoint>();
         serialize_to_message_pack::<BLSG1>();
         serialize_to_message_pack::<BLSG2>();
-        // serialize_to_message_pack::<BLSGt>(); TODO BLSGt is not serializable yet
         serialize_to_message_pack::<JubjubPoint>();
-    }
-
-    #[test]
-    fn test_elgamal_hybrid() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let base = JubjubPoint::get_base();
-        // encrypt and decrypt
-        let (sec_key, pub_key) = super::elgamal_key_gen::<_, JubjubPoint>(&mut prng, &base);
-        let m = vec![
-            BLSScalar::from(100u32),
-            BLSScalar::from(200u32),
-            BLSScalar::from(300u32),
-            BLSScalar::from(400u32),
-            BLSScalar::from(u64::max_value()),
-        ];
-        let r = JubjubScalar::random(&mut prng);
-        let ctext = super::elgamal_hybrid_encrypt(&base, &pub_key, &r, &m);
-        let plaintext = super::elgamal_hybrid_decrypt(&sec_key, &ctext);
-        assert_eq!(plaintext, m);
-        // given refreshed randomness `r`, the symmetric ciphertexts will be different
-        let r = JubjubScalar::random(&mut prng);
-        let ctext2 = super::elgamal_hybrid_encrypt(&base, &pub_key, &r, &m);
-        assert_ne!(ctext.symm_ctxts, ctext2.symm_ctxts);
-
-        // serialize to json
-        let json_str = serde_json::to_string(&ctext).unwrap();
-        let ctext_de: ElGamalHybridCiphertext<JubjubPoint, BLSScalar> =
-            serde_json::from_str(&json_str).unwrap();
-
-        assert_eq!(ctext, ctext_de);
-
-        // serialize to message pack
-        let mut vec = vec![];
-        ctext
-            .serialize(&mut rmp_serde::Serializer::new(&mut vec))
-            .unwrap();
-        let mut de = Deserializer::new(&vec[..]);
-        let ctext_de: ElGamalHybridCiphertext<JubjubPoint, BLSScalar> =
-            Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(ctext, ctext_de);
     }
 }

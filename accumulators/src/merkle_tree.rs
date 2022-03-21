@@ -132,7 +132,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             };
 
             let hasher = RescueInstance::new();
-            let hash = hasher.rescue_hash(&[sib0, sib1, sib2, BLSScalar::zero()])[0];
+            let hash = hasher.rescue(&[sib0, sib1, sib2, BLSScalar::zero()])[0];
             cache.set(keys[index + 1].0, BLSScalar::zei_to_bytes(&hash));
         }
 
@@ -394,7 +394,7 @@ pub fn verify(leaf: BLSScalar, proof: &Proof) -> bool {
             TreePath::Middle => (node.siblings1, next, node.siblings2),
             TreePath::Right => (node.siblings1, node.siblings2, next),
         };
-        let hash = hasher.rescue_hash(&[s1, s2, s3, BLSScalar::zero()])[0];
+        let hash = hasher.rescue(&[s1, s2, s3, BLSScalar::zero()])[0];
         next = hash
     }
     next == proof.root
