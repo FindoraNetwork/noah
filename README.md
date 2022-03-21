@@ -33,13 +33,13 @@ with confidential data.
   - Dlog: Simple proof of knowlege of discrete logarithms over generic groups.
 
 ### Xfr multi-input multi-output UTXO transfers
-    - Plain: XfrNote reveal amount and asset type
-    - Confidential amount and/or asset type: XfrNote hides amount and/or asset type
-    - AssetType mixing: Allows for multiple asset types in a confidential transaction
-      Implemented via the Cloak protocol. Currently using Interstellar spacesuite prototype
-    - Tracking policies: Allow tracking of amount, asset type, and/or identity
-      of asset holders. That is, confidential Xfrs need to provide ciphertexts of
-      amount/asset_type and/or identity and prove that this are correctly formed.
+  - Plain: XfrNote reveal amount and asset type
+  - Confidential amount and/or asset type: XfrNote hides amount and/or asset type
+  - AssetType mixing: Allows for multiple asset types in a confidential transaction
+    Implemented via the Cloak protocol. Currently using Interstellar spacesuite prototype
+  - Tracking policies: Allow tracking of amount, asset type, and/or identity
+    of asset holders. That is, confidential Xfrs need to provide ciphertexts of
+    amount/asset_type and/or identity and prove that this are correctly formed.
 
 ## Licensing
 
