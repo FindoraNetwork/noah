@@ -19,8 +19,8 @@ use zei_algebra::ristretto::{
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::basics::elgamal::elgamal_key_gen;
 use zei_crypto::basics::hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCipher};
+use zei_crypto::basics::pedersen_elgamal::PedersenElGamalEqProof;
 use zei_crypto::chaum_pedersen::ChaumPedersenProofX;
-use zei_crypto::pedersen_elgamal::PedersenElGamalEqProof;
 
 /// Asset Type identifier
 pub const ASSET_TYPE_LENGTH: usize = 32;

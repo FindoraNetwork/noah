@@ -17,12 +17,11 @@ use crate::xfr::structs::{
 use merlin::Transcript;
 use num_bigint::BigUint;
 use zei_algebra::prelude::*;
-use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+use zei_algebra::ristretto::RistrettoScalar;
 use zei_algebra::{
     bls12_381::BLSScalar,
     jubjub::{JubjubPoint, JubjubScalar},
 };
-use zei_crypto::basics::commitments::pedersen::PedersenGens;
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
 use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{
@@ -133,10 +132,10 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
         .add(&obar.amount_blinds.1.mul(&RistrettoScalar::from(TWO_POW_32)));
     let delta = obar.type_blind;
 
-    let pc_gens = PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+    let pc_gens = RistrettoPedersenGens::default();
 
-    let point_p = pc_gens.commit(&[x], &gamma).c(d!())?;
-    let point_q = pc_gens.commit(&[y], &delta).c(d!())?;
+    let point_p = pc_gens.commit(x, gamma);
+    let point_q = pc_gens.commit(y, delta);
 
     let nullifier = nullifier_and_signing_key.0;
 
@@ -245,7 +244,7 @@ pub fn verify_abar_to_bar(
     }
 
     let bar = body.output.clone();
-    let pc_gens = PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+    let pc_gens = RistrettoPedersenGens::default();
 
     // 1. get commitments
     // 1.1 reconstruct total amount commitment from bar object
@@ -262,12 +261,8 @@ pub fn verify_abar_to_bar(
             // fake commitment
             let (l, h) = u64_to_u32_pair(amount);
             (
-                pc_gens
-                    .commit(&[RistrettoScalar::from(l)], &RistrettoScalar::zero())
-                    .c(d!())?,
-                pc_gens
-                    .commit(&[RistrettoScalar::from(h)], &RistrettoScalar::zero())
-                    .c(d!())?,
+                pc_gens.commit(RistrettoScalar::from(l), RistrettoScalar::zero()),
+                pc_gens.commit(RistrettoScalar::from(h), RistrettoScalar::zero()),
             )
         }
     };
@@ -281,9 +276,7 @@ pub fn verify_abar_to_bar(
             .c(d!())?,
         XfrAssetType::NonConfidential(a) => {
             // fake commitment
-            pc_gens
-                .commit(&[a.as_scalar()], &RistrettoScalar::zero())
-                .c(d!())?
+            pc_gens.commit(a.as_scalar(), RistrettoScalar::zero())
         }
     };
 

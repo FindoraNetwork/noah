@@ -1,4 +1,4 @@
-use crate::basics::commitments::pedersen::PedersenGens;
+use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::basics::hash::rescue::RescueInstance;
 use crate::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
 use merlin::Transcript;
@@ -53,7 +53,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     gamma: &RistrettoScalar,
     y: &RistrettoScalar,
     delta: &RistrettoScalar,
-    pc_gens: &PedersenGens<RistrettoPoint>,
+    pc_gens: &RistrettoPedersenGens,
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
     aux_info: &BLSScalar,
@@ -116,20 +116,17 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     proof.non_zk_part_state_commitment = comm;
 
     // 5. compute the two blinding points
-    let point_r = pc_gens.commit(&[a], &c).c(d!())?;
-    let point_s = pc_gens.commit(&[b], &d).c(d!())?;
+    let point_r = pc_gens.commit(a, c);
+    let point_s = pc_gens.commit(b, d);
 
     proof.point_r = point_r;
     proof.point_s = point_s;
 
     // 6. Fiat-Shamir transform
-    transcript.append_message(
-        b"PC base",
-        &pc_gens.get_base(0).unwrap().to_compressed_bytes(),
-    );
+    transcript.append_message(b"PC base", &pc_gens.B.to_compressed_bytes());
     transcript.append_message(
         b"PC base blinding",
-        &pc_gens.get_blinding_base().to_compressed_bytes(),
+        &pc_gens.B_blinding.to_compressed_bytes(),
     );
     transcript.append_message(b"Point P", &point_p.to_compressed_bytes());
     transcript.append_message(b"Point Q", &point_q.to_compressed_bytes());
@@ -168,7 +165,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
 
 #[allow(unused)]
 pub fn verify_pc_eq_rescue_external(
-    pc_gens: &PedersenGens<RistrettoPoint>,
+    pc_gens: &RistrettoPedersenGens,
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
     aux_info: &BLSScalar,
@@ -177,13 +174,10 @@ pub fn verify_pc_eq_rescue_external(
     // 1. Fiat-Shamir transform
     let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
 
-    transcript.append_message(
-        b"PC base",
-        &pc_gens.get_base(0).unwrap().to_compressed_bytes(),
-    );
+    transcript.append_message(b"PC base", &pc_gens.B.to_compressed_bytes());
     transcript.append_message(
         b"PC base blinding",
-        &pc_gens.get_blinding_base().to_compressed_bytes(),
+        &pc_gens.B_blinding.to_compressed_bytes(),
     );
     transcript.append_message(b"Point P", &point_p.to_compressed_bytes());
     transcript.append_message(b"Point Q", &point_q.to_compressed_bytes());
@@ -204,18 +198,14 @@ pub fn verify_pc_eq_rescue_external(
     let beta = RistrettoScalar::random(&mut rng);
 
     // 2. check the group relationships
-    let first_eqn_left = pc_gens
-        .commit(&[zk_part_proof.s_1], &zk_part_proof.s_3)
-        .c(d!(ZeiError::ZKProofVerificationError))?;
+    let first_eqn_left = pc_gens.commit(zk_part_proof.s_1, zk_part_proof.s_3);
     let first_eqn_right = point_p.mul(&beta).add(&zk_part_proof.point_r);
 
     if first_eqn_left.ne(&first_eqn_right) {
         return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
-    let second_eqn_left = pc_gens
-        .commit(&[zk_part_proof.s_2], &zk_part_proof.s_4)
-        .c(d!(ZeiError::ZKProofVerificationError))?;
+    let second_eqn_left = pc_gens.commit(zk_part_proof.s_2, zk_part_proof.s_4);
     let second_eqn_right = point_q.mul(&beta).add(&zk_part_proof.point_s);
 
     if second_eqn_left.ne(&second_eqn_right) {
@@ -227,7 +217,7 @@ pub fn verify_pc_eq_rescue_external(
 
 #[cfg(test)]
 mod test {
-    use crate::basics::commitments::pedersen::PedersenGens;
+    use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crate::basics::hash::rescue::RescueInstance;
     use crate::pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external,
@@ -235,7 +225,7 @@ mod test {
     use num_bigint::BigUint;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+    use zei_algebra::ristretto::RistrettoScalar;
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
 
     #[test]
@@ -248,11 +238,10 @@ mod test {
             let y = RistrettoScalar::random(&mut rng);
             let delta = RistrettoScalar::random(&mut rng);
 
-            let pc_gens =
-                PedersenGens::<RistrettoPoint>::from(bulletproofs::PedersenGens::default());
+            let pc_gens = RistrettoPedersenGens::default();
 
-            let point_p = pc_gens.commit(&[x], &gamma).unwrap();
-            let point_q = pc_gens.commit(&[y], &delta).unwrap();
+            let point_p = pc_gens.commit(x, gamma);
+            let point_q = pc_gens.commit(y, delta);
 
             let z_randomizer = BLSScalar::random(&mut rng);
             let z_instance = RescueInstance::<BLSScalar>::new();

@@ -3,7 +3,7 @@ use crate::anon_creds::{
     ACUserSecretKey, Attribute, Credential, SOK_LABEL,
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
-use crate::sigma::{SigmaTranscript, SigmaTranscriptPairing};
+use crate::basics::sigma::{SigmaTranscript, SigmaTranscriptPairing};
 use merlin::Transcript;
 use zei_algebra::{prelude::*, traits::Pairing};
 

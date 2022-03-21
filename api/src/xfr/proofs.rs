@@ -16,13 +16,13 @@ use zei_algebra::ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScala
 use zei_algebra::utils::{min_greater_equal_power_of_two, u64_to_u32_pair};
 use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use zei_crypto::basics::elgamal::ElGamalCiphertext;
+use zei_crypto::basics::pedersen_elgamal::{
+    pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
+    PedersenElGamalEqProof, PedersenElGamalProofInstance,
+};
 use zei_crypto::bp_range_proofs::{batch_verify_ranges, prove_ranges};
 use zei_crypto::chaum_pedersen::{
     chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq, ChaumPedersenProofX,
-};
-use zei_crypto::pedersen_elgamal::{
-    pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
-    PedersenElGamalEqProof, PedersenElGamalProofInstance,
 };
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;

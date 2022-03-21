@@ -1,5 +1,7 @@
 use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use crate::sigma::{sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript};
+use crate::basics::sigma::{
+    sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
+};
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use zei_algebra::prelude::*;

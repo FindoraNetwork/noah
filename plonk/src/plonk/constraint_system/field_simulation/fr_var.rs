@@ -1,7 +1,9 @@
 use num_bigint::BigUint;
-use num_traits::{One, Zero};
-use std::cmp::{max, min};
-use zei_algebra::{bls12_381::BLSScalar, ops::*};
+use zei_algebra::{
+    bls12_381::BLSScalar,
+    cmp::{max, min},
+    prelude::*,
+};
 use zei_crypto::field_simulation::{
     ristretto_scalar_field_sub_pad_in_limbs, SimFr, BIT_PER_LIMB, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
