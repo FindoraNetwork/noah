@@ -10,6 +10,7 @@ name = 'zei_crypto'
 crate-type = ['rlib']
 
 [dependencies]
+aes = '0.8.1'
 digest = '0.9'
 ed25519-dalek = '1.0.0'
 itertools = '0.10.3'
@@ -23,10 +24,6 @@ ruc = '1.0'
 
 [dependencies.zei-algebra]
 path = '../algebra'
-
-[dependencies.aes]
-version = '0.8.1'
-features = ['ctr']
 
 [dependencies.bulletproofs]
 package = 'bulletproofs'
