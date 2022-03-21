@@ -1,7 +1,7 @@
 [[bin]]
 name = 'gen-params'
 path = 'src/gen-params.rs'
-required-features = ['parallel']
+required-features = ['gen']
 
 [package]
 name = 'zei'
@@ -70,6 +70,10 @@ features = ['rand']
 version = '1'
 optional = true
 
+[dependencies.structopt]
+version = '0.3.26'
+optional = true
+
 [dev-dependencies]
 bit-array = '0.4.3'
 criterion = '0.3.1'
@@ -111,3 +115,4 @@ parallel = [
     'rayon',
     'zei-algebra/parallel',
 ]
+gen = ["parallel", "structopt"]

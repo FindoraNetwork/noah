@@ -10,8 +10,8 @@ use zei::{
     anon_xfr::TREE_DEPTH,
     setup::{NodeParams, PublicParams, UserParams, PRECOMPUTED_PARTY_NUMBER},
 };
-use zei_plonk::commitments::kzg_poly_com::KZGCommitmentSchemeBLS;
-use zei_utils::save_to_file;
+use zei_algebra::utils::save_to_file;
+use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 
 use rayon::prelude::*;
 
@@ -67,7 +67,7 @@ enum Actions {
     },
 }
 
-// cargo run --release --features="parallel" --bin gen-params
+// cargo run --release --features="gen" --bin gen-params
 #[allow(dead_code)]
 fn main() {
     use Actions::*;
@@ -149,7 +149,7 @@ fn gen_node_params(n_payers: usize, n_payees: usize, tree_depth: usize, out_file
     save_to_file(&node_params_ser, out_filename);
 }
 
-// cargo run --release --features="parallel" --bin gen-params vk "./parameters"
+// cargo run --release --features="gen" --bin gen-params vk "./parameters"
 fn gen_vk(directory: PathBuf) {
     println!(
         "Generating 'Node Compressed Parameters' for 1..{} payers, 1..{} payees ...",
@@ -198,7 +198,7 @@ fn gen_vk(directory: PathBuf) {
     save_to_file(&specials_ser, specials_path);
 }
 
-// cargo run --release --features="parallel" --bin gen-params abar-to-bar "./parameters"
+// cargo run --release --features="gen" --bin gen-params abar-to-bar "./parameters"
 fn gen_abar_to_bar(mut path: PathBuf) {
     println!("Generating 'Node Compressed Parameters' ABAR TO BAR ...");
 
@@ -209,7 +209,7 @@ fn gen_abar_to_bar(mut path: PathBuf) {
     save_to_file(&bytes, path);
 }
 
-// cargo run --release --features="parallel" --bin gen-params bar-to-abar "./parameters"
+// cargo run --release --features="gen" --bin gen-params bar-to-abar "./parameters"
 fn gen_bar_to_abar(mut path: PathBuf) {
     println!("Generating 'Node Compressed Parameters' BAR TO ABAR ...");
 
@@ -220,7 +220,7 @@ fn gen_bar_to_abar(mut path: PathBuf) {
     save_to_file(&bytes, path);
 }
 
-// cargo run --release --features="parallel" --bin gen-params anon-fee "./parameters"
+// cargo run --release --features="gen" --bin gen-params anon-fee "./parameters"
 fn gen_anon_fee(mut path: PathBuf) {
     println!("Generating 'Node Compressed Parameters' ANON FEE ...");
 
