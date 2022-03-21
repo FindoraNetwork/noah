@@ -1,10 +1,11 @@
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use wasm_bindgen::prelude::*;
-use zei_algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
-use zei_algebra::prelude::*;
-use zei_crypto::basics::signatures::schnorr;
-use zei_crypto::basics::signatures::schnorr::{KeyPair, PublicKey};
+use zei_algebra::{
+    jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN},
+    prelude::*,
+};
+use zei_crypto::basics::signatures::schnorr::{self, KeyPair, PublicKey};
 
 const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
 const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
@@ -108,7 +109,6 @@ impl ZeiFromToBytes for AXfrPubKey {
 #[cfg(test)]
 mod test {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
-    use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaChaRng;
     use zei_algebra::prelude::*;
 

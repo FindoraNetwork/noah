@@ -1,22 +1,22 @@
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars};
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::structs::{
-        AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord,
+    use crate::anon_xfr::{
+        circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
+        keys::AXfrKeyPair,
+        structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
     };
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use ruc::*;
-    use std::sync::Arc;
-    use std::thread;
-    use storage::db::{RocksDB, TempRocksDB};
-    use storage::state::{ChainState, State};
-    use storage::store::PrefixedStore;
+    use std::{sync::Arc, thread};
+    use storage::{
+        db::{RocksDB, TempRocksDB},
+        state::{ChainState, State},
+        store::PrefixedStore,
+    };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::{traits::Scalar, Zero};
+    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
     use zei_crypto::basics::hash::rescue::RescueInstance;
     use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
 

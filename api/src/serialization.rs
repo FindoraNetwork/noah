@@ -1,5 +1,7 @@
-use crate::xfr::sig::{XfrPublicKey, XfrSecretKey, XfrSignature};
-use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
+use crate::xfr::{
+    sig::{XfrPublicKey, XfrSecretKey, XfrSignature},
+    structs::{AssetType, ASSET_TYPE_LENGTH},
+};
 use ed25519_dalek::{PublicKey, SecretKey};
 use ruc::*;
 use serde::Serializer;
@@ -109,20 +111,23 @@ mod test {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
     use crate::ristretto::CompressedRistretto;
     use crate::serialization::ZeiFromToBytes;
-    use crate::xfr::asset_tracer::RecordDataEncKey;
-    use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature};
-    use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType};
+    use crate::xfr::{
+        asset_tracer::RecordDataEncKey,
+        sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature},
+        structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
+    };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use rmp_serde::{Deserializer, Serializer};
     use ruc::*;
-    use serde::de::Deserialize;
-    use serde::ser::Serialize;
+    use serde::{de::Deserialize, ser::Serialize};
     use std::convert::TryFrom;
     use zei_algebra::ristretto::RistrettoPoint;
-    use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-    use zei_crypto::basics::elgamal::elgamal_key_gen;
-    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basics::{
+        commitments::ristretto_pedersen::RistrettoPedersenGens,
+        elgamal::elgamal_key_gen,
+        hybrid_encryption::{XPublicKey, XSecretKey},
+    };
 
     #[test]
     fn xfr_amount_u64_to_string_serde() {

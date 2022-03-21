@@ -1,6 +1,8 @@
 use crate::setup::PublicParams;
-use bulletproofs::r1cs::{batch_verify, Prover, R1CSProof, Verifier};
-use bulletproofs::{BulletproofGens, PedersenGens};
+use bulletproofs::{
+    r1cs::{batch_verify, Prover, R1CSProof, Verifier},
+    BulletproofGens, PedersenGens,
+};
 use merlin::Transcript;
 use wasm_bindgen::__rt::std::collections::HashSet;
 use zei_algebra::{

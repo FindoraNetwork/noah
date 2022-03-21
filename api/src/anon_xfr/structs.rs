@@ -1,14 +1,18 @@
-use crate::anon_xfr::decrypt_memo;
-use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature};
+use crate::anon_xfr::{
+    decrypt_memo,
+    keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature},
+};
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::bls12_381::{BLSPairingEngine, BLSScalar};
-use zei_algebra::jubjub::JubjubScalar;
-use zei_algebra::prelude::*;
-use zei_crypto::basics::commitments::rescue;
-use zei_crypto::basics::hybrid_encryption::{
-    hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
+use zei_algebra::{
+    bls12_381::{BLSPairingEngine, BLSScalar},
+    jubjub::JubjubScalar,
+    prelude::*,
+};
+use zei_crypto::basics::{
+    commitments::rescue,
+    hybrid_encryption::{hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey},
 };
 use zei_plonk::{plonk::setup::PlonkPf, poly_commit::kzg_poly_com::KZGCommitmentScheme};
 

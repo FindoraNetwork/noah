@@ -1,14 +1,13 @@
 use super::asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType};
-use super::lib::XfrNotePolicies;
 use super::sig::{XfrKeyPair, XfrPublicKey};
 use super::structs::{
     AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, BlindAssetRecord,
     IdentityRevealPolicy, OwnerMemo, TracingPolicies, TracingPolicy, XfrAmount, XfrAssetType,
     ASSET_TYPE_LENGTH,
 };
-use crate::api::anon_creds;
-use crate::api::anon_creds::{
-    ac_commit, ac_sign, ACCommitment, ACCommitmentKey, ACUserSecretKey, Credential,
+use super::XfrNotePolicies;
+use crate::anon_creds::{
+    self, ac_commit, ac_sign, ACCommitment, ACCommitmentKey, ACUserSecretKey, Credential,
 };
 use rand_chacha::ChaChaRng;
 use zei_algebra::prelude::*;

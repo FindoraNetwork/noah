@@ -1,26 +1,32 @@
 extern crate serde_str;
 
-use crate::api::anon_creds::{
+use crate::anon_creds::{
     ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
     AttributeEncKey,
 };
-use crate::xfr::asset_mixer::AssetMixProof;
-use crate::xfr::asset_record::AssetRecordType;
-use crate::xfr::asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey};
-use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey};
+use crate::xfr::{
+    asset_mixer::AssetMixProof,
+    asset_record::AssetRecordType,
+    asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey},
+    sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey},
+};
 use bulletproofs::RangeProof;
 use digest::Digest;
 use sha2::Sha512;
-use zei_algebra::bls12_381::BLSG1;
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::{
-    CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar,
+use zei_algebra::{
+    bls12_381::BLSG1,
+    prelude::*,
+    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
 };
-use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use zei_crypto::basics::elgamal::elgamal_key_gen;
-use zei_crypto::basics::hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCipher};
-use zei_crypto::basics::pedersen_elgamal::PedersenElGamalEqProof;
-use zei_crypto::chaum_pedersen::ChaumPedersenProofX;
+use zei_crypto::{
+    basics::{
+        commitments::ristretto_pedersen::RistrettoPedersenGens,
+        elgamal::elgamal_key_gen,
+        hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCipher},
+        pedersen_elgamal::PedersenElGamalEqProof,
+    },
+    chaum_pedersen::ChaumPedersenProofX,
+};
 
 /// Asset Type identifier
 pub const ASSET_TYPE_LENGTH: usize = 32;

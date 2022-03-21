@@ -1,19 +1,23 @@
-use crate::anon_xfr::keys::AXfrPubKey;
-use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
+use crate::anon_xfr::{
+    keys::AXfrPubKey,
+    structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier},
+};
 use num_bigint::BigUint;
-use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
-use zei_algebra::ristretto::RistrettoScalar;
 use zei_algebra::{
+    bls12_381::BLSScalar,
+    jubjub::{JubjubPoint, JubjubScalar},
     ops::*,
+    ristretto::RistrettoScalar,
     traits::{Group, Scalar},
     One, Zero,
 };
-use zei_crypto::basics::commitments::rescue::HashCommitment as CommScheme;
-use zei_crypto::basics::hash::rescue::RescueInstance;
-use zei_crypto::basics::prf::PRF;
-use zei_crypto::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
-use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
+use zei_crypto::{
+    basics::{
+        commitments::rescue::HashCommitment as CommScheme, hash::rescue::RescueInstance, prf::PRF,
+    },
+    field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
+    pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
+};
 use zei_plonk::plonk::constraint_system::{
     ecc::PointVar, field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
 };
@@ -897,13 +901,15 @@ pub(crate) mod tests {
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use ruc::*;
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::traits::Scalar;
-    use zei_crypto::basics::commitments::rescue::HashCommitment;
-    use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-    use zei_crypto::basics::hash::rescue::RescueInstance;
-    use zei_crypto::basics::prf::PRF;
-    use zei_crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external;
+    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar};
+    use zei_crypto::{
+        basics::{
+            commitments::{rescue::HashCommitment, ristretto_pedersen::RistrettoPedersenGens},
+            hash::rescue::RescueInstance,
+            prf::PRF,
+        },
+        pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external,
+    };
     use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
 
     pub(crate) fn new_multi_xfr_witness_for_test(

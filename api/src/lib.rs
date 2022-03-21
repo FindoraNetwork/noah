@@ -13,8 +13,8 @@
 extern crate serde_derive;
 extern crate core;
 
+pub mod anon_creds;
 pub mod anon_xfr;
-pub mod api;
 pub mod parameters;
 pub mod serialization;
 pub mod setup;

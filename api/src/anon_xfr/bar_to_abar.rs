@@ -1,21 +1,25 @@
-use crate::anon_xfr::keys::AXfrPubKey;
-use crate::anon_xfr::proofs::{prove_eq_committed_vals, verify_eq_committed_vals, AXfrPlonkPf};
-use crate::anon_xfr::structs::{
-    AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
+use crate::anon_xfr::{
+    keys::AXfrPubKey,
+    proofs::{prove_eq_committed_vals, verify_eq_committed_vals, AXfrPlonkPf},
+    structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
 };
 use crate::setup::{NodeParams, UserParams};
-use crate::xfr::sig::{XfrKeyPair, XfrPublicKey, XfrSignature};
-use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType};
+use crate::xfr::{
+    sig::{XfrKeyPair, XfrPublicKey, XfrSignature},
+    structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
+};
 use num_bigint::BigUint;
-use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::jubjub::JubjubScalar;
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::RistrettoScalar;
-use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-use zei_crypto::basics::hash::rescue::RescueInstance;
-use zei_crypto::basics::hybrid_encryption::XPublicKey;
-use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{
-    prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
+use zei_algebra::{
+    bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
+};
+use zei_crypto::{
+    basics::{
+        commitments::ristretto_pedersen::RistrettoPedersenGens, hash::rescue::RescueInstance,
+        hybrid_encryption::XPublicKey,
+    },
+    pc_eq_rescue_split_verifier_zk_part::{
+        prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
+    },
 };
 
 pub const TWO_POW_32: u64 = 1 << 32;
@@ -234,19 +238,23 @@ pub(crate) fn verify_bar_to_abar(
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note};
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder};
-    use crate::setup::{NodeParams, UserParams};
-    use crate::xfr::asset_record::{
-        build_blind_asset_record, open_blind_asset_record, AssetRecordType,
+    use crate::anon_xfr::{
+        bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
+        keys::AXfrKeyPair,
+        structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
     };
-    use crate::xfr::sig::{XfrKeyPair, XfrPublicKey};
-    use crate::xfr::structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo};
+    use crate::setup::{NodeParams, UserParams};
+    use crate::xfr::{
+        asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
+        sig::{XfrKeyPair, XfrPublicKey},
+        structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo},
+    };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
-    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basics::{
+        commitments::ristretto_pedersen::RistrettoPedersenGens,
+        hybrid_encryption::{XPublicKey, XSecretKey},
+    };
 
     // helper function
     fn build_bar(
