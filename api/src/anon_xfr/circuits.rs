@@ -12,9 +12,7 @@ use zei_algebra::{
     One, Zero,
 };
 use zei_crypto::{
-    basics::{
-        commitments::rescue::HashCommitment as CommScheme, hash::rescue::RescueInstance, prf::PRF,
-    },
+    basics::{hash::rescue::RescueInstance, prf::PRF},
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
     pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
 };
@@ -147,28 +145,26 @@ impl AMultiXfrPubInputs {
             .collect();
 
         // output commitments
-        let comm = CommScheme::new();
+        let hash = RescueInstance::new();
+        let zero = BLSScalar::zero();
         let payees_commitments: Vec<Commitment> = witness
             .payees_secrets
             .iter()
             .map(|sec| {
-                comm.commit(&sec.blind, &[BLSScalar::from(sec.amount), sec.asset_type])
-                    .unwrap()
+                hash.rescue_hash(&[sec.blind, BLSScalar::from(sec.amount), sec.asset_type, zero])[0]
             })
             .collect();
 
         // merkle root
-        let hash = RescueInstance::new();
         let payer = &witness.payers_secrets[0];
         let pk_point = base.mul(&payer.sec_key);
-        let zero = BLSScalar::zero();
         let pk_hash = hash.rescue_hash(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
-        let commitment = comm
-            .commit(
-                &payer.blind,
-                &[BLSScalar::from(payer.amount), payer.asset_type],
-            )
-            .unwrap();
+        let commitment = hash.rescue_hash(&[
+            payer.blind,
+            BLSScalar::from(payer.amount),
+            payer.asset_type,
+            zero,
+        ])[0];
         let mut node =
             hash.rescue_hash(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0];
         for path_node in payer.path.nodes.iter() {
@@ -902,12 +898,9 @@ pub(crate) mod tests {
     use rand_core::SeedableRng;
     use ruc::*;
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar};
+    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use zei_crypto::{
-        basics::{
-            commitments::{rescue::HashCommitment, ristretto_pedersen::RistrettoPedersenGens},
-            hash::rescue::RescueInstance,
-            prf::PRF,
-        },
+        basics::{hash::rescue::RescueInstance, prf::PRF},
         pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external,
     };
     use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
@@ -950,7 +943,6 @@ pub(crate) mod tests {
         // compute the merkle leaves and update the merkle paths if there are more than 1 payers
         if n_payers > 1 {
             let hash = RescueInstance::new();
-            let comm = CommScheme::new();
             let base = JubjubPoint::get_base();
             let leafs: Vec<BLSScalar> = payers_secrets
                 .iter()
@@ -958,12 +950,12 @@ pub(crate) mod tests {
                     let pk_point = base.mul(&payer.sec_key);
                     let pk_hash =
                         hash.rescue_hash(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
-                    let commitment = comm
-                        .commit(
-                            &payer.blind,
-                            &[BLSScalar::from(payer.amount), payer.asset_type],
-                        )
-                        .unwrap();
+                    let commitment = hash.rescue_hash(&[
+                        payer.blind,
+                        BLSScalar::from(payer.amount),
+                        payer.asset_type,
+                        zero,
+                    ])[0];
                     hash.rescue_hash(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0]
                 })
                 .collect();
@@ -1624,7 +1616,7 @@ pub(crate) mod tests {
     #[test]
     fn test_eq_committed_vals_cs() {
         let mut rng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         // 1. compute the parameters
         let amount = BLSScalar::from(71u32);
@@ -1690,10 +1682,10 @@ pub(crate) mod tests {
         let mut cs = TurboConstraintSystem::new();
         let amount = BLSScalar::from(7u32);
         let asset_type = BLSScalar::from(5u32);
-        let comm = HashCommitment::new();
+        let hash = RescueInstance::new();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let blind = BLSScalar::random(&mut prng);
-        let commitment = comm.commit(&blind, &[amount, asset_type]).unwrap(); // safe unwrap
+        let commitment = hash.rescue_hash(&[blind, amount, asset_type, BLSScalar::zero()])[0];
 
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);

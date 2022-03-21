@@ -21,8 +21,8 @@ use zei_algebra::{
     prelude::*,
     ristretto::RistrettoScalar,
 };
+use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
-    basics::commitments::ristretto_pedersen::RistrettoPedersenGens,
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
     pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
@@ -99,7 +99,7 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     let obar_amount = oabar.amount;
     let obar_type = oabar.asset_type;
 
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
     let art = AssetRecordTemplate::with_no_asset_tracing(
         obar_amount,
         obar_type,
@@ -133,7 +133,7 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
         .add(&obar.amount_blinds.1.mul(&RistrettoScalar::from(TWO_POW_32)));
     let delta = obar.type_blind;
 
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
 
     let point_p = pc_gens.commit(x, gamma);
     let point_q = pc_gens.commit(y, delta);
@@ -245,7 +245,7 @@ pub fn verify_abar_to_bar(
     }
 
     let bar = body.output.clone();
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
 
     // 1. get commitments
     // 1.1 reconstruct total amount commitment from bar object

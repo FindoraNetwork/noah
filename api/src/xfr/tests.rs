@@ -17,8 +17,8 @@ use rand_chacha::ChaChaRng;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
+use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::basics::{
-    commitments::ristretto_pedersen::RistrettoPedersenGens,
     elgamal::{elgamal_encrypt, elgamal_key_gen},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
 };
@@ -97,7 +97,7 @@ fn do_transfer_tests_single_asset(
         })
         .collect_vec();
 
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
 
     let tuple = create_xfr(
         &mut prng,
@@ -828,9 +828,8 @@ mod asset_tracing {
         jubjub::JubjubScalar,
         ristretto::{RistrettoPoint, RistrettoScalar},
     };
-    use zei_crypto::basics::{
-        commitments::ristretto_pedersen::RistrettoPedersenGens, elgamal::ElGamalCiphertext,
-    };
+    use zei_crypto::basics::elgamal::ElGamalCiphertext;
+    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
@@ -839,7 +838,7 @@ mod asset_tracing {
         let m = RistrettoScalar::from(10u32);
         let r = RistrettoScalar::from(7657u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
@@ -880,7 +879,7 @@ mod asset_tracing {
 
         let input_amount = 100u64;
 
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let in_keys = gen_key_pair_vec(input_templates.len(), &mut prng);
         let in_keys_ref = in_keys.iter().collect_vec();

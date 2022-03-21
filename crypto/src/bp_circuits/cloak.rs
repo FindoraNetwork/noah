@@ -39,7 +39,7 @@ match on each list. On each product the elements are shifted by a random challen
   - The last intermediate value is appended to the output list.
 */
 
-use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use bulletproofs::r1cs::{
     ConstraintSystem, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
@@ -87,7 +87,11 @@ impl CloakValue {
             },
         )
     }
-    pub fn commit(&self, pc_gens: &RistrettoPedersenGens, blinds: &CloakValue) -> CloakCommitment {
+    pub fn commit(
+        &self,
+        pc_gens: &RistrettoPedersenCommitment,
+        blinds: &CloakValue,
+    ) -> CloakCommitment {
         CloakCommitment {
             amount: pc_gens.commit(self.amount, blinds.amount).compress(),
             asset_type: pc_gens

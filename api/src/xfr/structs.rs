@@ -18,9 +18,9 @@ use zei_algebra::{
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
 };
+use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     basics::{
-        commitments::ristretto_pedersen::RistrettoPedersenGens,
         elgamal::elgamal_key_gen,
         hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCipher},
         pedersen_elgamal::PedersenElGamalEqProof,
@@ -198,7 +198,7 @@ impl XfrAmount {
 
     /// construct a confidential XfrAmount with amount and amount blinds
     pub fn from_blinds(
-        pc_gens: &RistrettoPedersenGens,
+        pc_gens: &RistrettoPedersenCommitment,
         amount: u64,
         blind_lo: &RistrettoScalar,
         blind_hi: &RistrettoScalar,
@@ -273,7 +273,7 @@ impl XfrAssetType {
 
     /// constructs a confidential XfrAssetType with an asset type and asset type blind
     pub fn from_blind(
-        pc_gens: &RistrettoPedersenGens,
+        pc_gens: &RistrettoPedersenCommitment,
         asset_type: &AssetType,
         blind: &RistrettoScalar,
     ) -> Self {

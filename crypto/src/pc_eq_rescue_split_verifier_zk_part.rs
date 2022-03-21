@@ -1,5 +1,5 @@
-use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::basics::hash::rescue::RescueInstance;
+use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use crate::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
 use merlin::Transcript;
 use num_bigint::BigUint;
@@ -53,7 +53,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     gamma: &RistrettoScalar,
     y: &RistrettoScalar,
     delta: &RistrettoScalar,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
     aux_info: &BLSScalar,
@@ -165,7 +165,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
 
 #[allow(unused)]
 pub fn verify_pc_eq_rescue_external(
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
     aux_info: &BLSScalar,
@@ -217,8 +217,8 @@ pub fn verify_pc_eq_rescue_external(
 
 #[cfg(test)]
 mod test {
-    use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crate::basics::hash::rescue::RescueInstance;
+    use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use crate::pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external,
     };
@@ -238,7 +238,7 @@ mod test {
             let y = RistrettoScalar::random(&mut rng);
             let delta = RistrettoScalar::random(&mut rng);
 
-            let pc_gens = RistrettoPedersenGens::default();
+            let pc_gens = RistrettoPedersenCommitment::default();
 
             let point_p = pc_gens.commit(x, gamma);
             let point_q = pc_gens.commit(y, delta);

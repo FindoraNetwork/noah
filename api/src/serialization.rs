@@ -123,8 +123,8 @@ mod test {
     use serde::{de::Deserialize, ser::Serialize};
     use std::convert::TryFrom;
     use zei_algebra::ristretto::RistrettoPoint;
+    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use zei_crypto::basics::{
-        commitments::ristretto_pedersen::RistrettoPedersenGens,
         elgamal::elgamal_key_gen,
         hybrid_encryption::{XPublicKey, XSecretKey},
     };
@@ -316,7 +316,7 @@ mod test {
     #[test]
     fn serialize_and_deserialize_elgamal() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
         let (_sk, xfr_pub_key) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
         let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
             res

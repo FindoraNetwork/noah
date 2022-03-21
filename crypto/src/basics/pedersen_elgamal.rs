@@ -1,5 +1,5 @@
-use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crate::basics::elgamal::{ElGamalCiphertext, ElGamalEncKey};
+use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use crate::basics::sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
@@ -30,7 +30,7 @@ pub struct PedersenElGamalEqProof {
 // Initiate transcript for Pedersen-Elgamal aggregate proof
 fn init_pedersen_elgamal_aggregate(
     transcript: &mut Transcript,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctexts: &[ElGamalCiphertext<RistrettoPoint>],
     commitments: &[RistrettoPoint],
@@ -56,7 +56,7 @@ fn init_pedersen_elgamal_aggregate(
 fn init_pok_pedersen_elgamal<'a>(
     transcript: &mut Transcript,
     identity: &'a RistrettoPoint,
-    pc_gens: &'a RistrettoPedersenGens,
+    pc_gens: &'a RistrettoPedersenCommitment,
     public_key: &'a ElGamalEncKey<RistrettoPoint>,
     ctext: &'a ElGamalCiphertext<RistrettoPoint>,
     commitment: &'a RistrettoPoint,
@@ -90,7 +90,7 @@ pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(
     ctext: &ElGamalCiphertext<RistrettoPoint>,
     commitment: &RistrettoPoint,
 ) -> PedersenElGamalEqProof {
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
     let identity = RistrettoPoint::get_identity();
     let (elems, lhs_matrix, _) = init_pok_pedersen_elgamal(
         transcript, &identity, &pc_gens, public_key, ctext, commitment,
@@ -116,7 +116,7 @@ pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(
 fn pedersem_elgamal_eq_verify_scalars<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctext: &ElGamalCiphertext<RistrettoPoint>,
     commitment: &RistrettoPoint,
@@ -149,7 +149,7 @@ fn pedersem_elgamal_eq_verify_scalars<R: CryptoRng + RngCore>(
 fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctext: &ElGamalCiphertext<RistrettoPoint>,
     commitment: &RistrettoPoint,
@@ -209,7 +209,7 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(
     assert_eq!(n, ctexts.len());
     assert_eq!(n, commitments.len());
 
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
     init_pedersen_elgamal_aggregate(transcript, &pc_gens, public_key, ctexts, commitments);
 
     // 1. compute x vector
@@ -254,7 +254,7 @@ pub struct PedersenElGamalProofInstance<'a> {
 pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     instances: &[PedersenElGamalProofInstance<'a>],
 ) -> Result<()> {
     let m = instances.len();
@@ -338,7 +338,7 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
 pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctexts: &[ElGamalCiphertext<RistrettoPoint>],
     commitments: &[RistrettoPoint],
@@ -358,7 +358,6 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
 #[cfg(test)]
 mod test {
     use super::PedersenElGamalEqProof;
-    use crate::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crate::basics::elgamal::{
         elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey,
     };
@@ -366,6 +365,7 @@ mod test {
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
         PedersenElGamalProofInstance,
     };
+    use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rmp_serde::Deserializer;
@@ -379,7 +379,7 @@ mod test {
         let m = RistrettoScalar::from(10u32);
         let r = RistrettoScalar::from(7657u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
@@ -416,7 +416,7 @@ mod test {
         let m2 = RistrettoScalar::from(11u32);
         let r = RistrettoScalar::from(7657u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
@@ -458,7 +458,7 @@ mod test {
         let m4 = RistrettoScalar::from(14u32);
         let r4 = RistrettoScalar::from(7660u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 
@@ -638,14 +638,14 @@ mod test {
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
         let mut rng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
         fn get_proof_instance<'a>(
             transcript: &mut Transcript,
             rng: &mut ChaChaRng,
             pk: &'a ElGamalEncKey<RistrettoPoint>,
             plaintexts: &[RistrettoScalar],
             rands: &[RistrettoScalar],
-            pc_gens: &RistrettoPedersenGens,
+            pc_gens: &RistrettoPedersenCommitment,
         ) -> (
             Vec<ElGamalCiphertext<RistrettoPoint>>,
             Vec<RistrettoPoint>,
@@ -738,7 +738,7 @@ mod test {
         let m = RistrettoScalar::from(10u32);
         let r = RistrettoScalar::from(7657u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let (_sk, pk) = elgamal_key_gen(&mut prng, &pc_gens.B);
         let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
@@ -764,7 +764,7 @@ mod test {
         let m = RistrettoScalar::from(10u32);
         let r = RistrettoScalar::from(7657u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
 

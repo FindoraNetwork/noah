@@ -10,7 +10,7 @@ use crate::xfr::{
     },
 };
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
 /// AssetRecrod confidentiality flags. Indicated if amount and/or assettype should be confidential
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -310,7 +310,7 @@ impl AssetRecordTemplate {
 }
 fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     asset_record: &AssetRecordTemplate,
     attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>,
 ) -> (
@@ -438,7 +438,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 ///  - Option<OwnerMemo> // Some(memo)  if asset_record.asset_record_type has a confidential flag
 pub fn build_open_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     asset_record: &AssetRecordTemplate,
     attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>,
 ) -> (OpenAssetRecord, Vec<TracerMemo>, Option<OwnerMemo>) {
@@ -465,7 +465,7 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(
 ///  - Option<OwnerMemo> // Some(memo)  if asset_record.asset_record_type has a confidential flag
 pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenGens,
+    pc_gens: &RistrettoPedersenCommitment,
     asset_record: &AssetRecordTemplate,
     attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>,
 ) -> (BlindAssetRecord, Vec<TracerMemo>, Option<OwnerMemo>) {
@@ -553,7 +553,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
     if asset_record.asset_tracing_policies.len() != identity_proofs_and_attrs.len() {
         return Err(eg!(ZeiError::ParameterError));
     }
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
     let mut attrs_ctexts = vec![];
     let mut reveal_proofs = vec![];
     let tracing_policy = asset_record.asset_tracing_policies.get_policies();
@@ -600,12 +600,12 @@ mod test {
     };
     use rand_chacha::ChaChaRng;
     use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-    use zei_crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
+    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracing: bool) {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let amount = 100u64;
         let asset_type = AssetType::from_identical_byte(0u8);
@@ -740,7 +740,7 @@ mod test {
     fn do_test_open_asset_record(record_type: AssetRecordType) {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let asset_type = AssetType::from_identical_byte(1u8);
 
@@ -831,7 +831,7 @@ mod test {
 
     fn build_and_open_blind_record(record_type: AssetRecordType, amt: u64, asset_type: AssetType) {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let keypair = XfrKeyPair::generate(&mut prng);
         let ar = AssetRecordTemplate::with_no_asset_tracing(
@@ -885,7 +885,7 @@ mod test {
     #[test]
     fn open_blind_asset_record_error() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
 
         let keypair = XfrKeyPair::generate(&mut prng);
         let asset_type: AssetType = AssetType(prng.gen());

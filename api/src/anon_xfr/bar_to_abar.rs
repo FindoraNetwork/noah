@@ -12,11 +12,9 @@ use num_bigint::BigUint;
 use zei_algebra::{
     bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
 };
+use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
-    basics::{
-        commitments::ristretto_pedersen::RistrettoPedersenGens, hash::rescue::RescueInstance,
-        hybrid_encryption::XPublicKey,
-    },
+    basics::{hash::rescue::RescueInstance, hybrid_encryption::XPublicKey},
     pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
     },
@@ -109,7 +107,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
 ) -> Result<(OpenAnonBlindAssetRecord, ConvertBarAbarProof)> {
     let oabar_amount = obar.amount;
 
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
 
     // 1. Construct ABAR.
     let oabar = OpenAnonBlindAssetRecordBuilder::new()
@@ -179,7 +177,7 @@ pub(crate) fn verify_bar_to_abar(
     abar: &AnonBlindAssetRecord,
     proof: &ConvertBarAbarProof,
 ) -> Result<()> {
-    let pc_gens = RistrettoPedersenGens::default();
+    let pc_gens = RistrettoPedersenCommitment::default();
 
     // 1. get commitments
     // 1.1 reconstruct total amount commitment from bar object
@@ -251,16 +249,14 @@ mod test {
     };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_crypto::basics::{
-        commitments::ristretto_pedersen::RistrettoPedersenGens,
-        hybrid_encryption::{XPublicKey, XSecretKey},
-    };
+    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     // helper function
     fn build_bar(
         pubkey: &XfrPublicKey,
         prng: &mut ChaChaRng,
-        pc_gens: &RistrettoPedersenGens,
+        pc_gens: &RistrettoPedersenCommitment,
         amt: u64,
         asset_type: AssetType,
         ar_type: AssetRecordType,
@@ -273,7 +269,7 @@ mod test {
     #[test]
     fn test_bar_to_abar() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
         let dec_key = XSecretKey::new(&mut prng);
@@ -332,7 +328,7 @@ mod test {
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
         let dec_key = XSecretKey::new(&mut prng);
         let enc_key = XPublicKey::from(&dec_key);
-        let pc_gens = RistrettoPedersenGens::default();
+        let pc_gens = RistrettoPedersenCommitment::default();
         let amount = 10;
         let asset_type = AssetType::from_identical_byte(1u8);
         let (bar, memo) = build_bar(
