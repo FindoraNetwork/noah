@@ -268,7 +268,7 @@ impl TurboConstraintSystem<BLSScalar> {
 mod test {
     use crate::plonk::constraint_system::{rescue::State, TurboConstraintSystem};
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basics::hash::rescue::RescueInstance;
+    use zei_crypto::basics::rescue::RescueInstance;
 
     type F = BLSScalar;
 

@@ -1,4 +1,4 @@
-use crate::basics::hash::rescue::RescueInstance;
+use crate::basics::rescue::RescueInstance;
 use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use crate::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
 use merlin::Transcript;
@@ -217,7 +217,7 @@ pub fn verify_pc_eq_rescue_external(
 
 #[cfg(test)]
 mod test {
-    use crate::basics::hash::rescue::RescueInstance;
+    use crate::basics::rescue::RescueInstance;
     use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use crate::pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external,

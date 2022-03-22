@@ -821,7 +821,7 @@ mod asset_tracing {
     use crate::xfr::{
         structs::XfrAmount::NonConfidential,
         structs::{AssetTracerKeyPair, TracingPolicies},
-        trace_assets, trace_assets_brute_force, XfrNotePolicies, XfrNotePoliciesRef,
+        trace_assets, XfrNotePolicies, XfrNotePoliciesRef,
     };
     use zei_algebra::{
         bls12_381::BLSScalar,
@@ -952,16 +952,7 @@ mod asset_tracing {
         ));
 
         // check that we can recover amount and type from memos
-        let candidate_assets = input_templates
-            .iter()
-            .chain(output_templates)
-            .map(|x| x.3)
-            .collect_vec();
-        let records_data_brute_force =
-            trace_assets_brute_force(&xfr_note.body, &input_templates[0].2, &candidate_assets)
-                .unwrap();
         let records_data = trace_assets(&xfr_note.body, &input_templates[0].2).unwrap();
-        assert_eq!(records_data, records_data_brute_force);
         if input_templates[0].1.len() == 1 {
             assert_eq!(records_data[0].0, input_amount);
             assert_eq!(records_data[0].1, input_templates[0].3);
@@ -1626,11 +1617,7 @@ mod asset_tracing {
             &xfr_body.clone(),
             &policies
         ));
-        let candidate_assets = [BITCOIN_ASSET, GOLD_ASSET];
-        let records_data_brute_force =
-            trace_assets_brute_force(&xfr_note.body, &tracer1_keypair, &candidate_assets).unwrap();
         let records_data = trace_assets(&xfr_note.body, &tracer1_keypair).unwrap();
-        assert_eq!(records_data, records_data_brute_force);
         let ids: Vec<u32> = vec![];
         assert_eq!(records_data.len(), 3);
         assert_eq!(records_data[0].0, 10); // first input amount
@@ -1646,10 +1633,7 @@ mod asset_tracing {
         assert_eq!(records_data[2].2, ids); // third output no id tracing
         assert_eq!(records_data[2].3, out_keys[2].pub_key); // third output no id tracing
 
-        let records_data_brute_force =
-            trace_assets_brute_force(&xfr_note.body, &tracer2_keypair, &candidate_assets).unwrap();
         let records_data = trace_assets(&xfr_note.body, &tracer2_keypair).unwrap();
-        assert_eq!(records_data, records_data_brute_force);
         let ids: Vec<u32> = vec![];
         assert_eq!(records_data.len(), 3);
         assert_eq!(records_data[0].0, 20); // third input amount

@@ -12,9 +12,10 @@ use num_bigint::BigUint;
 use zei_algebra::{
     bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
 };
+use zei_crypto::basics::rescue::RescueInstance;
 use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
-    basics::{hash::rescue::RescueInstance, hybrid_encryption::XPublicKey},
+    basics::hybrid_encryption::XPublicKey,
     pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
     },

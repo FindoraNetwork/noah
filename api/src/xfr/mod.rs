@@ -906,26 +906,6 @@ pub fn trace_assets(
     extract_tracing_info(bars_memos.as_slice(), &tracer_keypair.dec_key).c(d!())
 }
 
-/// Scan XfrBody transfers involving asset tracing memos intended for `tracer_keypair`.
-/// It takes each AssetTracer memo, decrypt the ElGamalEncryption
-/// and brute-force Dlog computation to retrieve amount and identity attributed.
-/// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
-/// Returning ZeiError::BogusAssetTracerMemo in case a TracerMemo decrypts inconsistent information, and
-/// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
-pub fn trace_assets_brute_force(
-    xfr_body: &XfrBody,
-    tracer_keypair: &AssetTracerKeyPair,
-    candidate_asset_types: &[AssetType],
-) -> Result<Vec<RecordData>> {
-    let bars_memos = find_tracing_memos(xfr_body, &tracer_keypair.enc_key).c(d!())?;
-    extract_tracing_info_brute_force(
-        bars_memos.as_slice(),
-        &tracer_keypair.dec_key,
-        candidate_asset_types,
-    )
-    .c(d!())
-}
-
 /// Scan list of (BlindAssetRecord, AssetTracerMemo) retrieved by find_tracing_memos
 /// (e.i. intended for the same asset tracer). It takes each AssetTracer memo,
 /// decrypts its lock_info field to retrieve amount, asset type and identity attributed.
@@ -965,56 +945,6 @@ pub(crate) fn extract_tracing_info(
                 Some(asset_type) => asset_type,
             },
         };
-
-        result.push((
-            amount,
-            asset_type,
-            attributes,
-            blind_asset_record.public_key,
-        ));
-    }
-    Ok(result)
-}
-
-/// Scan list of (BlindAssetRecord, AssetTracerMemo) retrieved by find_tracing_memos
-/// (e.i. intended for the same asset tracer). It takes each AssetTracer memo, decrypt the ElGamalEncryption
-/// and brute-force Dlog computation to retrieve amount and identity attributed.
-/// The asset type is verified agains a known list of possible asset types `candidate_asset_types`
-/// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
-/// Return Error in case data cannot be retrieved due to inconsistent structure.
-/// Eg. amount is not in a BlindAssetRecord nor in the corresponding AssetTracerMemo
-pub(crate) fn extract_tracing_info_brute_force(
-    memos: &[(&BlindAssetRecord, &TracerMemo)],
-    dec_key: &AssetTracerDecKeys,
-    candidate_asset_types: &[AssetType],
-) -> Result<Vec<RecordData>> {
-    let mut result = vec![];
-    for bar_memo in memos {
-        let blind_asset_record = bar_memo.0;
-        let memo = bar_memo.1;
-        let amount = match memo.lock_amount {
-            None => blind_asset_record
-                .amount
-                .get_amount()
-                .c(d!(ZeiError::InconsistentStructureError))?,
-            Some(_) => memo
-                .extract_amount_brute_force(&dec_key.record_data_dec_key)
-                .c(d!())?,
-        };
-
-        let asset_type = match memo.lock_asset_type {
-            None => blind_asset_record
-                .asset_type
-                .get_asset_type()
-                .c(d!(ZeiError::InconsistentStructureError))?,
-            Some(_) => memo
-                .extract_asset_type(&dec_key.record_data_dec_key, candidate_asset_types)
-                .c(d!())?,
-        };
-
-        let attributes = memo
-            .extract_identity_attributes_brute_force(&dec_key.attrs_dec_key)
-            .c(d!())?;
 
         result.push((
             amount,
