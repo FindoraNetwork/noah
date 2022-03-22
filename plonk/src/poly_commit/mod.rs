@@ -1,6 +1,18 @@
+/// Module for field polynomial.
 pub mod field_polynomial;
+
+/// Module for KZG polynomial commitment scheme.
 pub mod kzg_poly_com;
-pub mod oracle;
+
+/// Module for polynomial commitment structs.
 pub mod pcs;
+
+/// Module for polynomial commitment transcript,
+/// and implemented by `merlin::Transcript`.
 pub mod transcript;
+
+/// Module for ZK eval for hiding polynomial commitment schemes.
 pub mod zk_eval;
+
+/// Module for polynomial commitment errors.
+pub mod errors;

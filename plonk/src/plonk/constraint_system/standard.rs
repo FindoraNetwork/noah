@@ -1,17 +1,28 @@
-use ruc::*;
-use zei_algebra::traits::Scalar;
-
-use crate::plonk::errors::PlonkError;
-
 use super::ConstraintSystem;
+use crate::plonk::errors::PlonkError;
+use zei_algebra::prelude::*;
 
+/// The number of wires of a gate in Standard CS.
+pub const N_WIRES_PER_GATE: usize = 3;
+
+/// The number of selectors of Turbo.
+pub const N_SELECTORS: usize = 5;
+
+/// Standard PLONK Constraint System.
 pub struct StandardConstraintSystem<F> {
+    /// the selectors of the circuit.
     pub selectors: Vec<Vec<F>>,
-    pub wiring: [Vec<usize>; 3], // left, right, output, each of size `size`
+    /// the wiring of the circuit.
+    pub wiring: [Vec<usize>; N_WIRES_PER_GATE],
+    /// the number of variable.
     pub num_vars: usize,
+    /// the size of circuit.
     pub size: usize,
+    /// the constraint variables indices.
     pub public_vars_constraint_indices: Vec<usize>,
+    /// the witness variables indices.
     pub public_vars_witness_indices: Vec<usize>,
+    /// only for verifier use.
     pub verifier_only: bool,
 }
 
@@ -39,7 +50,7 @@ impl<F: Scalar> ConstraintSystem for StandardConstraintSystem<F> {
     }
 
     fn n_wires_per_gate() -> usize {
-        3
+        N_WIRES_PER_GATE
     }
 
     fn num_selectors(&self) -> usize {
@@ -70,7 +81,7 @@ impl<F: Scalar> ConstraintSystem for StandardConstraintSystem<F> {
         sel_vals: &[&Self::Field],
         pub_input: &Self::Field,
     ) -> Result<Self::Field> {
-        if wire_vals.len() < 3 || sel_vals.len() < 5 {
+        if wire_vals.len() < N_WIRES_PER_GATE || sel_vals.len() < N_SELECTORS {
             return Err(eg!(PlonkError::FuncParamsError));
         }
         let left = sel_vals[0].mul(wire_vals[0]);
@@ -83,7 +94,7 @@ impl<F: Scalar> ConstraintSystem for StandardConstraintSystem<F> {
 
     /// The coefficients are (wl, wr, wl * wr, -wo, 1).
     fn eval_selector_multipliers(wire_vals: &[&Self::Field]) -> Result<Vec<Self::Field>> {
-        if wire_vals.len() < 3 {
+        if wire_vals.len() < N_WIRES_PER_GATE {
             return Err(eg!(PlonkError::FuncParamsError));
         }
         Ok(vec![
@@ -113,6 +124,7 @@ impl<F: Scalar> ConstraintSystem for StandardConstraintSystem<F> {
 }
 
 impl<F: Scalar> StandardConstraintSystem<F> {
+    /// Create a Standard PLONK constraint system.
     pub fn new(num_vars: usize) -> StandardConstraintSystem<F> {
         StandardConstraintSystem {
             selectors: vec![vec![], vec![], vec![], vec![], vec![]], // q_L, q_R, q_M, q_O, q_C
@@ -125,6 +137,7 @@ impl<F: Scalar> StandardConstraintSystem<F> {
         }
     }
 
+    /// Add a Sub gate. (left, right, out).
     pub fn insert_add_gate(
         &mut self,
         left_var_index: usize,
@@ -140,6 +153,8 @@ impl<F: Scalar> StandardConstraintSystem<F> {
             F::one(),
         )
     }
+
+    /// Add a Sub gate with multiplier.
     pub fn insert_add_gate_with_inputs_multiplier(
         &mut self,
         left_var_index: usize,
@@ -172,6 +187,7 @@ impl<F: Scalar> StandardConstraintSystem<F> {
         self.size += 1;
     }
 
+    /// Add a Mul gate. (left, right, out).
     pub fn insert_mul_gate(
         &mut self,
         left_var_index: usize,
@@ -187,6 +203,7 @@ impl<F: Scalar> StandardConstraintSystem<F> {
         )
     }
 
+    /// Add a Mul gate with multiplier.
     pub fn insert_mul_gate_with_input_multiplier(
         &mut self,
         left_var_index: usize,
@@ -218,6 +235,7 @@ impl<F: Scalar> StandardConstraintSystem<F> {
         self.size += 1;
     }
 
+    /// Add a Boolean gate.
     pub fn insert_boolean_gate(&mut self, var_index: usize) {
         assert_eq!(self.verifier_only, false);
         assert!(
@@ -293,24 +311,28 @@ impl<F: Scalar> StandardConstraintSystem<F> {
         self.size += diff;
     }
 
+    /// Return the left wires witness index.
     fn get_left_witness_index(&self, cs_index: usize) -> usize {
         assert_eq!(self.verifier_only, false);
         assert!(cs_index < self.size);
-        self.wiring[0][cs_index] as usize
+        self.wiring[0][cs_index]
     }
 
+    /// Return the right wires witness index.
     fn get_right_witness_index(&self, cs_index: usize) -> usize {
         assert_eq!(self.verifier_only, false);
         assert!(cs_index < self.size);
-        self.wiring[1][cs_index] as usize
+        self.wiring[1][cs_index]
     }
 
+    /// Return the output wires witness index.
     fn get_out_witness_index(&self, cs_index: usize) -> usize {
         assert_eq!(self.verifier_only, false);
         assert!(cs_index < self.size);
-        self.wiring[2][cs_index] as usize
+        self.wiring[2][cs_index]
     }
 
+    /// Verify the given witness and publics.
     pub fn verify_witness(&self, witness: &[F], online_vars: &[F]) -> Result<()> {
         if witness.len() != self.num_vars {
             return Err(eg!());
@@ -360,15 +382,6 @@ impl<F: Scalar> StandardConstraintSystem<F> {
 
 #[cfg(test)]
 mod test {
-    use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use zei_algebra::{
-        bls12_381::{BLSPairingEngine, BLSScalar},
-        ops::*,
-        One, Zero,
-    };
-
     use crate::plonk::{
         constraint_system::{standard::StandardConstraintSystem, ConstraintSystem},
         prover::prover,
@@ -376,6 +389,12 @@ mod test {
         verifier::verifier,
     };
     use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
+    use merlin::Transcript;
+    use rand_chacha::ChaChaRng;
+    use zei_algebra::{
+        bls12_381::{BLSPairingEngine, BLSScalar},
+        prelude::*,
+    };
 
     type F = BLSScalar;
 
