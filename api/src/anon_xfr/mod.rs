@@ -311,18 +311,10 @@ pub fn nullifier(
 
 pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
     let hash = RescueInstance::new();
-
-    let pk_hash = hash.rescue(&[
-        abar.public_key.0.point_ref().get_x(),
-        abar.public_key.0.point_ref().get_y(),
-        BLSScalar::zero(),
-        BLSScalar::zero(),
-    ])[0];
-
     hash.rescue(&[
         BLSScalar::from(uid),
         abar.amount_type_commitment,
-        pk_hash,
+        abar.public_key.0.point_ref().get_x(),
         BLSScalar::zero(),
     ])[0]
 }
@@ -412,12 +404,10 @@ mod tests {
         };
         let hash = RescueInstance::new();
         let rand_pk_in_jj = rand_pk_in.as_jubjub_point();
-        let pk_in_hash =
-            hash.rescue(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])[0];
         let leaf = hash.rescue(&[
             /*uid=*/ two,
             oabar.compute_commitment(),
-            pk_in_hash,
+            rand_pk_in_jj.get_x(),
             zero,
         ])[0];
         let merkle_root = hash.rescue(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
@@ -626,17 +616,10 @@ mod tests {
         {
             let mut hash = {
                 let hasher = RescueInstance::new();
-                let pk_hash = hasher.rescue(&[
-                    abar.public_key.0.point_ref().get_x(),
-                    abar.public_key.0.point_ref().get_y(),
-                    BLSScalar::zero(),
-                    BLSScalar::zero(),
-                ])[0];
-
                 hasher.rescue(&[
                     BLSScalar::from(uid),
                     abar.amount_type_commitment,
-                    pk_hash,
+                    abar.public_key.0.point_ref().get_x(),
                     BLSScalar::zero(),
                 ])[0]
             };
@@ -709,12 +692,10 @@ mod tests {
             .enumerate()
             .map(|(uid, in_abar)| {
                 let rand_pk_in_jj = in_abar.public_key.as_jubjub_point();
-                let pk_in_hash =
-                    hash.rescue(&[rand_pk_in_jj.get_x(), rand_pk_in_jj.get_y(), zero, zero])[0];
                 hash.rescue(&[
                     BLSScalar::from(uid as u32),
                     in_abar.amount_type_commitment,
-                    pk_in_hash,
+                    rand_pk_in_jj.get_x(),
                     zero,
                 ])[0]
             })

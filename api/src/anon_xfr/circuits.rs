@@ -126,7 +126,7 @@ impl AMultiXfrPubInputs {
                 let pk_point = base.mul(&sec.sec_key);
                 let pk_sign = AXfrPubKey::from_jubjub_point(pk_point.mul(&sec.diversifier));
 
-                let pow_2_64 = BLSScalar::from(u64::max_value()).add(&BLSScalar::one());
+                let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
                 let uid_amount = pow_2_64
                     .mul(&BLSScalar::from(sec.uid))
                     .add(&BLSScalar::from(sec.amount));
@@ -154,14 +154,18 @@ impl AMultiXfrPubInputs {
         // merkle root
         let payer = &witness.payers_secrets[0];
         let pk_point = base.mul(&payer.sec_key);
-        let pk_hash = hash.rescue(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
         let commitment = hash.rescue(&[
             payer.blind,
             BLSScalar::from(payer.amount),
             payer.asset_type,
             zero,
         ])[0];
-        let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0];
+        let mut node = hash.rescue(&[
+            BLSScalar::from(payer.uid),
+            commitment,
+            pk_point.get_x(),
+            zero,
+        ])[0];
         for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
                 (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
@@ -889,14 +893,18 @@ pub(crate) mod tests {
                 .iter()
                 .map(|payer| {
                     let pk_point = base.mul(&payer.sec_key);
-                    let pk_hash = hash.rescue(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
                     let commitment = hash.rescue(&[
                         payer.blind,
                         BLSScalar::from(payer.amount),
                         payer.asset_type,
                         zero,
                     ])[0];
-                    hash.rescue(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0]
+                    hash.rescue(&[
+                        BLSScalar::from(payer.uid),
+                        commitment,
+                        pk_point.get_x(),
+                        zero,
+                    ])[0]
                 })
                 .collect();
             payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
@@ -1689,8 +1697,7 @@ pub(crate) mod tests {
         // compute the root value
         let hash = RescueInstance::new();
         let leaf = hash.rescue(&[
-            /*uid=*/ one, /*comm=*/ two, zero, /*pk_x=*/
-            zero,
+            /*uid=*/ one, /*comm=*/ two, /*pk_x=*/ zero, zero,
         ])[0];
         // leaf is the right child of node1
         let node1 = hash.rescue(&[path_node2.siblings1, path_node2.siblings2, leaf, zero])[0];
