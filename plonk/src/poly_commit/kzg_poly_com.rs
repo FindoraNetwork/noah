@@ -266,6 +266,11 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 
         // Compute the proof value
         if polynomial.degree() > max_degree {
+            println!(
+                "polynomial degree = {}, max_degree = {}",
+                polynomial.degree(),
+                max_degree
+            );
             return Err(eg!(PolyComSchemeError::DegreeError));
         }
 

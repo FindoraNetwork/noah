@@ -173,7 +173,7 @@ fn gen_vk(directory: PathBuf) {
             let mut bytes: HashMap<usize, Vec<u8>> = js
                 .par_iter()
                 .map(|j| {
-                    println!("generateing {} payers & {} payees", i, j);
+                    println!("generating {} payers & {} payees", i, j);
                     let node_params = NodeParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())

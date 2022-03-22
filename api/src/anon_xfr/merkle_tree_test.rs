@@ -98,7 +98,6 @@ mod tests {
             uid: uid_var,
             commitment: comm_var,
             pub_key_x: pk_var.get_x(),
-            pub_key_y: pk_var.get_y(),
         };
 
         let path_vars = add_merkle_path_variables(
@@ -269,17 +268,10 @@ mod tests {
     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
         let hash = RescueInstance::new();
 
-        let pk_hash = hash.rescue(&[
-            abar.public_key.0.point_ref().get_x(),
-            abar.public_key.0.point_ref().get_y(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-        ])[0];
-
         hash.rescue(&[
             BLSScalar::from(uid),
             abar.amount_type_commitment,
-            pk_hash,
+            abar.public_key.0.point_ref().get_x(),
             BLSScalar::zero(),
         ])[0]
     }

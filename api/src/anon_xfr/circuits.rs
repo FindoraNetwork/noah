@@ -12,7 +12,7 @@ use zei_algebra::{
     One, Zero,
 };
 use zei_crypto::{
-    basics::{hash::rescue::RescueInstance, prf::PRF},
+    basics::hash::rescue::RescueInstance,
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
     pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
 };
@@ -117,7 +117,7 @@ impl AMultiXfrPubInputs {
     #[allow(dead_code)]
     pub(crate) fn from_witness(witness: &AMultiXfrWitness) -> Self {
         // nullifiers and signature public keys
-        let prf = PRF::new();
+        let hash = RescueInstance::new();
         let base = JubjubPoint::get_base();
         let payers_inputs: Vec<(Nullifier, AXfrPubKey)> = witness
             .payers_secrets
@@ -126,19 +126,16 @@ impl AMultiXfrPubInputs {
                 let pk_point = base.mul(&sec.sec_key);
                 let pk_sign = AXfrPubKey::from_jubjub_point(pk_point.mul(&sec.diversifier));
 
-                let pow_2_64 = BLSScalar::from(u64::max_value()).add(&BLSScalar::one());
+                let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
                 let uid_amount = pow_2_64
                     .mul(&BLSScalar::from(sec.uid))
                     .add(&BLSScalar::from(sec.amount));
-                let nullifier = prf.eval(
-                    &BLSScalar::from(&sec.sec_key),
-                    &[
-                        uid_amount,
-                        sec.asset_type,
-                        pk_point.get_x(),
-                        pk_point.get_y(),
-                    ],
-                );
+                let nullifier = hash.rescue(&[
+                    uid_amount,
+                    sec.asset_type,
+                    pk_point.get_x(),
+                    BLSScalar::from(&sec.sec_key),
+                ])[0];
                 (nullifier, pk_sign)
             })
             .collect();
@@ -157,14 +154,18 @@ impl AMultiXfrPubInputs {
         // merkle root
         let payer = &witness.payers_secrets[0];
         let pk_point = base.mul(&payer.sec_key);
-        let pk_hash = hash.rescue(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
         let commitment = hash.rescue(&[
             payer.blind,
             BLSScalar::from(payer.amount),
             payer.asset_type,
             zero,
         ])[0];
-        let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0];
+        let mut node = hash.rescue(&[
+            BLSScalar::from(payer.uid),
+            commitment,
+            pk_point.get_x(),
+            zero,
+        ])[0];
         for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
                 (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
@@ -208,7 +209,6 @@ pub(crate) fn build_multi_xfr_cs(
         // prove knowledge of payer's secret key: pk = base^{sk}
         let (pk_var, pk_point) = cs.scalar_mul(base, payer.sec_key, SK_LEN);
         let pk_x = pk_var.get_x();
-        let pk_y = pk_var.get_y();
 
         // prove knowledge of diversifier: pk_sign = pk^{diversifier}
         let (pk_sign_var, _) = cs.var_base_scalar_mul(pk_var, pk_point, payer.diversifier, SK_LEN);
@@ -229,7 +229,6 @@ pub(crate) fn build_multi_xfr_cs(
             uid_amount,
             asset_type: payer.asset_type,
             pub_key_x: pk_x,
-            pub_key_y: pk_y,
         };
         let nullifier_var = nullify(&mut cs, payer.sec_key, nullifier_input_vars);
 
@@ -238,7 +237,6 @@ pub(crate) fn build_multi_xfr_cs(
             uid: payer.uid,
             commitment: com_abar_in_var,
             pub_key_x: pk_x,
-            pub_key_y: pk_y,
         };
         let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payer.path);
 
@@ -585,7 +583,6 @@ pub(crate) struct AccElemVars {
     pub uid: VarIndex,
     pub commitment: VarIndex,
     pub pub_key_x: VarIndex,
-    pub pub_key_y: VarIndex,
 }
 
 // cs variables for the nullifier PRF inputs
@@ -593,7 +590,6 @@ pub(crate) struct NullifierInputVars {
     pub uid_amount: VarIndex,
     pub asset_type: VarIndex,
     pub pub_key_x: VarIndex,
-    pub pub_key_y: VarIndex,
 }
 
 pub(crate) fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
@@ -651,13 +647,10 @@ pub(crate) fn compute_merkle_root(
     elem: AccElemVars,
     path_vars: &MerklePathVars,
 ) -> VarIndex {
-    let (uid, commitment, pub_key_x, pub_key_y) =
-        (elem.uid, elem.commitment, elem.pub_key_x, elem.pub_key_y);
+    let (uid, commitment, pub_key_x) = (elem.uid, elem.commitment, elem.pub_key_x);
     let zero_var = cs.zero_var();
-    // TODO: compute `pk_hash_var` using a simpler encoding that has fewer constraints
-    let pk_hash_var = cs.rescue_hash(&StateVar::new([pub_key_x, pub_key_y, zero_var, zero_var]))[0];
-    let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, pk_hash_var, zero_var]))[0];
 
+    let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, pub_key_x, zero_var]))[0];
     for path_node in path_vars.nodes.iter() {
         let input_var = sort(
             cs,
@@ -695,13 +688,12 @@ pub(crate) fn nullify(
     sk_var: VarIndex,
     nullifier_input_vars: NullifierInputVars,
 ) -> VarIndex {
-    let (uid_amount, asset_type, pub_key_x, pub_key_y) = (
+    let (uid_amount, asset_type, pub_key_x) = (
         nullifier_input_vars.uid_amount,
         nullifier_input_vars.asset_type,
         nullifier_input_vars.pub_key_x,
-        nullifier_input_vars.pub_key_y,
     );
-    let input_var = StateVar::new([uid_amount, asset_type, pub_key_x, cs.add(pub_key_y, sk_var)]);
+    let input_var = StateVar::new([uid_amount, asset_type, pub_key_x, sk_var]);
     cs.rescue_hash(&input_var)[0]
 }
 
@@ -853,7 +845,7 @@ pub(crate) mod tests {
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar};
     use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use zei_crypto::{
-        basics::{hash::rescue::RescueInstance, prf::PRF},
+        basics::hash::rescue::RescueInstance,
         pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external,
     };
     use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
@@ -901,14 +893,18 @@ pub(crate) mod tests {
                 .iter()
                 .map(|payer| {
                     let pk_point = base.mul(&payer.sec_key);
-                    let pk_hash = hash.rescue(&[pk_point.get_x(), pk_point.get_y(), zero, zero])[0];
                     let commitment = hash.rescue(&[
                         payer.blind,
                         BLSScalar::from(payer.amount),
                         payer.asset_type,
                         zero,
                     ])[0];
-                    hash.rescue(&[BLSScalar::from(payer.uid), commitment, pk_hash, zero])[0]
+                    hash.rescue(&[
+                        BLSScalar::from(payer.uid),
+                        commitment,
+                        pk_point.get_x(),
+                        zero,
+                    ])[0]
                 })
                 .collect();
             payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
@@ -1606,8 +1602,8 @@ pub(crate) mod tests {
         let uid_amount = BLSScalar::from_bytes(&bytes[..]).unwrap(); // safe unwrap
         let asset_type = one;
         let pk = Point::new(zero, one);
-        let prf = PRF::new();
-        let expected_output = prf.eval(&sk, &[uid_amount, asset_type, *pk.get_x(), *pk.get_y()]);
+        let hash = RescueInstance::new();
+        let expected_output = hash.rescue(&[uid_amount, asset_type, *pk.get_x(), sk])[0];
 
         let sk_var = cs.new_variable(sk);
         let uid_amount_var = cs.new_variable(uid_amount);
@@ -1617,7 +1613,6 @@ pub(crate) mod tests {
             uid_amount: uid_amount_var,
             asset_type: asset_var,
             pub_key_x: pk_var.get_x(),
-            pub_key_y: pk_var.get_y(),
         };
         let nullifier_var = nullify(&mut cs, sk_var, nullifier_input_var);
         let mut witness = cs.get_and_clear_witness();
@@ -1685,7 +1680,6 @@ pub(crate) mod tests {
             uid: uid_var,
             commitment: comm_var,
             pub_key_x: pk_var.get_x(),
-            pub_key_y: pk_var.get_y(),
         };
 
         let path_node1 = MTNode {
@@ -1702,8 +1696,9 @@ pub(crate) mod tests {
         };
         // compute the root value
         let hash = RescueInstance::new();
-        let pk_hash = hash.rescue(&[/*pk_x=*/ zero, /*pk_y=*/ one, zero, zero])[0];
-        let leaf = hash.rescue(&[/*uid=*/ one, /*comm=*/ two, pk_hash, zero])[0];
+        let leaf = hash.rescue(&[
+            /*uid=*/ one, /*comm=*/ two, /*pk_x=*/ zero, zero,
+        ])[0];
         // leaf is the right child of node1
         let node1 = hash.rescue(&[path_node2.siblings1, path_node2.siblings2, leaf, zero])[0];
         // node1 is the left child of the root

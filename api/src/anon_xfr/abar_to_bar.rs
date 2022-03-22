@@ -374,7 +374,6 @@ pub fn build_abar_to_bar_cs(
     // prove knowledge of payer's secret key: pk = base^{sk}
     let (pk_var, pk_point) = cs.scalar_mul(base, payers_secrets.sec_key, SK_LEN);
     let pk_x = pk_var.get_x();
-    let pk_y = pk_var.get_y();
 
     // prove knowledge of diversifier: pk_sign = pk^{diversifier}
     let (pk_sign_var, _) =
@@ -406,7 +405,6 @@ pub fn build_abar_to_bar_cs(
         uid_amount,
         asset_type: payers_secrets.asset_type,
         pub_key_x: pk_x,
-        pub_key_y: pk_y,
     };
     let nullifier_var = nullify(&mut cs, payers_secrets.sec_key, nullifier_input_vars);
 
@@ -415,7 +413,6 @@ pub fn build_abar_to_bar_cs(
         uid: payers_secrets.uid,
         commitment: com_abar_in_var,
         pub_key_x: pk_x,
-        pub_key_y: pk_y,
     };
     let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_secrets.path);
 
@@ -729,18 +726,10 @@ mod tests {
 
     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
         let hash = RescueInstance::new();
-
-        let pk_hash = hash.rescue(&[
-            abar.public_key.0.point_ref().get_x(),
-            abar.public_key.0.point_ref().get_y(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-        ])[0];
-
         hash.rescue(&[
             BLSScalar::from(uid),
             abar.amount_type_commitment,
-            pk_hash,
+            abar.public_key.0.point_ref().get_x(),
             BLSScalar::zero(),
         ])[0]
     }
