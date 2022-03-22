@@ -2,8 +2,7 @@ use crate::plonk::setup::PlonkVerifierParams;
 use crate::poly_commit::{pcs::ToBytes, transcript::PolyComTranscript};
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
-use zei_algebra::traits::Scalar;
+use zei_algebra::prelude::*;
 
 /// Initialize the transcript when compute PLONK proof.
 pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(

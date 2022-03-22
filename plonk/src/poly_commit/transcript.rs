@@ -1,7 +1,6 @@
 use crate::poly_commit::pcs::{PolyComScheme, ToBytes};
 use merlin::Transcript;
-use rand_core::SeedableRng;
-use zei_algebra::traits::Scalar;
+use zei_algebra::prelude::*;
 
 /// The trait for polynomial commitment transcript.
 pub trait PolyComTranscript {

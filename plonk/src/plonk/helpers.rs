@@ -7,10 +7,7 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
-use itertools::Itertools;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::{ops::*, traits::Scalar, One, Zero};
+use zei_algebra::prelude::*;
 
 /// Build the base group.
 pub(super) fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<Vec<F>> {
@@ -580,9 +577,8 @@ mod test {
         setup::preprocess_prover,
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
-    use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
-    use zei_algebra::{bls12_381::BLSScalar, ops::*, One, Zero};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
 

@@ -1,5 +1,4 @@
-use ruc::*;
-use zei_algebra::traits::Scalar;
+use zei_algebra::prelude::*;
 
 /// Module for ECC Constrain System.
 pub mod ecc;

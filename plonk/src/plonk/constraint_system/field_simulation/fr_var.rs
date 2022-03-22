@@ -177,11 +177,9 @@ mod test {
         TurboConstraintSystem,
     };
     use num_bigint::{BigUint, RandBigInt};
-    use num_traits::Zero;
     use rand_chacha::ChaCha20Rng;
-    use rand_core::SeedableRng;
     use std::ops::Shl;
-    use zei_algebra::bls12_381::BLSScalar;
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
     use zei_crypto::field_simulation::{
         ristretto_scalar_field_in_biguint, SimFr, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
     };

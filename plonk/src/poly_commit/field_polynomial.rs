@@ -1,6 +1,5 @@
 use num_bigint::{BigUint, ToBigUint};
 use num_integer::Integer;
-use rand::{CryptoRng, RngCore};
 use zei_algebra::prelude::*;
 
 /// Field polynomial.
@@ -167,7 +166,7 @@ impl<F: Scalar> FpPolynomial<F> {
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
     /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use zei_algebra::prelude::*;
     /// use rand::thread_rng;
     /// let poly = FpPolynomial::<BLSScalar>::random(&mut thread_rng(), 10);
     /// assert!(poly.degree() <= 10)
@@ -943,9 +942,8 @@ pub fn recursive_ifft<F: Scalar>(values: &[&F], root: &F) -> Vec<F> {
 #[cfg(test)]
 mod test {
     use crate::poly_commit::field_polynomial::FpPolynomial;
-    use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
-    use zei_algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One, Zero};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn from_zeroes() {

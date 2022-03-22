@@ -14,8 +14,7 @@ use crate::plonk::{
 };
 use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
 use merlin::Transcript;
-use ruc::*;
-use zei_algebra::ops::*;
+use zei_algebra::prelude::*;
 
 /// Verify a proof for a constraint system previously preprocessed into `cs_params`
 /// State of the transcript must match prover state of the transcript

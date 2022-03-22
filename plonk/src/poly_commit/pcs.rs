@@ -1,9 +1,8 @@
 use crate::poly_commit::{field_polynomial::FpPolynomial, transcript::PolyComTranscript};
 use merlin::Transcript;
-use ruc::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use zei_algebra::{ops::*, traits::Scalar, One, Zero};
+use zei_algebra::prelude::*;
 
 /// The trait for help serialize to bytes,
 /// implement by polynomial commitment.
@@ -380,8 +379,7 @@ mod test {
     };
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use zei_algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One, Zero};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn test_pcs_eval() {

@@ -1,7 +1,6 @@
 use super::ConstraintSystem;
 use crate::plonk::errors::PlonkError;
-use ruc::*;
-use zei_algebra::traits::Scalar;
+use zei_algebra::prelude::*;
 
 /// The wires of a gate in Standard CS.
 pub const N_WIRES_PER_GATE: usize = 3;
@@ -392,11 +391,9 @@ mod test {
     use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use zei_algebra::{
         bls12_381::{BLSPairingEngine, BLSScalar},
-        ops::*,
-        One, Zero,
+        prelude::*,
     };
 
     type F = BLSScalar;

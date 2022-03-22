@@ -17,9 +17,7 @@ use crate::poly_commit::{
     transcript::PolyComTranscript,
 };
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::{ops::*, traits::Scalar, Zero};
+use zei_algebra::prelude::*;
 
 const ZK_EVAL_CHALLENGE: &[u8] = b"zk_eval challenge";
 

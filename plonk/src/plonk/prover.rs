@@ -16,9 +16,7 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial, pcs::PolyComScheme, transcript::PolyComTranscript,
 };
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::ops::*;
+use zei_algebra::prelude::*;
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`
 /// Proof verifier must use a transcript with same state as prover and match the public parameters
@@ -36,8 +34,7 @@ use zei_algebra::ops::*;
 /// use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
 /// use merlin::Transcript;
 /// use rand_chacha::ChaChaRng;
-/// use rand_core::SeedableRng;
-/// use zei_algebra::{bls12_381::BLSScalar, One, ops::*};
+/// use zei_algebra::{prelude::*, bls12_381::BLSScalar};
 ///
 /// let mut prng = ChaChaRng::from_seed([1u8; 32]);
 /// let pcs = KZGCommitmentScheme::new(20, &mut prng);

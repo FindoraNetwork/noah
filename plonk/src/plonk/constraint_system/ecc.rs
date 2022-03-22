@@ -1,11 +1,5 @@
 use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
-use zei_algebra::{
-    bls12_381::BLSScalar,
-    jubjub::JubjubPoint,
-    ops::*,
-    traits::{Group, Scalar},
-    One, Zero,
-};
+use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 
 type F = BLSScalar;
 
@@ -384,18 +378,14 @@ impl TurboConstraintSystem<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-    use ruc::*;
-    use zei_algebra::{
-        bls12_381::BLSScalar,
-        jubjub::{JubjubPoint, JubjubScalar},
-        ops::*,
-        traits::{Group, Scalar},
-        One, Zero,
-    };
-
     use crate::plonk::constraint_system::{
         ecc::{Point, PointVar},
         TurboConstraintSystem,
+    };
+    use zei_algebra::{
+        bls12_381::BLSScalar,
+        jubjub::{JubjubPoint, JubjubScalar},
+        prelude::*,
     };
 
     #[test]

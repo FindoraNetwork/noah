@@ -31,15 +31,11 @@ use crate::poly_commit::{
     pcs::{HomomorphicPolyComElem, PolyComScheme, ToBytes},
 };
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
 use zei_algebra::{
     bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
     fs,
-    ops::*,
     prelude::*,
-    traits::{Group, Pairing, Scalar},
-    One,
+    traits::Pairing,
 };
 
 /// KZG commitment scheme about the `Group`.
@@ -355,16 +351,12 @@ mod tests_kzg_impl {
         kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
-    use itertools::Itertools;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use ruc::*;
     use zei_algebra::{
         bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
-        ops::*,
-        traits::{Group, Pairing},
-        One,
+        prelude::*,
+        traits::Pairing,
     };
 
     fn _check_public_parameters_generation<P: Pairing>() {

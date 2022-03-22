@@ -1,7 +1,5 @@
 use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
-use zei_algebra::{
-    bls12_381::BLSScalar, ops::*, traits::Scalar, utils::u64_lsf_from_bytes, One, Zero,
-};
+use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basics::hash::rescue::RescueInstance;
 
 /// state size.

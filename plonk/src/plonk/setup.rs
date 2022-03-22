@@ -8,9 +8,7 @@ use crate::poly_commit::{
     pcs::{BatchProofEval, PolyComScheme},
 };
 use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::*;
-use zei_algebra::{ops::*, traits::Scalar, utils::u64_lsf_from_bytes, One, Zero};
+use zei_algebra::prelude::*;
 
 /// A PlonkProof is generic on the polynomial commitment scheme, PCS.
 /// PCS is generic in the commitment group C, the eval proof type E,
@@ -270,8 +268,7 @@ pub fn preprocess_verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
 mod test {
     use crate::plonk::setup::choose_ks;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, utils::u64_lsf_from_bytes, One, Zero};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
 

@@ -5,8 +5,7 @@
 //! ecc.rs and rescue.rs, respectively.
 use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
-use ruc::*;
-use zei_algebra::traits::Scalar;
+use zei_algebra::prelude::*;
 
 /// The wires of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;
@@ -672,16 +671,8 @@ mod test {
     use crate::poly_commit::{kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme};
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
-    use rand_core::{CryptoRng, RngCore, SeedableRng};
-    use ruc::*;
     use std::str::FromStr;
-    use zei_algebra::{
-        bls12_381::BLSScalar,
-        jubjub::JubjubPoint,
-        ops::*,
-        traits::{Group, Scalar},
-        One, Zero,
-    };
+    use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 
     type F = BLSScalar;
 
