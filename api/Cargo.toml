@@ -86,7 +86,7 @@ parking_lot = '0.11.1'
 path = '../accumulators'
 
 [dev-dependencies.rand]
-version = '0.7'
+version = '0.8'
 default-features = false
 
 [dev-dependencies.storage]

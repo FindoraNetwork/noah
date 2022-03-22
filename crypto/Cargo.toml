@@ -42,7 +42,7 @@ default-features = false
 features = ['alloc']
 
 [dependencies.rand]
-version = '0.7'
+version = '0.8'
 default-features = false
 
 [dependencies.wasm-bindgen]
