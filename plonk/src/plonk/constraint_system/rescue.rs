@@ -1,6 +1,6 @@
 use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-use zei_crypto::basics::hash::rescue::RescueInstance;
+use zei_crypto::basics::rescue::RescueInstance;
 
 /// state size.
 const WIDTH: usize = 4;
