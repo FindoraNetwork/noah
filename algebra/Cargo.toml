@@ -68,7 +68,7 @@ version = '^0.3.0'
 default-features = false
 
 [dependencies.rand_chacha]
-version = '0.2'
+version = '0.3'
 default-features = false
 
 [dependencies.num-bigint]
