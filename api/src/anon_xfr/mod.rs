@@ -16,7 +16,6 @@ use zei_algebra::{
 use zei_crypto::basics::{
     hash::rescue::RescueInstance,
     hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey},
-    prf::PRF,
 };
 
 pub mod abar_to_bar;
@@ -296,16 +295,18 @@ pub fn nullifier(
     let pub_key = key_pair.pub_key();
     let pub_key_point = pub_key.as_jubjub_point();
     let pub_key_x = pub_key_point.get_x();
-    let pub_key_y = pub_key_point.get_y();
 
-    // TODO From<u128> for ZeiScalar and do let uid_amount = BLSScalar::from(amount as u128 + ((uid as u128) << 64));
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
     let uid_shifted = BLSScalar::from(uid).mul(&pow_2_64);
     let uid_amount = uid_shifted.add(&BLSScalar::from(amount));
-    PRF::new().eval(
-        &BLSScalar::from(&key_pair.get_secret_scalar()),
-        &[uid_amount, asset_type.as_scalar(), pub_key_x, pub_key_y],
-    )
+
+    let hash = RescueInstance::new();
+    hash.rescue(&[
+        uid_amount,
+        asset_type.as_scalar(),
+        pub_key_x,
+        BLSScalar::from(&key_pair.get_secret_scalar()),
+    ])[0]
 }
 
 pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
