@@ -17,7 +17,7 @@ mod tests {
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
-    use zei_crypto::basics::hash::rescue::RescueInstance;
+    use zei_crypto::basics::rescue::RescueInstance;
     use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
 
     #[test]

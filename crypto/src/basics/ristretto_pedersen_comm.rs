@@ -29,15 +29,6 @@ impl RistrettoPedersenCommitment {
     }
 }
 
-impl From<PedersenGens> for RistrettoPedersenCommitment {
-    fn from(gens: PedersenGens) -> Self {
-        RistrettoPedersenCommitment {
-            B: RistrettoPoint(gens.B),
-            B_blinding: RistrettoPoint(gens.B_blinding),
-        }
-    }
-}
-
 impl From<&RistrettoPedersenCommitment> for PedersenGens {
     fn from(rp: &RistrettoPedersenCommitment) -> Self {
         PedersenGens {

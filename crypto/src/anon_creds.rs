@@ -79,7 +79,6 @@ in the credentials by
 */
 
 use crate::basics::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use itertools::Itertools;
 use merlin::Transcript;
 use zei_algebra::{prelude::*, traits::Pairing};
 

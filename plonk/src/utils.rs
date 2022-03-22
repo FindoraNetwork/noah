@@ -5,7 +5,7 @@ custom_error! {#[derive(PartialEq)] pub ConvertError
     BigNumberToBLSScalarError  = "BigNumber value cannot be converted to BLSScalar",
 }
 
-pub fn u64_lsf_le_to_u8_lsf(limbs: &[u64]) -> Vec<u8> {
+pub fn u64_le_to_u8(limbs: &[u64]) -> Vec<u8> {
     let mut bytes = vec![];
     for a in limbs {
         let mut array = [0_u8; 8];
@@ -22,7 +22,6 @@ pub fn u64_lsf_le_to_u8_lsf(limbs: &[u64]) -> Vec<u8> {
 }
 
 pub fn u8_lsf_slice_to_u64_lsf_le_vec(slice: &[u8]) -> Vec<u64> {
-    // TODO move this to zei commons
     let mut r: Vec<u64> = vec![];
     let n = slice.len() / 8;
     for i in 0..n {

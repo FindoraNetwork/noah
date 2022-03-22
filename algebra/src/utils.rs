@@ -6,14 +6,14 @@ use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_chacha::ChaCha20Rng;
 
-/// convert an 8 byte array (big-endian) into a u64 (big-endian)
+/// convert an 8 byte array (big-endian) into a u64
 pub fn u8_be_slice_to_u64(slice: &[u8]) -> u64 {
     let mut a = [0u8; 8];
     a.copy_from_slice(slice);
     u64::from_be_bytes(a)
 }
 
-/// convert a 8 byte array (little-endian) into a u64 (big-endian)
+/// convert a 8 byte array (little-endian) into a u64
 pub fn u8_le_slice_to_u64(slice: &[u8]) -> u64 {
     let mut a = [0u8; 8];
     a.copy_from_slice(slice);

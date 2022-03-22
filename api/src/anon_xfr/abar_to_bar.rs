@@ -655,10 +655,8 @@ mod tests {
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
-    use zei_crypto::basics::{
-        hash::rescue::RescueInstance,
-        hybrid_encryption::{XPublicKey, XSecretKey},
-    };
+    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basics::rescue::RescueInstance;
 
     #[test]
     fn test_abar_to_bar_conversion() {

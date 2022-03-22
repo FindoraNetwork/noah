@@ -17,8 +17,7 @@ pub(crate) mod examples {
             test_utils::{
                 conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
             },
-            trace_assets, trace_assets_brute_force, verify_xfr_note, RecordData, XfrNotePolicies,
-            XfrNotePoliciesRef,
+            trace_assets, verify_xfr_note, RecordData, XfrNotePolicies, XfrNotePoliciesRef,
         },
     };
     use zei_algebra::prelude::*;
@@ -293,19 +292,7 @@ pub(crate) mod examples {
         assert_eq!(xfr_note.body.asset_tracing_memos[2].len(), 0);
         assert_eq!(xfr_note.body.asset_tracing_memos[3].len(), 0);
 
-        let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
-            Ok(data) => data,
-            Err(e) => {
-                msg_eq!(ZeiError::BogusAssetTracerMemo, e);
-                // User may choose to call brute_force decrypt to get the correct information
-                pnk!(trace_assets_brute_force(
-                    &xfr_note.body,
-                    &tracer_keys,
-                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                ))
-            }
-        };
-
+        let records_data = trace_assets(&xfr_note.body, &tracer_keys).unwrap();
         check_record_data(
             &records_data[0],
             amount_in1,
@@ -441,18 +428,7 @@ pub(crate) mod examples {
         assert_eq!(xfr_note.body.asset_tracing_memos[1].len(), 1);
         assert_eq!(xfr_note.body.asset_tracing_memos[2].len(), 1);
 
-        let records_data = match trace_assets(&xfr_note.body, &asset_tracing_key_pair) {
-            Ok(data) => data,
-            Err(e) => {
-                msg_eq!(ZeiError::BogusAssetTracerMemo, e);
-                // User may choose to call brute_force decrypt to get the correct information
-                pnk!(trace_assets_brute_force(
-                    &xfr_note.body,
-                    &asset_tracing_key_pair,
-                    &[ASSET1_TYPE, ASSET2_TYPE],
-                ))
-            }
-        };
+        let records_data = trace_assets(&xfr_note.body, &asset_tracing_key_pair).unwrap();
 
         check_record_data(
             &records_data[0],
@@ -643,19 +619,7 @@ pub(crate) mod examples {
         assert_eq!(xfr_note.body.asset_tracing_memos[1].len(), 1);
         assert_eq!(xfr_note.body.asset_tracing_memos[2].len(), 0);
 
-        let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
-            Ok(data) => data,
-            Err(e) => {
-                msg_eq!(ZeiError::BogusAssetTracerMemo, e);
-                // User may choose to call brute_force decrypt to get the correct information
-                pnk!(trace_assets_brute_force(
-                    &xfr_note.body,
-                    &tracer_keys,
-                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                ))
-            }
-        };
-
+        let records_data = trace_assets(&xfr_note.body, &tracer_keys).unwrap();
         assert_eq!(records_data.len(), 2);
         check_record_data(
             &records_data[0],
@@ -873,18 +837,7 @@ pub(crate) mod examples {
         assert_eq!(xfr_note.body.asset_tracing_memos[1].len(), 1);
         assert_eq!(xfr_note.body.asset_tracing_memos[2].len(), 1);
 
-        let records_data = match trace_assets(&xfr_note.body, &tracer_keys) {
-            Ok(data) => data,
-            Err(e) => {
-                msg_eq!(ZeiError::BogusAssetTracerMemo, e);
-                // User may choose to call brute_force decrypt to get the correct information
-                pnk!(trace_assets_brute_force(
-                    &xfr_note.body,
-                    &tracer_keys,
-                    &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE],
-                ))
-            }
-        };
+        let records_data = trace_assets(&xfr_note.body, &tracer_keys).unwrap();
 
         assert_eq!(records_data.len(), 2);
         check_record_data(
@@ -1212,11 +1165,6 @@ pub(crate) mod examples {
         // 5. check tracing
         // 5.1 tracer 1
         let records_data = trace_assets(&xfr_note.body, &asset1_tracing_key).unwrap();
-        // In case of error, user can call trace_asset_brute_force:
-        // let records_data = trace_assets_brute_force(&xfr_note.body,
-        //                                &asset1_tracing_key,
-        //                               &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE]).unwrap();
-
         assert_eq!(records_data.len(), 1);
         check_record_data(
             &records_data[0],
@@ -1227,10 +1175,6 @@ pub(crate) mod examples {
         );
 
         let records_data = trace_assets(&xfr_note.body, &asset2_tracing_key).unwrap();
-        // In case of error, user can call trace_asset_brute_force:
-        // let records_data = trace_assets_brute_force(&xfr_note.body,
-        //                                &assete_tracing_key,
-        //                               &[ASSET1_TYPE, ASSET2_TYPE, ASSET3_TYPE]).unwrap();
         assert_eq!(records_data.len(), 1);
         check_record_data(
             &records_data[0],

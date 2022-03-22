@@ -1,5 +1,5 @@
 use zei_algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One, Zero};
-use zei_crypto::basics::hash::rescue::RescueInstance;
+use zei_crypto::basics::rescue::RescueInstance;
 
 use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
 use crate::utils::u8_lsf_slice_to_u64_lsf_le_vec;
@@ -259,7 +259,7 @@ impl TurboConstraintSystem<BLSScalar> {
 #[cfg(test)]
 mod test {
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basics::hash::rescue::RescueInstance;
+    use zei_crypto::basics::rescue::RescueInstance;
 
     use crate::plonk::constraint_system::{rescue::State, TurboConstraintSystem};
 
