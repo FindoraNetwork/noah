@@ -1,3 +1,4 @@
+use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
 use zei_algebra::{
     bls12_381::BLSScalar,
     jubjub::JubjubPoint,
@@ -6,11 +7,9 @@ use zei_algebra::{
     One, Zero,
 };
 
-use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
-
 type F = BLSScalar;
 
-/// represents a curve point in Affine form
+/// Represents a curve point in Affine form
 #[derive(Clone)]
 pub struct Point(F, F);
 
@@ -21,20 +20,24 @@ pub struct PointVar(VarIndex, VarIndex);
 pub struct ExtendedPointVar(PointVar, JubjubPoint);
 
 impl ExtendedPointVar {
+    /// Return the point variable.
     pub fn get_var(&self) -> &PointVar {
         &self.0
     }
 
+    /// Return the point value.
     pub fn get_point(&self) -> &JubjubPoint {
         &self.1
     }
 
+    /// Return the point variable
     pub fn into_point_var(self) -> PointVar {
         self.0
     }
 }
 
 impl Point {
+    /// Create a point.
     pub fn new(x: F, y: F) -> Point {
         Point(x, y)
     }
@@ -57,6 +60,7 @@ impl From<&JubjubPoint> for Point {
 }
 
 impl PointVar {
+    /// Crate a point variable.
     pub fn new(x_var: VarIndex, y_var: VarIndex) -> PointVar {
         PointVar(x_var, y_var)
     }
@@ -229,12 +233,11 @@ impl TurboConstraintSystem<BLSScalar> {
     /// y = (1-b0) * (1-b1) + b0 * (1-b1) * G1.y + (1-b0) * b1 * G2.y + b0 * b1 * G3.y
     /// wiring: w1 = b0, w2 = b1, w_out = y
     /// selectors: q1 = G1.y - 1, q2 = G2.y - 1, qm1 = G3.y - G2.y - G1.y + 1, qc = 1, qo = 1
-    #[allow(non_snake_case)]
     fn ecc_select(
         &mut self,
-        G1: &JubjubPoint,
-        G2: &JubjubPoint,
-        G3: &JubjubPoint,
+        g1: &JubjubPoint,
+        g2: &JubjubPoint,
+        g3: &JubjubPoint,
         b0_var: VarIndex,
         b1_var: VarIndex,
     ) -> ExtendedPointVar {
@@ -245,16 +248,16 @@ impl TurboConstraintSystem<BLSScalar> {
         let p_out_ext: JubjubPoint =
             match (self.witness[b0_var] == one, self.witness[b1_var] == one) {
                 (false, false) => JubjubPoint::get_identity(),
-                (true, false) => *G1,
-                (false, true) => *G2,
-                (true, true) => *G3,
+                (true, false) => *g1,
+                (false, true) => *g2,
+                (true, true) => *g3,
             };
         let p_out_var = self.new_point_variable(Point::from(&p_out_ext));
 
         // x-coordinate constraint
-        let g1 = Point::from(G1);
-        let g2 = Point::from(G2);
-        let g3 = Point::from(G3);
+        let g1 = Point::from(g1);
+        let g2 = Point::from(g2);
+        let g3 = Point::from(g3);
 
         self.push_mul_selectors(g3.0.sub(&g1.0.add(&g2.0)), zero);
         self.push_add_selectors(g1.0, g2.0, zero, zero);
@@ -287,7 +290,8 @@ impl TurboConstraintSystem<BLSScalar> {
     }
 
     /// Variable-base scalar multiplication:
-    /// Given a base point variable `point`, and an `n_bits`-bit secret scalar s, returns s * `point`.
+    /// Given a base point variable `point`, and an `n_bits`-bit
+    /// secret scalar s, returns s * `point`.
     pub fn var_base_scalar_mul(
         &mut self,
         point_var: PointVar,

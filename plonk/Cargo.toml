@@ -29,11 +29,6 @@ path = '../algebra'
 [dependencies.zei-crypto]
 path = '../crypto'
 
-[dependencies.byteorder]
-version = '1.2.3'
-default-features = false
-features = ['i128']
-
 [dependencies.serde]
 version = '1.0.115'
 features = ['derive']

@@ -1,81 +1,117 @@
-use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use ruc::*;
-use zei_algebra::{ops::*, traits::Scalar, One, Zero};
-
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{build_group, compute_lagrange_constant},
 };
-use crate::poly_commit::field_polynomial::{primitive_nth_root_of_unity, FpPolynomial};
-use crate::poly_commit::pcs::{BatchProofEval, PolyComScheme};
-use crate::utils::u8_lsf_slice_to_u64_lsf_le_vec;
+use crate::poly_commit::{
+    field_polynomial::{primitive_nth_root_of_unity, FpPolynomial},
+    pcs::{BatchProofEval, PolyComScheme},
+};
+use rand_chacha::ChaChaRng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
+use ruc::*;
+use zei_algebra::{ops::*, traits::Scalar, utils::u64_lsf_from_bytes, One, Zero};
 
 /// A PlonkProof is generic on the polynomial commitment scheme, PCS.
-/// PCS is generic in the commitment group C, the eval proof type E, and Field elements F.
-#[allow(non_snake_case)]
+/// PCS is generic in the commitment group C, the eval proof type E,
+/// and Field elements F.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
 pub struct PlonkProof<C, E, F> {
-    pub(crate) C_witness_polys: Vec<C>,
-    pub(crate) C_q_polys: Vec<C>, // splitted quotient polynomials
-    pub(crate) C_Sigma: C,
+    /// the witness polynomial commitments.
+    pub(crate) c_witness_polys: Vec<C>,
+    /// the splitted quotient polynomial commitments
+    pub(crate) c_q_polys: Vec<C>,
+    /// the sigma polynomial commitment.
+    pub(crate) c_sigma: C,
+    /// the openings of witness polynomials at beta.
     pub(crate) witness_polys_eval_beta: Vec<F>,
-    pub(crate) Sigma_eval_g_beta: F,
+    /// the opening of Sigma(X) at point g * beta.
+    pub(crate) sigma_eval_g_beta: F,
+    /// the openings of permutation polynomials at beta.
     pub(crate) perms_eval_beta: Vec<F>,
-    pub(crate) L_eval_beta: F,
+    /// the opening of linearization polynomial at beta.
+    pub(crate) l_eval_beta: F,
+    /// Batch proof for polynomial evaluation.
     pub(crate) batch_eval_proof: BatchProofEval<C, E>,
 }
 
+/// Define the PLONK proof by given `PolyComScheme`.
 pub type PlonkPf<PCS> = PlonkProof<
     <PCS as PolyComScheme>::Commitment,
     <PCS as PolyComScheme>::EvalProof,
     <PCS as PolyComScheme>::Field,
 >;
 
-#[allow(non_snake_case)]
+/// PLONK prover parameters.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlonkProverParams<O, C, F> {
+    /// the polynomials of the selectors.
     pub(crate) selectors: Vec<O>,
-    // perm1, perm2, ..., perm_{n_wires_per_gate}
+    /// the polynomials of perm1, perm2, ..., perm_{n_wires_per_gate}.
     pub(crate) extended_permutations: Vec<O>,
+    /// the verifier parameters.
     pub(crate) verifier_params: PlonkVerifierParams<C, F>,
     pub(crate) group: Vec<F>,
-    // The evaluation domain for computing the quotient polynomial
+    /// The evaluation domain for computing the quotient polynomial.
     pub(crate) coset_quot: Vec<F>,
     pub(crate) root_m: F,
-    pub(crate) L1: FpPolynomial<F>, // first lagrange basis
-    pub(crate) Z_H: FpPolynomial<F>,
+    /// first lagrange basis.
+    pub(crate) l1: FpPolynomial<F>,
+    /// the l1's DFT of the polynomial of unity root set.
+    pub(crate) l1_coset_evals: Vec<F>,
+    /// initialize [one.neg, zero, zero, ... zero, one] polynomial.
+    pub(crate) z_h: FpPolynomial<F>,
+    /// the z_h's DFT of the polynomial of unity root set.
+    pub(crate) z_h_inv_coset_evals: Vec<F>,
+    /// the selectors' DFT of the polynomial of unity root set.
     pub(crate) selectors_coset_evals: Vec<Vec<F>>,
+    /// the perms' DFT of the polynomial of unity root set.
     pub(crate) perms_coset_evals: Vec<Vec<F>>,
-    pub(crate) L1_coset_evals: Vec<F>,
-    pub(crate) Z_H_inv_coset_evals: Vec<F>,
 }
 
+/// Define the PLONK prover params by given `PolyComScheme`.
+pub type ProverParams<PCS> = PlonkProverParams<
+    <PCS as PolyComScheme>::Opening,
+    <PCS as PolyComScheme>::Commitment,
+    <PCS as PolyComScheme>::Field,
+>;
+
 impl<O, C, F> PlonkProverParams<O, C, F> {
+    /// Return the verifier parameters.
     pub fn get_verifier_params(self) -> PlonkVerifierParams<C, F> {
         self.verifier_params
     }
 
+    /// Return the reference of verifier parameters.
     pub fn get_verifier_params_ref(&self) -> &PlonkVerifierParams<C, F> {
         &self.verifier_params
     }
 }
 
+/// PLONK verifier parameters.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlonkVerifierParams<C, F> {
+    /// the commitments of the selectors.
     pub(crate) selectors: Vec<C>,
+    /// the commitments of perm1, perm2, ..., perm_{n_wires_per_gate}.
     pub(crate) extended_permutations: Vec<C>,
+    /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub(crate) k: Vec<F>,
+    /// a primitive n-th root of unity.
     pub(crate) root: F,
+    /// the size of constraint system.
     pub(crate) cs_size: usize,
+    /// the public constrain variables indices.
     pub(crate) public_vars_constraint_indices: Vec<usize>,
+    /// the constrain lagrange base by public constrain variables.
     pub(crate) lagrange_constants: Vec<F>,
 }
 
+/// Define the PLONK verifier params by given `PolyComScheme`.
 pub type VerifierParams<PCS> =
     PlonkVerifierParams<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
 
+/// Permutation group.
 pub fn perm_values<F: Scalar>(group: &[F], perm: &[usize], k: &[F]) -> Vec<F> {
     let n = group.len();
     perm.iter()
@@ -90,14 +126,14 @@ pub fn perm_values<F: Scalar>(group: &[F], perm: &[usize], k: &[F]) -> Vec<F> {
         .collect()
 }
 
-// Compute `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
+/// Compute `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
 pub fn choose_ks<R: CryptoRng + RngCore, F: Scalar>(
     prng: &mut R,
     n_wires_per_gate: usize,
 ) -> Vec<F> {
     let mut k = vec![F::one()];
     let q_minus_1_half_lsf = F::field_size_minus_one_half();
-    let q_minus_1_half_u64_lims_le = u8_lsf_slice_to_u64_lsf_le_vec(&q_minus_1_half_lsf);
+    let q_minus_1_half_u64_lims_le = u64_lsf_from_bytes(&q_minus_1_half_lsf);
 
     for _ in 1..n_wires_per_gate {
         loop {
@@ -114,18 +150,11 @@ pub fn choose_ks<R: CryptoRng + RngCore, F: Scalar>(
     k
 }
 
-pub type ProverParams<PCS> = PlonkProverParams<
-    <PCS as PolyComScheme>::Opening,
-    <PCS as PolyComScheme>::Commitment,
-    <PCS as PolyComScheme>::Field,
->;
-
 /// Precompute the prover parameters.
 /// Before invoking preprocess_prover(), the constraint system `cs` should pad the number of
 /// constraints to a power of two.
 /// # Example
 /// See plonk::prover::prover
-#[allow(non_snake_case)]
 pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
@@ -139,6 +168,7 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     if n * factor != m {
         return Err(eg!(PlonkError::SetupError));
     }
+
     // Compute evaluation domains.
     let root_m =
         primitive_nth_root_of_unity::<PCS::Field>(m).c(d!(PlonkError::GroupNotFound(m)))?;
@@ -161,9 +191,9 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     for i in 0..n_wires_per_gate {
         let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n]);
         perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
-        let (C_perm, O_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
-        prover_extended_perms.push(O_perm);
-        verifier_extended_perms.push(C_perm);
+        let (c_perm, o_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
+        prover_extended_perms.push(o_perm);
+        verifier_extended_perms.push(c_perm);
     }
 
     // Compute the openings, commitments, and point evaluations of the selector polynomials.
@@ -173,19 +203,19 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
         let q = FpPolynomial::ffti(&root, cs.selector(i)?);
         selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
-        let (C_q, O_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
-        prover_selectors.push(O_q);
-        verifier_selectors.push(C_q);
+        let (c_q, o_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
+        prover_selectors.push(o_q);
+        verifier_selectors.push(c_q);
     }
 
     // Compute polynomials L1, Z_H, and point evaluations of L1 and Z_H^{-1}.
-    let L1 = FpPolynomial::from_zeroes(&group[1..]);
-    let L1_coset_evals = L1.coset_fft_with_unity_root(&root_m, m, &k[1]);
-    let mut Z_H_coefs = vec![PCS::Field::zero(); n + 1];
-    Z_H_coefs[0] = PCS::Field::one().neg();
-    Z_H_coefs[n] = PCS::Field::one();
-    let Z_H = FpPolynomial::from_coefs(Z_H_coefs);
-    let Z_H_inv_coset_evals = Z_H
+    let l1 = FpPolynomial::from_zeroes(&group[1..]);
+    let l1_coset_evals = l1.coset_fft_with_unity_root(&root_m, m, &k[1]);
+    let mut z_h_coefs = vec![PCS::Field::zero(); n + 1];
+    z_h_coefs[0] = PCS::Field::one().neg();
+    z_h_coefs[n] = PCS::Field::one();
+    let z_h = FpPolynomial::from_coefs(z_h_coefs);
+    let z_h_inv_coset_evals = z_h
         .coset_fft_with_unity_root(&root_m, m, &k[1])
         .into_iter()
         .map(|x| x.inv().unwrap())
@@ -213,12 +243,12 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
         group,
         coset_quot,
         root_m,
-        L1,
-        Z_H,
+        l1,
+        l1_coset_evals,
+        z_h,
+        z_h_inv_coset_evals,
         selectors_coset_evals,
         perms_coset_evals,
-        L1_coset_evals,
-        Z_H_inv_coset_evals,
     })
 }
 
@@ -238,12 +268,10 @@ pub fn preprocess_verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
 
 #[cfg(test)]
 mod test {
+    use crate::plonk::setup::choose_ks;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, One, Zero};
-
-    use crate::plonk::setup::choose_ks;
-    use crate::utils::u8_lsf_slice_to_u64_lsf_le_vec;
+    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, utils::u64_lsf_from_bytes, One, Zero};
 
     type F = BLSScalar;
 
@@ -253,7 +281,7 @@ mod test {
         let m = 8;
         let k = choose_ks::<_, F>(&mut prng, m);
         let q_minus_one_half = F::field_size_minus_one_half();
-        let q_minus_one_half_u64 = u8_lsf_slice_to_u64_lsf_le_vec(&q_minus_one_half);
+        let q_minus_one_half_u64 = u64_lsf_from_bytes(&q_minus_one_half);
         assert_eq!(k[0], F::one());
         assert!(k.iter().skip(1).all(|x| *x != F::zero()));
         assert!(k

@@ -1,10 +1,29 @@
-#![deny(warnings)]
-#![allow(clippy::needless_borrow)]
-#![allow(clippy::upper_case_acronyms)]
+//! The crate for plonk and polynomial commitment for the Zei library
+#![deny(unused_import_braces, unused_qualifications, trivial_casts)]
+#![deny(trivial_numeric_casts, private_in_public)]
+#![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
+#![deny(unused_attributes, unused_imports, unused_mut, missing_docs)]
+#![deny(renamed_and_removed_lints, stable_features, unused_allocation)]
+#![deny(unused_comparisons, bare_trait_objects, unused_must_use, const_err)]
+#![forbid(unsafe_code)]
+#![warn(
+    unused,
+    future_incompatible,
+    nonstandard_style,
+    rust_2018_idioms,
+    rust_2021_compatibility
+)]
+#![allow(
+    clippy::op_ref,
+    clippy::suspicious_op_assign_impl,
+    clippy::upper_case_acronyms
+)]
 
 #[macro_use]
 extern crate serde_derive;
 
+/// Module for the PLONK/turbo SNARK systems.
 pub mod plonk;
+
+/// Module for the polynomial commitment.
 pub mod poly_commit;
-pub mod utils;

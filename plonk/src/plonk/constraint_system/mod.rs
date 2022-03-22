@@ -1,22 +1,35 @@
 use ruc::*;
 use zei_algebra::traits::Scalar;
 
+/// Module for ECC Constrain System.
 pub mod ecc;
+
+/// Module for Field Simulation Constrain System.
 pub mod field_simulation;
+
+/// Module for Rescue Constrain System.
 pub mod rescue;
+
+/// Module for Standard PLONK Constrain System.
 pub mod standard;
+
+/// Module for Turbo PLONK Constrain System.
 pub mod turbo;
 
 /// Default used constraint system.
 pub use turbo::TurboConstraintSystem;
+
 /// Variable index
 pub type VarIndex = usize;
+
 /// Constraint index
 pub type CsIndex = usize;
 
 /// Trait for PLONK constraint systems.
 pub trait ConstraintSystem: Sized {
+    /// Type of scalar field.
     type Field: Scalar;
+
     /// Return the number of constraints in the system.
     /// `size should divide q-1 where q is the size of the prime field.
     /// This enables finding a multiplicative subgroup with order `size.
@@ -54,7 +67,7 @@ pub trait ConstraintSystem: Sized {
         // marked variables already processd
         // for each unmarked variable, find all position where this variable occurs to form a cycle.
         for (i, value) in v.iter().enumerate() {
-            if marked[*value as usize] {
+            if marked[*value] {
                 continue;
             }
             let first = i;
@@ -66,7 +79,7 @@ pub trait ConstraintSystem: Sized {
                 }
             }
             perm[prev] = first;
-            marked[*value as usize] = true
+            marked[*value] = true
         }
         perm
     }
@@ -92,20 +105,23 @@ pub trait ConstraintSystem: Sized {
     /// Borrow the (index)-th selector vector.
     fn selector(&self, index: usize) -> Result<&[Self::Field]>;
 
-    /// Evaluate the constraint equation given public input and the values of the wires and the selectors.
+    /// Evaluate the constraint equation given public input and the
+    /// values of the wires and the selectors.
     fn eval_gate_func(
         wire_vals: &[&Self::Field],
         sel_vals: &[&Self::Field],
         pub_input: &Self::Field,
     ) -> Result<Self::Field>;
 
-    /// Given the wires values of a gate, evaluate the coefficients of the selectors in the
-    /// constraint equation.
+    /// Given the wires values of a gate, evaluate the coefficients
+    /// of the selectors in the constraint equation.
     fn eval_selector_multipliers(wire_vals: &[&Self::Field]) -> Result<Vec<Self::Field>>;
 
+    /// is only for verifier use.
     fn is_verifier_only(&self) -> bool {
         false
     }
 
+    /// shrink to only verfier use.
     fn shrink_to_verifier_only(&self) -> Result<Self>;
 }

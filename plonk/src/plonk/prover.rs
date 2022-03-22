@@ -1,8 +1,3 @@
-use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::ops::*;
-
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
@@ -17,9 +12,13 @@ use crate::plonk::{
         transcript_init_plonk,
     },
 };
-use crate::poly_commit::field_polynomial::FpPolynomial;
-use crate::poly_commit::pcs::PolyComScheme;
-use crate::poly_commit::transcript::PolyComTranscript;
+use crate::poly_commit::{
+    field_polynomial::FpPolynomial, pcs::PolyComScheme, transcript::PolyComTranscript,
+};
+use merlin::Transcript;
+use rand_core::{CryptoRng, RngCore};
+use ruc::*;
+use zei_algebra::ops::*;
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`
 /// Proof verifier must use a transcript with same state as prover and match the public parameters
@@ -76,7 +75,6 @@ use crate::poly_commit::transcript::PolyComTranscript;
 ///     verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof).is_ok()
 /// )
 /// ```
-#[allow(non_snake_case)]
 pub fn prover<
     R: CryptoRng + RngCore,
     PCS: PolyComScheme,
@@ -105,23 +103,23 @@ pub fn prover<
 
     // Prepare extended witness
     let extended_witness = cs.extend_witness(witness);
-    let IO = public_vars_polynomial::<PCS>(&params, &online_values);
+    let io = public_vars_polynomial::<PCS>(&params, &online_values);
 
     // 1. build witness polynomials, hide them and commit
     let root = &params.verifier_params.root;
     let n_wires_per_gate = CS::n_wires_per_gate();
     let mut witness_openings = vec![];
-    let mut C_witness_polys = vec![];
+    let mut c_witness_polys = vec![];
     for i in 0..n_wires_per_gate {
         let mut f = FpPolynomial::ffti(
             root,
             &extended_witness[i * n_constraints..(i + 1) * n_constraints],
         );
         hide_polynomial(prng, &mut f, 1, n_constraints);
-        let (C_f, O_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
-        transcript.append_commitment::<PCS::Commitment>(&C_f);
-        witness_openings.push(O_f);
-        C_witness_polys.push(C_f);
+        let (c_f, o_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
+        transcript.append_commitment::<PCS::Commitment>(&c_f);
+        witness_openings.push(o_f);
+        c_witness_polys.push(c_f);
     }
 
     // 2. get challenges gamma and delta
@@ -130,10 +128,10 @@ pub fn prover<
     challenges.insert_gamma_delta(gamma, delta).unwrap(); // safe unwrap
 
     // 3. build sigma, hide it and commit
-    let mut Sigma = sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
-    hide_polynomial(prng, &mut Sigma, 2, n_constraints);
-    let (C_Sigma, O_Sigma) = pcs.commit(Sigma).c(d!(PlonkError::CommitmentError))?;
-    transcript.append_commitment::<PCS::Commitment>(&C_Sigma);
+    let mut sigma = sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
+    hide_polynomial(prng, &mut sigma, 2, n_constraints);
+    let (c_sigma, o_sigma) = pcs.commit(sigma).c(d!(PlonkError::CommitmentError))?;
+    transcript.append_commitment::<PCS::Commitment>(&c_sigma);
 
     // 4. get challenge alpha
     let alpha = transcript_get_plonk_challenge_alpha(transcript, n_constraints);
@@ -145,13 +143,13 @@ pub fn prover<
         .iter()
         .map(|open| pcs.polynomial_from_opening_ref(open))
         .collect();
-    let Sigma = pcs.polynomial_from_opening_ref(&O_Sigma);
-    let Q = quotient_polynomial::<PCS, CS>(cs, params, &witness_polys, &Sigma, &challenges, &IO)
+    let sigma = pcs.polynomial_from_opening_ref(&o_sigma);
+    let q = quotient_polynomial::<PCS, CS>(cs, params, &witness_polys, &sigma, &challenges, &io)
         .c(d!())?;
-    let (C_q_polys, O_q_polys) =
-        split_q_and_commit(pcs, &Q, n_wires_per_gate, n_constraints + 2).c(d!())?;
-    for C_q in C_q_polys.iter() {
-        transcript.append_commitment::<PCS::Commitment>(C_q);
+    let (c_q_polys, o_q_polys) =
+        split_q_and_commit(pcs, &q, n_wires_per_gate, n_constraints + 2).c(d!())?;
+    for c_q in c_q_polys.iter() {
+        transcript.append_commitment::<PCS::Commitment>(c_q);
     }
 
     // 6. get challenge beta
@@ -171,27 +169,27 @@ pub fn prover<
         .collect();
 
     let g_beta = root.mul(&beta);
-    let Sigma_eval_g_beta = pcs.eval_opening(&O_Sigma, &g_beta);
+    let sigma_eval_g_beta = pcs.eval_opening(&o_sigma, &g_beta);
 
     challenges.insert_beta(beta).unwrap();
     //  b). build linearization polynomial r_beta(X), and eval at beta
     let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> = witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();
-    let O_L = linearization_polynomial_opening::<PCS, CS>(
+    let o_l = linearization_polynomial_opening::<PCS, CS>(
         params,
-        &O_Sigma,
+        &o_sigma,
         &witness_polys_eval_beta_as_ref[..],
         &perms_eval_beta_as_ref[..],
-        &Sigma_eval_g_beta,
+        &sigma_eval_g_beta,
         &challenges,
     );
     for eval_beta in witness_polys_eval_beta.iter().chain(perms_eval_beta.iter()) {
         transcript.append_field_elem(eval_beta);
     }
     let beta = challenges.get_beta().unwrap();
-    let L_eval_beta = pcs.eval_opening(&O_L, &beta);
-    transcript.append_field_elem(&Sigma_eval_g_beta);
-    transcript.append_field_elem(&L_eval_beta);
+    let l_eval_beta = pcs.eval_opening(&o_l, &beta);
+    transcript.append_field_elem(&sigma_eval_g_beta);
+    transcript.append_field_elem(&l_eval_beta);
 
     // 8. batch eval proofs
     let mut openings: Vec<&PCS::Opening> = witness_openings
@@ -203,10 +201,10 @@ pub fn prover<
                 .take(CS::n_wires_per_gate() - 1),
         )
         .collect();
-    let O_q_combined = combine_q_polys(&O_q_polys, &beta, n_constraints + 2);
-    openings.push(&O_q_combined);
-    openings.push(&O_L);
-    openings.push(&O_Sigma);
+    let o_q_combined = combine_q_polys(&o_q_polys, &beta, n_constraints + 2);
+    openings.push(&o_q_combined);
+    openings.push(&o_l);
+    openings.push(&o_sigma);
     // n_wires_per_gate opening proofs for witness polynomials; n_wires_per_gate-1 opening proofs
     // for the first n_wires_per_gate-1 extended permutations; 1 opening proof for each of [Q(X), L(X)]
     let mut points = vec![*beta; 2 * n_wires_per_gate + 1];
@@ -224,13 +222,13 @@ pub fn prover<
 
     // return proof
     Ok(PlonkProof {
-        C_witness_polys,
-        C_q_polys,
-        C_Sigma,
+        c_witness_polys,
+        c_q_polys,
+        c_sigma,
         witness_polys_eval_beta,
-        Sigma_eval_g_beta,
+        sigma_eval_g_beta,
         perms_eval_beta,
-        L_eval_beta,
+        l_eval_beta,
         batch_eval_proof,
     })
 }

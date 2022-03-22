@@ -1,25 +1,26 @@
 use num_bigint::{BigUint, ToBigUint};
 use num_integer::Integer;
 use rand::{CryptoRng, RngCore};
-use zei_algebra::{ops::*, traits::Scalar, Zero};
+use zei_algebra::prelude::*;
 
+/// Field polynomial.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FpPolynomial<F> {
     pub(crate) coefs: Vec<F>,
 }
 
-impl<F> FpPolynomial<F> {
+impl<F: Scalar> FpPolynomial<F> {
+    /// Return the polynomial coefs reference.
     pub fn get_coefs_ref(&self) -> &[F] {
         self.coefs.as_slice()
     }
-}
 
-impl<F: Scalar> FpPolynomial<F> {
+    /// Return the little-endian byte representations of the field size
     pub fn get_field_size(&self) -> Vec<u8> {
         F::get_field_size_le_bytes()
     }
 
-    /// Returns the always zero polynomial
+    /// Return the always zero polynomial
     /// # Example
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -35,7 +36,7 @@ impl<F: Scalar> FpPolynomial<F> {
         Self::from_coefs(vec![F::zero()])
     }
 
-    /// Returns the always one polynomial
+    /// Return the always one polynomial
     /// # Example
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -117,9 +118,9 @@ impl<F: Scalar> FpPolynomial<F> {
         r
     }
 
-    /// Returns None if x is repeated
-    /// Returns `Some(poly)` where `poly(x[i]) = y[i]`
-    /// Returns `Some(0)` if `x.len() == 0`
+    /// Return None if x is repeated
+    /// Return `Some(poly)` where `poly(x[i]) = y[i]`
+    /// Return `Some(0)` if `x.len() == 0`
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -159,7 +160,7 @@ impl<F: Scalar> FpPolynomial<F> {
         Some(poly)
     }
 
-    /// Returns a polynomial of `degree` + 1 uniformly random coefficients. Note that for each
+    /// Return a polynomial of `degree` + 1 uniformly random coefficients. Note that for each
     /// coffiecient with probability
     /// 1/q is zero, and hence the degree could be less than `degree`
     /// # Example:
@@ -187,7 +188,7 @@ impl<F: Scalar> FpPolynomial<F> {
         }
     }
 
-    /// Returns degree of the polynomial
+    /// Return degree of the polynomial
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -804,6 +805,7 @@ impl<F: Scalar> FpPolynomial<F> {
         Self::ffti(root, values).mul_var(k_inv)
     }
 
+    /// Compute the Lagrange base by index.
     pub fn lagrange_ith_base(points: &[F], i: usize) -> Option<Self> {
         if i >= points.len() {
             return None;
@@ -887,6 +889,7 @@ fn recursive_fft<F: Scalar>(coefs: &[&F], root: &F) -> Vec<F> {
     dft
 }
 
+/// Compute the primitive the roof of unity used n.
 pub fn primitive_nth_root_of_unity<F: Scalar>(num_points: usize) -> Option<F> {
     let q_minus_one = BigUint::from_bytes_le(F::get_field_size_le_bytes().as_slice()).sub(1u64);
     let (exp, r) = q_minus_one.div_rem(&num_points.to_biguint().unwrap());
@@ -900,6 +903,7 @@ pub fn primitive_nth_root_of_unity<F: Scalar>(num_points: usize) -> Option<F> {
     }
 }
 
+/// Convert u32 slice to u64 vector.
 fn u32_limbs_to_u64_limbs(s: &[u32]) -> Vec<u64> {
     let mut u64_limbs = vec![];
     let mut even_limb = 0u64;
@@ -917,8 +921,8 @@ fn u32_limbs_to_u64_limbs(s: &[u32]) -> Vec<u64> {
     u64_limbs
 }
 
-/// given the the values of a polynomial at the n n-th root of unity, and a primitive n-th root of unity
-/// if computes its coefficients.
+/// given the the values of a polynomial at the n n-th root of unity,
+/// and a primitive n-th root of unity if computes its coefficients.
 /// n is with the form 2^k or 3 * 2^k
 pub fn recursive_ifft<F: Scalar>(values: &[&F], root: &F) -> Vec<F> {
     let n = values.len();

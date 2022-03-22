@@ -1,5 +1,35 @@
-use crate::poly_commit::field_polynomial::FpPolynomial;
-use crate::poly_commit::pcs::{HomomorphicPolyComElem, PolyComScheme, PolyComSchemeError, ToBytes};
+//! Implementation of KZG polynomial commitment scheme
+//! https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf
+//! This polynomial scheme relies on a bilinear map e:G1 x G2 -> Gt,
+//! where G1,G2,Gt are cyclic groups of prime order p.
+//! Let g1 be a generator of G1 and g2 be a generator of G_2.
+//! The operations of the scheme are as follows:
+//!
+//! setup(n: max polynomial degree)
+//!    Pick a random scalar s in Z_p
+//!    Compute public_parameter_group_1:= (g1,g1^s,g1^{s^2},...,g1^{s^n})
+//!    Compute public_parameter_group_2:= (g2,g2^s)
+//!    return (public_parameter_group_1,public_parameter_group_2)
+//!
+//! commit(P: polynomial)
+//!    let P(x) = a0 + a1X + a2X^2 + ...+ a_nX^n
+//!    let C := g1^{P(s)} = \pi_{i=0}^n (g_i^{s^i})^{a_i}
+//!    return C
+//!
+//! prove_eval(P:polynomial,x: evaluation point)
+//!    Let y=P(x)
+//!    Compute Q(X) = (P(X)-P(x))/(X-x)  # if indeed y==P(x) then (X-x)|P(X)-y
+//!    return g1^{Q(s)}
+//!
+//! verify_eval(C: commitment, x: evaluation point, y: evaluation of P on x, proof: proof of evaluation)
+//!    The goal of this verification procedure is to check that indeed P(X)-y=Q(X)(X-x) using pairings
+//!    Check that e(C/g1^y,g2) == e(proof,g2^s/g2^x)
+//!
+use crate::poly_commit::{
+    errors::PolyComSchemeError,
+    field_polynomial::FpPolynomial,
+    pcs::{HomomorphicPolyComElem, PolyComScheme, ToBytes},
+};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -12,38 +42,13 @@ use zei_algebra::{
     One,
 };
 
-/// Implementation of KZG polynomial commitment scheme
-/// https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf
-/// This polynomial scheme relies on a bilinear map e:G1 x G2 -> Gt,
-/// where G1,G2,Gt are cyclic groups of prime order p.
-/// Let g1 be a generator of G1 and g2 be a generator of G_2.
-/// The operations of the scheme are as follows:
-///
-/// setup(n: max polynomial degree)
-///    Pick a random scalar s in Z_p
-///    Compute public_parameter_group_1:= (g1,g1^s,g1^{s^2},...,g1^{s^n})
-///    Compute public_parameter_group_2:= (g2,g2^s)
-///    return (public_parameter_group_1,public_parameter_group_2)
-///
-/// commit(P: polynomial)
-///    let P(x) = a0 + a1X + a2X^2 + ...+ a_nX^n
-///    let C := g1^{P(s)} = \pi_{i=0}^n (g_i^{s^i})^{a_i}
-///    return C
-///
-/// prove_eval(P:polynomial,x: evaluation point)
-///    Let y=P(x)
-///    Compute Q(X) = (P(X)-P(x))/(X-x)  # if indeed y==P(x) then (X-x)|P(X)-y
-///    return g1^{Q(s)}
-///
-/// verify_eval(C: commitment, x: evaluation point, y: evaluation of P on x, proof: proof of evaluation)
-///    The goal of this verification procedure is to check that indeed P(X)-y=Q(X)(X-x) using pairings
-///    Check that e(C/g1^y,g2) == e(proof,g2^s/g2^x)
-///
-
+/// KZG commitment scheme about the `Group`.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KZGCommitment<G> {
+    /// the `Group` elements.
     pub value: G,
 }
+
 impl<'a, G> ToBytes for KZGCommitment<G>
 where
     G: Group,
@@ -52,6 +57,7 @@ where
         self.value.to_compressed_bytes()
     }
 }
+
 impl HomomorphicPolyComElem for KZGCommitment<BLSG1> {
     type Scalar = BLSScalar;
     fn get_base() -> Self {
@@ -132,6 +138,7 @@ impl<F: Scalar> HomomorphicPolyComElem for FpPolynomial<F> {
     }
 }
 
+/// KZG eval proof.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KZGEvalProof<G1>(G1);
 
@@ -141,16 +148,19 @@ impl<G: Group> ToBytes for KZGEvalProof<G> {
     }
 }
 
+/// KZG commitment scheme about `PairingEngine`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KZGCommitmentScheme<P: Pairing> {
+    /// public parameter about G1.
     pub public_parameter_group_1: Vec<P::G1>,
+    /// public parameter about G1.
     pub public_parameter_group_2: Vec<P::G2>,
 }
 
 impl<P: Pairing> KZGCommitmentScheme<P> {
-    /// Creates a new instance of a KZG polynomial commitment scheme
-    /// `max_degree` - max degree of the polynomial
-    /// `prng` - pseudo-random generator
+    /// Creates a new instance of a KZG polynomial commitment scheme.
+    /// `max_degree` - max degree of the polynomial,
+    /// `prng` - pseudo-random generator.
     pub fn new<R: CryptoRng + RngCore>(max_degree: usize, prng: &mut R) -> KZGCommitmentScheme<P> {
         let s = P::ScalarField::random(prng);
 
@@ -158,8 +168,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
 
         let mut elem_g1 = P::G1::get_base();
 
-        for _ in 0..max_degree + 1 {
-            //for _ in 0..max_degree + 1 {
+        for _ in 0..=max_degree {
             public_parameter_group_1.push(elem_g1.clone());
             elem_g1 = elem_g1.mul(&s);
         }
@@ -175,7 +184,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
         }
     }
 
-    /// Get the public parameters from a file
+    /// Get the public parameters from a file.
     /// This file is generated by the executable `zkp-params-utils`
     /// * `filename` - name of the file containing the data of the public parameters
     /// This file must be in the directory `test_data` at the root of this crate.
@@ -192,7 +201,10 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
         }
     }
 }
+
+/// Define the `KZGCommitmentScheme` by given `BLSPairingEngine`.
 pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
+
 impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
     type Field = BLSScalar;
     type Commitment = KZGCommitment<BLSG1>;
@@ -280,7 +292,8 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         // Negation must happen in Fq
         let point_neg = x.neg();
 
-        let divisor_polynomial = FpPolynomial::from_coefs(vec![point_neg, Self::Field::one()]); // X-x
+        // X-x
+        let divisor_polynomial = FpPolynomial::from_coefs(vec![point_neg, Self::Field::one()]);
         let (quotient_polynomial, remainder_polynomial) =
             f_eval_polynomial.div_rem(&divisor_polynomial); // P(X)-P(x) / (X-x)
 
@@ -290,18 +303,14 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 
         let proof_value = self.commit(quotient_polynomial).unwrap().0.value;
 
-        let res = (
-            evaluation,
-            KZGEvalProof::<zei_algebra::bls12_381::BLSG1>(proof_value),
-        );
+        let res = (evaluation, KZGEvalProof::<BLSG1>(proof_value));
         Ok(res)
     }
 
-    #[allow(non_snake_case)]
     fn verify_eval(
         &self,
         _transcript: &mut Transcript,
-        C: &Self::Commitment,
+        c: &Self::Commitment,
         _degree: usize,
         x: &Self::Field,
         y: &Self::Field,
@@ -314,14 +323,11 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let x_minus_point_group_element_group_2 = &g2_1.sub(&g2_0.mul(x));
 
         // e(g1^{P(X)-P(x)},g2)
-        let left_pairing_eval =
-            zei_algebra::bls12_381::BLSPairingEngine::pairing(&C.value.sub(&g1_0.mul(y)), &g2_0);
+        let left_pairing_eval = BLSPairingEngine::pairing(&c.value.sub(&g1_0.mul(y)), &g2_0);
 
         // e(g1^{Q(X)},g1^{X-x})
-        let right_pairing_eval = zei_algebra::bls12_381::BLSPairingEngine::pairing(
-            &proof.0,
-            &x_minus_point_group_element_group_2,
-        );
+        let right_pairing_eval =
+            BLSPairingEngine::pairing(&proof.0, &x_minus_point_group_element_group_2);
 
         // e(g1^{P(X)-P(x)},g2) == e(g1^{Q(X)},g2^{X-v})
         if left_pairing_eval == right_pairing_eval {
@@ -344,21 +350,22 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 
 #[cfg(test)]
 mod tests_kzg_impl {
-    use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
-    use crate::poly_commit::pcs::{HomomorphicPolyComElem, PolyComScheme};
-    use zei_algebra::{
-        ops::*,
-        traits::{Group, Pairing},
-        One,
+    use crate::poly_commit::{
+        field_polynomial::FpPolynomial,
+        kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
+        pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
-
-    use crate::poly_commit::field_polynomial::FpPolynomial;
     use itertools::Itertools;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use ruc::*;
-    use zei_algebra::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1};
+    use zei_algebra::{
+        bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
+        ops::*,
+        traits::{Group, Pairing},
+        One,
+    };
 
     fn _check_public_parameters_generation<P: Pairing>() {
         let param_size = 5;
@@ -402,7 +409,7 @@ mod tests_kzg_impl {
     }
 
     #[test]
-    pub fn test_homomorphic_poly_com_elem() {
+    fn test_homomorphic_poly_com_elem() {
         let mut prng = ChaChaRng::from_seed([0_u8; 32]);
         let pcs = KZGCommitmentSchemeBLS::new(20, &mut prng);
         type Field = BLSScalar;
