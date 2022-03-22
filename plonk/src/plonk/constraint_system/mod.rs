@@ -121,6 +121,6 @@ pub trait ConstraintSystem: Sized {
         false
     }
 
-    /// shrink to only verfier use.
+    /// Shrink to only verifier use.
     fn shrink_to_verifier_only(&self) -> Result<Self>;
 }

@@ -154,7 +154,7 @@ pub struct KZGCommitmentScheme<P: Pairing> {
 }
 
 impl<P: Pairing> KZGCommitmentScheme<P> {
-    /// Creates a new instance of a KZG polynomial commitment scheme.
+    /// Create a new instance of a KZG polynomial commitment scheme.
     /// `max_degree` - max degree of the polynomial,
     /// `prng` - pseudo-random generator.
     pub fn new<R: CryptoRng + RngCore>(max_degree: usize, prng: &mut R) -> KZGCommitmentScheme<P> {

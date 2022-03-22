@@ -35,7 +35,7 @@ pub trait HomomorphicPolyComElem: ToBytes {
     /// Multiply underlying polynomial by scalar `exp`.
     fn exp_assign(&mut self, exp: &Self::Scalar);
 
-    /// Negates the polynomials coefficients.
+    /// Negate the polynomials coefficients.
     fn inv(&self) -> Self;
 }
 
@@ -82,7 +82,7 @@ pub trait PolyComScheme: Sized {
     /// Type of `Opening`.
     type Opening: HomomorphicPolyComElem<Scalar = Self::Field> + Debug + PartialEq + Eq + Clone;
 
-    /// Commits to the polynomial, commitment is binding.
+    /// Commit to the polynomial, commitment is binding.
     fn commit(
         &self,
         polynomial: FpPolynomial<Self::Field>,
@@ -91,16 +91,16 @@ pub trait PolyComScheme: Sized {
     /// Return the opening of an original commitment of the polynomial.
     fn opening(&self, polynomial: &FpPolynomial<Self::Field>) -> Self::Opening;
 
-    /// Evaluated the polynomial using the commitment opening to it.
+    /// Evaluate the polynomial using the commitment opening to it.
     fn eval_opening(&self, opening: &Self::Opening, point: &Self::Field) -> Self::Field;
 
-    /// Computes the commitment of a polynomial given its opening.
+    /// Compute the commitment of a polynomial given its opening.
     fn commitment_from_opening(&self, opening: &Self::Opening) -> Self::Commitment;
 
     /// Computes the polynomial from an opening. This is slow as the polynomial is build.
     fn polynomial_from_opening_ref(&self, opening: &Self::Opening) -> FpPolynomial<Self::Field>;
 
-    /// Transforms the opening into a polynomial.
+    /// Transform the opening into a polynomial.
     fn polynomial_from_opening(&self, opening: Self::Opening) -> FpPolynomial<Self::Field>;
 
     /// Evaluate the polynomial producing a proof for it.
@@ -337,7 +337,7 @@ impl<PCS: PolyComScheme> HidingPCS<'_, PCS> {
         HidingPCS { pcs }
     }
 
-    /// Randomized the polynomial so that commitment of the original
+    /// Randomize the polynomial so that commitment of the original
     /// polynomial is binding and hiding.
     pub fn hide_polynomial(
         &self,
@@ -349,7 +349,7 @@ impl<PCS: PolyComScheme> HidingPCS<'_, PCS> {
         FpPolynomial::from_coefs(coefs)
     }
 
-    /// Commits to `polynomial` under blinding `blind`.
+    /// Commit to `polynomial` under blinding `blind`.
     pub fn commit(
         &self,
         polynomial: &FpPolynomial<PCS::Field>,

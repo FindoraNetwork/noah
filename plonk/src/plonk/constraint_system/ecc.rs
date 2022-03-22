@@ -3,7 +3,7 @@ use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 
 type F = BLSScalar;
 
-/// Represents a curve point in Affine form
+/// Represent a curve point in Affine form
 #[derive(Clone)]
 pub struct Point(F, F);
 

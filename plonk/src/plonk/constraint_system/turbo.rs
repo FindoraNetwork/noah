@@ -256,7 +256,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.size += 1;
     }
 
-    /// Add a Add gate. (left, right, out).
+    /// Add an Add gate. (left, right, out).
     pub fn insert_add_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
         self.insert_lc_gate(
             &[left_var, right_var, 0, 0],
@@ -383,7 +383,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
     /// Enforce a range constraint: `0 < witness[var] < 2^n_bits`:
     /// 1. Transform `witness[var]` into a binary vector and boolean
     ///    constrain the binary vector.
-    /// 2. Adding a set of linear combination constraints showing that
+    /// 2. Add a set of linear combination constraints showing that
     ///    the binary vector is a binary representation of
     ///    `witness[var]`.
     /// 3. Return witness indices of the binary vector. The binary
@@ -475,21 +475,21 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         out_var
     }
 
-    /// Returns a boolean variable that equals 1 if and
+    /// Return a boolean variable that equals 1 if and
     /// only if `left_var` == `right_var`.
     pub fn is_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
         let (is_equal, _) = self.is_equal_or_not_equal(left_var, right_var);
         is_equal
     }
 
-    /// Returns a boolean variable that equals 1 if and
+    /// Return a boolean variable that equals 1 if and
     /// only if `left_var` != `right_var`.
     pub fn is_not_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
         let (_, is_not_equal) = self.is_equal_or_not_equal(left_var, right_var);
         is_not_equal
     }
 
-    /// Returns two boolean variables that equals (1, 0) if and
+    /// Return two boolean variables that equals (1, 0) if and
     /// only if `left_var` == `right_var` and (0, 1) otherwise.
     pub fn is_equal_or_not_equal(
         &mut self,
@@ -570,7 +570,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.selectors[6].push(q_c);
     }
 
-    /// Add a ECC selectors.
+    /// Add an ECC selectors.
     pub fn push_ecc_selector(&mut self, q_ecc: F) {
         self.selectors[7].push(q_ecc);
     }
@@ -583,7 +583,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.selectors[11].push(q_hash_4);
     }
 
-    /// Add a Out selectors.
+    /// Add an Out selectors.
     pub fn push_out_selector(&mut self, q_out: F) {
         self.selectors[12].push(q_out);
     }

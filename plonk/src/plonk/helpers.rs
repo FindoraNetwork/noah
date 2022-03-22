@@ -120,7 +120,7 @@ pub(super) fn public_vars_polynomial<PCS: PolyComScheme>(
     FpPolynomial::ffti(&params.verifier_params.root, &y)
 }
 
-/// add a random degree `num_hide_points`+`zeroing_degree` polynomial
+/// Add a random degree `num_hide_points`+`zeroing_degree` polynomial
 /// that vanishes on X^{zeroing_degree} -1. Goal is to randomize
 /// `polynomial` maintaining output values for elements in a sub group
 /// of order N. Eg, when num_hide_points is 1, then it adds
@@ -357,7 +357,7 @@ fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     l
 }
 
-/// Opening the linearization_polynomial.
+/// Open the linearization_polynomial.
 pub(super) fn linearization_polynomial_opening<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
@@ -411,7 +411,7 @@ pub(super) fn linearization_commitment<
     )
 }
 
-/// Computes sum_{i=1}^\ell w_i L_j(X), where j is the constraint
+/// Compute sum_{i=1}^\ell w_i L_j(X), where j is the constraint
 /// index for the i-th public value. L_j(X) = (X^n-1) / (X - g^j) is
 /// the j-th lagrange base (zero for every X= g^i, except when i ==j)
 pub(super) fn eval_public_var_poly<PCS: PolyComScheme>(

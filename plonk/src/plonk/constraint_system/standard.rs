@@ -2,10 +2,10 @@ use super::ConstraintSystem;
 use crate::plonk::errors::PlonkError;
 use zei_algebra::prelude::*;
 
-/// The wires of a gate in Standard CS.
+/// The number of wires of a gate in Standard CS.
 pub const N_WIRES_PER_GATE: usize = 3;
 
-/// The selectors of Turbo.
+/// The number of selectors of Turbo.
 pub const N_SELECTORS: usize = 5;
 
 /// Standard PLONK Constraint System.

@@ -15,11 +15,11 @@ const ALPHA_INV: [u8; 32] = [
     0x02, 0xF0, 0x73, 0x9D, 0x69, 0x56, 0x4A, 0xE1, 0x1C, 0x32, 0x72, 0xDD, 0xBA, 0x0F, 0x5F, 0x2E,
 ];
 
-/// Represents a state variables.
+/// Represent a state variables.
 #[derive(Clone)]
 pub struct StateVar(Vec<VarIndex>); // StateVar.0.len() == WIDTH
 
-/// Represents a state values.
+/// Represent a state values.
 #[derive(Clone)]
 pub struct State(Vec<BLSScalar>); // State.0.len() == WIDTH
 
@@ -91,7 +91,7 @@ impl TurboConstraintSystem<BLSScalar> {
         self.rescue_hash_with_keys(input_var, &mds_states, &keys_states)
     }
 
-    /// Returns the output of the rescue hash function on input
+    /// Return the output of the rescue hash function on input
     /// variable `input_var`, round keys `key`, and an MDS matrix.
     fn rescue_hash_with_keys(
         &mut self,
