@@ -1,4 +1,4 @@
-//! Implementation of KZG polynomial commitment scheme
+//! KZG polynomial commitment scheme:
 //! https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf
 //! This polynomial scheme relies on a bilinear map e:G1 x G2 -> Gt,
 //! where G1,G2,Gt are cyclic groups of prime order p.

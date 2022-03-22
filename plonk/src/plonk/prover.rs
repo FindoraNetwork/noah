@@ -169,6 +169,7 @@ pub fn prover<
     let sigma_eval_g_beta = pcs.eval_opening(&o_sigma, &g_beta);
 
     challenges.insert_beta(beta).unwrap();
+
     //  b). build linearization polynomial r_beta(X), and eval at beta
     let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> = witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();

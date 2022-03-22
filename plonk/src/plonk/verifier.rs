@@ -77,8 +77,10 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         &proof.sigma_eval_g_beta,
         &challenges,
     );
-    // Note: for completeness steps 5 and 6 is analogous to getting Q(beta) in the proof, verify it, and then
-    // check that P(\beta) - Q(\beta) * Z_H(\beta) (plus checking all eval proofs)
+
+    // Note: for completeness steps 5 and 6 is analogous to getting Q(beta) in the proof,
+    // verify it, and then check that
+    // P(\beta) - Q(\beta) * Z_H(\beta) (plus checking all eval proofs)
 
     // 5. derive value of Q(\beta) such that P(\beta) - Q(\beta) * Z_H(\beta) = 0
     let beta = challenges.get_beta().unwrap();
@@ -86,7 +88,8 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         derive_q_eval_beta::<PCS>(cs_params, proof, &challenges, &public_vars_eval_beta);
     let g_beta = beta.mul(&cs_params.root);
 
-    // 6. verify batch eval proofs for witness/permutation polynomials evaluations at point beta, and Q(beta), L(beta), \Sigma(g*beta)
+    // 6. verify batch eval proofs for witness/permutation polynomials evaluations
+    // at point beta, and Q(beta), L(beta), \Sigma(g*beta)
     let mut commitments: Vec<&PCS::Commitment> = proof
         .c_witness_polys
         .iter()

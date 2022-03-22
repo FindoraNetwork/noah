@@ -1,16 +1,15 @@
-//! This file implements a Turbo PLONK constraint system. It also
-//! implements a set of arithmetic/boolean/range gates that will be
-//! used in Anonymous transfer. The gates for elliptic curve
+//! It also implements a set of arithmetic/boolean/range gates that
+//! will be used in Anonymous transfer. The gates for elliptic curve
 //! operations and Rescue cipher/hash functions are implemented in
 //! ecc.rs and rescue.rs, respectively.
 use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
 use zei_algebra::prelude::*;
 
-/// The wires of a gate in Turbo CS.
+/// The wires number of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;
 
-/// The selectors of Turbo.
+/// The selectors number in Turbo CS.
 pub const N_SELECTORS: usize = 13;
 
 /// Turbo PLONK Constraint System.
@@ -49,8 +48,9 @@ impl<F: Scalar> ConstraintSystem for TurboConstraintSystem<F> {
         &self.wiring[..]
     }
 
-    /// `quot_eval_dom_size` divides (q-1), and should be larger than the degree of the quotient
-    /// polynomial, i.e., `quot_eval_dom_size` > 5 * `self.size` + 7
+    /// `quot_eval_dom_size` divides (q-1), and should be larger than
+    /// the degree of the quotient polynomial, i.e.,
+    /// `quot_eval_dom_size` > 5 * `self.size` + 7.
     fn quot_eval_dom_size(&self) -> usize {
         if self.size > 4 {
             self.size * 6

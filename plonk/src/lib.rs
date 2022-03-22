@@ -22,7 +22,7 @@
 #[macro_use]
 extern crate serde_derive;
 
-/// Module for the PLONK/turbo SNARK systems.
+/// Module for the PLONK/Turbo SNARK systems.
 pub mod plonk;
 
 /// Module for the polynomial commitment.
