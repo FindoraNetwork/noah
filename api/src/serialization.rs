@@ -67,45 +67,6 @@ impl ZeiFromToBytes for XfrSignature {
 
 serialize_deserialize!(XfrSignature);
 
-/*
-// XXX keep this for future reference
-// use with #[serde(with = "serialization::option_bytes")]
-pub mod option_bytes {
-  use crate::serialization::ZeiFromToBytes;
-  use serde::{self, Deserialize, Deserializer, Serializer};
-
-  pub fn serialize<S, T>(object: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer,
-          T: ZeiFromToBytes
-  {
-    if object.is_none() {
-      serializer.serialize_none()
-    } else {
-      let bytes = object.as_ref().unwrap().zei_to_bytes();
-      //let encoded = hex::encode(&bytes[..]);
-      if serializer.is_human_readable() {
-        serializer.serialize_str(&b64enc(bytes.as_slice()))
-      } else {
-        serializer.serialize_bytes(bytes.as_slice())
-      }
-    }
-  }
-
-  pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
-    where D: Deserializer<'de>,
-          T: ZeiFromToBytes
-  {
-    let vec: Option<Vec<u8>> = Option::deserialize(deserializer)?;
-
-    if let Some(value) = vec {
-      Ok(Some(T::zei_from_bytes(value.as_slice())))
-    } else {
-      Ok(None)
-    }
-  }
-}
-*/
-
 #[cfg(test)]
 mod test {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
@@ -123,7 +84,6 @@ mod test {
     use serde::{de::Deserialize, ser::Serialize};
     use std::convert::TryFrom;
     use zei_algebra::ristretto::RistrettoPoint;
-    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use zei_crypto::basics::{
         elgamal::elgamal_key_gen,
         hybrid_encryption::{XPublicKey, XSecretKey},
@@ -316,8 +276,7 @@ mod test {
     #[test]
     fn serialize_and_deserialize_elgamal() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
-        let (_sk, xfr_pub_key) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
+        let (_sk, xfr_pub_key) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
         let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
             res
         } else {

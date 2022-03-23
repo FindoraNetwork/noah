@@ -97,7 +97,6 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
     // 1. create ciphertext for all revealed attributes
     let mut ctexts = vec![];
     let mut rands = vec![];
-    let base = P::G1::get_base();
     let mut revealed_attrs = vec![];
     if credential.attributes.len() != reveal_map.len() {
         return Err(eg!(ZeiError::ParameterError));
@@ -105,7 +104,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore, P: Pairing>(
     for (attr, b) in credential.attributes.iter().zip(reveal_map.iter()) {
         if *b {
             let r = P::ScalarField::random(prng);
-            let ctext = elgamal_encrypt::<P::G1>(&base, attr, &r, enc_key);
+            let ctext = elgamal_encrypt::<P::G1>(attr, &r, enc_key);
             rands.push(r);
             ctexts.push(ctext);
             revealed_attrs.push(*attr);
@@ -212,7 +211,7 @@ pub(crate) fn ac_confidential_sok_prove<R: CryptoRng + RngCore, P: Pairing>(
         commitment = commitment.add(&elem);
         if let Attribute::Revealed(_) = attr {
             let r_rand = P::ScalarField::random(prng);
-            let ctext_com = elgamal_encrypt(&P::G1::get_base(), &r_attr, &r_rand, enc_key);
+            let ctext_com = elgamal_encrypt(&r_attr, &r_rand, enc_key);
             transcript.append_proof_commitment(&ctext_com.e1);
             transcript.append_proof_commitment(&ctext_com.e2);
             ctext_coms.push(ctext_com);
@@ -321,7 +320,7 @@ fn verify_ciphertext<P: Pairing>(
         attrs_resp.iter(),
         rands_resps.iter()
     ) {
-        let enc = elgamal_encrypt(&P::G1::get_base(), attr_resp, rand_resp, enc_key);
+        let enc = elgamal_encrypt::<P::G1>(attr_resp, rand_resp, enc_key);
         if enc.e1 != ctext.e1.mul(challenge).add(&ctext_com.e1) {
             return Err(eg!(ZeiError::IdentityRevealVerifyError));
         }
@@ -358,7 +357,7 @@ pub(crate) mod test_helper {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
         let (user_pk, user_sk) = ac_user_key_gen::<_, P>(&mut prng, &issuer_pk);
-        let (_, enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng, &P::G1::get_base());
+        let (_, enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng);
 
         let mut attrs = Vec::new();
         for i in 0..num_attr {
@@ -462,7 +461,7 @@ pub(crate) mod test_helper {
         );
 
         // Wrong encryption public key
-        let (_, another_enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng, &P::G1::get_base());
+        let (_, another_enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng);
         let vrfy = ac_confidential_open_verify::<P>(
             &issuer_pk,
             &another_enc_key,
@@ -547,9 +546,8 @@ mod test_bls12_381 {
 
 #[cfg(test)]
 mod test_serialization {
-
     use zei_algebra::bls12_381::BLSPairingEngine;
-    use zei_algebra::traits::{Group, Pairing};
+    use zei_algebra::{prelude::*, traits::Pairing};
 
     use super::test_helper::byte_slice_to_scalar;
     use crate::anon_creds::{ac_commit, ac_sign};
@@ -558,7 +556,6 @@ mod test_serialization {
     use crate::conf_cred_reveal::ac_confidential_open_commitment;
     use crate::conf_cred_reveal::ConfidentialAC;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use rmp_serde::Deserializer;
     use serde::{Deserialize, Serialize};
 
@@ -572,7 +569,7 @@ mod test_serialization {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let (issuer_pk, issuer_sk) = ac_keygen_issuer::<_, P>(&mut prng, num_attr);
         let (user_pk, user_sk) = ac_user_key_gen::<_, P>(&mut prng, &issuer_pk);
-        let (_, enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng, &P::G1::get_base());
+        let (_, enc_key) = elgamal_key_gen::<_, P::G1>(&mut prng);
 
         let mut attrs = Vec::new();
         for i in 0..num_attr {

@@ -7,7 +7,6 @@ use zei_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::basics::{
     elgamal::{
         elgamal_encrypt, elgamal_partial_decrypt, ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey,
@@ -34,18 +33,15 @@ impl TracerMemo {
         attrs_info: &[(Attr, AttributeCiphertext)],
     ) -> Self {
         let mut plaintext = vec![];
-        let pc_gens = RistrettoPedersenCommitment::default();
         let lock_amount = amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
             plaintext.extend_from_slice(&amount_low.to_be_bytes());
             plaintext.extend_from_slice(&amount_high.to_be_bytes());
             let ctext_amount_low = elgamal_encrypt(
-                &pc_gens.B,
                 &RistrettoScalar::from(amount_low),
                 blind_low,
                 &tracer_enc_key.record_data_enc_key,
             );
             let ctext_amount_high = elgamal_encrypt(
-                &pc_gens.B,
                 &RistrettoScalar::from(amount_high),
                 blind_high,
                 &tracer_enc_key.record_data_enc_key,
@@ -56,7 +52,6 @@ impl TracerMemo {
         let lock_asset_type = asset_type_info.map(|(asset_type, blind)| {
             plaintext.extend_from_slice(&asset_type.0);
             elgamal_encrypt(
-                &pc_gens.B,
                 &asset_type.as_scalar(),
                 blind,
                 &tracer_enc_key.record_data_enc_key,
@@ -228,11 +223,7 @@ impl TracerMemo {
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use rand_chacha::ChaChaRng;
-    use zei_algebra::{
-        bls12_381::{BLSScalar, BLSG1},
-        prelude::*,
-        ristretto::RistrettoScalar,
-    };
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
     use zei_crypto::basics::elgamal::elgamal_encrypt;
 
     #[test]
@@ -341,9 +332,6 @@ mod tests {
     fn extract_identity_attributed_from_tracer_memo() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
-
-        let base = BLSG1::get_base();
-
         let attrs = [1u32, 2, 3];
 
         let attrs_and_ctexts = attrs
@@ -353,7 +341,6 @@ mod tests {
                 (
                     *x,
                     elgamal_encrypt(
-                        &base,
                         &scalar,
                         &BLSScalar::from(1000u32),
                         &tracer_keys.enc_key.attrs_enc_key,
