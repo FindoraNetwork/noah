@@ -1,6 +1,6 @@
 [package]
 name = "crypto"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2021"
 description = "Zei Cryptographic Primitives and Protocols"

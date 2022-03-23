@@ -1,6 +1,6 @@
 [package]
 name = "utils"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Findora <engineering@findora.org>"]
 edition = "2021"
 description = "Zei utility functions"
