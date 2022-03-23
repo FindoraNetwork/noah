@@ -17,8 +17,11 @@ use algebra::bls12_381::BLSScalar;
 use algebra::groups::{Group, One, Scalar, ScalarArithmetic, Zero};
 use algebra::jubjub::{JubjubPoint, JubjubScalar};
 use merlin::Transcript;
-use poly_iops::plonk::protocol::prover::{prover, verifier};
-use poly_iops::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
+use poly_iops::plonk::{
+    constraint_system::{TurboConstraintSystem, VarIndex},
+    prover::prover,
+    verifier::verifier,
+};
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
 use std::borrow::Borrow;
@@ -220,7 +223,7 @@ pub(crate) fn build_anon_fee_cs(
     payee_secret: PayeeSecret,
     fee_type: BLSScalar,
 ) -> (TurboPlonkCS, usize) {
-    let mut cs = TurboPlonkConstraintSystem::new();
+    let mut cs = TurboConstraintSystem::new();
 
     let payers_secrets = add_payers_secrets(&mut cs, vec![payer_secret].as_slice());
     let payees_secrets = add_payees_secrets(&mut cs, vec![payee_secret].as_slice());
@@ -417,7 +420,7 @@ mod tests {
 
         {
             // verifier scope
-            let verifier_params = NodeParams::from(user_params);
+            let verifier_params = NodeParams::anon_fee_params().unwrap();
             assert!(verify_anon_fee_body(
                 &verifier_params,
                 &body,

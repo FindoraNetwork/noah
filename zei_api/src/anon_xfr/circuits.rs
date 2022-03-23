@@ -13,13 +13,13 @@ use crypto::field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS};
 use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
-use poly_iops::plonk::field_simulation::SimFrVar;
-use poly_iops::plonk::turbo_plonk_cs::ecc::PointVar;
-use poly_iops::plonk::turbo_plonk_cs::rescue::StateVar;
-use poly_iops::plonk::turbo_plonk_cs::{TurboPlonkConstraintSystem, VarIndex};
+use poly_iops::plonk::constraint_system::{
+    ecc::PointVar, field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem,
+    VarIndex,
+};
 use std::ops::{AddAssign, Shl};
 
-pub type TurboPlonkCS = TurboPlonkConstraintSystem<BLSScalar>;
+pub type TurboPlonkCS = TurboConstraintSystem<BLSScalar>;
 
 // TODO: Move these constants to another file.
 pub(crate) const SK_LEN: usize = 252; // secret key size (in bits)
@@ -207,7 +207,7 @@ pub(crate) fn build_multi_xfr_cs(
     assert_ne!(secret_inputs.payers_secrets.len(), 0);
     assert_ne!(secret_inputs.payees_secrets.len(), 0);
 
-    let mut cs = TurboPlonkConstraintSystem::new();
+    let mut cs = TurboConstraintSystem::new();
     let payers_secrets = add_payers_secrets(&mut cs, &secret_inputs.payers_secrets);
     let payees_secrets = add_payees_secrets(&mut cs, &secret_inputs.payees_secrets);
 
@@ -313,7 +313,7 @@ pub(crate) fn build_eq_committed_vals_cs(
     non_zk_state: &NonZKState,
     beta: &RistrettoScalar,
 ) -> (TurboPlonkCS, usize) {
-    let mut cs = TurboPlonkConstraintSystem::new();
+    let mut cs = TurboConstraintSystem::new();
     let zero_var = cs.zero_var();
 
     let zero = BLSScalar::zero();
@@ -929,8 +929,7 @@ pub(crate) mod tests {
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::prf::PRF;
     use crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external;
-    use poly_iops::plonk::turbo_plonk_cs::ecc::Point;
-    use poly_iops::plonk::turbo_plonk_cs::TurboPlonkConstraintSystem;
+    use poly_iops::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use ruc::*;
@@ -1030,7 +1029,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_elgamal_hybrid_encrypt_cs() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
 
         // prepare inputs
         let base = JubjubPoint::get_base();
@@ -1110,7 +1109,7 @@ pub(crate) mod tests {
 
         // Test case 1: success
         // A minimalist transaction that pays sufficient fee
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1)
@@ -1127,7 +1126,7 @@ pub(crate) mod tests {
 
         // Test case 2: error
         // A minimalist transaction that pays too much fee
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1 + 1)
@@ -1144,7 +1143,7 @@ pub(crate) mod tests {
 
         // Test case 3: error
         // A minimalist transaction that pays insufficient fee
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1 - 1)
@@ -1161,7 +1160,7 @@ pub(crate) mod tests {
 
         // Test case 4: error
         // A classical case when the non-fee elements are wrong, but the fee is paid correctly
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (0, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1199,7 +1198,7 @@ pub(crate) mod tests {
 
         // Test case 5: success
         // A classical case when the non-fee elements and fee are both correct
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (0, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1237,7 +1236,7 @@ pub(crate) mod tests {
 
         // Test case 6: success
         // More assets, with the exact fee
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1292,7 +1291,7 @@ pub(crate) mod tests {
 
         // Test case 7: success
         // More assets, with more than enough fees, but are spent properly
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1349,7 +1348,7 @@ pub(crate) mod tests {
 
         // Test case 8: error
         // More assets, with more than enough fees, but are not spent properly
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1406,7 +1405,7 @@ pub(crate) mod tests {
 
         // Test case 9: error
         // More assets, with insufficient fees, case 1: no output of the fee type
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1461,7 +1460,7 @@ pub(crate) mod tests {
 
         // Test case 10: error
         // More assets, with insufficient fees, case 2: with output of the fee type
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1518,7 +1517,7 @@ pub(crate) mod tests {
 
         // Test case 11: error
         // More assets, with insufficient fees, case 3: with output of the fee type, fees not exact
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1576,7 +1575,7 @@ pub(crate) mod tests {
         // Test case 12: error
         // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
         // Missing output for an input type.
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (1, 0, 1, 2)
         let in_types = [
             cs.new_variable(one),
@@ -1620,7 +1619,7 @@ pub(crate) mod tests {
         // Test case 13: error
         // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
         // Missing input for an output type.
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // asset_types = (1, 0, 1)
         let in_types = [
             cs.new_variable(one),
@@ -1727,7 +1726,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_commit() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let amount = BLSScalar::from_u32(7);
         let asset_type = BLSScalar::from_u32(5);
         let comm = HashCommitment::new();
@@ -1754,7 +1753,7 @@ pub(crate) mod tests {
     fn test_nullify() {
         let one = BLSScalar::one();
         let zero = BLSScalar::zero();
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let mut prng = ChaChaRng::from_seed([1u8; 32]);
         let sk = BLSScalar::random(&mut prng);
         let bytes = vec![1u8; 32];
@@ -1789,7 +1788,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_sort() {
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let num: Vec<BLSScalar> =
             (0..5).map(|x| BLSScalar::from_u32(x as u32)).collect();
         let node_var = cs.new_variable(num[2]);
@@ -1834,7 +1833,7 @@ pub(crate) mod tests {
         let two = one.add(&one);
         let three = two.add(&one);
         let four = two.add(&two);
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let uid_var = cs.new_variable(one);
         let comm_var = cs.new_variable(two);
         let pk_var = cs.new_point_variable(Point::new(zero, one));
@@ -1892,7 +1891,7 @@ pub(crate) mod tests {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         // happy path: `is_left_child`/`is_right_child`/`is_left_child + is_right_child` are boolean
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         let node = MTNode {
             siblings1: one,
             siblings2: zero,
@@ -1905,7 +1904,7 @@ pub(crate) mod tests {
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
         // cs cannot be satisfied when `is_left_child` (or `is_right_child`) is not boolean
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // is_left is not boolean
         let node = MTNode {
             siblings1: one,
@@ -1919,7 +1918,7 @@ pub(crate) mod tests {
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // cs cannot be satisfied when `is_left_child` + `is_right_child` is not boolean
-        let mut cs = TurboPlonkConstraintSystem::new();
+        let mut cs = TurboConstraintSystem::new();
         // `is_left` and `is_right` are both 1
         let node = MTNode {
             siblings1: one,

@@ -1,10 +1,9 @@
-extern crate custom_error;
+use byteorder::{ByteOrder, LittleEndian};
 use custom_error::custom_error;
+
 custom_error! {#[derive(PartialEq)] pub ConvertError
     BigNumberToBLSScalarError  = "BigNumber value cannot be converted to BLSScalar",
 }
-
-use byteorder::{ByteOrder, LittleEndian};
 
 pub fn u64_lsf_le_to_u8_lsf(limbs: &[u64]) -> Vec<u8> {
     let mut bytes = vec![];

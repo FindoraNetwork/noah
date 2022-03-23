@@ -19,9 +19,12 @@ use algebra::ristretto::RistrettoScalar;
 use bulletproofs::BulletproofGens;
 use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
 use crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
-use poly_iops::commitments::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme};
-use poly_iops::plonk::plonk_setup::{
-    preprocess_prover, ConstraintSystem, ProverParams, VerifierParams,
+use poly_iops::{
+    commitments::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
+    plonk::{
+        constraint_system::ConstraintSystem,
+        setup::{preprocess_prover, ProverParams, VerifierParams},
+    },
 };
 use ruc::*;
 use serde::Deserialize;
@@ -253,11 +256,7 @@ impl NodeParams {
                         verifier_params: special.verifier_params,
                     })
                 }
-                _ => Err(SimpleError::new(
-                    d!(ZeiError::MissingVerifierParamsError),
-                    None,
-                )
-                .into()),
+                _ => Self::create(n_payers, n_payees, None),
             }
         }
     }
