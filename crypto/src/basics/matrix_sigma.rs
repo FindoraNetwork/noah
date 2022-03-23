@@ -1,13 +1,6 @@
 use digest::Digest;
-use itertools::Itertools;
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::errors::ZeiError;
-use zei_algebra::{
-    ops::*,
-    traits::{Group, Pairing, Scalar},
-};
+use zei_algebra::prelude::*;
 
 pub trait SigmaTranscript {
     fn init_sigma<G: Group>(
@@ -22,17 +15,6 @@ pub trait SigmaTranscript {
     fn get_challenge<S: Scalar>(&mut self) -> S;
 }
 
-pub trait SigmaTranscriptPairing: SigmaTranscript {
-    fn init_sigma_pairing<P: Pairing>(
-        &mut self,
-        instance_name: &'static [u8],
-        public_scalars: &[&P::ScalarField],
-        public_elems_g1: &[&P::G1],
-        public_elems_g2: &[&P::G2],
-        public_elems_gt: &[&P::Gt],
-    );
-}
-
 impl SigmaTranscript for Transcript {
     fn init_sigma<G: Group>(
         &mut self,
@@ -40,11 +22,8 @@ impl SigmaTranscript for Transcript {
         public_scalars: &[&G::ScalarType],
         public_elems: &[&G],
     ) {
-        self.append_message(
-            b"Sigma Protocol domain",
-            b"Sigma protocol single group v.0.1",
-        );
-        self.append_message(b"Sigma Protocol instance", instance_name);
+        self.append_message(b"Sigma Protocol domain", b"Sigma protocol single group");
+        self.append_message(b"instance name", instance_name);
         for scalar in public_scalars {
             self.append_message(b"public scalar", scalar.to_bytes().as_slice())
         }
@@ -63,39 +42,10 @@ impl SigmaTranscript for Transcript {
     }
     fn get_challenge<S: Scalar>(&mut self) -> S {
         let mut buffer = vec![0u8; 32];
-        self.challenge_bytes(b"Sigma challenge", &mut buffer); // cannot use buffer directly (S::from_bytes(buffer.as_slice())) as it may not represent a valid Scalar
+        self.challenge_bytes(b"Sigma challenge", &mut buffer);
         let mut hash = sha2::Sha512::new();
         hash.update(&buffer[..]);
         S::from_hash(hash)
-    }
-}
-
-impl SigmaTranscriptPairing for Transcript {
-    fn init_sigma_pairing<P: Pairing>(
-        &mut self,
-        instance_name: &'static [u8],
-        public_scalars: &[&P::ScalarField],
-        public_elems_g1: &[&P::G1],
-        public_elems_g2: &[&P::G2],
-        public_elems_gt: &[&P::Gt],
-    ) {
-        self.append_message(
-            b"Sigma Protocol domain",
-            b"Sigma protocol with pairings elements",
-        );
-        self.append_message(b"Sigma Protocol instance", instance_name);
-        for scalar in public_scalars {
-            self.append_message(b"public scalar", scalar.to_bytes().as_slice())
-        }
-        for elem in public_elems_g1 {
-            self.append_message(b"public elem g1", elem.to_compressed_bytes().as_slice())
-        }
-        for elem in public_elems_g2 {
-            self.append_message(b"public elem g2", elem.to_compressed_bytes().as_slice())
-        }
-        for elem in public_elems_gt {
-            self.append_message(b"public elem gt", elem.to_compressed_bytes().as_slice())
-        }
     }
 }
 
@@ -173,10 +123,10 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar>(
     responses: &[S],       // proof challenge responses
     challenge: &S,         // challenge
 ) -> Vec<S> {
-    // verifier needs to check that matrix * responses = challenge * rhs + proof_commitment
+    // verifier needs to check that `matrix * responses = challenge * rhs + proof_commitment`
     // rows are merged using a random linear combination
     // this functions collects the scalars factors for each element in order to apply a single
-    // multiexponentiation to verify all equations
+    // multi-exponentiation to verify all equations
     let mut s = vec![S::from(0u32); n_elems + rhs.len()]; // n elements + m proof commitments
     let mut alphas = vec![]; // linear combination scalars
                              // find in the matrix each element and multiply corresponding response by alpha

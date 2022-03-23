@@ -1,42 +1,21 @@
-use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-use crate::basics::sigma::{
+use crate::basics::matrix_sigma::{
     sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
 };
+use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 use zei_algebra::ristretto::RistrettoPoint;
 use zei_algebra::ristretto::RistrettoScalar;
 
+/// A Chaum-Pedersen proof of commitment equality
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
-    /// A Chaum-Pedersen equality of commitment proof
     pub(crate) c3: RistrettoPoint,
     pub(crate) c4: RistrettoPoint,
     pub(crate) z1: RistrettoScalar,
     pub(crate) z2: RistrettoScalar,
     pub(crate) z3: RistrettoScalar,
-}
-
-/// A Chaum-Pedersen equality of multiple commitments proof
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
-pub struct ChaumPedersenProofX {
-    pub(crate) c1_eq_c2: ChaumPedersenProof,
-    pub(crate) zero: Option<ChaumPedersenProof>,
-}
-
-fn init_chaum_pedersen_multiple(
-    transcript: &mut Transcript,
-    pc_gens: &RistrettoPedersenCommitment,
-    commitments: &[RistrettoPoint],
-) {
-    let b = pc_gens.B;
-    let b_blinding = pc_gens.B_blinding;
-    let mut public_elems = vec![&b, &b_blinding];
-    for c in commitments.iter() {
-        public_elems.push(c);
-    }
-    transcript.init_sigma(b"ChaumPedersenMultiple", &[], public_elems.as_slice())
 }
 
 fn init_chaum_pedersen<'a>(
@@ -152,27 +131,25 @@ pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(
     .c(d!())
 }
 
-// Helper functions for the proof of multiple commitments equality below
-
-// Obtain a fake compressed commitment to zero, eg The identity
-fn get_fake_zero_commitment() -> RistrettoPoint {
-    RistrettoPoint::get_identity()
+/// A Chaum-Pedersen proof of equality of multiple commitments
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+pub struct ChaumPedersenProofX {
+    pub(crate) c1_eq_c2: ChaumPedersenProof,
+    pub(crate) zero: Option<ChaumPedersenProof>,
 }
 
-// Obtain the blinding used in the get_fake_zero_commitment
-fn get_fake_zero_commitment_blinding() -> RistrettoScalar {
-    RistrettoScalar::zero()
-}
-
-fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<RistrettoScalar> {
-    if n == 0 {
-        return vec![];
+fn init_chaum_pedersen_multiple(
+    transcript: &mut Transcript,
+    pc_gens: &RistrettoPedersenCommitment,
+    commitments: &[RistrettoPoint],
+) {
+    let b = pc_gens.B;
+    let b_blinding = pc_gens.B_blinding;
+    let mut public_elems = vec![&b, &b_blinding];
+    for c in commitments.iter() {
+        public_elems.push(c);
     }
-    let mut r = vec![RistrettoScalar::one()];
-    for _ in 1..n {
-        r.push(transcript.get_challenge::<RistrettoScalar>());
-    }
-    r
+    transcript.init_sigma(b"ChaumPedersenMultiple", &[], public_elems.as_slice())
 }
 
 /// Creates a zero-knowledge proof of knowledge for equality of a set of commitments
@@ -429,6 +406,30 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
         Ok(())
     }
 }
+
+// Helper functions for the proof of multiple commitments equality below
+
+// Obtain a fake compressed commitment to zero, eg The identity
+fn get_fake_zero_commitment() -> RistrettoPoint {
+    RistrettoPoint::get_identity()
+}
+
+// Obtain the blinding used in the get_fake_zero_commitment
+fn get_fake_zero_commitment_blinding() -> RistrettoScalar {
+    RistrettoScalar::zero()
+}
+
+fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<RistrettoScalar> {
+    if n == 0 {
+        return vec![];
+    }
+    let mut r = vec![RistrettoScalar::one()];
+    for _ in 1..n {
+        r.push(transcript.get_challenge::<RistrettoScalar>());
+    }
+    r
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
