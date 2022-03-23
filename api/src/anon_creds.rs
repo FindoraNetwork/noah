@@ -430,5 +430,5 @@ pub fn ac_confidential_verify(
 pub fn ac_confidential_gen_encryption_keys<R: CryptoRng + RngCore>(
     prng: &mut R,
 ) -> (AttributeDecKey, AttributeEncKey) {
-    elgamal_key_gen::<_, G1>(prng, &G1::get_base())
+    elgamal_key_gen::<_, G1>(prng)
 }

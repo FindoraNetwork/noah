@@ -14,9 +14,8 @@ use bulletproofs::RangeProof;
 use digest::Digest;
 use sha2::Sha512;
 use zei_algebra::{
-    bls12_381::BLSG1,
     prelude::*,
-    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
+    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar},
 };
 use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
@@ -313,9 +312,8 @@ pub struct AssetTracerKeyPair {
 impl AssetTracerKeyPair {
     /// Generates a new keypair for asset tracing
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        let (record_data_dec_key, record_data_enc_key) =
-            elgamal_key_gen(prng, &RistrettoPoint::get_base());
-        let (attrs_dec_key, attrs_enc_key) = elgamal_key_gen(prng, &BLSG1::get_base());
+        let (record_data_dec_key, record_data_enc_key) = elgamal_key_gen(prng);
+        let (attrs_dec_key, attrs_enc_key) = elgamal_key_gen(prng);
         let lock_info_dec_key = XSecretKey::new(prng);
         let lock_info_enc_key = XPublicKey::from(&lock_info_dec_key);
         AssetTracerKeyPair {
