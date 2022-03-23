@@ -17,6 +17,9 @@ use zei_algebra::{
     ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar},
     utils::{min_greater_equal_power_of_two, u64_to_u32_pair},
 };
+use zei_crypto::basics::chaum_pedersen::{
+    chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq, ChaumPedersenProofX,
+};
 use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     basics::{
@@ -26,11 +29,7 @@ use zei_crypto::{
             PedersenElGamalEqProof, PedersenElGamalProofInstance,
         },
     },
-    bp_range_proofs::{batch_verify_ranges, prove_ranges},
-    chaum_pedersen::{
-        chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq,
-        ChaumPedersenProofX,
-    },
+    bp_circuits::range_proofs::{batch_verify_ranges, prove_ranges},
 };
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;

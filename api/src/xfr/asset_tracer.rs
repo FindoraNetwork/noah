@@ -11,7 +11,7 @@ use zei_crypto::basics::{
     elgamal::{
         elgamal_encrypt, elgamal_partial_decrypt, ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey,
     },
-    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key},
+    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_x25519},
 };
 
 pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
@@ -61,8 +61,7 @@ impl TracerMemo {
         for (attr, _) in attrs_info.iter() {
             plaintext.extend_from_slice(&attr.to_be_bytes())
         }
-        let lock_info =
-            hybrid_encrypt_with_x25519_key(prng, &tracer_enc_key.lock_info_enc_key, &plaintext);
+        let lock_info = hybrid_encrypt_x25519(prng, &tracer_enc_key.lock_info_enc_key, &plaintext);
 
         TracerMemo {
             enc_key: tracer_enc_key.clone(),

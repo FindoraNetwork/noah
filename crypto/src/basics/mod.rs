@@ -1,3 +1,4 @@
+pub mod chaum_pedersen;
 pub mod elgamal;
 pub mod hybrid_encryption;
 pub mod pedersen_elgamal;

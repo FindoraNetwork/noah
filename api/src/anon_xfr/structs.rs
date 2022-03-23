@@ -10,9 +10,7 @@ use zei_algebra::{
     jubjub::JubjubScalar,
     prelude::*,
 };
-use zei_crypto::basics::hybrid_encryption::{
-    hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
-};
+use zei_crypto::basics::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
 use zei_crypto::basics::rescue::RescueInstance;
 use zei_plonk::{plonk::setup::PlonkPf, poly_commit::kzg_poly_com::KZGCommitmentScheme};
 
@@ -242,7 +240,7 @@ impl OpenAnonBlindAssetRecordBuilder {
         msg.extend_from_slice(&self.oabar.asset_type.0);
         msg.extend_from_slice(&self.oabar.blind.to_bytes());
         msg.extend_from_slice(&self.oabar.key_rand_factor.to_bytes());
-        let cipher = hybrid_encrypt_with_x25519_key(prng, enc_key, &msg);
+        let cipher = hybrid_encrypt_x25519(prng, enc_key, &msg);
         let memo = OwnerMemo {
             blind_share: Default::default(),
             lock: cipher,

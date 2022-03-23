@@ -17,14 +17,12 @@ use zei_algebra::{
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar},
 };
+use zei_crypto::basics::chaum_pedersen::ChaumPedersenProofX;
 use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-use zei_crypto::{
-    basics::{
-        elgamal::elgamal_key_gen,
-        hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCipher},
-        pedersen_elgamal::PedersenElGamalEqProof,
-    },
-    chaum_pedersen::ChaumPedersenProofX,
+use zei_crypto::basics::{
+    elgamal::elgamal_key_gen,
+    hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCiphertext},
+    pedersen_elgamal::PedersenElGamalEqProof,
 };
 
 /// Asset Type identifier
@@ -386,14 +384,14 @@ pub struct TracerMemo {
     pub lock_asset_type: Option<RecordDataCiphertext>,
     pub lock_attributes: Vec<AttributeCiphertext>,
     /// A hybrid encryption of amount, asset type and attributes encrypted above for faster access
-    pub lock_info: ZeiHybridCipher,
+    pub lock_info: ZeiHybridCiphertext,
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OwnerMemo {
     pub blind_share: CompressedEdwardsY,
-    pub lock: ZeiHybridCipher,
+    pub lock: ZeiHybridCiphertext,
 }
 
 impl OwnerMemo {
@@ -411,11 +409,8 @@ impl OwnerMemo {
                 .c(d!())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
-        let lock = hybrid_encryption::hybrid_encrypt_with_sign_key(
-            prng,
-            &pub_key.0,
-            &amount.to_be_bytes(),
-        );
+        let lock =
+            hybrid_encryption::hybrid_encrypt_ed25519(prng, &pub_key.0, &amount.to_be_bytes());
         Ok((OwnerMemo { blind_share, lock }, amount_blinds))
     }
 
@@ -433,7 +428,7 @@ impl OwnerMemo {
                 .c(d!())?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
-        let lock = hybrid_encryption::hybrid_encrypt_with_sign_key(prng, &pub_key.0, &asset_type.0);
+        let lock = hybrid_encryption::hybrid_encrypt_ed25519(prng, &pub_key.0, &asset_type.0);
         Ok((OwnerMemo { blind_share, lock }, asset_type_blind))
     }
 
@@ -456,7 +451,7 @@ impl OwnerMemo {
         let mut amount_asset_type_plaintext = vec![];
         amount_asset_type_plaintext.extend_from_slice(&amount.to_be_bytes()[..]);
         amount_asset_type_plaintext.extend_from_slice(&asset_type.0[..]);
-        let lock = hybrid_encryption::hybrid_encrypt_with_sign_key(
+        let lock = hybrid_encryption::hybrid_encrypt_ed25519(
             prng,
             &pub_key.0,
             &amount_asset_type_plaintext,

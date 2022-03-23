@@ -10,7 +10,7 @@ use zei_algebra::ristretto::RistrettoScalar;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProof {
-    /// A Chaum-Perdersen equality of commitment proof
+    /// A Chaum-Pedersen equality of commitment proof
     pub(crate) c3: RistrettoPoint,
     pub(crate) c4: RistrettoPoint,
     pub(crate) z1: RistrettoScalar,
@@ -18,7 +18,7 @@ pub struct ChaumPedersenProof {
     pub(crate) z3: RistrettoScalar,
 }
 
-/// A Chaum-Perdersen equality of multiple commitments proof
+/// A Chaum-Pedersen equality of multiple commitments proof
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ChaumPedersenProofX {
     pub(crate) c1_eq_c2: ChaumPedersenProof,
