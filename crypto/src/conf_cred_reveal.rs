@@ -3,14 +3,22 @@ use crate::anon_creds::{
     ACUserSecretKey, Attribute, Credential, SOK_LABEL,
 };
 use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
-use crate::basics::sigma::{SigmaTranscript, SigmaTranscriptPairing};
+use crate::basics::matrix_sigma::SigmaTranscript;
 use merlin::Transcript;
 use zei_algebra::{prelude::*, traits::Pairing};
 
 const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
 const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"Confidential AC Reveal PoK New Instance";
 
-trait CACTranscript: SigmaTranscriptPairing {
+pub trait CACTranscript {
+    fn init_sigma_pairing<P: Pairing>(
+        &mut self,
+        instance_name: &'static [u8],
+        public_scalars: &[&P::ScalarField],
+        public_elems_g1: &[&P::G1],
+        public_elems_g2: &[&P::G2],
+        public_elems_gt: &[&P::Gt],
+    );
     fn cac_init<P: Pairing>(
         &mut self,
         ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
@@ -25,6 +33,33 @@ trait CACTranscript: SigmaTranscriptPairing {
 }
 
 impl CACTranscript for Transcript {
+    fn init_sigma_pairing<P: Pairing>(
+        &mut self,
+        instance_name: &'static [u8],
+        public_scalars: &[&P::ScalarField],
+        public_elems_g1: &[&P::G1],
+        public_elems_g2: &[&P::G2],
+        public_elems_gt: &[&P::Gt],
+    ) {
+        self.append_message(
+            b"Sigma Protocol domain",
+            b"Sigma protocol with pairings elements",
+        );
+        self.append_message(b"Sigma Protocol instance", instance_name);
+        for scalar in public_scalars {
+            self.append_message(b"public scalar", scalar.to_bytes().as_slice())
+        }
+        for elem in public_elems_g1 {
+            self.append_message(b"public elem g1", elem.to_compressed_bytes().as_slice())
+        }
+        for elem in public_elems_g2 {
+            self.append_message(b"public elem g2", elem.to_compressed_bytes().as_slice())
+        }
+        for elem in public_elems_gt {
+            self.append_message(b"public elem gt", elem.to_compressed_bytes().as_slice())
+        }
+    }
+
     fn cac_init<P: Pairing>(
         &mut self,
         ac_issuer_pk: &ACIssuerPublicKey<P::G1, P::G2>,
