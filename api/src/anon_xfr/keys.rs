@@ -46,8 +46,8 @@ impl AXfrKeyPair {
         self.0.get_secret_scalar()
     }
 
-    pub fn sign(&self, msg: &[u8]) -> AXfrSignature {
-        AXfrSignature(self.0.sign(msg))
+    pub fn sign<R: CryptoRng + RngCore>(&self, prng: &mut R, msg: &[u8]) -> AXfrSignature {
+        AXfrSignature(self.0.sign(prng, msg))
     }
 }
 

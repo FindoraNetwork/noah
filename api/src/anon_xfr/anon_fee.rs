@@ -34,14 +34,18 @@ pub struct AnonFeeNote {
 }
 
 impl AnonFeeNote {
-    pub fn generate_note_from_body(body: AnonFeeBody, keypair: AXfrKeyPair) -> Result<AnonFeeNote> {
+    pub fn generate_note_from_body<R: CryptoRng + RngCore>(
+        prng: &mut R,
+        body: AnonFeeBody,
+        keypair: AXfrKeyPair,
+    ) -> Result<AnonFeeNote> {
         let msg: Vec<u8> = bincode::serialize(&body)
             .map_err(|_| ZeiError::SerializationError)
             .c(d!())?;
 
         Ok(AnonFeeNote {
             body,
-            signature: keypair.sign(msg.as_slice()),
+            signature: keypair.sign(prng, msg.as_slice()),
         })
     }
 
@@ -415,7 +419,7 @@ mod tests {
                 verify_anon_fee_body(&verifier_params, &body, &BLSScalar::from(123u64)).is_err()
             );
 
-            let note = AnonFeeNote::generate_note_from_body(body, key_pairs).unwrap();
+            let note = AnonFeeNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
             assert!(note.verify_signatures().is_ok());
         }
         {

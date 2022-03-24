@@ -478,7 +478,7 @@ mod tests {
             let verifier_params = NodeParams::from(user_params);
             assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
 
-            let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
+            let note = AXfrNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
         }
     }
@@ -643,7 +643,7 @@ mod tests {
             let vk2 = NodeParams::load(1, 1).unwrap();
             assert!(verify_anon_xfr_body(&vk2, &body, &mt.get_root().unwrap()).is_ok());
 
-            let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
+            let note = AXfrNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
         }
     }
