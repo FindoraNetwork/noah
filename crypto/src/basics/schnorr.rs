@@ -1,26 +1,19 @@
-//! # Schnorr signature implementation
-//!
-//! This file implements a Schnorr (multi)-signature scheme.
-//! Currently this scheme is deterministic and the multi-signature is implemented in a naive way:
-//! a multi-signature is the list of simple Schnorr signatures.
-//! In the future we might implement a more sophisticated scheme that produces short multi-signatures
-//! See MuSig => <https://eprint.iacr.org/2018/068.pdf> and  MuSig-DN => <https://eprint.iacr.org/2020/1057>
+//! This file implements a Schnorr signature scheme and a naive implementation of a multi-signature,
+//! which is a list of simple Schnorr signatures.
 //!
 //! At a high level the scheme works as follows:
 //! * `key_gen()` => sample a random scalar `x` and compute `X=g^x` where `g` is some group generator. Return return the key pair `(x,X)`
 //! * `sign(m,sk)` => sample a random scalar `r` and compute `R=g^r`. Compute scalars `c=H(X,R,m)` and `s=r+cx`. Return `(R,s)`
 //! * `verify(m,pk,sig)` => parse `sig` as `(R,s)`. Compute `c=H(X,R,m)`. Check that `R.X^c == g^s`.
 
-use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
-use sha2::Sha512;
 use zei_algebra::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(non_snake_case)]
-/// A Schnorr signature is composed by some group element R and some scalar s
+/// A Schnorr signature consists of a group element R and a scalar s
 pub struct Signature<G, S> {
     R: G,
     s: S,
@@ -58,7 +51,7 @@ impl<G: Group> PublicKey<G> {
     pub fn from_point(point: G) -> PublicKey<G> {
         PublicKey(point)
     }
-    /// Verifies a Schnorr signature given a message, a public key
+    /// Verify a Schnorr signature given a message and a public key
     /// * `msg` - message
     /// * `sig` - signature
     /// * `returns` - Nothing if the verification succeeds, an error otherwise
@@ -92,15 +85,21 @@ impl<G: Group> KeyPair<G, G::ScalarType> {
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         gen_keys(prng)
     }
+
     /// Return scalar representing secret key
     pub fn get_secret_scalar(&self) -> G::ScalarType {
         self.sec_key.scalar()
     }
-    /// Computes a signature for `msg`.
+
+    /// Compute a signature for `msg`.
     /// * `msg` - sequence of bytes to be signed
     /// * `returns` - a Schnorr signature
-    pub fn sign(&self, msg: &[u8]) -> Signature<G, G::ScalarType> {
-        sign(self, msg)
+    pub fn sign<R: CryptoRng + RngCore>(
+        &self,
+        prng: &mut R,
+        msg: &[u8],
+    ) -> Signature<G, G::ScalarType> {
+        sign(prng, self, msg)
     }
 
     /// Randomize the keypair by `factor`
@@ -122,7 +121,6 @@ impl<G: Group> ZeiFromToBytes for KeyPair<G, G::ScalarType> {
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
         let alpha = G::ScalarType::from_bytes(&bytes[0..G::ScalarType::bytes_len()]).c(d!())?;
-        // Public key
         let u = PublicKey::zei_from_bytes(&bytes[G::ScalarType::bytes_len()..]).c(d!())?;
 
         Ok(KeyPair {
@@ -209,50 +207,21 @@ fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair<G, G::Sca
     }
 }
 
-/// Deterministic computation of a scalar based on the secret key and the message.
-/// This is to avoid attacks due to bad implementation of prng involving the generation
-/// of the commitment in the signature.
-/// The scalar is computed as PRF(algorith_desc, nonce,message) where PRF is the CRHF Sha512 following the
-/// high level idea of RFC 6979 (https://tools.ietf.org/html/rfc6979#section-3.2) and
-/// algorith_desc is a constant string describing the algorithm involved.
-/// This is to avoid attacks where the same private key is used with different
-/// algorithms (ECDSA and Schnorr) for example.
-/// Note that the transcript is not involved here as the verifier has no access to the
-/// secret key.
-/// * `message` - message to be signed. Needed to make the scalar unique
-/// * `secret_key` - Schnorr secret key.
-/// * `returns` - pseudo-random scalar
-#[allow(non_snake_case)]
-fn deterministic_scalar_gen<G: Group>(
-    message: &[u8],
-    secret_key: &SecretKey<G::ScalarType>,
-) -> G::ScalarType {
-    let mut hasher = Sha512::new();
-
-    let ALGORITHM_DESC = b"ZeiSchnorrAlgorithm";
-
-    hasher.update(ALGORITHM_DESC);
-    hasher.update(message);
-    hasher.update(&secret_key.0.to_bytes());
-
-    G::ScalarType::from_hash(hasher)
-}
-
 #[allow(clippy::many_single_char_names)]
 #[allow(non_snake_case)]
 /// Computes a signature given a key pair and a message.
 /// * `signing_key` - key pair. Having both public and private key makes the signature computation more efficient
 /// * `message` - sequence of bytes to be signed
 /// * `returns` - a Schnorr signature
-fn sign<G: Group>(
+fn sign<R: CryptoRng + RngCore, G: Group>(
+    prng: &mut R,
     signing_key: &KeyPair<G, G::ScalarType>,
     msg: &[u8],
 ) -> Signature<G, G::ScalarType> {
     let mut transcript = Transcript::new(b"schnorr_sig");
 
     let g = G::get_base();
-
-    let r = deterministic_scalar_gen::<G>(msg, &signing_key.sec_key);
+    let r = G::ScalarType::random(prng);
 
     let R = g.mul(&r);
     let pk = &signing_key.pub_key;
@@ -270,14 +239,15 @@ fn sign<G: Group>(
 /// Computes a signature with key pairs sk_1, sk_2,...,sk_n on a message m
 /// * `signing_keys` - list of key pairs
 /// * `message` - message to be signed
-pub fn multisig_sign<G: Group>(
+pub fn multisig_sign<R: CryptoRng + RngCore, G: Group>(
+    prng: &mut R,
     signing_keys: &[KeyPair<G, G::ScalarType>],
     message: &[u8],
 ) -> MultiSignature<G> {
     let mut signatures = vec![];
 
     for signing_key in signing_keys {
-        let sig = sign::<G>(signing_key, message);
+        let sig = sign::<R, G>(prng, signing_key, message);
         signatures.push(sig);
     }
     MultiSignature(signatures)
@@ -351,7 +321,7 @@ mod schnorr_sigs {
 
             let message = b"message";
 
-            let sig = key_pair.sign(message);
+            let sig = key_pair.sign(&mut prng, message);
 
             let public_key = key_pair.pub_key;
             let res = public_key.verify(message, &sig);
@@ -384,7 +354,7 @@ mod schnorr_sigs {
             let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
             let key_pair: KeyPair<G, G::ScalarType> = KeyPair::generate(&mut prng);
             let message = b"message";
-            let sig = key_pair.sign(message);
+            let sig = key_pair.sign(&mut prng, message);
             let public_key = key_pair.pub_key;
 
             // Public key
@@ -434,7 +404,7 @@ mod schnorr_sigs {
 
             let message = b"message";
 
-            let msig = multisig_sign(&key_pairs, message);
+            let msig = multisig_sign(&mut prng, &key_pairs, message);
 
             let res = multisig_verify(&public_keys, message, &msig);
             assert!(res.is_ok());

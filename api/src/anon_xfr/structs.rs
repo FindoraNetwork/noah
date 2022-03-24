@@ -42,14 +42,18 @@ pub struct AXfrNote {
 }
 
 impl AXfrNote {
-    pub fn generate_note_from_body(body: AXfrBody, keypairs: Vec<AXfrKeyPair>) -> Result<AXfrNote> {
+    pub fn generate_note_from_body<R: CryptoRng + RngCore>(
+        prng: &mut R,
+        body: AXfrBody,
+        keypairs: Vec<AXfrKeyPair>,
+    ) -> Result<AXfrNote> {
         let mut signatures: Vec<AXfrSignature> = Vec::new();
         let msg: Vec<u8> = bincode::serialize(&body)
             .map_err(|_| ZeiError::SerializationError)
             .c(d!())?;
 
         for keypair in keypairs {
-            signatures.push(keypair.sign(msg.as_slice()))
+            signatures.push(keypair.sign(prng, msg.as_slice()))
         }
 
         Ok(AXfrNote { body, signatures })
