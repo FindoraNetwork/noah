@@ -12,14 +12,14 @@ crate-type = ['rlib']
 [dependencies]
 aes = '0.8.1'
 ctr = '0.9.1'
-digest = '0.9'
+digest = '0.10'
 ed25519-dalek = '1.0.0'
 itertools = '0.10.3'
-merlin = '2.0'
-rand_chacha = '0.2'
+merlin = '3.0'
+rand_chacha = '0.3'
 serde = '1.0'
 serde_derive = '1.0'
-sha2 = '0.10.2'
+sha2 = '0.10'
 x25519-dalek = '1.1'
 ruc = '1.0'
 
@@ -29,20 +29,19 @@ path = '../algebra'
 [dependencies.bulletproofs]
 package = 'bulletproofs'
 git = 'https://github.com/FindoraNetwork/bp'
-branch = 'batch_verification'
-features = ['yoloproofs']
+branch = 'develop-refactoring'
 
 [dependencies.curve25519-dalek]
 version = '3.0.0'
 features = ['serde']
 
 [dependencies.rand_core]
-version = '0.5'
+version = '0.6'
 default-features = false
 features = ['alloc']
 
 [dependencies.rand]
-version = '0.7'
+version = '0.8'
 default-features = false
 
 [dependencies.wasm-bindgen]
@@ -56,7 +55,7 @@ version = '0.1.43'
 version = '0.2.12'
 
 [dependencies.num-bigint]
-version = '0.3.0'
+version = '0.4.0'
 features = ['rand']
 
 [dev-dependencies]
