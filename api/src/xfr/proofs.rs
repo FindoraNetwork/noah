@@ -17,12 +17,12 @@ use zei_algebra::{
     ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar},
     utils::{min_greater_equal_power_of_two, u64_to_u32_pair},
 };
-use zei_crypto::basics::chaum_pedersen::{
+use zei_crypto::basic::chaum_pedersen::{
     chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq, ChaumPedersenProofX,
 };
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
-    basics::{
+    basic::{
         elgamal::ElGamalCiphertext,
         pedersen_elgamal::{
             pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
@@ -85,7 +85,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
                 .c(d!(ZeiError::InconsistentStructureError))?;
             m.push(RistrettoScalar::from(low));
             r.push(open_record.amount_blinds.0);
-            ctexts.push(lock_amount_low.clone()); // TODO avoid this clone
+            ctexts.push(lock_amount_low.clone());
             commitments.push(
                 com_low
                     .decompress()
@@ -93,7 +93,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
             );
             m.push(RistrettoScalar::from(high));
             r.push(open_record.amount_blinds.1);
-            ctexts.push(lock_amount_high.clone()); // TODO avoid this clone
+            ctexts.push(lock_amount_high.clone());
             commitments.push(
                 com_high
                     .decompress()
@@ -107,7 +107,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
                 .c(d!(ZeiError::InconsistentStructureError))?;
             m.push(open_record.asset_type.as_scalar());
             r.push(open_record.type_blind);
-            ctexts.push(lock_asset_type.clone()); // TODO avoid this clone
+            ctexts.push(lock_asset_type.clone());
             commitments.push(com.decompress().c(d!(ZeiError::DecompressElementError))?);
         }
     }
@@ -220,7 +220,6 @@ fn collect_bars_and_memos_by_keys<'a>(
 
 pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     xfr_bodies: &[&XfrBody],
     instances_policies: &[&XfrNotePoliciesRef],
 ) -> Result<()> {
@@ -251,7 +250,6 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
         .collect();
     batch_verify_asset_tracing_proofs(
         prng,
-        pc_gens,
         xfr_bodies,
         &input_reveal_policies.c(d!())?,
         &output_reveal_policies.c(d!())?,
@@ -283,7 +281,6 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
 
 fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     xfr_bodies: &[&XfrBody],
     input_reveal_policies: &[&[&TracingPolicies]],
     output_reveal_policies: &[&[&TracingPolicies]],
@@ -341,7 +338,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
         }
     }
     let mut transcript = Transcript::new(b"AssetTracingProofs");
-    pedersen_elgamal_batch_aggregate_eq_verify(&mut transcript, prng, pc_gens, &instances).c(d!())
+    pedersen_elgamal_batch_aggregate_eq_verify(&mut transcript, prng, &instances).c(d!())
 }
 
 #[derive(Default)]
@@ -714,7 +711,6 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
     chaum_pedersen_prove_multiple_eq(
         &mut transcript,
         prng,
-        pc_gens,
         &open_inputs[0].asset_type.as_scalar(),
         asset_coms.as_slice(),
         asset_blinds.as_slice(),
@@ -746,7 +742,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
             .collect();
         proof_instances.push((instance_commitments.c(d!())?, *proof));
     }
-    chaum_pedersen_batch_verify_multiple_eq(&mut transcript, prng, &pc_gens, &proof_instances)
+    chaum_pedersen_batch_verify_multiple_eq(&mut transcript, prng, &proof_instances)
         .c(d!(ZeiError::XfrVerifyConfidentialAssetError))
 }
 

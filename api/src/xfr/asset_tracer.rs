@@ -7,7 +7,7 @@ use zei_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
-use zei_crypto::basics::{
+use zei_crypto::basic::{
     elgamal::{
         elgamal_encrypt, elgamal_partial_decrypt, ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey,
     },
@@ -223,7 +223,7 @@ mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use rand_chacha::ChaChaRng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
-    use zei_crypto::basics::elgamal::elgamal_encrypt;
+    use zei_crypto::basic::elgamal::elgamal_encrypt;
 
     #[test]
     fn extract_amount_from_tracer_memo() {

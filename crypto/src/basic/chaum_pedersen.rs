@@ -1,7 +1,7 @@
-use crate::basics::matrix_sigma::{
+use crate::basic::matrix_sigma::{
     sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
 };
-use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
@@ -18,25 +18,24 @@ pub struct ChaumPedersenProof {
     pub(crate) z3: RistrettoScalar,
 }
 
-fn init_chaum_pedersen<'a>(
+fn init_chaum_pedersen(
     transcript: &mut Transcript,
-    identity: &'a RistrettoPoint,
-    pc_gens: &'a RistrettoPedersenCommitment,
-    c1: &'a RistrettoPoint,
-    c2: &'a RistrettoPoint,
-) -> (Vec<&'a RistrettoPoint>, Vec<Vec<usize>>, Vec<usize>) {
+    c1: &RistrettoPoint,
+    c2: &RistrettoPoint,
+) -> (Vec<RistrettoPoint>, Vec<Vec<usize>>, Vec<usize>) {
+    let identity = RistrettoPoint::get_identity();
+    let pc_gens = RistrettoPedersenCommitment::default();
     transcript.append_message(b"new_domain", b"Chaum Pedersen");
-    let elems = vec![identity, &pc_gens.B, &pc_gens.B_blinding, c1, c2];
+    let elems = vec![identity, pc_gens.B, pc_gens.B_blinding, *c1, *c2];
     let lhs_matrix = vec![vec![1, 2, 0], vec![1, 0, 2]];
     let rhs_vec = vec![3, 4];
     (elems, lhs_matrix, rhs_vec)
 }
 
-/// Computes a Chaum-Pedersen proof of knowledge of openings of two commitments to the same value
+/// Compute a Chaum-Pedersen proof of knowledge of openings of two commitments to the same value
 pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     value: &RistrettoScalar,
     com1: (&RistrettoPoint, &RistrettoScalar), // commitment and blinding
     com2: (&RistrettoPoint, &RistrettoScalar), // commitment and blinding
@@ -45,8 +44,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(
     let c2 = com2.0;
     let blinding_factor1 = com1.1;
     let blinding_factor2 = com2.1;
-    let identity = RistrettoPoint::get_identity();
-    let (elems, lhs_matrix, _) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
+    let (elems, lhs_matrix, _) = init_chaum_pedersen(transcript, c1, c2);
     let secrets = [value, blinding_factor1, blinding_factor2];
     let proof = sigma_prove(
         transcript,
@@ -66,7 +64,7 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(
 }
 
 /// Return verification scalars associated with a chaum pedersen proof of equality of two commitment.
-/// The scalars can then be used in a single multiexponentiation to verify a chaum pedersen proof.
+/// The scalars can then be used in a single multi-exponentiation to verify a chaum pedersen proof.
 /// The order of the returned scalars is
 ///  - 0: scalar associated with pc_gens.B
 ///  - 1: scalar associated with pc_gens.B_blinding
@@ -77,13 +75,11 @@ pub fn chaum_pedersen_prove_eq<R: CryptoRng + RngCore>(
 pub fn chaum_pedersen_verify_eq_scalars<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     c1: &RistrettoPoint,
     c2: &RistrettoPoint,
     proof: &ChaumPedersenProof,
 ) -> Vec<RistrettoScalar> {
-    let identity = RistrettoPoint::get_identity();
-    let (elems, lhs_matrix, rhs_vec) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
+    let (elems, lhs_matrix, rhs_vec) = init_chaum_pedersen(transcript, c1, c2);
 
     let sigma_proof = SigmaProof {
         commitments: vec![proof.c3, proof.c4],
@@ -97,23 +93,21 @@ pub fn chaum_pedersen_verify_eq_scalars<R: CryptoRng + RngCore>(
         &rhs_vec,
         &sigma_proof,
     );
-    scalars.remove(0);
+    scalars.remove(0); // The first element is the identity element.
     scalars
 }
+
 /// Verify a Chaum-Pedersen equality proof. Return Ok() in case of success,
 /// Err(ZeiError::ZKVerificationError) in case of verification failure, and
 /// Err(Error::DecompressElementError) in case some CompressedRistretto can not be decompressed.
-/// Use aggregation technique and a single multi-exponentiation check
 pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     c1: &RistrettoPoint,
     c2: &RistrettoPoint,
     proof: &ChaumPedersenProof,
 ) -> Result<()> {
-    let identity = RistrettoPoint::get_identity();
-    let (elems, lhs_matrix, rhs_vec) = init_chaum_pedersen(transcript, &identity, pc_gens, c1, c2);
+    let (elems, lhs_matrix, rhs_vec) = init_chaum_pedersen(transcript, c1, c2);
 
     let sigma_proof = SigmaProof {
         commitments: vec![proof.c3, proof.c4],
@@ -138,16 +132,14 @@ pub struct ChaumPedersenProofX {
     pub(crate) zero: Option<ChaumPedersenProof>,
 }
 
-fn init_chaum_pedersen_multiple(
-    transcript: &mut Transcript,
-    pc_gens: &RistrettoPedersenCommitment,
-    commitments: &[RistrettoPoint],
-) {
+fn init_chaum_pedersen_multiple(transcript: &mut Transcript, commitments: &[RistrettoPoint]) {
+    let pc_gens = RistrettoPedersenCommitment::default();
+
     let b = pc_gens.B;
     let b_blinding = pc_gens.B_blinding;
-    let mut public_elems = vec![&b, &b_blinding];
+    let mut public_elems = vec![b, b_blinding];
     for c in commitments.iter() {
-        public_elems.push(c);
+        public_elems.push(*c);
     }
     transcript.init_sigma(b"ChaumPedersenMultiple", &[], public_elems.as_slice())
 }
@@ -156,7 +148,6 @@ fn init_chaum_pedersen_multiple(
 pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     value: &RistrettoScalar,
     commitments: &[RistrettoPoint],
     blinding_factors: &[RistrettoScalar],
@@ -166,11 +157,10 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
         return Err(eg!(ZeiError::ParameterError));
     }
 
-    init_chaum_pedersen_multiple(transcript, pc_gens, commitments);
+    init_chaum_pedersen_multiple(transcript, commitments);
     let proof_c0_c1 = chaum_pedersen_prove_eq(
         transcript,
         prng,
-        pc_gens,
         value,
         (&commitments[0], &blinding_factors[0]),
         (&commitments[1], &blinding_factors[1]),
@@ -206,13 +196,9 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     let proof_zero = chaum_pedersen_prove_eq(
         transcript,
         prng,
-        pc_gens,
         &RistrettoScalar::zero(),
         (&d, &z),
-        (
-            &get_fake_zero_commitment(),
-            &get_fake_zero_commitment_blinding(),
-        ),
+        (&get_zero_commitment(), &get_zero_commitment_blinding()),
     );
     Ok(ChaumPedersenProofX {
         c1_eq_c2: proof_c0_c1,
@@ -222,7 +208,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
 
 /// Return verification scalars associated with a chaum pedersen proof of equality of multiple
 /// pedersen commitments.
-/// The scalars can then be used in a single multiexponentiation to verify a chaum pedersen proof.
+/// The scalars can then be used in a single multi-exponentiation to verify a chaum pedersen proof.
 /// The order of the returned scalars is
 ///  - 0: scalar associated with pc_gens.B
 ///  - 1: scalar associated with pc_gens.B_blinding
@@ -237,22 +223,20 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
 pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     commitments: &[RistrettoPoint],
     proof: &ChaumPedersenProofX,
 ) -> Result<(Vec<RistrettoScalar>, Option<RistrettoPoint>)> {
-    init_chaum_pedersen_multiple(transcript, pc_gens, commitments);
+    init_chaum_pedersen_multiple(transcript, commitments);
     let c1_eq_c2_scalars = chaum_pedersen_verify_eq_scalars(
         transcript,
         prng,
-        pc_gens,
         &commitments[0],
         &commitments[1],
         &proof.c1_eq_c2,
     );
 
     if commitments.len() == 2 {
-        //check proof structure is consistent
+        // check proof structure is consistent
         return match proof.zero {
             None => Ok((c1_eq_c2_scalars, None)),
             Some(_) => Err(eg!(ZeiError::ZKProofVerificationError)),
@@ -272,19 +256,18 @@ pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
     let ci_scalars = chaum_pedersen_verify_eq_scalars(
         transcript,
         prng,
-        pc_gens,
         &d,
-        &get_fake_zero_commitment(),
+        &get_zero_commitment(),
         proof.zero.as_ref().unwrap(),
-    ); //safe unwrap
+    ); // safe unwrap
 
     let alpha = RistrettoScalar::random(prng);
 
     let mut result = c1_eq_c2_scalars;
     result[0] = result[0].add(&alpha.mul(&ci_scalars[0])); // aggregate B scalars
     result[1] = result[1].add(&alpha.mul(&ci_scalars[1])); // aggregate B_blinding scalars
-    result.push(alpha.mul(&ci_scalars[2]));
-    //result.push(alpha * ci_scalars[3]); unneeded since corresponding point is identity
+    result.push(alpha.mul(&ci_scalars[2])); // for commitment d
+                                            // result.push(alpha * ci_scalars[3]); skip, because this one is for the zero commitment
     result.push(alpha.mul(&ci_scalars[4]));
     result.push(alpha.mul(&ci_scalars[5]));
 
@@ -297,7 +280,6 @@ pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
 pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     commitments: &[RistrettoPoint],
     proof: &ChaumPedersenProofX,
 ) -> Result<()> {
@@ -305,11 +287,10 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
         return Err(eg!(ZeiError::ParameterError));
     }
 
-    init_chaum_pedersen_multiple(transcript, pc_gens, commitments);
+    init_chaum_pedersen_multiple(transcript, commitments);
     chaum_pedersen_verify_eq(
         transcript,
         prng,
-        pc_gens,
         &commitments[0],
         &commitments[1],
         &proof.c1_eq_c2,
@@ -318,7 +299,7 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
 
     if commitments.len() == 2 {
         return match proof.zero {
-            //check proof structure is consistent
+            // check proof structure is consistent
             None => Ok(()),
             Some(_) => Err(eg!(ZeiError::ZKProofVerificationError)),
         };
@@ -339,9 +320,8 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
     chaum_pedersen_verify_eq(
         transcript,
         prng,
-        pc_gens,
         &d,
-        &get_fake_zero_commitment(),
+        &get_zero_commitment(),
         proof.zero.as_ref().unwrap(),
     )
     .c(d!()) // safe unwrap
@@ -354,9 +334,10 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
 pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     instances: &[(Vec<RistrettoPoint>, &ChaumPedersenProofX)],
 ) -> Result<()> {
+    let pc_gens = RistrettoPedersenCommitment::default();
+
     let multi_exp_len_bound = 2 + 7 * instances.len();
     let mut all_scalars = Vec::with_capacity(multi_exp_len_bound);
     let mut all_elems = Vec::with_capacity(multi_exp_len_bound);
@@ -369,7 +350,6 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
         let (instance_scalars, elem) = chaum_pedersen_verify_multiple_eq_scalars(
             &mut instance_transcript,
             prng,
-            pc_gens,
             commitments.as_slice(),
             proof,
         )
@@ -410,12 +390,12 @@ pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
 // Helper functions for the proof of multiple commitments equality below
 
 // Obtain a fake compressed commitment to zero, eg The identity
-fn get_fake_zero_commitment() -> RistrettoPoint {
+fn get_zero_commitment() -> RistrettoPoint {
     RistrettoPoint::get_identity()
 }
 
 // Obtain the blinding used in the get_fake_zero_commitment
-fn get_fake_zero_commitment_blinding() -> RistrettoScalar {
+fn get_zero_commitment_blinding() -> RistrettoScalar {
     RistrettoScalar::zero()
 }
 
@@ -433,7 +413,7 @@ fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<RistrettoScalar>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use rand_chacha::ChaChaRng;
 
     #[test]
@@ -453,7 +433,6 @@ mod test {
         let proof = chaum_pedersen_prove_eq(
             &mut prover_transcript,
             &mut csprng,
-            &pc_gens,
             &value1,
             (&c1, &bf1),
             (&c2, &bf2),
@@ -462,22 +441,14 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"test");
         msg_eq!(
             ZeiError::ZKProofVerificationError,
-            chaum_pedersen_verify_eq(
-                &mut verifier_transcript,
-                &mut csprng,
-                &pc_gens,
-                &c1,
-                &c2,
-                &proof
-            )
-            .unwrap_err()
+            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut csprng, &c1, &c2, &proof)
+                .unwrap_err()
         );
 
         let mut prover_transcript = Transcript::new(b"test");
         let proof = chaum_pedersen_prove_eq(
             &mut prover_transcript,
             &mut csprng,
-            &pc_gens,
             &value2,
             (&c1, &bf2),
             (&c2, &bf2),
@@ -485,15 +456,8 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"test");
         msg_eq!(
             ZeiError::ZKProofVerificationError,
-            chaum_pedersen_verify_eq(
-                &mut verifier_transcript,
-                &mut csprng,
-                &pc_gens,
-                &c1,
-                &c2,
-                &proof
-            )
-            .unwrap_err()
+            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut csprng, &c1, &c2, &proof)
+                .unwrap_err()
         );
 
         let mut prover_transcript = Transcript::new(b"test");
@@ -501,33 +465,28 @@ mod test {
         let proof = chaum_pedersen_prove_eq(
             &mut prover_transcript,
             &mut csprng,
-            &pc_gens,
             &value1,
             (&c1, &bf1),
             (&c3, &bf2),
         );
         let mut verifier_transcript = Transcript::new(b"test");
-        assert!(chaum_pedersen_verify_eq(
-            &mut verifier_transcript,
-            &mut csprng,
-            &pc_gens,
-            &c1,
-            &c3,
-            &proof
-        )
-        .is_ok());
+        assert!(
+            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut csprng, &c1, &c3, &proof)
+                .is_ok()
+        );
     }
 
     #[test]
     fn test_chaum_pedersen_multiple_eq_proof() {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
         let value1 = RistrettoScalar::from(16u32);
         let value2 = RistrettoScalar::from(32u32);
         let bf1 = RistrettoScalar::from(10u32);
         let bf2 = RistrettoScalar::from(100u32);
         let bf3 = RistrettoScalar::from(1000u32);
+
+        let pc_gens = RistrettoPedersenCommitment::default();
         let c1 = pc_gens.commit(value1, bf1);
         let c2 = pc_gens.commit(value2, bf2);
         let c3 = pc_gens.commit(value1, bf3);
@@ -538,7 +497,6 @@ mod test {
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut prover_transcript,
             &mut csprng,
-            &pc_gens,
             &value1,
             com_vec,
             &blind_vec,
@@ -551,7 +509,6 @@ mod test {
             chaum_pedersen_verify_multiple_eq(
                 &mut verifier_transcript,
                 &mut csprng,
-                &pc_gens,
                 com_vec,
                 &proof
             )
@@ -569,7 +526,6 @@ mod test {
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut prover_transcript,
             &mut csprng,
-            &pc_gens,
             &value1,
             com_vec,
             &blind_vec,
@@ -579,7 +535,6 @@ mod test {
         assert!(chaum_pedersen_verify_multiple_eq(
             &mut verifier_transcript,
             &mut csprng,
-            &pc_gens,
             com_vec,
             &proof
         )
@@ -605,7 +560,6 @@ mod test {
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut prover_transcript,
             &mut csprng,
-            &pc_gens,
             &value1,
             com_vec,
             &blind_vec,
@@ -618,7 +572,6 @@ mod test {
             chaum_pedersen_verify_multiple_eq(
                 &mut verifier_transcript,
                 &mut csprng,
-                &pc_gens,
                 com_vec,
                 &proof
             )
@@ -636,7 +589,6 @@ mod test {
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut prover_transcript,
             &mut csprng,
-            &pc_gens,
             &value1,
             com_vec,
             &blind_vec,
@@ -647,7 +599,6 @@ mod test {
             chaum_pedersen_verify_multiple_eq(
                 &mut verifier_transcript,
                 &mut csprng,
-                &pc_gens,
                 com_vec,
                 &proof
             )

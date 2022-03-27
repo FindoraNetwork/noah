@@ -5,7 +5,7 @@ use zei_algebra::{
     collections::{hash_map::Iter, HashMap},
     prelude::*,
 };
-use zei_crypto::basics::rescue::RescueInstance;
+use zei_crypto::basic::rescue::RescueInstance;
 
 // ceil(log(u64::MAX, 3)) = 41
 // 3^0 + 3^1 + 3^2 + ... 3^40 < 2^64 (u64 can include all leaf & ancestor)
@@ -35,7 +35,7 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 ///     use zei_accumulators::merkle_tree::PersistentMerkleTree;
 ///     use zei_algebra::bls12_381::BLSScalar;
 ///     use zei_algebra::groups::Zero;
-///     use zei_crypto::basics::hash::rescue::RescueInstance;
+///     use zei_crypto::basic::hash::rescue::RescueInstance;
 ///
 ///     let hash = RescueInstance::new();
 ///

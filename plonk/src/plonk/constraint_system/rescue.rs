@@ -1,6 +1,6 @@
 use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-use zei_crypto::basics::rescue::RescueInstance;
+use zei_crypto::basic::rescue::RescueInstance;
 
 /// state size.
 const WIDTH: usize = 4;
@@ -268,7 +268,7 @@ impl TurboConstraintSystem<BLSScalar> {
 mod test {
     use crate::plonk::constraint_system::{rescue::State, TurboConstraintSystem};
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basics::rescue::RescueInstance;
+    use zei_crypto::basic::rescue::RescueInstance;
 
     type F = BLSScalar;
 

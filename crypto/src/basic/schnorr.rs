@@ -308,7 +308,7 @@ pub fn multisig_verify<G: Group>(
 mod schnorr_sigs {
 
     mod schnorr_simple_sig {
-        use crate::basics::schnorr::{KeyPair, PublicKey, Signature};
+        use crate::basic::schnorr::{KeyPair, PublicKey, Signature};
         use zei_algebra::jubjub::JubjubPoint;
         use zei_algebra::prelude::*;
         use zei_algebra::ristretto::RistrettoPoint;
@@ -381,7 +381,7 @@ mod schnorr_sigs {
 
     #[cfg(test)]
     mod schnorr_multisig {
-        use crate::basics::schnorr::{
+        use crate::basic::schnorr::{
             multisig_sign, multisig_verify, KeyPair, MultiSignature, Signature,
         };
         use zei_algebra::jubjub::JubjubPoint;

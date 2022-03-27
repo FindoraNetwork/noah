@@ -17,9 +17,9 @@ use zei_algebra::{
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar},
 };
-use zei_crypto::basics::chaum_pedersen::ChaumPedersenProofX;
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-use zei_crypto::basics::{
+use zei_crypto::basic::chaum_pedersen::ChaumPedersenProofX;
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::{
     elgamal::elgamal_key_gen,
     hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCiphertext},
     pedersen_elgamal::PedersenElGamalEqProof,

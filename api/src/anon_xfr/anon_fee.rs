@@ -357,7 +357,7 @@ mod tests {
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TREE_DEPTH};
     use zei_algebra::bls12_381::BLSScalar;
-    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
 
     #[test]
     fn test_anon_fee_happy_path() {

@@ -4,7 +4,7 @@ use zei_algebra::{
 };
 use zei_crypto::{
     anon_creds::{ACCommitOutput, Attribute},
-    basics::elgamal::elgamal_key_gen,
+    basic::elgamal::elgamal_key_gen,
 };
 
 type G1 = BLSG1;
@@ -330,9 +330,9 @@ pub fn ac_verify(
     .c(d!())
 }
 
-pub type AttributeEncKey = zei_crypto::basics::elgamal::ElGamalEncKey<G1>;
-pub type AttributeDecKey = zei_crypto::basics::elgamal::ElGamalDecKey<S>;
-pub type AttributeCiphertext = zei_crypto::basics::elgamal::ElGamalCiphertext<G1>;
+pub type AttributeEncKey = zei_crypto::basic::elgamal::ElGamalEncKey<G1>;
+pub type AttributeDecKey = zei_crypto::basic::elgamal::ElGamalDecKey<S>;
+pub type AttributeCiphertext = zei_crypto::basic::elgamal::ElGamalCiphertext<G1>;
 
 pub type ConfidentialAC = zei_crypto::conf_cred_reveal::ConfidentialAC<G1, G2, S>;
 

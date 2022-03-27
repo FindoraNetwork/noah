@@ -84,7 +84,7 @@ mod test {
     use serde::{de::Deserialize, ser::Serialize};
     use std::convert::TryFrom;
     use zei_algebra::ristretto::RistrettoPoint;
-    use zei_crypto::basics::{
+    use zei_crypto::basic::{
         elgamal::elgamal_key_gen,
         hybrid_encryption::{XPublicKey, XSecretKey},
     };

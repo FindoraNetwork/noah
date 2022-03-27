@@ -17,8 +17,8 @@ use rand_chacha::ChaChaRng;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-use zei_crypto::basics::{
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
 };
@@ -828,8 +828,8 @@ mod asset_tracing {
         jubjub::JubjubScalar,
         ristretto::{RistrettoPoint, RistrettoScalar},
     };
-    use zei_crypto::basics::elgamal::ElGamalCiphertext;
-    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::elgamal::ElGamalCiphertext;
+    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);

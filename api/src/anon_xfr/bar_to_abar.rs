@@ -12,10 +12,10 @@ use num_bigint::BigUint;
 use zei_algebra::{
     bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
 };
-use zei_crypto::basics::rescue::RescueInstance;
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::rescue::RescueInstance;
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
-    basics::hybrid_encryption::XPublicKey,
+    basic::hybrid_encryption::XPublicKey,
     pc_eq_rescue_split_verifier_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
     },
@@ -250,8 +250,8 @@ mod test {
     };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     // helper function
     fn build_bar(
@@ -310,7 +310,7 @@ mod test {
         let node_params = NodeParams::bar_to_abar_params().unwrap();
         // confidential case
         assert!(
-            super::verify_bar_to_abar(&node_params, &bar_conf, &abar_conf, &proof_conf,).is_ok()
+            super::verify_bar_to_abar(&node_params, &bar_conf, &abar_conf, &proof_conf).is_ok()
         );
         // non confidential case
         assert!(super::verify_bar_to_abar(
