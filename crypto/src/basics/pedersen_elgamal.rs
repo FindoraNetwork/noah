@@ -22,46 +22,46 @@ pub struct PedersenElGamalEqProof {
 // Initiate transcript for Pedersen-Elgamal aggregate proof
 fn init_pedersen_elgamal_aggregate(
     transcript: &mut Transcript,
-    pc_gens: &RistrettoPedersenCommitment,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctexts: &[ElGamalCiphertext<RistrettoPoint>],
     commitments: &[RistrettoPoint],
 ) {
+    let pc_gens = RistrettoPedersenCommitment::default();
     let mut public_elems = vec![];
     let b = pc_gens.B;
     let b_blinding = pc_gens.B_blinding;
-    public_elems.push(&b);
-    public_elems.push(&b_blinding);
-    public_elems.push(&public_key.0);
+    public_elems.push(b);
+    public_elems.push(b_blinding);
+    public_elems.push(public_key.0);
     for ctext in ctexts {
-        public_elems.push(&ctext.e1);
-        public_elems.push(&ctext.e2);
+        public_elems.push(ctext.e1);
+        public_elems.push(ctext.e2);
     }
     for commitment in commitments {
-        public_elems.push(commitment);
+        public_elems.push(*commitment);
     }
     transcript.init_sigma(b"PedersenElGamalAggEq", &[], public_elems.as_slice());
 }
 
 // Initiate transcript for PedersenElgamal proof and return proof elements,
 // lhs indices matrix and rhs indices vector to be used as input to the sigma protocol
-fn init_pok_pedersen_elgamal<'a>(
+fn init_pok_pedersen_elgamal(
     transcript: &mut Transcript,
-    identity: &'a RistrettoPoint,
-    pc_gens: &'a RistrettoPedersenCommitment,
-    public_key: &'a ElGamalEncKey<RistrettoPoint>,
-    ctext: &'a ElGamalCiphertext<RistrettoPoint>,
-    commitment: &'a RistrettoPoint,
-) -> (Vec<&'a RistrettoPoint>, Vec<Vec<usize>>, Vec<usize>) {
+    identity: &RistrettoPoint,
+    public_key: &ElGamalEncKey<RistrettoPoint>,
+    ctext: &ElGamalCiphertext<RistrettoPoint>,
+    commitment: &RistrettoPoint,
+) -> (Vec<RistrettoPoint>, Vec<Vec<usize>>, Vec<usize>) {
+    let pc_gens = RistrettoPedersenCommitment::default();
     transcript.append_message(b"new_domain", b"Dlog proof");
     let elems = vec![
-        identity,
-        &pc_gens.B,
-        &pc_gens.B_blinding,
-        &public_key.0,
-        &ctext.e1,
-        &ctext.e2,
-        commitment,
+        *identity,
+        pc_gens.B,
+        pc_gens.B_blinding,
+        public_key.0,
+        ctext.e1,
+        ctext.e2,
+        *commitment,
     ];
     let lhs_matrix = vec![
         vec![0, 1], // m*0 + r*B = ctext.e1
@@ -71,7 +71,7 @@ fn init_pok_pedersen_elgamal<'a>(
     let rhs_vec = vec![4, 5, 6]; // e1, e2, commitment
     (elems, lhs_matrix, rhs_vec)
 }
-// I compute a proof that ctext and commitment encrypts/holds m under same randomness r.
+// Compute a proof that ctext and commitment encrypts/holds m under same randomness r.
 // assumes transcript already contains ciphertexts and commitments
 pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
@@ -82,11 +82,9 @@ pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(
     ctext: &ElGamalCiphertext<RistrettoPoint>,
     commitment: &RistrettoPoint,
 ) -> PedersenElGamalEqProof {
-    let pc_gens = RistrettoPedersenCommitment::default();
     let identity = RistrettoPoint::get_identity();
-    let (elems, lhs_matrix, _) = init_pok_pedersen_elgamal(
-        transcript, &identity, &pc_gens, public_key, ctext, commitment,
-    );
+    let (elems, lhs_matrix, _) =
+        init_pok_pedersen_elgamal(transcript, &identity, public_key, ctext, commitment);
     let proof = sigma_prove(
         transcript,
         prng,
@@ -108,16 +106,14 @@ pub fn pedersen_elgamal_eq_prove<R: CryptoRng + RngCore>(
 fn pedersem_elgamal_eq_verify_scalars<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctext: &ElGamalCiphertext<RistrettoPoint>,
     commitment: &RistrettoPoint,
     proof: &PedersenElGamalEqProof,
 ) -> Vec<RistrettoScalar> {
     let identity = RistrettoPoint::get_identity();
-    let (elems, lhs_matrix, rhs_vec) = init_pok_pedersen_elgamal(
-        transcript, &identity, pc_gens, public_key, ctext, commitment,
-    );
+    let (elems, lhs_matrix, rhs_vec) =
+        init_pok_pedersen_elgamal(transcript, &identity, public_key, ctext, commitment);
     let sigma_proof = SigmaProof {
         commitments: vec![proof.e1.e1, proof.e1.e2, proof.c1],
         responses: vec![proof.z1, proof.z2],
@@ -141,15 +137,14 @@ fn pedersem_elgamal_eq_verify_scalars<R: CryptoRng + RngCore>(
 fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctext: &ElGamalCiphertext<RistrettoPoint>,
     commitment: &RistrettoPoint,
     proof: &PedersenElGamalEqProof,
 ) -> Result<()> {
-    let scalars = pedersem_elgamal_eq_verify_scalars(
-        transcript, prng, pc_gens, public_key, ctext, commitment, proof,
-    );
+    let pc_gens = RistrettoPedersenCommitment::default();
+    let scalars =
+        pedersem_elgamal_eq_verify_scalars(transcript, prng, public_key, ctext, commitment, proof);
 
     let elems = [
         pc_gens.B,
@@ -201,8 +196,7 @@ pub fn pedersen_elgamal_aggregate_eq_proof<R: CryptoRng + RngCore>(
     assert_eq!(n, ctexts.len());
     assert_eq!(n, commitments.len());
 
-    let pc_gens = RistrettoPedersenCommitment::default();
-    init_pedersen_elgamal_aggregate(transcript, &pc_gens, public_key, ctexts, commitments);
+    init_pedersen_elgamal_aggregate(transcript, public_key, ctexts, commitments);
 
     // 1. compute x vector
     let x = get_linear_combination_scalars(transcript, n);
@@ -241,15 +235,15 @@ pub struct PedersenElGamalProofInstance<'a> {
 }
 
 /// Verify a batch of PedersenElGamal aggregate proof instances with a single multiexponentiation
-/// of size 2 + n*7 elems. Each instance verification equation is scaled by a random factor.
+/// of size `2 + n*7` elems. Each instance verification equation is scaled by a random factor.
 /// Then, scaled equations are aggregated into a single equation of size 2 + n*7 elements.
 pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     instances: &[PedersenElGamalProofInstance<'a>],
 ) -> Result<()> {
     let m = instances.len();
+    let pc_gens = RistrettoPedersenCommitment::default();
     // 2 common elems: B, B_blinding
     // 7 elems per instance: public key,
     //                       ctext.e1, ctext.e2, commitment,
@@ -267,7 +261,6 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
         let alpha = RistrettoScalar::random(prng);
         init_pedersen_elgamal_aggregate(
             &mut inst_transcript,
-            pc_gens,
             instance.public_key,
             &instance.ctexts,
             &instance.commitments,
@@ -295,7 +288,6 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
         let instance_scalars = pedersem_elgamal_eq_verify_scalars(
             &mut inst_transcript,
             prng,
-            pc_gens,
             instance.public_key,
             &lc_e,
             &lc_c,
@@ -326,11 +318,10 @@ pub fn pedersen_elgamal_batch_aggregate_eq_verify<'a, R: CryptoRng + RngCore>(
 
     Ok(())
 }
-/// Verification of Proof of Knowledge for PedersenElGamal equality proof, for a set of statement.
+/// Verify Proof of Knowledge for PedersenElGamal equality proof, for a set of statement.
 pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctexts: &[ElGamalCiphertext<RistrettoPoint>],
     commitments: &[RistrettoPoint],
@@ -343,7 +334,7 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
         proof,
     };
 
-    pedersen_elgamal_batch_aggregate_eq_verify(transcript, prng, pc_gens, &[instance])
+    pedersen_elgamal_batch_aggregate_eq_verify(transcript, prng, &[instance])
         .c(d!(ZeiError::ZKProofVerificationError))
 }
 
@@ -393,7 +384,6 @@ mod test {
         let verify = super::pedersen_elgamal_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctext,
             &commitment,
@@ -429,7 +419,6 @@ mod test {
         let verify = super::pedersen_elgamal_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctext,
             &commitment,
@@ -480,7 +469,6 @@ mod test {
         let verify = super::pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctexts,
             &commitments,
@@ -502,7 +490,6 @@ mod test {
         let verify = super::pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctexts[..1],
             &commitments[..1],
@@ -524,7 +511,6 @@ mod test {
         let verify = super::pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctexts[1..2],
             &commitments[1..2],
@@ -546,7 +532,6 @@ mod test {
         let verify = super::pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctexts[1..3],
             &commitments[1..3],
@@ -568,7 +553,6 @@ mod test {
         let verify = super::pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctexts,
             &commitments,
@@ -591,7 +575,6 @@ mod test {
         let verify = super::pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctexts,
             &commitments,
@@ -615,7 +598,6 @@ mod test {
         let verify = super::pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
-            &pc_gens,
             &pk,
             &ctexts,
             &commitments,
@@ -720,7 +702,6 @@ mod test {
         assert!(pedersen_elgamal_batch_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut rng,
-            &pc_gens,
             &instances
         )
         .is_ok());

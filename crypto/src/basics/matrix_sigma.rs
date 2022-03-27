@@ -7,7 +7,7 @@ pub trait SigmaTranscript {
         &mut self,
         instance_name: &'static [u8],
         public_scalars: &[&G::ScalarType],
-        public_elems: &[&G],
+        public_elems: &[G],
     );
     fn append_group_element<G: Group>(&mut self, label: &'static [u8], elem: &G);
     fn append_field_element<S: Scalar>(&mut self, label: &'static [u8], scalar: &S);
@@ -20,7 +20,7 @@ impl SigmaTranscript for Transcript {
         &mut self,
         instance_name: &'static [u8],
         public_scalars: &[&G::ScalarType],
-        public_elems: &[&G],
+        public_elems: &[G],
     ) {
         self.append_message(b"Sigma Protocol domain", b"Sigma protocol single group");
         self.append_message(b"instance name", instance_name);
@@ -49,7 +49,7 @@ impl SigmaTranscript for Transcript {
     }
 }
 
-fn init_sigma_protocol<G: Group>(transcript: &mut Transcript, elems: &[&G]) {
+fn init_sigma_protocol<G: Group>(transcript: &mut Transcript, elems: &[G]) {
     transcript.init_sigma(b"New Sigma Protocol", &[], elems);
 }
 
@@ -64,7 +64,7 @@ fn sample_blindings<R: CryptoRng + RngCore, S: Scalar>(prng: &mut R, n: usize) -
 fn compute_proof_commitments<G: Group>(
     transcript: &mut Transcript,
     blindings: &[G::ScalarType],
-    elems: &[&G],
+    elems: &[G],
     lhs_matrix: &[Vec<usize>],
 ) -> Vec<G> {
     let mut pf_commitments = vec![];
@@ -92,7 +92,7 @@ pub struct SigmaProof<S, G> {
 pub fn sigma_prove<R: CryptoRng + RngCore, G: Group>(
     transcript: &mut Transcript,
     prng: &mut R,
-    elems: &[&G],              // public elements of the proofs
+    elems: &[G],               // public elements of the proofs
     lhs_matrix: &[Vec<usize>], // each row defines a lhs of a constraint
     secret_scalars: &[&G::ScalarType],
 ) -> SigmaProof<G::ScalarType, G> {
@@ -158,7 +158,7 @@ fn collect_multi_exp_scalars<R: CryptoRng + RngCore, S: Scalar>(
 pub fn sigma_verify_scalars<R: CryptoRng + RngCore, G: Group>(
     transcript: &mut Transcript,
     prng: &mut R, //use of for linear combination multiexp
-    elems: &[&G],
+    elems: &[G],
     lhs_matrix: &[Vec<usize>],
     rhs_vec: &[usize],
     proof: &SigmaProof<G::ScalarType, G>,
@@ -186,7 +186,7 @@ pub fn sigma_verify_scalars<R: CryptoRng + RngCore, G: Group>(
 pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
     transcript: &mut Transcript,
     prng: &mut R, //use of for linear combination multiexp
-    elems: &[&G],
+    elems: &[G],
     lhs_matrix: &[Vec<usize>],
     rhs_vec: &[usize],
     proof: &SigmaProof<G::ScalarType, G>,
@@ -197,7 +197,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
     let scalars_as_ref = multi_exp_scalars.iter().collect_vec();
     let mut me_elems = vec![];
     for e in elems {
-        me_elems.push(*e);
+        me_elems.push(e);
     }
     for e in proof.commitments.iter() {
         me_elems.push(e);
@@ -229,20 +229,20 @@ mod tests {
         let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
 
         //test 1 simple dlog
-        let elems: &[&RistrettoPoint] = &[&G, &H];
+        let elems = [G, H];
         let lhs_matrix = vec![vec![0]];
         let rhs_vec = vec![1];
         let dlog_proof = super::sigma_prove(
             &mut prover_transcript,
             &mut prng,
-            elems,
+            &elems,
             lhs_matrix.as_slice(),
             &[&secret],
         );
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,
-            elems,
+            &elems,
             lhs_matrix.as_slice(),
             rhs_vec.as_slice(),
             &dlog_proof
@@ -253,14 +253,14 @@ mod tests {
         let dlog_proof = super::sigma_prove(
             &mut prover_transcript,
             &mut prng,
-            elems,
+            &elems,
             bad_matrix.as_slice(),
             &[&secret],
         );
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,
-            elems,
+            &elems,
             bad_matrix.as_slice(),
             rhs_vec.as_slice(),
             &dlog_proof
@@ -272,20 +272,20 @@ mod tests {
         let secret2 = Scalar::from(20u32);
         let H2 = G.mul(&secret2);
         let zero = RistrettoPoint::get_identity();
-        let elems: &[&RistrettoPoint] = &[&zero, &G, &H, &H2];
+        let elems = [zero, G, H, H2];
         let lhs_matrix: &[Vec<usize>] = &[vec![1, 0], vec![0, 1]];
         let rhs_vec: &[usize] = &[2, 3];
         let dlog_proof = super::sigma_prove(
             &mut prover_transcript,
             &mut prng,
-            elems,
+            &elems,
             lhs_matrix,
             &[&secret, &secret2],
         );
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,
-            elems,
+            &elems,
             lhs_matrix,
             rhs_vec,
             &dlog_proof
@@ -296,14 +296,14 @@ mod tests {
         let dlog_proof = super::sigma_prove(
             &mut prover_transcript,
             &mut prng,
-            elems,
+            &elems,
             lhs_matrix,
             &[&secret, &secret2],
         );
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,
-            elems,
+            &elems,
             lhs_matrix,
             rhs_vec,
             &dlog_proof
@@ -314,14 +314,14 @@ mod tests {
         let dlog_proof = super::sigma_prove(
             &mut prover_transcript,
             &mut prng,
-            elems,
+            &elems,
             lhs_matrix,
             &[&secret, &secret2],
         );
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,
-            elems,
+            &elems,
             lhs_matrix,
             rhs_vec,
             &dlog_proof
@@ -335,15 +335,15 @@ mod tests {
         let Z1 = G.mul(&secret).add(&H.mul(&secret2));
         let Z2 = G.mul(&secret3).add(&H.mul(&secret4)).add(&H2.mul(&secret5));
 
-        let elems = &[&zero, &G, &H, &H2, &Z1, &Z2];
+        let elems = [zero, G, H, H2, Z1, Z2];
         let matrix: &[Vec<usize>] = &[vec![1, 2, 0, 0, 0], vec![0, 0, 1, 2, 3]];
         let rhs_vec = &[4, 5];
         let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &secret5];
-        let proof = super::sigma_prove(&mut prover_transcript, &mut prng, elems, matrix, secrets);
+        let proof = super::sigma_prove(&mut prover_transcript, &mut prng, &elems, matrix, secrets);
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,
-            elems,
+            &elems,
             matrix,
             rhs_vec,
             &proof
@@ -351,11 +351,11 @@ mod tests {
         .is_ok());
 
         let secrets: &[&Scalar] = &[&secret, &secret2, &secret3, &secret4, &Scalar::zero()]; // bad secrets
-        let proof = super::sigma_prove(&mut prover_transcript, &mut prng, elems, matrix, secrets);
+        let proof = super::sigma_prove(&mut prover_transcript, &mut prng, &elems, matrix, secrets);
         assert!(super::sigma_verify(
             &mut verifier_transcript,
             &mut prng,
-            elems,
+            &elems,
             matrix,
             rhs_vec,
             &proof

@@ -310,7 +310,7 @@ mod test {
         let node_params = NodeParams::bar_to_abar_params().unwrap();
         // confidential case
         assert!(
-            super::verify_bar_to_abar(&node_params, &bar_conf, &abar_conf, &proof_conf,).is_ok()
+            super::verify_bar_to_abar(&node_params, &bar_conf, &abar_conf, &proof_conf).is_ok()
         );
         // non confidential case
         assert!(super::verify_bar_to_abar(

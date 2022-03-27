@@ -689,7 +689,7 @@ pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(
     batch_verify_xfr_body_asset_records(prng, params, bodies).c(d!())?;
 
     // 2. verify tracing proofs
-    batch_verify_tracer_tracing_proof(prng, &params.pc_gens, bodies, policies).c(d!())
+    batch_verify_tracer_tracing_proof(prng, bodies, policies).c(d!())
 }
 
 /// Takes a vector of u64, converts each element to u128 and compute the sum of the new elements.

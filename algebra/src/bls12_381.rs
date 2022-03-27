@@ -6,7 +6,11 @@ use ark_bls12_381::{
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{BigInteger, FftField, FftParameters, Field, Fp12, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{result::Result as StdResult, str::FromStr};
+use ark_std::{
+    fmt::{Debug, Display, Formatter},
+    result::Result as StdResult,
+    str::FromStr,
+};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use wasm_bindgen::prelude::*;
@@ -16,8 +20,15 @@ pub const BLS12_381_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `ark_bls12_381::Fr`
 #[wasm_bindgen]
-#[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Default)]
 pub struct BLSScalar(pub(crate) Fr);
+
+impl Debug for BLSScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let biguint = BigUint::from(self.0.clone());
+        <BigUint as Display>::fmt(&biguint, f)
+    }
+}
 
 /// The wrapped struct for `ark_bls12_381::G1Projective`
 #[wasm_bindgen]
