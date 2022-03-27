@@ -1,18 +1,17 @@
-use merlin::Transcript;
-use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
-use zei_algebra::traits::Scalar;
-
 use crate::plonk::setup::PlonkVerifierParams;
 use crate::poly_commit::{pcs::ToBytes, transcript::PolyComTranscript};
+use merlin::Transcript;
+use rand_chacha::ChaChaRng;
+use zei_algebra::prelude::*;
 
+/// Initialize the transcript when compute PLONK proof.
 pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(
     transcript: &mut Transcript,
     params: &PlonkVerifierParams<C, F>,
     io_values: &[F],
 ) {
     transcript.append_message(b"New Domain", b"PLONK");
-    // TODO hash all this in preprocessing step
+
     transcript.append_u64(b"CS size", params.cs_size as u64);
     transcript.append_message(b"field size", &F::get_field_size_le_bytes());
     for q in params.selectors.iter() {
@@ -31,6 +30,7 @@ pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(
     }
 }
 
+/// Return the challenge result.
 pub(crate) fn transcript_get_challenge_field_elem<F: Scalar>(
     transcript: &mut Transcript,
     group_order: usize,
@@ -48,6 +48,7 @@ pub(crate) fn transcript_get_challenge_field_elem<F: Scalar>(
     }
 }
 
+/// Return the challenge result by label: "alpha".
 pub(crate) fn transcript_get_plonk_challenge_alpha<F: Scalar>(
     transcript: &mut Transcript,
     group_order: usize,
@@ -55,6 +56,7 @@ pub(crate) fn transcript_get_plonk_challenge_alpha<F: Scalar>(
     transcript_get_challenge_field_elem(transcript, group_order, b"alpha")
 }
 
+/// Return the challenge result by label: "beta".
 pub(crate) fn transcript_get_plonk_challenge_beta<F: Scalar>(
     transcript: &mut Transcript,
     group_order: usize,
@@ -62,6 +64,7 @@ pub(crate) fn transcript_get_plonk_challenge_beta<F: Scalar>(
     transcript_get_challenge_field_elem(transcript, group_order, b"beta")
 }
 
+/// Return the challenge result by label: "gamma".
 pub(crate) fn transcript_get_plonk_challenge_gamma<F: Scalar>(
     transcript: &mut Transcript,
     group_order: usize,
@@ -69,6 +72,7 @@ pub(crate) fn transcript_get_plonk_challenge_gamma<F: Scalar>(
     transcript_get_challenge_field_elem(transcript, group_order, b"gamma")
 }
 
+/// Return the challenge result by label: "delta".
 pub(crate) fn transcript_get_plonk_challenge_delta<F: Scalar>(
     transcript: &mut Transcript,
     group_order: usize,

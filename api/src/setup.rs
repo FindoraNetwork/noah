@@ -18,7 +18,7 @@ use serde::Deserialize;
 use zei_algebra::{
     bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
 };
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use zei_plonk::{
     plonk::{

@@ -10,7 +10,7 @@ use crate::xfr::{
     },
 };
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
 /// AssetRecrod confidentiality flags. Indicated if amount and/or assettype should be confidential
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -600,7 +600,7 @@ mod test {
     };
     use rand_chacha::ChaChaRng;
     use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracing: bool) {
         let mut prng: ChaChaRng;

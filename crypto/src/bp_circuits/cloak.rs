@@ -39,7 +39,7 @@ match on each list. On each product the elements are shifted by a random challen
   - The last intermediate value is appended to the output list.
 */
 
-use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use bulletproofs::r1cs::{
     ConstraintSystem, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };

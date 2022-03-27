@@ -13,10 +13,7 @@ use zei_algebra::{
     jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN},
     prelude::*,
 };
-use zei_crypto::basics::{
-    hash::rescue::RescueInstance,
-    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey},
-};
+use zei_crypto::basic::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
 
 pub mod abar_to_bar;
 pub mod anon_fee;
@@ -28,6 +25,7 @@ mod merkle_tree_test;
 pub(crate) mod proofs;
 pub mod structs;
 pub use circuits::TREE_DEPTH;
+use zei_crypto::basic::rescue::RescueInstance;
 
 /// Build an anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
@@ -343,10 +341,8 @@ mod tests {
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basics::{
-        hash::rescue::RescueInstance,
-        hybrid_encryption::{XPublicKey, XSecretKey},
-    };
+    use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basic::rescue::RescueInstance;
 
     pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
         MTLeafInfo {
@@ -482,7 +478,7 @@ mod tests {
             let verifier_params = NodeParams::from(user_params);
             assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
 
-            let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
+            let note = AXfrNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
         }
     }
@@ -647,7 +643,7 @@ mod tests {
             let vk2 = NodeParams::load(1, 1).unwrap();
             assert!(verify_anon_xfr_body(&vk2, &body, &mt.get_root().unwrap()).is_ok());
 
-            let note = AXfrNote::generate_note_from_body(body, key_pairs).unwrap();
+            let note = AXfrNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
             assert!(note.verify().is_ok())
         }
     }

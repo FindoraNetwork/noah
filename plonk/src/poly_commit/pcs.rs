@@ -1,69 +1,73 @@
-use crate::poly_commit::field_polynomial::FpPolynomial;
-use crate::poly_commit::transcript::PolyComTranscript;
-use custom_error::custom_error;
+use crate::poly_commit::{field_polynomial::FpPolynomial, transcript::PolyComTranscript};
 use merlin::Transcript;
-use ruc::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use zei_algebra::{ops::*, traits::Scalar, One, Zero};
+use zei_algebra::prelude::*;
 
-custom_error! {#[derive(PartialEq)] pub PolyComSchemeError
-    PCSProveEvalError  = "It is not possible to compute the proof as F(x) != y.",
-    PCSCommitError = "Polynomial degree does not match the public parameters size.",
-    DegreeError  = "The degree of the polynomial is higher than the maximum degree allowed.",
-}
-
+/// The trait for help serialize to bytes,
+/// implement by polynomial commitment.
 pub trait ToBytes {
+    /// Convert to bytes.
     fn to_bytes(&self) -> Vec<u8>;
 }
 
-/// Group definition for polynomial commitment space
+/// The trait for homomorphic polynomial commitment field.
 pub trait HomomorphicPolyComElem: ToBytes {
+    /// This is the scalar field of the polynomial.
     type Scalar;
-    /// get base (generator) of the group
+
+    /// Get base (generator) of the group.
     fn get_base() -> Self;
 
-    /// get identity of the group
+    /// Get identity of the group.
     fn get_identity() -> Self;
 
-    /// Add the underlying polynomials
+    /// Add the underlying polynomials.
     fn op(&self, other: &Self) -> Self;
 
-    /// Add the underlying polynomials
+    /// Add assign the underlying polynomials.
     fn op_assign(&mut self, other: &Self);
 
-    /// Multiply underlying polynomial by scalar `exp` represented in least significant byte first
+    /// Multiply underlying polynomial by scalar `exp` represented
+    /// in least significant byte first.
     fn exp(&self, exp: &Self::Scalar) -> Self;
 
-    /// Multiply underlying polynomial by scalar `exp`
+    /// Multiply underlying polynomial by scalar `exp`.
     fn exp_assign(&mut self, exp: &Self::Scalar);
 
-    /// Negates the polynomials coefficients
+    /// Negate the polynomials coefficients.
     fn inv(&self) -> Self;
 }
 
+/// Batch eval proof of polynomial.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
 pub struct BatchProofEval<C, E> {
+    /// The commitment of batch eval.
     commitment: C,
+    /// The eval proof.
     eval_proof: E,
 }
 
+/// Batch eval params of polynomial.
 pub struct BatchEvalParams<'a, C, F> {
     commitments: &'a [&'a C],
     evals: &'a [F],
 }
 
+/// Define the batch eval proof by given `PolyComScheme`.
 pub type BatchPfEval<PCS> =
     BatchProofEval<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::EvalProof>;
+
+/// Define the Option type of batch eval params by given `PolyComScheme`.
 pub type OptionParams<'a, PCS> =
     Option<BatchEvalParams<'a, <PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>>;
 
-/// Trait for homomorphic polynomial commitment schemes
+/// Trait for polynomial commitment scheme.
 pub trait PolyComScheme: Sized {
-    /// Type of prime field
+    /// Type of prime field.
     type Field: Scalar;
 
-    /// Type of commitment produces, need to implement HomomorphicPolyComElem
+    /// Type of commitment produces, need to implement `HomomorphicPolyComElem`.
     type Commitment: HomomorphicPolyComElem<Scalar = Self::Field>
         + Debug
         + PartialEq
@@ -72,31 +76,31 @@ pub trait PolyComScheme: Sized {
         + Serialize
         + for<'de> Deserialize<'de>;
 
-    /// Type of EvalProof
+    /// Type of `EvalProof`.
     type EvalProof: ToBytes + Serialize + for<'de> Deserialize<'de> + Debug + PartialEq + Eq;
 
-    /// Type of Opening
+    /// Type of `Opening`.
     type Opening: HomomorphicPolyComElem<Scalar = Self::Field> + Debug + PartialEq + Eq + Clone;
 
-    /// Commits to the polynomial, commitment is binding
+    /// Commit to the polynomial, commitment is binding.
     fn commit(
         &self,
         polynomial: FpPolynomial<Self::Field>,
     ) -> Result<(Self::Commitment, Self::Opening)>;
 
-    /// Returns the opening of an original commitment of the polynomial
+    /// Return the opening of an original commitment of the polynomial.
     fn opening(&self, polynomial: &FpPolynomial<Self::Field>) -> Self::Opening;
 
-    /// evaluated the polynomial using the commitment opening to it.
+    /// Evaluate the polynomial using the commitment opening to it.
     fn eval_opening(&self, opening: &Self::Opening, point: &Self::Field) -> Self::Field;
 
-    /// Computes the commitment of a polynomial given its opening
+    /// Compute the commitment of a polynomial given its opening.
     fn commitment_from_opening(&self, opening: &Self::Opening) -> Self::Commitment;
 
     /// Computes the polynomial from an opening. This is slow as the polynomial is build.
     fn polynomial_from_opening_ref(&self, opening: &Self::Opening) -> FpPolynomial<Self::Field>;
 
-    /// Transforms the opening into a polynomial
+    /// Transform the opening into a polynomial.
     fn polynomial_from_opening(&self, opening: Self::Opening) -> FpPolynomial<Self::Field>;
 
     /// Evaluate the polynomial producing a proof for it.
@@ -108,7 +112,8 @@ pub trait PolyComScheme: Sized {
         max_degree: usize,
     ) -> Result<(Self::Field, Self::EvalProof)>;
 
-    /// Verify an evaluation proof that polynomial inside commitment evaluates to `value` on input `point `
+    /// Verify an evaluation proof that polynomial inside commitment
+    /// evaluates to `value` on input `point `.
     fn verify_eval(
         &self,
         transcript: &mut Transcript,
@@ -121,23 +126,27 @@ pub trait PolyComScheme: Sized {
 
     /// Batch proof for polynomial evaluation.
     /// `param` stores the instance parameters to be appended to the transcript.
-    /// When `param` is `None`, our function assumes `params` are implicit in the transcript already.
-    #[allow(non_snake_case)]
+    /// When `param` is `None`, our function assumes `params` are implicit
+    /// in the transcript already.
     fn batch_prove_eval(
         &self,
         transcript: &mut Transcript,
         openings: &[&Self::Opening],
         points: &[Self::Field],
         max_degree: usize,
-        params: OptionParams<Self>,
+        params: OptionParams<'_, Self>,
     ) -> Result<(Vec<Self::Field>, BatchPfEval<Self>)> {
         let n = openings.len();
         assert_eq!(n, points.len());
         assert!(n > 0);
+
         Self::init_pcs_batch_eval_transcript(transcript, max_degree, points, params);
+
         // 1. Compute quotient Polynomial q(X) = h(X)/z(X), where
         // h(X) = \sum_i \alpha^i * z_i_bar(X) * [fi(X) - fi(xi)]
-        let alpha = transcript.get_challenge_field_elem(b"alpha"); // linear combination scalar factor
+
+        // linear combination scalar factor
+        let alpha = transcript.get_challenge_field_elem(b"alpha");
         let mut h = FpPolynomial::<Self::Field>::zero();
         let mut c_i = Self::Field::one(); // linear combination first scalar = alpha^0
         let z = FpPolynomial::from_zeroes(points);
@@ -162,15 +171,18 @@ pub trait PolyComScheme: Sized {
             return Err(eg!());
         }
 
-        let (C_q, O_q) = self.commit(q).c(d!())?;
-        transcript.append_commitment::<Self::Commitment>(&C_q);
+        let (c_q, o_q) = self.commit(q).c(d!())?;
+        transcript.append_commitment::<Self::Commitment>(&c_q);
 
-        // Derive opening of g(X) = sum \alpha^i * z_i_bar(\rho) * (fi(X) - fi(xi)) - q(X) * z(rho)
-        // = - z(rho) * q(X) + sum \alpha^i * z_i_bar(\rho) * fi(X) - [sum \alpha^i * z_i_bar(\rho) * fi(xi)]
+        // Derive opening of g(X)
+        // = sum \alpha^i * z_i_bar(\rho) * (fi(X) - fi(xi)) - q(X) * z(rho)
+        // = - z(rho) * q(X)
+        //   + sum \alpha^i * z_i_bar(\rho) * fi(X)
+        //   - [sum \alpha^i * z_i_bar(\rho) * fi(xi)]
         let rho = transcript.get_challenge_field_elem(b"rho");
 
         // term `-z(rho) * q(X)`
-        let mut g_opening = O_q.inv();
+        let mut g_opening = o_q.inv();
         let z_eval_rho = z.eval(&rho);
         g_opening = g_opening.exp(&z_eval_rho);
 
@@ -205,18 +217,16 @@ pub trait PolyComScheme: Sized {
             Ok((
                 eval_values,
                 BatchProofEval {
-                    commitment: C_q,
+                    commitment: c_q,
                     eval_proof: g_proof,
                 },
             ))
         }
     }
 
-    /// Verify batch eval proof
+    /// Verify batch eval proof.
     /// Optimized according to Sec 4.1 in <https://eprint.iacr.org/2020/081.pdf>
     /// Saves |points| G1 exps
-    #[allow(non_snake_case)]
-    #[allow(clippy::too_many_arguments)]
     fn batch_verify_eval(
         &self,
         transcript: &mut Transcript,
@@ -225,12 +235,13 @@ pub trait PolyComScheme: Sized {
         points: &[Self::Field],
         values: &[Self::Field],
         proof: &BatchPfEval<Self>,
-        params: OptionParams<Self>,
+        params: OptionParams<'_, Self>,
     ) -> Result<()> {
         Self::init_pcs_batch_eval_transcript(transcript, max_degree, points, params);
         let alpha = transcript.get_challenge_field_elem::<Self::Field>(b"alpha");
         transcript.append_commitment::<Self::Commitment>(&proof.commitment);
         let rho = transcript.get_challenge_field_elem::<Self::Field>(b"rho");
+
         // 1. z_eval_rho = prod (X - point_i) at X = \rho
         let mut z_eval_rho = Self::Field::one();
         for point in points {
@@ -240,7 +251,8 @@ pub trait PolyComScheme: Sized {
 
         // Compute commitment F = com_lc - Com(q(X) * z(\rho)), where
         // com_lc = sum_i alpha^i * z_i_bar(\rho)) * Com((f_i(X) - y_i)
-        //        = sum_i alpha^i * z_i_bar(\rho)) * Com(f_i(X)) - Com(sum_i alpha^i * z_i_bar(\rho)) * y_i)
+        //        = sum_i alpha^i * z_i_bar(\rho)) * Com(f_i(X))
+        //          - Com(sum_i alpha^i * z_i_bar(\rho)) * y_i)
         let mut c_i = Self::Field::one(); // linear combination scalar c_i = alpha^i
         let mut com_lc = Self::Commitment::get_identity();
         let mut val_lc = Self::Field::zero(); // \sum y_i * alpha^i * \z_i_bar(rho)
@@ -250,8 +262,7 @@ pub trait PolyComScheme: Sized {
 
             let scalar = z_i_bar_eval_rho.mul(&c_i);
 
-            let C_i = commitment.exp(&scalar);
-            com_lc = com_lc.op(&C_i);
+            com_lc = com_lc.op(&commitment.exp(&scalar));
 
             let value_times_scalar = scalar.mul(value);
             val_lc.add_assign(&value_times_scalar);
@@ -276,21 +287,23 @@ pub trait PolyComScheme: Sized {
         .c(d!())
     }
 
+    /// Compute the transaction when batch eval.
     fn init_pcs_batch_eval_transcript(
         transcript: &mut Transcript,
         max_degree: usize,
         points: &[Self::Field],
-        params: Option<BatchEvalParams<Self::Commitment, Self::Field>>,
+        params: Option<BatchEvalParams<'_, Self::Commitment, Self::Field>>,
     ) {
         transcript.append_message(b"Domain Separator", b"New PCS-Batch-Eval Protocol");
         Self::transcript_append_params(transcript, max_degree, points, params);
     }
 
+    /// Append params to the transaction.
     fn transcript_append_params(
         transcript: &mut Transcript,
         max_degree: usize,
         points: &[Self::Field],
-        params: Option<BatchEvalParams<Self::Commitment, Self::Field>>,
+        params: Option<BatchEvalParams<'_, Self::Commitment, Self::Field>>,
     ) {
         transcript.append_message(b"field size", &Self::Field::get_field_size_le_bytes());
         transcript.append_u64(b"max_degree", max_degree as u64);
@@ -307,20 +320,25 @@ pub trait PolyComScheme: Sized {
         }
     }
 
+    /// Shrink this to only for verifier use.
     fn shrink_to_verifier_only(&self) -> Result<Self>;
 }
 
-/// Uses a Binding Polynomial commitment scheme and transforms it into a Binding and Hiding Polynomial Commitment Scheme
+/// Uses a binding polynomial commitment scheme and transforms it into
+/// a binding and hiding polynomial commitment scheme.
 pub struct HidingPCS<'a, PCS> {
+    /// A polynomial commitment scheme.
     pub pcs: &'a PCS,
 }
 
 impl<PCS: PolyComScheme> HidingPCS<'_, PCS> {
-    pub fn new(pcs: &PCS) -> HidingPCS<PCS> {
+    /// Return by a polynomial commitment scheme.
+    pub fn new(pcs: &PCS) -> HidingPCS<'_, PCS> {
         HidingPCS { pcs }
     }
 
-    /// Randomized the polynomial so that commitment of the original polynomial is binding and hiding
+    /// Randomize the polynomial so that commitment of the original
+    /// polynomial is binding and hiding.
     pub fn hide_polynomial(
         &self,
         polynomial: &FpPolynomial<PCS::Field>,
@@ -331,7 +349,7 @@ impl<PCS: PolyComScheme> HidingPCS<'_, PCS> {
         FpPolynomial::from_coefs(coefs)
     }
 
-    /// Commits to `polynomial` under blinding `blind`
+    /// Commit to `polynomial` under blinding `blind`.
     pub fn commit(
         &self,
         polynomial: &FpPolynomial<PCS::Field>,
@@ -342,24 +360,26 @@ impl<PCS: PolyComScheme> HidingPCS<'_, PCS> {
     }
 }
 
+/// The trait for shift polynomial commitment scheme.
 pub trait ShiftPCS: PolyComScheme {
-    /// shift polynomial by one and add blind
+    /// Shift polynomial by one and add blind.
     fn to_hidden(&self, commitment: &Self::Commitment, blind: &Self::Field) -> Self::Commitment;
 
-    /// shift the underling polynomial by appending low order zero coefficients
+    /// Shift the underling polynomial by appending low order zero coefficients.
     fn shift(&self, commitment: &Self::Commitment, n: usize) -> Self::Commitment;
 }
 
 #[cfg(test)]
 #[allow(non_snake_case)]
 mod test {
-    use crate::poly_commit::field_polynomial::FpPolynomial;
-    use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
-    use crate::poly_commit::pcs::{BatchEvalParams, PolyComScheme};
+    use crate::poly_commit::{
+        field_polynomial::FpPolynomial,
+        kzg_poly_com::KZGCommitmentScheme,
+        pcs::{BatchEvalParams, PolyComScheme},
+    };
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use zei_algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One, Zero};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn test_pcs_eval() {

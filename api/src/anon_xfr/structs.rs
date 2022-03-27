@@ -10,10 +10,8 @@ use zei_algebra::{
     jubjub::JubjubScalar,
     prelude::*,
 };
-use zei_crypto::basics::hash::rescue::RescueInstance;
-use zei_crypto::basics::hybrid_encryption::{
-    hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
-};
+use zei_crypto::basic::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
+use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::{plonk::setup::PlonkPf, poly_commit::kzg_poly_com::KZGCommitmentScheme};
 
 pub type Nullifier = BLSScalar;
@@ -44,14 +42,18 @@ pub struct AXfrNote {
 }
 
 impl AXfrNote {
-    pub fn generate_note_from_body(body: AXfrBody, keypairs: Vec<AXfrKeyPair>) -> Result<AXfrNote> {
+    pub fn generate_note_from_body<R: CryptoRng + RngCore>(
+        prng: &mut R,
+        body: AXfrBody,
+        keypairs: Vec<AXfrKeyPair>,
+    ) -> Result<AXfrNote> {
         let mut signatures: Vec<AXfrSignature> = Vec::new();
         let msg: Vec<u8> = bincode::serialize(&body)
             .map_err(|_| ZeiError::SerializationError)
             .c(d!())?;
 
         for keypair in keypairs {
-            signatures.push(keypair.sign(msg.as_slice()))
+            signatures.push(keypair.sign(prng, msg.as_slice()))
         }
 
         Ok(AXfrNote { body, signatures })
@@ -242,7 +244,7 @@ impl OpenAnonBlindAssetRecordBuilder {
         msg.extend_from_slice(&self.oabar.asset_type.0);
         msg.extend_from_slice(&self.oabar.blind.to_bytes());
         msg.extend_from_slice(&self.oabar.key_rand_factor.to_bytes());
-        let cipher = hybrid_encrypt_with_x25519_key(prng, enc_key, &msg);
+        let cipher = hybrid_encrypt_x25519(prng, enc_key, &msg);
         let memo = OwnerMemo {
             blind_share: Default::default(),
             lock: cipher,

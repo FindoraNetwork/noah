@@ -78,8 +78,7 @@ in the credentials by
          e(sigma2', c * G2) = e(G1,G2) * r * c * u * (x + \sum attr_i * y_i + t + sk * x)
 */
 
-use crate::basics::sigma::{SigmaTranscript, SigmaTranscriptPairing};
-use itertools::Itertools;
+use crate::{basic::matrix_sigma::SigmaTranscript, conf_cred_reveal::CACTranscript};
 use merlin::Transcript;
 use zei_algebra::{prelude::*, traits::Pairing};
 

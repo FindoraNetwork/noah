@@ -1,30 +1,31 @@
+use crate::plonk::constraint_system::{
+    field_simulation::SimFrVar, TurboConstraintSystem, VarIndex,
+};
 use num_bigint::BigUint;
 use num_integer::Integer;
-use num_traits::Zero;
 use std::{
     cmp::{max, min},
     ops::{Shl, Shr},
 };
-use zei_algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar, One};
+use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::field_simulation::{
     ristretto_scalar_field_in_biguint, ristretto_scalar_field_in_limbs,
     ristretto_scalar_field_sub_pad_in_limbs, SimFr, SimFrMul, BIT_PER_LIMB, NUM_OF_GROUPS,
     NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
 
-use crate::plonk::constraint_system::{
-    field_simulation::SimFrVar, TurboConstraintSystem, VarIndex,
-};
-
 /// `SimFrMulVar` is the variable for `SimFrMul` in
 /// `TurboConstraintSystem<BLSScalar>`
 #[derive(Clone)]
 pub struct SimFrMulVar {
+    /// the `SimFrMul` value.
     pub val: SimFrMul,
+    /// the `SimFrMul` variables.
     pub var: [VarIndex; NUM_OF_LIMBS_MUL],
 }
 
 impl SimFrMulVar {
+    /// Create a zero `SimFrMul`.
     pub fn new(cs: &mut TurboConstraintSystem<BLSScalar>) -> Self {
         Self {
             val: SimFrMul::default(),
@@ -32,6 +33,7 @@ impl SimFrMulVar {
         }
     }
 
+    /// the Sub operation.
     pub fn sub(&self, cs: &mut TurboConstraintSystem<BLSScalar>, other: &SimFrVar) -> SimFrMulVar {
         let mut res = self.clone();
         res.val = &self.val - &other.val;
@@ -72,6 +74,7 @@ impl SimFrMulVar {
         res
     }
 
+    /// Enforce a zero constraint.
     pub fn enforce_zero(&self, cs: &mut TurboConstraintSystem<BLSScalar>) {
         let surfeit = self.val.prod_of_num_of_additions.bits() as usize;
         assert!(surfeit <= 5);
@@ -274,16 +277,13 @@ impl SimFrMulVar {
 
 #[cfg(test)]
 mod test {
-    use num_bigint::{BigUint, RandBigInt};
-    use num_traits::Zero;
-    use rand_chacha::ChaCha20Rng;
-    use rand_core::SeedableRng;
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_crypto::field_simulation::{ristretto_scalar_field_in_biguint, SimFr};
-
     use crate::plonk::constraint_system::{
         field_simulation::SimFrVar, turbo::TurboConstraintSystem,
     };
+    use num_bigint::{BigUint, RandBigInt};
+    use rand_chacha::ChaCha20Rng;
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use zei_crypto::field_simulation::{ristretto_scalar_field_in_biguint, SimFr};
 
     #[test]
     fn test_enforce_zero_trivial() {

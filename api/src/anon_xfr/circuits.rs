@@ -11,8 +11,8 @@ use zei_algebra::{
     traits::{Group, Scalar},
     One, Zero,
 };
+use zei_crypto::basic::rescue::RescueInstance;
 use zei_crypto::{
-    basics::hash::rescue::RescueInstance,
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
     pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
 };
@@ -843,11 +843,9 @@ pub(crate) mod tests {
     use rand_core::SeedableRng;
     use ruc::*;
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar};
-    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-    use zei_crypto::{
-        basics::hash::rescue::RescueInstance,
-        pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external,
-    };
+    use zei_crypto::basic::rescue::RescueInstance;
+    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external;
     use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
 
     pub(crate) fn new_multi_xfr_witness_for_test(

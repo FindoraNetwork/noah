@@ -17,8 +17,8 @@ use rand_chacha::ChaChaRng;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-use zei_crypto::basics::{
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
 };
@@ -821,15 +821,15 @@ mod asset_tracing {
     use crate::xfr::{
         structs::XfrAmount::NonConfidential,
         structs::{AssetTracerKeyPair, TracingPolicies},
-        trace_assets, trace_assets_brute_force, XfrNotePolicies, XfrNotePoliciesRef,
+        trace_assets, XfrNotePolicies, XfrNotePoliciesRef,
     };
     use zei_algebra::{
         bls12_381::BLSScalar,
         jubjub::JubjubScalar,
         ristretto::{RistrettoPoint, RistrettoScalar},
     };
-    use zei_crypto::basics::elgamal::ElGamalCiphertext;
-    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::elgamal::ElGamalCiphertext;
+    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
@@ -840,9 +840,9 @@ mod asset_tracing {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenCommitment::default();
 
-        let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng, &pc_gens.B);
+        let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
 
-        let ctext = elgamal_encrypt(&pc_gens.B, &m, &r, &pk);
+        let ctext = elgamal_encrypt(&m, &r, &pk);
         let commitment = pc_gens.commit(m, r);
 
         let mut prover_transcript = Transcript::new(b"test");
@@ -952,16 +952,7 @@ mod asset_tracing {
         ));
 
         // check that we can recover amount and type from memos
-        let candidate_assets = input_templates
-            .iter()
-            .chain(output_templates)
-            .map(|x| x.3)
-            .collect_vec();
-        let records_data_brute_force =
-            trace_assets_brute_force(&xfr_note.body, &input_templates[0].2, &candidate_assets)
-                .unwrap();
         let records_data = trace_assets(&xfr_note.body, &input_templates[0].2).unwrap();
-        assert_eq!(records_data, records_data_brute_force);
         if input_templates[0].1.len() == 1 {
             assert_eq!(records_data[0].0, input_amount);
             assert_eq!(records_data[0].1, input_templates[0].3);
@@ -1626,11 +1617,7 @@ mod asset_tracing {
             &xfr_body.clone(),
             &policies
         ));
-        let candidate_assets = [BITCOIN_ASSET, GOLD_ASSET];
-        let records_data_brute_force =
-            trace_assets_brute_force(&xfr_note.body, &tracer1_keypair, &candidate_assets).unwrap();
         let records_data = trace_assets(&xfr_note.body, &tracer1_keypair).unwrap();
-        assert_eq!(records_data, records_data_brute_force);
         let ids: Vec<u32> = vec![];
         assert_eq!(records_data.len(), 3);
         assert_eq!(records_data[0].0, 10); // first input amount
@@ -1646,10 +1633,7 @@ mod asset_tracing {
         assert_eq!(records_data[2].2, ids); // third output no id tracing
         assert_eq!(records_data[2].3, out_keys[2].pub_key); // third output no id tracing
 
-        let records_data_brute_force =
-            trace_assets_brute_force(&xfr_note.body, &tracer2_keypair, &candidate_assets).unwrap();
         let records_data = trace_assets(&xfr_note.body, &tracer2_keypair).unwrap();
-        assert_eq!(records_data, records_data_brute_force);
         let ids: Vec<u32> = vec![];
         assert_eq!(records_data.len(), 3);
         assert_eq!(records_data[0].0, 20); // third input amount

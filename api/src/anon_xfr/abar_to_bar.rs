@@ -21,7 +21,7 @@ use zei_algebra::{
     prelude::*,
     ristretto::RistrettoScalar,
 };
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
     pc_eq_rescue_split_verifier_zk_part::{
@@ -208,7 +208,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     let msg = bincode::serialize(&body)
         .c(d!(ZeiError::SerializationError))
         .c(d!())?;
-    let signature = randomized_keypair.sign(&msg);
+    let signature = randomized_keypair.sign(prng, &msg);
     let note = AbarToBarNote { body, signature };
     Ok(note)
 }
@@ -655,10 +655,8 @@ mod tests {
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
-    use zei_crypto::basics::{
-        hash::rescue::RescueInstance,
-        hybrid_encryption::{XPublicKey, XSecretKey},
-    };
+    use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basic::rescue::RescueInstance;
 
     #[test]
     fn test_abar_to_bar_conversion() {

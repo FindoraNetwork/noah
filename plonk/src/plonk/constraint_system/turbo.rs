@@ -1,32 +1,36 @@
-use ruc::*;
-/// This file implements a Turbo PLONK constraint system. It also implements a set of
-/// arithmetic/boolean/range gates that will be used in Anonymous transfer.
-/// The gates for elliptic curve operations and Rescue cipher/hash functions are implemented
-/// in ecc.rs and rescue.rs, respectively.
-use zei_algebra::traits::Scalar;
-
-use crate::plonk::errors::PlonkError;
-
+//! It also implements a set of arithmetic/boolean/range gates that
+//! will be used in Anonymous transfer. The gates for elliptic curve
+//! operations and Rescue cipher/hash functions are implemented in
+//! ecc.rs and rescue.rs, respectively.
 use super::{ConstraintSystem, CsIndex, VarIndex};
+use crate::plonk::errors::PlonkError;
+use zei_algebra::prelude::*;
 
+/// The wires number of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;
+
+/// The selectors number in Turbo CS.
 pub const N_SELECTORS: usize = 13;
 
+/// Turbo PLONK Constraint System.
 #[derive(Serialize, Deserialize)]
 pub struct TurboConstraintSystem<F> {
+    /// the selectors of the circuit.
     pub selectors: Vec<Vec<F>>,
+    /// the wiring of the circuit.
     pub wiring: [Vec<VarIndex>; N_WIRES_PER_GATE],
+    /// the number of variable.
     pub num_vars: usize,
+    /// the size of circuit.
     pub size: usize,
+    /// the public constraint variables indices.
     pub public_vars_constraint_indices: Vec<CsIndex>,
+    /// the public witness variables indices.
     pub public_vars_witness_indices: Vec<VarIndex>,
+    /// only for verifier use.
     pub verifier_only: bool,
-    // A private witness for the circuit, cleared after computing a proof
+    /// A private witness for the circuit, cleared after computing a proof
     pub witness: Vec<F>,
-    // A reserved variable that maps to value zero
-    zero_var: Option<VarIndex>,
-    // A reserved variable that maps to value one
-    one_var: Option<VarIndex>,
 }
 
 impl<F: Scalar> ConstraintSystem for TurboConstraintSystem<F> {
@@ -44,8 +48,9 @@ impl<F: Scalar> ConstraintSystem for TurboConstraintSystem<F> {
         &self.wiring[..]
     }
 
-    /// `quot_eval_dom_size` divides (q-1), and should be larger than the degree of the quotient
-    /// polynomial, i.e., `quot_eval_dom_size` > 5 * `self.size` + 7
+    /// `quot_eval_dom_size` divides (q-1), and should be larger than
+    /// the degree of the quotient polynomial, i.e.,
+    /// `quot_eval_dom_size` > 5 * `self.size` + 7.
     fn quot_eval_dom_size(&self) -> usize {
         if self.size > 4 {
             self.size * 6
@@ -159,21 +164,20 @@ impl<F: Scalar> ConstraintSystem for TurboConstraintSystem<F> {
     fn shrink_to_verifier_only(&self) -> Result<Self> {
         Ok(Self {
             selectors: vec![],
-            wiring: [vec![], vec![], vec![], vec![], vec![]], // N_WIRES_PER_GATE = 5
+            wiring: [vec![], vec![], vec![], vec![], vec![]],
             num_vars: self.num_vars,
             size: self.size,
             public_vars_constraint_indices: vec![],
             public_vars_witness_indices: vec![],
             verifier_only: true,
             witness: vec![],
-            zero_var: None,
-            one_var: None,
         })
     }
 }
 
-// A helper function that computes the little-endian binary representation of a value.
-// Each bit is represented as a field element.
+/// A helper function that computes the little-endian binary
+/// representation of a value. Each bit is represented as a field
+/// element.
 fn compute_binary_le<F: Scalar>(bytes: &[u8]) -> Vec<F> {
     let mut res = vec![];
     for byte in bytes.iter() {
@@ -198,44 +202,32 @@ impl<F: Scalar> Default for TurboConstraintSystem<F> {
 
 impl<F: Scalar> TurboConstraintSystem<F> {
     /// Create a TurboPLONK constraint system with a certain field size.
+    /// With default witness [F::zero(), F::one()].
     pub fn new() -> TurboConstraintSystem<F> {
         let selectors: Vec<Vec<F>> = std::iter::repeat(vec![]).take(N_SELECTORS).collect();
-        let mut cs = TurboConstraintSystem {
+        TurboConstraintSystem {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
-            num_vars: 0,
+            num_vars: 2,
             size: 0,
             public_vars_constraint_indices: vec![],
             public_vars_witness_indices: vec![],
             verifier_only: false,
-            witness: vec![],
-            zero_var: None,
-            one_var: None,
-        };
-        let _ = cs.zero_var();
-        let _ = cs.one_var();
-        cs
+            witness: vec![F::zero(), F::one()],
+        }
     }
 
+    /// 0-index is Zero
     pub fn zero_var(&mut self) -> VarIndex {
-        if self.zero_var.is_none() {
-            self.zero_var = Some(self.num_vars);
-            self.witness.push(F::zero());
-            self.num_vars += 1;
-        }
-        self.zero_var.unwrap() // safe unwrap
+        0
     }
 
+    /// 1-index is One
     pub fn one_var(&mut self) -> VarIndex {
-        if self.one_var.is_none() {
-            self.one_var = Some(self.num_vars);
-            self.witness.push(F::one());
-            self.num_vars += 1;
-        }
-        self.one_var.unwrap() // safe unwrap
+        1
     }
 
-    /// Insert a linear combination gate: wo = w1 * q1 + w2 * q2 + w3 * q3 + w4 * q4.
+    /// Add a linear combination gate: wo = w1 * q1 + w2 * q2 + w3 * q3 + w4 * q4.
     pub fn insert_lc_gate(
         &mut self,
         wires_in: &[VarIndex; 4],
@@ -264,6 +256,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.size += 1;
     }
 
+    /// Add an Add gate. (left, right, out).
     pub fn insert_add_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
         self.insert_lc_gate(
             &[left_var, right_var, 0, 0],
@@ -275,6 +268,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         );
     }
 
+    /// Add a Sub gate. (left, right, out).
     pub fn insert_sub_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
         self.insert_lc_gate(
             &[left_var, right_var, 0, 0],
@@ -286,6 +280,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         );
     }
 
+    /// Add a Mul gate. (left, right, out).
     pub fn insert_mul_gate(&mut self, left_var: VarIndex, right_var: VarIndex, out_var: VarIndex) {
         assert!(left_var < self.num_vars, "left_var index out of bound");
         assert!(right_var < self.num_vars, "right_var index out of bound");
@@ -364,7 +359,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         out_var
     }
 
-    // Add a constraint that `left_var` and `right_var` have the same value.
+    /// Add a constraint that `left_var` and `right_var` have the same value.
     pub fn equal(&mut self, left_var: VarIndex, right_var: VarIndex) {
         let zero_var = self.zero_var();
         self.insert_sub_gate(left_var, right_var, zero_var);
@@ -379,17 +374,20 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         out_var
     }
 
-    /// Boolean constrain `var` by adding a multiplication gate:
+    /// Add a Boolean constrain `var` by adding a multiplication gate:
     /// `witness[var] * witness[var] = witness[var]`
     pub fn insert_boolean_gate(&mut self, var: VarIndex) {
         self.insert_mul_gate(var, var, var);
     }
 
     /// Enforce a range constraint: `0 < witness[var] < 2^n_bits`:
-    /// 1. Transform `witness[var]` into a binary vector and boolean constrain the binary vector.
-    /// 2. Adding a set of linear combination constraints showing that the binary vector is a binary
-    /// representation of `witness[var]`.
-    /// 3. Return witness indices of the binary vector. The binary vector is in little endian form.
+    /// 1. Transform `witness[var]` into a binary vector and boolean
+    ///    constrain the binary vector.
+    /// 2. Add a set of linear combination constraints showing that
+    ///    the binary vector is a binary representation of
+    ///    `witness[var]`.
+    /// 3. Return witness indices of the binary vector. The binary
+    ///    vector is in little endian form.
     pub fn range_check(&mut self, var: VarIndex, n_bits: usize) -> Vec<VarIndex> {
         assert!(var < self.num_vars, "var index out of bound");
         assert!(n_bits >= 2, "the number of bits is less than two");
@@ -477,19 +475,22 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         out_var
     }
 
-    // Returns a boolean variable that equals 1 if and only if `left_var` == `right_var`
+    /// Return a boolean variable that equals 1 if and
+    /// only if `left_var` == `right_var`.
     pub fn is_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
         let (is_equal, _) = self.is_equal_or_not_equal(left_var, right_var);
         is_equal
     }
 
-    // Returns a boolean variable that equals 1 if and only if `left_var` != `right_var`
+    /// Return a boolean variable that equals 1 if and
+    /// only if `left_var` != `right_var`.
     pub fn is_not_equal(&mut self, left_var: VarIndex, right_var: VarIndex) -> VarIndex {
         let (_, is_not_equal) = self.is_equal_or_not_equal(left_var, right_var);
         is_not_equal
     }
 
-    // Returns two boolean variables that equals (1, 0) if and only if `left_var` == `right_var` and (0, 1) otherwise
+    /// Return two boolean variables that equals (1, 0) if and
+    /// only if `left_var` == `right_var` and (0, 1) otherwise.
     pub fn is_equal_or_not_equal(
         &mut self,
         left_var: VarIndex,
@@ -514,7 +515,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         (diff_is_zero, mul_var)
     }
 
-    /// Insert a constant constraint: wo = constant
+    /// Add a constant constraint: wo = constant.
     pub fn insert_constant_gate(&mut self, var: VarIndex, constant: F) {
         assert!(var < self.num_vars, "variable index out of bound");
         let zero = F::zero();
@@ -530,7 +531,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.size += 1;
     }
 
-    /// Insert constraint of a public IO value to be decided online.
+    /// Add constraint of a public IO value to be decided online.
     pub fn prepare_io_variable(&mut self, var: VarIndex) {
         self.public_vars_witness_indices.push(var);
         self.public_vars_constraint_indices.push(self.size);
@@ -550,6 +551,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.size += diff;
     }
 
+    /// Add a Add selectors.
     pub fn push_add_selectors(&mut self, q1: F, q2: F, q3: F, q4: F) {
         self.selectors[0].push(q1);
         self.selectors[1].push(q2);
@@ -557,19 +559,23 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.selectors[3].push(q4);
     }
 
+    /// Add a Mul selectors.
     pub fn push_mul_selectors(&mut self, q_mul12: F, q_mul34: F) {
         self.selectors[4].push(q_mul12);
         self.selectors[5].push(q_mul34);
     }
 
+    /// Add a constant selectors.
     pub fn push_constant_selector(&mut self, q_c: F) {
         self.selectors[6].push(q_c);
     }
 
+    /// Add an ECC selectors.
     pub fn push_ecc_selector(&mut self, q_ecc: F) {
         self.selectors[7].push(q_ecc);
     }
 
+    /// Add a Rescue selectors.
     pub fn push_rescue_selectors(&mut self, q_hash_1: F, q_hash_2: F, q_hash_3: F, q_hash_4: F) {
         self.selectors[8].push(q_hash_1);
         self.selectors[9].push(q_hash_2);
@@ -577,16 +583,19 @@ impl<F: Scalar> TurboConstraintSystem<F> {
         self.selectors[11].push(q_hash_4);
     }
 
+    /// Add an Out selectors.
     pub fn push_out_selector(&mut self, q_out: F) {
         self.selectors[12].push(q_out);
     }
 
+    /// Return the witness index for given wire and cs index.
     fn get_witness_index(&self, wire_index: usize, cs_index: CsIndex) -> VarIndex {
         assert!(wire_index < N_WIRES_PER_GATE, "wire index out of bound");
         assert!(cs_index < self.size, "constraint index out of bound");
         self.wiring[wire_index][cs_index]
     }
 
+    /// Verify the given witness and publics.
     pub fn verify_witness(&self, witness: &[F], online_vars: &[F]) -> Result<()> {
         if witness.len() != self.num_vars {
             return Err(eg!(format!(
@@ -653,19 +662,6 @@ impl<F: Scalar> TurboConstraintSystem<F> {
 
 #[cfg(test)]
 mod test {
-    use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
-    use rand_core::{CryptoRng, RngCore, SeedableRng};
-    use ruc::*;
-    use std::str::FromStr;
-    use zei_algebra::{
-        bls12_381::BLSScalar,
-        jubjub::JubjubPoint,
-        ops::*,
-        traits::{Group, Scalar},
-        One, Zero,
-    };
-
     use crate::plonk::{
         constraint_system::{rescue::State, ConstraintSystem, TurboConstraintSystem},
         prover::prover,
@@ -673,6 +669,10 @@ mod test {
         verifier::verifier,
     };
     use crate::poly_commit::{kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme};
+    use merlin::Transcript;
+    use rand_chacha::ChaChaRng;
+    use std::str::FromStr;
+    use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 
     type F = BLSScalar;
 
@@ -1188,7 +1188,7 @@ mod test {
         cs.pad();
 
         let online_vars = [PCS::Field::from_str(
-            "52184923318241479436224725218017640784400243367974222506608059144773855444730",
+            "6038713180564719469093204954070454311200442976044511285254586065910759707410",
         )
         .unwrap()];
         let witness = cs.get_and_clear_witness();

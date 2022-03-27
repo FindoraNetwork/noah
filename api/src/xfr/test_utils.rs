@@ -11,7 +11,7 @@ use crate::anon_creds::{
 };
 use rand_chacha::ChaChaRng;
 use zei_algebra::prelude::*;
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
 pub const ASSET_TYPE_1: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
 pub const ASSET_TYPE_2: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);

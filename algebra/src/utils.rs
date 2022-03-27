@@ -6,14 +6,14 @@ use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_chacha::ChaCha20Rng;
 
-/// convert an 8 byte array (big-endian) into a u64 (big-endian)
+/// convert an 8 byte array (big-endian) into a u64
 pub fn u8_be_slice_to_u64(slice: &[u8]) -> u64 {
     let mut a = [0u8; 8];
     a.copy_from_slice(slice);
     u64::from_be_bytes(a)
 }
 
-/// convert a 8 byte array (little-endian) into a u64 (big-endian)
+/// convert a 8 byte array (little-endian) into a u64
 pub fn u8_le_slice_to_u64(slice: &[u8]) -> u64 {
     let mut a = [0u8; 8];
     a.copy_from_slice(slice);
@@ -79,6 +79,39 @@ pub fn shift_u8_vec(r: &mut Vec<u8>) {
     }
 }
 
+/// convert a u64 slice into a shrink bytes (little-endian)
+pub fn u64_lsf_to_bytes(slice: &[u64]) -> Vec<u8> {
+    let mut bytes = vec![];
+    for a in slice {
+        bytes.extend(&a.to_le_bytes()[..])
+    }
+    while let Some(b) = bytes.last() {
+        if *b != 0 {
+            break;
+        }
+        bytes.pop();
+    }
+    bytes
+}
+
+/// convert a u64 slice from a shrink bytes (little-endian)
+pub fn u64_lsf_from_bytes(slice: &[u8]) -> Vec<u64> {
+    let mut r: Vec<u64> = vec![];
+    let n = slice.len() / 8;
+    for i in 0..n {
+        let mut u64_bytes = [0u8; 8];
+        u64_bytes.copy_from_slice(&slice[i * 8..(i + 1) * 8]);
+        r.push(u64::from_le_bytes(u64_bytes));
+    }
+    if slice.len() % 8 != 0 {
+        let bytes = &slice[n * 8..];
+        let mut u64_bytes = [0u8; 8];
+        u64_bytes[..bytes.len()].copy_from_slice(bytes);
+        r.push(u64::from_le_bytes(u64_bytes));
+    }
+    r
+}
+
 /// save parameters to a file
 pub fn save_to_file(params_ser: &[u8], out_filename: PathBuf) {
     let filename = out_filename.to_str().unwrap();
@@ -138,6 +171,15 @@ mod test {
         let array = [0xFA_u8, 0x01, 0xC6, 0x73, 0x22, 0xE4, 0x98, 0xA2];
         let n = super::u8_be_slice_to_u64(&array);
         assert_eq!(0xFA01C67322E498A2, n);
+    }
+
+    #[test]
+    fn u64_lsf_to_bytes() {
+        let n = vec![1, 2, 3, 4, 5];
+        let bytes = super::u64_lsf_to_bytes(&n);
+        assert!(bytes.len() < n.len() * 8);
+        let nn = super::u64_lsf_from_bytes(&bytes);
+        assert_eq!(n, nn);
     }
 
     #[test]

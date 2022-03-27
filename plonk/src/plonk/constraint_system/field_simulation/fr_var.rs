@@ -1,3 +1,6 @@
+use crate::plonk::constraint_system::{
+    field_simulation::SimFrMulVar, TurboConstraintSystem, VarIndex,
+};
 use num_bigint::BigUint;
 use zei_algebra::{
     bls12_381::BLSScalar,
@@ -8,19 +11,18 @@ use zei_crypto::field_simulation::{
     ristretto_scalar_field_sub_pad_in_limbs, SimFr, BIT_PER_LIMB, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
 
-use crate::plonk::constraint_system::{
-    field_simulation::SimFrMulVar, TurboConstraintSystem, VarIndex,
-};
-
 /// `SimFrVar` is the variable for `SimFr` in
 /// `TurboConstraintSystem<BLSScalar>`
 #[derive(Clone)]
 pub struct SimFrVar {
+    /// the `SimFr` value.
     pub val: SimFr,
+    /// the `SimFr` variables.
     pub var: [VarIndex; NUM_OF_LIMBS],
 }
 
 impl SimFrVar {
+    /// Create a zero `SimFr`.
     pub fn new(cs: &mut TurboConstraintSystem<BLSScalar>) -> Self {
         Self {
             val: SimFr::default(),
@@ -28,6 +30,7 @@ impl SimFrVar {
         }
     }
 
+    /// the Sub operation.
     pub fn sub(&self, cs: &mut TurboConstraintSystem<BLSScalar>, other: &SimFrVar) -> SimFrVar {
         let mut res = SimFrVar::new(cs);
         res.val = &self.val - &other.val;
@@ -63,6 +66,7 @@ impl SimFrVar {
         res
     }
 
+    /// the Mul operation.
     pub fn mul(&self, cs: &mut TurboConstraintSystem<BLSScalar>, other: &SimFrVar) -> SimFrMulVar {
         let mut res = SimFrMulVar::new(cs);
         res.val = &self.val * &other.val;
@@ -111,6 +115,7 @@ impl SimFrVar {
         res
     }
 
+    /// Alloc a constant gate.
     pub fn alloc_constant(cs: &mut TurboConstraintSystem<BLSScalar>, val: &SimFr) -> Self {
         let mut res = Self::new(cs);
         res.val = val.clone();
@@ -121,6 +126,7 @@ impl SimFrVar {
         res
     }
 
+    /// Alloc a witness variable and range check gate.
     pub fn alloc_witness(cs: &mut TurboConstraintSystem<BLSScalar>, val: &SimFr) -> Self {
         assert!(val.num_of_additions_over_normal_form.is_zero());
 
@@ -134,6 +140,7 @@ impl SimFrVar {
         res
     }
 
+    /// Alloc a witness variable and range check gate with bounded.
     pub fn alloc_witness_bounded_total_bits(
         cs: &mut TurboConstraintSystem<BLSScalar>,
         val: &SimFr,
@@ -165,19 +172,16 @@ impl SimFrVar {
 
 #[cfg(test)]
 mod test {
-    use num_bigint::{BigUint, RandBigInt};
-    use num_traits::Zero;
-    use rand_chacha::ChaCha20Rng;
-    use rand_core::SeedableRng;
-    use std::ops::Shl;
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_crypto::field_simulation::{
-        ristretto_scalar_field_in_biguint, SimFr, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
-    };
-
     use crate::plonk::constraint_system::{
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboConstraintSystem,
+    };
+    use num_bigint::{BigUint, RandBigInt};
+    use rand_chacha::ChaCha20Rng;
+    use std::ops::Shl;
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use zei_crypto::field_simulation::{
+        ristretto_scalar_field_in_biguint, SimFr, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
     };
 
     fn test_sim_fr_equality(cs: TurboConstraintSystem<BLSScalar>, val: &SimFrVar) {

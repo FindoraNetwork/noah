@@ -5,7 +5,7 @@ use zei_algebra::{
     jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN},
     prelude::*,
 };
-use zei_crypto::basics::schnorr::{KeyPair, PublicKey, Signature};
+use zei_crypto::basic::schnorr::{KeyPair, PublicKey, Signature};
 
 const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
 const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
@@ -46,8 +46,8 @@ impl AXfrKeyPair {
         self.0.get_secret_scalar()
     }
 
-    pub fn sign(&self, msg: &[u8]) -> AXfrSignature {
-        AXfrSignature(self.0.sign(msg))
+    pub fn sign<R: CryptoRng + RngCore>(&self, prng: &mut R, msg: &[u8]) -> AXfrSignature {
+        AXfrSignature(self.0.sign(prng, msg))
     }
 }
 

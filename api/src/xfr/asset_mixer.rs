@@ -135,7 +135,7 @@ pub struct AssetMixingInstance<'a> {
 /// use rand::thread_rng;
 /// use ruc::err::*;
 /// use zei::setup::PublicParams;
-/// use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+/// use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 /// let input = [
 ///            (60u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
 ///            (100u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10001u32), RistrettoScalar::from(200001u32)),
@@ -278,7 +278,7 @@ mod test {
     use rand_core::SeedableRng;
     use ruc::*;
     use zei_algebra::ristretto::{CompressedRistretto, RistrettoScalar};
-    use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     #[test]
     fn test_asset_mixer() {

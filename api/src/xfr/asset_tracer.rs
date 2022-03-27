@@ -7,13 +7,11 @@ use zei_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-use zei_crypto::basics::{
+use zei_crypto::basic::{
     elgamal::{
-        elgamal_decrypt, elgamal_decrypt_elem, elgamal_encrypt, ElGamalCiphertext, ElGamalDecKey,
-        ElGamalEncKey,
+        elgamal_encrypt, elgamal_partial_decrypt, ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey,
     },
-    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_with_x25519_key},
+    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_x25519},
 };
 
 pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
@@ -35,18 +33,15 @@ impl TracerMemo {
         attrs_info: &[(Attr, AttributeCiphertext)],
     ) -> Self {
         let mut plaintext = vec![];
-        let pc_gens = RistrettoPedersenCommitment::default();
         let lock_amount = amount_info.map(|(amount_low, amount_high, blind_low, blind_high)| {
             plaintext.extend_from_slice(&amount_low.to_be_bytes());
             plaintext.extend_from_slice(&amount_high.to_be_bytes());
             let ctext_amount_low = elgamal_encrypt(
-                &pc_gens.B,
                 &RistrettoScalar::from(amount_low),
                 blind_low,
                 &tracer_enc_key.record_data_enc_key,
             );
             let ctext_amount_high = elgamal_encrypt(
-                &pc_gens.B,
                 &RistrettoScalar::from(amount_high),
                 blind_high,
                 &tracer_enc_key.record_data_enc_key,
@@ -57,7 +52,6 @@ impl TracerMemo {
         let lock_asset_type = asset_type_info.map(|(asset_type, blind)| {
             plaintext.extend_from_slice(&asset_type.0);
             elgamal_encrypt(
-                &pc_gens.B,
                 &asset_type.as_scalar(),
                 blind,
                 &tracer_enc_key.record_data_enc_key,
@@ -67,8 +61,7 @@ impl TracerMemo {
         for (attr, _) in attrs_info.iter() {
             plaintext.extend_from_slice(&attr.to_be_bytes())
         }
-        let lock_info =
-            hybrid_encrypt_with_x25519_key(prng, &tracer_enc_key.lock_info_enc_key, &plaintext);
+        let lock_info = hybrid_encrypt_x25519(prng, &tracer_enc_key.lock_info_enc_key, &plaintext);
 
         TracerMemo {
             enc_key: tracer_enc_key.clone(),
@@ -147,8 +140,8 @@ impl TracerMemo {
     ) -> Result<()> {
         let (low, high) = u64_to_u32_pair(expected);
         if let Some((ctext_low, ctext_high)) = self.lock_amount.as_ref() {
-            let decrypted_low = elgamal_decrypt_elem(ctext_low, dec_key);
-            let decrypted_high = elgamal_decrypt_elem(ctext_high, dec_key);
+            let decrypted_low = elgamal_partial_decrypt(ctext_low, dec_key);
+            let decrypted_high = elgamal_partial_decrypt(ctext_high, dec_key);
             let base = RistrettoPoint::get_base();
             if base.mul(&RistrettoScalar::from(low)) != decrypted_low
                 || base.mul(&RistrettoScalar::from(high)) != decrypted_high
@@ -170,29 +163,11 @@ impl TracerMemo {
         expected: &AssetType,
     ) -> Result<()> {
         if let Some(ctext) = self.lock_asset_type.as_ref() {
-            let decrypted = elgamal_decrypt_elem(ctext, dec_key);
+            let decrypted = elgamal_partial_decrypt(ctext, dec_key);
             if decrypted == RistrettoPoint::get_base().mul(&expected.as_scalar()) {
                 return Ok(());
             }
             Err(eg!(ZeiError::AssetTracingExtractionError))
-        } else {
-            Err(eg!(ZeiError::ParameterError)) // nothing to decrypt
-        }
-    }
-
-    /// Decrypt amount in self.lock_amount via brute force check taking 2^33 Ristretto additions in the worst case.
-    /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
-    /// Otherwise, return RistrettoScalar representing the amount
-    pub fn extract_amount_brute_force(
-        &self,
-        dec_key: &ElGamalDecKey<RistrettoScalar>,
-    ) -> Result<u64> {
-        if let Some((ctext_low, ctext_high)) = self.lock_amount.as_ref() {
-            let base = RistrettoPoint::get_base();
-            let decrypted_low = elgamal_decrypt(&base, ctext_low, dec_key).c(d!())?;
-            let decrypted_high = elgamal_decrypt(&base, ctext_high, dec_key).c(d!())?;
-            let result = decrypted_low + decrypted_high * (1u64 << 32);
-            Ok(result)
         } else {
             Err(eg!(ZeiError::ParameterError)) // nothing to decrypt
         }
@@ -232,28 +207,12 @@ impl TracerMemo {
         let mut result = vec![];
         for (ctext, expected) in self.lock_attributes.iter().zip(expected_attributes.iter()) {
             let scalar_attr = BLSScalar::from(*expected);
-            let elem = elgamal_decrypt_elem(ctext, dec_key);
+            let elem = elgamal_partial_decrypt(ctext, dec_key);
             if elem != BLSG1::get_base().mul(&scalar_attr) {
                 result.push(false);
             } else {
                 result.push(true);
             }
-        }
-        Ok(result)
-    }
-
-    /// Check is the attributes encrypted in self.lock_attrs are the same as in expected_attributes
-    /// If self.lock_attrs is None or if attribute length doesn't match expected list, return Err(ZeiError::ParameterError)
-    /// Otherwise, it returns a boolean vector indicating true for every positive match and false otherwise.
-    pub fn extract_identity_attributes_brute_force(
-        &self,
-        dec_key: &ElGamalDecKey<BLSScalar>,
-    ) -> Result<Vec<u32>> {
-        let mut result = vec![];
-        let base = BLSG1::get_base();
-        for ctext in self.lock_attributes.iter() {
-            let attr = elgamal_decrypt(&base, ctext, dec_key).c(d!())? as u32;
-            result.push(attr);
         }
         Ok(result)
     }
@@ -263,12 +222,8 @@ impl TracerMemo {
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use rand_chacha::ChaChaRng;
-    use zei_algebra::{
-        bls12_381::{BLSScalar, BLSG1},
-        prelude::*,
-        ristretto::RistrettoScalar,
-    };
-    use zei_crypto::basics::elgamal::elgamal_encrypt;
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
+    use zei_crypto::basic::elgamal::elgamal_encrypt;
 
     #[test]
     fn extract_amount_from_tracer_memo() {
@@ -295,10 +250,6 @@ mod tests {
         );
         assert!(memo
             .verify_amount(&tracer_keys.dec_key.record_data_dec_key, amount)
-            .is_ok());
-
-        assert!(memo
-            .extract_amount_brute_force(&tracer_keys.dec_key.record_data_dec_key)
             .is_ok());
     }
 
@@ -380,9 +331,6 @@ mod tests {
     fn extract_identity_attributed_from_tracer_memo() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
-
-        let base = BLSG1::get_base();
-
         let attrs = [1u32, 2, 3];
 
         let attrs_and_ctexts = attrs
@@ -392,7 +340,6 @@ mod tests {
                 (
                     *x,
                     elgamal_encrypt(
-                        &base,
                         &scalar,
                         &BLSScalar::from(1000u32),
                         &tracer_keys.enc_key.attrs_enc_key,
@@ -439,10 +386,5 @@ mod tests {
                 .unwrap(),
             vec![false, false, false]
         );
-
-        let attrs = memo
-            .extract_identity_attributes_brute_force(&tracer_keys.dec_key.attrs_dec_key)
-            .unwrap();
-        assert_eq!(attrs, vec![1u32, 2, 3]);
     }
 }
