@@ -94,7 +94,7 @@ pub fn elgamal_partial_decrypt<G: Group>(
 
 #[cfg(test)]
 mod elgamal_test {
-    use crate::basics::elgamal::{ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey};
+    use crate::basic::elgamal::{ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey};
     use rand_chacha::ChaChaRng;
     use rmp_serde::Deserializer;
     use serde::de::Deserialize;

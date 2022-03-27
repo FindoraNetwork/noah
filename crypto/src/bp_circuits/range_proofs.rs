@@ -1,4 +1,4 @@
-use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use itertools::Itertools;
 use merlin::Transcript;

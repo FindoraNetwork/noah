@@ -10,8 +10,8 @@ use zei_algebra::{
     jubjub::JubjubScalar,
     prelude::*,
 };
-use zei_crypto::basics::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
-use zei_crypto::basics::rescue::RescueInstance;
+use zei_crypto::basic::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
+use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::{plonk::setup::PlonkPf, poly_commit::kzg_poly_com::KZGCommitmentScheme};
 
 pub type Nullifier = BLSScalar;

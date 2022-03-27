@@ -13,7 +13,7 @@ use zei_algebra::{
     jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN},
     prelude::*,
 };
-use zei_crypto::basics::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
+use zei_crypto::basic::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
 
 pub mod abar_to_bar;
 pub mod anon_fee;
@@ -25,7 +25,7 @@ mod merkle_tree_test;
 pub(crate) mod proofs;
 pub mod structs;
 pub use circuits::TREE_DEPTH;
-use zei_crypto::basics::rescue::RescueInstance;
+use zei_crypto::basic::rescue::RescueInstance;
 
 /// Build an anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
@@ -341,8 +341,8 @@ mod tests {
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
-    use zei_crypto::basics::rescue::RescueInstance;
+    use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
+    use zei_crypto::basic::rescue::RescueInstance;
 
     pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
         MTLeafInfo {

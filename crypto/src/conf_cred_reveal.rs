@@ -2,8 +2,8 @@ use crate::anon_creds::{
     ac_do_challenge_check_commitment, ac_randomize, ACCommitment, ACIssuerPublicKey, ACKey, ACPoK,
     ACUserSecretKey, Attribute, Credential, SOK_LABEL,
 };
-use crate::basics::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
-use crate::basics::matrix_sigma::SigmaTranscript;
+use crate::basic::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
+use crate::basic::matrix_sigma::SigmaTranscript;
 use merlin::Transcript;
 use zei_algebra::{prelude::*, traits::Pairing};
 
@@ -371,7 +371,7 @@ pub(crate) mod test_helper {
     use crate::anon_creds::{
         ac_commit, ac_keygen_issuer, ac_sign, ac_user_key_gen, ac_verify_commitment, Credential,
     };
-    use crate::basics::elgamal::elgamal_key_gen;
+    use crate::basic::elgamal::elgamal_key_gen;
     use crate::conf_cred_reveal::{ac_confidential_open_commitment, ac_confidential_open_verify};
     use rand_chacha::ChaChaRng;
     use zei_algebra::prelude::*;
@@ -587,7 +587,7 @@ mod test_serialization {
     use super::test_helper::byte_slice_to_scalar;
     use crate::anon_creds::{ac_commit, ac_sign};
     use crate::anon_creds::{ac_keygen_issuer, ac_user_key_gen, Credential};
-    use crate::basics::elgamal::elgamal_key_gen;
+    use crate::basic::elgamal::elgamal_key_gen;
     use crate::conf_cred_reveal::ac_confidential_open_commitment;
     use crate::conf_cred_reveal::ConfidentialAC;
     use rand_chacha::ChaChaRng;

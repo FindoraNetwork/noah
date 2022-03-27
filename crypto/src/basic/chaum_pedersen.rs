@@ -1,7 +1,7 @@
-use crate::basics::matrix_sigma::{
+use crate::basic::matrix_sigma::{
     sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
 };
-use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
@@ -413,7 +413,7 @@ fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<RistrettoScalar>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use rand_chacha::ChaChaRng;
 
     #[test]

@@ -317,7 +317,7 @@ impl RescueInstance<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-    use crate::basics::rescue::RescueInstance;
+    use crate::basic::rescue::RescueInstance;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*, str::FromStr};
 
     // Hash output on zero inputs

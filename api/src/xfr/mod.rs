@@ -4,7 +4,7 @@ use zei_algebra::{
     prelude::*,
     ristretto::{CompressedRistretto, RistrettoScalar},
 };
-use zei_crypto::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
 pub mod asset_mixer;
 pub mod asset_record;

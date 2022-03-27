@@ -10,7 +10,7 @@ extern crate itertools;
 extern crate serde_derive;
 
 pub mod anon_creds;
-pub mod basics;
+pub mod basic;
 pub mod bp_circuits;
 pub mod conf_cred_reveal;
 pub mod field_simulation;

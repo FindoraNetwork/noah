@@ -1,6 +1,6 @@
-use crate::basics::elgamal::{ElGamalCiphertext, ElGamalEncKey};
-use crate::basics::matrix_sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use crate::basic::elgamal::{ElGamalCiphertext, ElGamalEncKey};
+use crate::basic::matrix_sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
+use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
@@ -341,14 +341,14 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
 #[cfg(test)]
 mod test {
     use super::PedersenElGamalEqProof;
-    use crate::basics::elgamal::{
+    use crate::basic::elgamal::{
         elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey,
     };
-    use crate::basics::pedersen_elgamal::{
+    use crate::basic::pedersen_elgamal::{
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
         PedersenElGamalProofInstance,
     };
-    use crate::basics::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rmp_serde::Deserializer;
