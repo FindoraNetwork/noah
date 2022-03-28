@@ -164,9 +164,8 @@ mod tests {
         proofs::{prove_xfr, verify_xfr},
     };
     use crate::setup::{NodeParams, UserParams};
-    use rand::RngCore;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
+    use rand_core::{RngCore, SeedableRng};
     use zei_algebra::{bls12_381::BLSScalar, One};
 
     #[test]
