@@ -1,3 +1,5 @@
+//! This file encapsulates the prove and verify of Bulletproof's range proof.
+
 use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use itertools::Itertools;
