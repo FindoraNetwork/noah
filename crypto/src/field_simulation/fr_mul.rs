@@ -71,11 +71,14 @@ impl Sub<&SimFr> for &SimFrMul {
 
 impl SimFrMul {
     /// The `enforce_zero` function uses the techniques from two works:
-    /// [KPS18]: A. E. Kosba, C. Papamanthou, and E. Shi.
+    ///
+    /// [KPS18](https://akosba.github.io/papers/xjsnark.pdf):
+    /// A. E. Kosba, C. Papamanthou, and E. Shi.
     /// "xJsnark: a framework for efficient verifiable computation,"
     /// in S&P 2018
     ///
-    /// [OWWB20]: A. Ozdemir, R. S. Wahby, B. Whitehat, and D. Boneh.
+    /// [OWWB20](https://eprint.iacr.org/2019/1494.pdf):
+    /// A. Ozdemir, R. S. Wahby, B. Whitehat, and D. Boneh.
     /// "Scaling verifiable computation using efficient set accumulators,"
     /// in USENIX Security 2020
     ///
