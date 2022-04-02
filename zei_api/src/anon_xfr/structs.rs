@@ -3,7 +3,6 @@ use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature};
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use algebra::bls12_381::{BLSScalar, Bls12381};
 use algebra::groups::{Scalar, Zero};
-use algebra::jubjub::JubjubScalar;
 use crypto::basics::commitments::rescue;
 use crypto::basics::hybrid_encryption::{
     hybrid_encrypt_with_x25519_key, XPublicKey, XSecretKey,
@@ -95,10 +94,9 @@ pub struct AnonBlindAssetRecord {
 
 impl AnonBlindAssetRecord {
     pub fn from_oabar(oabar: &OpenAnonBlindAssetRecord) -> AnonBlindAssetRecord {
-        let rand_pub_key = oabar.pub_key_ref().randomize(&oabar.key_rand_factor);
         AnonBlindAssetRecord {
             amount_type_commitment: oabar.compute_commitment(),
-            public_key: rand_pub_key,
+            public_key: oabar.pub_key.clone(),
         }
     }
 }
@@ -137,7 +135,6 @@ pub struct OpenAnonBlindAssetRecord {
     pub(crate) asset_type: AssetType,
     pub(crate) blind: BLSScalar,
     pub(crate) pub_key: AXfrPubKey,
-    pub(crate) key_rand_factor: JubjubScalar,
     pub(crate) owner_memo: Option<OwnerMemo>,
     pub(crate) mt_leaf_info: Option<MTLeafInfo>,
 }
@@ -162,11 +159,6 @@ impl OpenAnonBlindAssetRecord {
     /// Get record public_key
     pub fn pub_key_ref(&self) -> &AXfrPubKey {
         &self.pub_key
-    }
-
-    /// Get record key randomization factor
-    pub fn get_key_rand_factor(&self) -> JubjubScalar {
-        self.key_rand_factor
     }
 
     /// Get record's owner memo
@@ -241,12 +233,10 @@ impl OpenAnonBlindAssetRecordBuilder {
         }
 
         self.oabar.blind = BLSScalar::random(prng);
-        self.oabar.key_rand_factor = JubjubScalar::random(prng);
         let mut msg = vec![];
         msg.extend_from_slice(&self.oabar.amount.to_le_bytes());
         msg.extend_from_slice(&self.oabar.asset_type.0);
         msg.extend_from_slice(&self.oabar.blind.to_bytes());
-        msg.extend_from_slice(&self.oabar.key_rand_factor.to_bytes());
         let cipher = hybrid_encrypt_with_x25519_key(prng, enc_key, &msg);
         let memo = OwnerMemo {
             blind_share: Default::default(),
@@ -272,7 +262,7 @@ impl OpenAnonBlindAssetRecordBuilder {
         key_pair: &AXfrKeyPair,
         dec_key: &XSecretKey,
     ) -> Result<Self> {
-        let (amount, asset_type, blind, key_rand) =
+        let (amount, asset_type, blind) =
             decrypt_memo(&owner_memo, dec_key, key_pair, record).c(d!())?;
         let mut builder = OpenAnonBlindAssetRecordBuilder::new()
             .pub_key(key_pair.pub_key())
@@ -280,7 +270,6 @@ impl OpenAnonBlindAssetRecordBuilder {
             .asset_type(asset_type);
 
         builder.oabar.blind = blind;
-        builder.oabar.key_rand_factor = key_rand;
         builder.oabar.owner_memo = Some(owner_memo);
         Ok(builder)
     }

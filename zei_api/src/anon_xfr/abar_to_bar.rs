@@ -95,11 +95,11 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
     oabar: &OpenAnonBlindAssetRecord,
-    abar_keypair: &AXfrKeyPair,
+    rand_input_keypair: &AXfrKeyPair,
     bar_pub_key: &XfrPublicKey,
     asset_record_type: AssetRecordType,
 ) -> Result<(AbarToBarBody, AXfrKeyPair)> {
-    if oabar.mt_leaf_info.is_none() || abar_keypair.pub_key() != oabar.pub_key {
+    if oabar.mt_leaf_info.is_none() || rand_input_keypair.pub_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
     }
 
@@ -114,9 +114,6 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
         bar_pub_key.clone(),
     );
     let (obar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
-
-    // 2. randomize input key pair with open_abar rand key
-    let rand_input_keypair = abar_keypair.randomize(&oabar.key_rand_factor);
 
     // 3. build input witness info
     let diversifier = JubjubScalar::random(prng);
@@ -656,6 +653,7 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Borrow;
     use crate::anon_xfr::abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
@@ -679,6 +677,7 @@ mod tests {
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
+    use algebra::jubjub::JubjubScalar;
 
     #[test]
     fn test_abar_to_bar_conversion() {
@@ -686,7 +685,7 @@ mod tests {
         let params = UserParams::abar_to_bar_params(40).unwrap();
 
         let recv = XfrKeyPair::generate(&mut prng);
-        let sender = AXfrKeyPair::generate(&mut prng);
+        let randomized_sender = AXfrKeyPair::generate(&mut prng).randomize(JubjubScalar::random(&mut prng).borrow());
         let sender_dec_key = XSecretKey::new(&mut prng);
 
         let path = thread::current().name().unwrap().to_owned();
@@ -701,7 +700,7 @@ mod tests {
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         let mut oabar = OpenAnonBlindAssetRecordBuilder::new()
-            .pub_key(sender.pub_key())
+            .pub_key(randomized_sender.pub_key())
             .amount(1234u64)
             .asset_type(AssetType::from_identical_byte(0u8))
             .finalize(&mut prng, &XPublicKey::from(&sender_dec_key))
@@ -720,7 +719,7 @@ mod tests {
             &mut prng,
             &params,
             &oabar.clone(),
-            &sender,
+            &randomized_sender,
             &recv.pub_key,
             ConfidentialAmount_ConfidentialAssetType,
         )

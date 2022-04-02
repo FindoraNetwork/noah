@@ -12,7 +12,6 @@ use crate::xfr::structs::{
 };
 use algebra::bls12_381::BLSScalar;
 use algebra::groups::{GroupArithmetic, Scalar, ScalarArithmetic, Zero};
-use algebra::jubjub::JubjubScalar;
 use algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use crypto::basics::commitments::pedersen::PedersenGens;
 use crypto::basics::hash::rescue::RescueInstance;
@@ -53,18 +52,18 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
     record: &OpenAssetRecord,
-    abar_pubkey: &AXfrPubKey,
+    randomized_abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
-) -> Result<(BarToAbarBody, JubjubScalar)> {
+) -> Result<BarToAbarBody> {
     let (open_abar, proof) =
-        bar_to_abar(prng, params, record, abar_pubkey, enc_key).c(d!())?;
+        bar_to_abar(prng, params, record, randomized_abar_pubkey, enc_key).c(d!())?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
         output: AnonBlindAssetRecord::from_oabar(&open_abar),
         proof,
         memo: open_abar.owner_memo.unwrap(),
     };
-    Ok((body, open_abar.key_rand_factor))
+    Ok(body)
 }
 
 /// Generate BlindAssetRecord To AnonymousBlindAssetRecord conversion note: body + spending input signature
@@ -74,11 +73,11 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     params: &UserParams,
     record: &OpenAssetRecord,
     bar_keypair: &XfrKeyPair,
-    abar_pubkey: &AXfrPubKey,
+    randomized_abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
 ) -> Result<BarToAbarNote> {
-    let (body, _r) =
-        gen_bar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
+    let body =
+        gen_bar_to_abar_body(prng, params, record, &randomized_abar_pubkey, enc_key).c(d!())?;
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
@@ -109,7 +108,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &UserParams,
     obar: &OpenAssetRecord,
-    abar_pubkey: &AXfrPubKey,
+    randomized_abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
 ) -> Result<(OpenAnonBlindAssetRecord, ConvertBarAbarProof)> {
     let oabar_amount = obar.amount;
@@ -121,7 +120,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     let oabar = OpenAnonBlindAssetRecordBuilder::new()
         .amount(oabar_amount)
         .asset_type(obar.asset_type)
-        .pub_key(*abar_pubkey)
+        .pub_key(*randomized_abar_pubkey)
         .finalize(prng, &enc_key)
         .c(d!())?
         .build()
@@ -253,6 +252,7 @@ pub(crate) fn verify_bar_to_abar(
 
 #[cfg(test)]
 mod test {
+    use std::borrow::Borrow;
     use crate::anon_xfr::bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
@@ -270,6 +270,8 @@ mod test {
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use algebra::groups::Scalar;
+    use algebra::jubjub::JubjubScalar;
 
     // helper function
     fn build_bar(
@@ -361,6 +363,7 @@ mod test {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
+        let rand_abar_keypair = abar_keypair.randomize(JubjubScalar::random(&mut prng).borrow());
         let dec_key = XSecretKey::new(&mut prng);
         let enc_key = XPublicKey::from(&dec_key);
         let pc_gens = RistrettoPedersenGens::default();
@@ -381,7 +384,7 @@ mod test {
             &params,
             &obar,
             &bar_keypair,
-            &abar_keypair.pub_key(),
+            &rand_abar_keypair.pub_key(),
             &enc_key,
         )
         .unwrap();
@@ -390,7 +393,7 @@ mod test {
         let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
             &note.body.output,
             note.body.memo.clone(),
-            &abar_keypair,
+            &rand_abar_keypair,
             &dec_key,
         )
         .unwrap()
@@ -399,7 +402,7 @@ mod test {
         assert_eq!(oabar.amount, amount);
         assert_eq!(oabar.asset_type, asset_type);
         assert_eq!(
-            abar_keypair.pub_key().randomize(&oabar.key_rand_factor),
+            rand_abar_keypair.pub_key(),
             note.body.output.public_key
         );
 
