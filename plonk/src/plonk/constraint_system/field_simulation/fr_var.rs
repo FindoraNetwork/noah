@@ -1,14 +1,14 @@
 use crate::plonk::constraint_system::{
     field_simulation::SimFrMulVar, TurboConstraintSystem, VarIndex,
 };
-use num_bigint::BigUint;
 use zei_algebra::{
     bls12_381::BLSScalar,
     cmp::{max, min},
     prelude::*,
 };
 use zei_crypto::field_simulation::{
-    ristretto_scalar_field_sub_pad_in_limbs, SimFr, BIT_PER_LIMB, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
+    ristretto_scalar_field_sub_pad_in_limbs, SimFr, SimReducibility, BIT_IN_TOP_LIMB, BIT_PER_LIMB,
+    NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
 
 /// `SimFrVar` is the variable for `SimFr` in
@@ -128,14 +128,19 @@ impl SimFrVar {
 
     /// Alloc a witness variable and range check gate.
     pub fn alloc_witness(cs: &mut TurboConstraintSystem<BLSScalar>, val: &SimFr) -> Self {
-        assert!(val.num_of_additions_over_normal_form.is_zero());
+        assert!(val.num_of_additions_over_normal_form == SimReducibility::StrictlyNotReducible);
 
         let mut res = Self::new(cs);
         res.val = val.clone();
-        res.val.num_of_additions_over_normal_form = BigUint::one();
+        res.val.num_of_additions_over_normal_form = SimReducibility::AtMostReducibleByOne;
         for i in 0..NUM_OF_LIMBS {
             res.var[i] = cs.new_variable(val.limbs[i]);
-            cs.range_check(res.var[i], BIT_PER_LIMB);
+
+            if i == NUM_OF_LIMBS - 1 {
+                cs.range_check(res.var[i], BIT_IN_TOP_LIMB);
+            } else {
+                cs.range_check(res.var[i], BIT_PER_LIMB);
+            }
         }
         res
     }
@@ -146,12 +151,12 @@ impl SimFrVar {
         val: &SimFr,
         total_bits: usize,
     ) -> Self {
-        assert!(val.num_of_additions_over_normal_form.is_zero());
+        assert!(val.num_of_additions_over_normal_form == SimReducibility::StrictlyNotReducible);
 
         let mut res = Self::new(cs);
         res.val = val.clone();
-        if total_bits == 255 {
-            res.val.num_of_additions_over_normal_form = BigUint::one();
+        if total_bits == 253 {
+            res.val.num_of_additions_over_normal_form = SimReducibility::AtMostReducibleByOne;
         }
 
         let mut remaining_bits = total_bits;
