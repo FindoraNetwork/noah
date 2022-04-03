@@ -1,5 +1,5 @@
 use crate::anon_creds::{ac_confidential_verify, ACCommitment, ACConfidentialRevealProof};
-use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
+use crate::setup::{BulletproofParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::xfr::{
     asset_record::AssetRecordType,
     asset_tracer::RecordDataEncKey,
@@ -29,7 +29,7 @@ use zei_crypto::{
             PedersenElGamalEqProof, PedersenElGamalProofInstance,
         },
     },
-    bp_circuits::range_proofs::{batch_verify_ranges, prove_ranges},
+    bulletproofs::range::{batch_verify_ranges, prove_ranges},
 };
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
@@ -500,7 +500,7 @@ pub(crate) fn range_proof(
         return Err(eg!(ZeiError::RangeProofProveError));
     }
 
-    let params = PublicParams::default();
+    let params = BulletproofParams::default();
 
     //build values vector (out amounts + amount difference)
     let in_total = inputs.iter().fold(0u64, |accum, x| accum + x.amount);
@@ -568,7 +568,7 @@ fn add_blindings(oar: &[&OpenAssetRecord]) -> (RistrettoScalar, RistrettoScalar)
 
 pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &PublicParams,
+    params: &BulletproofParams,
     instances: &[(
         &Vec<BlindAssetRecord>,
         &Vec<BlindAssetRecord>,

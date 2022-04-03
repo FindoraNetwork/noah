@@ -544,7 +544,7 @@ fn range_proof_64<CS: ConstraintSystem>(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::bp_circuits::cloak::{
+    use crate::bulletproofs::cloak::{
         allocate_cloak_vector, CloakCommitment, CloakValue, CloakVariable,
     };
     use bulletproofs::{

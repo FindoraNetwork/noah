@@ -5,7 +5,7 @@ pub(crate) mod examples {
     use wasm_bindgen::__rt::std::collections::HashMap;
     use zei::{
         anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
-        setup::PublicParams,
+        setup::BulletproofParams,
         xfr::{
             asset_record::{open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
@@ -42,7 +42,7 @@ pub(crate) mod examples {
     #[test]
     fn xfr_note_non_confidential_one_input_one_output() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let amount = 100u64;
         // 1. setup
         // 1.1 user keys
@@ -104,7 +104,7 @@ pub(crate) mod examples {
     #[test]
     fn xfr_note_confidential_amount_one_input_one_output() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let amount = 100u64;
         // 1. setup
         // 1.1 user keys
@@ -167,7 +167,7 @@ pub(crate) mod examples {
     #[test]
     fn xfr_note_confidential_two_inputs_two_outputs_asset_tracing_on_inputs() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let amount_in1 = 50u64;
         let amount_in2 = 75u64;
         let amount_out1 = 100u64;
@@ -312,7 +312,7 @@ pub(crate) mod examples {
     #[test]
     fn xfr_note_confidential_one_input_two_outputs_asset_tracing_on_outputs() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let amount_in1 = 50u64;
         let amount_out1 = 30u64;
         let amount_out2 = 20u64;
@@ -450,7 +450,7 @@ pub(crate) mod examples {
     #[allow(non_snake_case)]
     fn xfr_note_confidential_two_inputs_one_output_asset_tracing_and_identity_tracking_on_inputs() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let mut AIR: HashMap<&[u8], _> = HashMap::new();
         let amount_in1 = 50u64;
         let amount_in2 = 75u64;
@@ -642,7 +642,7 @@ pub(crate) mod examples {
     fn xfr_note_confidential_one_input_two_outputs_asset_tracing_and_identity_tracking_on_outputs()
     {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let mut AIR: HashMap<&[u8], _> = HashMap::new();
         let amount_in1 = 100u64;
         let amount_out1 = 75u64;
@@ -871,7 +871,7 @@ pub(crate) mod examples {
         // 3 asset types, 2 different tracing policies and one with no policy
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let mut AIR: HashMap<&[u8], _> = HashMap::new();
         let amount_asset1_in1 = 25;
         let amount_asset2_in2 = 50;

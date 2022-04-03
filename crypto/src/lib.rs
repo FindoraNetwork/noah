@@ -11,7 +11,7 @@ extern crate serde_derive;
 
 pub mod anon_creds;
 pub mod basic;
-pub mod bp_circuits;
+pub mod bulletproofs;
 pub mod conf_cred_reveal;
 pub mod field_simulation;
 pub mod pc_eq_rescue_split_verifier_zk_part;

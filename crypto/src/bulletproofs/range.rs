@@ -1,14 +1,13 @@
-//! This file encapsulates the prove and verify of Bulletproof's range proof.
+//! Module for the Bulletproof range proof scheme
 
 use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
-use itertools::Itertools;
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 use zei_algebra::ristretto::CompressedRistretto;
 use zei_algebra::ristretto::RistrettoScalar as Scalar;
 
-/// Gives a bulletproof range proof that values committed using  `blindings`
+/// Generate a Bulletproof range proof that values committed using `blindings`
 /// are within [0..2^{`log_range_upper_bound`}-1].
 pub fn prove_ranges(
     bp_gens: &BulletproofGens,

@@ -18,7 +18,7 @@ pub mod test_utils; // for integration test
 pub(crate) mod tests; // unit tests
 
 use crate::anon_creds::{ACCommitment, Attr};
-use crate::setup::PublicParams;
+use crate::setup::BulletproofParams;
 
 use self::{
     asset_mixer::{
@@ -124,10 +124,10 @@ impl XfrType {
 /// use zei::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
 /// use zei_algebra::prelude::*;
 /// use ruc::err::*;
-/// use zei::setup::PublicParams;
+/// use zei::setup::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
-/// let mut params = PublicParams::default();
+/// let mut params = BulletproofParams::default();
 /// let asset_type = AssetType::from_identical_byte(0u8);
 /// let inputs_amounts = [(10u64, asset_type),
 ///                       (10u64, asset_type),
@@ -208,10 +208,10 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use zei::xfr::asset_record::AssetRecordType;
 /// use zei::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
-/// use zei::setup::PublicParams;
+/// use zei::setup::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
-/// let mut params = PublicParams::default();
+/// let mut params = BulletproofParams::default();
 /// let asset_type = AssetType::from_identical_byte(0u8);
 /// let inputs_amounts = [(10u64, asset_type),
 ///                       (10u64, asset_type),
@@ -492,7 +492,7 @@ pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<()> {
 /// * `returns` - () or an ZeiError in case of verification error
 pub fn verify_xfr_note<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &mut PublicParams,
+    params: &mut BulletproofParams,
     xfr_note: &XfrNote,
     policies: &XfrNotePoliciesRef,
 ) -> Result<()> {
@@ -506,7 +506,7 @@ pub fn verify_xfr_note<R: CryptoRng + RngCore>(
 /// * `returns` - () or an ZeiError in case of verification error
 pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &mut PublicParams,
+    params: &mut BulletproofParams,
     notes: &[&XfrNote],
     policies: &[&XfrNotePoliciesRef],
 ) -> Result<()> {
@@ -521,7 +521,7 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
 
 pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &mut PublicParams,
+    params: &mut BulletproofParams,
     bodies: &[&XfrBody],
 ) -> Result<()> {
     let mut conf_amount_records = vec![];
@@ -667,7 +667,7 @@ impl XfrNotePolicies {
 /// * `returns` - () or an ZeiError in case of verification error
 pub fn verify_xfr_body<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &mut PublicParams,
+    params: &mut BulletproofParams,
     body: &XfrBody,
     policies: &XfrNotePoliciesRef,
 ) -> Result<()> {
@@ -681,7 +681,7 @@ pub fn verify_xfr_body<R: CryptoRng + RngCore>(
 /// * `returns` - () or an ZeiError in case of verification error
 pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &mut PublicParams,
+    params: &mut BulletproofParams,
     bodies: &[&XfrBody],
     policies: &[&XfrNotePoliciesRef],
 ) -> Result<()> {
@@ -807,7 +807,7 @@ fn verify_plain_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetReco
 
 fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &mut PublicParams,
+    params: &mut BulletproofParams,
     bars_instances: &[(&[BlindAssetRecord], &[BlindAssetRecord], &AssetMixProof)],
 ) -> Result<()> {
     fn process_bars(

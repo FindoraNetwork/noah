@@ -1,4 +1,4 @@
-use crate::setup::PublicParams;
+use crate::setup::BulletproofParams;
 use bulletproofs::{
     r1cs::{batch_verify, Prover, R1CSProof, Verifier},
     BulletproofGens, PedersenGens,
@@ -9,7 +9,7 @@ use zei_algebra::{
     prelude::*,
     ristretto::{CompressedRistretto, RistrettoScalar},
 };
-use zei_crypto::bp_circuits::cloak::{cloak, CloakCommitment, CloakValue};
+use zei_crypto::bulletproofs::cloak::{cloak, CloakCommitment, CloakValue};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
@@ -134,7 +134,7 @@ pub struct AssetMixingInstance<'a> {
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
 /// use ruc::err::*;
-/// use zei::setup::PublicParams;
+/// use zei::setup::BulletproofParams;
 /// use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 /// let input = [
 ///            (60u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
@@ -174,12 +174,12 @@ pub struct AssetMixingInstance<'a> {
 ///        proof: &proof
 ///    };
 ///    let mut prng = thread_rng();
-///    let mut params = PublicParams::default();
+///    let mut params = BulletproofParams::default();
 ///    pnk!(batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
 /// ```
 pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &mut PublicParams,
+    params: &mut BulletproofParams,
     instances: &[AssetMixingInstance],
 ) -> Result<()> {
     let mut max_circuit_size = 0;
@@ -240,7 +240,7 @@ pub(crate) fn prepare_asset_mixer_verifier(
         .map(|com| com.commit_verifier(verifier))
         .collect_vec();
 
-    zei_crypto::bp_circuits::cloak::cloak(verifier, &in_vars, None, &out_vars, None)
+    zei_crypto::bulletproofs::cloak::cloak(verifier, &in_vars, None, &out_vars, None)
         .c(d!(ZeiError::AssetMixerVerificationError))
 }
 
@@ -272,7 +272,7 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
 }
 #[cfg(test)]
 mod test {
-    use crate::setup::PublicParams;
+    use crate::setup::BulletproofParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -427,7 +427,7 @@ mod test {
             proof: &proof,
         };
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         pnk!(super::batch_verify_asset_mixing(
             &mut prng,
             &mut params,

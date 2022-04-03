@@ -1,4 +1,4 @@
-pub static RISTRETTO_SRS: &'static [u8] = include_bytes!("../parameters/ristretto.bin");
+pub static BULLETPROOF_URS: &'static [u8] = include_bytes!("../parameters/bulletproof_urs.bin");
 
 #[cfg(not(feature = "no_srs"))]
 pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs.bin"));

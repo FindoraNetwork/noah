@@ -3,7 +3,7 @@
 pub(crate) mod xfr_note_complex_variable_size {
     use rand_chacha::ChaChaRng;
     use zei::{
-        setup::PublicParams,
+        setup::BulletproofParams,
         xfr::{
             gen_xfr_body,
             structs::TracingPolicies,
@@ -53,7 +53,7 @@ pub(crate) mod xfr_note_complex_variable_size {
             vec![None; n],
         );
 
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
 
         assert!(verify_xfr_body(&mut prng, &mut params, &xfr_body, &policies).is_ok());
     }

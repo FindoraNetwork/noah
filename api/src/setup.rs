@@ -11,7 +11,7 @@ use crate::anon_xfr::{
 };
 use crate::parameters::{
     ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
-    RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
+    BULLETPROOF_URS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
 use bulletproofs::BulletproofGens;
 use serde::Deserialize;
@@ -30,16 +30,15 @@ use zei_plonk::{
 
 // Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]
-pub struct PublicParams {
+pub struct BulletproofParams {
     pub bp_gens: BulletproofGens,
     pub bp_circuit_gens: BulletproofGens,
-    pub pc_gens: RistrettoPedersenCommitment,
     pub range_proof_bits: usize,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct UserParams {
-    pub bp_params: PublicParams,
+    pub bp_params: BulletproofParams,
     pub pcs: KZGCommitmentSchemeBLS,
     pub cs: TurboPlonkCS,
     pub prover_params: ProverParams<KZGCommitmentSchemeBLS>,
@@ -47,7 +46,7 @@ pub struct UserParams {
 
 #[derive(Serialize, Deserialize)]
 pub struct NodeParams {
-    pub bp_params: PublicParams,
+    pub bp_params: BulletproofParams,
     pub pcs: KZGCommitmentSchemeBLS,
     pub cs: TurboPlonkCS,
     pub verifier_params: VerifierParams<KZGCommitmentSchemeBLS>,
@@ -55,7 +54,7 @@ pub struct NodeParams {
 
 #[derive(Serialize, Deserialize)]
 pub struct NodeParamsSplitCommon {
-    pub bp_params: PublicParams,
+    pub bp_params: BulletproofParams,
     pub pcs: KZGCommitmentSchemeBLS,
 }
 
@@ -70,9 +69,9 @@ pub const MAX_PARTY_NUMBER: usize = 128;
 const COMMON_SEED: [u8; 32] = [0u8; 32];
 pub const PRECOMPUTED_PARTY_NUMBER: usize = 6;
 
-impl PublicParams {
-    pub fn new() -> PublicParams {
-        let pp: PublicParams = bincode::deserialize(&RISTRETTO_SRS)
+impl BulletproofParams {
+    pub fn new() -> BulletproofParams {
+        let pp: BulletproofParams = bincode::deserialize(&BULLETPROOF_URS)
             .c(d!(ZeiError::DeserializationError))
             .unwrap();
         pp
@@ -85,9 +84,17 @@ impl PublicParams {
     }
 }
 
-impl Default for PublicParams {
+impl Default for BulletproofParams {
     fn default() -> Self {
-        PublicParams::new()
+        let range_generators =
+            BulletproofGens::new(BULLET_PROOF_RANGE, MAX_PARTY_NUMBER);
+        let circuit_generators = BulletproofGens::new(bp_num_gens, 1);
+
+        BulletproofParams {
+            bp_gens: range_generators,
+            bp_circuit_gens: circuit_generators,
+            range_proof_bits: BULLET_PROOF_RANGE,
+        }
     }
 }
 
@@ -113,7 +120,7 @@ impl UserParams {
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
 
         Ok(UserParams {
-            bp_params: PublicParams::new(),
+            bp_params: BulletproofParams::new(),
             pcs,
             cs,
             prover_params,
@@ -132,7 +139,7 @@ impl UserParams {
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
         Ok(UserParams {
-            bp_params: PublicParams::new(),
+            bp_params: BulletproofParams::new(),
             pcs,
             cs,
             prover_params,
@@ -170,7 +177,7 @@ impl UserParams {
 
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
         Ok(UserParams {
-            bp_params: PublicParams::new(),
+            bp_params: BulletproofParams::new(),
             pcs,
             cs,
             prover_params,
@@ -209,7 +216,7 @@ impl UserParams {
 
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
         Ok(UserParams {
-            bp_params: PublicParams::new(),
+            bp_params: BulletproofParams::new(),
             pcs,
             cs,
             prover_params,

@@ -8,7 +8,7 @@ use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 use zei::{
     anon_xfr::TREE_DEPTH,
-    setup::{NodeParams, PublicParams, UserParams, PRECOMPUTED_PARTY_NUMBER},
+    setup::{NodeParams, BulletproofParams, UserParams, PRECOMPUTED_PARTY_NUMBER},
 };
 use zei_algebra::utils::save_to_file;
 use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
@@ -51,19 +51,8 @@ enum Actions {
         directory: PathBuf,
     },
 
-    BP {
-        gens_capacity: usize,
-        party_capacity: usize,
-        out_filename: PathBuf,
-    },
-
-    KZG {
-        size: usize,
-        out_filename: PathBuf,
-    },
-
-    PublicParams {
-        out_filename: PathBuf,
+    Bulletproof {
+        directory: PathBuf,
     },
 }
 
@@ -101,17 +90,10 @@ fn main() {
         ANON_FEE { directory } => {
             gen_anon_fee(directory);
         }
-        BP {
-            gens_capacity,
-            party_capacity,
-            out_filename,
-        } => {
-            gen_params_bp(gens_capacity, party_capacity, out_filename);
-        }
         KZG { size, out_filename } => {
             gen_params_kzg(size, out_filename);
         }
-        PublicParams { out_filename } => gen_public_params(out_filename),
+        Bulletproof { directory } => gen_bulletproof_urs(directory),
     };
 }
 
@@ -231,27 +213,12 @@ fn gen_anon_fee(mut path: PathBuf) {
     save_to_file(&bytes, path);
 }
 
-fn gen_params_bp(gens_capacity: usize, party_capacity: usize, out_filename: PathBuf) {
-    println!("Generating BP parameters of size {} ...", gens_capacity);
-    let bpgens = BulletproofGens::new(gens_capacity, party_capacity);
-    let bpgens_ser = bincode::serialize(&bpgens).unwrap();
-    save_to_file(&bpgens_ser, out_filename);
-}
-
-fn gen_params_kzg(size: usize, out_filename: PathBuf) {
-    println!(
-        "Warning: The KZG parameters should come from a setup ceremony instead of generated here."
-    );
-    println!("Generating KZG parameters of size {} ...", size);
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pcs = KZGCommitmentSchemeBLS::new(size, &mut prng);
-    let params_ser = bincode::serialize(&pcs).unwrap();
-    save_to_file(&params_ser, out_filename);
-}
-
-fn gen_public_params(out_filename: PathBuf) {
+// cargo run --release --features="gen" --bin gen-params bulletproof "./parameters"
+fn gen_bulletproof_urs(mut path: PathBuf) {
     println!("Generating Public Parameters ...");
-    let pp = PublicParams::default();
-    let pp_ser = bincode::serialize(&pp).unwrap();
-    save_to_file(&pp_ser, out_filename);
+
+    let pp = BulletproofParams::default();
+    let bytes = bincode::serialize(&pp).unwrap();
+    path.push("bulletproof-urs.bin");
+    save_to_file(&bytes, out_filename);
 }
