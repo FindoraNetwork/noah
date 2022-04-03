@@ -77,7 +77,8 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     enc_key: &XPublicKey,
 ) -> Result<BarToAbarNote> {
     let body =
-        gen_bar_to_abar_body(prng, params, record, &randomized_abar_pubkey, enc_key).c(d!())?;
+        gen_bar_to_abar_body(prng, params, record, &randomized_abar_pubkey, enc_key)
+            .c(d!())?;
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
@@ -252,7 +253,6 @@ pub(crate) fn verify_bar_to_abar(
 
 #[cfg(test)]
 mod test {
-    use std::borrow::Borrow;
     use crate::anon_xfr::bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
@@ -266,12 +266,13 @@ mod test {
     use crate::xfr::structs::{
         AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo,
     };
+    use algebra::groups::Scalar;
+    use algebra::jubjub::JubjubScalar;
     use crypto::basics::commitments::ristretto_pedersen::RistrettoPedersenGens;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use algebra::groups::Scalar;
-    use algebra::jubjub::JubjubScalar;
+    use std::borrow::Borrow;
 
     // helper function
     fn build_bar(
@@ -363,7 +364,8 @@ mod test {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
-        let rand_abar_keypair = abar_keypair.randomize(JubjubScalar::random(&mut prng).borrow());
+        let rand_abar_keypair =
+            abar_keypair.randomize(JubjubScalar::random(&mut prng).borrow());
         let dec_key = XSecretKey::new(&mut prng);
         let enc_key = XPublicKey::from(&dec_key);
         let pc_gens = RistrettoPedersenGens::default();
@@ -401,10 +403,7 @@ mod test {
         .unwrap();
         assert_eq!(oabar.amount, amount);
         assert_eq!(oabar.asset_type, asset_type);
-        assert_eq!(
-            rand_abar_keypair.pub_key(),
-            note.body.output.public_key
-        );
+        assert_eq!(rand_abar_keypair.pub_key(), note.body.output.public_key);
 
         let node_params = NodeParams::from(params);
         assert!(

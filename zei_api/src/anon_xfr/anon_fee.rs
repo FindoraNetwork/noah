@@ -341,7 +341,6 @@ pub(crate) fn verify_anon_fee(
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Borrow;
     use crate::anon_xfr::anon_fee::{
         gen_anon_fee_body, verify_anon_fee_body, AnonFeeNote, ANON_FEE_MIN,
     };
@@ -357,16 +356,17 @@ mod tests {
     use accumulators::merkle_tree::{PersistentMerkleTree, TREE_DEPTH};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::Scalar;
+    use algebra::jubjub::JubjubScalar;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::{CryptoRng, RngCore, SeedableRng};
+    use std::borrow::Borrow;
     use std::sync::Arc;
     use std::thread;
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
-    use algebra::jubjub::JubjubScalar;
 
     #[test]
     fn test_anon_fee_happy_path() {
@@ -402,7 +402,8 @@ mod tests {
 
         // output keys
         let keypair_out = AXfrKeyPair::generate(&mut prng);
-        let rand_keypair_out = keypair_out.randomize(JubjubScalar::random(&mut prng).borrow());
+        let rand_keypair_out =
+            keypair_out.randomize(JubjubScalar::random(&mut prng).borrow());
         let dec_key_out = XSecretKey::new(&mut prng);
         let enc_key_out = XPublicKey::from(&dec_key_out);
 
@@ -415,9 +416,14 @@ mod tests {
             .build()
             .unwrap();
 
-        let (body, key_pairs) =
-            gen_anon_fee_body(&mut prng, &user_params, &oabar, &oabar_out, &rand_keypair_in)
-                .unwrap();
+        let (body, key_pairs) = gen_anon_fee_body(
+            &mut prng,
+            &user_params,
+            &oabar,
+            &oabar_out,
+            &rand_keypair_in,
+        )
+        .unwrap();
 
         {
             // verifier scope
@@ -489,11 +495,12 @@ mod tests {
         let input_amount = output_amount + ANON_FEE_MIN;
 
         // simulate input abar
-        let (mut oabar, _keypair_in, rand_keypair_in, _dec_key_in, _) = gen_oabar_and_keys(
-            &mut prng,
-            input_amount,
-            AssetType::from_identical_byte(3u8),
-        );
+        let (mut oabar, _keypair_in, rand_keypair_in, _dec_key_in, _) =
+            gen_oabar_and_keys(
+                &mut prng,
+                input_amount,
+                AssetType::from_identical_byte(3u8),
+            );
         let abar = AnonBlindAssetRecord::from_oabar(&oabar);
         assert_eq!(rand_keypair_in.pub_key(), *oabar.pub_key_ref());
         assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
@@ -517,7 +524,8 @@ mod tests {
 
         // output keys
         let keypair_out = AXfrKeyPair::generate(&mut prng);
-        let rand_keypair_out = keypair_out.randomize(JubjubScalar::random(&mut prng).borrow());
+        let rand_keypair_out =
+            keypair_out.randomize(JubjubScalar::random(&mut prng).borrow());
         let dec_key_out = XSecretKey::new(&mut prng);
         let enc_key_out = XPublicKey::from(&dec_key_out);
 
@@ -552,7 +560,7 @@ mod tests {
         XPublicKey,
     ) {
         let keypair = AXfrKeyPair::generate(prng);
-        let randomized_keypair  = keypair.randomize(JubjubScalar::random(prng).borrow());
+        let randomized_keypair = keypair.randomize(JubjubScalar::random(prng).borrow());
         let dec_key = XSecretKey::new(prng);
         let enc_key = XPublicKey::from(&dec_key);
         let oabar = OpenAnonBlindAssetRecordBuilder::new()

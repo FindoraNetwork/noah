@@ -11,7 +11,7 @@ use crate::setup::{NodeParams, UserParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use algebra::bls12_381::{BLSScalar, BLS_SCALAR_LEN};
 use algebra::groups::{Scalar, ScalarArithmetic, Zero};
-use algebra::jubjub::{JubjubScalar};
+use algebra::jubjub::JubjubScalar;
 use crypto::basics::hash::rescue::RescueInstance;
 use crypto::basics::hybrid_encryption::{
     hybrid_decrypt_with_x25519_secret_key, XSecretKey,
@@ -322,7 +322,6 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Borrow;
     use crate::anon_xfr::{
         gen_anon_xfr_body, hash_abar,
         keys::AXfrKeyPair,
@@ -334,6 +333,7 @@ mod tests {
     };
     use itertools::Itertools;
     use parking_lot::lock_api::RwLock;
+    use std::borrow::Borrow;
     use std::sync::Arc;
     use std::thread;
 
@@ -352,11 +352,11 @@ mod tests {
     use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
     use crate::anon_xfr::structs::AXfrNote;
     use crate::setup::{NodeParams, UserParams};
+    use algebra::jubjub::JubjubScalar;
     use crypto::basics::hash::rescue::RescueInstance;
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
-    use algebra::jubjub::JubjubScalar;
     use utils::errors::ZeiError;
 
     pub fn create_mt_leaf_info(proof: Proof) -> MTLeafInfo {
@@ -437,7 +437,8 @@ mod tests {
 
         // output keys
         let keypair_out = AXfrKeyPair::generate(&mut prng);
-        let rand_keypair_out = keypair_out.randomize(JubjubScalar::random(&mut prng).borrow());
+        let rand_keypair_out =
+            keypair_out.randomize(JubjubScalar::random(&mut prng).borrow());
         let dec_key_out = XSecretKey::new(&mut prng);
         let enc_key_out = XPublicKey::from(&dec_key_out);
 
@@ -574,7 +575,8 @@ mod tests {
 
         // output keys
         let keypair_out = AXfrKeyPair::generate(&mut prng);
-        let rand_keypair_out = keypair_out.randomize(JubjubScalar::random(&mut prng).borrow());
+        let rand_keypair_out =
+            keypair_out.randomize(JubjubScalar::random(&mut prng).borrow());
         let dec_key_out = XSecretKey::new(&mut prng);
         let enc_key_out = XPublicKey::from(&dec_key_out);
 
@@ -701,7 +703,7 @@ mod tests {
         let mut in_dec_keys = vec![];
         let mut in_owner_memos = vec![];
         for i in 0..n_payers {
-            let (oabar, _keypair, randomized_keypair,  dec_key, _) =
+            let (oabar, _keypair, randomized_keypair, dec_key, _) =
                 gen_oabar_and_keys(&mut prng, amounts_in[i], asset_types_in[i]);
             let abar = AnonBlindAssetRecord::from_oabar(&oabar);
             let owner_memo = oabar.get_owner_memo().unwrap();
@@ -753,7 +755,8 @@ mod tests {
         let merkle_root = hash.rescue_hash(&[leafs[0], leafs[1], leafs[2], zero])[0];
 
         // output keys, amounts, asset_types
-        let (_keypairs_out, rand_keypairs_out, dec_keys_out, enc_keys_out) = gen_keys(&mut prng, n_payees);
+        let (_keypairs_out, rand_keypairs_out, dec_keys_out, enc_keys_out) =
+            gen_keys(&mut prng, n_payees);
         let amounts_out = vec![5u64, 5u64, 50u64];
         let asset_types_out =
             vec![FEE_TYPE, FEE_TYPE, AssetType::from_identical_byte(1)];
@@ -878,8 +881,7 @@ mod tests {
                 .unwrap()
                 .build()
                 .unwrap();
-                let rand_pk = rand_keypairs_out[i]
-                    .pub_key();
+                let rand_pk = rand_keypairs_out[i].pub_key();
                 assert_eq!(amounts_out[i], oabar_out.amount);
                 assert_eq!(asset_types_out[i], oabar_out.asset_type);
                 assert_eq!(rand_pk, body.outputs[i].public_key);
@@ -897,13 +899,19 @@ mod tests {
     fn gen_keys<R: CryptoRng + RngCore>(
         prng: &mut R,
         n: usize,
-    ) -> (Vec<AXfrKeyPair>, Vec<AXfrKeyPair>, Vec<XSecretKey>, Vec<XPublicKey>) {
+    ) -> (
+        Vec<AXfrKeyPair>,
+        Vec<AXfrKeyPair>,
+        Vec<XSecretKey>,
+        Vec<XPublicKey>,
+    ) {
         let keypairs_in: Vec<AXfrKeyPair> =
             (0..n).map(|_| AXfrKeyPair::generate(prng)).collect();
 
-        let rand_keypairs_in: Vec<AXfrKeyPair> = keypairs_in.iter().map(|k| {
-            k.randomize(JubjubScalar::random(prng).borrow())
-        }).collect();
+        let rand_keypairs_in: Vec<AXfrKeyPair> = keypairs_in
+            .iter()
+            .map(|k| k.randomize(JubjubScalar::random(prng).borrow()))
+            .collect();
 
         let dec_keys_in: Vec<XSecretKey> =
             (0..n).map(|_| XSecretKey::new(prng)).collect();
@@ -924,7 +932,8 @@ mod tests {
         XPublicKey,
     ) {
         let keypair = AXfrKeyPair::generate(prng);
-        let randomized_keypair  = AXfrKeyPair::generate(prng).randomize(JubjubScalar::random(prng).borrow());
+        let randomized_keypair =
+            AXfrKeyPair::generate(prng).randomize(JubjubScalar::random(prng).borrow());
         let dec_key = XSecretKey::new(prng);
         let enc_key = XPublicKey::from(&dec_key);
         let oabar = OpenAnonBlindAssetRecordBuilder::new()

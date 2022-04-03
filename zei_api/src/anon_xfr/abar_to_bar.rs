@@ -653,7 +653,6 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Borrow;
     use crate::anon_xfr::abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body};
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::{
@@ -667,17 +666,18 @@ mod tests {
     use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, Zero};
+    use algebra::jubjub::JubjubScalar;
     use crypto::basics::hash::rescue::RescueInstance;
     use crypto::basics::hybrid_encryption::{XPublicKey, XSecretKey};
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
+    use std::borrow::Borrow;
     use std::sync::Arc;
     use std::thread;
     use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
-    use algebra::jubjub::JubjubScalar;
 
     #[test]
     fn test_abar_to_bar_conversion() {
@@ -685,7 +685,8 @@ mod tests {
         let params = UserParams::abar_to_bar_params(40).unwrap();
 
         let recv = XfrKeyPair::generate(&mut prng);
-        let randomized_sender = AXfrKeyPair::generate(&mut prng).randomize(JubjubScalar::random(&mut prng).borrow());
+        let randomized_sender = AXfrKeyPair::generate(&mut prng)
+            .randomize(JubjubScalar::random(&mut prng).borrow());
         let sender_dec_key = XSecretKey::new(&mut prng);
 
         let path = thread::current().name().unwrap().to_owned();
