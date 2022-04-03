@@ -1,12 +1,187 @@
-use crate::field_simulation::{
-    ristretto_scalar_field_in_biguint, ristretto_scalar_field_in_limbs,
-    ristretto_scalar_field_sub_pad_in_biguint, ristretto_scalar_field_sub_pad_in_limbs, SimFr,
-    BIT_PER_LIMB, NUM_OF_GROUPS, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
-};
 use num_bigint::BigUint;
 use num_integer::Integer;
-use num_traits::Zero;
-use zei_algebra::{bls12_381::BLSScalar, ops::*, traits::Scalar};
+use zei_algebra::bls12_381::BLSScalar;
+use zei_algebra::prelude::*;
+use zei_algebra::str::FromStr;
+
+pub const NUM_OF_LIMBS: usize = 6;
+pub const BIT_PER_LIMB: usize = 43;
+pub const BIT_IN_TOP_LIMB: usize = 38;
+pub const NUM_OF_LIMBS_MUL: usize = NUM_OF_LIMBS * 2 - 1;
+
+pub const NUM_OF_GROUPS: usize = 6;
+
+/// A precise indicator of the reducibility in a simulate element
+#[derive(Eq, PartialEq, Clone)]
+pub enum SimReducibility {
+    StrictlyNotReducible,
+    AtMostReducibleByOne,
+    Others(BigUint),
+}
+
+impl<'a> From<&'a SimReducibility> for BigUint {
+    fn from(src: &'a SimReducibility) -> Self {
+        match src {
+            SimReducibility::StrictlyNotReducible => BigUint::zero(),
+            SimReducibility::AtMostReducibleByOne => BigUint::one(),
+            SimReducibility::Others(x) => x.clone(),
+        }
+    }
+}
+
+/// This is the `BigUint` of the Ristretto scalar field modulus.
+pub fn ristretto_scalar_field_in_biguint() -> BigUint {
+    BigUint::from_str(
+        "7237005577332262213973186563042994240857116359379907606001950938285454250989",
+    )
+    .unwrap()
+}
+
+/// This is the limbs of the Ristretto scalar field modulus.
+pub fn ristretto_scalar_field_in_limbs() -> [BLSScalar; NUM_OF_LIMBS] {
+    [
+        BLSScalar::from_str("3411763647469").unwrap(),
+        BLSScalar::from_str("7643343815244").unwrap(),
+        BLSScalar::from_str("358561053323").unwrap(),
+        BLSScalar::from_str("0").unwrap(),
+        BLSScalar::from_str("0").unwrap(),
+        BLSScalar::from_str("137438953472").unwrap(),
+    ]
+}
+
+/// This is the limbs of the Ristretto scalar field modulus being adjusted
+/// so that each limb is more than 2^43 (except the last one, 2^38).
+///
+/// We use it in subtraction, and we call it sub pad.
+pub fn ristretto_scalar_field_sub_pad_in_limbs() -> [BLSScalar; NUM_OF_LIMBS] {
+    [
+        BLSScalar::from_str("10235290942407").unwrap(),
+        BLSScalar::from_str("14133938423524").unwrap(),
+        BLSScalar::from_str("9871776182178").unwrap(),
+        BLSScalar::from_str("17592186044415").unwrap(),
+        BLSScalar::from_str("17592186044414").unwrap(),
+        BLSScalar::from_str("412316860414").unwrap(),
+    ]
+}
+
+/// This is the `BigUint` representation of the sub pad.
+pub fn ristretto_scalar_field_sub_pad_in_biguint() -> BigUint {
+    BigUint::from_str(
+        "21711016731996786641919559689128982722571349078139722818005852814856362752967",
+    )
+    .unwrap()
+}
+
+/// `SimFr` is the simulated Ristretto scalar field element
+/// over BLS12-381 scalar field.
+///
+#[derive(Clone)]
+pub struct SimFr {
+    pub limbs: [BLSScalar; NUM_OF_LIMBS],
+    pub val: BigUint,
+    pub num_of_additions_over_normal_form: SimReducibility,
+}
+
+impl Default for SimFr {
+    fn default() -> Self {
+        Self {
+            limbs: [BLSScalar::zero(); NUM_OF_LIMBS],
+            val: BigUint::zero(),
+            num_of_additions_over_normal_form: SimReducibility::StrictlyNotReducible,
+        }
+    }
+}
+
+impl Sub<&SimFr> for &SimFr {
+    type Output = SimFr;
+
+    fn sub(self, rhs: &SimFr) -> SimFr {
+        // For simplicity, given that our use case involves only one subtraction,
+        // we require the value to be subtracted by a simulated field element
+        // with at most one addition.
+        //
+        assert!(
+            rhs.num_of_additions_over_normal_form == SimReducibility::StrictlyNotReducible
+                || rhs.num_of_additions_over_normal_form == SimReducibility::AtMostReducibleByOne
+        );
+
+        let mut res = SimFr::default();
+        let r_limbs = ristretto_scalar_field_sub_pad_in_limbs();
+        let r_biguint = ristretto_scalar_field_sub_pad_in_biguint();
+
+        for i in 0..NUM_OF_LIMBS {
+            res.limbs[i] = self.limbs[i].add(&r_limbs[i]).sub(&rhs.limbs[i]);
+        }
+        res.val = (&self.val).add(&r_biguint).sub(&rhs.val);
+
+        res.num_of_additions_over_normal_form = SimReducibility::Others(
+            BigUint::from(&self.num_of_additions_over_normal_form) + BigUint::from(3u32),
+        );
+
+        res
+    }
+}
+
+impl Mul<&SimFr> for &SimFr {
+    type Output = SimFrMul;
+
+    fn mul(self, rhs: &SimFr) -> SimFrMul {
+        let mut mul_res = SimFrMul::default();
+        for i in 0..NUM_OF_LIMBS {
+            for j in 0..NUM_OF_LIMBS {
+                mul_res.limbs[i + j].add_assign(&self.limbs[i].mul(&rhs.limbs[j]));
+            }
+        }
+        mul_res.val = (&self.val).mul(&rhs.val);
+        mul_res.prod_of_num_of_additions = BigUint::from(&self.num_of_additions_over_normal_form)
+            .add(&BigUint::one())
+            .mul(&BigUint::from(&rhs.num_of_additions_over_normal_form).add(&BigUint::one()));
+
+        mul_res
+    }
+}
+
+impl From<&BigUint> for SimFr {
+    fn from(src: &BigUint) -> Self {
+        let step = BigUint::from(1u32).shl(BIT_PER_LIMB);
+        let p_biguint = ristretto_scalar_field_in_biguint();
+        let (_, mut rem) = src.div_rem(&p_biguint);
+
+        let mut res = SimFr::default();
+        res.val = rem.clone();
+        for i in 0..NUM_OF_LIMBS {
+            let (new_rem, limb) = rem.div_rem(&step);
+            rem = new_rem;
+            res.limbs[i] = BLSScalar::from(&limb);
+        }
+        res.num_of_additions_over_normal_form = SimReducibility::StrictlyNotReducible;
+
+        res
+    }
+}
+
+impl Into<BigUint> for &SimFr {
+    fn into(self) -> BigUint {
+        let step = BigUint::from(1u32).shl(43i32);
+        let mut res = BigUint::zero();
+        for limb in self.limbs.iter().rev() {
+            res.mul_assign(&step);
+            res.add_assign(&limb.into());
+        }
+        assert_eq!(res, self.val);
+        res
+    }
+}
+
+impl SimFr {
+    pub fn is_zero(&self) -> bool {
+        let self_biguint: BigUint = self.into();
+        let r_biguint = ristretto_scalar_field_in_biguint();
+
+        let (_, rem) = self_biguint.div_rem(&r_biguint);
+        rem.is_zero()
+    }
+}
 
 /// `SimFrMul` is the intermediate representation for
 /// the product of two simulated Ristretto scalar field elements
@@ -48,7 +223,7 @@ impl Sub<&SimFr> for &SimFrMul {
         // For simplicity, we require the value to be subtracted
         // by a simulated field element with at most four additions.
         //
-        assert!(rhs.num_of_additions_over_normal_form <= BigUint::from(4u32));
+        assert!(BigUint::from(&rhs.num_of_additions_over_normal_form) <= BigUint::from(4u32));
 
         let mut res = self.clone();
         let r_limbs = ristretto_scalar_field_sub_pad_in_limbs();
@@ -87,8 +262,8 @@ impl SimFrMul {
     pub fn enforce_zero(&self) {
         // For safety, since in our use case we are only doing very few algebraic operations,
         // we limit the `prod_of_num_of_additions` to be smaller than 32.
-        let surfeit = self.prod_of_num_of_additions.bits() as usize;
-        assert!(surfeit <= 5);
+        assert!(self.prod_of_num_of_additions.bits() as usize <= 5);
+        let surfeit = 5; // for safety
 
         let cur_val: BigUint = self.into();
         let r_biguint = ristretto_scalar_field_in_biguint();
@@ -196,9 +371,65 @@ impl SimFrMul {
 mod test {
     use crate::field_simulation::{ristretto_scalar_field_in_biguint, SimFr};
     use num_bigint::{BigUint, RandBigInt};
-    use num_traits::Zero;
+    use num_integer::Integer;
     use rand_chacha::ChaCha20Rng;
-    use rand_core::SeedableRng;
+    use zei_algebra::prelude::*;
+
+    #[test]
+    fn test_sim_fr_biguint_conversion() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = ristretto_scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let a_sim_fr = SimFr::from(&a);
+            let a_recovered: BigUint = (&a_sim_fr).into();
+
+            assert_eq!(a, a_recovered);
+        }
+    }
+
+    #[test]
+    fn test_sub() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = ristretto_scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_sim_fr = SimFr::from(&a);
+            let b_sim_fr = SimFr::from(&b);
+            let sum_sim_fr = &a_sim_fr - &b_sim_fr;
+
+            let (_, sum) = a.add(&r_biguint).sub(&b).div_rem(&r_biguint);
+            let (_, sum_recovered) =
+                <&SimFr as Into<BigUint>>::into(&sum_sim_fr).div_rem(&r_biguint);
+
+            assert_eq!(sum, sum_recovered);
+        }
+    }
+
+    #[test]
+    fn test_mul() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = ristretto_scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_sim_fr = SimFr::from(&a);
+            let b_sim_fr = SimFr::from(&b);
+
+            let prod_sim_fr_mul = a_sim_fr.mul(&b_sim_fr);
+            let prod_sim_fr_mul_recovered: BigUint = (&prod_sim_fr_mul).into();
+
+            let prod = &a * &b;
+
+            assert_eq!(prod, prod_sim_fr_mul_recovered);
+        }
+    }
 
     #[test]
     fn test_enforce_zero_trivial() {

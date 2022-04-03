@@ -10,8 +10,8 @@ use std::{
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::field_simulation::{
     ristretto_scalar_field_in_biguint, ristretto_scalar_field_in_limbs,
-    ristretto_scalar_field_sub_pad_in_limbs, SimFr, SimFrMul, BIT_PER_LIMB, NUM_OF_GROUPS,
-    NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
+    ristretto_scalar_field_sub_pad_in_limbs, SimFr, SimFrMul, BIT_IN_TOP_LIMB, BIT_PER_LIMB,
+    NUM_OF_GROUPS, NUM_OF_LIMBS, NUM_OF_LIMBS_MUL,
 };
 
 /// `SimFrMulVar` is the variable for `SimFrMul` in
@@ -99,7 +99,11 @@ impl SimFrMulVar {
         let mut k_limbs_var = Vec::with_capacity(k_limbs.len());
         for i in 0..NUM_OF_LIMBS {
             let new_var = cs.new_variable(k_limbs[i]);
-            cs.range_check(new_var, BIT_PER_LIMB + 5);
+            if i == NUM_OF_LIMBS - 1 {
+                cs.range_check(new_var, BIT_IN_TOP_LIMB + 5);
+            } else {
+                cs.range_check(new_var, BIT_PER_LIMB);
+            }
             k_limbs_var.push(new_var);
         }
 
