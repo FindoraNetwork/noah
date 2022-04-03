@@ -76,8 +76,8 @@ impl SimFrMulVar {
 
     /// Enforce a zero constraint.
     pub fn enforce_zero(&self, cs: &mut TurboConstraintSystem<BLSScalar>) {
-        let surfeit = self.val.prod_of_num_of_additions.bits() as usize;
-        assert!(surfeit <= 5);
+        assert!(self.val.prod_of_num_of_additions.bits() as usize <= 5);
+        let surfeit = 5;
 
         let cur_val: BigUint = (&self.val).into();
         let r_biguint = ristretto_scalar_field_in_biguint();
