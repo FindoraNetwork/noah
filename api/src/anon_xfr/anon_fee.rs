@@ -10,7 +10,7 @@ use crate::anon_xfr::{
     proofs::AXfrPlonkPf,
     structs::{AXfrProof, AnonBlindAssetRecord, Nullifier, OpenAnonBlindAssetRecord, SnarkProof},
 };
-use crate::setup::{NodeParams, UserParams};
+use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::structs::OwnerMemo;
 use merlin::Transcript;
 use zei_algebra::{
@@ -80,7 +80,7 @@ pub struct AnonFeeBody {
 #[allow(unused_variables)]
 pub fn gen_anon_fee_body<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     input: &OpenAnonBlindAssetRecord,
     output: &OpenAnonBlindAssetRecord,
     input_keypair: &AXfrKeyPair,
@@ -162,7 +162,7 @@ fn check_fee_asset_amount(
 /// * `accumulator` - candidate state of the accumulator. It must match body.proof.merkle_root, otherwise it returns ZeiError::AXfrVerification Error.
 #[allow(unused_variables)]
 pub fn verify_anon_fee_body(
-    params: &NodeParams,
+    params: &VerifierParams,
     body: &AnonFeeBody,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
@@ -190,7 +190,7 @@ pub struct AnonFeeProof {
 
 fn prove_anon_fee<R: CryptoRng + RngCore>(
     rng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     input_secret: PayerSecret,
     remainder_secret: PayeeSecret,
 ) -> Result<AXfrPlonkPf> {
@@ -315,7 +315,7 @@ pub(crate) fn build_anon_fee_cs(
 /// * `pub_inputs` - the public inputs of the transaction.
 /// * `proof` - the proof
 pub(crate) fn verify_anon_fee(
-    params: &NodeParams,
+    params: &VerifierParams,
     pub_inputs: &AMultiXfrPubInputs,
     proof: &AXfrPlonkPf,
 ) -> Result<()> {
@@ -344,7 +344,7 @@ mod tests {
         },
         tests::create_mt_leaf_info,
     };
-    use crate::setup::{NodeParams, UserParams};
+    use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn test_anon_fee_happy_path() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
+        let user_params = ProverParams::anon_fee_params(TREE_DEPTH).unwrap();
 
         let output_amount = 1 + prng.next_u64() % 100;
         let input_amount = output_amount + ANON_FEE_MIN;
@@ -411,7 +411,7 @@ mod tests {
 
         {
             // verifier scope
-            let verifier_params = NodeParams::anon_fee_params().unwrap();
+            let verifier_params = VerifierParams::anon_fee_params().unwrap();
             assert!(
                 verify_anon_fee_body(&verifier_params, &body, &pmt.get_root().unwrap()).is_ok()
             );
@@ -423,7 +423,7 @@ mod tests {
             assert!(note.verify_signatures().is_ok());
         }
         {
-            let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
+            let user_params = ProverParams::anon_fee_params(TREE_DEPTH).unwrap();
             let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
                 .amount(output_amount + 1)
                 .asset_type(FEE_TYPE)
@@ -439,7 +439,7 @@ mod tests {
             );
         }
         {
-            let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
+            let user_params = ProverParams::anon_fee_params(TREE_DEPTH).unwrap();
             let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
                 .amount(output_amount)
                 .asset_type(AssetType::from_identical_byte(4u8))
@@ -459,7 +459,7 @@ mod tests {
     #[test]
     fn test_anon_fee_bad_input() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
+        let user_params = ProverParams::anon_fee_params(TREE_DEPTH).unwrap();
 
         let output_amount = 1 + prng.next_u64() % 100;
         let input_amount = output_amount + ANON_FEE_MIN;

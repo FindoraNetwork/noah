@@ -1,4 +1,9 @@
-pub static BULLETPROOF_URS: &'static [u8] = include_bytes!("../parameters/bulletproof_urs.bin");
+#[cfg(not(feature = "no_urs"))]
+pub static BULLETPROOF_URS: Option<&'static [u8]> =
+    Some(include_bytes!("../parameters/bulletproof-urs.bin"));
+
+#[cfg(feature = "no_urs")]
+pub static BULLETPROOF_URS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_srs"))]
 pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs.bin"));
@@ -8,14 +13,14 @@ pub static SRS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
 pub static VERIFIER_COMMON_PARAMS: Option<&'static [u8]> =
-    Some(include_bytes!("../parameters/vk-common.bin"));
+    Some(include_bytes!("../parameters/transfer-vk-common.bin"));
 
 #[cfg(feature = "no_vk")]
 pub static VERIFIER_COMMON_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
 pub static VERIFIER_SPECIALS_PARAMS: Option<&'static [u8]> =
-    Some(include_bytes!("../parameters/vk-specials.bin"));
+    Some(include_bytes!("../parameters/transfer-vk-specials.bin"));
 
 #[cfg(feature = "no_vk")]
 pub static VERIFIER_SPECIALS_PARAMS: Option<&'static [u8]> = None;

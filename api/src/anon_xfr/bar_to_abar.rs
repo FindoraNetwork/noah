@@ -3,7 +3,7 @@ use crate::anon_xfr::{
     proofs::{prove_eq_committed_vals, verify_eq_committed_vals, AXfrPlonkPf},
     structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
 };
-use crate::setup::{NodeParams, UserParams};
+use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
     sig::{XfrKeyPair, XfrPublicKey, XfrSignature},
     structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
@@ -47,7 +47,7 @@ pub struct BarToAbarNote {
 /// Returns note Body and ABAR opening keys
 pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     record: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
@@ -66,7 +66,7 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
 /// Returns conversion note and output AnonymousBlindAssetRecord opening keys
 pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     record: &OpenAssetRecord,
     bar_keypair: &XfrKeyPair,
     abar_pubkey: &AXfrPubKey,
@@ -83,14 +83,14 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
 
 /// Verifies BlindAssetRecord To AnonymousBlindAssetRecord conversion body
 /// Warning: This function doesn't check that input owner has signed the body
-pub fn verify_bar_to_abar_body(params: &NodeParams, body: &BarToAbarBody) -> Result<()> {
+pub fn verify_bar_to_abar_body(params: &VerifierParams, body: &BarToAbarBody) -> Result<()> {
     verify_bar_to_abar(params, &body.input, &body.output, &body.proof).c(d!())
 }
 
 /// Verifies BlindAssetRecord To AnonymousBlindAssetRecord conversion note by verifying proof of conversion
 /// and signature by input owner key
 pub fn verify_bar_to_abar_note(
-    params: &NodeParams,
+    params: &VerifierParams,
     note: &BarToAbarNote,
     bar_pub_key: &XfrPublicKey,
 ) -> Result<()> {
@@ -101,7 +101,7 @@ pub fn verify_bar_to_abar_note(
 
 pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     obar: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
@@ -173,7 +173,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
 }
 
 pub(crate) fn verify_bar_to_abar(
-    params: &NodeParams,
+    params: &VerifierParams,
     bar: &BlindAssetRecord,
     abar: &AnonBlindAssetRecord,
     proof: &ConvertBarAbarProof,
@@ -242,7 +242,7 @@ mod test {
         keys::AXfrKeyPair,
         structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
     };
-    use crate::setup::{NodeParams, UserParams};
+    use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::{
         asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
         sig::{XfrKeyPair, XfrPublicKey},
@@ -276,7 +276,7 @@ mod test {
         let dec_key = XSecretKey::new(&mut prng);
         let enc_key = XPublicKey::from(&dec_key);
         // proving
-        let params = UserParams::eq_committed_vals_params().unwrap();
+        let params = ProverParams::eq_committed_vals_params().unwrap();
         // confidential case
         let (bar_conf, memo) = build_bar(
             &bar_keypair.pub_key,
@@ -307,7 +307,7 @@ mod test {
         let abar_non_conf = AnonBlindAssetRecord::from_oabar(&oabar_non_conf);
 
         // verifications
-        let node_params = NodeParams::bar_to_abar_params().unwrap();
+        let node_params = VerifierParams::bar_to_abar_params().unwrap();
         // confidential case
         assert!(
             super::verify_bar_to_abar(&node_params, &bar_conf, &abar_conf, &proof_conf).is_ok()
@@ -341,7 +341,7 @@ mod test {
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         );
         let obar = open_blind_asset_record(&bar, &memo, &bar_keypair).unwrap();
-        let params = UserParams::eq_committed_vals_params().unwrap();
+        let params = ProverParams::eq_committed_vals_params().unwrap();
         let note = gen_bar_to_abar_note(
             &mut prng,
             &params,
@@ -369,7 +369,7 @@ mod test {
             note.body.output.public_key
         );
 
-        let node_params = NodeParams::from(params);
+        let node_params = VerifierParams::from(params);
         assert!(verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key).is_ok());
 
         let mut note = note;

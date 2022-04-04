@@ -543,7 +543,6 @@ pub(crate) fn range_proof(
     let mut transcript = Transcript::new(b"Zei Range Proof");
     let (range_proof, coms) = prove_ranges(
         &params.bp_gens,
-        &params.pc_gens,
         &mut transcript,
         values.as_slice(),
         range_proof_blinds.as_slice(),
@@ -586,7 +585,6 @@ pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
     batch_verify_ranges(
         prng,
         &params.bp_gens,
-        &params.pc_gens,
         proofs.as_slice(),
         &mut transcripts,
         &value_commitments,
@@ -720,13 +718,13 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
 
 pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     instances: &[(
         &Vec<BlindAssetRecord>,
         &Vec<BlindAssetRecord>,
         &ChaumPedersenProofX,
     )],
 ) -> Result<()> {
+    let pc_gens = RistrettoPedersenCommitment::default();
     let mut transcript = Transcript::new(b"AssetEquality");
     let mut proof_instances = Vec::with_capacity(instances.len());
     for (inputs, outputs, proof) in instances {

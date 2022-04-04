@@ -5,7 +5,7 @@ use crate::plonk::{
         combine_q_polys, derive_q_eval_beta, eval_public_var_poly, linearization_commitment,
         PlonkChallenges,
     },
-    setup::{PlonkPf, VerifierParams},
+    setup::{PlonkPf, PlonkVK},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
         transcript_get_plonk_challenge_delta, transcript_get_plonk_challenge_gamma,
@@ -25,7 +25,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     transcript: &mut Transcript,
     pcs: &PCS,
     cs: &CS,
-    cs_params: &VerifierParams<PCS>,
+    cs_params: &PlonkVK<PCS>,
     public_values: &[PCS::Field],
     proof: &PlonkPf<PCS>,
 ) -> Result<()> {

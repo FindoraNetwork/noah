@@ -4,7 +4,7 @@ use crate::anon_xfr::{
     },
     config::{FEE_CALCULATING_FUNC, FEE_TYPE},
 };
-use crate::setup::{NodeParams, UserParams};
+use crate::setup::{ProverParams, VerifierParams};
 use merlin::Transcript;
 use num_bigint::BigUint;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
@@ -30,7 +30,7 @@ pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 /// * `secret_inputs` - input to generate witness of the constraint system
 pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     secret_inputs: AMultiXfrWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
@@ -65,7 +65,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
 /// * `pub_inputs` - the public inputs of the transaction.
 /// * `proof` - the proof
 pub(crate) fn verify_xfr(
-    params: &NodeParams,
+    params: &VerifierParams,
     pub_inputs: &AMultiXfrPubInputs,
     proof: &AXfrPlonkPf,
 ) -> Result<()> {
@@ -98,7 +98,7 @@ pub(crate) fn verify_xfr(
 /// * Return the plonk proof if the witness is valid, return an error otherwise.
 pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     rng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     amount: BLSScalar,
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
@@ -129,7 +129,7 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
 /// * `proof` - the proof
 /// * Returns Ok() if the verification succeeds, returns an error otherwise.
 pub(crate) fn verify_eq_committed_vals(
-    params: &NodeParams,
+    params: &VerifierParams,
     hash_comm: BLSScalar,
     proof_zk_part: &ZKPartProof,
     proof: &AXfrPlonkPf,
@@ -163,7 +163,7 @@ mod tests {
         config::{FEE_CALCULATING_FUNC, FEE_TYPE},
         proofs::{prove_xfr, verify_xfr},
     };
-    use crate::setup::{NodeParams, UserParams};
+    use crate::setup::{ProverParams, VerifierParams};
     use rand_chacha::ChaChaRng;
     use rand_core::{RngCore, SeedableRng};
     use zei_algebra::{bls12_381::BLSScalar, One};
@@ -318,7 +318,7 @@ mod tests {
         let secret_inputs =
             new_multi_xfr_witness_for_test(inputs.to_vec(), outputs.to_vec(), [0u8; 32]);
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
-        let params = UserParams::new(n_payers, n_payees, Some(1)).unwrap();
+        let params = ProverParams::new(n_payers, n_payees, Some(1)).unwrap();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let proof = prove_xfr(&mut prng, &params, secret_inputs).unwrap();
 
@@ -327,7 +327,7 @@ mod tests {
         let bad_proof = prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
 
         // verify good witness
-        let node_params = NodeParams::from(params);
+        let node_params = VerifierParams::from(params);
         assert!(verify_xfr(&node_params, &pub_inputs, &proof).is_ok());
 
         // verify bad witness

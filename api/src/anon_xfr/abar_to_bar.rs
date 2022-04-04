@@ -7,7 +7,7 @@ use crate::anon_xfr::{
     nullifier,
     structs::{Nullifier, OpenAnonBlindAssetRecord},
 };
-use crate::setup::{NodeParams, UserParams};
+use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
     asset_record::{build_open_asset_record, AssetRecordType},
     sig::XfrPublicKey,
@@ -86,7 +86,7 @@ pub struct AbarToBarNote {
 #[allow(dead_code)]
 pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     oabar: &OpenAnonBlindAssetRecord,
     abar_keypair: &AXfrKeyPair,
     bar_pub_key: &XfrPublicKey,
@@ -190,7 +190,7 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
 
 pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     record: &OpenAnonBlindAssetRecord,
     abar_keypair: &AXfrKeyPair,
     bar_pub_key: &XfrPublicKey,
@@ -216,7 +216,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
 // Verifies the body
 #[allow(dead_code)]
 pub fn verify_abar_to_bar_body(
-    params: &NodeParams,
+    params: &VerifierParams,
     body: &AbarToBarBody,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
@@ -224,7 +224,7 @@ pub fn verify_abar_to_bar_body(
 }
 
 pub fn verify_abar_to_bar_note(
-    params: &NodeParams,
+    params: &VerifierParams,
     note: &AbarToBarNote,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
@@ -236,7 +236,7 @@ pub fn verify_abar_to_bar_note(
 /// Verifies the proof with the input and output
 #[allow(dead_code)]
 pub fn verify_abar_to_bar(
-    params: &NodeParams,
+    params: &VerifierParams,
     body: &AbarToBarBody,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
@@ -324,7 +324,7 @@ pub fn verify_abar_to_bar(
 
 fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
     rng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     payers_secret: PayerSecret,
     proof: &ZKPartProof,
     non_zk_state: &NonZKState,
@@ -639,7 +639,7 @@ mod tests {
             AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
         },
     };
-    use crate::setup::{NodeParams, UserParams};
+    use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::{
         asset_record::AssetRecordType::ConfidentialAmount_ConfidentialAssetType, sig::XfrKeyPair,
         structs::AssetType,
@@ -661,7 +661,7 @@ mod tests {
     #[test]
     fn test_abar_to_bar_conversion() {
         let mut prng = ChaChaRng::from_seed([5u8; 32]);
-        let params = UserParams::abar_to_bar_params(40).unwrap();
+        let params = ProverParams::abar_to_bar_params(40).unwrap();
 
         let recv = XfrKeyPair::generate(&mut prng);
         let sender = AXfrKeyPair::generate(&mut prng);
@@ -704,7 +704,7 @@ mod tests {
         )
         .unwrap();
 
-        let node_params = NodeParams::abar_to_bar_params().unwrap();
+        let node_params = VerifierParams::abar_to_bar_params().unwrap();
         verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
 
         assert!(

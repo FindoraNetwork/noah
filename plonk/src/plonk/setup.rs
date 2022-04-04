@@ -68,7 +68,7 @@ pub struct PlonkProverParams<O, C, F> {
 }
 
 /// Define the PLONK prover params by given `PolyComScheme`.
-pub type ProverParams<PCS> = PlonkProverParams<
+pub type PlonkPK<PCS> = PlonkProverParams<
     <PCS as PolyComScheme>::Opening,
     <PCS as PolyComScheme>::Commitment,
     <PCS as PolyComScheme>::Field,
@@ -106,7 +106,7 @@ pub struct PlonkVerifierParams<C, F> {
 }
 
 /// Define the PLONK verifier params by given `PolyComScheme`.
-pub type VerifierParams<PCS> =
+pub type PlonkVK<PCS> =
     PlonkVerifierParams<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
 
 /// Permutation group.
@@ -157,7 +157,7 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     cs: &CS,
     pcs: &PCS,
     prg_seed: [u8; 32],
-) -> Result<ProverParams<PCS>> {
+) -> Result<PlonkPK<PCS>> {
     let mut prng = ChaChaRng::from_seed(prg_seed);
     let n_wires_per_gate = CS::n_wires_per_gate();
     let n = cs.size();
@@ -259,7 +259,7 @@ pub fn preprocess_verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
     cs: &CS,
     pcs: &PCS,
     prg_seed: [u8; 32],
-) -> Result<VerifierParams<PCS>> {
+) -> Result<PlonkVK<PCS>> {
     let prover_params = preprocess_prover(cs, pcs, prg_seed).c(d!())?;
     Ok(prover_params.verifier_params)
 }

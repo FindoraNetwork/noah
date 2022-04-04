@@ -5,7 +5,7 @@ use crate::plonk::{
         combine_q_polys, hide_polynomial, linearization_polynomial_opening, public_vars_polynomial,
         quotient_polynomial, sigma_polynomial, split_q_and_commit, PlonkChallenges,
     },
-    setup::{PlonkPf, PlonkProof, ProverParams},
+    setup::{PlonkPK, PlonkPf, PlonkProof},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
         transcript_get_plonk_challenge_delta, transcript_get_plonk_challenge_gamma,
@@ -81,7 +81,7 @@ pub fn prover<
     transcript: &mut Transcript,
     pcs: &PCS,
     cs: &CS,
-    params: &ProverParams<PCS>,
+    params: &PlonkPK<PCS>,
     witness: &[PCS::Field],
 ) -> Result<PlonkPf<PCS>> {
     if cs.is_verifier_only() {

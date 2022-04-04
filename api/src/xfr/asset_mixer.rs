@@ -200,11 +200,9 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
 
     max_circuit_size = max_circuit_size.next_power_of_two();
     if params.bp_circuit_gens.gens_capacity < max_circuit_size {
-        // info(format!("Zei: Increasing bulletproofs gens {} before batch verify asset mixing proofs", max_circuit_size));
         params.increase_circuit_gens(max_circuit_size);
-        // info!("Zei: Bulletproof gens increased");
     }
-    let pc_gens = (&params.pc_gens).into();
+    let pc_gens = PedersenGens::default();
     batch_verify(prng, verifiers, &pc_gens, &params.bp_circuit_gens)
         .c(d!(ZeiError::AssetMixerVerificationError))
 }

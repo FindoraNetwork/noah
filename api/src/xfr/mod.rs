@@ -566,7 +566,7 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
     batch_verify_confidential_amount(prng, params, conf_amount_records.as_slice()).c(d!())?;
 
     // 2. verify confidential asset_types
-    batch_verify_confidential_asset(prng, &params.pc_gens, &conf_asset_type_records).c(d!())?;
+    batch_verify_confidential_asset(prng, &conf_asset_type_records).c(d!())?;
 
     // 3. verify confidential asset mix proofs
     batch_verify_asset_mix(prng, params, conf_asset_mix_bodies.as_slice()).c(d!())

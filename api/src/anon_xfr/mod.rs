@@ -5,7 +5,7 @@ use crate::anon_xfr::{
     proofs::{prove_xfr, verify_xfr},
     structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
 };
-use crate::setup::{NodeParams, UserParams};
+use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
@@ -34,7 +34,7 @@ use zei_crypto::basic::rescue::RescueInstance;
 /// * `outputs` - Description of output asset records.
 pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &UserParams,
+    params: &ProverParams,
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
     input_keypairs: &[AXfrKeyPair],
@@ -139,7 +139,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
 /// * `body` - Transfer structure to verify
 /// * `accumulator` - candidate state of the accumulator. It must match body.proof.merkle_root, otherwise it returns ZeiError::AXfrVerification Error.
 pub fn verify_anon_xfr_body(
-    params: &NodeParams,
+    params: &VerifierParams,
     body: &AXfrBody,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
@@ -329,7 +329,7 @@ mod tests {
         },
         verify_anon_xfr_body, TREE_DEPTH,
     };
-    use crate::setup::{NodeParams, UserParams};
+    use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
     use parking_lot::lock_api::RwLock;
     use rand_chacha::ChaChaRng;
@@ -368,7 +368,7 @@ mod tests {
     fn test_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let user_params = UserParams::new(1, 1, Some(1)).unwrap();
+        let user_params = ProverParams::new(1, 1, Some(1)).unwrap();
 
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
@@ -475,7 +475,7 @@ mod tests {
         }
         {
             // verifier scope
-            let verifier_params = NodeParams::from(user_params);
+            let verifier_params = VerifierParams::from(user_params);
             assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
 
             let note = AXfrNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
@@ -522,7 +522,7 @@ mod tests {
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);
 
-        let user_params = UserParams::new(1, 1, Some(TREE_DEPTH)).unwrap();
+        let user_params = ProverParams::new(1, 1, Some(TREE_DEPTH)).unwrap();
 
         let fee_amount = FEE_CALCULATING_FUNC(1, 1) as u64;
         let output_amount = 10u64;
@@ -632,7 +632,7 @@ mod tests {
         }
         {
             // verifier scope
-            let verifier_params = NodeParams::from(user_params);
+            let verifier_params = VerifierParams::from(user_params);
             let t = verify_anon_xfr_body(&verifier_params, &body, &mt.get_root().unwrap());
             println!("{:?}", t);
             assert!(t.is_ok());
@@ -640,7 +640,7 @@ mod tests {
             let vk1 = verifier_params.shrink().unwrap();
             assert!(verify_anon_xfr_body(&vk1, &body, &mt.get_root().unwrap()).is_ok());
 
-            let vk2 = NodeParams::load(1, 1).unwrap();
+            let vk2 = VerifierParams::load(1, 1).unwrap();
             assert!(verify_anon_xfr_body(&vk2, &body, &mt.get_root().unwrap()).is_ok());
 
             let note = AXfrNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
@@ -653,7 +653,7 @@ mod tests {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let n_payers = 3;
         let n_payees = 3;
-        let user_params = UserParams::new(n_payers, n_payees, Some(1)).unwrap();
+        let user_params = ProverParams::new(n_payers, n_payees, Some(1)).unwrap();
 
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
@@ -845,7 +845,7 @@ mod tests {
         }
         {
             // verifier scope
-            let verifier_params = NodeParams::from(user_params);
+            let verifier_params = VerifierParams::from(user_params);
             // inconsistent merkle roots
             assert!(verify_anon_xfr_body(&verifier_params, &body, &zero).is_err());
             assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
