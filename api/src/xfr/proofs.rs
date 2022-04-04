@@ -1,5 +1,5 @@
 use crate::anon_creds::{ac_confidential_verify, ACCommitment, ACConfidentialRevealProof};
-use crate::setup::{PublicParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
+use crate::setup::{BulletproofParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
 use crate::xfr::{
     asset_record::AssetRecordType,
     asset_tracer::RecordDataEncKey,
@@ -29,7 +29,7 @@ use zei_crypto::{
             PedersenElGamalEqProof, PedersenElGamalProofInstance,
         },
     },
-    bp_circuits::range_proofs::{batch_verify_ranges, prove_ranges},
+    bulletproofs::range::{batch_verify_ranges, prove_ranges},
 };
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
@@ -500,7 +500,7 @@ pub(crate) fn range_proof(
         return Err(eg!(ZeiError::RangeProofProveError));
     }
 
-    let params = PublicParams::default();
+    let params = BulletproofParams::default();
 
     //build values vector (out amounts + amount difference)
     let in_total = inputs.iter().fold(0u64, |accum, x| accum + x.amount);
@@ -543,7 +543,6 @@ pub(crate) fn range_proof(
     let mut transcript = Transcript::new(b"Zei Range Proof");
     let (range_proof, coms) = prove_ranges(
         &params.bp_gens,
-        &params.pc_gens,
         &mut transcript,
         values.as_slice(),
         range_proof_blinds.as_slice(),
@@ -568,7 +567,7 @@ fn add_blindings(oar: &[&OpenAssetRecord]) -> (RistrettoScalar, RistrettoScalar)
 
 pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &PublicParams,
+    params: &BulletproofParams,
     instances: &[(
         &Vec<BlindAssetRecord>,
         &Vec<BlindAssetRecord>,
@@ -586,7 +585,6 @@ pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
     batch_verify_ranges(
         prng,
         &params.bp_gens,
-        &params.pc_gens,
         proofs.as_slice(),
         &mut transcripts,
         &value_commitments,
@@ -720,13 +718,13 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
 
 pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
     instances: &[(
         &Vec<BlindAssetRecord>,
         &Vec<BlindAssetRecord>,
         &ChaumPedersenProofX,
     )],
 ) -> Result<()> {
+    let pc_gens = RistrettoPedersenCommitment::default();
     let mut transcript = Transcript::new(b"AssetEquality");
     let mut proof_instances = Vec::with_capacity(instances.len());
     for (inputs, outputs, proof) in instances {

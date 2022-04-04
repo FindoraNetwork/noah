@@ -11,71 +11,72 @@ use crate::anon_xfr::{
 };
 use crate::parameters::{
     ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
-    RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
+    BULLETPROOF_URS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
 use bulletproofs::BulletproofGens;
 use serde::Deserialize;
 use zei_algebra::{
     bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
 };
-use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use zei_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,
-        setup::{preprocess_prover, ProverParams, VerifierParams},
+        setup::{preprocess_prover, PlonkPK, PlonkVK},
     },
     poly_commit::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
 };
 
 // Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]
-pub struct PublicParams {
+pub struct BulletproofParams {
     pub bp_gens: BulletproofGens,
     pub bp_circuit_gens: BulletproofGens,
-    pub pc_gens: RistrettoPedersenCommitment,
     pub range_proof_bits: usize,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct UserParams {
-    pub bp_params: PublicParams,
+pub struct ProverParams {
+    pub bp_params: BulletproofParams,
     pub pcs: KZGCommitmentSchemeBLS,
     pub cs: TurboPlonkCS,
-    pub prover_params: ProverParams<KZGCommitmentSchemeBLS>,
+    pub prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct NodeParams {
-    pub bp_params: PublicParams,
+pub struct VerifierParams {
+    pub bp_params: BulletproofParams,
     pub pcs: KZGCommitmentSchemeBLS,
     pub cs: TurboPlonkCS,
-    pub verifier_params: VerifierParams<KZGCommitmentSchemeBLS>,
+    pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct NodeParamsSplitCommon {
-    pub bp_params: PublicParams,
+    pub bp_params: BulletproofParams,
     pub pcs: KZGCommitmentSchemeBLS,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct NodeParamsSplitSpecial {
     pub cs: TurboPlonkCS,
-    pub verifier_params: VerifierParams<KZGCommitmentSchemeBLS>,
+    pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
 
 pub const BULLET_PROOF_RANGE: usize = 32;
 pub const MAX_PARTY_NUMBER: usize = 128;
 const COMMON_SEED: [u8; 32] = [0u8; 32];
 pub const PRECOMPUTED_PARTY_NUMBER: usize = 6;
+pub const DEFAULT_BP_NUM_GENS: usize = 256;
 
-impl PublicParams {
-    pub fn new() -> PublicParams {
-        let pp: PublicParams = bincode::deserialize(&RISTRETTO_SRS)
+impl BulletproofParams {
+    pub fn new() -> Result<BulletproofParams> {
+        let urs = BULLETPROOF_URS.c(d!(ZeiError::MissingSRSError))?;
+
+        let pp: BulletproofParams = bincode::deserialize(&urs)
             .c(d!(ZeiError::DeserializationError))
             .unwrap();
-        pp
+        Ok(pp)
     }
 
     /// Has no effect if new_size.next_power_of_two() is less or equal than current capacity
@@ -85,14 +86,25 @@ impl PublicParams {
     }
 }
 
-impl Default for PublicParams {
+impl Default for BulletproofParams {
     fn default() -> Self {
-        PublicParams::new()
+        let range_generators = BulletproofGens::new(BULLET_PROOF_RANGE, MAX_PARTY_NUMBER);
+        let circuit_generators = BulletproofGens::new(DEFAULT_BP_NUM_GENS, 1);
+
+        BulletproofParams {
+            bp_gens: range_generators,
+            bp_circuit_gens: circuit_generators,
+            range_proof_bits: BULLET_PROOF_RANGE,
+        }
     }
 }
 
-impl UserParams {
-    pub fn new(n_payers: usize, n_payees: usize, tree_depth: Option<usize>) -> Result<UserParams> {
+impl ProverParams {
+    pub fn new(
+        n_payers: usize,
+        n_payees: usize,
+        tree_depth: Option<usize>,
+    ) -> Result<ProverParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
 
         let (cs, _) = match tree_depth {
@@ -112,15 +124,15 @@ impl UserParams {
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
 
-        Ok(UserParams {
-            bp_params: PublicParams::new(),
+        Ok(ProverParams {
+            bp_params: BulletproofParams::new()?,
             pcs,
             cs,
             prover_params,
         })
     }
 
-    pub fn eq_committed_vals_params() -> Result<UserParams> {
+    pub fn eq_committed_vals_params() -> Result<ProverParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let zero = BLSScalar::zero();
         let proof = ZKPartProof::default();
@@ -131,15 +143,15 @@ impl UserParams {
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
-        Ok(UserParams {
-            bp_params: PublicParams::new(),
+        Ok(ProverParams {
+            bp_params: BulletproofParams::new()?,
             pcs,
             cs,
             prover_params,
         })
     }
 
-    pub fn abar_to_bar_params(tree_depth: usize) -> Result<UserParams> {
+    pub fn abar_to_bar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
         let jubjub_zero = JubjubScalar::zero();
 
@@ -169,15 +181,15 @@ impl UserParams {
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
 
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
-        Ok(UserParams {
-            bp_params: PublicParams::new(),
+        Ok(ProverParams {
+            bp_params: BulletproofParams::new()?,
             pcs,
             cs,
             prover_params,
         })
     }
 
-    pub fn anon_fee_params(tree_depth: usize) -> Result<UserParams> {
+    pub fn anon_fee_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
         let jubjub_zero = JubjubScalar::zero();
 
@@ -208,8 +220,8 @@ impl UserParams {
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
 
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
-        Ok(UserParams {
-            bp_params: PublicParams::new(),
+        Ok(ProverParams {
+            bp_params: BulletproofParams::new()?,
             pcs,
             cs,
             prover_params,
@@ -217,18 +229,18 @@ impl UserParams {
     }
 }
 
-impl NodeParams {
+impl VerifierParams {
     pub fn create(
         n_payers: usize,
         n_payees: usize,
         tree_depth: Option<usize>,
-    ) -> Result<NodeParams> {
-        let user_params = UserParams::new(n_payers, n_payees, tree_depth)?;
-        Ok(Self::from(user_params))
+    ) -> Result<VerifierParams> {
+        let prover_params = ProverParams::new(n_payers, n_payees, tree_depth)?;
+        Ok(Self::from(prover_params))
     }
 
     /// anon transfer verifier parameters.
-    pub fn load(n_payers: usize, n_payees: usize) -> Result<NodeParams> {
+    pub fn load(n_payers: usize, n_payees: usize) -> Result<VerifierParams> {
         if n_payees > PRECOMPUTED_PARTY_NUMBER || n_payers > PRECOMPUTED_PARTY_NUMBER {
             Err(SimpleError::new(d!(ZeiError::MissingVerifierParamsError), None).into())
         } else {
@@ -240,7 +252,7 @@ impl NodeParams {
                     let special: NodeParamsSplitSpecial =
                         bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
                             .c(d!(ZeiError::DeserializationError))?;
-                    Ok(NodeParams {
+                    Ok(VerifierParams {
                         bp_params: common.bp_params,
                         pcs: common.pcs,
                         cs: special.cs,
@@ -253,37 +265,37 @@ impl NodeParams {
     }
 
     /// abar to bar transfer verifier parameters.
-    pub fn abar_to_bar_params() -> Result<NodeParams> {
+    pub fn abar_to_bar_params() -> Result<VerifierParams> {
         if let Some(bytes) = ABAR_TO_BAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
-            let user_params = UserParams::abar_to_bar_params(TREE_DEPTH)?;
-            Ok(NodeParams::from(user_params))
+            let prover_params = ProverParams::abar_to_bar_params(TREE_DEPTH)?;
+            Ok(VerifierParams::from(prover_params))
         }
     }
 
     /// bar to abar transfer verifier parameters.
-    pub fn bar_to_abar_params() -> Result<NodeParams> {
+    pub fn bar_to_abar_params() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
-            let user_params = UserParams::eq_committed_vals_params()?;
-            Ok(NodeParams::from(user_params))
+            let prover_params = ProverParams::eq_committed_vals_params()?;
+            Ok(VerifierParams::from(prover_params))
         }
     }
 
     /// anon_fee verifier parameters.
-    pub fn anon_fee_params() -> Result<NodeParams> {
+    pub fn anon_fee_params() -> Result<VerifierParams> {
         if let Some(bytes) = ANON_FEE_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
-            let user_params = UserParams::anon_fee_params(TREE_DEPTH)?;
-            Ok(NodeParams::from(user_params))
+            let prover_params = ProverParams::anon_fee_params(TREE_DEPTH)?;
+            Ok(VerifierParams::from(prover_params))
         }
     }
 
-    pub fn shrink(self) -> Result<NodeParams> {
-        Ok(NodeParams {
+    pub fn shrink(self) -> Result<VerifierParams> {
+        Ok(VerifierParams {
             bp_params: self.bp_params,
             pcs: self.pcs.shrink_to_verifier_only()?,
             cs: self.cs.shrink_to_verifier_only()?,
@@ -305,9 +317,9 @@ impl NodeParams {
     }
 }
 
-impl From<UserParams> for NodeParams {
-    fn from(params: UserParams) -> Self {
-        NodeParams {
+impl From<ProverParams> for VerifierParams {
+    fn from(params: ProverParams) -> Self {
+        VerifierParams {
             bp_params: params.bp_params,
             pcs: params.pcs,
             cs: params.cs,
@@ -319,7 +331,7 @@ impl From<UserParams> for NodeParams {
 #[cfg(test)]
 mod test {
     use crate::parameters::SRS;
-    use crate::setup::{NodeParams, UserParams};
+    use crate::setup::{ProverParams, VerifierParams};
     use zei_algebra::{
         bls12_381::{BLSScalar, BLSG1},
         prelude::*,
@@ -330,22 +342,22 @@ mod test {
 
     #[test]
     fn test_params_serialization() {
-        let params = UserParams::new(1, 1, Some(1)).unwrap();
+        let params = ProverParams::new(1, 1, Some(1)).unwrap();
 
         let v = bincode::serialize(&params).unwrap();
-        let params_de: UserParams = bincode::deserialize(&v).unwrap();
+        let params_de: ProverParams = bincode::deserialize(&v).unwrap();
         let v2 = bincode::serialize(&params_de).unwrap();
         assert_eq!(v, v2);
     }
 
     #[test]
     fn test_vk_params_serialization() {
-        let params = NodeParams::create(3, 3, Some(40))
+        let params = VerifierParams::create(3, 3, Some(40))
             .unwrap()
             .shrink()
             .unwrap();
         let v = bincode::serialize(&params).unwrap();
-        let params_de: NodeParams = bincode::deserialize(&v).unwrap();
+        let params_de: VerifierParams = bincode::deserialize(&v).unwrap();
         let v2 = bincode::serialize(&params_de).unwrap();
         assert_eq!(v, v2);
     }

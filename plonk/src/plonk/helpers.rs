@@ -1,7 +1,7 @@
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
-    setup::{PlonkPf, ProverParams, VerifierParams},
+    setup::{PlonkPK, PlonkPf, PlonkVK},
 };
 use crate::poly_commit::{
     field_polynomial::FpPolynomial,
@@ -100,7 +100,7 @@ impl<F: Scalar> PlonkChallenges<F> {
 
 /// Return the public variables polynomial.
 pub(super) fn public_vars_polynomial<PCS: PolyComScheme>(
-    params: &ProverParams<PCS>,
+    params: &PlonkPK<PCS>,
     public_vars: &[PCS::Field],
 ) -> FpPolynomial<PCS::Field> {
     let mut y = Vec::with_capacity(params.verifier_params.cs_size);
@@ -145,7 +145,7 @@ pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Scalar>(
 /// and setting \Sigma(1) = 1 for the base case
 pub(super) fn sigma_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
-    params: &ProverParams<PCS>,
+    params: &PlonkPK<PCS>,
     witness: &[PCS::Field],
     challenges: &PlonkChallenges<PCS::Field>,
 ) -> FpPolynomial<PCS::Field> {
@@ -226,7 +226,7 @@ pub(super) fn sigma_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = 
 /// ifft to recover Q(X).
 pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
-    params: &ProverParams<PCS>,
+    params: &PlonkPK<PCS>,
     witness_polys: &[FpPolynomial<PCS::Field>],
     sigma: &FpPolynomial<PCS::Field>,
     challenges: &PlonkChallenges<PCS::Field>,
@@ -362,7 +362,7 @@ pub(super) fn linearization_polynomial_opening<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
 >(
-    params: &ProverParams<PCS>,
+    params: &PlonkPK<PCS>,
     sigma: &PCS::Opening,
     witness_polys_eval_beta: &[&PCS::Field],
     perms_eval_beta: &[&PCS::Field],
@@ -389,7 +389,7 @@ pub(super) fn linearization_commitment<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
 >(
-    params: &VerifierParams<PCS>,
+    params: &PlonkVK<PCS>,
     c_sigma: &PCS::Commitment,
     witness_polys_eval_beta: &[&PCS::Field],
     perms_eval_beta: &[&PCS::Field],
@@ -415,7 +415,7 @@ pub(super) fn linearization_commitment<
 /// index for the i-th public value. L_j(X) = (X^n-1) / (X - g^j) is
 /// the j-th lagrange base (zero for every X= g^i, except when i ==j)
 pub(super) fn eval_public_var_poly<PCS: PolyComScheme>(
-    params: &VerifierParams<PCS>,
+    params: &PlonkVK<PCS>,
     public_values: &[PCS::Field],
     eval_point: &PCS::Field,
 ) -> PCS::Field {
@@ -494,7 +494,7 @@ fn compute_sigma_scalar_in_l<F: Scalar>(
 ///     * (f_{n_wires_per_gate}(beta) + delta)
 ///     - alpha^2 *(\beta^n - 1) / (\beta - 1) ) / (\beta^n - 1)
 pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
-    params: &VerifierParams<PCS>,
+    params: &PlonkVK<PCS>,
     proof: &PlonkPf<PCS>,
     challenges: &PlonkChallenges<PCS::Field>,
     public_vars_eval_beta: &PCS::Field,

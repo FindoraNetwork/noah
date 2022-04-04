@@ -1,25 +1,22 @@
-//! This file encapsulates the prove and verify of Bulletproof's range proof.
+//! Module for the Bulletproof range proof scheme
 
-use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
-use itertools::Itertools;
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 use zei_algebra::ristretto::CompressedRistretto;
 use zei_algebra::ristretto::RistrettoScalar as Scalar;
 
-/// Gives a bulletproof range proof that values committed using  `blindings`
+/// Generate a Bulletproof range proof that values committed using `blindings`
 /// are within [0..2^{`log_range_upper_bound`}-1].
 pub fn prove_ranges(
     bp_gens: &BulletproofGens,
-    pc_gens: &RistrettoPedersenCommitment,
     transcript: &mut Transcript,
     values: &[u64],
     blindings: &[Scalar],
     log_range_upper_bound: usize,
 ) -> Result<(RangeProof, Vec<CompressedRistretto>)> {
     let blindings = blindings.iter().map(|s| s.0).collect_vec();
-    let pc_gens = pc_gens.into();
+    let pc_gens = PedersenGens::default();
     let (proof, coms) = RangeProof::prove_multiple(
         bp_gens,
         &pc_gens,
@@ -33,42 +30,17 @@ pub fn prove_ranges(
     Ok((proof, commitments))
 }
 
-/// Verify a bulletproof range proof that a set of committed values
-/// are within [0..2^{`log_range_upper_bound`}-1].
-/// State of transcript should match the state just before the proof was computed
-pub fn verify_ranges<R: CryptoRng + RngCore>(
-    prng: &mut R,
-    bp_gens: &BulletproofGens,
-    pc_gens: &PedersenGens,
-    proof: &RangeProof,
-    transcript: &mut Transcript,
-    commitments: &[CompressedRistretto],
-    log_range_upper_bound: usize,
-) -> Result<()> {
-    let commitments = commitments.iter().map(|x| x.0).collect_vec();
-    proof
-        .verify_multiple_with_rng(
-            bp_gens,
-            pc_gens,
-            transcript,
-            &commitments,
-            log_range_upper_bound,
-            prng,
-        )
-        .c(d!(ZeiError::RangeProofVerifyError))
-}
-
 /// Batch verify a set bulletproof range proofs
 /// State of transcripts should match the state just before each proof was computed
 pub fn batch_verify_ranges<R: CryptoRng + RngCore>(
     prng: &mut R,
     bp_gens: &BulletproofGens,
-    pc_gens: &RistrettoPedersenCommitment,
     proofs: &[&RangeProof],
     transcripts: &mut [Transcript],
     commitments: &[&[CompressedRistretto]],
     log_range_upper_bound: usize,
 ) -> Result<()> {
+    let pc_gens = PedersenGens::default();
     let mut comms = vec![];
     for slice in commitments {
         let v = slice.iter().map(|x| x.0).collect_vec();
@@ -79,7 +51,6 @@ pub fn batch_verify_ranges<R: CryptoRng + RngCore>(
         slices.push(v.as_slice());
     }
 
-    let pc_gens = pc_gens.into();
     RangeProof::batch_verify(
         prng,
         proofs,

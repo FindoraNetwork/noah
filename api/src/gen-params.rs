@@ -1,5 +1,9 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(non_camel_case_types)]
+#![cfg_attr(
+    any(feature = "no_urs", feature = "no_srs", feature = "no_vk"),
+    allow(unused)
+)]
 
 use bulletproofs::BulletproofGens;
 use rand_chacha::ChaChaRng;
@@ -8,7 +12,7 @@ use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 use zei::{
     anon_xfr::TREE_DEPTH,
-    setup::{NodeParams, PublicParams, UserParams, PRECOMPUTED_PARTY_NUMBER},
+    setup::{BulletproofParams, ProverParams, VerifierParams, PRECOMPUTED_PARTY_NUMBER},
 };
 use zei_algebra::utils::save_to_file;
 use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
@@ -17,151 +21,65 @@ use rayon::prelude::*;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
-    about = "Zei tool to handle public zkp-parameters.",
+    about = "Zei tool to generate necessary zero-knowledge proof parameters.",
     rename_all = "kebab-case"
 )]
 enum Actions {
-    User {
-        n_payers: usize,
-        n_payees: usize,
-        tree_depth: usize,
-        out_filename: PathBuf,
-    },
+    /// Generates the verifying key for anonymous transfer
+    TRANSFER { directory: PathBuf },
 
-    Node {
-        n_payers: usize,
-        n_payees: usize,
-        tree_depth: usize,
-        out_filename: PathBuf,
-    },
+    /// Generates the verifying key for ABAR to BAR transform
+    ABAR_TO_BAR { directory: PathBuf },
 
-    VK {
-        directory: PathBuf,
-    },
+    /// Generates the verifying key for BAR to ABAR transform
+    BAR_TO_ABAR { directory: PathBuf },
 
-    ABAR_TO_BAR {
-        directory: PathBuf,
-    },
+    /// Generates the verifying key for anonymous fees
+    ANON_FEE { directory: PathBuf },
 
-    BAR_TO_ABAR {
-        directory: PathBuf,
-    },
-
-    ANON_FEE {
-        directory: PathBuf,
-    },
-
-    BP {
-        gens_capacity: usize,
-        party_capacity: usize,
-        out_filename: PathBuf,
-    },
-
-    KZG {
-        size: usize,
-        out_filename: PathBuf,
-    },
-
-    PublicParams {
-        out_filename: PathBuf,
-    },
+    /// Generates the uniform reference string for Bulletproof
+    BULLETPROOF { directory: PathBuf },
 }
 
-// cargo run --release --features="gen" --bin gen-params
+// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params
 #[allow(dead_code)]
 fn main() {
     use Actions::*;
     let action = Actions::from_args();
     match action {
-        User {
-            n_payers,
-            n_payees,
-            tree_depth,
-            out_filename,
-        } => {
-            gen_user_params(n_payers, n_payees, tree_depth, out_filename);
+        TRANSFER { directory } => {
+            gen_transfer_vk(directory);
         }
-        Node {
-            n_payers,
-            n_payees,
-            tree_depth,
-            out_filename,
-        } => {
-            gen_node_params(n_payers, n_payees, tree_depth, out_filename);
-        }
-        VK { directory } => {
-            gen_vk(directory);
-        }
+
         ABAR_TO_BAR { directory } => {
-            gen_abar_to_bar(directory);
+            gen_abar_to_bar_vk(directory);
         }
+
         BAR_TO_ABAR { directory } => {
-            gen_bar_to_abar(directory);
+            gen_bar_to_abar_vk(directory);
         }
+
         ANON_FEE { directory } => {
-            gen_anon_fee(directory);
+            gen_anon_fee_vk(directory);
         }
-        BP {
-            gens_capacity,
-            party_capacity,
-            out_filename,
-        } => {
-            gen_params_bp(gens_capacity, party_capacity, out_filename);
-        }
-        KZG { size, out_filename } => {
-            gen_params_kzg(size, out_filename);
-        }
-        PublicParams { out_filename } => gen_public_params(out_filename),
+
+        BULLETPROOF { directory } => gen_bulletproof_urs(directory),
     };
 }
 
-fn gen_user_params(n_payers: usize, n_payees: usize, tree_depth: usize, out_filename: PathBuf) {
+// cargo run --release --features="gen no_vk" --bin gen-params transfer "./parameters"
+fn gen_transfer_vk(directory: PathBuf) {
     println!(
-        "Generating 'User Parameters' for {} payers, {} payees and with tree depth={}...",
-        n_payers, n_payees, tree_depth
-    );
-
-    let tree_dept_option = if tree_depth == 0 {
-        None
-    } else {
-        Some(tree_depth)
-    };
-
-    let user_params = UserParams::new(n_payers, n_payees, tree_dept_option).unwrap();
-    let user_params_ser = bincode::serialize(&user_params).unwrap();
-    save_to_file(&user_params_ser, out_filename);
-}
-
-fn gen_node_params(n_payers: usize, n_payees: usize, tree_depth: usize, out_filename: PathBuf) {
-    println!(
-        "Generating 'Node Parameters' for {} payers, {} payees and with tree depth={}...",
-        n_payers, n_payees, tree_depth
-    );
-
-    let tree_dept_option = if tree_depth == 0 {
-        None
-    } else {
-        Some(tree_depth)
-    };
-
-    let node_params = NodeParams::create(n_payers, n_payees, tree_dept_option).unwrap();
-    let node_params_ser = bincode::serialize(&node_params).unwrap();
-    save_to_file(&node_params_ser, out_filename);
-}
-
-// cargo run --release --features="gen" --bin gen-params vk "./parameters"
-fn gen_vk(directory: PathBuf) {
-    println!(
-        "Generating 'Node Compressed Parameters' for 1..{} payers, 1..{} payees ...",
+        "Generating verifying keys for anonymous transfer for 1..{} payers, 1..{} payees ...",
         PRECOMPUTED_PARTY_NUMBER, PRECOMPUTED_PARTY_NUMBER
     );
 
-    //let mut specials = vec![];
-    let node_params = NodeParams::create(1, 1, Some(TREE_DEPTH)).unwrap();
-    let (common, _) = node_params.split().unwrap();
+    let transfer_params = VerifierParams::create(1, 1, Some(TREE_DEPTH)).unwrap();
+    let (common, _) = transfer_params.split().unwrap();
     let common_ser = bincode::serialize(&common).unwrap();
+
     let mut common_path = directory.clone();
-    common_path.push("vk-common.bin");
+    common_path.push("transfer-vk-common.bin");
     save_to_file(&common_ser, common_path);
 
     //let mut need_common = true;
@@ -174,7 +92,7 @@ fn gen_vk(directory: PathBuf) {
                 .par_iter()
                 .map(|j| {
                     println!("generating {} payers & {} payees", i, j);
-                    let node_params = NodeParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
+                    let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
                 })
@@ -194,64 +112,49 @@ fn gen_vk(directory: PathBuf) {
 
     let specials_ser = bincode::serialize(&specials).unwrap();
     let mut specials_path = directory.clone();
-    specials_path.push("vk-specials.bin");
+    specials_path.push("transfer-vk-specials.bin");
     save_to_file(&specials_ser, specials_path);
 }
 
-// cargo run --release --features="gen" --bin gen-params abar-to-bar "./parameters"
-fn gen_abar_to_bar(mut path: PathBuf) {
-    println!("Generating 'Node Compressed Parameters' ABAR TO BAR ...");
+// cargo run --release --features="gen no_vk" --bin gen-params abar-to-bar "./parameters"
+fn gen_abar_to_bar_vk(mut path: PathBuf) {
+    println!("Generating the verifying key for ABAR TO BAR ...");
 
-    let user_params = UserParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-    let node_params = NodeParams::from(user_params).shrink().unwrap();
+    let user_params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
+    let node_params = VerifierParams::from(user_params).shrink().unwrap();
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-bar-vk.bin");
     save_to_file(&bytes, path);
 }
 
-// cargo run --release --features="gen" --bin gen-params bar-to-abar "./parameters"
-fn gen_bar_to_abar(mut path: PathBuf) {
-    println!("Generating 'Node Compressed Parameters' BAR TO ABAR ...");
+// cargo run --release --features="gen no_vk" --bin gen-params bar-to-abar "./parameters"
+fn gen_bar_to_abar_vk(mut path: PathBuf) {
+    println!("Generating the verifying key for BAR TO ABAR ...");
 
-    let user_params = UserParams::eq_committed_vals_params().unwrap();
-    let node_params = NodeParams::from(user_params).shrink().unwrap();
+    let user_params = ProverParams::eq_committed_vals_params().unwrap();
+    let node_params = VerifierParams::from(user_params).shrink().unwrap();
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("bar-to-abar-vk.bin");
     save_to_file(&bytes, path);
 }
 
-// cargo run --release --features="gen" --bin gen-params anon-fee "./parameters"
-fn gen_anon_fee(mut path: PathBuf) {
-    println!("Generating 'Node Compressed Parameters' ANON FEE ...");
+// cargo run --release --features="gen no_vk" --bin gen-params anon-fee "./parameters"
+fn gen_anon_fee_vk(mut path: PathBuf) {
+    println!("Generating the verifying key for anonymous fees ...");
 
-    let user_params = UserParams::anon_fee_params(TREE_DEPTH).unwrap();
-    let node_params = NodeParams::from(user_params).shrink().unwrap();
+    let user_params = ProverParams::anon_fee_params(TREE_DEPTH).unwrap();
+    let node_params = VerifierParams::from(user_params).shrink().unwrap();
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("anon-fee-vk.bin");
     save_to_file(&bytes, path);
 }
 
-fn gen_params_bp(gens_capacity: usize, party_capacity: usize, out_filename: PathBuf) {
-    println!("Generating BP parameters of size {} ...", gens_capacity);
-    let bpgens = BulletproofGens::new(gens_capacity, party_capacity);
-    let bpgens_ser = bincode::serialize(&bpgens).unwrap();
-    save_to_file(&bpgens_ser, out_filename);
-}
+// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof "./parameters"
+fn gen_bulletproof_urs(mut path: PathBuf) {
+    println!("Generating Bulletproof uniform reference string ...");
 
-fn gen_params_kzg(size: usize, out_filename: PathBuf) {
-    println!(
-        "Warning: The KZG parameters should come from a setup ceremony instead of generated here."
-    );
-    println!("Generating KZG parameters of size {} ...", size);
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let pcs = KZGCommitmentSchemeBLS::new(size, &mut prng);
-    let params_ser = bincode::serialize(&pcs).unwrap();
-    save_to_file(&params_ser, out_filename);
-}
-
-fn gen_public_params(out_filename: PathBuf) {
-    println!("Generating Public Parameters ...");
-    let pp = PublicParams::default();
-    let pp_ser = bincode::serialize(&pp).unwrap();
-    save_to_file(&pp_ser, out_filename);
+    let pp = BulletproofParams::default();
+    let bytes = bincode::serialize(&pp).unwrap();
+    path.push("bulletproof-urs.bin");
+    save_to_file(&bytes, path);
 }

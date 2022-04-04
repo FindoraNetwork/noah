@@ -1,5 +1,5 @@
 use crate::anon_creds::{self, ac_commit, ACCommitment, Credential};
-use crate::setup::PublicParams;
+use crate::setup::BulletproofParams;
 use crate::xfr::{
     asset_record::AssetRecordType,
     batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
@@ -52,7 +52,7 @@ pub(crate) fn gen_key_pair_vec(size: usize, prng: &mut ChaChaRng) -> Vec<XfrKeyP
 }
 
 fn do_transfer_tests_single_asset(
-    params: &mut PublicParams,
+    params: &mut BulletproofParams,
     inputs_template: &[AssetRecordType],
     outputs_template: &[AssetRecordType],
 ) {
@@ -303,12 +303,12 @@ fn do_transfer_tests_single_asset(
 
 mod single_asset_no_tracing {
     use super::*;
-    use crate::setup::PublicParams;
+    use crate::setup::BulletproofParams;
 
     #[test]
     fn test_transfer_not_confidential() {
         /*! Test non confidential transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let inputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 4];
         let outputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
         do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
@@ -317,7 +317,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_confidential_amount_plain_asset() {
         /*! Test confidential amount in all inputs and all outputs transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let inputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType; 4];
         let outputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType; 6];
         do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
@@ -326,7 +326,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_confidential_asset_plain_amount() {
         /*! Test confidential asset types in all inputs and all outputs transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let inputs_template = [AssetRecordType::NonConfidentialAmount_ConfidentialAssetType; 4];
         let outputs_template = [AssetRecordType::NonConfidentialAmount_ConfidentialAssetType; 6];
         do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
@@ -335,7 +335,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_confidential() {
         /*! Test confidential amount and confidential asset in all inputs and outputs*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let inputs_template = [AssetRecordType::ConfidentialAmount_ConfidentialAssetType; 4];
         let outputs_template = vec![AssetRecordType::ConfidentialAmount_ConfidentialAssetType; 6];
         do_transfer_tests_single_asset(&mut params, &inputs_template, &outputs_template);
@@ -344,7 +344,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_input_some_amount_confidential_output_non_confidential() {
         /*! Test confidential amount in some inputs transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let inputs_template = [
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
@@ -359,7 +359,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_inputs_some_asset_confidential_output_non_confidential() {
         /*! Test confidential asset_types in some inputs transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let inputs_template = [
             AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
             AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
@@ -374,7 +374,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_input_some_confidential_amount_and_asset_type_output_non_confidential() {
         /*! Test confidential amount and asset type in some input AssetRecords transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let inputs_template = [
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
@@ -390,7 +390,7 @@ mod single_asset_no_tracing {
     fn test_transfer_input_some_confidential_amount_other_confidential_asset_type_output_non_confidential(
     ) {
         /*! Test confidential amount in some input and confidential asset type in other input AssetRecords transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let inputs_template = [
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
             AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
@@ -405,7 +405,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_output_some_amount_confidential_input_non_confidential() {
         /*! Test confidential amount in some outputs transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let outputs_template = [
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
@@ -420,7 +420,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_output_some_asset_confidential_input_non_confidential() {
         /*! Test some confidential asset types in the output transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let outputs_template = [
             AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
             AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
@@ -435,7 +435,7 @@ mod single_asset_no_tracing {
     #[test]
     fn test_transfer_output_some_confidential_amount_and_asset_type_input_non_confidential() {
         /*! I test confidential amount and asset type in some output AssetRecords transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let outputs_template = [
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
@@ -451,7 +451,7 @@ mod single_asset_no_tracing {
     fn test_transfer_output_some_confidential_amount_other_confidential_asset_type_input_non_confidential(
     ) {
         /*! I test confidential amount in some output and confidential asset type in other output AssetRecords transfers*/
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let outputs_template = [
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
             AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
@@ -471,7 +471,7 @@ mod multi_asset_no_tracing {
     #[test]
     fn do_multiasset_transfer_tests() {
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_type0 = AssetType::from_identical_byte(0u8);
         let asset_type1 = AssetType::from_identical_byte(1u8);
@@ -690,7 +690,7 @@ mod identity_tracing {
 
     fn check_identity_tracing_for_asset_type(asset_record_type: AssetRecordType) {
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let addr = b"0x7789654"; // receiver address
 
@@ -860,7 +860,7 @@ mod asset_tracing {
     }
 
     fn do_test_asset_tracing(
-        params: &mut PublicParams,
+        params: &mut BulletproofParams,
         input_templates: &[(
             AssetRecordType,
             &TracingPolicies,
@@ -1057,7 +1057,7 @@ mod asset_tracing {
     #[test]
     fn asset_tracing_for_non_conf_assets_should_work() {
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_type = AssetType::from_identical_byte(0u8);
 
@@ -1116,7 +1116,7 @@ mod asset_tracing {
     #[test]
     fn test_one_input_one_output_all_confidential() {
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
@@ -1161,7 +1161,7 @@ mod asset_tracing {
     #[test]
     fn test_one_input_one_output_amount_confidential() {
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
@@ -1192,7 +1192,7 @@ mod asset_tracing {
     #[test]
     fn test_one_input_one_output_asset_confidential() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
@@ -1227,7 +1227,7 @@ mod asset_tracing {
     #[test]
     fn test_two_inputs_two_outputs_all_confidential_tracing_on_inputs() {
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
@@ -1273,7 +1273,7 @@ mod asset_tracing {
     #[test]
     fn test_two_inputs_two_outputs_all_confidential_tracing_on_inputs_and_outputs() {
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
@@ -1319,7 +1319,7 @@ mod asset_tracing {
     #[test]
     fn test_single_asset_first_input_asset_tracing() {
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
@@ -1378,7 +1378,7 @@ mod asset_tracing {
     fn test_single_asset_two_first_input_asset_tracing() {
         // The first two inputs have asset tracing policies
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
@@ -1447,7 +1447,7 @@ mod asset_tracing {
         // Mix of asset_tracing policies for inputs / outputs
         // Mix of asset record type for inputs /outputs
         let mut prng: ChaChaRng;
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
         prng = ChaChaRng::from_seed([0u8; 32]);
 
         let tracer1_keypair = AssetTracerKeyPair::generate(&mut prng);
@@ -1653,7 +1653,7 @@ mod asset_tracing {
     fn do_integer_overflow(asset_record_type: AssetRecordType) {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let mut params = PublicParams::default();
+        let mut params = BulletproofParams::default();
 
         let asset_type = AssetType::from_identical_byte(0u8);
 
