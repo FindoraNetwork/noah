@@ -16,7 +16,7 @@ use zei_crypto::basic::rescue::RescueInstance;
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     basic::hybrid_encryption::XPublicKey,
-    pc_eq_rescue_split_verifier_zk_part::{
+    pc_eq_rescue_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
     },
 };

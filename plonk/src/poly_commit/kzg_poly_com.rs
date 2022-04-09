@@ -214,6 +214,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let coefs_poly = polynomial.get_coefs_ref();
 
         let pol_degree = polynomial.degree();
+
         if pol_degree + 1 > self.public_parameter_group_1.len() {
             return Err(eg!(PolyComSchemeError::PCSProveEvalError));
         }

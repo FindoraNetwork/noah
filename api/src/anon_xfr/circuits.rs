@@ -14,7 +14,7 @@ use zei_algebra::{
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_crypto::{
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
-    pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
+    pc_eq_rescue_zk_part::{NonZKState, ZKPartProof},
 };
 use zei_plonk::plonk::constraint_system::{
     field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
@@ -845,7 +845,7 @@ pub(crate) mod tests {
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar};
     use zei_crypto::basic::rescue::RescueInstance;
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-    use zei_crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external;
+    use zei_crypto::pc_eq_rescue_zk_part::prove_pc_eq_rescue_external;
     use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
 
     pub(crate) fn new_multi_xfr_witness_for_test(

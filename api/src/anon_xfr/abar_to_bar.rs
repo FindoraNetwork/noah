@@ -24,7 +24,7 @@ use zei_algebra::{
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
-    pc_eq_rescue_split_verifier_zk_part::{
+    pc_eq_rescue_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
     },
 };

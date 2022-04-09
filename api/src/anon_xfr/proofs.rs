@@ -10,7 +10,7 @@ use num_bigint::BigUint;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::{
     field_simulation::{SimFr, NUM_OF_LIMBS},
-    pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
+    pc_eq_rescue_zk_part::{NonZKState, ZKPartProof},
 };
 use zei_plonk::{
     plonk::{prover::prover, setup::PlonkPf, verifier::verifier},

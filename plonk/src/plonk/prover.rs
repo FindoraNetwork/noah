@@ -112,6 +112,8 @@ pub fn prover<
             root,
             &extended_witness[i * n_constraints..(i + 1) * n_constraints],
         );
+
+        println!("wires {}: {}", i, f.coefs.len());
         hide_polynomial(prng, &mut f, 1, n_constraints);
         let (c_f, o_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
         transcript.append_commitment::<PCS::Commitment>(&c_f);
@@ -127,6 +129,7 @@ pub fn prover<
     // 3. build sigma, hide it and commit
     let mut sigma = sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
     hide_polynomial(prng, &mut sigma, 2, n_constraints);
+    println!("sigma: {}", sigma.coefs.len());
     let (c_sigma, o_sigma) = pcs.commit(sigma).c(d!(PlonkError::CommitmentError))?;
     transcript.append_commitment::<PCS::Commitment>(&c_sigma);
 

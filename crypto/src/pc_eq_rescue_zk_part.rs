@@ -219,7 +219,7 @@ pub fn verify_pc_eq_rescue_external(
 mod test {
     use crate::basic::rescue::RescueInstance;
     use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-    use crate::pc_eq_rescue_split_verifier_zk_part::{
+    use crate::pc_eq_rescue_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external,
     };
     use num_bigint::BigUint;

@@ -189,6 +189,7 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     for i in 0..n_wires_per_gate {
         let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n]);
         perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
+        println!("perm: {} {}", i, perm.coefs.len());
         let (c_perm, o_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
         prover_extended_perms.push(o_perm);
         verifier_extended_perms.push(c_perm);
@@ -200,6 +201,7 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     let mut verifier_selectors = vec![];
     for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
         let q = FpPolynomial::ffti(&root, cs.selector(i)?);
+        println!("selector: {} {}", i, q.coefs.len());
         selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
         let (c_q, o_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
         prover_selectors.push(o_q);
