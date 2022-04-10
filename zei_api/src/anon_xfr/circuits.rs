@@ -26,8 +26,8 @@ pub(crate) const SK_LEN: usize = 252; // secret key size (in bits)
 const JUBJUB_SCALAR_BIT_LEN: usize = 252; // jubjub scalar size (in bits)
 pub(crate) const AMOUNT_LEN: usize = 64; // amount value size (in bits)
 
-// Depth of the Merkle Tree circuit. here <= accumulators::merkle_tree::TREE_DEPTH (40)
-pub const TREE_DEPTH: usize = 40;
+// Depth of the Merkle Tree circuit. here <= accumulators::merkle_tree::TREE_DEPTH (20)
+pub const TREE_DEPTH: usize = 20;
 
 #[derive(Debug, Clone)]
 pub struct PayerSecret {
