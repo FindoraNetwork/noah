@@ -95,6 +95,9 @@ pub trait PolyComScheme: Sized {
         + Eq
         + Clone;
 
+    /// Returns maximal supported degree
+    fn max_degree(&self) -> usize;
+
     /// Commits to the polynomial, commitment is binding
     fn commit(
         &self,

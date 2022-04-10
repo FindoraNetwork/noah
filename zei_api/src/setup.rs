@@ -3,16 +3,13 @@ use crate::anon_xfr::circuits::{
     build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret,
     PayerSecret, TurboPlonkCS, TREE_DEPTH,
 };
-use algebra::bls12_381::BLSScalar;
+use algebra::bls12_381::{BLSG1, BLSScalar};
 
 use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
 use crate::anon_xfr::anon_fee::build_anon_fee_cs;
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::structs::{MTNode, MTPath};
-use crate::parameters::{
-    ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
-    RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
-};
+use crate::parameters::{ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS, LAGRANGE_BASES, RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS};
 use algebra::groups::Zero;
 use algebra::jubjub::JubjubScalar;
 use algebra::ristretto::RistrettoScalar;
@@ -23,7 +20,7 @@ use poly_iops::{
     commitments::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
     plonk::{
         constraint_system::ConstraintSystem,
-        setup::{preprocess_prover, ProverParams, VerifierParams},
+        setup::{preprocess_prover_with_lagrange, ProverParams, VerifierParams},
     },
 };
 use ruc::*;
@@ -43,6 +40,7 @@ pub struct PublicParams {
 pub struct UserParams {
     pub bp_params: PublicParams,
     pub pcs: KZGCommitmentSchemeBLS,
+    pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
     pub cs: TurboPlonkCS,
     pub prover_params: ProverParams<KZGCommitmentSchemeBLS>,
 }
@@ -114,13 +112,29 @@ impl UserParams {
             ),
         };
 
+        println!("{}", cs.size());
+
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
+
+        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()){
+            None => None,
+            Some(bytes) => {
+                println!("found basis");
+                let v: Vec<BLSG1> = bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
+                Some(KZGCommitmentSchemeBLS{
+                    public_parameter_group_1: v,
+                    public_parameter_group_2: vec![]
+                })
+            },
+        };
+
+        let prover_params = preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
 
         Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
+            lagrange_pcs,
             cs,
             prover_params,
         })
@@ -135,12 +149,29 @@ impl UserParams {
         let (cs, _) =
             build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
 
+        println!("{}", cs.size());
+
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
+
+        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()){
+            None => None,
+            Some(bytes) => {
+                println!("found basis");
+                let v: Vec<BLSG1> = bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
+                Some(KZGCommitmentSchemeBLS{
+                    public_parameter_group_1: v,
+                    public_parameter_group_2: vec![]
+                })
+            },
+        };
+
+        let prover_params = preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+
         Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
+            lagrange_pcs,
             cs,
             prover_params,
         })
@@ -171,14 +202,31 @@ impl UserParams {
         };
 
         let (cs, _) = build_abar_to_bar_cs(payer_secret, &proof, &non_zk_state, &beta);
+
+        println!("{}", cs.size());
+
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
 
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
+        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()){
+            None => None,
+            Some(bytes) => {
+                println!("found basis");
+                let v: Vec<BLSG1> = bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
+                Some(KZGCommitmentSchemeBLS{
+                    public_parameter_group_1: v,
+                    public_parameter_group_2: vec![]
+                })
+            },
+        };
+
+        let prover_params = preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+
         Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
+            lagrange_pcs,
             cs,
             prover_params,
         })
@@ -211,14 +259,30 @@ impl UserParams {
         let (cs, _) =
             build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
 
+        println!("{}", cs.size());
+
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
 
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()){
+            None => None,
+            Some(bytes) => {
+                println!("found basis");
+                let v: Vec<BLSG1> = bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
+                Some(KZGCommitmentSchemeBLS{
+                    public_parameter_group_1: v,
+                    public_parameter_group_2: vec![]
+                })
+            },
+        };
+
+        let prover_params = preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+
         Ok(UserParams {
             bp_params: PublicParams::new(),
             pcs,
+            lagrange_pcs,
             cs,
             prover_params,
         })

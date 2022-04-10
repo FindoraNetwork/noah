@@ -12,7 +12,7 @@ use merlin::Transcript;
 use num_bigint::BigUint;
 use poly_iops::{
     commitments::kzg_poly_com::KZGCommitmentSchemeBLS,
-    plonk::{prover::prover, setup::PlonkPf, verifier::verifier},
+    plonk::{prover::prover_with_lagrange, setup::PlonkPf, verifier::verifier},
 };
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
@@ -50,10 +50,11 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &fee_calculating_func);
     let witness = cs.get_and_clear_witness();
 
-    prover(
+    prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
+        params.lagrange_pcs.as_ref(),
         &params.cs,
         &params.prover_params,
         &witness,
@@ -118,10 +119,11 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    prover(
+    prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
+        params.lagrange_pcs.as_ref(),
         &params.cs,
         &params.prover_params,
         &witness,

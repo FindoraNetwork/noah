@@ -90,6 +90,23 @@ pub fn prover<
     params: &ProverParams<PCS>,
     witness: &[PCS::Field],
 ) -> Result<PlonkPf<PCS>> {
+    prover_with_lagrange(prng, transcript, pcs, None, cs, params, witness)
+}
+
+#[allow(non_snake_case)]
+pub fn prover_with_lagrange<
+    R: CryptoRng + RngCore,
+    PCS: PolyComScheme,
+    CS: ConstraintSystem<Field = PCS::Field>,
+>(
+    prng: &mut R,
+    transcript: &mut Transcript,
+    pcs: &PCS,
+    lagrange_pcs: Option<&PCS>,
+    cs: &CS,
+    params: &ProverParams<PCS>,
+    witness: &[PCS::Field],
+) -> Result<PlonkPf<PCS>> {
     if cs.is_verifier_only() {
         return Err(eg!(PlonkError::FuncParamsError));
     }
@@ -108,6 +125,16 @@ pub fn prover<
     let mut challenges = PlonkChallenges::new();
     let n_constraints = cs.size();
 
+    let lagrange_pcs = if lagrange_pcs.is_some() {
+        if lagrange_pcs.unwrap().max_degree() + 1 == n_constraints {
+            lagrange_pcs
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Prepare extended witness
     let extended_witness = cs.extend_witness(witness);
     let IO = public_vars_polynomial::<PCS>(&params, &online_values);
@@ -117,16 +144,36 @@ pub fn prover<
     let n_wires_per_gate = CS::n_wires_per_gate();
     let mut witness_openings = vec![];
     let mut C_witness_polys = vec![];
-    for i in 0..n_wires_per_gate {
-        let mut f = FpPolynomial::ffti(
-            root,
-            &extended_witness[i * n_constraints..(i + 1) * n_constraints],
-        );
-        hide_polynomial(prng, &mut f, 1, n_constraints);
-        let (C_f, O_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
-        transcript.append_commitment::<PCS::Commitment>(&C_f);
-        witness_openings.push(O_f);
-        C_witness_polys.push(C_f);
+
+    if let Some(lagrange_pcs) = lagrange_pcs {
+        println!("using lagrange bases!");
+        for i in 0..n_wires_per_gate {
+            let f_eval = FpPolynomial::from_coefs(extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec());
+            let f = FpPolynomial::ffti(
+                root,
+                &extended_witness[i * n_constraints..(i + 1) * n_constraints],
+            );
+            // TODO: add this back
+            // hide_polynomial(prng, &mut f, 1, n_constraints);
+            let (C_f, _) = lagrange_pcs.commit(f_eval).c(d!(PlonkError::CommitmentError))?;
+            let O_f = pcs.opening(&f);
+            transcript.append_commitment::<PCS::Commitment>(&C_f);
+            witness_openings.push(O_f);
+            C_witness_polys.push(C_f);
+        }
+    } else {
+        for i in 0..n_wires_per_gate {
+            let f = FpPolynomial::ffti(
+                root,
+                &extended_witness[i * n_constraints..(i + 1) * n_constraints],
+            );
+            // TODO: add this back
+            // hide_polynomial(prng, &mut f, 1, n_constraints);
+            let (C_f, O_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
+            transcript.append_commitment::<PCS::Commitment>(&C_f);
+            witness_openings.push(O_f);
+            C_witness_polys.push(C_f);
+        }
     }
 
     // 2. get challenges gamma and delta
