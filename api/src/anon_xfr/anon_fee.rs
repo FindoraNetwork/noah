@@ -420,6 +420,7 @@ mod tests {
             );
 
             let note = AnonFeeNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
+
             assert!(note.verify_signatures().is_ok());
         }
         {
