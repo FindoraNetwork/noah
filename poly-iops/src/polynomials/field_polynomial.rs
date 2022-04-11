@@ -482,7 +482,7 @@ impl<F: Scalar> FpPolynomial<F> {
         for (self_eval, other_eval) in self_evals.iter_mut().zip(other_evals.iter()) {
             self_eval.mul_assign(other_eval);
         }
-        Self::ffti(&root, &self_evals)
+        Self::ffti(&root, &self_evals, n)
     }
 
     /// Add `coef` to the coefficient of order `order`
@@ -802,16 +802,18 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 
     /// Compute the polynomial given its evaluation values at the n n-th root of unity given a primitive n-th root of unity
-    pub fn ffti(root: &F, values: &[F]) -> Self {
-        let values: Vec<&F> = values.iter().collect();
+    pub fn ffti(root: &F, values: &[F], len: usize) -> Self {
+        let mut values: Vec<&F> = values.iter().collect();
+        let zero = F::zero();
+        values.resize(len, &zero);
         let coefs = recursive_ifft(&values, root);
         Self::from_coefs(coefs)
     }
 
     /// Compute the polynomial given its evaluation values at a coset k * H, where H are n n-th
     /// root of unities and k_inv is the inverse of k.
-    pub fn coset_ffti(root: &F, values: &[F], k_inv: &F) -> Self {
-        Self::ffti(root, values).mul_var(k_inv)
+    pub fn coset_ffti(root: &F, values: &[F], k_inv: &F, len: usize) -> Self {
+        Self::ffti(root, values, len).mul_var(k_inv)
     }
 
     pub fn lagrange_ith_base(points: &[F], i: usize) -> Option<Self> {

@@ -2,6 +2,7 @@ use algebra::groups::ScalarArithmetic;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 use ruc::*;
+use std::time::Instant;
 
 use crate::commitments::pcs::PolyComScheme;
 use crate::commitments::transcript::PolyComTranscript;
@@ -145,17 +146,23 @@ pub fn prover_with_lagrange<
     let mut witness_openings = vec![];
     let mut C_witness_polys = vec![];
 
+    let timer = Instant::now();
     if let Some(lagrange_pcs) = lagrange_pcs {
         println!("using lagrange bases!");
         for i in 0..n_wires_per_gate {
-            let f_eval = FpPolynomial::from_coefs(extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec());
+            let f_eval = FpPolynomial::from_coefs(
+                extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec(),
+            );
             let f = FpPolynomial::ffti(
                 root,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
+                n_constraints,
             );
             // TODO: add this back
             // hide_polynomial(prng, &mut f, 1, n_constraints);
-            let (C_f, _) = lagrange_pcs.commit(f_eval).c(d!(PlonkError::CommitmentError))?;
+            let (C_f, _) = lagrange_pcs
+                .commit(f_eval)
+                .c(d!(PlonkError::CommitmentError))?;
             let O_f = pcs.opening(&f);
             transcript.append_commitment::<PCS::Commitment>(&C_f);
             witness_openings.push(O_f);
@@ -163,18 +170,20 @@ pub fn prover_with_lagrange<
         }
     } else {
         for i in 0..n_wires_per_gate {
-            let f = FpPolynomial::ffti(
+            let mut f = FpPolynomial::ffti(
                 root,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
+                n_constraints,
             );
             // TODO: add this back
-            // hide_polynomial(prng, &mut f, 1, n_constraints);
+            hide_polynomial(prng, &mut f, 1, n_constraints);
             let (C_f, O_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
             transcript.append_commitment::<PCS::Commitment>(&C_f);
             witness_openings.push(O_f);
             C_witness_polys.push(C_f);
         }
     }
+    println!("Commit witness: {}", timer.elapsed().as_secs_f32());
 
     // 2. get challenges gamma and delta
     let gamma = transcript_get_plonk_challenge_gamma(transcript, n_constraints);
@@ -182,11 +191,15 @@ pub fn prover_with_lagrange<
     challenges.insert_gamma_delta(gamma, delta).unwrap(); // safe unwrap
 
     // 3. build sigma, hide it and commit
+    let timer = Instant::now();
     let mut Sigma =
         sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
     hide_polynomial(prng, &mut Sigma, 2, n_constraints);
+    println!("Build sigma: {}", timer.elapsed().as_secs_f32());
+    let timer = Instant::now();
     let (C_Sigma, O_Sigma) = pcs.commit(Sigma).c(d!(PlonkError::CommitmentError))?;
     transcript.append_commitment::<PCS::Commitment>(&C_Sigma);
+    println!("Commit sigma: {}", timer.elapsed().as_secs_f32());
 
     // 4. get challenge alpha
     let alpha = transcript_get_plonk_challenge_alpha(transcript, n_constraints);
@@ -194,6 +207,8 @@ pub fn prover_with_lagrange<
 
     // 5. build Q, split into `n_wires_per_gate` degree-(N+2) polynomials and commit
     // TODO: avoid the cloning when computing witness_polys and Sigma
+
+    let timer = Instant::now();
     let witness_polys: Vec<FpPolynomial<PCS::Field>> = witness_openings
         .iter()
         .map(|open| pcs.polynomial_from_opening_ref(open))
@@ -208,17 +223,21 @@ pub fn prover_with_lagrange<
         &IO,
     )
     .c(d!())?;
+    println!("Build quotient: {}", timer.elapsed().as_secs_f32());
+    let timer = Instant::now();
     let (C_q_polys, O_q_polys) =
         split_q_and_commit(pcs, &Q, n_wires_per_gate, n_constraints + 2).c(d!())?;
     for C_q in C_q_polys.iter() {
         transcript.append_commitment::<PCS::Commitment>(C_q);
     }
+    println!("Commit quotient: {}", timer.elapsed().as_secs_f32());
 
     // 6. get challenge beta
     let beta = transcript_get_plonk_challenge_beta(transcript, n_constraints);
 
     // 7. a) Evaluate the openings of witness/permutation polynomials at beta, and
     // evaluate the opening of Sigma(X) at point g * beta.
+    let timer = Instant::now();
     let witness_polys_eval_beta: Vec<PCS::Field> = witness_openings
         .iter()
         .map(|open| pcs.eval_opening(open, &beta))
@@ -232,12 +251,15 @@ pub fn prover_with_lagrange<
 
     let g_beta = root.mul(&beta);
     let Sigma_eval_g_beta = pcs.eval_opening(&O_Sigma, &g_beta);
+    println!("Compute opening: {}", timer.elapsed().as_secs_f32());
 
     challenges.insert_beta(beta).unwrap();
     //  b). build linearization polynomial r_beta(X), and eval at beta
     let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> =
         witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();
+
+    let timer = Instant::now();
     let O_L = linearization_polynomial_opening::<PCS, CS>(
         params,
         &O_Sigma,
@@ -246,6 +268,7 @@ pub fn prover_with_lagrange<
         &Sigma_eval_g_beta,
         &challenges,
     );
+    println!("Linearize: {}", timer.elapsed().as_secs_f32());
     for eval_beta in witness_polys_eval_beta.iter().chain(perms_eval_beta.iter()) {
         transcript.append_field_elem(eval_beta);
     }
@@ -264,7 +287,9 @@ pub fn prover_with_lagrange<
                 .take(CS::n_wires_per_gate() - 1),
         )
         .collect();
+    let timer = Instant::now();
     let O_q_combined = combine_q_polys(&O_q_polys, &beta, n_constraints + 2);
+    println!("Combine: {}", timer.elapsed().as_secs_f32());
     openings.push(&O_q_combined);
     openings.push(&O_L);
     openings.push(&O_Sigma);
@@ -273,6 +298,8 @@ pub fn prover_with_lagrange<
     let mut points = vec![*beta; 2 * n_wires_per_gate + 1];
     // One opening proof for Sigma(X) at point g * beta
     points.push(g_beta);
+
+    let timer = Instant::now();
     let (_, batch_eval_proof) = pcs
         .batch_prove_eval(
             transcript,
@@ -282,6 +309,7 @@ pub fn prover_with_lagrange<
             None,
         )
         .c(d!(PlonkError::ProofError))?;
+    println!("Opening proof: {}", timer.elapsed().as_secs_f32());
 
     // return proof
     Ok(PlonkProof {

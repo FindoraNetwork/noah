@@ -1,15 +1,20 @@
+use std::time::Instant;
 // The Public Setup needed for Proofs
 use crate::anon_xfr::circuits::{
     build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret,
     PayerSecret, TurboPlonkCS, TREE_DEPTH,
 };
-use algebra::bls12_381::{BLSG1, BLSScalar};
+use algebra::bls12_381::{BLSScalar, BLSG1};
 
 use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
 use crate::anon_xfr::anon_fee::build_anon_fee_cs;
 use crate::anon_xfr::config::{FEE_CALCULATING_FUNC, FEE_TYPE};
 use crate::anon_xfr::structs::{MTNode, MTPath};
-use crate::parameters::{ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS, LAGRANGE_BASES, RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS};
+use crate::parameters::{
+    ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
+    LAGRANGE_BASES, RISTRETTO_SRS, SRS, VERIFIER_COMMON_PARAMS,
+    VERIFIER_SPECIALS_PARAMS,
+};
 use algebra::groups::Zero;
 use algebra::jubjub::JubjubScalar;
 use algebra::ristretto::RistrettoScalar;
@@ -117,19 +122,26 @@ impl UserParams {
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
 
-        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()){
+        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()) {
             None => None,
             Some(bytes) => {
                 println!("found basis");
-                let v: Vec<BLSG1> = bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
-                Some(KZGCommitmentSchemeBLS{
+                let v: Vec<BLSG1> =
+                    bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
+                Some(KZGCommitmentSchemeBLS {
                     public_parameter_group_1: v,
-                    public_parameter_group_2: vec![]
+                    public_parameter_group_2: vec![],
                 })
-            },
+            }
         };
 
-        let prover_params = preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+        let prover_params = preprocess_prover_with_lagrange(
+            &cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            COMMON_SEED,
+        )
+        .unwrap();
 
         Ok(UserParams {
             bp_params: PublicParams::new(),
@@ -154,19 +166,26 @@ impl UserParams {
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
 
-        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()){
+        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()) {
             None => None,
             Some(bytes) => {
                 println!("found basis");
-                let v: Vec<BLSG1> = bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
-                Some(KZGCommitmentSchemeBLS{
+                let v: Vec<BLSG1> =
+                    bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
+                Some(KZGCommitmentSchemeBLS {
                     public_parameter_group_1: v,
-                    public_parameter_group_2: vec![]
+                    public_parameter_group_2: vec![],
                 })
-            },
+            }
         };
 
-        let prover_params = preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+        let prover_params = preprocess_prover_with_lagrange(
+            &cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            COMMON_SEED,
+        )
+        .unwrap();
 
         Ok(UserParams {
             bp_params: PublicParams::new(),
@@ -201,27 +220,51 @@ impl UserParams {
             blind: bls_zero,
         };
 
+        let timer = Instant::now();
         let (cs, _) = build_abar_to_bar_cs(payer_secret, &proof, &non_zk_state, &beta);
+        println!("build cs: {}", timer.elapsed().as_secs_f32());
 
         println!("{}", cs.size());
 
+        let timer = Instant::now();
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
+        println!("load pcs: {}", timer.elapsed().as_secs_f32());
 
-        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()){
+        let timer = Instant::now();
+        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()) {
             None => None,
             Some(bytes) => {
                 println!("found basis");
-                let v: Vec<BLSG1> = bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
-                Some(KZGCommitmentSchemeBLS{
+                let v: Vec<BLSG1> =
+                    bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
+                Some(KZGCommitmentSchemeBLS {
                     public_parameter_group_1: v,
-                    public_parameter_group_2: vec![]
+                    public_parameter_group_2: vec![],
                 })
-            },
+            }
         };
+        println!("load lagrange_pcs: {}", timer.elapsed().as_secs_f32());
 
-        let prover_params = preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+        let prover_params = preprocess_prover_with_lagrange(
+            &cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            COMMON_SEED,
+        )
+        .unwrap();
+
+        println!("pcs size: {}", bincode::serialize(&pcs).unwrap().len());
+        println!(
+            "lagrange_pcs size: {}",
+            bincode::serialize(&lagrange_pcs).unwrap().len()
+        );
+        println!("cs size: {}", bincode::serialize(&cs).unwrap().len());
+        println!(
+            "prover_params size: {}",
+            bincode::serialize(&prover_params).unwrap().len()
+        );
 
         Ok(UserParams {
             bp_params: PublicParams::new(),
@@ -265,19 +308,26 @@ impl UserParams {
         let pcs: KZGCommitmentSchemeBLS =
             bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
 
-        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()){
+        let lagrange_pcs = match LAGRANGE_BASES.get(&cs.size()) {
             None => None,
             Some(bytes) => {
                 println!("found basis");
-                let v: Vec<BLSG1> = bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
-                Some(KZGCommitmentSchemeBLS{
+                let v: Vec<BLSG1> =
+                    bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))?;
+                Some(KZGCommitmentSchemeBLS {
                     public_parameter_group_1: v,
-                    public_parameter_group_2: vec![]
+                    public_parameter_group_2: vec![],
                 })
-            },
+            }
         };
 
-        let prover_params = preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+        let prover_params = preprocess_prover_with_lagrange(
+            &cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            COMMON_SEED,
+        )
+        .unwrap();
 
         Ok(UserParams {
             bp_params: PublicParams::new(),

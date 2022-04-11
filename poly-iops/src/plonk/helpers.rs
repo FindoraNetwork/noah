@@ -106,7 +106,11 @@ pub(super) fn public_vars_polynomial<PCS: PolyComScheme>(
         }
     }
 
-    FpPolynomial::ffti(&params.verifier_params.root, &y)
+    FpPolynomial::ffti(
+        &params.verifier_params.root,
+        &y,
+        params.verifier_params.cs_size,
+    )
 }
 
 // add a random degree `num_hide_points`+`zeroing_degree` polynomial that vanishes on X^{zeroing_degree} -1
@@ -184,7 +188,7 @@ pub(super) fn sigma_polynomial<
         sigma_values.push(prev);
     }
     // interpolate polynomial
-    FpPolynomial::ffti(&params.verifier_params.root, &sigma_values)
+    FpPolynomial::ffti(&params.verifier_params.root, &sigma_values, n_constraints)
 }
 
 // Computes PLONK's quotient polynomial.
@@ -293,7 +297,12 @@ pub(super) fn quotient_polynomial<
     }
 
     let k_inv = k[1].inv().c(d!(PlonkError::DivisionByZero))?;
-    Ok(FpPolynomial::coset_ffti(root_m, &quot_coset_evals, &k_inv))
+    Ok(FpPolynomial::coset_ffti(
+        root_m,
+        &quot_coset_evals,
+        &k_inv,
+        m,
+    ))
 }
 
 // Compute linearization polynomial opening/commitment.

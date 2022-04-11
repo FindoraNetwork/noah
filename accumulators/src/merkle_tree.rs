@@ -8,13 +8,13 @@ use storage::db::MerkleDB;
 use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
 use utils::serialization::ZeiFromToBytes;
 
-// ceil(log(u64::MAX, 3)) = 41
-// 3^0 + 3^1 + 3^2 + ... 3^40 < 2^64 (u64 can include all leaf & ancestor)
-// store max num is 3^40 = 12157665459056928801 (max uid = 3^40 - 1)
+// ceil(log(u32::MAX, 3)) = 21
+// 3^0 + 3^1 + 3^2 + ... 3^20 < 2^64 (u64 can include all leaf & ancestor)
+// store max num is 3^20 = 3486784401 (max uid = 3^20 - 1)
 // sid   max num is 2^64 = 18446744073709551616 (max uid = 2^64 - 1)
-pub const TREE_DEPTH: usize = 40;
-// 6078832729528464400 = 3^0 + 3^1 + 3^2 + ... 3^39, if change TREE_DEPTH, MUST update.
-const LEAF_START: u64 = 6078832729528464400;
+pub const TREE_DEPTH: usize = 20;
+// 1743392200 = 3^0 + 3^1 + 3^2 + ... 3^19, if change TREE_DEPTH, MUST update.
+const LEAF_START: u64 = 1743392200;
 
 const KEY_PAD: [u8; 4] = [0, 0, 0, 0];
 const ROOT_KEY: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // KEY_PAD + 0u64
@@ -466,99 +466,4 @@ fn get_path_keys(uid: u64) -> Vec<(u64, TreePath)> {
         }
     }
     keys
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{get_path_keys, TreePath};
-
-    #[test]
-    fn test_merkle_tree_path() {
-        let first_keys = get_path_keys(0);
-        let mut first_sum = 0u64;
-        for (i, (key, path)) in
-            first_keys[0..first_keys.len() - 1].iter().rev().enumerate()
-        {
-            first_sum += 3u64.pow(i as u32);
-            assert_eq!(*key, first_sum);
-            assert_eq!(*path, TreePath::Left);
-        }
-
-        let mut t1 = get_path_keys(1);
-        t1.pop(); // pop root.
-        assert_eq!(t1[0].1, TreePath::Middle);
-        for (_, path) in &t1[1..] {
-            assert_eq!(*path, TreePath::Left);
-        }
-
-        let mut t2 = get_path_keys(2);
-        t2.pop();
-        assert_eq!(t2[0].1, TreePath::Right);
-        for (_, path) in &t2[1..] {
-            assert_eq!(*path, TreePath::Left);
-        }
-
-        let mut t3 = get_path_keys(3);
-        t3.pop();
-        assert_eq!(t3[0].1, TreePath::Left);
-        assert_eq!(t3[1].1, TreePath::Middle);
-        for (_, path) in &t3[2..] {
-            assert_eq!(*path, TreePath::Left);
-        }
-
-        let tmp = get_path_keys(1_000_000_000_000);
-        let tmp_path: Vec<TreePath> = tmp.iter().map(|(_, p)| *p).collect();
-        let tmp_right = vec![
-            TreePath::Middle, // (6078833729528464400, Middle)
-            TreePath::Left,   // (2026277909842821466, Left)
-            TreePath::Left,   // (675425969947607155, Left)
-            TreePath::Middle, // (225141989982535718, Middle)
-            TreePath::Middle, // (75047329994178572, Middle)
-            TreePath::Middle, // (25015776664726190, Middle)
-            TreePath::Right,  // (8338592221575396, Right)
-            TreePath::Left,   // (2779530740525131, Left)
-            TreePath::Middle, // (926510246841710, Middle)
-            TreePath::Right,  // (308836748947236, Right)
-            TreePath::Left,   // (102945582982411, Left)
-            TreePath::Middle, // (34315194327470, Middle)
-            TreePath::Middle, // (11438398109156, Middle)
-            TreePath::Left,   // (3812799369718, Left)
-            TreePath::Right,  // (1270933123239, Right)
-            TreePath::Middle, // (423644374412, Middle)
-            TreePath::Middle, // (141214791470, Middle)
-            TreePath::Left,   // (47071597156, Left)
-            TreePath::Middle, // (15690532385, Middle)
-            TreePath::Right,  // (5230177461, Right)
-            TreePath::Middle, // (1743392486, Middle)
-            TreePath::Right,  // (581130828, Right)
-            TreePath::Middle, // (193710275, Middle)
-            TreePath::Middle, // (64570091, Middle)
-            TreePath::Left,   // (21523363, Left)
-            TreePath::Middle, // (7174454, Middle)
-            TreePath::Left,   // (2391484, Left)
-            TreePath::Left,   // (797161, Left)
-            TreePath::Left,   // (265720, Left)
-            TreePath::Left,   // (88573, Left)
-            TreePath::Left,   // (29524, Left)
-            TreePath::Left,   // (9841, Left)
-            TreePath::Left,   // (3280, Left)
-            TreePath::Left,   // (1093, Left)
-            TreePath::Left,   // (364, Left)
-            TreePath::Left,   // (121, Left)
-            TreePath::Left,   // (40, Left)
-            TreePath::Left,   // (13, Left)
-            TreePath::Left,   // (4, Left)
-            TreePath::Left,   // (1, Left)
-            TreePath::Right,  // (0, Right)
-        ];
-        assert_eq!(tmp_path, tmp_right);
-
-        let last_keys = get_path_keys(3u64.pow(40) - 1);
-        let mut last_sum = 0u64;
-        for (i, (key, path)) in last_keys.iter().rev().enumerate() {
-            last_sum += 3u64.pow(i as u32);
-            assert_eq!(*key, last_sum - 1);
-            assert_eq!(*path, TreePath::Right);
-        }
-    }
 }

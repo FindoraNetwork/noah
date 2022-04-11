@@ -24,13 +24,14 @@ use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use rand_chacha::ChaCha20Rng;
 use ruc::*;
+use std::fmt::{Debug, Formatter};
 use utils::{derive_prng_from_hash, u8_le_slice_to_u64};
 use wasm_bindgen::prelude::*;
 
 pub const BLS_SCALAR_LEN: usize = 32;
 
 #[wasm_bindgen]
-#[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Default)]
 pub struct BLSScalar(Fr);
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSG1(pub(crate) G1Projective);
@@ -38,6 +39,13 @@ pub struct BLSG1(pub(crate) G1Projective);
 pub struct BLSG2(pub(crate) G2Projective);
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BLSGt(pub(crate) Fp12<Fq12Parameters>);
+
+impl Debug for BLSScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let bigint: BigUint = BigUint::from(self.0.into_repr());
+        bigint.fmt(f)
+    }
+}
 
 impl FromStr for BLSScalar {
     type Err = AlgebraError;

@@ -93,7 +93,9 @@ pub trait PolyComScheme: Sized {
         + Debug
         + PartialEq
         + Eq
-        + Clone;
+        + Clone
+        + Serialize
+        + for<'de> Deserialize<'de>;
 
     /// Returns maximal supported degree
     fn max_degree(&self) -> usize;
