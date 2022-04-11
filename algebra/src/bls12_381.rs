@@ -350,6 +350,9 @@ impl Group for BLSG1 {
 
     #[inline]
     fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
+        use std::time::Instant;
+
+        let timer = Instant::now();
         let scalars_raw = scalars
             .iter()
             .map(|r| r.0.into_repr())
@@ -357,6 +360,7 @@ impl Group for BLSG1 {
         let points_raw = G1Projective::batch_normalization_into_affine(
             &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
         );
+        println!("normalize: {}", timer.elapsed().as_secs_f64());
 
         Self(ark_ec::msm::VariableBase::msm(&points_raw, &scalars_raw))
     }

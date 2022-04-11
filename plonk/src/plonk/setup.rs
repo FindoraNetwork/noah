@@ -177,6 +177,9 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
     let coset_quot = group_m.iter().map(|x| k[1].mul(x)).collect();
 
+    use std::time::Instant;
+
+    let timer = Instant::now();
     // Compute the openings, commitments, and point evaluations of the permutation polynomials.
     let perm = cs.compute_permutation();
     let mut p_values = Vec::with_capacity(n_wires_per_gate * n);
@@ -187,25 +190,37 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     let mut prover_extended_perms = vec![];
     let mut verifier_extended_perms = vec![];
     for i in 0..n_wires_per_gate {
+        let timer1 = Instant::now();
         let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n], n);
         perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
+        println!("FFT: {}", timer1.elapsed().as_secs_f64());
+        let timer1 = Instant::now();
         let (c_perm, o_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
         prover_extended_perms.push(o_perm);
         verifier_extended_perms.push(c_perm);
+        println!("MSM: {}", timer1.elapsed().as_secs_f64());
     }
+    println!("perm polynomial: {}", timer.elapsed().as_secs_f64());
 
+    let timer = Instant::now();
     // Compute the openings, commitments, and point evaluations of the selector polynomials.
     let mut selectors_coset_evals = vec![vec![]; cs.num_selectors()];
     let mut prover_selectors = vec![];
     let mut verifier_selectors = vec![];
     for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
+        let timer1 = Instant::now();
         let q = FpPolynomial::ffti(&root, cs.selector(i)?, n);
         selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
+        println!("FFT: {}", timer1.elapsed().as_secs_f64());
+        let timer1 = Instant::now();
         let (c_q, o_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
         prover_selectors.push(o_q);
         verifier_selectors.push(c_q);
+        println!("MSM: {}", timer1.elapsed().as_secs_f64());
     }
+    println!("selectors polynomial: {}", timer.elapsed().as_secs_f64());
 
+    let timer = Instant::now();
     // Compute polynomials L1, Z_H, and point evaluations of L1 and Z_H^{-1}.
     let mut l1 = FpPolynomial::from_coefs(vec![PCS::Field::zero(); group.len()]);
     // X^n - 1 = (X - 1) (X^{n-1} + X^{n-2} + ... + 1)
@@ -221,6 +236,7 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
         .into_iter()
         .map(|x| x.inv().unwrap())
         .collect();
+    println!("cosets eval (FFT): {}", timer.elapsed().as_secs_f64());
 
     let mut lagrange_constants = vec![];
     for constraint_index in cs.public_vars_constraint_indices().iter() {
