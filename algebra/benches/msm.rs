@@ -1,9 +1,9 @@
-use algebra::{
+use ark_std::{rand::SeedableRng, time::Instant};
+use rand_chacha::ChaChaRng;
+use zei_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     traits::{Group, Scalar},
 };
-use ark_std::{rand::SeedableRng, time::Instant};
-use rand_chacha::ChaChaRng;
 
 fn main() {
     let mut prng = ChaChaRng::from_entropy();

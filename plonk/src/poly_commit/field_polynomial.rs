@@ -5,7 +5,8 @@ use zei_algebra::prelude::*;
 /// Field polynomial.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FpPolynomial<F> {
-    pub(crate) coefs: Vec<F>,
+    /// Coefficients (or evaluations) of the polynomial
+    pub coefs: Vec<F>,
 }
 
 impl<F: Scalar> FpPolynomial<F> {
@@ -477,7 +478,7 @@ impl<F: Scalar> FpPolynomial<F> {
         for (self_eval, other_eval) in self_evals.iter_mut().zip(other_evals.iter()) {
             self_eval.mul_assign(other_eval);
         }
-        Self::ffti(&root, &self_evals)
+        Self::ffti(&root, &self_evals, n)
     }
 
     /// Add `coef` to the coefficient of order `order`
@@ -792,16 +793,18 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 
     /// Compute the polynomial given its evaluation values at the n n-th root of unity given a primitive n-th root of unity
-    pub fn ffti(root: &F, values: &[F]) -> Self {
-        let values: Vec<&F> = values.iter().collect();
+    pub fn ffti(root: &F, values: &[F], len: usize) -> Self {
+        let mut values: Vec<&F> = values.iter().collect();
+        let zero = F::zero();
+        values.resize(len, &zero);
         let coefs = recursive_ifft(&values, root);
         Self::from_coefs(coefs)
     }
 
     /// Compute the polynomial given its evaluation values at a coset k * H, where H are n n-th
     /// root of unities and k_inv is the inverse of k.
-    pub fn coset_ffti(root: &F, values: &[F], k_inv: &F) -> Self {
-        Self::ffti(root, values).mul_var(k_inv)
+    pub fn coset_ffti(root: &F, values: &[F], k_inv: &F, len: usize) -> Self {
+        Self::ffti(root, values, len).mul_var(k_inv)
     }
 
     /// Compute the Lagrange base by index.
@@ -1033,7 +1036,7 @@ mod test {
         let dft = polynomial.fft_with_unity_root(&root, 4);
         check_dft(&polynomial, &root, &dft);
 
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft);
+        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 4);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -1042,7 +1045,7 @@ mod test {
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
         let (dft, root) = polynomial.fft(16).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft);
+        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 16);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -1051,7 +1054,7 @@ mod test {
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
         let (dft, root) = polynomial.fft(32).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft);
+        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 32);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -1060,7 +1063,7 @@ mod test {
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
         let (dft, root) = polynomial.fft(3).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft);
+        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 3);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -1069,7 +1072,7 @@ mod test {
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
         let (dft, root) = polynomial.fft(48).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft);
+        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 48);
         assert_eq!(ffti_polynomial, polynomial);
     }
 

@@ -187,7 +187,7 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     let mut prover_extended_perms = vec![];
     let mut verifier_extended_perms = vec![];
     for i in 0..n_wires_per_gate {
-        let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n]);
+        let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n], n);
         perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
         let (c_perm, o_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
         prover_extended_perms.push(o_perm);
@@ -199,7 +199,7 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     let mut prover_selectors = vec![];
     let mut verifier_selectors = vec![];
     for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
-        let q = FpPolynomial::ffti(&root, cs.selector(i)?);
+        let q = FpPolynomial::ffti(&root, cs.selector(i)?, n);
         selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
         let (c_q, o_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
         prover_selectors.push(o_q);
@@ -207,7 +207,10 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     }
 
     // Compute polynomials L1, Z_H, and point evaluations of L1 and Z_H^{-1}.
-    let l1 = FpPolynomial::from_zeroes(&group[1..]);
+    let mut l1 = FpPolynomial::from_coefs(vec![PCS::Field::zero(); group.len()]);
+    // X^n - 1 = (X - 1) (X^{n-1} + X^{n-2} + ... + 1)
+    l1.coefs[0] = PCS::Field::from(n as u64);
+    let l1 = FpPolynomial::ffti(&root, &l1.coefs, n);
     let l1_coset_evals = l1.coset_fft_with_unity_root(&root_m, m, &k[1]);
     let mut z_h_coefs = vec![PCS::Field::zero(); n + 1];
     z_h_coefs[0] = PCS::Field::one().neg();

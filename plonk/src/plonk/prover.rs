@@ -111,6 +111,7 @@ pub fn prover<
         let mut f = FpPolynomial::ffti(
             root,
             &extended_witness[i * n_constraints..(i + 1) * n_constraints],
+            n_constraints,
         );
         hide_polynomial(prng, &mut f, 1, n_constraints);
         let (c_f, o_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
