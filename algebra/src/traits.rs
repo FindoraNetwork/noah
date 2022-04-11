@@ -129,6 +129,15 @@ pub trait Group:
     /// Convert from bytes in the compressed representation
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self>;
 
+    /// Convert to bytes in the unchecked representation
+    fn to_unchecked_bytes(&self) -> Vec<u8>;
+
+    /// Convert from bytes in the unchecked representation
+    fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self>;
+
+    /// Return the size of unchecked bytes.
+    fn unchecked_size() -> usize;
+
     /// Sample a group element based on a hash value
     fn from_hash<D>(hash: D) -> Self
     where

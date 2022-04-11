@@ -120,8 +120,8 @@ impl ProverParams {
             ),
         };
 
-        let pcs: KZGCommitmentSchemeBLS =
-            bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
+        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+            .c(d!(ZeiError::DeserializationError))?;
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
 
         Ok(ProverParams {
@@ -140,8 +140,8 @@ impl ProverParams {
         let beta = RistrettoScalar::zero();
         let (cs, _) = build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
 
-        let pcs: KZGCommitmentSchemeBLS =
-            bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
+        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+            .c(d!(ZeiError::DeserializationError))?;
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -177,8 +177,8 @@ impl ProverParams {
 
         let (cs, _) = build_abar_to_bar_cs(payer_secret, &proof, &non_zk_state, &beta);
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
-        let pcs: KZGCommitmentSchemeBLS =
-            bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
+        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+            .c(d!(ZeiError::DeserializationError))?;
 
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
         Ok(ProverParams {
@@ -216,8 +216,8 @@ impl ProverParams {
         let (cs, _) = build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
 
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
-        let pcs: KZGCommitmentSchemeBLS =
-            bincode::deserialize(&srs).c(d!(ZeiError::DeserializationError))?;
+        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+            .c(d!(ZeiError::DeserializationError))?;
 
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
         Ok(ProverParams {
@@ -352,6 +352,14 @@ mod test {
     }
 
     #[test]
+    fn bench_serialization() {
+        let start = std::time::Instant::now();
+        let _pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&SRS.unwrap()).unwrap();
+        let elapsed = start.elapsed();
+        println!("{:.2?}", elapsed);
+    }
+
+    #[test]
     fn test_vk_params_serialization() {
         let params = VerifierParams::create(3, 3, Some(TREE_DEPTH))
             .unwrap()
@@ -365,9 +373,7 @@ mod test {
 
     #[test]
     fn test_crs_commit() {
-        let pcs: KZGCommitmentSchemeBLS = bincode::deserialize(&SRS.unwrap())
-            .c(d!(ZeiError::DeserializationError))
-            .unwrap();
+        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&SRS.unwrap()).unwrap();
         let one = BLSScalar::one();
         let two = one.add(&one);
         let three = two.add(&one);
