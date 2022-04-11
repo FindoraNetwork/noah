@@ -299,6 +299,15 @@ impl Group for BLSG1 {
     }
 
     #[inline]
+    fn to_unchecked_bytes(&self) -> Vec<u8> {
+        let affine = G1Affine::from(self.0);
+        let mut buf = Vec::new();
+        affine.serialize_unchecked(&mut buf).unwrap();
+
+        buf
+    }
+
+    #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
@@ -309,6 +318,25 @@ impl Group for BLSG1 {
         } else {
             Err(eg!(AlgebraError::DeserializationError))
         }
+    }
+
+    #[inline]
+    fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut reader = ark_std::io::BufReader::new(bytes);
+
+        let affine = G1Affine::deserialize_unchecked(&mut reader);
+
+        if affine.is_ok() {
+            Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
+        } else {
+            Err(eg!(AlgebraError::DeserializationError))
+        }
+    }
+
+    #[inline]
+    fn unchecked_size() -> usize {
+        let g = G1Affine::from(Self::get_base().0);
+        g.uncompressed_size()
     }
 
     #[inline]
@@ -408,6 +436,15 @@ impl Group for BLSG2 {
     }
 
     #[inline]
+    fn to_unchecked_bytes(&self) -> Vec<u8> {
+        let affine = G2Affine::from(self.0);
+        let mut buf = Vec::new();
+        affine.serialize_unchecked(&mut buf).unwrap();
+
+        buf
+    }
+
+    #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
@@ -418,6 +455,25 @@ impl Group for BLSG2 {
         } else {
             Err(eg!(AlgebraError::DeserializationError))
         }
+    }
+
+    #[inline]
+    fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut reader = ark_std::io::BufReader::new(bytes);
+
+        let affine = G2Affine::deserialize_unchecked(&mut reader);
+
+        if affine.is_ok() {
+            Ok(Self(affine.unwrap().into_projective()))
+        } else {
+            Err(eg!(AlgebraError::DeserializationError))
+        }
+    }
+
+    #[inline]
+    fn unchecked_size() -> usize {
+        let g = G2Affine::from(Self::get_base().0);
+        g.uncompressed_size()
     }
 
     #[inline]
@@ -589,6 +645,14 @@ impl Group for BLSGt {
     }
 
     #[inline]
+    fn to_unchecked_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.0.serialize_unchecked(&mut buf).unwrap();
+
+        buf
+    }
+
+    #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
@@ -599,6 +663,25 @@ impl Group for BLSGt {
         } else {
             Err(eg!(AlgebraError::DeserializationError))
         }
+    }
+
+    #[inline]
+    fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut reader = ark_std::io::BufReader::new(bytes);
+
+        let res = Fp12::<Fq12Parameters>::deserialize_unchecked(&mut reader);
+
+        if res.is_ok() {
+            Ok(Self(res.unwrap()))
+        } else {
+            Err(eg!(AlgebraError::DeserializationError))
+        }
+    }
+
+    #[inline]
+    fn unchecked_size() -> usize {
+        let g = Self::get_base().0;
+        g.uncompressed_size()
     }
 
     #[inline]

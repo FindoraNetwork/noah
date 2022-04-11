@@ -291,12 +291,33 @@ impl Group for RistrettoPoint {
     }
 
     #[inline]
+    fn to_unchecked_bytes(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.extend_from_slice(self.0.compress().as_bytes());
+        v
+    }
+
+    #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(Self(
             CR::from_slice(bytes)
                 .decompress()
                 .ok_or(eg!(AlgebraError::DecompressElementError))?,
         ))
+    }
+
+    #[inline]
+    fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(Self(
+            CR::from_slice(bytes)
+                .decompress()
+                .ok_or(eg!(AlgebraError::DecompressElementError))?,
+        ))
+    }
+
+    #[inline]
+    fn unchecked_size() -> usize {
+        RISTRETTO_SCALAR_LEN
     }
 
     #[inline]

@@ -276,6 +276,14 @@ impl Group for JubjubPoint {
     }
 
     #[inline]
+    fn to_unchecked_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.0.serialize_unchecked(&mut buf).unwrap();
+
+        buf
+    }
+
+    #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
@@ -286,6 +294,25 @@ impl Group for JubjubPoint {
         } else {
             Err(eg!(AlgebraError::DecompressElementError))
         }
+    }
+
+    #[inline]
+    fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut reader = ark_std::io::BufReader::new(bytes);
+
+        let affine = AffinePoint::deserialize_unchecked(&mut reader);
+
+        if let Ok(affine) = affine {
+            Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
+        } else {
+            Err(eg!(AlgebraError::DecompressElementError))
+        }
+    }
+
+    #[inline]
+    fn unchecked_size() -> usize {
+        let g = Self::get_base().0;
+        g.uncompressed_size()
     }
 
     #[inline]
