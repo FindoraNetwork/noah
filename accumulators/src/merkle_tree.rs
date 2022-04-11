@@ -467,3 +467,78 @@ fn get_path_keys(uid: u64) -> Vec<(u64, TreePath)> {
     }
     keys
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{get_path_keys, TreePath};
+
+    #[test]
+    fn test_merkle_tree_path() {
+        let first_keys = get_path_keys(0);
+        let mut first_sum = 0u64;
+        for (i, (key, path)) in
+            first_keys[0..first_keys.len() - 1].iter().rev().enumerate()
+        {
+            first_sum += 3u64.pow(i as u32);
+            assert_eq!(*key, first_sum);
+            assert_eq!(*path, TreePath::Left);
+        }
+
+        let mut t1 = get_path_keys(1);
+        t1.pop(); // pop root.
+        assert_eq!(t1[0].1, TreePath::Middle);
+        for (_, path) in &t1[1..] {
+            assert_eq!(*path, TreePath::Left);
+        }
+
+        let mut t2 = get_path_keys(2);
+        t2.pop();
+        assert_eq!(t2[0].1, TreePath::Right);
+        for (_, path) in &t2[1..] {
+            assert_eq!(*path, TreePath::Left);
+        }
+
+        let mut t3 = get_path_keys(3);
+        t3.pop();
+        assert_eq!(t3[0].1, TreePath::Left);
+        assert_eq!(t3[1].1, TreePath::Middle);
+        for (_, path) in &t3[2..] {
+            assert_eq!(*path, TreePath::Left);
+        }
+
+        let tmp = get_path_keys(1_000_000);
+        let tmp_path: Vec<TreePath> = tmp.iter().map(|(_, p)| *p).collect();
+        let tmp_right = vec![
+            TreePath::Middle,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Right,
+            TreePath::Left,
+            TreePath::Right,
+            TreePath::Left,
+            TreePath::Middle,
+            TreePath::Right,
+            TreePath::Right,
+            TreePath::Middle,
+            TreePath::Right,
+            TreePath::Middle,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Right,
+        ];
+        assert_eq!(tmp_path, tmp_right);
+
+        let last_keys = get_path_keys(3u64.pow(20) - 1);
+        let mut last_sum = 0u64;
+        for (i, (key, path)) in last_keys.iter().rev().enumerate() {
+            last_sum += 3u64.pow(i as u32);
+            assert_eq!(*key, last_sum - 1);
+            assert_eq!(*path, TreePath::Right);
+        }
+    }
+}

@@ -667,7 +667,7 @@ mod tests {
     use crate::xfr::asset_record::AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
     use crate::xfr::sig::XfrKeyPair;
     use crate::xfr::structs::AssetType;
-    use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
+    use accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath, TREE_DEPTH};
     use algebra::bls12_381::BLSScalar;
     use algebra::groups::{Scalar, Zero};
     use crypto::basics::hash::rescue::RescueInstance;
@@ -685,8 +685,9 @@ mod tests {
     #[test]
     fn test_abar_to_bar_conversion() {
         let mut prng = ChaChaRng::from_seed([5u8; 32]);
+      
         let timer = Instant::now();
-        let params = UserParams::abar_to_bar_params(20).unwrap();
+        let params = UserParams::abar_to_bar_params(TREE_DEPTH).unwrap();
         println!("param generation: {}", timer.elapsed().as_secs_f32());
 
         let recv = XfrKeyPair::generate(&mut prng);
