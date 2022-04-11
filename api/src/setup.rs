@@ -352,14 +352,6 @@ mod test {
     }
 
     #[test]
-    fn bench_serialization() {
-        let start = std::time::Instant::now();
-        let _pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&SRS.unwrap()).unwrap();
-        let elapsed = start.elapsed();
-        println!("{:.2?}", elapsed);
-    }
-
-    #[test]
     fn test_vk_params_serialization() {
         let params = VerifierParams::create(3, 3, Some(TREE_DEPTH))
             .unwrap()

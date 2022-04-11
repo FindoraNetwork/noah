@@ -125,6 +125,11 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-bar-vk.bin");
     save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
 }
 
 // cargo run --release --features="gen no_vk" --bin gen-params bar-to-abar "./parameters"
@@ -136,6 +141,11 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("bar-to-abar-vk.bin");
     save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
 }
 
 // cargo run --release --features="gen no_vk" --bin gen-params anon-fee "./parameters"
@@ -147,6 +157,11 @@ fn gen_anon_fee_vk(mut path: PathBuf) {
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("anon-fee-vk.bin");
     save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
 }
 
 // cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof "./parameters"
@@ -157,4 +172,9 @@ fn gen_bulletproof_urs(mut path: PathBuf) {
     let bytes = bincode::serialize(&pp).unwrap();
     path.push("bulletproof-urs.bin");
     save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: BulletproofParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
 }
