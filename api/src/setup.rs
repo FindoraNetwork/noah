@@ -330,6 +330,7 @@ impl From<ProverParams> for VerifierParams {
 
 #[cfg(test)]
 mod test {
+    use crate::anon_xfr::circuits::TREE_DEPTH;
     use crate::parameters::SRS;
     use crate::setup::{ProverParams, VerifierParams};
     use zei_algebra::{
@@ -352,7 +353,7 @@ mod test {
 
     #[test]
     fn test_vk_params_serialization() {
-        let params = VerifierParams::create(3, 3, Some(40))
+        let params = VerifierParams::create(3, 3, Some(TREE_DEPTH))
             .unwrap()
             .shrink()
             .unwrap();

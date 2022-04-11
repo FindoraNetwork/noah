@@ -637,6 +637,7 @@ mod tests {
         keys::AXfrKeyPair,
         structs::{
             AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
+            TREE_DEPTH,
         },
     };
     use crate::setup::{ProverParams, VerifierParams};
@@ -661,7 +662,7 @@ mod tests {
     #[test]
     fn test_abar_to_bar_conversion() {
         let mut prng = ChaChaRng::from_seed([5u8; 32]);
-        let params = ProverParams::abar_to_bar_params(40).unwrap();
+        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
 
         let recv = XfrKeyPair::generate(&mut prng);
         let sender = AXfrKeyPair::generate(&mut prng);

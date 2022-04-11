@@ -12,7 +12,9 @@ use zei_crypto::basic::rescue::RescueInstance;
 // store max num is 3^20 = 3486784401 (max uid = 3^20 - 1)
 // sid   max num is 2^64 = 18446744073709551616 (max uid = 2^64 - 1)
 
+/// default merkle tree depth.
 pub const TREE_DEPTH: usize = 20;
+
 // 1743392200 = 3^0 + 3^1 + 3^2 + ... 3^19, if change TREE_DEPTH, MUST update.
 const LEAF_START: u64 = 1743392200;
 
