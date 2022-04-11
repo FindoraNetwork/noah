@@ -25,7 +25,7 @@ use zei_plonk::plonk::{
 };
 
 const ANON_FEE_TRANSCRIPT: &[u8] = b"Anon Fee";
-pub const ANON_FEE_MIN: u64 = 20_000;
+pub const ANON_FEE_MIN: u64 = 10_000;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AnonFeeNote {
