@@ -319,6 +319,7 @@ mod test {
             let mut cs = TurboConstraintSystem::<BLSScalar>::new();
 
             let a_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+
             test_sim_fr_equality(cs, &a_sim_fr_var);
         }
     }

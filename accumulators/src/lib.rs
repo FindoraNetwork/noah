@@ -51,9 +51,9 @@ mod tests {
         let sid_x = mt.add_commitment_hash(BLSScalar::one()).unwrap();
         let proofx = mt.generate_proof_with_depth(sid_x, 10).unwrap();
         assert!(verify(BLSScalar::one(), &proofx));
-        let proof4 = mt.generate_proof_with_depth(sid_x, 32).unwrap();
+        let proof4 = mt.generate_proof_with_depth(sid_x, 14).unwrap();
         assert!(verify(BLSScalar::one(), &proof4));
-        assert!(mt.generate_proof_with_depth(sid_x, 41).is_err());
+        assert!(mt.generate_proof_with_depth(sid_x, 21).is_err());
         assert!(mt.generate_proof_with_depth(sid_x, 2).is_err());
     }
 }

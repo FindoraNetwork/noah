@@ -634,6 +634,7 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 mod tests {
     use crate::anon_xfr::{
         abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body},
+        circuits::TREE_DEPTH,
         keys::AXfrKeyPair,
         structs::{
             AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
@@ -661,7 +662,7 @@ mod tests {
     #[test]
     fn test_abar_to_bar_conversion() {
         let mut prng = ChaChaRng::from_seed([5u8; 32]);
-        let params = ProverParams::abar_to_bar_params(40).unwrap();
+        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
 
         let recv = XfrKeyPair::generate(&mut prng);
         let sender = AXfrKeyPair::generate(&mut prng);

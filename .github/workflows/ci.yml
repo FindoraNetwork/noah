@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop
+      - develop-refactoring
 env:
   RUST_BACKTRACE: 1
 
