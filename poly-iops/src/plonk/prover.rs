@@ -150,6 +150,7 @@ pub fn prover_with_lagrange<
     if let Some(lagrange_pcs) = lagrange_pcs {
         println!("using lagrange bases!");
         for i in 0..n_wires_per_gate {
+            let timer1 = Instant::now();
             let f_eval = FpPolynomial::from_coefs(
                 extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec(),
             );
@@ -160,9 +161,18 @@ pub fn prover_with_lagrange<
             );
             // TODO: add this back
             // hide_polynomial(prng, &mut f, 1, n_constraints);
+            println!(
+                "FFT: {}",
+                timer1.elapsed().as_secs_f32()
+            );
+            let timer1 = Instant::now();
             let (C_f, _) = lagrange_pcs
                 .commit(f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
+            println!(
+                "MSM: {}",
+                timer1.elapsed().as_secs_f32()
+            );
             let O_f = pcs.opening(&f);
             transcript.append_commitment::<PCS::Commitment>(&C_f);
             witness_openings.push(O_f);
@@ -237,7 +247,6 @@ pub fn prover_with_lagrange<
 
     // 7. a) Evaluate the openings of witness/permutation polynomials at beta, and
     // evaluate the opening of Sigma(X) at point g * beta.
-    let timer = Instant::now();
     let witness_polys_eval_beta: Vec<PCS::Field> = witness_openings
         .iter()
         .map(|open| pcs.eval_opening(open, &beta))
@@ -251,7 +260,6 @@ pub fn prover_with_lagrange<
 
     let g_beta = root.mul(&beta);
     let Sigma_eval_g_beta = pcs.eval_opening(&O_Sigma, &g_beta);
-    println!("Compute opening: {}", timer.elapsed().as_secs_f32());
 
     challenges.insert_beta(beta).unwrap();
     //  b). build linearization polynomial r_beta(X), and eval at beta
@@ -259,7 +267,6 @@ pub fn prover_with_lagrange<
         witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();
 
-    let timer = Instant::now();
     let O_L = linearization_polynomial_opening::<PCS, CS>(
         params,
         &O_Sigma,
@@ -268,7 +275,6 @@ pub fn prover_with_lagrange<
         &Sigma_eval_g_beta,
         &challenges,
     );
-    println!("Linearize: {}", timer.elapsed().as_secs_f32());
     for eval_beta in witness_polys_eval_beta.iter().chain(perms_eval_beta.iter()) {
         transcript.append_field_elem(eval_beta);
     }

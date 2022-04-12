@@ -171,7 +171,6 @@ pub fn preprocess_prover_with_lagrange<
         None
     };
 
-    let timer = Instant::now();
     // Compute evaluation domains.
     let root_m = primitive_nth_root_of_unity::<PCS::Field>(m)
         .c(d!(PlonkError::GroupNotFound(m)))?;
@@ -181,19 +180,13 @@ pub fn preprocess_prover_with_lagrange<
     // TODO: we can fix the set k for different circuits.
     let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
     let coset_quot = group_m.iter().map(|x| k[1].mul(x)).collect();
-    println!(
-        "Compute evaluation domains: {}",
-        timer.elapsed().as_secs_f32()
-    );
 
-    let timer = Instant::now();
     // Compute the openings, commitments, and point evaluations of the permutation polynomials.
     let perm = cs.compute_permutation();
     let mut p_values = Vec::with_capacity(n_wires_per_gate * n);
     for i in 0..n_wires_per_gate {
         p_values.extend(perm_values(&group, &perm[i * n..(i + 1) * n], &k));
     }
-    println!("Compute p_values: {}", timer.elapsed().as_secs_f32());
     let mut perms_coset_evals = vec![vec![]; n_wires_per_gate];
     let mut prover_extended_perms = vec![];
     let mut verifier_extended_perms = vec![];
@@ -202,15 +195,25 @@ pub fn preprocess_prover_with_lagrange<
     if let Some(lagrange_pcs) = lagrange_pcs {
         println!("using the basis");
         for i in 0..n_wires_per_gate {
+            let timer1 = Instant::now();
             let perm_eval =
                 FpPolynomial::from_coefs(p_values[i * n..(i + 1) * n].to_vec());
             let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n], n);
             perms_coset_evals[i]
                 .extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            println!(
+                "FFT: {}",
+                timer1.elapsed().as_secs_f32()
+            );
+            let timer1 = Instant::now();
             let (C_perm, _) = lagrange_pcs
                 .commit(perm_eval)
                 .c(d!(PlonkError::SetupError))?;
             let O_perm = pcs.opening(&perm);
+            println!(
+                "MSM: {}",
+                timer1.elapsed().as_secs_f32()
+            );
             prover_extended_perms.push(O_perm);
             verifier_extended_perms.push(C_perm);
         }
@@ -236,11 +239,21 @@ pub fn preprocess_prover_with_lagrange<
     let mut verifier_selectors = vec![];
     if let Some(lagrange_pcs) = lagrange_pcs {
         for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
+            let timer1 = Instant::now();
             let q_eval = FpPolynomial::from_coefs(cs.selector(i)?.to_vec());
             let q = FpPolynomial::ffti(&root, cs.selector(i)?, n);
             selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            println!(
+                "FFT: {}",
+                timer1.elapsed().as_secs_f32()
+            );
+            let timer1 = Instant::now();
             let (C_q, _) = lagrange_pcs.commit(q_eval).c(d!(PlonkError::SetupError))?;
             let O_q = pcs.opening(&q);
+            println!(
+                "MSM: {}",
+                timer1.elapsed().as_secs_f32()
+            );
             prover_selectors.push(O_q);
             verifier_selectors.push(C_q);
         }
@@ -258,7 +271,6 @@ pub fn preprocess_prover_with_lagrange<
         timer.elapsed().as_secs_f32()
     );
 
-    let timer = Instant::now();
     // Compute polynomials L1, Z_H, and point evaluations of L1 and Z_H^{-1}.
     let mut L1 = FpPolynomial::from_coefs(vec![PCS::Field::zero(); group.len()]);
     // X^n - 1 = (X - 1) (X^{n-1} + X^{n-2} + ... + 1)
@@ -268,32 +280,18 @@ pub fn preprocess_prover_with_lagrange<
     let mut Z_H_coefs = vec![PCS::Field::zero(); n + 1];
     Z_H_coefs[0] = PCS::Field::one().neg();
     Z_H_coefs[n] = PCS::Field::one();
-    println!(
-        "Compute coset_fft_with_unity_root: {}",
-        timer.elapsed().as_secs_f32()
-    );
 
-    let timer = Instant::now();
     let Z_H = FpPolynomial::from_coefs(Z_H_coefs);
     let Z_H_inv_coset_evals = Z_H
         .coset_fft_with_unity_root(&root_m, m, &k[1])
         .into_iter()
         .map(|x| x.inv().unwrap())
         .collect();
-    println!(
-        "Compute Z_H_inv_coset_evals: {}",
-        timer.elapsed().as_secs_f32()
-    );
 
-    let timer = Instant::now();
     let mut lagrange_constants = vec![];
     for constraint_index in cs.public_vars_constraint_indices().iter() {
         lagrange_constants.push(compute_lagrange_constant(&group, *constraint_index));
     }
-    println!(
-        "Compute lagrange_constants: {}",
-        timer.elapsed().as_secs_f32()
-    );
 
     let verifier_params = PlonkVerifierParams {
         selectors: verifier_selectors,
@@ -304,43 +302,6 @@ pub fn preprocess_prover_with_lagrange<
         public_vars_constraint_indices: cs.public_vars_constraint_indices().to_vec(),
         lagrange_constants,
     };
-
-    println!(
-        "selectors: {}",
-        bincode::serialize(&prover_selectors).unwrap().len()
-    );
-    println!(
-        "extended_permutations: {}",
-        bincode::serialize(&prover_extended_perms).unwrap().len()
-    );
-    println!(
-        "verifier_params: {}",
-        bincode::serialize(&verifier_params).unwrap().len()
-    );
-    println!("group: {}", bincode::serialize(&group).unwrap().len());
-    println!(
-        "coset_quot: {}",
-        bincode::serialize(&coset_quot).unwrap().len()
-    );
-    println!("root_m: {}", bincode::serialize(&root_m).unwrap().len());
-    println!("L1: {}", bincode::serialize(&L1).unwrap().len());
-    println!("Z_H: {}", bincode::serialize(&Z_H).unwrap().len());
-    println!(
-        "selectors_coset_evals: {}",
-        bincode::serialize(&selectors_coset_evals).unwrap().len()
-    );
-    println!(
-        "perms_coset_evals: {}",
-        bincode::serialize(&perms_coset_evals).unwrap().len()
-    );
-    println!(
-        "L1_coset_evals: {}",
-        bincode::serialize(&L1_coset_evals).unwrap().len()
-    );
-    println!(
-        "Z_H_inv_coset_evals: {}",
-        bincode::serialize(&Z_H_inv_coset_evals).unwrap().len()
-    );
 
     Ok(PlonkProverParams {
         selectors: prover_selectors,
