@@ -325,10 +325,7 @@ impl TurboConstraintSystem<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::constraint_system::{
-        ecc::{Point, PointVar},
-        TurboConstraintSystem,
-    };
+    use crate::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
     use zei_algebra::{
         bls12_381::BLSScalar,
         jubjub::{JubjubPoint, JubjubScalar},
@@ -389,7 +386,7 @@ mod test {
 
         // build circuit
         let scalar_var = cs.new_variable(scalar);
-        let (p_out_var, _) = cs.scalar_mul(base_ext, scalar_var, 256);
+        let p_out_var = cs.scalar_mul(base_ext, scalar_var, 256);
         let mut witness = cs.get_and_clear_witness();
         pnk!(cs.verify_witness(&witness[..], &[]));
 
@@ -407,7 +404,7 @@ mod test {
         let base_ext = JubjubPoint::get_base();
         let base_point = Point::from(&base_ext);
         let scalar_var = cs.new_variable(BLSScalar::zero());
-        let (p_out_var, _) = cs.scalar_mul(base_ext, scalar_var, 64);
+        let p_out_var = cs.scalar_mul(base_ext, scalar_var, 64);
         let mut witness = cs.get_and_clear_witness();
         // check p_out is an identity point
         assert_eq!(witness[p_out_var.0], BLSScalar::zero());

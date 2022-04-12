@@ -127,6 +127,14 @@ pub trait PolyComScheme: Sized {
         proof: &Self::EvalProof,
     ) -> Result<()>;
 
+    /// Apply blind factors over the vanishing part
+    fn apply_blind_factors(
+        &self,
+        commitment: &Self::Commitment,
+        blinds: &[Self::Field],
+        zeroing_degree: usize,
+    ) -> Self::Commitment;
+
     /// Batch proof for polynomial evaluation.
     /// `param` stores the instance parameters to be appended to the transcript.
     /// When `param` is `None`, our function assumes `params` are implicit

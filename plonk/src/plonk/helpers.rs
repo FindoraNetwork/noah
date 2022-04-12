@@ -134,13 +134,16 @@ pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Scalar>(
     polynomial: &mut FpPolynomial<F>,
     num_hide_points: usize,
     zeroing_degree: usize,
-) {
+) -> Vec<F> {
+    let mut blinds = Vec::new();
     for i in 0..num_hide_points + 1 {
         let mut blind = F::random(prng);
+        blinds.push(blind);
         polynomial.add_coef_assign(&blind, i);
         blind = blind.neg();
         polynomial.add_coef_assign(&blind, zeroing_degree + i);
     }
+    blinds
 }
 
 /// Build polynomial Sigma, by interpolating

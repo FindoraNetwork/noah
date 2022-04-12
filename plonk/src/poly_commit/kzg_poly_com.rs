@@ -307,6 +307,22 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         opening.eval(point)
     }
 
+    fn apply_blind_factors(
+        &self,
+        commitment: &Self::Commitment,
+        blinds: &[Self::Field],
+        zeroing_degree: usize,
+    ) -> Self::Commitment {
+        let mut commitment = commitment.value.clone();
+        for (i, blind) in blinds.iter().enumerate() {
+            let mut blind = blind.clone();
+            commitment = commitment + &(self.public_parameter_group_1[i] * &blind);
+            blind = blind.neg();
+            commitment = commitment + &(self.public_parameter_group_1[zeroing_degree + i] * &blind);
+        }
+        KZGCommitment { value: commitment }
+    }
+
     fn commitment_from_opening(&self, opening: &Self::Opening) -> Self::Commitment {
         let poly = self.polynomial_from_opening_ref(opening);
         let (c, _) = self.commit(poly).unwrap();

@@ -139,16 +139,16 @@ pub fn prover_with_lagrange<
             let f_eval = FpPolynomial::from_coefs(
                 extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec(),
             );
-            let f = FpPolynomial::ffti(
+            let mut f = FpPolynomial::ffti(
                 root,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
                 n_constraints,
             );
-            // TODO: implement this!
-            // hide_polynomial(prng, &mut f, 1, n_constraints);
+            let blinds = hide_polynomial(prng, &mut f, 1, n_constraints);
             let (c_f, _) = lagrange_pcs
                 .commit(f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
+            let c_f = pcs.apply_blind_factors(&c_f, &blinds, n_constraints);
             let o_f = pcs.opening(&f);
             transcript.append_commitment::<PCS::Commitment>(&c_f);
             witness_openings.push(o_f);
@@ -161,7 +161,7 @@ pub fn prover_with_lagrange<
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
                 n_constraints,
             );
-            hide_polynomial(prng, &mut f, 1, n_constraints);
+            let _ = hide_polynomial(prng, &mut f, 1, n_constraints);
             let (c_f, o_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
             transcript.append_commitment::<PCS::Commitment>(&c_f);
             witness_openings.push(o_f);
@@ -178,16 +178,16 @@ pub fn prover_with_lagrange<
     let (c_sigma, o_sigma) = if let Some(lagrange_pcs) = lagrange_pcs {
         let sigma_evals =
             sigma_polynomial_evals::<PCS, CS>(cs, params, &extended_witness, &challenges);
-        // TODO: implement this
-        // hide_polynomial(prng, &mut sigma, 2, n_constraints);
-        let sigma = FpPolynomial::ffti(
+        let mut sigma = FpPolynomial::ffti(
             &params.verifier_params.root,
             &sigma_evals.coefs,
             n_constraints,
         );
+        let blinds = hide_polynomial(prng, &mut sigma, 2, n_constraints);
         let (c_sigma, _) = lagrange_pcs
             .commit(sigma_evals)
             .c(d!(PlonkError::CommitmentError))?;
+        let c_sigma = pcs.apply_blind_factors(&c_sigma, &blinds, n_constraints);
         let o_sigma = pcs.opening(&sigma);
         transcript.append_commitment::<PCS::Commitment>(&c_sigma);
         (c_sigma, o_sigma)
@@ -199,7 +199,7 @@ pub fn prover_with_lagrange<
             &sigma_evals.coefs,
             n_constraints,
         );
-        hide_polynomial(prng, &mut sigma, 2, n_constraints);
+        let _ = hide_polynomial(prng, &mut sigma, 2, n_constraints);
         let (c_sigma, o_sigma) = pcs.commit(sigma).c(d!(PlonkError::CommitmentError))?;
         transcript.append_commitment::<PCS::Commitment>(&c_sigma);
 
