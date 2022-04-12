@@ -180,7 +180,6 @@ pub fn preprocess_prover_with_lagrange<
     if n * factor != m {
         return Err(eg!(PlonkError::SetupError));
     }
-    println!("n = {}", n);
 
     let lagrange_pcs = if lagrange_pcs.is_some() {
         if lagrange_pcs.unwrap().max_degree() + 1 == n {

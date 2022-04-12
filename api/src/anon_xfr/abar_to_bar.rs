@@ -1,10 +1,9 @@
-#[allow(unused)]
 use crate::anon_xfr::{
     circuits::{
         add_merkle_path_variables, commit, compute_merkle_root, nullify, AccElemVars,
         NullifierInputVars, PayerSecret, PayerSecretVars, TurboPlonkCS,
     },
-    keys::{AXfrKeyPair, AXfrPubKey},
+    keys::AXfrKeyPair,
     nullifier,
     structs::{Nullifier, OpenAnonBlindAssetRecord},
 };
@@ -183,7 +182,6 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
 
     let (hash, non_malleability_tag) =
         compute_non_malleability_tag(b"AbarToBar", &msg, &[&abar_keypair]);
-    println!("{:?}", hash);
 
     let spending_proof = prove_abar_to_bar_spending(
         prng,
@@ -337,7 +335,6 @@ pub fn verify_abar_to_bar_note(
     hasher.update(b"AbarToBar");
     hasher.update(msg);
     let hash = BLSScalar::from_hash(hasher);
-    println!("{:?}", hash);
     online_inputs.push(hash);
     online_inputs.push(note.non_malleability_tag);
 
@@ -419,13 +416,10 @@ pub fn build_abar_to_bar_cs(
     let hash_var = cs.new_variable(*hash);
     let non_malleability_tag_var = cs.new_variable(*non_malleability_tag);
 
-    println!("before pk_var: {}", cs.size);
     // prove knowledge of payer's secret key: pk = base^{sk}
     let pk_var = cs.scalar_mul(base, payers_secrets.sec_key, SK_LEN);
     let pk_x = pk_var.get_x();
-    println!("after pk_var: {}", cs.size);
 
-    println!("before com_abar_in_var: {}", cs.size);
     // commitments
     let com_abar_in_var = commit(
         &mut cs,
@@ -434,7 +428,6 @@ pub fn build_abar_to_bar_cs(
         payers_secrets.asset_type,
         pk_x,
     );
-    println!("after com_abar_in_var: {}", cs.size);
 
     // prove pre-image of the nullifier
     // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
@@ -456,9 +449,7 @@ pub fn build_abar_to_bar_cs(
         pub_key_x: pk_x,
     };
 
-    println!("before nullifier_var: {}", cs.size);
     let nullifier_var = nullify(&mut cs, payers_secrets.sec_key, nullifier_input_vars);
-    println!("after nullifier_var: {}", cs.size);
 
     // Merkle path authentication
     let acc_elem = AccElemVars {
@@ -466,9 +457,7 @@ pub fn build_abar_to_bar_cs(
         commitment: com_abar_in_var,
     };
 
-    println!("before tmp_root_var: {}", cs.size);
     let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_secrets.path);
-    println!("after tmp_root_var: {}", cs.size);
 
     if let Some(root) = root_var {
         cs.equal(root, tmp_root_var);
@@ -476,7 +465,6 @@ pub fn build_abar_to_bar_cs(
         root_var = Some(tmp_root_var);
     }
 
-    println!("before allocation: {}", cs.size);
     // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2
     let x_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.x.to_bytes()));
     let y_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.y.to_bytes()));
@@ -504,7 +492,6 @@ pub fn build_abar_to_bar_cs(
     let lambda_sim_fr_var = SimFrVar::alloc_input(&mut cs, &lambda_sim_fr);
     let beta_lambda_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_lambda_sim_fr);
     let s1_plus_lambda_s2_sim_fr_var = SimFrVar::alloc_input(&mut cs, &s1_plus_lambda_s2_sim_fr);
-    println!("after allocation: {}", cs.size);
 
     // 3. Merge the limbs for x, y, a, b
     let mut all_limbs = Vec::with_capacity(4 * NUM_OF_LIMBS);
@@ -575,7 +562,6 @@ pub fn build_abar_to_bar_cs(
         cs.equal(h2_var, comm_var);
     }
 
-    println!("before the check: {}", cs.size);
     // 5. Perform the check in field simulation
     {
         let beta_x_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &x_sim_fr_var);
@@ -591,7 +577,6 @@ pub fn build_abar_to_bar_cs(
         let eqn = rhs.sub(&mut cs, &s1_plus_lambda_s2_minus_a_sim_fr_var);
         eqn.enforce_zero(&mut cs);
     }
-    println!("after the check: {}", cs.size);
 
     // 6. Check x = amount_var and y = at_var
     {
@@ -650,8 +635,6 @@ pub fn build_abar_to_bar_cs(
     }
 
     // 7. Check that validity of the the non malleability tag.
-
-    println!("before the non_malleability check: {}", cs.size);
     {
         let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
             one_var,
@@ -662,7 +645,6 @@ pub fn build_abar_to_bar_cs(
 
         cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
     }
-    println!("after the non_malleability check: {}", cs.size);
 
     // prepare public inputs variables
     cs.prepare_io_variable(nullifier_var);

@@ -576,7 +576,6 @@ mod tests {
             // verifier scope
             let verifier_params = VerifierParams::from(user_params);
             let t = verify_anon_xfr_note(&verifier_params, &note, &mt.get_root().unwrap());
-            println!("{:?}", t);
             assert!(t.is_ok());
 
             let vk1 = verifier_params.shrink().unwrap();

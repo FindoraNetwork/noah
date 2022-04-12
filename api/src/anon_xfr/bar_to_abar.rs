@@ -153,8 +153,6 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     )
     .c(d!())?;
 
-    println!("beta = {:?}, lambda = {:?}", beta, lambda);
-
     // 4. prove abar correctness
     let pc_rescue_commitments_eq_proof = prove_eq_committed_vals(
         prng,
@@ -230,8 +228,6 @@ pub(crate) fn verify_bar_to_abar(
         &proof.commitment_eq_proof,
     )
     .c(d!())?;
-
-    println!("beta = {:?}, lambda = {:?}", beta, lambda);
 
     // 3. verify PLONK proof
     verify_eq_committed_vals(

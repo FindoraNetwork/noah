@@ -272,7 +272,6 @@ pub(crate) fn build_multi_xfr_cs(
         .collect();
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
 
-    println!("before pad: {}", cs.size);
     // pad the number of constraints to power of two
     cs.pad();
 
@@ -659,7 +658,6 @@ pub(crate) fn compute_merkle_root(
     let zero_var = cs.zero_var();
 
     let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, zero_var, zero_var]))[0];
-    println!("tree height: {}", path_vars.nodes.len());
     for path_node in path_vars.nodes.iter() {
         let input_var = sort(
             cs,
