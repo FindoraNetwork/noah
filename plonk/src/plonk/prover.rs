@@ -111,6 +111,7 @@ pub fn prover<
         let mut f = FpPolynomial::ffti(
             root,
             &extended_witness[i * n_constraints..(i + 1) * n_constraints],
+            n_constraints,
         );
         hide_polynomial(prng, &mut f, 1, n_constraints);
         let (c_f, o_f) = pcs.commit(f).c(d!(PlonkError::CommitmentError))?;
@@ -125,6 +126,7 @@ pub fn prover<
     challenges.insert_gamma_delta(gamma, delta).unwrap(); // safe unwrap
 
     // 3. build sigma, hide it and commit
+
     let mut sigma = sigma_polynomial::<PCS, CS>(cs, params, &extended_witness, &challenges);
     hide_polynomial(prng, &mut sigma, 2, n_constraints);
     let (c_sigma, o_sigma) = pcs.commit(sigma).c(d!(PlonkError::CommitmentError))?;
@@ -167,7 +169,6 @@ pub fn prover<
 
     let g_beta = root.mul(&beta);
     let sigma_eval_g_beta = pcs.eval_opening(&o_sigma, &g_beta);
-
     challenges.insert_beta(beta).unwrap();
 
     //  b). build linearization polynomial r_beta(X), and eval at beta

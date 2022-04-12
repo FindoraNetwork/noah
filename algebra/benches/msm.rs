@@ -1,9 +1,9 @@
-use algebra::{
+use ark_std::{rand::SeedableRng, time::Instant};
+use rand_chacha::ChaChaRng;
+use zei_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     traits::{Group, Scalar},
 };
-use ark_std::{rand::SeedableRng, time::Instant};
-use rand_chacha::ChaChaRng;
 
 fn main() {
     let mut prng = ChaChaRng::from_entropy();
@@ -26,8 +26,8 @@ fn main() {
     let scalars_ptr = scalars.iter().collect::<Vec<&BLSScalar>>();
 
     let start = Instant::now();
-    let _ = BLSG1::multi_exp(&scalars_ptr, &points_ptr);
-
-    println!("total time: {} s", start.elapsed().as_secs_f32());
-    println!("average time: {} us", start.elapsed().as_micros() / count);
+    for _ in 0..10 {
+        let _ = BLSG1::multi_exp(&scalars_ptr, &points_ptr);
+    }
+    println!("average time: {} s", start.elapsed().as_secs_f32() / 10f32);
 }
