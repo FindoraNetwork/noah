@@ -1,7 +1,4 @@
-use crate::anon_xfr::{
-    keys::AXfrPubKey,
-    structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier},
-};
+use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
 use num_bigint::BigUint;
 use zei_algebra::{
     bls12_381::BLSScalar,
@@ -32,7 +29,6 @@ pub const TREE_DEPTH: usize = 20;
 #[derive(Debug, Clone)]
 pub struct PayerSecret {
     pub sec_key: JubjubScalar,
-    pub diversifier: JubjubScalar, // key randomizer for the signature verification key
     pub amount: u64,
     pub asset_type: BLSScalar,
     pub uid: u64,
@@ -45,6 +41,7 @@ pub struct PayeeSecret {
     pub amount: u64,
     pub blind: BlindFactor,
     pub asset_type: BLSScalar,
+    pub pubkey_x: BLSScalar,
 }
 
 /// Secret witness of an anonymous transaction.
@@ -67,7 +64,6 @@ impl AMultiXfrWitness {
         };
         let payer_secret = PayerSecret {
             sec_key: jubjub_zero,
-            diversifier: jubjub_zero,
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -78,6 +74,7 @@ impl AMultiXfrWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
+            pubkey_x: bls_zero,
         };
 
         AMultiXfrWitness {
@@ -90,7 +87,7 @@ impl AMultiXfrWitness {
 /// Public inputs of an anonymous transaction.
 #[derive(Debug)]
 pub(crate) struct AMultiXfrPubInputs {
-    pub payers_inputs: Vec<(Nullifier, AXfrPubKey)>,
+    pub payers_inputs: Vec<Nullifier>,
     pub payees_commitments: Vec<Commitment>,
     pub merkle_root: BLSScalar,
 }
@@ -99,10 +96,8 @@ impl AMultiXfrPubInputs {
     pub fn to_vec(&self) -> Vec<BLSScalar> {
         let mut result = vec![];
         // nullifiers and signature verification keys
-        for (nullifier, pk_sign) in &self.payers_inputs {
+        for nullifier in &self.payers_inputs {
             result.push(*nullifier);
-            result.push(pk_sign.as_jubjub_point().get_x());
-            result.push(pk_sign.as_jubjub_point().get_y());
         }
         // merkle_root
         result.push(self.merkle_root);
@@ -119,24 +114,22 @@ impl AMultiXfrPubInputs {
         // nullifiers and signature public keys
         let hash = RescueInstance::new();
         let base = JubjubPoint::get_base();
-        let payers_inputs: Vec<(Nullifier, AXfrPubKey)> = witness
+        let payers_inputs: Vec<Nullifier> = witness
             .payers_secrets
             .iter()
             .map(|sec| {
                 let pk_point = base.mul(&sec.sec_key);
-                let pk_sign = AXfrPubKey::from_jubjub_point(pk_point.mul(&sec.diversifier));
 
                 let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
                 let uid_amount = pow_2_64
                     .mul(&BLSScalar::from(sec.uid))
                     .add(&BLSScalar::from(sec.amount));
-                let nullifier = hash.rescue(&[
+                hash.rescue(&[
                     uid_amount,
                     sec.asset_type,
                     pk_point.get_x(),
                     BLSScalar::from(&sec.sec_key),
-                ])[0];
-                (nullifier, pk_sign)
+                ])[0]
             })
             .collect();
 
@@ -207,14 +200,11 @@ pub(crate) fn build_multi_xfr_cs(
     let mut root_var: Option<VarIndex> = None;
     for payer in &payers_secrets {
         // prove knowledge of payer's secret key: pk = base^{sk}
-        let (pk_var, pk_point) = cs.scalar_mul(base, payer.sec_key, SK_LEN);
+        let pk_var = cs.scalar_mul(base, payer.sec_key, SK_LEN);
         let pk_x = pk_var.get_x();
 
-        // prove knowledge of diversifier: pk_sign = pk^{diversifier}
-        let (pk_sign_var, _) = cs.var_base_scalar_mul(pk_var, pk_point, payer.diversifier, SK_LEN);
-
         // commitments
-        let com_abar_in_var = commit(&mut cs, payer.blind, payer.amount, payer.asset_type);
+        let com_abar_in_var = commit(&mut cs, payer.blind, payer.amount, payer.asset_type, pk_x);
 
         // prove pre-image of the nullifier
         // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
@@ -236,7 +226,6 @@ pub(crate) fn build_multi_xfr_cs(
         let acc_elem = AccElemVars {
             uid: payer.uid,
             commitment: com_abar_in_var,
-            pub_key_x: pk_x,
         };
         let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payer.path);
 
@@ -248,14 +237,19 @@ pub(crate) fn build_multi_xfr_cs(
 
         // prepare public inputs variables
         cs.prepare_io_variable(nullifier_var);
-        cs.prepare_io_point_variable(pk_sign_var);
     }
     // prepare the publc input for merkle_root
     cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
 
     for payee in &payees_secrets {
         // commitment
-        let com_abar_out_var = commit(&mut cs, payee.blind, payee.amount, payee.asset_type);
+        let com_abar_out_var = commit(
+            &mut cs,
+            payee.blind,
+            payee.amount,
+            payee.asset_type,
+            payee.pubkey_x,
+        );
 
         // Range check `amount`
         // Note we don't need to range-check payers' `amount`, because those amounts are bound
@@ -278,6 +272,7 @@ pub(crate) fn build_multi_xfr_cs(
         .collect();
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
 
+    println!("before pad: {}", cs.size);
     // pad the number of constraints to power of two
     cs.pad();
 
@@ -291,9 +286,11 @@ pub(crate) fn build_eq_committed_vals_cs(
     amount: BLSScalar,
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
+    pubkey_x: BLSScalar,
     proof: &ZKPartProof,
     non_zk_state: &NonZKState,
     beta: &RistrettoScalar,
+    lambda: &RistrettoScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboConstraintSystem::new();
     let zero_var = cs.zero_var();
@@ -310,6 +307,7 @@ pub(crate) fn build_eq_committed_vals_cs(
     let amount_var = cs.new_variable(amount);
     let at_var = cs.new_variable(asset_type);
     let blind_hash_var = cs.new_variable(blind_hash);
+    let pubkey_x_var = cs.new_variable(pubkey_x);
 
     // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2
     let x_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.x.to_bytes()));
@@ -318,9 +316,16 @@ pub(crate) fn build_eq_committed_vals_cs(
     let b_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.b.to_bytes()));
     let comm = proof.non_zk_part_state_commitment;
     let r = non_zk_state.r;
+
     let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-    let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_1.to_bytes()));
-    let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_2.to_bytes()));
+    let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+
+    let beta_lambda = *beta * lambda;
+    let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
+
+    let s1_plus_lambda_s2 = proof.s_1 + proof.s_2 * lambda;
+    let s1_plus_lambda_s2_sim_fr =
+        SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
     let x_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
     let y_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
@@ -328,9 +333,10 @@ pub(crate) fn build_eq_committed_vals_cs(
     let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
     let comm_var = cs.new_variable(comm);
     let r_var = cs.new_variable(r);
-    let beta_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &beta_sim_fr, 128);
-    let s1_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s1_sim_fr);
-    let s2_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s2_sim_fr);
+    let beta_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_sim_fr);
+    let lambda_sim_fr_var = SimFrVar::alloc_input(&mut cs, &lambda_sim_fr);
+    let beta_lambda_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_lambda_sim_fr);
+    let s1_plus_lambda_s2_sim_fr_var = SimFrVar::alloc_input(&mut cs, &s1_plus_lambda_s2_sim_fr);
 
     // 3. Merge the limbs for x, y, a, b
     let mut all_limbs = Vec::with_capacity(4 * NUM_OF_LIMBS);
@@ -404,16 +410,17 @@ pub(crate) fn build_eq_committed_vals_cs(
     // 5. Perform the check in field simulation
     {
         let beta_x_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &x_sim_fr_var);
-        let beta_y_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &y_sim_fr_var);
+        let beta_lambda_y_sim_fr_mul_var = beta_lambda_sim_fr_var.mul(&mut cs, &y_sim_fr_var);
+        let lambda_b_sim_fr_mul_var = lambda_sim_fr_var.mul(&mut cs, &b_sim_fr_var);
 
-        let s_1_minus_a_sim_fr_var = s1_sim_fr_var.sub(&mut cs, &a_sim_fr_var);
-        let s_2_minus_b_sim_fr_var = s2_sim_fr_var.sub(&mut cs, &b_sim_fr_var);
+        let mut rhs = beta_x_sim_fr_mul_var.add(&mut cs, &beta_lambda_y_sim_fr_mul_var);
+        rhs = rhs.add(&mut cs, &lambda_b_sim_fr_mul_var);
 
-        let first_eqn = beta_x_sim_fr_mul_var.sub(&mut cs, &s_1_minus_a_sim_fr_var);
-        let second_eqn = beta_y_sim_fr_mul_var.sub(&mut cs, &s_2_minus_b_sim_fr_var);
+        let s1_plus_lambda_s2_minus_a_sim_fr_var =
+            s1_plus_lambda_s2_sim_fr_var.sub(&mut cs, &a_sim_fr_var);
 
-        first_eqn.enforce_zero(&mut cs);
-        second_eqn.enforce_zero(&mut cs);
+        let eqn = rhs.sub(&mut cs, &s1_plus_lambda_s2_minus_a_sim_fr_var);
+        eqn.enforce_zero(&mut cs);
     }
 
     // 6. Check x = amount_var and y = at_var
@@ -477,7 +484,7 @@ pub(crate) fn build_eq_committed_vals_cs(
         blind_hash_var,
         amount_var,
         at_var,
-        zero_var,
+        pubkey_x_var,
     ]))[0];
 
     // prepare public inputs
@@ -488,10 +495,13 @@ pub(crate) fn build_eq_committed_vals_cs(
         cs.prepare_io_variable(beta_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(s1_sim_fr_var.var[i]);
+        cs.prepare_io_variable(lambda_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(s2_sim_fr_var.var[i]);
+        cs.prepare_io_variable(beta_lambda_sim_fr_var.var[i]);
+    }
+    for i in 0..NUM_OF_LIMBS {
+        cs.prepare_io_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
     }
 
     // pad the number of constraints to power of two
@@ -509,9 +519,7 @@ pub(crate) fn add_payers_secrets(
         .iter()
         .map(|secret| {
             let bls_sk = BLSScalar::from(&secret.sec_key);
-            let bls_diversifier = BLSScalar::from(&secret.diversifier);
             let sec_key = cs.new_variable(bls_sk);
-            let diversifier = cs.new_variable(bls_diversifier);
             let uid = cs.new_variable(BLSScalar::from(secret.uid));
             let amount = cs.new_variable(BLSScalar::from(secret.amount));
             let blind = cs.new_variable(secret.blind);
@@ -519,7 +527,6 @@ pub(crate) fn add_payers_secrets(
             let asset_type = cs.new_variable(secret.asset_type);
             PayerSecretVars {
                 sec_key,
-                diversifier,
                 uid,
                 amount,
                 asset_type,
@@ -540,10 +547,12 @@ pub(crate) fn add_payees_secrets(
             let amount = cs.new_variable(BLSScalar::from(secret.amount));
             let blind = cs.new_variable(secret.blind);
             let asset_type = cs.new_variable(secret.asset_type);
+            let pubkey_x = cs.new_variable(secret.pubkey_x);
             PayeeSecretVars {
                 amount,
                 blind,
                 asset_type,
+                pubkey_x,
             }
         })
         .collect()
@@ -551,7 +560,6 @@ pub(crate) fn add_payees_secrets(
 
 pub struct PayerSecretVars {
     pub sec_key: VarIndex,
-    pub diversifier: VarIndex,
     pub uid: VarIndex,
     pub amount: VarIndex,
     pub asset_type: VarIndex,
@@ -563,6 +571,7 @@ pub(crate) struct PayeeSecretVars {
     pub amount: VarIndex,
     pub blind: VarIndex,
     pub asset_type: VarIndex,
+    pub pubkey_x: VarIndex,
 }
 
 // cs variables for a Merkle node
@@ -582,7 +591,6 @@ pub struct MerklePathVars {
 pub(crate) struct AccElemVars {
     pub uid: VarIndex,
     pub commitment: VarIndex,
-    pub pub_key_x: VarIndex,
 }
 
 // cs variables for the nullifier PRF inputs
@@ -647,10 +655,11 @@ pub(crate) fn compute_merkle_root(
     elem: AccElemVars,
     path_vars: &MerklePathVars,
 ) -> VarIndex {
-    let (uid, commitment, pub_key_x) = (elem.uid, elem.commitment, elem.pub_key_x);
+    let (uid, commitment) = (elem.uid, elem.commitment);
     let zero_var = cs.zero_var();
 
-    let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, pub_key_x, zero_var]))[0];
+    let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, zero_var, zero_var]))[0];
+    println!("tree height: {}", path_vars.nodes.len());
     for path_node in path_vars.nodes.iter() {
         let input_var = sort(
             cs,
@@ -672,8 +681,9 @@ pub fn commit(
     blinding_var: VarIndex,
     amount_var: VarIndex,
     asset_var: VarIndex,
+    pubkey_x_var: VarIndex,
 ) -> VarIndex {
-    let input_var = StateVar::new([blinding_var, amount_var, asset_var, cs.zero_var()]);
+    let input_var = StateVar::new([blinding_var, amount_var, asset_var, pubkey_x_var]);
     cs.rescue_hash(&input_var)[0]
 }
 
@@ -850,7 +860,7 @@ pub(crate) mod tests {
 
     pub(crate) fn new_multi_xfr_witness_for_test(
         inputs: Vec<(u64, BLSScalar)>,
-        outputs: Vec<(u64, BLSScalar)>,
+        outputs: Vec<(u64, BLSScalar, BLSScalar)>,
         seed: [u8; 32],
     ) -> AMultiXfrWitness {
         let n_payers = inputs.len();
@@ -874,7 +884,6 @@ pub(crate) mod tests {
                 };
                 PayerSecret {
                     sec_key: JubjubScalar::random(&mut prng),
-                    diversifier: JubjubScalar::random(&mut prng),
                     uid: i as u64,
                     amount,
                     asset_type,
@@ -921,10 +930,11 @@ pub(crate) mod tests {
 
         let payees_secrets: Vec<PayeeSecret> = outputs
             .iter()
-            .map(|&(amount, asset_type)| PayeeSecret {
+            .map(|&(amount, asset_type, pubkey_x)| PayeeSecret {
                 amount,
                 blind: BLSScalar::random(&mut prng),
                 asset_type,
+                pubkey_x,
             })
             .collect();
 
@@ -1524,15 +1534,12 @@ pub(crate) mod tests {
         let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
         let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-        let z = z_instance.rescue(&[
-            z_randomizer,
-            x_in_bls12_381,
-            y_in_bls12_381,
-            BLSScalar::zero(),
-        ])[0];
+        let pubkey_x = BLSScalar::random(&mut rng);
+
+        let z = z_instance.rescue(&[z_randomizer, x_in_bls12_381, y_in_bls12_381, pubkey_x])[0];
 
         // 2. compute the ZK part of the proof
-        let (proof, non_zk_state, beta) = prove_pc_eq_rescue_external(
+        let (proof, non_zk_state, beta, lambda) = prove_pc_eq_rescue_external(
             &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
         )
         .unwrap();
@@ -1542,9 +1549,11 @@ pub(crate) mod tests {
             amount,
             asset_type,
             z_randomizer,
+            pubkey_x,
             &proof,
             &non_zk_state,
             &beta,
+            &lambda,
         );
         let witness = cs.get_and_clear_witness();
 
@@ -1572,12 +1581,14 @@ pub(crate) mod tests {
         let hash = RescueInstance::new();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let blind = BLSScalar::random(&mut prng);
-        let commitment = hash.rescue(&[blind, amount, asset_type, BLSScalar::zero()])[0];
+        let pubkey_x = BLSScalar::random(&mut prng);
+        let commitment = hash.rescue(&[blind, amount, asset_type, pubkey_x])[0];
 
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);
         let blind_var = cs.new_variable(blind);
-        let comm_var = commit(&mut cs, blind_var, amount_var, asset_var);
+        let pubkey_x_var = cs.new_variable(pubkey_x);
+        let comm_var = commit(&mut cs, blind_var, amount_var, asset_var, pubkey_x_var);
         let mut witness = cs.get_and_clear_witness();
 
         // Check commitment consistency
@@ -1673,11 +1684,9 @@ pub(crate) mod tests {
         let mut cs = TurboConstraintSystem::new();
         let uid_var = cs.new_variable(one);
         let comm_var = cs.new_variable(two);
-        let pk_var = cs.new_point_variable(Point::new(zero, one));
         let elem = AccElemVars {
             uid: uid_var,
             commitment: comm_var,
-            pub_key_x: pk_var.get_x(),
         };
 
         let path_node1 = MTNode {
@@ -1772,6 +1781,9 @@ pub(crate) mod tests {
         // base fee 5, every input 1, every output 2
         let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
 
+        // Receiver pub key x coordinate
+        let pubkey_x = BLSScalar::from(4567u32);
+
         // single-asset api: good witness
         let zero = BLSScalar::zero();
         let inputs = vec![
@@ -1779,7 +1791,11 @@ pub(crate) mod tests {
             (30, zero),
             (5 + 3 + 2 * 3, fee_type),
         ];
-        let mut outputs = vec![(19, zero), (17, zero), (24, zero)];
+        let mut outputs = vec![
+            (19, zero, pubkey_x),
+            (17, zero, pubkey_x),
+            (24, zero, pubkey_x),
+        ];
         test_xfr_cs(
             inputs.to_vec(),
             outputs.to_vec(),
@@ -1800,13 +1816,13 @@ pub(crate) mod tests {
             (5 + 3 + 2 * 7 + 100, fee_type),
         ];
         let mut outputs = vec![
-            (19, one),
-            (15, zero),
-            (1, one),
-            (35, zero),
-            (20, zero),
-            (40, one),
-            (100, fee_type),
+            (19, one, pubkey_x),
+            (15, zero, pubkey_x),
+            (1, one, pubkey_x),
+            (35, zero, pubkey_x),
+            (20, zero, pubkey_x),
+            (40, one, pubkey_x),
+            (100, fee_type, pubkey_x),
         ];
         test_xfr_cs(
             inputs.to_vec(),
@@ -1823,7 +1839,7 @@ pub(crate) mod tests {
 
     fn test_xfr_cs(
         inputs: Vec<(u64, BLSScalar)>,
-        outputs: Vec<(u64, BLSScalar)>,
+        outputs: Vec<(u64, BLSScalar, BLSScalar)>,
         witness_is_valid: bool,
         fee_type: BLSScalar,
         fee_calculating_func: &dyn Fn(u32, u32) -> u32,

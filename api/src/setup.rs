@@ -147,7 +147,17 @@ impl ProverParams {
         let proof = ZKPartProof::default();
         let non_zk_state = NonZKState::default();
         let beta = RistrettoScalar::zero();
-        let (cs, _) = build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
+        let lambda = RistrettoScalar::zero();
+        let (cs, _) = build_eq_committed_vals_cs(
+            zero,
+            zero,
+            zero,
+            zero,
+            &proof,
+            &non_zk_state,
+            &beta,
+            &lambda,
+        );
 
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
@@ -173,6 +183,9 @@ impl ProverParams {
         let proof = ZKPartProof::default();
         let non_zk_state = NonZKState::default();
         let beta = RistrettoScalar::zero();
+        let lambda = RistrettoScalar::zero();
+        let hash = bls_zero;
+        let non_malleability_tag = bls_zero;
 
         let node = MTNode {
             siblings1: bls_zero,
@@ -182,7 +195,6 @@ impl ProverParams {
         };
         let payer_secret = PayerSecret {
             sec_key: jubjub_zero,
-            diversifier: jubjub_zero,
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -190,7 +202,15 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let (cs, _) = build_abar_to_bar_cs(payer_secret, &proof, &non_zk_state, &beta);
+        let (cs, _) = build_abar_to_bar_cs(
+            payer_secret,
+            &proof,
+            &non_zk_state,
+            &beta,
+            &lambda,
+            &hash,
+            &non_malleability_tag,
+        );
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
@@ -221,7 +241,6 @@ impl ProverParams {
         };
         let payer_secret = PayerSecret {
             sec_key: jubjub_zero,
-            diversifier: jubjub_zero,
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -232,6 +251,7 @@ impl ProverParams {
             amount: 0,
             blind: Default::default(),
             asset_type: Default::default(),
+            pubkey_x: Default::default(),
         };
         let (cs, _) = build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
 

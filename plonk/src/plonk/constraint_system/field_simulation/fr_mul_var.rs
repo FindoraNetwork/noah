@@ -33,6 +33,43 @@ impl SimFrMulVar {
         }
     }
 
+    /// the Add operation.
+    pub fn add(
+        &self,
+        cs: &mut TurboConstraintSystem<BLSScalar>,
+        other: &SimFrMulVar,
+    ) -> SimFrMulVar {
+        let mut res = self.clone();
+        res.val = &self.val + &other.val;
+
+        let zero_var = cs.zero_var();
+        let zero = BLSScalar::zero();
+        let one = BLSScalar::one();
+
+        for i in 0..NUM_OF_LIMBS_MUL {
+            res.var[i] = cs.new_variable(res.val.limbs[i]);
+
+            // The following gate represents
+            // res.var[i] := self.var[i] + other.var[i]
+
+            cs.push_add_selectors(one, zero, one, zero);
+            cs.push_mul_selectors(zero, zero);
+            cs.push_constant_selector(zero);
+            cs.push_ecc_selector(zero);
+            cs.push_rescue_selectors(zero, zero, zero, zero);
+            cs.push_out_selector(one);
+
+            cs.wiring[0].push(self.var[i]);
+            cs.wiring[1].push(zero_var);
+            cs.wiring[2].push(other.var[i]);
+            cs.wiring[3].push(zero_var);
+            cs.wiring[4].push(res.var[i]);
+            cs.size += 1;
+        }
+
+        res
+    }
+
     /// the Sub operation.
     pub fn sub(&self, cs: &mut TurboConstraintSystem<BLSScalar>, other: &SimFrVar) -> SimFrMulVar {
         let mut res = self.clone();

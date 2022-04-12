@@ -126,6 +126,16 @@ impl SimFrVar {
         res
     }
 
+    /// Alloc an input variable.
+    pub fn alloc_input(cs: &mut TurboConstraintSystem<BLSScalar>, val: &SimFr) -> Self {
+        let mut res = Self::new(cs);
+        res.val = val.clone();
+        for i in 0..NUM_OF_LIMBS {
+            res.var[i] = cs.new_variable(val.limbs[i]);
+        }
+        res
+    }
+
     /// Alloc a witness variable and range check gate.
     pub fn alloc_witness(cs: &mut TurboConstraintSystem<BLSScalar>, val: &SimFr) -> Self {
         assert!(val.num_of_additions_over_normal_form == SimReducibility::StrictlyNotReducible);

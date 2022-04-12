@@ -2,7 +2,6 @@
 mod tests {
     use crate::anon_xfr::{
         circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
-        keys::AXfrKeyPair,
         structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
     };
     use parking_lot::RwLock;
@@ -18,7 +17,7 @@ mod tests {
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
     use zei_crypto::basic::rescue::RescueInstance;
-    use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
+    use zei_plonk::plonk::constraint_system::TurboConstraintSystem;
 
     #[test]
     fn test_persistent_merkle_tree() {
@@ -76,10 +75,8 @@ mod tests {
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
         let abar = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
@@ -89,15 +86,10 @@ mod tests {
 
         let mut cs = TurboConstraintSystem::new();
         let uid_var = cs.new_variable(BLSScalar::from(0u32));
-        let comm_var = cs.new_variable(abar.amount_type_commitment);
-        let pk_var = cs.new_point_variable(Point::new(
-            abar.public_key.0.point_ref().get_x(),
-            abar.public_key.0.point_ref().get_y(),
-        ));
+        let comm_var = cs.new_variable(abar.commitment);
         let elem = AccElemVars {
             uid: uid_var,
             commitment: comm_var,
-            pub_key_x: pk_var.get_x(),
         };
 
         let path_vars = add_merkle_path_variables(
@@ -170,40 +162,32 @@ mod tests {
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let mut key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
         let mut abar = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
         mt.commit()?;
 
-        key_pair = AXfrKeyPair::generate(&mut prng);
         abar = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
         mt.commit()?;
 
-        key_pair = AXfrKeyPair::generate(&mut prng);
         abar = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
         mt.commit()?;
 
-        key_pair = AXfrKeyPair::generate(&mut prng);
         abar = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
@@ -224,18 +208,14 @@ mod tests {
         let mut pmt = PersistentMerkleTree::new(store).unwrap();
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
         let abar0 = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
         let abar1 = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
         let abar2 = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
 
         pmt.add_commitment_hash(hash_abar(pmt.entry_count(), &abar0))
@@ -270,8 +250,8 @@ mod tests {
 
         hash.rescue(&[
             BLSScalar::from(uid),
-            abar.amount_type_commitment,
-            abar.public_key.0.point_ref().get_x(),
+            abar.commitment,
+            BLSScalar::zero(),
             BLSScalar::zero(),
         ])[0]
     }

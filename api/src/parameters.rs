@@ -59,8 +59,6 @@ static LAGRANGE_BASE_8192: &'static [u8] = include_bytes!("../parameters/lagrang
 static LAGRANGE_BASE_16384: &'static [u8] = include_bytes!("../parameters/lagrange-srs-16384.bin");
 #[cfg(not(feature = "no_vk"))]
 static LAGRANGE_BASE_32768: &'static [u8] = include_bytes!("../parameters/lagrange-srs-32768.bin");
-#[cfg(not(feature = "no_vk"))]
-static LAGRANGE_BASE_65536: &'static [u8] = include_bytes!("../parameters/lagrange-srs-65536.bin");
 
 #[cfg(not(feature = "no_vk"))]
 lazy_static! {
@@ -69,7 +67,6 @@ lazy_static! {
         m.insert(8192, LAGRANGE_BASE_8192);
         m.insert(16384, LAGRANGE_BASE_16384);
         m.insert(32768, LAGRANGE_BASE_32768);
-        m.insert(65536, LAGRANGE_BASE_65536);
         m
     };
 }

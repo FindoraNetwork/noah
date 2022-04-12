@@ -9,9 +9,7 @@ use crate::xfr::{
     structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
 };
 use num_bigint::BigUint;
-use zei_algebra::{
-    bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
-};
+use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
@@ -51,7 +49,7 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
     record: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
-) -> Result<(BarToAbarBody, JubjubScalar)> {
+) -> Result<BarToAbarBody> {
     let (open_abar, proof) = bar_to_abar(prng, params, record, abar_pubkey, enc_key).c(d!())?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
@@ -59,7 +57,7 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
         proof,
         memo: open_abar.owner_memo.unwrap(),
     };
-    Ok((body, open_abar.key_rand_factor))
+    Ok(body)
 }
 
 /// Generate BlindAssetRecord To AnonymousBlindAssetRecord conversion note: body + spending input signature
@@ -72,7 +70,7 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
 ) -> Result<BarToAbarNote> {
-    let (body, _r) = gen_bar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
+    let body = gen_bar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
@@ -145,7 +143,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     ])[0];
 
     // 3. compute the non-ZK part of the proof
-    let (commitment_eq_proof, non_zk_state, beta) = prove_pc_eq_rescue_external(
+    let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_pc_eq_rescue_external(
         prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
     )
     .c(d!())?;
@@ -157,9 +155,11 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         x_in_bls12_381,
         y_in_bls12_381,
         oabar.blind,
+        abar_pubkey.0.point_ref().get_x(),
         &commitment_eq_proof,
         &non_zk_state,
         &beta,
+        &lambda,
     )
     .c(d!())?;
 
@@ -215,11 +215,11 @@ pub(crate) fn verify_bar_to_abar(
     };
 
     // 2. verify equality of committed values
-    let beta = verify_pc_eq_rescue_external(
+    let (beta, lambda) = verify_pc_eq_rescue_external(
         &pc_gens,
         &com_amount,
         &com_asset_type,
-        &abar.amount_type_commitment,
+        &abar.commitment,
         &proof.commitment_eq_proof,
     )
     .c(d!())?;
@@ -227,10 +227,11 @@ pub(crate) fn verify_bar_to_abar(
     // 3. verify PLONK proof
     verify_eq_committed_vals(
         params,
-        abar.amount_type_commitment,
+        abar.commitment,
         &proof.commitment_eq_proof,
         &proof.pc_rescue_commitments_eq_proof,
         &beta,
+        &lambda,
     )
     .c(d!())
 }
@@ -364,10 +365,6 @@ mod test {
         .unwrap();
         assert_eq!(oabar.amount, amount);
         assert_eq!(oabar.asset_type, asset_type);
-        assert_eq!(
-            abar_keypair.pub_key().randomize(&oabar.key_rand_factor),
-            note.body.output.public_key
-        );
 
         let node_params = VerifierParams::from(params);
         assert!(verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key).is_ok());

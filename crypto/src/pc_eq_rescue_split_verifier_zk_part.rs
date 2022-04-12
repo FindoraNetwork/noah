@@ -57,7 +57,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
     aux_info: &BLSScalar,
-) -> Result<(ZKPartProof, NonZKState, RistrettoScalar)> {
+) -> Result<(ZKPartProof, NonZKState, RistrettoScalar, RistrettoScalar)> {
     assert_eq!(NUM_OF_LIMBS, 6);
     assert_eq!(BIT_PER_LIMB, 43);
 
@@ -152,6 +152,19 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     let s_3 = beta.mul(gamma).add(&c);
     let s_4 = beta.mul(delta).add(&d);
 
+    transcript.append_message(b"Response s1", &s_1.to_bytes());
+    transcript.append_message(b"Response s2", &s_2.to_bytes());
+    transcript.append_message(b"Response s3", &s_3.to_bytes());
+    transcript.append_message(b"Response s4", &s_4.to_bytes());
+
+    let mut bytes = [0u8; 32];
+    transcript.challenge_bytes(b"challenge", &mut bytes);
+    let mut rng = ChaChaRng::from_seed(bytes);
+
+    let mut rand_bytes = [0u8; 16];
+    rng.fill_bytes(&mut rand_bytes);
+    let lambda = RistrettoScalar::from_bytes(&rand_bytes).unwrap();
+
     proof.s_1 = s_1;
     proof.s_2 = s_2;
     proof.s_3 = s_3;
@@ -163,7 +176,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     non_zk_state.b = b;
     non_zk_state.r = r;
 
-    Ok((proof, non_zk_state, beta))
+    Ok((proof, non_zk_state, beta, lambda))
 }
 
 #[allow(unused)]
@@ -173,7 +186,7 @@ pub fn verify_pc_eq_rescue_external(
     point_q: &RistrettoPoint,
     aux_info: &BLSScalar,
     zk_part_proof: &ZKPartProof,
-) -> Result<RistrettoScalar> {
+) -> Result<(RistrettoScalar, RistrettoScalar)> {
     // 1. Fiat-Shamir transform
     let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
 
@@ -203,6 +216,19 @@ pub fn verify_pc_eq_rescue_external(
     rng.fill_bytes(&mut rand_bytes);
     let beta = RistrettoScalar::from_bytes(&rand_bytes).unwrap();
 
+    transcript.append_message(b"Response s1", &zk_part_proof.s_1.to_bytes());
+    transcript.append_message(b"Response s2", &zk_part_proof.s_2.to_bytes());
+    transcript.append_message(b"Response s3", &zk_part_proof.s_3.to_bytes());
+    transcript.append_message(b"Response s4", &zk_part_proof.s_4.to_bytes());
+
+    let mut bytes = [0u8; 32];
+    transcript.challenge_bytes(b"challenge", &mut bytes);
+    let mut rng = ChaChaRng::from_seed(bytes);
+
+    let mut rand_bytes = [0u8; 16];
+    rng.fill_bytes(&mut rand_bytes);
+    let lambda = RistrettoScalar::from_bytes(&rand_bytes).unwrap();
+
     // 2. check the group relationships
     let first_eqn_left = pc_gens.commit(zk_part_proof.s_1, zk_part_proof.s_3);
     let first_eqn_right = point_p.mul(&beta).add(&zk_part_proof.point_r);
@@ -218,7 +244,7 @@ pub fn verify_pc_eq_rescue_external(
         return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
-    Ok(beta)
+    Ok((beta, lambda))
 }
 
 #[cfg(test)]
