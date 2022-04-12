@@ -205,7 +205,6 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
         prover_selectors.push(o_q);
         verifier_selectors.push(c_q);
     }
-    println!("selectors polynomial: {}", timer.elapsed().as_secs_f64());
 
     // Compute polynomials L1, Z_H, and point evaluations of L1 and Z_H^{-1}.
     let mut l1 = FpPolynomial::from_coefs(vec![PCS::Field::zero(); group.len()]);
