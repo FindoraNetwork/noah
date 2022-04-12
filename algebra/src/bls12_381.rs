@@ -365,7 +365,20 @@ impl Group for BLSG1 {
             &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
         );
 
-        Self(msm(&points_raw, &scalars_raw))
+        Self(ark_ec::msm::VariableBase::msm(&points_raw, &scalars_raw))
+    }
+
+    #[inline]
+    fn multi_exp_unsafe(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
+        let scalars_raw = scalars
+            .iter()
+            .map(|r| r.0.into_repr())
+            .collect::<Vec<<FrParameters as FftParameters>::BigInt>>();
+        let points_raw = G1Projective::batch_normalization_into_affine(
+            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
+        );
+
+        Self(msm_unsafe(&points_raw, &scalars_raw))
     }
 }
 
@@ -379,7 +392,7 @@ fn ln_without_floats(a: usize) -> usize {
 }
 
 /// Bucketed MSM
-pub fn msm(bases: &[G1Affine], scalars: &[BigInteger256]) -> G1Projective {
+pub fn msm_unsafe(bases: &[G1Affine], scalars: &[BigInteger256]) -> G1Projective {
     let size = ark_std::cmp::min(bases.len(), scalars.len());
     let scalars = &scalars[..size];
     let bases = &bases[..size];
@@ -442,7 +455,6 @@ pub fn msm(bases: &[G1Affine], scalars: &[BigInteger256]) -> G1Projective {
 
             // Prepare to sum all the buckets
             let buckets_sum = reduce_buckets(&mut buckets);
-            //let buckets_sum = vec![zero; 1 << c];
 
             // Compute sum_{i in 0..num_buckets} (sum_{j in i..num_buckets} bucket[j])
             // This is computed below for b buckets, using 2b curve additions.

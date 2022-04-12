@@ -120,8 +120,6 @@ impl ProverParams {
             ),
         };
 
-        println!("{}", cs.size());
-
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
         let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;

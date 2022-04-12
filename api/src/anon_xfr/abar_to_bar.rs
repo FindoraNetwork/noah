@@ -662,12 +662,7 @@ mod tests {
     #[test]
     fn test_abar_to_bar_conversion() {
         let mut prng = ChaChaRng::from_seed([5u8; 32]);
-
-        use std::time::Instant;
-
-        let timer = Instant::now();
         let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-        println!("Params gen: {}", timer.elapsed().as_secs_f64());
 
         let recv = XfrKeyPair::generate(&mut prng);
         let sender = AXfrKeyPair::generate(&mut prng);
@@ -700,7 +695,6 @@ mod tests {
 
         oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone()));
 
-        let timer = Instant::now();
         let (body, _) = gen_abar_to_bar_body(
             &mut prng,
             &params,
@@ -710,7 +704,6 @@ mod tests {
             ConfidentialAmount_ConfidentialAssetType,
         )
         .unwrap();
-        println!("Building the proof: {}", timer.elapsed().as_secs_f64());
 
         let node_params = VerifierParams::abar_to_bar_params().unwrap();
         verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
