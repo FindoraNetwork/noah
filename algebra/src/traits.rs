@@ -156,7 +156,7 @@ pub trait Group:
     /// Compute the multiscalar multiplication (unsafe)
     #[inline]
     fn multi_exp_unsafe(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
-        multi_exp(scalars, points)
+        Self::multi_exp(scalars, points)
     }
 }
 
