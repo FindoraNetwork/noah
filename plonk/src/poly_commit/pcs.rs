@@ -82,6 +82,9 @@ pub trait PolyComScheme: Sized {
     /// Type of `Opening`.
     type Opening: HomomorphicPolyComElem<Scalar = Self::Field> + Debug + PartialEq + Eq + Clone;
 
+    /// Returns maximal supported degree
+    fn max_degree(&self) -> usize;
+
     /// Commit to the polynomial, commitment is binding.
     fn commit(
         &self,

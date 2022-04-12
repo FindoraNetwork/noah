@@ -261,6 +261,10 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
     type EvalProof = KZGEvalProof<BLSG1>;
     type Opening = FpPolynomial<Self::Field>;
 
+    fn max_degree(&self) -> usize {
+        self.public_parameter_group_1.len() - 1
+    }
+
     fn commit(
         &self,
         polynomial: FpPolynomial<BLSScalar>,
@@ -277,6 +281,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             [0..pol_degree + 1]
             .iter()
             .collect();
+
         let commitment_value = BLSG1::multi_exp_unsafe(
             &coefs_poly_bls_scalar_ref[..],
             &pub_param_group_1_as_ref[..],

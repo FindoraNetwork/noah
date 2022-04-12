@@ -118,48 +118,6 @@ impl<F: Scalar> FpPolynomial<F> {
         r
     }
 
-    /// Return None if x is repeated
-    /// Return `Some(poly)` where `poly(x[i]) = y[i]`
-    /// Return `Some(0)` if `x.len() == 0`
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let two = one.add(&one);
-    /// let five = two.add(&two).add(&one);
-    /// let x = [zero, one, two, five];
-    /// let y = [five, five, one, two];
-    /// let poly = FpPolynomial::from_interpolation(&x, &y).unwrap();
-    /// assert_eq!(poly.degree(), 3);
-    /// assert_eq!(poly.eval(&zero), five);
-    /// assert_eq!(poly.eval(&one), five);
-    /// assert_eq!(poly.eval(&two), one);
-    /// assert_eq!(poly.eval(&five), two);
-    /// let x = [zero, one, two, two];
-    /// let y = [five, five, one, two];
-    /// let poly_option = FpPolynomial::from_interpolation(&x, &y);
-    /// assert!(poly_option.is_none());
-    /// ```
-    pub fn from_interpolation(x: &[F], y: &[F]) -> Option<Self> {
-        assert_eq!(x.len(), y.len());
-        let n = x.len();
-        if n == 0 {
-            return Some(Self::zero());
-        }
-
-        let mut poly = Self::zero();
-        for (i, y_i) in y.iter().enumerate() {
-            let mut lagrange_i = Self::lagrange_ith_base(x, i)?;
-            lagrange_i.mul_scalar_assign(y_i);
-            poly.add_assign(&lagrange_i);
-        }
-        poly.trim_coefs();
-        Some(poly)
-    }
-
     /// Return a polynomial of `degree` + 1 uniformly random coefficients. Note that for each
     /// coffiecient with probability
     /// 1/q is zero, and hence the degree could be less than `degree`
@@ -224,23 +182,6 @@ impl<F: Scalar> FpPolynomial<F> {
 
     /// Evaluate a polynomial on a point
     /// Tests if polynomial is the zero polynomial
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let two = one.add(&one);
-    /// let five = two.add(&two).add(&one);
-    /// let x = [zero, one, two, five];
-    /// let y = [five, five, one, two];
-    /// let poly = FpPolynomial::from_interpolation(&x, &y).unwrap();
-    /// assert_eq!(poly.eval(&zero), five);
-    /// assert_eq!(poly.eval(&one), five);
-    /// assert_eq!(poly.eval(&two), one);
-    /// assert_eq!(poly.eval(&five), two);
-    /// ```
     pub fn eval(&self, point: &F) -> F {
         let mut result = F::zero();
         let mut variable = F::one();
@@ -259,37 +200,6 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 
     /// Add another polynomial to self
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let two = one.add(&one);
-    /// let three = two.add(&one);
-    /// let x = [zero, one, two, three];
-    /// let y1 = [zero, one, two, three];
-    /// let mut poly1 = FpPolynomial::from_interpolation(&x, &y1).unwrap();
-    /// let y2 = [three, two, one, zero];
-    /// let poly2 = FpPolynomial::from_interpolation(&x, &y2).unwrap();
-    /// poly1.add_assign(&poly2);
-    /// let y_expected = [three, three, three, three];
-    /// let poly_expected = FpPolynomial::from_interpolation(&x, &y_expected).unwrap();
-    /// assert_eq!(poly1, poly_expected);
-    /// // first polynomial is of lower degree
-    /// let mut poly1 = FpPolynomial::from_coefs(vec![one, one]);
-    /// let poly2 = FpPolynomial::from_coefs(vec![one, one, one]);
-    /// poly1.add_assign(&poly2);
-    /// let expected = FpPolynomial::from_coefs(vec![two, two, one]);
-    /// assert_eq!(poly1, expected);
-    /// // second polynomial is of lower degree
-    /// let mut poly1 = FpPolynomial::from_coefs(vec![one, one, one]);
-    /// let poly2 = FpPolynomial::from_coefs(vec![one, one]);
-    /// poly1.add_assign(&poly2);
-    /// let expected = FpPolynomial::from_coefs(vec![two, two, one]);
-    /// assert_eq!(poly1, expected);
-    /// ```
     pub fn add_assign(&mut self, other: &Self) {
         for (self_coef, other_coef) in self.coefs.iter_mut().zip(other.coefs.iter()) {
             self_coef.add_assign(other_coef);
@@ -428,31 +338,6 @@ impl<F: Scalar> FpPolynomial<F> {
     pub fn neg(&self) -> Self {
         let mut new = self.clone();
         new.neg_assign();
-        new
-    }
-
-    /// Compute product of self with another polynomial, producing a new polynomial
-    /// O(self.degree * other.degree) naive algorithm. For FFT based implementation use fast_mul function
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let poly1 = FpPolynomial::from_coefs(vec![zero, one]);
-    /// let poly2 = FpPolynomial::from_coefs(vec![one, one]);
-    /// let poly_mul = poly1.naive_mul(&poly2);
-    /// let poly_expected = FpPolynomial::from_coefs(vec![zero, one, one]);
-    /// assert_eq!(poly_mul, poly_expected);
-    /// ```
-    pub fn naive_mul(&self, other: &Self) -> Self {
-        let mut new = Self::zero();
-        for (i, other_coefs) in other.coefs.iter().enumerate() {
-            let mut shifted_i = self.shift(i); // multiply by X^i
-            shifted_i.mul_scalar_assign(other_coefs);
-            new.add_assign(&shifted_i);
-        }
         new
     }
 
@@ -733,33 +618,6 @@ impl<F: Scalar> FpPolynomial<F> {
         (q, r)
     }
 
-    /// Compute polynomial with another polynomials f.compose(inner)(x) = f(inner(x))
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let two = one.add(&one);
-    /// let three = two.add(&one);
-    /// let mut outer = FpPolynomial::from_coefs(vec![zero, one, one]); // x + x^2
-    /// let mut inner = FpPolynomial::from_coefs(vec![one, one]); // 1 + x
-    /// let expected = FpPolynomial::from_coefs(vec![two, three, one]); // (1+x) + (1+x)^2 = 2 + 3x + x^2
-    /// let composed = outer.compose(&inner);
-    /// assert_eq!(composed, expected);
-    /// ```
-    pub fn compose(&self, inner: &Self) -> Self {
-        let mut r = Self::zero();
-        let mut prev = Self::one();
-        for a_i in self.coefs.iter() {
-            let poly_i = prev.mul_scalar(a_i);
-            r.add_assign(&poly_i);
-            prev = prev.fast_mul(inner);
-        }
-        r
-    }
-
     /// Compute the DFT of the polynomial, return DFT and primitive the roof of unity used
     /// n is with the form 2^k or 3 * 2^k
     pub fn fft(&self, num_points: usize) -> Option<(Vec<F>, F)> {
@@ -797,6 +655,7 @@ impl<F: Scalar> FpPolynomial<F> {
         let mut values: Vec<&F> = values.iter().collect();
         let zero = F::zero();
         values.resize(len, &zero);
+
         let coefs = recursive_ifft(&values, root);
         Self::from_coefs(coefs)
     }
@@ -805,35 +664,6 @@ impl<F: Scalar> FpPolynomial<F> {
     /// root of unities and k_inv is the inverse of k.
     pub fn coset_ffti(root: &F, values: &[F], k_inv: &F, len: usize) -> Self {
         Self::ffti(root, values, len).mul_var(k_inv)
-    }
-
-    /// Compute the Lagrange base by index.
-    pub fn lagrange_ith_base(points: &[F], i: usize) -> Option<Self> {
-        if i >= points.len() {
-            return None;
-        }
-        let mut divisor = F::one();
-        let x_i = &points[i];
-        for (index, point) in points.iter().enumerate() {
-            if index == i {
-                continue;
-            }
-            let c = x_i.sub(point);
-            divisor.mul_assign(&c);
-        }
-
-        let points_skip_i: Vec<&F> = points
-            .iter()
-            .enumerate()
-            .filter(|(j, _)| *j != i)
-            .map(|(_, v)| v)
-            .collect();
-        let mut result = Self::from_zeroes_ref(points_skip_i.as_slice());
-        let inv = divisor.inv().ok();
-        inv.as_ref().map(|inv| {
-            result.mul_scalar_assign(inv);
-            result
-        })
     }
 }
 
@@ -968,23 +798,6 @@ mod test {
         }
     }
 
-    #[test]
-    fn from_interpolation() {
-        let n = 10;
-        let mut y = vec![];
-        let mut x = vec![];
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        for _ in 0..n {
-            x.push(BLSScalar::random(&mut prng));
-            y.push(BLSScalar::random(&mut prng));
-        }
-        let poly = FpPolynomial::from_interpolation(x.as_slice(), y.as_slice()).unwrap();
-        for (x, y) in x.iter().zip(y.iter()) {
-            let z = poly.eval(x);
-            assert_eq!(*y, z);
-        }
-    }
-
     fn check_dft<F: Scalar>(poly: &FpPolynomial<F>, root: &F, dft: &[F]) -> bool {
         let mut omega = F::one();
         if !dft.len().is_power_of_two() {
@@ -1074,36 +887,5 @@ mod test {
         let (dft, root) = polynomial.fft(48).unwrap();
         let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 48);
         assert_eq!(ffti_polynomial, polynomial);
-    }
-
-    #[test]
-    fn test_fast_mul() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let n = 7;
-        let mut coefs = vec![];
-        for _ in 0..n {
-            coefs.push(BLSScalar::random(&mut prng));
-        }
-        let polynomial1 = FpPolynomial::<BLSScalar>::from_coefs(coefs);
-
-        let mut coefs2 = vec![];
-        for _ in 0..n {
-            coefs2.push(BLSScalar::random(&mut prng));
-        }
-        let polynomial2 = FpPolynomial::<BLSScalar>::from_coefs(coefs2);
-        let mul = polynomial1.naive_mul(&polynomial2);
-        let fast_mul = polynomial1.fast_mul(&polynomial2);
-
-        assert_eq!(mul, fast_mul);
-
-        for _ in 0..2 * n {
-            let elem = BLSScalar::random(&mut prng);
-            let mut a = polynomial1.eval(&elem);
-            a.mul_assign(&polynomial2.eval(&elem));
-            let b = mul.eval(&elem);
-            let c = fast_mul.eval(&elem);
-            assert_eq!(b, c);
-            assert_eq!(a, b);
-        }
     }
 }

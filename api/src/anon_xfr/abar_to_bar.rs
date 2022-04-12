@@ -33,7 +33,7 @@ use zei_plonk::{
         constraint_system::{
             field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
         },
-        prover::prover,
+        prover::prover_with_lagrange,
         setup::PlonkPf,
         verifier::verifier,
     },
@@ -335,10 +335,11 @@ fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
     let (mut cs, _) = build_abar_to_bar_cs(payers_secret, proof, non_zk_state, beta);
     let witness = cs.get_and_clear_witness();
 
-    prover(
+    prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
+        params.lagrange_pcs.as_ref(),
         &params.cs,
         &params.prover_params,
         &witness,

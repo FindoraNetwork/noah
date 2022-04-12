@@ -20,7 +20,7 @@ use zei_algebra::{
 };
 use zei_plonk::plonk::{
     constraint_system::{TurboConstraintSystem, VarIndex},
-    prover::prover,
+    prover::prover_with_lagrange,
     verifier::verifier,
 };
 
@@ -201,10 +201,11 @@ fn prove_anon_fee<R: CryptoRng + RngCore>(
     let (mut cs, _) = build_anon_fee_cs(input_secret, remainder_secret, fee_type);
     let witness = cs.get_and_clear_witness();
 
-    prover(
+    prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
+        params.lagrange_pcs.as_ref(),
         &params.cs,
         &params.prover_params,
         &witness,

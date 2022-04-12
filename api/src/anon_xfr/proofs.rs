@@ -13,7 +13,7 @@ use zei_crypto::{
     pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
 };
 use zei_plonk::{
-    plonk::{prover::prover, setup::PlonkPf, verifier::verifier},
+    plonk::{prover::prover_with_lagrange, setup::PlonkPf, verifier::verifier},
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
 
@@ -49,10 +49,11 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &fee_calculating_func);
     let witness = cs.get_and_clear_witness();
 
-    prover(
+    prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
+        params.lagrange_pcs.as_ref(),
         &params.cs,
         &params.prover_params,
         &witness,
@@ -111,10 +112,11 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
         build_eq_committed_vals_cs(amount, asset_type, blind_hash, proof, non_zk_state, beta);
     let witness = cs.get_and_clear_witness();
 
-    prover(
+    prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
+        params.lagrange_pcs.as_ref(),
         &params.cs,
         &params.prover_params,
         &witness,

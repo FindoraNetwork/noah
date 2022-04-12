@@ -13,6 +13,9 @@
 extern crate serde_derive;
 extern crate core;
 
+#[macro_use]
+extern crate lazy_static;
+
 pub mod anon_creds;
 pub mod anon_xfr;
 pub mod parameters;
