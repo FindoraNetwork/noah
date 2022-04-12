@@ -288,7 +288,7 @@ mod test {
                 BLSScalar::zero(),
             ])[0];
 
-            let (proof, _, _) = prove_pc_eq_rescue_external(
+            let (proof, _, _, _) = prove_pc_eq_rescue_external(
                 &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
             )
             .unwrap();
