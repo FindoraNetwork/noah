@@ -415,6 +415,7 @@ pub fn build_abar_to_bar_cs(
         commitment: com_abar_in_var,
         pub_key_x: pk_x,
     };
+
     let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_secrets.path);
 
     if let Some(root) = root_var {
@@ -440,7 +441,7 @@ pub fn build_abar_to_bar_cs(
     let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
     let comm_var = cs.new_variable(comm);
     let r_var = cs.new_variable(r);
-    let beta_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &beta_sim_fr);
+    let beta_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &beta_sim_fr, 128);
     let s1_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s1_sim_fr);
     let s2_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s2_sim_fr);
 

@@ -49,7 +49,9 @@ pub static ANON_FEE_VERIFIER_PARAMS: Option<&'static [u8]> =
 pub static ANON_FEE_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(feature = "no_vk")]
-pub static LAGRANGE_BASES: HashMap<usize, &'static [u8]> = HashMap::default();
+lazy_static! {
+    pub static ref LAGRANGE_BASES: BTreeMap<usize, &'static [u8]> = BTreeMap::default();
+}
 
 #[cfg(not(feature = "no_vk"))]
 static LAGRANGE_BASE_8192: &'static [u8] = include_bytes!("../parameters/lagrange-srs-8192.bin");

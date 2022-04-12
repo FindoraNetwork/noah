@@ -141,7 +141,10 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     let mut bytes = [0u8; 32];
     transcript.challenge_bytes(b"challenge", &mut bytes);
     let mut rng = ChaChaRng::from_seed(bytes);
-    let beta = RistrettoScalar::random(&mut rng);
+
+    let mut rand_bytes = [0u8; 16];
+    rng.fill_bytes(&mut rand_bytes);
+    let beta = RistrettoScalar::from_bytes(&rand_bytes).unwrap();
 
     // 7. compute the responses
     let s_1 = beta.mul(x).add(&a);
@@ -195,7 +198,10 @@ pub fn verify_pc_eq_rescue_external(
     let mut bytes = [0u8; 32];
     transcript.challenge_bytes(b"challenge", &mut bytes);
     let mut rng = ChaChaRng::from_seed(bytes);
-    let beta = RistrettoScalar::random(&mut rng);
+
+    let mut rand_bytes = [0u8; 16];
+    rng.fill_bytes(&mut rand_bytes);
+    let beta = RistrettoScalar::from_bytes(&rand_bytes).unwrap();
 
     // 2. check the group relationships
     let first_eqn_left = pc_gens.commit(zk_part_proof.s_1, zk_part_proof.s_3);

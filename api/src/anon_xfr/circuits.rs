@@ -328,7 +328,7 @@ pub(crate) fn build_eq_committed_vals_cs(
     let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
     let comm_var = cs.new_variable(comm);
     let r_var = cs.new_variable(r);
-    let beta_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &beta_sim_fr);
+    let beta_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &beta_sim_fr, 128);
     let s1_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s1_sim_fr);
     let s2_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s2_sim_fr);
 
