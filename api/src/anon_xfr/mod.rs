@@ -10,7 +10,6 @@ use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
-    jubjub::JUBJUB_SCALAR_LEN,
     prelude::*,
 };
 use zei_crypto::basic::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
@@ -226,7 +225,7 @@ pub fn decrypt_memo(
     abar: &AnonBlindAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
     let plaintext = hybrid_decrypt_with_x25519_secret_key(&memo.lock, dec_key);
-    if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN + JUBJUB_SCALAR_LEN {
+    if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
         return Err(eg!(ZeiError::ParameterError));
     }
     let amount = u8_le_slice_to_u64(&plaintext[0..8]);

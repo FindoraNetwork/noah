@@ -1,6 +1,7 @@
 use crate::anon_xfr::{
+    circuits::build_eq_committed_vals_cs,
     keys::AXfrPubKey,
-    proofs::{prove_eq_committed_vals, verify_eq_committed_vals, AXfrPlonkPf},
+    proofs::AXfrPlonkPf,
     structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
 };
 use crate::setup::{ProverParams, VerifierParams};
@@ -8,17 +9,21 @@ use crate::xfr::{
     sig::{XfrKeyPair, XfrPublicKey, XfrSignature},
     structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
 };
+use merlin::Transcript;
 use num_bigint::BigUint;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     basic::hybrid_encryption::XPublicKey,
+    field_simulation::{SimFr, NUM_OF_LIMBS},
     pc_eq_rescue_split_verifier_zk_part::{
-        prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, ZKPartProof,
+        prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
     },
 };
+use zei_plonk::plonk::{prover::prover_with_lagrange, verifier::verifier};
 
+const EQ_COMM_TRANSCRIPT: &[u8] = b"Equal committed values proof";
 pub const TWO_POW_32: u64 = 1 << 32;
 
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
@@ -139,7 +144,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         z_randomizer,
         x_in_bls12_381,
         y_in_bls12_381,
-        BLSScalar::zero(),
+        abar_pubkey.0.point_ref().get_x(),
     ])[0];
 
     // 3. compute the non-ZK part of the proof
@@ -147,6 +152,8 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
     )
     .c(d!())?;
+
+    println!("beta = {:?}, lambda = {:?}", beta, lambda);
 
     // 4. prove abar correctness
     let pc_rescue_commitments_eq_proof = prove_eq_committed_vals(
@@ -224,6 +231,8 @@ pub(crate) fn verify_bar_to_abar(
     )
     .c(d!())?;
 
+    println!("beta = {:?}, lambda = {:?}", beta, lambda);
+
     // 3. verify PLONK proof
     verify_eq_committed_vals(
         params,
@@ -234,6 +243,96 @@ pub(crate) fn verify_bar_to_abar(
         &lambda,
     )
     .c(d!())
+}
+
+/// I generates the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
+/// * `rng` - pseudo-random generator.
+/// * `params` - System params
+/// * `amount` - transaction amount
+/// * `asset_type` - asset type
+/// * `blind_pc` - blinding factor for the Pedersen commitment
+/// * `blind_hash` - blinding factor for the Rescue commitment
+/// * `pc_gens` - the Pedersen commitment instance
+/// * Return the plonk proof if the witness is valid, return an error otherwise.
+pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
+    rng: &mut R,
+    params: &ProverParams,
+    amount: BLSScalar,
+    asset_type: BLSScalar,
+    blind_hash: BLSScalar,
+    pubkey_x: BLSScalar,
+    proof: &ZKPartProof,
+    non_zk_state: &NonZKState,
+    beta: &RistrettoScalar,
+    lambda: &RistrettoScalar,
+) -> Result<AXfrPlonkPf> {
+    let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
+    let (mut cs, _) = build_eq_committed_vals_cs(
+        amount,
+        asset_type,
+        blind_hash,
+        pubkey_x,
+        proof,
+        non_zk_state,
+        beta,
+        lambda,
+    );
+    let witness = cs.get_and_clear_witness();
+
+    prover_with_lagrange(
+        rng,
+        &mut transcript,
+        &params.pcs,
+        params.lagrange_pcs.as_ref(),
+        &params.cs,
+        &params.prover_params,
+        &witness,
+    )
+    .c(d!(ZeiError::AXfrProofError))
+}
+
+/// I verify the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
+/// * `params` - System parameters including KZG params and the constraint system
+/// * `hash_comm` - the Rescue commitment
+/// * `ped_comm` - the Pedersen commitment
+/// * `proof` - the proof
+/// * Returns Ok() if the verification succeeds, returns an error otherwise.
+pub(crate) fn verify_eq_committed_vals(
+    params: &VerifierParams,
+    hash_comm: BLSScalar,
+    proof_zk_part: &ZKPartProof,
+    proof: &AXfrPlonkPf,
+    beta: &RistrettoScalar,
+    lambda: &RistrettoScalar,
+) -> Result<()> {
+    let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
+    let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
+    online_inputs.push(hash_comm);
+    online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
+    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+    let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+
+    let beta_lambda = *beta * lambda;
+    let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
+
+    let s1_plus_lambda_s2 = proof_zk_part.s_1 + proof_zk_part.s_2 * lambda;
+    let s1_plus_lambda_s2_sim_fr =
+        SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
+
+    online_inputs.extend_from_slice(&beta_sim_fr.limbs);
+    online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
+    online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
+    online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
+
+    verifier(
+        &mut transcript,
+        &params.pcs,
+        &params.cs,
+        &params.verifier_params,
+        &online_inputs,
+        proof,
+    )
+    .c(d!(ZeiError::ZKProofVerificationError))
 }
 
 #[cfg(test)]

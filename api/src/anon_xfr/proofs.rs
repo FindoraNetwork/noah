@@ -1,17 +1,10 @@
 use crate::anon_xfr::{
-    circuits::{
-        build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness,
-    },
+    circuits::{build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness},
     config::{FEE_CALCULATING_FUNC, FEE_TYPE},
 };
 use crate::setup::{ProverParams, VerifierParams};
 use merlin::Transcript;
-use num_bigint::BigUint;
-use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::{
-    field_simulation::{SimFr, NUM_OF_LIMBS},
-    pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof},
-};
+use zei_algebra::prelude::*;
 use zei_plonk::{
     plonk::{prover::prover_with_lagrange, setup::PlonkPf, verifier::verifier},
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
@@ -20,7 +13,6 @@ use zei_plonk::{
 const ANON_XFR_TRANSCRIPT: &[u8] = b"Anon Xfr";
 const N_INPUTS_TRANSCRIPT: &[u8] = b"Number of input ABARs";
 const N_OUTPUTS_TRANSCRIPT: &[u8] = b"Number of output ABARs";
-const EQ_COMM_TRANSCRIPT: &[u8] = b"Equal committed values proof";
 
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 
@@ -77,96 +69,6 @@ pub(crate) fn verify_xfr(
         pub_inputs.payees_commitments.len() as u64,
     );
     let online_inputs = pub_inputs.to_vec();
-    verifier(
-        &mut transcript,
-        &params.pcs,
-        &params.cs,
-        &params.verifier_params,
-        &online_inputs,
-        proof,
-    )
-    .c(d!(ZeiError::ZKProofVerificationError))
-}
-
-/// I generates the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
-/// * `rng` - pseudo-random generator.
-/// * `params` - System params
-/// * `amount` - transaction amount
-/// * `asset_type` - asset type
-/// * `blind_pc` - blinding factor for the Pedersen commitment
-/// * `blind_hash` - blinding factor for the Rescue commitment
-/// * `pc_gens` - the Pedersen commitment instance
-/// * Return the plonk proof if the witness is valid, return an error otherwise.
-pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
-    rng: &mut R,
-    params: &ProverParams,
-    amount: BLSScalar,
-    asset_type: BLSScalar,
-    blind_hash: BLSScalar,
-    pubkey_x: BLSScalar,
-    proof: &ZKPartProof,
-    non_zk_state: &NonZKState,
-    beta: &RistrettoScalar,
-    lambda: &RistrettoScalar,
-) -> Result<AXfrPlonkPf> {
-    let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let (mut cs, _) = build_eq_committed_vals_cs(
-        amount,
-        asset_type,
-        blind_hash,
-        pubkey_x,
-        proof,
-        non_zk_state,
-        beta,
-        lambda,
-    );
-    let witness = cs.get_and_clear_witness();
-
-    prover_with_lagrange(
-        rng,
-        &mut transcript,
-        &params.pcs,
-        params.lagrange_pcs.as_ref(),
-        &params.cs,
-        &params.prover_params,
-        &witness,
-    )
-    .c(d!(ZeiError::AXfrProofError))
-}
-
-/// I verify the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
-/// * `params` - System parameters including KZG params and the constraint system
-/// * `hash_comm` - the Rescue commitment
-/// * `ped_comm` - the Pedersen commitment
-/// * `proof` - the proof
-/// * Returns Ok() if the verification succeeds, returns an error otherwise.
-pub(crate) fn verify_eq_committed_vals(
-    params: &VerifierParams,
-    hash_comm: BLSScalar,
-    proof_zk_part: &ZKPartProof,
-    proof: &AXfrPlonkPf,
-    beta: &RistrettoScalar,
-    lambda: &RistrettoScalar,
-) -> Result<()> {
-    let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
-    online_inputs.push(hash_comm);
-    online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
-    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-    let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
-
-    let beta_lambda = *beta * lambda;
-    let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
-
-    let s1_plus_lambda_s2 = proof_zk_part.s_1 + proof_zk_part.s_2 * lambda;
-    let s1_plus_lambda_s2_sim_fr =
-        SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
-
-    online_inputs.extend_from_slice(&beta_sim_fr.limbs);
-    online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
-    online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
-    online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
-
     verifier(
         &mut transcript,
         &params.pcs,

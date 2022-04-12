@@ -140,7 +140,12 @@ impl AMultiXfrPubInputs {
             .payees_secrets
             .iter()
             .map(|sec| {
-                hash.rescue(&[sec.blind, BLSScalar::from(sec.amount), sec.asset_type, zero])[0]
+                hash.rescue(&[
+                    sec.blind,
+                    BLSScalar::from(sec.amount),
+                    sec.asset_type,
+                    sec.pubkey_x,
+                ])[0]
             })
             .collect();
 
@@ -151,14 +156,9 @@ impl AMultiXfrPubInputs {
             payer.blind,
             BLSScalar::from(payer.amount),
             payer.asset_type,
-            zero,
-        ])[0];
-        let mut node = hash.rescue(&[
-            BLSScalar::from(payer.uid),
-            commitment,
             pk_point.get_x(),
-            zero,
         ])[0];
+        let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0];
         for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
                 (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
@@ -904,14 +904,9 @@ pub(crate) mod tests {
                         payer.blind,
                         BLSScalar::from(payer.amount),
                         payer.asset_type,
-                        zero,
-                    ])[0];
-                    hash.rescue(&[
-                        BLSScalar::from(payer.uid),
-                        commitment,
                         pk_point.get_x(),
-                        zero,
-                    ])[0]
+                    ])[0];
+                    hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0]
                 })
                 .collect();
             payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
@@ -1560,12 +1555,21 @@ pub(crate) mod tests {
         let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
         online_inputs.push(z);
         online_inputs.push(proof.non_zk_part_state_commitment);
+
         let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-        let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_1.to_bytes()));
-        let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_2.to_bytes()));
+        let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+
+        let beta_lambda = beta * &lambda;
+        let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
+
+        let s1_plus_lambda_s2 = proof.s_1 + proof.s_2 * lambda;
+        let s1_plus_lambda_s2_sim_fr =
+            SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
+
         online_inputs.extend_from_slice(&beta_sim_fr.limbs);
-        online_inputs.extend_from_slice(&s1_sim_fr.limbs);
-        online_inputs.extend_from_slice(&s2_sim_fr.limbs);
+        online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
+        online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
+        online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
 
         // Check the constraints
         assert!(cs.verify_witness(&witness, &online_inputs).is_ok());
