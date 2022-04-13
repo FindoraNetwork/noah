@@ -36,9 +36,20 @@ pub type SnarkProof = PlonkPf<KZGCommitmentScheme<BLSPairingEngine>>;
 /// Anonymous transfers structure
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AXfrNote {
+    /// The body part of AnonFee
+    pub body: AXfrBody,
+    /// The spending proof (assuming non-malleability)
+    pub anon_xfr_proof: SnarkProof,
+    /// The non-malleability tag
+    pub non_malleability_tag: BLSScalar,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
+pub struct AXfrBody {
     pub inputs: Vec<Nullifier>,
     pub outputs: Vec<AnonBlindAssetRecord>,
-    pub proof: AXfrProof,
+    pub merkle_root: BLSScalar,
+    pub merkle_root_version: usize,
     pub owner_memos: Vec<OwnerMemo>,
 }
 
@@ -55,14 +66,6 @@ impl AnonBlindAssetRecord {
             commitment: oabar.compute_commitment(),
         }
     }
-}
-
-/// Proof for an AXfrBody correctness
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
-pub struct AXfrProof {
-    pub snark_proof: SnarkProof,
-    pub merkle_root: BLSScalar,
-    pub merkle_root_version: usize,
 }
 
 /// MT PATH, merkle root value, leaf identifier

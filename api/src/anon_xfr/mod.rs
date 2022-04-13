@@ -3,10 +3,12 @@ use crate::anon_xfr::{
     config::{FEE_CALCULATING_FUNC, FEE_TYPE},
     keys::AXfrKeyPair,
     proofs::{prove_xfr, verify_xfr},
-    structs::{AXfrNote, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
+    structs::{AXfrNote, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
+use digest::Digest;
+use sha2::Sha512;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
@@ -23,6 +25,7 @@ pub mod keys;
 mod merkle_tree_test;
 pub(crate) mod proofs;
 pub mod structs;
+use crate::anon_xfr::structs::AXfrBody;
 pub use circuits::TREE_DEPTH;
 use zei_crypto::basic::rescue::RescueInstance;
 
@@ -86,8 +89,6 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
         payers_secrets,
         payees_secrets,
     };
-    let proof = prove_xfr(prng, params, secret_inputs).c(d!())?;
-
     let out_abars = outputs
         .iter()
         .map(AnonBlindAssetRecord::from_oabar)
@@ -98,15 +99,37 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
         .collect();
 
     let mt_info_temp = inputs[0].mt_leaf_info.as_ref().unwrap();
-    Ok(AXfrNote {
+    let body = AXfrBody {
         inputs: nullifiers,
         outputs: out_abars,
-        proof: AXfrProof {
-            snark_proof: proof,
-            merkle_root: mt_info_temp.root,
-            merkle_root_version: mt_info_temp.root_version,
-        },
+        merkle_root: mt_info_temp.root,
+        merkle_root_version: mt_info_temp.root_version,
         owner_memos: out_memos.c(d!())?,
+    };
+
+    let msg = bincode::serialize(&body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+
+    let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
+
+    let (hash, non_malleability_randomizer, non_malleability_tag) =
+        compute_non_malleability_tag(prng, b"AnonXfr", &msg, &input_keypairs_ref);
+
+    let proof = prove_xfr(
+        prng,
+        params,
+        secret_inputs,
+        &hash,
+        &non_malleability_randomizer,
+        &non_malleability_tag,
+    )
+    .c(d!())?;
+
+    Ok(AXfrNote {
+        body,
+        anon_xfr_proof: proof,
+        non_malleability_tag,
     })
 }
 
@@ -116,23 +139,40 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
 /// * `accumulator` - candidate state of the accumulator. It must match body.proof.merkle_root, otherwise it returns ZeiError::AXfrVerification Error.
 pub fn verify_anon_xfr_note(
     params: &VerifierParams,
-    body: &AXfrNote,
+    note: &AXfrNote,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
-    if *merkle_root != body.proof.merkle_root {
+    if *merkle_root != note.body.merkle_root {
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
-    let payees_commitments = body
+    let payees_commitments = note
+        .body
         .outputs
         .iter()
         .map(|output| output.commitment)
         .collect();
     let pub_inputs = AMultiXfrPubInputs {
-        payers_inputs: body.inputs.clone(),
+        payers_inputs: note.body.inputs.clone(),
         payees_commitments,
         merkle_root: *merkle_root,
     };
-    verify_xfr(params, &pub_inputs, &body.proof.snark_proof).c(d!(ZeiError::AXfrVerificationError))
+
+    let msg = bincode::serialize(&note.body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+    let mut hasher = Sha512::new();
+    hasher.update(b"AnonXfr");
+    hasher.update(&msg);
+    let hash = BLSScalar::from_hash(hasher);
+
+    verify_xfr(
+        params,
+        &pub_inputs,
+        &note.anon_xfr_proof,
+        &hash,
+        &note.non_malleability_tag,
+    )
+    .c(d!(ZeiError::AXfrVerificationError))
 }
 
 /// Check that inputs have mt witness and keypair matched pubkey
@@ -210,6 +250,52 @@ fn check_roots(inputs: &[OpenAnonBlindAssetRecord]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    domain_separator: &[u8],
+    msg: &[u8],
+    secret_keys: &[&AXfrKeyPair],
+) -> (BLSScalar, BLSScalar, BLSScalar) {
+    let mut hasher = Sha512::new();
+    hasher.update(domain_separator);
+    hasher.update(msg);
+
+    let hash = BLSScalar::from_hash(hasher);
+    let randomizer = BLSScalar::random(prng);
+
+    let mut input_to_rescue = vec![];
+    input_to_rescue.push(BLSScalar::from(secret_keys.len() as u64));
+    input_to_rescue.push(hash);
+    input_to_rescue.push(randomizer);
+    for secret_key in secret_keys.iter() {
+        input_to_rescue.push(BLSScalar::from(&secret_key.get_secret_scalar()));
+    }
+
+    if input_to_rescue.len() < 4 {
+        // pad to 4
+        input_to_rescue.resize(4, BLSScalar::zero());
+    } else {
+        // pad to 4 + 3k
+        input_to_rescue.resize(
+            1 + (input_to_rescue.len() - 1 + 2) / 3 * 3,
+            BLSScalar::zero(),
+        );
+    }
+
+    let rescue = RescueInstance::new();
+    let mut acc = rescue.rescue(&[
+        input_to_rescue[0],
+        input_to_rescue[1],
+        input_to_rescue[2],
+        input_to_rescue[3],
+    ])[0];
+    for chunk in input_to_rescue[4..].chunks_exact(3) {
+        acc = rescue.rescue(&[acc, chunk[0], chunk[1], chunk[2]])[0];
+    }
+
+    (hash, randomizer, acc)
 }
 
 /// Decrypts the owner memo
@@ -417,8 +503,8 @@ mod tests {
         {
             // owner scope
             let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
-                &note.outputs[0],
-                note.owner_memos[0].clone(),
+                &note.body.outputs[0],
+                note.body.owner_memos[0].clone(),
                 &keypair_out,
                 &dec_key_out,
             )
@@ -540,8 +626,8 @@ mod tests {
         {
             // owner scope
             let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
-                &note.outputs[0],
-                note.owner_memos[0].clone(),
+                &note.body.outputs[0],
+                note.body.owner_memos[0].clone(),
                 &keypair_out,
                 &dec_key_out,
             )
@@ -759,8 +845,8 @@ mod tests {
             // owner scope
             for i in 0..n_payees {
                 let oabar_out = OpenAnonBlindAssetRecordBuilder::from_abar(
-                    &note.outputs[i],
-                    note.owner_memos[i].clone(),
+                    &note.body.outputs[i],
+                    note.body.owner_memos[i].clone(),
                     &keypairs_out[i],
                     &dec_keys_out[i],
                 )

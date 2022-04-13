@@ -111,16 +111,28 @@ impl ProverParams {
     ) -> Result<ProverParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
 
+        let zero = BLSScalar::zero();
+
+        let hash = zero;
+        let non_malleability_randomizer = zero;
+        let non_malleability_tag = zero;
+
         let (cs, _) = match tree_depth {
             Some(depth) => build_multi_xfr_cs(
                 AMultiXfrWitness::fake(n_payers, n_payees, depth),
                 FEE_TYPE.as_scalar(),
                 &FEE_CALCULATING_FUNC,
+                &hash,
+                &non_malleability_randomizer,
+                &non_malleability_tag,
             ),
             None => build_multi_xfr_cs(
                 AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
                 FEE_TYPE.as_scalar(),
                 &FEE_CALCULATING_FUNC,
+                &hash,
+                &non_malleability_randomizer,
+                &non_malleability_tag,
             ),
         };
 
@@ -185,6 +197,7 @@ impl ProverParams {
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
         let hash = bls_zero;
+        let non_malleability_randomizer = bls_zero;
         let non_malleability_tag = bls_zero;
 
         let node = MTNode {
@@ -209,6 +222,7 @@ impl ProverParams {
             &beta,
             &lambda,
             &hash,
+            &non_malleability_randomizer,
             &non_malleability_tag,
         );
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
@@ -232,6 +246,9 @@ impl ProverParams {
     pub fn anon_fee_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
         let jubjub_zero = JubjubScalar::zero();
+        let hash = bls_zero;
+        let non_malleability_randomizer = bls_zero;
+        let non_malleability_tag = bls_zero;
 
         let node = MTNode {
             siblings1: bls_zero,
@@ -253,7 +270,14 @@ impl ProverParams {
             asset_type: Default::default(),
             pubkey_x: Default::default(),
         };
-        let (cs, _) = build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
+        let (cs, _) = build_anon_fee_cs(
+            payer_secret,
+            payee_secret,
+            FEE_TYPE.as_scalar(),
+            &hash,
+            &non_malleability_randomizer,
+            &non_malleability_tag,
+        );
 
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)

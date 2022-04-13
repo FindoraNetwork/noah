@@ -86,6 +86,17 @@ impl<G: Group> KeyPair<G, G::ScalarType> {
         gen_keys(prng)
     }
 
+    /// Return the key pair from secret value
+    pub fn from_secret_scalar(secret: G::ScalarType) -> Self {
+        let base = G::get_base();
+        let pub_key = base.mul(&secret);
+
+        Self {
+            sec_key: SecretKey(secret),
+            pub_key: PublicKey(pub_key),
+        }
+    }
+
     /// Return scalar representing secret key
     pub fn get_secret_scalar(&self) -> G::ScalarType {
         self.sec_key.scalar()
