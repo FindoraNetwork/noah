@@ -187,34 +187,6 @@ impl TurboConstraintSystem<BLSScalar> {
         ExtendedPointVar(p_out_var, p_out_ext)
     }
 
-    /// Returns an identity jubjub point and its corresponding point variable
-    fn get_identity(&mut self) -> ExtendedPointVar {
-        ExtendedPointVar(
-            PointVar(self.zero_var(), self.one_var()),
-            JubjubPoint::get_identity(),
-        )
-    }
-
-    /// Given two (extended) point variables `point0`, `point1`, and a boolean variable `bit`,
-    /// returns `point_bit`.
-    fn select_point(
-        &mut self,
-        point0: &ExtendedPointVar,
-        point1: &ExtendedPointVar,
-        bit: VarIndex,
-    ) -> ExtendedPointVar {
-        let point0_var = &point0.0;
-        let point1_var = &point1.0;
-        let x = self.select(point0_var.0, point1_var.0, bit);
-        let y = self.select(point0_var.1, point1_var.1, bit);
-        let res_point_var = PointVar(x, y);
-        if self.witness[bit].is_zero() {
-            ExtendedPointVar(res_point_var, point0.1)
-        } else {
-            ExtendedPointVar(res_point_var, point1.1)
-        }
-    }
-
     /// Given public base points [G0 = identity, G1, G2, G3] and
     /// 2 boolean variables b0, b1 \in {0, 1}, returns G_{b0 + 2*b1}
     ///
@@ -283,31 +255,6 @@ impl TurboConstraintSystem<BLSScalar> {
         ExtendedPointVar(p_out_var, p_out_ext)
     }
 
-    /// Variable-base scalar multiplication:
-    /// Given a base point variable `point`, and an `n_bits`-bit
-    /// secret scalar s, returns s * `point`.
-    pub fn var_base_scalar_mul(
-        &mut self,
-        point_var: PointVar,
-        point: JubjubPoint,
-        scalar_var: VarIndex,
-        n_bits: usize,
-    ) -> (PointVar, JubjubPoint) {
-        // convert `scalar_var` into binary variables
-        let b_scalar_var = self.range_check(scalar_var, n_bits);
-        let mut res_ext = self.get_identity();
-        let identity = self.get_identity();
-        let extended_point = ExtendedPointVar(point_var, point);
-        for &bit in b_scalar_var.iter().rev() {
-            // doubling
-            res_ext = self.ecc_add(&res_ext.0, &res_ext.0, &res_ext.1, &res_ext.1);
-            // conditional addition
-            let tmp_ext = self.select_point(&identity, &extended_point, bit);
-            res_ext = self.ecc_add(&res_ext.0, &tmp_ext.0, &res_ext.1, &tmp_ext.1);
-        }
-        (res_ext.0, res_ext.1)
-    }
-
     ///  Fixed-base scalar multiplication:
     ///  Given a base point `[G]` and an `n_bits`-bit secret scalar `s`, returns `s * [G]`.
     /// `n_bits` should be a positive even number.
@@ -316,7 +263,7 @@ impl TurboConstraintSystem<BLSScalar> {
         base: JubjubPoint,
         scalar_var: VarIndex,
         n_bits: usize,
-    ) -> (PointVar, JubjubPoint) {
+    ) -> PointVar {
         assert_eq!(n_bits & 1, 0, "n_bits is odd");
         assert!(n_bits > 0, "n_bits is not positive");
         // TODO: we can remove the range_check constraint if we can guarantee that `scalar_var`
@@ -346,7 +293,7 @@ impl TurboConstraintSystem<BLSScalar> {
         bases2: &[JubjubPoint],
         bases3: &[JubjubPoint],
         b_scalar_var: &[VarIndex],
-    ) -> (PointVar, JubjubPoint) {
+    ) -> PointVar {
         let n_bits = b_scalar_var.len();
         assert_eq!(n_bits & 1, 0, "n_bits is odd");
         assert!(n_bits > 0, "n_bits is not positive");
@@ -372,16 +319,13 @@ impl TurboConstraintSystem<BLSScalar> {
             );
             p_var_ext = self.ecc_add(&p_var_ext.0, &tmp_var_ext.0, &p_var_ext.1, &tmp_var_ext.1);
         }
-        (p_var_ext.0, p_var_ext.1)
+        p_var_ext.0
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::constraint_system::{
-        ecc::{Point, PointVar},
-        TurboConstraintSystem,
-    };
+    use crate::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
     use zei_algebra::{
         bls12_381::BLSScalar,
         jubjub::{JubjubPoint, JubjubScalar},
@@ -442,7 +386,7 @@ mod test {
 
         // build circuit
         let scalar_var = cs.new_variable(scalar);
-        let (p_out_var, _) = cs.scalar_mul(base_ext, scalar_var, 256);
+        let p_out_var = cs.scalar_mul(base_ext, scalar_var, 256);
         let mut witness = cs.get_and_clear_witness();
         pnk!(cs.verify_witness(&witness[..], &[]));
 
@@ -460,7 +404,7 @@ mod test {
         let base_ext = JubjubPoint::get_base();
         let base_point = Point::from(&base_ext);
         let scalar_var = cs.new_variable(BLSScalar::zero());
-        let (p_out_var, _) = cs.scalar_mul(base_ext, scalar_var, 64);
+        let p_out_var = cs.scalar_mul(base_ext, scalar_var, 64);
         let mut witness = cs.get_and_clear_witness();
         // check p_out is an identity point
         assert_eq!(witness[p_out_var.0], BLSScalar::zero());
@@ -471,36 +415,5 @@ mod test {
         witness[p_out_var.0] = base_point.0;
         witness[p_out_var.1] = base_point.1;
         assert!(cs.verify_witness(&witness[..], &[]).is_err());
-    }
-
-    #[test]
-    fn test_var_base_scalar_mul() {
-        let mut cs = TurboConstraintSystem::new();
-
-        // compute secret scalar
-        let scalar_bytes = [
-            17, 144, 47, 113, 34, 14, 11, 207, 13, 116, 200, 201, 17, 33, 101, 116, 0, 59, 51, 1,
-            2, 39, 13, 56, 69, 175, 41, 111, 134, 180, 0, 0,
-        ];
-        let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
-        let jubjub_scalar = JubjubScalar::from_bytes(&scalar_bytes).unwrap(); // safe unwrap
-        let scalar_var = cs.new_variable(scalar);
-
-        // compute secret base point
-        let var_base = JubjubPoint::get_base().double();
-        let x_var = cs.new_variable(var_base.get_x());
-        let y_var = cs.new_variable(var_base.get_y());
-        let base_var = PointVar(x_var, y_var);
-
-        // check that the output point is consistent
-        let expected_point = var_base.mul(&jubjub_scalar);
-        let (res, res_point) = cs.var_base_scalar_mul(base_var, var_base, scalar_var, 256);
-        assert_eq!(res_point, expected_point);
-        assert_eq!(cs.witness[res.0], expected_point.get_x());
-        assert_eq!(cs.witness[res.1], expected_point.get_y());
-
-        // check constraints
-        let witness = cs.get_and_clear_witness();
-        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
     }
 }

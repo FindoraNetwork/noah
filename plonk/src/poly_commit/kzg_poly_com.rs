@@ -261,6 +261,10 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
     type EvalProof = KZGEvalProof<BLSG1>;
     type Opening = FpPolynomial<Self::Field>;
 
+    fn max_degree(&self) -> usize {
+        self.public_parameter_group_1.len() - 1
+    }
+
     fn commit(
         &self,
         polynomial: FpPolynomial<BLSScalar>,
@@ -277,6 +281,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             [0..pol_degree + 1]
             .iter()
             .collect();
+
         let commitment_value = BLSG1::multi_exp_unsafe(
             &coefs_poly_bls_scalar_ref[..],
             &pub_param_group_1_as_ref[..],
@@ -300,6 +305,22 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         point: &Self::Field,
     ) -> Self::Field {
         opening.eval(point)
+    }
+
+    fn apply_blind_factors(
+        &self,
+        commitment: &Self::Commitment,
+        blinds: &[Self::Field],
+        zeroing_degree: usize,
+    ) -> Self::Commitment {
+        let mut commitment = commitment.value.clone();
+        for (i, blind) in blinds.iter().enumerate() {
+            let mut blind = blind.clone();
+            commitment = commitment + &(self.public_parameter_group_1[i] * &blind);
+            blind = blind.neg();
+            commitment = commitment + &(self.public_parameter_group_1[zeroing_degree + i] * &blind);
+        }
+        KZGCommitment { value: commitment }
     }
 
     fn commitment_from_opening(&self, opening: &Self::Opening) -> Self::Commitment {

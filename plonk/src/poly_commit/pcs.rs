@@ -82,6 +82,9 @@ pub trait PolyComScheme: Sized {
     /// Type of `Opening`.
     type Opening: HomomorphicPolyComElem<Scalar = Self::Field> + Debug + PartialEq + Eq + Clone;
 
+    /// Returns maximal supported degree
+    fn max_degree(&self) -> usize;
+
     /// Commit to the polynomial, commitment is binding.
     fn commit(
         &self,
@@ -123,6 +126,14 @@ pub trait PolyComScheme: Sized {
         value: &Self::Field,
         proof: &Self::EvalProof,
     ) -> Result<()>;
+
+    /// Apply blind factors over the vanishing part
+    fn apply_blind_factors(
+        &self,
+        commitment: &Self::Commitment,
+        blinds: &[Self::Field],
+        zeroing_degree: usize,
+    ) -> Self::Commitment;
 
     /// Batch proof for polynomial evaluation.
     /// `param` stores the instance parameters to be appended to the transcript.

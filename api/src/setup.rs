@@ -11,18 +11,21 @@ use crate::anon_xfr::{
 };
 use crate::parameters::{
     ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
-    BULLETPROOF_URS, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
+    BULLETPROOF_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
 use bulletproofs::BulletproofGens;
 use serde::Deserialize;
 use zei_algebra::{
-    bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*, ristretto::RistrettoScalar,
+    bls12_381::{BLSScalar, BLSG1},
+    jubjub::JubjubScalar,
+    prelude::*,
+    ristretto::RistrettoScalar,
 };
 use zei_crypto::pc_eq_rescue_split_verifier_zk_part::{NonZKState, ZKPartProof};
 use zei_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,
-        setup::{preprocess_prover, PlonkPK, PlonkVK},
+        setup::{preprocess_prover_with_lagrange, PlonkPK, PlonkVK},
     },
     poly_commit::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
 };
@@ -39,6 +42,7 @@ pub struct BulletproofParams {
 pub struct ProverParams {
     pub bp_params: BulletproofParams,
     pub pcs: KZGCommitmentSchemeBLS,
+    pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
     pub cs: TurboPlonkCS,
     pub prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
 }
@@ -122,11 +126,16 @@ impl ProverParams {
 
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
+
+        let lagrange_pcs = load_lagrange_params(cs.size());
+
+        let prover_params =
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
             pcs,
+            lagrange_pcs,
             cs,
             prover_params,
         })
@@ -138,14 +147,30 @@ impl ProverParams {
         let proof = ZKPartProof::default();
         let non_zk_state = NonZKState::default();
         let beta = RistrettoScalar::zero();
-        let (cs, _) = build_eq_committed_vals_cs(zero, zero, zero, &proof, &non_zk_state, &beta);
+        let lambda = RistrettoScalar::zero();
+        let (cs, _) = build_eq_committed_vals_cs(
+            zero,
+            zero,
+            zero,
+            zero,
+            &proof,
+            &non_zk_state,
+            &beta,
+            &lambda,
+        );
 
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
+
+        let lagrange_pcs = load_lagrange_params(cs.size());
+
+        let prover_params =
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
             pcs,
+            lagrange_pcs,
             cs,
             prover_params,
         })
@@ -158,6 +183,9 @@ impl ProverParams {
         let proof = ZKPartProof::default();
         let non_zk_state = NonZKState::default();
         let beta = RistrettoScalar::zero();
+        let lambda = RistrettoScalar::zero();
+        let hash = bls_zero;
+        let non_malleability_tag = bls_zero;
 
         let node = MTNode {
             siblings1: bls_zero,
@@ -167,7 +195,6 @@ impl ProverParams {
         };
         let payer_secret = PayerSecret {
             sec_key: jubjub_zero,
-            diversifier: jubjub_zero,
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -175,15 +202,28 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let (cs, _) = build_abar_to_bar_cs(payer_secret, &proof, &non_zk_state, &beta);
+        let (cs, _) = build_abar_to_bar_cs(
+            payer_secret,
+            &proof,
+            &non_zk_state,
+            &beta,
+            &lambda,
+            &hash,
+            &non_malleability_tag,
+        );
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
 
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED)?;
+        let lagrange_pcs = load_lagrange_params(cs.size());
+
+        let prover_params =
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
             pcs,
+            lagrange_pcs,
             cs,
             prover_params,
         })
@@ -201,7 +241,6 @@ impl ProverParams {
         };
         let payer_secret = PayerSecret {
             sec_key: jubjub_zero,
-            diversifier: jubjub_zero,
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -212,6 +251,7 @@ impl ProverParams {
             amount: 0,
             blind: Default::default(),
             asset_type: Default::default(),
+            pubkey_x: Default::default(),
         };
         let (cs, _) = build_anon_fee_cs(payer_secret, payee_secret, FEE_TYPE.as_scalar());
 
@@ -219,13 +259,41 @@ impl ProverParams {
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
 
-        let prover_params = preprocess_prover(&cs, &pcs, COMMON_SEED).unwrap();
+        let lagrange_pcs = load_lagrange_params(cs.size());
+
+        let prover_params =
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
             pcs,
+            lagrange_pcs,
             cs,
             prover_params,
         })
+    }
+}
+
+fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
+    match LAGRANGE_BASES.get(&size) {
+        None => None,
+        Some(bytes) => {
+            let mut len_bytes = [0u8; 4];
+            len_bytes.copy_from_slice(&bytes[0..4]);
+            let len = u32::from_le_bytes(len_bytes) as usize;
+
+            let n = BLSG1::unchecked_size();
+
+            let mut v = vec![];
+            for i in 0..len {
+                v.push(BLSG1::from_unchecked_bytes(&bytes[(4 + n * i)..(4 + n * (i + 1))]).ok()?);
+            }
+
+            Some(KZGCommitmentSchemeBLS {
+                public_parameter_group_1: v,
+                public_parameter_group_2: vec![],
+            })
+        }
     }
 }
 

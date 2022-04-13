@@ -134,20 +134,26 @@ pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Scalar>(
     polynomial: &mut FpPolynomial<F>,
     num_hide_points: usize,
     zeroing_degree: usize,
-) {
+) -> Vec<F> {
+    let mut blinds = Vec::new();
     for i in 0..num_hide_points + 1 {
         let mut blind = F::random(prng);
+        blinds.push(blind);
         polynomial.add_coef_assign(&blind, i);
         blind = blind.neg();
         polynomial.add_coef_assign(&blind, zeroing_degree + i);
     }
+    blinds
 }
 
 /// Build polynomial Sigma, by interpolating
 /// \Sigma(g^{i+1}) = \Sigma(g^i)\prod_{j=1}^{n_wires_per_gate}(fj(g^i)
 /// + \gamma*k_j*g^i +\delta)/(fj(g^i) + \gamma*perm_j(g^i) +\delta)
 /// and setting \Sigma(1) = 1 for the base case
-pub(super) fn sigma_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
+pub(super) fn sigma_polynomial_evals<
+    PCS: PolyComScheme,
+    CS: ConstraintSystem<Field = PCS::Field>,
+>(
     cs: &CS,
     params: &PlonkPK<PCS>,
     witness: &[PCS::Field],
@@ -196,7 +202,7 @@ pub(super) fn sigma_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = 
         sigma_values.push(prev);
     }
     // interpolate polynomial
-    FpPolynomial::ffti(&params.verifier_params.root, &sigma_values, n_constraints)
+    FpPolynomial::from_coefs(sigma_values)
 }
 
 /// Computes PLONK's quotient polynomial.
@@ -582,7 +588,7 @@ pub(crate) fn combine_q_polys<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar 
 mod test {
     use crate::plonk::{
         constraint_system::TurboConstraintSystem,
-        helpers::{sigma_polynomial, PlonkChallenges},
+        helpers::{sigma_polynomial_evals, PlonkChallenges},
         setup::preprocess_prover,
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
@@ -615,18 +621,17 @@ mod test {
         let mut prng = ChaChaRng::from_seed([0_u8; 32]);
         let pcs = KZGCommitmentScheme::new(20, &mut prng);
         let params = preprocess_prover(&cs, &pcs, [0u8; 32]).unwrap();
-        let group = &params.group[..];
 
         let mut challenges = PlonkChallenges::<F>::new();
         challenges.insert_gamma_delta(one, zero).unwrap();
-        let q = sigma_polynomial::<KZGCommitmentSchemeBLS, TurboConstraintSystem<F>>(
+        let q = sigma_polynomial_evals::<KZGCommitmentSchemeBLS, TurboConstraintSystem<F>>(
             &cs,
             &params,
             &witness[..],
             &challenges,
         );
 
-        let q0 = q.eval(&group[0]);
+        let q0 = q.coefs[0];
         assert_eq!(q0, one);
     }
 }
