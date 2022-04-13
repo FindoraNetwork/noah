@@ -27,7 +27,7 @@ pub const BLS12_381_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `ark_bls12_381::Fr`
 #[wasm_bindgen]
-#[derive(Copy, Clone, PartialEq, Eq, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct BLSScalar(pub(crate) Fr);
 
 impl Debug for BLSScalar {
