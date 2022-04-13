@@ -36,6 +36,13 @@ impl AXfrKeyPair {
         AXfrPubKey(self.0.pub_key)
     }
 
+    /// Return the key pair
+    pub fn from_secret_scalar(secret: JubjubScalar) -> Self {
+        AXfrKeyPair(KeyPair::<JubjubPoint, JubjubScalar>::from_secret_scalar(
+            secret,
+        ))
+    }
+
     /// Return secret key scalar value
     pub(crate) fn get_secret_scalar(&self) -> JubjubScalar {
         self.0.get_secret_scalar()

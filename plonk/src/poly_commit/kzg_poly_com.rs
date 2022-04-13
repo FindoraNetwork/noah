@@ -272,8 +272,9 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let coefs_poly = polynomial.get_coefs_ref();
 
         let pol_degree = polynomial.degree();
+
         if pol_degree + 1 > self.public_parameter_group_1.len() {
-            return Err(eg!(PolyComSchemeError::PCSProveEvalError));
+            return Err(eg!(PolyComSchemeError::DegreeError));
         }
 
         let coefs_poly_bls_scalar_ref: Vec<&BLSScalar> = coefs_poly.iter().collect();

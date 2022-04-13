@@ -3,6 +3,7 @@ use crate::anon_xfr::{
         add_merkle_path_variables, commit, compute_merkle_root, nullify, AccElemVars,
         NullifierInputVars, PayerSecret, PayerSecretVars, TurboPlonkCS,
     },
+    compute_non_malleability_tag,
     keys::AXfrKeyPair,
     nullifier,
     structs::{Nullifier, OpenAnonBlindAssetRecord},
@@ -20,9 +21,7 @@ use sha2::Sha512;
 use zei_algebra::{
     bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*, ristretto::RistrettoScalar,
 };
-use zei_crypto::basic::{
-    rescue::RescueInstance, ristretto_pedersen_comm::RistrettoPedersenCommitment,
-};
+use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
     pc_eq_rescue_split_verifier_zk_part::{
@@ -180,8 +179,8 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
         .c(d!(ZeiError::SerializationError))
         .c(d!())?;
 
-    let (hash, non_malleability_tag) =
-        compute_non_malleability_tag(b"AbarToBar", &msg, &[&abar_keypair]);
+    let (hash, non_malleability_randomizer, non_malleability_tag) =
+        compute_non_malleability_tag(prng, b"AbarToBar", &msg, &[&abar_keypair]);
 
     let spending_proof = prove_abar_to_bar_spending(
         prng,
@@ -192,6 +191,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
         &beta,
         &lambda,
         &hash,
+        &non_malleability_randomizer,
         &non_malleability_tag,
     )
     .c(d!())?;
@@ -201,49 +201,6 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
         spending_proof,
         non_malleability_tag,
     })
-}
-
-pub fn compute_non_malleability_tag(
-    domain_separator: &[u8],
-    msg: &[u8],
-    secret_keys: &[&AXfrKeyPair],
-) -> (BLSScalar, BLSScalar) {
-    let mut hasher = Sha512::new();
-    hasher.update(domain_separator);
-    hasher.update(msg);
-
-    let hash = BLSScalar::from_hash(hasher);
-
-    let mut input_to_rescue = vec![];
-    input_to_rescue.push(BLSScalar::from(secret_keys.len() as u64));
-    input_to_rescue.push(hash);
-    for secret_key in secret_keys.iter() {
-        input_to_rescue.push(BLSScalar::from(&secret_key.get_secret_scalar()));
-    }
-
-    if input_to_rescue.len() < 4 {
-        // pad to 4
-        input_to_rescue.resize(4, BLSScalar::zero());
-    } else {
-        // pad to 4 + 3k
-        input_to_rescue.resize(
-            1 + (input_to_rescue.len() - 1 + 2) / 3 * 3,
-            BLSScalar::zero(),
-        );
-    }
-
-    let rescue = RescueInstance::new();
-    let mut acc = rescue.rescue(&[
-        input_to_rescue[0],
-        input_to_rescue[1],
-        input_to_rescue[2],
-        input_to_rescue[3],
-    ])[0];
-    for chunk in input_to_rescue[4..].chunks_exact(3) {
-        acc = rescue.rescue(&[acc, chunk[0], chunk[1], chunk[2]])[0];
-    }
-
-    (hash, acc)
 }
 
 // Verifies the body
@@ -357,6 +314,7 @@ fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     hash: &BLSScalar,
+    non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
 ) -> Result<Abar2BarPlonkProof> {
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
@@ -368,6 +326,7 @@ fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
         beta,
         lambda,
         hash,
+        non_malleability_randomizer,
         non_malleability_tag,
     );
     let witness = cs.get_and_clear_witness();
@@ -395,6 +354,7 @@ pub fn build_abar_to_bar_cs(
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     hash: &BLSScalar,
+    non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboConstraintSystem::new();
@@ -414,6 +374,7 @@ pub fn build_abar_to_bar_cs(
     let step_5 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 5));
 
     let hash_var = cs.new_variable(*hash);
+    let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
     let non_malleability_tag_var = cs.new_variable(*non_malleability_tag);
 
     // prove knowledge of payer's secret key: pk = base^{sk}
@@ -639,8 +600,8 @@ pub fn build_abar_to_bar_cs(
         let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
             one_var,
             hash_var,
+            non_malleability_randomizer_var,
             payers_secrets.sec_key,
-            zero_var,
         ]))[0];
 
         cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);

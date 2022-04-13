@@ -4,6 +4,7 @@ use crate::anon_xfr::{
 };
 use crate::setup::{ProverParams, VerifierParams};
 use merlin::Transcript;
+use zei_algebra::bls12_381::BLSScalar;
 use zei_algebra::prelude::*;
 use zei_plonk::{
     plonk::{prover::prover_with_lagrange, setup::PlonkPf, verifier::verifier},
@@ -24,6 +25,9 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     secret_inputs: AMultiXfrWitness,
+    hash: &BLSScalar,
+    non_malleability_randomizer: &BLSScalar,
+    non_malleability_tag: &BLSScalar,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
     transcript.append_u64(
@@ -38,7 +42,14 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     let fee_type = FEE_TYPE.as_scalar();
     let fee_calculating_func = FEE_CALCULATING_FUNC;
 
-    let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &fee_calculating_func);
+    let (mut cs, _) = build_multi_xfr_cs(
+        secret_inputs,
+        fee_type,
+        &fee_calculating_func,
+        &hash,
+        &non_malleability_randomizer,
+        &non_malleability_tag,
+    );
     let witness = cs.get_and_clear_witness();
 
     prover_with_lagrange(
@@ -61,6 +72,8 @@ pub(crate) fn verify_xfr(
     params: &VerifierParams,
     pub_inputs: &AMultiXfrPubInputs,
     proof: &AXfrPlonkPf,
+    hash: &BLSScalar,
+    non_malleability_tag: &BLSScalar,
 ) -> Result<()> {
     let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
     transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);
@@ -68,7 +81,10 @@ pub(crate) fn verify_xfr(
         N_OUTPUTS_TRANSCRIPT,
         pub_inputs.payees_commitments.len() as u64,
     );
-    let online_inputs = pub_inputs.to_vec();
+    let mut online_inputs = pub_inputs.to_vec();
+    online_inputs.push(*hash);
+    online_inputs.push(*non_malleability_tag);
+
     verifier(
         &mut transcript,
         &params.pcs,
@@ -82,8 +98,10 @@ pub(crate) fn verify_xfr(
 
 #[cfg(test)]
 mod tests {
+    use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
         circuits::{tests::new_multi_xfr_witness_for_test, AMultiXfrPubInputs},
+        compute_non_malleability_tag,
         config::{FEE_CALCULATING_FUNC, FEE_TYPE},
         proofs::{prove_xfr, verify_xfr},
     };
@@ -269,17 +287,56 @@ mod tests {
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
         let params = ProverParams::new(n_payers, n_payees, Some(1)).unwrap();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let proof = prove_xfr(&mut prng, &params, secret_inputs).unwrap();
 
-        // A bad proof should fail the verification
-        let bad_secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [1u8; 32]);
-        let bad_proof = prove_xfr(&mut prng, &params, bad_secret_inputs).unwrap();
+        let mut msg = [0u8; 32];
+        prng.fill_bytes(&mut msg);
+
+        let input_keypairs: Vec<AXfrKeyPair> = secret_inputs
+            .payers_secrets
+            .iter()
+            .map(|x| AXfrKeyPair::from_secret_scalar(x.sec_key))
+            .collect();
+
+        let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
+
+        let (hash, non_malleability_randomizer, non_malleability_tag) =
+            compute_non_malleability_tag(&mut prng, b"AnonXfr", &msg, &input_keypairs_ref);
+
+        let proof = prove_xfr(
+            &mut prng,
+            &params,
+            secret_inputs,
+            &hash,
+            &non_malleability_randomizer,
+            &non_malleability_tag,
+        )
+        .unwrap();
 
         // verify good witness
         let node_params = VerifierParams::from(params);
-        assert!(verify_xfr(&node_params, &pub_inputs, &proof).is_ok());
+        assert!(verify_xfr(
+            &node_params,
+            &pub_inputs,
+            &proof,
+            &hash,
+            &non_malleability_tag
+        )
+        .is_ok());
 
+        // An unmatched input fail the verification
+        let bad_secret_inputs = AMultiXfrPubInputs::from_witness(&new_multi_xfr_witness_for_test(
+            inputs.to_vec(),
+            outputs.to_vec(),
+            [1u8; 32],
+        ));
         // verify bad witness
-        assert!(verify_xfr(&node_params, &pub_inputs, &bad_proof).is_err());
+        assert!(verify_xfr(
+            &node_params,
+            &bad_secret_inputs,
+            &proof,
+            &hash,
+            &non_malleability_tag
+        )
+        .is_err());
     }
 }

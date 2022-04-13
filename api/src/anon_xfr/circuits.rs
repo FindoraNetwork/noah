@@ -184,6 +184,9 @@ pub(crate) fn build_multi_xfr_cs(
     secret_inputs: AMultiXfrWitness,
     fee_type: BLSScalar,
     fee_calculating_func: &dyn Fn(u32, u32) -> u32,
+    hash: &BLSScalar,
+    non_malleability_randomizer: &BLSScalar,
+    non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(secret_inputs.payers_secrets.len(), 0);
     assert_ne!(secret_inputs.payees_secrets.len(), 0);
@@ -191,6 +194,10 @@ pub(crate) fn build_multi_xfr_cs(
     let mut cs = TurboConstraintSystem::new();
     let payers_secrets = add_payers_secrets(&mut cs, &secret_inputs.payers_secrets);
     let payees_secrets = add_payees_secrets(&mut cs, &secret_inputs.payees_secrets);
+
+    let hash_var = cs.new_variable(*hash);
+    let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
+    let non_malleability_tag_var = cs.new_variable(*non_malleability_tag);
 
     let base = JubjubPoint::get_base();
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
@@ -263,14 +270,45 @@ pub(crate) fn build_multi_xfr_cs(
 
     // add asset-mixing constraints
     let inputs: Vec<(VarIndex, VarIndex)> = payers_secrets
-        .into_iter()
+        .iter()
         .map(|payer| (payer.asset_type, payer.amount))
         .collect();
     let outputs: Vec<(VarIndex, VarIndex)> = payees_secrets
-        .into_iter()
+        .iter()
         .map(|payee| (payee.asset_type, payee.amount))
         .collect();
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
+
+    // Check that validity of the the non malleability tag.
+    {
+        let num_inputs = BLSScalar::from(payers_secrets.len() as u64);
+        let num_inputs_var = cs.new_variable(num_inputs);
+        cs.insert_constant_gate(num_inputs_var, num_inputs);
+
+        let mut non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
+            num_inputs_var,
+            hash_var,
+            non_malleability_randomizer_var,
+            payers_secrets[0].sec_key,
+        ]))[0];
+
+        for chunk in payers_secrets[1..].chunks(3) {
+            let mut sec_keys: Vec<VarIndex> = chunk.iter().map(|x| x.sec_key).collect();
+            sec_keys.resize(3, zero_var);
+
+            non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
+                non_malleability_tag_var_supposed,
+                sec_keys[0],
+                sec_keys[1],
+                sec_keys[2],
+            ]))[0];
+        }
+
+        cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
+    }
+
+    cs.prepare_io_variable(hash_var);
+    cs.prepare_io_variable(non_malleability_tag_var);
 
     // pad the number of constraints to power of two
     cs.pad();
@@ -847,8 +885,10 @@ fn match_select(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::anon_xfr::compute_non_malleability_tag;
+    use crate::anon_xfr::keys::AXfrKeyPair;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
+    use rand_core::{RngCore, SeedableRng};
     use ruc::*;
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar};
     use zei_crypto::basic::rescue::RescueInstance;
@@ -1849,10 +1889,33 @@ pub(crate) mod tests {
         let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [0u8; 32]);
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
 
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let mut msg = [0u8; 32];
+        prng.fill_bytes(&mut msg);
+
+        let input_keypairs: Vec<AXfrKeyPair> = secret_inputs
+            .payers_secrets
+            .iter()
+            .map(|x| AXfrKeyPair::from_secret_scalar(x.sec_key))
+            .collect();
+        let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
+        let (hash, non_malleability_randomizer, non_malleability_tag) =
+            compute_non_malleability_tag(&mut prng, b"AnonXfr", &msg, &input_keypairs_ref);
+
         // check the constraints
-        let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, fee_calculating_func);
+        let (mut cs, _) = build_multi_xfr_cs(
+            secret_inputs,
+            fee_type,
+            fee_calculating_func,
+            &hash,
+            &non_malleability_randomizer,
+            &non_malleability_tag,
+        );
         let witness = cs.get_and_clear_witness();
-        let online_inputs = pub_inputs.to_vec();
+        let mut online_inputs = pub_inputs.to_vec();
+        online_inputs.push(hash);
+        online_inputs.push(non_malleability_tag);
         let verify = cs.verify_witness(&witness, &online_inputs);
         if witness_is_valid {
             pnk!(verify);
