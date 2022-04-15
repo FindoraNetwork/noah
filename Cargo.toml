@@ -9,15 +9,16 @@ members = [
 resolver = "2"
 
 [patch.crates-io]
-ark-ec = { git = "https://github.com/FindoraNetwork/ark-algebra", branch = "develop-refactoring" }
-ark-ff = { git = "https://github.com/FindoraNetwork/ark-algebra", branch = "develop-refactoring" }
-ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra", branch = "develop-refactoring" }
-ark-std = { git = "https://github.com/FindoraNetwork/ark-std", branch = "develop-refactoring" }
-ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves", branch = "develop-refactoring" }
-ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves", branch = "develop-refactoring" }
-curve25519-dalek = { git = "https://github.com/FindoraNetwork/curve25519-dalek", branch = "develop-refactoring" }
-ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek", branch = "develop-refactoring" }
-x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek", branch = "develop-refactoring" }
+ark-ec = { git = "https://github.com/FindoraNetwork/ark-algebra" }
+ark-ff = { git = "https://github.com/FindoraNetwork/ark-algebra" }
+ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra" }
+ark-std = { git = "https://github.com/FindoraNetwork/ark-std" }
+ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
+ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
+curve25519-dalek = { git = "https://github.com/FindoraNetwork/curve25519-dalek" }
+ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek" }
+x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek" }
+bulletproofs = { git = "https://github.com/FindoraNetwork/bp" }
 
 [profile.release]
 opt-level = 3
