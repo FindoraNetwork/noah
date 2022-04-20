@@ -301,6 +301,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         if depth > TREE_DEPTH || id > 3u64.pow(depth as u32) {
             return Err(eg!("tree depth is invalid for generate proof"));
         }
+        let v = self.version();
 
         let keys = get_path_keys(id);
 
@@ -327,12 +328,12 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                 };
                 let mut store_key1 = KEY_PAD.to_vec();
                 store_key1.extend(sib1.to_be_bytes());
-                if let Some(b) = self.store.get(&store_key1)? {
+                if let Some(b) = self.store.get_v(&store_key1, v)? {
                     node.siblings1 = BLSScalar::zei_from_bytes(b.as_slice())?;
                 }
                 let mut store_key2 = KEY_PAD.to_vec();
                 store_key2.extend(sib2.to_be_bytes());
-                if let Some(b) = self.store.get(&store_key2)? {
+                if let Some(b) = self.store.get_v(&store_key2, v)? {
                     node.siblings2 = BLSScalar::zei_from_bytes(b.as_slice())?;
                 }
 
@@ -355,17 +356,8 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
 
     /// get tree root by depth
     pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
-        let mut pos = 0u64;
-        for i in 0..(TREE_DEPTH - depth) {
-            pos += 3u64.pow(i as u32);
-        }
-        let mut store_key = KEY_PAD.to_vec();
-        store_key.extend(pos.to_be_bytes());
-
-        match self.store.get(&store_key)? {
-            Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
-            None => Err(eg!("root hash key not found")),
-        }
+        let v = self.version();
+        self.get_root_with_depth_and_version(depth, v)
     }
 
     /// get tree root by depth and version.
@@ -390,8 +382,9 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
     pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(uid.to_be_bytes());
+        let v = self.version();
 
-        match self.store.get(&store_key)? {
+        match self.store.get_v(&store_key, v)? {
             Some(hash) => Ok(Some(BLSScalar::zei_from_bytes(hash.as_slice())?)),
             None => Ok(None),
         }
