@@ -37,6 +37,7 @@ mod tests {
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
+        assert_eq!(0, mt.version());
 
         let start = Instant::now();
         for _ in 0..10 {
@@ -47,9 +48,14 @@ mod tests {
         }
         let end = start.elapsed();
         println!("Time: {:?} microseconds", end.as_micros());
+        let v1 = mt.commit().unwrap();
+        assert_eq!(v1, mt.version());
+        assert_eq!(1, v1);
 
         let sid_x = mt.add_commitment_hash(BLSScalar::one()).unwrap();
         let proofx = mt.generate_proof_with_depth(sid_x, 10).unwrap();
+        let _v2 = mt.commit().unwrap();
+        assert_eq!(2, mt.version());
         assert!(verify(BLSScalar::one(), &proofx));
         let proof4 = mt.generate_proof_with_depth(sid_x, 14).unwrap();
         assert!(verify(BLSScalar::one(), &proof4));

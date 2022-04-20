@@ -61,7 +61,6 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 /// ```
 pub struct PersistentMerkleTree<'a, D: MerkleDB> {
     entry_count: u64,
-    version: u64,
     store: PrefixedStore<'a, D>,
 }
 
@@ -69,25 +68,19 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
     /// Generates a new PersistentMerkleTree based on a sessioned KV store
     pub fn new(mut store: PrefixedStore<'a, D>) -> Result<PersistentMerkleTree<'a, D>> {
         let mut entry_count = 0;
-        let mut version = 0;
 
         if let Some(bytes) = store.get(&ENTRY_COUNT_KEY)? {
             let array: [u8; 8] = [
                 bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
             ];
             entry_count = u64::from_be_bytes(array);
-            version = store.height().c(d!())?;
         } else {
             store.set(&ROOT_KEY, BLSScalar::zero().zei_to_bytes())?;
             store.set(&ENTRY_COUNT_KEY, 0u64.to_be_bytes().to_vec())?;
             store.state_mut().commit(0).c(d!())?;
         }
 
-        Ok(PersistentMerkleTree {
-            entry_count,
-            version,
-            store,
-        })
+        Ok(PersistentMerkleTree { entry_count, store })
     }
 
     /// add a new leaf and return the leaf uid.
@@ -229,9 +222,9 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
     /// commit to store and add the tree version
     pub fn commit(&mut self) -> Result<u64> {
-        let (_, ver) = self.store.state_mut().commit(self.version + 1).c(d!())?;
-        self.version = ver;
-        Ok(self.version)
+        let height = self.store.height()?;
+        let (_, ver) = self.store.state_mut().commit(height + 1).c(d!())?;
+        Ok(ver)
     }
 
     /// get leaf hash by uid
@@ -247,7 +240,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
     /// get the tree version
     pub fn version(&self) -> u64 {
-        self.version
+        self.store.height().unwrap_or(0)
     }
 
     /// get the number of entries
@@ -260,7 +253,6 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 /// used to store the records in anonymous payment
 pub struct ImmutablePersistentMerkleTree<'a, D: MerkleDB> {
     entry_count: u64,
-    version: u64,
     store: ImmutablePrefixedStore<'a, D>,
 }
 
@@ -270,21 +262,15 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         store: ImmutablePrefixedStore<'a, D>,
     ) -> Result<ImmutablePersistentMerkleTree<'a, D>> {
         let mut entry_count = 0;
-        let mut version = 0;
 
         if let Some(bytes) = store.get(&ENTRY_COUNT_KEY)? {
             let array: [u8; 8] = [
                 bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
             ];
             entry_count = u64::from_be_bytes(array);
-            version = store.height().c(d!())?;
         }
 
-        Ok(ImmutablePersistentMerkleTree {
-            entry_count,
-            version,
-            store,
-        })
+        Ok(ImmutablePersistentMerkleTree { entry_count, store })
     }
 
     /// generate leaf's merkle proof by uid
@@ -377,7 +363,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
 
     /// get the tree version
     pub fn version(&self) -> u64 {
-        self.version
+        self.store.height().unwrap_or(0)
     }
 
     /// get the number of entries
