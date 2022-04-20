@@ -49,7 +49,7 @@ pub struct AXfrBody {
     pub inputs: Vec<Nullifier>,
     pub outputs: Vec<AnonBlindAssetRecord>,
     pub merkle_root: BLSScalar,
-    pub merkle_root_version: usize,
+    pub merkle_root_version: u64,
     pub owner_memos: Vec<OwnerMemo>,
 }
 
@@ -73,7 +73,7 @@ impl AnonBlindAssetRecord {
 pub struct MTLeafInfo {
     pub path: MTPath,
     pub root: BLSScalar,
-    pub root_version: usize,
+    pub root_version: u64,
     pub uid: u64,
 }
 

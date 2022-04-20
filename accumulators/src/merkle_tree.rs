@@ -195,7 +195,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         Ok(Proof {
             nodes: nodes,
             root: self.get_root_with_depth(depth)?,
-            root_version: 1,
+            root_version: self.version(),
             uid: id,
         })
     }
@@ -325,7 +325,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         Ok(Proof {
             nodes: nodes,
             root: self.get_root_with_depth(depth)?,
-            root_version: 1,
+            root_version: self.version(),
             uid: id,
         })
     }
@@ -396,7 +396,7 @@ pub struct Proof {
     /// current root.
     pub root: BLSScalar,
     /// current root version.
-    pub root_version: usize,
+    pub root_version: u64,
     /// leaf's uid.
     pub uid: u64,
 }

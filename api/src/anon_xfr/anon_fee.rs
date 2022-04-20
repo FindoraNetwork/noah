@@ -41,7 +41,7 @@ pub struct AnonFeeBody {
     pub input: Nullifier,
     pub output: AnonBlindAssetRecord,
     pub merkle_root: BLSScalar,
-    pub merkle_root_version: usize,
+    pub merkle_root_version: u64,
     pub owner_memo: OwnerMemo,
 }
 
@@ -183,7 +183,7 @@ pub fn verify_anon_fee_note(
 pub struct AnonFeeProof {
     pub snark_proof: SnarkProof,
     pub merkle_root: BLSScalar,
-    pub merkle_root_version: usize,
+    pub merkle_root_version: u64,
 }
 
 fn prove_anon_fee<R: CryptoRng + RngCore>(

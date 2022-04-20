@@ -52,12 +52,12 @@ pub struct ConvertAbarBarProof {
     commitment_eq_proof: ZKPartProof,
     spending_proof: Abar2BarPlonkProof,
     merkle_root: BLSScalar,
-    merkle_root_version: usize,
+    merkle_root_version: u64,
 }
 
 impl ConvertAbarBarProof {
     #[allow(dead_code)]
-    pub fn get_merkle_root_version(&self) -> usize {
+    pub fn get_merkle_root_version(&self) -> u64 {
         return self.merkle_root_version;
     }
 }
@@ -85,7 +85,7 @@ pub struct AbarToBarBody {
     /// The Merkle root hash
     pub merkle_root: BLSScalar,
     /// The Merkle root version
-    pub merkle_root_version: usize,
+    pub merkle_root_version: u64,
     /// The owner memo
     pub memo: Option<OwnerMemo>,
 }
