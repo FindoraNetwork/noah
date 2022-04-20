@@ -216,7 +216,25 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         match self.store.get(&store_key)? {
             Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
-            None => Err(eg!("root hash key not found")),
+            None => Err(eg!("root hash key not found at this depth")),
+        }
+    }
+
+    /// get tree root by depth and version.
+    pub fn get_root_with_depth_and_version(&self, depth: usize, version: u64) -> Result<BLSScalar> {
+        if version == 0 {
+            return Ok(BLSScalar::zero());
+        }
+
+        let mut pos = 0u64;
+        for i in 0..(TREE_DEPTH - depth) {
+            pos += 3u64.pow(i as u32);
+        }
+        let mut store_key = KEY_PAD.to_vec();
+        store_key.extend(pos.to_be_bytes());
+        match self.store.get_v(&store_key, version)? {
+            Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
+            None => Err(eg!("root hash key not found at this depth and version")),
         }
     }
 
@@ -347,6 +365,24 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         match self.store.get(&store_key)? {
             Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
             None => Err(eg!("root hash key not found")),
+        }
+    }
+
+    /// get tree root by depth and version.
+    pub fn get_root_with_depth_and_version(&self, depth: usize, version: u64) -> Result<BLSScalar> {
+        if version == 0 {
+            return Ok(BLSScalar::zero());
+        }
+
+        let mut pos = 0u64;
+        for i in 0..(TREE_DEPTH - depth) {
+            pos += 3u64.pow(i as u32);
+        }
+        let mut store_key = KEY_PAD.to_vec();
+        store_key.extend(pos.to_be_bytes());
+        match self.store.get_v(&store_key, version)? {
+            Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
+            None => Err(eg!("root hash key not found at this depth and version")),
         }
     }
 
