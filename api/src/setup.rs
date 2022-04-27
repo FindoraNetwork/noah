@@ -11,8 +11,9 @@ use crate::anon_xfr::{
     structs::{MTNode, MTPath},
 };
 use crate::parameters::{
-    ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
-    BULLETPROOF_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
+    ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS,
+    BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS,
+    VERIFIER_SPECIALS_PARAMS,
 };
 use bulletproofs::BulletproofGens;
 use serde::Deserialize;
@@ -399,6 +400,16 @@ impl VerifierParams {
     /// bar to abar transfer verifier parameters.
     pub fn bar_to_abar_params() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
+            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+        } else {
+            let prover_params = ProverParams::eq_committed_vals_params()?;
+            Ok(VerifierParams::from(prover_params))
+        }
+    }
+
+    /// ar to abar transfer verifier parameters.
+    pub fn ar_to_abar_params() -> Result<VerifierParams> {
+        if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
             let prover_params = ProverParams::eq_committed_vals_params()?;
