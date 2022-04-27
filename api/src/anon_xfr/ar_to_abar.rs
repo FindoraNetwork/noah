@@ -8,7 +8,7 @@ use crate::anon_xfr::{
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
-    sig::{XfrKeyPair, XfrPublicKey, XfrSignature},
+    sig::{XfrKeyPair, XfrSignature},
     structs::{AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo},
 };
 use merlin::Transcript;
@@ -59,11 +59,10 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
 pub fn verify_ar_to_abar_note(
     params: &VerifierParams,
     note: ArToAbarNote,
-    bar_pub_key: &XfrPublicKey,
 ) -> Result<()> {
     // verify signature
     let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
-    bar_pub_key.verify(&msg, &note.signature).c(d!())?;
+    note.body.input.public_key.verify(&msg, &note.signature).c(d!())?;
 
     // verify body
     verify_ar_to_abar_body(params, note.body).c(d!())
@@ -229,4 +228,65 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
 
     let n_constraints = cs.size;
     (cs, n_constraints)
+}
+
+#[cfg(test)]
+mod test {
+    use rand_chacha::ChaChaRng;
+    use rand_core::SeedableRng;
+    use zei_crypto::basic::hybrid_encryption::XSecretKey;
+    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use crate::anon_xfr::keys::AXfrKeyPair;
+    use crate::xfr::asset_record::{AssetRecordType, build_blind_asset_record, open_blind_asset_record};
+    use crate::xfr::sig::XfrPublicKey;
+    use crate::xfr::structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo};
+    use super::*;
+
+    // helper function
+    fn _build_ar(
+        pubkey: &XfrPublicKey,
+        prng: &mut ChaChaRng,
+        pc_gens: &RistrettoPedersenCommitment,
+        amt: u64,
+        asset_type: AssetType,
+        ar_type: AssetRecordType,
+    ) -> (BlindAssetRecord, Option<OwnerMemo>) {
+        let ar = AssetRecordTemplate::with_no_asset_tracing(amt, asset_type, ar_type, *pubkey);
+        let (bar, _, memo) = build_blind_asset_record(prng, &pc_gens, &ar, vec![]);
+        (bar, memo)
+    }
+
+    #[test]
+    fn test_ar_to_abar() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let pc_gens = RistrettoPedersenCommitment::default();
+
+        let bar_keypair = XfrKeyPair::generate(&mut prng);
+        let abar_keypair = AXfrKeyPair::generate(&mut prng);
+        let dec_key = XSecretKey::new(&mut prng);
+        let enc_key = XPublicKey::from(&dec_key);
+        // proving
+        let params = ProverParams::ar_to_abar_params().unwrap();
+
+        let (bar_conf, memo) = _build_ar(
+            &bar_keypair.pub_key,
+            &mut prng,
+            &pc_gens,
+            10u64,
+            AssetType::from_identical_byte(1u8),
+            AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
+        );
+        let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
+
+        let note = gen_ar_to_abar_note(&mut prng, &params, &obar, &bar_keypair, &abar_keypair.pub_key(), &enc_key).unwrap();
+
+        // verifications
+        let node_params = VerifierParams::ar_to_abar_params().unwrap();
+        assert!(
+            verify_ar_to_abar_note(
+                &node_params,
+                note,
+            ).is_ok()
+        );
+    }
 }

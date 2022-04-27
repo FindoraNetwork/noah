@@ -78,6 +78,9 @@ pub fn build_abar_to_bar_cs(payers_secret: PayerSecret) -> (TurboPlonkCS, usize)
     // prepare the public input for merkle_root
     cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
 
+    cs.prepare_io_variable(payers_secrets_vars.amount);
+    cs.prepare_io_variable(payers_secrets_vars.asset_type);
+
     // pad the number of constraints to power of two
     cs.pad();
 
