@@ -2,6 +2,7 @@
 use crate::anon_xfr::{
     abar_to_bar::build_abar_to_bar_cs,
     anon_fee::build_anon_fee_cs,
+    ar_to_abar::build_ar_to_abar_cs,
     circuits::{
         build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret,
         TurboPlonkCS, TREE_DEPTH,
@@ -225,6 +226,35 @@ impl ProverParams {
             &non_malleability_randomizer,
             &non_malleability_tag,
         );
+        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+            .c(d!(ZeiError::DeserializationError))?;
+
+        let lagrange_pcs = load_lagrange_params(cs.size());
+
+        let prover_params =
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+
+        Ok(ProverParams {
+            bp_params: BulletproofParams::new()?,
+            pcs,
+            lagrange_pcs,
+            cs,
+            prover_params,
+        })
+    }
+
+    pub fn ar_to_abar_params() -> Result<ProverParams> {
+        let bls_zero = BLSScalar::zero();
+        let dummy_payee = PayeeSecret {
+            amount: 0,
+            blind: bls_zero,
+            asset_type: bls_zero,
+            pubkey_x: bls_zero,
+        };
+
+        let (cs, _) = build_ar_to_abar_cs(dummy_payee);
+
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
