@@ -56,13 +56,14 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     Ok(note)
 }
 
-pub fn verify_ar_to_abar_note(
-    params: &VerifierParams,
-    note: ArToAbarNote,
-) -> Result<()> {
+pub fn verify_ar_to_abar_note(params: &VerifierParams, note: ArToAbarNote) -> Result<()> {
     // verify signature
     let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
-    note.body.input.public_key.verify(&msg, &note.signature).c(d!())?;
+    note.body
+        .input
+        .public_key
+        .verify(&msg, &note.signature)
+        .c(d!())?;
 
     // verify body
     verify_ar_to_abar_body(params, note.body).c(d!())
@@ -232,15 +233,17 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::anon_xfr::keys::AXfrKeyPair;
+    use crate::xfr::asset_record::{
+        build_blind_asset_record, open_blind_asset_record, AssetRecordType,
+    };
+    use crate::xfr::sig::XfrPublicKey;
+    use crate::xfr::structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use zei_crypto::basic::hybrid_encryption::XSecretKey;
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::xfr::asset_record::{AssetRecordType, build_blind_asset_record, open_blind_asset_record};
-    use crate::xfr::sig::XfrPublicKey;
-    use crate::xfr::structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo};
-    use super::*;
 
     // helper function
     fn _build_ar(
@@ -278,15 +281,18 @@ mod test {
         );
         let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
 
-        let note = gen_ar_to_abar_note(&mut prng, &params, &obar, &bar_keypair, &abar_keypair.pub_key(), &enc_key).unwrap();
+        let note = gen_ar_to_abar_note(
+            &mut prng,
+            &params,
+            &obar,
+            &bar_keypair,
+            &abar_keypair.pub_key(),
+            &enc_key,
+        )
+        .unwrap();
 
         // verifications
         let node_params = VerifierParams::ar_to_abar_params().unwrap();
-        assert!(
-            verify_ar_to_abar_note(
-                &node_params,
-                note,
-            ).is_ok()
-        );
+        assert!(verify_ar_to_abar_note(&node_params, note,).is_ok());
     }
 }

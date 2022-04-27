@@ -3,9 +3,9 @@ use crate::anon_xfr::{
     abar_to_bar::build_abar_to_bar_cs,
     anon_fee::build_anon_fee_cs,
     ar_to_abar::build_ar_to_abar_cs,
+    bar_to_abar::build_eq_committed_vals_cs,
     circuits::{
-        build_eq_committed_vals_cs, build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret,
-        TurboPlonkCS, TREE_DEPTH,
+        build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret, TurboPlonkCS, TREE_DEPTH,
     },
     config::{FEE_CALCULATING_FUNC, FEE_TYPE},
     structs::{MTNode, MTPath},
