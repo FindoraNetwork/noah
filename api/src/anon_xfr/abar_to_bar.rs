@@ -595,7 +595,7 @@ pub fn build_abar_to_bar_cs(
         cs.equal(y_in_bls12_381, payers_secrets.asset_type);
     }
 
-    // 7. Check that validity of the the non malleability tag.
+    // 7. Check the validity of the non malleability tag.
     {
         let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
             one_var,
