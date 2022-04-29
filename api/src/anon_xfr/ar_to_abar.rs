@@ -20,25 +20,41 @@ use zei_plonk::plonk::{
     constraint_system::TurboConstraintSystem, prover::prover_with_lagrange, verifier::verifier,
 };
 
+/// Transcript header for AR_TO_ABAR
 const AR_TO_ABAR_TRANSCRIPT: &[u8] = b"AR To ABAR proof";
-pub const TWO_POW_32: u64 = 1 << 32;
 
+/// ArToAbarBody holds the input, output, proof and memo for the Ar conversion.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ArToAbarBody {
+    /// input UTXO to convert
     pub input: BlindAssetRecord,
+    /// freshly created commitment in Anon domain
     pub output: AnonBlindAssetRecord,
+    /// proof to prove the equality of amount and asset type
     pub proof: AXfrPlonkPf,
+    /// memo to hold the blinding factor of commitment
     pub memo: OwnerMemo,
 }
 
+/// ArToAbarNote has the body and the signature required for the ArToAbar conversion
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ArToAbarNote {
+    /// body of the transfer note
     pub body: ArToAbarBody,
+    /// signature of the spender
     pub signature: XfrSignature,
 }
 
-/// Generate BlindAssetRecord To AnonymousBlindAssetRecord conversion note: body + spending input signature
-/// Returns conversion note and output AnonymousBlindAssetRecord opening keys
+/// Generate AssetRecord To AnonymousBlindAssetRecord conversion note: body + spending input signature
+/// Returns conversion note
+/// * `prng` - pseudo-random generator
+/// * `params` - prover params for ar_to_abar
+/// * `record` - input record to convert in the open form
+/// * `bar_keypair` - owner keypair of input record
+/// * `abar_pubkey` - Anon public key to receive ABAR
+/// * `enc_key` - Encryption key for Owner memo of the commitment
+/// Returns ArToAbarNote
+/// Returns error if it fails to generate body or fails to serialize the body.
 pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
@@ -47,15 +63,24 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     abar_pubkey: &AXfrPubKey,
     enc_key: &XPublicKey,
 ) -> Result<ArToAbarNote> {
+    // generate body
     let body = gen_ar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
+
+    // serialize and sign the body
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
     let signature = bar_keypair.sign(&msg);
+
+    // prepare note
     let note = ArToAbarNote { body, signature };
     Ok(note)
 }
 
+/// Verifies the note for proof and signature correctness
+/// * `params` - Verifier Params for the ArToAbar proof
+/// * `note` - ref of note to verify
+/// Fails if the proof or signature is incorrect
 pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> Result<()> {
     // verify signature
     let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
@@ -71,6 +96,13 @@ pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> R
 
 /// Generate AR To Abar conversion note body
 /// Returns note Body and ABAR opening keys
+/// * `prng` - pseudo-random generator
+/// * `params` - prover params for ar_to_abar
+/// * `record` - input record to convert in the open form
+/// * `abar_pubkey` - Anon public key to receive ABAR
+/// * `enc_key` - Encryption key for Owner memo of the commitment
+/// Returns the ArToAbarBody
+/// Returns an error if the proof generation fails
 pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
@@ -88,15 +120,20 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     Ok(body)
 }
 
+/// Verifies the proof in the ar_to_abar body
+/// * `params` - verifier params
+/// * `body`   - body to verify
+/// Returns an error if the input record is confidential or if the proof
+/// verification fails.
 pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> Result<()> {
     // check amount & asset type are non-confidential
     if body.input.amount.is_confidential() || body.input.asset_type.is_confidential() {
         return Err(eg!(ZeiError::ParameterError));
     }
-
     let amount = body.input.amount.get_amount().unwrap();
     let asset_type = body.input.asset_type.get_asset_type().unwrap();
 
+    // verify the proof
     verify_ar_to_abar(
         params,
         amount,
@@ -107,6 +144,7 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     .c(d!("ArToAbar Body verification failed"))
 }
 
+/// Generates output record and the plonk proof
 pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
@@ -139,7 +177,7 @@ pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
 
 ///
 ///     Generate proof for ArToAbar body
-///
+/// * `rng`
 fn prove_ar_to_abar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,

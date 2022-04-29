@@ -71,7 +71,7 @@ pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
 }
 
 /// Generate BlindAssetRecord To AnonymousBlindAssetRecord conversion note: body + spending input signature
-/// Returns conversion note and output AnonymousBlindAssetRecord opening keys
+/// Returns conversion note
 pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
