@@ -56,7 +56,7 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     Ok(note)
 }
 
-pub fn verify_ar_to_abar_note(params: &VerifierParams, note: ArToAbarNote) -> Result<()> {
+pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> Result<()> {
     // verify signature
     let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
     note.body
@@ -66,7 +66,7 @@ pub fn verify_ar_to_abar_note(params: &VerifierParams, note: ArToAbarNote) -> Re
         .c(d!())?;
 
     // verify body
-    verify_ar_to_abar_body(params, note.body).c(d!())
+    verify_ar_to_abar_body(params, &note.body).c(d!())
 }
 
 /// Generate AR To Abar conversion note body
@@ -88,7 +88,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     Ok(body)
 }
 
-pub fn verify_ar_to_abar_body(params: &VerifierParams, body: ArToAbarBody) -> Result<()> {
+pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> Result<()> {
     // check amount & asset type are non-confidential
     if body.input.amount.is_confidential() || body.input.asset_type.is_confidential() {
         return Err(eg!(ZeiError::ParameterError));
@@ -293,6 +293,6 @@ mod test {
 
         // verifications
         let node_params = VerifierParams::ar_to_abar_params().unwrap();
-        assert!(verify_ar_to_abar_note(&node_params, note,).is_ok());
+        assert!(verify_ar_to_abar_note(&node_params, &note,).is_ok());
     }
 }
