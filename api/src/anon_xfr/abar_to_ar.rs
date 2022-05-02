@@ -162,6 +162,9 @@ pub fn verify_abar_to_ar_note(
     note: &AbarToArNote,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
+    let payer_amount = note.body.output.amount.get_amount().unwrap();
+    let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
+
     // check amount & asset type are non-confidential
     if note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential() {
         return Err(eg!(ZeiError::ParameterError));
@@ -178,6 +181,8 @@ pub fn verify_abar_to_ar_note(
 
     online_inputs.push(input.clone());
     online_inputs.push(merkle_root.clone());
+    online_inputs.push(BLSScalar::from(payer_amount));
+    online_inputs.push(payer_asset_type.as_scalar());
 
     let msg = bincode::serialize(&note.body)
         .c(d!(ZeiError::SerializationError))
@@ -321,6 +326,9 @@ pub fn build_abar_to_ar_cs(
 
     cs.prepare_io_variable(payers_secrets_vars.amount);
     cs.prepare_io_variable(payers_secrets_vars.asset_type);
+
+    cs.prepare_io_variable(hash_var);
+    cs.prepare_io_variable(non_malleability_tag_var);   
 
     // pad the number of constraints to power of two
     cs.pad();
