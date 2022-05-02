@@ -1,5 +1,6 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::{
+    abar_to_ar::build_abar_to_ar_cs,
     abar_to_bar::build_abar_to_bar_cs,
     anon_fee::build_anon_fee_cs,
     ar_to_abar::build_ar_to_abar_cs,
@@ -11,9 +12,9 @@ use crate::anon_xfr::{
     structs::{MTNode, MTPath},
 };
 use crate::parameters::{
-    ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS,
-    BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS,
-    VERIFIER_SPECIALS_PARAMS,
+    ABAR_TO_AR_VERIFIER_PARAMS, ABAR_TO_BAR_VERIFIER_PARAMS, ANON_FEE_VERIFIER_PARAMS,
+    AR_TO_ABAR_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_URS, LAGRANGE_BASES, SRS,
+    VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS,
 };
 use bulletproofs::BulletproofGens;
 use serde::Deserialize;
@@ -274,6 +275,53 @@ impl ProverParams {
         })
     }
 
+    pub fn abar_to_ar_params(tree_depth: usize) -> Result<ProverParams> {
+        let bls_zero = BLSScalar::zero();
+        let jubjub_zero = JubjubScalar::zero();
+        let hash = bls_zero;
+        let non_malleability_randomizer = bls_zero;
+        let non_malleability_tag = bls_zero;
+
+        let node = MTNode {
+            siblings1: bls_zero,
+            siblings2: bls_zero,
+            is_left_child: 0,
+            is_right_child: 0,
+        };
+        let payer_secret = PayerSecret {
+            sec_key: jubjub_zero,
+            uid: 0,
+            amount: 0,
+            asset_type: bls_zero,
+            path: MTPath::new(vec![node; tree_depth]),
+            blind: bls_zero,
+        };
+
+        let (cs, _) = build_abar_to_ar_cs(
+            payer_secret,
+            &hash,
+            &non_malleability_randomizer,
+            &non_malleability_tag,
+        );
+
+        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+            .c(d!(ZeiError::DeserializationError))?;
+
+        let lagrange_pcs = load_lagrange_params(cs.size());
+
+        let prover_params =
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+
+        Ok(ProverParams {
+            bp_params: BulletproofParams::new()?,
+            pcs,
+            lagrange_pcs,
+            cs,
+            prover_params,
+        })
+    }
+
     pub fn anon_fee_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
         let jubjub_zero = JubjubScalar::zero();
@@ -412,7 +460,17 @@ impl VerifierParams {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
-            let prover_params = ProverParams::eq_committed_vals_params()?;
+            let prover_params = ProverParams::ar_to_abar_params()?;
+            Ok(VerifierParams::from(prover_params))
+        }
+    }
+
+    /// abar to ar transfer verifier parameters.
+    pub fn abar_to_ar_params() -> Result<VerifierParams> {
+        if let Some(bytes) = ABAR_TO_AR_VERIFIER_PARAMS {
+            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+        } else {
+            let prover_params = ProverParams::abar_to_ar_params(TREE_DEPTH)?;
             Ok(VerifierParams::from(prover_params))
         }
     }
