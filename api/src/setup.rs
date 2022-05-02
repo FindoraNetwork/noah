@@ -460,7 +460,7 @@ impl VerifierParams {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
-            let prover_params = ProverParams::eq_committed_vals_params()?;
+            let prover_params = ProverParams::ar_to_abar_params()?;
             Ok(VerifierParams::from(prover_params))
         }
     }
@@ -470,7 +470,7 @@ impl VerifierParams {
         if let Some(bytes) = ABAR_TO_AR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
-            let prover_params = ProverParams::eq_committed_vals_params()?;
+            let prover_params = ProverParams::abar_to_ar_params(TREE_DEPTH)?;
             Ok(VerifierParams::from(prover_params))
         }
     }

@@ -10,7 +10,7 @@ use crate::anon_xfr::{
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
-    asset_record::{build_open_asset_record, AssetRecordType},
+    asset_record::{build_open_asset_record},
     sig::XfrPublicKey,
     structs::{AssetRecordTemplate, BlindAssetRecord, OwnerMemo},
 };
@@ -28,6 +28,7 @@ use zei_plonk::{
     },
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
+use crate::xfr::asset_record::AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 
 pub type Abar2ArPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
 pub const TWO_POW_32: u64 = 1 << 32;
@@ -84,7 +85,6 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     oabar: &OpenAnonBlindAssetRecord,
     abar_keypair: &AXfrKeyPair,
     ar_pub_key: &XfrPublicKey,
-    asset_record_type: AssetRecordType,
 ) -> Result<AbarToArNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.pub_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
@@ -97,7 +97,7 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     let art = AssetRecordTemplate::with_no_asset_tracing(
         oar_amount,
         oar_type,
-        asset_record_type,
+        NonConfidentialAmount_NonConfidentialAssetType,
         ar_pub_key.clone(),
     );
     let (oar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
@@ -162,13 +162,13 @@ pub fn verify_abar_to_ar_note(
     note: &AbarToArNote,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
-    let payer_amount = note.body.output.amount.get_amount().unwrap();
-    let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
-
     // check amount & asset type are non-confidential
     if note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential() {
         return Err(eg!(ZeiError::ParameterError));
     }
+
+    let payer_amount = note.body.output.amount.get_amount().unwrap();
+    let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
 
     if *merkle_root != note.body.merkle_root {
         return Err(eg!(ZeiError::AXfrVerificationError));
@@ -189,7 +189,7 @@ pub fn verify_abar_to_ar_note(
         .c(d!())?;
     let mut hasher = Sha512::new();
     hasher.update(b"AbarToAr");
-    hasher.update(msg);
+    hasher.update(msg.as_slice());
     let hash = BLSScalar::from_hash(hasher);
     online_inputs.push(hash);
     online_inputs.push(note.non_malleability_tag);
@@ -368,7 +368,6 @@ mod tests {
                 AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
             },
         },
-        xfr::asset_record::AssetRecordType,
     };
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
@@ -426,7 +425,6 @@ mod tests {
             &oabar.clone(),
             &sender,
             &recv.pub_key,
-            AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
         )
         .unwrap();
 
