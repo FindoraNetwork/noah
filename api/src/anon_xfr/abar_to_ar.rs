@@ -10,7 +10,9 @@ use crate::anon_xfr::{
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
-    asset_record::{build_open_asset_record},
+    asset_record::{
+        build_open_asset_record, AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
+    },
     sig::XfrPublicKey,
     structs::{AssetRecordTemplate, BlindAssetRecord, OwnerMemo},
 };
@@ -28,10 +30,8 @@ use zei_plonk::{
     },
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
-use crate::xfr::asset_record::AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 
 pub type Abar2ArPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
-pub const TWO_POW_32: u64 = 1 << 32;
 const ABAR_TO_AR_TRANSCRIPT: &[u8] = b"Abar to AR proof";
 
 /// ConvertAbarArProof is a struct to hold various aspects of a ZKP to prove spendability
@@ -328,7 +328,7 @@ pub fn build_abar_to_ar_cs(
     cs.prepare_io_variable(payers_secrets_vars.asset_type);
 
     cs.prepare_io_variable(hash_var);
-    cs.prepare_io_variable(non_malleability_tag_var);   
+    cs.prepare_io_variable(non_malleability_tag_var);
 
     // pad the number of constraints to power of two
     cs.pad();
@@ -357,18 +357,16 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 
 #[cfg(test)]
 mod tests {
-    use crate::setup::{ProverParams, VerifierParams};
-    use crate::xfr::{sig::XfrKeyPair, structs::AssetType};
-    use crate::{
-        anon_xfr::{
-            abar_to_ar::{gen_abar_to_ar_note, verify_abar_to_ar_note},
-            circuits::TREE_DEPTH,
-            keys::AXfrKeyPair,
-            structs::{
-                AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
-            },
+    use crate::anon_xfr::{
+        abar_to_ar::{gen_abar_to_ar_note, verify_abar_to_ar_note},
+        circuits::TREE_DEPTH,
+        keys::AXfrKeyPair,
+        structs::{
+            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
         },
     };
+    use crate::setup::{ProverParams, VerifierParams};
+    use crate::xfr::{sig::XfrKeyPair, structs::AssetType};
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -419,14 +417,8 @@ mod tests {
 
         oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone()));
 
-        let note = gen_abar_to_ar_note(
-            &mut prng,
-            &params,
-            &oabar.clone(),
-            &sender,
-            &recv.pub_key,
-        )
-        .unwrap();
+        let note = gen_abar_to_ar_note(&mut prng, &params, &oabar.clone(), &sender, &recv.pub_key)
+            .unwrap();
 
         let node_params = VerifierParams::abar_to_ar_params().unwrap();
         verify_abar_to_ar_note(&node_params, &note, &proof.root).unwrap();
