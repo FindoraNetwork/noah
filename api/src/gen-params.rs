@@ -37,6 +37,9 @@ enum Actions {
     /// Generates the verifying key for AR to ABAR transform
     AR_TO_ABAR { directory: PathBuf },
 
+    /// Generates the verifying key for ABAR to AR transform
+    ABAR_TO_AR { directory: PathBuf },
+
     /// Generates the verifying key for anonymous fees
     ANON_FEE { directory: PathBuf },
 
@@ -64,6 +67,10 @@ fn main() {
 
         AR_TO_ABAR { directory } => {
             gen_ar_to_abar_vk(directory);
+        }
+
+        ABAR_TO_AR { directory } => {
+            gen_abar_to_ar_vk(directory);
         }
 
         ANON_FEE { directory } => {
@@ -163,6 +170,22 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("ar-to-abar-vk.bin");
+    save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
+}
+
+// cargo run --release --features="gen no_vk" --bin gen-params abar-to-ar "./parameters"
+fn gen_abar_to_ar_vk(mut path: PathBuf) {
+    println!("Generating the verifying key for ABAR TO AR ...");
+
+    let user_params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
+    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    let bytes = bincode::serialize(&node_params).unwrap();
+    path.push("abar-to-ar-vk.bin");
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
