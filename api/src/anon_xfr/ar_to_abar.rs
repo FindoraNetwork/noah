@@ -145,6 +145,13 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
 }
 
 /// Generates output record and the plonk proof
+/// * `prng` - pseudo-random generator
+/// * `params` - prover params for ar_to_abar
+/// * `obar`   - open asset record for conversion
+/// * `abar_pubkey` - receiving pubkey for anonymous asset
+/// * `enc_key` - encryption key for new OwnerMemo
+/// Returns the OpenAnonBlindAssetRecord and the plonk proof
+/// Returns an error if the ABAR generation or proof generation fails
 pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
@@ -177,7 +184,7 @@ pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
 
 ///
 ///     Generate proof for ArToAbar body
-/// * `rng`
+///
 fn prove_ar_to_abar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
@@ -199,6 +206,9 @@ fn prove_ar_to_abar<R: CryptoRng + RngCore>(
     .c(d!(ZeiError::AXfrProofError))
 }
 
+///
+/// Verifies the proof for ar to abar
+///
 fn verify_ar_to_abar(
     params: &VerifierParams,
     payer_amount: u64,

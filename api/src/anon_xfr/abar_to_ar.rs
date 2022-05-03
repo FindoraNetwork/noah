@@ -38,8 +38,11 @@ const ABAR_TO_AR_TRANSCRIPT: &[u8] = b"Abar to AR proof";
 /// and conversion of an ABAR to a AR on the chain.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ConvertAbarArProof {
+    /// proof of correctness of spent ABAR and new Asset Record
     spending_proof: Abar2ArPlonkProof,
+    /// root hash of merkle tree
     merkle_root: BLSScalar,
+    /// version of the root hash of merkle tree
     merkle_root_version: u64,
 }
 
@@ -78,6 +81,11 @@ pub struct AbarToArBody {
 
 /// This function generates the AbarToArBody from the Open ABARs, the receiver address and the signing
 /// key pair.
+/// * `prng` - pseudo random generator
+/// * `params` - prover params for abar_to_ar note
+/// * `oabar` - OpenAnonBlindAssetRecord to spend
+/// * `abar_keypair` - keypair for spending ABAR
+/// * `ar_pub_key` - Public key for receiving AR
 #[allow(dead_code)]
 pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
@@ -155,7 +163,10 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     })
 }
 
-// Verifies the body
+/// Verifies the body
+/// * `params` - verifier params
+/// * `note` - note to verify
+/// * `merkle_root` - root hash of ABAR commitment tree
 #[allow(dead_code)]
 pub fn verify_abar_to_ar_note(
     params: &VerifierParams,
