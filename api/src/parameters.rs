@@ -49,6 +49,13 @@ pub static AR_TO_ABAR_VERIFIER_PARAMS: Option<&'static [u8]> =
 pub static AR_TO_ABAR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
+pub static ABAR_TO_AR_VERIFIER_PARAMS: Option<&'static [u8]> =
+    Some(include_bytes!("../parameters/abar-to-ar-vk.bin"));
+
+#[cfg(feature = "no_vk")]
+pub static ABAR_TO_AR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
+
+#[cfg(not(feature = "no_vk"))]
 pub static ANON_FEE_VERIFIER_PARAMS: Option<&'static [u8]> =
     Some(include_bytes!("../parameters/anon-fee-vk.bin"));
 
