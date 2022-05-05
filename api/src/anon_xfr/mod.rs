@@ -16,8 +16,10 @@ use zei_algebra::{
 };
 use zei_crypto::basic::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
 
+pub mod abar_to_ar;
 pub mod abar_to_bar;
 pub mod anon_fee;
+pub mod ar_to_abar;
 pub mod bar_to_abar;
 pub(crate) mod circuits;
 pub mod config;

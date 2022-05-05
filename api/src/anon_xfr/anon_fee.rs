@@ -23,7 +23,7 @@ use zei_plonk::plonk::{
     verifier::verifier,
 };
 
-const ANON_FEE_TRANSCRIPT: &[u8] = b"Anon Fee";
+const ANON_FEE_TRANSCRIPT: &[u8] = b"Anon Fee proof";
 pub const ANON_FEE_MIN: u64 = 10_000;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]

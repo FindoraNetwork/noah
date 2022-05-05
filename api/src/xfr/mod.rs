@@ -283,8 +283,7 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
             .c(d!())?
     };
 
-    //do tracing proofs
-    // TODO avoid clones below
+    // do tracing proofs
     let asset_type_amount_tracing_proof =
         asset_amount_tracing_proofs(prng, inputs, outputs).c(d!())?;
     let asset_tracing_proof = AssetTracingProofs {

@@ -42,7 +42,7 @@ use zei_plonk::{
 
 pub type Abar2BarPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
 pub const TWO_POW_32: u64 = 1 << 32;
-const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"Abar to Bar Conversion";
+const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"ABAR to BAR proof";
 const SK_LEN: usize = 252;
 
 /// ConvertAbarBarProof is a struct to hold various aspects of a ZKP to prove equality, spendability
@@ -595,7 +595,7 @@ pub fn build_abar_to_bar_cs(
         cs.equal(y_in_bls12_381, payers_secrets.asset_type);
     }
 
-    // 7. Check that validity of the the non malleability tag.
+    // 7. Check the validity of the non malleability tag.
     {
         let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
             one_var,
