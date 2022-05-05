@@ -234,7 +234,7 @@ fn verify_ar_to_abar(
 }
 
 ///
-///        Constraint System for abar_to_bar
+///        Constraint System for ar_to_abar
 ///
 pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
     let mut cs = TurboConstraintSystem::new();
@@ -262,12 +262,6 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
         payee.asset_type,
         payee.pubkey_x,
     );
-
-    // Range check `amount`
-    // Note we don't need to range-check payers' `amount`, because those amounts are bound
-    // to payers' accumulated abars, whose underlying amounts have already been range-checked
-    // in the transactions that created the payers' abars.
-    cs.range_check(payee.amount, AMOUNT_LEN);
 
     // prepare the public input for the output commitment
     cs.prepare_io_variable(com_abar_out_var);
