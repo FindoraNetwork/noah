@@ -28,7 +28,7 @@ use zei_plonk::plonk::{
     verifier::verifier,
 };
 
-const EQ_COMM_TRANSCRIPT: &[u8] = b"Equal committed values proof";
+const BAR_TO_ABAR_TRANSCRIPT: &[u8] = b"BAR to ABAR proof";
 pub const TWO_POW_32: u64 = 1 << 32;
 
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
@@ -267,8 +267,8 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> Result<AXfrPlonkPf> {
-    let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
-    let (mut cs, _) = build_eq_committed_vals_cs(
+    let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+    let (mut cs, _) = build_bar_to_abar_cs(
         amount,
         asset_type,
         blind_hash,
@@ -306,7 +306,7 @@ pub(crate) fn verify_eq_committed_vals(
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> Result<()> {
-    let mut transcript = Transcript::new(EQ_COMM_TRANSCRIPT);
+    let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
     let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
     online_inputs.push(hash_comm);
     online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
@@ -338,7 +338,7 @@ pub(crate) fn verify_eq_committed_vals(
 
 /// Returns the constraint system (and associated number of constraints) for equality of values
 /// in a Pedersen commitment and a Rescue commitment.
-pub(crate) fn build_eq_committed_vals_cs(
+pub(crate) fn build_bar_to_abar_cs(
     amount: BLSScalar,
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
@@ -617,7 +617,7 @@ mod test {
         let dec_key = XSecretKey::new(&mut prng);
         let enc_key = XPublicKey::from(&dec_key);
         // proving
-        let params = ProverParams::eq_committed_vals_params().unwrap();
+        let params = ProverParams::bar_to_abar_params().unwrap();
         // confidential case
         let (bar_conf, memo) = build_bar(
             &bar_keypair.pub_key,
@@ -682,7 +682,7 @@ mod test {
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         );
         let obar = open_blind_asset_record(&bar, &memo, &bar_keypair).unwrap();
-        let params = ProverParams::eq_committed_vals_params().unwrap();
+        let params = ProverParams::bar_to_abar_params().unwrap();
         let note = gen_bar_to_abar_note(
             &mut prng,
             &params,
@@ -751,7 +751,7 @@ mod test {
         .unwrap();
 
         // compute cs
-        let (mut cs, _) = super::build_eq_committed_vals_cs(
+        let (mut cs, _) = super::build_bar_to_abar_cs(
             amount,
             asset_type,
             z_randomizer,

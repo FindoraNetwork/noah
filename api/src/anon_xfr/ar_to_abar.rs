@@ -21,7 +21,7 @@ use zei_plonk::plonk::{
 };
 
 /// Transcript header for AR_TO_ABAR
-const AR_TO_ABAR_TRANSCRIPT: &[u8] = b"AR To ABAR proof";
+const AR_TO_ABAR_TRANSCRIPT: &[u8] = b"AR to ABAR proof";
 
 /// ArToAbarBody holds the input, output, proof and memo for the Ar conversion.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]

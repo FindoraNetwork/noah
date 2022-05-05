@@ -42,7 +42,7 @@ use zei_plonk::{
 
 pub type Abar2BarPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
 pub const TWO_POW_32: u64 = 1 << 32;
-const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"Abar to Bar Conversion";
+const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"ABAR to BAR proof";
 const SK_LEN: usize = 252;
 
 /// ConvertAbarBarProof is a struct to hold various aspects of a ZKP to prove equality, spendability

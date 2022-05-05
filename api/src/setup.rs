@@ -4,7 +4,7 @@ use crate::anon_xfr::{
     abar_to_bar::build_abar_to_bar_cs,
     anon_fee::build_anon_fee_cs,
     ar_to_abar::build_ar_to_abar_cs,
-    bar_to_abar::build_eq_committed_vals_cs,
+    bar_to_abar::build_bar_to_abar_cs,
     circuits::{
         build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret, TurboPlonkCS, TREE_DEPTH,
     },
@@ -156,14 +156,14 @@ impl ProverParams {
         })
     }
 
-    pub fn eq_committed_vals_params() -> Result<ProverParams> {
+    pub fn bar_to_abar_params() -> Result<ProverParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let zero = BLSScalar::zero();
         let proof = ZKPartProof::default();
         let non_zk_state = NonZKState::default();
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
-        let (cs, _) = build_eq_committed_vals_cs(
+        let (cs, _) = build_bar_to_abar_cs(
             zero,
             zero,
             zero,
@@ -450,7 +450,7 @@ impl VerifierParams {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
         } else {
-            let prover_params = ProverParams::eq_committed_vals_params()?;
+            let prover_params = ProverParams::bar_to_abar_params()?;
             Ok(VerifierParams::from(prover_params))
         }
     }

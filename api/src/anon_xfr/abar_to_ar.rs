@@ -32,7 +32,7 @@ use zei_plonk::{
 };
 
 pub type Abar2ArPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
-const ABAR_TO_AR_TRANSCRIPT: &[u8] = b"Abar to AR proof";
+const ABAR_TO_AR_TRANSCRIPT: &[u8] = b"ABAR to AR proof";
 
 /// ConvertAbarArProof is a struct to hold various aspects of a ZKP to prove spendability
 /// and conversion of an ABAR to a AR on the chain.

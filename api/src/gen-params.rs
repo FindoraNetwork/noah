@@ -150,7 +150,7 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
 fn gen_bar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for BAR TO ABAR ...");
 
-    let user_params = ProverParams::eq_committed_vals_params().unwrap();
+    let user_params = ProverParams::bar_to_abar_params().unwrap();
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("bar-to-abar-vk.bin");
