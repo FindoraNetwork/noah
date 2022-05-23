@@ -11,8 +11,5 @@ pub mod pcs;
 /// and implemented by `merlin::Transcript`.
 pub mod transcript;
 
-/// Module for ZK eval for hiding polynomial commitment schemes.
-pub mod zk_eval;
-
 /// Module for polynomial commitment errors.
 pub mod errors;

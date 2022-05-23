@@ -12,7 +12,7 @@ use crate::xfr::{
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
-/// AssetRecrod confidentiality flags. Indicated if amount and/or assettype should be confidential
+/// AssetRecord confidentiality flags. Indicated if amount and/or assettype should be confidential
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum AssetRecordType {

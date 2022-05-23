@@ -4,71 +4,44 @@ use crate::anon_xfr::{
         AMultiXfrPubInputs, AccElemVars, NullifierInputVars, PayeeSecret, PayerSecret,
         TurboPlonkCS, AMOUNT_LEN, SK_LEN,
     },
+    compute_non_malleability_tag,
     config::FEE_TYPE,
-    keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature},
+    keys::AXfrKeyPair,
     nullifier,
     proofs::AXfrPlonkPf,
-    structs::{AXfrProof, AnonBlindAssetRecord, Nullifier, OpenAnonBlindAssetRecord, SnarkProof},
+    structs::{AnonBlindAssetRecord, Nullifier, OpenAnonBlindAssetRecord, SnarkProof},
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::structs::OwnerMemo;
+use digest::Digest;
 use merlin::Transcript;
-use zei_algebra::{
-    bls12_381::BLSScalar,
-    jubjub::{JubjubPoint, JubjubScalar},
-    prelude::*,
-};
+use sha2::Sha512;
+use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 use zei_plonk::plonk::{
-    constraint_system::{TurboConstraintSystem, VarIndex},
-    prover::prover,
+    constraint_system::{rescue::StateVar, TurboConstraintSystem, VarIndex},
+    prover::prover_with_lagrange,
     verifier::verifier,
 };
 
-const ANON_FEE_TRANSCRIPT: &[u8] = b"Anon Fee";
-pub const ANON_FEE_MIN: u64 = 20_000;
+const ANON_FEE_TRANSCRIPT: &[u8] = b"Anon Fee proof";
+pub const ANON_FEE_MIN: u64 = 10_000;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AnonFeeNote {
+    /// The body part of AnonFee
     pub body: AnonFeeBody,
-    pub signature: AXfrSignature,
-}
-
-impl AnonFeeNote {
-    pub fn generate_note_from_body<R: CryptoRng + RngCore>(
-        prng: &mut R,
-        body: AnonFeeBody,
-        keypair: AXfrKeyPair,
-    ) -> Result<AnonFeeNote> {
-        let msg: Vec<u8> = bincode::serialize(&body)
-            .map_err(|_| ZeiError::SerializationError)
-            .c(d!())?;
-
-        Ok(AnonFeeNote {
-            body,
-            signature: keypair.sign(prng, msg.as_slice()),
-        })
-    }
-
-    pub fn verify_signatures(&self) -> Result<()> {
-        let msg: Vec<u8> = bincode::serialize(&self.body)
-            .map_err(|_| ZeiError::SerializationError)
-            .c(d!())?;
-
-        self.body
-            .input
-            .1
-            .verify(msg.as_slice(), &self.signature)
-            .c(d!("AXfrNote signature verification failed"))?;
-
-        Ok(())
-    }
+    /// The spending proof (assuming non-malleability)
+    pub anon_fee_proof: SnarkProof,
+    /// The non-malleability tag
+    pub non_malleability_tag: BLSScalar,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AnonFeeBody {
-    pub input: (Nullifier, AXfrPubKey),
+    pub input: Nullifier,
     pub output: AnonBlindAssetRecord,
-    pub proof: AXfrProof,
+    pub merkle_root: BLSScalar,
+    pub merkle_root_version: u64,
     pub owner_memo: OwnerMemo,
 }
 
@@ -78,34 +51,28 @@ pub struct AnonFeeBody {
 /// * `input` - Open source asset records
 /// * `output` - Description of output asset records.
 #[allow(unused_variables)]
-pub fn gen_anon_fee_body<R: CryptoRng + RngCore>(
+pub fn gen_anon_fee_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     input: &OpenAnonBlindAssetRecord,
     output: &OpenAnonBlindAssetRecord,
     input_keypair: &AXfrKeyPair,
-) -> Result<(AnonFeeBody, AXfrKeyPair)> {
+) -> Result<AnonFeeNote> {
     if input.pub_key.ne(input_keypair.pub_key().borrow()) {
         return Err(eg!(ZeiError::ParameterError));
     }
     check_fee_asset_amount(input, output).c(d!())?;
 
     let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
-    let rand_input_keypair = input_keypair.randomize(&input.key_rand_factor);
-    let diversifier = JubjubScalar::random(prng);
-    let nullifier_and_signing_key = (
-        nullifier(
-            &rand_input_keypair,
-            input.amount,
-            &input.asset_type,
-            mt_leaf_info.uid,
-        ),
-        rand_input_keypair.pub_key().randomize(&diversifier),
+    let this_nullifier = nullifier(
+        &input_keypair,
+        input.amount,
+        &input.asset_type,
+        mt_leaf_info.uid,
     );
 
     let payers_secret = PayerSecret {
-        sec_key: rand_input_keypair.get_secret_scalar(),
-        diversifier,
+        sec_key: input_keypair.get_secret_scalar(),
         uid: mt_leaf_info.uid,
         amount: input.amount,
         asset_type: input.asset_type.as_scalar(),
@@ -116,27 +83,44 @@ pub fn gen_anon_fee_body<R: CryptoRng + RngCore>(
         amount: output.amount,
         blind: output.blind,
         asset_type: output.asset_type.as_scalar(),
+        pubkey_x: output.pub_key.0.point_ref().get_x(),
     };
 
-    let proof = prove_anon_fee(prng, params, payers_secret, payees_secrets).c(d!())?;
+    let body = AnonFeeBody {
+        input: this_nullifier,
+        output: AnonBlindAssetRecord::from_oabar(output),
+        merkle_root: mt_leaf_info.root,
+        merkle_root_version: mt_leaf_info.root_version,
+        owner_memo: output
+            .owner_memo
+            .clone()
+            .c(d!(ZeiError::ParameterError))
+            .c(d!())?,
+    };
 
-    Ok((
-        AnonFeeBody {
-            input: nullifier_and_signing_key,
-            output: AnonBlindAssetRecord::from_oabar(output),
-            proof: AXfrProof {
-                snark_proof: proof,
-                merkle_root: mt_leaf_info.root,
-                merkle_root_version: mt_leaf_info.root_version,
-            },
-            owner_memo: output
-                .owner_memo
-                .clone()
-                .c(d!(ZeiError::ParameterError))
-                .c(d!())?,
-        },
-        rand_input_keypair.randomize(&diversifier),
-    ))
+    let msg = bincode::serialize(&body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+
+    let (hash, non_malleability_randomizer, non_malleability_tag) =
+        compute_non_malleability_tag(prng, b"AnonFee", &msg, &[&input_keypair]);
+
+    let proof = prove_anon_fee(
+        prng,
+        params,
+        payers_secret,
+        payees_secrets,
+        &hash,
+        &non_malleability_randomizer,
+        &non_malleability_tag,
+    )
+    .c(d!())?;
+
+    Ok(AnonFeeNote {
+        body,
+        anon_fee_proof: proof,
+        non_malleability_tag: non_malleability_tag,
+    })
 }
 
 fn check_fee_asset_amount(
@@ -161,23 +145,37 @@ fn check_fee_asset_amount(
 /// * `body` - Transfer structure to verify
 /// * `accumulator` - candidate state of the accumulator. It must match body.proof.merkle_root, otherwise it returns ZeiError::AXfrVerification Error.
 #[allow(unused_variables)]
-pub fn verify_anon_fee_body(
+pub fn verify_anon_fee_note(
     params: &VerifierParams,
-    body: &AnonFeeBody,
+    note: &AnonFeeNote,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
-    if *merkle_root != body.proof.merkle_root {
+    if *merkle_root != note.body.merkle_root {
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
+    let msg = bincode::serialize(&note.body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+    let mut hasher = Sha512::new();
+    hasher.update(b"AnonFee");
+    hasher.update(&msg);
+    let hash = BLSScalar::from_hash(hasher);
+
     let pub_inputs = AMultiXfrPubInputs {
-        payers_inputs: vec![body.input.clone()],
-        payees_commitments: vec![body.output.amount_type_commitment],
+        payers_inputs: vec![note.body.input.clone()],
+        payees_commitments: vec![note.body.output.commitment],
         merkle_root: *merkle_root,
     };
 
-    verify_anon_fee(params, &pub_inputs, &body.proof.snark_proof)
-        .c(d!(ZeiError::AXfrVerificationError))
+    verify_anon_fee(
+        params,
+        &pub_inputs,
+        &note.anon_fee_proof,
+        &hash,
+        &note.non_malleability_tag,
+    )
+    .c(d!(ZeiError::AXfrVerificationError))
 }
 
 /// Proof for an AXfrBody correctness
@@ -185,7 +183,7 @@ pub fn verify_anon_fee_body(
 pub struct AnonFeeProof {
     pub snark_proof: SnarkProof,
     pub merkle_root: BLSScalar,
-    pub merkle_root_version: usize,
+    pub merkle_root_version: u64,
 }
 
 fn prove_anon_fee<R: CryptoRng + RngCore>(
@@ -193,18 +191,29 @@ fn prove_anon_fee<R: CryptoRng + RngCore>(
     params: &ProverParams,
     input_secret: PayerSecret,
     remainder_secret: PayeeSecret,
+    hash: &BLSScalar,
+    non_malleability_randomizer: &BLSScalar,
+    non_malleability_tag: &BLSScalar,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_FEE_TRANSCRIPT);
 
     let fee_type = FEE_TYPE.as_scalar();
 
-    let (mut cs, _) = build_anon_fee_cs(input_secret, remainder_secret, fee_type);
+    let (mut cs, _) = build_anon_fee_cs(
+        input_secret,
+        remainder_secret,
+        fee_type,
+        &hash,
+        &non_malleability_randomizer,
+        &non_malleability_tag,
+    );
     let witness = cs.get_and_clear_witness();
 
-    prover(
+    prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
+        params.lagrange_pcs.as_ref(),
         &params.cs,
         &params.prover_params,
         &witness,
@@ -220,28 +229,33 @@ pub(crate) fn build_anon_fee_cs(
     payer_secret: PayerSecret,
     payee_secret: PayeeSecret,
     fee_type: BLSScalar,
+    hash: &BLSScalar,
+    non_malleability_randomizer: &BLSScalar,
+    non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboConstraintSystem::new();
 
     let payers_secrets = add_payers_secrets(&mut cs, vec![payer_secret].as_slice());
     let payees_secrets = add_payees_secrets(&mut cs, vec![payee_secret].as_slice());
 
+    let hash_var = cs.new_variable(*hash);
+    let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
+    let non_malleability_tag_var = cs.new_variable(*non_malleability_tag);
+
     let base = JubjubPoint::get_base();
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
+    let one_var = cs.one_var();
     let mut root_var: Option<VarIndex> = None;
     for payer in &payers_secrets {
         // prove knowledge of payer's secret key: pk = base^{sk}
-        let (pk_var, pk_point) = cs.scalar_mul(base, payer.sec_key, SK_LEN);
+        let pk_var = cs.scalar_mul(base, payer.sec_key, SK_LEN);
         let pk_x = pk_var.get_x();
 
-        // prove knowledge of diversifier: pk_sign = pk^{diversifier}
-        let (pk_sign_var, _) = cs.var_base_scalar_mul(pk_var, pk_point, payer.diversifier, SK_LEN);
-
         // commitments
-        let com_abar_in_var = commit(&mut cs, payer.blind, payer.amount, payer.asset_type);
+        let com_abar_in_var = commit(&mut cs, payer.blind, payer.amount, payer.asset_type, pk_x);
 
         // prove pre-image of the nullifier
         // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
@@ -263,7 +277,6 @@ pub(crate) fn build_anon_fee_cs(
         let acc_elem = AccElemVars {
             uid: payer.uid,
             commitment: com_abar_in_var,
-            pub_key_x: pk_x,
         };
         let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payer.path);
 
@@ -275,14 +288,19 @@ pub(crate) fn build_anon_fee_cs(
 
         // prepare public inputs variables
         cs.prepare_io_variable(nullifier_var);
-        cs.prepare_io_point_variable(pk_sign_var);
     }
     // prepare the publc input for merkle_root
     cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
 
     for payee in &payees_secrets {
         // commitment
-        let com_abar_out_var = commit(&mut cs, payee.blind, payee.amount, payee.asset_type);
+        let com_abar_out_var = commit(
+            &mut cs,
+            payee.blind,
+            payee.amount,
+            payee.asset_type,
+            payee.pubkey_x,
+        );
 
         // Range check `amount`
         // Note we don't need to range-check payers' `amount`, because those amounts are bound
@@ -303,6 +321,21 @@ pub(crate) fn build_anon_fee_cs(
     let output_amount_var = cs.add(payees_secrets[0].amount, fee_var);
     cs.equal(payers_secrets[0].amount, output_amount_var);
 
+    // Check that validity of the the non malleability tag.
+    {
+        let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
+            one_var,
+            hash_var,
+            non_malleability_randomizer_var,
+            payers_secrets[0].sec_key,
+        ]))[0];
+
+        cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
+    }
+
+    cs.prepare_io_variable(hash_var);
+    cs.prepare_io_variable(non_malleability_tag_var);
+
     // pad the number of constraints to power of two
     cs.pad();
 
@@ -318,9 +351,14 @@ pub(crate) fn verify_anon_fee(
     params: &VerifierParams,
     pub_inputs: &AMultiXfrPubInputs,
     proof: &AXfrPlonkPf,
+    hash: &BLSScalar,
+    non_malleability_tag: &BLSScalar,
 ) -> Result<()> {
     let mut transcript = Transcript::new(ANON_FEE_TRANSCRIPT);
-    let online_inputs = pub_inputs.to_vec();
+    let mut online_inputs = pub_inputs.to_vec();
+    online_inputs.push(*hash);
+    online_inputs.push(*non_malleability_tag);
+
     verifier(
         &mut transcript,
         &params.pcs,
@@ -335,7 +373,7 @@ pub(crate) fn verify_anon_fee(
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::{
-        anon_fee::{gen_anon_fee_body, verify_anon_fee_body, AnonFeeNote, ANON_FEE_MIN},
+        anon_fee::{gen_anon_fee_note, verify_anon_fee_note, ANON_FEE_MIN},
         config::FEE_TYPE,
         hash_abar,
         keys::AXfrKeyPair,
@@ -372,8 +410,6 @@ mod tests {
             gen_oabar_and_keys(&mut prng, input_amount, FEE_TYPE);
         let abar = AnonBlindAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
-        let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
-        assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
         let _owner_memo = oabar.get_owner_memo().unwrap();
 
         let path = thread::current().name().unwrap().to_owned();
@@ -406,21 +442,18 @@ mod tests {
             .build()
             .unwrap();
 
-        let (body, key_pairs) =
-            gen_anon_fee_body(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in).unwrap();
+        let note =
+            gen_anon_fee_note(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in).unwrap();
 
         {
             // verifier scope
             let verifier_params = VerifierParams::anon_fee_params().unwrap();
             assert!(
-                verify_anon_fee_body(&verifier_params, &body, &pmt.get_root().unwrap()).is_ok()
+                verify_anon_fee_note(&verifier_params, &note, &pmt.get_root().unwrap()).is_ok()
             );
             assert!(
-                verify_anon_fee_body(&verifier_params, &body, &BLSScalar::from(123u64)).is_err()
+                verify_anon_fee_note(&verifier_params, &note, &BLSScalar::from(123u64)).is_err()
             );
-
-            let note = AnonFeeNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
-            assert!(note.verify_signatures().is_ok());
         }
         {
             let user_params = ProverParams::anon_fee_params(TREE_DEPTH).unwrap();
@@ -434,7 +467,7 @@ mod tests {
                 .unwrap();
 
             assert!(
-                gen_anon_fee_body(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in,)
+                gen_anon_fee_note(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in,)
                     .is_err()
             );
         }
@@ -450,7 +483,7 @@ mod tests {
                 .unwrap();
 
             assert!(
-                gen_anon_fee_body(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in,)
+                gen_anon_fee_note(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in,)
                     .is_err()
             );
         }
@@ -469,8 +502,6 @@ mod tests {
             gen_oabar_and_keys(&mut prng, input_amount, AssetType::from_identical_byte(3u8));
         let abar = AnonBlindAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
-        let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
-        assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
         let _owner_memo = oabar.get_owner_memo().unwrap();
 
         let path = thread::current().name().unwrap().to_owned();
@@ -504,7 +535,7 @@ mod tests {
             .unwrap();
 
         assert!(
-            gen_anon_fee_body(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in,).is_err()
+            gen_anon_fee_note(&mut prng, &user_params, &oabar, &oabar_out, &keypair_in,).is_err()
         );
     }
 

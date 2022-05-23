@@ -230,7 +230,10 @@ fn merge(sorted: &[MixValue]) -> (Vec<MixValue>, Vec<MixValue>) {
     }
     for value in sorted[1..].iter() {
         if value.asset_type == prev.asset_type {
-            merged.push(MixValue::new(RistrettoScalar::zero(), RistrettoScalar::zero()));
+            merged.push(MixValue::new(
+                RistrettoScalar::zero(),
+                RistrettoScalar::zero(),
+            ));
             intermediate.push(MixValue::new(
                 prev.amount.add(&value.amount),
                 value.asset_type,
@@ -344,7 +347,9 @@ fn mix_merge_gadget<CS: RandomizableConstraintSystem>(
     let in1iter = zei_algebra::iter::once(&first_in).chain(intermediate.iter());
     let in2iter = sorted[1..l].iter();
     let out1iter = merged[0..l - 1].iter();
-    let out2iter = intermediate.iter().chain(zei_algebra::iter::once(&merged[l - 1]));
+    let out2iter = intermediate
+        .iter()
+        .chain(zei_algebra::iter::once(&merged[l - 1]));
 
     for (((in1, in2), out1), out2) in in1iter.zip(in2iter).zip(out1iter).zip(out2iter) {
         n_gates += gate_mix(cs, *in1, *in2, *out1, *out2).c(d!())?;
@@ -503,7 +508,10 @@ fn range_proof_64<CS: ConstraintSystem>(
                     return Err(eg!(R1CSError::FormatError));
                 }
                 let bit = ((bytes[index] >> (i & 7)) & 1u8) as i8;
-                let assignment = (RistrettoScalar::from(1 - bit as u32), RistrettoScalar::from(bit as u32));
+                let assignment = (
+                    RistrettoScalar::from(1 - bit as u32),
+                    RistrettoScalar::from(bit as u32),
+                );
                 cs.allocate_multiplier(Some(assignment).map(|(a, b)| (a.0, b.0)))
             }
             None => cs.allocate_multiplier(None),
@@ -531,9 +539,7 @@ fn range_proof_64<CS: ConstraintSystem>(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::bulletproofs::mix::{
-        allocate_mix_vector, MixCommitment, MixValue, MixVariable,
-    };
+    use crate::bulletproofs::mix::{allocate_mix_vector, MixCommitment, MixValue, MixVariable};
     use bulletproofs::{
         r1cs::{Prover, R1CSProof, Verifier},
         BulletproofGens, PedersenGens,
@@ -573,8 +579,7 @@ pub mod tests {
         let sorted =
             allocate_mix_vector(&mut prover, Some(&sorted_values), sorted_values.len()).unwrap();
         let mid = allocate_mix_vector(&mut prover, Some(&mid_values), mid_values.len()).unwrap();
-        let added =
-            allocate_mix_vector(&mut prover, Some(&out_values), out_values.len()).unwrap();
+        let added = allocate_mix_vector(&mut prover, Some(&out_values), out_values.len()).unwrap();
         let num_wires =
             super::mix_merge_gadget(&mut prover, &sorted[..], &mid[..], &added[..]).unwrap();
         let bp_gens = BulletproofGens::new(
@@ -609,10 +614,8 @@ pub mod tests {
             })
             .collect();
         let mid = allocate_mix_vector(&mut prover, Some(&mid_values), mid_values.len()).unwrap();
-        let added =
-            allocate_mix_vector(&mut prover, Some(&out_values), out_values.len()).unwrap();
-        let sorted_vars: Vec<MixVariable> =
-            sorted_coms_vars.iter().map(|(_, var)| *var).collect();
+        let added = allocate_mix_vector(&mut prover, Some(&out_values), out_values.len()).unwrap();
+        let sorted_vars: Vec<MixVariable> = sorted_coms_vars.iter().map(|(_, var)| *var).collect();
         let num_wires =
             super::mix_merge_gadget(&mut prover, &sorted_vars[..], &mid[..], &added[..]).unwrap();
         let num_wires = num_wires + added.len() + mid.len();
@@ -630,8 +633,7 @@ pub mod tests {
         let mid = allocate_mix_vector(&mut verifier, None, mid_values.len()).unwrap();
         let added = allocate_mix_vector(&mut verifier, None, out_values.len()).unwrap();
         let num_wires =
-            super::mix_merge_gadget(&mut verifier, &sorted_vars[..], &mid[..], &added[..])
-                .unwrap();
+            super::mix_merge_gadget(&mut verifier, &sorted_vars[..], &mid[..], &added[..]).unwrap();
         let num_wires = num_wires + added.len() + mid.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());

@@ -3,20 +3,23 @@ use crate::anon_xfr::{
     config::{FEE_CALCULATING_FUNC, FEE_TYPE},
     keys::AXfrKeyPair,
     proofs::{prove_xfr, verify_xfr},
-    structs::{AXfrBody, AXfrProof, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
+    structs::{AXfrNote, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
+use digest::Digest;
+use sha2::Sha512;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
-    jubjub::{JubjubScalar, JUBJUB_SCALAR_LEN},
     prelude::*,
 };
 use zei_crypto::basic::hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey};
 
+pub mod abar_to_ar;
 pub mod abar_to_bar;
 pub mod anon_fee;
+pub mod ar_to_abar;
 pub mod bar_to_abar;
 pub(crate) mod circuits;
 pub mod config;
@@ -24,21 +27,22 @@ pub mod keys;
 mod merkle_tree_test;
 pub(crate) mod proofs;
 pub mod structs;
+use crate::anon_xfr::structs::AXfrBody;
 pub use circuits::TREE_DEPTH;
 use zei_crypto::basic::rescue::RescueInstance;
 
-/// Build an anonymous transfer structure AXfrBody. It also returns randomized signature keys to sign the transfer,
+/// Build an anonymous transfer structure AXfrNote. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
 /// * `params` - User parameters
 /// * `inputs` - Open source asset records
 /// * `outputs` - Description of output asset records.
-pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
+pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
     input_keypairs: &[AXfrKeyPair],
-) -> Result<(AXfrBody, Vec<AXfrKeyPair>)> {
+) -> Result<AXfrNote> {
     // 1. check input correctness
     if inputs.is_empty() || outputs.is_empty() {
         return Err(eg!(ZeiError::AXfrProverParamsError));
@@ -47,39 +51,24 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
     check_asset_amount(inputs, outputs).c(d!())?;
     check_roots(inputs).c(d!())?;
 
-    // 2. randomize input key pair with open_abar rand key
-    let rand_input_keypairs = inputs
+    // 2. build input witness infos
+    let nullifiers = inputs
         .iter()
         .zip(input_keypairs.iter())
-        .map(|(input, keypair)| keypair.randomize(&input.key_rand_factor))
-        .collect_vec();
-
-    // 3. build input witness infos
-    let diversifiers: Vec<JubjubScalar> =
-        inputs.iter().map(|_| JubjubScalar::random(prng)).collect();
-    let nullifiers_and_signing_keys = inputs
-        .iter()
-        .zip(rand_input_keypairs.iter())
-        .zip(diversifiers.iter())
-        .map(|((input, keypair), diversifier)| {
+        .map(|(input, keypair)| {
             let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
-            (
-                nullifier(&keypair, input.amount, &input.asset_type, mt_leaf_info.uid),
-                keypair.pub_key().randomize(diversifier),
-            )
+            nullifier(&keypair, input.amount, &input.asset_type, mt_leaf_info.uid)
         })
         .collect();
 
-    // 4. build proof
+    // 3. build proof
     let payers_secrets = inputs
         .iter()
-        .zip(rand_input_keypairs.iter())
-        .zip(diversifiers.iter())
-        .map(|((input, keypair), &diversifier)| {
+        .zip(input_keypairs.iter())
+        .map(|(input, keypair)| {
             let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
             PayerSecret {
                 sec_key: keypair.get_secret_scalar(),
-                diversifier,
                 uid: mt_leaf_info.uid,
                 amount: input.amount,
                 asset_type: input.asset_type.as_scalar(),
@@ -94,6 +83,7 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
             amount: output.amount,
             blind: output.blind,
             asset_type: output.asset_type.as_scalar(),
+            pubkey_x: output.pub_key.0.point_ref().get_x(),
         })
         .collect();
 
@@ -101,14 +91,6 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
         payers_secrets,
         payees_secrets,
     };
-    let proof = prove_xfr(prng, params, secret_inputs).c(d!())?;
-
-    let diversified_key_pairs = rand_input_keypairs
-        .iter()
-        .zip(diversifiers.iter())
-        .map(|(keypair, diversifier)| keypair.randomize(diversifier))
-        .collect();
-
     let out_abars = outputs
         .iter()
         .map(AnonBlindAssetRecord::from_oabar)
@@ -119,44 +101,80 @@ pub fn gen_anon_xfr_body<R: CryptoRng + RngCore>(
         .collect();
 
     let mt_info_temp = inputs[0].mt_leaf_info.as_ref().unwrap();
-    Ok((
-        AXfrBody {
-            inputs: nullifiers_and_signing_keys,
-            outputs: out_abars,
-            proof: AXfrProof {
-                snark_proof: proof,
-                merkle_root: mt_info_temp.root,
-                merkle_root_version: mt_info_temp.root_version,
-            },
-            owner_memos: out_memos.c(d!())?,
-        },
-        diversified_key_pairs,
-    ))
+    let body = AXfrBody {
+        inputs: nullifiers,
+        outputs: out_abars,
+        merkle_root: mt_info_temp.root,
+        merkle_root_version: mt_info_temp.root_version,
+        owner_memos: out_memos.c(d!())?,
+    };
+
+    let msg = bincode::serialize(&body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+
+    let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
+
+    let (hash, non_malleability_randomizer, non_malleability_tag) =
+        compute_non_malleability_tag(prng, b"AnonXfr", &msg, &input_keypairs_ref);
+
+    let proof = prove_xfr(
+        prng,
+        params,
+        secret_inputs,
+        &hash,
+        &non_malleability_randomizer,
+        &non_malleability_tag,
+    )
+    .c(d!())?;
+
+    Ok(AXfrNote {
+        body,
+        anon_xfr_proof: proof,
+        non_malleability_tag,
+    })
 }
 
-/// Verifies an anonymous transfer structure AXfrBody.
+/// Verifies an anonymous transfer structure AXfrNote.
 /// * `params` - Verifier parameters
 /// * `body` - Transfer structure to verify
 /// * `accumulator` - candidate state of the accumulator. It must match body.proof.merkle_root, otherwise it returns ZeiError::AXfrVerification Error.
-pub fn verify_anon_xfr_body(
+pub fn verify_anon_xfr_note(
     params: &VerifierParams,
-    body: &AXfrBody,
+    note: &AXfrNote,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
-    if *merkle_root != body.proof.merkle_root {
+    if *merkle_root != note.body.merkle_root {
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
-    let payees_commitments = body
+    let payees_commitments = note
+        .body
         .outputs
         .iter()
-        .map(|output| output.amount_type_commitment)
+        .map(|output| output.commitment)
         .collect();
     let pub_inputs = AMultiXfrPubInputs {
-        payers_inputs: body.inputs.clone(),
+        payers_inputs: note.body.inputs.clone(),
         payees_commitments,
         merkle_root: *merkle_root,
     };
-    verify_xfr(params, &pub_inputs, &body.proof.snark_proof).c(d!(ZeiError::AXfrVerificationError))
+
+    let msg = bincode::serialize(&note.body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+    let mut hasher = Sha512::new();
+    hasher.update(b"AnonXfr");
+    hasher.update(&msg);
+    let hash = BLSScalar::from_hash(hasher);
+
+    verify_xfr(
+        params,
+        &pub_inputs,
+        &note.anon_xfr_proof,
+        &hash,
+        &note.non_malleability_tag,
+    )
+    .c(d!(ZeiError::AXfrVerificationError))
 }
 
 /// Check that inputs have mt witness and keypair matched pubkey
@@ -236,6 +254,52 @@ fn check_roots(inputs: &[OpenAnonBlindAssetRecord]) -> Result<()> {
     Ok(())
 }
 
+pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
+    prng: &mut R,
+    domain_separator: &[u8],
+    msg: &[u8],
+    secret_keys: &[&AXfrKeyPair],
+) -> (BLSScalar, BLSScalar, BLSScalar) {
+    let mut hasher = Sha512::new();
+    hasher.update(domain_separator);
+    hasher.update(msg);
+
+    let hash = BLSScalar::from_hash(hasher);
+    let randomizer = BLSScalar::random(prng);
+
+    let mut input_to_rescue = vec![];
+    input_to_rescue.push(BLSScalar::from(secret_keys.len() as u64));
+    input_to_rescue.push(hash);
+    input_to_rescue.push(randomizer);
+    for secret_key in secret_keys.iter() {
+        input_to_rescue.push(BLSScalar::from(&secret_key.get_secret_scalar()));
+    }
+
+    if input_to_rescue.len() < 4 {
+        // pad to 4
+        input_to_rescue.resize(4, BLSScalar::zero());
+    } else {
+        // pad to 4 + 3k
+        input_to_rescue.resize(
+            1 + (input_to_rescue.len() - 1 + 2) / 3 * 3,
+            BLSScalar::zero(),
+        );
+    }
+
+    let rescue = RescueInstance::new();
+    let mut acc = rescue.rescue(&[
+        input_to_rescue[0],
+        input_to_rescue[1],
+        input_to_rescue[2],
+        input_to_rescue[3],
+    ])[0];
+    for chunk in input_to_rescue[4..].chunks_exact(3) {
+        acc = rescue.rescue(&[acc, chunk[0], chunk[1], chunk[2]])[0];
+    }
+
+    (hash, randomizer, acc)
+}
+
 /// Decrypts the owner memo
 /// * `memo` - Owner memo to decrypt
 /// * `dec_key` - Decryption key
@@ -247,9 +311,9 @@ pub fn decrypt_memo(
     dec_key: &XSecretKey,
     key_pair: &AXfrKeyPair,
     abar: &AnonBlindAssetRecord,
-) -> Result<(u64, AssetType, BLSScalar, JubjubScalar)> {
+) -> Result<(u64, AssetType, BLSScalar)> {
     let plaintext = hybrid_decrypt_with_x25519_secret_key(&memo.lock, dec_key);
-    if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN + JUBJUB_SCALAR_LEN {
+    if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
         return Err(eg!(ZeiError::ParameterError));
     }
     let amount = u8_le_slice_to_u64(&plaintext[0..8]);
@@ -260,9 +324,6 @@ pub fn decrypt_memo(
     i += ASSET_TYPE_LENGTH;
     let blind = BLSScalar::from_bytes(&plaintext[i..i + BLS12_381_SCALAR_LEN])
         .c(d!(ZeiError::ParameterError))?;
-    i += BLS12_381_SCALAR_LEN;
-    let rand = JubjubScalar::from_bytes(&plaintext[i..i + JUBJUB_SCALAR_LEN])
-        .c(d!(ZeiError::ParameterError))?;
 
     // verify abar's commitment
     let hash = RescueInstance::new();
@@ -270,18 +331,13 @@ pub fn decrypt_memo(
         blind,
         BLSScalar::from(amount),
         asset_type.as_scalar(),
-        BLSScalar::zero(),
+        key_pair.pub_key().0.point_ref().get_x(),
     ])[0];
-    if expected_commitment != abar.amount_type_commitment {
+    if expected_commitment != abar.commitment {
         return Err(eg!(ZeiError::CommitmentVerificationError));
     }
 
-    // verify abar's public key
-    if key_pair.randomize(&rand).pub_key() != abar.public_key {
-        return Err(eg!(ZeiError::InconsistentStructureError));
-    }
-
-    Ok((amount, asset_type, blind, rand))
+    Ok((amount, asset_type, blind))
 }
 
 pub fn nullifier(
@@ -311,8 +367,8 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
     let hash = RescueInstance::new();
     hash.rescue(&[
         BLSScalar::from(uid),
-        abar.amount_type_commitment,
-        abar.public_key.0.point_ref().get_x(),
+        abar.commitment,
+        BLSScalar::zero(),
         BLSScalar::zero(),
     ])[0]
 }
@@ -321,13 +377,13 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
 mod tests {
     use crate::anon_xfr::{
         config::{FEE_CALCULATING_FUNC, FEE_TYPE},
-        gen_anon_xfr_body, hash_abar,
+        gen_anon_xfr_note, hash_abar,
         keys::AXfrKeyPair,
         structs::{
-            AXfrNote, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
+            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecord,
             OpenAnonBlindAssetRecordBuilder,
         },
-        verify_anon_xfr_body, TREE_DEPTH,
+        verify_anon_xfr_note, TREE_DEPTH,
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
@@ -385,13 +441,10 @@ mod tests {
             gen_oabar_and_keys(&mut prng, input_amount, asset_type);
         let abar = AnonBlindAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
-        let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
-        assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
 
         let owner_memo = oabar.get_owner_memo().unwrap();
 
         // simulate Merkle tree state
-        let rand_pk_in = rand_keypair_in.pub_key();
         let node = MTNode {
             siblings1: one,
             siblings2: two,
@@ -399,13 +452,7 @@ mod tests {
             is_right_child: 1u8,
         };
         let hash = RescueInstance::new();
-        let rand_pk_in_jj = rand_pk_in.as_jubjub_point();
-        let leaf = hash.rescue(&[
-            /*uid=*/ two,
-            oabar.compute_commitment(),
-            rand_pk_in_jj.get_x(),
-            zero,
-        ])[0];
+        let leaf = hash.rescue(&[/*uid=*/ two, oabar.compute_commitment(), zero, zero])[0];
         let merkle_root = hash.rescue(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
         let mt_leaf_info = MTLeafInfo {
             path: MTPath { nodes: vec![node] },
@@ -419,7 +466,7 @@ mod tests {
         let dec_key_out = XSecretKey::new(&mut prng);
         let enc_key_out = XPublicKey::from(&dec_key_out);
 
-        let (body, merkle_root, key_pairs) = {
+        let (note, merkle_root) = {
             // prover scope
             // 1. open abar
             let oabar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
@@ -445,7 +492,7 @@ mod tests {
                 .build()
                 .unwrap();
 
-            let (body, key_pairs) = gen_anon_xfr_body(
+            let note = gen_anon_xfr_note(
                 &mut prng,
                 &user_params,
                 &[oabar_in],
@@ -453,33 +500,26 @@ mod tests {
                 &[keypair_in],
             )
             .unwrap();
-            (body, merkle_root, key_pairs)
+            (note, merkle_root)
         };
         {
             // owner scope
             let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
-                &body.outputs[0],
-                body.owner_memos[0].clone(),
+                &note.body.outputs[0],
+                note.body.owner_memos[0].clone(),
                 &keypair_out,
                 &dec_key_out,
             )
             .unwrap()
             .build()
             .unwrap();
-            let rand_pk = keypair_out
-                .pub_key()
-                .randomize(&oabar.get_key_rand_factor());
             assert_eq!(output_amount, oabar.get_amount());
             assert_eq!(asset_type, oabar.get_asset_type());
-            assert_eq!(rand_pk, body.outputs[0].public_key);
         }
         {
             // verifier scope
             let verifier_params = VerifierParams::from(user_params);
-            assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
-
-            let note = AXfrNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
-            assert!(note.verify().is_ok())
+            assert!(verify_anon_xfr_note(&verifier_params, &note, &merkle_root).is_ok());
         }
     }
 
@@ -488,11 +528,9 @@ mod tests {
         // add 6/7 abar and populate and then retrieve values
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let key_pair = AXfrKeyPair::generate(&mut prng);
 
         let mut abar = AnonBlindAssetRecord {
-            amount_type_commitment: BLSScalar::random(&mut prng),
-            public_key: key_pair.pub_key(),
+            commitment: BLSScalar::random(&mut prng),
         };
 
         let _ = mt.add_commitment_hash(hash_abar(mt.entry_count(), &abar))?;
@@ -500,8 +538,7 @@ mod tests {
 
         for _i in 0..n - 1 {
             abar = AnonBlindAssetRecord {
-                amount_type_commitment: BLSScalar::random(&mut prng),
-                public_key: key_pair.pub_key(),
+                commitment: BLSScalar::random(&mut prng),
             };
 
             let _ = mt.add_commitment_hash(hash_abar(mt.entry_count(), &abar))?;
@@ -532,10 +569,7 @@ mod tests {
         // simulate input abar
         let (oabar, keypair_in, dec_key_in, _) =
             gen_oabar_and_keys(&mut prng, input_amount, asset_type);
-        let abar = AnonBlindAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
-        let rand_keypair_in = keypair_in.randomize(&oabar.get_key_rand_factor());
-        assert_eq!(rand_keypair_in.pub_key(), abar.public_key);
 
         let owner_memo = oabar.get_owner_memo().unwrap();
 
@@ -555,7 +589,7 @@ mod tests {
         let dec_key_out = XSecretKey::new(&mut prng);
         let enc_key_out = XPublicKey::from(&dec_key_out);
 
-        let (body, _merkle_root, key_pairs) = {
+        let (note, _merkle_root) = {
             // prover scope
             // 1. open abar
             let oabar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
@@ -581,7 +615,7 @@ mod tests {
                 .build()
                 .unwrap();
 
-            let (body, key_pairs) = gen_anon_xfr_body(
+            let note = gen_anon_xfr_note(
                 &mut prng,
                 &user_params,
                 &[oabar_in],
@@ -589,33 +623,29 @@ mod tests {
                 &[keypair_in],
             )
             .unwrap();
-            (body, mt_proof.root, key_pairs)
+            (note, mt_proof.root)
         };
         {
             // owner scope
             let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
-                &body.outputs[0],
-                body.owner_memos[0].clone(),
+                &note.body.outputs[0],
+                note.body.owner_memos[0].clone(),
                 &keypair_out,
                 &dec_key_out,
             )
             .unwrap()
             .build()
             .unwrap();
-            let rand_pk = keypair_out
-                .pub_key()
-                .randomize(&oabar.get_key_rand_factor());
             assert_eq!(output_amount, oabar.get_amount());
             assert_eq!(asset_type, oabar.get_asset_type());
-            assert_eq!(rand_pk, body.outputs[0].public_key);
         }
         {
             let mut hash = {
                 let hasher = RescueInstance::new();
                 hasher.rescue(&[
                     BLSScalar::from(uid),
-                    abar.amount_type_commitment,
-                    abar.public_key.0.point_ref().get_x(),
+                    abar.commitment,
+                    BLSScalar::zero(),
                     BLSScalar::zero(),
                 ])[0]
             };
@@ -633,18 +663,14 @@ mod tests {
         {
             // verifier scope
             let verifier_params = VerifierParams::from(user_params);
-            let t = verify_anon_xfr_body(&verifier_params, &body, &mt.get_root().unwrap());
-            println!("{:?}", t);
+            let t = verify_anon_xfr_note(&verifier_params, &note, &mt.get_root().unwrap());
             assert!(t.is_ok());
 
             let vk1 = verifier_params.shrink().unwrap();
-            assert!(verify_anon_xfr_body(&vk1, &body, &mt.get_root().unwrap()).is_ok());
+            assert!(verify_anon_xfr_note(&vk1, &note, &mt.get_root().unwrap()).is_ok());
 
             let vk2 = VerifierParams::load(1, 1).unwrap();
-            assert!(verify_anon_xfr_body(&vk2, &body, &mt.get_root().unwrap()).is_ok());
-
-            let note = AXfrNote::generate_note_from_body(&mut prng, body, key_pairs).unwrap();
-            assert!(note.verify().is_ok())
+            assert!(verify_anon_xfr_note(&vk2, &note, &mt.get_root().unwrap()).is_ok());
         }
     }
 
@@ -681,19 +707,13 @@ mod tests {
             in_dec_keys.push(dec_key);
             in_owner_memos.push(owner_memo);
         }
-        // simulate merklee tree state
+        // simulate Merkle tree state
         let hash = RescueInstance::new();
         let leafs: Vec<BLSScalar> = in_abars
             .iter()
             .enumerate()
             .map(|(uid, in_abar)| {
-                let rand_pk_in_jj = in_abar.public_key.as_jubjub_point();
-                hash.rescue(&[
-                    BLSScalar::from(uid as u32),
-                    in_abar.amount_type_commitment,
-                    rand_pk_in_jj.get_x(),
-                    zero,
-                ])[0]
+                hash.rescue(&[BLSScalar::from(uid as u32), in_abar.commitment, zero, zero])[0]
             })
             .collect();
         let node0 = MTNode {
@@ -735,7 +755,7 @@ mod tests {
             );
         }
 
-        let (body, merkle_root) = {
+        let (note, merkle_root) = {
             // prover scope
             let mut open_abars_in: Vec<OpenAnonBlindAssetRecord> = (0..n_payers)
                 .map(|uid| {
@@ -779,16 +799,16 @@ mod tests {
             // empty inputs/outputs
             msg_eq!(
                 ZeiError::AXfrProverParamsError,
-                gen_anon_xfr_body(&mut prng, &user_params, &[], &open_abars_out, &[]).unwrap_err(),
+                gen_anon_xfr_note(&mut prng, &user_params, &[], &open_abars_out, &[]).unwrap_err(),
             );
             msg_eq!(
                 ZeiError::AXfrProverParamsError,
-                gen_anon_xfr_body(&mut prng, &user_params, &open_abars_in, &[], &in_keypairs)
+                gen_anon_xfr_note(&mut prng, &user_params, &open_abars_in, &[], &in_keypairs)
                     .unwrap_err(),
             );
             // invalid inputs/outputs
             open_abars_in[0].amount += 1;
-            assert!(gen_anon_xfr_body(
+            assert!(gen_anon_xfr_note(
                 &mut prng,
                 &user_params,
                 &open_abars_in,
@@ -801,7 +821,7 @@ mod tests {
             let mut mt_info = open_abars_in[0].mt_leaf_info.clone().unwrap();
             mt_info.root.add_assign(&one);
             open_abars_in[0].mt_leaf_info = Some(mt_info);
-            assert!(gen_anon_xfr_body(
+            assert!(gen_anon_xfr_note(
                 &mut prng,
                 &user_params,
                 &open_abars_in,
@@ -813,7 +833,7 @@ mod tests {
             mt_info.root.sub_assign(&one);
             open_abars_in[0].mt_leaf_info = Some(mt_info);
 
-            let (body, _) = gen_anon_xfr_body(
+            let note = gen_anon_xfr_note(
                 &mut prng,
                 &user_params,
                 &open_abars_in,
@@ -821,34 +841,30 @@ mod tests {
                 &in_keypairs,
             )
             .unwrap();
-            (body, merkle_root)
+            (note, merkle_root)
         };
         {
             // owner scope
             for i in 0..n_payees {
                 let oabar_out = OpenAnonBlindAssetRecordBuilder::from_abar(
-                    &body.outputs[i],
-                    body.owner_memos[i].clone(),
+                    &note.body.outputs[i],
+                    note.body.owner_memos[i].clone(),
                     &keypairs_out[i],
                     &dec_keys_out[i],
                 )
                 .unwrap()
                 .build()
                 .unwrap();
-                let rand_pk = keypairs_out[i]
-                    .pub_key()
-                    .randomize(&oabar_out.key_rand_factor);
                 assert_eq!(amounts_out[i], oabar_out.amount);
                 assert_eq!(asset_types_out[i], oabar_out.asset_type);
-                assert_eq!(rand_pk, body.outputs[i].public_key);
             }
         }
         {
             // verifier scope
             let verifier_params = VerifierParams::from(user_params);
             // inconsistent merkle roots
-            assert!(verify_anon_xfr_body(&verifier_params, &body, &zero).is_err());
-            assert!(verify_anon_xfr_body(&verifier_params, &body, &merkle_root).is_ok());
+            assert!(verify_anon_xfr_note(&verifier_params, &note, &zero).is_err());
+            assert!(verify_anon_xfr_note(&verifier_params, &note, &merkle_root).is_ok());
         }
     }
 

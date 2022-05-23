@@ -1,3 +1,8 @@
+[[bench]]
+name = 'fft'
+path = 'benches/fft.rs'
+harness = false
+
 [package]
 name = 'zei-plonk'
 version = '0.1.4'

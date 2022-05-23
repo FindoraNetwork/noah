@@ -1,13 +1,12 @@
 use crate::anon_xfr::{
     decrypt_memo,
-    keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature},
+    keys::{AXfrKeyPair, AXfrPubKey},
 };
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use zei_algebra::{
     bls12_381::{BLSPairingEngine, BLSScalar},
-    jubjub::JubjubScalar,
     prelude::*,
 };
 use zei_crypto::basic::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
@@ -34,54 +33,23 @@ pub struct MTNode {
 
 pub type SnarkProof = PlonkPf<KZGCommitmentScheme<BLSPairingEngine>>;
 
-// AXfrNote is a wrapper over AXfrBody with signatures and verification.
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
-pub struct AXfrNote {
-    pub body: AXfrBody,
-    pub signatures: Vec<AXfrSignature>,
-}
-
-impl AXfrNote {
-    pub fn generate_note_from_body<R: CryptoRng + RngCore>(
-        prng: &mut R,
-        body: AXfrBody,
-        keypairs: Vec<AXfrKeyPair>,
-    ) -> Result<AXfrNote> {
-        let mut signatures: Vec<AXfrSignature> = Vec::new();
-        let msg: Vec<u8> = bincode::serialize(&body)
-            .map_err(|_| ZeiError::SerializationError)
-            .c(d!())?;
-
-        for keypair in keypairs {
-            signatures.push(keypair.sign(prng, msg.as_slice()))
-        }
-
-        Ok(AXfrNote { body, signatures })
-    }
-
-    pub fn verify(&self) -> Result<()> {
-        let msg: Vec<u8> = bincode::serialize(&self.body)
-            .map_err(|_| ZeiError::SerializationError)
-            .c(d!())?;
-
-        self.body
-            .inputs
-            .iter()
-            .zip(self.signatures.iter())
-            .map(|(inp, sig)| inp.1.verify(msg.as_slice(), sig))
-            .collect::<Result<Vec<()>>>()
-            .c(d!("AXfrNote signature verification failed"))?;
-
-        Ok(())
-    }
-}
-
 /// Anonymous transfers structure
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
+pub struct AXfrNote {
+    /// The body part of AnonFee
+    pub body: AXfrBody,
+    /// The spending proof (assuming non-malleability)
+    pub anon_xfr_proof: SnarkProof,
+    /// The non-malleability tag
+    pub non_malleability_tag: BLSScalar,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AXfrBody {
-    pub inputs: Vec<(Nullifier, AXfrPubKey)>,
+    pub inputs: Vec<Nullifier>,
     pub outputs: Vec<AnonBlindAssetRecord>,
-    pub proof: AXfrProof,
+    pub merkle_root: BLSScalar,
+    pub merkle_root_version: u64,
     pub owner_memos: Vec<OwnerMemo>,
 }
 
@@ -89,26 +57,15 @@ pub struct AXfrBody {
 #[wasm_bindgen]
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AnonBlindAssetRecord {
-    pub amount_type_commitment: Commitment,
-    pub public_key: AXfrPubKey,
+    pub commitment: BLSScalar,
 }
 
 impl AnonBlindAssetRecord {
     pub fn from_oabar(oabar: &OpenAnonBlindAssetRecord) -> AnonBlindAssetRecord {
-        let rand_pub_key = oabar.pub_key_ref().randomize(&oabar.key_rand_factor);
         AnonBlindAssetRecord {
-            amount_type_commitment: oabar.compute_commitment(),
-            public_key: rand_pub_key,
+            commitment: oabar.compute_commitment(),
         }
     }
-}
-
-/// Proof for an AXfrBody correctness
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
-pub struct AXfrProof {
-    pub snark_proof: SnarkProof,
-    pub merkle_root: BLSScalar,
-    pub merkle_root_version: usize,
 }
 
 /// MT PATH, merkle root value, leaf identifier
@@ -116,7 +73,7 @@ pub struct AXfrProof {
 pub struct MTLeafInfo {
     pub path: MTPath,
     pub root: BLSScalar,
-    pub root_version: usize,
+    pub root_version: u64,
     pub uid: u64,
 }
 
@@ -137,7 +94,6 @@ pub struct OpenAnonBlindAssetRecord {
     pub(crate) asset_type: AssetType,
     pub(crate) blind: BLSScalar,
     pub(crate) pub_key: AXfrPubKey,
-    pub(crate) key_rand_factor: JubjubScalar,
     pub(crate) owner_memo: Option<OwnerMemo>,
     pub(crate) mt_leaf_info: Option<MTLeafInfo>,
 }
@@ -164,24 +120,19 @@ impl OpenAnonBlindAssetRecord {
         &self.pub_key
     }
 
-    /// Get record key randomization factor
-    pub fn get_key_rand_factor(&self) -> JubjubScalar {
-        self.key_rand_factor
-    }
-
     /// Get record's owner memo
     pub fn get_owner_memo(&self) -> Option<OwnerMemo> {
         self.owner_memo.clone()
     }
 
-    /// computes record's amount||asset type commitment
+    /// computes record's amount||asset type||pub key commitment
     pub fn compute_commitment(&self) -> Commitment {
         let hash = RescueInstance::new();
         hash.rescue(&[
             self.blind,
             BLSScalar::from(self.amount),
             self.asset_type.as_scalar(),
-            BLSScalar::zero(),
+            self.pub_key.0.point_ref().get_x(),
         ])[0]
     }
 }
@@ -238,12 +189,10 @@ impl OpenAnonBlindAssetRecordBuilder {
         }
 
         self.oabar.blind = BLSScalar::random(prng);
-        self.oabar.key_rand_factor = JubjubScalar::random(prng);
         let mut msg = vec![];
         msg.extend_from_slice(&self.oabar.amount.to_le_bytes());
         msg.extend_from_slice(&self.oabar.asset_type.0);
         msg.extend_from_slice(&self.oabar.blind.to_bytes());
-        msg.extend_from_slice(&self.oabar.key_rand_factor.to_bytes());
         let cipher = hybrid_encrypt_x25519(prng, enc_key, &msg);
         let memo = OwnerMemo {
             blind_share: Default::default(),
@@ -269,7 +218,7 @@ impl OpenAnonBlindAssetRecordBuilder {
         key_pair: &AXfrKeyPair,
         dec_key: &XSecretKey,
     ) -> Result<Self> {
-        let (amount, asset_type, blind, key_rand) =
+        let (amount, asset_type, blind) =
             decrypt_memo(&owner_memo, dec_key, key_pair, record).c(d!())?;
         let mut builder = OpenAnonBlindAssetRecordBuilder::new()
             .pub_key(key_pair.pub_key())
@@ -277,7 +226,6 @@ impl OpenAnonBlindAssetRecordBuilder {
             .asset_type(asset_type);
 
         builder.oabar.blind = blind;
-        builder.oabar.key_rand_factor = key_rand;
         builder.oabar.owner_memo = Some(owner_memo);
         Ok(builder)
     }

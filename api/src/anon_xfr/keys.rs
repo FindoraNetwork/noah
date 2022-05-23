@@ -31,14 +31,16 @@ impl AXfrKeyPair {
         AXfrKeyPair(KeyPair::generate(prng))
     }
 
-    /// Multiply the secret key scalar by `factor` producing a new "randomized" KeyPair
-    pub fn randomize(&self, factor: &JubjubScalar) -> AXfrKeyPair {
-        AXfrKeyPair(self.0.randomize(factor))
-    }
-
     /// Return public key
     pub fn pub_key(&self) -> AXfrPubKey {
         AXfrPubKey(self.0.pub_key)
+    }
+
+    /// Return the key pair
+    pub fn from_secret_scalar(secret: JubjubScalar) -> Self {
+        AXfrKeyPair(KeyPair::<JubjubPoint, JubjubScalar>::from_secret_scalar(
+            secret,
+        ))
     }
 
     /// Return secret key scalar value
@@ -69,17 +71,9 @@ impl ZeiFromToBytes for AXfrKeyPair {
 }
 
 impl AXfrPubKey {
-    /// Implicitly multiply the associated secret key scalar by `factor` producing a new "randomized" key
-    pub fn randomize(&self, factor: &JubjubScalar) -> AXfrPubKey {
-        AXfrPubKey(self.0.randomize(factor))
-    }
     /// return a reference to the EC group point defining the public key
     pub fn as_jubjub_point(&self) -> &JubjubPoint {
         self.0.point_ref()
-    }
-
-    pub(crate) fn from_jubjub_point(point: JubjubPoint) -> AXfrPubKey {
-        AXfrPubKey(PublicKey::from_point(point))
     }
 
     /// Signature verification function

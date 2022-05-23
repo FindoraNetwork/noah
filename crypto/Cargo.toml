@@ -11,6 +11,7 @@ crate-type = ['rlib']
 
 [dependencies]
 aes = '0.8.1'
+bulletproofs = "2.0"
 ctr = '0.9.1'
 digest = '0.10'
 ed25519-dalek = '1.0.0'
@@ -25,11 +26,6 @@ ruc = '1.0'
 
 [dependencies.zei-algebra]
 path = '../algebra'
-
-[dependencies.bulletproofs]
-package = 'bulletproofs'
-git = 'https://github.com/FindoraNetwork/bp'
-branch = 'develop-refactoring'
 
 [dependencies.curve25519-dalek]
 version = '3.0.0'

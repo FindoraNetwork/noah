@@ -16,21 +16,18 @@ crate-type = ['rlib']
 
 [dependencies]
 base64 = "0.13"
-serde = '1.0'
+bulletproofs = "2.0"
 digest = '0.10'
-ruc = '1.0'
-x25519-dalek = '1.1'
 itertools = '0.10.0'
+ruc = '1.0'
+serde = '1.0'
+x25519-dalek = '1.1'
+rayon = { version = "1", optional = true }
 
 [dependencies.byteorder]
 version = '^1.2.3'
 default-features = false
 features = ['i128']
-
-[dependencies.bulletproofs]
-package = 'bulletproofs'
-git = 'https://github.com/FindoraNetwork/bp'
-branch = 'develop-refactoring'
 
 [dependencies.curve25519-dalek]
 version = '3.0.0'
@@ -73,6 +70,9 @@ default-features = false
 [dependencies.num-bigint]
 version = '0.4'
 
+[dependencies.num-integer]
+version = "0.1"
+
 [features]
 default = [
     'std',
@@ -93,6 +93,7 @@ u64_backend = ['curve25519-dalek/u64_backend']
 u32_backend = ['curve25519-dalek/u32_backend']
 avx2_backend = ['curve25519-dalek/avx2_backend']
 parallel = [
+    'rayon',
     'ark-ec/parallel',
     'ark-ff/parallel',
 ]

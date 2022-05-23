@@ -34,6 +34,12 @@ enum Actions {
     /// Generates the verifying key for BAR to ABAR transform
     BAR_TO_ABAR { directory: PathBuf },
 
+    /// Generates the verifying key for AR to ABAR transform
+    AR_TO_ABAR { directory: PathBuf },
+
+    /// Generates the verifying key for ABAR to AR transform
+    ABAR_TO_AR { directory: PathBuf },
+
     /// Generates the verifying key for anonymous fees
     ANON_FEE { directory: PathBuf },
 
@@ -57,6 +63,14 @@ fn main() {
 
         BAR_TO_ABAR { directory } => {
             gen_bar_to_abar_vk(directory);
+        }
+
+        AR_TO_ABAR { directory } => {
+            gen_ar_to_abar_vk(directory);
+        }
+
+        ABAR_TO_AR { directory } => {
+            gen_abar_to_ar_vk(directory);
         }
 
         ANON_FEE { directory } => {
@@ -125,17 +139,59 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-bar-vk.bin");
     save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
 }
 
 // cargo run --release --features="gen no_vk" --bin gen-params bar-to-abar "./parameters"
 fn gen_bar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for BAR TO ABAR ...");
 
-    let user_params = ProverParams::eq_committed_vals_params().unwrap();
+    let user_params = ProverParams::bar_to_abar_params().unwrap();
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("bar-to-abar-vk.bin");
     save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
+}
+
+// cargo run --release --features="gen no_vk" --bin gen-params ar-to-abar "./parameters"
+fn gen_ar_to_abar_vk(mut path: PathBuf) {
+    println!("Generating the verifying key for AR TO ABAR ...");
+
+    let user_params = ProverParams::ar_to_abar_params().unwrap();
+    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    let bytes = bincode::serialize(&node_params).unwrap();
+    path.push("ar-to-abar-vk.bin");
+    save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
+}
+
+// cargo run --release --features="gen no_vk" --bin gen-params abar-to-ar "./parameters"
+fn gen_abar_to_ar_vk(mut path: PathBuf) {
+    println!("Generating the verifying key for ABAR TO AR ...");
+
+    let user_params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
+    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    let bytes = bincode::serialize(&node_params).unwrap();
+    path.push("abar-to-ar-vk.bin");
+    save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
 }
 
 // cargo run --release --features="gen no_vk" --bin gen-params anon-fee "./parameters"
@@ -147,6 +203,11 @@ fn gen_anon_fee_vk(mut path: PathBuf) {
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("anon-fee-vk.bin");
     save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
 }
 
 // cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof "./parameters"
@@ -157,4 +218,9 @@ fn gen_bulletproof_urs(mut path: PathBuf) {
     let bytes = bincode::serialize(&pp).unwrap();
     path.push("bulletproof-urs.bin");
     save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let _n: BulletproofParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
 }

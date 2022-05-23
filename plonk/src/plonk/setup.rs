@@ -153,9 +153,23 @@ pub fn choose_ks<R: CryptoRng + RngCore, F: Scalar>(
 /// constraints to a power of two.
 /// # Example
 /// See plonk::prover::prover
+///
 pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
+    prg_seed: [u8; 32],
+) -> Result<PlonkPK<PCS>> {
+    preprocess_prover_with_lagrange(cs, pcs, None, prg_seed)
+}
+
+/// Indexer that uses Lagrange bases
+pub fn preprocess_prover_with_lagrange<
+    PCS: PolyComScheme,
+    CS: ConstraintSystem<Field = PCS::Field>,
+>(
+    cs: &CS,
+    pcs: &PCS,
+    lagrange_pcs: Option<&PCS>,
     prg_seed: [u8; 32],
 ) -> Result<PlonkPK<PCS>> {
     let mut prng = ChaChaRng::from_seed(prg_seed);
@@ -167,13 +181,22 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
         return Err(eg!(PlonkError::SetupError));
     }
 
+    let lagrange_pcs = if lagrange_pcs.is_some() {
+        if lagrange_pcs.unwrap().max_degree() + 1 == n {
+            lagrange_pcs
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Compute evaluation domains.
     let root_m =
         primitive_nth_root_of_unity::<PCS::Field>(m).c(d!(PlonkError::GroupNotFound(m)))?;
     let group_m = build_group(&root_m, m)?;
     let root = group_m[factor % m];
     let group = build_group(&root, n)?;
-    // TODO: we can fix the set k for different circuits.
     let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
     let coset_quot = group_m.iter().map(|x| k[1].mul(x)).collect();
 
@@ -186,30 +209,57 @@ pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::F
     let mut perms_coset_evals = vec![vec![]; n_wires_per_gate];
     let mut prover_extended_perms = vec![];
     let mut verifier_extended_perms = vec![];
-    for i in 0..n_wires_per_gate {
-        let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n]);
-        perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
-        println!("perm: {} {}", i, perm.coefs.len());
-        let (c_perm, o_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
-        prover_extended_perms.push(o_perm);
-        verifier_extended_perms.push(c_perm);
+    if let Some(lagrange_pcs) = lagrange_pcs {
+        for i in 0..n_wires_per_gate {
+            let perm_eval = FpPolynomial::from_coefs(p_values[i * n..(i + 1) * n].to_vec());
+            let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n], n);
+            perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            let (c_perm, _) = lagrange_pcs
+                .commit(perm_eval)
+                .c(d!(PlonkError::SetupError))?;
+            let o_perm = pcs.opening(&perm);
+            prover_extended_perms.push(o_perm);
+            verifier_extended_perms.push(c_perm);
+        }
+    } else {
+        for i in 0..n_wires_per_gate {
+            let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n], n);
+            perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            let (c_perm, o_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
+            prover_extended_perms.push(o_perm);
+            verifier_extended_perms.push(c_perm);
+        }
     }
 
     // Compute the openings, commitments, and point evaluations of the selector polynomials.
     let mut selectors_coset_evals = vec![vec![]; cs.num_selectors()];
     let mut prover_selectors = vec![];
     let mut verifier_selectors = vec![];
-    for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
-        let q = FpPolynomial::ffti(&root, cs.selector(i)?);
-        println!("selector: {} {}", i, q.coefs.len());
-        selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
-        let (c_q, o_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
-        prover_selectors.push(o_q);
-        verifier_selectors.push(c_q);
+    if let Some(lagrange_pcs) = lagrange_pcs {
+        for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
+            let q_eval = FpPolynomial::from_coefs(cs.selector(i)?.to_vec());
+            let q = FpPolynomial::ffti(&root, cs.selector(i)?, n);
+            selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            let (c_q, _) = lagrange_pcs.commit(q_eval).c(d!(PlonkError::SetupError))?;
+            let o_q = pcs.opening(&q);
+            prover_selectors.push(o_q);
+            verifier_selectors.push(c_q);
+        }
+    } else {
+        for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
+            let q = FpPolynomial::ffti(&root, cs.selector(i)?, n);
+            selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            let (c_q, o_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
+            prover_selectors.push(o_q);
+            verifier_selectors.push(c_q);
+        }
     }
 
     // Compute polynomials L1, Z_H, and point evaluations of L1 and Z_H^{-1}.
-    let l1 = FpPolynomial::from_zeroes(&group[1..]);
+    let mut l1 = FpPolynomial::from_coefs(vec![PCS::Field::zero(); group.len()]);
+    // X^n - 1 = (X - 1) (X^{n-1} + X^{n-2} + ... + 1)
+    l1.coefs[0] = PCS::Field::from(n as u64);
+    let l1 = FpPolynomial::ffti(&root, &l1.coefs, n);
     let l1_coset_evals = l1.coset_fft_with_unity_root(&root_m, m, &k[1]);
     let mut z_h_coefs = vec![PCS::Field::zero(); n + 1];
     z_h_coefs[0] = PCS::Field::one().neg();

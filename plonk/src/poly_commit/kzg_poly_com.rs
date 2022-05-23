@@ -196,6 +196,60 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
             _ => Err(eg!(ZeiError::ParameterError)),
         }
     }
+
+    /// serialize the parameters to unchecked bytes.
+    pub fn to_unchecked_bytes(&self) -> Result<Vec<u8>> {
+        let mut bytes = vec![];
+        let len_1 = self.public_parameter_group_1.len() as u32;
+        let len_2 = self.public_parameter_group_2.len() as u32;
+        bytes.extend(len_1.to_le_bytes());
+        bytes.extend(len_2.to_le_bytes());
+
+        for i in &self.public_parameter_group_1 {
+            bytes.extend(i.to_unchecked_bytes());
+        }
+        for i in &self.public_parameter_group_2 {
+            bytes.extend(i.to_unchecked_bytes());
+        }
+        Ok(bytes)
+    }
+
+    /// deserialize the parameters from unchecked bytes.
+    pub fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() < 8 {
+            return Err(eg!(ZeiError::DeserializationError));
+        }
+        let mut len_1_bytes = [0u8; 4];
+        let mut len_2_bytes = [0u8; 4];
+        len_1_bytes.copy_from_slice(&bytes[0..4]);
+        len_2_bytes.copy_from_slice(&bytes[4..8]);
+        let len_1 = u32::from_le_bytes(len_1_bytes) as usize;
+        let len_2 = u32::from_le_bytes(len_2_bytes) as usize;
+        let n_1 = P::G1::unchecked_size();
+        let n_2 = P::G2::unchecked_size();
+
+        let bytes_1 = &bytes[8..];
+        let bytes_2 = &bytes[8 + (n_1 * len_1)..];
+        let mut p1 = vec![];
+        let mut p2 = vec![];
+
+        for i in 0..len_1 {
+            p1.push(P::G1::from_unchecked_bytes(
+                &bytes_1[n_1 * i..n_1 * (i + 1)],
+            )?);
+        }
+
+        for i in 0..len_2 {
+            p2.push(P::G2::from_unchecked_bytes(
+                &bytes_2[n_2 * i..n_2 * (i + 1)],
+            )?);
+        }
+
+        Ok(Self {
+            public_parameter_group_1: p1,
+            public_parameter_group_2: p2,
+        })
+    }
 }
 
 /// Define the `KZGCommitmentScheme` by given `BLSPairingEngine`.
@@ -207,6 +261,10 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
     type EvalProof = KZGEvalProof<BLSG1>;
     type Opening = FpPolynomial<Self::Field>;
 
+    fn max_degree(&self) -> usize {
+        self.public_parameter_group_1.len() - 1
+    }
+
     fn commit(
         &self,
         polynomial: FpPolynomial<BLSScalar>,
@@ -216,7 +274,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let pol_degree = polynomial.degree();
 
         if pol_degree + 1 > self.public_parameter_group_1.len() {
-            return Err(eg!(PolyComSchemeError::PCSProveEvalError));
+            return Err(eg!(PolyComSchemeError::DegreeError));
         }
 
         let coefs_poly_bls_scalar_ref: Vec<&BLSScalar> = coefs_poly.iter().collect();
@@ -224,7 +282,8 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             [0..pol_degree + 1]
             .iter()
             .collect();
-        let commitment_value = BLSG1::multi_exp(
+
+        let commitment_value = BLSG1::multi_exp_unsafe(
             &coefs_poly_bls_scalar_ref[..],
             &pub_param_group_1_as_ref[..],
         );
@@ -247,6 +306,22 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         point: &Self::Field,
     ) -> Self::Field {
         opening.eval(point)
+    }
+
+    fn apply_blind_factors(
+        &self,
+        commitment: &Self::Commitment,
+        blinds: &[Self::Field],
+        zeroing_degree: usize,
+    ) -> Self::Commitment {
+        let mut commitment = commitment.value.clone();
+        for (i, blind) in blinds.iter().enumerate() {
+            let mut blind = blind.clone();
+            commitment = commitment + &(self.public_parameter_group_1[i] * &blind);
+            blind = blind.neg();
+            commitment = commitment + &(self.public_parameter_group_1[zeroing_degree + i] * &blind);
+        }
+        KZGCommitment { value: commitment }
     }
 
     fn commitment_from_opening(&self, opening: &Self::Opening) -> Self::Commitment {

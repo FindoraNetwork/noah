@@ -216,6 +216,23 @@ impl Into<BigUint> for &SimFrMul {
     }
 }
 
+impl Add<&SimFrMul> for &SimFrMul {
+    type Output = SimFrMul;
+
+    fn add(self, rhs: &SimFrMul) -> SimFrMul {
+        let mut res = self.clone();
+
+        for i in 0..NUM_OF_LIMBS_MUL {
+            res.limbs[i] = res.limbs[i].add(&rhs.limbs[i]);
+        }
+        res.val = &res.val + &rhs.val;
+        res.prod_of_num_of_additions =
+            &res.prod_of_num_of_additions + &rhs.prod_of_num_of_additions;
+
+        res
+    }
+}
+
 impl Sub<&SimFr> for &SimFrMul {
     type Output = SimFrMul;
 

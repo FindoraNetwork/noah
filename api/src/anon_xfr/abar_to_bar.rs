@@ -3,7 +3,8 @@ use crate::anon_xfr::{
         add_merkle_path_variables, commit, compute_merkle_root, nullify, AccElemVars,
         NullifierInputVars, PayerSecret, PayerSecretVars, TurboPlonkCS,
     },
-    keys::{AXfrKeyPair, AXfrPubKey, AXfrSignature},
+    compute_non_malleability_tag,
+    keys::AXfrKeyPair,
     nullifier,
     structs::{Nullifier, OpenAnonBlindAssetRecord},
 };
@@ -13,13 +14,12 @@ use crate::xfr::{
     sig::XfrPublicKey,
     structs::{AssetRecordTemplate, BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
 };
+use digest::Digest;
 use merlin::Transcript;
 use num_bigint::BigUint;
+use sha2::Sha512;
 use zei_algebra::{
-    bls12_381::BLSScalar,
-    jubjub::{JubjubPoint, JubjubScalar},
-    prelude::*,
-    ristretto::RistrettoScalar,
+    bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*, ristretto::RistrettoScalar,
 };
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
@@ -33,7 +33,7 @@ use zei_plonk::{
         constraint_system::{
             field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
         },
-        prover::prover,
+        prover::prover_with_lagrange,
         setup::PlonkPf,
         verifier::verifier,
     },
@@ -42,7 +42,7 @@ use zei_plonk::{
 
 pub type Abar2BarPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
 pub const TWO_POW_32: u64 = 1 << 32;
-const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"Abar to Bar Conversion";
+const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"ABAR to BAR proof";
 const SK_LEN: usize = 252;
 
 /// ConvertAbarBarProof is a struct to hold various aspects of a ZKP to prove equality, spendability
@@ -52,46 +52,55 @@ pub struct ConvertAbarBarProof {
     commitment_eq_proof: ZKPartProof,
     spending_proof: Abar2BarPlonkProof,
     merkle_root: BLSScalar,
-    merkle_root_version: usize,
+    merkle_root_version: u64,
 }
 
 impl ConvertAbarBarProof {
     #[allow(dead_code)]
-    pub fn get_merkle_root_version(&self) -> usize {
+    pub fn get_merkle_root_version(&self) -> u64 {
         return self.merkle_root_version;
     }
 }
 
-/// AbarToBarBody has the input, the output and the proof related to the conversion.
+/// AbarToBarNote has the input, the output and the proof related to the conversion.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AbarToBarNote {
+    /// The body part of ABAR to BAR
+    pub body: AbarToBarBody,
+    /// The spending proof (assuming non-malleability)
+    pub spending_proof: Abar2BarPlonkProof,
+    /// The non-malleability tag
+    pub non_malleability_tag: BLSScalar,
+}
+
+/// AbarToBarNote has the input, the output and the proof related to the conversion.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToBarBody {
     /// input ABAR being spent
-    pub input: (Nullifier, AXfrPubKey),
+    pub input: Nullifier,
     /// The new BAR to be created
     pub output: BlindAssetRecord,
-    /// The ZKP for the conversion
-    pub proof: ConvertAbarBarProof,
+    /// The ZK part of commitment equality proof
+    pub commitment_eq_proof: ZKPartProof,
+    /// The Merkle root hash
+    pub merkle_root: BLSScalar,
+    /// The Merkle root version
+    pub merkle_root_version: u64,
     /// The owner memo
     pub memo: Option<OwnerMemo>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AbarToBarNote {
-    pub body: AbarToBarBody,
-    pub signature: AXfrSignature,
 }
 
 /// This function generates the AbarToBarBody from the Open ABARs, the receiver address and the signing
 /// key pair.
 #[allow(dead_code)]
-pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
+pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     oabar: &OpenAnonBlindAssetRecord,
     abar_keypair: &AXfrKeyPair,
     bar_pub_key: &XfrPublicKey,
     asset_record_type: AssetRecordType,
-) -> Result<(AbarToBarBody, AXfrKeyPair)> {
+) -> Result<AbarToBarNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.pub_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
     }
@@ -108,23 +117,16 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     );
     let (obar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
 
-    // 2. randomize input key pair with open_abar rand key
-    let rand_input_keypair = abar_keypair.randomize(&oabar.key_rand_factor);
-
-    // 3. build input witness info
-    let diversifier = JubjubScalar::random(prng);
+    // 2. build input witness info
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let nullifier_and_signing_key = (
-        nullifier(
-            &rand_input_keypair,
-            oabar.amount,
-            &oabar.asset_type,
-            mt_leaf_info.uid,
-        ),
-        rand_input_keypair.pub_key().randomize(&diversifier),
+    let this_nullifier = nullifier(
+        &abar_keypair,
+        oabar.amount,
+        &oabar.asset_type,
+        mt_leaf_info.uid,
     );
 
-    // 4. Construct the equality proof
+    // 3. Construct the equality proof
     let x = RistrettoScalar::from(oabar.amount);
     let y: RistrettoScalar = oabar.asset_type.as_scalar();
     let gamma = obar
@@ -138,24 +140,47 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
     let point_p = pc_gens.commit(x, gamma);
     let point_q = pc_gens.commit(y, delta);
 
-    let nullifier = nullifier_and_signing_key.0;
-
-    // 5. compute the non-ZK part of the proof
-    let (commitment_eq_proof, non_zk_state, beta) = prove_pc_eq_rescue_external(
-        prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &nullifier,
+    // 4. compute the non-ZK part of the proof
+    let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_pc_eq_rescue_external(
+        prng,
+        &x,
+        &gamma,
+        &y,
+        &delta,
+        &pc_gens,
+        &point_p,
+        &point_q,
+        &this_nullifier,
     )
     .c(d!())?;
 
-    // 4. build the plonk proof
+    // 5. build the plonk proof
     let payers_secret = PayerSecret {
-        sec_key: rand_input_keypair.get_secret_scalar(),
-        diversifier,
+        sec_key: abar_keypair.get_secret_scalar(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
         asset_type: oabar.asset_type.as_scalar(),
         path: mt_leaf_info.path.clone(),
         blind: oabar.blind,
     };
+
+    let mt_info_temp = oabar.mt_leaf_info.as_ref().unwrap();
+
+    let body = AbarToBarBody {
+        input: this_nullifier,
+        output: obar.blind_asset_record.clone(),
+        commitment_eq_proof: commitment_eq_proof.clone(),
+        merkle_root: mt_info_temp.root,
+        merkle_root_version: mt_info_temp.root_version,
+        memo: owner_memo,
+    };
+
+    let msg = bincode::serialize(&body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+
+    let (hash, non_malleability_randomizer, non_malleability_tag) =
+        compute_non_malleability_tag(prng, b"AbarToBar", &msg, &[&abar_keypair]);
 
     let spending_proof = prove_abar_to_bar_spending(
         prng,
@@ -164,87 +189,32 @@ pub fn gen_abar_to_bar_body<R: CryptoRng + RngCore>(
         &commitment_eq_proof,
         &non_zk_state,
         &beta,
+        &lambda,
+        &hash,
+        &non_malleability_randomizer,
+        &non_malleability_tag,
     )
     .c(d!())?;
 
-    let diversified_key_pair = rand_input_keypair.randomize(&diversifier);
-
-    let mt_info_temp = oabar.mt_leaf_info.as_ref().unwrap();
-    let convert_proof = ConvertAbarBarProof {
-        commitment_eq_proof,
+    Ok(AbarToBarNote {
+        body,
         spending_proof,
-        merkle_root: mt_info_temp.root,
-        merkle_root_version: mt_info_temp.root_version,
-    };
-
-    Ok((
-        AbarToBarBody {
-            input: nullifier_and_signing_key,
-            output: obar.blind_asset_record.clone(),
-            proof: convert_proof,
-            memo: owner_memo,
-        },
-        diversified_key_pair,
-    ))
-}
-
-pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
-    prng: &mut R,
-    params: &ProverParams,
-    record: &OpenAnonBlindAssetRecord,
-    abar_keypair: &AXfrKeyPair,
-    bar_pub_key: &XfrPublicKey,
-    asset_record_type: AssetRecordType,
-) -> Result<AbarToBarNote> {
-    let (body, randomized_keypair) = gen_abar_to_bar_body(
-        prng,
-        params,
-        record,
-        abar_keypair,
-        bar_pub_key,
-        asset_record_type,
-    )
-    .c(d!())?;
-    let msg = bincode::serialize(&body)
-        .c(d!(ZeiError::SerializationError))
-        .c(d!())?;
-    let signature = randomized_keypair.sign(prng, &msg);
-    let note = AbarToBarNote { body, signature };
-    Ok(note)
+        non_malleability_tag,
+    })
 }
 
 // Verifies the body
 #[allow(dead_code)]
-pub fn verify_abar_to_bar_body(
-    params: &VerifierParams,
-    body: &AbarToBarBody,
-    merkle_root: &BLSScalar,
-) -> Result<()> {
-    verify_abar_to_bar(params, &body, merkle_root)
-}
-
 pub fn verify_abar_to_bar_note(
     params: &VerifierParams,
     note: &AbarToBarNote,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
-    verify_abar_to_bar_body(params, &note.body, merkle_root).c(d!())?;
-    let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
-    note.body.input.1.verify(&msg, &note.signature).c(d!())
-}
-
-/// Verifies the proof with the input and output
-#[allow(dead_code)]
-pub fn verify_abar_to_bar(
-    params: &VerifierParams,
-    body: &AbarToBarBody,
-    merkle_root: &BLSScalar,
-) -> Result<()> {
-    if *merkle_root != body.proof.merkle_root {
+    if *merkle_root != note.body.merkle_root {
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
-    let bar = body.output.clone();
+    let bar = note.body.output.clone();
     let pc_gens = RistrettoPedersenCommitment::default();
 
     // 1. get commitments
@@ -281,36 +251,49 @@ pub fn verify_abar_to_bar(
         }
     };
 
-    let input = body.input;
-    let proof = body.proof.clone();
+    let input = note.body.input;
 
     // 2. verify equality of committed values
-    let beta = verify_pc_eq_rescue_external(
+    let (beta, lambda) = verify_pc_eq_rescue_external(
         &pc_gens,
         &com_amount,
         &com_asset_type,
-        &input.0,
-        &proof.commitment_eq_proof,
+        &input,
+        &note.body.commitment_eq_proof,
     )
     .c(d!())?;
 
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
     let mut online_inputs = vec![];
 
-    online_inputs.push(input.clone().0);
-    online_inputs.push(input.clone().1.as_jubjub_point().get_x());
-    online_inputs.push(input.clone().1.as_jubjub_point().get_y());
+    online_inputs.push(input.clone());
     online_inputs.push(merkle_root.clone());
 
-    let proof_zk_part = proof.commitment_eq_proof;
+    let proof_zk_part = note.body.commitment_eq_proof.clone();
+
+    let beta_lambda = beta * &lambda;
+    let s1_plus_lambda_s2 = proof_zk_part.s_1 + proof_zk_part.s_2 * &lambda;
 
     online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
     let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-    let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof_zk_part.s_1.to_bytes()));
-    let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof_zk_part.s_2.to_bytes()));
+    let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+    let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
+    let s1_plus_lambda_s2_sim_fr =
+        SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
     online_inputs.extend_from_slice(&beta_sim_fr.limbs);
-    online_inputs.extend_from_slice(&s1_sim_fr.limbs);
-    online_inputs.extend_from_slice(&s2_sim_fr.limbs);
+    online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
+    online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
+    online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
+
+    let msg = bincode::serialize(&note.body)
+        .c(d!(ZeiError::SerializationError))
+        .c(d!())?;
+    let mut hasher = Sha512::new();
+    hasher.update(b"AbarToBar");
+    hasher.update(msg);
+    let hash = BLSScalar::from_hash(hasher);
+    online_inputs.push(hash);
+    online_inputs.push(note.non_malleability_tag);
 
     verifier(
         &mut transcript,
@@ -318,7 +301,7 @@ pub fn verify_abar_to_bar(
         &params.cs,
         &params.verifier_params,
         &online_inputs,
-        &proof.spending_proof,
+        &note.spending_proof,
     )
 }
 
@@ -329,16 +312,30 @@ fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
     proof: &ZKPartProof,
     non_zk_state: &NonZKState,
     beta: &RistrettoScalar,
+    lambda: &RistrettoScalar,
+    hash: &BLSScalar,
+    non_malleability_randomizer: &BLSScalar,
+    non_malleability_tag: &BLSScalar,
 ) -> Result<Abar2BarPlonkProof> {
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
 
-    let (mut cs, _) = build_abar_to_bar_cs(payers_secret, proof, non_zk_state, beta);
+    let (mut cs, _) = build_abar_to_bar_cs(
+        payers_secret,
+        proof,
+        non_zk_state,
+        beta,
+        lambda,
+        hash,
+        non_malleability_randomizer,
+        non_malleability_tag,
+    );
     let witness = cs.get_and_clear_witness();
 
-    prover(
+    prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
+        params.lagrange_pcs.as_ref(),
         &params.cs,
         &params.prover_params,
         &witness,
@@ -355,6 +352,10 @@ pub fn build_abar_to_bar_cs(
     proof: &ZKPartProof,
     non_zk_state: &NonZKState,
     beta: &RistrettoScalar,
+    lambda: &RistrettoScalar,
+    hash: &BLSScalar,
+    non_malleability_randomizer: &BLSScalar,
+    non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboConstraintSystem::new();
     let payers_secrets = add_payers_secret(&mut cs, payers_secret);
@@ -364,6 +365,7 @@ pub fn build_abar_to_bar_cs(
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
+    let one_var = cs.one_var();
     let mut root_var: Option<VarIndex> = None;
     let step_1 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB));
     let step_2 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 2));
@@ -371,13 +373,13 @@ pub fn build_abar_to_bar_cs(
     let step_4 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 4));
     let step_5 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 5));
 
-    // prove knowledge of payer's secret key: pk = base^{sk}
-    let (pk_var, pk_point) = cs.scalar_mul(base, payers_secrets.sec_key, SK_LEN);
-    let pk_x = pk_var.get_x();
+    let hash_var = cs.new_variable(*hash);
+    let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
+    let non_malleability_tag_var = cs.new_variable(*non_malleability_tag);
 
-    // prove knowledge of diversifier: pk_sign = pk^{diversifier}
-    let (pk_sign_var, _) =
-        cs.var_base_scalar_mul(pk_var, pk_point, payers_secrets.diversifier, SK_LEN);
+    // prove knowledge of payer's secret key: pk = base^{sk}
+    let pk_var = cs.scalar_mul(base, payers_secrets.sec_key, SK_LEN);
+    let pk_x = pk_var.get_x();
 
     // commitments
     let com_abar_in_var = commit(
@@ -385,6 +387,7 @@ pub fn build_abar_to_bar_cs(
         payers_secrets.blind,
         payers_secrets.amount,
         payers_secrets.asset_type,
+        pk_x,
     );
 
     // prove pre-image of the nullifier
@@ -406,14 +409,15 @@ pub fn build_abar_to_bar_cs(
         asset_type: payers_secrets.asset_type,
         pub_key_x: pk_x,
     };
+
     let nullifier_var = nullify(&mut cs, payers_secrets.sec_key, nullifier_input_vars);
 
     // Merkle path authentication
     let acc_elem = AccElemVars {
         uid: payers_secrets.uid,
         commitment: com_abar_in_var,
-        pub_key_x: pk_x,
     };
+
     let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_secrets.path);
 
     if let Some(root) = root_var {
@@ -430,8 +434,14 @@ pub fn build_abar_to_bar_cs(
     let comm = proof.non_zk_part_state_commitment;
     let r = non_zk_state.r;
     let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-    let s1_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_1.to_bytes()));
-    let s2_sim_fr = SimFr::from(&BigUint::from_bytes_le(&proof.s_2.to_bytes()));
+    let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+
+    let beta_lambda = *beta * lambda;
+    let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
+
+    let s1_plus_lambda_s2 = proof.s_1 + proof.s_2 * lambda;
+    let s1_plus_lambda_s2_sim_fr =
+        SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
     let x_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
     let y_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
@@ -439,9 +449,10 @@ pub fn build_abar_to_bar_cs(
     let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
     let comm_var = cs.new_variable(comm);
     let r_var = cs.new_variable(r);
-    let beta_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &beta_sim_fr);
-    let s1_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s1_sim_fr);
-    let s2_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &s2_sim_fr);
+    let beta_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_sim_fr);
+    let lambda_sim_fr_var = SimFrVar::alloc_input(&mut cs, &lambda_sim_fr);
+    let beta_lambda_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_lambda_sim_fr);
+    let s1_plus_lambda_s2_sim_fr_var = SimFrVar::alloc_input(&mut cs, &s1_plus_lambda_s2_sim_fr);
 
     // 3. Merge the limbs for x, y, a, b
     let mut all_limbs = Vec::with_capacity(4 * NUM_OF_LIMBS);
@@ -515,16 +526,17 @@ pub fn build_abar_to_bar_cs(
     // 5. Perform the check in field simulation
     {
         let beta_x_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &x_sim_fr_var);
-        let beta_y_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &y_sim_fr_var);
+        let beta_lambda_y_sim_fr_mul_var = beta_lambda_sim_fr_var.mul(&mut cs, &y_sim_fr_var);
+        let lambda_b_sim_fr_mul_var = lambda_sim_fr_var.mul(&mut cs, &b_sim_fr_var);
 
-        let s_1_minus_a_sim_fr_var = s1_sim_fr_var.sub(&mut cs, &a_sim_fr_var);
-        let s_2_minus_b_sim_fr_var = s2_sim_fr_var.sub(&mut cs, &b_sim_fr_var);
+        let mut rhs = beta_x_sim_fr_mul_var.add(&mut cs, &beta_lambda_y_sim_fr_mul_var);
+        rhs = rhs.add(&mut cs, &lambda_b_sim_fr_mul_var);
 
-        let first_eqn = beta_x_sim_fr_mul_var.sub(&mut cs, &s_1_minus_a_sim_fr_var);
-        let second_eqn = beta_y_sim_fr_mul_var.sub(&mut cs, &s_2_minus_b_sim_fr_var);
+        let s1_plus_lambda_s2_minus_a_sim_fr_var =
+            s1_plus_lambda_s2_sim_fr_var.sub(&mut cs, &a_sim_fr_var);
 
-        first_eqn.enforce_zero(&mut cs);
-        second_eqn.enforce_zero(&mut cs);
+        let eqn = rhs.sub(&mut cs, &s1_plus_lambda_s2_minus_a_sim_fr_var);
+        eqn.enforce_zero(&mut cs);
     }
 
     // 6. Check x = amount_var and y = at_var
@@ -583,9 +595,20 @@ pub fn build_abar_to_bar_cs(
         cs.equal(y_in_bls12_381, payers_secrets.asset_type);
     }
 
+    // 7. Check the validity of the non malleability tag.
+    {
+        let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
+            one_var,
+            hash_var,
+            non_malleability_randomizer_var,
+            payers_secrets.sec_key,
+        ]))[0];
+
+        cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
+    }
+
     // prepare public inputs variables
     cs.prepare_io_variable(nullifier_var);
-    cs.prepare_io_point_variable(pk_sign_var);
 
     // prepare the public input for merkle_root
     cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
@@ -596,11 +619,17 @@ pub fn build_abar_to_bar_cs(
         cs.prepare_io_variable(beta_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(s1_sim_fr_var.var[i]);
+        cs.prepare_io_variable(lambda_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(s2_sim_fr_var.var[i]);
+        cs.prepare_io_variable(beta_lambda_sim_fr_var.var[i]);
     }
+    for i in 0..NUM_OF_LIMBS {
+        cs.prepare_io_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
+    }
+
+    cs.prepare_io_variable(hash_var);
+    cs.prepare_io_variable(non_malleability_tag_var);
 
     // pad the number of constraints to power of two
     cs.pad();
@@ -611,9 +640,7 @@ pub fn build_abar_to_bar_cs(
 
 fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretVars {
     let bls_sk = BLSScalar::from(&secret.sec_key);
-    let bls_diversifier = BLSScalar::from(&secret.diversifier);
     let sec_key = cs.new_variable(bls_sk);
-    let diversifier = cs.new_variable(bls_diversifier);
     let uid = cs.new_variable(BLSScalar::from(secret.uid));
     let amount = cs.new_variable(BLSScalar::from(secret.amount));
     let blind = cs.new_variable(secret.blind);
@@ -621,7 +648,6 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
     let asset_type = cs.new_variable(secret.asset_type);
     PayerSecretVars {
         sec_key,
-        diversifier,
         uid,
         amount,
         asset_type,
@@ -633,7 +659,8 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::{
-        abar_to_bar::{gen_abar_to_bar_body, verify_abar_to_bar_body},
+        abar_to_bar::{gen_abar_to_bar_note, verify_abar_to_bar_note},
+        circuits::TREE_DEPTH,
         keys::AXfrKeyPair,
         structs::{
             AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
@@ -661,7 +688,7 @@ mod tests {
     #[test]
     fn test_abar_to_bar_conversion() {
         let mut prng = ChaChaRng::from_seed([5u8; 32]);
-        let params = ProverParams::abar_to_bar_params(40).unwrap();
+        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
 
         let recv = XfrKeyPair::generate(&mut prng);
         let sender = AXfrKeyPair::generate(&mut prng);
@@ -694,7 +721,7 @@ mod tests {
 
         oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone()));
 
-        let (body, _) = gen_abar_to_bar_body(
+        let note = gen_abar_to_bar_note(
             &mut prng,
             &params,
             &oabar.clone(),
@@ -705,29 +732,25 @@ mod tests {
         .unwrap();
 
         let node_params = VerifierParams::abar_to_bar_params().unwrap();
-        verify_abar_to_bar_body(&node_params, &body, &proof.root).unwrap();
+        verify_abar_to_bar_note(&node_params, &note, &proof.root).unwrap();
 
         assert!(
-            verify_abar_to_bar_body(&node_params, &body, &BLSScalar::random(&mut prng),).is_err()
+            verify_abar_to_bar_note(&node_params, &note, &BLSScalar::random(&mut prng),).is_err()
         );
 
-        let mut body_wrong_nullifier = body.clone();
-        body_wrong_nullifier.input.0 = BLSScalar::random(&mut prng);
+        let mut note_wrong_nullifier = note.clone();
+        note_wrong_nullifier.body.input = BLSScalar::random(&mut prng);
         assert!(
-            verify_abar_to_bar_body(&node_params, &body_wrong_nullifier, &proof.root,).is_err()
+            verify_abar_to_bar_note(&node_params, &note_wrong_nullifier, &proof.root,).is_err()
         );
-
-        let mut body_wrong_pubkey = body.clone();
-        body_wrong_pubkey.input.1 = AXfrKeyPair::generate(&mut prng).pub_key();
-        assert!(verify_abar_to_bar_body(&node_params, &body_wrong_pubkey, &proof.root).is_err());
     }
 
     fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
         let hash = RescueInstance::new();
         hash.rescue(&[
             BLSScalar::from(uid),
-            abar.amount_type_commitment,
-            abar.public_key.0.point_ref().get_x(),
+            abar.commitment,
+            BLSScalar::zero(),
             BLSScalar::zero(),
         ])[0]
     }
