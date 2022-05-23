@@ -560,7 +560,6 @@ pub(crate) fn split_q_and_commit<PCS: PolyComScheme>(
             q.get_coefs_ref()[(n_wires_per_gate - 1) * n..].to_vec()
         };
         let q_poly = FpPolynomial::from_coefs(coefs);
-        println!("split: {} {}", i, q_poly.coefs.len());
         let (c_q, o_q) = pcs.commit(q_poly).c(d!(PlonkError::CommitmentError))?;
         c_q_polys.push(c_q);
         o_q_polys.push(o_q);

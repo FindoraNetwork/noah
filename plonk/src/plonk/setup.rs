@@ -209,6 +209,7 @@ pub fn preprocess_prover_with_lagrange<
     let mut perms_coset_evals = vec![vec![]; n_wires_per_gate];
     let mut prover_extended_perms = vec![];
     let mut verifier_extended_perms = vec![];
+
     if let Some(lagrange_pcs) = lagrange_pcs {
         for i in 0..n_wires_per_gate {
             let perm_eval = FpPolynomial::from_coefs(p_values[i * n..(i + 1) * n].to_vec());
