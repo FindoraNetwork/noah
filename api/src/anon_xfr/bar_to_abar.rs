@@ -18,7 +18,7 @@ use zei_crypto::{
         ristretto_pedersen_comm::RistrettoPedersenCommitment,
     },
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
-    pc_eq_rescue_split_verifier_zk_part::{
+    pc_eq_rescue_zk_part::{
         prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
     },
 };
@@ -592,7 +592,7 @@ mod test {
     use zei_crypto::basic::rescue::RescueInstance;
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use zei_crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
-    use zei_crypto::pc_eq_rescue_split_verifier_zk_part::prove_pc_eq_rescue_external;
+    use zei_crypto::pc_eq_rescue_zk_part::prove_pc_eq_rescue_external;
 
     // helper function
     fn build_bar(

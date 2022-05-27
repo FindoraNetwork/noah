@@ -9,7 +9,7 @@ use zei_algebra::{
     prelude::*,
     ristretto::{CompressedRistretto, RistrettoScalar},
 };
-use zei_crypto::bulletproofs::cloak::{cloak, CloakCommitment, CloakValue};
+use zei_crypto::bulletproofs::mix::{mix, MixCommitment, MixValue};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
@@ -56,17 +56,17 @@ pub fn prove_asset_mixing(
     let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
     fn extract_values_and_blinds(
         list: &[(u64, RistrettoScalar, RistrettoScalar, RistrettoScalar)],
-    ) -> (Vec<CloakValue>, Vec<CloakValue>) {
+    ) -> (Vec<MixValue>, Vec<MixValue>) {
         let values = list
             .iter()
-            .map(|(amount, asset_type, _, _)| CloakValue {
+            .map(|(amount, asset_type, _, _)| MixValue {
                 amount: RistrettoScalar::from(*amount),
                 asset_type: *asset_type,
             })
             .collect();
         let blinds = list
             .iter()
-            .map(|(_, _, blind_amount, blind_asset_type)| CloakValue {
+            .map(|(_, _, blind_amount, blind_asset_type)| MixValue {
                 amount: *blind_amount,
                 asset_type: *blind_asset_type,
             })
@@ -102,7 +102,7 @@ pub fn prove_asset_mixing(
     let n = in_vars.len();
     let m = out_vars.len();
 
-    cloak(
+    mix(
         &mut prover,
         &in_vars,
         Some(&in_values),
@@ -214,7 +214,7 @@ pub(crate) fn prepare_asset_mixer_verifier(
     let in_cloak = instance
         .inputs
         .iter()
-        .map(|(amount, asset_type)| CloakCommitment {
+        .map(|(amount, asset_type)| MixCommitment {
             amount: *amount,
             asset_type: *asset_type,
         })
@@ -223,7 +223,7 @@ pub(crate) fn prepare_asset_mixer_verifier(
     let out_cloak = instance
         .outputs
         .iter()
-        .map(|(amount, asset_type)| CloakCommitment {
+        .map(|(amount, asset_type)| MixCommitment {
             amount: *amount,
             asset_type: *asset_type,
         })
@@ -238,7 +238,7 @@ pub(crate) fn prepare_asset_mixer_verifier(
         .map(|com| com.commit_verifier(verifier))
         .collect_vec();
 
-    zei_crypto::bulletproofs::cloak::cloak(verifier, &in_vars, None, &out_vars, None)
+    zei_crypto::bulletproofs::mix::mix(verifier, &in_vars, None, &out_vars, None)
         .c(d!(ZeiError::AssetMixerVerificationError))
 }
 

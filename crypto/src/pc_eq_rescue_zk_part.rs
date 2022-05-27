@@ -251,9 +251,7 @@ pub fn verify_pc_eq_rescue_external(
 mod test {
     use crate::basic::rescue::RescueInstance;
     use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-    use crate::pc_eq_rescue_split_verifier_zk_part::{
-        prove_pc_eq_rescue_external, verify_pc_eq_rescue_external,
-    };
+    use crate::pc_eq_rescue_zk_part::{prove_pc_eq_rescue_external, verify_pc_eq_rescue_external};
     use num_bigint::BigUint;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
