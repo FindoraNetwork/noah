@@ -23,6 +23,7 @@
 //! the padding version is easier to argue.
 //!
 //! Also, don't forget: append a range proof on each output value.
+//! There is no range proof performed over any input value.
 //!
 //! The system is sound because a malicious prover, although it can use any strategy to
 //! reorder and perform the RHS merging, all these representations are equal.
@@ -123,7 +124,10 @@ impl MixCommitment {
 
 /// Implement the mixing protocol, run by prover and verifier to prove that
 /// 1) output values in [0..2^64)
-/// 2) Once amounts are aggregated by asset type, input and output matches.
+/// 2) by aggregating the amounts by asset type, input and output matches.
+///
+/// Note that this is just the strategy for our honest prover, a malicious
+/// prover could mix the tokens not using the same aggregation strategy.
 pub fn mix<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     input_vars: &[MixVariable],
@@ -148,18 +152,17 @@ pub fn mix<CS: RandomizableConstraintSystem>(
     n_gates += n + m;
 
     // pad input or output to be of same length
-    let pad_value = input_values.map(|_| RistrettoScalar::zero());
     if input_len < output_len {
-        pad(cs, output_len, &mut merged_input_vars, pad_value).c(d!(ZeiError::R1CSProofError))?;
+        pad(cs, output_len, &mut merged_input_vars).c(d!(ZeiError::R1CSProofError))?;
     } else {
-        pad(cs, input_len, &mut merged_output_vars, pad_value).c(d!(ZeiError::R1CSProofError))?;
+        pad(cs, input_len, &mut merged_output_vars).c(d!(ZeiError::R1CSProofError))?;
     }
 
     // do a proof of shuffle
     n_gates += mix_shuffle_gadget(cs, merged_input_vars, merged_output_vars)
         .c(d!(ZeiError::R1CSProofError))?;
 
-    // final range proof:
+    // final range proof
     for (i, out) in output_vars.iter().enumerate() {
         n_gates += range_proof_64(
             cs,
@@ -177,18 +180,25 @@ fn pad<CS: ConstraintSystem>(
     cs: &mut CS,
     expected_len: usize,
     list: &mut Vec<MixVariable>,
-    value: Option<RistrettoScalar>,
 ) -> Result<()> {
+    let zero_scalar = Some(RistrettoScalar::zero().0);
     for _ in list.len()..expected_len {
         list.push(MixVariable {
-            amount: cs.allocate(value.map(|x| x.0)).c(d!())?,
-            asset_type: cs.allocate(value.map(|x| x.0)).c(d!())?,
+            amount: cs.allocate(zero_scalar).c(d!())?,
+            asset_type: cs.allocate(zero_scalar).c(d!())?,
         })
     }
     Ok(())
 }
 
-/// sorts the input list by asset_type
+/// Sort the input list by `asset_type`
+///
+/// It does not use a standard sorting algorithm (e.g., `sort_by`)
+/// because `asset_type`, as a `RistrettoScalar`, is not comparable.
+///
+/// In other words, this function arranges entries with the same
+/// asset type together, but it does not define a partial order of
+/// these asset types.
 fn sort(input: &[MixValue]) -> Vec<MixValue> {
     let mut sorted_values = input.to_vec();
     let mut i = 0;
@@ -209,21 +219,25 @@ fn sort(input: &[MixValue]) -> Vec<MixValue> {
     sorted_values
 }
 
-/// Aggregate amounts of consecutive CloakValues if asset_types match
-/// Return vec 0 correspond to intermediate values storing the result
-/// of each current pair. That is, intermediate[i] = Merge(intermediate[i-1], input[i])[1]
-/// Where intermediate[0] = input[0]. Return vec 1 is the final aggregated values.
-/// That is output[i] = Merge(intermediate[i-1], input[i])[0]
-/// Where output[l-1] = intermediate[l-1];
-/// Intermediate list is of length (l-2) (all intermediate produced except last)
-/// Output list is of length l (all outputs plus last intermediate)
+/// Aggregate amounts of consecutive MixValues if `asset_types` match
+///
+/// Return vec 0 corresponds to intermediate values storing the result
+/// of each current pair. That is, `intermediate[i] = Merge(intermediate[i-1], input[i])[1]`,
+/// where `intermediate[0] = input[0]`. It intentionally drops the last intermediate value.
+///
+/// Return vec 1 is the final aggregated values.
+/// That is `output[i] = Merge(intermediate[i-1], input[i])[0]`
+/// where `output[l-1] = intermediate[l-1]`.
+///
+/// Intermediate list is of length `(l-2)` (all intermediate produced except last)
+/// Output list is of length `l` (all outputs plus last intermediate)
 fn merge(sorted: &[MixValue]) -> (Vec<MixValue>, Vec<MixValue>) {
     let mut intermediate = vec![];
     let mut merged = vec![];
     let mut prev = sorted[0];
     let len = sorted.len();
     if len == 0 {
-        return (intermediate, merged);
+        return (intermediate, vec![]);
     }
     if len == 1 {
         return (intermediate, sorted.to_vec());
@@ -249,7 +263,7 @@ fn merge(sorted: &[MixValue]) -> (Vec<MixValue>, Vec<MixValue>) {
     (intermediate, merged)
 }
 
-/// Implements the sort and merge steps of the Cloak protocol
+/// Implement the sort-and-merge steps of the Mix protocol
 fn sort_and_merge<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     vars: &[MixVariable],
@@ -281,7 +295,7 @@ fn sort_and_merge<CS: RandomizableConstraintSystem>(
 
     n_gates += mix_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())
         .c(d!(ZeiError::R1CSProofError))?;
-    n_gates += mix_merge_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars)
+    n_gates += mix_merge_or_not_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars)
         .c(d!(ZeiError::R1CSProofError))?;
 
     Ok((n_gates, merged_vars))
@@ -321,8 +335,10 @@ fn allocate_mix_vector<CS: ConstraintSystem>(
     })
 }
 
-/// Implements the merge gadget of the mixing protocol
-fn mix_merge_gadget<CS: RandomizableConstraintSystem>(
+/// Implement the merge gadget of the mixing protocol
+///
+/// This gadget does not enforce that the merge must happen.
+fn mix_merge_or_not_gadget<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     sorted: &[MixVariable],
     intermediate: &[MixVariable],
@@ -351,18 +367,23 @@ fn mix_merge_gadget<CS: RandomizableConstraintSystem>(
         .iter()
         .chain(zei_algebra::iter::once(&merged[l - 1]));
 
+    // consider `in2` to be the input, and `out1` to be the output
+    // and consider `in1` and `out2` to be the immediate state that is being updated.
+
     for (((in1, in2), out1), out2) in in1iter.zip(in2iter).zip(out1iter).zip(out2iter) {
-        n_gates += gate_mix(cs, *in1, *in2, *out1, *out2).c(d!())?;
+        n_gates += gate_mix_or_not(cs, *in1, *in2, *out1, *out2).c(d!())?;
     }
 
     Ok(n_gates)
 }
 
-/// I implement the mix gate gadget, proving that either
-/// in1 = out1 and in2 = out2  if in1 and in2 have different types or
-/// out1 = 0 and out2 = in1 + in2 if in1 and in2 have same type
-/// I return the number of left wires created
-fn gate_mix<CS: RandomizableConstraintSystem>(
+/// The mix-or-not gate gadget proves that
+/// - `in1 = out1` and `in2 = out2`
+/// - or `out1 = 0` and `out2 = in1 + in2` if `in1` and `in2` have same type
+///
+/// Note that even if the asset types are the same, this gate
+/// can choose to not perform any mixing.
+fn gate_mix_or_not<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
     in1: MixVariable,
     in2: MixVariable,
@@ -373,15 +394,19 @@ fn gate_mix<CS: RandomizableConstraintSystem>(
         let w1 = cs.challenge_scalar(b"mix challenge1");
         let w2 = cs.challenge_scalar(b"mix challenge2");
         let w3 = cs.challenge_scalar(b"mix challenge3");
+
+        // By showing that the product is zero, we know that either left or right is zero.
+        // Then, using the property of the challenge scalars, we know all those on the left,
+        // and/or all those on the right, are zeroes.
         let (_, _, out) = cs.multiply(
-            (in1.amount - out1.amount) +          // quantity maintains
-                (in1.asset_type - out1.asset_type) * w1 + // asset type maintains in first input
-                (in2.amount - out2.amount) * w2 + // quantity maintains
-                (in2.asset_type - out2.asset_type) * w3, // asset type maintains in second input
-            out1.amount + // or out1 is 0
-                (in1.asset_type - in2.asset_type) * w1 + // or in flavors are equal
-                (out2.amount - in1.amount - in2.amount) * w2 // or out2 is the sum of the inputs
-                + (out2.asset_type - in1.asset_type) * w3, // in 1 and out2 have same asset type
+            (in1.amount - out1.amount)
+                + (in1.asset_type - out1.asset_type) * w1
+                + (in2.amount - out2.amount) * w2
+                + (in2.asset_type - out2.asset_type) * w3,
+            out1.amount
+                + (in1.asset_type - in2.asset_type) * w1
+                + (out2.amount - in1.amount - in2.amount) * w2
+                + (out2.asset_type - in1.asset_type) * w3,
         );
         cs.constrain(out.into());
         Ok(())
@@ -390,7 +415,7 @@ fn gate_mix<CS: RandomizableConstraintSystem>(
     Ok(1usize)
 }
 
-/// Prove shuffling of a list of CloakValues
+/// Prove shuffling of a list of MixValues
 /// Return the number of gates created
 fn mix_shuffle_gadget<CS: RandomizableConstraintSystem>(
     cs: &mut CS,
@@ -418,7 +443,7 @@ fn mix_shuffle_gadget<CS: RandomizableConstraintSystem>(
         let mut single_perm = Vec::with_capacity(l);
 
         for (in_var, perm_var) in input.iter().zip(permuted.iter()) {
-            //compute a single representative for the pair
+            // compute a single representative for the pair
             let (single_in, single_pe, _) = cs.multiply(
                 in_var.amount + challenge * in_var.asset_type,
                 perm_var.amount + challenge * perm_var.asset_type,
@@ -463,20 +488,22 @@ fn list_shuffle<CS: RandomizedConstraintSystem>(
 
     let challenge = cs.challenge_scalar(b"shuffle challenge");
 
-    // Make last x multiplier for i = l-1 and l-2
+    // Multiply `x - challenge` for i = l-1 and l-2
+    // This is to save an unnecessary multiplication.
     let (_, _, last_mulx_out) = cs.multiply(input[l - 1] - challenge, input[l - 2] - challenge);
 
-    // Make multipliers for x from i == [0, l-3]
+    // Compute the product of `x - challenge`
     let first_mulx_out = (0..l - 2).rev().fold(last_mulx_out, |prev_out, i| {
         let (_, _, o) = cs.multiply(prev_out.into(), input[i] - challenge);
         o
     });
 
-    // Make last y multiplier for i = l-1 and l-2
+    // Multiply `y - challenge` for i = l-1 and l-2
+    // This is to save an unnecessary multiplication.
     let (_, _, last_muly_out) =
         cs.multiply(permuted[l - 1] - challenge, permuted[l - 2] - challenge);
 
-    // Make multipliers for y from i == [0, l-3]
+    // Compute the product of `y - challenge`
     let first_muly_out = (0..l - 2).rev().fold(last_muly_out, |prev_out, i| {
         let (_, _, o) = cs.multiply(prev_out.into(), permuted[i] - challenge);
         o
@@ -489,7 +516,7 @@ fn list_shuffle<CS: RandomizedConstraintSystem>(
     Ok(2 * (l - 1))
 }
 
-/// I prove that value is in [0..2^64-1]
+/// Prove that value is in [0..2^64-1]
 fn range_proof_64<CS: ConstraintSystem>(
     cs: &mut CS,
     mut var: LinearCombination,
@@ -550,7 +577,7 @@ pub mod tests {
     use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 
     #[test]
-    fn test_cloak_merge() {
+    fn test_mix_merge() {
         let pc_gens = PedersenGens::default();
 
         let sorted_values = vec![
@@ -581,7 +608,7 @@ pub mod tests {
         let mid = allocate_mix_vector(&mut prover, Some(&mid_values), mid_values.len()).unwrap();
         let added = allocate_mix_vector(&mut prover, Some(&out_values), out_values.len()).unwrap();
         let num_wires =
-            super::mix_merge_gadget(&mut prover, &sorted[..], &mid[..], &added[..]).unwrap();
+            super::mix_merge_or_not_gadget(&mut prover, &sorted[..], &mid[..], &added[..]).unwrap();
         let bp_gens = BulletproofGens::new(
             (num_wires + 2 * (sorted.len() + mid.len() + added.len())).next_power_of_two(),
             1,
@@ -594,7 +621,8 @@ pub mod tests {
         let mid = allocate_mix_vector(&mut verifier, None, mid_values.len()).unwrap();
         let added = allocate_mix_vector(&mut verifier, None, out_values.len()).unwrap();
         let num_wires =
-            super::mix_merge_gadget(&mut verifier, &sorted[..], &mid[..], &added[..]).unwrap();
+            super::mix_merge_or_not_gadget(&mut verifier, &sorted[..], &mid[..], &added[..])
+                .unwrap();
         let bp_gens = BulletproofGens::new(
             (num_wires + 2 * (sorted.len() + mid.len() + added.len())).next_power_of_two(),
             1,
@@ -617,7 +645,8 @@ pub mod tests {
         let added = allocate_mix_vector(&mut prover, Some(&out_values), out_values.len()).unwrap();
         let sorted_vars: Vec<MixVariable> = sorted_coms_vars.iter().map(|(_, var)| *var).collect();
         let num_wires =
-            super::mix_merge_gadget(&mut prover, &sorted_vars[..], &mid[..], &added[..]).unwrap();
+            super::mix_merge_or_not_gadget(&mut prover, &sorted_vars[..], &mid[..], &added[..])
+                .unwrap();
         let num_wires = num_wires + added.len() + mid.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         let proof = prover.prove(&bp_gens).unwrap();
@@ -633,7 +662,8 @@ pub mod tests {
         let mid = allocate_mix_vector(&mut verifier, None, mid_values.len()).unwrap();
         let added = allocate_mix_vector(&mut verifier, None, out_values.len()).unwrap();
         let num_wires =
-            super::mix_merge_gadget(&mut verifier, &sorted_vars[..], &mid[..], &added[..]).unwrap();
+            super::mix_merge_or_not_gadget(&mut verifier, &sorted_vars[..], &mid[..], &added[..])
+                .unwrap();
         let num_wires = num_wires + added.len() + mid.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
         assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
@@ -763,7 +793,7 @@ pub mod tests {
         assert_eq!(&added[..], &expected[..]);
     }
 
-    pub(crate) fn test_cloak(inputs: &[MixValue], outputs: &[MixValue], pass: bool) {
+    pub(crate) fn test_mix(inputs: &[MixValue], outputs: &[MixValue], pass: bool) {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let input_coms: Vec<MixCommitment>;
         let output_coms: Vec<MixCommitment>;
@@ -846,7 +876,7 @@ pub mod tests {
         let v_out = MixValue::new(out, asset_type0);
 
         assert_eq!(in1.add(&in2), out);
-        test_cloak(&[v_in_1, v_in_2], &[v_out], pass);
+        test_mix(&[v_in_1, v_in_2], &[v_out], pass);
     }
 
     #[test]
@@ -867,21 +897,21 @@ pub mod tests {
     }
 
     #[test]
-    fn cloak_misc() {
-        test_cloak(&[], &[], true);
-        test_cloak(&[yuan(10)], &[yuan(10)], true);
-        test_cloak(&[yuan(20)], &[yuan(10), yuan(10)], true);
-        test_cloak(&[yuan(10), yuan(10)], &[yuan(20)], true);
-        test_cloak(&[yuan(10), yuan(10), yuan(20)], &[yuan(20), yuan(20)], true);
-        test_cloak(&[yuan(10), yuan(20)], &[yuan(20), yuan(20)], false);
-        test_cloak(&[peso(10)], &[peso(10)], true);
-        test_cloak(&[peso(10), yuan(20)], &[peso(10), yuan(20)], true);
-        test_cloak(
+    fn mix_misc() {
+        test_mix(&[], &[], true);
+        test_mix(&[yuan(10)], &[yuan(10)], true);
+        test_mix(&[yuan(20)], &[yuan(10), yuan(10)], true);
+        test_mix(&[yuan(10), yuan(10)], &[yuan(20)], true);
+        test_mix(&[yuan(10), yuan(10), yuan(20)], &[yuan(20), yuan(20)], true);
+        test_mix(&[yuan(10), yuan(20)], &[yuan(20), yuan(20)], false);
+        test_mix(&[peso(10)], &[peso(10)], true);
+        test_mix(&[peso(10), yuan(20)], &[peso(10), yuan(20)], true);
+        test_mix(
             &[peso(10), yuan(20), peso(10), yuan(20)],
             &[peso(10), yuan(20), peso(10), yuan(20)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[peso(0), peso(0), peso(10), yuan(20), peso(10), yuan(20)],
             &[peso(10), yuan(20), peso(10), yuan(0), yuan(20)],
             true,
@@ -894,106 +924,106 @@ pub mod tests {
 
     // m=1, n=1
     #[test]
-    fn cloak_1_1() {
-        test_cloak(&[yuan(1)], &[yuan(1)], true);
-        test_cloak(&[peso(4)], &[peso(4)], true);
-        test_cloak(&[yuan(1)], &[peso(4)], false);
+    fn mix_1_1() {
+        test_mix(&[yuan(1)], &[yuan(1)], true);
+        test_mix(&[peso(4)], &[peso(4)], true);
+        test_mix(&[yuan(1)], &[peso(4)], false);
     }
 
     // max(m, n) = 2
     #[test]
-    fn cloak_uneven_2() {
-        test_cloak(&[yuan(3)], &[yuan(1), yuan(2)], true);
-        test_cloak(&[yuan(1), yuan(2)], &[yuan(3)], true);
+    fn mix_uneven_2() {
+        test_mix(&[yuan(3)], &[yuan(1), yuan(2)], true);
+        test_mix(&[yuan(1), yuan(2)], &[yuan(3)], true);
     }
 
     // m=2, n=2
     #[test]
-    fn cloak_2_2() {
+    fn mix_2_2() {
         // Only shuffle (all different flavors)
-        test_cloak(&[yuan(1), peso(4)], &[yuan(1), peso(4)], true);
-        test_cloak(&[yuan(1), peso(4)], &[peso(4), yuan(1)], true);
+        test_mix(&[yuan(1), peso(4)], &[yuan(1), peso(4)], true);
+        test_mix(&[yuan(1), peso(4)], &[peso(4), yuan(1)], true);
 
         // Middle shuffle & merge & split (has multiple inputs or outputs of same flavor)
-        test_cloak(&[peso(4), peso(4)], &[peso(4), peso(4)], true);
-        test_cloak(&[peso(5), peso(3)], &[peso(5), peso(3)], true);
-        test_cloak(&[peso(5), peso(3)], &[peso(1), peso(7)], true);
-        test_cloak(&[peso(1), peso(8)], &[peso(0), peso(9)], true);
-        test_cloak(&[yuan(1), yuan(1)], &[peso(4), yuan(1)], false);
+        test_mix(&[peso(4), peso(4)], &[peso(4), peso(4)], true);
+        test_mix(&[peso(5), peso(3)], &[peso(5), peso(3)], true);
+        test_mix(&[peso(5), peso(3)], &[peso(1), peso(7)], true);
+        test_mix(&[peso(1), peso(8)], &[peso(0), peso(9)], true);
+        test_mix(&[yuan(1), yuan(1)], &[peso(4), yuan(1)], false);
     }
 
     // m=3, n=3
     #[test]
-    fn cloak_3_3() {
+    fn mix_3_3() {
         // Only shuffle
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[yuan(1), peso(4), euro(8)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[yuan(1), euro(8), peso(4)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[peso(4), yuan(1), euro(8)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[peso(4), euro(8), yuan(1)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[euro(8), yuan(1), peso(4)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[euro(8), peso(4), yuan(1)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[yuan(2), peso(4), euro(8)],
             false,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[yuan(1), euro(4), euro(8)],
             false,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(8)],
             &[yuan(1), peso(4), euro(9)],
             false,
         );
 
         // Middle shuffle & merge & split
-        test_cloak(
+        test_mix(
             &[yuan(1), yuan(1), peso(4)],
             &[yuan(1), yuan(1), peso(4)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(4), yuan(3), peso(4)],
             &[yuan(2), yuan(5), peso(4)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(4), yuan(3), peso(4)],
             &[peso(4), yuan(2), yuan(5)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), yuan(2), yuan(5)],
             &[yuan(4), yuan(3), yuan(1)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), yuan(2), yuan(5)],
             &[yuan(4), yuan(3), yuan(10)],
             false,
@@ -1001,12 +1031,12 @@ pub mod tests {
 
         // End shuffles & merge & split & middle shuffle
         // (multiple asset types that need to be grouped and merged or split)
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), yuan(1)],
             &[yuan(1), yuan(1), peso(4)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(4), peso(4), yuan(3)],
             &[peso(3), yuan(7), peso(1)],
             true,
@@ -1015,75 +1045,75 @@ pub mod tests {
 
     // max(m, n) = 3
     #[test]
-    fn cloak_uneven_3() {
-        test_cloak(&[yuan(4), yuan(4), yuan(3)], &[yuan(11)], true);
-        test_cloak(&[yuan(11)], &[yuan(4), yuan(4), yuan(3)], true);
-        test_cloak(&[yuan(11), peso(4)], &[yuan(4), yuan(7), peso(4)], true);
-        test_cloak(&[yuan(4), yuan(7), peso(4)], &[yuan(11), peso(4)], true);
-        test_cloak(&[yuan(5), yuan(6)], &[yuan(4), yuan(4), yuan(3)], true);
-        test_cloak(&[yuan(4), yuan(4), yuan(3)], &[yuan(5), yuan(6)], true);
+    fn mix_uneven_3() {
+        test_mix(&[yuan(4), yuan(4), yuan(3)], &[yuan(11)], true);
+        test_mix(&[yuan(11)], &[yuan(4), yuan(4), yuan(3)], true);
+        test_mix(&[yuan(11), peso(4)], &[yuan(4), yuan(7), peso(4)], true);
+        test_mix(&[yuan(4), yuan(7), peso(4)], &[yuan(11), peso(4)], true);
+        test_mix(&[yuan(5), yuan(6)], &[yuan(4), yuan(4), yuan(3)], true);
+        test_mix(&[yuan(4), yuan(4), yuan(3)], &[yuan(5), yuan(6)], true);
     }
 
     // m=4, n=4
     #[test]
-    fn cloak_4_4() {
+    fn mix_4_4() {
         // Only shuffle
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(7), euro(10)],
             &[yuan(1), peso(4), euro(7), euro(10)],
             true,
         );
 
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), euro(7), euro(10)],
             &[euro(7), yuan(1), euro(10), peso(4)],
             true,
         );
 
         // Middle shuffle & merge & split
-        test_cloak(
+        test_mix(
             &[yuan(1), yuan(1), peso(4), peso(4)],
             &[yuan(1), yuan(1), peso(4), peso(4)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(4), yuan(3), peso(4), peso(4)],
             &[yuan(2), yuan(5), peso(1), peso(7)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(4), yuan(3), peso(4), peso(4)],
             &[peso(1), peso(7), yuan(2), yuan(5)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), yuan(1), yuan(5), yuan(2)],
             &[yuan(1), yuan(1), yuan(5), yuan(2)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), yuan(2), yuan(5), yuan(2)],
             &[yuan(4), yuan(3), yuan(3), zero()],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(1), yuan(2), yuan(5), yuan(2)],
             &[yuan(4), yuan(3), yuan(3), yuan(20)],
             false,
         );
 
         // End shuffles & merge & split & middle shuffle
-        test_cloak(
+        test_mix(
             &[yuan(1), peso(4), yuan(1), peso(4)],
             &[peso(4), yuan(1), yuan(1), peso(4)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(4), peso(4), peso(4), yuan(3)],
             &[peso(1), yuan(2), yuan(5), peso(7)],
             true,
         );
-        test_cloak(
+        test_mix(
             &[yuan(10), peso(1), peso(2), peso(3)],
             &[yuan(5), yuan(4), yuan(1), peso(6)],
             true,
