@@ -162,7 +162,7 @@ impl From<&BigUint> for SimFr {
 
 impl Into<BigUint> for &SimFr {
     fn into(self) -> BigUint {
-        let step = BigUint::from(1u32).shl(43i32);
+        let step = BigUint::from(1u32).shl(BIT_PER_LIMB);
         let mut res = BigUint::zero();
         for limb in self.limbs.iter().rev() {
             res.mul_assign(&step);
@@ -205,7 +205,7 @@ impl Default for SimFrMul {
 
 impl Into<BigUint> for &SimFrMul {
     fn into(self) -> BigUint {
-        let step = BigUint::from(1u32).shl(43i32);
+        let step = BigUint::from(1u32).shl(BIT_PER_LIMB);
         let mut res = BigUint::zero();
         for limb in self.limbs.iter().rev() {
             res.mul_assign(&step);
