@@ -1,4 +1,6 @@
 //! Module for the Bulletproof range proof scheme
+//!
+//! This is mostly a wrapper.
 
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use merlin::Transcript;
@@ -30,7 +32,7 @@ pub fn prove_ranges(
     Ok((proof, commitments))
 }
 
-/// Batch verify a set bulletproof range proofs
+/// Batch-verify a set bulletproof range proofs
 /// State of transcripts should match the state just before each proof was computed
 pub fn batch_verify_ranges<R: CryptoRng + RngCore>(
     prng: &mut R,
