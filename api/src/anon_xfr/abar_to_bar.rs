@@ -23,10 +23,10 @@ use zei_algebra::{
 };
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
-    field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
-    pc_eq_rescue_zk_part::{
-        prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
+    delegated_chaum_pedersen::{
+        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen, NonZKState, ZKPartProof,
     },
+    field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
 };
 use zei_plonk::{
     plonk::{
@@ -141,7 +141,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     let point_q = pc_gens.commit(y, delta);
 
     // 4. compute the non-ZK part of the proof
-    let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_pc_eq_rescue_external(
+    let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
         prng,
         &x,
         &gamma,
@@ -254,7 +254,7 @@ pub fn verify_abar_to_bar_note(
     let input = note.body.input;
 
     // 2. verify equality of committed values
-    let (beta, lambda) = verify_pc_eq_rescue_external(
+    let (beta, lambda) = verify_delegated_chaum_pedersen(
         &pc_gens,
         &com_amount,
         &com_asset_type,

@@ -13,5 +13,5 @@ pub mod anon_creds;
 pub mod basic;
 pub mod bulletproofs;
 pub mod conf_cred_reveal;
+pub mod delegated_chaum_pedersen;
 pub mod field_simulation;
-pub mod pc_eq_rescue_zk_part;
