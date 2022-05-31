@@ -9,9 +9,6 @@ pub mod field_simulation;
 /// Module for Rescue Constrain System.
 pub mod rescue;
 
-/// Module for Standard PLONK Constrain System.
-pub mod standard;
-
 /// Module for Turbo PLONK Constrain System.
 pub mod turbo;
 
