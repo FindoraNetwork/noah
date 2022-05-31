@@ -17,10 +17,10 @@ use zei_crypto::{
         hybrid_encryption::XPublicKey, rescue::RescueInstance,
         ristretto_pedersen_comm::RistrettoPedersenCommitment,
     },
-    field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
-    pc_eq_rescue_zk_part::{
-        prove_pc_eq_rescue_external, verify_pc_eq_rescue_external, NonZKState, ZKPartProof,
+    delegated_chaum_pedersen::{
+        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen, NonZKState, ZKPartProof,
     },
+    field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
 };
 use zei_plonk::plonk::{
     constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem},
@@ -153,7 +153,7 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     ])[0];
 
     // 3. compute the non-ZK part of the proof
-    let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_pc_eq_rescue_external(
+    let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
         prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
     )
     .c(d!())?;
@@ -225,7 +225,7 @@ pub(crate) fn verify_bar_to_abar(
     };
 
     // 2. verify equality of committed values
-    let (beta, lambda) = verify_pc_eq_rescue_external(
+    let (beta, lambda) = verify_delegated_chaum_pedersen(
         &pc_gens,
         &com_amount,
         &com_asset_type,
@@ -591,8 +591,8 @@ mod test {
     use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
     use zei_crypto::basic::rescue::RescueInstance;
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::delegated_chaum_pedersen::prove_delegated_chaum_pedersen;
     use zei_crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
-    use zei_crypto::pc_eq_rescue_zk_part::prove_pc_eq_rescue_external;
 
     // helper function
     fn build_bar(
@@ -745,7 +745,7 @@ mod test {
         let z = z_instance.rescue(&[z_randomizer, x_in_bls12_381, y_in_bls12_381, pubkey_x])[0];
 
         // 2. compute the ZK part of the proof
-        let (proof, non_zk_state, beta, lambda) = prove_pc_eq_rescue_external(
+        let (proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
             &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
         )
         .unwrap();

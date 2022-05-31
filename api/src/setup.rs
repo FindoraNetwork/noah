@@ -24,7 +24,7 @@ use zei_algebra::{
     prelude::*,
     ristretto::RistrettoScalar,
 };
-use zei_crypto::pc_eq_rescue_zk_part::{NonZKState, ZKPartProof};
+use zei_crypto::delegated_chaum_pedersen::{NonZKState, ZKPartProof};
 use zei_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,

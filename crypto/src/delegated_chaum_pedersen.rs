@@ -46,8 +46,7 @@ impl ZKPartProof {
     }
 }
 
-#[allow(unused)]
-pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
+pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore>(
     rng: &mut R,
     x: &RistrettoScalar,
     gamma: &RistrettoScalar,
@@ -179,8 +178,7 @@ pub fn prove_pc_eq_rescue_external<R: CryptoRng + RngCore>(
     Ok((proof, non_zk_state, beta, lambda))
 }
 
-#[allow(unused)]
-pub fn verify_pc_eq_rescue_external(
+pub fn verify_delegated_chaum_pedersen(
     pc_gens: &RistrettoPedersenCommitment,
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
@@ -251,7 +249,9 @@ pub fn verify_pc_eq_rescue_external(
 mod test {
     use crate::basic::rescue::RescueInstance;
     use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-    use crate::pc_eq_rescue_zk_part::{prove_pc_eq_rescue_external, verify_pc_eq_rescue_external};
+    use crate::delegated_chaum_pedersen::{
+        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
+    };
     use num_bigint::BigUint;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -286,12 +286,13 @@ mod test {
                 BLSScalar::zero(),
             ])[0];
 
-            let (proof, _, _, _) = prove_pc_eq_rescue_external(
+            let (proof, _, _, _) = prove_delegated_chaum_pedersen(
                 &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
             )
             .unwrap();
 
-            let _ = verify_pc_eq_rescue_external(&pc_gens, &point_p, &point_q, &z, &proof).unwrap();
+            let _ =
+                verify_delegated_chaum_pedersen(&pc_gens, &point_p, &point_q, &z, &proof).unwrap();
         }
     }
 }
