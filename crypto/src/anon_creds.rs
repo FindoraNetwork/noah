@@ -1,43 +1,16 @@
+//! This file implements anonymous credentials based on the signature scheme of
+//! David Pointcheval and Olivier Sanders. Short Randomizable Signatures. CT RSA 2015.
+//! <https://eprint.iacr.org/2015/525.pdf>. Details are described below:
+//!
+//! Credential issuers can issue credentials for a set of n attributes by providing a signature
+//! on this attributes for a given user.
+
+//! Given a credential signature, users can selectively reveal a subset of attributes that are signed
+//! in the credentials.
+
 /*
-This file implements anonymous credentials based on the signature scheme of
-David Pointcheval and Olivier Sanders. Short Randomizable Signatures. CT RSA 2015.
-<https://eprint.iacr.org/2015/525.pdf>. Details are described below:
-
-Credential issuers can issue credentials for a set of n attributes by providing a signature
-on this attributes for a given user.
-
-Given a credential signature, users can selectively reveal a subset of attributes that are signed
-in the credentials by
- a) Randomizing the signature (provide unlinkability between reveals)
- b) Revealing a subset of attributes
- c) Provide a zero knowledge proof of knowledge of the user secret key and hidden attributes for
- the credential signature
-
- Specifications:
- Let G1, G2,Gt be groups of prime order and a bilinear map e: G1 x G2 -> Gt. In what follows,
- additive notation is used.
- Issuer secret key:
-     - G1 // random generator of group 1
-     - x // random scalar
-     - {y_i} one y_i per attribute // random scalars
-
- Issuer public key:
-     - G2  // random generator of group 2
-     - X2 = x * G2
-     - Z1 = z * G1 //for a random scalar z
-     - Z2 = z * G2
-     - {Y2_i} = {y_i * G2} // one y_i per attribute
-
  User secret key: sk // random scalar
  User public key: sk * Z2
-
-
- + Signature over attributes {attr_i} for user public key user_pub_key = user_sec_key * Z1:
-   - Sample random scalar u
-   - Compute C = (issuer_sec_key.x + \sum attr_i * y_i) * issuer_sec_key.G1
-   - sigma1 = u * issuer_sec_key.G1 // u * G1
-   - sigma2 = u * (C + user_pub_key) // u* (x + \sum attr_i * y_i + user_sec_key * z) * G1
-   - output (sigma1, sigma2)
 
  + Signature Verification for a set of attributes {attr_i} for user public key user_pub_key over
    - compare e(sigma1, \sum attr_i * Y2_i + user_pk + X2) =? e(sigma2, G2)
@@ -45,7 +18,7 @@ in the credentials by
       // Right hand side e(G1, G2) * u * (x + \sum attr_i * y_i + user_sec_key * z)
 
  + Selective revealing: prove that a signature verify against a set of attributes,
- some of which are hidden to the verifier. Strategy:
+  some of which are hidden to the verifier. Strategy:
     a) Randomize the signature to provide unlinkability (and hence anonymity ) different reveals
     of the same underlying signature.
     b) provide a proof of knowledge of user's secret key,
@@ -208,7 +181,7 @@ pub type ACCommitOutput<P: Pairing> = (
     Option<ACKey<P::ScalarField>>,
 );
 
-/// I generate e key pair for a credential issuer
+/// I generate a key pair for a credential issuer
 #[allow(clippy::type_complexity)]
 pub fn ac_keygen_issuer<R: CryptoRng + RngCore, P: Pairing>(
     prng: &mut R,
@@ -439,7 +412,18 @@ pub(crate) fn ac_do_challenge_check_commitment<P: Pairing>(
         elems.push(y);
     }
     let p = P::G2::multi_exp(scalars.as_slice(), elems.as_slice());
-    ac_verify_final_check::<P>(sig_commitment, challenge, &issuer_pub_key.gen2, &p)
+
+    let lhs = P::pairing(&sig_commitment.0.sigma1, &p);
+    let rhs = P::pairing(
+        &sig_commitment.0.sigma2.mul(challenge),
+        &issuer_pub_key.gen2,
+    );
+
+    if lhs == rhs {
+        Ok(())
+    } else {
+        Err(eg!(ZeiError::IdentityRevealVerifyError))
+    }
 }
 /// Produce a AttrsRevealProof, attributes that are not Revealed(attr) and secret parameters
 /// are proved in ZeroKnowledge.
@@ -637,23 +621,6 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
         response_sk,
         response_attrs,
     })
-}
-
-#[allow(non_snake_case)]
-fn ac_verify_final_check<P: Pairing>(
-    sig_commitment: &ACCommitment<P::G1>,
-    challenge: &P::ScalarField,
-    G2: &P::G2,
-    p: &P::G2,
-) -> Result<()> {
-    let lhs = P::pairing(&sig_commitment.0.sigma1, p);
-    let rhs = P::pairing(&sig_commitment.0.sigma2.mul(challenge), G2);
-
-    if lhs == rhs {
-        Ok(())
-    } else {
-        Err(eg!(ZeiError::IdentityRevealVerifyError))
-    }
 }
 
 #[cfg(test)]
