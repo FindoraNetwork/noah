@@ -620,7 +620,7 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
     }
     transcript.append_proof_commitment(&commitment);
     let challenge = transcript.get_challenge::<P::ScalarField>();
-    let response_t = challenge.mul(t).add(&beta1); // challente*t + beta1
+    let response_t = challenge.mul(t).add(&beta1); // challenge*t + beta1
     let response_sk = challenge.mul(&user_sk.0).add(&beta2);
     let mut response_attrs = vec![];
     let mut gamma_iter = gamma.iter();
