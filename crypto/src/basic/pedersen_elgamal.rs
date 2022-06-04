@@ -351,9 +351,6 @@ mod test {
     use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
-    use rmp_serde::Deserializer;
-    use serde::de::Deserialize;
-    use serde::ser::Serialize;
     use zei_algebra::prelude::*;
     use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 
@@ -705,62 +702,5 @@ mod test {
             &instances
         )
         .is_ok());
-    }
-    #[test]
-    fn to_json() {
-        let m = RistrettoScalar::from(10u32);
-        let r = RistrettoScalar::from(7657u32);
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
-
-        let (_sk, pk) = elgamal_key_gen(&mut prng);
-        let ctext = elgamal_encrypt(&m, &r, &pk);
-        let commitment = pc_gens.commit(m, r);
-        let mut transcript = Transcript::new(b"test");
-        let proof = super::pedersen_elgamal_aggregate_eq_proof(
-            &mut transcript,
-            &mut prng,
-            &[m],
-            &[r],
-            &pk,
-            &[ctext],
-            &[commitment],
-        );
-
-        let json_str = serde_json::to_string(&proof).unwrap();
-        let proof_de = serde_json::from_str(&json_str).unwrap();
-        assert_eq!(proof, proof_de, "Deserialized proof does not match");
-    }
-
-    #[test]
-    fn to_message_pack() {
-        let m = RistrettoScalar::from(10u32);
-        let r = RistrettoScalar::from(7657u32);
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
-
-        let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
-
-        let ctext = elgamal_encrypt(&m, &r, &pk);
-        let commitment = pc_gens.commit(m, r);
-        let mut transcript = Transcript::new(b"test");
-        let proof = super::pedersen_elgamal_aggregate_eq_proof(
-            &mut transcript,
-            &mut prng,
-            &[m],
-            &[r],
-            &pk,
-            &[ctext],
-            &[commitment],
-        );
-
-        let mut vec = vec![];
-        proof
-            .serialize(&mut rmp_serde::Serializer::new(&mut vec))
-            .unwrap();
-
-        let mut de = Deserializer::new(&vec[..]);
-        let proof_de: PedersenElGamalEqProof = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(proof, proof_de);
     }
 }

@@ -697,8 +697,8 @@ mod identity_tracing {
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
 
         let attrs = vec![1u32, 2, 3, 4];
-        let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
-        let (receiver_ac_pk, receiver_ac_sk) =
+        let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
+        let (receiver_ac_sk, receiver_ac_pk) =
             anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         let ac_signature = anon_creds::ac_sign(
             &mut prng,
@@ -709,9 +709,9 @@ mod identity_tracing {
         .unwrap();
 
         let credential = Credential {
-            signature: ac_signature,
-            attributes: attrs,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            sig: ac_signature,
+            attrs: attrs,
+            ipk: cred_issuer_pk.clone(),
         };
 
         let (sig_commitment, _, key) =
