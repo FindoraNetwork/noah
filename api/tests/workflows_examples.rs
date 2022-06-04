@@ -465,9 +465,9 @@ pub(crate) mod examples {
         let recv1_pub_key = recv1_keypair.pub_key;
 
         // 1.2 Credential keys
-        let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
-        let (user1_ac_pk, user1_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-        let (user2_ac_pk, user2_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
+        let (user1_ac_sk, user1_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user2_ac_sk, user2_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
         // 1.3 setup policy
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -489,14 +489,14 @@ pub(crate) mod examples {
         let cred_sig_user1 = ac_sign(&mut prng, &cred_issuer_sk, &user1_ac_pk, &user1_attr);
         let cred_sig_user2 = ac_sign(&mut prng, &cred_issuer_sk, &user2_ac_pk, &user2_attr);
         let credential_user1 = Credential {
-            signature: cred_sig_user1.unwrap(),
-            attributes: user1_attr,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            sig: cred_sig_user1.unwrap(),
+            attrs: user1_attr,
+            ipk: cred_issuer_pk.clone(),
         };
         let credential_user2 = Credential {
-            signature: cred_sig_user2.unwrap(),
-            attributes: user2_attr,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            sig: cred_sig_user2.unwrap(),
+            attrs: user2_attr,
+            ipk: cred_issuer_pk.clone(),
         };
 
         // 2.2 credential commitments
@@ -657,10 +657,10 @@ pub(crate) mod examples {
         let recv_user2_pub_key = recv_user2_keypair.pub_key;
 
         // 1.2 Credential keys
-        let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
-        let (recv_user1_ac_pk, recv_user1_ac_sk) =
+        let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
+        let (recv_user1_ac_sk, recv_user1_ac_pk) =
             anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-        let (recv_user2_ac_pk, recv_user2_ac_sk) =
+        let (recv_user2_ac_sk, recv_user2_ac_pk) =
             anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
         // 1.3 setup policy
@@ -685,14 +685,14 @@ pub(crate) mod examples {
         let cred_sig_user2 =
             ac_sign(&mut prng, &cred_issuer_sk, &recv_user2_ac_pk, &recv2_attr).unwrap();
         let credential_user1 = Credential {
-            signature: cred_sig_user1,
-            attributes: recv1_attr,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            sig: cred_sig_user1,
+            attrs: recv1_attr,
+            ipk: cred_issuer_pk.clone(),
         };
         let credential_user2 = Credential {
-            signature: cred_sig_user2,
-            attributes: recv2_attr,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            sig: cred_sig_user2,
+            attrs: recv2_attr,
+            ipk: cred_issuer_pk.clone(),
         };
 
         // 2.2 credential commitments
@@ -882,7 +882,7 @@ pub(crate) mod examples {
         let amount_asset2_out3 = 50;
         let amount_asset3_out4 = 75;
         // credential keys
-        let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
+        let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
 
         // asset tracing keys
         let asset1_tracing_key = AssetTracerKeyPair::generate(&mut prng);
@@ -892,13 +892,13 @@ pub(crate) mod examples {
         let user1_key_pair1 = XfrKeyPair::generate(&mut prng);
         let user1_key_pair2 = XfrKeyPair::generate(&mut prng);
         let user1_key_pair3 = XfrKeyPair::generate(&mut prng);
-        let (user1_ac_pk, user1_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user1_ac_sk, user1_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         let user2_key_pair1 = XfrKeyPair::generate(&mut prng);
-        let (user2_ac_pk, user2_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user2_ac_sk, user2_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         let user3_key_pair1 = XfrKeyPair::generate(&mut prng);
-        let (user3_ac_pk, user3_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user3_ac_sk, user3_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         let user4_key_pair1 = XfrKeyPair::generate(&mut prng);
-        let (user4_ac_pk, user4_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user4_ac_sk, user4_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
         //2.1 generate credential for each of the 4 users
         let user1_attrs = vec![0u32, 1, 2, 3];
@@ -906,48 +906,48 @@ pub(crate) mod examples {
         let user3_attrs = vec![8u32, 9, 10, 11];
         let user4_attrs = vec![12u32, 13, 14, 15];
         let credential_user1 = Credential {
-            signature: ac_sign(
+            sig: ac_sign(
                 &mut prng,
                 &cred_issuer_sk,
                 &user1_ac_pk,
                 user1_attrs.as_slice(),
             )
             .unwrap(),
-            attributes: user1_attrs,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            attrs: user1_attrs,
+            ipk: cred_issuer_pk.clone(),
         };
         let credential_user2 = Credential {
-            signature: ac_sign(
+            sig: ac_sign(
                 &mut prng,
                 &cred_issuer_sk,
                 &user2_ac_pk,
                 user2_attrs.as_slice(),
             )
             .unwrap(),
-            attributes: user2_attrs,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            attrs: user2_attrs,
+            ipk: cred_issuer_pk.clone(),
         };
         let credential_user3 = Credential {
-            signature: ac_sign(
+            sig: ac_sign(
                 &mut prng,
                 &cred_issuer_sk,
                 &user3_ac_pk,
                 user3_attrs.as_slice(),
             )
             .unwrap(),
-            attributes: user3_attrs,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            attrs: user3_attrs,
+            ipk: cred_issuer_pk.clone(),
         };
         let credential_user4 = Credential {
-            signature: ac_sign(
+            sig: ac_sign(
                 &mut prng,
                 &cred_issuer_sk,
                 &user4_ac_pk,
                 user4_attrs.as_slice(),
             )
             .unwrap(),
-            attributes: user4_attrs,
-            issuer_pub_key: cred_issuer_pk.clone(),
+            attrs: user4_attrs,
+            ipk: cred_issuer_pk.clone(),
         };
 
         // 1.4 Register address/identity in AIR

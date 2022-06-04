@@ -74,7 +74,7 @@ pub fn setup_with_policies(
     let (sender_key_pairs, _) = multiple_key_gen(n);
 
     // credential keys
-    let (cred_issuer_pk, cred_issuer_sk) = anon_creds::ac_keygen_issuer(&mut prng, ATTR_SIZE);
+    let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, ATTR_SIZE);
     // asset tracing keys
     let asset_tracing_key = AssetTracerKeyPair::generate(&mut prng);
 
@@ -91,19 +91,19 @@ pub fn setup_with_policies(
     #[allow(clippy::needless_range_loop)]
     for i in 0..n {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let (user_ac_pk, user_ac_sk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
+        let (user_ac_sk, user_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
         user_ac_pks.push(user_ac_pk.clone());
         user_ac_sks.push(user_ac_sk.clone());
         let credential_user = Credential {
-            signature: ac_sign(
+            sig: ac_sign(
                 &mut prng,
                 &cred_issuer_sk,
                 &user_ac_pk,
                 user_attrs.as_slice(),
             )
             .unwrap(),
-            attributes: user_attrs.clone(),
-            issuer_pub_key: cred_issuer_pk.clone(),
+            attrs: user_attrs.clone(),
+            ipk: cred_issuer_pk.clone(),
         };
         credentials.push(credential_user.clone());
 

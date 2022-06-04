@@ -94,11 +94,7 @@ pub fn elgamal_partial_decrypt<G: Group>(
 
 #[cfg(test)]
 mod elgamal_test {
-    use crate::basic::elgamal::{ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey};
     use rand_chacha::ChaChaRng;
-    use rmp_serde::Deserializer;
-    use serde::de::Deserialize;
-    use serde::ser::Serialize;
     use zei_algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
     use zei_algebra::jubjub::JubjubPoint;
     use zei_algebra::prelude::*;
@@ -136,68 +132,6 @@ mod elgamal_test {
         pnk!(super::elgamal_verify(&m, &ctext, &secret_key));
     }
 
-    fn serialize_to_json<G: Group>() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let (secret_key, public_key) = super::elgamal_key_gen::<_, G>(&mut prng);
-
-        // key serialization
-        let json_str = serde_json::to_string(&secret_key).unwrap();
-        let sk_de: ElGamalDecKey<G::ScalarType> = serde_json::from_str(&json_str).unwrap();
-        assert_eq!(secret_key, sk_de);
-
-        let json_str = serde_json::to_string(&public_key).unwrap();
-        let pk_de: ElGamalEncKey<G> = serde_json::from_str(&json_str).unwrap();
-        assert_eq!(public_key, pk_de);
-
-        // ciphertext serialization
-        let m = G::ScalarType::from(100u32);
-        let r = G::ScalarType::random(&mut prng);
-
-        let ctext = super::elgamal_encrypt(&m, &r, &public_key);
-        let json_str = serde_json::to_string(&ctext).unwrap();
-        let ctext_de: ElGamalCiphertext<G> = serde_json::from_str(&json_str).unwrap();
-
-        assert_eq!(ctext, ctext_de);
-    }
-
-    fn serialize_to_message_pack<G: Group>() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let (secret_key, public_key) = super::elgamal_key_gen::<_, G>(&mut prng);
-
-        // key serialization
-        let mut vec = vec![];
-        secret_key
-            .serialize(&mut rmp_serde::Serializer::new(&mut vec))
-            .unwrap();
-        let mut de = Deserializer::new(&vec[..]);
-        let sk_de: ElGamalDecKey<G::ScalarType> = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(secret_key, sk_de);
-
-        // public key serialization
-        let mut vec = vec![];
-        public_key
-            .serialize(&mut rmp_serde::Serializer::new(&mut vec))
-            .unwrap();
-        let mut de = Deserializer::new(&vec[..]);
-        let pk_de: ElGamalEncKey<G> = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(public_key, pk_de);
-
-        // ciphertext serialization
-        let m = G::ScalarType::from(100u32);
-        let r = G::ScalarType::random(&mut prng);
-
-        let ctext = super::elgamal_encrypt(&m, &r, &public_key);
-
-        let mut vec = vec![];
-        ctext
-            .serialize(&mut rmp_serde::Serializer::new(&mut vec))
-            .unwrap();
-
-        let mut de = Deserializer::new(&vec[..]);
-        let ctext_de: ElGamalCiphertext<G> = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(ctext, ctext_de);
-    }
-
     #[test]
     fn verify() {
         verification::<RistrettoPoint>();
@@ -214,21 +148,5 @@ mod elgamal_test {
         decryption::<BLSG2>();
         decryption::<BLSGt>();
         decryption::<JubjubPoint>();
-    }
-
-    #[test]
-    fn to_json() {
-        serialize_to_json::<RistrettoPoint>();
-        serialize_to_json::<BLSG1>();
-        serialize_to_json::<BLSG2>();
-        serialize_to_json::<JubjubPoint>();
-    }
-
-    #[test]
-    fn to_message_pack() {
-        serialize_to_message_pack::<RistrettoPoint>();
-        serialize_to_message_pack::<BLSG1>();
-        serialize_to_message_pack::<BLSG2>();
-        serialize_to_message_pack::<JubjubPoint>();
     }
 }
