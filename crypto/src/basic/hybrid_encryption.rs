@@ -282,7 +282,7 @@ mod test {
     }
 
     #[test]
-    fn zei_hybrid_cipher() {
+    fn hybrid_cipher() {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
         let key_pair = Keypair::generate(&mut prng);

@@ -182,7 +182,7 @@ impl AssetRecord {
             let (attrs_and_ctexts, proof) = match asset_tracing_policy.identity_tracing.as_ref() {
                 Some(id_policy) => {
                     // 1. check for inconsistency errors
-                    if credential.issuer_pub_key != id_policy.cred_issuer_pub_key {
+                    if credential.ipk != id_policy.cred_issuer_pub_key {
                         return Err(eg!(ZeiError::ParameterError));
                     }
                     let (attrs_ctext, proof) = ac_confidential_open_commitment(
