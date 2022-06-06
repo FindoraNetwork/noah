@@ -8,26 +8,41 @@ use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
+/// The non-interactive proof provided to the ZK verifier.
 pub struct ZKPartProof {
+    /// The commitment of the non-ZK verifier's state.
     pub non_zk_part_state_commitment: BLSScalar,
+    /// The first randomizer point.
     pub point_r: RistrettoPoint,
+    /// The second randomizer point.
     pub point_s: RistrettoPoint,
+    /// The response scalar `s_1`.
     pub s_1: RistrettoScalar,
+    /// The response scalar `s_2`.
     pub s_2: RistrettoScalar,
+    /// The response scalar `s_3`.
     pub s_3: RistrettoScalar,
+    /// The response scalar `s_4`.
     pub s_4: RistrettoScalar,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
+/// The state of the non-ZK verifier.
 pub struct NonZKState {
+    /// The committed value of the first Pedersen commitment.
     pub x: RistrettoScalar,
+    /// The committed value of the second Pedersen commitment.
     pub y: RistrettoScalar,
+    /// The committed value of the randomizer for the first Pedersen commitment.
     pub a: RistrettoScalar,
+    /// The committed value of the randomizer for the second Pedersen commitment.
     pub b: RistrettoScalar,
+    /// The randomizer used to make the Rescue hash function a commitment scheme.
     pub r: BLSScalar,
 }
 
 impl ZKPartProof {
+    /// Represent the information needed by zk-SNARKs in its format.
     pub fn to_verifier_input(&self) -> Vec<BLSScalar> {
         let s_1_biguint = BigUint::from_bytes_le(&self.s_1.to_bytes());
         let s_2_biguint = BigUint::from_bytes_le(&self.s_2.to_bytes());
@@ -46,6 +61,7 @@ impl ZKPartProof {
     }
 }
 
+/// Generate a proof in the delegated Chaum-Pedersen protocol.
 pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore>(
     rng: &mut R,
     x: &RistrettoScalar,
@@ -178,6 +194,7 @@ pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore>(
     Ok((proof, non_zk_state, beta, lambda))
 }
 
+/// Verify a proof in the delegated Chaum-Pedersen protocol.
 pub fn verify_delegated_chaum_pedersen(
     pc_gens: &RistrettoPedersenCommitment,
     point_p: &RistrettoPoint,

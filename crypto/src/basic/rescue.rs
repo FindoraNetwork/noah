@@ -34,31 +34,45 @@
 use zei_algebra::{bls12_381::BLSScalar, prelude::*, str::FromStr};
 
 #[allow(non_snake_case)]
+/// The Rescue sponge.
 pub struct RescueInstance<S> {
-    pub MDS: Vec<Vec<S>>, // m * m matrix, m = rate + capacity
-    pub IC: Vec<S>,       // initial constant m vector
-    pub C: Vec<S>,        // key scheduling constant m vector
-    pub K: Vec<Vec<S>>,   // key scheduling constant m * m matrix
+    /// The MDS matrix of the Rescue sponge.
+    pub MDS: Vec<Vec<S>>,
+    /// The initial constants.
+    pub IC: Vec<S>,
+    /// The constants.
+    pub C: Vec<S>,
+    /// The key scheduling constants.
+    pub K: Vec<Vec<S>>,
+    /// The rate of the Rescue sponge.
     pub rate: usize,
+    /// The capacity of the Rescue sponge.
     pub capacity: usize,
+    /// The `\alpha` in the Rescue sponge.
     pub alpha: u64,
+    /// The slice representation of the inverse of `\alpha`
     pub alpha_inv: Vec<u64>,
+    /// The number of rounds.
     pub num_rounds: usize,
 }
 
-pub type RoundSubKey<S> = Vec<S>;
+/// The round keys for the Rescue sponge.
+pub type RoundKey<S> = Vec<S>;
+/// The Rescue sponge state, represented as a vector.
 pub type RescueState<S> = Vec<S>;
 
 impl<S: Scalar> RescueInstance<S> {
+    /// Return the number of rounds.
     pub fn num_rounds(&self) -> usize {
         self.num_rounds
     }
 
+    /// Return the size of the Rescue state.
     pub fn state_size(&self) -> usize {
         self.rate + self.capacity
     }
 
-    // Take input and produce an initial state by appending `capacity` zeros.
+    /// Take input and produce an initial state by appending `capacity` zeros.
     fn pad_input_to_state_size(&self, input: &[S]) -> RescueState<S> {
         let mut r = input.to_vec();
         while r.len() != self.state_size() {
@@ -67,8 +81,8 @@ impl<S: Scalar> RescueInstance<S> {
         r
     }
 
-    /// Produces RESCUE round keys from `key`
-    pub fn key_scheduling(&self, key: &[S]) -> Vec<RoundSubKey<S>> {
+    /// Produce RESCUE round keys from `key`
+    pub fn key_scheduling(&self, key: &[S]) -> Vec<RoundKey<S>> {
         let mut key_injection = self.IC.clone();
         let mut prev_key: Vec<S> = key
             .iter()
@@ -96,7 +110,7 @@ impl<S: Scalar> RescueInstance<S> {
         keys
     }
 
-    /// Compute hash sampling the rounds' keys online
+    /// Compute hash sampling the rounds' keys online.
     pub fn rescue(&self, input: &[S]) -> RescueState<S> {
         assert_eq!(input.len(), self.state_size());
 
@@ -124,7 +138,7 @@ impl<S: Scalar> RescueInstance<S> {
         state
     }
 
-    // Compute a rescue round, sampling the round keys online
+    /// Compute a rescue round, sampling the round keys online.
     fn rescue_round(
         &self,
         state: &mut [S],
@@ -145,7 +159,7 @@ impl<S: Scalar> RescueInstance<S> {
         Self::linear_op(&self.MDS, state, key_state);
     }
 
-    // helper function: compute r = M*r + c, where M is a square matrix and r and c are vectors. Result is stored in r.
+    /// Helper function: compute r = M*r + c, where M is a square matrix and r and c are vectors. Result is stored in r.
     pub fn linear_op(matrix: &[Vec<S>], mul_assign_vector: &mut [S], add_vector: &[S]) {
         let mut aux_vec = add_vector.to_vec();
         // multiply matrix agains mul assign vector, result in aux_vec
@@ -240,6 +254,7 @@ impl Default for RescueInstance<BLSScalar> {
 }
 
 impl RescueInstance<BLSScalar> {
+    /// Obtain a Rescue hash instance with the preconfigured parameters.
     pub fn new() -> Self {
         Self {
             MDS: vec![

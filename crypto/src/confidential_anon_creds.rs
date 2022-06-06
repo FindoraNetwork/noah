@@ -1,25 +1,29 @@
-use crate::anon_creds::Attribute::{Hidden, Revealed};
 use crate::anon_creds::{
-    verify_pok, Attribute, Credential, CredentialComm, CredentialCommRandomizer,
-    CredentialIssuerPK, CredentialPoK, CredentialUserSK, POK_LABEL,
+    verify_pok, Attribute,
+    Attribute::{Hidden, Revealed},
+    Credential, CredentialComm, CredentialCommRandomizer, CredentialIssuerPK, CredentialPoK,
+    CredentialUserSK, POK_LABEL,
 };
-use crate::basic::elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey};
-use crate::basic::matrix_sigma::SigmaTranscript;
+use crate::basic::{
+    elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey},
+    matrix_sigma::SigmaTranscript,
+};
 use merlin::Transcript;
 use zei_algebra::{prelude::*, traits::Pairing};
 
 const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
 const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"Confidential AC Reveal PoK New Instance";
 
+/// The transcript methods used in confidential anonymous credentials.
 pub trait CACTranscript {
+    /// Append the public parameters for EC pairing.
     fn init_sigma_pairing<P: Pairing>(
         &mut self,
         instance_name: &'static [u8],
-        public_scalars: &[&P::ScalarField],
-        public_elems_g1: &[&P::G1],
-        public_elems_g2: &[&P::G2],
-        public_elems_gt: &[&P::Gt],
+        g1: &[&P::G1],
+        g2: &[&P::G2],
     );
+    /// Append the information for the confidential anonymous credentials.
     fn cac_init<P: Pairing>(
         &mut self,
         ipk: &CredentialIssuerPK<P::G1, P::G2>,
@@ -27,9 +31,13 @@ pub trait CACTranscript {
         cm: &CredentialComm<P::G1>,
         ct: &[ElGamalCiphertext<P::G1>],
     );
+    /// Append the issuer PK to the transcript.
     fn append_issuer_pk<P: Pairing>(&mut self, ipk: &CredentialIssuerPK<P::G1, P::G2>);
+    /// Append an ElGamal encryption key to the transcript.
     fn append_encryption_key<P: Pairing>(&mut self, ek: &ElGamalEncKey<P::G1>);
+    /// Append an ElGamal ciphertext to the transcript.
     fn append_ciphertext<P: Pairing>(&mut self, ct: &ElGamalCiphertext<P::G1>);
+    /// Append a commitment to the transcript.
     fn append_commitment<P: Pairing>(&mut self, cm: &CredentialComm<P::G1>);
 }
 
@@ -37,44 +45,35 @@ impl CACTranscript for Transcript {
     fn init_sigma_pairing<P: Pairing>(
         &mut self,
         instance_name: &'static [u8],
-        public_scalars: &[&P::ScalarField],
-        public_elems_g1: &[&P::G1],
-        public_elems_g2: &[&P::G2],
-        public_elems_gt: &[&P::Gt],
+        g1: &[&P::G1],
+        g2: &[&P::G2],
     ) {
         self.append_message(
             b"Sigma Protocol domain",
             b"Sigma protocol with pairings elements",
         );
         self.append_message(b"Sigma Protocol instance", instance_name);
-        for scalar in public_scalars {
-            self.append_message(b"public scalar", scalar.to_bytes().as_slice())
-        }
-        for elem in public_elems_g1 {
+        for elem in g1 {
             self.append_message(b"public elem g1", elem.to_compressed_bytes().as_slice())
         }
-        for elem in public_elems_g2 {
+        for elem in g2 {
             self.append_message(b"public elem g2", elem.to_compressed_bytes().as_slice())
         }
-        for elem in public_elems_gt {
-            self.append_message(b"public elem gt", elem.to_compressed_bytes().as_slice())
-        }
     }
-
     fn cac_init<P: Pairing>(
         &mut self,
-        ac_issuer_pk: &CredentialIssuerPK<P::G1, P::G2>,
-        enc_key: &ElGamalEncKey<P::G1>,
-        sig_commitment: &CredentialComm<P::G1>,
-        ctexts: &[ElGamalCiphertext<P::G1>],
+        ipk: &CredentialIssuerPK<P::G1, P::G2>,
+        ek: &ElGamalEncKey<P::G1>,
+        cm: &CredentialComm<P::G1>,
+        cts: &[ElGamalCiphertext<P::G1>],
     ) {
         self.append_message(b"New Domain", CAC_REVEAL_PROOF_DOMAIN);
         self.append_group_element(b"G1", &P::G1::get_base());
         self.append_group_element(b"G2", &P::G2::get_base());
-        self.append_issuer_pk::<P>(ac_issuer_pk);
-        self.append_encryption_key::<P>(enc_key);
-        self.append_commitment::<P>(sig_commitment);
-        for ctext in ctexts.iter() {
+        self.append_issuer_pk::<P>(ipk);
+        self.append_encryption_key::<P>(ek);
+        self.append_commitment::<P>(cm);
+        for ctext in cts.iter() {
             self.append_ciphertext::<P>(ctext);
         }
     }
@@ -88,7 +87,7 @@ impl CACTranscript for Transcript {
         }
     }
     fn append_encryption_key<P: Pairing>(&mut self, ek: &ElGamalEncKey<P::G1>) {
-        self.append_group_element(b"encryption key", ek.get_point_ref());
+        self.append_group_element(b"encryption key", &ek.0);
     }
     fn append_ciphertext<P: Pairing>(&mut self, ct: &ElGamalCiphertext<P::G1>) {
         self.append_group_element(b"ct.e1", &ct.e1);
@@ -100,27 +99,38 @@ impl CACTranscript for Transcript {
     }
 }
 
-/// Confidential anonymous credential reveal proof
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Confidential anonymous credential reveal proof
 pub struct CACPoK<G1, G2, S> {
+    /// The proof of knowledge.
     pub pok: CredentialPoK<G2, S>,
-    pub cm_ct: Vec<ElGamalCiphertext<G1>>, //this can be aggregated
+    /// The randomizers for the individual attributes.
+    pub cm_ct: Vec<ElGamalCiphertext<G1>>,
+    /// The responses for individual attributes.
     pub response_rands: Vec<S>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Confidential anonymous credentials (attributes and a proof).
 pub struct ConfidentialAC<G1, G2, S> {
+    /// The ciphertexts of the revealed attributes.
     pub cts: Vec<ElGamalCiphertext<G1>>,
+    /// The proof of knowledge.
     pub pok: CACPoK<G1, G2, S>,
 }
 
 impl<G1: Group, G2: Group, S: Scalar> ConfidentialAC<G1, G2, S> {
+    /// Obtain the field elements
     pub fn get_fields(self) -> (Vec<ElGamalCiphertext<G1>>, CACPoK<G1, G2, S>) {
         (self.cts, self.pok)
     }
 }
 
-#[allow(clippy::type_complexity)]
+/// Selectively open some attributes committed in `cm` to ciphertexts, where `\vec{attrs}` lists
+/// the attributes, `cm` is the commitment, `rand` is the randomizer used in the commitment,
+/// `\vec{reveal_map}` describes whether an attribute should be revealed or not, `ek` is the
+/// encryption key, and `m`is the message committed along with the commitment. It outputs the
+/// ciphertexts `\vec{ct}` and an opening proof `\pi_{open}`$`.
 pub fn confidential_open_comm<R: CryptoRng + RngCore, P: Pairing>(
     prng: &mut R,
     usk: &CredentialUserSK<P::ScalarField>,
@@ -133,7 +143,7 @@ pub fn confidential_open_comm<R: CryptoRng + RngCore, P: Pairing>(
 ) -> Result<ConfidentialAC<P::G1, P::G2, P::ScalarField>> {
     // 1. create ciphertext for all revealed attributes
     let mut cts = vec![];
-    let mut rands = vec![];
+    let mut ct_rands = vec![];
     let mut revealed_attrs = vec![];
     if credential.attrs.len() != reveal_map.len() {
         return Err(eg!(ZeiError::ParameterError));
@@ -142,7 +152,7 @@ pub fn confidential_open_comm<R: CryptoRng + RngCore, P: Pairing>(
         if *b {
             let r = P::ScalarField::random(prng);
             let ct = elgamal_encrypt::<P::G1>(attr, &r, ek);
-            rands.push(r);
+            ct_rands.push(r);
             cts.push(ct);
             revealed_attrs.push(*attr);
         }
@@ -162,18 +172,20 @@ pub fn confidential_open_comm<R: CryptoRng + RngCore, P: Pairing>(
         prng,
         usk,
         &credential.ipk,
-        &rand.t,
+        &rand,
         attributes.as_slice(),
         &cm,
         ek,
         cts.as_slice(),
-        rands.as_slice(),
+        ct_rands.as_slice(),
         m,
     );
 
     Ok(ConfidentialAC { cts, pok })
 }
 
+/// Verify a confidential selective opening, that is, the ElGamal ciphertexts `\vec{ct}` correctly
+/// encrypt the attributes that are being committed in `cm` and specified in `\vec{reveal_map}`.
 pub fn confidential_verify_open<P: Pairing>(
     ipk: &CredentialIssuerPK<P::G1, P::G2>,
     ek: &ElGamalEncKey<P::G1>,
@@ -208,12 +220,12 @@ pub(crate) fn confidential_prove_pok<R: CryptoRng + RngCore, P: Pairing>(
     prng: &mut R,
     usk: &CredentialUserSK<P::ScalarField>,
     ipk: &CredentialIssuerPK<P::G1, P::G2>,
-    t: &P::ScalarField,
+    rand: &CredentialCommRandomizer<P::ScalarField>,
     attrs: &[Attribute<&P::ScalarField>],
     cm: &CredentialComm<P::G1>,
     ek: &ElGamalEncKey<P::G1>,
     cts: &[ElGamalCiphertext<P::G1>],
-    rands: &[P::ScalarField],
+    ct_rands: &[P::ScalarField],
     m: &[u8],
 ) -> CACPoK<P::G1, P::G2, P::ScalarField> {
     transcript.cac_init::<P>(ipk, ek, cm, cts);
@@ -228,7 +240,7 @@ pub(crate) fn confidential_prove_pok<R: CryptoRng + RngCore, P: Pairing>(
         let r_attr = P::ScalarField::random(prng);
         let elem = y2_i.mul(&r_attr);
         blinding = blinding.add(&elem);
-        if let Attribute::Revealed(_) = attr {
+        if let Revealed(_) = attr {
             let r_rand = P::ScalarField::random(prng);
             let ct_cm = elgamal_encrypt(&r_attr, &r_rand, ek);
             transcript.append_proof_commitment(&ct_cm.e1);
@@ -240,16 +252,16 @@ pub(crate) fn confidential_prove_pok<R: CryptoRng + RngCore, P: Pairing>(
     }
     transcript.append_proof_commitment(&blinding);
     let challenge = transcript.get_challenge::<P::ScalarField>();
-    let response_t = challenge.mul(t).add(&r_t); // challente*t + beta1
+    let response_t = challenge.mul(rand.t).add(&r_t);
     let response_sk = challenge.mul(&usk.0).add(&r_sk);
     let mut response_attrs = vec![];
     for (attr_enum, r_attr) in attrs.iter().zip(r_attrs.iter()) {
         match attr_enum {
-            Attribute::Hidden(Some(attr)) => {
+            Hidden(Some(attr)) => {
                 let response_attr = challenge.mul(*attr).add(r_attr);
                 response_attrs.push(response_attr);
             }
-            Attribute::Revealed(attr) => {
+            Revealed(attr) => {
                 let response_attr = challenge.mul(*attr).add(r_attr);
                 response_attrs.push(response_attr);
             }
@@ -257,8 +269,8 @@ pub(crate) fn confidential_prove_pok<R: CryptoRng + RngCore, P: Pairing>(
         }
     }
     let mut response_rands = vec![];
-    for (rand, r_rand) in rands.iter().zip(r_rands.iter()) {
-        let response_rand = challenge.mul(rand).add(r_rand);
+    for (ct_rand, r_rand) in ct_rands.iter().zip(r_rands.iter()) {
+        let response_rand = challenge.mul(ct_rand).add(r_rand);
         response_rands.push(response_rand);
     }
     CACPoK {
@@ -313,7 +325,7 @@ fn confidential_verify_pok<P: Pairing>(
     .c(d!())?;
 
     // 3. verify credential proof
-    let hidden_attrs = vec![Attribute::Hidden(None); ipk.num_attrs()];
+    let hidden_attrs = vec![Hidden(None); ipk.num_attrs()];
     verify_pok::<P>(ipk, cm, &pok.pok, hidden_attrs.as_slice(), &challenge).c(d!())
 }
 
@@ -344,7 +356,7 @@ pub(crate) mod test_helper {
         Credential,
     };
     use crate::basic::elgamal::elgamal_key_gen;
-    use crate::conf_cred_reveal::{confidential_open_comm, confidential_verify_open};
+    use crate::confidential_anon_creds::{confidential_open_comm, confidential_verify_open};
     use rand_chacha::ChaChaRng;
     use zei_algebra::prelude::*;
     use zei_algebra::traits::Pairing;
@@ -357,7 +369,7 @@ pub(crate) mod test_helper {
         S::from_hash(hasher)
     }
 
-    pub fn test_confidential_ac_reveal<P: Pairing>(reveal_map: &[bool]) {
+    pub(crate) fn test_confidential_ac_reveal<P: Pairing>(reveal_map: &[bool]) {
         let proof_msg = b"Some message";
         let credential_addr = b"Some address";
         let num_attr = reveal_map.len();
@@ -506,7 +518,7 @@ pub(crate) mod test_helper {
 
 #[cfg(test)]
 mod test_bls12_381 {
-    use crate::conf_cred_reveal::test_helper::test_confidential_ac_reveal;
+    use crate::confidential_anon_creds::test_helper::test_confidential_ac_reveal;
     use zei_algebra::bls12_381::BLSPairingEngine;
 
     #[test]

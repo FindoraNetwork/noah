@@ -4,18 +4,25 @@ use zei_algebra::bls12_381::BLSScalar;
 use zei_algebra::prelude::*;
 use zei_algebra::str::FromStr;
 
+/// The number of limbs in the simulated field element representation.
 pub const NUM_OF_LIMBS: usize = 6;
+/// The expected number of bits for non-top limbs.
 pub const BIT_PER_LIMB: usize = 43;
+/// The expected number of bits for the top limb.
 pub const BIT_IN_TOP_LIMB: usize = 38;
+/// The number of limbs in the intermediate representation.
 pub const NUM_OF_LIMBS_MUL: usize = NUM_OF_LIMBS * 2 - 1;
-
+/// The number of groups used during the zero-checking algorithm.
 pub const NUM_OF_GROUPS: usize = 6;
 
-/// A precise indicator of the reducibility in a simulate element
+/// A precise indicator of the reducibility in a simulate element.
 #[derive(Eq, PartialEq, Clone)]
 pub enum SimReducibility {
+    /// For public input or constant, the field element is in the normalized form.
     StrictlyNotReducible,
+    /// For witness, meaning that the field element is either `x` or `x + p`.
     AtMostReducibleByOne,
+    /// The field element might have been added this number of times.
     Others(BigUint),
 }
 
@@ -74,11 +81,13 @@ pub fn ristretto_scalar_field_sub_pad_in_biguint() -> BigUint {
 
 /// `SimFr` is the simulated Ristretto scalar field element
 /// over BLS12-381 scalar field.
-///
 #[derive(Clone)]
 pub struct SimFr {
+    /// The limbs of a simulated field element.
     pub limbs: [BLSScalar; NUM_OF_LIMBS],
+    /// The actual value of the simulated field element.
     pub val: BigUint,
+    /// The reducibility of this simulated field element.
     pub num_of_additions_over_normal_form: SimReducibility,
 }
 
@@ -174,6 +183,9 @@ impl Into<BigUint> for &SimFr {
 }
 
 impl SimFr {
+    /// Check if the *actual* value of the simulated field element is zero.
+    /// Note: One cannot simply require each limb to be zero, because the limbs
+    ///   could be representing k * p where k is a positive integer.
     pub fn is_zero(&self) -> bool {
         let self_biguint: BigUint = self.into();
         let r_biguint = ristretto_scalar_field_in_biguint();
@@ -188,8 +200,11 @@ impl SimFr {
 /// over BLS12-381 scalar field.
 #[derive(Clone)]
 pub struct SimFrMul {
+    /// The limbs of this intermediate representation.
     pub limbs: [BLSScalar; NUM_OF_LIMBS_MUL],
+    /// The actual value of this intermediate representation.
     pub val: BigUint,
+    /// The product of the num of additions over two original field elements.
     pub prod_of_num_of_additions: BigUint,
 }
 

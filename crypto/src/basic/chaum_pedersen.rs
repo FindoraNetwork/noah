@@ -417,7 +417,7 @@ mod test {
     use rand_chacha::ChaChaRng;
 
     #[test]
-    pub fn test_chaum_pedersen_equality_commitment() {
+    pub(crate) fn test_chaum_pedersen_equality_commitment() {
         let mut csprng: ChaChaRng;
         csprng = ChaChaRng::from_seed([0u8; 32]);
         let pc_gens = RistrettoPedersenCommitment::default();

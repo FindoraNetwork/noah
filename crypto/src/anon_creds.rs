@@ -1,7 +1,7 @@
 //! Anonymous credentials enable a credential issuer to issue a credential (with some attributes)
 //! to a user, and the user can later, with anonymity, selectively disclose some attributes.
 
-use crate::{basic::matrix_sigma::SigmaTranscript, conf_cred_reveal::CACTranscript};
+use crate::{basic::matrix_sigma::SigmaTranscript, confidential_anon_creds::CACTranscript};
 use merlin::Transcript;
 use serde_derive::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, traits::Pairing};
@@ -11,13 +11,18 @@ pub(crate) const REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Reveal PoK I
 pub(crate) const COMMIT_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Commit SoK Instance";
 pub(crate) const POK_LABEL: &[u8] = b"Signature Message";
 
-/// Credential issuer public key (`ipk`)
+/// Credential issuer public key (`ipk`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialIssuerPK<G1, G2> {
+    /// The public generator in `G2`.
     pub gen2: G2,
+    /// The public parameter `x G2`.
     pub xx2: G2,
+    /// The public parameter `z G1`.
     pub zz1: G1,
+    /// The public parameter `x G2`.
     pub zz2: G2,
+    /// The public parameter for each attribute, `y[i] G2`.
     pub yy2: Vec<G2>,
 }
 
@@ -28,18 +33,23 @@ impl<G1: Group, G2: Group> CredentialIssuerPK<G1, G2> {
     }
 }
 
-/// Credential issue secret key (`isk`)
+/// Credential issue secret key (`isk`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialIssuerSK<G1, S> {
+    /// The secret generator in `G1`.
     pub gen1: G1,
+    /// The secret value `x`.
     pub x: S,
+    /// The secret key for individual attributes.
     pub y: Vec<S>,
 }
 
-/// Credential signature (`\sigma`)
+/// Credential signature (`\sigma`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialSig<G1> {
+    /// First element of the signature.
     pub sigma1: G1,
+    /// Second element of the signature.
     pub sigma2: G1,
 }
 
@@ -52,15 +62,19 @@ impl<G: Group> Default for CredentialSig<G> {
     }
 }
 
-/// Credential data structure: credential signature, attribute, and the issuer public key
+/// Credential data structure: credential signature, attribute, and the issuer public key.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Credential<G1, G2, AttrType> {
+    /// The credential signature.
     pub sig: CredentialSig<G1>,
+    /// The list of all attributes.
     pub attrs: Vec<AttrType>,
+    /// The issuer public key.
     pub ipk: CredentialIssuerPK<G1, G2>,
 }
 
 impl<G1: Group, G2: Group, AttrType: Copy> Credential<G1, G2, AttrType> {
+    /// Apply the reveal map to get revealed attributes.
     pub fn get_revealed_attributes(&self, reveal_map: &[bool]) -> Result<Vec<AttrType>> {
         if reveal_map.len() != self.attrs.len() {
             return Err(eg!(ZeiError::ParameterError));
@@ -76,7 +90,7 @@ impl<G1: Group, G2: Group, AttrType: Copy> Credential<G1, G2, AttrType> {
 }
 
 /// Credential commitment attached to specific data (`cm`),
-/// which is a randomized version of the signature
+/// which is a randomized version of the signature.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialComm<G1>(pub(crate) CredentialSig<G1>);
 
@@ -87,6 +101,7 @@ impl<G1: Group> Default for CredentialComm<G1> {
 }
 
 impl<G1: Group> CredentialComm<G1> {
+    /// Derive the commitment from the credential signature and the randomizer.
     pub fn new(sig: &CredentialSig<G1>, rand: &CredentialCommRandomizer<G1::ScalarType>) -> Self {
         let sigma1_r = sig.sigma1.mul(&rand.r);
         let sigma2_r = sig.sigma2.add(&sig.sigma1.mul(&rand.t)).mul(&rand.r);
@@ -99,26 +114,28 @@ impl<G1: Group> CredentialComm<G1> {
     }
 }
 
-/// User public key (`upk`)
+/// User public key (`upk`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialUserPK<G1>(pub(crate) G1);
 
-/// User secret key (`usk`)
+/// User secret key (`usk`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialUserSK<S>(pub(crate) S);
 
-/// Proof of selective disclosure of the attributes inside a signature `\sigma`
+/// Proof of selective disclosure of the attributes inside a signature `\sigma`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialSigOpenProof<G1, G2, S> {
+    /// The credential commitment.
     pub cm: CredentialComm<G1>,
+    /// The opening proof.
     pub proof_open: CredentialPoK<G2, S>,
 }
 
-/// Proof that revealed attributes verify a credential commitment signature
+/// Proof that revealed attributes verify a credential commitment signature.
 pub type CredentialCommOpenProof<G2, S> = CredentialPoK<G2, S>;
 
 /// Proof of knowledge for t, sk (UserSecretKey), and hidden attributes that satisfy a
-/// certain relation.
+/// certain relation..
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialPoK<G2, S> {
     pub(crate) blinding: G2, // r_t * G2 + r_sk * Z2 + sum_{a_i in hidden attrs} r_{a_i} * Y2_i
@@ -128,18 +145,25 @@ pub struct CredentialPoK<G2, S> {
 }
 
 #[derive(Clone)]
+/// An attribute in the anonymous credential scheme.
 pub enum Attribute<AttrType: Copy> {
+    /// A revealed attribute.
     Revealed(AttrType),
+    /// A hidden attribute.
+    /// The prover must provide the attribute value, but the verifier does not.
     Hidden(Option<AttrType>),
 }
 
 /// Randomizer used in the commitment scheme for credentials.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialCommRandomizer<S> {
+    /// The first randomizer value.
     pub r: S,
+    /// The second randomizer value.
     pub t: S,
 }
 
+/// The commitment scheme output.
 pub type CommOutput<G1, G2, S> = (
     CredentialComm<G1>,
     CredentialPoK<G2, S>,
@@ -237,7 +261,7 @@ pub fn open_credential<R: CryptoRng + RngCore, P: Pairing>(
     Ok(CredentialSigOpenProof { cm, proof_open })
 }
 
-/// Sample a randomizer used to generate a commitment from the signature
+/// Sample a randomizer used to generate a commitment from the signature.
 pub fn randomizer_gen<R: CryptoRng + RngCore, P: Pairing>(
     prng: &mut R,
 ) -> CredentialCommRandomizer<P::ScalarField> {
@@ -247,7 +271,7 @@ pub fn randomizer_gen<R: CryptoRng + RngCore, P: Pairing>(
     }
 }
 
-/// Credential commitment associated with a message
+/// Credential commitment associated with a message.
 pub fn commit_without_randomizer<R: CryptoRng + RngCore, P: Pairing>(
     prng: &mut R,
     usk: &CredentialUserSK<P::ScalarField>,
@@ -390,16 +414,10 @@ pub(super) fn init_pok_transcript<P: Pairing>(
     for e in ipk.yy2.iter() {
         g2_elems.push(e);
     }
-    transcript.init_sigma_pairing::<P>(
-        REVEAL_PROOF_DOMAIN,
-        &[],
-        &g1_elems[..],
-        g2_elems.as_slice(),
-        &[],
-    );
+    transcript.init_sigma_pairing::<P>(REVEAL_PROOF_DOMAIN, &g1_elems[..], g2_elems.as_slice());
 }
 
-/// Internal function for generating a proof of knowledge
+/// Internal function for generating a proof of knowledge.
 fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
     transcript: &mut Transcript,
     prng: &mut R,
@@ -447,7 +465,7 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
     })
 }
 
-/// Internal function for verify a proof of knowledge
+/// Internal function for verify a proof of knowledge.
 pub(crate) fn verify_pok<P: Pairing>(
     ipk: &CredentialIssuerPK<P::G1, P::G2>,
     cm: &CredentialComm<P::G1>,
@@ -593,23 +611,23 @@ pub(crate) mod credentials_tests {
         )
     }
 
-    pub fn no_attributes() {
+    pub(crate) fn no_attributes() {
         reveal(&[]);
     }
 
-    pub fn single_attribute() {
+    pub(crate) fn single_attribute() {
         reveal(&[false]);
         reveal(&[true]);
     }
 
-    pub fn two_attributes() {
+    pub(crate) fn two_attributes() {
         reveal(&[false, false]);
         reveal(&[true, false]);
         reveal(&[false, true]);
         reveal(&[true, true]);
     }
 
-    pub fn ten_attributes() {
+    pub(crate) fn ten_attributes() {
         reveal(&[false; 10]);
         reveal(&[
             true, false, true, false, true, false, true, false, true, false,
@@ -621,7 +639,7 @@ pub(crate) mod credentials_tests {
     }
 
     #[test]
-    pub fn test_attributes() {
+    pub(crate) fn test_attributes() {
         no_attributes();
         single_attribute();
         two_attributes();

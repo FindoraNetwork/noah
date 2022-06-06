@@ -2,16 +2,22 @@ use digest::Digest;
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 
+/// The transcript methods for the Sigma protocol.
 pub trait SigmaTranscript {
+    /// Initialize the transcript for the Sigma protocol.
     fn init_sigma<G: Group>(
         &mut self,
         instance_name: &'static [u8],
         public_scalars: &[&G::ScalarType],
         public_elems: &[G],
     );
+    /// Append group elements to the transcript.
     fn append_group_element<G: Group>(&mut self, label: &'static [u8], elem: &G);
+    /// Append field elements to the transcript.
     fn append_field_element<S: Scalar>(&mut self, label: &'static [u8], scalar: &S);
+    /// Append the proof commitment to the transcript.
     fn append_proof_commitment<G: Group>(&mut self, elem: &G);
+    /// Compute a challenge from the transcript.
     fn get_challenge<S: Scalar>(&mut self) -> S;
 }
 
@@ -82,6 +88,7 @@ fn compute_proof_commitments<G: Group>(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// The Sigma proof.
 pub struct SigmaProof<S, G> {
     pub(crate) commitments: Vec<G>,
     pub(crate) responses: Vec<S>,
