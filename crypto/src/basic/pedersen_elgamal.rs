@@ -282,11 +282,7 @@ pub fn pedersen_elgamal_batch_verify<'a, R: CryptoRng + RngCore>(
         let mut lc_e1 = RistrettoPoint::get_identity();
         let mut lc_e2 = RistrettoPoint::get_identity();
         let mut lc_c = RistrettoPoint::get_identity();
-        for (xi, ei, ci) in izip!(
-            x.iter(),
-            instance.cts.iter(),
-            instance.commitments.iter()
-        ) {
+        for (xi, ei, ci) in izip!(x.iter(), instance.cts.iter(), instance.commitments.iter()) {
             lc_e1 = lc_e1.add(&ei.e1.mul(xi));
             lc_e2 = lc_e2.add(&ei.e2.mul(xi));
             lc_c = lc_c.add(&ci.mul(xi));
@@ -355,7 +351,10 @@ mod test {
     use crate::basic::elgamal::{
         elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey,
     };
-    use crate::basic::pedersen_elgamal::{pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify, pedersen_elgamal_batch_verify, PedersenElGamalProofInstance};
+    use crate::basic::pedersen_elgamal::{
+        pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
+        pedersen_elgamal_batch_verify, PedersenElGamalProofInstance,
+    };
     use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
@@ -704,11 +703,8 @@ mod test {
                 proof: &proof2,
             },
         ];
-        assert!(pedersen_elgamal_batch_verify(
-            &mut verifier_transcript,
-            &mut rng,
-            &instances
-        )
-        .is_ok());
+        assert!(
+            pedersen_elgamal_batch_verify(&mut verifier_transcript, &mut rng, &instances).is_ok()
+        );
     }
 }

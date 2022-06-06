@@ -414,11 +414,7 @@ pub(super) fn init_pok_transcript<P: Pairing>(
     for e in ipk.yy2.iter() {
         g2_elems.push(e);
     }
-    transcript.init_sigma_pairing::<P>(
-        REVEAL_PROOF_DOMAIN,
-        &g1_elems[..],
-        g2_elems.as_slice(),
-    );
+    transcript.init_sigma_pairing::<P>(REVEAL_PROOF_DOMAIN, &g1_elems[..], g2_elems.as_slice());
 }
 
 /// Internal function for generating a proof of knowledge.
