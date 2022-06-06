@@ -157,9 +157,8 @@ pub fn choose_ks<R: CryptoRng + RngCore, F: Scalar>(
 pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
-    prg_seed: [u8; 32],
 ) -> Result<PlonkPK<PCS>> {
-    preprocess_prover_with_lagrange(cs, pcs, None, prg_seed)
+    preprocess_prover_with_lagrange(cs, pcs, None)
 }
 
 /// Indexer that uses Lagrange bases
@@ -170,9 +169,8 @@ pub fn preprocess_prover_with_lagrange<
     cs: &CS,
     pcs: &PCS,
     lagrange_pcs: Option<&PCS>,
-    prg_seed: [u8; 32],
 ) -> Result<PlonkPK<PCS>> {
-    let mut prng = ChaChaRng::from_seed(prg_seed);
+    let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let n_wires_per_gate = CS::n_wires_per_gate();
     let n = cs.size();
     let m = cs.quot_eval_dom_size();
@@ -311,9 +309,8 @@ pub fn preprocess_prover_with_lagrange<
 pub fn preprocess_verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
-    prg_seed: [u8; 32],
 ) -> Result<PlonkVK<PCS>> {
-    let prover_params = preprocess_prover(cs, pcs, prg_seed).c(d!())?;
+    let prover_params = preprocess_prover(cs, pcs).c(d!())?;
     Ok(prover_params.verifier_params)
 }
 

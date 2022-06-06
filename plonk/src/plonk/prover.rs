@@ -36,7 +36,7 @@ use zei_algebra::prelude::*;
 /// use rand_chacha::ChaChaRng;
 /// use zei_algebra::{prelude::*, bls12_381::BLSScalar};
 ///
-/// let mut prng = ChaChaRng::from_seed([1u8; 32]);
+/// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let pcs = KZGCommitmentScheme::new(20, &mut prng);
 /// let mut cs = TurboConstraintSystem::new();
 ///
@@ -50,10 +50,9 @@ use zei_algebra::prelude::*;
 /// cs.insert_add_gate(var_one, var_two, var_three);
 /// cs.pad();
 ///
-/// let common_seed = [0u8; 32];
 /// let proof = {
 ///     let witness = cs.get_and_clear_witness();
-///     let prover_params = preprocess_prover(&cs, &pcs, common_seed).unwrap();
+///     let prover_params = preprocess_prover(&cs, &pcs).unwrap();
 ///     let mut transcript = Transcript::new(b"Test");
 ///     prover(
 ///         &mut prng,
@@ -66,7 +65,7 @@ use zei_algebra::prelude::*;
 ///         .unwrap()
 /// };
 ///
-/// let verifier_params = preprocess_verifier(&cs, &pcs, common_seed).unwrap();
+/// let verifier_params = preprocess_verifier(&cs, &pcs).unwrap();
 /// let mut transcript = Transcript::new(b"Test");
 /// assert!(
 ///     verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof).is_ok()

@@ -620,7 +620,7 @@ mod test {
 
         let mut prng = ChaChaRng::from_seed([0_u8; 32]);
         let pcs = KZGCommitmentScheme::new(20, &mut prng);
-        let params = preprocess_prover(&cs, &pcs, [0u8; 32]).unwrap();
+        let params = preprocess_prover(&cs, &pcs).unwrap();
 
         let mut challenges = PlonkChallenges::<F>::new();
         challenges.insert_gamma_delta(one, zero).unwrap();
