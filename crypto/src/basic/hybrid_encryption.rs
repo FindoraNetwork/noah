@@ -15,6 +15,7 @@ type Aes256Ctr = ctr::Ctr64BE<Aes256>;
 
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
+/// The public key for the hybrid encryption scheme.
 pub struct XPublicKey {
     pub(crate) key: x25519_dalek::PublicKey,
 }
@@ -40,6 +41,7 @@ impl ZeiFromToBytes for XPublicKey {
 serialize_deserialize!(XPublicKey);
 
 impl XPublicKey {
+    /// Derive the public key from the secret key.
     pub fn from(sk: &XSecretKey) -> XPublicKey {
         XPublicKey {
             key: x25519_dalek::PublicKey::from(&sk.key),
@@ -57,6 +59,7 @@ impl Eq for XPublicKey {}
 
 #[wasm_bindgen]
 #[derive(Clone)]
+/// The secret key for the hybrid encryption scheme.
 pub struct XSecretKey {
     pub(crate) key: x25519_dalek::StaticSecret,
 }
@@ -82,6 +85,7 @@ impl ZeiFromToBytes for XSecretKey {
 serialize_deserialize!(XSecretKey);
 
 impl XSecretKey {
+    /// Create a new secret key for x25519.
     pub fn new<R: CryptoRng + RngCore>(prng: &mut R) -> XSecretKey {
         XSecretKey {
             key: x25519_dalek::StaticSecret::new(prng),
@@ -98,6 +102,7 @@ impl PartialEq for XSecretKey {
 impl Eq for XSecretKey {}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// The ciphertext from the symmetric encryption.
 pub struct Ctext(pub Vec<u8>);
 impl ZeiFromToBytes for Ctext {
     fn zei_to_bytes(&self) -> Vec<u8> {
@@ -111,6 +116,7 @@ impl ZeiFromToBytes for Ctext {
 serialize_deserialize!(Ctext);
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+/// A ciphertext of hybrid encryption.
 pub struct ZeiHybridCiphertext {
     pub(crate) ciphertext: Ctext,
     pub(crate) ephemeral_public_key: XPublicKey,

@@ -5,24 +5,20 @@ use zei_algebra::{
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ElGamalEncKey<G>(pub G); // pk = sk * G
-
-impl<G: Clone> ElGamalEncKey<G> {
-    pub fn get_point(&self) -> G {
-        self.0.clone()
-    }
-    pub fn get_point_ref(&self) -> &G {
-        &self.0
-    }
-}
+/// The ElGamal encryption key/public key.
+pub struct ElGamalEncKey<G>(pub G);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ElGamalDecKey<S>(pub(crate) S); // sk
+/// The ElGamal decryption key/secret key.
+pub struct ElGamalDecKey<S>(pub(crate) S);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// An ElGamal ciphertext.
 pub struct ElGamalCiphertext<G> {
-    pub e1: G, // r * G
-    pub e2: G, // m * G + r * pk
+    /// `e1` = `r * G`
+    pub e1: G,
+    /// `e2` = `m * G + r * pk`
+    pub e2: G,
 }
 
 impl Hash for ElGamalEncKey<RistrettoPoint> {

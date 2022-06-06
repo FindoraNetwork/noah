@@ -25,7 +25,7 @@ use zei_crypto::{
     basic::{
         elgamal::ElGamalCiphertext,
         pedersen_elgamal::{
-            pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_aggregate_eq_verify,
+            pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_verify,
             PedersenElGamalEqProof, PedersenElGamalProofInstance,
         },
     },
@@ -330,7 +330,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
                 extract_ciphertext_and_commitments(&records_and_memos.0).c(d!())?;
             let peg_eq_instance = PedersenElGamalProofInstance {
                 public_key: key,
-                ctexts,
+                cts: ctexts,
                 commitments,
                 proof,
             };
@@ -338,7 +338,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
         }
     }
     let mut transcript = Transcript::new(b"AssetTracingProofs");
-    pedersen_elgamal_batch_aggregate_eq_verify(&mut transcript, prng, &instances).c(d!())
+    pedersen_elgamal_batch_verify(&mut transcript, prng, &instances).c(d!())
 }
 
 #[derive(Default)]

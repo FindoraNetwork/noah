@@ -185,7 +185,7 @@ impl AssetRecord {
                     if credential.ipk != id_policy.cred_issuer_pub_key {
                         return Err(eg!(ZeiError::ParameterError));
                     }
-                    let (attrs_ctext, proof) = ac_confidential_open_commitment(
+                    let open = ac_confidential_open_commitment(
                         prng,
                         credential_sec_key,
                         credential,
@@ -194,8 +194,9 @@ impl AssetRecord {
                         id_policy.reveal_map.as_slice(),
                         &[],
                     )
-                    .c(d!())?
-                    .get_fields();
+                    .c(d!())?;
+                    let attrs_ctext = open.cts;
+                    let proof = open.pok;
                     let attrs = credential
                         .get_revealed_attributes(id_policy.reveal_map.as_slice())
                         .c(d!())?;
@@ -566,7 +567,8 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
         let (attrs_and_ctexts, reveal_proof) = match id_proof_and_attrs {
             (None, _) => (vec![], None),
             (Some(conf_ac), attrs) => {
-                let (c, p) = conf_ac.clone().get_fields();
+                let c = conf_ac.cts.clone();
+                let p = conf_ac.pok.clone();
                 let attrs_and_ctexts = attrs.iter().zip(c).map(|(a, c)| (*a, c)).collect();
                 (attrs_and_ctexts, Some(p))
             }

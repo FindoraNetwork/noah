@@ -4,8 +4,11 @@ use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// The Pedersen commitment implementation for the Ristretto group.
 pub struct RistrettoPedersenCommitment {
+    /// The generator for the value part.
     pub B: RistrettoPoint,
+    /// The generator for the blinding part.
     pub B_blinding: RistrettoPoint,
 }
 
@@ -19,6 +22,7 @@ impl Default for RistrettoPedersenCommitment {
     }
 }
 impl RistrettoPedersenCommitment {
+    /// Compute the Pedersen commitment over the Ristretto group.
     pub fn commit(&self, value: RistrettoScalar, blinding: RistrettoScalar) -> RistrettoPoint {
         RistrettoPoint(
             curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(

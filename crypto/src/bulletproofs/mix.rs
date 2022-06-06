@@ -60,7 +60,7 @@ impl MixValue {
     /// Return commitments and circuit variables.
     pub fn commit_prover(
         &self,
-        prover: &mut Prover<&mut Transcript>,
+        prover: &mut Prover<'_, &mut Transcript>,
         blinds: &MixValue,
     ) -> (MixCommitment, MixVariable) {
         let (amount_com, amount_var) = prover.commit(self.amount.0, blinds.amount.0);

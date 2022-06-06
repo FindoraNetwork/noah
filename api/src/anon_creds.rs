@@ -32,7 +32,7 @@ pub type Credential = zei_crypto::anon_creds::Credential<G1, G2, Attr>;
 
 pub type ACRevealProof = zei_crypto::anon_creds::CredentialCommOpenProof<G2, S>;
 
-pub type ACConfidentialRevealProof = zei_crypto::conf_cred_reveal::CACPoK<G1, G2, S>;
+pub type ACConfidentialRevealProof = zei_crypto::confidential_anon_creds::CACPoK<G1, G2, S>;
 
 pub type Attr = u32;
 
@@ -343,7 +343,7 @@ pub type AttributeEncKey = zei_crypto::basic::elgamal::ElGamalEncKey<G1>;
 pub type AttributeDecKey = zei_crypto::basic::elgamal::ElGamalDecKey<S>;
 pub type AttributeCiphertext = zei_crypto::basic::elgamal::ElGamalCiphertext<G1>;
 
-pub type ConfidentialAC = zei_crypto::conf_cred_reveal::ConfidentialAC<G1, G2, S>;
+pub type ConfidentialAC = zei_crypto::confidential_anon_creds::ConfidentialAC<G1, G2, S>;
 
 /// Produced a Confidential Anonymous Credential Reveal Proof for a single instance of a confidential anonymous reveal. Proof asserts
 /// that a list of attributes can be decrypted from a list of ciphertexts under recv_enc_pub_key,
@@ -400,7 +400,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
         ipk: credential.ipk.clone(),
     };
     let cm = ACCommitment::new(&credential.sig, &rand);
-    zei_crypto::conf_cred_reveal::confidential_open_comm::<R, BLSPairingEngine>(
+    zei_crypto::confidential_anon_creds::confidential_open_comm::<R, BLSPairingEngine>(
         prng, usk, &c, &cm, rand, reveal_map, enc_key, msg,
     )
     .c(d!())
@@ -425,7 +425,7 @@ pub fn ac_confidential_verify(
     cac_proof: &ACConfidentialRevealProof,
     msg: &[u8],
 ) -> Result<()> {
-    zei_crypto::conf_cred_reveal::confidential_verify_open::<BLSPairingEngine>(
+    zei_crypto::confidential_anon_creds::confidential_verify_open::<BLSPairingEngine>(
         issuer_pk,
         enc_key,
         reveal_map,
