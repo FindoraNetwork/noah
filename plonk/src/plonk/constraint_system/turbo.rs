@@ -1203,8 +1203,7 @@ mod test {
         witness: &[PCS::Field],
         online_vars: &[PCS::Field],
     ) {
-        let common_seed = [0u8; 32];
-        let prover_params = preprocess_prover(cs, pcs, common_seed).unwrap();
+        let prover_params = preprocess_prover(cs, pcs).unwrap();
         let verifier_params_ref = &prover_params.verifier_params;
 
         let mut transcript = Transcript::new(b"TestTurboPlonk");

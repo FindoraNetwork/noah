@@ -72,7 +72,6 @@ pub struct NodeParamsSplitSpecial {
 
 pub const BULLET_PROOF_RANGE: usize = 32;
 pub const MAX_PARTY_NUMBER: usize = 128;
-const COMMON_SEED: [u8; 32] = [0u8; 32];
 pub const PRECOMPUTED_PARTY_NUMBER: usize = 6;
 pub const DEFAULT_BP_NUM_GENS: usize = 256;
 
@@ -145,7 +144,7 @@ impl ProverParams {
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -180,7 +179,7 @@ impl ProverParams {
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -235,7 +234,7 @@ impl ProverParams {
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -264,7 +263,7 @@ impl ProverParams {
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -311,7 +310,7 @@ impl ProverParams {
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -365,7 +364,7 @@ impl ProverParams {
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), COMMON_SEED).unwrap();
+            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
