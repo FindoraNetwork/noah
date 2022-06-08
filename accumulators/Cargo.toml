@@ -12,7 +12,7 @@ crate-type = ['rlib']
 [dependencies]
 itertools = '0.8.0'
 ruc = '1.0'
-parking_lot = '0.11.2'
+parking_lot = "0.12"
 
 [dependencies.zei-algebra]
 path = '../algebra'
@@ -22,4 +22,8 @@ path = '../crypto'
 
 [dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v0.1.4'
+branch = "refactor"
+
+[dev-dependencies.mem_db]
+git = 'https://github.com/FindoraNetwork/storage.git'
+branch = "refactor"

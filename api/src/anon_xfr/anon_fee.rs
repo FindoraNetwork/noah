@@ -384,12 +384,12 @@ mod tests {
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
+    use mem_db::MemoryDB;
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::{CryptoRng, RngCore, SeedableRng};
-    use std::{sync::Arc, thread};
+    use std::sync::Arc;
     use storage::{
-        db::TempRocksDB,
         state::{ChainState, State},
         store::PrefixedStore,
     };
@@ -412,8 +412,7 @@ mod tests {
         assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
         let _owner_memo = oabar.get_owner_memo().unwrap();
 
-        let path = thread::current().name().unwrap().to_owned();
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs, false);
 
@@ -504,8 +503,7 @@ mod tests {
         assert_eq!(keypair_in.pub_key(), *oabar.pub_key_ref());
         let _owner_memo = oabar.get_owner_memo().unwrap();
 
-        let path = thread::current().name().unwrap().to_owned();
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs, false);
 
