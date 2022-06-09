@@ -5,7 +5,7 @@ use crate::plonk::{
 };
 use crate::poly_commit::{
     field_polynomial::{primitive_nth_root_of_unity, FpPolynomial},
-    pcs::{BatchProofEval, PolyComScheme},
+    pcs::PolyComScheme,
 };
 use rand_chacha::ChaChaRng;
 use zei_algebra::prelude::*;
@@ -14,10 +14,10 @@ use zei_algebra::prelude::*;
 /// PCS is generic in the commitment group C, the eval proof type E,
 /// and Field elements F.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
-pub struct PlonkProof<C, E, F> {
+pub struct PlonkProof<C, F> {
     /// the witness polynomial commitments.
     pub(crate) c_witness_polys: Vec<C>,
-    /// the splitted quotient polynomial commitments
+    /// the split quotient polynomial commitments
     pub(crate) c_q_polys: Vec<C>,
     /// the sigma polynomial commitment.
     pub(crate) c_sigma: C,
@@ -27,18 +27,15 @@ pub struct PlonkProof<C, E, F> {
     pub(crate) sigma_eval_g_beta: F,
     /// the openings of permutation polynomials at beta.
     pub(crate) perms_eval_beta: Vec<F>,
-    /// the opening of linearization polynomial at beta.
-    pub(crate) l_eval_beta: F,
-    /// Batch proof for polynomial evaluation.
-    pub(crate) batch_eval_proof: BatchProofEval<C, E>,
+    /// The commitment for the first witness polynomial.
+    pub(crate) eval_proof_1: C,
+    /// The commitment for the second witness polynomial.
+    pub(crate) eval_proof_2: C,
 }
 
 /// Define the PLONK proof by given `PolyComScheme`.
-pub type PlonkPf<PCS> = PlonkProof<
-    <PCS as PolyComScheme>::Commitment,
-    <PCS as PolyComScheme>::EvalProof,
-    <PCS as PolyComScheme>::Field,
->;
+pub type PlonkPf<PCS> =
+    PlonkProof<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
 
 /// PLONK prover parameters.
 #[derive(Debug, Serialize, Deserialize)]

@@ -2,8 +2,7 @@ use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{
-        combine_q_polys, derive_q_eval_beta, eval_public_var_poly, linearization_commitment,
-        PlonkChallenges,
+        derive_q_eval_beta, eval_public_var_poly, linearization_commitment, PlonkChallenges,
     },
     setup::{PlonkPf, PlonkVK},
     transcript::{
@@ -60,24 +59,11 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         transcript.append_field_elem(eval_beta);
     }
     transcript.append_field_elem(&proof.sigma_eval_g_beta);
-    transcript.append_field_elem(&proof.l_eval_beta);
 
     let public_vars_eval_beta =
         eval_public_var_poly::<PCS>(cs_params, public_values, challenges.get_beta().unwrap());
 
     // 4. derive linearization polynomial commitment
-    let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> =
-        proof.witness_polys_eval_beta.iter().collect();
-    let perms_eval_beta_as_ref: Vec<&PCS::Field> = proof.perms_eval_beta.iter().collect();
-    let c_l = linearization_commitment::<PCS, CS>(
-        cs_params,
-        &proof.c_sigma,
-        &witness_polys_eval_beta_as_ref[..],
-        &perms_eval_beta_as_ref[..],
-        &proof.sigma_eval_g_beta,
-        &challenges,
-    );
-
     // Note: for completeness steps 5 and 6 is analogous to getting Q(beta) in the proof,
     // verify it, and then check that
     // P(\beta) - Q(\beta) * Z_H(\beta) (plus checking all eval proofs)
@@ -87,6 +73,20 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     let derived_q_eval_beta =
         derive_q_eval_beta::<PCS>(cs_params, proof, &challenges, &public_vars_eval_beta);
     let g_beta = beta.mul(&cs_params.root);
+
+    let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> =
+        proof.witness_polys_eval_beta.iter().collect();
+    let perms_eval_beta_as_ref: Vec<&PCS::Field> = proof.perms_eval_beta.iter().collect();
+    let c_q_combined = linearization_commitment::<PCS, CS>(
+        cs_params,
+        &proof.c_sigma,
+        &witness_polys_eval_beta_as_ref[..],
+        &perms_eval_beta_as_ref[..],
+        &proof.sigma_eval_g_beta,
+        &challenges,
+        &proof.c_q_polys[..],
+        cs_params.cs_size + 2,
+    );
 
     // 6. verify batch eval proofs for witness/permutation polynomials evaluations
     // at point beta, and Q(beta), L(beta), \Sigma(g*beta)
@@ -100,12 +100,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
                 .take(CS::n_wires_per_gate() - 1),
         )
         .collect();
-    let c_q_combined = combine_q_polys(&proof.c_q_polys[..], &beta, cs_params.cs_size + 2);
     commitments.push(&c_q_combined);
-    commitments.push(&c_l);
-    commitments.push(&proof.c_sigma);
-    let mut points = vec![*beta; 2 * CS::n_wires_per_gate() + 1];
-    points.push(g_beta);
     let mut values: Vec<PCS::Field> = proof
         .witness_polys_eval_beta
         .iter()
@@ -113,16 +108,22 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         .cloned()
         .collect();
     values.push(derived_q_eval_beta);
-    values.push(proof.l_eval_beta);
-    values.push(proof.sigma_eval_g_beta);
-    pcs.batch_verify_eval(
+    pcs.batch_verify(
         transcript,
         &commitments[..],
         cs_params.cs_size + 2,
-        &points[..],
+        &beta,
         &values[..],
-        &proof.batch_eval_proof,
-        None,
+        &proof.eval_proof_1,
+    )
+    .c(d!(PlonkError::VerificationError))?;
+    pcs.verify(
+        transcript,
+        &proof.c_sigma,
+        cs_params.cs_size + 2,
+        &g_beta,
+        &proof.sigma_eval_g_beta,
+        &proof.eval_proof_2,
     )
     .c(d!(PlonkError::VerificationError))
 }
