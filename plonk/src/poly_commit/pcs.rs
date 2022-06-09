@@ -45,7 +45,7 @@ pub trait HomomorphicPolyComElem: ToBytes + Clone {
 /// Trait for polynomial commitment scheme.
 pub trait PolyComScheme: Sized {
     /// Type of prime field.
-    type Field: Scalar;
+    type Field: Scalar + Debug;
 
     /// Type of commitment produces, need to implement `HomomorphicPolyComElem`.
     type Commitment: HomomorphicPolyComElem<Scalar = Self::Field>
@@ -138,6 +138,7 @@ pub trait PolyComScheme: Sized {
         for open in openings.iter() {
             let mut poly = self.polynomial_from_opening_ref(open);
             let eval_value = poly.eval(point);
+            println!("eval_value = {:?}", eval_value);
             poly.sub_assign(&FpPolynomial::from_coefs(vec![eval_value]));
             poly.mul_scalar_assign(&c_i);
             h.add_assign(&poly);

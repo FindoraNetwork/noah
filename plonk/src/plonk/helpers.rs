@@ -54,7 +54,8 @@ impl<F: Scalar> PlonkChallenges<F> {
     /// Insert Alpha.
     pub(super) fn insert_alpha(&mut self, alpha: F) -> Result<()> {
         if self.challenges.len() == 2 {
-            self.challenges.push(alpha);
+            //self.challenges.push(alpha);
+            self.challenges.push(F::zero());
             Ok(())
         } else {
             Err(eg!())
@@ -376,13 +377,12 @@ fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
 
     let mut z_h_eval_beta = beta.pow(&[n as u64]);
     z_h_eval_beta.sub_assign(&F::one());
-    z_h_eval_beta = z_h_eval_beta.neg();
 
     // 4. subtract the combined q polynomial
     // Given value \beta, and homomorphic polynomial commitments/openings {qi(X)}_{i=0..m-1},
     // compute \sum_{i=0..m-1} \beta^{i*n} * qi(X)
     let factor = beta.pow(&[n_q_polys as u64]);
-    let mut exponent = factor * z_h_eval_beta;
+    let mut exponent = z_h_eval_beta * factor;
     let mut q_poly_combined = q_polys[0].clone();
     for q_poly in q_polys.iter().skip(1) {
         q_poly_combined.add_assign(&q_poly.mul(&exponent));
@@ -547,6 +547,7 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
 
     let term0 = public_vars_eval_beta;
+    println!("term0 = {:?}", term0);
     let mut term1 = alpha.mul(&proof.sigma_eval_g_beta);
     let n_wires_per_gate = &proof.witness_polys_eval_beta.len();
     for i in 0..n_wires_per_gate - 1 {
@@ -556,6 +557,7 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
         term1.mul_assign(&b);
     }
     term1.mul_assign(&proof.witness_polys_eval_beta[n_wires_per_gate - 1].add(delta));
+    println!("term1 = {:?}", term1);
 
     let one = PCS::Field::one();
     let beta_n = beta.pow(&[params.cs_size as u64]);
@@ -563,12 +565,12 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let beta_minus_one = beta.sub(&one);
     let first_lagrange_eval_beta = z_h_eval_beta.mul(beta_minus_one.inv().unwrap());
     let term2 = first_lagrange_eval_beta.mul(alpha.mul(alpha));
+    println!("term2 = {:?}", term2);
 
     let term1_plus_term2 = term1.add(&term2);
-
-    let dividend = term0.sub(&term1_plus_term2);
-
-    dividend.mul(&z_h_eval_beta.inv().unwrap())
+    let res = term1_plus_term2.sub(&term0);
+    println!("verifier = {:?}", res);
+    res
 }
 
 /// Split the quotient polynomial into `n_wires_per_gate` degree-`n` polynomials and commit.

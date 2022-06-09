@@ -116,8 +116,8 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         &values[..],
         &proof.eval_proof_1,
     )
-    .c(d!(PlonkError::VerificationError))?;
-    pcs.verify(
+    .c(d!(PlonkError::VerificationError))
+    /*pcs.verify(
         transcript,
         &proof.c_sigma,
         cs_params.cs_size + 2,
@@ -125,5 +125,5 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         &proof.sigma_eval_g_beta,
         &proof.eval_proof_2,
     )
-    .c(d!(PlonkError::VerificationError))
+    .c(d!(PlonkError::VerificationError))*/
 }
