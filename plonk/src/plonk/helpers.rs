@@ -43,7 +43,9 @@ impl<F: Scalar> PlonkChallenges<F> {
     /// Insert Gamma and Delta.
     pub(super) fn insert_gamma_delta(&mut self, gamma: F, delta: F) -> Result<()> {
         if self.challenges.is_empty() {
+            println!("gamma: {:?}", gamma);
             self.challenges.push(gamma);
+            println!("delta: {:?}", delta);
             self.challenges.push(delta);
             Ok(())
         } else {
@@ -54,6 +56,7 @@ impl<F: Scalar> PlonkChallenges<F> {
     /// Insert Alpha.
     pub(super) fn insert_alpha(&mut self, alpha: F) -> Result<()> {
         if self.challenges.len() == 2 {
+            println!("alpha = 0: {:?}", alpha);
             //self.challenges.push(alpha);
             self.challenges.push(F::zero());
             Ok(())
@@ -65,6 +68,7 @@ impl<F: Scalar> PlonkChallenges<F> {
     /// Insert Beta.
     pub(super) fn insert_beta(&mut self, beta: F) -> Result<()> {
         if self.challenges.len() == 3 {
+            println!("beta: {:?}", beta);
             self.challenges.push(beta);
             Ok(())
         } else {
@@ -383,7 +387,7 @@ fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     // compute \sum_{i=0..m-1} \beta^{i*n} * qi(X)
     let factor = beta.pow(&[n_q_polys as u64]);
     let mut exponent = z_h_eval_beta * factor;
-    let mut q_poly_combined = q_polys[0].clone();
+    let mut q_poly_combined = q_polys[0].clone().mul(&z_h_eval_beta);
     for q_poly in q_polys.iter().skip(1) {
         q_poly_combined.add_assign(&q_poly.mul(&exponent));
         exponent.mul_assign(&factor);
