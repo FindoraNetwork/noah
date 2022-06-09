@@ -1,6 +1,7 @@
 use crate::poly_commit::{field_polynomial::FpPolynomial, transcript::PolyComTranscript};
 use merlin::Transcript;
 use serde::{Deserialize, Serialize};
+use std::cmp::max;
 use std::fmt::Debug;
 use zei_algebra::prelude::*;
 
@@ -154,16 +155,15 @@ pub trait PolyComScheme: Sized {
         Ok(c_q)
     }
 
-    /// Verify a batched proof
-    fn batch_verify(
+    /// Combine multiple commitments into one commitment of zero
+    fn batch(
         &self,
         transcript: &mut Transcript,
         commitments: &[&Self::Commitment],
         max_degree: usize,
         point: &Self::Field,
         values: &[Self::Field],
-        proof: &Self::Commitment,
-    ) -> Result<()> {
+    ) -> Self::Commitment {
         Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
         let alpha = transcript.get_challenge_field_elem::<Self::Field>(b"alpha");
 
@@ -182,8 +182,23 @@ pub trait PolyComScheme: Sized {
         }
         let (com, _) = self
             .commit(FpPolynomial::from_coefs(vec![val_lc]))
-            .c(d!())?;
+            .c(d!())
+            .unwrap();
         com_lc = com_lc.sub(&com);
+        com_lc
+    }
+
+    /// Verify a batched proof
+    fn batch_verify(
+        &self,
+        transcript: &mut Transcript,
+        commitments: &[&Self::Commitment],
+        max_degree: usize,
+        point: &Self::Field,
+        values: &[Self::Field],
+        proof: &Self::Commitment,
+    ) -> Result<()> {
+        let com_lc = self.batch(transcript, commitments, max_degree, point, values);
 
         self.verify(
             transcript,
@@ -195,6 +210,18 @@ pub trait PolyComScheme: Sized {
         )
         .c(d!())
     }
+
+    /// Batch verify a list of proofs with different points
+    fn batch_verify_diff_points(
+        &self,
+        _transcript: &mut Transcript,
+        c: &[Self::Commitment],
+        _degree: usize,
+        x: &[Self::Field],
+        y: &[Self::Field],
+        proof: &[Self::Commitment],
+        challenge: &Self::Field,
+    ) -> Result<()>;
 
     /// Compute the transaction when batch eval.
     fn init_pcs_batch_eval_transcript(

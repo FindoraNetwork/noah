@@ -43,9 +43,7 @@ impl<F: Scalar> PlonkChallenges<F> {
     /// Insert Gamma and Delta.
     pub(super) fn insert_gamma_delta(&mut self, gamma: F, delta: F) -> Result<()> {
         if self.challenges.is_empty() {
-            println!("gamma: {:?}", gamma);
             self.challenges.push(gamma);
-            println!("delta: {:?}", delta);
             self.challenges.push(delta);
             Ok(())
         } else {
@@ -56,9 +54,7 @@ impl<F: Scalar> PlonkChallenges<F> {
     /// Insert Alpha.
     pub(super) fn insert_alpha(&mut self, alpha: F) -> Result<()> {
         if self.challenges.len() == 2 {
-            println!("alpha = 0: {:?}", alpha);
-            //self.challenges.push(alpha);
-            self.challenges.push(F::zero());
+            self.challenges.push(alpha);
             Ok(())
         } else {
             Err(eg!())
@@ -68,7 +64,6 @@ impl<F: Scalar> PlonkChallenges<F> {
     /// Insert Beta.
     pub(super) fn insert_beta(&mut self, beta: F) -> Result<()> {
         if self.challenges.len() == 3 {
-            println!("beta: {:?}", beta);
             self.challenges.push(beta);
             Ok(())
         } else {

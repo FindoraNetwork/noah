@@ -381,13 +381,64 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let x_minus_point_group_element_group_2 = &g2_1.sub(&g2_0.mul(x));
 
         // e(g1^{P(X)-P(x)},g2)
-        let left_pairing_eval = BLSPairingEngine::pairing(&c.0.sub(&g1_0.mul(y)), &g2_0);
+        let left_pairing_eval = if y.is_zero() {
+            BLSPairingEngine::pairing(&c.0, &g2_0)
+        } else {
+            BLSPairingEngine::pairing(&c.0.sub(&g1_0.mul(y)), &g2_0)
+        };
 
         // e(g1^{Q(X)},g1^{X-x})
         let right_pairing_eval =
             BLSPairingEngine::pairing(&proof.0, &x_minus_point_group_element_group_2);
 
         // e(g1^{P(X)-P(x)},g2) == e(g1^{Q(X)},g2^{X-v})
+        if left_pairing_eval == right_pairing_eval {
+            Ok(())
+        } else {
+            Err(eg!(PolyComSchemeError::PCSProveEvalError))
+        }
+    }
+
+    fn batch_verify_diff_points(
+        &self,
+        _transcript: &mut Transcript,
+        c: &[Self::Commitment],
+        _degree: usize,
+        x: &[Self::Field],
+        y: &[Self::Field],
+        proof: &[Self::Commitment],
+        challenge: &Self::Field,
+    ) -> Result<()> {
+        assert!(proof.len() > 0);
+        assert_eq!(proof.len(), x.len());
+        assert_eq!(proof.len(), y.len());
+        assert_eq!(proof.len(), c.len());
+
+        let g1_0 = self.public_parameter_group_1[0].clone();
+        let g2_0 = self.public_parameter_group_2[0].clone();
+        let g2_1 = self.public_parameter_group_2[1].clone();
+
+        let mut left_first = proof[0].0.clone();
+        let left_second = g2_1;
+        let right_second = g2_0;
+
+        let mut right_first = proof[0].0.mul(&x[0]);
+        let mut right_first_val = y[0].clone();
+        let mut cur_challenge = challenge.clone();
+        for i in 1..proof.len() {
+            let new_comm = proof[i].0.mul(&cur_challenge);
+
+            left_first.add_assign(&new_comm);
+            right_first.add_assign(&new_comm.mul(&x[i]));
+            right_first_val.add_assign(&y[i].mul(&cur_challenge));
+
+            cur_challenge.mul_assign(&challenge);
+        }
+        right_first.add_assign(&g1_0.mul(&right_first_val));
+
+        let left_pairing_eval = BLSPairingEngine::pairing(&left_first, &left_second);
+        let right_pairing_eval = BLSPairingEngine::pairing(&right_first, &right_second);
+
         if left_pairing_eval == right_pairing_eval {
             Ok(())
         } else {
