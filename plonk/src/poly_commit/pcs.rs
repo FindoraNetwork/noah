@@ -1,7 +1,6 @@
 use crate::poly_commit::{field_polynomial::FpPolynomial, transcript::PolyComTranscript};
 use merlin::Transcript;
 use serde::{Deserialize, Serialize};
-use std::cmp::max;
 use std::fmt::Debug;
 use zei_algebra::prelude::*;
 
@@ -127,7 +126,7 @@ pub trait PolyComScheme: Sized {
         let n = openings.len();
         assert!(n > 0);
 
-        Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
+        //Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
 
         // 1. Compute quotient Polynomial q(X) = h(X)/z(X), where
         // h(X) = \sum_i \alpha^i * [fi(X) - fi(xi)]
@@ -139,12 +138,13 @@ pub trait PolyComScheme: Sized {
         for open in openings.iter() {
             let mut poly = self.polynomial_from_opening_ref(open);
             let eval_value = poly.eval(point);
-            println!("eval_value = {:?}", eval_value);
             poly.sub_assign(&FpPolynomial::from_coefs(vec![eval_value]));
             poly.mul_scalar_assign(&c_i);
             h.add_assign(&poly);
             c_i.mul_assign(&alpha);
         }
+
+        println!("alpha = {:?}", alpha);
 
         let (q, rem) = h.div_rem(&z);
         if !rem.is_zero() {
@@ -155,7 +155,7 @@ pub trait PolyComScheme: Sized {
         Ok(c_q)
     }
 
-    /// Combine multiple commitments into one commitment of zero
+    /// Combine multiple commitments into one commitment
     fn batch(
         &self,
         transcript: &mut Transcript,
@@ -163,9 +163,11 @@ pub trait PolyComScheme: Sized {
         max_degree: usize,
         point: &Self::Field,
         values: &[Self::Field],
-    ) -> Self::Commitment {
-        Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
+    ) -> (Self::Commitment, Self::Field) {
+        //Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
         let alpha = transcript.get_challenge_field_elem::<Self::Field>(b"alpha");
+
+        println!("alpha = {:?}", alpha.clone());
 
         // Compute commitment F = com_lc - Com(q(X) * z(\rho)), where
         // com_lc = sum_i alpha^i * z_i_bar(\rho)) * Com((f_i(X) - y_i)
@@ -180,12 +182,7 @@ pub trait PolyComScheme: Sized {
             val_lc.add_assign(&value_times_scalar);
             c_i.mul_assign(&alpha);
         }
-        let (com, _) = self
-            .commit(FpPolynomial::from_coefs(vec![val_lc]))
-            .c(d!())
-            .unwrap();
-        com_lc = com_lc.sub(&com);
-        com_lc
+        (com_lc, val_lc)
     }
 
     /// Verify a batched proof
@@ -198,17 +195,10 @@ pub trait PolyComScheme: Sized {
         values: &[Self::Field],
         proof: &Self::Commitment,
     ) -> Result<()> {
-        let com_lc = self.batch(transcript, commitments, max_degree, point, values);
+        let (com_lc, val_lc) = self.batch(transcript, commitments, max_degree, point, values);
 
-        self.verify(
-            transcript,
-            &com_lc,
-            max_degree,
-            &point,
-            &Self::Field::zero(),
-            &proof,
-        )
-        .c(d!())
+        self.verify(transcript, &com_lc, max_degree, &point, &val_lc, &proof)
+            .c(d!())
     }
 
     /// Batch verify a list of proofs with different points

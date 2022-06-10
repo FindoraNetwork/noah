@@ -418,12 +418,14 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let g2_0 = self.public_parameter_group_2[0].clone();
         let g2_1 = self.public_parameter_group_2[1].clone();
 
-        let mut left_first = proof[0].0.clone();
         let left_second = g2_1;
         let right_second = g2_0;
 
+        let mut left_first = proof[0].0.clone();
         let mut right_first = proof[0].0.mul(&x[0]);
         let mut right_first_val = y[0].clone();
+        let mut right_first_comm = c[0].0.clone();
+
         let mut cur_challenge = challenge.clone();
         for i in 1..proof.len() {
             let new_comm = proof[i].0.mul(&cur_challenge);
@@ -431,10 +433,12 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             left_first.add_assign(&new_comm);
             right_first.add_assign(&new_comm.mul(&x[i]));
             right_first_val.add_assign(&y[i].mul(&cur_challenge));
+            right_first_comm.add_assign(&c[i].0.mul(&cur_challenge));
 
             cur_challenge.mul_assign(&challenge);
         }
-        right_first.add_assign(&g1_0.mul(&right_first_val));
+        right_first.sub_assign(&g1_0.mul(&right_first_val));
+        right_first.add_assign(&right_first_comm);
 
         let left_pairing_eval = BLSPairingEngine::pairing(&left_first, &left_second);
         let right_pairing_eval = BLSPairingEngine::pairing(&right_first, &right_second);
@@ -442,6 +446,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         if left_pairing_eval == right_pairing_eval {
             Ok(())
         } else {
+            println!("not equal");
             Err(eg!(PolyComSchemeError::PCSProveEvalError))
         }
     }

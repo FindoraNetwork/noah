@@ -79,3 +79,11 @@ pub(crate) fn transcript_get_plonk_challenge_delta<F: Scalar>(
 ) -> F {
     transcript_get_challenge_field_elem(transcript, group_order, b"delta")
 }
+
+/// Return the challenge result by label: "u"
+pub(crate) fn transcript_get_plonk_challenge_u<F: Scalar>(
+    transcript: &mut Transcript,
+    group_order: usize,
+) -> F {
+    transcript_get_challenge_field_elem(transcript, group_order, b"u")
+}

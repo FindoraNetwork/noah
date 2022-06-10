@@ -1,3 +1,6 @@
+use crate::plonk::transcript::{
+    transcript_get_challenge_field_elem, transcript_get_plonk_challenge_u,
+};
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
@@ -17,6 +20,7 @@ use crate::poly_commit::{
 };
 use merlin::Transcript;
 use zei_algebra::prelude::*;
+use zei_crypto::basic::matrix_sigma::SigmaTranscript;
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`
 /// Proof verifier must use a transcript with same state as prover and match the public parameters
@@ -249,8 +253,10 @@ pub fn prover_with_lagrange<
     for eval_beta in witness_polys_eval_beta.iter().chain(perms_eval_beta.iter()) {
         transcript.append_field_elem(eval_beta);
     }
-    let beta = challenges.get_beta().unwrap();
     transcript.append_field_elem(&sigma_eval_g_beta);
+
+    let u = transcript_get_plonk_challenge_u(transcript, cs.size());
+    challenges.insert_u(u).unwrap();
 
     let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> = witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();
@@ -276,6 +282,8 @@ pub fn prover_with_lagrange<
         )
         .collect();
     openings.push(&o_r);
+
+    let beta = challenges.get_beta().unwrap();
 
     let eval_proof_1 = pcs
         .batch_prove(transcript, &openings[..], &beta, n_constraints + 2)

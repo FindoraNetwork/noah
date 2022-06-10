@@ -71,6 +71,16 @@ impl<F: Scalar> PlonkChallenges<F> {
         }
     }
 
+    /// Insert u.
+    pub(super) fn insert_u(&mut self, u: F) -> Result<()> {
+        if self.challenges.len() == 4 {
+            self.challenges.push(u);
+            Ok(())
+        } else {
+            Err(eg!())
+        }
+    }
+
     /// Return the Gamme and Delta value.
     pub(super) fn get_gamma_delta(&self) -> Result<(&F, &F)> {
         if self.challenges.len() > 1 {
@@ -93,6 +103,15 @@ impl<F: Scalar> PlonkChallenges<F> {
     pub(super) fn get_beta(&self) -> Result<&F> {
         if self.challenges.len() > 3 {
             Ok(&self.challenges[3])
+        } else {
+            Err(eg!())
+        }
+    }
+
+    /// Return the u value
+    pub(super) fn get_u(&self) -> Result<&F> {
+        if self.challenges.len() > 4 {
+            Ok(&self.challenges[4])
         } else {
             Err(eg!())
         }
@@ -546,7 +565,6 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
 
     let term0 = public_vars_eval_beta;
-    println!("term0 = {:?}", term0);
     let mut term1 = alpha.mul(&proof.sigma_eval_g_beta);
     let n_wires_per_gate = &proof.witness_polys_eval_beta.len();
     for i in 0..n_wires_per_gate - 1 {
@@ -556,7 +574,6 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
         term1.mul_assign(&b);
     }
     term1.mul_assign(&proof.witness_polys_eval_beta[n_wires_per_gate - 1].add(delta));
-    println!("term1 = {:?}", term1);
 
     let one = PCS::Field::one();
     let beta_n = beta.pow(&[params.cs_size as u64]);
@@ -564,12 +581,9 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let beta_minus_one = beta.sub(&one);
     let first_lagrange_eval_beta = z_h_eval_beta.mul(beta_minus_one.inv().unwrap());
     let term2 = first_lagrange_eval_beta.mul(alpha.mul(alpha));
-    println!("term2 = {:?}", term2);
 
     let term1_plus_term2 = term1.add(&term2);
-    let res = term1_plus_term2.sub(&term0);
-    println!("verifier = {:?}", res);
-    res
+    term1_plus_term2.sub(&term0)
 }
 
 /// Split the quotient polynomial into `n_wires_per_gate` degree-`n` polynomials and commit.
@@ -584,8 +598,6 @@ pub(crate) fn split_q_and_commit<PCS: PolyComScheme>(
     let mut o_q_polys = vec![];
     let coefs_len = q.get_coefs_ref().len();
 
-    println!("n here = {}", n);
-
     for i in 0..n_wires_per_gate {
         let coefs_start = i * n;
         let coefs_end = if i == n_wires_per_gate - 1 {
@@ -599,7 +611,6 @@ pub(crate) fn split_q_and_commit<PCS: PolyComScheme>(
             vec![]
         };
         let q_poly = FpPolynomial::from_coefs(coefs);
-        println!("The {}-th polynomial = {}", i + 1, q_poly.degree());
         let (c_q, o_q) = pcs.commit(q_poly).c(d!(PlonkError::CommitmentError))?;
         c_q_polys.push(c_q);
         o_q_polys.push(o_q);

@@ -1,3 +1,6 @@
+use crate::plonk::transcript::{
+    transcript_get_challenge_field_elem, transcript_get_plonk_challenge_u,
+};
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
@@ -14,6 +17,7 @@ use crate::plonk::{
 use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
+use zei_crypto::basic::matrix_sigma::SigmaTranscript;
 
 /// Verify a proof for a constraint system previously preprocessed into `cs_params`
 /// State of the transcript must match prover state of the transcript
@@ -59,6 +63,9 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         transcript.append_field_elem(eval_beta);
     }
     transcript.append_field_elem(&proof.sigma_eval_g_beta);
+
+    let u = transcript_get_plonk_challenge_u(transcript, cs.size());
+    challenges.insert_u(u).unwrap();
 
     let public_vars_eval_beta =
         eval_public_var_poly::<PCS>(cs_params, public_values, challenges.get_beta().unwrap());
@@ -108,22 +115,22 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         .cloned()
         .collect();
     values.push(derived_q_eval_beta);
-    pcs.batch_verify(
+
+    let (comm, val) = pcs.batch(
         transcript,
         &commitments[..],
         cs_params.cs_size + 2,
         &beta,
         &values[..],
-        &proof.eval_proof_1,
+    );
+    pcs.batch_verify_diff_points(
+        transcript,
+        &[comm, proof.c_sigma.clone()],
+        cs_params.cs_size + 2,
+        &[beta.clone(), g_beta.clone()],
+        &[val, proof.sigma_eval_g_beta],
+        &[proof.eval_proof_1.clone(), proof.eval_proof_2.clone()],
+        challenges.get_u().unwrap(),
     )
     .c(d!(PlonkError::VerificationError))
-    /*pcs.verify(
-        transcript,
-        &proof.c_sigma,
-        cs_params.cs_size + 2,
-        &g_beta,
-        &proof.sigma_eval_g_beta,
-        &proof.eval_proof_2,
-    )
-    .c(d!(PlonkError::VerificationError))*/
 }
