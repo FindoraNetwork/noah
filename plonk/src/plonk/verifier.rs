@@ -3,9 +3,9 @@ use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{
-        derive_q_eval_beta, eval_public_var_poly, linearization_commitment, PlonkChallenges,
+        derive_q_eval_beta, eval_public_var_poly, mineralization_commitment, PlonkChallenges,
     },
-    setup::{PlonkPf, PlonkVK},
+    indexer::{PlonkPf, PlonkVK},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
         transcript_get_plonk_challenge_delta, transcript_get_plonk_challenge_gamma,
@@ -34,7 +34,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     let mut challenges = PlonkChallenges::new();
 
     // 1. compute gamma and delta challenges
-    for c in proof.c_witness_polys.iter() {
+    for c in proof.w_polys.iter() {
         transcript.append_commitment::<PCS::Commitment>(c);
     }
     let gamma = transcript_get_plonk_challenge_gamma(transcript, cs.size());
@@ -45,7 +45,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     transcript.append_commitment::<PCS::Commitment>(&proof.c_sigma);
     let alpha = transcript_get_plonk_challenge_alpha(transcript, cs.size());
     challenges.insert_alpha(alpha).unwrap();
-    for c_q in &proof.c_q_polys {
+    for c_q in &proof.t_polys {
         transcript.append_commitment::<PCS::Commitment>(&c_q);
     }
 
@@ -81,25 +81,25 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> =
         proof.witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = proof.perms_eval_beta.iter().collect();
-    let c_q_combined = linearization_commitment::<PCS, CS>(
+    let c_q_combined = mineralization_commitment::<PCS, CS>(
         cs_params,
         &proof.c_sigma,
         &witness_polys_eval_beta_as_ref[..],
         &perms_eval_beta_as_ref[..],
         &proof.sigma_eval_g_beta,
         &challenges,
-        &proof.c_q_polys[..],
+        &proof.t_polys[..],
         cs_params.cs_size + 2,
     );
 
     // 6. verify batch eval proofs for witness/permutation polynomials evaluations
     // at point beta, and Q(beta), L(beta), \Sigma(g*beta)
     let mut commitments: Vec<&PCS::Commitment> = proof
-        .c_witness_polys
+        .w_polys
         .iter()
         .chain(
             cs_params
-                .extended_permutations
+                .permutation_commitments
                 .iter()
                 .take(CS::n_wires_per_gate() - 1),
         )

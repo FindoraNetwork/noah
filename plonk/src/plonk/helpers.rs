@@ -1,7 +1,7 @@
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
-    setup::{PlonkPK, PlonkPf, PlonkVK},
+    indexer::{PlonkPK, PlonkPf, PlonkVK},
 };
 use crate::poly_commit::{
     field_polynomial::FpPolynomial,
@@ -225,35 +225,7 @@ pub(super) fn sigma_polynomial_evals<
     FpPolynomial::from_coefs(sigma_values)
 }
 
-/// Computes PLONK's quotient polynomial.
-/// To compute Q(X), we first get the evaluations of Q(X) on a set H' where |H'| > deg(Q(X)),
-/// then we recover the coefficients of Q(X) using an inverse FFT.
-/// To evaluate Q(X) at a point z \in H', we need to obtain the values of
-/// 1. Evaluations of witness polynomials at point z: {fj(z)}_{j=1..n_wires_per_gate}.
-/// 2. Evaluations of sigma polynomials at point z and g*z: Sigma(z), Sigma(g*z).
-/// 3. The evaluation of the IO polynomial at point z: IO(z).
-/// And we need to precompute the values of
-/// 1. Evaluations of selector polynomials at point z: {qj(z)}.
-/// 2. Evaluations of permutation polynomials at point z: {perm_j(z)}_{j=1..n_wires_per_gate}.
-/// 3. The evaluation of Z_H^{-1}(z), where Z_H(X) is the vanishing polynomial of H.
-/// Then Q(z) is evaluated as
-/// Q(z) = P(z) * Z_H^{-1}(z), for P(z)=
-///     constraint_equation({fj(z)}, {qj(z)}, IO(z))
-///   + alpha * \Sigma(z)\prod_j (fj(z) + gamma * kj * z + delta)
-///   - alpha * \Sigma(g*z)\prod_j (fj(z) + gamma * perm_j(z) + delta)
-///   + alpha^2 (Sigma(z) - 1) * (z^n - 1) / (z - 1).
-///
-/// To guarantee that Z_H^{-1}(z) is well-defined for any z \in H', we have to make sure
-/// z \notin H, hence we choose H' to be a set that does not overlap with H. In particular,
-/// we define
-/// H'' := <g> where |H''| = m > deg(Q(X)),
-/// H := <g^{m/n}> and thus |H| = n,
-/// H' := k[1] * H'' where k[1] is a generator of Fq-{0}.
-/// Thus |H'| > deg(Q(X)) and H' does not overlap with H.
-///
-/// The algorithm takes (n_wires_per_gate+2) deg-m ffts to compute the evaluations of
-/// ({fj(X)}, IO(X), Sigma(X)}), O(m) ops to evaluate {Q(z)}_{z\in H'}, and 1 deg-m
-/// ifft to recover Q(X).
+/// Compute the quotient polynomial.
 pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     params: &PlonkPK<PCS>,
@@ -291,7 +263,7 @@ pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field
             .map(|poly_coset_evals| &poly_coset_evals[point])
             .collect();
         let sel_vals: Vec<&PCS::Field> = params
-            .selectors_coset_evals
+            .selector_coset_evals
             .iter()
             .map(|poly_coset_evals| &poly_coset_evals[point])
             .collect();
@@ -302,7 +274,7 @@ pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field
         for j in 0..CS::n_wires_per_gate() {
             let tmp = witness_polys_coset_evals[j][point]
                 .add(delta)
-                .add(&gamma.mul(&k[j].mul(&params.coset_quot[point])));
+                .add(&gamma.mul(&k[j].mul(&params.coset_quotient[point])));
             term2.mul_assign(&tmp);
         }
 
@@ -310,7 +282,7 @@ pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field
         let mut term3 = alpha.mul(&sigma_coset_evals[(point + factor) % m]);
         for (w_poly_coset_evals, perm_coset_evals) in witness_polys_coset_evals
             .iter()
-            .zip(params.perms_coset_evals.iter())
+            .zip(params.permutation_coset_evals.iter())
         {
             let tmp = &w_poly_coset_evals[point]
                 .add(delta)
@@ -336,24 +308,9 @@ pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field
     ))
 }
 
-/// Compute linearization polynomial opening/commitment.
-/// Denote cs.eval_selector_multipliers(f1(beta), .., f_{n_wires_per_gate}(beta))
-///   = (w1, .., w_{n_selectors}).
-/// Denote the selector polynomials [q1(X), ..., q_{n_selectors}(X)].
-/// Denote the selector polynomials commitments [C_q1(X), ..., C_q_{n_selectors}(X)].
-/// The opening:
-///  L(X) = sum_{i=1..n_selectors} wi * qi(X)
-///       + \Sigma(X) [alpha * prod_j (fj(beta) + gamma * kj * beta + delta) + alpha^2 * L1(beta)]
-///       - perm_{n_wires_per_gate}(X) [alpha * \Sigma(g*beta) * gamma
-///         * prod_{j=1..n_wires_per_gate-1}(fj(beta) + gamma * perm_j(beta) + delta)]
-/// The commitment:
-///  C_L(X) = sum_{i=1..n_selectors} wi * qi(X)
-///       + C_\Sigma(X) [alpha * prod_j (fj(beta) + gamma * kj * beta + delta)
-///                      + alpha^2 * L1(beta)]
-///       - C_perm_{n_wires_per_gate}(X) [alpha * \Sigma(g*beta) * gamma
-///         * prod_{j=1..n_wires_per_gate-1}(fj(beta) + gamma * perm_j(beta) + delta)]
+/// Compute mineralization polynomial。
 #[allow(clippy::too_many_arguments)]
-fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
+fn mineralization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     wires: &[F],
     n: usize,
     selectors: &[PCSType],
@@ -410,8 +367,8 @@ fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     l
 }
 
-/// Open the linearization_polynomial.
-pub(super) fn linearization_polynomial_opening<
+/// Open the mineralization polynomial.
+pub(super) fn mineralization_polynomial_opening<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
 >(
@@ -425,12 +382,12 @@ pub(super) fn linearization_polynomial_opening<
     n_q_polys: usize,
 ) -> PCS::Opening {
     let w = CS::eval_selector_multipliers(witness_polys_eval_beta).unwrap(); // safe unwrap
-    linearization::<PCS::Field, PCS::Opening>(
+    mineralization::<PCS::Field, PCS::Opening>(
         &w,
         params.group.len(),
-        &params.selectors,
+        &params.selector_polynomials,
         &params.verifier_params.k,
-        &params.extended_permutations[CS::n_wires_per_gate() - 1],
+        &params.permutation_polynomials[CS::n_wires_per_gate() - 1],
         sigma,
         witness_polys_eval_beta,
         perms_eval_beta,
@@ -441,8 +398,8 @@ pub(super) fn linearization_polynomial_opening<
     )
 }
 
-/// Commit the linearization_polynomial.
-pub(super) fn linearization_commitment<
+/// Commit the mineralization polynomial.
+pub(super) fn mineralization_commitment<
     PCS: PolyComScheme,
     CS: ConstraintSystem<Field = PCS::Field>,
 >(
@@ -456,12 +413,12 @@ pub(super) fn linearization_commitment<
     n_q_polys: usize,
 ) -> PCS::Commitment {
     let w = CS::eval_selector_multipliers(witness_polys_eval_beta).unwrap(); // safe unwrap
-    linearization::<PCS::Field, PCS::Commitment>(
+    mineralization::<PCS::Field, PCS::Commitment>(
         &w,
         params.cs_size,
-        &params.selectors,
+        &params.selector_commitments,
         &params.k,
-        &params.extended_permutations[CS::n_wires_per_gate() - 1],
+        &params.permutation_commitments[CS::n_wires_per_gate() - 1],
         c_sigma,
         witness_polys_eval_beta,
         perms_eval_beta,
@@ -624,7 +581,7 @@ mod test {
     use crate::plonk::{
         constraint_system::TurboConstraintSystem,
         helpers::{sigma_polynomial_evals, PlonkChallenges},
-        setup::preprocess_prover,
+        indexer::indexer,
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
     use rand_chacha::ChaChaRng;
@@ -655,7 +612,7 @@ mod test {
 
         let mut prng = ChaChaRng::from_seed([0_u8; 32]);
         let pcs = KZGCommitmentScheme::new(20, &mut prng);
-        let params = preprocess_prover(&cs, &pcs).unwrap();
+        let params = indexer(&cs, &pcs).unwrap();
 
         let mut challenges = PlonkChallenges::<F>::new();
         challenges.insert_gamma_delta(one, zero).unwrap();

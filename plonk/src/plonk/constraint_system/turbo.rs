@@ -664,8 +664,8 @@ impl<F: Scalar> TurboConstraintSystem<F> {
 mod test {
     use crate::plonk::{
         constraint_system::{rescue::State, ConstraintSystem, TurboConstraintSystem},
+        indexer::indexer,
         prover::prover,
-        setup::preprocess_prover,
         verifier::verifier,
     };
     use crate::poly_commit::{kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme};
@@ -1203,7 +1203,7 @@ mod test {
         witness: &[PCS::Field],
         online_vars: &[PCS::Field],
     ) {
-        let prover_params = preprocess_prover(cs, pcs).unwrap();
+        let prover_params = indexer(cs, pcs).unwrap();
         let verifier_params_ref = &prover_params.verifier_params;
 
         let mut transcript = Transcript::new(b"TestTurboPlonk");

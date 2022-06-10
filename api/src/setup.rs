@@ -28,7 +28,7 @@ use zei_crypto::delegated_chaum_pedersen::{NonZKState, ZKPartProof};
 use zei_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,
-        setup::{preprocess_prover_with_lagrange, PlonkPK, PlonkVK},
+        indexer::{indexer_with_lagrange, PlonkPK, PlonkVK},
     },
     poly_commit::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
 };
@@ -143,8 +143,7 @@ impl ProverParams {
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
-        let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -178,8 +177,7 @@ impl ProverParams {
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
-        let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -233,8 +231,7 @@ impl ProverParams {
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
-        let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -262,8 +259,7 @@ impl ProverParams {
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
-        let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -309,8 +305,7 @@ impl ProverParams {
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
-        let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,
@@ -363,8 +358,7 @@ impl ProverParams {
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
-        let prover_params =
-            preprocess_prover_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
             bp_params: BulletproofParams::new()?,

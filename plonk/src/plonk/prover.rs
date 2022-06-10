@@ -3,10 +3,10 @@ use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{
-        hide_polynomial, linearization_polynomial_opening, public_vars_polynomial,
+        hide_polynomial, mineralization_polynomial_opening, public_vars_polynomial,
         quotient_polynomial, sigma_polynomial_evals, split_q_and_commit, PlonkChallenges,
     },
-    setup::{PlonkPK, PlonkPf, PlonkProof},
+    indexer::{PlonkPK, PlonkPf, PlonkProof},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
         transcript_get_plonk_challenge_delta, transcript_get_plonk_challenge_gamma,
@@ -30,7 +30,7 @@ use zei_algebra::prelude::*;
 ///     constraint_system::TurboConstraintSystem,
 ///     verifier::verifier,
 ///     prover::prover,
-///     setup::{preprocess_prover, preprocess_verifier}
+///     indexer::{indexer, preprocess_verifier}
 /// };
 /// use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
 /// use merlin::Transcript;
@@ -53,7 +53,7 @@ use zei_algebra::prelude::*;
 ///
 /// let proof = {
 ///     let witness = cs.get_and_clear_witness();
-///     let prover_params = preprocess_prover(&cs, &pcs).unwrap();
+///     let prover_params = indexer(&cs, &pcs).unwrap();
 ///     let mut transcript = Transcript::new(b"Test");
 ///     prover(
 ///         &mut prng,
@@ -66,10 +66,9 @@ use zei_algebra::prelude::*;
 ///         .unwrap()
 /// };
 ///
-/// let verifier_params = preprocess_verifier(&cs, &pcs).unwrap();
 /// let mut transcript = Transcript::new(b"Test");
 /// assert!(
-///     verifier(&mut transcript, &pcs, &cs, &verifier_params, &[], &proof).is_ok()
+///     verifier(&mut transcript, &pcs, &cs, &prover_params.verifier_params, &[], &proof).is_ok()
 /// )
 /// ```
 pub fn prover<
@@ -236,7 +235,7 @@ pub fn prover_with_lagrange<
         .map(|open| pcs.eval_opening(open, &beta))
         .collect();
     let perms_eval_beta: Vec<PCS::Field> = params
-        .extended_permutations
+        .permutation_polynomials
         .iter()
         .take(n_wires_per_gate - 1)
         .map(|open| pcs.eval_opening(open, &beta))
@@ -257,7 +256,7 @@ pub fn prover_with_lagrange<
     let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> = witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();
 
-    let o_r = linearization_polynomial_opening::<PCS, CS>(
+    let o_r = mineralization_polynomial_opening::<PCS, CS>(
         params,
         &o_sigma,
         &witness_polys_eval_beta_as_ref[..],
@@ -272,7 +271,7 @@ pub fn prover_with_lagrange<
         .iter()
         .chain(
             params
-                .extended_permutations
+                .permutation_polynomials
                 .iter()
                 .take(CS::n_wires_per_gate() - 1),
         )
@@ -291,8 +290,8 @@ pub fn prover_with_lagrange<
 
     // return proof
     Ok(PlonkProof {
-        c_witness_polys,
-        c_q_polys,
+        w_polys: c_witness_polys,
+        t_polys: c_q_polys,
         c_sigma,
         witness_polys_eval_beta,
         sigma_eval_g_beta,

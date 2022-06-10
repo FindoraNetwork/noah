@@ -24,8 +24,8 @@ use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_plonk::{
     plonk::{
         constraint_system::{rescue::StateVar, TurboConstraintSystem, VarIndex},
+        indexer::PlonkPf,
         prover::prover_with_lagrange,
-        setup::PlonkPf,
         verifier::verifier,
     },
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,

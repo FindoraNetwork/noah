@@ -33,8 +33,8 @@ use zei_plonk::{
         constraint_system::{
             field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
         },
+        indexer::PlonkPf,
         prover::prover_with_lagrange,
-        setup::PlonkPf,
         verifier::verifier,
     },
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,

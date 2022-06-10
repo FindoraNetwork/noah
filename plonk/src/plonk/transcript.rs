@@ -1,4 +1,4 @@
-use crate::plonk::setup::PlonkVerifierParams;
+use crate::plonk::indexer::PlonkVerifierParams;
 use crate::poly_commit::{pcs::ToBytes, transcript::PolyComTranscript};
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
@@ -14,10 +14,10 @@ pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(
 
     transcript.append_u64(b"CS size", params.cs_size as u64);
     transcript.append_message(b"field size", &F::get_field_size_le_bytes());
-    for q in params.selectors.iter() {
+    for q in params.selector_commitments.iter() {
         transcript.append_commitment(q);
     }
-    for p in params.extended_permutations.iter() {
+    for p in params.permutation_commitments.iter() {
         transcript.append_commitment(p);
     }
     transcript.append_field_elem(&params.root);

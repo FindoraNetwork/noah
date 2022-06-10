@@ -16,9 +16,9 @@ use zei_algebra::prelude::*;
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
 pub struct PlonkProof<C, F> {
     /// the witness polynomial commitments.
-    pub(crate) c_witness_polys: Vec<C>,
+    pub(crate) w_polys: Vec<C>,
     /// the split quotient polynomial commitments
-    pub(crate) c_q_polys: Vec<C>,
+    pub(crate) t_polys: Vec<C>,
     /// the sigma polynomial commitment.
     pub(crate) c_sigma: C,
     /// the openings of witness polynomials at beta.
@@ -27,9 +27,9 @@ pub struct PlonkProof<C, F> {
     pub(crate) sigma_eval_g_beta: F,
     /// the openings of permutation polynomials at beta.
     pub(crate) perms_eval_beta: Vec<F>,
-    /// The commitment for the first witness polynomial.
+    /// The commitment for the first witness polynomial, for \zeta.
     pub(crate) eval_proof_1: C,
-    /// The commitment for the second witness polynomial.
+    /// The commitment for the second witness polynomial, for \zeta\omega.
     pub(crate) eval_proof_2: C,
 }
 
@@ -37,34 +37,34 @@ pub struct PlonkProof<C, F> {
 pub type PlonkPf<PCS> =
     PlonkProof<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
 
-/// PLONK prover parameters.
+/// Prover parameters.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlonkProverParams<O, C, F> {
     /// the polynomials of the selectors.
-    pub(crate) selectors: Vec<O>,
+    pub(crate) selector_polynomials: Vec<O>,
     /// the polynomials of perm1, perm2, ..., perm_{n_wires_per_gate}.
-    pub(crate) extended_permutations: Vec<O>,
+    pub(crate) permutation_polynomials: Vec<O>,
     /// the verifier parameters.
     pub(crate) verifier_params: PlonkVerifierParams<C, F>,
     pub(crate) group: Vec<F>,
     /// The evaluation domain for computing the quotient polynomial.
-    pub(crate) coset_quot: Vec<F>,
+    pub(crate) coset_quotient: Vec<F>,
     pub(crate) root_m: F,
     /// first lagrange basis.
-    pub(crate) l1: FpPolynomial<F>,
+    pub(crate) l1_coefs: FpPolynomial<F>,
     /// the l1's DFT of the polynomial of unity root set.
     pub(crate) l1_coset_evals: Vec<F>,
     /// initialize [one.neg, zero, zero, ... zero, one] polynomial.
     pub(crate) z_h: FpPolynomial<F>,
-    /// the z_h's DFT of the polynomial of unity root set.
+    /// the z_h's FFT of the polynomial of unity root set.
     pub(crate) z_h_inv_coset_evals: Vec<F>,
-    /// the selectors' DFT of the polynomial of unity root set.
-    pub(crate) selectors_coset_evals: Vec<Vec<F>>,
-    /// the perms' DFT of the polynomial of unity root set.
-    pub(crate) perms_coset_evals: Vec<Vec<F>>,
+    /// the selector polynomials' FFT of the polynomial of unity root set.
+    pub(crate) selector_coset_evals: Vec<Vec<F>>,
+    /// the permutation polynomials' FFT of the polynomial of unity root set.
+    pub(crate) permutation_coset_evals: Vec<Vec<F>>,
 }
 
-/// Define the PLONK prover params by given `PolyComScheme`.
+/// Prover parameters over a particular polynomial commitment scheme.
 pub type PlonkPK<PCS> = PlonkProverParams<
     <PCS as PolyComScheme>::Opening,
     <PCS as PolyComScheme>::Commitment,
@@ -77,19 +77,19 @@ impl<O, C, F> PlonkProverParams<O, C, F> {
         self.verifier_params
     }
 
-    /// Return the reference of verifier parameters.
+    /// Return a reference of verifier parameters.
     pub fn get_verifier_params_ref(&self) -> &PlonkVerifierParams<C, F> {
         &self.verifier_params
     }
 }
 
-/// PLONK verifier parameters.
+/// Verifier parameters.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlonkVerifierParams<C, F> {
     /// the commitments of the selectors.
-    pub(crate) selectors: Vec<C>,
+    pub(crate) selector_commitments: Vec<C>,
     /// the commitments of perm1, perm2, ..., perm_{n_wires_per_gate}.
-    pub(crate) extended_permutations: Vec<C>,
+    pub(crate) permutation_commitments: Vec<C>,
     /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub(crate) k: Vec<F>,
     /// a primitive n-th root of unity.
@@ -106,7 +106,7 @@ pub struct PlonkVerifierParams<C, F> {
 pub type PlonkVK<PCS> =
     PlonkVerifierParams<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
 
-/// Permutation group.
+/// Encode the permutation value, from an index to a field element.
 pub fn perm_values<F: Scalar>(group: &[F], perm: &[usize], k: &[F]) -> Vec<F> {
     let n = group.len();
     perm.iter()
@@ -148,21 +148,16 @@ pub fn choose_ks<R: CryptoRng + RngCore, F: Scalar>(
 /// Precompute the prover parameters.
 /// Before invoking preprocess_prover(), the constraint system `cs` should pad the number of
 /// constraints to a power of two.
-/// # Example
-/// See plonk::prover::prover
 ///
-pub fn preprocess_prover<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
+pub fn indexer<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
 ) -> Result<PlonkPK<PCS>> {
-    preprocess_prover_with_lagrange(cs, pcs, None)
+    indexer_with_lagrange(cs, pcs, None)
 }
 
 /// Indexer that uses Lagrange bases
-pub fn preprocess_prover_with_lagrange<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
+pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
     lagrange_pcs: Option<&PCS>,
@@ -175,7 +170,6 @@ pub fn preprocess_prover_with_lagrange<
     if n * factor != m {
         return Err(eg!(PlonkError::SetupError));
     }
-
     let lagrange_pcs = if lagrange_pcs.is_some() {
         if lagrange_pcs.unwrap().max_degree() + 1 == n {
             lagrange_pcs
@@ -185,78 +179,91 @@ pub fn preprocess_prover_with_lagrange<
     } else {
         None
     };
-
-    // Compute evaluation domains.
     let root_m =
         primitive_nth_root_of_unity::<PCS::Field>(m).c(d!(PlonkError::GroupNotFound(m)))?;
     let group_m = build_group(&root_m, m)?;
     let root = group_m[factor % m];
     let group = build_group(&root, n)?;
     let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
-    let coset_quot = group_m.iter().map(|x| k[1].mul(x)).collect();
+    let coset_quotient = group_m.iter().map(|x| k[1].mul(x)).collect();
 
-    // Compute the openings, commitments, and point evaluations of the permutation polynomials.
-    let perm = cs.compute_permutation();
-    let mut p_values = Vec::with_capacity(n_wires_per_gate * n);
+    // Step 1: compute permutation polynomials and commit them.
+
+    let raw_permutation = cs.compute_permutation();
+    let mut encoded_permutation = Vec::with_capacity(n_wires_per_gate * n);
     for i in 0..n_wires_per_gate {
-        p_values.extend(perm_values(&group, &perm[i * n..(i + 1) * n], &k));
+        encoded_permutation.extend(perm_values(
+            &group,
+            &raw_permutation[i * n..(i + 1) * n],
+            &k,
+        ));
     }
-    let mut perms_coset_evals = vec![vec![]; n_wires_per_gate];
-    let mut prover_extended_perms = vec![];
-    let mut verifier_extended_perms = vec![];
+    let mut permutation_coset_evals = vec![vec![]; n_wires_per_gate];
+    let mut permutation_polynomials = vec![];
+    let mut permutation_commitments = vec![];
 
     if let Some(lagrange_pcs) = lagrange_pcs {
         for i in 0..n_wires_per_gate {
-            let perm_eval = FpPolynomial::from_coefs(p_values[i * n..(i + 1) * n].to_vec());
-            let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n], n);
-            perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            let perm_evals =
+                FpPolynomial::from_coefs(encoded_permutation[i * n..(i + 1) * n].to_vec());
+            let perm_coefs = FpPolynomial::ffti(&root, &encoded_permutation[i * n..(i + 1) * n], n);
+
+            permutation_coset_evals[i]
+                .extend(perm_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]));
+
             let (c_perm, _) = lagrange_pcs
-                .commit(perm_eval)
+                .commit(perm_evals)
                 .c(d!(PlonkError::SetupError))?;
-            let o_perm = pcs.opening(&perm);
-            prover_extended_perms.push(o_perm);
-            verifier_extended_perms.push(c_perm);
+            permutation_commitments.push(c_perm);
+
+            let o_perm = pcs.opening(&perm_coefs);
+            permutation_polynomials.push(o_perm);
         }
     } else {
         for i in 0..n_wires_per_gate {
-            let perm = FpPolynomial::ffti(&root, &p_values[i * n..(i + 1) * n], n);
-            perms_coset_evals[i].extend(perm.coset_fft_with_unity_root(&root_m, m, &k[1]));
-            let (c_perm, o_perm) = pcs.commit(perm).c(d!(PlonkError::SetupError))?;
-            prover_extended_perms.push(o_perm);
-            verifier_extended_perms.push(c_perm);
+            let perm_coefs = FpPolynomial::ffti(&root, &encoded_permutation[i * n..(i + 1) * n], n);
+
+            permutation_coset_evals[i]
+                .extend(perm_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]));
+
+            let (c_perm, o_perm) = pcs.commit(perm_coefs).c(d!(PlonkError::SetupError))?;
+            permutation_polynomials.push(o_perm);
+            permutation_commitments.push(c_perm);
         }
     }
 
-    // Compute the openings, commitments, and point evaluations of the selector polynomials.
-    let mut selectors_coset_evals = vec![vec![]; cs.num_selectors()];
-    let mut prover_selectors = vec![];
-    let mut verifier_selectors = vec![];
+    let mut selector_coset_evals = vec![vec![]; cs.num_selectors()];
+    let mut selector_polynomials = vec![];
+    let mut selector_commitments = vec![];
     if let Some(lagrange_pcs) = lagrange_pcs {
-        for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
-            let q_eval = FpPolynomial::from_coefs(cs.selector(i)?.to_vec());
-            let q = FpPolynomial::ffti(&root, cs.selector(i)?, n);
-            selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
-            let (c_q, _) = lagrange_pcs.commit(q_eval).c(d!(PlonkError::SetupError))?;
-            let o_q = pcs.opening(&q);
-            prover_selectors.push(o_q);
-            verifier_selectors.push(c_q);
+        for (i, selector_coset_evals) in selector_coset_evals.iter_mut().enumerate() {
+            let q_evals = FpPolynomial::from_coefs(cs.selector(i)?.to_vec());
+            let q_coefs = FpPolynomial::ffti(&root, cs.selector(i)?, n);
+            selector_coset_evals.extend(q_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]));
+
+            let (c_q, _) = lagrange_pcs.commit(q_evals).c(d!(PlonkError::SetupError))?;
+            selector_commitments.push(c_q);
+
+            let o_q = pcs.opening(&q_coefs);
+            selector_polynomials.push(o_q);
         }
     } else {
-        for (i, selector_coset_evals) in selectors_coset_evals.iter_mut().enumerate() {
+        for (i, selector_coset_evals) in selector_coset_evals.iter_mut().enumerate() {
             let q = FpPolynomial::ffti(&root, cs.selector(i)?, n);
             selector_coset_evals.extend(q.coset_fft_with_unity_root(&root_m, m, &k[1]));
+
             let (c_q, o_q) = pcs.commit(q).c(d!(PlonkError::SetupError))?;
-            prover_selectors.push(o_q);
-            verifier_selectors.push(c_q);
+            selector_polynomials.push(o_q);
+            selector_commitments.push(c_q);
         }
     }
 
-    // Compute polynomials L1, Z_H, and point evaluations of L1 and Z_H^{-1}.
-    let mut l1 = FpPolynomial::from_coefs(vec![PCS::Field::zero(); group.len()]);
-    // X^n - 1 = (X - 1) (X^{n-1} + X^{n-2} + ... + 1)
-    l1.coefs[0] = PCS::Field::from(n as u64);
-    let l1 = FpPolynomial::ffti(&root, &l1.coefs, n);
-    let l1_coset_evals = l1.coset_fft_with_unity_root(&root_m, m, &k[1]);
+    // Step 2: precompute two helper functions, L1 and Z_H.
+    let mut l1_evals = FpPolynomial::from_coefs(vec![PCS::Field::zero(); group.len()]);
+    l1_evals.coefs[0] = PCS::Field::from(n as u32); // X^n - 1 = (X - 1) (X^{n-1} + X^{n-2} + ... + 1)
+    let l1_coefs = FpPolynomial::ffti(&root, &l1_evals.coefs, n);
+    let l1_coset_evals = l1_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]);
+
     let mut z_h_coefs = vec![PCS::Field::zero(); n + 1];
     z_h_coefs[0] = PCS::Field::one().neg();
     z_h_coefs[n] = PCS::Field::one();
@@ -267,14 +274,15 @@ pub fn preprocess_prover_with_lagrange<
         .map(|x| x.inv().unwrap())
         .collect();
 
+    // Step 3: compute the Lagrange interpolation constants.
     let mut lagrange_constants = vec![];
     for constraint_index in cs.public_vars_constraint_indices().iter() {
         lagrange_constants.push(compute_lagrange_constant(&group, *constraint_index));
     }
 
     let verifier_params = PlonkVerifierParams {
-        selectors: verifier_selectors,
-        extended_permutations: verifier_extended_perms,
+        selector_commitments,
+        permutation_commitments,
         k,
         root,
         cs_size: n,
@@ -283,37 +291,24 @@ pub fn preprocess_prover_with_lagrange<
     };
 
     Ok(PlonkProverParams {
-        selectors: prover_selectors,
-        extended_permutations: prover_extended_perms,
+        selector_polynomials,
+        permutation_polynomials,
         verifier_params,
         group,
-        coset_quot,
+        coset_quotient,
         root_m,
-        l1,
+        l1_coefs,
         l1_coset_evals,
         z_h,
         z_h_inv_coset_evals,
-        selectors_coset_evals,
-        perms_coset_evals,
+        selector_coset_evals,
+        permutation_coset_evals,
     })
-}
-
-/// Precompute the verifier parameters.
-/// Before invoking preprocess_verifier(), the constraint system `cs` should pad the number of
-/// constraints to a power of two.
-/// # Example
-/// See plonk::prover::prover
-pub fn preprocess_verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
-    cs: &CS,
-    pcs: &PCS,
-) -> Result<PlonkVK<PCS>> {
-    let prover_params = preprocess_prover(cs, pcs).c(d!())?;
-    Ok(prover_params.verifier_params)
 }
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::setup::choose_ks;
+    use crate::plonk::indexer::choose_ks;
     use rand_chacha::ChaChaRng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
