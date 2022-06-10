@@ -7,6 +7,7 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
+use std::cmp::min;
 use zei_algebra::prelude::*;
 
 /// Build the base group.
@@ -70,6 +71,16 @@ impl<F: Scalar> PlonkChallenges<F> {
         }
     }
 
+    /// Insert u.
+    pub(super) fn insert_u(&mut self, u: F) -> Result<()> {
+        if self.challenges.len() == 4 {
+            self.challenges.push(u);
+            Ok(())
+        } else {
+            Err(eg!())
+        }
+    }
+
     /// Return the Gamme and Delta value.
     pub(super) fn get_gamma_delta(&self) -> Result<(&F, &F)> {
         if self.challenges.len() > 1 {
@@ -92,6 +103,15 @@ impl<F: Scalar> PlonkChallenges<F> {
     pub(super) fn get_beta(&self) -> Result<&F> {
         if self.challenges.len() > 3 {
             Ok(&self.challenges[3])
+        } else {
+            Err(eg!())
+        }
+    }
+
+    /// Return the u value
+    pub(super) fn get_u(&self) -> Result<&F> {
+        if self.challenges.len() > 4 {
+            Ok(&self.challenges[4])
         } else {
             Err(eg!())
         }
@@ -344,20 +364,23 @@ fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     perms_eval_beta: &[&F],
     sigma_eval_g_beta: &F,
     challenges: &PlonkChallenges<F>,
+    q_polys: &[PCSType],
+    n_q_polys: usize,
 ) -> PCSType {
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
     let alpha = challenges.get_alpha().unwrap();
+    let beta = challenges.get_beta().unwrap();
 
     // 1. sum_{i=1..n_selectors} wi * qi(X)
-    let mut l = selectors[0].exp(&wires[0]);
+    let mut l = selectors[0].mul(&wires[0]);
     for i in 1..selectors.len() {
-        l.op_assign(&selectors[i].exp(&wires[i]));
+        l.add_assign(&selectors[i].mul(&wires[i]));
     }
 
     // 2. \Sigma(X) [ alpha * prod_{j=1..n_wires_per_gate} (fj(beta) + gamma * kj * beta + delta)
     //              + alpha^2 * L1(beta)]
     let sigma_scalar = compute_sigma_scalar_in_l(n, witness_polys_eval_beta, k, challenges);
-    l.op_assign(&sigma.exp(&sigma_scalar));
+    l.add_assign(&sigma.mul(&sigma_scalar));
 
     // 3. - perm_{n_wires_per_gate}(X) [alpha * \Sigma(g*beta) * gamma
     //    * prod_{j=1..n_wires_per_gate-1}(fj(beta) + gamma * perm_j(beta) + delta)]
@@ -368,7 +391,22 @@ fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
             .add(delta);
         b.mul_assign(&bi);
     }
-    l.op_assign(&last_extended_perm.exp(&b).inv());
+    l.sub_assign(&last_extended_perm.mul(&b));
+
+    let mut z_h_eval_beta = beta.pow(&[n as u64]);
+    z_h_eval_beta.sub_assign(&F::one());
+
+    // 4. subtract the combined q polynomial
+    // Given value \beta, and homomorphic polynomial commitments/openings {qi(X)}_{i=0..m-1},
+    // compute \sum_{i=0..m-1} \beta^{i*n} * qi(X)
+    let factor = beta.pow(&[n_q_polys as u64]);
+    let mut exponent = z_h_eval_beta * factor;
+    let mut q_poly_combined = q_polys[0].clone().mul(&z_h_eval_beta);
+    for q_poly in q_polys.iter().skip(1) {
+        q_poly_combined.add_assign(&q_poly.mul(&exponent));
+        exponent.mul_assign(&factor);
+    }
+    l.sub_assign(&q_poly_combined);
     l
 }
 
@@ -383,6 +421,8 @@ pub(super) fn linearization_polynomial_opening<
     perms_eval_beta: &[&PCS::Field],
     sigma_eval_g_beta: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
+    q_polys: &[PCS::Opening],
+    n_q_polys: usize,
 ) -> PCS::Opening {
     let w = CS::eval_selector_multipliers(witness_polys_eval_beta).unwrap(); // safe unwrap
     linearization::<PCS::Field, PCS::Opening>(
@@ -396,6 +436,8 @@ pub(super) fn linearization_polynomial_opening<
         perms_eval_beta,
         sigma_eval_g_beta,
         challenges,
+        q_polys,
+        n_q_polys,
     )
 }
 
@@ -410,6 +452,8 @@ pub(super) fn linearization_commitment<
     perms_eval_beta: &[&PCS::Field],
     sigma_eval_g_beta: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
+    q_polys: &[PCS::Commitment],
+    n_q_polys: usize,
 ) -> PCS::Commitment {
     let w = CS::eval_selector_multipliers(witness_polys_eval_beta).unwrap(); // safe unwrap
     linearization::<PCS::Field, PCS::Commitment>(
@@ -423,6 +467,8 @@ pub(super) fn linearization_commitment<
         perms_eval_beta,
         sigma_eval_g_beta,
         challenges,
+        q_polys,
+        n_q_polys,
     )
 }
 
@@ -518,7 +564,7 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let alpha = challenges.get_alpha().unwrap();
     let (gamma, delta) = challenges.get_gamma_delta().unwrap();
 
-    let term0 = proof.l_eval_beta.add(public_vars_eval_beta);
+    let term0 = public_vars_eval_beta;
     let mut term1 = alpha.mul(&proof.sigma_eval_g_beta);
     let n_wires_per_gate = &proof.witness_polys_eval_beta.len();
     for i in 0..n_wires_per_gate - 1 {
@@ -537,10 +583,7 @@ pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
     let term2 = first_lagrange_eval_beta.mul(alpha.mul(alpha));
 
     let term1_plus_term2 = term1.add(&term2);
-
-    let dividend = term0.sub(&term1_plus_term2);
-
-    dividend.mul(&z_h_eval_beta.inv().unwrap())
+    term1_plus_term2.sub(&term0)
 }
 
 /// Split the quotient polynomial into `n_wires_per_gate` degree-`n` polynomials and commit.
@@ -553,35 +596,27 @@ pub(crate) fn split_q_and_commit<PCS: PolyComScheme>(
 ) -> Result<(Vec<PCS::Commitment>, Vec<PCS::Opening>)> {
     let mut c_q_polys = vec![];
     let mut o_q_polys = vec![];
+    let coefs_len = q.get_coefs_ref().len();
+
     for i in 0..n_wires_per_gate {
-        let coefs = if i < n_wires_per_gate - 1 {
-            q.get_coefs_ref()[i * n..(i + 1) * n].to_vec()
+        let coefs_start = i * n;
+        let coefs_end = if i == n_wires_per_gate - 1 {
+            coefs_len
         } else {
-            q.get_coefs_ref()[(n_wires_per_gate - 1) * n..].to_vec()
+            (i + 1) * n
+        };
+        let coefs = if coefs_start < coefs_len {
+            q.get_coefs_ref()[coefs_start..min(coefs_len, coefs_end)].to_vec()
+        } else {
+            vec![]
         };
         let q_poly = FpPolynomial::from_coefs(coefs);
         let (c_q, o_q) = pcs.commit(q_poly).c(d!(PlonkError::CommitmentError))?;
         c_q_polys.push(c_q);
         o_q_polys.push(o_q);
     }
-    Ok((c_q_polys, o_q_polys))
-}
 
-/// Given value \beta, and homomorphic polynomial commitments/openings {qi(X)}_{i=0..m-1},
-/// compute \sum_{i=0..m-1} \beta^{i*n} * qi(X)
-pub(crate) fn combine_q_polys<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F> + Clone>(
-    q_polys: &[PCSType],
-    beta: &F,
-    n: usize,
-) -> PCSType {
-    let factor = beta.pow(&[n as u64]);
-    let mut exponent = factor;
-    let mut q_poly_combined = q_polys[0].clone();
-    for q_poly in q_polys.iter().skip(1) {
-        q_poly_combined.op_assign(&q_poly.exp(&exponent));
-        exponent.mul_assign(&factor);
-    }
-    q_poly_combined
+    Ok((c_q_polys, o_q_polys))
 }
 
 #[cfg(test)]

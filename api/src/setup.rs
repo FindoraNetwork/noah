@@ -572,6 +572,6 @@ mod test {
             let g_i = pcs.public_parameter_group_1[i].clone();
             expected_committed_value = expected_committed_value.add(&g_i.mul(&coef));
         }
-        assert_eq!(expected_committed_value, commitment.value);
+        assert_eq!(expected_committed_value, commitment.0);
     }
 }

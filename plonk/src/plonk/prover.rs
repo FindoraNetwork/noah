@@ -1,8 +1,9 @@
+use crate::plonk::transcript::transcript_get_plonk_challenge_u;
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{
-        combine_q_polys, hide_polynomial, linearization_polynomial_opening, public_vars_polynomial,
+        hide_polynomial, linearization_polynomial_opening, public_vars_polynomial,
         quotient_polynomial, sigma_polynomial_evals, split_q_and_commit, PlonkChallenges,
     },
     setup::{PlonkPK, PlonkPf, PlonkProof},
@@ -219,12 +220,14 @@ pub fn prover_with_lagrange<
         .c(d!())?;
     let (c_q_polys, o_q_polys) =
         split_q_and_commit(pcs, &q, n_wires_per_gate, n_constraints + 2).c(d!())?;
+
     for c_q in c_q_polys.iter() {
         transcript.append_commitment::<PCS::Commitment>(c_q);
     }
 
     // 6. get challenge beta
     let beta = transcript_get_plonk_challenge_beta(transcript, n_constraints);
+    challenges.insert_beta(beta).unwrap();
 
     // 7. a) Evaluate the openings of witness/permutation polynomials at beta, and
     // evaluate the opening of Sigma(X) at point g * beta.
@@ -241,28 +244,30 @@ pub fn prover_with_lagrange<
 
     let g_beta = root.mul(&beta);
     let sigma_eval_g_beta = pcs.eval_opening(&o_sigma, &g_beta);
-    challenges.insert_beta(beta).unwrap();
 
     //  b). build linearization polynomial r_beta(X), and eval at beta
+    for eval_beta in witness_polys_eval_beta.iter().chain(perms_eval_beta.iter()) {
+        transcript.append_field_elem(eval_beta);
+    }
+    transcript.append_field_elem(&sigma_eval_g_beta);
+
+    let u = transcript_get_plonk_challenge_u(transcript, cs.size());
+    challenges.insert_u(u).unwrap();
+
     let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> = witness_polys_eval_beta.iter().collect();
     let perms_eval_beta_as_ref: Vec<&PCS::Field> = perms_eval_beta.iter().collect();
-    let o_l = linearization_polynomial_opening::<PCS, CS>(
+
+    let o_r = linearization_polynomial_opening::<PCS, CS>(
         params,
         &o_sigma,
         &witness_polys_eval_beta_as_ref[..],
         &perms_eval_beta_as_ref[..],
         &sigma_eval_g_beta,
         &challenges,
+        &o_q_polys,
+        n_constraints + 2,
     );
-    for eval_beta in witness_polys_eval_beta.iter().chain(perms_eval_beta.iter()) {
-        transcript.append_field_elem(eval_beta);
-    }
-    let beta = challenges.get_beta().unwrap();
-    let l_eval_beta = pcs.eval_opening(&o_l, &beta);
-    transcript.append_field_elem(&sigma_eval_g_beta);
-    transcript.append_field_elem(&l_eval_beta);
 
-    // 8. batch eval proofs
     let mut openings: Vec<&PCS::Opening> = witness_openings
         .iter()
         .chain(
@@ -272,23 +277,16 @@ pub fn prover_with_lagrange<
                 .take(CS::n_wires_per_gate() - 1),
         )
         .collect();
-    let o_q_combined = combine_q_polys(&o_q_polys, &beta, n_constraints + 2);
-    openings.push(&o_q_combined);
-    openings.push(&o_l);
-    openings.push(&o_sigma);
-    // n_wires_per_gate opening proofs for witness polynomials; n_wires_per_gate-1 opening proofs
-    // for the first n_wires_per_gate-1 extended permutations; 1 opening proof for each of [Q(X), L(X)]
-    let mut points = vec![*beta; 2 * n_wires_per_gate + 1];
-    // One opening proof for Sigma(X) at point g * beta
-    points.push(g_beta);
-    let (_, batch_eval_proof) = pcs
-        .batch_prove_eval(
-            transcript,
-            &openings[..],
-            &points[..],
-            n_constraints + 2,
-            None,
-        )
+    openings.push(&o_r);
+
+    let beta = challenges.get_beta().unwrap();
+
+    let eval_proof_1 = pcs
+        .batch_prove(transcript, &openings[..], &beta, n_constraints + 2)
+        .c(d!(PlonkError::ProofError))?;
+
+    let eval_proof_2 = pcs
+        .prove(transcript, &o_sigma, &g_beta, n_constraints + 2)
         .c(d!(PlonkError::ProofError))?;
 
     // return proof
@@ -299,7 +297,7 @@ pub fn prover_with_lagrange<
         witness_polys_eval_beta,
         sigma_eval_g_beta,
         perms_eval_beta,
-        l_eval_beta,
-        batch_eval_proof,
+        eval_proof_1,
+        eval_proof_2,
     })
 }

@@ -165,7 +165,7 @@ impl<F: Scalar> FpPolynomial<F> {
         }
     }
 
-    /// Tests if polynomial is the zero polynomial
+    /// Test if polynomial is the zero polynomial
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;

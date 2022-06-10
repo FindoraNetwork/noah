@@ -40,59 +40,49 @@ use zei_algebra::{
 
 /// KZG commitment scheme about the `Group`.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct KZGCommitment<G> {
-    /// the `Group` elements.
-    pub value: G,
-}
+pub struct KZGCommitment<G>(pub G);
 
 impl<'a, G> ToBytes for KZGCommitment<G>
 where
     G: Group,
 {
     fn to_bytes(&self) -> Vec<u8> {
-        self.value.to_compressed_bytes()
+        self.0.to_compressed_bytes()
     }
 }
 
 impl HomomorphicPolyComElem for KZGCommitment<BLSG1> {
     type Scalar = BLSScalar;
     fn get_base() -> Self {
-        KZGCommitment {
-            value: BLSG1::get_base(),
-        }
+        KZGCommitment(BLSG1::get_base())
     }
 
     fn get_identity() -> Self {
-        KZGCommitment {
-            value: BLSG1::get_identity(),
-        }
+        KZGCommitment(BLSG1::get_identity())
     }
 
-    fn op(&self, other: &Self) -> Self {
-        KZGCommitment {
-            value: self.value.add(&other.value),
-        }
+    fn add(&self, other: &Self) -> Self {
+        KZGCommitment(self.0.add(&other.0))
     }
 
-    fn op_assign(&mut self, other: &Self) {
-        self.value = self.value.add(&other.value); // TODO have real add_assign
+    fn add_assign(&mut self, other: &Self) {
+        self.0.add_assign(&other.0)
     }
 
-    fn exp(&self, exp: &BLSScalar) -> Self {
-        KZGCommitment {
-            value: self.value.mul(exp),
-        }
+    fn sub(&self, other: &Self) -> Self {
+        KZGCommitment(self.0.sub(&other.0))
     }
 
-    fn exp_assign(&mut self, exp: &BLSScalar) {
-        self.value = self.value.mul(&exp); // TODO have real add_assign
+    fn sub_assign(&mut self, other: &Self) {
+        self.0.sub_assign(&other.0)
     }
 
-    fn inv(&self) -> Self {
-        let minus_one_scalar = BLSScalar::one().neg();
-        KZGCommitment {
-            value: self.value.mul(&minus_one_scalar),
-        }
+    fn mul(&self, exp: &BLSScalar) -> Self {
+        KZGCommitment(self.0.mul(exp))
+    }
+
+    fn mul_assign(&mut self, exp: &BLSScalar) {
+        self.0.mul_assign(&exp)
     }
 }
 
@@ -113,30 +103,34 @@ impl<F: Scalar> HomomorphicPolyComElem for FpPolynomial<F> {
         unimplemented!()
     }
 
-    fn op(&self, other: &Self) -> Self {
+    fn add(&self, other: &Self) -> Self {
         self.add(other)
     }
 
-    fn op_assign(&mut self, other: &Self) {
+    fn add_assign(&mut self, other: &Self) {
         self.add_assign(other)
     }
 
-    fn exp(&self, exp: &F) -> Self {
+    fn sub(&self, other: &Self) -> Self {
+        self.sub(other)
+    }
+
+    fn sub_assign(&mut self, other: &Self) {
+        self.sub_assign(other)
+    }
+
+    fn mul(&self, exp: &F) -> Self {
         self.mul_scalar(exp)
     }
 
-    fn exp_assign(&mut self, exp: &F) {
+    fn mul_assign(&mut self, exp: &F) {
         self.mul_scalar_assign(exp)
-    }
-
-    fn inv(&self) -> Self {
-        self.neg()
     }
 }
 
 /// KZG eval proof.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct KZGEvalProof<G1>(G1);
+pub struct KZGEvalProof<G1>(pub G1);
 
 impl<G: Group> ToBytes for KZGEvalProof<G> {
     fn to_bytes(&self) -> Vec<u8> {
@@ -258,7 +252,6 @@ pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
 impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
     type Field = BLSScalar;
     type Commitment = KZGCommitment<BLSG1>;
-    type EvalProof = KZGEvalProof<BLSG1>;
     type Opening = FpPolynomial<Self::Field>;
 
     fn max_degree(&self) -> usize {
@@ -288,12 +281,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             &pub_param_group_1_as_ref[..],
         );
 
-        Ok((
-            KZGCommitment {
-                value: commitment_value,
-            },
-            polynomial,
-        ))
+        Ok((KZGCommitment(commitment_value), polynomial))
     }
 
     fn opening(&self, polynomial: &FpPolynomial<Self::Field>) -> Self::Opening {
@@ -314,14 +302,14 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         blinds: &[Self::Field],
         zeroing_degree: usize,
     ) -> Self::Commitment {
-        let mut commitment = commitment.value.clone();
+        let mut commitment = commitment.0.clone();
         for (i, blind) in blinds.iter().enumerate() {
             let mut blind = blind.clone();
             commitment = commitment + &(self.public_parameter_group_1[i] * &blind);
             blind = blind.neg();
             commitment = commitment + &(self.public_parameter_group_1[zeroing_degree + i] * &blind);
         }
-        KZGCommitment { value: commitment }
+        KZGCommitment(commitment)
     }
 
     fn commitment_from_opening(&self, opening: &Self::Opening) -> Self::Commitment {
@@ -338,13 +326,13 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         opening
     }
 
-    fn prove_eval(
+    fn prove(
         &self,
         _transcript: &mut Transcript,
         opening: &FpPolynomial<Self::Field>,
         x: &Self::Field,
         max_degree: usize,
-    ) -> Result<(Self::Field, Self::EvalProof)> {
+    ) -> Result<Self::Commitment> {
         let polynomial = opening;
         let evaluation = polynomial.eval(x);
 
@@ -373,20 +361,18 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             return Err(eg!(PolyComSchemeError::PCSProveEvalError));
         }
 
-        let proof_value = self.commit(quotient_polynomial).unwrap().0.value;
-
-        let res = (evaluation, KZGEvalProof::<BLSG1>(proof_value));
-        Ok(res)
+        let proof_value = self.commit(quotient_polynomial).unwrap().0;
+        Ok(proof_value)
     }
 
-    fn verify_eval(
+    fn verify(
         &self,
         _transcript: &mut Transcript,
         c: &Self::Commitment,
         _degree: usize,
         x: &Self::Field,
         y: &Self::Field,
-        proof: &Self::EvalProof,
+        proof: &Self::Commitment,
     ) -> Result<()> {
         let g1_0 = self.public_parameter_group_1[0].clone();
         let g2_0 = self.public_parameter_group_2[0].clone();
@@ -395,7 +381,11 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let x_minus_point_group_element_group_2 = &g2_1.sub(&g2_0.mul(x));
 
         // e(g1^{P(X)-P(x)},g2)
-        let left_pairing_eval = BLSPairingEngine::pairing(&c.value.sub(&g1_0.mul(y)), &g2_0);
+        let left_pairing_eval = if y.is_zero() {
+            BLSPairingEngine::pairing(&c.0, &g2_0)
+        } else {
+            BLSPairingEngine::pairing(&c.0.sub(&g1_0.mul(y)), &g2_0)
+        };
 
         // e(g1^{Q(X)},g1^{X-x})
         let right_pairing_eval =
@@ -405,6 +395,58 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         if left_pairing_eval == right_pairing_eval {
             Ok(())
         } else {
+            Err(eg!(PolyComSchemeError::PCSProveEvalError))
+        }
+    }
+
+    fn batch_verify_diff_points(
+        &self,
+        _transcript: &mut Transcript,
+        c: &[Self::Commitment],
+        _degree: usize,
+        x: &[Self::Field],
+        y: &[Self::Field],
+        proof: &[Self::Commitment],
+        challenge: &Self::Field,
+    ) -> Result<()> {
+        assert!(proof.len() > 0);
+        assert_eq!(proof.len(), x.len());
+        assert_eq!(proof.len(), y.len());
+        assert_eq!(proof.len(), c.len());
+
+        let g1_0 = self.public_parameter_group_1[0].clone();
+        let g2_0 = self.public_parameter_group_2[0].clone();
+        let g2_1 = self.public_parameter_group_2[1].clone();
+
+        let left_second = g2_1;
+        let right_second = g2_0;
+
+        let mut left_first = proof[0].0.clone();
+        let mut right_first = proof[0].0.mul(&x[0]);
+        let mut right_first_val = y[0].clone();
+        let mut right_first_comm = c[0].0.clone();
+
+        let mut cur_challenge = challenge.clone();
+        for i in 1..proof.len() {
+            let new_comm = proof[i].0.mul(&cur_challenge);
+
+            left_first.add_assign(&new_comm);
+            right_first.add_assign(&new_comm.mul(&x[i]));
+            right_first_val.add_assign(&y[i].mul(&cur_challenge));
+            right_first_comm.add_assign(&c[i].0.mul(&cur_challenge));
+
+            cur_challenge.mul_assign(&challenge);
+        }
+        right_first.sub_assign(&g1_0.mul(&right_first_val));
+        right_first.add_assign(&right_first_comm);
+
+        let left_pairing_eval = BLSPairingEngine::pairing(&left_first, &left_second);
+        let right_pairing_eval = BLSPairingEngine::pairing(&right_first, &right_second);
+
+        if left_pairing_eval == right_pairing_eval {
+            Ok(())
+        } else {
+            println!("not equal");
             Err(eg!(PolyComSchemeError::PCSProveEvalError))
         }
     }
@@ -498,27 +540,15 @@ mod tests_kzg_impl {
         // Add two polynomials
         let poly_sum = poly1.add(&poly2);
         let (commitment_sum, _) = pcs.commit(poly_sum).unwrap();
-        let commitment_sum_computed = commitment1.op(&commitment2);
-        assert_eq!(commitment_sum.value, commitment_sum_computed.value);
-
-        let minus_two = two.neg();
-        let minus_three = three.neg();
-        let minus_six = six.neg();
-        // Negating the coefficients of the polynomial
-        let poly1_neg = FpPolynomial::from_coefs(vec![minus_two, minus_three, minus_six]);
-        let (commitment_poly1_neg, _) = pcs.commit(poly1_neg).unwrap();
-        let commitment_poly1_neg_hom = commitment1.inv();
-        assert_eq!(commitment_poly1_neg_hom.value, commitment_poly1_neg.value);
+        let commitment_sum_computed = commitment1.add(&commitment2);
+        assert_eq!(commitment_sum, commitment_sum_computed);
 
         // Multiplying all the coefficients of a polynomial by some value
         let exponent = four.add(&one);
         let poly1_mult_5 = poly1.mul_scalar(&exponent);
         let (commitment_poly1_mult_5, _) = pcs.commit(poly1_mult_5).unwrap();
-        let commitment_poly1_mult_5_hom = commitment1.exp(&exponent);
-        assert_eq!(
-            commitment_poly1_mult_5.value,
-            commitment_poly1_mult_5_hom.value
-        );
+        let commitment_poly1_mult_5_hom = commitment1.mul(&exponent);
+        assert_eq!(commitment_poly1_mult_5, commitment_poly1_mult_5_hom);
     }
 
     #[test]
@@ -552,7 +582,7 @@ mod tests_kzg_impl {
             let g_i = pcs.public_parameter_group_1[i].clone();
             expected_committed_value = expected_committed_value.add(&g_i.mul(&coef));
         }
-        assert_eq!(expected_committed_value, commitment.value);
+        assert_eq!(expected_committed_value, commitment.0);
     }
 
     #[test]
@@ -577,7 +607,7 @@ mod tests_kzg_impl {
 
         // Check that an error is returned if the degree of the polynomial exceeds the maximum degree.
         let wrong_max_degree = 1;
-        let res = pcs.prove_eval(
+        let res = pcs.prove(
             &mut not_needed_transcript,
             &opening,
             &point,
@@ -585,34 +615,33 @@ mod tests_kzg_impl {
         );
         assert!(res.is_err());
 
-        let (value, proof) = pcs
-            .prove_eval(&mut not_needed_transcript, &opening, &point, max_degree)
+        let proof = pcs
+            .prove(&mut not_needed_transcript, &opening, &point, max_degree)
             .unwrap();
-        assert_eq!(value, seven);
 
-        let res = pcs.verify_eval(
+        let res = pcs.verify(
             &mut not_needed_transcript,
             &commitment_value,
             degree,
             &point,
-            &value,
+            &seven,
             &proof,
         );
         pnk!(res);
 
         let new_pcs = pcs.shrink_to_verifier_only().unwrap();
-        let res = new_pcs.verify_eval(
+        let res = new_pcs.verify(
             &mut not_needed_transcript,
             &commitment_value,
             degree,
             &point,
-            &value,
+            &seven,
             &proof,
         );
         pnk!(res);
 
         let wrong_value_verif = one;
-        let wrong_value_verif = pcs.verify_eval(
+        let wrong_value_verif = pcs.verify(
             &mut not_needed_transcript,
             &commitment_value,
             degree,
