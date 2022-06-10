@@ -1,6 +1,4 @@
-use crate::plonk::transcript::{
-    transcript_get_challenge_field_elem, transcript_get_plonk_challenge_u,
-};
+use crate::plonk::transcript::transcript_get_plonk_challenge_u;
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
@@ -20,7 +18,6 @@ use crate::poly_commit::{
 };
 use merlin::Transcript;
 use zei_algebra::prelude::*;
-use zei_crypto::basic::matrix_sigma::SigmaTranscript;
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`
 /// Proof verifier must use a transcript with same state as prover and match the public parameters

@@ -1,6 +1,4 @@
-use crate::plonk::transcript::{
-    transcript_get_challenge_field_elem, transcript_get_plonk_challenge_u,
-};
+use crate::plonk::transcript::transcript_get_plonk_challenge_u;
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
@@ -17,7 +15,6 @@ use crate::plonk::{
 use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
-use zei_crypto::basic::matrix_sigma::SigmaTranscript;
 
 /// Verify a proof for a constraint system previously preprocessed into `cs_params`
 /// State of the transcript must match prover state of the transcript

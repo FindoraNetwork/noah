@@ -126,7 +126,7 @@ pub trait PolyComScheme: Sized {
         let n = openings.len();
         assert!(n > 0);
 
-        //Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
+        Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
 
         // 1. Compute quotient Polynomial q(X) = h(X)/z(X), where
         // h(X) = \sum_i \alpha^i * [fi(X) - fi(xi)]
@@ -143,8 +143,6 @@ pub trait PolyComScheme: Sized {
             h.add_assign(&poly);
             c_i.mul_assign(&alpha);
         }
-
-        println!("alpha = {:?}", alpha);
 
         let (q, rem) = h.div_rem(&z);
         if !rem.is_zero() {
@@ -164,10 +162,8 @@ pub trait PolyComScheme: Sized {
         point: &Self::Field,
         values: &[Self::Field],
     ) -> (Self::Commitment, Self::Field) {
-        //Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
+        Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
         let alpha = transcript.get_challenge_field_elem::<Self::Field>(b"alpha");
-
-        println!("alpha = {:?}", alpha.clone());
 
         // Compute commitment F = com_lc - Com(q(X) * z(\rho)), where
         // com_lc = sum_i alpha^i * z_i_bar(\rho)) * Com((f_i(X) - y_i)
