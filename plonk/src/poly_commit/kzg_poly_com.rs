@@ -40,7 +40,7 @@ use zei_algebra::{
 
 /// KZG commitment scheme about the `Group`.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct KZGCommitment<G>(G);
+pub struct KZGCommitment<G>(pub G);
 
 impl<'a, G> ToBytes for KZGCommitment<G>
 where
@@ -130,7 +130,7 @@ impl<F: Scalar> HomomorphicPolyComElem for FpPolynomial<F> {
 
 /// KZG eval proof.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct KZGEvalProof<G1>(G1);
+pub struct KZGEvalProof<G1>(pub G1);
 
 impl<G: Group> ToBytes for KZGEvalProof<G> {
     fn to_bytes(&self) -> Vec<u8> {
