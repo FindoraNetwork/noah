@@ -369,7 +369,7 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::{
-        abar_to_ar::{gen_abar_to_ar_note, verify_abar_to_ar_note},
+        anonymous_to_transparent::{gen_abar_to_ar_note, verify_abar_to_ar_note},
         circuits::TREE_DEPTH,
         keys::AXfrKeyPair,
         structs::{

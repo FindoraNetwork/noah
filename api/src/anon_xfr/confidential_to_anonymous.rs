@@ -570,7 +570,7 @@ pub(crate) fn build_bar_to_abar_cs(
 #[cfg(test)]
 mod test {
     use crate::anon_xfr::{
-        bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
+        confidential_to_anonymous::{gen_bar_to_abar_note, verify_bar_to_abar_note},
         keys::AXfrKeyPair,
         structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
     };

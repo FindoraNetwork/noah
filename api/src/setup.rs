@@ -1,10 +1,10 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::{
-    abar_to_ar::build_abar_to_ar_cs,
-    abar_to_bar::build_abar_to_bar_cs,
+    anonymous_to_transparent::build_abar_to_ar_cs,
+    anonymous_to_confidential::build_abar_to_bar_cs,
     anon_fee::build_anon_fee_cs,
-    ar_to_abar::build_ar_to_abar_cs,
-    bar_to_abar::build_bar_to_abar_cs,
+    transparent_to_anonymous::build_ar_to_abar_cs,
+    confidential_to_anonymous::build_bar_to_abar_cs,
     circuits::{
         build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret, TurboPlonkCS, TREE_DEPTH,
     },
