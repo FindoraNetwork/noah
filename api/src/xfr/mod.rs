@@ -12,10 +12,10 @@ pub mod asset_tracer;
 pub mod proofs;
 pub mod sig;
 pub mod structs;
-pub mod test_utils; // for integration test
+pub mod test_utils;
 
 #[cfg(test)]
-pub(crate) mod tests; // unit tests
+pub(crate) mod tests;
 
 use crate::anon_creds::{ACCommitment, Attr};
 use crate::setup::BulletproofParams;
@@ -109,7 +109,7 @@ impl XfrType {
     }
 }
 
-/// I Create a XfrNote from list of opened asset records inputs and asset record outputs
+/// Create a XfrNote from list of opened asset records inputs and asset record outputs
 /// * `prng` - pseudo-random number generator
 /// * `inputs` - asset records containing amounts, assets, policies and memos
 /// * `outputs` - asset records containing amounts, assets, policies and memos
@@ -188,13 +188,12 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
     check_keys(inputs, input_key_pairs).c(d!())?;
 
     let body = gen_xfr_body(prng, inputs, outputs).c(d!())?;
-
     let multisig = compute_transfer_multisig(&body, input_key_pairs).c(d!())?;
 
     Ok(XfrNote { body, multisig })
 }
 
-/// I create the body of a api note. This body contains the data to be signed.
+/// Create the body of a XfrNote. This body will be signed.
 /// * `prng` - pseudo-random number generator
 /// * `inputs` - asset records containing amounts, assets, policies and memos
 /// * `outputs` - asset records containing amounts, assets, policies and memos
@@ -283,7 +282,6 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
             .c(d!())?
     };
 
-    // do tracing proofs
     let asset_type_amount_tracing_proof =
         asset_amount_tracing_proofs(prng, inputs, outputs).c(d!())?;
     let asset_tracing_proof = AssetTracingProofs {
@@ -317,13 +315,13 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
         .iter()
         .chain(outputs)
         .map(|record_input| {
-            record_input.asset_tracers_memos.clone() // Can I avoid this clone?
+            record_input.asset_tracers_memos.clone()
         })
         .collect_vec();
     let owner_memos = outputs
         .iter()
         .map(|record_input| {
-            record_input.owner_memo.clone() // Can I avoid this clone?
+            record_input.owner_memo.clone()
         })
         .collect_vec();
     Ok(XfrBody {
