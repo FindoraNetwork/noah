@@ -30,9 +30,7 @@ use zei_crypto::{
 };
 use zei_plonk::{
     plonk::{
-        constraint_system::{
-            field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex,
-        },
+        constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex},
         indexer::PlonkPf,
         prover::prover_with_lagrange,
         verifier::verifier,
