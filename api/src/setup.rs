@@ -556,9 +556,9 @@ mod test {
         let six = three.add(&three);
 
         let fq_poly = FpPolynomial::from_coefs(vec![two, three, six]);
-        let (commitment, open) = pcs.commit(fq_poly).unwrap();
+        let commitment = pcs.commit(&fq_poly).unwrap();
 
-        let coefs_poly_blsscalar = open.get_coefs_ref().iter().collect_vec();
+        let coefs_poly_blsscalar = fq_poly.get_coefs_ref().iter().collect_vec();
         let mut expected_committed_value = BLSG1::get_identity();
 
         // Doing the multiexp by hand

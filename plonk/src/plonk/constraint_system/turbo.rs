@@ -14,7 +14,7 @@ pub const N_SELECTORS: usize = 13;
 
 /// Turbo PLONK Constraint System.
 #[derive(Serialize, Deserialize)]
-pub struct TurboConstraintSystem<F> {
+pub struct TurboCS<F> {
     /// the selectors of the circuit.
     pub selectors: Vec<Vec<F>>,
     /// the wiring of the circuit.
@@ -33,7 +33,7 @@ pub struct TurboConstraintSystem<F> {
     pub witness: Vec<F>,
 }
 
-impl<F: Scalar> ConstraintSystem for TurboConstraintSystem<F> {
+impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     type Field = F;
 
     fn size(&self) -> usize {
@@ -194,18 +194,18 @@ fn compute_binary_le<F: Scalar>(bytes: &[u8]) -> Vec<F> {
     res
 }
 
-impl<F: Scalar> Default for TurboConstraintSystem<F> {
+impl<F: Scalar> Default for TurboCS<F> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F: Scalar> TurboConstraintSystem<F> {
+impl<F: Scalar> TurboCS<F> {
     /// Create a TurboPLONK constraint system with a certain field size.
     /// With default witness [F::zero(), F::one()].
-    pub fn new() -> TurboConstraintSystem<F> {
+    pub fn new() -> TurboCS<F> {
         let selectors: Vec<Vec<F>> = std::iter::repeat(vec![]).take(N_SELECTORS).collect();
-        TurboConstraintSystem {
+        TurboCS {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
             num_vars: 2,
@@ -532,7 +532,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
     }
 
     /// Add constraint of a public IO value to be decided online.
-    pub fn prepare_io_variable(&mut self, var: VarIndex) {
+    pub fn prepare_pi_variable(&mut self, var: VarIndex) {
         self.public_vars_witness_indices.push(var);
         self.public_vars_constraint_indices.push(self.size);
         self.insert_constant_gate(var, F::zero());
@@ -663,7 +663,7 @@ impl<F: Scalar> TurboConstraintSystem<F> {
 #[cfg(test)]
 mod test {
     use crate::plonk::{
-        constraint_system::{rescue::State, ConstraintSystem, TurboConstraintSystem},
+        constraint_system::{rescue::State, ConstraintSystem, TurboCS},
         indexer::indexer,
         prover::prover,
         verifier::verifier,
@@ -678,7 +678,7 @@ mod test {
 
     #[test]
     fn test_select() {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let num: Vec<F> = (0..4).map(|x| F::from(x as u32)).collect();
         let index_0 = cs.new_variable(num[0]); // bit0 = 0 -- Variable index 2
         let index_1 = cs.new_variable(num[1]); // bit1 = 1 -- Variable index 3
@@ -744,7 +744,7 @@ mod test {
 
     #[test]
     fn test_sub_and_equal() {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let zero = F::zero();
         let one = F::one();
         let two = one.add(&one);
@@ -767,7 +767,7 @@ mod test {
 
     #[test]
     fn test_is_equal() {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let zero = F::zero();
         let one = F::one();
         let two = one.add(&one);
@@ -788,7 +788,7 @@ mod test {
 
     #[test]
     fn test_turbo_plonk_circuit_1() {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let num: Vec<F> = (0..6).map(|x| F::from(x as u32)).collect();
 
         // The circuit description:
@@ -859,7 +859,7 @@ mod test {
 
     #[test]
     fn test_turbo_plonk_circuit_2() {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let num: Vec<F> = (0..9).map(|x| F::from(x as u32)).collect();
 
         // The circuit description:
@@ -1082,7 +1082,7 @@ mod test {
         // circuit (x_0 + y0) * (x_2 + 4) + x_0 * y1;
         // y0, y1 are online variables
         // witness (1 + 2) * (3 + 4) + 1 * 4 = 25
-        let mut cs = TurboConstraintSystem::<PCS::Field>::new();
+        let mut cs = TurboCS::<PCS::Field>::new();
         cs.add_variables(&[
             one,
             two,
@@ -1101,8 +1101,8 @@ mod test {
         cs.insert_mul_gate(0 + 2, 7 + 2, 8 + 2);
         cs.insert_add_gate(6 + 2, 8 + 2, 9 + 2);
         cs.insert_constant_gate(3 + 2, four);
-        cs.prepare_io_variable(1 + 2);
-        cs.prepare_io_variable(7 + 2);
+        cs.prepare_pi_variable(1 + 2);
+        cs.prepare_pi_variable(7 + 2);
         cs.pad();
 
         let mut online_vars = [two, four];
@@ -1118,7 +1118,7 @@ mod test {
         pcs: &PCS,
         prng: &mut R,
     ) {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let num: Vec<PCS::Field> = (0..9).map(|x| PCS::Field::from(x as u32)).collect();
 
         // The circuit description:
@@ -1152,7 +1152,7 @@ mod test {
         pcs: &PCS,
         prng: &mut R,
     ) {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
 
         // Compute secret scalar and public base point.
         let scalar_bytes: [u8; 32] = [
@@ -1179,12 +1179,12 @@ mod test {
         prng: &mut R,
     ) {
         let zero_vec = [PCS::Field::zero(); 4];
-        let mut cs = TurboConstraintSystem::<PCS::Field>::new();
+        let mut cs = TurboCS::<PCS::Field>::new();
         // Prove the knowledge of hash pre-image.
         let input_state = State::new(zero_vec);
-        let input_var = cs.new_hash_input_variable(input_state);
+        let input_var = cs.new_rescue_state_variable(input_state);
         let out_var = cs.rescue_hash(&input_var)[0];
-        cs.prepare_io_variable(out_var);
+        cs.prepare_pi_variable(out_var);
         cs.pad();
 
         let online_vars = [PCS::Field::from_str(
@@ -1199,7 +1199,7 @@ mod test {
     fn check_turbo_plonk_proof<PCS: PolyComScheme, R: CryptoRng + RngCore>(
         pcs: &PCS,
         prng: &mut R,
-        cs: &TurboConstraintSystem<PCS::Field>,
+        cs: &TurboCS<PCS::Field>,
         witness: &[PCS::Field],
         online_vars: &[PCS::Field],
     ) {

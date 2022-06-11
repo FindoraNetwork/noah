@@ -95,7 +95,7 @@ pub fn u64_lsf_to_bytes(slice: &[u64]) -> Vec<u8> {
 }
 
 /// convert a u64 slice from a shrink bytes (little-endian)
-pub fn u64_lsf_from_bytes(slice: &[u8]) -> Vec<u64> {
+pub fn u64_limbs_from_bytes(slice: &[u8]) -> Vec<u64> {
     let mut r: Vec<u64> = vec![];
     let n = slice.len() / 8;
     for i in 0..n {
@@ -178,7 +178,7 @@ mod test {
         let n = vec![1, 2, 3, 4, 5];
         let bytes = super::u64_lsf_to_bytes(&n);
         assert!(bytes.len() < n.len() * 8);
-        let nn = super::u64_lsf_from_bytes(&bytes);
+        let nn = super::u64_limbs_from_bytes(&bytes);
         assert_eq!(n, nn);
     }
 

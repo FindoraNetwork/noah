@@ -104,23 +104,20 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 
     /// Builds a polynomial from its zeroes/roots given as reference.
-    /// # Example
-    /// see from_zeroes
     pub fn from_zeroes_ref(zeroes: &[&F]) -> Self {
         let mut r = Self::one();
         for root in zeroes.iter() {
             let mut p = r.clone();
             r.shift_assign(1); // multiply by X
             p.mul_scalar_assign(*root); // x_0 * r
-            r.sub_assign(&p); // r = r*(X - x_0)
+            r.sub_assign(&p); // r = r * (X - x_0)
         }
         r.trim_coefs();
         r
     }
 
     /// Return a polynomial of `degree` + 1 uniformly random coefficients. Note that for each
-    /// coffiecient with probability
-    /// 1/q is zero, and hence the degree could be less than `degree`
+    /// coffiecient with probability 1/q is zero, and hence the degree could be less than `degree`
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -138,7 +135,7 @@ impl<F: Scalar> FpPolynomial<F> {
         Self::from_coefs(coefs)
     }
 
-    /// Removes high degree zero-coefficients
+    /// Remove high degree zero-coefficients
     fn trim_coefs(&mut self) {
         while self.coefs.len() > 1 && self.coefs.last().unwrap().is_zero() {
             // safe unwrap
@@ -165,7 +162,7 @@ impl<F: Scalar> FpPolynomial<F> {
         }
     }
 
-    /// Test if polynomial is the zero polynomial
+    /// Test if polynomial is the zero polynomial.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -180,26 +177,21 @@ impl<F: Scalar> FpPolynomial<F> {
         self.degree() == 0 && self.coefs[0].is_zero()
     }
 
-    /// Evaluate a polynomial on a point
-    /// Tests if polynomial is the zero polynomial
+    /// Evaluate a polynomial on a point.
     pub fn eval(&self, point: &F) -> F {
         let mut result = F::zero();
         let mut variable = F::one();
         let num_coefs = self.coefs.len();
-        for coef in self.coefs[0..num_coefs - 1].iter() {
+        for coef in self.coefs[0..num_coefs].iter() {
             let mut a = variable;
             a.mul_assign(coef);
             result.add_assign(&a);
             variable.mul_assign(point);
         }
-        let last_coef = &self.coefs.last().unwrap();
-        let mut a = variable;
-        a.mul_assign(*last_coef);
-        result.add_assign(&a);
         result
     }
 
-    /// Add another polynomial to self
+    /// Add another polynomial to self.
     pub fn add_assign(&mut self, other: &Self) {
         for (self_coef, other_coef) in self.coefs.iter_mut().zip(other.coefs.iter()) {
             self_coef.add_assign(other_coef);
@@ -213,7 +205,7 @@ impl<F: Scalar> FpPolynomial<F> {
         self.trim_coefs();
     }
 
-    /// Add with another polynomial, producing a new polynomial
+    /// Add with another polynomial, producing a new polynomial.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -237,7 +229,7 @@ impl<F: Scalar> FpPolynomial<F> {
         new
     }
 
-    /// Subtracts another polynomial from self
+    /// Subtracts another polynomial from self.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -273,14 +265,13 @@ impl<F: Scalar> FpPolynomial<F> {
         let n = self.coefs.len();
         if other.coefs.len() > n {
             for other_coef in other.coefs[n..].iter() {
-                let c = other_coef.neg();
-                self.coefs.push(c);
+                self.coefs.push(other_coef.neg());
             }
         }
         self.trim_coefs();
     }
 
-    /// Subtract another polynomial from self, producing a new polynomial
+    /// Subtract another polynomial from self, producing a new polynomial.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -302,7 +293,7 @@ impl<F: Scalar> FpPolynomial<F> {
         new
     }
 
-    /// Negate the coefficients
+    /// Negate the coefficients.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -321,7 +312,7 @@ impl<F: Scalar> FpPolynomial<F> {
         self.mul_scalar_assign(&minus_one);
     }
 
-    /// negate the coefficients
+    /// negate the coefficients.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -341,32 +332,7 @@ impl<F: Scalar> FpPolynomial<F> {
         new
     }
 
-    /// Compute product of self with another polynomial, producing a new polynomial
-    /// O(n log n) algorithm using FFT
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let poly1 = FpPolynomial::from_coefs(vec![zero, one]);
-    /// let poly2 = FpPolynomial::from_coefs(vec![one, one]);
-    /// let poly_mul = poly1.fast_mul(&poly2);
-    /// let poly_expected = FpPolynomial::from_coefs(vec![zero, one, one]);
-    /// assert_eq!(poly_mul, poly_expected);
-    /// ```
-    pub fn fast_mul(&self, other: &Self) -> Self {
-        let n = (self.degree() + other.degree() + 1).next_power_of_two();
-        let (mut self_evals, root) = self.fft(n).unwrap();
-        let other_evals = other.fft_with_unity_root(&root, n);
-        for (self_eval, other_eval) in self_evals.iter_mut().zip(other_evals.iter()) {
-            self_eval.mul_assign(other_eval);
-        }
-        Self::ffti(&root, &self_evals, n)
-    }
-
-    /// Add `coef` to the coefficient of order `order`
+    /// Add `coef` to the coefficient of order `order`.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -395,52 +361,7 @@ impl<F: Scalar> FpPolynomial<F> {
         self.trim_coefs();
     }
 
-    /// Multiply the coefficient of order `order` by `coef`
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let two = one.add(&one);
-    /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
-    /// poly.mul_coef_assign(&two, 1);
-    /// let poly_expected = FpPolynomial::from_coefs(vec![zero, two, one]);
-    /// assert_eq!(poly, poly_expected);
-    /// poly.mul_coef_assign(&two, 3);
-    /// let poly_expected = FpPolynomial::from_coefs(vec![zero, two, one]);
-    /// assert_eq!(poly, poly_expected);
-    /// ```
-    pub fn mul_coef_assign(&mut self, coef: &F, order: usize) {
-        while self.degree() < order {
-            self.coefs.push(F::zero());
-        }
-        self.coefs[order].mul_assign(coef);
-        self.trim_coefs();
-    }
-
-    /// Append coefficients, increasing the degree by `coef.len()`
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let two = one.add(&one);
-    /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
-    /// let extra_coefs = [two, two];
-    /// poly.append_coefs_assign(&extra_coefs);
-    /// let poly_expected = FpPolynomial::from_coefs(vec![zero, one, one, two, two]);
-    /// assert_eq!(poly, poly_expected);
-    /// ```
-    pub fn append_coefs_assign(&mut self, coef: &[F]) {
-        self.coefs.extend_from_slice(coef);
-        self.trim_coefs();
-    }
-
-    /// Multiply polynomial by X^n
+    /// Multiply polynomial by X^n.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -460,7 +381,7 @@ impl<F: Scalar> FpPolynomial<F> {
         self.coefs = new_coefs
     }
 
-    /// Multiply polynomial by X^n into a new polynomial
+    /// Multiply polynomial by X^n into a new polynomial.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -479,7 +400,7 @@ impl<F: Scalar> FpPolynomial<F> {
         new
     }
 
-    /// Multiply polynomial by a constant scalar
+    /// Multiply polynomial by a constant scalar.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -503,7 +424,7 @@ impl<F: Scalar> FpPolynomial<F> {
         self.trim_coefs();
     }
 
-    /// Multiply polynomial by a constant scalar into a new polynomial
+    /// Multiply polynomial by a constant scalar into a new polynomial.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -523,7 +444,7 @@ impl<F: Scalar> FpPolynomial<F> {
         new
     }
 
-    /// Multiply the polynomial variable by a scalar
+    /// Multiply the polynomial variable by a scalar.
     /// mul_var(\sum a_i X^i, b) = \sum a_i b^i X^i
     /// # Example:
     /// ```
@@ -569,7 +490,7 @@ impl<F: Scalar> FpPolynomial<F> {
         new
     }
 
-    /// divide polynomial producing quotient and remainder polynomial
+    /// Divide polynomial to produce the quotient and remainder polynomials.
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -618,7 +539,7 @@ impl<F: Scalar> FpPolynomial<F> {
         (q, r)
     }
 
-    /// Compute the DFT of the polynomial, return DFT and primitive the roof of unity used
+    /// Compute the FFT of the polynomial, return FFT and primitive the roof of unity used
     /// n is with the form 2^k or 3 * 2^k
     pub fn fft(&self, num_points: usize) -> Option<(Vec<F>, F)> {
         assert!(
@@ -629,7 +550,7 @@ impl<F: Scalar> FpPolynomial<F> {
         Some((self.fft_with_unity_root(&root, num_points), root))
     }
 
-    /// Compute the DFT of the polynomial using given n-th root of unity
+    /// Compute the FFT of the polynomial using given n-th root of unity
     /// n is with the form 2^k or 3 * 2^k
     pub fn fft_with_unity_root(&self, root: &F, num_points: usize) -> Vec<F> {
         assert!(
@@ -645,7 +566,7 @@ impl<F: Scalar> FpPolynomial<F> {
         recursive_fft(&coefs, &root)
     }
 
-    /// Compute the DFT of the polynomial on the set k * <root>.
+    /// Compute the FFT of the polynomial on the set k * <root>.
     pub fn coset_fft_with_unity_root(&self, root: &F, num_points: usize, k: &F) -> Vec<F> {
         self.mul_var(k).fft_with_unity_root(root, num_points)
     }
@@ -667,7 +588,7 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 }
 
-/// given the coefs of a polynomial and a primitive n-th root of unity for field, compute its DFT
+/// given the coefs of a polynomial and a primitive n-th root of unity for field, compute its FFT
 /// n is with the form 2^k or 3 * 2^k
 fn recursive_fft<F: Scalar>(coefs: &[&F], root: &F) -> Vec<F> {
     let n = coefs.len();
@@ -760,7 +681,7 @@ pub fn recursive_ifft<F: Scalar>(values: &[&F], root: &F) -> Vec<F> {
     let n = values.len();
     assert!(n.is_power_of_two() || ((n % 3 == 0) && (n / 3).is_power_of_two()));
     let root_inv = root.pow(&[(n - 1) as u64]);
-    let n = F::from(n as u64);
+    let n = F::from(n as u32);
     let n_inv = n.inv().unwrap();
     recursive_fft(values, &root_inv)
         .into_iter()
@@ -798,7 +719,7 @@ mod test {
         }
     }
 
-    fn check_dft<F: Scalar>(poly: &FpPolynomial<F>, root: &F, dft: &[F]) -> bool {
+    fn check_fft<F: Scalar>(poly: &FpPolynomial<F>, root: &F, dft: &[F]) -> bool {
         let mut omega = F::one();
         if !dft.len().is_power_of_two() {
             return false;
@@ -825,31 +746,31 @@ mod test {
         let four = two.add(&two);
 
         let polynomial = FpPolynomial::from_coefs(vec![one]);
-        let (dft, root) = polynomial.fft(1).unwrap();
-        check_dft(&polynomial, &root, &dft);
+        let (fft, root) = polynomial.fft(1).unwrap();
+        check_fft(&polynomial, &root, &fft);
 
         let polynomial = FpPolynomial::from_coefs(vec![one, one]);
-        let (dft, root) = polynomial.fft(2).unwrap();
-        check_dft(&polynomial, &root, &dft);
+        let (fft, root) = polynomial.fft(2).unwrap();
+        check_fft(&polynomial, &root, &fft);
 
         let polynomial = FpPolynomial::from_coefs(vec![one, zero]);
-        let (dft, root) = polynomial.fft(2).unwrap();
-        check_dft(&polynomial, &root, &dft);
+        let (fft, root) = polynomial.fft(2).unwrap();
+        check_fft(&polynomial, &root, &fft);
 
         let polynomial = FpPolynomial::from_coefs(vec![zero, one]);
-        let (dft, root) = polynomial.fft(2).unwrap();
-        check_dft(&polynomial, &root, &dft);
+        let (fft, root) = polynomial.fft(2).unwrap();
+        check_fft(&polynomial, &root, &fft);
 
         let polynomial = FpPolynomial::from_coefs(vec![zero, one, one]);
-        let (dft, root) = polynomial.fft(3).unwrap();
-        check_dft(&polynomial, &root, &dft);
+        let (fft, root) = polynomial.fft(3).unwrap();
+        check_fft(&polynomial, &root, &fft);
 
         let root = super::primitive_nth_root_of_unity(4).unwrap();
         let polynomial = FpPolynomial::from_coefs(vec![one, two, three, four]);
-        let dft = polynomial.fft_with_unity_root(&root, 4);
-        check_dft(&polynomial, &root, &dft);
+        let fft = polynomial.fft_with_unity_root(&root, 4);
+        check_fft(&polynomial, &root, &fft);
 
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 4);
+        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 4);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -857,8 +778,8 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (dft, root) = polynomial.fft(16).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 16);
+        let (fft, root) = polynomial.fft(16).unwrap();
+        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 16);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -866,8 +787,8 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (dft, root) = polynomial.fft(32).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 32);
+        let (fft, root) = polynomial.fft(32).unwrap();
+        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 32);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -875,8 +796,8 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (dft, root) = polynomial.fft(3).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 3);
+        let (fft, root) = polynomial.fft(3).unwrap();
+        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 3);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -884,8 +805,8 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (dft, root) = polynomial.fft(48).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &dft, 48);
+        let (fft, root) = polynomial.fft(48).unwrap();
+        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 48);
         assert_eq!(ffti_polynomial, polynomial);
     }
 }

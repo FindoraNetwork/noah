@@ -18,7 +18,7 @@ use merlin::Transcript;
 use sha2::Sha512;
 use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 use zei_plonk::plonk::{
-    constraint_system::{rescue::StateVar, TurboConstraintSystem, VarIndex},
+    constraint_system::{rescue::StateVar, TurboCS, VarIndex},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
@@ -233,7 +233,7 @@ pub(crate) fn build_anon_fee_cs(
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
-    let mut cs = TurboConstraintSystem::new();
+    let mut cs = TurboCS::new();
 
     let payers_secrets = add_payers_secrets(&mut cs, vec![payer_secret].as_slice());
     let payees_secrets = add_payees_secrets(&mut cs, vec![payee_secret].as_slice());
@@ -287,10 +287,10 @@ pub(crate) fn build_anon_fee_cs(
         }
 
         // prepare public inputs variables
-        cs.prepare_io_variable(nullifier_var);
+        cs.prepare_pi_variable(nullifier_var);
     }
     // prepare the publc input for merkle_root
-    cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
+    cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
     for payee in &payees_secrets {
         // commitment
@@ -309,7 +309,7 @@ pub(crate) fn build_anon_fee_cs(
         cs.range_check(payee.amount, AMOUNT_LEN);
 
         // prepare the public input for the output commitment
-        cs.prepare_io_variable(com_abar_out_var);
+        cs.prepare_pi_variable(com_abar_out_var);
     }
 
     // Initialize a constant value `fee_type_val`
@@ -333,8 +333,8 @@ pub(crate) fn build_anon_fee_cs(
         cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
     }
 
-    cs.prepare_io_variable(hash_var);
-    cs.prepare_io_variable(non_malleability_tag_var);
+    cs.prepare_pi_variable(hash_var);
+    cs.prepare_pi_variable(non_malleability_tag_var);
 
     // pad the number of constraints to power of two
     cs.pad();

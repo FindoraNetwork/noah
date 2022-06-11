@@ -1,4 +1,4 @@
-use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
+use crate::plonk::constraint_system::{TurboCS, VarIndex};
 use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 
 type F = BLSScalar;
@@ -96,7 +96,7 @@ fn compute_base_multiples(base: JubjubPoint, n: usize) -> Vec<Vec<JubjubPoint>> 
     bases
 }
 
-impl TurboConstraintSystem<BLSScalar> {
+impl TurboCS<BLSScalar> {
     /// Create variables for a point.
     pub fn new_point_variable(&mut self, point: Point) -> PointVar {
         let x = self.new_variable(point.0);
@@ -105,9 +105,9 @@ impl TurboConstraintSystem<BLSScalar> {
     }
 
     /// Insert constraint for a public IO point to be decided online.
-    pub fn prepare_io_point_variable(&mut self, point_var: PointVar) {
-        self.prepare_io_variable(point_var.0);
-        self.prepare_io_variable(point_var.1);
+    pub fn prepare_pi_point_variable(&mut self, point_var: PointVar) {
+        self.prepare_pi_variable(point_var.0);
+        self.prepare_pi_variable(point_var.1);
     }
 
     /// Insert a curve addition gate: (x1, y1) + (x2, y2) = (x3, y3)
@@ -188,7 +188,7 @@ impl TurboConstraintSystem<BLSScalar> {
     }
 
     /// Given public base points [G0 = identity, G1, G2, G3] and
-    /// 2 boolean variables b0, b1 \in {0, 1}, returns G_{b0 + 2*b1}
+    /// 2 boolean variables b0, b1 \in {0, 1}, returns G_{b0 + 2 * b1}
     ///
     /// x-coordinate constraint:
     /// x = b0 * (1-b1) * G1.x + (1-b0) * b1 * G2.x + b0 * b1 * G3.x
@@ -266,8 +266,7 @@ impl TurboConstraintSystem<BLSScalar> {
     ) -> PointVar {
         assert_eq!(n_bits & 1, 0, "n_bits is odd");
         assert!(n_bits > 0, "n_bits is not positive");
-        // TODO: we can remove the range_check constraint if we can guarantee that `scalar_var`
-        // is always consistent with `b_scalar_var`.
+
         let b_scalar_var = self.range_check(scalar_var, n_bits);
         let bases = compute_base_multiples(base, n_bits >> 1);
         self.scalar_mul_with_bases(&bases[0], &bases[1], &bases[2], &b_scalar_var)
@@ -325,7 +324,7 @@ impl TurboConstraintSystem<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
+    use crate::plonk::constraint_system::{ecc::Point, TurboCS};
     use zei_algebra::{
         bls12_381::BLSScalar,
         jubjub::{JubjubPoint, JubjubScalar},
@@ -334,8 +333,7 @@ mod test {
 
     #[test]
     fn test_ecc_add() {
-        // use BLS12-381 field
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let p1_ext = JubjubPoint::get_base();
         let p2_ext = p1_ext.double();
         let p3_ext = p1_ext.add(&p2_ext);
@@ -370,8 +368,7 @@ mod test {
 
     #[test]
     fn test_scalar_mul() {
-        // use BLS12-381 field
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
 
         // compute secret scalar
         let scalar_bytes = [
@@ -399,13 +396,13 @@ mod test {
 
     #[test]
     fn test_scalar_mul_with_zero_scalar() {
-        // use BLS12-381 field
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let base_ext = JubjubPoint::get_base();
         let base_point = Point::from(&base_ext);
         let scalar_var = cs.new_variable(BLSScalar::zero());
         let p_out_var = cs.scalar_mul(base_ext, scalar_var, 64);
         let mut witness = cs.get_and_clear_witness();
+
         // check p_out is an identity point
         assert_eq!(witness[p_out_var.0], BLSScalar::zero());
         assert_eq!(witness[p_out_var.1], BLSScalar::one());

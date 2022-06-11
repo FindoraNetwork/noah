@@ -1,25 +1,25 @@
-use crate::plonk::constraint_system::{TurboConstraintSystem, VarIndex};
+use crate::plonk::constraint_system::{TurboCS, VarIndex};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::rescue::RescueInstance;
 
 /// state size.
 const WIDTH: usize = 4;
 
-/// rounds.
+/// number of rounds.
 const NR: usize = 12;
 
 /// alpha^{-1} mod (q-1) = 20974350070050476191779096203274386335076221000211055129041463479975432473805;
-/// least significant u8limb first
+/// least significant byte first
 const ALPHA_INV: [u8; 32] = [
     0xCD, 0xCC, 0xCC, 0xCC, 0x32, 0x33, 0x33, 0x33, 0x99, 0xF1, 0x98, 0x99, 0x67, 0x0E, 0x7F, 0x21,
     0x02, 0xF0, 0x73, 0x9D, 0x69, 0x56, 0x4A, 0xE1, 0x1C, 0x32, 0x72, 0xDD, 0xBA, 0x0F, 0x5F, 0x2E,
 ];
 
-/// Represent a state variables.
+/// the data structure of the variables of the sponge state
 #[derive(Clone)]
 pub struct StateVar(Vec<VarIndex>); // StateVar.0.len() == WIDTH
 
-/// Represent a state values.
+/// the data structure of the values in the sponge
 #[derive(Clone)]
 pub struct State(Vec<BLSScalar>); // State.0.len() == WIDTH
 
@@ -38,7 +38,7 @@ impl From<&[BLSScalar]> for State {
 }
 
 impl State {
-    /// Create a state values.
+    /// Create a data structure for state values.
     pub fn new(array: [BLSScalar; WIDTH]) -> State {
         State(array.to_vec())
     }
@@ -50,7 +50,7 @@ impl State {
 }
 
 impl StateVar {
-    /// Create a state variables.
+    /// Create a data structure of state variables.
     pub fn new(array: [VarIndex; WIDTH]) -> StateVar {
         StateVar(array.to_vec())
     }
@@ -61,8 +61,8 @@ impl StateVar {
     }
 }
 
-impl TurboConstraintSystem<BLSScalar> {
-    /// Create a rescue state variables.
+impl TurboCS<BLSScalar> {
+    /// Allocate the state values into state variables.
     pub fn new_rescue_state_variable(&mut self, state: State) -> StateVar {
         let vars: Vec<VarIndex> = state
             .0
@@ -72,33 +72,15 @@ impl TurboConstraintSystem<BLSScalar> {
         StateVar(vars)
     }
 
-    /// Create a rescue input variable and add a zero constraint for the last input elem.
-    pub fn new_hash_input_variable(&mut self, input_state: State) -> StateVar {
-        assert_eq!(input_state.0[WIDTH - 1], BLSScalar::zero());
-        let input_var = self.new_rescue_state_variable(input_state);
-        self.insert_constant_gate(input_var.0[WIDTH - 1], BLSScalar::zero());
-        input_var
-    }
-
     /// Returns the output of the rescue hash function on input variable `input_var`
     pub fn rescue_hash(&mut self, input_var: &StateVar) -> Vec<VarIndex> {
         let hash = RescueInstance::new();
         let zero = BLSScalar::zero();
         let zero_vec = vec![zero, zero, zero, zero];
         let keys = hash.key_scheduling(&zero_vec[..]);
-        let keys_states: Vec<State> = keys.iter().map(|key| State::from(&key[..])).collect();
-        let mds_states: Vec<State> = hash.MDS.iter().map(|mi| State::from(&mi[..])).collect();
-        self.rescue_hash_with_keys(input_var, &mds_states, &keys_states)
-    }
+        let keys: Vec<State> = keys.iter().map(|key| State::from(&key[..])).collect();
+        let mds: Vec<State> = hash.MDS.iter().map(|mi| State::from(&mi[..])).collect();
 
-    /// Return the output of the rescue hash function on input
-    /// variable `input_var`, round keys `key`, and an MDS matrix.
-    fn rescue_hash_with_keys(
-        &mut self,
-        input_var: &StateVar,
-        mds: &[State],
-        keys: &[State],
-    ) -> Vec<VarIndex> {
         assert_eq!(keys.len(), 2 * NR + 1);
         assert_eq!(mds.len(), WIDTH);
 
@@ -106,9 +88,9 @@ impl TurboConstraintSystem<BLSScalar> {
         for (r, key) in keys.iter().skip(1).enumerate() {
             if r % 2 == 0 {
                 state_var = self.pow_5_inv(&state_var);
-                state_var = self.linear_op(&state_var, mds, key);
+                state_var = self.linear_op(&state_var, &mds, key);
             } else {
-                state_var = self.non_linear_op(&state_var, mds, key);
+                state_var = self.non_linear_op(&state_var, &mds, key);
             }
         }
         state_var.0
@@ -125,7 +107,7 @@ impl TurboConstraintSystem<BLSScalar> {
         StateVar(vars)
     }
 
-    /// Add multiple linear constraints.
+    /// Apply the linear constraints.
     fn linear_op(&mut self, state_var: &StateVar, mds: &[State], key: &State) -> StateVar {
         assert_eq!(mds.len(), WIDTH);
         // vars[i] = key[i] + \sum_{j=0..WIDTH-1} mds[i][j] * state_var[j]
@@ -135,7 +117,7 @@ impl TurboConstraintSystem<BLSScalar> {
         StateVar(vars)
     }
 
-    /// Add multiple non-linear constraints.
+    /// Apply the non-linear constraints.
     fn non_linear_op(&mut self, state_var: &StateVar, mds: &[State], key: &State) -> StateVar {
         assert_eq!(mds.len(), WIDTH);
         // vars[i] = key[i] + \sum_{j=0..WIDTH-1} mds[i][j] * state_var[j]^5
@@ -145,7 +127,7 @@ impl TurboConstraintSystem<BLSScalar> {
         StateVar(vars)
     }
 
-    /// Add multiple pow 5 constrains.
+    /// Add the pow 5 inverse constrains.
     fn pow_5_inv(&mut self, state_var: &StateVar) -> StateVar {
         let vars: Vec<VarIndex> = state_var
             .0
@@ -242,7 +224,7 @@ impl TurboConstraintSystem<BLSScalar> {
     /// Add a 5th power inverse constraint:
     /// witness[out_var]^5 = witness[var]
     fn add_pow_5_inv_constraint(&mut self, var: VarIndex) -> VarIndex {
-        let alpha_inv_u64_vec = u64_lsf_from_bytes(&ALPHA_INV[..]);
+        let alpha_inv_u64_vec = u64_limbs_from_bytes(&ALPHA_INV[..]);
         let out_val = self.witness[var].pow(&alpha_inv_u64_vec);
         let out_var = self.new_variable(out_val);
         let zero = BLSScalar::zero();
@@ -266,7 +248,7 @@ impl TurboConstraintSystem<BLSScalar> {
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::constraint_system::{rescue::State, TurboConstraintSystem};
+    use crate::plonk::constraint_system::{rescue::State, TurboCS};
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
     use zei_crypto::basic::rescue::RescueInstance;
 
@@ -276,7 +258,7 @@ mod test {
     fn test_rescue_hash() {
         let hash = RescueInstance::new();
         // use BLS12-381 field
-        let mut cs = TurboConstraintSystem::<BLSScalar>::new();
+        let mut cs = TurboCS::<BLSScalar>::new();
         let input_vec = [
             BLSScalar::from(11u32),
             BLSScalar::from(171u32),
@@ -284,7 +266,7 @@ mod test {
             BLSScalar::zero(),
         ];
         let input_state = State::from(&input_vec[..]);
-        let input_var = cs.new_hash_input_variable(input_state.clone());
+        let input_var = cs.new_rescue_state_variable(input_state.clone());
         let out_var = cs.rescue_hash(&input_var)[0];
 
         // Check consistency between witness[input_var] and input_state

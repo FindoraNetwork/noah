@@ -31,7 +31,7 @@ use zei_crypto::{
 use zei_plonk::{
     plonk::{
         constraint_system::{
-            field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem, VarIndex,
+            field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex,
         },
         indexer::PlonkPf,
         prover::prover_with_lagrange,
@@ -357,7 +357,7 @@ pub fn build_abar_to_bar_cs(
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
-    let mut cs = TurboConstraintSystem::new();
+    let mut cs = TurboCS::new();
     let payers_secrets = add_payers_secret(&mut cs, payers_secret);
 
     let base = JubjubPoint::get_base();
@@ -608,28 +608,28 @@ pub fn build_abar_to_bar_cs(
     }
 
     // prepare public inputs variables
-    cs.prepare_io_variable(nullifier_var);
+    cs.prepare_pi_variable(nullifier_var);
 
     // prepare the public input for merkle_root
-    cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
+    cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
-    cs.prepare_io_variable(comm_var);
+    cs.prepare_pi_variable(comm_var);
 
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(beta_sim_fr_var.var[i]);
+        cs.prepare_pi_variable(beta_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(lambda_sim_fr_var.var[i]);
+        cs.prepare_pi_variable(lambda_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(beta_lambda_sim_fr_var.var[i]);
+        cs.prepare_pi_variable(beta_lambda_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
+        cs.prepare_pi_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
     }
 
-    cs.prepare_io_variable(hash_var);
-    cs.prepare_io_variable(non_malleability_tag_var);
+    cs.prepare_pi_variable(hash_var);
+    cs.prepare_pi_variable(non_malleability_tag_var);
 
     // pad the number of constraints to power of two
     cs.pad();

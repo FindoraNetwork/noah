@@ -23,7 +23,7 @@ use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_plonk::{
     plonk::{
-        constraint_system::{rescue::StateVar, TurboConstraintSystem, VarIndex},
+        constraint_system::{rescue::StateVar, TurboCS, VarIndex},
         indexer::PlonkPf,
         prover::prover_with_lagrange,
         verifier::verifier,
@@ -255,7 +255,7 @@ pub fn build_abar_to_ar_cs(
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
-    let mut cs = TurboConstraintSystem::new();
+    let mut cs = TurboCS::new();
     let payers_secrets_vars = add_payers_secret(&mut cs, payers_secret);
 
     let base = JubjubPoint::get_base();
@@ -330,16 +330,16 @@ pub fn build_abar_to_ar_cs(
     }
 
     // prepare public inputs variables
-    cs.prepare_io_variable(nullifier_var);
+    cs.prepare_pi_variable(nullifier_var);
 
     // prepare the public input for merkle_root
-    cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
+    cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
-    cs.prepare_io_variable(payers_secrets_vars.amount);
-    cs.prepare_io_variable(payers_secrets_vars.asset_type);
+    cs.prepare_pi_variable(payers_secrets_vars.amount);
+    cs.prepare_pi_variable(payers_secrets_vars.asset_type);
 
-    cs.prepare_io_variable(hash_var);
-    cs.prepare_io_variable(non_malleability_tag_var);
+    cs.prepare_pi_variable(hash_var);
+    cs.prepare_pi_variable(non_malleability_tag_var);
 
     // pad the number of constraints to power of two
     cs.pad();

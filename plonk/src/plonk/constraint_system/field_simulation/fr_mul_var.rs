@@ -1,12 +1,10 @@
-use crate::plonk::constraint_system::{
-    field_simulation::SimFrVar, TurboConstraintSystem, VarIndex,
-};
-use num_bigint::BigUint;
-use num_integer::Integer;
-use std::{
+use crate::plonk::constraint_system::{field_simulation::SimFrVar, TurboCS, VarIndex};
+use core::{
     cmp::{max, min},
     ops::{Shl, Shr},
 };
+use num_bigint::BigUint;
+use num_integer::Integer;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::field_simulation::{
     ristretto_scalar_field_in_biguint, ristretto_scalar_field_in_limbs,
@@ -26,7 +24,7 @@ pub struct SimFrMulVar {
 
 impl SimFrMulVar {
     /// Create a zero `SimFrMul`.
-    pub fn new(cs: &mut TurboConstraintSystem<BLSScalar>) -> Self {
+    pub fn new(cs: &mut TurboCS<BLSScalar>) -> Self {
         Self {
             val: SimFrMul::default(),
             var: [cs.zero_var(); NUM_OF_LIMBS_MUL],
@@ -34,11 +32,7 @@ impl SimFrMulVar {
     }
 
     /// the Add operation.
-    pub fn add(
-        &self,
-        cs: &mut TurboConstraintSystem<BLSScalar>,
-        other: &SimFrMulVar,
-    ) -> SimFrMulVar {
+    pub fn add(&self, cs: &mut TurboCS<BLSScalar>, other: &SimFrMulVar) -> SimFrMulVar {
         let mut res = self.clone();
         res.val = &self.val + &other.val;
 
@@ -71,7 +65,7 @@ impl SimFrMulVar {
     }
 
     /// the Sub operation.
-    pub fn sub(&self, cs: &mut TurboConstraintSystem<BLSScalar>, other: &SimFrVar) -> SimFrMulVar {
+    pub fn sub(&self, cs: &mut TurboCS<BLSScalar>, other: &SimFrVar) -> SimFrMulVar {
         let mut res = self.clone();
         res.val = &self.val - &other.val;
 
@@ -112,7 +106,7 @@ impl SimFrMulVar {
     }
 
     /// Enforce a zero constraint.
-    pub fn enforce_zero(&self, cs: &mut TurboConstraintSystem<BLSScalar>) {
+    pub fn enforce_zero(&self, cs: &mut TurboCS<BLSScalar>) {
         assert!(self.val.prod_of_num_of_additions.bits() as usize <= 5);
         let surfeit = 5;
 
@@ -318,9 +312,7 @@ impl SimFrMulVar {
 
 #[cfg(test)]
 mod test {
-    use crate::plonk::constraint_system::{
-        field_simulation::SimFrVar, turbo::TurboConstraintSystem,
-    };
+    use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
     use num_bigint::{BigUint, RandBigInt};
     use rand_chacha::ChaCha20Rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
@@ -328,7 +320,7 @@ mod test {
 
     #[test]
     fn test_enforce_zero_trivial() {
-        let mut cs = TurboConstraintSystem::<BLSScalar>::new();
+        let mut cs = TurboCS::<BLSScalar>::new();
 
         let zero_fr = SimFr::from(&BigUint::zero());
         let zero_fr_val = SimFrVar::alloc_witness(&mut cs, &zero_fr);
@@ -343,7 +335,7 @@ mod test {
         let r_biguint = ristretto_scalar_field_in_biguint();
 
         for _ in 0..1000 {
-            let mut cs = TurboConstraintSystem::<BLSScalar>::new();
+            let mut cs = TurboCS::<BLSScalar>::new();
 
             let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
             let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -372,7 +364,7 @@ mod test {
         let mut rng = ChaCha20Rng::from_entropy();
         let r_biguint = ristretto_scalar_field_in_biguint();
 
-        let mut cs = TurboConstraintSystem::<BLSScalar>::new();
+        let mut cs = TurboCS::<BLSScalar>::new();
 
         let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
         let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
