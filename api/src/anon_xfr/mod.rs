@@ -21,8 +21,6 @@ use zei_crypto::basic::{
     rescue::RescueInstance,
 };
 
-/// Module for paying the fee anonymously.
-pub mod anon_fee;
 /// Module for converting anonymous assets to confidential assets.
 pub mod anonymous_to_confidential;
 /// Module for converting anonymous assets to transparent assets.
