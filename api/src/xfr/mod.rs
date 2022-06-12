@@ -314,15 +314,11 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
     let tracer_memos = inputs
         .iter()
         .chain(outputs)
-        .map(|record_input| {
-            record_input.asset_tracers_memos.clone()
-        })
+        .map(|record_input| record_input.asset_tracers_memos.clone())
         .collect_vec();
     let owner_memos = outputs
         .iter()
-        .map(|record_input| {
-            record_input.owner_memo.clone()
-        })
+        .map(|record_input| record_input.owner_memo.clone())
         .collect_vec();
     Ok(XfrBody {
         inputs: xfr_inputs,

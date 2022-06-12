@@ -1,3 +1,4 @@
+use crate::anon_xfr::structs::AXfrBody;
 use crate::anon_xfr::{
     circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
     config::{FEE_CALCULATING_FUNC, FEE_TYPE},
@@ -7,6 +8,7 @@ use crate::anon_xfr::{
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
+pub use circuits::TREE_DEPTH;
 use digest::Digest;
 use sha2::Sha512;
 use zei_algebra::{
@@ -15,28 +17,26 @@ use zei_algebra::{
     prelude::*,
 };
 use zei_crypto::basic::{
+    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey},
     rescue::RescueInstance,
-    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey}
 };
-use crate::anon_xfr::structs::AXfrBody;
-pub use circuits::TREE_DEPTH;
 
-/// Module for converting anonymous assets to transparent assets.
-pub mod anonymous_to_transparent;
-/// Module for converting anonymous assets to confidential assets.
-pub mod anonymous_to_confidential;
 /// Module for paying the fee anonymously.
 pub mod anon_fee;
-/// Module for converting transparent assets to anonymous assets.
-pub mod transparent_to_anonymous;
+/// Module for converting anonymous assets to confidential assets.
+pub mod anonymous_to_confidential;
+/// Module for converting anonymous assets to transparent assets.
+pub mod anonymous_to_transparent;
+pub(crate) mod circuits;
 /// Module for converting confidential assets to anonymous assets.
 pub mod confidential_to_anonymous;
-pub(crate) mod circuits;
 pub mod config;
 pub mod keys;
 mod merkle_tree_test;
 pub(crate) mod proofs;
 pub mod structs;
+/// Module for converting transparent assets to anonymous assets.
+pub mod transparent_to_anonymous;
 
 /// Build an anonymous transfer structure AXfrNote. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.

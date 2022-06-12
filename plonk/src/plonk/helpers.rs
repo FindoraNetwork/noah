@@ -495,13 +495,13 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     verifier_params: &PlonkVK<PCS>,
     proof: &PlonkPf<PCS>,
     challenges: &PlonkChallenges<PCS::Field>,
-    pi_eval_beta: &PCS::Field,
+    pi_eval_zeta: &PCS::Field,
 ) -> PCS::Field {
     let zeta = challenges.get_zeta().unwrap();
     let alpha = challenges.get_alpha().unwrap();
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
 
-    let term0 = pi_eval_beta;
+    let term0 = pi_eval_zeta;
     let mut term1 = alpha.mul(&proof.z_eval_zeta_omega);
     let n_wires_per_gate = &proof.w_polys_eval_zeta.len();
     for i in 0..n_wires_per_gate - 1 {
@@ -515,8 +515,8 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     let one = PCS::Field::one();
     let zeta_n = zeta.pow(&[verifier_params.cs_size as u64]);
     let z_h_eval_zeta = zeta_n.sub(&one);
-    let beta_minus_one = zeta.sub(&one);
-    let first_lagrange_eval_zeta = z_h_eval_zeta.mul(beta_minus_one.inv().unwrap());
+    let zeta_minus_one = zeta.sub(&one);
+    let first_lagrange_eval_zeta = z_h_eval_zeta.mul(zeta_minus_one.inv().unwrap());
     let term2 = first_lagrange_eval_zeta.mul(alpha.mul(alpha));
 
     let term1_plus_term2 = term1.add(&term2);
