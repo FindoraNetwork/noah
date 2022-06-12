@@ -172,18 +172,18 @@ pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Scalar>(
 /// and setting z(1) = 1 for the base case
 pub(super) fn z_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
-    params: &PlonkPK<PCS>,
-    witness: &[PCS::Field],
+    prover_params: &PlonkPK<PCS>,
+    w: &[PCS::Field],
     challenges: &PlonkChallenges<PCS::Field>,
 ) -> FpPolynomial<PCS::Field> {
     let n_wires_per_gate = CS::n_wires_per_gate();
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
     let mut z_evals = vec![];
     let perm = cs.compute_permutation();
-    let n_constraints = witness.len() / n_wires_per_gate;
+    let n_constraints = w.len() / n_wires_per_gate;
     let mut prev = PCS::Field::one();
     z_evals.push(PCS::Field::one());
-    let group = &params.group[..];
+    let group = &prover_params.group[..];
 
     // computes permutation values
     let p_of_x =
@@ -196,15 +196,15 @@ pub(super) fn z_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             k[0].mul(&group[perm_value])
         };
 
-    let k = &params.verifier_params.k;
+    let k = &prover_params.verifier_params.k;
     for i in 0..n_constraints - 1 {
-        // 1. a = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * k_j * \omega^i + \gamma)
-        // 2. b = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * permj(\omega^i) +\gamma)
+        // 1. numerator = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * k_j * \omega^i + \gamma)
+        // 2. denominator = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * permj(\omega^i) +\gamma)
         let mut numerator = PCS::Field::one();
         let mut denominator = PCS::Field::one();
         for j in 0..n_wires_per_gate {
             let k_x = k[j].mul(&group[i]);
-            let f_x = &witness[j * n_constraints + i];
+            let f_x = &w[j * n_constraints + i];
             let f_plus_beta_id_plus_gamma = &f_x.add(gamma).add(&beta.mul(&k_x));
             numerator.mul_assign(&f_plus_beta_id_plus_gamma);
 
@@ -226,7 +226,7 @@ pub(super) fn z_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
 /// Compute the t polynomial.
 pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
-    params: &PlonkPK<PCS>,
+    prover_params: &PlonkPK<PCS>,
     w_polys: &[FpPolynomial<PCS::Field>],
     z: &FpPolynomial<PCS::Field>,
     challenges: &PlonkChallenges<PCS::Field>,
@@ -238,8 +238,8 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     if n * factor != m {
         return Err(eg!(PlonkError::SetupError));
     }
-    let root_m = &params.root_m;
-    let k = &params.verifier_params.k;
+    let root_m = &prover_params.root_m;
+    let k = &prover_params.verifier_params.k;
 
     // Compute the evaluations of w/pi/z polynomials on the coset k[1] * <root_m>.
     let w_polys_coset_evals: Vec<Vec<PCS::Field>> = w_polys
@@ -260,7 +260,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             .iter()
             .map(|poly_coset_evals| &poly_coset_evals[point])
             .collect();
-        let q_vals: Vec<&PCS::Field> = params
+        let q_vals: Vec<&PCS::Field> = prover_params
             .q_coset_evals
             .iter()
             .map(|poly_coset_evals| &poly_coset_evals[point])
@@ -273,14 +273,15 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
         for j in 0..CS::n_wires_per_gate() {
             let tmp = w_polys_coset_evals[j][point]
                 .add(gamma)
-                .add(&beta.mul(&k[j].mul(&params.coset_quotient[point])));
+                .add(&beta.mul(&k[j].mul(&prover_params.coset_quotient[point])));
             term2.mul_assign(&tmp);
         }
 
         // alpha * [z(\omega * X)\prod_j (fj(X) + beta * perm_j(X) + gamma)]
         let mut term3 = alpha.mul(&z_coset_evals[(point + factor) % m]);
-        for (w_poly_coset_evals, s_coset_evals) in
-            w_polys_coset_evals.iter().zip(params.s_coset_evals.iter())
+        for (w_poly_coset_evals, s_coset_evals) in w_polys_coset_evals
+            .iter()
+            .zip(prover_params.s_coset_evals.iter())
         {
             let tmp = &w_poly_coset_evals[point]
                 .add(gamma)
@@ -290,11 +291,11 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
 
         // alpha^2 * (z(X) - 1) * L_1(X)
         let term4 = alpha_sq
-            .mul(&params.l1_coset_evals[point])
+            .mul(&prover_params.l1_coset_evals[point])
             .mul(&z_coset_evals[point].sub(&PCS::Field::one()));
 
         let numerator = term1.add(&term2).add(&term4.sub(&term3));
-        t_coset_evals.push(numerator.mul(&params.z_h_inv_coset_evals[point]));
+        t_coset_evals.push(numerator.mul(&prover_params.z_h_inv_coset_evals[point]));
     }
 
     let k_inv = k[1].inv().c(d!(PlonkError::DivisionByZero))?;
@@ -302,7 +303,6 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
 }
 
 /// Compute r polynomial or commitment.
-#[allow(clippy::too_many_arguments)]
 fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     w: &[F],
     n: usize,
@@ -415,8 +415,8 @@ pub(super) fn r_commitment<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
 }
 
 /// Compute sum_{i=1}^\ell w_i L_j(X), where j is the constraint
-/// index for the i-th public value. L_j(X) = (X^n-1) / (X - g^j) is
-/// the j-th lagrange base (zero for every X= g^i, except when i == j)
+/// index for the i-th public value. L_j(X) = (X^n-1) / (X - \omega^j) is
+/// the j-th lagrange base (zero for every X = \omega^i, except when i == j)
 pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
     verifier_params: &PlonkVK<PCS>,
     public_inputs: &[PCS::Field],
@@ -433,7 +433,7 @@ pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
         .zip(public_inputs)
         .zip(verifier_params.lagrange_constants.iter())
     {
-        // X - g^j j-th lagrange denominator
+        // X - \omega^j j-th Lagrange denominator
         let root_to_j = verifier_params.root.pow(&[*constraint_index as u64]);
         let denominator = eval_point.sub(&root_to_j);
         let denominator_inv = denominator.inv().unwrap();
@@ -457,7 +457,7 @@ pub(super) fn compute_lagrange_constant<F: Scalar>(group: &[F], base_index: usiz
     constant_inv.inv().unwrap()
 }
 
-/// compute the scalar factor of z(X) in the r poly
+/// compute the scalar factor of z(X) in the r poly.
 /// prod(fi(\zeta) + \beta * k_i * \zeta + \gamma) * \alpha
 ///       + (\zeta^n - 1) / (\zeta-1) * \alpha^2
 fn compute_z_scalar_in_r<F: Scalar>(
@@ -490,7 +490,7 @@ fn compute_z_scalar_in_r<F: Scalar>(
     z_scalar
 }
 
-/// Evaluate the r polynomial at point \zeta
+/// Evaluate the r polynomial at point \zeta.
 pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     verifier_params: &PlonkVK<PCS>,
     proof: &PlonkPf<PCS>,

@@ -4,12 +4,11 @@ pub mod field_polynomial;
 /// Module for KZG polynomial commitment scheme.
 pub mod kzg_poly_com;
 
-/// Module for polynomial commitment structs.
+/// Module for polynomial commitment traits.
 pub mod pcs;
 
-/// Module for polynomial commitment transcript,
-/// and implemented by `merlin::Transcript`.
+/// Module for polynomial commitment transcript.
 pub mod transcript;
 
-/// Module for polynomial commitment errors.
+/// Module for error handling.
 pub mod errors;

@@ -1,4 +1,4 @@
-//! The crate for plonk and polynomial commitment for the Zei library
+//! The crate for Plonk and polynomial commitment for the Zei library
 #![deny(unused_import_braces, unused_qualifications, trivial_casts)]
 #![deny(trivial_numeric_casts, private_in_public)]
 #![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
@@ -22,7 +22,7 @@
 #[macro_use]
 extern crate serde_derive;
 
-/// Module for the PLONK/Turbo SNARK systems.
+/// Module for the TurboPlonk systems.
 pub mod plonk;
 
 /// Module for the polynomial commitment.

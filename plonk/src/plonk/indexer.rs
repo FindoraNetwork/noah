@@ -52,7 +52,7 @@ pub struct PlonkProverParams<O, C, F> {
     pub root_m: F,
     /// first lagrange basis.
     pub l1_coefs: FpPolynomial<F>,
-    /// the l1's DFT of the polynomial of unity root set.
+    /// the l1's FFT of the polynomial of unity root set.
     pub l1_coset_evals: Vec<F>,
     /// initialize [one.neg, zero, zero, ... zero, one] polynomial.
     pub z_h_coefs: FpPolynomial<F>,
