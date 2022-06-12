@@ -149,7 +149,7 @@ pub fn prover_with_lagrange<
                 .c(d!(PlonkError::CommitmentError))?;
             let c_f = pcs.apply_blind_factors(&c_f, &blinds, n_constraints);
             transcript.append_commitment::<PCS::Commitment>(&c_f);
-            witness_polys.push(f_eval);
+            witness_polys.push(f);
             c_witness_polys.push(c_f);
         }
     } else {
