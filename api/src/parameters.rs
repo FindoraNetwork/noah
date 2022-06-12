@@ -55,13 +55,6 @@ pub static ABAR_TO_AR_VERIFIER_PARAMS: Option<&'static [u8]> =
 #[cfg(feature = "no_vk")]
 pub static ABAR_TO_AR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
-#[cfg(not(feature = "no_vk"))]
-pub static ANON_FEE_VERIFIER_PARAMS: Option<&'static [u8]> =
-    Some(include_bytes!("../parameters/anon-fee-vk.bin"));
-
-#[cfg(feature = "no_vk")]
-pub static ANON_FEE_VERIFIER_PARAMS: Option<&'static [u8]> = None;
-
 #[cfg(feature = "no_srs")]
 lazy_static! {
     pub static ref LAGRANGE_BASES: BTreeMap<usize, &'static [u8]> = BTreeMap::default();
