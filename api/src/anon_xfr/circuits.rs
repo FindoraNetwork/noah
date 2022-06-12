@@ -116,11 +116,17 @@ impl AMultiXfrPubInputs {
                 let uid_amount = pow_2_64
                     .mul(&BLSScalar::from(sec.uid))
                     .add(&BLSScalar::from(sec.amount));
-                hash.rescue(&[
+                let cur = hash.rescue(&[
                     uid_amount,
                     sec.asset_type,
+                    BLSScalar::zero(),
                     pk_point.get_x(),
+                ])[0];
+                hash.rescue(&[
+                    cur,
                     BLSScalar::from(&sec.sec_key),
+                    BLSScalar::zero(),
+                    BLSScalar::zero(),
                 ])[0]
             })
             .collect();
@@ -132,24 +138,28 @@ impl AMultiXfrPubInputs {
             .payees_secrets
             .iter()
             .map(|sec| {
-                hash.rescue(&[
+                let cur = hash.rescue(&[
                     sec.blind,
                     BLSScalar::from(sec.amount),
                     sec.asset_type,
-                    sec.pubkey_x,
-                ])[0]
+                    BLSScalar::zero(),
+                ])[0];
+                hash.rescue(&[cur, sec.pubkey_x, BLSScalar::zero(), BLSScalar::zero()])[0]
             })
             .collect();
 
         // merkle root
         let payer = &witness.payers_secrets[0];
         let pk_point = base.mul(&payer.sec_key);
-        let commitment = hash.rescue(&[
-            payer.blind,
-            BLSScalar::from(payer.amount),
-            payer.asset_type,
-            pk_point.get_x(),
-        ])[0];
+        let commitment = {
+            let cur = hash.rescue(&[
+                payer.blind,
+                BLSScalar::from(payer.amount),
+                payer.asset_type,
+                BLSScalar::zero(),
+            ])[0];
+            hash.rescue(&[cur, pk_point.get_x(), BLSScalar::zero(), BLSScalar::zero()])[0]
+        };
         let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0];
         for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
@@ -480,7 +490,9 @@ pub fn commit(
     asset_var: VarIndex,
     pubkey_x_var: VarIndex,
 ) -> VarIndex {
-    let input_var = StateVar::new([blinding_var, amount_var, asset_var, pubkey_x_var]);
+    let input_var = StateVar::new([blinding_var, amount_var, asset_var, cs.zero_var()]);
+    let cur = cs.rescue_hash(&input_var)[0];
+    let input_var = StateVar::new([cur, pubkey_x_var, cs.zero_var(), cs.zero_var()]);
     cs.rescue_hash(&input_var)[0]
 }
 
@@ -500,7 +512,9 @@ pub(crate) fn nullify(
         nullifier_input_vars.asset_type,
         nullifier_input_vars.pub_key_x,
     );
-    let input_var = StateVar::new([uid_amount, asset_type, pub_key_x, sk_var]);
+    let input_var = StateVar::new([uid_amount, asset_type, cs.zero_var(), pub_key_x]);
+    let cur = cs.rescue_hash(&input_var)[0];
+    let input_var = StateVar::new([cur, sk_var, cs.zero_var(), cs.zero_var()]);
     cs.rescue_hash(&input_var)[0]
 }
 
@@ -697,12 +711,15 @@ pub(crate) mod tests {
                 .iter()
                 .map(|payer| {
                     let pk_point = base.mul(&payer.sec_key);
-                    let commitment = hash.rescue(&[
+                    let cur = hash.rescue(&[
                         payer.blind,
                         BLSScalar::from(payer.amount),
                         payer.asset_type,
-                        pk_point.get_x(),
+                        BLSScalar::zero(),
                     ])[0];
+                    let commitment =
+                        hash.rescue(&[cur, pk_point.get_x(), BLSScalar::zero(), BLSScalar::zero()])
+                            [0];
                     hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0]
                 })
                 .collect();
@@ -1311,7 +1328,10 @@ pub(crate) mod tests {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let blind = BLSScalar::random(&mut prng);
         let pubkey_x = BLSScalar::random(&mut prng);
-        let commitment = hash.rescue(&[blind, amount, asset_type, pubkey_x])[0];
+        let commitment = {
+            let cur = hash.rescue(&[blind, amount, asset_type, BLSScalar::zero()])[0];
+            hash.rescue(&[cur, pubkey_x, BLSScalar::zero(), BLSScalar::zero()])[0]
+        };
 
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);
@@ -1341,7 +1361,10 @@ pub(crate) mod tests {
         let asset_type = one;
         let pk = Point::new(zero, one);
         let hash = RescueInstance::new();
-        let expected_output = hash.rescue(&[uid_amount, asset_type, *pk.get_x(), sk])[0];
+        let expected_output = {
+            let cur = hash.rescue(&[uid_amount, asset_type, BLSScalar::zero(), *pk.get_x()])[0];
+            hash.rescue(&[cur, sk, BLSScalar::zero(), BLSScalar::zero()])[0]
+        };
 
         let sk_var = cs.new_variable(sk);
         let uid_amount_var = cs.new_variable(uid_amount);
@@ -1432,9 +1455,7 @@ pub(crate) mod tests {
         };
         // compute the root value
         let hash = RescueInstance::new();
-        let leaf = hash.rescue(&[
-            /*uid=*/ one, /*comm=*/ two, /*pk_x=*/ zero, zero,
-        ])[0];
+        let leaf = hash.rescue(&[/*uid=*/ one, /*comm=*/ two, zero, zero])[0];
         // leaf is the right child of node1
         let node1 = hash.rescue(&[path_node2.siblings1, path_node2.siblings2, leaf, zero])[0];
         // node1 is the left child of the root

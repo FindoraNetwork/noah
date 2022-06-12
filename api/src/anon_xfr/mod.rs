@@ -332,12 +332,20 @@ pub fn decrypt_memo(
 
     // verify abar's commitment
     let hash = RescueInstance::new();
-    let expected_commitment = hash.rescue(&[
-        blind,
-        BLSScalar::from(amount),
-        asset_type.as_scalar(),
-        key_pair.pub_key().0.point_ref().get_x(),
-    ])[0];
+    let expected_commitment = {
+        let cur = hash.rescue(&[
+            blind,
+            BLSScalar::from(amount),
+            asset_type.as_scalar(),
+            BLSScalar::zero(),
+        ])[0];
+        hash.rescue(&[
+            cur,
+            key_pair.pub_key().0.point_ref().get_x(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+        ])[0]
+    };
     if expected_commitment != abar.commitment {
         return Err(eg!(ZeiError::CommitmentVerificationError));
     }
@@ -360,11 +368,17 @@ pub fn nullifier(
     let uid_amount = uid_shifted.add(&BLSScalar::from(amount));
 
     let hash = RescueInstance::new();
-    hash.rescue(&[
+    let cur = hash.rescue(&[
         uid_amount,
         asset_type.as_scalar(),
+        BLSScalar::zero(),
         pub_key_x,
+    ])[0];
+    hash.rescue(&[
+        cur,
         BLSScalar::from(&key_pair.get_secret_scalar()),
+        BLSScalar::zero(),
+        BLSScalar::zero(),
     ])[0]
 }
 
