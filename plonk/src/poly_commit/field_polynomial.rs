@@ -20,7 +20,7 @@ impl<F: Scalar> FpPolynomial<F> {
         F::get_field_size_le_bytes()
     }
 
-    /// Return the always zero polynomial
+    /// Return the constant zero polynomial
     /// # Example
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -36,7 +36,7 @@ impl<F: Scalar> FpPolynomial<F> {
         Self::from_coefs(vec![F::zero()])
     }
 
-    /// Return the always one polynomial
+    /// Return the constant one polynomial
     /// # Example
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -52,8 +52,8 @@ impl<F: Scalar> FpPolynomial<F> {
         Self::from_coefs(vec![F::one()])
     }
 
-    /// Builds a polynomial from the coefficient vector, low-order coefficient first.
-    /// High-order zero coefficient are trimmed
+    /// Build a polynomial from the coefficient vector, low-order coefficient first.
+    /// High-order zero coefficient are trimmed.
     /// # Example
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -80,7 +80,7 @@ impl<F: Scalar> FpPolynomial<F> {
         p
     }
 
-    /// Builds a polynomial from its zeroes/roots.
+    /// Build a polynomial from its zeroes/roots.
     /// # Example
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -103,12 +103,12 @@ impl<F: Scalar> FpPolynomial<F> {
         Self::from_zeroes_ref(&roots_ref[..])
     }
 
-    /// Builds a polynomial from its zeroes/roots given as reference.
+    /// Build a polynomial from its zeroes/roots given as reference.
     pub fn from_zeroes_ref(zeroes: &[&F]) -> Self {
         let mut r = Self::one();
         for root in zeroes.iter() {
             let mut p = r.clone();
-            r.shift_assign(1); // multiply by X
+            r.coefs.insert(0, F::zero()); // multiply by X
             p.mul_scalar_assign(*root); // x_0 * r
             r.sub_assign(&p); // r = r * (X - x_0)
         }
@@ -361,45 +361,6 @@ impl<F: Scalar> FpPolynomial<F> {
         self.trim_coefs();
     }
 
-    /// Multiply polynomial by X^n.
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
-    /// poly.shift_assign(3);
-    /// let poly_expected = FpPolynomial::from_coefs(vec![zero, zero, zero, zero, one, one]);
-    /// assert_eq!(poly, poly_expected);
-    /// ```
-    pub fn shift_assign(&mut self, n: usize) {
-        let mut new_coefs = Vec::with_capacity(n + self.coefs.len());
-        new_coefs.extend(vec![F::zero(); n]);
-        new_coefs.append(&mut self.coefs);
-        self.coefs = new_coefs
-    }
-
-    /// Multiply polynomial by X^n into a new polynomial.
-    /// # Example:
-    /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
-    /// let poly = FpPolynomial::from_coefs(vec![zero, one, one]);
-    /// let shifted = poly.shift(3);
-    /// let poly_expected = FpPolynomial::from_coefs(vec![zero, zero, zero, zero, one, one]);
-    /// assert_eq!(shifted, poly_expected);
-    /// ```
-    pub fn shift(&self, n: usize) -> Self {
-        let mut new = self.clone();
-        new.shift_assign(n);
-        new
-    }
-
     /// Multiply polynomial by a constant scalar.
     /// # Example:
     /// ```
@@ -469,7 +430,7 @@ impl<F: Scalar> FpPolynomial<F> {
         self.trim_coefs();
     }
 
-    /// Multiply polynomial's variable by a scalar
+    /// Multiply polynomial variable by a scalar
     /// # Example:
     /// ```
     /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
@@ -540,7 +501,7 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 
     /// Compute the FFT of the polynomial, return FFT and primitive the roof of unity used
-    /// n is with the form 2^k or 3 * 2^k
+    /// n is with the form 2^k or 3 * 2^k.
     pub fn fft(&self, num_points: usize) -> Option<(Vec<F>, F)> {
         assert!(
             num_points.is_power_of_two()
@@ -551,7 +512,7 @@ impl<F: Scalar> FpPolynomial<F> {
     }
 
     /// Compute the FFT of the polynomial using given n-th root of unity
-    /// n is with the form 2^k or 3 * 2^k
+    /// n is with the form 2^k or 3 * 2^k.
     pub fn fft_with_unity_root(&self, root: &F, num_points: usize) -> Vec<F> {
         assert!(
             num_points.is_power_of_two()
@@ -571,7 +532,8 @@ impl<F: Scalar> FpPolynomial<F> {
         self.mul_var(k).fft_with_unity_root(root, num_points)
     }
 
-    /// Compute the polynomial given its evaluation values at the n n-th root of unity given a primitive n-th root of unity
+    /// Compute the polynomial given its evaluation values at the n n-th root of unity given a
+    /// primitive n-th root of unity.
     pub fn ffti(root: &F, values: &[F], len: usize) -> Self {
         let mut values: Vec<&F> = values.iter().collect();
         let zero = F::zero();
@@ -632,14 +594,14 @@ fn recursive_fft<F: Scalar>(coefs: &[&F], root: &F) -> Vec<F> {
     let y_odd = recursive_fft(&odd, &root_sq);
 
     let mut omega = F::one();
-    let mut dft = vec![F::zero(); n];
+    let mut fft = vec![F::zero(); n];
     for (i, (e, o)) in y_even.iter().zip(y_odd.iter()).enumerate() {
         let omega_o = omega.mul(o);
-        dft[i] = e.add(&omega_o);
-        dft[n / 2 + i] = e.sub(&omega_o);
+        fft[i] = e.add(&omega_o);
+        fft[n / 2 + i] = e.sub(&omega_o);
         omega.mul_assign(root);
     }
-    dft
+    fft
 }
 
 /// Compute the primitive the roof of unity used n.
@@ -719,15 +681,15 @@ mod test {
         }
     }
 
-    fn check_fft<F: Scalar>(poly: &FpPolynomial<F>, root: &F, dft: &[F]) -> bool {
+    fn check_fft<F: Scalar>(poly: &FpPolynomial<F>, root: &F, fft: &[F]) -> bool {
         let mut omega = F::one();
-        if !dft.len().is_power_of_two() {
+        if !fft.len().is_power_of_two() {
             return false;
         }
-        if (dft.len() % 3 == 0) && !(dft.len() / 3).is_power_of_two() {
+        if (fft.len() % 3 == 0) && !(fft.len() / 3).is_power_of_two() {
             return false;
         }
-        for fft_elem in dft {
+        for fft_elem in fft {
             if *fft_elem != poly.eval(&omega) {
                 return false;
             }

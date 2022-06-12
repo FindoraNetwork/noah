@@ -97,8 +97,8 @@ pub fn prover_with_lagrange<
     pcs: &PCS,
     lagrange_pcs: Option<&PCS>,
     cs: &CS,
-    params: &PlonkPK<PCS>,
-    witness: &[PCS::Field],
+    prover_params: &PlonkPK<PCS>,
+    w: &[PCS::Field],
 ) -> Result<PlonkPf<PCS>> {
     if cs.is_verifier_only() {
         return Err(eg!(PlonkError::FuncParamsError));
@@ -107,10 +107,14 @@ pub fn prover_with_lagrange<
     let online_values: Vec<PCS::Field> = cs
         .public_vars_witness_indices()
         .iter()
-        .map(|index| witness[*index])
+        .map(|index| w[*index])
         .collect();
     // Init transcript
-    transcript_init_plonk::<_, PCS::Field>(transcript, &params.verifier_params, &online_values);
+    transcript_init_plonk::<_, PCS::Field>(
+        transcript,
+        &prover_params.verifier_params,
+        &online_values,
+    );
     let mut challenges = PlonkChallenges::new();
     let n_constraints = cs.size();
 
@@ -125,45 +129,45 @@ pub fn prover_with_lagrange<
     };
 
     // Prepare extended witness
-    let extended_witness = cs.extend_witness(witness);
-    let io = pi_poly::<PCS>(&params, &online_values);
+    let extended_witness = cs.extend_witness(w);
+    let pi = pi_poly::<PCS>(&prover_params, &online_values);
 
     // 1. build witness polynomials, hide them and commit
-    let root = &params.verifier_params.root;
+    let root = &prover_params.verifier_params.root;
     let n_wires_per_gate = CS::n_wires_per_gate();
-    let mut witness_polys = vec![];
-    let mut c_witness_polys = vec![];
+    let mut w_polys = vec![];
+    let mut cm_w_vec = vec![];
     if let Some(lagrange_pcs) = lagrange_pcs {
         for i in 0..n_wires_per_gate {
             let f_eval = FpPolynomial::from_coefs(
                 extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec(),
             );
-            let mut f = FpPolynomial::ffti(
+            let mut f_coefs = FpPolynomial::ffti(
                 root,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
                 n_constraints,
             );
-            let blinds = hide_polynomial(prng, &mut f, 1, n_constraints);
-            let c_f = lagrange_pcs
+            let blinds = hide_polynomial(prng, &mut f_coefs, 1, n_constraints);
+            let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
-            let c_f = pcs.apply_blind_factors(&c_f, &blinds, n_constraints);
-            transcript.append_commitment::<PCS::Commitment>(&c_f);
-            witness_polys.push(f);
-            c_witness_polys.push(c_f);
+            let cm_w = pcs.apply_blind_factors(&cm_w, &blinds, n_constraints);
+            transcript.append_commitment::<PCS::Commitment>(&cm_w);
+            w_polys.push(f_coefs);
+            cm_w_vec.push(cm_w);
         }
     } else {
         for i in 0..n_wires_per_gate {
-            let mut f = FpPolynomial::ffti(
+            let mut f_coefs = FpPolynomial::ffti(
                 root,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
                 n_constraints,
             );
-            let _ = hide_polynomial(prng, &mut f, 1, n_constraints);
-            let c_f = pcs.commit(&f).c(d!(PlonkError::CommitmentError))?;
-            transcript.append_commitment::<PCS::Commitment>(&c_f);
-            witness_polys.push(f);
-            c_witness_polys.push(c_f);
+            let _ = hide_polynomial(prng, &mut f_coefs, 1, n_constraints);
+            let cm_w = pcs.commit(&f_coefs).c(d!(PlonkError::CommitmentError))?;
+            transcript.append_commitment::<PCS::Commitment>(&cm_w);
+            w_polys.push(f_coefs);
+            cm_w_vec.push(cm_w);
         }
     }
 
@@ -172,11 +176,14 @@ pub fn prover_with_lagrange<
     let gamma = transcript_get_plonk_challenge_gamma(transcript, n_constraints);
     challenges.insert_beta_gamma(beta, gamma).unwrap(); // safe unwrap
 
-    // 3. build sigma, hide it and commit
-    let (cm_z, sigma) = if let Some(lagrange_pcs) = lagrange_pcs {
-        let z_evals = z_poly::<PCS, CS>(cs, params, &extended_witness, &challenges);
-        let mut z_coefs =
-            FpPolynomial::ffti(&params.verifier_params.root, &z_evals.coefs, n_constraints);
+    // 3. build the z polynomial, hide it and commit
+    let (cm_z, z_poly) = if let Some(lagrange_pcs) = lagrange_pcs {
+        let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
+        let mut z_coefs = FpPolynomial::ffti(
+            &prover_params.verifier_params.root,
+            &z_evals.coefs,
+            n_constraints,
+        );
         let blinds = hide_polynomial(prng, &mut z_coefs, 2, n_constraints);
         let cm_z = lagrange_pcs
             .commit(&z_evals)
@@ -185,9 +192,12 @@ pub fn prover_with_lagrange<
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
         (cm_z, z_coefs)
     } else {
-        let z_evals = z_poly::<PCS, CS>(cs, params, &extended_witness, &challenges);
-        let mut z_coefs =
-            FpPolynomial::ffti(&params.verifier_params.root, &z_evals.coefs, n_constraints);
+        let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
+        let mut z_coefs = FpPolynomial::ffti(
+            &prover_params.verifier_params.root,
+            &z_evals.coefs,
+            n_constraints,
+        );
         let _ = hide_polynomial(prng, &mut z_coefs, 2, n_constraints);
         let cm_z = pcs.commit(&z_coefs).c(d!(PlonkError::CommitmentError))?;
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
@@ -200,7 +210,8 @@ pub fn prover_with_lagrange<
     challenges.insert_alpha(alpha).unwrap();
 
     // 5. build t, split into `n_wires_per_gate` degree-(N+2) polynomials and commit
-    let t_poly = t_poly::<PCS, CS>(cs, params, &witness_polys, &sigma, &challenges, &io).c(d!())?;
+    let t_poly =
+        t_poly::<PCS, CS>(cs, prover_params, &w_polys, &z_poly, &challenges, &pi).c(d!())?;
     let (cm_t_vec, t_polys) =
         split_t_and_commit(pcs, &t_poly, n_wires_per_gate, n_constraints + 2).c(d!())?;
 
@@ -212,70 +223,74 @@ pub fn prover_with_lagrange<
     let zeta = transcript_get_plonk_challenge_zeta(transcript, n_constraints);
     challenges.insert_zeta(zeta).unwrap();
 
-    // 7. a) Evaluate the openings of witness/permutation polynomials at zeta, and
-    // evaluate the opening of z(X) at point \omega * zeta.
-    let w_polys_eval_zeta: Vec<PCS::Field> = witness_polys
-        .iter()
-        .map(|open| pcs.eval(open, &zeta))
-        .collect();
-    let z_poly_eval_zeta: Vec<PCS::Field> = params
+    // 7. a) Evaluate the openings of witness/permutation polynomials at \zeta, and
+    // evaluate the opening of z(X) at point \omega * \zeta.
+    let w_polys_eval_zeta: Vec<PCS::Field> =
+        w_polys.iter().map(|poly| pcs.eval(poly, &zeta)).collect();
+    let s_polys_eval_zeta: Vec<PCS::Field> = prover_params
         .s_polys
         .iter()
         .take(n_wires_per_gate - 1)
-        .map(|open| pcs.eval(open, &zeta))
+        .map(|poly| pcs.eval(poly, &zeta))
         .collect();
 
     let zeta_omega = root.mul(&zeta);
-    let s_eval_zeta_omega = pcs.eval(&sigma, &zeta_omega);
+    let z_eval_zeta_omega = pcs.eval(&z_poly, &zeta_omega);
 
-    //  b). build linearization polynomial r_zeta(X), and eval at zeta
-    for eval_zeta in w_polys_eval_zeta.iter().chain(z_poly_eval_zeta.iter()) {
+    //  b). build the r polynomial, and eval at zeta
+    for eval_zeta in w_polys_eval_zeta.iter().chain(s_polys_eval_zeta.iter()) {
         transcript.append_field_elem(eval_zeta);
     }
-    transcript.append_field_elem(&s_eval_zeta_omega);
+    transcript.append_field_elem(&z_eval_zeta_omega);
 
+    // 8. get challenge u
     let u = transcript_get_plonk_challenge_u(transcript, cs.size());
     challenges.insert_u(u).unwrap();
 
     let w_polys_eval_zeta_as_ref: Vec<&PCS::Field> = w_polys_eval_zeta.iter().collect();
-    let z_poly_eval_zeta_as_ref: Vec<&PCS::Field> = z_poly_eval_zeta.iter().collect();
+    let s_poly_eval_zeta_as_ref: Vec<&PCS::Field> = s_polys_eval_zeta.iter().collect();
 
     let r_poly = r_poly::<PCS, CS>(
-        params,
-        &sigma,
+        prover_params,
+        &z_poly,
         &w_polys_eval_zeta_as_ref[..],
-        &z_poly_eval_zeta_as_ref[..],
-        &s_eval_zeta_omega,
+        &s_poly_eval_zeta_as_ref[..],
+        &z_eval_zeta_omega,
         &challenges,
         &t_polys,
         n_constraints + 2,
     );
 
-    let mut polys_to_open: Vec<&FpPolynomial<PCS::Field>> = witness_polys
+    let mut polys_to_open: Vec<&FpPolynomial<PCS::Field>> = w_polys
         .iter()
-        .chain(params.s_polys.iter().take(CS::n_wires_per_gate() - 1))
+        .chain(
+            prover_params
+                .s_polys
+                .iter()
+                .take(CS::n_wires_per_gate() - 1),
+        )
         .collect();
     polys_to_open.push(&r_poly);
 
     let zeta = challenges.get_zeta().unwrap();
 
-    let eval_proof_1 = pcs
+    let opening_witness_zeta = pcs
         .batch_prove(transcript, &polys_to_open[..], &zeta, n_constraints + 2)
         .c(d!(PlonkError::ProofError))?;
 
-    let eval_proof_2 = pcs
-        .prove(transcript, &sigma, &zeta_omega, n_constraints + 2)
+    let opening_witness_zeta_omega = pcs
+        .prove(transcript, &z_poly, &zeta_omega, n_constraints + 2)
         .c(d!(PlonkError::ProofError))?;
 
     // return proof
     Ok(PlonkProof {
-        cm_w_vec: c_witness_polys,
+        cm_w_vec,
         cm_t_vec,
         cm_z,
         w_polys_eval_zeta,
-        z_eval_zeta_omega: s_eval_zeta_omega,
-        s_polys_eval_zeta: z_poly_eval_zeta,
-        opening_witness_zeta: eval_proof_1,
-        opening_witness_zeta_omega: eval_proof_2,
+        z_eval_zeta_omega,
+        s_polys_eval_zeta,
+        opening_witness_zeta,
+        opening_witness_zeta_omega,
     })
 }
