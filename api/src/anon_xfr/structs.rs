@@ -128,11 +128,17 @@ impl OpenAnonBlindAssetRecord {
     /// computes record's amount||asset type||pub key commitment
     pub fn compute_commitment(&self) -> Commitment {
         let hash = RescueInstance::new();
-        hash.rescue(&[
+        let cur = hash.rescue(&[
             self.blind,
             BLSScalar::from(self.amount),
             self.asset_type.as_scalar(),
+            BLSScalar::zero(),
+        ])[0];
+        hash.rescue(&[
+            cur,
             self.pub_key.0.point_ref().get_x(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
         ])[0]
     }
 }

@@ -145,12 +145,20 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
     let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-    let z = z_instance.rescue(&[
-        z_randomizer,
-        x_in_bls12_381,
-        y_in_bls12_381,
-        abar_pubkey.0.point_ref().get_x(),
-    ])[0];
+    let z = {
+        let cur = z_instance.rescue(&[
+            z_randomizer,
+            x_in_bls12_381,
+            y_in_bls12_381,
+            BLSScalar::zero(),
+        ])[0];
+        z_instance.rescue(&[
+            cur,
+            abar_pubkey.0.point_ref().get_x(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+        ])[0]
+    };
 
     // 3. compute the non-ZK part of the proof
     let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
@@ -536,12 +544,15 @@ pub(crate) fn build_bar_to_abar_cs(
     }
 
     // 7. Rescue commitment
-    let rescue_comm_var = cs.rescue_hash(&StateVar::new([
-        blind_hash_var,
-        amount_var,
-        at_var,
-        pubkey_x_var,
-    ]))[0];
+    let rescue_comm_var = {
+        let cur = cs.rescue_hash(&StateVar::new([
+            blind_hash_var,
+            amount_var,
+            at_var,
+            zero_var,
+        ]))[0];
+        cs.rescue_hash(&StateVar::new([cur, pubkey_x_var, zero_var, zero_var]))[0]
+    };
 
     // prepare public inputs
     cs.prepare_pi_variable(rescue_comm_var);
@@ -581,7 +592,7 @@ mod test {
         structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo},
     };
     use num_bigint::BigUint;
-    use num_traits::One;
+    use num_traits::{One, Zero};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use std::ops::AddAssign;
@@ -742,7 +753,15 @@ mod test {
 
         let pubkey_x = BLSScalar::random(&mut rng);
 
-        let z = z_instance.rescue(&[z_randomizer, x_in_bls12_381, y_in_bls12_381, pubkey_x])[0];
+        let z = {
+            let cur = z_instance.rescue(&[
+                z_randomizer,
+                x_in_bls12_381,
+                y_in_bls12_381,
+                BLSScalar::zero(),
+            ])[0];
+            z_instance.rescue(&[cur, pubkey_x, BLSScalar::zero(), BLSScalar::zero()])[0]
+        };
 
         // 2. compute the ZK part of the proof
         let (proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(

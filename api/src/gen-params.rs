@@ -40,9 +40,6 @@ enum Actions {
     /// Generates the verifying key for ABAR to AR transform
     ABAR_TO_AR { directory: PathBuf },
 
-    /// Generates the verifying key for anonymous fees
-    ANON_FEE { directory: PathBuf },
-
     /// Generates the uniform reference string for Bulletproof
     BULLETPROOF { directory: PathBuf },
 }
@@ -73,10 +70,6 @@ fn main() {
             gen_abar_to_ar_vk(directory);
         }
 
-        ANON_FEE { directory } => {
-            gen_anon_fee_vk(directory);
-        }
-
         BULLETPROOF { directory } => gen_bulletproof_urs(directory),
     };
 }
@@ -96,7 +89,6 @@ fn gen_transfer_vk(directory: PathBuf) {
     common_path.push("transfer-vk-common.bin");
     save_to_file(&common_ser, common_path);
 
-    //let mut need_common = true;
     let is: Vec<usize> = (1..=PRECOMPUTED_PARTY_NUMBER).map(|i| i).collect();
     let mut bytes: HashMap<usize, Vec<Vec<u8>>> = is
         .par_iter()
