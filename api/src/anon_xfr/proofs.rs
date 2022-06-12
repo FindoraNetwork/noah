@@ -7,7 +7,7 @@ use merlin::Transcript;
 use zei_algebra::bls12_381::BLSScalar;
 use zei_algebra::prelude::*;
 use zei_plonk::{
-    plonk::{prover::prover_with_lagrange, setup::PlonkPf, verifier::verifier},
+    plonk::{indexer::PlonkPf, prover::prover_with_lagrange, verifier::verifier},
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
 

@@ -13,7 +13,7 @@ pub mod rescue;
 pub mod turbo;
 
 /// Default used constraint system.
-pub use turbo::TurboConstraintSystem;
+pub use turbo::TurboCS;
 
 /// Variable index
 pub type VarIndex = usize;
@@ -27,8 +27,8 @@ pub trait ConstraintSystem: Sized {
     type Field: Scalar;
 
     /// Return the number of constraints in the system.
-    /// `size should divide q-1 where q is the size of the prime field.
-    /// This enables finding a multiplicative subgroup with order `size.
+    /// `size` should divide q-1 where q is the size of the prime field.
+    /// This enables finding a multiplicative subgroup with order `size`.
     fn size(&self) -> usize;
 
     /// Return number of variables in the constrain system
@@ -92,7 +92,7 @@ pub trait ConstraintSystem: Sized {
         let mut extended = Vec::with_capacity(Self::n_wires_per_gate() * self.size());
         for wire_slice in self.wiring().iter() {
             for index in wire_slice.iter() {
-                extended.push(witness[*index]);
+                extended.push(witness[*index].clone());
             }
         }
         extended

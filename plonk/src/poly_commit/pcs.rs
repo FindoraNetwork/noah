@@ -4,14 +4,13 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use zei_algebra::prelude::*;
 
-/// The trait for help serialize to bytes,
-/// implement by polynomial commitment.
+/// The trait for serialization to bytes
 pub trait ToBytes {
     /// Convert to bytes.
     fn to_bytes(&self) -> Vec<u8>;
 }
 
-/// The trait for homomorphic polynomial commitment field.
+/// The trait for homomorphic polynomial commitment or polynomial.
 pub trait HomomorphicPolyComElem: ToBytes + Clone {
     /// This is the scalar field of the polynomial.
     type Scalar;
@@ -34,12 +33,12 @@ pub trait HomomorphicPolyComElem: ToBytes + Clone {
     /// Subtract assign the underlying polynomials.
     fn sub_assign(&mut self, other: &Self);
 
-    /// Multiply underlying polynomial by scalar `exp` represented
+    /// Multiply underlying polynomial by scalar `scalar` represented
     /// in least significant byte first.
-    fn mul(&self, exp: &Self::Scalar) -> Self;
+    fn mul(&self, scalar: &Self::Scalar) -> Self;
 
-    /// Multiply underlying polynomial by scalar `exp`.
-    fn mul_assign(&mut self, exp: &Self::Scalar);
+    /// Multiply underlying polynomial by scalar `scalar`.
+    fn mul_assign(&mut self, scalar: &Self::Scalar);
 }
 
 /// Trait for polynomial commitment scheme.
@@ -56,38 +55,20 @@ pub trait PolyComScheme: Sized {
         + Serialize
         + for<'de> Deserialize<'de>;
 
-    /// Type of `Opening`.
-    type Opening: HomomorphicPolyComElem<Scalar = Self::Field> + Debug + PartialEq + Eq + Clone;
-
-    /// Returns maximal supported degree
+    /// Return maximal supported degree
     fn max_degree(&self) -> usize;
 
     /// Commit to the polynomial, commitment is binding.
-    fn commit(
-        &self,
-        polynomial: FpPolynomial<Self::Field>,
-    ) -> Result<(Self::Commitment, Self::Opening)>;
-
-    /// Return the opening of an original commitment of the polynomial.
-    fn opening(&self, polynomial: &FpPolynomial<Self::Field>) -> Self::Opening;
+    fn commit(&self, polynomial: &FpPolynomial<Self::Field>) -> Result<Self::Commitment>;
 
     /// Evaluate the polynomial using the commitment opening to it.
-    fn eval_opening(&self, opening: &Self::Opening, point: &Self::Field) -> Self::Field;
-
-    /// Compute the commitment of a polynomial given its opening.
-    fn commitment_from_opening(&self, opening: &Self::Opening) -> Self::Commitment;
-
-    /// Computes the polynomial from an opening. This is slow as the polynomial is build.
-    fn polynomial_from_opening_ref(&self, opening: &Self::Opening) -> FpPolynomial<Self::Field>;
-
-    /// Transform the opening into a polynomial.
-    fn polynomial_from_opening(&self, opening: Self::Opening) -> FpPolynomial<Self::Field>;
+    fn eval(&self, polynomial: &FpPolynomial<Self::Field>, point: &Self::Field) -> Self::Field;
 
     /// Evaluate the polynomial producing a proof for it.
     fn prove(
         &self,
         transcript: &mut Transcript,
-        opening: &Self::Opening,
+        polynomial: &FpPolynomial<Self::Field>,
         point: &Self::Field,
         max_degree: usize,
     ) -> Result<Self::Commitment>;
@@ -119,29 +100,27 @@ pub trait PolyComScheme: Sized {
     fn batch_prove(
         &self,
         transcript: &mut Transcript,
-        openings: &[&Self::Opening],
+        polys: &[&FpPolynomial<Self::Field>],
         point: &Self::Field,
         max_degree: usize,
     ) -> Result<Self::Commitment> {
-        let n = openings.len();
+        let n = polys.len();
         assert!(n > 0);
 
         Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
 
-        // 1. Compute quotient Polynomial q(X) = h(X)/z(X), where
-        // h(X) = \sum_i \alpha^i * [fi(X) - fi(xi)]
         let alpha = transcript.get_challenge_field_elem(b"alpha");
         let mut h = FpPolynomial::<Self::Field>::zero();
-        let mut c_i = Self::Field::one(); // linear combination first scalar = alpha^0
+        let mut multiplier = Self::Field::one();
         let z = FpPolynomial::from_zeroes(&[point.clone()]);
 
-        for open in openings.iter() {
-            let mut poly = self.polynomial_from_opening_ref(open);
+        for poly in polys.iter() {
+            let mut poly = (*poly).clone();
             let eval_value = poly.eval(point);
             poly.sub_assign(&FpPolynomial::from_coefs(vec![eval_value]));
-            poly.mul_scalar_assign(&c_i);
+            poly.mul_scalar_assign(&multiplier);
             h.add_assign(&poly);
-            c_i.mul_assign(&alpha);
+            multiplier.mul_assign(&alpha);
         }
 
         let (q, rem) = h.div_rem(&z);
@@ -149,39 +128,34 @@ pub trait PolyComScheme: Sized {
             return Err(eg!());
         }
 
-        let (c_q, _) = self.commit(q).c(d!())?;
-        Ok(c_q)
+        let cm = self.commit(&q).c(d!())?;
+        Ok(cm)
     }
 
-    /// Combine multiple commitments into one commitment
+    /// Combine multiple commitments into one commitment.
     fn batch(
         &self,
         transcript: &mut Transcript,
-        commitments: &[&Self::Commitment],
+        cm_vec: &[&Self::Commitment],
         max_degree: usize,
         point: &Self::Field,
-        values: &[Self::Field],
+        evals: &[Self::Field],
     ) -> (Self::Commitment, Self::Field) {
         Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
         let alpha = transcript.get_challenge_field_elem::<Self::Field>(b"alpha");
 
-        // Compute commitment F = com_lc - Com(q(X) * z(\rho)), where
-        // com_lc = sum_i alpha^i * z_i_bar(\rho)) * Com((f_i(X) - y_i)
-        //        = sum_i alpha^i * z_i_bar(\rho)) * Com(f_i(X))
-        //          - Com(sum_i alpha^i * z_i_bar(\rho)) * y_i)
-        let mut c_i = Self::Field::one();
-        let mut com_lc = Self::Commitment::get_identity();
-        let mut val_lc = Self::Field::zero();
-        for (value, commitment) in values.iter().zip(commitments) {
-            com_lc = com_lc.add(&commitment.mul(&c_i));
-            let value_times_scalar = c_i.mul(value);
-            val_lc.add_assign(&value_times_scalar);
-            c_i.mul_assign(&alpha);
+        let mut multiplier = Self::Field::one();
+        let mut cm_combined = Self::Commitment::get_identity();
+        let mut eval_combined = Self::Field::zero();
+        for (eval, cm) in evals.iter().zip(cm_vec) {
+            cm_combined = cm_combined.add(&cm.mul(&multiplier));
+            eval_combined.add_assign(&multiplier.mul(eval));
+            multiplier.mul_assign(&alpha);
         }
-        (com_lc, val_lc)
+        (cm_combined, eval_combined)
     }
 
-    /// Verify a batched proof
+    /// Verify a batched proof.
     fn batch_verify(
         &self,
         transcript: &mut Transcript,
@@ -191,25 +165,33 @@ pub trait PolyComScheme: Sized {
         values: &[Self::Field],
         proof: &Self::Commitment,
     ) -> Result<()> {
-        let (com_lc, val_lc) = self.batch(transcript, commitments, max_degree, point, values);
+        let (cm_combined, eval_combined) =
+            self.batch(transcript, commitments, max_degree, point, values);
 
-        self.verify(transcript, &com_lc, max_degree, &point, &val_lc, &proof)
-            .c(d!())
+        self.verify(
+            transcript,
+            &cm_combined,
+            max_degree,
+            &point,
+            &eval_combined,
+            &proof,
+        )
+        .c(d!())
     }
 
-    /// Batch verify a list of proofs with different points
+    /// Batch verify a list of proofs with different points.
     fn batch_verify_diff_points(
         &self,
         _transcript: &mut Transcript,
-        c: &[Self::Commitment],
+        cm_vec: &[Self::Commitment],
         _degree: usize,
-        x: &[Self::Field],
-        y: &[Self::Field],
+        point_vec: &[Self::Field],
+        eval_vec: &[Self::Field],
         proof: &[Self::Commitment],
         challenge: &Self::Field,
     ) -> Result<()>;
 
-    /// Compute the transaction when batch eval.
+    /// Initialize the transcript for batch evaluation.
     fn init_pcs_batch_eval_transcript(
         transcript: &mut Transcript,
         max_degree: usize,
@@ -219,7 +201,7 @@ pub trait PolyComScheme: Sized {
         Self::transcript_append_params(transcript, max_degree, point);
     }
 
-    /// Append params to the transaction.
+    /// Append params to the transcript.
     fn transcript_append_params(
         transcript: &mut Transcript,
         max_degree: usize,
@@ -232,51 +214,6 @@ pub trait PolyComScheme: Sized {
 
     /// Shrink this to only for verifier use.
     fn shrink_to_verifier_only(&self) -> Result<Self>;
-}
-
-/// Uses a binding polynomial commitment scheme and transforms it into
-/// a binding and hiding polynomial commitment scheme.
-pub struct HidingPCS<'a, PCS> {
-    /// A polynomial commitment scheme.
-    pub pcs: &'a PCS,
-}
-
-impl<PCS: PolyComScheme> HidingPCS<'_, PCS> {
-    /// Return by a polynomial commitment scheme.
-    pub fn new(pcs: &PCS) -> HidingPCS<'_, PCS> {
-        HidingPCS { pcs }
-    }
-
-    /// Randomize the polynomial so that commitment of the original
-    /// polynomial is binding and hiding.
-    pub fn hide_polynomial(
-        &self,
-        polynomial: &FpPolynomial<PCS::Field>,
-        blind: &PCS::Field,
-    ) -> FpPolynomial<PCS::Field> {
-        let mut coefs = vec![*blind];
-        coefs.extend_from_slice(polynomial.get_coefs_ref());
-        FpPolynomial::from_coefs(coefs)
-    }
-
-    /// Commit to `polynomial` under blinding `blind`.
-    pub fn commit(
-        &self,
-        polynomial: &FpPolynomial<PCS::Field>,
-        blind: &PCS::Field,
-    ) -> PCS::Commitment {
-        let hidden = self.hide_polynomial(polynomial, blind);
-        self.pcs.commit(hidden).unwrap().0
-    }
-}
-
-/// The trait for shift polynomial commitment scheme.
-pub trait ShiftPCS: PolyComScheme {
-    /// Shift polynomial by one and add blind.
-    fn to_hidden(&self, commitment: &Self::Commitment, blind: &Self::Field) -> Self::Commitment;
-
-    /// Shift the underling polynomial by appending low order zero coefficients.
-    fn shift(&self, commitment: &Self::Commitment, n: usize) -> Self::Commitment;
 }
 
 #[cfg(test)]
@@ -299,13 +236,13 @@ mod test {
         let poly = FpPolynomial::from_zeroes(&[zero, one, two]);
         let degree = poly.degree();
         let pcs = KZGCommitmentScheme::new(degree, &mut prng);
-        let (com, open) = pcs.commit(poly).unwrap();
+        let com = pcs.commit(&poly).unwrap();
         let point = BLSScalar::random(&mut prng);
         let proof = {
             let mut transcript = Transcript::new(b"TestPCS");
-            pcs.prove(&mut transcript, &open, &point, degree).unwrap()
+            pcs.prove(&mut transcript, &poly, &point, degree).unwrap()
         };
-        let eval = pcs.eval_opening(&open, &point);
+        let eval = pcs.eval(&poly, &point);
         {
             let mut transcript = Transcript::new(b"TestPCS");
             assert!(pcs
@@ -327,19 +264,19 @@ mod test {
         let poly3 = FpPolynomial::from_coefs(vec![two, two, two, two]);
         let degree = poly3.degree();
         let pcs = KZGCommitmentScheme::new(degree + 1, &mut prng);
-        let (com1, open1) = pcs.commit(poly1).unwrap();
-        let (com2, open2) = pcs.commit(poly2).unwrap();
-        let (com3, open3) = pcs.commit(poly3).unwrap();
+        let com1 = pcs.commit(&poly1).unwrap();
+        let com2 = pcs.commit(&poly2).unwrap();
+        let com3 = pcs.commit(&poly3).unwrap();
         let point = Field::random(&mut prng);
         let proof = {
             let mut transcript = Transcript::new(b"TestPCS");
-            pcs.batch_prove(&mut transcript, &[&open1, &open2, &open3], &point, degree)
+            pcs.batch_prove(&mut transcript, &[&poly1, &poly2, &poly3], &point, degree)
                 .unwrap()
         };
         let evals = vec![
-            pcs.eval_opening(&open1, &point),
-            pcs.eval_opening(&open2, &point),
-            pcs.eval_opening(&open3, &point),
+            pcs.eval(&poly1, &point),
+            pcs.eval(&poly2, &point),
+            pcs.eval(&poly3, &point),
         ];
         {
             let mut transcript = Transcript::new(b"TestPCS");

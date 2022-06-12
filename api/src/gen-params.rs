@@ -194,22 +194,6 @@ fn gen_abar_to_ar_vk(mut path: PathBuf) {
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
-// cargo run --release --features="gen no_vk" --bin gen-params anon-fee "./parameters"
-fn gen_anon_fee_vk(mut path: PathBuf) {
-    println!("Generating the verifying key for anonymous fees ...");
-
-    let user_params = ProverParams::anon_fee_params(TREE_DEPTH).unwrap();
-    let node_params = VerifierParams::from(user_params).shrink().unwrap();
-    let bytes = bincode::serialize(&node_params).unwrap();
-    path.push("anon-fee-vk.bin");
-    save_to_file(&bytes, path);
-
-    let start = std::time::Instant::now();
-    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
-    let elapsed = start.elapsed();
-    println!("Deserialize time: {:.2?}", elapsed);
-}
-
 // cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof "./parameters"
 fn gen_bulletproof_urs(mut path: PathBuf) {
     println!("Generating Bulletproof uniform reference string ...");
