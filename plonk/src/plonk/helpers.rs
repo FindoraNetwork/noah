@@ -344,12 +344,12 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     l.sub_assign(&last_s_poly_or_comm.mul(&s_last_poly_scalar));
 
     // 4. subtract the combined t polynomial
-    let mut z_h_eval_beta = zeta.pow(&[n as u64]);
-    z_h_eval_beta.sub_assign(&F::one());
+    let mut z_h_eval_zeta = zeta.pow(&[n as u64]);
+    z_h_eval_zeta.sub_assign(&F::one());
 
     let factor = zeta.pow(&[n_t_polys as u64]);
-    let mut exponent = z_h_eval_beta * factor;
-    let mut t_poly_combined = t_polys_or_comms[0].clone().mul(&z_h_eval_beta);
+    let mut exponent = z_h_eval_zeta * factor;
+    let mut t_poly_combined = t_polys_or_comms[0].clone().mul(&z_h_eval_zeta);
     for t_poly in t_polys_or_comms.iter().skip(1) {
         t_poly_combined.add_assign(&t_poly.mul(&exponent));
         exponent.mul_assign(&factor);
