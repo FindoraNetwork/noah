@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    circuits::{commit, PayeeSecret, PayeeSecretVars, TurboPlonkCS},
+    anonymous_transfer::{commit, PayeeSecret, PayeeSecretVars, TurboPlonkCS},
     keys::AXfrPubKey,
     proofs::AXfrPlonkPf,
     structs::{

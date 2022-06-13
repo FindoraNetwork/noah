@@ -41,11 +41,12 @@ pub struct PayeeSecret {
 pub(crate) struct AMultiXfrWitness {
     pub payers_secrets: Vec<PayerSecret>,
     pub payees_secrets: Vec<PayeeSecret>,
+    pub fee: u32,
 }
 
 impl AMultiXfrWitness {
     // create a default `AMultiXfrWitness`.
-    pub(crate) fn fake(n_payers: usize, n_payees: usize, tree_depth: usize) -> Self {
+    pub(crate) fn fake(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
         let bls_zero = BLSScalar::zero();
         let jubjub_zero = JubjubScalar::zero();
         let node = MTNode {
@@ -72,6 +73,7 @@ impl AMultiXfrWitness {
         AMultiXfrWitness {
             payers_secrets: vec![payer_secret; n_payers],
             payees_secrets: vec![payee_secret; n_payees],
+            fee,
         }
     }
 }
@@ -82,6 +84,7 @@ pub(crate) struct AMultiXfrPubInputs {
     pub payers_inputs: Vec<Nullifier>,
     pub payees_commitments: Vec<Commitment>,
     pub merkle_root: BLSScalar,
+    pub fee: u32,
 }
 
 impl AMultiXfrPubInputs {
@@ -97,6 +100,8 @@ impl AMultiXfrPubInputs {
         for comm in &self.payees_commitments {
             result.push(*comm);
         }
+        // fee
+        result.push(BLSScalar::from(self.fee));
         result
     }
 
@@ -174,6 +179,7 @@ impl AMultiXfrPubInputs {
             payers_inputs,
             payees_commitments,
             merkle_root: node,
+            fee: witness.fee,
         }
     }
 }
@@ -185,7 +191,6 @@ impl AMultiXfrPubInputs {
 pub(crate) fn build_multi_xfr_cs(
     secret_inputs: AMultiXfrWitness,
     fee_type: BLSScalar,
-    fee_calculating_func: &dyn Fn(u32, u32) -> u32,
     hash: &BLSScalar,
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
@@ -279,7 +284,12 @@ pub(crate) fn build_multi_xfr_cs(
         .iter()
         .map(|payee| (payee.asset_type, payee.amount))
         .collect();
-    asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
+
+    let fee_var = cs.new_variable(BLSScalar::from(secret_inputs.fee));
+    cs.range_check(fee_var, 32);
+    cs.prepare_pi_variable(fee_var);
+
+    asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
 
     // Check that validity of the the non malleability tag.
     {
@@ -544,7 +554,7 @@ fn asset_mixing(
     inputs: &[(VarIndex, VarIndex)],
     outputs: &[(VarIndex, VarIndex)],
     fee_type: BLSScalar,
-    fee_calculating_func: &dyn Fn(u32, u32) -> u32,
+    fee_var: VarIndex,
 ) {
     // Compute the `sum_in_i`
     let inputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = inputs
@@ -585,14 +595,6 @@ fn asset_mixing(
     // Initialize a constant value `fee_type_val`
     let fee_type_val = cs.new_variable(fee_type);
     cs.insert_constant_gate(fee_type_val, fee_type);
-
-    // Calculate the fee
-    let fee = BLSScalar::from(fee_calculating_func(
-        inputs.len() as u32,
-        outputs.len() as u32,
-    ));
-    let fee_var = cs.new_variable(fee);
-    cs.insert_constant_gate(fee_var, fee);
 
     // At least one input type is `fee_type` by checking `flag_no_fee_type = 0`
     // and also check that the amount is matching
@@ -672,6 +674,7 @@ pub(crate) mod tests {
     pub(crate) fn new_multi_xfr_witness_for_test(
         inputs: Vec<(u64, BLSScalar)>,
         outputs: Vec<(u64, BLSScalar, BLSScalar)>,
+        fee: u32,
         seed: [u8; 32],
     ) -> AMultiXfrWitness {
         let n_payers = inputs.len();
@@ -750,6 +753,7 @@ pub(crate) mod tests {
         AMultiXfrWitness {
             payers_secrets,
             payees_secrets,
+            fee,
         }
     }
 
@@ -760,7 +764,8 @@ pub(crate) mod tests {
 
         // Fee function
         // base fee 5, every input 1, every output 2
-        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
+        let fee_calculating_func =
+            |x: usize, y: usize| BLSScalar::from(5 + (x as u32) + 2 * (y as u32));
 
         // Constants
         let zero = BLSScalar::zero();
@@ -780,7 +785,9 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), 0));
+        asset_mixing(&mut cs, &inputs, &[], fee_type, fee_var);
+
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
@@ -797,7 +804,9 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), 0));
+        asset_mixing(&mut cs, &inputs, &[], fee_type, fee_var);
+
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -814,7 +823,9 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), 0));
+        asset_mixing(&mut cs, &inputs, &[], fee_type, fee_var);
+
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -852,7 +863,8 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -890,7 +902,8 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
@@ -945,7 +958,8 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
@@ -1002,7 +1016,8 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
@@ -1059,7 +1074,8 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1113,8 +1129,8 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1170,8 +1186,8 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1227,8 +1243,8 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1272,7 +1288,8 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
@@ -1314,7 +1331,8 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }
@@ -1528,8 +1546,8 @@ pub(crate) mod tests {
         let fee_type = BLSScalar::from(1234u32);
 
         // Fee function
-        // base fee 5, every input 1, every output 2
-        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
+        // base fee 5, every input 1, every output 29
+        let fee_calculating_func = |x: usize, y: usize| 5 + (x as u32) + 2 * (y as u32);
 
         // Receiver pub key x coordinate
         let pubkey_x = BLSScalar::from(4567u32);
@@ -1551,12 +1569,13 @@ pub(crate) mod tests {
             outputs.to_vec(),
             true,
             fee_type,
-            &fee_calculating_func,
+            fee_calculating_func(inputs.len(), outputs.len()),
         );
 
         // single-asset api: bad witness
         outputs[2].0 = 5 + 3 + 2 * 3 - 1;
-        test_xfr_cs(inputs, outputs, false, fee_type, &fee_calculating_func);
+        let fee = fee_calculating_func(inputs.len(), outputs.len());
+        test_xfr_cs(inputs, outputs, false, fee_type, fee);
 
         // multi-assets api: good witness
         let one = BLSScalar::one();
@@ -1579,12 +1598,13 @@ pub(crate) mod tests {
             outputs.to_vec(),
             true,
             fee_type,
-            &fee_calculating_func,
+            fee_calculating_func(inputs.len(), outputs.len()),
         );
 
         // multi-assets api: bad witness
         outputs[2].0 = 5 + 3 + 2 * 7 + 100 - 1;
-        test_xfr_cs(inputs, outputs, false, fee_type, &fee_calculating_func);
+        let fee = fee_calculating_func(inputs.len(), outputs.len());
+        test_xfr_cs(inputs, outputs, false, fee_type, fee);
     }
 
     fn test_xfr_cs(
@@ -1592,9 +1612,9 @@ pub(crate) mod tests {
         outputs: Vec<(u64, BLSScalar, BLSScalar)>,
         witness_is_valid: bool,
         fee_type: BLSScalar,
-        fee_calculating_func: &dyn Fn(u32, u32) -> u32,
+        fee: u32,
     ) {
-        let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [0u8; 32]);
+        let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, fee, [0u8; 32]);
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -1615,7 +1635,6 @@ pub(crate) mod tests {
         let (mut cs, _) = build_multi_xfr_cs(
             secret_inputs,
             fee_type,
-            fee_calculating_func,
             &hash,
             &non_malleability_randomizer,
             &non_malleability_tag,

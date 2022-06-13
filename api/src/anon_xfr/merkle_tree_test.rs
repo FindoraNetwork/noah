@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::{
-        circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
+        anonymous_transfer::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
         structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
     };
     use parking_lot::RwLock;
