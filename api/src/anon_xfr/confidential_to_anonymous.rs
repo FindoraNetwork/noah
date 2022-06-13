@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    circuits::TurboPlonkCS,
+    anonymous_transfer::TurboPlonkCS,
     keys::AXfrPubKey,
     proofs::AXfrPlonkPf,
     structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
@@ -254,7 +254,7 @@ pub(crate) fn verify_bar_to_abar(
     .c(d!())
 }
 
-/// I generates the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
+/// Generate the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
 /// * `rng` - pseudo-random generator.
 /// * `params` - System params
 /// * `amount` - transaction amount

@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    circuits::{
+    anonymous_transfer::{
         add_merkle_path_variables, commit, compute_merkle_root, nullify, AccElemVars,
         NullifierInputVars, PayerSecret, PayerSecretVars, TurboPlonkCS,
     },
@@ -658,7 +658,7 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 mod tests {
     use crate::anon_xfr::{
         anonymous_to_confidential::{gen_abar_to_bar_note, verify_abar_to_bar_note},
-        circuits::TREE_DEPTH,
+        anonymous_transfer::TREE_DEPTH,
         keys::AXfrKeyPair,
         structs::{
             AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,

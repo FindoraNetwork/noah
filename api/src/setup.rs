@@ -2,11 +2,11 @@
 use crate::anon_xfr::{
     anonymous_to_confidential::build_abar_to_bar_cs,
     anonymous_to_transparent::build_abar_to_ar_cs,
-    circuits::{
+    anonymous_transfer::{
         build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret, TurboPlonkCS, TREE_DEPTH,
     },
     confidential_to_anonymous::build_bar_to_abar_cs,
-    config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+    config::FEE_TYPE,
     structs::{MTNode, MTPath},
     transparent_to_anonymous::build_ar_to_abar_cs,
 };
@@ -120,17 +120,15 @@ impl ProverParams {
 
         let (cs, _) = match tree_depth {
             Some(depth) => build_multi_xfr_cs(
-                AMultiXfrWitness::fake(n_payers, n_payees, depth),
+                AMultiXfrWitness::fake(n_payers, n_payees, depth, 0),
                 FEE_TYPE.as_scalar(),
-                &FEE_CALCULATING_FUNC,
                 &hash,
                 &non_malleability_randomizer,
                 &non_malleability_tag,
             ),
             None => build_multi_xfr_cs(
-                AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH),
+                AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
                 FEE_TYPE.as_scalar(),
-                &FEE_CALCULATING_FUNC,
                 &hash,
                 &non_malleability_randomizer,
                 &non_malleability_tag,
@@ -450,7 +448,7 @@ impl From<ProverParams> for VerifierParams {
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::circuits::TREE_DEPTH;
+    use crate::anon_xfr::anonymous_transfer::TREE_DEPTH;
     use crate::parameters::SRS;
     use crate::setup::{ProverParams, VerifierParams};
     use zei_algebra::{

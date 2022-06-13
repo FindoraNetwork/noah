@@ -50,6 +50,7 @@ pub struct AXfrBody {
     pub outputs: Vec<AnonBlindAssetRecord>,
     pub merkle_root: BLSScalar,
     pub merkle_root_version: u64,
+    pub fee: u32,
     pub owner_memos: Vec<OwnerMemo>,
 }
 

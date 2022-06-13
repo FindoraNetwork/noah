@@ -1,14 +1,14 @@
 use crate::anon_xfr::structs::AXfrBody;
 use crate::anon_xfr::{
-    circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
-    config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+    anonymous_transfer::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
+    config::FEE_TYPE,
     keys::AXfrKeyPair,
     proofs::{prove_xfr, verify_xfr},
     structs::{AXfrNote, AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
-pub use circuits::TREE_DEPTH;
+pub use anonymous_transfer::TREE_DEPTH;
 use digest::Digest;
 use sha2::Sha512;
 use zei_algebra::{
@@ -25,7 +25,7 @@ use zei_crypto::basic::{
 pub mod anonymous_to_confidential;
 /// Module for converting anonymous assets to transparent assets.
 pub mod anonymous_to_transparent;
-pub(crate) mod circuits;
+pub(crate) mod anonymous_transfer;
 /// Module for converting confidential assets to anonymous assets.
 pub mod confidential_to_anonymous;
 pub mod config;
@@ -46,6 +46,7 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
     params: &ProverParams,
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
+    fee: u32,
     input_keypairs: &[AXfrKeyPair],
 ) -> Result<AXfrNote> {
     // 1. check input correctness
@@ -53,7 +54,7 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
         return Err(eg!(ZeiError::AXfrProverParamsError));
     }
     check_inputs(inputs, input_keypairs).c(d!())?;
-    check_asset_amount(inputs, outputs).c(d!())?;
+    check_asset_amount(inputs, outputs, fee).c(d!())?;
     check_roots(inputs).c(d!())?;
 
     // 2. build input witness infos
@@ -95,6 +96,7 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
     let secret_inputs = AMultiXfrWitness {
         payers_secrets,
         payees_secrets,
+        fee,
     };
     let out_abars = outputs
         .iter()
@@ -111,6 +113,7 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
         outputs: out_abars,
         merkle_root: mt_info_temp.root,
         merkle_root_version: mt_info_temp.root_version,
+        fee,
         owner_memos: out_memos.c(d!())?,
     };
 
@@ -162,6 +165,7 @@ pub fn verify_anon_xfr_note(
         payers_inputs: note.body.inputs.clone(),
         payees_commitments,
         merkle_root: *merkle_root,
+        fee: note.body.fee,
     };
 
     let msg = bincode::serialize(&note.body)
@@ -200,6 +204,7 @@ fn check_inputs(inputs: &[OpenAnonBlindAssetRecord], keypairs: &[AXfrKeyPair]) -
 fn check_asset_amount(
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
+    fee: u32,
 ) -> Result<()> {
     let fee_asset_type = FEE_TYPE;
     let mut balances = HashMap::new();
@@ -220,15 +225,13 @@ fn check_asset_amount(
         }
     }
 
-    let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32, outputs.len() as u32);
-
     for (&asset_type, &sum) in balances.iter() {
         if asset_type != fee_asset_type {
             if sum != 0i128 {
                 return Err(eg!(ZeiError::XfrCreationAssetAmountError));
             }
         } else {
-            if sum != fee_amount.into() {
+            if sum != fee.into() {
                 return Err(eg!(ZeiError::XfrCreationAssetAmountError));
             }
         }
@@ -395,7 +398,7 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::{
-        config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+        config::FEE_TYPE,
         gen_anon_xfr_note, hash_abar,
         keys::AXfrKeyPair,
         structs::{
@@ -450,10 +453,10 @@ mod tests {
         let two = one.add(&one);
 
         let asset_type = FEE_TYPE;
-        let fee_amount = FEE_CALCULATING_FUNC(1u32, 1u32) as u64;
+        let fee_amount = 65u32;
 
         let output_amount = 1 + prng.next_u64() % 100;
-        let input_amount = output_amount + fee_amount;
+        let input_amount = output_amount + fee_amount as u64;
 
         // simulate input abar
         let (oabar, keypair_in, dec_key_in, _) =
@@ -516,6 +519,7 @@ mod tests {
                 &user_params,
                 &[oabar_in],
                 &[oabar_out],
+                fee_amount,
                 &[keypair_in],
             )
             .unwrap();
@@ -580,9 +584,9 @@ mod tests {
 
         let user_params = ProverParams::new(1, 1, Some(TREE_DEPTH)).unwrap();
 
-        let fee_amount = FEE_CALCULATING_FUNC(1, 1) as u64;
+        let fee_amount = 25u32;
         let output_amount = 10u64;
-        let input_amount = output_amount + fee_amount;
+        let input_amount = output_amount + fee_amount as u64;
         let asset_type = FEE_TYPE;
 
         // simulate input abar
@@ -639,6 +643,7 @@ mod tests {
                 &user_params,
                 &[oabar_in],
                 &[oabar_out],
+                fee_amount,
                 &[keypair_in],
             )
             .unwrap();
@@ -703,7 +708,7 @@ mod tests {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
 
-        let fee_amount = FEE_CALCULATING_FUNC(3, 3) as u64;
+        let fee_amount = 15;
 
         // simulate input abars
         let amounts_in = vec![10u64 + fee_amount, 20u64, 30u64];
@@ -818,12 +823,20 @@ mod tests {
             // empty inputs/outputs
             msg_eq!(
                 ZeiError::AXfrProverParamsError,
-                gen_anon_xfr_note(&mut prng, &user_params, &[], &open_abars_out, &[]).unwrap_err(),
+                gen_anon_xfr_note(&mut prng, &user_params, &[], &open_abars_out, 15, &[])
+                    .unwrap_err(),
             );
             msg_eq!(
                 ZeiError::AXfrProverParamsError,
-                gen_anon_xfr_note(&mut prng, &user_params, &open_abars_in, &[], &in_keypairs)
-                    .unwrap_err(),
+                gen_anon_xfr_note(
+                    &mut prng,
+                    &user_params,
+                    &open_abars_in,
+                    &[],
+                    15,
+                    &in_keypairs
+                )
+                .unwrap_err(),
             );
             // invalid inputs/outputs
             open_abars_in[0].amount += 1;
@@ -832,6 +845,7 @@ mod tests {
                 &user_params,
                 &open_abars_in,
                 &open_abars_out,
+                15,
                 &in_keypairs
             )
             .is_err());
@@ -845,6 +859,7 @@ mod tests {
                 &user_params,
                 &open_abars_in,
                 &open_abars_out,
+                15,
                 &in_keypairs
             )
             .is_err());
@@ -857,6 +872,7 @@ mod tests {
                 &user_params,
                 &open_abars_in,
                 &open_abars_out,
+                15,
                 &in_keypairs,
             )
             .unwrap();
