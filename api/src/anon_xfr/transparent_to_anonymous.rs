@@ -244,14 +244,12 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
     let ar_asset_var = cs.new_variable(payee_data.asset_type);
     cs.prepare_pi_variable(ar_asset_var);
 
-    let amount = cs.new_variable(BLSScalar::from(payee_data.amount));
     let blind = cs.new_variable(payee_data.blind);
-    let asset_type = cs.new_variable(payee_data.asset_type);
     let pubkey_x = cs.new_variable(payee_data.pubkey_x);
     let payee = PayeeSecretVars {
-        amount,
+        amount: ar_amount_var,
         blind,
-        asset_type,
+        asset_type: ar_asset_var,
         pubkey_x,
     };
     // commitment
