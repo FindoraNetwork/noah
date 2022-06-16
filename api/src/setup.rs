@@ -1,14 +1,14 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::{
-    anonymous_to_confidential::build_abar_to_bar_cs,
-    anonymous_to_transparent::build_abar_to_ar_cs,
-    anonymous_transfer::{
+    abar_to_bar::build_abar_to_bar_cs,
+    abar_to_ar::build_abar_to_ar_cs,
+    circuits::{
         build_multi_xfr_cs, AMultiXfrWitness, PayeeSecret, PayerSecret, TurboPlonkCS, TREE_DEPTH,
     },
-    confidential_to_anonymous::build_bar_to_abar_cs,
+    bar_to_abar::build_bar_to_abar_cs,
     config::FEE_TYPE,
     structs::{MTNode, MTPath},
-    transparent_to_anonymous::build_ar_to_abar_cs,
+    ar_to_abar::build_ar_to_abar_cs,
 };
 use crate::parameters::{
     ABAR_TO_AR_VERIFIER_PARAMS, ABAR_TO_BAR_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS,
@@ -448,7 +448,7 @@ impl From<ProverParams> for VerifierParams {
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::anonymous_transfer::TREE_DEPTH;
+    use crate::anon_xfr::circuits::TREE_DEPTH;
     use crate::parameters::SRS;
     use crate::setup::{ProverParams, VerifierParams};
     use zei_algebra::{

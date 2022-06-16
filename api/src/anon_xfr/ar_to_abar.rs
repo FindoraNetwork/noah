@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    anonymous_transfer::{commit, PayeeSecret, PayeeSecretVars, TurboPlonkCS},
+    circuits::{commit_with_native_address, PayeeSecret, PayeeSecretVars, TurboPlonkCS},
     keys::AXfrPubKey,
     proofs::AXfrPlonkPf,
     structs::{
@@ -253,7 +253,7 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
         pubkey_x,
     };
     // commitment
-    let com_abar_out_var = commit(
+    let com_abar_out_var = commit_with_native_address(
         &mut cs,
         payee.blind,
         payee.amount,

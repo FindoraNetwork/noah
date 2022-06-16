@@ -218,7 +218,7 @@ pub(crate) fn build_multi_xfr_cs(
         let pk_x = pk_var.get_x();
 
         // commitments
-        let com_abar_in_var = commit(&mut cs, payer.blind, payer.amount, payer.asset_type, pk_x);
+        let com_abar_in_var = commit_with_native_address(&mut cs, payer.blind, payer.amount, payer.asset_type, pk_x);
 
         // prove pre-image of the nullifier
         // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
@@ -234,7 +234,7 @@ pub(crate) fn build_multi_xfr_cs(
             asset_type: payer.asset_type,
             pub_key_x: pk_x,
         };
-        let nullifier_var = nullify(&mut cs, payer.sec_key, nullifier_input_vars);
+        let nullifier_var = nullify_with_native_address(&mut cs, payer.sec_key, nullifier_input_vars);
 
         // Merkle path authentication
         let acc_elem = AccElemVars {
@@ -257,7 +257,7 @@ pub(crate) fn build_multi_xfr_cs(
 
     for payee in &payees_secrets {
         // commitment
-        let com_abar_out_var = commit(
+        let com_abar_out_var = commit_with_native_address(
             &mut cs,
             payee.blind,
             payee.amount,
@@ -286,7 +286,6 @@ pub(crate) fn build_multi_xfr_cs(
         .collect();
 
     let fee_var = cs.new_variable(BLSScalar::from(secret_inputs.fee));
-    cs.range_check(fee_var, 32);
     cs.prepare_pi_variable(fee_var);
 
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
@@ -493,7 +492,7 @@ pub(crate) fn compute_merkle_root(
 
 // Add the commitment constraints to the constraint system:
 // comm = commit(blinding, amount, asset_type)
-pub fn commit(
+pub fn commit_with_native_address(
     cs: &mut TurboPlonkCS,
     blinding_var: VarIndex,
     amount_var: VarIndex,
@@ -512,7 +511,7 @@ pub fn commit(
 // Let perm : Fp^w -> Fp^w be a public permutation.
 // Given secret key `key`, set initial state `s_key` := (0 || ... || 0 || key), the PRF output is:
 // PRF^p(key, (m1, ..., mw)) = perm(s_key \xor (m1 || ... || mw))[0]
-pub(crate) fn nullify(
+pub(crate) fn nullify_with_native_address(
     cs: &mut TurboPlonkCS,
     sk_var: VarIndex,
     nullifier_input_vars: NullifierInputVars,
@@ -1355,7 +1354,7 @@ pub(crate) mod tests {
         let asset_var = cs.new_variable(asset_type);
         let blind_var = cs.new_variable(blind);
         let pubkey_x_var = cs.new_variable(pubkey_x);
-        let comm_var = commit(&mut cs, blind_var, amount_var, asset_var, pubkey_x_var);
+        let comm_var = commit_with_native_address(&mut cs, blind_var, amount_var, asset_var, pubkey_x_var);
         let mut witness = cs.get_and_clear_witness();
 
         // Check commitment consistency
@@ -1393,7 +1392,7 @@ pub(crate) mod tests {
             asset_type: asset_var,
             pub_key_x: pk_var.get_x(),
         };
-        let nullifier_var = nullify(&mut cs, sk_var, nullifier_input_var);
+        let nullifier_var = nullify_with_native_address(&mut cs, sk_var, nullifier_input_var);
         let mut witness = cs.get_and_clear_witness();
 
         // Check PRF output consistency

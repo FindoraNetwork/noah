@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    anonymous_transfer::TurboPlonkCS,
+    circuits::TurboPlonkCS,
     keys::AXfrPubKey,
     proofs::AXfrPlonkPf,
     structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
@@ -581,7 +581,7 @@ pub(crate) fn build_bar_to_abar_cs(
 #[cfg(test)]
 mod test {
     use crate::anon_xfr::{
-        confidential_to_anonymous::{gen_bar_to_abar_note, verify_bar_to_abar_note},
+        bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
         keys::AXfrKeyPair,
         structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
     };

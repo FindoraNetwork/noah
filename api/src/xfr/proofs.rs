@@ -511,7 +511,7 @@ pub(crate) fn range_proof(
     } else {
         return Err(eg!(ZeiError::RangeProofProveError));
     };
-    let mut values = Vec::with_capacity(out_amounts.len() + 1);
+    let mut values = Vec::with_capacity(upper_power2);
     for x in out_amounts {
         let (lower, higher) = u64_to_u32_pair(x);
         values.push(lower as u64);
@@ -675,7 +675,7 @@ fn extract_value_commitments(
     commitments.push(proof.xfr_diff_commitment_low);
     commitments.push(proof.xfr_diff_commitment_high);
 
-    // 5. padd with commitments to 0
+    // 5. pad with commitments to 0
     for _ in commitments.len()..upper_power2 {
         commitments.push(CompressedRistretto::identity());
     }

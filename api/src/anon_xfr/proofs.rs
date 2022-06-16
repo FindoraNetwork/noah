@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    anonymous_transfer::{build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness},
+    circuits::{build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness},
     config::FEE_TYPE,
 };
 use crate::setup::{ProverParams, VerifierParams};
@@ -97,7 +97,7 @@ pub(crate) fn verify_xfr(
 mod tests {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
-        anonymous_transfer::{tests::new_multi_xfr_witness_for_test, AMultiXfrPubInputs},
+        circuits::{tests::new_multi_xfr_witness_for_test, AMultiXfrPubInputs},
         compute_non_malleability_tag,
         config::FEE_TYPE,
         proofs::{prove_xfr, verify_xfr},

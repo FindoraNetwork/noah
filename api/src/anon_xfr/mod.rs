@@ -1,6 +1,6 @@
 use crate::anon_xfr::structs::AXfrBody;
 use crate::anon_xfr::{
-    anonymous_transfer::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
+    circuits::{AMultiXfrPubInputs, AMultiXfrWitness, PayeeSecret, PayerSecret},
     config::FEE_TYPE,
     keys::AXfrKeyPair,
     proofs::{prove_xfr, verify_xfr},
@@ -8,7 +8,7 @@ use crate::anon_xfr::{
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
-pub use anonymous_transfer::TREE_DEPTH;
+pub use circuits::TREE_DEPTH;
 use digest::Digest;
 use sha2::Sha512;
 use zei_algebra::{
@@ -22,19 +22,19 @@ use zei_crypto::basic::{
 };
 
 /// Module for converting anonymous assets to confidential assets.
-pub mod anonymous_to_confidential;
+pub mod abar_to_bar;
 /// Module for converting anonymous assets to transparent assets.
-pub mod anonymous_to_transparent;
-pub(crate) mod anonymous_transfer;
+pub mod abar_to_ar;
+pub(crate) mod circuits;
 /// Module for converting confidential assets to anonymous assets.
-pub mod confidential_to_anonymous;
+pub mod bar_to_abar;
 pub mod config;
 pub mod keys;
 mod merkle_tree_test;
 pub(crate) mod proofs;
 pub mod structs;
 /// Module for converting transparent assets to anonymous assets.
-pub mod transparent_to_anonymous;
+pub mod ar_to_abar;
 
 /// Build an anonymous transfer structure AXfrNote. It also returns randomized signature keys to sign the transfer,
 /// * `rng` - pseudo-random generator.
