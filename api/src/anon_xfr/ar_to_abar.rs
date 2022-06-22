@@ -1,10 +1,12 @@
+use crate::anon_xfr::abar_to_abar::AXfrPlonkPf;
+use crate::anon_xfr::structs::AXfrPubKey;
 use crate::anon_xfr::{
-    circuits::{commit_with_native_address, PayeeSecret, PayeeSecretVars, TurboPlonkCS},
-    keys::AXfrPubKey,
-    proofs::AXfrPlonkPf,
+    circuits::PayeeSecretVars,
+    commit_with_native_address,
     structs::{
         AnonBlindAssetRecord, Commitment, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
     },
+    PayeeSecret, TurboPlonkCS,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -274,7 +276,7 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::anon_xfr::keys::AXfrKeyPair;
+    use crate::anon_xfr::structs::AXfrKeyPair;
     use crate::xfr::asset_record::{
         build_blind_asset_record, open_blind_asset_record, AssetRecordType,
     };

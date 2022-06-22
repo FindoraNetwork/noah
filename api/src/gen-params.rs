@@ -10,14 +10,12 @@ use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
-use zei::{
-    anon_xfr::TREE_DEPTH,
-    setup::{BulletproofParams, ProverParams, VerifierParams, PRECOMPUTED_PARTY_NUMBER},
-};
+use zei::setup::{BulletproofParams, ProverParams, VerifierParams, PRECOMPUTED_PARTY_NUMBER};
 use zei_algebra::utils::save_to_file;
 use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 
 use rayon::prelude::*;
+use zei::anon_xfr::TREE_DEPTH;
 
 #[derive(StructOpt, Debug)]
 #[structopt(

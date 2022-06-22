@@ -1,12 +1,13 @@
+use crate::anon_xfr::structs::AXfrKeyPair;
 use crate::anon_xfr::{
     circuits::{
-        add_merkle_path_variables, commit_with_native_address, compute_merkle_root, nullify_with_native_address, AccElemVars,
-        NullifierInputVars, PayerSecret, PayerSecretVars, TurboPlonkCS, SK_LEN,
+        add_merkle_path_variables, compute_merkle_root, AccElemVars, NullifierInputVars,
+        PayerSecretVars,
     },
-    compute_non_malleability_tag,
-    keys::AXfrKeyPair,
-    nullifier,
+    commit_with_native_address, compute_non_malleability_tag, nullifier,
+    nullify_with_native_address,
     structs::{Nullifier, OpenAnonBlindAssetRecord},
+    PayerSecret, TurboPlonkCS, SK_LEN,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -297,7 +298,8 @@ pub fn build_abar_to_ar_cs(
         asset_type: payers_secrets_vars.asset_type,
         pub_key_x: pk_x,
     };
-    let nullifier_var = nullify_with_native_address(&mut cs, payers_secrets_vars.sec_key, nullifier_input_vars);
+    let nullifier_var =
+        nullify_with_native_address(&mut cs, payers_secrets_vars.sec_key, nullifier_input_vars);
 
     // Merkle path authentication
     let acc_elem = AccElemVars {
@@ -368,13 +370,13 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
 
 #[cfg(test)]
 mod tests {
+    use crate::anon_xfr::structs::AXfrKeyPair;
     use crate::anon_xfr::{
         abar_to_ar::{gen_abar_to_ar_note, verify_abar_to_ar_note},
-        circuits::TREE_DEPTH,
-        keys::AXfrKeyPair,
         structs::{
             AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
         },
+        TREE_DEPTH,
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::{sig::XfrKeyPair, structs::AssetType};

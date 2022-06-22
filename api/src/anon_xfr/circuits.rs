@@ -1,188 +1,10 @@
-use crate::anon_xfr::structs::{BlindFactor, Commitment, MTNode, MTPath, Nullifier};
-use zei_algebra::{
-    bls12_381::BLSScalar,
-    jubjub::{JubjubPoint, JubjubScalar},
-    ops::*,
-    traits::Group,
-    One, Zero,
+use crate::anon_xfr::abar_to_abar::AMultiXfrWitness;
+use crate::anon_xfr::{
+    commit_with_native_address, nullify_with_native_address, structs::MTPath, PayeeSecret,
+    PayerSecret, TurboPlonkCS, AMOUNT_LEN, SK_LEN,
 };
-use zei_crypto::basic::rescue::RescueInstance;
+use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, ops::*, traits::Group, One, Zero};
 use zei_plonk::plonk::constraint_system::{rescue::StateVar, TurboCS, VarIndex};
-
-pub type TurboPlonkCS = TurboCS<BLSScalar>;
-
-// TODO: Move these constants to another file.
-pub(crate) const SK_LEN: usize = 252; // secret key size (in bits)
-pub(crate) const AMOUNT_LEN: usize = 64; // amount value size (in bits)
-
-// Depth of the Merkle Tree circuit. here <= accumulators::merkle_tree::TREE_DEPTH (20)
-pub const TREE_DEPTH: usize = 20;
-
-#[derive(Debug, Clone)]
-pub struct PayerSecret {
-    pub sec_key: JubjubScalar,
-    pub amount: u64,
-    pub asset_type: BLSScalar,
-    pub uid: u64,
-    pub path: MTPath,
-    pub blind: BlindFactor,
-}
-
-#[derive(Debug, Clone)]
-pub struct PayeeSecret {
-    pub amount: u64,
-    pub blind: BlindFactor,
-    pub asset_type: BLSScalar,
-    pub pubkey_x: BLSScalar,
-}
-
-/// Secret witness of an anonymous transaction.
-#[derive(Debug)]
-pub(crate) struct AMultiXfrWitness {
-    pub payers_secrets: Vec<PayerSecret>,
-    pub payees_secrets: Vec<PayeeSecret>,
-    pub fee: u32,
-}
-
-impl AMultiXfrWitness {
-    // create a default `AMultiXfrWitness`.
-    pub(crate) fn fake(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
-        let bls_zero = BLSScalar::zero();
-        let jubjub_zero = JubjubScalar::zero();
-        let node = MTNode {
-            siblings1: bls_zero,
-            siblings2: bls_zero,
-            is_left_child: 0,
-            is_right_child: 0,
-        };
-        let payer_secret = PayerSecret {
-            sec_key: jubjub_zero,
-            uid: 0,
-            amount: 0,
-            asset_type: bls_zero,
-            path: MTPath::new(vec![node; tree_depth]),
-            blind: bls_zero,
-        };
-        let payee_secret = PayeeSecret {
-            amount: 0,
-            blind: bls_zero,
-            asset_type: bls_zero,
-            pubkey_x: bls_zero,
-        };
-
-        AMultiXfrWitness {
-            payers_secrets: vec![payer_secret; n_payers],
-            payees_secrets: vec![payee_secret; n_payees],
-            fee,
-        }
-    }
-}
-
-/// Public inputs of an anonymous transaction.
-#[derive(Debug)]
-pub(crate) struct AMultiXfrPubInputs {
-    pub payers_inputs: Vec<Nullifier>,
-    pub payees_commitments: Vec<Commitment>,
-    pub merkle_root: BLSScalar,
-    pub fee: u32,
-}
-
-impl AMultiXfrPubInputs {
-    pub fn to_vec(&self) -> Vec<BLSScalar> {
-        let mut result = vec![];
-        // nullifiers and signature verification keys
-        for nullifier in &self.payers_inputs {
-            result.push(*nullifier);
-        }
-        // merkle_root
-        result.push(self.merkle_root);
-        // output commitments
-        for comm in &self.payees_commitments {
-            result.push(*comm);
-        }
-        // fee
-        result.push(BLSScalar::from(self.fee));
-        result
-    }
-
-    // Compute the public inputs from the secret inputs
-    #[allow(dead_code)]
-    pub(crate) fn from_witness(witness: &AMultiXfrWitness) -> Self {
-        // nullifiers and signature public keys
-        let hash = RescueInstance::new();
-        let base = JubjubPoint::get_base();
-        let payers_inputs: Vec<Nullifier> = witness
-            .payers_secrets
-            .iter()
-            .map(|sec| {
-                let pk_point = base.mul(&sec.sec_key);
-
-                let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
-                let uid_amount = pow_2_64
-                    .mul(&BLSScalar::from(sec.uid))
-                    .add(&BLSScalar::from(sec.amount));
-                let cur = hash.rescue(&[
-                    uid_amount,
-                    sec.asset_type,
-                    BLSScalar::zero(),
-                    pk_point.get_x(),
-                ])[0];
-                hash.rescue(&[
-                    cur,
-                    BLSScalar::from(&sec.sec_key),
-                    BLSScalar::zero(),
-                    BLSScalar::zero(),
-                ])[0]
-            })
-            .collect();
-
-        // output commitments
-        let hash = RescueInstance::new();
-        let zero = BLSScalar::zero();
-        let payees_commitments: Vec<Commitment> = witness
-            .payees_secrets
-            .iter()
-            .map(|sec| {
-                let cur = hash.rescue(&[
-                    sec.blind,
-                    BLSScalar::from(sec.amount),
-                    sec.asset_type,
-                    BLSScalar::zero(),
-                ])[0];
-                hash.rescue(&[cur, sec.pubkey_x, BLSScalar::zero(), BLSScalar::zero()])[0]
-            })
-            .collect();
-
-        // merkle root
-        let payer = &witness.payers_secrets[0];
-        let pk_point = base.mul(&payer.sec_key);
-        let commitment = {
-            let cur = hash.rescue(&[
-                payer.blind,
-                BLSScalar::from(payer.amount),
-                payer.asset_type,
-                BLSScalar::zero(),
-            ])[0];
-            hash.rescue(&[cur, pk_point.get_x(), BLSScalar::zero(), BLSScalar::zero()])[0]
-        };
-        let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0];
-        for path_node in payer.path.nodes.iter() {
-            let input = match (path_node.is_left_child, path_node.is_right_child) {
-                (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
-                (0, 0) => vec![path_node.siblings1, node, path_node.siblings2, zero],
-                _ => vec![path_node.siblings1, path_node.siblings2, node, zero],
-            };
-            node = hash.rescue(&input)[0];
-        }
-
-        Self {
-            payers_inputs,
-            payees_commitments,
-            merkle_root: node,
-            fee: witness.fee,
-        }
-    }
-}
 
 /// Returns the constraint system (and associated number of constraints) for a multi-inputs/outputs transaction.
 /// A prover can provide honest `secret_inputs` and obtain the cs witness by calling `cs.get_and_clear_witness()`.
@@ -218,7 +40,8 @@ pub(crate) fn build_multi_xfr_cs(
         let pk_x = pk_var.get_x();
 
         // commitments
-        let com_abar_in_var = commit_with_native_address(&mut cs, payer.blind, payer.amount, payer.asset_type, pk_x);
+        let com_abar_in_var =
+            commit_with_native_address(&mut cs, payer.blind, payer.amount, payer.asset_type, pk_x);
 
         // prove pre-image of the nullifier
         // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
@@ -234,7 +57,8 @@ pub(crate) fn build_multi_xfr_cs(
             asset_type: payer.asset_type,
             pub_key_x: pk_x,
         };
-        let nullifier_var = nullify_with_native_address(&mut cs, payer.sec_key, nullifier_input_vars);
+        let nullifier_var =
+            nullify_with_native_address(&mut cs, payer.sec_key, nullifier_input_vars);
 
         // Merkle path authentication
         let acc_elem = AccElemVars {
@@ -405,7 +229,7 @@ pub struct MerklePathVars {
 }
 
 // cs variables for an accumulated element
-pub(crate) struct AccElemVars {
+pub struct AccElemVars {
     pub uid: VarIndex,
     pub commitment: VarIndex,
 }
@@ -417,7 +241,7 @@ pub(crate) struct NullifierInputVars {
     pub pub_key_x: VarIndex,
 }
 
-pub(crate) fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
+pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
     let path_vars: Vec<MerkleNodeVars> = path
         .nodes
         .into_iter()
@@ -467,7 +291,7 @@ fn sort(
     StateVar::new([left, mid, right, cs.zero_var()])
 }
 
-pub(crate) fn compute_merkle_root(
+pub fn compute_merkle_root(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
@@ -488,43 +312,6 @@ pub(crate) fn compute_merkle_root(
         node_var = cs.rescue_hash(&input_var)[0];
     }
     node_var
-}
-
-// Add the commitment constraints to the constraint system:
-// comm = commit(blinding, amount, asset_type)
-pub fn commit_with_native_address(
-    cs: &mut TurboPlonkCS,
-    blinding_var: VarIndex,
-    amount_var: VarIndex,
-    asset_var: VarIndex,
-    pubkey_x_var: VarIndex,
-) -> VarIndex {
-    let input_var = StateVar::new([blinding_var, amount_var, asset_var, cs.zero_var()]);
-    let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([cur, pubkey_x_var, cs.zero_var(), cs.zero_var()]);
-    cs.rescue_hash(&input_var)[0]
-}
-
-// Add the nullifier constraints to the constraint system.
-// nullifer = PRF(sk, msg = [uid_amount, asset_type, pk_x, pk_y])
-// The PRF follows the Full-State Keyed Sponge (FKS) paradigm explained in https://eprint.iacr.org/2015/541.pdf
-// Let perm : Fp^w -> Fp^w be a public permutation.
-// Given secret key `key`, set initial state `s_key` := (0 || ... || 0 || key), the PRF output is:
-// PRF^p(key, (m1, ..., mw)) = perm(s_key \xor (m1 || ... || mw))[0]
-pub(crate) fn nullify_with_native_address(
-    cs: &mut TurboPlonkCS,
-    sk_var: VarIndex,
-    nullifier_input_vars: NullifierInputVars,
-) -> VarIndex {
-    let (uid_amount, asset_type, pub_key_x) = (
-        nullifier_input_vars.uid_amount,
-        nullifier_input_vars.asset_type,
-        nullifier_input_vars.pub_key_x,
-    );
-    let input_var = StateVar::new([uid_amount, asset_type, cs.zero_var(), pub_key_x]);
-    let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([cur, sk_var, cs.zero_var(), cs.zero_var()]);
-    cs.rescue_hash(&input_var)[0]
 }
 
 /// Enforce asset_mixing_with_fees constraints:
@@ -661,12 +448,13 @@ fn match_select(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::anon_xfr::compute_non_malleability_tag;
-    use crate::anon_xfr::keys::AXfrKeyPair;
+    use crate::anon_xfr::structs::AXfrKeyPair;
+    use crate::anon_xfr::{
+        abar_to_abar::AMultiXfrPubInputs, commit_with_native_address, compute_non_malleability_tag,
+        nullify_with_native_address, structs::MTNode,
+    };
     use rand_chacha::ChaChaRng;
-    use rand_core::{RngCore, SeedableRng};
-    use ruc::*;
-    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar};
+    use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubScalar, prelude::*};
     use zei_crypto::basic::rescue::RescueInstance;
     use zei_plonk::plonk::constraint_system::{ecc::Point, TurboCS};
 
@@ -1354,7 +1142,8 @@ pub(crate) mod tests {
         let asset_var = cs.new_variable(asset_type);
         let blind_var = cs.new_variable(blind);
         let pubkey_x_var = cs.new_variable(pubkey_x);
-        let comm_var = commit_with_native_address(&mut cs, blind_var, amount_var, asset_var, pubkey_x_var);
+        let comm_var =
+            commit_with_native_address(&mut cs, blind_var, amount_var, asset_var, pubkey_x_var);
         let mut witness = cs.get_and_clear_witness();
 
         // Check commitment consistency

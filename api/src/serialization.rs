@@ -69,7 +69,7 @@ serialize_deserialize!(XfrSignature);
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
+    use crate::anon_xfr::structs::{AXfrKeyPair, AXfrPubKey};
     use crate::ristretto::CompressedRistretto;
     use crate::serialization::ZeiFromToBytes;
     use crate::xfr::{

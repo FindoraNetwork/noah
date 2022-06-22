@@ -1,17 +1,12 @@
-use crate::anon_xfr::{
-    decrypt_memo,
-    keys::{AXfrKeyPair, AXfrPubKey},
-};
+use crate::anon_xfr::decrypt_memo;
 use crate::xfr::structs::{AssetType, OwnerMemo};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::{
-    bls12_381::{BLSPairingEngine, BLSScalar},
-    prelude::*,
-};
+use zei_algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
+use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
 use zei_crypto::basic::rescue::RescueInstance;
-use zei_plonk::{plonk::indexer::PlonkPf, poly_commit::kzg_poly_com::KZGCommitmentScheme};
+use zei_crypto::basic::schnorr::{KeyPair, PublicKey, Signature};
 
 pub type Nullifier = BLSScalar;
 pub type Commitment = BLSScalar;
@@ -29,29 +24,6 @@ pub struct MTNode {
     pub siblings2: BLSScalar,
     pub is_left_child: u8,
     pub is_right_child: u8,
-}
-
-pub type SnarkProof = PlonkPf<KZGCommitmentScheme<BLSPairingEngine>>;
-
-/// Anonymous transfers structure
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
-pub struct AXfrNote {
-    /// The body part of AnonFee
-    pub body: AXfrBody,
-    /// The spending proof (assuming non-malleability)
-    pub anon_xfr_proof: SnarkProof,
-    /// The non-malleability tag
-    pub non_malleability_tag: BLSScalar,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
-pub struct AXfrBody {
-    pub inputs: Vec<Nullifier>,
-    pub outputs: Vec<AnonBlindAssetRecord>,
-    pub merkle_root: BLSScalar,
-    pub merkle_root_version: u64,
-    pub fee: u32,
-    pub owner_memos: Vec<OwnerMemo>,
 }
 
 /// Asset record to be published
@@ -260,5 +232,131 @@ pub struct MTPath {
 impl MTPath {
     pub fn new(nodes: Vec<MTNode>) -> Self {
         Self { nodes }
+    }
+}
+
+const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
+const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
+
+/// Public key used to address an Anonymous records and verify transaction spending it
+#[wasm_bindgen]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash, Ord, PartialOrd, Copy,
+)]
+pub struct AXfrPubKey(pub(crate) PublicKey<JubjubPoint>);
+
+/// Keypair associated with an Anonymous records. It is used to spending it.
+#[wasm_bindgen]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+pub struct AXfrKeyPair(pub(crate) KeyPair<JubjubPoint, JubjubScalar>);
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+pub struct AXfrSignature(pub(crate) Signature<JubjubPoint, JubjubScalar>);
+
+impl AXfrKeyPair {
+    /// Generate a new signature key pair
+    pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> AXfrKeyPair {
+        AXfrKeyPair(KeyPair::generate(prng))
+    }
+
+    /// Return public key
+    pub fn pub_key(&self) -> AXfrPubKey {
+        AXfrPubKey(self.0.pub_key)
+    }
+
+    /// Return the key pair
+    pub fn from_secret_scalar(secret: JubjubScalar) -> Self {
+        AXfrKeyPair(KeyPair::<JubjubPoint, JubjubScalar>::from_secret_scalar(
+            secret,
+        ))
+    }
+
+    /// Return secret key scalar value
+    pub(crate) fn get_secret_scalar(&self) -> JubjubScalar {
+        self.0.get_secret_scalar()
+    }
+
+    pub fn sign<R: CryptoRng + RngCore>(&self, prng: &mut R, msg: &[u8]) -> AXfrSignature {
+        AXfrSignature(self.0.sign(prng, msg))
+    }
+}
+
+impl ZeiFromToBytes for AXfrKeyPair {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        self.0.zei_to_bytes()
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != (AXFR_SECRET_KEY_LENGTH + AXFR_PUBLIC_KEY_LENGTH) {
+            Err(eg!(ZeiError::DeserializationError))
+        } else {
+            let keypair: KeyPair<JubjubPoint, JubjubScalar> =
+                KeyPair::zei_from_bytes(bytes).c(d!(""))?;
+
+            Ok(AXfrKeyPair(keypair))
+        }
+    }
+}
+
+impl AXfrPubKey {
+    /// return a reference to the EC group point defining the public key
+    pub fn as_jubjub_point(&self) -> &JubjubPoint {
+        self.0.point_ref()
+    }
+
+    /// Signature verification function
+    pub fn verify(&self, msg: &[u8], sig: &AXfrSignature) -> Result<()> {
+        self.0.verify(msg, &sig.0).c(d!())
+    }
+}
+
+impl ZeiFromToBytes for AXfrPubKey {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        self.0.zei_to_bytes()
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != AXFR_PUBLIC_KEY_LENGTH {
+            Err(eg!(ZeiError::DeserializationError))
+        } else {
+            let point: JubjubPoint =
+                JubjubPoint::zei_from_bytes(bytes).c(d!("error in deserializing JubJub point"))?;
+            Ok(AXfrPubKey {
+                0: PublicKey::from_point(point),
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::anon_xfr::structs::{AXfrKeyPair, AXfrPubKey};
+    use rand_chacha::ChaChaRng;
+    use zei_algebra::prelude::*;
+
+    #[test]
+    fn test_axfr_pub_key_serialization() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+
+        let pub_key: AXfrPubKey = keypair.pub_key();
+
+        let bytes = pub_key.zei_to_bytes();
+        assert_ne!(bytes.len(), 0);
+
+        let reformed_pub_key = AXfrPubKey::zei_from_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(pub_key, reformed_pub_key);
+    }
+
+    #[test]
+    fn test_axfr_key_pair_serialization() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+
+        let bytes: Vec<u8> = keypair.zei_to_bytes();
+        assert_ne!(bytes.len(), 0);
+
+        let reformed_key_pair = AXfrKeyPair::zei_from_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(keypair, reformed_key_pair);
     }
 }

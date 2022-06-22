@@ -1,9 +1,6 @@
+#![deny(warnings)]
 #[cfg(test)]
-mod tests {
-    use crate::anon_xfr::{
-        circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
-        structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
-    };
+pub(crate) mod merkle_tree_test {
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
@@ -13,6 +10,10 @@ mod tests {
         db::{RocksDB, TempRocksDB},
         state::{ChainState, State},
         store::PrefixedStore,
+    };
+    use zei::anon_xfr::{
+        circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
+        structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};

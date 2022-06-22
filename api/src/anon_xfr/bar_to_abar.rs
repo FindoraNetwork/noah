@@ -1,8 +1,8 @@
+use crate::anon_xfr::abar_to_abar::AXfrPlonkPf;
+use crate::anon_xfr::structs::AXfrPubKey;
 use crate::anon_xfr::{
-    circuits::TurboPlonkCS,
-    keys::AXfrPubKey,
-    proofs::AXfrPlonkPf,
     structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
+    TurboPlonkCS,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -580,9 +580,9 @@ pub(crate) fn build_bar_to_abar_cs(
 
 #[cfg(test)]
 mod test {
+    use crate::anon_xfr::structs::AXfrKeyPair;
     use crate::anon_xfr::{
         bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
-        keys::AXfrKeyPair,
         structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
     };
     use crate::setup::{ProverParams, VerifierParams};
