@@ -409,11 +409,11 @@ mod tests {
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
+    use mem_db::MemoryDB;
     use parking_lot::lock_api::RwLock;
     use rand_chacha::ChaChaRng;
-    use std::{sync::Arc, thread};
+    use std::sync::Arc;
     use storage::{
-        db::TempRocksDB,
         state::{ChainState, State},
         store::PrefixedStore,
     };
@@ -547,7 +547,7 @@ mod tests {
     }
 
     // outputs &mut merkle tree (wrap it in an option merkle tree, not req)
-    fn build_new_merkle_tree(n: i32, mt: &mut PersistentMerkleTree<TempRocksDB>) -> Result<()> {
+    fn build_new_merkle_tree(n: i32, mt: &mut PersistentMerkleTree<MemoryDB>) -> Result<()> {
         // add 6/7 abar and populate and then retrieve values
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -576,8 +576,7 @@ mod tests {
     fn test_new_anon_xfr() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let path = thread::current().name().unwrap().to_owned();
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);

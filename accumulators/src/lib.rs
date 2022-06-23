@@ -20,19 +20,17 @@ pub mod merkle_tree;
 #[cfg(test)]
 mod tests {
     use crate::merkle_tree::{verify, PersistentMerkleTree, TREE_DEPTH};
+    use mem_db::MemoryDB;
     use parking_lot::RwLock;
     use std::sync::Arc;
-    use std::thread;
     use std::time::Instant;
-    use storage::db::TempRocksDB;
     use storage::state::{ChainState, State};
     use storage::store::PrefixedStore;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn test_merkle_tree() {
-        let path = thread::current().name().unwrap().to_owned();
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let fdb = MemoryDB::new();
         let ver_window = 100;
         let cs = Arc::new(RwLock::new(ChainState::new(
             fdb,
