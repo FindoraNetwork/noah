@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    circuits::TurboPlonkCS,
+    anonymous_transfer::TurboPlonkCS,
     keys::AXfrPubKey,
     proofs::AXfrPlonkPf,
     structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
@@ -23,7 +23,7 @@ use zei_crypto::{
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
 };
 use zei_plonk::plonk::{
-    constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboConstraintSystem},
+    constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
@@ -145,12 +145,20 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
     let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-    let z = z_instance.rescue(&[
-        z_randomizer,
-        x_in_bls12_381,
-        y_in_bls12_381,
-        abar_pubkey.0.point_ref().get_x(),
-    ])[0];
+    let z = {
+        let cur = z_instance.rescue(&[
+            z_randomizer,
+            x_in_bls12_381,
+            y_in_bls12_381,
+            BLSScalar::zero(),
+        ])[0];
+        z_instance.rescue(&[
+            cur,
+            abar_pubkey.0.point_ref().get_x(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
+        ])[0]
+    };
 
     // 3. compute the non-ZK part of the proof
     let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
@@ -246,7 +254,7 @@ pub(crate) fn verify_bar_to_abar(
     .c(d!())
 }
 
-/// I generates the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
+/// Generate the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
 /// * `rng` - pseudo-random generator.
 /// * `params` - System params
 /// * `amount` - transaction amount
@@ -348,7 +356,7 @@ pub(crate) fn build_bar_to_abar_cs(
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> (TurboPlonkCS, usize) {
-    let mut cs = TurboConstraintSystem::new();
+    let mut cs = TurboCS::new();
     let zero_var = cs.zero_var();
 
     let zero = BLSScalar::zero();
@@ -536,28 +544,31 @@ pub(crate) fn build_bar_to_abar_cs(
     }
 
     // 7. Rescue commitment
-    let rescue_comm_var = cs.rescue_hash(&StateVar::new([
-        blind_hash_var,
-        amount_var,
-        at_var,
-        pubkey_x_var,
-    ]))[0];
+    let rescue_comm_var = {
+        let cur = cs.rescue_hash(&StateVar::new([
+            blind_hash_var,
+            amount_var,
+            at_var,
+            zero_var,
+        ]))[0];
+        cs.rescue_hash(&StateVar::new([cur, pubkey_x_var, zero_var, zero_var]))[0]
+    };
 
     // prepare public inputs
-    cs.prepare_io_variable(rescue_comm_var);
-    cs.prepare_io_variable(comm_var);
+    cs.prepare_pi_variable(rescue_comm_var);
+    cs.prepare_pi_variable(comm_var);
 
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(beta_sim_fr_var.var[i]);
+        cs.prepare_pi_variable(beta_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(lambda_sim_fr_var.var[i]);
+        cs.prepare_pi_variable(lambda_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(beta_lambda_sim_fr_var.var[i]);
+        cs.prepare_pi_variable(beta_lambda_sim_fr_var.var[i]);
     }
     for i in 0..NUM_OF_LIMBS {
-        cs.prepare_io_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
+        cs.prepare_pi_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
     }
 
     // pad the number of constraints to power of two
@@ -570,7 +581,7 @@ pub(crate) fn build_bar_to_abar_cs(
 #[cfg(test)]
 mod test {
     use crate::anon_xfr::{
-        bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
+        confidential_to_anonymous::{gen_bar_to_abar_note, verify_bar_to_abar_note},
         keys::AXfrKeyPair,
         structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
     };
@@ -581,7 +592,7 @@ mod test {
         structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo},
     };
     use num_bigint::BigUint;
-    use num_traits::One;
+    use num_traits::{One, Zero};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use std::ops::AddAssign;
@@ -742,7 +753,15 @@ mod test {
 
         let pubkey_x = BLSScalar::random(&mut rng);
 
-        let z = z_instance.rescue(&[z_randomizer, x_in_bls12_381, y_in_bls12_381, pubkey_x])[0];
+        let z = {
+            let cur = z_instance.rescue(&[
+                z_randomizer,
+                x_in_bls12_381,
+                y_in_bls12_381,
+                BLSScalar::zero(),
+            ])[0];
+            z_instance.rescue(&[cur, pubkey_x, BLSScalar::zero(), BLSScalar::zero()])[0]
+        };
 
         // 2. compute the ZK part of the proof
         let (proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(

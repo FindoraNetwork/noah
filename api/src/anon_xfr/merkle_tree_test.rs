@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::{
-        circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
+        anonymous_transfer::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
         structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
     };
     use mem_db::MemoryDB;
@@ -20,7 +20,7 @@ mod tests {
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
     use zei_crypto::basic::rescue::RescueInstance;
-    use zei_plonk::plonk::constraint_system::TurboConstraintSystem;
+    use zei_plonk::plonk::constraint_system::TurboCS;
 
     #[test]
     fn test_persistent_merkle_tree() {
@@ -85,7 +85,7 @@ mod tests {
 
         let proof = mt.generate_proof(0).unwrap();
 
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let uid_var = cs.new_variable(BLSScalar::from(0u32));
         let comm_var = cs.new_variable(abar.commitment);
         let elem = AccElemVars {

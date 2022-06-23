@@ -7,9 +7,9 @@ use zei_algebra::{
     One, Zero,
 };
 use zei_crypto::basic::rescue::RescueInstance;
-use zei_plonk::plonk::constraint_system::{rescue::StateVar, TurboConstraintSystem, VarIndex};
+use zei_plonk::plonk::constraint_system::{rescue::StateVar, TurboCS, VarIndex};
 
-pub type TurboPlonkCS = TurboConstraintSystem<BLSScalar>;
+pub type TurboPlonkCS = TurboCS<BLSScalar>;
 
 // TODO: Move these constants to another file.
 pub(crate) const SK_LEN: usize = 252; // secret key size (in bits)
@@ -41,11 +41,12 @@ pub struct PayeeSecret {
 pub(crate) struct AMultiXfrWitness {
     pub payers_secrets: Vec<PayerSecret>,
     pub payees_secrets: Vec<PayeeSecret>,
+    pub fee: u32,
 }
 
 impl AMultiXfrWitness {
     // create a default `AMultiXfrWitness`.
-    pub(crate) fn fake(n_payers: usize, n_payees: usize, tree_depth: usize) -> Self {
+    pub(crate) fn fake(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
         let bls_zero = BLSScalar::zero();
         let jubjub_zero = JubjubScalar::zero();
         let node = MTNode {
@@ -72,6 +73,7 @@ impl AMultiXfrWitness {
         AMultiXfrWitness {
             payers_secrets: vec![payer_secret; n_payers],
             payees_secrets: vec![payee_secret; n_payees],
+            fee,
         }
     }
 }
@@ -82,6 +84,7 @@ pub(crate) struct AMultiXfrPubInputs {
     pub payers_inputs: Vec<Nullifier>,
     pub payees_commitments: Vec<Commitment>,
     pub merkle_root: BLSScalar,
+    pub fee: u32,
 }
 
 impl AMultiXfrPubInputs {
@@ -97,6 +100,8 @@ impl AMultiXfrPubInputs {
         for comm in &self.payees_commitments {
             result.push(*comm);
         }
+        // fee
+        result.push(BLSScalar::from(self.fee));
         result
     }
 
@@ -116,11 +121,17 @@ impl AMultiXfrPubInputs {
                 let uid_amount = pow_2_64
                     .mul(&BLSScalar::from(sec.uid))
                     .add(&BLSScalar::from(sec.amount));
-                hash.rescue(&[
+                let cur = hash.rescue(&[
                     uid_amount,
                     sec.asset_type,
+                    BLSScalar::zero(),
                     pk_point.get_x(),
+                ])[0];
+                hash.rescue(&[
+                    cur,
                     BLSScalar::from(&sec.sec_key),
+                    BLSScalar::zero(),
+                    BLSScalar::zero(),
                 ])[0]
             })
             .collect();
@@ -132,24 +143,28 @@ impl AMultiXfrPubInputs {
             .payees_secrets
             .iter()
             .map(|sec| {
-                hash.rescue(&[
+                let cur = hash.rescue(&[
                     sec.blind,
                     BLSScalar::from(sec.amount),
                     sec.asset_type,
-                    sec.pubkey_x,
-                ])[0]
+                    BLSScalar::zero(),
+                ])[0];
+                hash.rescue(&[cur, sec.pubkey_x, BLSScalar::zero(), BLSScalar::zero()])[0]
             })
             .collect();
 
         // merkle root
         let payer = &witness.payers_secrets[0];
         let pk_point = base.mul(&payer.sec_key);
-        let commitment = hash.rescue(&[
-            payer.blind,
-            BLSScalar::from(payer.amount),
-            payer.asset_type,
-            pk_point.get_x(),
-        ])[0];
+        let commitment = {
+            let cur = hash.rescue(&[
+                payer.blind,
+                BLSScalar::from(payer.amount),
+                payer.asset_type,
+                BLSScalar::zero(),
+            ])[0];
+            hash.rescue(&[cur, pk_point.get_x(), BLSScalar::zero(), BLSScalar::zero()])[0]
+        };
         let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0];
         for path_node in payer.path.nodes.iter() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
@@ -164,6 +179,7 @@ impl AMultiXfrPubInputs {
             payers_inputs,
             payees_commitments,
             merkle_root: node,
+            fee: witness.fee,
         }
     }
 }
@@ -175,7 +191,6 @@ impl AMultiXfrPubInputs {
 pub(crate) fn build_multi_xfr_cs(
     secret_inputs: AMultiXfrWitness,
     fee_type: BLSScalar,
-    fee_calculating_func: &dyn Fn(u32, u32) -> u32,
     hash: &BLSScalar,
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
@@ -183,7 +198,7 @@ pub(crate) fn build_multi_xfr_cs(
     assert_ne!(secret_inputs.payers_secrets.len(), 0);
     assert_ne!(secret_inputs.payees_secrets.len(), 0);
 
-    let mut cs = TurboConstraintSystem::new();
+    let mut cs = TurboCS::new();
     let payers_secrets = add_payers_secrets(&mut cs, &secret_inputs.payers_secrets);
     let payees_secrets = add_payees_secrets(&mut cs, &secret_inputs.payees_secrets);
 
@@ -235,10 +250,10 @@ pub(crate) fn build_multi_xfr_cs(
         }
 
         // prepare public inputs variables
-        cs.prepare_io_variable(nullifier_var);
+        cs.prepare_pi_variable(nullifier_var);
     }
     // prepare the publc input for merkle_root
-    cs.prepare_io_variable(root_var.unwrap()); // safe unwrap
+    cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
     for payee in &payees_secrets {
         // commitment
@@ -257,7 +272,7 @@ pub(crate) fn build_multi_xfr_cs(
         cs.range_check(payee.amount, AMOUNT_LEN);
 
         // prepare the public input for the output commitment
-        cs.prepare_io_variable(com_abar_out_var);
+        cs.prepare_pi_variable(com_abar_out_var);
     }
 
     // add asset-mixing constraints
@@ -269,7 +284,12 @@ pub(crate) fn build_multi_xfr_cs(
         .iter()
         .map(|payee| (payee.asset_type, payee.amount))
         .collect();
-    asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_calculating_func);
+
+    let fee_var = cs.new_variable(BLSScalar::from(secret_inputs.fee));
+    cs.range_check(fee_var, 32);
+    cs.prepare_pi_variable(fee_var);
+
+    asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
 
     // Check that validity of the the non malleability tag.
     {
@@ -299,8 +319,8 @@ pub(crate) fn build_multi_xfr_cs(
         cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
     }
 
-    cs.prepare_io_variable(hash_var);
-    cs.prepare_io_variable(non_malleability_tag_var);
+    cs.prepare_pi_variable(hash_var);
+    cs.prepare_pi_variable(non_malleability_tag_var);
 
     // pad the number of constraints to power of two
     cs.pad();
@@ -480,7 +500,9 @@ pub fn commit(
     asset_var: VarIndex,
     pubkey_x_var: VarIndex,
 ) -> VarIndex {
-    let input_var = StateVar::new([blinding_var, amount_var, asset_var, pubkey_x_var]);
+    let input_var = StateVar::new([blinding_var, amount_var, asset_var, cs.zero_var()]);
+    let cur = cs.rescue_hash(&input_var)[0];
+    let input_var = StateVar::new([cur, pubkey_x_var, cs.zero_var(), cs.zero_var()]);
     cs.rescue_hash(&input_var)[0]
 }
 
@@ -500,7 +522,9 @@ pub(crate) fn nullify(
         nullifier_input_vars.asset_type,
         nullifier_input_vars.pub_key_x,
     );
-    let input_var = StateVar::new([uid_amount, asset_type, pub_key_x, sk_var]);
+    let input_var = StateVar::new([uid_amount, asset_type, cs.zero_var(), pub_key_x]);
+    let cur = cs.rescue_hash(&input_var)[0];
+    let input_var = StateVar::new([cur, sk_var, cs.zero_var(), cs.zero_var()]);
     cs.rescue_hash(&input_var)[0]
 }
 
@@ -530,7 +554,7 @@ fn asset_mixing(
     inputs: &[(VarIndex, VarIndex)],
     outputs: &[(VarIndex, VarIndex)],
     fee_type: BLSScalar,
-    fee_calculating_func: &dyn Fn(u32, u32) -> u32,
+    fee_var: VarIndex,
 ) {
     // Compute the `sum_in_i`
     let inputs_type_sum_amounts: Vec<(VarIndex, VarIndex)> = inputs
@@ -571,14 +595,6 @@ fn asset_mixing(
     // Initialize a constant value `fee_type_val`
     let fee_type_val = cs.new_variable(fee_type);
     cs.insert_constant_gate(fee_type_val, fee_type);
-
-    // Calculate the fee
-    let fee = BLSScalar::from(fee_calculating_func(
-        inputs.len() as u32,
-        outputs.len() as u32,
-    ));
-    let fee_var = cs.new_variable(fee);
-    cs.insert_constant_gate(fee_var, fee);
 
     // At least one input type is `fee_type` by checking `flag_no_fee_type = 0`
     // and also check that the amount is matching
@@ -653,11 +669,12 @@ pub(crate) mod tests {
     use ruc::*;
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar};
     use zei_crypto::basic::rescue::RescueInstance;
-    use zei_plonk::plonk::constraint_system::{ecc::Point, TurboConstraintSystem};
+    use zei_plonk::plonk::constraint_system::{ecc::Point, TurboCS};
 
     pub(crate) fn new_multi_xfr_witness_for_test(
         inputs: Vec<(u64, BLSScalar)>,
         outputs: Vec<(u64, BLSScalar, BLSScalar)>,
+        fee: u32,
         seed: [u8; 32],
     ) -> AMultiXfrWitness {
         let n_payers = inputs.len();
@@ -697,12 +714,15 @@ pub(crate) mod tests {
                 .iter()
                 .map(|payer| {
                     let pk_point = base.mul(&payer.sec_key);
-                    let commitment = hash.rescue(&[
+                    let cur = hash.rescue(&[
                         payer.blind,
                         BLSScalar::from(payer.amount),
                         payer.asset_type,
-                        pk_point.get_x(),
+                        BLSScalar::zero(),
                     ])[0];
+                    let commitment =
+                        hash.rescue(&[cur, pk_point.get_x(), BLSScalar::zero(), BLSScalar::zero()])
+                            [0];
                     hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0]
                 })
                 .collect();
@@ -733,6 +753,7 @@ pub(crate) mod tests {
         AMultiXfrWitness {
             payers_secrets,
             payees_secrets,
+            fee,
         }
     }
 
@@ -743,7 +764,8 @@ pub(crate) mod tests {
 
         // Fee function
         // base fee 5, every input 1, every output 2
-        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
+        let fee_calculating_func =
+            |x: usize, y: usize| BLSScalar::from(5 + (x as u32) + 2 * (y as u32));
 
         // Constants
         let zero = BLSScalar::zero();
@@ -752,7 +774,7 @@ pub(crate) mod tests {
 
         // Test case 1: success
         // A minimalist transaction that pays sufficient fee
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1)
@@ -763,13 +785,15 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), 0));
+        asset_mixing(&mut cs, &inputs, &[], fee_type, fee_var);
+
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
         // Test case 2: error
         // A minimalist transaction that pays too much fee
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1 + 1)
@@ -780,13 +804,15 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), 0));
+        asset_mixing(&mut cs, &inputs, &[], fee_type, fee_var);
+
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // Test case 3: error
         // A minimalist transaction that pays insufficient fee
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (1234)
         let in_types = [cs.new_variable(fee_type)];
         // amounts = (5 + 1 - 1)
@@ -797,13 +823,15 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &[], fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), 0));
+        asset_mixing(&mut cs, &inputs, &[], fee_type, fee_var);
+
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // Test case 4: error
         // A classical case when the non-fee elements are wrong, but the fee is paid correctly
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (0, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -835,13 +863,14 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // Test case 5: success
         // A classical case when the non-fee elements and fee are both correct
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (0, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -873,13 +902,14 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
         // Test case 6: success
         // More assets, with the exact fee
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -928,13 +958,14 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
         // Test case 7: success
         // More assets, with more than enough fees, but are spent properly
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -985,13 +1016,14 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
         // Test case 8: error
         // More assets, with more than enough fees, but are not spent properly
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1042,13 +1074,14 @@ pub(crate) mod tests {
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
 
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // Test case 9: error
         // More assets, with insufficient fees, case 1: no output of the fee type
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1096,14 +1129,14 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // Test case 10: error
         // More assets, with insufficient fees, case 2: with output of the fee type
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1153,14 +1186,14 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // Test case 11: error
         // More assets, with insufficient fees, case 3: with output of the fee type, fees not exact
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (0, 2, 1, 2, 1234)
         let in_types = [
             cs.new_variable(zero),
@@ -1210,15 +1243,15 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // Test case 12: error
         // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
         // Missing output for an input type.
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (1, 0, 1, 2)
         let in_types = [
             cs.new_variable(one),
@@ -1255,14 +1288,15 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // Test case 13: error
         // The circuit cannot be satisfied when the set of input asset types is different from the set of output asset types.
         // Missing input for an output type.
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // asset_types = (1, 0, 1)
         let in_types = [
             cs.new_variable(one),
@@ -1297,21 +1331,25 @@ pub(crate) mod tests {
             .zip(out_amounts.iter())
             .map(|(&asset_type, &amount)| (asset_type, amount))
             .collect();
-        asset_mixing(&mut cs, &inputs, &outputs, fee_type, &fee_calculating_func);
+        let fee_var = cs.new_variable(fee_calculating_func(inputs.len(), outputs.len()));
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }
 
     #[test]
     fn test_commit() {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let amount = BLSScalar::from(7u32);
         let asset_type = BLSScalar::from(5u32);
         let hash = RescueInstance::new();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let blind = BLSScalar::random(&mut prng);
         let pubkey_x = BLSScalar::random(&mut prng);
-        let commitment = hash.rescue(&[blind, amount, asset_type, pubkey_x])[0];
+        let commitment = {
+            let cur = hash.rescue(&[blind, amount, asset_type, BLSScalar::zero()])[0];
+            hash.rescue(&[cur, pubkey_x, BLSScalar::zero(), BLSScalar::zero()])[0]
+        };
 
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);
@@ -1333,7 +1371,7 @@ pub(crate) mod tests {
     fn test_nullify() {
         let one = BLSScalar::one();
         let zero = BLSScalar::zero();
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let mut prng = ChaChaRng::from_seed([1u8; 32]);
         let sk = BLSScalar::random(&mut prng);
         let bytes = vec![1u8; 32];
@@ -1341,7 +1379,10 @@ pub(crate) mod tests {
         let asset_type = one;
         let pk = Point::new(zero, one);
         let hash = RescueInstance::new();
-        let expected_output = hash.rescue(&[uid_amount, asset_type, *pk.get_x(), sk])[0];
+        let expected_output = {
+            let cur = hash.rescue(&[uid_amount, asset_type, BLSScalar::zero(), *pk.get_x()])[0];
+            hash.rescue(&[cur, sk, BLSScalar::zero(), BLSScalar::zero()])[0]
+        };
 
         let sk_var = cs.new_variable(sk);
         let uid_amount_var = cs.new_variable(uid_amount);
@@ -1366,7 +1407,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_sort() {
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let num: Vec<BLSScalar> = (0..5).map(|x| BLSScalar::from(x as u32)).collect();
         let node_var = cs.new_variable(num[2]);
         let sib1_var = cs.new_variable(num[3]);
@@ -1410,7 +1451,7 @@ pub(crate) mod tests {
         let two = one.add(&one);
         let three = two.add(&one);
         let four = two.add(&two);
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let uid_var = cs.new_variable(one);
         let comm_var = cs.new_variable(two);
         let elem = AccElemVars {
@@ -1432,9 +1473,7 @@ pub(crate) mod tests {
         };
         // compute the root value
         let hash = RescueInstance::new();
-        let leaf = hash.rescue(&[
-            /*uid=*/ one, /*comm=*/ two, /*pk_x=*/ zero, zero,
-        ])[0];
+        let leaf = hash.rescue(&[/*uid=*/ one, /*comm=*/ two, zero, zero])[0];
         // leaf is the right child of node1
         let node1 = hash.rescue(&[path_node2.siblings1, path_node2.siblings2, leaf, zero])[0];
         // node1 is the left child of the root
@@ -1460,7 +1499,7 @@ pub(crate) mod tests {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         // happy path: `is_left_child`/`is_right_child`/`is_left_child + is_right_child` are boolean
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         let node = MTNode {
             siblings1: one,
             siblings2: zero,
@@ -1473,7 +1512,7 @@ pub(crate) mod tests {
         assert!(cs.verify_witness(&witness, &[]).is_ok());
 
         // cs cannot be satisfied when `is_left_child` (or `is_right_child`) is not boolean
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // is_left is not boolean
         let node = MTNode {
             siblings1: one,
@@ -1487,7 +1526,7 @@ pub(crate) mod tests {
         assert!(cs.verify_witness(&witness, &[]).is_err());
 
         // cs cannot be satisfied when `is_left_child` + `is_right_child` is not boolean
-        let mut cs = TurboConstraintSystem::new();
+        let mut cs = TurboCS::new();
         // `is_left` and `is_right` are both 1
         let node = MTNode {
             siblings1: one,
@@ -1507,8 +1546,8 @@ pub(crate) mod tests {
         let fee_type = BLSScalar::from(1234u32);
 
         // Fee function
-        // base fee 5, every input 1, every output 2
-        let fee_calculating_func = |x: u32, y: u32| 5 + x + 2 * y;
+        // base fee 5, every input 1, every output 29
+        let fee_calculating_func = |x: usize, y: usize| 5 + (x as u32) + 2 * (y as u32);
 
         // Receiver pub key x coordinate
         let pubkey_x = BLSScalar::from(4567u32);
@@ -1530,12 +1569,13 @@ pub(crate) mod tests {
             outputs.to_vec(),
             true,
             fee_type,
-            &fee_calculating_func,
+            fee_calculating_func(inputs.len(), outputs.len()),
         );
 
         // single-asset api: bad witness
         outputs[2].0 = 5 + 3 + 2 * 3 - 1;
-        test_xfr_cs(inputs, outputs, false, fee_type, &fee_calculating_func);
+        let fee = fee_calculating_func(inputs.len(), outputs.len());
+        test_xfr_cs(inputs, outputs, false, fee_type, fee);
 
         // multi-assets api: good witness
         let one = BLSScalar::one();
@@ -1558,12 +1598,13 @@ pub(crate) mod tests {
             outputs.to_vec(),
             true,
             fee_type,
-            &fee_calculating_func,
+            fee_calculating_func(inputs.len(), outputs.len()),
         );
 
         // multi-assets api: bad witness
         outputs[2].0 = 5 + 3 + 2 * 7 + 100 - 1;
-        test_xfr_cs(inputs, outputs, false, fee_type, &fee_calculating_func);
+        let fee = fee_calculating_func(inputs.len(), outputs.len());
+        test_xfr_cs(inputs, outputs, false, fee_type, fee);
     }
 
     fn test_xfr_cs(
@@ -1571,9 +1612,9 @@ pub(crate) mod tests {
         outputs: Vec<(u64, BLSScalar, BLSScalar)>,
         witness_is_valid: bool,
         fee_type: BLSScalar,
-        fee_calculating_func: &dyn Fn(u32, u32) -> u32,
+        fee: u32,
     ) {
-        let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, [0u8; 32]);
+        let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, fee, [0u8; 32]);
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -1594,7 +1635,6 @@ pub(crate) mod tests {
         let (mut cs, _) = build_multi_xfr_cs(
             secret_inputs,
             fee_type,
-            fee_calculating_func,
             &hash,
             &non_malleability_randomizer,
             &non_malleability_tag,

@@ -632,6 +632,13 @@ impl<'a> SubAssign<&'a BLSG1> for BLSG1 {
     }
 }
 
+impl<'a> MulAssign<&'a BLSScalar> for BLSG1 {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a BLSScalar) {
+        self.0.mul_assign(rhs.0.clone())
+    }
+}
+
 impl Group for BLSG2 {
     type ScalarType = BLSScalar;
     const COMPRESSED_LEN: usize = 96;

@@ -1,13 +1,13 @@
 use crate::anon_xfr::{
-    circuits::{build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness},
-    config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+    anonymous_transfer::{build_multi_xfr_cs, AMultiXfrPubInputs, AMultiXfrWitness},
+    config::FEE_TYPE,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use merlin::Transcript;
 use zei_algebra::bls12_381::BLSScalar;
 use zei_algebra::prelude::*;
 use zei_plonk::{
-    plonk::{prover::prover_with_lagrange, setup::PlonkPf, verifier::verifier},
+    plonk::{indexer::PlonkPf, prover::prover_with_lagrange, verifier::verifier},
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
 
@@ -40,12 +40,9 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
 
     let fee_type = FEE_TYPE.as_scalar();
-    let fee_calculating_func = FEE_CALCULATING_FUNC;
-
     let (mut cs, _) = build_multi_xfr_cs(
         secret_inputs,
         fee_type,
-        &fee_calculating_func,
         &hash,
         &non_malleability_randomizer,
         &non_malleability_tag,
@@ -100,9 +97,9 @@ pub(crate) fn verify_xfr(
 mod tests {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
-        circuits::{tests::new_multi_xfr_witness_for_test, AMultiXfrPubInputs},
+        anonymous_transfer::{tests::new_multi_xfr_witness_for_test, AMultiXfrPubInputs},
         compute_non_malleability_tag,
-        config::{FEE_CALCULATING_FUNC, FEE_TYPE},
+        config::FEE_TYPE,
         proofs::{prove_xfr, verify_xfr},
     };
     use crate::setup::{ProverParams, VerifierParams};
@@ -139,10 +136,11 @@ mod tests {
         }
         outputs.push((total_output, fee_type, pubkey_x));
 
-        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_calculating_func = |x: usize, y: usize| 5 + (x as u32) + 2 * (y as u32);
+        let fee_amount = fee_calculating_func(inputs.len() + 1, outputs.len()) as u64;
         inputs.push((fee_amount, fee_type));
 
-        test_anon_xfr_proof(inputs, outputs);
+        test_anon_xfr_proof(inputs, outputs, fee_amount as u32);
     }
 
     #[test]
@@ -171,11 +169,11 @@ mod tests {
         total_output -= amount_out;
         outputs.push((total_output, fee_type, pubkey_x));
 
-        // input for fees
-        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_calculating_func = |x: usize, y: usize| 5 + (x as u32) + 2 * (y as u32);
+        let fee_amount = fee_calculating_func(inputs.len() + 1, outputs.len()) as u64;
         inputs.push((fee_amount, fee_type));
 
-        test_anon_xfr_proof(inputs, outputs);
+        test_anon_xfr_proof(inputs, outputs, fee_amount as u32);
     }
 
     #[test]
@@ -189,11 +187,11 @@ mod tests {
         let amount = 0; // a random number in [50, 100)
         let outputs = vec![(amount, fee_type, pubkey_x), (amount, fee_type, pubkey_x)];
 
-        let fee_amount = FEE_CALCULATING_FUNC(1, outputs.len() as u32) as u64;
-
+        let fee_calculating_func = |x: usize, y: usize| 5 + (x as u32) + 2 * (y as u32);
+        let fee_amount = fee_calculating_func(1, outputs.len()) as u64;
         let inputs = vec![(fee_amount, fee_type)];
 
-        test_anon_xfr_proof(inputs, outputs);
+        test_anon_xfr_proof(inputs, outputs, fee_amount as u32);
     }
 
     #[test]
@@ -211,10 +209,11 @@ mod tests {
         let outputs = vec![(amount, fee_type, pubkey_x)];
         let mut inputs = vec![(amount, fee_type)];
 
-        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_calculating_func = |x: usize, y: usize| 5 + (x as u32) + 2 * (y as u32);
+        let fee_amount = fee_calculating_func(inputs.len() + 1, outputs.len()) as u64;
         inputs.push((fee_amount, fee_type));
 
-        test_anon_xfr_proof(inputs, outputs);
+        test_anon_xfr_proof(inputs, outputs, fee_amount as u32);
     }
 
     #[test]
@@ -238,10 +237,11 @@ mod tests {
             (40, one, pubkey_x),
         ];
 
-        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_calculating_func = |x: usize, y: usize| 5 + (x as u32) + 2 * (y as u32);
+        let fee_amount = fee_calculating_func(inputs.len() + 1, outputs.len()) as u64;
         inputs.push((fee_amount, fee_type));
 
-        test_anon_xfr_proof(inputs, outputs);
+        test_anon_xfr_proof(inputs, outputs, fee_amount as u32);
     }
 
     #[test]
@@ -268,22 +268,24 @@ mod tests {
             (output_3, one, pubkey_x),
         ];
 
-        let fee_amount = FEE_CALCULATING_FUNC(inputs.len() as u32 + 1, outputs.len() as u32) as u64;
+        let fee_calculating_func = |x: usize, y: usize| 5 + (x as u32) + 2 * (y as u32);
+        let fee_amount = fee_calculating_func(inputs.len() + 1, outputs.len()) as u64;
         inputs.push((fee_amount, fee_type));
 
-        test_anon_xfr_proof(inputs, outputs);
+        test_anon_xfr_proof(inputs, outputs, fee_amount as u32);
     }
 
     fn test_anon_xfr_proof(
         inputs: Vec<(u64, BLSScalar)>,
         outputs: Vec<(u64, BLSScalar, BLSScalar)>,
+        fee: u32,
     ) {
         let n_payers = inputs.len();
         let n_payees = outputs.len();
 
         // build cs
         let secret_inputs =
-            new_multi_xfr_witness_for_test(inputs.to_vec(), outputs.to_vec(), [0u8; 32]);
+            new_multi_xfr_witness_for_test(inputs.to_vec(), outputs.to_vec(), fee, [0u8; 32]);
         let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
         let params = ProverParams::new(n_payers, n_payees, Some(1)).unwrap();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -327,6 +329,7 @@ mod tests {
         let bad_secret_inputs = AMultiXfrPubInputs::from_witness(&new_multi_xfr_witness_for_test(
             inputs.to_vec(),
             outputs.to_vec(),
+            fee,
             [1u8; 32],
         ));
         // verify bad witness

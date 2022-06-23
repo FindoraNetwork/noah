@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    circuits::{commit, PayeeSecret, PayeeSecretVars, TurboPlonkCS},
+    anonymous_transfer::{commit, PayeeSecret, PayeeSecretVars, TurboPlonkCS},
     keys::AXfrPubKey,
     proofs::AXfrPlonkPf,
     structs::{
@@ -17,7 +17,7 @@ use ruc::*;
 use zei_algebra::{bls12_381::BLSScalar, errors::ZeiError};
 use zei_crypto::basic::hybrid_encryption::XPublicKey;
 use zei_plonk::plonk::{
-    constraint_system::TurboConstraintSystem, prover::prover_with_lagrange, verifier::verifier,
+    constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };
 
 /// Transcript header for AR_TO_ABAR
@@ -237,21 +237,19 @@ fn verify_ar_to_abar(
 ///        Constraint System for ar_to_abar
 ///
 pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
-    let mut cs = TurboConstraintSystem::new();
+    let mut cs = TurboCS::new();
 
     let ar_amount_var = cs.new_variable(BLSScalar::from(payee_data.amount));
-    cs.prepare_io_variable(ar_amount_var);
+    cs.prepare_pi_variable(ar_amount_var);
     let ar_asset_var = cs.new_variable(payee_data.asset_type);
-    cs.prepare_io_variable(ar_asset_var);
+    cs.prepare_pi_variable(ar_asset_var);
 
-    let amount = cs.new_variable(BLSScalar::from(payee_data.amount));
     let blind = cs.new_variable(payee_data.blind);
-    let asset_type = cs.new_variable(payee_data.asset_type);
     let pubkey_x = cs.new_variable(payee_data.pubkey_x);
     let payee = PayeeSecretVars {
-        amount,
+        amount: ar_amount_var,
         blind,
-        asset_type,
+        asset_type: ar_asset_var,
         pubkey_x,
     };
     // commitment
@@ -264,7 +262,7 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
     );
 
     // prepare the public input for the output commitment
-    cs.prepare_io_variable(com_abar_out_var);
+    cs.prepare_pi_variable(com_abar_out_var);
 
     // pad the number of constraints to power of two
     cs.pad();

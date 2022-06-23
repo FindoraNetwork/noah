@@ -11,7 +11,7 @@ use zei_algebra::{
 };
 use zei_crypto::basic::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
 use zei_crypto::basic::rescue::RescueInstance;
-use zei_plonk::{plonk::setup::PlonkPf, poly_commit::kzg_poly_com::KZGCommitmentScheme};
+use zei_plonk::{plonk::indexer::PlonkPf, poly_commit::kzg_poly_com::KZGCommitmentScheme};
 
 pub type Nullifier = BLSScalar;
 pub type Commitment = BLSScalar;
@@ -50,6 +50,7 @@ pub struct AXfrBody {
     pub outputs: Vec<AnonBlindAssetRecord>,
     pub merkle_root: BLSScalar,
     pub merkle_root_version: u64,
+    pub fee: u32,
     pub owner_memos: Vec<OwnerMemo>,
 }
 
@@ -128,11 +129,17 @@ impl OpenAnonBlindAssetRecord {
     /// computes record's amount||asset type||pub key commitment
     pub fn compute_commitment(&self) -> Commitment {
         let hash = RescueInstance::new();
-        hash.rescue(&[
+        let cur = hash.rescue(&[
             self.blind,
             BLSScalar::from(self.amount),
             self.asset_type.as_scalar(),
+            BLSScalar::zero(),
+        ])[0];
+        hash.rescue(&[
+            cur,
             self.pub_key.0.point_ref().get_x(),
+            BLSScalar::zero(),
+            BLSScalar::zero(),
         ])[0]
     }
 }

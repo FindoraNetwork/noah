@@ -1,12 +1,13 @@
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
-    setup::{PlonkPK, PlonkPf, PlonkVK},
+    indexer::{PlonkPK, PlonkPf, PlonkVK},
 };
 use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
+use std::cmp::min;
 use zei_algebra::prelude::*;
 
 /// Build the base group.
@@ -25,7 +26,7 @@ pub(super) fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<
     Ok(elems)
 }
 
-/// The PLONK challenges values.
+/// The data structure for challenges in Plonk.
 #[derive(Default)]
 pub(super) struct PlonkChallenges<F> {
     challenges: Vec<F>,
@@ -39,18 +40,18 @@ impl<F: Scalar> PlonkChallenges<F> {
         }
     }
 
-    /// Insert Gamma and Delta.
-    pub(super) fn insert_gamma_delta(&mut self, gamma: F, delta: F) -> Result<()> {
+    /// Insert beta and gamma.
+    pub(super) fn insert_beta_gamma(&mut self, beta: F, gamma: F) -> Result<()> {
         if self.challenges.is_empty() {
+            self.challenges.push(beta);
             self.challenges.push(gamma);
-            self.challenges.push(delta);
             Ok(())
         } else {
             Err(eg!())
         }
     }
 
-    /// Insert Alpha.
+    /// Insert alpha.
     pub(super) fn insert_alpha(&mut self, alpha: F) -> Result<()> {
         if self.challenges.len() == 2 {
             self.challenges.push(alpha);
@@ -60,18 +61,28 @@ impl<F: Scalar> PlonkChallenges<F> {
         }
     }
 
-    /// Insert Beta.
-    pub(super) fn insert_beta(&mut self, beta: F) -> Result<()> {
+    /// Insert zeta.
+    pub(super) fn insert_zeta(&mut self, zeta: F) -> Result<()> {
         if self.challenges.len() == 3 {
-            self.challenges.push(beta);
+            self.challenges.push(zeta);
             Ok(())
         } else {
             Err(eg!())
         }
     }
 
-    /// Return the Gamme and Delta value.
-    pub(super) fn get_gamma_delta(&self) -> Result<(&F, &F)> {
+    /// Insert u.
+    pub(super) fn insert_u(&mut self, u: F) -> Result<()> {
+        if self.challenges.len() == 4 {
+            self.challenges.push(u);
+            Ok(())
+        } else {
+            Err(eg!())
+        }
+    }
+
+    /// Return beta and gamma.
+    pub(super) fn get_beta_gamma(&self) -> Result<(&F, &F)> {
         if self.challenges.len() > 1 {
             Ok((&self.challenges[0], &self.challenges[1]))
         } else {
@@ -79,7 +90,7 @@ impl<F: Scalar> PlonkChallenges<F> {
         }
     }
 
-    /// Return the Alpha value.
+    /// Return alpha.
     pub(super) fn get_alpha(&self) -> Result<&F> {
         if self.challenges.len() > 2 {
             Ok(&self.challenges[2])
@@ -88,39 +99,48 @@ impl<F: Scalar> PlonkChallenges<F> {
         }
     }
 
-    /// Return the Beta value.
-    pub(super) fn get_beta(&self) -> Result<&F> {
+    /// Return zeta.
+    pub(super) fn get_zeta(&self) -> Result<&F> {
         if self.challenges.len() > 3 {
             Ok(&self.challenges[3])
         } else {
             Err(eg!())
         }
     }
+
+    /// Return u.
+    pub(super) fn get_u(&self) -> Result<&F> {
+        if self.challenges.len() > 4 {
+            Ok(&self.challenges[4])
+        } else {
+            Err(eg!())
+        }
+    }
 }
 
-/// Return the public variables polynomial.
-pub(super) fn public_vars_polynomial<PCS: PolyComScheme>(
-    params: &PlonkPK<PCS>,
-    public_vars: &[PCS::Field],
+/// Return the PI polynomial.
+pub(super) fn pi_poly<PCS: PolyComScheme>(
+    prover_params: &PlonkPK<PCS>,
+    pi: &[PCS::Field],
 ) -> FpPolynomial<PCS::Field> {
-    let mut y = Vec::with_capacity(params.verifier_params.cs_size);
-    for (i, _) in params.group.iter().enumerate() {
-        if let Some((pos, _)) = params
+    let mut evals = Vec::with_capacity(prover_params.verifier_params.cs_size);
+    for (i, _) in prover_params.group.iter().enumerate() {
+        if let Some((pos, _)) = prover_params
             .verifier_params
             .public_vars_constraint_indices
             .iter()
             .find_position(|&&x| x == i)
         {
-            y.push(public_vars[pos])
+            evals.push(pi[pos])
         } else {
-            y.push(PCS::Field::zero());
+            evals.push(PCS::Field::zero());
         }
     }
 
     FpPolynomial::ffti(
-        &params.verifier_params.root,
-        &y,
-        params.verifier_params.cs_size,
+        &prover_params.verifier_params.root,
+        &evals,
+        prover_params.verifier_params.cs_size,
     )
 }
 
@@ -146,27 +166,24 @@ pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Scalar>(
     blinds
 }
 
-/// Build polynomial Sigma, by interpolating
-/// \Sigma(g^{i+1}) = \Sigma(g^i)\prod_{j=1}^{n_wires_per_gate}(fj(g^i)
-/// + \gamma*k_j*g^i +\delta)/(fj(g^i) + \gamma*perm_j(g^i) +\delta)
-/// and setting \Sigma(1) = 1 for the base case
-pub(super) fn sigma_polynomial_evals<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
+/// Build the z polynomial, by interpolating
+/// z(\omega^{i+1}) = z(\omega^i)\prod_{j=1}^{n_wires_per_gate}(fj(\omega^i)
+/// + \beta * k_j * \omega^i +\gamma)/(fj(\omega^i) + \beta * perm_j(\omega^i) +\gamma)
+/// and setting z(1) = 1 for the base case
+pub(super) fn z_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
-    params: &PlonkPK<PCS>,
-    witness: &[PCS::Field],
+    prover_params: &PlonkPK<PCS>,
+    w: &[PCS::Field],
     challenges: &PlonkChallenges<PCS::Field>,
 ) -> FpPolynomial<PCS::Field> {
     let n_wires_per_gate = CS::n_wires_per_gate();
-    let (gamma, delta) = challenges.get_gamma_delta().unwrap();
-    let mut sigma_values = vec![];
+    let (beta, gamma) = challenges.get_beta_gamma().unwrap();
+    let mut z_evals = vec![];
     let perm = cs.compute_permutation();
-    let n_constraints = witness.len() / n_wires_per_gate;
+    let n_constraints = w.len() / n_wires_per_gate;
     let mut prev = PCS::Field::one();
-    sigma_values.push(PCS::Field::one());
-    let group = &params.group[..];
+    z_evals.push(PCS::Field::one());
+    let group = &prover_params.group[..];
 
     // computes permutation values
     let p_of_x =
@@ -179,68 +196,41 @@ pub(super) fn sigma_polynomial_evals<
             k[0].mul(&group[perm_value])
         };
 
-    let k = &params.verifier_params.k;
+    let k = &prover_params.verifier_params.k;
     for i in 0..n_constraints - 1 {
-        // 1. a = prod_{j=1..n_wires_per_gate}(fj(g^i) + \gamma*k_j*g^i +\delta)
-        // 2. b = prod_{j=1..n_wires_per_gate}(fj(g^i) + \gamma*permj(g^i) +\delta)
-        let mut a = PCS::Field::one();
-        let mut b = PCS::Field::one();
+        // 1. numerator = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * k_j * \omega^i + \gamma)
+        // 2. denominator = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * permj(\omega^i) +\gamma)
+        let mut numerator = PCS::Field::one();
+        let mut denominator = PCS::Field::one();
         for j in 0..n_wires_per_gate {
             let k_x = k[j].mul(&group[i]);
-            let f_x = &witness[j * n_constraints + i];
-            let f_plus_gamma_id_plus_delta = &f_x.add(delta).add(&gamma.mul(&k_x));
-            a.mul_assign(&f_plus_gamma_id_plus_delta);
+            let f_x = &w[j * n_constraints + i];
+            let f_plus_beta_id_plus_gamma = &f_x.add(gamma).add(&beta.mul(&k_x));
+            numerator.mul_assign(&f_plus_beta_id_plus_gamma);
 
             let p_x = p_of_x(perm[j * n_constraints + i], n_constraints, group, k);
-            let f_plus_gamma_perm_plus_delta = f_x.add(delta).add(&gamma.mul(&p_x));
-            b.mul_assign(&f_plus_gamma_perm_plus_delta);
+            let f_plus_beta_perm_plus_gamma = f_x.add(gamma).add(&beta.mul(&p_x));
+            denominator.mul_assign(&f_plus_beta_perm_plus_gamma);
         }
 
-        // save \Sigma(g^{i+1}) = \Sigma(g^i)* a / b
-        let b_inv = b.inv().unwrap();
-        prev.mul_assign(&a.mul(&b_inv));
-        sigma_values.push(prev);
+        // save s(\omega^{i+1}) = s(\omega^i)* a / b
+        let denominator_inv = denominator.inv().unwrap();
+        prev.mul_assign(&numerator.mul(&denominator_inv));
+        z_evals.push(prev);
     }
-    // interpolate polynomial
-    FpPolynomial::from_coefs(sigma_values)
+
+    // interpolate the polynomial
+    FpPolynomial::from_coefs(z_evals)
 }
 
-/// Computes PLONK's quotient polynomial.
-/// To compute Q(X), we first get the evaluations of Q(X) on a set H' where |H'| > deg(Q(X)),
-/// then we recover the coefficients of Q(X) using an inverse FFT.
-/// To evaluate Q(X) at a point z \in H', we need to obtain the values of
-/// 1. Evaluations of witness polynomials at point z: {fj(z)}_{j=1..n_wires_per_gate}.
-/// 2. Evaluations of sigma polynomials at point z and g*z: Sigma(z), Sigma(g*z).
-/// 3. The evaluation of the IO polynomial at point z: IO(z).
-/// And we need to precompute the values of
-/// 1. Evaluations of selector polynomials at point z: {qj(z)}.
-/// 2. Evaluations of permutation polynomials at point z: {perm_j(z)}_{j=1..n_wires_per_gate}.
-/// 3. The evaluation of Z_H^{-1}(z), where Z_H(X) is the vanishing polynomial of H.
-/// Then Q(z) is evaluated as
-/// Q(z) = P(z) * Z_H^{-1}(z), for P(z)=
-///     constraint_equation({fj(z)}, {qj(z)}, IO(z))
-///   + alpha * \Sigma(z)\prod_j (fj(z) + gamma * kj * z + delta)
-///   - alpha * \Sigma(g*z)\prod_j (fj(z) + gamma * perm_j(z) + delta)
-///   + alpha^2 (Sigma(z) - 1) * (z^n - 1) / (z - 1).
-///
-/// To guarantee that Z_H^{-1}(z) is well-defined for any z \in H', we have to make sure
-/// z \notin H, hence we choose H' to be a set that does not overlap with H. In particular,
-/// we define
-/// H'' := <g> where |H''| = m > deg(Q(X)),
-/// H := <g^{m/n}> and thus |H| = n,
-/// H' := k[1] * H'' where k[1] is a generator of Fq-{0}.
-/// Thus |H'| > deg(Q(X)) and H' does not overlap with H.
-///
-/// The algorithm takes (n_wires_per_gate+2) deg-m ffts to compute the evaluations of
-/// ({fj(X)}, IO(X), Sigma(X)}), O(m) ops to evaluate {Q(z)}_{z\in H'}, and 1 deg-m
-/// ifft to recover Q(X).
-pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
+/// Compute the t polynomial.
+pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
-    params: &PlonkPK<PCS>,
-    witness_polys: &[FpPolynomial<PCS::Field>],
-    sigma: &FpPolynomial<PCS::Field>,
+    prover_params: &PlonkPK<PCS>,
+    w_polys: &[FpPolynomial<PCS::Field>],
+    z: &FpPolynomial<PCS::Field>,
     challenges: &PlonkChallenges<PCS::Field>,
-    io: &FpPolynomial<PCS::Field>,
+    pi: &FpPolynomial<PCS::Field>,
 ) -> Result<FpPolynomial<PCS::Field>> {
     let n = cs.size();
     let m = cs.quot_eval_dom_size();
@@ -248,215 +238,214 @@ pub(super) fn quotient_polynomial<PCS: PolyComScheme, CS: ConstraintSystem<Field
     if n * factor != m {
         return Err(eg!(PlonkError::SetupError));
     }
-    let root_m = &params.root_m;
-    let k = &params.verifier_params.k;
+    let root_m = &prover_params.root_m;
+    let k = &prover_params.verifier_params.k;
 
-    // Compute the evaluations of witness/IO/Sigma polynomials on the coset k[1] * <root_m>.
-    let witness_polys_coset_evals: Vec<Vec<PCS::Field>> = witness_polys
+    // Compute the evaluations of w/pi/z polynomials on the coset k[1] * <root_m>.
+    let w_polys_coset_evals: Vec<Vec<PCS::Field>> = w_polys
         .iter()
         .map(|poly| poly.coset_fft_with_unity_root(root_m, m, &k[1]))
         .collect();
-    let io_coset_evals = io.coset_fft_with_unity_root(root_m, m, &k[1]);
-    let sigma_coset_evals = sigma.coset_fft_with_unity_root(root_m, m, &k[1]);
+    let pi_coset_evals = pi.coset_fft_with_unity_root(root_m, m, &k[1]);
+    let z_coset_evals = z.coset_fft_with_unity_root(root_m, m, &k[1]);
 
     // Compute the evaluations of the quotient polynomial on the coset.
-    let (gamma, delta) = challenges.get_gamma_delta().unwrap();
+    let (beta, gamma) = challenges.get_beta_gamma().unwrap();
     let alpha = challenges.get_alpha().unwrap();
     let alpha_sq = alpha.mul(alpha);
-    let mut quot_coset_evals = vec![];
+    let mut t_coset_evals = vec![];
 
     for point in 0..m {
-        let wire_vals: Vec<&PCS::Field> = witness_polys_coset_evals
+        let w_vals: Vec<&PCS::Field> = w_polys_coset_evals
             .iter()
             .map(|poly_coset_evals| &poly_coset_evals[point])
             .collect();
-        let sel_vals: Vec<&PCS::Field> = params
-            .selectors_coset_evals
+        let q_vals: Vec<&PCS::Field> = prover_params
+            .q_coset_evals
             .iter()
             .map(|poly_coset_evals| &poly_coset_evals[point])
             .collect();
-        let term1 = CS::eval_gate_func(&wire_vals, &sel_vals, &io_coset_evals[point])?;
+        // q * w
+        let term1 = CS::eval_gate_func(&w_vals, &q_vals, &pi_coset_evals[point])?;
 
-        // alpha * [\Sigma(X)\prod_j (fj(X) + gamma * kj * X + delta)]
-        let mut term2 = alpha.mul(&sigma_coset_evals[point]);
+        // alpha * [z(X)\prod_j (fj(X) + beta * kj * X + gamma)]
+        let mut term2 = alpha.mul(&z_coset_evals[point]);
         for j in 0..CS::n_wires_per_gate() {
-            let tmp = witness_polys_coset_evals[j][point]
-                .add(delta)
-                .add(&gamma.mul(&k[j].mul(&params.coset_quot[point])));
+            let tmp = w_polys_coset_evals[j][point]
+                .add(gamma)
+                .add(&beta.mul(&k[j].mul(&prover_params.coset_quotient[point])));
             term2.mul_assign(&tmp);
         }
 
-        // alpha * [\Sigma(g*X)\prod_j (fj(X) + gamma * perm_j(X) + delta)]
-        let mut term3 = alpha.mul(&sigma_coset_evals[(point + factor) % m]);
-        for (w_poly_coset_evals, perm_coset_evals) in witness_polys_coset_evals
+        // alpha * [z(\omega * X)\prod_j (fj(X) + beta * perm_j(X) + gamma)]
+        let mut term3 = alpha.mul(&z_coset_evals[(point + factor) % m]);
+        for (w_poly_coset_evals, s_coset_evals) in w_polys_coset_evals
             .iter()
-            .zip(params.perms_coset_evals.iter())
+            .zip(prover_params.s_coset_evals.iter())
         {
             let tmp = &w_poly_coset_evals[point]
-                .add(delta)
-                .add(&gamma.mul(&perm_coset_evals[point]));
+                .add(gamma)
+                .add(&beta.mul(&s_coset_evals[point]));
             term3.mul_assign(&tmp);
         }
 
-        // alpha^2 * (Sigma(X) - 1) * L_1(X)
+        // alpha^2 * (z(X) - 1) * L_1(X)
         let term4 = alpha_sq
-            .mul(&params.l1_coset_evals[point])
-            .mul(&sigma_coset_evals[point].sub(&PCS::Field::one()));
+            .mul(&prover_params.l1_coset_evals[point])
+            .mul(&z_coset_evals[point].sub(&PCS::Field::one()));
 
         let numerator = term1.add(&term2).add(&term4.sub(&term3));
-        quot_coset_evals.push(numerator.mul(&params.z_h_inv_coset_evals[point]));
+        t_coset_evals.push(numerator.mul(&prover_params.z_h_inv_coset_evals[point]));
     }
 
     let k_inv = k[1].inv().c(d!(PlonkError::DivisionByZero))?;
-    Ok(FpPolynomial::coset_ffti(
-        root_m,
-        &quot_coset_evals,
-        &k_inv,
-        m,
-    ))
+    Ok(FpPolynomial::coset_ffti(root_m, &t_coset_evals, &k_inv, m))
 }
 
-/// Compute linearization polynomial opening/commitment.
-/// Denote cs.eval_selector_multipliers(f1(beta), .., f_{n_wires_per_gate}(beta))
-///   = (w1, .., w_{n_selectors}).
-/// Denote the selector polynomials [q1(X), ..., q_{n_selectors}(X)].
-/// Denote the selector polynomials commitments [C_q1(X), ..., C_q_{n_selectors}(X)].
-/// The opening:
-///  L(X) = sum_{i=1..n_selectors} wi * qi(X)
-///       + \Sigma(X) [alpha * prod_j (fj(beta) + gamma * kj * beta + delta) + alpha^2 * L1(beta)]
-///       - perm_{n_wires_per_gate}(X) [alpha * \Sigma(g*beta) * gamma
-///         * prod_{j=1..n_wires_per_gate-1}(fj(beta) + gamma * perm_j(beta) + delta)]
-/// The commitment:
-///  C_L(X) = sum_{i=1..n_selectors} wi * qi(X)
-///       + C_\Sigma(X) [alpha * prod_j (fj(beta) + gamma * kj * beta + delta)
-///                      + alpha^2 * L1(beta)]
-///       - C_perm_{n_wires_per_gate}(X) [alpha * \Sigma(g*beta) * gamma
-///         * prod_{j=1..n_wires_per_gate-1}(fj(beta) + gamma * perm_j(beta) + delta)]
-#[allow(clippy::too_many_arguments)]
-fn linearization<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
-    wires: &[F],
+/// Compute r polynomial or commitment.
+fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
+    w: &[F],
     n: usize,
-    selectors: &[PCSType],
+    q_polys_or_comms: &[PCSType],
     k: &[F],
-    last_extended_perm: &PCSType,
-    sigma: &PCSType,
-    witness_polys_eval_beta: &[&F],
-    perms_eval_beta: &[&F],
-    sigma_eval_g_beta: &F,
+    last_s_poly_or_comm: &PCSType,
+    z_poly_or_comm: &PCSType,
+    w_polys_eval_zeta: &[&F],
+    s_polys_eval_zeta: &[&F],
+    z_eval_zeta_omega: &F,
     challenges: &PlonkChallenges<F>,
+    t_polys_or_comms: &[PCSType],
+    n_t_polys: usize,
 ) -> PCSType {
-    let (gamma, delta) = challenges.get_gamma_delta().unwrap();
+    let (beta, gamma) = challenges.get_beta_gamma().unwrap();
     let alpha = challenges.get_alpha().unwrap();
+    let zeta = challenges.get_zeta().unwrap();
 
     // 1. sum_{i=1..n_selectors} wi * qi(X)
-    let mut l = selectors[0].exp(&wires[0]);
-    for i in 1..selectors.len() {
-        l.op_assign(&selectors[i].exp(&wires[i]));
+    let mut l = q_polys_or_comms[0].mul(&w[0]);
+    for i in 1..q_polys_or_comms.len() {
+        l.add_assign(&q_polys_or_comms[i].mul(&w[i]));
     }
 
-    // 2. \Sigma(X) [ alpha * prod_{j=1..n_wires_per_gate} (fj(beta) + gamma * kj * beta + delta)
-    //              + alpha^2 * L1(beta)]
-    let sigma_scalar = compute_sigma_scalar_in_l(n, witness_polys_eval_beta, k, challenges);
-    l.op_assign(&sigma.exp(&sigma_scalar));
+    // 2. z(X) [ alpha * prod_{j=1..n_wires_per_gate} (fj(zeta) + beta * kj * zeta + gamma)
+    //              + alpha^2 * L1(zeta)]
+    let z_scalar = compute_z_scalar_in_r(n, w_polys_eval_zeta, k, challenges);
+    l.add_assign(&z_poly_or_comm.mul(&z_scalar));
 
-    // 3. - perm_{n_wires_per_gate}(X) [alpha * \Sigma(g*beta) * gamma
-    //    * prod_{j=1..n_wires_per_gate-1}(fj(beta) + gamma * perm_j(beta) + delta)]
-    let mut b = alpha.mul(&sigma_eval_g_beta.mul(gamma));
-    for i in 0..witness_polys_eval_beta.len() - 1 {
-        let bi = witness_polys_eval_beta[i]
-            .add(&gamma.mul(perms_eval_beta[i]))
-            .add(delta);
-        b.mul_assign(&bi);
+    // 3. - perm_{n_wires_per_gate}(X) [alpha * z(zeta * omega) * beta
+    //    * prod_{j=1..n_wires_per_gate-1}(fj(zeta) + beta * perm_j(zeta) + gamma)]
+    let mut s_last_poly_scalar = alpha.mul(&z_eval_zeta_omega.mul(beta));
+    for i in 0..w_polys_eval_zeta.len() - 1 {
+        let tmp = w_polys_eval_zeta[i]
+            .add(&beta.mul(s_polys_eval_zeta[i]))
+            .add(gamma);
+        s_last_poly_scalar.mul_assign(&tmp);
     }
-    l.op_assign(&last_extended_perm.exp(&b).inv());
+    l.sub_assign(&last_s_poly_or_comm.mul(&s_last_poly_scalar));
+
+    // 4. subtract the combined t polynomial
+    let mut z_h_eval_zeta = zeta.pow(&[n as u64]);
+    z_h_eval_zeta.sub_assign(&F::one());
+
+    let factor = zeta.pow(&[n_t_polys as u64]);
+    let mut exponent = z_h_eval_zeta * factor;
+    let mut t_poly_combined = t_polys_or_comms[0].clone().mul(&z_h_eval_zeta);
+    for t_poly in t_polys_or_comms.iter().skip(1) {
+        t_poly_combined.add_assign(&t_poly.mul(&exponent));
+        exponent.mul_assign(&factor);
+    }
+    l.sub_assign(&t_poly_combined);
     l
 }
 
-/// Open the linearization_polynomial.
-pub(super) fn linearization_polynomial_opening<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
-    params: &PlonkPK<PCS>,
-    sigma: &PCS::Opening,
-    witness_polys_eval_beta: &[&PCS::Field],
-    perms_eval_beta: &[&PCS::Field],
-    sigma_eval_g_beta: &PCS::Field,
+/// Compute the r polynomial.
+pub(super) fn r_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
+    prover_params: &PlonkPK<PCS>,
+    z: &FpPolynomial<PCS::Field>,
+    w_polys_eval_zeta: &[&PCS::Field],
+    s_polys_eval_zeta: &[&PCS::Field],
+    z_eval_zeta_omega: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
-) -> PCS::Opening {
-    let w = CS::eval_selector_multipliers(witness_polys_eval_beta).unwrap(); // safe unwrap
-    linearization::<PCS::Field, PCS::Opening>(
+    t_polys: &[FpPolynomial<PCS::Field>],
+    n_t_polys: usize,
+) -> FpPolynomial<PCS::Field> {
+    let w = CS::eval_selector_multipliers(w_polys_eval_zeta).unwrap(); // safe unwrap
+    r_poly_or_comm::<PCS::Field, FpPolynomial<PCS::Field>>(
         &w,
-        params.group.len(),
-        &params.selectors,
-        &params.verifier_params.k,
-        &params.extended_permutations[CS::n_wires_per_gate() - 1],
-        sigma,
-        witness_polys_eval_beta,
-        perms_eval_beta,
-        sigma_eval_g_beta,
+        prover_params.group.len(),
+        &prover_params.q_polys,
+        &prover_params.verifier_params.k,
+        &prover_params.s_polys[CS::n_wires_per_gate() - 1],
+        z,
+        w_polys_eval_zeta,
+        s_polys_eval_zeta,
+        z_eval_zeta_omega,
         challenges,
+        t_polys,
+        n_t_polys,
     )
 }
 
-/// Commit the linearization_polynomial.
-pub(super) fn linearization_commitment<
-    PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
->(
-    params: &PlonkVK<PCS>,
-    c_sigma: &PCS::Commitment,
-    witness_polys_eval_beta: &[&PCS::Field],
-    perms_eval_beta: &[&PCS::Field],
-    sigma_eval_g_beta: &PCS::Field,
+/// Commit the r commitment.
+pub(super) fn r_commitment<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
+    verifier_params: &PlonkVK<PCS>,
+    cm_z: &PCS::Commitment,
+    w_polys_eval_zeta: &[&PCS::Field],
+    s_polys_eval_zeta: &[&PCS::Field],
+    z_eval_zeta_omega: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
+    t_polys: &[PCS::Commitment],
+    n_t_polys: usize,
 ) -> PCS::Commitment {
-    let w = CS::eval_selector_multipliers(witness_polys_eval_beta).unwrap(); // safe unwrap
-    linearization::<PCS::Field, PCS::Commitment>(
+    let w = CS::eval_selector_multipliers(w_polys_eval_zeta).unwrap(); // safe unwrap
+    r_poly_or_comm::<PCS::Field, PCS::Commitment>(
         &w,
-        params.cs_size,
-        &params.selectors,
-        &params.k,
-        &params.extended_permutations[CS::n_wires_per_gate() - 1],
-        c_sigma,
-        witness_polys_eval_beta,
-        perms_eval_beta,
-        sigma_eval_g_beta,
+        verifier_params.cs_size,
+        &verifier_params.cm_q_vec,
+        &verifier_params.k,
+        &verifier_params.cm_s_vec[CS::n_wires_per_gate() - 1],
+        cm_z,
+        w_polys_eval_zeta,
+        s_polys_eval_zeta,
+        z_eval_zeta_omega,
         challenges,
+        t_polys,
+        n_t_polys,
     )
 }
 
 /// Compute sum_{i=1}^\ell w_i L_j(X), where j is the constraint
-/// index for the i-th public value. L_j(X) = (X^n-1) / (X - g^j) is
-/// the j-th lagrange base (zero for every X= g^i, except when i ==j)
-pub(super) fn eval_public_var_poly<PCS: PolyComScheme>(
-    params: &PlonkVK<PCS>,
-    public_values: &[PCS::Field],
+/// index for the i-th public value. L_j(X) = (X^n-1) / (X - \omega^j) is
+/// the j-th lagrange base (zero for every X = \omega^i, except when i == j)
+pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
+    verifier_params: &PlonkVK<PCS>,
+    public_inputs: &[PCS::Field],
     eval_point: &PCS::Field,
 ) -> PCS::Field {
     let mut eval = PCS::Field::zero();
-    // (X^n -1) lagrange numerator
-    let x_to_n = eval_point.pow(&[params.cs_size as u64]);
+    // compute X ^ n - 1
+    let x_to_n = eval_point.pow(&[verifier_params.cs_size as u64]);
     let num = x_to_n.sub(&PCS::Field::one());
-    for ((constraint_index, public_value), lagrange_constant) in params
+
+    for ((constraint_index, public_value), lagrange_constant) in verifier_params
         .public_vars_constraint_indices
         .iter()
-        .zip(public_values)
-        .zip(params.lagrange_constants.iter())
+        .zip(public_inputs)
+        .zip(verifier_params.lagrange_constants.iter())
     {
-        // X - g^j j-th lagrange denominator
-        let root_to_j = params.root.pow(&[*constraint_index as u64]);
-        let den = eval_point.sub(&root_to_j);
-        let den_inv = den.inv().unwrap();
-        let lagrange_i = lagrange_constant.mul(&num.mul(&den_inv));
+        // X - \omega^j j-th Lagrange denominator
+        let root_to_j = verifier_params.root.pow(&[*constraint_index as u64]);
+        let denominator = eval_point.sub(&root_to_j);
+        let denominator_inv = denominator.inv().unwrap();
+        let lagrange_i = lagrange_constant.mul(&denominator_inv);
         eval.add_assign(&lagrange_i.mul(public_value));
     }
-    eval
+    eval.mul(&num)
 }
 
-/// Compute constant c_j such that 1=c_j*prod_{i != j} (g^j - g^i).
+/// Compute constant c_j such that 1 = c_j * prod_{i != j} (\omega^j - \omega^i).
 /// In such case, j-th lagrange base can be represented
-/// by L_j(X) = c_j (X^n-1)/(X-g^j)
+/// by L_j(X) = c_j (X^n-1) / (X- \omega^j)
 pub(super) fn compute_lagrange_constant<F: Scalar>(group: &[F], base_index: usize) -> F {
     let mut constant_inv = F::one();
     for (i, elem) in group.iter().enumerate() {
@@ -468,128 +457,110 @@ pub(super) fn compute_lagrange_constant<F: Scalar>(group: &[F], base_index: usiz
     constant_inv.inv().unwrap()
 }
 
-/// compute the scalar factor of \Sigma(X) in linearization polynomial
-/// L(X): prod(fi(\beta) + \gamma * k_i * \beta + delta)*\alpha
-///       + (\beta^n-1) / (\beta-1) * \alpha^2
-fn compute_sigma_scalar_in_l<F: Scalar>(
+/// compute the scalar factor of z(X) in the r poly.
+/// prod(fi(\zeta) + \beta * k_i * \zeta + \gamma) * \alpha
+///       + (\zeta^n - 1) / (\zeta-1) * \alpha^2
+fn compute_z_scalar_in_r<F: Scalar>(
     n: usize,
-    witness_polys_eval_beta: &[&F],
+    w_polys_eval_zeta: &[&F],
     k: &[F],
     challenges: &PlonkChallenges<F>,
 ) -> F {
-    let n_wires_per_gate = witness_polys_eval_beta.len();
-    let (gamma, delta) = challenges.get_gamma_delta().unwrap();
+    let n_wires_per_gate = w_polys_eval_zeta.len();
+    let (beta, gamma) = challenges.get_beta_gamma().unwrap();
     let alpha = challenges.get_alpha().unwrap();
-    let beta = challenges.get_beta().unwrap();
-    // 1. alpha * prod_{i=1..n_wires_per_gate}(fi(\beta) + \gamma * k_i * \beta + delta)
-    let gamma_beta = gamma.mul(beta);
-    let mut a = *alpha;
+    let zeta = challenges.get_zeta().unwrap();
+
+    // 1. alpha * prod_{i=1..n_wires_per_gate}(fi(\zeta) + \beta * k_i * \zeta + \gamma)
+    let beta_zeta = beta.mul(zeta);
+    let mut z_scalar = *alpha;
     for i in 0..n_wires_per_gate {
-        let ai = witness_polys_eval_beta[i]
-            .add(&k[i].mul(&gamma_beta))
-            .add(delta);
-        a.mul_assign(&ai);
+        let tmp = w_polys_eval_zeta[i].add(&k[i].mul(&beta_zeta)).add(gamma);
+        z_scalar.mul_assign(&tmp);
     }
 
-    // 2. alpha^2*(beta^n - 1) / (beta - 1)
+    // 2. alpha^2 * (beta^n - 1) / (beta - 1)
     let alpha_sq = alpha.mul(alpha);
-    let beta_pow_n = beta.pow(&[n as u64]);
-    let l1_eval_beta = beta_pow_n
+    let zeta_pow_n = zeta.pow(&[n as u64]);
+    let l1_eval_zeta = zeta_pow_n
         .sub(&F::one())
-        .mul(&beta.sub(&F::one()).inv().unwrap());
-    let c = l1_eval_beta.mul(&alpha_sq);
+        .mul(&zeta.sub(&F::one()).inv().unwrap());
 
-    a.add(&c)
+    z_scalar.add_assign(&l1_eval_zeta.mul(&alpha_sq));
+    z_scalar
 }
 
-/// derive Q(beta) such that P(\beta) - Q(beta)*Z_H(beta) = 0
-/// That is Q(beta) = P(\beta)/Z_H(beta) =
-///  (L(\beta) + PI(\beta) - alpha * \Sigma(g * beta)
-///     * prod_{i=1..n_wires_per_gate-1}(fi(beta) + gamma * permi(beta) + delta)
-///     * (f_{n_wires_per_gate}(beta) + delta)
-///     - alpha^2 *(\beta^n - 1) / (\beta - 1) ) / (\beta^n - 1)
-pub(super) fn derive_q_eval_beta<PCS: PolyComScheme>(
-    params: &PlonkVK<PCS>,
+/// Evaluate the r polynomial at point \zeta.
+pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
+    verifier_params: &PlonkVK<PCS>,
     proof: &PlonkPf<PCS>,
     challenges: &PlonkChallenges<PCS::Field>,
-    public_vars_eval_beta: &PCS::Field,
+    pi_eval_zeta: &PCS::Field,
 ) -> PCS::Field {
-    let beta = challenges.get_beta().unwrap();
+    let zeta = challenges.get_zeta().unwrap();
     let alpha = challenges.get_alpha().unwrap();
-    let (gamma, delta) = challenges.get_gamma_delta().unwrap();
+    let (beta, gamma) = challenges.get_beta_gamma().unwrap();
 
-    let term0 = proof.l_eval_beta.add(public_vars_eval_beta);
-    let mut term1 = alpha.mul(&proof.sigma_eval_g_beta);
-    let n_wires_per_gate = &proof.witness_polys_eval_beta.len();
+    let term0 = pi_eval_zeta;
+    let mut term1 = alpha.mul(&proof.z_eval_zeta_omega);
+    let n_wires_per_gate = &proof.w_polys_eval_zeta.len();
     for i in 0..n_wires_per_gate - 1 {
-        let b = proof.witness_polys_eval_beta[i]
-            .add(&gamma.mul(&proof.perms_eval_beta[i]))
-            .add(delta);
+        let b = proof.w_polys_eval_zeta[i]
+            .add(&beta.mul(&proof.s_polys_eval_zeta[i]))
+            .add(gamma);
         term1.mul_assign(&b);
     }
-    term1.mul_assign(&proof.witness_polys_eval_beta[n_wires_per_gate - 1].add(delta));
+    term1.mul_assign(&proof.w_polys_eval_zeta[n_wires_per_gate - 1].add(gamma));
 
     let one = PCS::Field::one();
-    let beta_n = beta.pow(&[params.cs_size as u64]);
-    let z_h_eval_beta = beta_n.sub(&one);
-    let beta_minus_one = beta.sub(&one);
-    let first_lagrange_eval_beta = z_h_eval_beta.mul(beta_minus_one.inv().unwrap());
-    let term2 = first_lagrange_eval_beta.mul(alpha.mul(alpha));
+    let zeta_n = zeta.pow(&[verifier_params.cs_size as u64]);
+    let z_h_eval_zeta = zeta_n.sub(&one);
+    let zeta_minus_one = zeta.sub(&one);
+    let first_lagrange_eval_zeta = z_h_eval_zeta.mul(zeta_minus_one.inv().unwrap());
+    let term2 = first_lagrange_eval_zeta.mul(alpha.mul(alpha));
 
     let term1_plus_term2 = term1.add(&term2);
-
-    let dividend = term0.sub(&term1_plus_term2);
-
-    dividend.mul(&z_h_eval_beta.inv().unwrap())
+    term1_plus_term2.sub(&term0)
 }
 
-/// Split the quotient polynomial into `n_wires_per_gate` degree-`n` polynomials and commit.
-#[allow(clippy::type_complexity)]
-pub(crate) fn split_q_and_commit<PCS: PolyComScheme>(
+/// Split the t polynomial into `n_wires_per_gate` degree-`n` polynomials and commit.
+pub(crate) fn split_t_and_commit<PCS: PolyComScheme>(
     pcs: &PCS,
-    q: &FpPolynomial<PCS::Field>,
+    t: &FpPolynomial<PCS::Field>,
     n_wires_per_gate: usize,
     n: usize,
-) -> Result<(Vec<PCS::Commitment>, Vec<PCS::Opening>)> {
-    let mut c_q_polys = vec![];
-    let mut o_q_polys = vec![];
-    for i in 0..n_wires_per_gate {
-        let coefs = if i < n_wires_per_gate - 1 {
-            q.get_coefs_ref()[i * n..(i + 1) * n].to_vec()
-        } else {
-            q.get_coefs_ref()[(n_wires_per_gate - 1) * n..].to_vec()
-        };
-        let q_poly = FpPolynomial::from_coefs(coefs);
-        let (c_q, o_q) = pcs.commit(q_poly).c(d!(PlonkError::CommitmentError))?;
-        c_q_polys.push(c_q);
-        o_q_polys.push(o_q);
-    }
-    Ok((c_q_polys, o_q_polys))
-}
+) -> Result<(Vec<PCS::Commitment>, Vec<FpPolynomial<PCS::Field>>)> {
+    let mut cm_t_vec = vec![];
+    let mut t_polys = vec![];
+    let coefs_len = t.get_coefs_ref().len();
 
-/// Given value \beta, and homomorphic polynomial commitments/openings {qi(X)}_{i=0..m-1},
-/// compute \sum_{i=0..m-1} \beta^{i*n} * qi(X)
-pub(crate) fn combine_q_polys<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F> + Clone>(
-    q_polys: &[PCSType],
-    beta: &F,
-    n: usize,
-) -> PCSType {
-    let factor = beta.pow(&[n as u64]);
-    let mut exponent = factor;
-    let mut q_poly_combined = q_polys[0].clone();
-    for q_poly in q_polys.iter().skip(1) {
-        q_poly_combined.op_assign(&q_poly.exp(&exponent));
-        exponent.mul_assign(&factor);
+    for i in 0..n_wires_per_gate {
+        let coefs_start = i * n;
+        let coefs_end = if i == n_wires_per_gate - 1 {
+            coefs_len
+        } else {
+            (i + 1) * n
+        };
+        let coefs = if coefs_start < coefs_len {
+            t.get_coefs_ref()[coefs_start..min(coefs_len, coefs_end)].to_vec()
+        } else {
+            vec![]
+        };
+        let t_poly = FpPolynomial::from_coefs(coefs);
+        let cm_t = pcs.commit(&t_poly).c(d!(PlonkError::CommitmentError))?;
+        cm_t_vec.push(cm_t);
+        t_polys.push(t_poly);
     }
-    q_poly_combined
+
+    Ok((cm_t_vec, t_polys))
 }
 
 #[cfg(test)]
 mod test {
     use crate::plonk::{
-        constraint_system::TurboConstraintSystem,
-        helpers::{sigma_polynomial_evals, PlonkChallenges},
-        setup::preprocess_prover,
+        constraint_system::TurboCS,
+        helpers::{z_poly, PlonkChallenges},
+        indexer::indexer,
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
     use rand_chacha::ChaChaRng;
@@ -598,8 +569,8 @@ mod test {
     type F = BLSScalar;
 
     #[test]
-    fn test_sigma_polynomial() {
-        let mut cs = TurboConstraintSystem::new();
+    fn test_z_polynomial() {
+        let mut cs = TurboCS::new();
 
         let zero = F::zero();
         let one = F::one();
@@ -620,16 +591,12 @@ mod test {
 
         let mut prng = ChaChaRng::from_seed([0_u8; 32]);
         let pcs = KZGCommitmentScheme::new(20, &mut prng);
-        let params = preprocess_prover(&cs, &pcs).unwrap();
+        let params = indexer(&cs, &pcs).unwrap();
 
         let mut challenges = PlonkChallenges::<F>::new();
-        challenges.insert_gamma_delta(one, zero).unwrap();
-        let q = sigma_polynomial_evals::<KZGCommitmentSchemeBLS, TurboConstraintSystem<F>>(
-            &cs,
-            &params,
-            &witness[..],
-            &challenges,
-        );
+        challenges.insert_beta_gamma(one, zero).unwrap();
+        let q =
+            z_poly::<KZGCommitmentSchemeBLS, TurboCS<F>>(&cs, &params, &witness[..], &challenges);
 
         let q0 = q.coefs[0];
         assert_eq!(q0, one);

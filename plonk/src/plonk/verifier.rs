@@ -1,128 +1,121 @@
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
-    helpers::{
-        combine_q_polys, derive_q_eval_beta, eval_public_var_poly, linearization_commitment,
-        PlonkChallenges,
-    },
-    setup::{PlonkPf, PlonkVK},
+    helpers::{eval_pi_poly, r_commitment, r_eval_zeta, PlonkChallenges},
+    indexer::{PlonkPf, PlonkVK},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
-        transcript_get_plonk_challenge_delta, transcript_get_plonk_challenge_gamma,
-        transcript_init_plonk,
+        transcript_get_plonk_challenge_gamma, transcript_get_plonk_challenge_u,
+        transcript_get_plonk_challenge_zeta, transcript_init_plonk,
     },
 };
 use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 
-/// Verify a proof for a constraint system previously preprocessed into `cs_params`
-/// State of the transcript must match prover state of the transcript
-/// Polynomial Commitement parameters must be shared between prover and verifier.
-/// # Example
-/// See plonk::prover::prover
+/// Verify a proof
 pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     transcript: &mut Transcript,
     pcs: &PCS,
     cs: &CS,
-    cs_params: &PlonkVK<PCS>,
-    public_values: &[PCS::Field],
+    verifier_params: &PlonkVK<PCS>,
+    pi: &[PCS::Field],
     proof: &PlonkPf<PCS>,
 ) -> Result<()> {
-    transcript_init_plonk(transcript, cs_params, public_values);
+    transcript_init_plonk(transcript, verifier_params, pi);
 
     let mut challenges = PlonkChallenges::new();
 
     // 1. compute gamma and delta challenges
-    for c in proof.c_witness_polys.iter() {
-        transcript.append_commitment::<PCS::Commitment>(c);
+    for cm_w in proof.cm_w_vec.iter() {
+        transcript.append_commitment::<PCS::Commitment>(cm_w);
     }
+    let beta = transcript_get_plonk_challenge_beta(transcript, cs.size());
     let gamma = transcript_get_plonk_challenge_gamma(transcript, cs.size());
-    let delta = transcript_get_plonk_challenge_delta(transcript, cs.size());
-    challenges.insert_gamma_delta(gamma, delta).unwrap();
+    challenges.insert_beta_gamma(beta, gamma).unwrap();
 
     // 2. compute alpha challenge
-    transcript.append_commitment::<PCS::Commitment>(&proof.c_sigma);
+    transcript.append_commitment::<PCS::Commitment>(&proof.cm_z);
     let alpha = transcript_get_plonk_challenge_alpha(transcript, cs.size());
     challenges.insert_alpha(alpha).unwrap();
-    for c_q in &proof.c_q_polys {
-        transcript.append_commitment::<PCS::Commitment>(&c_q);
+    for cm_t in &proof.cm_t_vec {
+        transcript.append_commitment::<PCS::Commitment>(&cm_t);
     }
 
-    // 3. compute beta challenge
-    let beta = transcript_get_plonk_challenge_beta(transcript, cs.size());
-    challenges.insert_beta(beta).unwrap();
-    for eval_beta in proof
-        .witness_polys_eval_beta
+    // 3. compute zeta challenge
+    let zeta = transcript_get_plonk_challenge_zeta(transcript, cs.size());
+    challenges.insert_zeta(zeta).unwrap();
+    for eval_zeta in proof
+        .w_polys_eval_zeta
         .iter()
-        .chain(proof.perms_eval_beta.iter())
+        .chain(proof.s_polys_eval_zeta.iter())
     {
-        transcript.append_field_elem(eval_beta);
+        transcript.append_field_elem(eval_zeta);
     }
-    transcript.append_field_elem(&proof.sigma_eval_g_beta);
-    transcript.append_field_elem(&proof.l_eval_beta);
+    transcript.append_field_elem(&proof.z_eval_zeta_omega);
 
-    let public_vars_eval_beta =
-        eval_public_var_poly::<PCS>(cs_params, public_values, challenges.get_beta().unwrap());
+    let u = transcript_get_plonk_challenge_u(transcript, cs.size());
+    challenges.insert_u(u).unwrap();
 
-    // 4. derive linearization polynomial commitment
-    let witness_polys_eval_beta_as_ref: Vec<&PCS::Field> =
-        proof.witness_polys_eval_beta.iter().collect();
-    let perms_eval_beta_as_ref: Vec<&PCS::Field> = proof.perms_eval_beta.iter().collect();
-    let c_l = linearization_commitment::<PCS, CS>(
-        cs_params,
-        &proof.c_sigma,
-        &witness_polys_eval_beta_as_ref[..],
-        &perms_eval_beta_as_ref[..],
-        &proof.sigma_eval_g_beta,
+    let pi_eval_zeta = eval_pi_poly::<PCS>(verifier_params, pi, challenges.get_zeta().unwrap());
+
+    // 4. derive the linearization polynomial commitment
+    let zeta = challenges.get_zeta().unwrap();
+    let r_eval_zeta = r_eval_zeta::<PCS>(verifier_params, proof, &challenges, &pi_eval_zeta);
+    let zeta_omega = zeta.mul(&verifier_params.root);
+
+    let w_polys_eval_zeta_as_ref: Vec<&PCS::Field> = proof.w_polys_eval_zeta.iter().collect();
+    let s_eval_zeta_as_ref: Vec<&PCS::Field> = proof.s_polys_eval_zeta.iter().collect();
+    let cm_r = r_commitment::<PCS, CS>(
+        verifier_params,
+        &proof.cm_z,
+        &w_polys_eval_zeta_as_ref[..],
+        &s_eval_zeta_as_ref[..],
+        &proof.z_eval_zeta_omega,
         &challenges,
+        &proof.cm_t_vec[..],
+        verifier_params.cs_size + 2,
     );
 
-    // Note: for completeness steps 5 and 6 is analogous to getting Q(beta) in the proof,
-    // verify it, and then check that
-    // P(\beta) - Q(\beta) * Z_H(\beta) (plus checking all eval proofs)
-
-    // 5. derive value of Q(\beta) such that P(\beta) - Q(\beta) * Z_H(\beta) = 0
-    let beta = challenges.get_beta().unwrap();
-    let derived_q_eval_beta =
-        derive_q_eval_beta::<PCS>(cs_params, proof, &challenges, &public_vars_eval_beta);
-    let g_beta = beta.mul(&cs_params.root);
-
-    // 6. verify batch eval proofs for witness/permutation polynomials evaluations
-    // at point beta, and Q(beta), L(beta), \Sigma(g*beta)
+    // 5. verify opening proofs
     let mut commitments: Vec<&PCS::Commitment> = proof
-        .c_witness_polys
+        .cm_w_vec
         .iter()
         .chain(
-            cs_params
-                .extended_permutations
+            verifier_params
+                .cm_s_vec
                 .iter()
                 .take(CS::n_wires_per_gate() - 1),
         )
         .collect();
-    let c_q_combined = combine_q_polys(&proof.c_q_polys[..], &beta, cs_params.cs_size + 2);
-    commitments.push(&c_q_combined);
-    commitments.push(&c_l);
-    commitments.push(&proof.c_sigma);
-    let mut points = vec![*beta; 2 * CS::n_wires_per_gate() + 1];
-    points.push(g_beta);
+    commitments.push(&cm_r);
+
     let mut values: Vec<PCS::Field> = proof
-        .witness_polys_eval_beta
+        .w_polys_eval_zeta
         .iter()
-        .chain(proof.perms_eval_beta.iter())
+        .chain(proof.s_polys_eval_zeta.iter())
         .cloned()
         .collect();
-    values.push(derived_q_eval_beta);
-    values.push(proof.l_eval_beta);
-    values.push(proof.sigma_eval_g_beta);
-    pcs.batch_verify_eval(
+    values.push(r_eval_zeta);
+
+    let (comm, val) = pcs.batch(
         transcript,
         &commitments[..],
-        cs_params.cs_size + 2,
-        &points[..],
+        verifier_params.cs_size + 2,
+        &zeta,
         &values[..],
-        &proof.batch_eval_proof,
-        None,
+    );
+    pcs.batch_verify_diff_points(
+        transcript,
+        &[comm, proof.cm_z.clone()],
+        verifier_params.cs_size + 2,
+        &[zeta.clone(), zeta_omega.clone()],
+        &[val, proof.z_eval_zeta_omega],
+        &[
+            proof.opening_witness_zeta.clone(),
+            proof.opening_witness_zeta_omega.clone(),
+        ],
+        challenges.get_u().unwrap(),
     )
     .c(d!(PlonkError::VerificationError))
 }

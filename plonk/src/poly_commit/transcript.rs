@@ -1,4 +1,4 @@
-use crate::poly_commit::pcs::{PolyComScheme, ToBytes};
+use crate::poly_commit::pcs::ToBytes;
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 
@@ -9,9 +9,6 @@ pub trait PolyComTranscript {
 
     /// Append the field to the transcript.
     fn append_field_elem<F: Scalar>(&mut self, point: &F);
-
-    /// Append the eval proof to the transaction.
-    fn append_eval_proof<PCS: PolyComScheme>(&mut self, proof: &PCS::EvalProof);
 
     /// Get challenge result.
     fn get_challenge_field_elem<F: Scalar>(&mut self, label: &'static [u8]) -> F;
@@ -24,10 +21,6 @@ impl PolyComTranscript for Transcript {
 
     fn append_field_elem<F: Scalar>(&mut self, field_elem: &F) {
         self.append_message(b"append field point", &field_elem.to_bytes());
-    }
-
-    fn append_eval_proof<PCS: PolyComScheme>(&mut self, proof: &PCS::EvalProof) {
-        self.append_message(b"append eval proof", &proof.to_bytes());
     }
 
     fn get_challenge_field_elem<F: Scalar>(&mut self, label: &'static [u8]) -> F {
