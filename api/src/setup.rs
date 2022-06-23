@@ -4,9 +4,8 @@ use crate::anon_xfr::{
     abar_to_bar::build_abar_to_bar_cs,
     ar_to_abar::build_ar_to_abar_cs,
     bar_to_abar::build_bar_to_abar_cs,
-    circuits::build_multi_xfr_cs,
     structs::{MTNode, MTPath},
-    PayeeSecret, PayerSecret, TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
+    TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
 use crate::parameters::{
     ABAR_TO_AR_VERIFIER_PARAMS, ABAR_TO_BAR_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS,
@@ -30,7 +29,9 @@ use zei_plonk::{
     poly_commit::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
 };
 // The Public Setup needed for Proofs
-use crate::anon_xfr::abar_to_abar::AMultiXfrWitness;
+use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AMultiXfrWitness};
+// The Public Setup needed for Proofs
+use crate::anon_xfr::structs::{PayeeSecret, PayerSecret};
 
 // Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]

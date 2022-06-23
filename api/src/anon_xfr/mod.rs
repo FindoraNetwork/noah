@@ -1,10 +1,10 @@
-use crate::anon_xfr::circuits::NullifierInputVars;
-use crate::anon_xfr::structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord};
-use crate::anon_xfr::structs::{BlindFactor, MTPath};
+use crate::anon_xfr::structs::{
+    AXfrKeyPair, AccElemVars, AnonBlindAssetRecord, BlindFactor, MTPath, MerkleNodeVars,
+    MerklePathVars, NullifierInputVars, OpenAnonBlindAssetRecord,
+};
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use digest::Digest;
 use sha2::Sha512;
-use structs::AXfrKeyPair;
 use zei_algebra::jubjub::JubjubScalar;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
@@ -28,7 +28,6 @@ pub mod abar_to_bar;
 pub mod ar_to_abar;
 /// Module for converting confidential assets to anonymous assets.
 pub mod bar_to_abar;
-pub mod circuits;
 pub mod structs;
 
 const ASSET_TYPE_FRA: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
@@ -246,29 +245,12 @@ pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
 }
 
 pub(crate) const SK_LEN: usize = 252;
+
 // secret key size (in bits)
 pub(crate) const AMOUNT_LEN: usize = 64;
 
 // Depth of the Merkle Tree circuit. here <= accumulators::merkle_tree::TREE_DEPTH (20)
 pub const TREE_DEPTH: usize = 20;
-
-#[derive(Debug, Clone)]
-pub struct PayerSecret {
-    pub sec_key: JubjubScalar,
-    pub amount: u64,
-    pub asset_type: BLSScalar,
-    pub uid: u64,
-    pub path: MTPath,
-    pub blind: BlindFactor,
-}
-
-#[derive(Debug, Clone)]
-pub struct PayeeSecret {
-    pub amount: u64,
-    pub blind: BlindFactor,
-    pub asset_type: BLSScalar,
-    pub pubkey_x: BLSScalar,
-}
 
 // Add the commitment constraints to the constraint system:
 // comm = commit(blinding, amount, asset_type)
@@ -305,4 +287,77 @@ pub(crate) fn nullify_with_native_address(
     let cur = cs.rescue_hash(&input_var)[0];
     let input_var = StateVar::new([cur, sk_var, cs.zero_var(), cs.zero_var()]);
     cs.rescue_hash(&input_var)[0]
+}
+
+pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
+    let path_vars: Vec<MerkleNodeVars> = path
+        .nodes
+        .into_iter()
+        .map(|node| MerkleNodeVars {
+            siblings1: cs.new_variable(node.siblings1),
+            siblings2: cs.new_variable(node.siblings2),
+            is_left_child: cs.new_variable(BLSScalar::from(node.is_left_child as u32)),
+            is_right_child: cs.new_variable(BLSScalar::from(node.is_right_child as u32)),
+        })
+        .collect();
+    // Boolean-constrain `is_left_child` and `is_right_child`
+    for node_var in path_vars.iter() {
+        cs.insert_boolean_gate(node_var.is_left_child);
+        cs.insert_boolean_gate(node_var.is_right_child);
+        // 0 <= is_left_child[i] + is_right_child[i] <= 1 for every i,
+        // because a node can't simultaneously be the left and right child of its parent
+        let left_add_right = cs.add(node_var.is_left_child, node_var.is_right_child);
+        cs.insert_boolean_gate(left_add_right);
+    }
+
+    MerklePathVars { nodes: path_vars }
+}
+
+// Add the sorting constraints that arrange the positions of the sibling nodes.
+// If `node` is the left child of parent, output (`node`, `sib1`, `sib2`);
+// if `node` is the right child of parent, output (`sib1`, `sib2`, `node`);
+// otherwise, output (`sib1`, `node`, `sib2`)
+fn sort(
+    cs: &mut TurboPlonkCS,
+    node: VarIndex,
+    sib1: VarIndex,
+    sib2: VarIndex,
+    is_left_child: VarIndex,
+    is_right_child: VarIndex,
+) -> StateVar {
+    let left = cs.select(sib1, node, is_left_child);
+    let right = cs.select(sib2, node, is_right_child);
+    let sum_left_right = cs.add(left, right);
+    let one = BLSScalar::one();
+    let mid = cs.linear_combine(
+        &[node, sib1, sib2, sum_left_right],
+        one,
+        one,
+        one,
+        one.neg(),
+    );
+    StateVar::new([left, mid, right, cs.zero_var()])
+}
+
+pub fn compute_merkle_root(
+    cs: &mut TurboPlonkCS,
+    elem: AccElemVars,
+    path_vars: &MerklePathVars,
+) -> VarIndex {
+    let (uid, commitment) = (elem.uid, elem.commitment);
+    let zero_var = cs.zero_var();
+
+    let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, zero_var, zero_var]))[0];
+    for path_node in path_vars.nodes.iter() {
+        let input_var = sort(
+            cs,
+            node_var,
+            path_node.siblings1,
+            path_node.siblings2,
+            path_node.is_left_child,
+            path_node.is_right_child,
+        );
+        node_var = cs.rescue_hash(&input_var)[0];
+    }
+    node_var
 }

@@ -1,12 +1,11 @@
 use crate::anon_xfr::abar_to_abar::AXfrPlonkPf;
-use crate::anon_xfr::structs::AXfrPubKey;
+use crate::anon_xfr::structs::{AXfrPubKey, PayeeSecret, PayeeSecretVars};
 use crate::anon_xfr::{
-    circuits::PayeeSecretVars,
     commit_with_native_address,
     structs::{
         AnonBlindAssetRecord, Commitment, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
     },
-    PayeeSecret, TurboPlonkCS,
+    TurboPlonkCS,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{

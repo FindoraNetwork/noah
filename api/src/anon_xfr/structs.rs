@@ -7,6 +7,7 @@ use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_crypto::basic::schnorr::{KeyPair, PublicKey, Signature};
+use zei_plonk::plonk::constraint_system::VarIndex;
 
 pub type Nullifier = BLSScalar;
 pub type Commitment = BLSScalar;
@@ -359,4 +360,64 @@ mod test {
         let reformed_key_pair = AXfrKeyPair::zei_from_bytes(bytes.as_slice()).unwrap();
         assert_eq!(keypair, reformed_key_pair);
     }
+}
+
+pub struct PayerSecretVars {
+    pub sec_key: VarIndex,
+    pub uid: VarIndex,
+    pub amount: VarIndex,
+    pub asset_type: VarIndex,
+    pub path: MerklePathVars,
+    pub blind: VarIndex,
+}
+
+pub(crate) struct PayeeSecretVars {
+    pub amount: VarIndex,
+    pub blind: VarIndex,
+    pub asset_type: VarIndex,
+    pub pubkey_x: VarIndex,
+}
+
+// cs variables for a Merkle node
+pub struct MerkleNodeVars {
+    pub siblings1: VarIndex,
+    pub siblings2: VarIndex,
+    pub is_left_child: VarIndex,
+    pub is_right_child: VarIndex,
+}
+
+// cs variables for a merkle authentication path
+pub struct MerklePathVars {
+    pub nodes: Vec<MerkleNodeVars>,
+}
+
+// cs variables for an accumulated element
+pub struct AccElemVars {
+    pub uid: VarIndex,
+    pub commitment: VarIndex,
+}
+
+// cs variables for the nullifier PRF inputs
+pub(crate) struct NullifierInputVars {
+    pub uid_amount: VarIndex,
+    pub asset_type: VarIndex,
+    pub pub_key_x: VarIndex,
+}
+
+#[derive(Debug, Clone)]
+pub struct PayerSecret {
+    pub sec_key: JubjubScalar,
+    pub amount: u64,
+    pub asset_type: BLSScalar,
+    pub uid: u64,
+    pub path: MTPath,
+    pub blind: BlindFactor,
+}
+
+#[derive(Debug, Clone)]
+pub struct PayeeSecret {
+    pub amount: u64,
+    pub blind: BlindFactor,
+    pub asset_type: BLSScalar,
+    pub pubkey_x: BLSScalar,
 }

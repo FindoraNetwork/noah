@@ -1,13 +1,11 @@
-use crate::anon_xfr::structs::AXfrKeyPair;
+use crate::anon_xfr::structs::{
+    AXfrKeyPair, AccElemVars, NullifierInputVars, PayerSecret, PayerSecretVars,
+};
 use crate::anon_xfr::{
-    circuits::{
-        add_merkle_path_variables, compute_merkle_root, AccElemVars, NullifierInputVars,
-        PayerSecretVars,
-    },
-    commit_with_native_address, compute_non_malleability_tag, nullifier,
-    nullify_with_native_address,
+    add_merkle_path_variables, commit_with_native_address, compute_merkle_root,
+    compute_non_malleability_tag, nullifier, nullify_with_native_address,
     structs::{Nullifier, OpenAnonBlindAssetRecord},
-    PayerSecret, TurboPlonkCS, SK_LEN,
+    TurboPlonkCS, SK_LEN,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{

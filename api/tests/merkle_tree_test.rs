@@ -11,8 +11,9 @@ pub(crate) mod merkle_tree_test {
         state::{ChainState, State},
         store::PrefixedStore,
     };
+    use zei::anon_xfr::structs::AccElemVars;
     use zei::anon_xfr::{
-        circuits::{add_merkle_path_variables, compute_merkle_root, AccElemVars},
+        add_merkle_path_variables, compute_merkle_root,
         structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
