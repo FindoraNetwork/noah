@@ -4,8 +4,8 @@ use crate::anon_xfr::structs::{
 };
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots,
-    commit_with_native_address, compute_merkle_root, compute_non_malleability_tag, nullifier,
-    nullify_with_native_address,
+    commit_in_cs_with_native_address, compute_merkle_root, compute_non_malleability_tag,
+    nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord},
     TurboPlonkCS, AMOUNT_LEN, FEE_TYPE, SK_LEN,
 };
@@ -77,7 +77,7 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
         .zip(input_keypairs.iter())
         .map(|(input, keypair)| {
             let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
-            nullifier(&keypair, input.amount, &input.asset_type, mt_leaf_info.uid)
+            nullify_with_native_address(&keypair, input.amount, &input.asset_type, mt_leaf_info.uid)
         })
         .collect();
 
@@ -464,8 +464,13 @@ pub(crate) fn build_multi_xfr_cs(
         let pk_x = pk_var.get_x();
 
         // commitments
-        let com_abar_in_var =
-            commit_with_native_address(&mut cs, payer.blind, payer.amount, payer.asset_type, pk_x);
+        let com_abar_in_var = commit_in_cs_with_native_address(
+            &mut cs,
+            payer.blind,
+            payer.amount,
+            payer.asset_type,
+            pk_x,
+        );
 
         // prove pre-image of the nullifier
         // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
@@ -482,7 +487,7 @@ pub(crate) fn build_multi_xfr_cs(
             pub_key_x: pk_x,
         };
         let nullifier_var =
-            nullify_with_native_address(&mut cs, payer.sec_key, nullifier_input_vars);
+            nullify_in_cs_with_native_address(&mut cs, payer.sec_key, nullifier_input_vars);
 
         // Merkle path authentication
         let acc_elem = AccElemVars {
@@ -505,7 +510,7 @@ pub(crate) fn build_multi_xfr_cs(
 
     for payee in &payees_secrets {
         // commitment
-        let com_abar_out_var = commit_with_native_address(
+        let com_abar_out_var = commit_in_cs_with_native_address(
             &mut cs,
             payee.blind,
             payee.amount,
@@ -756,14 +761,15 @@ pub(crate) fn add_payees_secrets(
 
 #[cfg(test)]
 mod tests {
+    use crate::anon_xfr::abar_to_abar::compute_merkle_leaf_value;
     use crate::anon_xfr::structs::{PayeeSecret, PayerSecret};
     use crate::anon_xfr::{
         abar_to_abar::{
             asset_mixing, build_multi_xfr_cs, gen_anon_xfr_note, prove_xfr, verify_anon_xfr_note,
             verify_xfr, AMultiXfrPubInputs, AMultiXfrWitness,
         },
-        add_merkle_path_variables, commit_with_native_address, compute_merkle_root,
-        compute_non_malleability_tag, hash_abar, nullify_with_native_address, sort,
+        add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
+        compute_non_malleability_tag, nullify_in_cs_with_native_address, sort,
         structs::{
             AXfrKeyPair, AccElemVars, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
             NullifierInputVars, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
@@ -1163,7 +1169,7 @@ mod tests {
             commitment: BLSScalar::random(&mut prng),
         };
 
-        let _ = mt.add_commitment_hash(hash_abar(mt.entry_count(), &abar))?;
+        let _ = mt.add_commitment_hash(compute_merkle_leaf_value(mt.entry_count(), &abar))?;
         mt.commit()?;
 
         for _i in 0..n - 1 {
@@ -1171,7 +1177,7 @@ mod tests {
                 commitment: BLSScalar::random(&mut prng),
             };
 
-            let _ = mt.add_commitment_hash(hash_abar(mt.entry_count(), &abar))?;
+            let _ = mt.add_commitment_hash(compute_merkle_leaf_value(mt.entry_count(), &abar))?;
             mt.commit()?;
         }
 
@@ -1208,7 +1214,7 @@ mod tests {
 
         let abar = AnonBlindAssetRecord::from_oabar(&oabar);
         let uid = mt
-            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
+            .add_commitment_hash(compute_merkle_leaf_value(mt.entry_count(), &abar))
             .unwrap();
         let _ = mt.commit();
         let mt_proof = mt.generate_proof(uid).unwrap();
@@ -2143,8 +2149,13 @@ mod tests {
         let asset_var = cs.new_variable(asset_type);
         let blind_var = cs.new_variable(blind);
         let pubkey_x_var = cs.new_variable(pubkey_x);
-        let comm_var =
-            commit_with_native_address(&mut cs, blind_var, amount_var, asset_var, pubkey_x_var);
+        let comm_var = commit_in_cs_with_native_address(
+            &mut cs,
+            blind_var,
+            amount_var,
+            asset_var,
+            pubkey_x_var,
+        );
         let mut witness = cs.get_and_clear_witness();
 
         // Check commitment consistency
@@ -2182,7 +2193,7 @@ mod tests {
             asset_type: asset_var,
             pub_key_x: pk_var.get_x(),
         };
-        let nullifier_var = nullify_with_native_address(&mut cs, sk_var, nullifier_input_var);
+        let nullifier_var = nullify_in_cs_with_native_address(&mut cs, sk_var, nullifier_input_var);
         let mut witness = cs.get_and_clear_witness();
 
         // Check PRF output consistency
@@ -2525,4 +2536,15 @@ mod tests {
             assert!(verify.is_err());
         }
     }
+}
+
+/// Compute the commitment hash for the Merkle tree leaf for an anonymous asset
+pub fn compute_merkle_leaf_value(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
+    let hash = RescueInstance::new();
+    hash.rescue(&[
+        BLSScalar::from(uid),
+        abar.commitment,
+        BLSScalar::zero(),
+        BLSScalar::zero(),
+    ])[0]
 }

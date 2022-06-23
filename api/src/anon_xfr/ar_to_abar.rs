@@ -1,9 +1,9 @@
-use crate::anon_xfr::abar_to_abar::AXfrPlonkPf;
-use crate::anon_xfr::structs::{AXfrPubKey, PayeeSecret, PayeeSecretVars};
 use crate::anon_xfr::{
-    commit_with_native_address,
+    abar_to_abar::AXfrPlonkPf,
+    commit_in_cs_with_native_address,
     structs::{
-        AnonBlindAssetRecord, Commitment, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
+        AXfrPubKey, AnonBlindAssetRecord, Commitment, OpenAnonBlindAssetRecord,
+        OpenAnonBlindAssetRecordBuilder, PayeeSecret, PayeeSecretVars,
     },
     TurboPlonkCS,
 };
@@ -13,9 +13,7 @@ use crate::xfr::{
     structs::{AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo},
 };
 use merlin::Transcript;
-use rand_core::{CryptoRng, RngCore};
-use ruc::*;
-use zei_algebra::{bls12_381::BLSScalar, errors::ZeiError};
+use zei_algebra::{bls12_381::BLSScalar, errors::ZeiError, prelude::*};
 use zei_crypto::basic::hybrid_encryption::XPublicKey;
 use zei_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
@@ -254,7 +252,7 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
         pubkey_x,
     };
     // commitment
-    let com_abar_out_var = commit_with_native_address(
+    let com_abar_out_var = commit_in_cs_with_native_address(
         &mut cs,
         payee.blind,
         payee.amount,

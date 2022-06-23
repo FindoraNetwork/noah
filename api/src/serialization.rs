@@ -3,7 +3,6 @@ use crate::xfr::{
     structs::{AssetType, ASSET_TYPE_LENGTH},
 };
 use ed25519_dalek::{PublicKey, SecretKey};
-use ruc::*;
 use serde::Serializer;
 use zei_algebra::prelude::*;
 

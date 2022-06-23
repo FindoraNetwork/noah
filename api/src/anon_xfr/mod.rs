@@ -1,11 +1,10 @@
 use crate::anon_xfr::structs::{
-    AXfrKeyPair, AccElemVars, AnonBlindAssetRecord, BlindFactor, MTPath, MerkleNodeVars,
-    MerklePathVars, NullifierInputVars, OpenAnonBlindAssetRecord,
+    AXfrKeyPair, AccElemVars, AnonBlindAssetRecord, MTPath, MerkleNodeVars, MerklePathVars,
+    NullifierInputVars, OpenAnonBlindAssetRecord,
 };
 use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
 use digest::Digest;
 use sha2::Sha512;
-use zei_algebra::jubjub::JubjubScalar;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
@@ -15,8 +14,7 @@ use zei_crypto::basic::{
     hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey},
     rescue::RescueInstance,
 };
-use zei_plonk::plonk::constraint_system::rescue::StateVar;
-use zei_plonk::plonk::constraint_system::{TurboCS, VarIndex};
+use zei_plonk::plonk::constraint_system::{rescue::StateVar, TurboCS, VarIndex};
 
 /// Module for general-purpose anonymous payment.
 pub mod abar_to_abar;
@@ -28,14 +26,17 @@ pub mod abar_to_bar;
 pub mod ar_to_abar;
 /// Module for converting confidential assets to anonymous assets.
 pub mod bar_to_abar;
+/// Module for shared structures.
 pub mod structs;
 
+/// The asset type for FRA.
 const ASSET_TYPE_FRA: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
+/// FRA as the token used to pay the fee.
 pub const FEE_TYPE: AssetType = ASSET_TYPE_FRA;
 
-pub type TurboPlonkCS = TurboCS<BLSScalar>; // amount value size (in bits)
+pub type TurboPlonkCS = TurboCS<BLSScalar>;
 
-/// Check that inputs have mt witness and keypair matched pubkey
+/// Check that inputs have Merkle tree witness and matching key pairs.
 fn check_inputs(inputs: &[OpenAnonBlindAssetRecord], keypairs: &[AXfrKeyPair]) -> Result<()> {
     if inputs.len() != keypairs.len() {
         return Err(eg!(ZeiError::ParameterError));
@@ -49,7 +50,7 @@ fn check_inputs(inputs: &[OpenAnonBlindAssetRecord], keypairs: &[AXfrKeyPair]) -
 }
 
 /// Check that for each asset type total input amount == total output amount
-/// and for FRA, total input amount == total output amount + fees for fra
+/// and for FRA, total input amount == total output amount + fees.
 fn check_asset_amount(
     inputs: &[OpenAnonBlindAssetRecord],
     outputs: &[OpenAnonBlindAssetRecord],
@@ -89,8 +90,8 @@ fn check_asset_amount(
     Ok(())
 }
 
-/// Check that the merkle roots in input asset records are consistent
-/// `inputs` is guaranteed to have at least one asset record
+/// Check that the Merkle roots in input asset records are the same
+/// `inputs` is guaranteed to have at least one asset record.
 fn check_roots(inputs: &[OpenAnonBlindAssetRecord]) -> Result<()> {
     let root = inputs[0]
         .mt_leaf_info
@@ -111,6 +112,7 @@ fn check_roots(inputs: &[OpenAnonBlindAssetRecord]) -> Result<()> {
     Ok(())
 }
 
+/// Compute the non-malleability tag given the information and the secret keys.
 pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
     prng: &mut R,
     domain_separator: &[u8],
@@ -157,12 +159,12 @@ pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
     (hash, randomizer, acc)
 }
 
-/// Decrypts the owner memo
+/// Decrypts the owner memo.
 /// * `memo` - Owner memo to decrypt
 /// * `dec_key` - Decryption key
 /// * `abar` - Associated anonymous blind asset record to check memo info against.
-/// Return Error if memo info does not match abar's commitment or public key
-/// Return Ok(amount, asset_type, blinding) otherwise
+/// Return Error if memo info does not match the commitment or public key.
+/// Return Ok(amount, asset_type, blinding) otherwise.
 pub fn decrypt_memo(
     memo: &OwnerMemo,
     dec_key: &XSecretKey,
@@ -182,7 +184,6 @@ pub fn decrypt_memo(
     let blind = BLSScalar::from_bytes(&plaintext[i..i + BLS12_381_SCALAR_LEN])
         .c(d!(ZeiError::ParameterError))?;
 
-    // verify abar's commitment
     let hash = RescueInstance::new();
     let expected_commitment = {
         let cur = hash.rescue(&[
@@ -205,7 +206,8 @@ pub fn decrypt_memo(
     Ok((amount, asset_type, blind))
 }
 
-pub fn nullifier(
+/// Compute the nullifier.
+pub fn nullify_with_native_address(
     key_pair: &AXfrKeyPair,
     amount: u64,
     asset_type: &AssetType,
@@ -234,27 +236,18 @@ pub fn nullifier(
     ])[0]
 }
 
-pub fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
-    let hash = RescueInstance::new();
-    hash.rescue(&[
-        BLSScalar::from(uid),
-        abar.commitment,
-        BLSScalar::zero(),
-        BLSScalar::zero(),
-    ])[0]
-}
-
+/// Length of the secret key in anonymous payment (in bits).
 pub(crate) const SK_LEN: usize = 252;
 
-// secret key size (in bits)
+/// Length of the amount allowed in anonymous assets.
 pub(crate) const AMOUNT_LEN: usize = 64;
 
-// Depth of the Merkle Tree circuit. here <= accumulators::merkle_tree::TREE_DEPTH (20)
+/// Depth of the Merkle Tree circuit.
 pub const TREE_DEPTH: usize = 20;
 
-// Add the commitment constraints to the constraint system:
-// comm = commit(blinding, amount, asset_type)
-pub fn commit_with_native_address(
+/// Add the commitment constraints to the constraint system:
+/// comm = commit(blinding, amount, asset_type)
+pub fn commit_in_cs_with_native_address(
     cs: &mut TurboPlonkCS,
     blinding_var: VarIndex,
     amount_var: VarIndex,
@@ -273,7 +266,7 @@ pub fn commit_with_native_address(
 // Let perm : Fp^w -> Fp^w be a public permutation.
 // Given secret key `key`, set initial state `s_key` := (0 || ... || 0 || key), the PRF output is:
 // PRF^p(key, (m1, ..., mw)) = perm(s_key \xor (m1 || ... || mw))[0]
-pub(crate) fn nullify_with_native_address(
+pub(crate) fn nullify_in_cs_with_native_address(
     cs: &mut TurboPlonkCS,
     sk_var: VarIndex,
     nullifier_input_vars: NullifierInputVars,

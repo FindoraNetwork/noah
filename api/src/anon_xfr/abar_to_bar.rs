@@ -1,11 +1,11 @@
-use crate::anon_xfr::structs::{
-    AXfrKeyPair, AccElemVars, NullifierInputVars, PayerSecret, PayerSecretVars,
-};
 use crate::anon_xfr::{
-    add_merkle_path_variables, commit_with_native_address, compute_merkle_root,
-    compute_non_malleability_tag, nullifier, nullify_with_native_address,
-    structs::{Nullifier, OpenAnonBlindAssetRecord},
-    TurboPlonkCS,
+    add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
+    compute_non_malleability_tag, nullify_in_cs_with_native_address, nullify_with_native_address,
+    structs::{
+        AXfrKeyPair, AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord,
+        PayerSecret, PayerSecretVars,
+    },
+    TurboPlonkCS, SK_LEN,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -20,8 +20,8 @@ use sha2::Sha512;
 use zei_algebra::{
     bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*, ristretto::RistrettoScalar,
 };
-use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
+    basic::ristretto_pedersen_comm::RistrettoPedersenCommitment,
     delegated_chaum_pedersen::{
         prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen, NonZKState, ZKPartProof,
     },
@@ -40,7 +40,6 @@ use zei_plonk::{
 pub type Abar2BarPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
 pub const TWO_POW_32: u64 = 1 << 32;
 const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"ABAR to BAR proof";
-const SK_LEN: usize = 252;
 
 /// ConvertAbarBarProof is a struct to hold various aspects of a ZKP to prove equality, spendability
 /// and conversion of an ABAR to a BAR on the chain.
@@ -116,7 +115,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
 
     // 2. build input witness info
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let this_nullifier = nullifier(
+    let this_nullifier = nullify_with_native_address(
         &abar_keypair,
         oabar.amount,
         &oabar.asset_type,
@@ -379,7 +378,7 @@ pub fn build_abar_to_bar_cs(
     let pk_x = pk_var.get_x();
 
     // commitments
-    let com_abar_in_var = commit_with_native_address(
+    let com_abar_in_var = commit_in_cs_with_native_address(
         &mut cs,
         payers_secrets.blind,
         payers_secrets.amount,
@@ -408,7 +407,7 @@ pub fn build_abar_to_bar_cs(
     };
 
     let nullifier_var =
-        nullify_with_native_address(&mut cs, payers_secrets.sec_key, nullifier_input_vars);
+        nullify_in_cs_with_native_address(&mut cs, payers_secrets.sec_key, nullifier_input_vars);
 
     // Merkle path authentication
     let acc_elem = AccElemVars {

@@ -2,8 +2,8 @@ use crate::anon_xfr::structs::{
     AXfrKeyPair, AccElemVars, NullifierInputVars, PayerSecret, PayerSecretVars,
 };
 use crate::anon_xfr::{
-    add_merkle_path_variables, commit_with_native_address, compute_merkle_root,
-    compute_non_malleability_tag, nullifier, nullify_with_native_address,
+    add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
+    compute_non_malleability_tag, nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{Nullifier, OpenAnonBlindAssetRecord},
     TurboPlonkCS, SK_LEN,
 };
@@ -111,7 +111,7 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
 
     // 2. build input witness info
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let this_nullifier = nullifier(
+    let this_nullifier = nullify_with_native_address(
         &abar_keypair,
         oabar.amount,
         &oabar.asset_type,
@@ -269,7 +269,7 @@ pub fn build_abar_to_ar_cs(
     let pk_x = pk_var.get_x();
 
     // commitments
-    let com_abar_in_var = commit_with_native_address(
+    let com_abar_in_var = commit_in_cs_with_native_address(
         &mut cs,
         payers_secrets_vars.blind,
         payers_secrets_vars.amount,
@@ -296,8 +296,11 @@ pub fn build_abar_to_ar_cs(
         asset_type: payers_secrets_vars.asset_type,
         pub_key_x: pk_x,
     };
-    let nullifier_var =
-        nullify_with_native_address(&mut cs, payers_secrets_vars.sec_key, nullifier_input_vars);
+    let nullifier_var = nullify_in_cs_with_native_address(
+        &mut cs,
+        payers_secrets_vars.sec_key,
+        nullifier_input_vars,
+    );
 
     // Merkle path authentication
     let acc_elem = AccElemVars {
