@@ -8,9 +8,7 @@ mod tests {
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use ruc::*;
     use std::env::temp_dir;
-    use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::SystemTime;
     use storage::{
@@ -120,16 +118,62 @@ mod tests {
 
     #[test]
     fn test_persistent_merkle_tree_recovery() {
-        let path = build_and_save_dummy_tree().unwrap();
+        let time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let mut path = temp_dir();
+        path.push(format!("temp-memorydb–{}", time));
 
-        let fdb = MemoryDB::open(path).unwrap();
+        let fdb = MemoryDB::open(path.clone()).unwrap();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("mystore", &mut state);
-        let mt = PersistentMerkleTree::new(store).unwrap();
+        let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-        assert_eq!(mt.version(), 4);
-        assert_eq!(mt.entry_count(), 4);
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+
+        let mut abar = AnonBlindAssetRecord {
+            commitment: BLSScalar::random(&mut prng),
+        };
+        assert!(mt
+            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
+            .is_ok());
+        mt.commit().unwrap();
+
+        abar = AnonBlindAssetRecord {
+            commitment: BLSScalar::random(&mut prng),
+        };
+        assert!(mt
+            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
+            .is_ok());
+        mt.commit().unwrap();
+
+        abar = AnonBlindAssetRecord {
+            commitment: BLSScalar::random(&mut prng),
+        };
+        assert!(mt
+            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
+            .is_ok());
+        mt.commit().unwrap();
+
+        abar = AnonBlindAssetRecord {
+            commitment: BLSScalar::random(&mut prng),
+        };
+        assert!(mt
+            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
+            .is_ok());
+        mt.commit().unwrap();
+
+        // test recovery
+        let fdb2 = MemoryDB::open(path).unwrap();
+        let cs2 = Arc::new(RwLock::new(ChainState::new(fdb2, "test_db".to_string(), 0)));
+        let mut state2 = State::new(cs2, false);
+        let store2 = PrefixedStore::new("mystore", &mut state2);
+        let mt2 = PersistentMerkleTree::new(store2).unwrap();
+
+        assert_eq!(mt2.version(), 4);
+        assert_eq!(mt2.entry_count(), 4);
     }
 
     #[test]
@@ -146,58 +190,6 @@ mod tests {
     fn build_tree(state: &mut State<MemoryDB>) {
         let store = PrefixedStore::new("mystore", state);
         let _mt = PersistentMerkleTree::new(store).unwrap();
-    }
-
-    #[allow(dead_code)]
-    fn build_and_save_dummy_tree() -> Result<PathBuf> {
-        let time = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let mut path = temp_dir();
-        path.push(format!("temp-memorydb–{}", time));
-
-        let fdb = MemoryDB::open(path.clone())?;
-        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-        let mut state = State::new(cs, false);
-        let store = PrefixedStore::new("mystore", &mut state);
-        let mut mt = PersistentMerkleTree::new(store).unwrap();
-
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-
-        let mut abar = AnonBlindAssetRecord {
-            commitment: BLSScalar::random(&mut prng),
-        };
-        assert!(mt
-            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
-            .is_ok());
-        mt.commit()?;
-
-        abar = AnonBlindAssetRecord {
-            commitment: BLSScalar::random(&mut prng),
-        };
-        assert!(mt
-            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
-            .is_ok());
-        mt.commit()?;
-
-        abar = AnonBlindAssetRecord {
-            commitment: BLSScalar::random(&mut prng),
-        };
-        assert!(mt
-            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
-            .is_ok());
-        mt.commit()?;
-
-        abar = AnonBlindAssetRecord {
-            commitment: BLSScalar::random(&mut prng),
-        };
-        assert!(mt
-            .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
-            .is_ok());
-        mt.commit()?;
-
-        Ok(path)
     }
 
     #[test]
