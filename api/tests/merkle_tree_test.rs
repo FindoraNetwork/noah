@@ -1,13 +1,13 @@
 #![deny(warnings)]
 #[cfg(test)]
 pub(crate) mod merkle_tree_test {
+    use mem_db::MemoryDB;
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use ruc::*;
-    use std::{sync::Arc, thread};
+    use std::env::temp_dir;
+    use std::sync::Arc;
+    use std::time::SystemTime;
     use storage::{
-        db::{RocksDB, TempRocksDB},
         state::{ChainState, State},
         store::PrefixedStore,
     };
@@ -17,7 +17,7 @@ pub(crate) mod merkle_tree_test {
         structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
-    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
     use zei_crypto::basic::rescue::RescueInstance;
     use zei_plonk::plonk::constraint_system::TurboCS;
 
@@ -25,8 +25,7 @@ pub(crate) mod merkle_tree_test {
     fn test_persistent_merkle_tree() {
         let hash = RescueInstance::new();
 
-        let path = thread::current().name().unwrap().to_owned();
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("mystore", &mut state);
@@ -68,8 +67,7 @@ pub(crate) mod merkle_tree_test {
 
     #[test]
     fn test_persistent_merkle_tree_proof_commitment() {
-        let path = thread::current().name().unwrap().to_owned();
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("mystore", &mut state);
@@ -121,42 +119,14 @@ pub(crate) mod merkle_tree_test {
 
     #[test]
     fn test_persistent_merkle_tree_recovery() {
-        let path = thread::current().name().unwrap().to_owned();
-        let _ = build_and_save_dummy_tree(path.clone()).unwrap();
+        let time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let mut path = temp_dir();
+        path.push(format!("temp-memorydb–{}", time));
 
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
-        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-        let mut state = State::new(cs, false);
-        let store = PrefixedStore::new("mystore", &mut state);
-        let mt = PersistentMerkleTree::new(store).unwrap();
-
-        assert_eq!(mt.version(), 4);
-        assert_eq!(mt.entry_count(), 4);
-    }
-
-    #[test]
-    fn test_init_tree() {
-        let path = thread::current().name().unwrap().to_owned();
-
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
-
-        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-        let mut state = State::new(cs, false);
-
-        build_tree(&mut state);
-        build_tree(&mut state);
-    }
-
-    #[allow(dead_code)]
-    fn build_tree(state: &mut State<TempRocksDB>) {
-        let store = PrefixedStore::new("mystore", state);
-        let _mt = PersistentMerkleTree::new(store).unwrap();
-    }
-
-    #[allow(dead_code)]
-    fn build_and_save_dummy_tree(path: String) -> Result<()> {
-        let fdb = RocksDB::open(path).expect("failed to open db");
-
+        let fdb = MemoryDB::open(path.clone()).unwrap();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("mystore", &mut state);
@@ -170,7 +140,7 @@ pub(crate) mod merkle_tree_test {
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
-        mt.commit()?;
+        mt.commit().unwrap();
 
         abar = AnonBlindAssetRecord {
             commitment: BLSScalar::random(&mut prng),
@@ -178,7 +148,7 @@ pub(crate) mod merkle_tree_test {
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
-        mt.commit()?;
+        mt.commit().unwrap();
 
         abar = AnonBlindAssetRecord {
             commitment: BLSScalar::random(&mut prng),
@@ -186,7 +156,7 @@ pub(crate) mod merkle_tree_test {
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
-        mt.commit()?;
+        mt.commit().unwrap();
 
         abar = AnonBlindAssetRecord {
             commitment: BLSScalar::random(&mut prng),
@@ -194,15 +164,38 @@ pub(crate) mod merkle_tree_test {
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
-        mt.commit()?;
+        mt.commit().unwrap();
 
-        Ok(())
+        // test recovery
+        let fdb2 = MemoryDB::open(path).unwrap();
+        let cs2 = Arc::new(RwLock::new(ChainState::new(fdb2, "test_db".to_string(), 0)));
+        let mut state2 = State::new(cs2, false);
+        let store2 = PrefixedStore::new("mystore", &mut state2);
+        let mt2 = PersistentMerkleTree::new(store2).unwrap();
+
+        assert_eq!(mt2.version(), 4);
+        assert_eq!(mt2.entry_count(), 4);
+    }
+
+    #[test]
+    fn test_init_tree() {
+        let fdb = MemoryDB::new();
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+        let mut state = State::new(cs, false);
+
+        build_tree(&mut state);
+        build_tree(&mut state);
+    }
+
+    #[allow(dead_code)]
+    fn build_tree(state: &mut State<MemoryDB>) {
+        let store = PrefixedStore::new("mystore", state);
+        let _mt = PersistentMerkleTree::new(store).unwrap();
     }
 
     #[test]
     pub fn test_merkle_proofs() {
-        let path = thread::current().name().unwrap().to_owned();
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
         let mut state = State::new(cs, false);
 

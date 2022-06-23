@@ -381,12 +381,12 @@ mod tests {
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::{sig::XfrKeyPair, structs::AssetType};
+    use mem_db::MemoryDB;
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use std::{sync::Arc, thread};
+    use std::sync::Arc;
     use storage::{
-        db::TempRocksDB,
         state::{ChainState, State},
         store::PrefixedStore,
     };
@@ -404,8 +404,7 @@ mod tests {
         let sender = AXfrKeyPair::generate(&mut prng);
         let sender_dec_key = XSecretKey::new(&mut prng);
 
-        let path = thread::current().name().unwrap().to_owned();
-        let fdb = TempRocksDB::open(path).expect("failed to open db");
+        let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(
             fdb,
             "test_abar_to_ar_conversion_db".to_string(),
