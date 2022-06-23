@@ -28,8 +28,7 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 /// Usage:
 ///    ```ignore
 ///     use std::collections::HashMap;
-///     use std::thread;
-///     use storage::db::TempRocksDB;
+///     use mem_db::MemoryDB;
 ///     use std::sync::Arc;
 ///     use parking_lot::RwLock;
 ///     use storage::state::{ChainState, State};
@@ -41,8 +40,7 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 ///
 ///     let hash = RescueInstance::new();
 ///
-///     let path = thread::current().name().unwrap().to_owned();
-///     let fdb = TempRocksDB::open(path).expect("failed to open db");
+///     let fdb = MemoryDB::new();
 ///     let cs = Arc::new(RwLock::new(ChainState::new(
 ///         fdb,
 ///         "test_db".to_string(),

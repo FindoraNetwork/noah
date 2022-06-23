@@ -76,7 +76,7 @@ criterion = '0.3.1'
 lazy_static = '1.4.0'
 serde_json = '1.0'
 typenum = '1.11.2'
-parking_lot = '0.11.1'
+parking_lot = '0.12'
 
 [dev-dependencies.zei-accumulators]
 path = '../accumulators'
@@ -87,7 +87,11 @@ default-features = false
 
 [dev-dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v0.1.4'
+tag = 'v0.2.0'
+
+[dev-dependencies.mem_db]
+git = 'https://github.com/FindoraNetwork/storage.git'
+tag = 'v0.2.0'
 
 [features]
 default = [
