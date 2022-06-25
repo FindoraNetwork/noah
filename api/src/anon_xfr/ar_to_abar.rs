@@ -1,11 +1,10 @@
 use crate::anon_xfr::{
-    abar_to_abar::AXfrPlonkPf,
     commit_in_cs_with_native_address,
     structs::{
         AXfrPubKey, AnonBlindAssetRecord, Commitment, OpenAnonBlindAssetRecord,
-        OpenAnonBlindAssetRecordBuilder, PayeeSecret, PayeeSecretVars,
+        OpenAnonBlindAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
     },
-    TurboPlonkCS,
+    AXfrPlonkPf, TurboPlonkCS,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -170,7 +169,7 @@ pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
         .build()
         .c(d!())?;
 
-    let payee_secret = PayeeSecret {
+    let payee_secret = PayeeWitness {
         amount: oabar.get_amount(),
         blind: oabar.blind.clone(),
         asset_type: oabar.asset_type.as_scalar(),
@@ -187,7 +186,7 @@ pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
 fn prove_ar_to_abar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    payee_secret: PayeeSecret,
+    payee_secret: PayeeWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(AR_TO_ABAR_TRANSCRIPT);
     let (mut cs, _) = build_ar_to_abar_cs(payee_secret);
@@ -235,7 +234,7 @@ fn verify_ar_to_abar(
 ///
 ///        Constraint System for ar_to_abar
 ///
-pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
+pub fn build_ar_to_abar_cs(payee_data: PayeeWitness) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
 
     let ar_amount_var = cs.new_variable(BLSScalar::from(payee_data.amount));
@@ -245,7 +244,7 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeSecret) -> (TurboPlonkCS, usize) {
 
     let blind = cs.new_variable(payee_data.blind);
     let pubkey_x = cs.new_variable(payee_data.pubkey_x);
-    let payee = PayeeSecretVars {
+    let payee = PayeeWitnessVars {
         amount: ar_amount_var,
         blind,
         asset_type: ar_asset_var,

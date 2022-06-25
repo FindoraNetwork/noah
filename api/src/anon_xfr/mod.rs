@@ -15,6 +15,8 @@ use zei_crypto::basic::{
     rescue::RescueInstance,
 };
 use zei_plonk::plonk::constraint_system::{rescue::StateVar, TurboCS, VarIndex};
+use zei_plonk::plonk::indexer::PlonkPf;
+use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 
 /// Module for general-purpose anonymous payment.
 pub mod abar_to_abar;
@@ -35,6 +37,9 @@ const ASSET_TYPE_FRA: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
 pub const FEE_TYPE: AssetType = ASSET_TYPE_FRA;
 
 pub type TurboPlonkCS = TurboCS<BLSScalar>;
+
+/// The Plonk proof type.
+pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 
 /// Check that inputs have Merkle tree witness and matching key pairs.
 fn check_inputs(inputs: &[OpenAnonBlindAssetRecord], keypairs: &[AXfrKeyPair]) -> Result<()> {
@@ -246,7 +251,7 @@ pub(crate) const AMOUNT_LEN: usize = 64;
 pub const TREE_DEPTH: usize = 20;
 
 /// Add the commitment constraints to the constraint system:
-/// comm = commit(blinding, amount, asset_type)
+/// comm = hash(hash(blinding, amount, asset_type, 0), pubkey_x, 0, 0).
 pub fn commit_in_cs_with_native_address(
     cs: &mut TurboPlonkCS,
     blinding_var: VarIndex,
@@ -260,12 +265,7 @@ pub fn commit_in_cs_with_native_address(
     cs.rescue_hash(&input_var)[0]
 }
 
-// Add the nullifier constraints to the constraint system.
-// nullifer = PRF(sk, msg = [uid_amount, asset_type, pk_x, pk_y])
-// The PRF follows the Full-State Keyed Sponge (FKS) paradigm explained in https://eprint.iacr.org/2015/541.pdf
-// Let perm : Fp^w -> Fp^w be a public permutation.
-// Given secret key `key`, set initial state `s_key` := (0 || ... || 0 || key), the PRF output is:
-// PRF^p(key, (m1, ..., mw)) = perm(s_key \xor (m1 || ... || mw))[0]
+/// Add the nullifier constraints to the constraint system.
 pub(crate) fn nullify_in_cs_with_native_address(
     cs: &mut TurboPlonkCS,
     sk_var: VarIndex,
@@ -282,6 +282,7 @@ pub(crate) fn nullify_in_cs_with_native_address(
     cs.rescue_hash(&input_var)[0]
 }
 
+/// Add the Merkle tree path constraints to the constraint system.
 pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerklePathVars {
     let path_vars: Vec<MerkleNodeVars> = path
         .nodes
@@ -306,10 +307,10 @@ pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerkleP
     MerklePathVars { nodes: path_vars }
 }
 
-// Add the sorting constraints that arrange the positions of the sibling nodes.
-// If `node` is the left child of parent, output (`node`, `sib1`, `sib2`);
-// if `node` is the right child of parent, output (`sib1`, `sib2`, `node`);
-// otherwise, output (`sib1`, `node`, `sib2`)
+/// Add the sorting constraints that arrange the positions of the sibling nodes.
+/// If `node` is the left child of parent, output (`node`, `sib1`, `sib2`);
+/// if `node` is the right child of parent, output (`sib1`, `sib2`, `node`);
+/// otherwise, output (`sib1`, `node`, `sib2`).
 fn sort(
     cs: &mut TurboPlonkCS,
     node: VarIndex,
@@ -332,6 +333,7 @@ fn sort(
     StateVar::new([left, mid, right, cs.zero_var()])
 }
 
+/// Compute the Merkle tree root given the path information.
 pub fn compute_merkle_root(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,

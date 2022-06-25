@@ -13,7 +13,9 @@ use rand_chacha::ChaChaRng;
 use zei_algebra::prelude::*;
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
+/// Test asset one, which is also FRA.
 pub const ASSET_TYPE_1: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
+/// Test asset two.
 pub const ASSET_TYPE_2: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
 
 // Simulate getting a BlindAssetRecord from Ledger

@@ -362,20 +362,20 @@ mod test {
     }
 }
 
-pub struct PayerSecretVars {
-    pub sec_key: VarIndex,
-    pub uid: VarIndex,
-    pub amount: VarIndex,
-    pub asset_type: VarIndex,
-    pub path: MerklePathVars,
-    pub blind: VarIndex,
+pub(crate) struct PayerWitnessVars {
+    pub(crate) sec_key: VarIndex,
+    pub(crate) uid: VarIndex,
+    pub(crate) amount: VarIndex,
+    pub(crate) asset_type: VarIndex,
+    pub(crate) path: MerklePathVars,
+    pub(crate) blind: VarIndex,
 }
 
-pub(crate) struct PayeeSecretVars {
-    pub amount: VarIndex,
-    pub blind: VarIndex,
-    pub asset_type: VarIndex,
-    pub pubkey_x: VarIndex,
+pub(crate) struct PayeeWitnessVars {
+    pub(crate) amount: VarIndex,
+    pub(crate) blind: VarIndex,
+    pub(crate) asset_type: VarIndex,
+    pub(crate) pubkey_x: VarIndex,
 }
 
 // cs variables for a Merkle node
@@ -399,13 +399,13 @@ pub struct AccElemVars {
 
 // cs variables for the nullifier PRF inputs
 pub(crate) struct NullifierInputVars {
-    pub uid_amount: VarIndex,
-    pub asset_type: VarIndex,
-    pub pub_key_x: VarIndex,
+    pub(crate) uid_amount: VarIndex,
+    pub(crate) asset_type: VarIndex,
+    pub(crate) pub_key_x: VarIndex,
 }
 
 #[derive(Debug, Clone)]
-pub struct PayerSecret {
+pub struct PayerWitness {
     pub sec_key: JubjubScalar,
     pub amount: u64,
     pub asset_type: BLSScalar,
@@ -415,7 +415,7 @@ pub struct PayerSecret {
 }
 
 #[derive(Debug, Clone)]
-pub struct PayeeSecret {
+pub struct PayeeWitness {
     pub amount: u64,
     pub blind: BlindFactor,
     pub asset_type: BLSScalar,

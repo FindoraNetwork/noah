@@ -1,5 +1,3 @@
-extern crate serde_str;
-
 use crate::anon_creds::{
     ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
     AttributeEncKey,
@@ -93,7 +91,7 @@ pub struct XfrNote {
 }
 
 impl XfrNote {
-    pub fn outputs_iter(&self) -> std::slice::Iter<BlindAssetRecord> {
+    pub fn outputs_iter(&self) -> std::slice::Iter<'_, BlindAssetRecord> {
         self.body.outputs.iter()
     }
 }
@@ -631,7 +629,7 @@ pub enum AssetTypeAndAmountProof {
     NoProof,                             // non-confidential transaction
 }
 
-/// I contain the proofs of a transfer note
+/// The proofs for a confidential transfer.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrProofs {
     pub asset_type_and_amount_proof: AssetTypeAndAmountProof,

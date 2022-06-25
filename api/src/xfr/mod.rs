@@ -487,7 +487,7 @@ pub fn verify_xfr_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     xfr_note: &XfrNote,
-    policies: &XfrNotePoliciesRef,
+    policies: &XfrNotePoliciesRef<'_>,
 ) -> Result<()> {
     batch_verify_xfr_notes(prng, params, &[&xfr_note], &[&policies]).c(d!())
 }
@@ -501,7 +501,7 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     notes: &[&XfrNote],
-    policies: &[&XfrNotePoliciesRef],
+    policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
     // 1. verify signature
     for xfr_note in notes {
@@ -566,6 +566,7 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
 }
 
 #[derive(Clone, Default)]
+/// A reference of the policies.
 pub struct XfrNotePoliciesRef<'b> {
     pub(crate) valid: bool,
     pub(crate) inputs_tracing_policies: Vec<&'b TracingPolicies>,
@@ -609,6 +610,7 @@ pub struct XfrNotePolicies {
 }
 
 impl XfrNotePolicies {
+    /// Create a structure of policies.
     pub fn new(
         inputs_tracing_policies: Vec<TracingPolicies>,
         inputs_sig_commitments: Vec<Option<ACCommitment>>,
@@ -623,6 +625,8 @@ impl XfrNotePolicies {
             outputs_sig_commitments,
         }
     }
+
+    /// Return empty policies for the given numbers of inputs and outputs.
     pub fn empty_policies(num_inputs: usize, num_outputs: usize) -> XfrNotePolicies {
         XfrNotePolicies {
             valid: true,
@@ -633,7 +637,8 @@ impl XfrNotePolicies {
         }
     }
 
-    pub fn to_ref(&self) -> XfrNotePoliciesRef {
+    /// Obtain a reference of the policies.
+    pub fn to_ref(&self) -> XfrNotePoliciesRef<'_> {
         if self.valid {
             XfrNotePoliciesRef::new(
                 self.inputs_tracing_policies.iter().collect_vec(),
@@ -662,7 +667,7 @@ pub fn verify_xfr_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     body: &XfrBody,
-    policies: &XfrNotePoliciesRef,
+    policies: &XfrNotePoliciesRef<'_>,
 ) -> Result<()> {
     batch_verify_xfr_bodies(prng, params, &[body], &[policies]).c(d!())
 }
@@ -676,7 +681,7 @@ pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     bodies: &[&XfrBody],
-    policies: &[&XfrNotePoliciesRef],
+    policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
     // 1. verify amounts and asset types
     batch_verify_xfr_body_asset_records(prng, params, bodies).c(d!())?;
@@ -860,7 +865,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
     batch_verify_asset_mixing(prng, params, &asset_mix_instances).c(d!())
 }
 
-// ASSET TRACING
+/// Find the tracer memo corresponding to the encryption keys.
 pub fn find_tracing_memos<'a>(
     xfr_body: &'a XfrBody,
     pub_key: &AssetTracerEncKeys,
@@ -884,7 +889,7 @@ pub fn find_tracing_memos<'a>(
     Ok(result)
 }
 
-/// amount, asset type, identity attribute, public key
+/// The asset tracing result.
 pub type RecordData = (u64, AssetType, Vec<Attr>, XfrPublicKey);
 
 /// Scan XfrBody transfers involving asset tracing for `tracer_keypair`

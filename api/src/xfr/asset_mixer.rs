@@ -180,7 +180,7 @@ pub struct AssetMixingInstance<'a> {
 pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
-    instances: &[AssetMixingInstance],
+    instances: &[AssetMixingInstance<'_>],
 ) -> Result<()> {
     let mut max_circuit_size = 0;
     let mut transcripts = Vec::with_capacity(instances.len());
@@ -209,7 +209,7 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
 
 pub(crate) fn prepare_asset_mixer_verifier(
     verifier: &mut Verifier<&mut Transcript>,
-    instance: &AssetMixingInstance,
+    instance: &AssetMixingInstance<'_>,
 ) -> Result<usize> {
     let in_cloak = instance
         .inputs
@@ -238,8 +238,7 @@ pub(crate) fn prepare_asset_mixer_verifier(
         .map(|com| com.commit_verifier(verifier))
         .collect_vec();
 
-    zei_crypto::bulletproofs::mix::mix(verifier, &in_vars, None, &out_vars, None)
-        .c(d!(ZeiError::AssetMixerVerificationError))
+    mix(verifier, &in_vars, None, &out_vars, None).c(d!(ZeiError::AssetMixerVerificationError))
 }
 
 fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {

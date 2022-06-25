@@ -1,9 +1,8 @@
 use crate::anon_xfr::{
-    abar_to_abar::AXfrPlonkPf,
     structs::{
         AXfrPubKey, AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
     },
-    TurboPlonkCS,
+    AXfrPlonkPf, TurboPlonkCS,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{

@@ -155,7 +155,7 @@ type BarMemosPoliciesCollectionIterator<'a> = std::iter::Zip<
         std::slice::Iter<'a, &'a TracingPolicies>,
         std::slice::Iter<'a, BlindAssetRecord>,
     >,
-    std::slice::Iter<'a, std::vec::Vec<TracerMemo>>,
+    std::slice::Iter<'a, Vec<TracerMemo>>,
 >;
 
 #[derive(Clone)]
@@ -221,7 +221,7 @@ fn collect_bars_and_memos_by_keys<'a>(
 pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
     prng: &mut R,
     xfr_bodies: &[&XfrBody],
-    instances_policies: &[&XfrNotePoliciesRef],
+    instances_policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
     if xfr_bodies.len() != instances_policies.len() {
         return Err(eg!(ZeiError::ParameterError));

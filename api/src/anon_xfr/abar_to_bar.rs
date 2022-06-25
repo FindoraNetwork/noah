@@ -3,7 +3,7 @@ use crate::anon_xfr::{
     compute_non_malleability_tag, nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{
         AXfrKeyPair, AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord,
-        PayerSecret, PayerSecretVars,
+        PayerWitness, PayerWitnessVars,
     },
     TurboPlonkCS, SK_LEN,
 };
@@ -151,7 +151,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     .c(d!())?;
 
     // 5. build the plonk proof
-    let payers_secret = PayerSecret {
+    let payers_secret = PayerWitness {
         sec_key: abar_keypair.get_secret_scalar(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
@@ -304,7 +304,7 @@ pub fn verify_abar_to_bar_note(
 fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    payers_secret: PayerSecret,
+    payers_secret: PayerWitness,
     proof: &ZKPartProof,
     non_zk_state: &NonZKState,
     beta: &RistrettoScalar,
@@ -344,7 +344,7 @@ fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
 ///
 ///
 pub fn build_abar_to_bar_cs(
-    payers_secret: PayerSecret,
+    payers_secret: PayerWitness,
     proof: &ZKPartProof,
     non_zk_state: &NonZKState,
     beta: &RistrettoScalar,
@@ -635,7 +635,7 @@ pub fn build_abar_to_bar_cs(
     (cs, n_constraints)
 }
 
-fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretVars {
+fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerWitness) -> PayerWitnessVars {
     let bls_sk = BLSScalar::from(&secret.sec_key);
     let sec_key = cs.new_variable(bls_sk);
     let uid = cs.new_variable(BLSScalar::from(secret.uid));
@@ -643,7 +643,7 @@ fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretV
     let blind = cs.new_variable(secret.blind);
     let path = add_merkle_path_variables(cs, secret.path.clone());
     let asset_type = cs.new_variable(secret.asset_type);
-    PayerSecretVars {
+    PayerWitnessVars {
         sec_key,
         uid,
         amount,

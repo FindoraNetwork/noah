@@ -31,7 +31,7 @@ use zei_plonk::{
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AMultiXfrWitness};
 // The Public Setup needed for Proofs
-use crate::anon_xfr::structs::{PayeeSecret, PayerSecret};
+use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 
 // Shared by all members of the ledger
 #[derive(Serialize, Deserialize)]
@@ -204,7 +204,7 @@ impl ProverParams {
             is_left_child: 0,
             is_right_child: 0,
         };
-        let payer_secret = PayerSecret {
+        let payer_secret = PayerWitness {
             sec_key: jubjub_zero,
             uid: 0,
             amount: 0,
@@ -242,7 +242,7 @@ impl ProverParams {
 
     pub fn ar_to_abar_params() -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
-        let dummy_payee = PayeeSecret {
+        let dummy_payee = PayeeWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
@@ -281,7 +281,7 @@ impl ProverParams {
             is_left_child: 0,
             is_right_child: 0,
         };
-        let payer_secret = PayerSecret {
+        let payer_secret = PayerWitness {
             sec_key: jubjub_zero,
             uid: 0,
             amount: 0,

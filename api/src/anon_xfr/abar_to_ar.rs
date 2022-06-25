@@ -1,11 +1,12 @@
-use crate::anon_xfr::structs::{
-    AXfrKeyPair, AccElemVars, NullifierInputVars, PayerSecret, PayerSecretVars,
-};
+use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
 use crate::anon_xfr::{
     add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
     compute_non_malleability_tag, nullify_in_cs_with_native_address, nullify_with_native_address,
-    structs::{Nullifier, OpenAnonBlindAssetRecord},
-    TurboPlonkCS, SK_LEN,
+    structs::{
+        AXfrKeyPair, AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord,
+        PayerWitness, PayerWitnessVars,
+    },
+    AXfrPlonkPf, TurboPlonkCS, SK_LEN,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -20,71 +21,41 @@ use merlin::Transcript;
 use sha2::Sha512;
 use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
-use zei_plonk::{
-    plonk::{
-        constraint_system::{rescue::StateVar, TurboCS, VarIndex},
-        indexer::PlonkPf,
-        prover::prover_with_lagrange,
-        verifier::verifier,
-    },
-    poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
+use zei_plonk::plonk::{
+    constraint_system::{rescue::StateVar, TurboCS, VarIndex},
+    prover::prover_with_lagrange,
+    verifier::verifier,
 };
 
-pub type Abar2ArPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
 const ABAR_TO_AR_TRANSCRIPT: &[u8] = b"ABAR to AR proof";
 
-/// ConvertAbarArProof is a struct to hold various aspects of a ZKP to prove spendability
-/// and conversion of an ABAR to a AR on the chain.
-#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
-pub struct ConvertAbarArProof {
-    /// proof of correctness of spent ABAR and new Asset Record
-    spending_proof: Abar2ArPlonkProof,
-    /// root hash of merkle tree
-    merkle_root: BLSScalar,
-    /// version of the root hash of merkle tree
-    merkle_root_version: u64,
-}
-
-impl ConvertAbarArProof {
-    #[allow(dead_code)]
-    pub fn get_merkle_root_version(&self) -> u64 {
-        return self.merkle_root_version;
-    }
-}
-
-/// AbarToArNote has the AbarToArBody and the proof related to the conversion.
+/// The anonymous-to-transparent note.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToArNote {
-    /// The body part of ABAR to AR
+    /// The body part of ABAR to AR.
     pub body: AbarToArBody,
-    /// The spending proof (assuming non-malleability)
-    pub spending_proof: Abar2ArPlonkProof,
-    /// The non-malleability tag
+    /// The spending proof (assuming non-malleability).
+    pub proof: AXfrPlonkPf,
+    /// The non-malleability tag.
     pub non_malleability_tag: BLSScalar,
 }
 
-/// AbarToArBody has the input, the output, the merkle root and the owner memo.
+/// The anonymous-to-transparent body.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToArBody {
-    /// input ABAR being spent
+    /// input ABAR being spent.
     pub input: Nullifier,
-    /// The new AR to be created
+    /// The new AR to be created.
     pub output: BlindAssetRecord,
-    /// The Merkle root hash
+    /// The Merkle root hash.
     pub merkle_root: BLSScalar,
-    /// The Merkle root version
+    /// The Merkle root version.
     pub merkle_root_version: u64,
-    /// The owner memo
+    /// The owner memo.
     pub memo: Option<OwnerMemo>,
 }
 
-/// This function generates the AbarToArBody from the Open ABARs, the receiver address and the signing
-/// key pair.
-/// * `prng` - pseudo random generator
-/// * `params` - prover params for abar_to_ar note
-/// * `oabar` - OpenAnonBlindAssetRecord to spend
-/// * `abar_keypair` - keypair for spending ABAR
-/// * `ar_pub_key` - Public key for receiving AR
+/// Generate an anonymous-to-transparent note.
 #[allow(dead_code)]
 pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
@@ -109,7 +80,6 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     );
     let (oar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
 
-    // 2. build input witness info
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
     let this_nullifier = nullify_with_native_address(
         &abar_keypair,
@@ -118,8 +88,7 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
         mt_leaf_info.uid,
     );
 
-    // 3. build the plonk proof
-    let payers_secret = PayerSecret {
+    let payers_secret = PayerWitness {
         sec_key: abar_keypair.get_secret_scalar(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
@@ -145,7 +114,7 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     let (hash, non_malleability_randomizer, non_malleability_tag) =
         compute_non_malleability_tag(prng, b"AbarToAr", &msg, &[&abar_keypair]);
 
-    let spending_proof = prove_abar_to_ar_spending(
+    let proof = prove_abar_to_ar(
         prng,
         params,
         payers_secret,
@@ -157,22 +126,19 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
 
     Ok(AbarToArNote {
         body,
-        spending_proof,
+        proof,
         non_malleability_tag,
     })
 }
 
-/// Verifies the body
-/// * `params` - verifier params
-/// * `note` - note to verify
-/// * `merkle_root` - root hash of ABAR commitment tree
+/// Verify the anonymous-to-transparent note.
 #[allow(dead_code)]
 pub fn verify_abar_to_ar_note(
     params: &VerifierParams,
     note: &AbarToArNote,
     merkle_root: &BLSScalar,
 ) -> Result<()> {
-    // check amount & asset type are non-confidential
+    // require the output amount & asset type are non-confidential
     if note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential() {
         return Err(eg!(ZeiError::ParameterError));
     }
@@ -184,16 +150,6 @@ pub fn verify_abar_to_ar_note(
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
-    let input = note.body.input;
-
-    let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
-    let mut online_inputs = vec![];
-
-    online_inputs.push(input.clone());
-    online_inputs.push(merkle_root.clone());
-    online_inputs.push(BLSScalar::from(payer_amount));
-    online_inputs.push(payer_asset_type.as_scalar());
-
     let msg = bincode::serialize(&note.body)
         .c(d!(ZeiError::SerializationError))
         .c(d!())?;
@@ -201,6 +157,13 @@ pub fn verify_abar_to_ar_note(
     hasher.update(b"AbarToAr");
     hasher.update(msg.as_slice());
     let hash = BLSScalar::from_hash(hasher);
+
+    let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
+    let mut online_inputs = vec![];
+    online_inputs.push(note.body.input.clone());
+    online_inputs.push(merkle_root.clone());
+    online_inputs.push(BLSScalar::from(payer_amount));
+    online_inputs.push(payer_asset_type.as_scalar());
     online_inputs.push(hash);
     online_inputs.push(note.non_malleability_tag);
 
@@ -210,22 +173,22 @@ pub fn verify_abar_to_ar_note(
         &params.cs,
         &params.verifier_params,
         &online_inputs,
-        &note.spending_proof,
+        &note.proof,
     )
 }
 
-fn prove_abar_to_ar_spending<R: CryptoRng + RngCore>(
+fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    payers_secret: PayerSecret,
+    payers_witness: PayerWitness,
     hash: &BLSScalar,
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
-) -> Result<Abar2ArPlonkProof> {
+) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
 
     let (mut cs, _) = build_abar_to_ar_cs(
-        payers_secret,
+        payers_witness,
         hash,
         non_malleability_randomizer,
         non_malleability_tag,
@@ -244,18 +207,16 @@ fn prove_abar_to_ar_spending<R: CryptoRng + RngCore>(
     .c(d!(ZeiError::AXfrProofError))
 }
 
-///
-///        Constraint System for abar_to_ar
-///
-///
+/// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
-    payers_secret: PayerSecret,
+    payers_secret: PayerWitness,
     hash: &BLSScalar,
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
-    let payers_secrets_vars = add_payers_secret(&mut cs, payers_secret);
+    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_secret]);
+    let payers_witness_vars = &payers_witnesses_vars[0];
 
     let base = JubjubPoint::get_base();
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
@@ -265,15 +226,15 @@ pub fn build_abar_to_ar_cs(
     let mut root_var: Option<VarIndex> = None;
 
     // prove knowledge of payer's secret key: pk = base^{sk}
-    let pk_var = cs.scalar_mul(base, payers_secrets_vars.sec_key, SK_LEN);
+    let pk_var = cs.scalar_mul(base, payers_witness_vars.sec_key, SK_LEN);
     let pk_x = pk_var.get_x();
 
     // commitments
     let com_abar_in_var = commit_in_cs_with_native_address(
         &mut cs,
-        payers_secrets_vars.blind,
-        payers_secrets_vars.amount,
-        payers_secrets_vars.asset_type,
+        payers_witness_vars.blind,
+        payers_witness_vars.amount,
+        payers_witness_vars.asset_type,
         pk_x,
     );
 
@@ -281,8 +242,8 @@ pub fn build_abar_to_ar_cs(
     // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
     let uid_amount = cs.linear_combine(
         &[
-            payers_secrets_vars.uid,
-            payers_secrets_vars.amount,
+            payers_witness_vars.uid,
+            payers_witness_vars.amount,
             zero_var,
             zero_var,
         ],
@@ -293,21 +254,21 @@ pub fn build_abar_to_ar_cs(
     );
     let nullifier_input_vars = NullifierInputVars {
         uid_amount,
-        asset_type: payers_secrets_vars.asset_type,
+        asset_type: payers_witness_vars.asset_type,
         pub_key_x: pk_x,
     };
     let nullifier_var = nullify_in_cs_with_native_address(
         &mut cs,
-        payers_secrets_vars.sec_key,
+        payers_witness_vars.sec_key,
         nullifier_input_vars,
     );
 
     // Merkle path authentication
     let acc_elem = AccElemVars {
-        uid: payers_secrets_vars.uid,
+        uid: payers_witness_vars.uid,
         commitment: com_abar_in_var,
     };
-    let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_secrets_vars.path);
+    let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_witness_vars.path);
 
     if let Some(root) = root_var {
         cs.equal(root, tmp_root_var);
@@ -315,7 +276,7 @@ pub fn build_abar_to_ar_cs(
         root_var = Some(tmp_root_var);
     }
 
-    // Check the validity of the non malleability tag
+    // Check the non-malleability tag
     let one_var = cs.one_var();
     let hash_var = cs.new_variable(*hash);
     let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
@@ -326,7 +287,7 @@ pub fn build_abar_to_ar_cs(
             one_var,
             hash_var,
             non_malleability_randomizer_var,
-            payers_secrets_vars.sec_key,
+            payers_witness_vars.sec_key,
         ]))[0];
 
         cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
@@ -334,12 +295,10 @@ pub fn build_abar_to_ar_cs(
 
     // prepare public inputs variables
     cs.prepare_pi_variable(nullifier_var);
-
-    // prepare the public input for merkle_root
     cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
-    cs.prepare_pi_variable(payers_secrets_vars.amount);
-    cs.prepare_pi_variable(payers_secrets_vars.asset_type);
+    cs.prepare_pi_variable(payers_witness_vars.amount);
+    cs.prepare_pi_variable(payers_witness_vars.asset_type);
 
     cs.prepare_pi_variable(hash_var);
     cs.prepare_pi_variable(non_malleability_tag_var);
@@ -351,31 +310,13 @@ pub fn build_abar_to_ar_cs(
     (cs, n_constraints)
 }
 
-fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerSecret) -> PayerSecretVars {
-    let bls_sk = BLSScalar::from(&secret.sec_key);
-    let sec_key = cs.new_variable(bls_sk);
-    let uid = cs.new_variable(BLSScalar::from(secret.uid));
-    let amount = cs.new_variable(BLSScalar::from(secret.amount));
-    let blind = cs.new_variable(secret.blind);
-    let path = add_merkle_path_variables(cs, secret.path.clone());
-    let asset_type = cs.new_variable(secret.asset_type);
-    PayerSecretVars {
-        sec_key,
-        uid,
-        amount,
-        asset_type,
-        path,
-        blind,
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::structs::AXfrKeyPair;
     use crate::anon_xfr::{
         abar_to_ar::{gen_abar_to_ar_note, verify_abar_to_ar_note},
         structs::{
-            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
+            AXfrKeyPair, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
+            OpenAnonBlindAssetRecordBuilder,
         },
         TREE_DEPTH,
     };
@@ -384,16 +325,17 @@ mod tests {
     use mem_db::MemoryDB;
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use std::sync::Arc;
     use storage::{
         state::{ChainState, State},
         store::PrefixedStore,
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
-    use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
-    use zei_crypto::basic::rescue::RescueInstance;
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use zei_crypto::basic::{
+        hybrid_encryption::{XPublicKey, XSecretKey},
+        rescue::RescueInstance,
+    };
 
     #[test]
     fn test_abar_to_ar_conversion() {
