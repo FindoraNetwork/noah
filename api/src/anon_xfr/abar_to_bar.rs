@@ -1,10 +1,10 @@
 use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
 use crate::anon_xfr::{
-    add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
-    compute_non_malleability_tag, nullify_in_cs_with_native_address, nullify_with_native_address,
+    commit_in_cs_with_native_address, compute_merkle_root, compute_non_malleability_tag,
+    nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{
         AXfrKeyPair, AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord,
-        PayerWitness, PayerWitnessVars,
+        PayerWitness,
     },
     AXfrPlonkPf, TurboPlonkCS, SK_LEN,
 };
@@ -29,14 +29,10 @@ use zei_crypto::{
     },
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
 };
-use zei_plonk::{
-    plonk::{
-        constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex},
-        indexer::PlonkPf,
-        prover::prover_with_lagrange,
-        verifier::verifier,
-    },
-    poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
+use zei_plonk::plonk::{
+    constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex},
+    prover::prover_with_lagrange,
+    verifier::verifier,
 };
 
 pub const TWO_POW_32: u64 = 1 << 32;
@@ -84,10 +80,10 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
         return Err(eg!(ZeiError::ParameterError));
     }
 
-    /// Reject anonymous-to-confidential note that actually has transparent output.
-    /// Should direct to AbarToAr.
+    // Reject anonymous-to-confidential note that actually has transparent output.
+    // Should direct to AbarToAr.
     if asset_record_type == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
-        return Err(eg1(ZeiError::ParameterError));
+        return Err(eg!(ZeiError::ParameterError));
     }
 
     let obar_amount = oabar.amount;
@@ -309,7 +305,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     hash: &BLSScalar,
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
-) -> Result<Abar2BarPlonkProof> {
+) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
 
     let (mut cs, _) = build_abar_to_bar_cs(
@@ -586,8 +582,8 @@ pub fn build_abar_to_bar_cs(
             zero,
         );
 
-        cs.equal(x_in_bls12_381, payers_witnesses_vars.amount);
-        cs.equal(y_in_bls12_381, payers_witnesses_vars.asset_type);
+        cs.equal(x_in_bls12_381, payers_witness_vars.amount);
+        cs.equal(y_in_bls12_381, payers_witness_vars.asset_type);
     }
 
     // 7. Check the non-malleability tag.
@@ -596,7 +592,7 @@ pub fn build_abar_to_bar_cs(
             one_var,
             hash_var,
             non_malleability_randomizer_var,
-            payers_witnesses_vars.sec_key,
+            payers_witness_vars.sec_key,
         ]))[0];
 
         cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);

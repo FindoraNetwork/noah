@@ -1,10 +1,10 @@
 use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
 use crate::anon_xfr::{
-    add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
-    compute_non_malleability_tag, nullify_in_cs_with_native_address, nullify_with_native_address,
+    commit_in_cs_with_native_address, compute_merkle_root, compute_non_malleability_tag,
+    nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{
         AXfrKeyPair, AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord,
-        PayerWitness, PayerWitnessVars,
+        PayerWitness,
     },
     AXfrPlonkPf, TurboPlonkCS, SK_LEN,
 };
