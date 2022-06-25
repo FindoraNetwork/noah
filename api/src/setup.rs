@@ -20,7 +20,9 @@ use zei_algebra::{
     prelude::*,
     ristretto::RistrettoScalar,
 };
-use zei_crypto::delegated_chaum_pedersen::{NonZKState, ZKPartProof};
+use zei_crypto::delegated_chaum_pedersen::{
+    DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
+};
 use zei_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,
@@ -155,8 +157,8 @@ impl ProverParams {
     pub fn bar_to_abar_params() -> Result<ProverParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let zero = BLSScalar::zero();
-        let proof = ZKPartProof::default();
-        let non_zk_state = NonZKState::default();
+        let proof = DelegatedChaumPedersenProof::default();
+        let non_zk_state = DelegatedChaumPedersenInspection::default();
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
         let (cs, _) = build_bar_to_abar_cs(
@@ -190,8 +192,8 @@ impl ProverParams {
         let bls_zero = BLSScalar::zero();
         let jubjub_zero = JubjubScalar::zero();
 
-        let proof = ZKPartProof::default();
-        let non_zk_state = NonZKState::default();
+        let proof = DelegatedChaumPedersenProof::default();
+        let non_zk_state = DelegatedChaumPedersenInspection::default();
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
         let hash = bls_zero;

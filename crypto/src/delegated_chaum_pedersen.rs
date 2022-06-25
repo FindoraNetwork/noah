@@ -8,10 +8,10 @@ use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
-/// The non-interactive proof provided to the ZK verifier.
-pub struct ZKPartProof {
+/// The non-interactive proof provided to the verifier.
+pub struct DelegatedChaumPedersenProof {
     /// The commitment of the non-ZK verifier's state.
-    pub non_zk_part_state_commitment: BLSScalar,
+    pub inspection_comm: BLSScalar,
     /// The first randomizer point.
     pub point_r: RistrettoPoint,
     /// The second randomizer point.
@@ -27,8 +27,8 @@ pub struct ZKPartProof {
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
-/// The state of the non-ZK verifier.
-pub struct NonZKState {
+/// The state of the inspector.
+pub struct DelegatedChaumPedersenInspection {
     /// The committed value of the first Pedersen commitment.
     pub x: RistrettoScalar,
     /// The committed value of the second Pedersen commitment.
@@ -41,7 +41,7 @@ pub struct NonZKState {
     pub r: BLSScalar,
 }
 
-impl ZKPartProof {
+impl DelegatedChaumPedersenProof {
     /// Represent the information needed by zk-SNARKs in its format.
     pub fn to_verifier_input(&self) -> Vec<BLSScalar> {
         let s_1_biguint = BigUint::from_bytes_le(&self.s_1.to_bytes());
@@ -51,7 +51,7 @@ impl ZKPartProof {
         let s_2_sim_fr = SimFr::from(&s_2_biguint);
 
         let mut res = Vec::with_capacity(1 + NUM_OF_LIMBS * 2);
-        res[0] = self.non_zk_part_state_commitment;
+        res[0] = self.inspection_comm;
         for i in 0..NUM_OF_LIMBS {
             res[i + 1] = s_1_sim_fr.limbs[i];
             res[i + NUM_OF_LIMBS + 1] = s_2_sim_fr.limbs[i];
@@ -72,12 +72,17 @@ pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore>(
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
     aux_info: &BLSScalar,
-) -> Result<(ZKPartProof, NonZKState, RistrettoScalar, RistrettoScalar)> {
+) -> Result<(
+    DelegatedChaumPedersenProof,
+    DelegatedChaumPedersenInspection,
+    RistrettoScalar,
+    RistrettoScalar,
+)> {
     assert_eq!(NUM_OF_LIMBS, 6);
     assert_eq!(BIT_PER_LIMB, 43);
 
-    let mut proof = ZKPartProof::default();
-    let mut non_zk_state = NonZKState::default();
+    let mut proof = DelegatedChaumPedersenProof::default();
+    let mut inspection = DelegatedChaumPedersenInspection::default();
     let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
 
     // 1. sample a, b, c, d
@@ -128,7 +133,7 @@ pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore>(
         ])[0];
         comm_instance.rescue(&[h1, compressed_limbs[4], r, BLSScalar::zero()])[0]
     };
-    proof.non_zk_part_state_commitment = comm;
+    proof.inspection_comm = comm;
 
     // 5. compute the two blinding points
     let point_r = pc_gens.commit(a, c);
@@ -149,7 +154,7 @@ pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore>(
         b"Auxiliary information (Rescue commitment z, or a nullifier)",
         &aux_info.to_bytes(),
     );
-    transcript.append_message(b"Non-ZK verifier state commitment comm", &comm.to_bytes());
+    transcript.append_message(b"Inspector state commitment comm", &comm.to_bytes());
     transcript.append_message(b"Point R", &point_r.to_compressed_bytes());
     transcript.append_message(b"Point S", &point_s.to_compressed_bytes());
 
@@ -185,13 +190,13 @@ pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore>(
     proof.s_3 = s_3;
     proof.s_4 = s_4;
 
-    non_zk_state.x = *x;
-    non_zk_state.y = *y;
-    non_zk_state.a = a;
-    non_zk_state.b = b;
-    non_zk_state.r = r;
+    inspection.x = *x;
+    inspection.y = *y;
+    inspection.a = a;
+    inspection.b = b;
+    inspection.r = r;
 
-    Ok((proof, non_zk_state, beta, lambda))
+    Ok((proof, inspection, beta, lambda))
 }
 
 /// Verify a proof in the delegated Chaum-Pedersen protocol.
@@ -200,7 +205,7 @@ pub fn verify_delegated_chaum_pedersen(
     point_p: &RistrettoPoint,
     point_q: &RistrettoPoint,
     aux_info: &BLSScalar,
-    zk_part_proof: &ZKPartProof,
+    proof: &DelegatedChaumPedersenProof,
 ) -> Result<(RistrettoScalar, RistrettoScalar)> {
     // 1. Fiat-Shamir transform
     let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
@@ -217,11 +222,11 @@ pub fn verify_delegated_chaum_pedersen(
         &aux_info.to_bytes(),
     );
     transcript.append_message(
-        b"Non-ZK verifier state commitment comm",
-        &zk_part_proof.non_zk_part_state_commitment.to_bytes(),
+        b"Inspector state commitment comm",
+        &proof.inspection_comm.to_bytes(),
     );
-    transcript.append_message(b"Point R", &zk_part_proof.point_r.to_compressed_bytes());
-    transcript.append_message(b"Point S", &zk_part_proof.point_s.to_compressed_bytes());
+    transcript.append_message(b"Point R", &proof.point_r.to_compressed_bytes());
+    transcript.append_message(b"Point S", &proof.point_s.to_compressed_bytes());
 
     let mut bytes = [0u8; 32];
     transcript.challenge_bytes(b"challenge", &mut bytes);
@@ -231,10 +236,10 @@ pub fn verify_delegated_chaum_pedersen(
     rng.fill_bytes(&mut rand_bytes);
     let beta = RistrettoScalar::from_bytes(&rand_bytes).unwrap();
 
-    transcript.append_message(b"Response s1", &zk_part_proof.s_1.to_bytes());
-    transcript.append_message(b"Response s2", &zk_part_proof.s_2.to_bytes());
-    transcript.append_message(b"Response s3", &zk_part_proof.s_3.to_bytes());
-    transcript.append_message(b"Response s4", &zk_part_proof.s_4.to_bytes());
+    transcript.append_message(b"Response s1", &proof.s_1.to_bytes());
+    transcript.append_message(b"Response s2", &proof.s_2.to_bytes());
+    transcript.append_message(b"Response s3", &proof.s_3.to_bytes());
+    transcript.append_message(b"Response s4", &proof.s_4.to_bytes());
 
     let mut bytes = [0u8; 32];
     transcript.challenge_bytes(b"challenge", &mut bytes);
@@ -245,15 +250,15 @@ pub fn verify_delegated_chaum_pedersen(
     let lambda = RistrettoScalar::from_bytes(&rand_bytes).unwrap();
 
     // 2. check the group relationships
-    let first_eqn_left = pc_gens.commit(zk_part_proof.s_1, zk_part_proof.s_3);
-    let first_eqn_right = point_p.mul(&beta).add(&zk_part_proof.point_r);
+    let first_eqn_left = pc_gens.commit(proof.s_1, proof.s_3);
+    let first_eqn_right = point_p.mul(&beta).add(&proof.point_r);
 
     if first_eqn_left.ne(&first_eqn_right) {
         return Err(eg!(ZeiError::ZKProofVerificationError));
     }
 
-    let second_eqn_left = pc_gens.commit(zk_part_proof.s_2, zk_part_proof.s_4);
-    let second_eqn_right = point_q.mul(&beta).add(&zk_part_proof.point_s);
+    let second_eqn_left = pc_gens.commit(proof.s_2, proof.s_4);
+    let second_eqn_right = point_q.mul(&beta).add(&proof.point_s);
 
     if second_eqn_left.ne(&second_eqn_right) {
         return Err(eg!(ZeiError::ZKProofVerificationError));

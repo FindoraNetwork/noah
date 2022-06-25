@@ -18,7 +18,8 @@ use zei_crypto::{
         ristretto_pedersen_comm::RistrettoPedersenCommitment,
     },
     delegated_chaum_pedersen::{
-        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen, NonZKState, ZKPartProof,
+        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
+        DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
     },
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
 };
@@ -33,7 +34,7 @@ pub const TWO_POW_32: u64 = 1 << 32;
 
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ConvertBarAbarProof {
-    commitment_eq_proof: ZKPartProof,
+    commitment_eq_proof: DelegatedChaumPedersenProof,
     pc_rescue_commitments_eq_proof: AXfrPlonkPf,
 }
 
@@ -270,8 +271,8 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
     pubkey_x: BLSScalar,
-    proof: &ZKPartProof,
-    non_zk_state: &NonZKState,
+    proof: &DelegatedChaumPedersenProof,
+    non_zk_state: &DelegatedChaumPedersenInspection,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> Result<AXfrPlonkPf> {
@@ -309,7 +310,7 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
 pub(crate) fn verify_eq_committed_vals(
     params: &VerifierParams,
     hash_comm: BLSScalar,
-    proof_zk_part: &ZKPartProof,
+    proof_zk_part: &DelegatedChaumPedersenProof,
     proof: &AXfrPlonkPf,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
@@ -317,7 +318,7 @@ pub(crate) fn verify_eq_committed_vals(
     let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
     let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
     online_inputs.push(hash_comm);
-    online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
+    online_inputs.push(proof_zk_part.inspection_comm);
     let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
     let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
 
@@ -351,8 +352,8 @@ pub(crate) fn build_bar_to_abar_cs(
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
     pubkey_x: BLSScalar,
-    proof: &ZKPartProof,
-    non_zk_state: &NonZKState,
+    proof: &DelegatedChaumPedersenProof,
+    non_zk_state: &DelegatedChaumPedersenInspection,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> (TurboPlonkCS, usize) {
@@ -378,7 +379,7 @@ pub(crate) fn build_bar_to_abar_cs(
     let y_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.y.to_bytes()));
     let a_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.a.to_bytes()));
     let b_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.b.to_bytes()));
-    let comm = proof.non_zk_part_state_commitment;
+    let comm = proof.inspection_comm;
     let r = non_zk_state.r;
 
     let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
@@ -784,7 +785,7 @@ mod test {
 
         let mut online_inputs = Vec::with_capacity(2 + 3 * NUM_OF_LIMBS);
         online_inputs.push(z);
-        online_inputs.push(proof.non_zk_part_state_commitment);
+        online_inputs.push(proof.inspection_comm);
 
         let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
         let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));

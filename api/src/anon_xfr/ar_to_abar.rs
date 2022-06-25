@@ -21,6 +21,15 @@ use zei_plonk::plonk::{
 /// Transcript header for AR_TO_ABAR
 const AR_TO_ABAR_TRANSCRIPT: &[u8] = b"AR to ABAR proof";
 
+/// ArToAbarNote has the body and the signature required for the ArToAbar conversion
+#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
+pub struct ArToAbarNote {
+    /// body of the transfer note
+    pub body: ArToAbarBody,
+    /// signature of the spender
+    pub signature: XfrSignature,
+}
+
 /// ArToAbarBody holds the input, output, proof and memo for the Ar conversion.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct ArToAbarBody {
@@ -32,15 +41,6 @@ pub struct ArToAbarBody {
     pub proof: AXfrPlonkPf,
     /// memo to hold the blinding factor of commitment
     pub memo: OwnerMemo,
-}
-
-/// ArToAbarNote has the body and the signature required for the ArToAbar conversion
-#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
-pub struct ArToAbarNote {
-    /// body of the transfer note
-    pub body: ArToAbarBody,
-    /// signature of the spender
-    pub signature: XfrSignature,
 }
 
 /// Generate AssetRecord To AnonymousBlindAssetRecord conversion note: body + spending input signature

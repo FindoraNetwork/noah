@@ -1,3 +1,4 @@
+use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
 use crate::anon_xfr::{
     add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
     compute_non_malleability_tag, nullify_in_cs_with_native_address, nullify_with_native_address,
@@ -5,7 +6,7 @@ use crate::anon_xfr::{
         AXfrKeyPair, AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord,
         PayerWitness, PayerWitnessVars,
     },
-    TurboPlonkCS, SK_LEN,
+    AXfrPlonkPf, TurboPlonkCS, SK_LEN,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -23,7 +24,8 @@ use zei_algebra::{
 use zei_crypto::{
     basic::ristretto_pedersen_comm::RistrettoPedersenCommitment,
     delegated_chaum_pedersen::{
-        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen, NonZKState, ZKPartProof,
+        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
+        DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
     },
     field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
 };
@@ -37,57 +39,38 @@ use zei_plonk::{
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
 
-pub type Abar2BarPlonkProof = PlonkPf<KZGCommitmentSchemeBLS>;
 pub const TWO_POW_32: u64 = 1 << 32;
 const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"ABAR to BAR proof";
 
-/// ConvertAbarBarProof is a struct to hold various aspects of a ZKP to prove equality, spendability
-/// and conversion of an ABAR to a BAR on the chain.
-#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
-pub struct ConvertAbarBarProof {
-    commitment_eq_proof: ZKPartProof,
-    spending_proof: Abar2BarPlonkProof,
-    merkle_root: BLSScalar,
-    merkle_root_version: u64,
-}
-
-impl ConvertAbarBarProof {
-    #[allow(dead_code)]
-    pub fn get_merkle_root_version(&self) -> u64 {
-        return self.merkle_root_version;
-    }
-}
-
-/// AbarToBarNote has the input, the output and the proof related to the conversion.
+/// An anonymous-to-confidential note.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToBarNote {
-    /// The body part of ABAR to BAR
+    /// The anonymous-to-confidential body.
     pub body: AbarToBarBody,
-    /// The spending proof (assuming non-malleability)
-    pub spending_proof: Abar2BarPlonkProof,
-    /// The non-malleability tag
+    /// The proof (assuming non-malleability).
+    pub proof: AXfrPlonkPf,
+    /// The non-malleability tag.
     pub non_malleability_tag: BLSScalar,
 }
 
-/// AbarToBarNote has the input, the output and the proof related to the conversion.
+/// An anonymous-to-confidential body.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToBarBody {
-    /// input ABAR being spent
+    /// Input ABAR being spent.
     pub input: Nullifier,
-    /// The new BAR to be created
+    /// The new BAR to be created.
     pub output: BlindAssetRecord,
-    /// The ZK part of commitment equality proof
-    pub commitment_eq_proof: ZKPartProof,
-    /// The Merkle root hash
+    /// The inspector's proof.
+    pub delegated_cp_proof: DelegatedChaumPedersenProof,
+    /// The Merkle root hash.
     pub merkle_root: BLSScalar,
-    /// The Merkle root version
+    /// The Merkle root version.
     pub merkle_root_version: u64,
-    /// The owner memo
+    /// The owner memo.
     pub memo: Option<OwnerMemo>,
 }
 
-/// This function generates the AbarToBarBody from the Open ABARs, the receiver address and the signing
-/// key pair.
+/// Generate the anonymous-to-confidential note.
 #[allow(dead_code)]
 pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
@@ -99,6 +82,12 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
 ) -> Result<AbarToBarNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.pub_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
+    }
+
+    /// Reject anonymous-to-confidential note that actually has transparent output.
+    /// Should direct to AbarToAr.
+    if asset_record_type == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
+        return Err(eg1(ZeiError::ParameterError));
     }
 
     let obar_amount = oabar.amount;
@@ -113,7 +102,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     );
     let (obar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
 
-    // 2. build input witness info
+    // 1. Build input witness info.
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
     let this_nullifier = nullify_with_native_address(
         &abar_keypair,
@@ -122,7 +111,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
         mt_leaf_info.uid,
     );
 
-    // 3. Construct the equality proof
+    // 2. Construct the equality proof.
     let x = RistrettoScalar::from(oabar.amount);
     let y: RistrettoScalar = oabar.asset_type.as_scalar();
     let gamma = obar
@@ -136,22 +125,23 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     let point_p = pc_gens.commit(x, gamma);
     let point_q = pc_gens.commit(y, delta);
 
-    // 4. compute the non-ZK part of the proof
-    let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
-        prng,
-        &x,
-        &gamma,
-        &y,
-        &delta,
-        &pc_gens,
-        &point_p,
-        &point_q,
-        &this_nullifier,
-    )
-    .c(d!())?;
+    // 4. Compute the inspector's proof.
+    let (delegated_cp_proof, delegated_cp_inspection, beta, lambda) =
+        prove_delegated_chaum_pedersen(
+            prng,
+            &x,
+            &gamma,
+            &y,
+            &delta,
+            &pc_gens,
+            &point_p,
+            &point_q,
+            &this_nullifier,
+        )
+        .c(d!())?;
 
-    // 5. build the plonk proof
-    let payers_secret = PayerWitness {
+    // 5. Build the Plonk proof.
+    let payers_witness = PayerWitness {
         sec_key: abar_keypair.get_secret_scalar(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
@@ -165,7 +155,7 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     let body = AbarToBarBody {
         input: this_nullifier,
         output: obar.blind_asset_record.clone(),
-        commitment_eq_proof: commitment_eq_proof.clone(),
+        delegated_cp_proof: delegated_cp_proof.clone(),
         merkle_root: mt_info_temp.root,
         merkle_root_version: mt_info_temp.root_version,
         memo: owner_memo,
@@ -178,12 +168,12 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
     let (hash, non_malleability_randomizer, non_malleability_tag) =
         compute_non_malleability_tag(prng, b"AbarToBar", &msg, &[&abar_keypair]);
 
-    let spending_proof = prove_abar_to_bar_spending(
+    let proof = prove_abar_to_bar(
         prng,
         params,
-        payers_secret,
-        &commitment_eq_proof,
-        &non_zk_state,
+        payers_witness,
+        &delegated_cp_proof,
+        &delegated_cp_inspection,
         &beta,
         &lambda,
         &hash,
@@ -194,12 +184,12 @@ pub fn gen_abar_to_bar_note<R: CryptoRng + RngCore>(
 
     Ok(AbarToBarNote {
         body,
-        spending_proof,
+        proof,
         non_malleability_tag,
     })
 }
 
-// Verifies the body
+/// Verify the anonymous-to-confidential note.
 #[allow(dead_code)]
 pub fn verify_abar_to_bar_note(
     params: &VerifierParams,
@@ -213,8 +203,15 @@ pub fn verify_abar_to_bar_note(
     let bar = note.body.output.clone();
     let pc_gens = RistrettoPedersenCommitment::default();
 
-    // 1. get commitments
-    // 1.1 reconstruct total amount commitment from bar object
+    // Reject anonymous-to-confidential notes whose outputs are transparent.
+    if note.body.output.get_record_type()
+        == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
+    {
+        return Err(eg!(ZeiError::AXfrVerificationError));
+    }
+
+    // 1. Get commitments.
+    // 1.1 Reconstruct total amount commitment from bar.
     let (com_low, com_high) = match bar.amount {
         XfrAmount::Confidential((low, high)) => (
             low.decompress()
@@ -225,7 +222,7 @@ pub fn verify_abar_to_bar_note(
                 .c(d!())?,
         ),
         XfrAmount::NonConfidential(amount) => {
-            // fake commitment
+            // Use a trivial commitment
             let (l, h) = u64_to_u32_pair(amount);
             (
                 pc_gens.commit(RistrettoScalar::from(l), RistrettoScalar::zero()),
@@ -234,7 +231,7 @@ pub fn verify_abar_to_bar_note(
         }
     };
 
-    // 1.2 get asset type commitment
+    // 1.2 Get asset type commitment.
     let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
     let com_asset_type = match bar.asset_type {
         XfrAssetType::Confidential(a) => a
@@ -242,20 +239,20 @@ pub fn verify_abar_to_bar_note(
             .ok_or(ZeiError::DecompressElementError)
             .c(d!())?,
         XfrAssetType::NonConfidential(a) => {
-            // fake commitment
+            // Use a trivial commitment
             pc_gens.commit(a.as_scalar(), RistrettoScalar::zero())
         }
     };
 
     let input = note.body.input;
 
-    // 2. verify equality of committed values
+    // 2. Verify the delegated Chaum-Pedersen proof.
     let (beta, lambda) = verify_delegated_chaum_pedersen(
         &pc_gens,
         &com_amount,
         &com_asset_type,
         &input,
-        &note.body.commitment_eq_proof,
+        &note.body.delegated_cp_proof,
     )
     .c(d!())?;
 
@@ -265,12 +262,12 @@ pub fn verify_abar_to_bar_note(
     online_inputs.push(input.clone());
     online_inputs.push(merkle_root.clone());
 
-    let proof_zk_part = note.body.commitment_eq_proof.clone();
+    let delegated_cp_proof = note.body.delegated_cp_proof.clone();
 
     let beta_lambda = beta * &lambda;
-    let s1_plus_lambda_s2 = proof_zk_part.s_1 + proof_zk_part.s_2 * &lambda;
+    let s1_plus_lambda_s2 = delegated_cp_proof.s_1 + delegated_cp_proof.s_2 * &lambda;
 
-    online_inputs.push(proof_zk_part.non_zk_part_state_commitment);
+    online_inputs.push(delegated_cp_proof.inspection_comm);
     let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
     let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
     let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
@@ -286,7 +283,7 @@ pub fn verify_abar_to_bar_note(
         .c(d!())?;
     let mut hasher = Sha512::new();
     hasher.update(b"AbarToBar");
-    hasher.update(msg);
+    hasher.update(&msg);
     let hash = BLSScalar::from_hash(hasher);
     online_inputs.push(hash);
     online_inputs.push(note.non_malleability_tag);
@@ -297,16 +294,16 @@ pub fn verify_abar_to_bar_note(
         &params.cs,
         &params.verifier_params,
         &online_inputs,
-        &note.spending_proof,
+        &note.proof,
     )
 }
 
-fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
+fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    payers_secret: PayerWitness,
-    proof: &ZKPartProof,
-    non_zk_state: &NonZKState,
+    payers_witness: PayerWitness,
+    proof: &DelegatedChaumPedersenProof,
+    inspection: &DelegatedChaumPedersenInspection,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     hash: &BLSScalar,
@@ -316,9 +313,9 @@ fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
 
     let (mut cs, _) = build_abar_to_bar_cs(
-        payers_secret,
+        payers_witness,
         proof,
-        non_zk_state,
+        inspection,
         beta,
         lambda,
         hash,
@@ -339,14 +336,11 @@ fn prove_abar_to_bar_spending<R: CryptoRng + RngCore>(
     .c(d!(ZeiError::AXfrProofError))
 }
 
-///
-///        Constraint System for abar_to_bar
-///
-///
+/// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
-    payers_secret: PayerWitness,
-    proof: &ZKPartProof,
-    non_zk_state: &NonZKState,
+    payers_witness: PayerWitness,
+    proof: &DelegatedChaumPedersenProof,
+    inspection: &DelegatedChaumPedersenInspection,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     hash: &BLSScalar,
@@ -354,7 +348,9 @@ pub fn build_abar_to_bar_cs(
     non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
-    let payers_secrets = add_payers_secret(&mut cs, payers_secret);
+
+    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_witness]);
+    let payers_witness_vars = &payers_witnesses_vars[0];
 
     let base = JubjubPoint::get_base();
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
@@ -373,25 +369,25 @@ pub fn build_abar_to_bar_cs(
     let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
     let non_malleability_tag_var = cs.new_variable(*non_malleability_tag);
 
-    // prove knowledge of payer's secret key: pk = base^{sk}
-    let pk_var = cs.scalar_mul(base, payers_secrets.sec_key, SK_LEN);
+    // Prove knowledge of payer's secret key: pk = base^{sk}.
+    let pk_var = cs.scalar_mul(base, payers_witness_vars.sec_key, SK_LEN);
     let pk_x = pk_var.get_x();
 
-    // commitments
+    // Commit.
     let com_abar_in_var = commit_in_cs_with_native_address(
         &mut cs,
-        payers_secrets.blind,
-        payers_secrets.amount,
-        payers_secrets.asset_type,
+        payers_witness_vars.blind,
+        payers_witness_vars.amount,
+        payers_witness_vars.asset_type,
         pk_x,
     );
 
-    // prove pre-image of the nullifier
-    // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
+    // Nullify.
+    // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`.
     let uid_amount = cs.linear_combine(
         &[
-            payers_secrets.uid,
-            payers_secrets.amount,
+            payers_witness_vars.uid,
+            payers_witness_vars.amount,
             zero_var,
             zero_var,
         ],
@@ -402,20 +398,22 @@ pub fn build_abar_to_bar_cs(
     );
     let nullifier_input_vars = NullifierInputVars {
         uid_amount,
-        asset_type: payers_secrets.asset_type,
+        asset_type: payers_witness_vars.asset_type,
         pub_key_x: pk_x,
     };
+    let nullifier_var = nullify_in_cs_with_native_address(
+        &mut cs,
+        payers_witness_vars.sec_key,
+        nullifier_input_vars,
+    );
 
-    let nullifier_var =
-        nullify_in_cs_with_native_address(&mut cs, payers_secrets.sec_key, nullifier_input_vars);
-
-    // Merkle path authentication
+    // Merkle path authentication.
     let acc_elem = AccElemVars {
-        uid: payers_secrets.uid,
+        uid: payers_witness_vars.uid,
         commitment: com_abar_in_var,
     };
 
-    let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_secrets.path);
+    let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_witness_vars.path);
 
     if let Some(root) = root_var {
         cs.equal(root, tmp_root_var);
@@ -423,13 +421,13 @@ pub fn build_abar_to_bar_cs(
         root_var = Some(tmp_root_var);
     }
 
-    // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2
-    let x_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.x.to_bytes()));
-    let y_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.y.to_bytes()));
-    let a_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.a.to_bytes()));
-    let b_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.b.to_bytes()));
-    let comm = proof.non_zk_part_state_commitment;
-    let r = non_zk_state.r;
+    // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2.
+    let x_sim_fr = SimFr::from(&BigUint::from_bytes_le(&inspection.x.to_bytes()));
+    let y_sim_fr = SimFr::from(&BigUint::from_bytes_le(&inspection.y.to_bytes()));
+    let a_sim_fr = SimFr::from(&BigUint::from_bytes_le(&inspection.a.to_bytes()));
+    let b_sim_fr = SimFr::from(&BigUint::from_bytes_le(&inspection.b.to_bytes()));
+    let comm = proof.inspection_comm;
+    let r = inspection.r;
     let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
     let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
 
@@ -451,7 +449,7 @@ pub fn build_abar_to_bar_cs(
     let beta_lambda_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_lambda_sim_fr);
     let s1_plus_lambda_s2_sim_fr_var = SimFrVar::alloc_input(&mut cs, &s1_plus_lambda_s2_sim_fr);
 
-    // 3. Merge the limbs for x, y, a, b
+    // 3. Merge the limbs for x, y, a, b.
     let mut all_limbs = Vec::with_capacity(4 * NUM_OF_LIMBS);
     all_limbs.extend_from_slice(&x_sim_fr.limbs);
     all_limbs.extend_from_slice(&y_sim_fr.limbs);
@@ -502,7 +500,7 @@ pub fn build_abar_to_bar_cs(
         compressed_limbs_var.push(sum_var);
     }
 
-    // 4. Open the non-ZK verifier state
+    // 4. Check the inspector's state commitment.
     {
         let h1_var = cs.rescue_hash(&StateVar::new([
             compressed_limbs_var[0],
@@ -520,7 +518,7 @@ pub fn build_abar_to_bar_cs(
         cs.equal(h2_var, comm_var);
     }
 
-    // 5. Perform the check in field simulation
+    // 5. Perform the check in field simulation.
     {
         let beta_x_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &x_sim_fr_var);
         let beta_lambda_y_sim_fr_mul_var = beta_lambda_sim_fr_var.mul(&mut cs, &y_sim_fr_var);
@@ -536,7 +534,7 @@ pub fn build_abar_to_bar_cs(
         eqn.enforce_zero(&mut cs);
     }
 
-    // 6. Check x = amount_var and y = at_var
+    // 6. Check x = amount_var and y = at_var.
     {
         let mut x_in_bls12_381 = cs.linear_combine(
             &[
@@ -588,26 +586,24 @@ pub fn build_abar_to_bar_cs(
             zero,
         );
 
-        cs.equal(x_in_bls12_381, payers_secrets.amount);
-        cs.equal(y_in_bls12_381, payers_secrets.asset_type);
+        cs.equal(x_in_bls12_381, payers_witnesses_vars.amount);
+        cs.equal(y_in_bls12_381, payers_witnesses_vars.asset_type);
     }
 
-    // 7. Check the validity of the non malleability tag.
+    // 7. Check the non-malleability tag.
     {
         let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
             one_var,
             hash_var,
             non_malleability_randomizer_var,
-            payers_secrets.sec_key,
+            payers_witnesses_vars.sec_key,
         ]))[0];
 
         cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
     }
 
-    // prepare public inputs variables
+    // prepare public inputs variables.
     cs.prepare_pi_variable(nullifier_var);
-
-    // prepare the public input for merkle_root
     cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
     cs.prepare_pi_variable(comm_var);
@@ -635,31 +631,13 @@ pub fn build_abar_to_bar_cs(
     (cs, n_constraints)
 }
 
-fn add_payers_secret(cs: &mut TurboPlonkCS, secret: PayerWitness) -> PayerWitnessVars {
-    let bls_sk = BLSScalar::from(&secret.sec_key);
-    let sec_key = cs.new_variable(bls_sk);
-    let uid = cs.new_variable(BLSScalar::from(secret.uid));
-    let amount = cs.new_variable(BLSScalar::from(secret.amount));
-    let blind = cs.new_variable(secret.blind);
-    let path = add_merkle_path_variables(cs, secret.path.clone());
-    let asset_type = cs.new_variable(secret.asset_type);
-    PayerWitnessVars {
-        sec_key,
-        uid,
-        amount,
-        asset_type,
-        path,
-        blind,
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::structs::AXfrKeyPair;
     use crate::anon_xfr::{
         abar_to_bar::{gen_abar_to_bar_note, verify_abar_to_bar_note},
         structs::{
-            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
+            AXfrKeyPair, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
+            OpenAnonBlindAssetRecordBuilder,
         },
         TREE_DEPTH,
     };
@@ -671,14 +649,13 @@ mod tests {
     use mem_db::MemoryDB;
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use std::sync::Arc;
     use storage::{
         state::{ChainState, State},
         store::PrefixedStore,
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
     use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
     use zei_crypto::basic::rescue::RescueInstance;
 
@@ -729,7 +706,6 @@ mod tests {
 
         let node_params = VerifierParams::abar_to_bar_params().unwrap();
         verify_abar_to_bar_note(&node_params, &note, &proof.root).unwrap();
-
         assert!(
             verify_abar_to_bar_note(&node_params, &note, &BLSScalar::random(&mut prng),).is_err()
         );
