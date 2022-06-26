@@ -1,101 +1,106 @@
-use digest::crypto_common::Key;
+use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
+use wasm_bindgen::prelude::*;
 use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
+use zei_algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
 use zei_algebra::prelude::*;
 use zei_crypto::basic::rescue::RescueInstance;
 
-pub const fn get_viewing_key_domain_separator() -> BLSScalar {
+pub const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
+pub const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
+
+pub fn get_view_key_domain_separator() -> BLSScalar {
     let mut hasher = Sha512::new();
     hasher.update(b"Viewing key domain separator");
     let hash = BLSScalar::from_hash(hasher);
     hash
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-/// A Schnorr signature consists of a group element R and a scalar s.
-pub struct Signature {
-    pub point_r: JubjubPoint,
-    pub s: JubjubScalar,
-}
-
 /// The spending key.
-pub struct SpendKey(pub BLSScalar);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
+pub struct AXfrSpendKey(pub BLSScalar);
+
 /// The viewing key.
-pub struct ViewKey(pub JubjubScalar);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct AXfrViewKey(pub JubjubScalar);
+
+#[wasm_bindgen]
 /// The public key.
-pub struct PublicKey(pub JubjubPoint);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
+pub struct AXfrPubKey(pub(crate) JubjubPoint);
 
-impl PublicKey {
-    /// Verify the signature.
-    pub fn verify(&self, msg: &[u8], sig: &Signature) -> Result<()> {
-        let mut transcript = Transcript::new(b"schnorr_sig");
-        transcript.update_transcript_with_sig_info(msg, self, &sig.point_r);
-
-        let c = transcript.compute_challenge::<JubjubScalar>();
-
-        let g = JubjubPoint::get_base();
-        let left = sig.point_r.add(&self.0.mul(&c));
-        let right = g.mul(&sig.s);
-
-        if left == right {
-            Ok(())
-        } else {
-            Err(eg!(ZeiError::SignatureError))
-        }
-    }
-}
-
-impl ZeiFromToBytes for PublicKey {
+impl ZeiFromToBytes for AXfrPubKey {
     fn zei_to_bytes(&self) -> Vec<u8> {
         self.0.to_compressed_bytes()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<PublicKey> {
-        let group_element = JubjubPoint::from_compressed_bytes(bytes);
-        match group_element {
-            Ok(g) => Ok(PublicKey(g)),
-            _ => Err(eg!(ZeiError::ParameterError)),
+    fn zei_from_bytes(bytes: &[u8]) -> Result<AXfrPubKey> {
+        if bytes.len() != AXFR_PUBLIC_KEY_LENGTH {
+            Err(eg!(ZeiError::DeserializationError))
+        } else {
+            let group_element = JubjubPoint::from_compressed_bytes(bytes);
+            match group_element {
+                Ok(g) => Ok(AXfrPubKey(g)),
+                _ => Err(eg!(ZeiError::ParameterError)),
+            }
         }
     }
 }
 
+/// Keypair associated with an Anonymous records. It is used to spending it.
+#[wasm_bindgen]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 /// The key pair for anonymous payment.
-pub struct KeyPair {
+pub struct AXfrKeyPair {
     /// The random seed that generates the secret key.
-    pub spend_key: SpendKey,
+    pub(crate) spend_key: AXfrSpendKey,
     /// The secret key of Schnorr signature.
-    pub view_key: ViewKey,
+    pub(crate) view_key: AXfrViewKey,
     /// The public key of Schnorr signature.
-    pub pub_key: PublicKey,
+    pub(crate) pub_key: AXfrPubKey,
 }
 
-impl KeyPair {
+impl AXfrKeyPair {
     /// Generate a Schnorr keypair from `prng`.
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        gen_keys(prng)
+        let spend_key = AXfrSpendKey(BLSScalar::random(prng));
+        Self::from_spend_key(spend_key)
+    }
+
+    /// Return the public key
+    pub fn get_pub_key(&self) -> AXfrPubKey {
+        self.pub_key.clone()
+    }
+
+    /// Return the view key
+    pub fn get_view_key(&self) -> AXfrViewKey {
+        self.view_key.clone()
+    }
+
+    /// Return the spend key
+    pub fn get_spend_key(&self) -> AXfrSpendKey {
+        self.spend_key.clone()
     }
 
     /// Return the key pair from the spending key.
-    pub fn from_spend_key(spend_key: SpendKey) -> Self {
+    pub fn from_spend_key(spend_key: AXfrSpendKey) -> Self {
         let hash_instance = RescueInstance::<BLSScalar>::new();
         let viewing_key_in_bls12_381 = hash_instance.rescue(&[
-            get_viewing_key_domain_separator(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
+            get_view_key_domain_separator(),
             spend_key.0,
+            BLSScalar::zero(),
+            BLSScalar::zero(),
         ])[0];
 
         // Viewing key in Jubjub = Viewing key in BLS12-381 mod Jubjub's r.
         // `from_bytes` will allow so because the number of `bytes` are the same, although it may (very likely) go beyond.
         let view_key =
-            ViewKey(JubjubScalar::from_bytes(&viewing_key_in_bls12_381.to_bytes()).unwrap());
+            AXfrViewKey(JubjubScalar::from_bytes(&viewing_key_in_bls12_381.to_bytes()).unwrap());
 
         let base = JubjubPoint::get_base();
-        let pub_key = PublicKey(base.mul(&view_key.0));
+        let pub_key = AXfrPubKey(base.mul(&view_key.0));
 
         Self {
             spend_key,
@@ -113,14 +118,9 @@ impl KeyPair {
     pub fn get_view_key_scalar(&self) -> JubjubScalar {
         self.view_key.0
     }
-
-    /// Compute a signature for `msg`.
-    pub fn sign<R: CryptoRng + RngCore>(&self, prng: &mut R, msg: &[u8]) -> Signature {
-        sign(prng, self, msg)
-    }
 }
 
-impl ZeiFromToBytes for KeyPair {
+impl ZeiFromToBytes for AXfrKeyPair {
     fn zei_to_bytes(&self) -> Vec<u8> {
         let mut vec = vec![];
         vec.extend_from_slice(self.get_spend_key_scalar().to_bytes().as_slice());
@@ -136,17 +136,18 @@ impl ZeiFromToBytes for KeyPair {
             return Err(eg!(ZeiError::DeserializationError));
         }
 
-        let spend_key = SpendKey(BLSScalar::from_bytes(&bytes[0..BLSScalar::bytes_len()]).c(d!())?);
+        let spend_key =
+            AXfrSpendKey(BLSScalar::from_bytes(&bytes[0..BLSScalar::bytes_len()]).c(d!())?);
 
         let mut offset = BLSScalar::bytes_len();
-        let view_key = ViewKey(
+        let view_key = AXfrViewKey(
             JubjubScalar::from_bytes(&bytes[offset..offset + JubjubScalar::bytes_len()]).c(d!())?,
         );
 
         offset += JubjubScalar::bytes_len();
-        let pub_key = PublicKey::zei_from_bytes(&bytes[offset..]).c(d!())?;
+        let pub_key = AXfrPubKey::zei_from_bytes(&bytes[offset..]).c(d!())?;
 
-        Ok(KeyPair {
+        Ok(AXfrKeyPair {
             spend_key,
             view_key,
             pub_key,
@@ -160,7 +161,7 @@ pub trait SchnorrTranscript {
     fn update_transcript_with_sig_info<G: Group>(
         &mut self,
         msg: &[u8],
-        pk: &PublicKey,
+        pk: &AXfrPubKey,
         commitment: &G,
     );
 
@@ -172,7 +173,7 @@ impl SchnorrTranscript for Transcript {
     fn update_transcript_with_sig_info<G: Group>(
         &mut self,
         msg: &[u8],
-        pk: &PublicKey,
+        pk: &AXfrPubKey,
         commitment: &G,
     ) {
         self.append_message(b"message", msg);
@@ -189,140 +190,23 @@ impl SchnorrTranscript for Transcript {
     }
 }
 
-impl ZeiFromToBytes for Signature {
-    fn zei_to_bytes(&self) -> Vec<u8> {
-        let mut v1 = self.point_r.to_compressed_bytes();
-        let mut v2 = self.s.to_bytes();
-        v1.append(&mut v2);
-        v1
-    }
-
-    fn zei_from_bytes(bytes_repr: &[u8]) -> Result<Signature> {
-        let point_r =
-            JubjubPoint::from_compressed_bytes(&bytes_repr[..JubjubPoint::COMPRESSED_LEN]);
-        if point_r.is_err() {
-            return Err(eg!(ZeiError::ParameterError));
-        }
-        let point_r = point_r.unwrap(); // safe unwrap()
-        let s = JubjubScalar::from_bytes(&bytes_repr[JubjubPoint::COMPRESSED_LEN..]);
-        match s {
-            Ok(s) => Ok(Signature { point_r, s }),
-            _ => Err(eg!(ZeiError::DeserializationError)),
-        }
-    }
-}
-
-/// Generates a key pair.
-fn gen_keys<R: CryptoRng + RngCore, G: Group>(prng: &mut R) -> KeyPair {
-    let spend_key = SpendKey(BLSScalar::random(prng));
-    KeyPair::from_spend_key(spend_key)
-}
-
-#[allow(clippy::many_single_char_names)]
-/// Compute a signature given a key pair and a message.
-fn sign<R: CryptoRng + RngCore, G: Group>(
-    prng: &mut R,
-    signing_key: &KeyPair,
-    msg: &[u8],
-) -> Signature {
-    let mut transcript = Transcript::new(b"schnorr_sig");
-
-    let g = G::get_base();
-    let r = G::ScalarType::random(prng);
-
-    let point_r = g.mul(&r);
-    let pk = &signing_key.pub_key;
-
-    transcript.update_transcript_with_sig_info::<G>(msg, pk, &point_r);
-
-    let c = transcript.compute_challenge::<G::ScalarType>();
-
-    let private_key = &(signing_key.view_key);
-    let s: G::ScalarType = r.add(&c.mul(&private_key.0));
-
-    Signature { point_r, s }
-}
-
-/// Verifies a signature.
-#[allow(non_snake_case)]
-fn verify(pk: &PublicKey, msg: &[u8], sig: &Signature) -> Result<()> {
-    let mut transcript = Transcript::new(b"schnorr_sig");
-
-    let g = JubjubPoint::get_base();
-    transcript.update_transcript_with_sig_info(msg, pk, &sig.point_r);
-
-    let c = transcript.compute_challenge::<JubjubScalar>();
-
-    let left = sig.point_r.add(&pk.0.mul(&c));
-    let right = g.mul(&sig.s);
-
-    if left == right {
-        Ok(())
-    } else {
-        Err(eg!(ZeiError::SignatureError))
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::keys::{KeyPair, PublicKey, Signature};
+    use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
     use zei_algebra::jubjub::JubjubPoint;
     use zei_algebra::prelude::*;
-    use zei_algebra::ristretto::RistrettoPoint;
-
-    fn check_schnorr<G: Group>() {
-        let seed = [0_u8; 32];
-        let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-
-        let key_pair: KeyPair<G, G::ScalarType> = KeyPair::generate(&mut prng);
-
-        let message = b"message";
-
-        let sig = key_pair.sign(&mut prng, message);
-
-        let public_key = key_pair.pub_key;
-        let res = public_key.verify(message, &sig);
-        assert!(res.is_ok());
-
-        let wrong_sig = Signature {
-            point_r: G::get_identity(),
-            s: G::ScalarType::one(),
-        };
-        let res = public_key.verify(message, &wrong_sig);
-        assert!(res.is_err());
-
-        let wrong_message = b"wrong_message";
-        let res = public_key.verify(wrong_message, &sig);
-        assert!(res.is_err());
-    }
-
-    #[test]
-    fn schnorr_sig_over_jubjub() {
-        check_schnorr::<JubjubPoint>();
-    }
-
-    #[test]
-    fn schnorr_sig_over_ristretto() {
-        check_schnorr::<RistrettoPoint>();
-    }
 
     fn check_from_to_bytes<G: Group>() {
         let seed = [0_u8; 32];
         let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
-        let key_pair: KeyPair<G, G::ScalarType> = KeyPair::generate(&mut prng);
-        let message = b"message";
-        let sig = key_pair.sign(&mut prng, message);
-        let public_key = key_pair.pub_key;
+        let key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+
+        let public_key = key_pair.get_pub_key();
 
         // Public key
         let public_key_bytes = public_key.zei_to_bytes();
-        let public_key_from_bytes = PublicKey::zei_from_bytes(&public_key_bytes).unwrap();
+        let public_key_from_bytes = AXfrPubKey::zei_from_bytes(&public_key_bytes).unwrap();
         assert_eq!(public_key, public_key_from_bytes);
-
-        // Signature
-        let signature_bytes = sig.zei_to_bytes();
-        let signature_from_bytes = Signature::zei_from_bytes(&signature_bytes).unwrap();
-        assert_eq!(sig, signature_from_bytes);
     }
 
     #[test]

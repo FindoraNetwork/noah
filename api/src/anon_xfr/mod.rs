@@ -1,19 +1,17 @@
 use crate::anon_xfr::structs::{
-    AXfrKeyPair, AccElemVars, AnonBlindAssetRecord, MTPath, MerkleNodeVars, MerklePathVars,
+    AccElemVars, AnonBlindAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
     NullifierInputVars, OpenAnonBlindAssetRecord,
 };
-use crate::xfr::structs::{AssetType, OwnerMemo, ASSET_TYPE_LENGTH};
+use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use digest::Digest;
+use keys::AXfrKeyPair;
 use sha2::Sha512;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
     prelude::*,
 };
-use zei_crypto::basic::{
-    hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, XSecretKey},
-    rescue::RescueInstance,
-};
+use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::constraint_system::{rescue::StateVar, TurboCS, VarIndex};
 use zei_plonk::plonk::indexer::PlonkPf;
 use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
@@ -49,7 +47,7 @@ fn check_inputs(inputs: &[OpenAnonBlindAssetRecord], keypairs: &[AXfrKeyPair]) -
         return Err(eg!(ZeiError::ParameterError));
     }
     for (input, keypair) in inputs.iter().zip(keypairs.iter()) {
-        if input.mt_leaf_info.is_none() || keypair.pub_key() != input.pub_key {
+        if input.mt_leaf_info.is_none() || keypair.get_pub_key() != input.pub_key {
             return Err(eg!(ZeiError::ParameterError));
         }
     }
@@ -138,7 +136,7 @@ pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
     input_to_rescue.push(hash);
     input_to_rescue.push(randomizer);
     for secret_key in secret_keys.iter() {
-        input_to_rescue.push(BLSScalar::from(&secret_key.get_secret_scalar()));
+        input_to_rescue.push(secret_key.get_spend_key_scalar());
     }
 
     if input_to_rescue.len() < 4 {
@@ -173,12 +171,11 @@ pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
 /// Return Error if memo info does not match the commitment or public key.
 /// Return Ok(amount, asset_type, blinding) otherwise.
 pub fn decrypt_memo(
-    memo: &OwnerMemo,
-    dec_key: &XSecretKey,
+    memo: &AxfrOwnerMemo,
     key_pair: &AXfrKeyPair,
     abar: &AnonBlindAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
-    let plaintext = hybrid_decrypt_with_x25519_secret_key(&memo.lock, dec_key);
+    let plaintext = memo.decrypt(&key_pair.get_view_key())?;
     if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
         return Err(eg!(ZeiError::ParameterError));
     }
@@ -201,7 +198,7 @@ pub fn decrypt_memo(
         ])[0];
         hash.rescue(&[
             cur,
-            key_pair.pub_key().0.point_ref().get_x(),
+            key_pair.get_pub_key().0.get_x(),
             BLSScalar::zero(),
             BLSScalar::zero(),
         ])[0]
@@ -220,8 +217,8 @@ pub fn nullify_with_native_address(
     asset_type: &AssetType,
     uid: u64,
 ) -> BLSScalar {
-    let pub_key = key_pair.pub_key();
-    let pub_key_point = pub_key.as_jubjub_point();
+    let pub_key = key_pair.get_pub_key();
+    let pub_key_point = &pub_key.0;
     let pub_key_x = pub_key_point.get_x();
 
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
@@ -237,14 +234,14 @@ pub fn nullify_with_native_address(
     ])[0];
     hash.rescue(&[
         cur,
-        BLSScalar::from(&key_pair.get_secret_scalar()),
+        key_pair.get_spend_key_scalar(),
         BLSScalar::zero(),
         BLSScalar::zero(),
     ])[0]
 }
 
 /// Length of the secret key in anonymous payment (in bits).
-pub(crate) const SK_LEN: usize = 252;
+pub(crate) const SK_LEN: usize = 256;
 
 /// Length of the amount allowed in anonymous assets.
 pub(crate) const AMOUNT_LEN: usize = 64;

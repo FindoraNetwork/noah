@@ -1,24 +1,20 @@
 use crate::anon_xfr::structs::AxfrOwnerMemo;
 use crate::anon_xfr::{
-    structs::{
-        AXfrPubKey, AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
-    },
+    keys::AXfrPubKey,
+    structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
     AXfrPlonkPf, TurboPlonkCS,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::{
     sig::{XfrKeyPair, XfrPublicKey, XfrSignature},
-    structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
+    structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
 };
 use merlin::Transcript;
 use num_bigint::BigUint;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::{
-    basic::{
-        hybrid_encryption::XPublicKey, rescue::RescueInstance,
-        ristretto_pedersen_comm::RistrettoPedersenCommitment,
-    },
+    basic::{rescue::RescueInstance, ristretto_pedersen_comm::RistrettoPedersenCommitment},
     delegated_chaum_pedersen::{
         prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
         DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
@@ -57,7 +53,6 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     record: &OpenAssetRecord,
     bar_keypair: &XfrKeyPair,
     abar_pubkey: &AXfrPubKey,
-    enc_key: &XPublicKey,
 ) -> Result<BarToAbarNote> {
     // Reject confidential-to-anonymous note that actually has transparent input.
     // Should direct to ArToAbar.
@@ -66,7 +61,7 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     }
 
     let (open_abar, delegated_cp_proof, inspector_proof) =
-        prove_bar_to_abar(prng, params, record, abar_pubkey, enc_key).c(d!())?;
+        prove_bar_to_abar(prng, params, record, abar_pubkey).c(d!())?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
         output: AnonBlindAssetRecord::from_oabar(&open_abar),
@@ -106,7 +101,6 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     params: &ProverParams,
     obar: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
-    enc_key: &XPublicKey,
 ) -> Result<(
     OpenAnonBlindAssetRecord,
     DelegatedChaumPedersenProof,
@@ -120,8 +114,8 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     let oabar = OpenAnonBlindAssetRecordBuilder::new()
         .amount(oabar_amount)
         .asset_type(obar.asset_type)
-        .pub_key(*abar_pubkey)
-        .finalize(prng, &enc_key)
+        .pub_key(abar_pubkey)
+        .finalize(prng)
         .c(d!())?
         .build()
         .c(d!())?;
@@ -152,7 +146,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         ])[0];
         z_instance.rescue(&[
             cur,
-            abar_pubkey.0.point_ref().get_x(),
+            abar_pubkey.0.get_x(),
             BLSScalar::zero(),
             BLSScalar::zero(),
         ])[0]
@@ -171,7 +165,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         x_in_bls12_381,
         y_in_bls12_381,
         oabar.blind,
-        abar_pubkey.0.point_ref().get_x(),
+        abar_pubkey.0.get_x(),
         &delegated_cp_proof,
         &inspection,
         &beta,
@@ -555,7 +549,7 @@ pub(crate) fn build_bar_to_abar_cs(
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::structs::AXfrKeyPair;
+    use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
         bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
         structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
@@ -574,7 +568,6 @@ mod test {
     use zei_algebra::bls12_381::BLSScalar;
     use zei_algebra::ristretto::RistrettoScalar;
     use zei_algebra::traits::Scalar;
-    use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
     use zei_crypto::basic::rescue::RescueInstance;
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use zei_crypto::delegated_chaum_pedersen::prove_delegated_chaum_pedersen;
@@ -599,8 +592,6 @@ mod test {
         let pc_gens = RistrettoPedersenCommitment::default();
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
-        let dec_key = XSecretKey::new(&mut prng);
-        let enc_key = XPublicKey::from(&dec_key);
 
         let params = ProverParams::bar_to_abar_params().unwrap();
 
@@ -614,7 +605,7 @@ mod test {
         );
         let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
         let (oabar_conf, delegated_cp_proof_conf, inspector_proof_conf) =
-            super::prove_bar_to_abar(&mut prng, &params, &obar, &abar_keypair.pub_key(), &enc_key)
+            super::prove_bar_to_abar(&mut prng, &params, &obar, &abar_keypair.get_pub_key())
                 .unwrap();
         let abar_conf = AnonBlindAssetRecord::from_oabar(&oabar_conf);
 
@@ -633,8 +624,6 @@ mod test {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
-        let dec_key = XSecretKey::new(&mut prng);
-        let enc_key = XPublicKey::from(&dec_key);
         let pc_gens = RistrettoPedersenCommitment::default();
         let amount = 10;
         let asset_type = AssetType::from_identical_byte(1u8);
@@ -653,8 +642,7 @@ mod test {
             &params,
             &obar,
             &bar_keypair,
-            &abar_keypair.pub_key(),
-            &enc_key,
+            &abar_keypair.get_pub_key(),
         )
         .unwrap();
 
@@ -663,7 +651,6 @@ mod test {
             &note.body.output,
             note.body.memo.clone(),
             &abar_keypair,
-            &dec_key,
         )
         .unwrap()
         .build()
