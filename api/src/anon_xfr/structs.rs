@@ -1,23 +1,24 @@
 use crate::anon_xfr::decrypt_memo;
+use crate::anon_xfr::keys::{KeyPair, PublicKey, Signature, ViewKey};
 use crate::xfr::structs::{AssetType, OwnerMemo};
+use aes_gcm::aead::Aead;
+use aes_gcm::NewAead;
+use digest::generic_array::GenericArray;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use zei_algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-use zei_crypto::basic::hybrid_encryption::{hybrid_encrypt_x25519, XPublicKey, XSecretKey};
+use zei_crypto::basic::hybrid_encryption::{
+    hybrid_encrypt_x25519, XPublicKey, XSecretKey, ZeiHybridCiphertext,
+};
 use zei_crypto::basic::rescue::RescueInstance;
-use zei_crypto::basic::schnorr::{KeyPair, PublicKey, Signature};
 use zei_plonk::plonk::constraint_system::VarIndex;
 
 pub type Nullifier = BLSScalar;
 pub type Commitment = BLSScalar;
 pub type BlindFactor = BLSScalar;
 
-/// A Merkle tree node which consists of the following:
-/// * `siblings1` - the 1st sibling of the tree node
-/// * `siblings2` - the 2nd sibling of the tree node
-/// * `is_left_child` - indicates whether the tree node is the left child of its parent
-/// * `is_right_child` - indicates whether the tree node is the right child of its parent
+/// A Merkle tree node.
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTNode {
@@ -27,7 +28,7 @@ pub struct MTNode {
     pub is_right_child: u8,
 }
 
-/// Asset record to be published
+/// Asset record to be put as leaves on the tree.
 #[wasm_bindgen]
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 pub struct AnonBlindAssetRecord {
@@ -42,7 +43,7 @@ impl AnonBlindAssetRecord {
     }
 }
 
-/// MT PATH, merkle root value, leaf identifier
+/// A Merkle tree leaf.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MTLeafInfo {
     pub path: MTPath,
@@ -68,7 +69,7 @@ pub struct OpenAnonBlindAssetRecord {
     pub(crate) asset_type: AssetType,
     pub(crate) blind: BLSScalar,
     pub(crate) pub_key: AXfrPubKey,
-    pub(crate) owner_memo: Option<OwnerMemo>,
+    pub(crate) owner_memo: Option<AxfrOwnerMemo>,
     pub(crate) mt_leaf_info: Option<MTLeafInfo>,
 }
 
@@ -95,7 +96,7 @@ impl OpenAnonBlindAssetRecord {
     }
 
     /// Get record's owner memo
-    pub fn get_owner_memo(&self) -> Option<OwnerMemo> {
+    pub fn get_owner_memo(&self) -> Option<AxfrOwnerMemo> {
         self.owner_memo.clone()
     }
 
@@ -159,11 +160,7 @@ impl OpenAnonBlindAssetRecordBuilder {
     /// If built via constructor + builder methods, it samples commitment blinding and key randomization factor and
     /// creates associated owner memo.
     /// If built via `Self::from_abar(...)`, return Err(ZeiError::InconsistentStructureError)
-    pub fn finalize<R: CryptoRng + RngCore>(
-        mut self,
-        prng: &mut R,
-        enc_key: &XPublicKey,
-    ) -> Result<Self> {
+    pub fn finalize<R: CryptoRng + RngCore>(mut self, prng: &mut R) -> Result<Self> {
         if self.oabar.owner_memo.is_some() {
             return Err(eg!(ZeiError::InconsistentStructureError));
         }
@@ -173,12 +170,8 @@ impl OpenAnonBlindAssetRecordBuilder {
         msg.extend_from_slice(&self.oabar.amount.to_le_bytes());
         msg.extend_from_slice(&self.oabar.asset_type.0);
         msg.extend_from_slice(&self.oabar.blind.to_bytes());
-        let cipher = hybrid_encrypt_x25519(prng, enc_key, &msg);
-        let memo = OwnerMemo {
-            blind_share: Default::default(),
-            lock: cipher,
-        };
-        self.oabar.owner_memo = Some(memo);
+
+        self.oabar.owner_memo = Some(AxfrOwnerMemo::new(prng, &self.oabar.pub_key.0, &msg)?);
         Ok(self)
     }
 
@@ -244,15 +237,15 @@ const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash, Ord, PartialOrd, Copy,
 )]
-pub struct AXfrPubKey(pub(crate) PublicKey<JubjubPoint>);
+pub struct AXfrPubKey(pub(crate) PublicKey);
 
 /// Keypair associated with an Anonymous records. It is used to spending it.
 #[wasm_bindgen]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
-pub struct AXfrKeyPair(pub(crate) KeyPair<JubjubPoint, JubjubScalar>);
+pub struct AXfrKeyPair(pub(crate) KeyPair);
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
-pub struct AXfrSignature(pub(crate) Signature<JubjubPoint, JubjubScalar>);
+pub struct AXfrSignature(pub(crate) Signature);
 
 impl AXfrKeyPair {
     /// Generate a new signature key pair
@@ -262,14 +255,12 @@ impl AXfrKeyPair {
 
     /// Return public key
     pub fn pub_key(&self) -> AXfrPubKey {
-        AXfrPubKey(self.0.pub_key)
+        AXfrPubKey(self.0.pub_key.clone())
     }
 
     /// Return the key pair
     pub fn from_secret_scalar(secret: JubjubScalar) -> Self {
-        AXfrKeyPair(KeyPair::<JubjubPoint, JubjubScalar>::from_secret_scalar(
-            secret,
-        ))
+        AXfrKeyPair(KeyPair::from_secret_scalar(secret))
     }
 
     /// Return secret key scalar value
@@ -291,8 +282,7 @@ impl ZeiFromToBytes for AXfrKeyPair {
         if bytes.len() != (AXFR_SECRET_KEY_LENGTH + AXFR_PUBLIC_KEY_LENGTH) {
             Err(eg!(ZeiError::DeserializationError))
         } else {
-            let keypair: KeyPair<JubjubPoint, JubjubScalar> =
-                KeyPair::zei_from_bytes(bytes).c(d!(""))?;
+            let keypair: KeyPair = KeyPair::zei_from_bytes(bytes).c(d!(""))?;
 
             Ok(AXfrKeyPair(keypair))
         }
@@ -326,39 +316,6 @@ impl ZeiFromToBytes for AXfrPubKey {
                 0: PublicKey::from_point(point),
             })
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::anon_xfr::structs::{AXfrKeyPair, AXfrPubKey};
-    use rand_chacha::ChaChaRng;
-    use zei_algebra::prelude::*;
-
-    #[test]
-    fn test_axfr_pub_key_serialization() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
-
-        let pub_key: AXfrPubKey = keypair.pub_key();
-
-        let bytes = pub_key.zei_to_bytes();
-        assert_ne!(bytes.len(), 0);
-
-        let reformed_pub_key = AXfrPubKey::zei_from_bytes(bytes.as_slice()).unwrap();
-        assert_eq!(pub_key, reformed_pub_key);
-    }
-
-    #[test]
-    fn test_axfr_key_pair_serialization() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
-
-        let bytes: Vec<u8> = keypair.zei_to_bytes();
-        assert_ne!(bytes.len(), 0);
-
-        let reformed_key_pair = AXfrKeyPair::zei_from_bytes(bytes.as_slice()).unwrap();
-        assert_eq!(keypair, reformed_key_pair);
     }
 }
 
@@ -420,4 +377,77 @@ pub struct PayeeWitness {
     pub blind: BlindFactor,
     pub asset_type: BLSScalar,
     pub pubkey_x: BLSScalar,
+}
+
+/// Information directed to secret key holder of a BlindAssetRecord
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AxfrOwnerMemo {
+    pub share: JubjubPoint,
+    pub ctext: Vec<u8>,
+}
+
+impl AxfrOwnerMemo {
+    fn new<R: CryptoRng + RngCore>(prng: &mut R, pub_key: &PublicKey, msg: &[u8]) -> Result<Self> {
+        let share_scalar = JubjubScalar::random(prng);
+        let share = JubjubPoint::get_base().mul(&share_scalar);
+
+        let dh = pub_key.0.mul(&share_scalar);
+
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(dh.as_bytes());
+        let hash = hasher.finalize();
+
+        let nonce = GenericArray::from_slice(&[0u8; 16]);
+
+        let gcm = aes_gcm::Aes256Gcm::new_from_slice(hash.as_slice()).c(d!())?;
+        let ctext = gcm.encrypt(nonce, msg).c(d!())?;
+
+        Ok(Self { share, ctext })
+    }
+
+    fn decrypt(&self, view_key: &ViewKey) -> Result<Vec<u8>> {
+        let dh = self.share.mul(&view_key.0);
+
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(dh.as_bytes());
+        let hash = hasher.finalize();
+
+        let nonce = GenericArray::from_slice(&[0u8; 16]);
+
+        let gcm = aes_gcm::Aes256Gcm::new_from_slice(hash.as_slice()).c(d!())?;
+        gcm.decrypt(nonce, &self.ctext).c(d!())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::anon_xfr::structs::{AXfrKeyPair, AXfrPubKey};
+    use rand_chacha::ChaChaRng;
+    use zei_algebra::prelude::*;
+
+    #[test]
+    fn test_axfr_pub_key_serialization() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+
+        let pub_key: AXfrPubKey = keypair.pub_key();
+
+        let bytes = pub_key.zei_to_bytes();
+        assert_ne!(bytes.len(), 0);
+
+        let reformed_pub_key = AXfrPubKey::zei_from_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(pub_key, reformed_pub_key);
+    }
+
+    #[test]
+    fn test_axfr_key_pair_serialization() {
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+
+        let bytes: Vec<u8> = keypair.zei_to_bytes();
+        assert_ne!(bytes.len(), 0);
+
+        let reformed_key_pair = AXfrKeyPair::zei_from_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(keypair, reformed_key_pair);
+    }
 }

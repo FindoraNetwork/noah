@@ -28,6 +28,8 @@ pub mod abar_to_bar;
 pub mod ar_to_abar;
 /// Module for converting confidential assets to anonymous assets.
 pub mod bar_to_abar;
+/// Module for the spending key, the viewing key, and the public key.
+pub mod keys;
 /// Module for shared structures.
 pub mod structs;
 

@@ -1,3 +1,4 @@
+use crate::anon_xfr::structs::AxfrOwnerMemo;
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots,
     commit_in_cs_with_native_address, compute_merkle_root, compute_non_malleability_tag,
@@ -59,7 +60,7 @@ pub struct AXfrBody {
     /// The amount of fee.
     pub fee: u32,
     /// The owner memos.
-    pub owner_memos: Vec<OwnerMemo>,
+    pub owner_memos: Vec<AxfrOwnerMemo>,
 }
 
 /// Build an anonymous transfer note.
@@ -165,7 +166,7 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
     })
 }
 
-/// Verifies an anonymous transfer note.
+/// Verify an anonymous transfer note.
 pub fn verify_anon_xfr_note(
     params: &VerifierParams,
     note: &AXfrNote,

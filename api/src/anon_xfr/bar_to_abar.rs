@@ -1,3 +1,4 @@
+use crate::anon_xfr::structs::AxfrOwnerMemo;
 use crate::anon_xfr::{
     structs::{
         AXfrPubKey, AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
@@ -46,7 +47,7 @@ pub struct BarToAbarBody {
     pub input: BlindAssetRecord,
     pub output: AnonBlindAssetRecord,
     pub proof: (DelegatedChaumPedersenProof, AXfrPlonkPf),
-    pub memo: OwnerMemo,
+    pub memo: AxfrOwnerMemo,
 }
 
 /// Generate confidential-to-anonymous note.
