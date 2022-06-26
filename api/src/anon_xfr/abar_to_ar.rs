@@ -56,7 +56,6 @@ pub struct AbarToArBody {
 }
 
 /// Generate an anonymous-to-transparent note.
-#[allow(dead_code)]
 pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
@@ -132,7 +131,6 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
 }
 
 /// Verify the anonymous-to-transparent note.
-#[allow(dead_code)]
 pub fn verify_abar_to_ar_note(
     params: &VerifierParams,
     note: &AbarToArNote,
@@ -175,6 +173,7 @@ pub fn verify_abar_to_ar_note(
         &online_inputs,
         &note.proof,
     )
+    .c(d!(ZeiError::AXfrVerificationError))
 }
 
 fn prove_abar_to_ar<R: CryptoRng + RngCore>(

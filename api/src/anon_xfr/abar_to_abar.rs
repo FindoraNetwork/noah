@@ -340,7 +340,6 @@ impl AMultiXfrPubInputs {
         result
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_witness(witness: &AMultiXfrWitness) -> Self {
         let hash = RescueInstance::new();
         let base = JubjubPoint::get_base();
