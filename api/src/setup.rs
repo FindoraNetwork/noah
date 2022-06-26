@@ -16,7 +16,6 @@ use bulletproofs::BulletproofGens;
 use serde::Deserialize;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLSG1},
-    jubjub::JubjubScalar,
     prelude::*,
     ristretto::RistrettoScalar,
 };
@@ -74,7 +73,7 @@ pub struct NodeParamsSplitSpecial {
 
 pub const BULLET_PROOF_RANGE: usize = 32;
 pub const MAX_PARTY_NUMBER: usize = 128;
-pub const PRECOMPUTED_PARTY_NUMBER: usize = 6;
+pub const PRECOMPUTED_PARTY_NUMBER: usize = 5;
 pub const DEFAULT_BP_NUM_GENS: usize = 256;
 
 impl BulletproofParams {
@@ -190,7 +189,6 @@ impl ProverParams {
 
     pub fn abar_to_bar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
-        let jubjub_zero = JubjubScalar::zero();
 
         let proof = DelegatedChaumPedersenProof::default();
         let non_zk_state = DelegatedChaumPedersenInspection::default();
@@ -207,7 +205,7 @@ impl ProverParams {
             is_right_child: 0,
         };
         let payer_secret = PayerWitness {
-            sec_key: jubjub_zero,
+            spend_key: bls_zero,
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -272,7 +270,7 @@ impl ProverParams {
 
     pub fn abar_to_ar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
-        let jubjub_zero = JubjubScalar::zero();
+
         let hash = bls_zero;
         let non_malleability_randomizer = bls_zero;
         let non_malleability_tag = bls_zero;
@@ -284,7 +282,7 @@ impl ProverParams {
             is_right_child: 0,
         };
         let payer_secret = PayerWitness {
-            sec_key: jubjub_zero,
+            spend_key: bls_zero,
             uid: 0,
             amount: 0,
             asset_type: bls_zero,

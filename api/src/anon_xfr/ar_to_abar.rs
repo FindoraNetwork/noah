@@ -1,7 +1,8 @@
 use crate::anon_xfr::{
     commit_in_cs_with_native_address,
+    keys::AXfrPubKey,
     structs::{
-        AXfrPubKey, AnonBlindAssetRecord, Commitment, OpenAnonBlindAssetRecord,
+        AnonBlindAssetRecord, AxfrOwnerMemo, Commitment, OpenAnonBlindAssetRecord,
         OpenAnonBlindAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
     },
     AXfrPlonkPf, TurboPlonkCS,
@@ -9,11 +10,10 @@ use crate::anon_xfr::{
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
     sig::{XfrKeyPair, XfrSignature},
-    structs::{AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo},
+    structs::{AssetType, BlindAssetRecord, OpenAssetRecord},
 };
 use merlin::Transcript;
 use zei_algebra::{bls12_381::BLSScalar, errors::ZeiError, prelude::*};
-use zei_crypto::basic::hybrid_encryption::XPublicKey;
 use zei_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };
@@ -38,8 +38,8 @@ pub struct ArToAbarBody {
     pub output: AnonBlindAssetRecord,
     /// The proof that the output matches the input.
     pub proof: AXfrPlonkPf,
-    /// The owner memo for the recipient to use the anonymous asset commitment.
-    pub memo: OwnerMemo,
+    /// memo to hold the blinding factor of commitment
+    pub memo: AxfrOwnerMemo,
 }
 
 /// Generate a transparent-to-anonymous note.
@@ -49,9 +49,9 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     record: &OpenAssetRecord,
     bar_keypair: &XfrKeyPair,
     abar_pubkey: &AXfrPubKey,
-    enc_key: &XPublicKey,
 ) -> Result<ArToAbarNote> {
-    let body = gen_ar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
+    // generate body
+    let body = gen_ar_to_abar_body(prng, params, record, &abar_pubkey).c(d!())?;
 
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
@@ -80,9 +80,8 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     params: &ProverParams,
     record: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
-    enc_key: &XPublicKey,
 ) -> Result<ArToAbarBody> {
-    let (open_abar, proof) = ar_to_abar(prng, params, record, abar_pubkey, enc_key).c(d!())?;
+    let (open_abar, proof) = ar_to_abar(prng, params, record, abar_pubkey).c(d!())?;
     let body = ArToAbarBody {
         input: record.blind_asset_record.clone(),
         output: AnonBlindAssetRecord::from_oabar(&open_abar),
@@ -124,7 +123,6 @@ pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
     params: &ProverParams,
     obar: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
-    enc_key: &XPublicKey,
 ) -> Result<(OpenAnonBlindAssetRecord, AXfrPlonkPf)> {
     let oabar_amount = obar.amount;
 
@@ -132,8 +130,8 @@ pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
     let oabar = OpenAnonBlindAssetRecordBuilder::new()
         .amount(oabar_amount)
         .asset_type(obar.asset_type)
-        .pub_key(*abar_pubkey)
-        .finalize(prng, &enc_key)
+        .pub_key(abar_pubkey)
+        .finalize(prng)
         .c(d!())?
         .build()
         .c(d!())?;
@@ -142,7 +140,7 @@ pub(crate) fn ar_to_abar<R: CryptoRng + RngCore>(
         amount: oabar.get_amount(),
         blind: oabar.blind.clone(),
         asset_type: oabar.asset_type.as_scalar(),
-        pubkey_x: oabar.pub_key.0.point_ref().get_x(),
+        pubkey_x: oabar.pub_key.0.get_x(),
     };
 
     let mut transcript = Transcript::new(AR_TO_ABAR_TRANSCRIPT);
@@ -229,7 +227,7 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeWitness) -> (TurboPlonkCS, usize) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::anon_xfr::structs::AXfrKeyPair;
+    use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::xfr::asset_record::{
         build_blind_asset_record, open_blind_asset_record, AssetRecordType,
     };
@@ -237,7 +235,6 @@ mod test {
     use crate::xfr::structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo};
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_crypto::basic::hybrid_encryption::XSecretKey;
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     // helper function
@@ -261,8 +258,7 @@ mod test {
 
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
-        let dec_key = XSecretKey::new(&mut prng);
-        let enc_key = XPublicKey::from(&dec_key);
+
         // proving
         let params = ProverParams::ar_to_abar_params().unwrap();
 
@@ -281,8 +277,7 @@ mod test {
             &params,
             &obar,
             &bar_keypair,
-            &abar_keypair.pub_key(),
-            &enc_key,
+            &abar_keypair.get_pub_key(),
         )
         .unwrap();
 

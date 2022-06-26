@@ -1,22 +1,20 @@
+use crate::anon_xfr::structs::AxfrOwnerMemo;
 use crate::anon_xfr::{
-    structs::{
-        AXfrPubKey, AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder,
-    },
+    keys::AXfrPubKey,
+    structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
     AXfrPlonkPf, TurboPlonkCS,
 };
 use crate::setup::{ProverParams, VerifierParams};
+use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::{
     sig::{XfrKeyPair, XfrPublicKey, XfrSignature},
-    structs::{BlindAssetRecord, OpenAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
+    structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
 };
 use merlin::Transcript;
 use num_bigint::BigUint;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::{
-    basic::{
-        hybrid_encryption::XPublicKey, rescue::RescueInstance,
-        ristretto_pedersen_comm::RistrettoPedersenCommitment,
-    },
+    basic::{rescue::RescueInstance, ristretto_pedersen_comm::RistrettoPedersenCommitment},
     delegated_chaum_pedersen::{
         prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
         DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
@@ -32,89 +30,82 @@ use zei_plonk::plonk::{
 const BAR_TO_ABAR_TRANSCRIPT: &[u8] = b"BAR to ABAR proof";
 pub const TWO_POW_32: u64 = 1 << 32;
 
-#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
-pub struct ConvertBarAbarProof {
-    commitment_eq_proof: DelegatedChaumPedersenProof,
-    pc_rescue_commitments_eq_proof: AXfrPlonkPf,
-}
-
-#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
-pub struct BarToAbarBody {
-    pub input: BlindAssetRecord,
-    pub output: AnonBlindAssetRecord,
-    pub proof: ConvertBarAbarProof,
-    pub memo: OwnerMemo,
-}
-
+/// The confidential-to-anonymous note.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct BarToAbarNote {
     pub body: BarToAbarBody,
     pub signature: XfrSignature,
 }
 
-/// Generate Bar To Abar conversion note body
-/// Returns note Body and ABAR opening keys
-pub fn gen_bar_to_abar_body<R: CryptoRng + RngCore>(
-    prng: &mut R,
-    params: &ProverParams,
-    record: &OpenAssetRecord,
-    abar_pubkey: &AXfrPubKey,
-    enc_key: &XPublicKey,
-) -> Result<BarToAbarBody> {
-    let (open_abar, proof) = bar_to_abar(prng, params, record, abar_pubkey, enc_key).c(d!())?;
-    let body = BarToAbarBody {
-        input: record.blind_asset_record.clone(),
-        output: AnonBlindAssetRecord::from_oabar(&open_abar),
-        proof,
-        memo: open_abar.owner_memo.unwrap(),
-    };
-    Ok(body)
+/// The confidential-to-anonymous body.
+#[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
+pub struct BarToAbarBody {
+    pub input: BlindAssetRecord,
+    pub output: AnonBlindAssetRecord,
+    pub proof: (DelegatedChaumPedersenProof, AXfrPlonkPf),
+    pub memo: AxfrOwnerMemo,
 }
 
-/// Generate BlindAssetRecord To AnonymousBlindAssetRecord conversion note: body + spending input signature
-/// Returns conversion note
+/// Generate confidential-to-anonymous note.
 pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     record: &OpenAssetRecord,
     bar_keypair: &XfrKeyPair,
     abar_pubkey: &AXfrPubKey,
-    enc_key: &XPublicKey,
 ) -> Result<BarToAbarNote> {
-    let body = gen_bar_to_abar_body(prng, params, record, &abar_pubkey, enc_key).c(d!())?;
+    // Reject confidential-to-anonymous note that actually has transparent input.
+    // Should direct to ArToAbar.
+    if record.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
+        return Err(eg!(ZeiError::ParameterError));
+    }
+
+    let (open_abar, delegated_cp_proof, inspector_proof) =
+        prove_bar_to_abar(prng, params, record, abar_pubkey).c(d!())?;
+    let body = BarToAbarBody {
+        input: record.blind_asset_record.clone(),
+        output: AnonBlindAssetRecord::from_oabar(&open_abar),
+        proof: (delegated_cp_proof, inspector_proof),
+        memo: open_abar.owner_memo.unwrap(),
+    };
+
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
     let signature = bar_keypair.sign(&msg);
+
     let note = BarToAbarNote { body, signature };
     Ok(note)
 }
 
-/// Verifies BlindAssetRecord To AnonymousBlindAssetRecord conversion body
-/// Warning: This function doesn't check that input owner has signed the body
-pub fn verify_bar_to_abar_body(params: &VerifierParams, body: &BarToAbarBody) -> Result<()> {
-    verify_bar_to_abar(params, &body.input, &body.output, &body.proof).c(d!())
-}
-
-/// Verifies BlindAssetRecord To AnonymousBlindAssetRecord conversion note by verifying proof of conversion
-/// and signature by input owner key
+/// Verify a confidential-to-anonymous note.
 pub fn verify_bar_to_abar_note(
     params: &VerifierParams,
     note: &BarToAbarNote,
     bar_pub_key: &XfrPublicKey,
 ) -> Result<()> {
-    verify_bar_to_abar_body(params, &note.body).c(d!())?;
+    verify_bar_to_abar(
+        params,
+        &note.body.input,
+        &note.body.output,
+        &note.body.proof,
+    )
+    .c(d!())?;
+
     let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
     bar_pub_key.verify(&msg, &note.signature).c(d!())
 }
 
-pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
+pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     obar: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
-    enc_key: &XPublicKey,
-) -> Result<(OpenAnonBlindAssetRecord, ConvertBarAbarProof)> {
+) -> Result<(
+    OpenAnonBlindAssetRecord,
+    DelegatedChaumPedersenProof,
+    AXfrPlonkPf,
+)> {
     let oabar_amount = obar.amount;
 
     let pc_gens = RistrettoPedersenCommitment::default();
@@ -123,8 +114,8 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
     let oabar = OpenAnonBlindAssetRecordBuilder::new()
         .amount(oabar_amount)
         .asset_type(obar.asset_type)
-        .pub_key(*abar_pubkey)
-        .finalize(prng, &enc_key)
+        .pub_key(abar_pubkey)
+        .finalize(prng)
         .c(d!())?
         .build()
         .c(d!())?;
@@ -155,52 +146,51 @@ pub(crate) fn bar_to_abar<R: CryptoRng + RngCore>(
         ])[0];
         z_instance.rescue(&[
             cur,
-            abar_pubkey.0.point_ref().get_x(),
+            abar_pubkey.0.get_x(),
             BLSScalar::zero(),
             BLSScalar::zero(),
         ])[0]
     };
 
-    // 3. compute the non-ZK part of the proof
-    let (commitment_eq_proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
+    // 3. Compute the delegated Chaum-Pedersen proof.
+    let (delegated_cp_proof, inspection, beta, lambda) = prove_delegated_chaum_pedersen(
         prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
     )
     .c(d!())?;
 
-    // 4. prove abar correctness
-    let pc_rescue_commitments_eq_proof = prove_eq_committed_vals(
+    // 4. Compute the inspector's proof.
+    let inspector_proof = prove_inspection(
         prng,
         params,
         x_in_bls12_381,
         y_in_bls12_381,
         oabar.blind,
-        abar_pubkey.0.point_ref().get_x(),
-        &commitment_eq_proof,
-        &non_zk_state,
+        abar_pubkey.0.get_x(),
+        &delegated_cp_proof,
+        &inspection,
         &beta,
         &lambda,
     )
     .c(d!())?;
 
-    Ok((
-        oabar,
-        ConvertBarAbarProof {
-            commitment_eq_proof,
-            pc_rescue_commitments_eq_proof,
-        },
-    ))
+    Ok((oabar, delegated_cp_proof, inspector_proof))
 }
 
 pub(crate) fn verify_bar_to_abar(
     params: &VerifierParams,
     bar: &BlindAssetRecord,
     abar: &AnonBlindAssetRecord,
-    proof: &ConvertBarAbarProof,
+    proof: &(DelegatedChaumPedersenProof, AXfrPlonkPf),
 ) -> Result<()> {
     let pc_gens = RistrettoPedersenCommitment::default();
 
-    // 1. get commitments
-    // 1.1 reconstruct total amount commitment from bar object
+    // Reject confidential-to-anonymous notes whose inputs are transparent.
+    if bar.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
+        return Err(eg!(ZeiError::AXfrVerificationError));
+    }
+
+    // 1. Get commitments.
+    // 1.1 Reconstruct the commitments for the amount.
     let (com_low, com_high) = match bar.amount {
         XfrAmount::Confidential((low, high)) => (
             low.decompress()
@@ -211,7 +201,7 @@ pub(crate) fn verify_bar_to_abar(
                 .c(d!())?,
         ),
         XfrAmount::NonConfidential(amount) => {
-            // fake commitment
+            // a trivial commitment
             let (l, h) = u64_to_u32_pair(amount);
             (
                 pc_gens.commit(RistrettoScalar::from(l), RistrettoScalar::zero()),
@@ -220,7 +210,7 @@ pub(crate) fn verify_bar_to_abar(
         }
     };
 
-    // 1.2 get asset type commitment
+    // 1.2 Reconstruct the commitments for the asset types.
     let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
     let com_asset_type = match bar.asset_type {
         XfrAssetType::Confidential(a) => a
@@ -228,51 +218,35 @@ pub(crate) fn verify_bar_to_abar(
             .ok_or(ZeiError::DecompressElementError)
             .c(d!())?,
         XfrAssetType::NonConfidential(a) => {
-            // fake commitment
+            // a trivial commitment
             pc_gens.commit(a.as_scalar(), RistrettoScalar::zero())
         }
     };
 
-    // 2. verify equality of committed values
+    // 2. Verify the delegated Chaum-Pedersen proof.
     let (beta, lambda) = verify_delegated_chaum_pedersen(
         &pc_gens,
         &com_amount,
         &com_asset_type,
         &abar.commitment,
-        &proof.commitment_eq_proof,
+        &proof.0,
     )
     .c(d!())?;
 
-    // 3. verify PLONK proof
-    verify_eq_committed_vals(
-        params,
-        abar.commitment,
-        &proof.commitment_eq_proof,
-        &proof.pc_rescue_commitments_eq_proof,
-        &beta,
-        &lambda,
-    )
-    .c(d!())
+    // 3. Verify the inspector's proof.
+    verify_inspection(params, abar.commitment, &proof.0, &proof.1, &beta, &lambda).c(d!())
 }
 
-/// Generate the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
-/// * `rng` - pseudo-random generator.
-/// * `params` - System params
-/// * `amount` - transaction amount
-/// * `asset_type` - asset type
-/// * `blind_pc` - blinding factor for the Pedersen commitment
-/// * `blind_hash` - blinding factor for the Rescue commitment
-/// * `pc_gens` - the Pedersen commitment instance
-/// * Return the plonk proof if the witness is valid, return an error otherwise.
-pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
+/// Generate the inspector's proof.
+pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     amount: BLSScalar,
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
     pubkey_x: BLSScalar,
-    proof: &DelegatedChaumPedersenProof,
-    non_zk_state: &DelegatedChaumPedersenInspection,
+    delegated_cp_proof: &DelegatedChaumPedersenProof,
+    inspection: &DelegatedChaumPedersenInspection,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> Result<AXfrPlonkPf> {
@@ -282,8 +256,8 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
         asset_type,
         blind_hash,
         pubkey_x,
-        proof,
-        non_zk_state,
+        delegated_cp_proof,
+        inspection,
         beta,
         lambda,
     );
@@ -301,13 +275,8 @@ pub(crate) fn prove_eq_committed_vals<R: CryptoRng + RngCore>(
     .c(d!(ZeiError::AXfrProofError))
 }
 
-/// I verify the plonk proof for equality of values in a Pedersen commitment and a Rescue commitment.
-/// * `params` - System parameters including KZG params and the constraint system
-/// * `hash_comm` - the Rescue commitment
-/// * `ped_comm` - the Pedersen commitment
-/// * `proof` - the proof
-/// * Returns Ok() if the verification succeeds, returns an error otherwise.
-pub(crate) fn verify_eq_committed_vals(
+/// Verify the inspector's proof.
+pub(crate) fn verify_inspection(
     params: &VerifierParams,
     hash_comm: BLSScalar,
     proof_zk_part: &DelegatedChaumPedersenProof,
@@ -345,8 +314,7 @@ pub(crate) fn verify_eq_committed_vals(
     .c(d!(ZeiError::ZKProofVerificationError))
 }
 
-/// Returns the constraint system (and associated number of constraints) for equality of values
-/// in a Pedersen commitment and a Rescue commitment.
+/// Construct the confidential-to-anonymous constraint system.
 pub(crate) fn build_bar_to_abar_cs(
     amount: BLSScalar,
     asset_type: BLSScalar,
@@ -368,13 +336,13 @@ pub(crate) fn build_bar_to_abar_cs(
     let step_4 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 4));
     let step_5 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 5));
 
-    // 1. Input Ristretto commitment data
+    // 1. Input commitment witnesses.
     let amount_var = cs.new_variable(amount);
     let at_var = cs.new_variable(asset_type);
     let blind_hash_var = cs.new_variable(blind_hash);
     let pubkey_x_var = cs.new_variable(pubkey_x);
 
-    // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2
+    // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2.
     let x_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.x.to_bytes()));
     let y_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.y.to_bytes()));
     let a_sim_fr = SimFr::from(&BigUint::from_bytes_le(&non_zk_state.a.to_bytes()));
@@ -403,7 +371,7 @@ pub(crate) fn build_bar_to_abar_cs(
     let beta_lambda_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_lambda_sim_fr);
     let s1_plus_lambda_s2_sim_fr_var = SimFrVar::alloc_input(&mut cs, &s1_plus_lambda_s2_sim_fr);
 
-    // 3. Merge the limbs for x, y, a, b
+    // 3. Merge the limbs for x, y, a, b.
     let mut all_limbs = Vec::with_capacity(4 * NUM_OF_LIMBS);
     all_limbs.extend_from_slice(&x_sim_fr.limbs);
     all_limbs.extend_from_slice(&y_sim_fr.limbs);
@@ -454,7 +422,7 @@ pub(crate) fn build_bar_to_abar_cs(
         compressed_limbs_var.push(sum_var);
     }
 
-    // 4. Open the non-ZK verifier state
+    // 4. Open the inspector's state commitment.
     {
         let h1_var = cs.rescue_hash(&StateVar::new([
             compressed_limbs_var[0],
@@ -472,7 +440,7 @@ pub(crate) fn build_bar_to_abar_cs(
         cs.equal(h2_var, comm_var);
     }
 
-    // 5. Perform the check in field simulation
+    // 5. Perform the check in field simulation.
     {
         let beta_x_sim_fr_mul_var = beta_sim_fr_var.mul(&mut cs, &x_sim_fr_var);
         let beta_lambda_y_sim_fr_mul_var = beta_lambda_sim_fr_var.mul(&mut cs, &y_sim_fr_var);
@@ -488,7 +456,7 @@ pub(crate) fn build_bar_to_abar_cs(
         eqn.enforce_zero(&mut cs);
     }
 
-    // 6. Check x = amount_var and y = at_var
+    // 6. Check x = amount_var and y = at_var.
     {
         let mut x_in_bls12_381 = cs.linear_combine(
             &[
@@ -555,7 +523,7 @@ pub(crate) fn build_bar_to_abar_cs(
         cs.rescue_hash(&StateVar::new([cur, pubkey_x_var, zero_var, zero_var]))[0]
     };
 
-    // prepare public inputs
+    // prepare public inputs.
     cs.prepare_pi_variable(rescue_comm_var);
     cs.prepare_pi_variable(comm_var);
 
@@ -572,7 +540,7 @@ pub(crate) fn build_bar_to_abar_cs(
         cs.prepare_pi_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
     }
 
-    // pad the number of constraints to power of two
+    // pad the number of constraints to power of two.
     cs.pad();
 
     let n_constraints = cs.size;
@@ -581,7 +549,7 @@ pub(crate) fn build_bar_to_abar_cs(
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::structs::AXfrKeyPair;
+    use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
         bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
         structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
@@ -600,13 +568,11 @@ mod test {
     use zei_algebra::bls12_381::BLSScalar;
     use zei_algebra::ristretto::RistrettoScalar;
     use zei_algebra::traits::Scalar;
-    use zei_crypto::basic::hybrid_encryption::{XPublicKey, XSecretKey};
     use zei_crypto::basic::rescue::RescueInstance;
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
     use zei_crypto::delegated_chaum_pedersen::prove_delegated_chaum_pedersen;
     use zei_crypto::field_simulation::{SimFr, NUM_OF_LIMBS};
 
-    // helper function
     fn build_bar(
         pubkey: &XfrPublicKey,
         prng: &mut ChaChaRng,
@@ -626,11 +592,9 @@ mod test {
         let pc_gens = RistrettoPedersenCommitment::default();
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
-        let dec_key = XSecretKey::new(&mut prng);
-        let enc_key = XPublicKey::from(&dec_key);
-        // proving
+
         let params = ProverParams::bar_to_abar_params().unwrap();
-        // confidential case
+
         let (bar_conf, memo) = build_bar(
             &bar_keypair.pub_key,
             &mut prng,
@@ -640,37 +604,17 @@ mod test {
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         );
         let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
-        let (oabar_conf, proof_conf) =
-            super::bar_to_abar(&mut prng, &params, &obar, &abar_keypair.pub_key(), &enc_key)
+        let (oabar_conf, delegated_cp_proof_conf, inspector_proof_conf) =
+            super::prove_bar_to_abar(&mut prng, &params, &obar, &abar_keypair.get_pub_key())
                 .unwrap();
         let abar_conf = AnonBlindAssetRecord::from_oabar(&oabar_conf);
-        // non confidential case
-        let (bar_non_conf, memo) = build_bar(
-            &bar_keypair.pub_key,
-            &mut prng,
-            &pc_gens,
-            10u64,
-            AssetType::from_identical_byte(1u8),
-            AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-        );
-        let obar = open_blind_asset_record(&bar_non_conf, &memo, &bar_keypair).unwrap();
-        let (oabar_non_conf, proof_non_conf) =
-            super::bar_to_abar(&mut prng, &params, &obar, &abar_keypair.pub_key(), &enc_key)
-                .unwrap();
-        let abar_non_conf = AnonBlindAssetRecord::from_oabar(&oabar_non_conf);
 
-        // verifications
-        let node_params = VerifierParams::bar_to_abar_params().unwrap();
-        // confidential case
-        assert!(
-            super::verify_bar_to_abar(&node_params, &bar_conf, &abar_conf, &proof_conf).is_ok()
-        );
-        // non confidential case
+        let verifier_params = VerifierParams::from(params);
         assert!(super::verify_bar_to_abar(
-            &node_params,
-            &bar_non_conf,
-            &abar_non_conf,
-            &proof_non_conf,
+            &verifier_params,
+            &bar_conf,
+            &abar_conf,
+            &(delegated_cp_proof_conf, inspector_proof_conf)
         )
         .is_ok());
     }
@@ -680,8 +624,6 @@ mod test {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
-        let dec_key = XSecretKey::new(&mut prng);
-        let enc_key = XPublicKey::from(&dec_key);
         let pc_gens = RistrettoPedersenCommitment::default();
         let amount = 10;
         let asset_type = AssetType::from_identical_byte(1u8);
@@ -700,8 +642,7 @@ mod test {
             &params,
             &obar,
             &bar_keypair,
-            &abar_keypair.pub_key(),
-            &enc_key,
+            &abar_keypair.get_pub_key(),
         )
         .unwrap();
 
@@ -710,7 +651,6 @@ mod test {
             &note.body.output,
             note.body.memo.clone(),
             &abar_keypair,
-            &dec_key,
         )
         .unwrap()
         .build()

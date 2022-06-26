@@ -1,11 +1,9 @@
 use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
+use crate::anon_xfr::keys::{get_view_key_domain_separator, AXfrKeyPair};
 use crate::anon_xfr::{
-    add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
-    compute_non_malleability_tag, nullify_in_cs_with_native_address, nullify_with_native_address,
-    structs::{
-        AXfrKeyPair, AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord,
-        PayerWitness, PayerWitnessVars,
-    },
+    commit_in_cs_with_native_address, compute_merkle_root, compute_non_malleability_tag,
+    nullify_in_cs_with_native_address, nullify_with_native_address,
+    structs::{AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord, PayerWitness},
     AXfrPlonkPf, TurboPlonkCS, SK_LEN,
 };
 use crate::setup::{ProverParams, VerifierParams};
@@ -63,7 +61,7 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     abar_keypair: &AXfrKeyPair,
     ar_pub_key: &XfrPublicKey,
 ) -> Result<AbarToArNote> {
-    if oabar.mt_leaf_info.is_none() || abar_keypair.pub_key() != oabar.pub_key {
+    if oabar.mt_leaf_info.is_none() || abar_keypair.get_pub_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
     }
 
@@ -88,7 +86,7 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     );
 
     let payers_secret = PayerWitness {
-        sec_key: abar_keypair.get_secret_scalar(),
+        spend_key: abar_keypair.get_spend_key_scalar(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
         asset_type: oabar.asset_type.as_scalar(),
@@ -208,13 +206,13 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
 
 /// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
-    payers_secret: PayerWitness,
+    payers_witness: PayerWitness,
     hash: &BLSScalar,
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
-    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_secret]);
+    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
 
     let base = JubjubPoint::get_base();
@@ -224,8 +222,18 @@ pub fn build_abar_to_ar_cs(
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
-    // prove knowledge of payer's secret key: pk = base^{sk}
-    let pk_var = cs.scalar_mul(base, payers_witness_vars.sec_key, SK_LEN);
+    let view_key_domain_separator = get_view_key_domain_separator();
+    let view_key_domain_separator_var = cs.new_variable(view_key_domain_separator);
+    cs.insert_constant_gate(view_key_domain_separator_var, view_key_domain_separator);
+
+    // prove knowledge of payer's secret key: pk = base^{sk}.
+    let view_key = cs.rescue_hash(&StateVar::new([
+        view_key_domain_separator_var,
+        payers_witness_vars.spend_key,
+        zero_var,
+        zero_var,
+    ]))[0];
+    let pk_var = cs.scalar_mul(base, view_key, SK_LEN);
     let pk_x = pk_var.get_x();
 
     // commitments
@@ -258,7 +266,7 @@ pub fn build_abar_to_ar_cs(
     };
     let nullifier_var = nullify_in_cs_with_native_address(
         &mut cs,
-        payers_witness_vars.sec_key,
+        payers_witness_vars.spend_key,
         nullifier_input_vars,
     );
 
@@ -286,7 +294,7 @@ pub fn build_abar_to_ar_cs(
             one_var,
             hash_var,
             non_malleability_randomizer_var,
-            payers_witness_vars.sec_key,
+            payers_witness_vars.spend_key,
         ]))[0];
 
         cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
@@ -311,11 +319,11 @@ pub fn build_abar_to_ar_cs(
 
 #[cfg(test)]
 mod tests {
+    use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
         abar_to_ar::{gen_abar_to_ar_note, verify_abar_to_ar_note},
         structs::{
-            AXfrKeyPair, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath,
-            OpenAnonBlindAssetRecordBuilder,
+            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
         },
         TREE_DEPTH,
     };
@@ -331,10 +339,7 @@ mod tests {
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basic::{
-        hybrid_encryption::{XPublicKey, XSecretKey},
-        rescue::RescueInstance,
-    };
+    use zei_crypto::basic::rescue::RescueInstance;
 
     #[test]
     fn test_abar_to_ar_conversion() {
@@ -343,7 +348,6 @@ mod tests {
 
         let recv = XfrKeyPair::generate(&mut prng);
         let sender = AXfrKeyPair::generate(&mut prng);
-        let sender_dec_key = XSecretKey::new(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(
@@ -356,10 +360,10 @@ mod tests {
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         let mut oabar = OpenAnonBlindAssetRecordBuilder::new()
-            .pub_key(sender.pub_key())
+            .pub_key(&sender.get_pub_key())
             .amount(1234u64)
             .asset_type(AssetType::from_identical_byte(0u8))
-            .finalize(&mut prng, &XPublicKey::from(&sender_dec_key))
+            .finalize(&mut prng)
             .unwrap()
             .build()
             .unwrap();
