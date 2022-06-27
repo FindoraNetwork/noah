@@ -33,9 +33,11 @@ pub struct AXfrSpendKey(pub BLSScalar);
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct AXfrViewKey(pub JubjubScalar);
 
-#[wasm_bindgen]
 /// The public key.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
+#[wasm_bindgen]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default, Hash,
+)]
 pub struct AXfrPubKey(pub(crate) JubjubPoint);
 
 impl ZeiFromToBytes for AXfrPubKey {

@@ -38,7 +38,7 @@ pub struct MTNode {
 
 /// Asset record to be put as leaves on the tree.
 #[wasm_bindgen]
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnonAssetRecord {
     /// The commitment.
     pub commitment: BLSScalar,
