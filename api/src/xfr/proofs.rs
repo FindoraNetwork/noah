@@ -1,5 +1,5 @@
 use crate::anon_creds::{ac_confidential_verify, ACCommitment, ACConfidentialRevealProof};
-use crate::setup::{BulletproofParams, BULLET_PROOF_RANGE, MAX_PARTY_NUMBER};
+use crate::setup::{BulletproofParams, BULLET_PROOF_RANGE, MAX_CONFIDENTIAL_RECORD_NUMBER};
 use crate::xfr::{
     asset_record::AssetRecordType,
     asset_tracer::RecordDataEncKey,
@@ -17,24 +17,24 @@ use zei_algebra::{
     ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar},
     utils::{min_greater_equal_power_of_two, u64_to_u32_pair},
 };
-use zei_crypto::basic::chaum_pedersen::{
-    chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq, ChaumPedersenProofX,
-};
-use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::{
     basic::{
+        chaum_pedersen::{
+            chaum_pedersen_batch_verify_multiple_eq, chaum_pedersen_prove_multiple_eq,
+            ChaumPedersenProofX,
+        },
         elgamal::ElGamalCiphertext,
         pedersen_elgamal::{
             pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_verify,
             PedersenElGamalEqProof, PedersenElGamalProofInstance,
         },
+        ristretto_pedersen_comm::RistrettoPedersenCommitment,
     },
     bulletproofs::range::{batch_verify_ranges, prove_ranges},
 };
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
-#[allow(clippy::or_fun_call)]
 pub(crate) fn asset_amount_tracing_proofs<R: CryptoRng + RngCore>(
     prng: &mut R,
     inputs: &[AssetRecord],
@@ -43,11 +43,11 @@ pub(crate) fn asset_amount_tracing_proofs<R: CryptoRng + RngCore>(
     let mut pks_map: LinearMap<RecordDataEncKey, Vec<(&AssetRecord, &TracerMemo)>> =
         LinearMap::new(); // use linear map because of determinism  (rather than HashMap)
 
-    // 1. group records by policies with same asset_tracer public keys
-    // discard when there is no policy or policy asset tracing flag is off
+    // 1. Group records by policies with same asset_tracer public keys
+    // discard when there is no policy or policy asset tracing flag is off.
     collect_records_and_memos_by_keys(&mut pks_map, inputs, outputs);
 
-    // 2. do asset tracing for each tracer_key
+    // 2. Do asset tracing for each tracer_key.
     let mut proofs = vec![];
     for (tracer_pub_key, records_memos) in pks_map.iter() {
         let mut transcript = Transcript::new(b"AssetTracingProofs");
@@ -150,15 +150,16 @@ fn collect_records_and_memos_by_keys<'a>(
     }
 }
 
-type BarMemosPoliciesCollectionIterator<'a> = std::iter::Zip<
-    std::iter::Zip<
-        std::slice::Iter<'a, &'a TracingPolicies>,
-        std::slice::Iter<'a, BlindAssetRecord>,
+type BarMemosPoliciesCollectionIterator<'a> = core::iter::Zip<
+    core::iter::Zip<
+        core::slice::Iter<'a, &'a TracingPolicies>,
+        core::slice::Iter<'a, BlindAssetRecord>,
     >,
-    std::slice::Iter<'a, std::vec::Vec<TracerMemo>>,
+    core::slice::Iter<'a, Vec<TracerMemo>>,
 >;
 
 #[derive(Clone)]
+/// A collection of blind asset records, memos, and policies, for ease of programming.
 pub struct BarMemosPoliciesCollection<'a> {
     bars: &'a [BlindAssetRecord],
     memos: &'a [Vec<TracerMemo>],
@@ -166,6 +167,7 @@ pub struct BarMemosPoliciesCollection<'a> {
 }
 
 impl<'a> BarMemosPoliciesCollection<'a> {
+    /// Create a new collection.
     pub fn new(
         bars: &'a [BlindAssetRecord],
         memos: &'a [Vec<TracerMemo>],
@@ -178,10 +180,12 @@ impl<'a> BarMemosPoliciesCollection<'a> {
         }
     }
 
+    /// Obtain an iterator of this collection.
     pub fn range_over(&self) -> BarMemosPoliciesCollectionIterator<'a> {
         self.policies.iter().zip(self.bars.iter()).zip(self.memos)
     }
 
+    /// Check if the collection is well-constructed.
     pub fn check(&self) -> Result<()> {
         if self.policies.len() != self.bars.len() || self.bars.len() != self.memos.len() {
             Err(eg!(ZeiError::ParameterError))
@@ -198,7 +202,7 @@ fn collect_bars_and_memos_by_keys<'a>(
     bmp.check().c(d!())?;
 
     for ((tracing_policies_i, bar_i), memos_i) in bmp.range_over() {
-        // If the bar is non confidential skip memo and bar, since there is no tracing proof
+        // If the bar is non-confidential skip memo and bar, since there is no tracing proof.
         if bar_i.get_record_type()
             == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
         {
@@ -221,13 +225,13 @@ fn collect_bars_and_memos_by_keys<'a>(
 pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
     prng: &mut R,
     xfr_bodies: &[&XfrBody],
-    instances_policies: &[&XfrNotePoliciesRef],
+    instances_policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
     if xfr_bodies.len() != instances_policies.len() {
         return Err(eg!(ZeiError::ParameterError));
     }
 
-    // 1. batch asset_type and amount tracing
+    // 1. Batch asset_type and amount tracing.
     let input_reveal_policies: Result<Vec<&[&TracingPolicies]>> = instances_policies
         .iter()
         .map(|policies| {
@@ -256,7 +260,7 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
     )
     .c(d!(ZeiError::XfrVerifyAssetTracingAssetAmountError))?;
 
-    // Identity proofs can be batched(?)
+    // 2. Check the identity proof individually for now.
     for (xfr_body, policies) in xfr_bodies.iter().zip(instances_policies.iter()) {
         // 2. do identity tracing proof
         let inputs_len = xfr_body.inputs.len();
@@ -381,7 +385,7 @@ fn verify_identity_proofs(
     proofs: &[Vec<Option<ACConfidentialRevealProof>>],
     sig_commitments: &[Option<&ACCommitment>],
 ) -> Result<()> {
-    // 1. check for errors
+    // 1. Check structures.
     let n = reveal_policies.len();
 
     if memos.len() != proofs.len() || n != sig_commitments.len() {
@@ -397,7 +401,7 @@ fn verify_identity_proofs(
         return Err(eg!(ZeiError::XfrVerifyAssetTracingIdentityError));
     }
 
-    // 2. check proofs
+    // 2. Check proofs.
     for (policies, (memos, (proofs, sig_commitment))) in reveal_policies
         .iter()
         .zip(memos.iter().zip(proofs.iter().zip(sig_commitments.iter())))
@@ -443,7 +447,7 @@ fn extract_ciphertext_and_commitments(
     for record_and_memo in records_and_memos {
         let record = record_and_memo.0;
         let asset_tracer_memo = record_and_memo.1;
-        // 1 amount
+
         if asset_tracer_memo.lock_amount.is_none() && record.amount.is_confidential() {
             return Err(eg!(ZeiError::InconsistentStructureError)); // There should be a lock for the amount
         }
@@ -466,7 +470,6 @@ fn extract_ciphertext_and_commitments(
             );
         }
 
-        // 2 asset type
         if asset_tracer_memo.lock_asset_type.is_none() && record.asset_type.is_confidential() {
             return Err(eg!(ZeiError::InconsistentStructureError)); // There should be a lock for the asset type
         }
@@ -485,24 +488,22 @@ fn extract_ciphertext_and_commitments(
     Ok((ctexts, coms))
 }
 
-/**** Range Proofs *****/
-
-/// I compute a range proof for confidential amount transfers.
-/// The proof guarantees that output amounts and difference between total input
-/// and total output are in the range [0,2^{64} - 1]
-pub(crate) fn range_proof(
+/// Compute a range proof for confidential amount non-confidential asset type transfers.
+/// The proof guarantees that output amounts and difference between total input,
+/// and total output are in the range [0,2^{64} - 1].
+pub(crate) fn gen_range_proof(
     inputs: &[&OpenAssetRecord],
     outputs: &[&OpenAssetRecord],
 ) -> Result<XfrRangeProof> {
     let num_output = outputs.len();
     let upper_power2 = min_greater_equal_power_of_two((2 * (num_output + 1)) as u32) as usize;
-    if upper_power2 > MAX_PARTY_NUMBER {
+    if upper_power2 > MAX_CONFIDENTIAL_RECORD_NUMBER {
         return Err(eg!(ZeiError::RangeProofProveError));
     }
 
     let params = BulletproofParams::default();
 
-    //build values vector (out amounts + amount difference)
+    // Build values vector (out amounts + amount difference).
     let in_total = inputs.iter().fold(0u64, |accum, x| accum + x.amount);
     let out_amounts: Vec<u64> = outputs.iter().map(|x| x.amount).collect();
     let out_total = out_amounts.iter().sum::<u64>();
@@ -511,7 +512,7 @@ pub(crate) fn range_proof(
     } else {
         return Err(eg!(ZeiError::RangeProofProveError));
     };
-    let mut values = Vec::with_capacity(out_amounts.len() + 1);
+    let mut values = Vec::with_capacity(upper_power2);
     for x in out_amounts {
         let (lower, higher) = u64_to_u32_pair(x);
         values.push(lower as u64);
@@ -522,7 +523,7 @@ pub(crate) fn range_proof(
     values.push(diff_high as u64);
     values.resize(upper_power2, 0u64);
 
-    //build blinding vectors (out blindings + blindings difference)
+    // Build blinding vectors (out blindings + blindings difference).
     let (total_blind_input_low, total_blind_input_high) = add_blindings(inputs);
     let (total_blind_output_low, total_blind_output_high) = add_blindings(outputs);
 
@@ -558,6 +559,7 @@ pub(crate) fn range_proof(
         xfr_diff_commitment_high: diff_com_high,
     })
 }
+
 fn add_blindings(oar: &[&OpenAssetRecord]) -> (RistrettoScalar, RistrettoScalar) {
     oar.iter().fold(
         (RistrettoScalar::zero(), RistrettoScalar::zero()),
@@ -603,7 +605,8 @@ fn extract_value_commitments(
     let pow2_32 = RistrettoScalar::from(POW_2_32);
 
     let mut commitments = Vec::with_capacity(upper_power2);
-    // 1. verify proof commitment to transfer's input - output amounts match proof commitments
+
+    // 1. Verify proof commitment to transfer's input - output amounts match proof commitments.
     let mut total_input_com_low = RistrettoPoint::get_identity();
     let mut total_input_com_high = RistrettoPoint::get_identity();
     for input in inputs.iter() {
@@ -648,10 +651,9 @@ fn extract_value_commitments(
 
         commitments.push(com_low.compress());
         commitments.push(com_high.compress());
-        //output_com.push(com_low + com_high * RistrettoScalar::from(0xFFFFFFFF as u64 + 1));
     }
 
-    // 3. derive input - output commitment, compare with proof struct low anc high commitments
+    // 2. Derive input - output commitment, compare with proof struct low and high commitments
     let derived_xfr_diff_com = total_input_com_low.sub(&total_output_com_low).add(
         &total_input_com_high
             .sub(&total_output_com_high)
@@ -671,20 +673,19 @@ fn extract_value_commitments(
         return Err(eg!(ZeiError::XfrVerifyConfidentialAmountError));
     }
 
-    // 4. Push diff commitments
+    // 3. Push diff commitments.
     commitments.push(proof.xfr_diff_commitment_low);
     commitments.push(proof.xfr_diff_commitment_high);
 
-    // 5. padd with commitments to 0
+    // 4. Pad with commitments to 0.
     for _ in commitments.len()..upper_power2 {
         commitments.push(CompressedRistretto::identity());
     }
 
     Ok(commitments)
 }
-/**** Asset Equality Proofs *****/
 
-/// I compute asset equality proof for confidential asset transfers
+/// Compute an asset proof for confidential asset transfers
 pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
     prng: &mut R,
     pc_gens: &RistrettoPedersenCommitment,
@@ -751,7 +752,6 @@ mod tests {
         structs::{AssetTracerKeyPair, TracerMemo, TracingPolicies, TracingPolicy},
     };
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use zei_algebra::prelude::*;
 
     #[test]

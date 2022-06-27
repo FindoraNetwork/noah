@@ -6,13 +6,18 @@ use zei_algebra::{
 };
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
+/// Module for asset mixing.
 pub mod asset_mixer;
+/// Module for asset records.
 pub mod asset_record;
+/// Module for asset tracing.
 pub mod asset_tracer;
+/// Module for zero-knowledge proofs.
 pub mod proofs;
+/// Module for signatures.
 pub mod sig;
+/// Module for shared structures.
 pub mod structs;
-pub mod test_utils;
 
 #[cfg(test)]
 pub(crate) mod tests;
@@ -26,7 +31,7 @@ use self::{
     },
     proofs::{
         asset_amount_tracing_proofs, asset_proof, batch_verify_confidential_amount,
-        batch_verify_confidential_asset, batch_verify_tracer_tracing_proof, range_proof,
+        batch_verify_confidential_asset, batch_verify_tracer_tracing_proof, gen_range_proof,
     },
     sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey},
     structs::*,
@@ -109,12 +114,7 @@ impl XfrType {
     }
 }
 
-/// Create a XfrNote from list of opened asset records inputs and asset record outputs
-/// * `prng` - pseudo-random number generator
-/// * `inputs` - asset records containing amounts, assets, policies and memos
-/// * `outputs` - asset records containing amounts, assets, policies and memos
-/// * `input_keys`- keys needed to sign the inputs
-/// * `returns` an error or an XfrNote
+/// Generate a confidential transfer note.
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
@@ -174,7 +174,6 @@ impl XfrType {
 /// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
 /// pnk!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()));
 /// ```
-
 pub fn gen_xfr_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     inputs: &[AssetRecord],
@@ -193,11 +192,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
     Ok(XfrNote { body, multisig })
 }
 
-/// Create the body of a XfrNote. This body will be signed.
-/// * `prng` - pseudo-random number generator
-/// * `inputs` - asset records containing amounts, assets, policies and memos
-/// * `outputs` - asset records containing amounts, assets, policies and memos
-/// * `returns` - an XfrBody struct or an error
+/// Generate the confidential transfer body.
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
@@ -391,7 +386,7 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
     match xfr_type {
         XfrType::NonConfidential_SingleAsset => Ok(AssetTypeAndAmountProof::NoProof),
         XfrType::ConfidentialAmount_NonConfidentialAssetType_SingleAsset => Ok(
-            AssetTypeAndAmountProof::ConfAmount(range_proof(inputs, outputs).c(d!())?),
+            AssetTypeAndAmountProof::ConfAmount(gen_range_proof(inputs, outputs).c(d!())?),
         ),
         XfrType::NonConfidentialAmount_ConfidentialAssetType_SingleAsset => {
             Ok(AssetTypeAndAmountProof::ConfAsset(Box::new(
@@ -399,17 +394,14 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
             )))
         }
         XfrType::Confidential_SingleAsset => Ok(AssetTypeAndAmountProof::ConfAll(Box::new((
-            range_proof(inputs, outputs).c(d!())?,
+            gen_range_proof(inputs, outputs).c(d!())?,
             asset_proof(prng, &pc_gens, inputs, outputs).c(d!())?,
         )))),
         _ => Err(eg!(ZeiError::XfrCreationAssetAmountError)), // Type cannot be multi asset
     }
 }
 
-/// Check that for each asset type total input amount >= total output amount,
-/// returns Err(ZeiError::XfrCreationAssetAmountError) otherwise.
-/// Return Ok(true) if all inputs and outputs involve a single asset type. If multiple assets
-/// are detected, then return Ok(false)
+/// Check that for each asset type total input amount == total output amount.
 fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result<()> {
     let mut amounts = HashMap::new();
 
@@ -451,7 +443,7 @@ fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result
     Ok(())
 }
 
-/// I compute a multisignature over the transfer's body
+/// Compute a multisignature over the body.
 pub(crate) fn compute_transfer_multisig(
     body: &XfrBody,
     keys: &[&XfrKeyPair],
@@ -462,7 +454,7 @@ pub(crate) fn compute_transfer_multisig(
     Ok(XfrMultiSig::sign(&keys, &bytes))
 }
 
-/// I verify the transfer multisignature over the its body
+/// Verify the multisignature over the body.
 pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<()> {
     let mut bytes = vec![];
     xfr_note
@@ -478,32 +470,25 @@ pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<()> {
     xfr_note.multisig.verify(&pubkeys, &bytes)
 }
 
-/// XfrNote verification
-/// * `prng` - pseudo-random number generator
-/// * `xfr_note` - XfrNote struct to be verified
-/// * `policies` - list of set of policies and associated information corresponding to each xfr_note-
-/// * `returns` - () or an ZeiError in case of verification error
+/// Verify a confidential transfer note.
 pub fn verify_xfr_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     xfr_note: &XfrNote,
-    policies: &XfrNotePoliciesRef,
+    policies: &XfrNotePoliciesRef<'_>,
 ) -> Result<()> {
     batch_verify_xfr_notes(prng, params, &[&xfr_note], &[&policies]).c(d!())
 }
 
-/// XfrNote Batch verification
-/// * `prng` - pseudo-random number generator
-/// * `xfr_notes` - XfrNote structs to be verified
-/// * `policies` - list of set of policies and associated information corresponding to each xfr_note
-/// * `returns` - () or an ZeiError in case of verification error
+/// Batch-verify confidential transfer notes.
+/// Note: in practice, the batch verification should only be used if the notes are assumed to be true.
 pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     notes: &[&XfrNote],
-    policies: &[&XfrNotePoliciesRef],
+    policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
-    // 1. verify signature
+    // Verify each note's multisignature, one by one.
     for xfr_note in notes {
         verify_transfer_multisig(xfr_note).c(d!())?;
     }
@@ -555,17 +540,18 @@ pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
         }
     }
 
-    // 1. verify confidential amounts
+    // 1. Batch-verify confidential amounts.
     batch_verify_confidential_amount(prng, params, conf_amount_records.as_slice()).c(d!())?;
 
-    // 2. verify confidential asset_types
+    // 2. Batch-verify confidential asset_types.
     batch_verify_confidential_asset(prng, &conf_asset_type_records).c(d!())?;
 
-    // 3. verify confidential asset mix proofs
+    // 3. Batch-verify confidential asset mix proofs.
     batch_verify_asset_mix(prng, params, conf_asset_mix_bodies.as_slice()).c(d!())
 }
 
 #[derive(Clone, Default)]
+/// A reference of the policies.
 pub struct XfrNotePoliciesRef<'b> {
     pub(crate) valid: bool,
     pub(crate) inputs_tracing_policies: Vec<&'b TracingPolicies>,
@@ -575,6 +561,7 @@ pub struct XfrNotePoliciesRef<'b> {
 }
 
 impl<'b> XfrNotePoliciesRef<'b> {
+    /// Create a new reference of the policies.
     pub fn new(
         inputs_tracing_policies: Vec<&'b TracingPolicies>,
         inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
@@ -599,16 +586,23 @@ pub(crate) fn if_some_closure(x: &Option<ACCommitment>) -> Option<&ACCommitment>
     }
 }
 
+/// Tracing policies for an asset record.
 #[derive(Clone, Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct XfrNotePolicies {
-    pub valid: bool, // allows to implement Default, if false (as after Default), then use empty_policies to create a "valid" XfrNotePolicies struct with empty policies
+    /// Whether the structure is valid and has policies.
+    pub valid: bool, // default to false
+    /// The tracing policies
     pub inputs_tracing_policies: Vec<TracingPolicies>,
+    /// The attribute commitments for each input.
     pub inputs_sig_commitments: Vec<Option<ACCommitment>>,
+    /// The tracing policies for each output.
     pub outputs_tracing_policies: Vec<TracingPolicies>,
+    /// The attribute commitments for each output.
     pub outputs_sig_commitments: Vec<Option<ACCommitment>>,
 }
 
 impl XfrNotePolicies {
+    /// Create a structure of policies.
     pub fn new(
         inputs_tracing_policies: Vec<TracingPolicies>,
         inputs_sig_commitments: Vec<Option<ACCommitment>>,
@@ -623,6 +617,8 @@ impl XfrNotePolicies {
             outputs_sig_commitments,
         }
     }
+
+    /// Return empty policies for the given numbers of inputs and outputs.
     pub fn empty_policies(num_inputs: usize, num_outputs: usize) -> XfrNotePolicies {
         XfrNotePolicies {
             valid: true,
@@ -633,7 +629,8 @@ impl XfrNotePolicies {
         }
     }
 
-    pub fn to_ref(&self) -> XfrNotePoliciesRef {
+    /// Obtain a reference of the policies.
+    pub fn to_ref(&self) -> XfrNotePoliciesRef<'_> {
         if self.valid {
             XfrNotePoliciesRef::new(
                 self.inputs_tracing_policies.iter().collect_vec(),
@@ -653,35 +650,27 @@ impl XfrNotePolicies {
     }
 }
 
-/// XfrBody verification with tracing policies
-/// * `prng` - pseudo-random number generator. Needed for verifying proofs in batch.
-/// * `body` - XfrBody structure to be verified
-/// * `policies` - list of set of policies and associated information corresponding to each xfr_note
-/// * `returns` - () or an ZeiError in case of verification error
+/// Verify the confidential transfer body with policies.
 pub fn verify_xfr_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     body: &XfrBody,
-    policies: &XfrNotePoliciesRef,
+    policies: &XfrNotePoliciesRef<'_>,
 ) -> Result<()> {
     batch_verify_xfr_bodies(prng, params, &[body], &[policies]).c(d!())
 }
 
-/// XfrBodys batch verification
-/// * `prng` - pseudo-random number generator. Needed for verifying proofs in batch.
-/// * `bodies` - XfrBody structures to be verified
-/// * `policies` - list of set of policies and associated information corresponding to each xfr_note
-/// * `returns` - () or an ZeiError in case of verification error
+/// Batch-verify confidential transfer bodies with policies.
 pub fn batch_verify_xfr_bodies<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     bodies: &[&XfrBody],
-    policies: &[&XfrNotePoliciesRef],
+    policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
-    // 1. verify amounts and asset types
+    // 1. Verify amounts and asset types.
     batch_verify_xfr_body_asset_records(prng, params, bodies).c(d!())?;
 
-    // 2. verify tracing proofs
+    // 2. Verify tracing proofs.
     batch_verify_tracer_tracing_proof(prng, bodies, policies).c(d!())
 }
 
@@ -704,7 +693,7 @@ fn verify_plain_amounts(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord
     let sum_inputs = safe_sum_u64(in_amount.c(d!())?.as_slice());
     let sum_outputs = safe_sum_u64(out_amount.c(d!())?.as_slice());
 
-    if sum_inputs < sum_outputs {
+    if sum_inputs != sum_outputs {
         return Err(eg!(ZeiError::XfrVerifyAssetAmountError));
     }
 
@@ -791,7 +780,7 @@ fn verify_plain_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetReco
 
     for (_, a) in amounts.iter() {
         let sum = a.iter().sum::<i128>();
-        if sum < 0i128 {
+        if sum != 0i128 {
             return Err(eg!(ZeiError::XfrVerifyAssetAmountError));
         }
     }
@@ -860,7 +849,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
     batch_verify_asset_mixing(prng, params, &asset_mix_instances).c(d!())
 }
 
-// ASSET TRACING
+/// Find the tracer memo corresponding to the encryption keys.
 pub fn find_tracing_memos<'a>(
     xfr_body: &'a XfrBody,
     pub_key: &AssetTracerEncKeys,
@@ -884,13 +873,10 @@ pub fn find_tracing_memos<'a>(
     Ok(result)
 }
 
-/// amount, asset type, identity attribute, public key
+/// The asset tracing result.
 pub type RecordData = (u64, AssetType, Vec<Attr>, XfrPublicKey);
 
-/// Scan XfrBody transfers involving asset tracing for `tracer_keypair`
-/// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
-/// Returning ZeiError::BogusAssetTracerMemo in case a TracerMemo decrypts inconsistent information, and
-/// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
+/// Find and extract tracing information from confidential-transfer body.
 pub fn trace_assets(
     xfr_body: &XfrBody,
     tracer_keypair: &AssetTracerKeyPair,
@@ -899,13 +885,7 @@ pub fn trace_assets(
     extract_tracing_info(bars_memos.as_slice(), &tracer_keypair.dec_key).c(d!())
 }
 
-/// Scan list of (BlindAssetRecord, AssetTracerMemo) retrieved by find_tracing_memos
-/// (e.i. intended for the same asset tracer). It takes each AssetTracer memo,
-/// decrypts its lock_info field to retrieve amount, asset type and identity attributed.
-/// ElGamal ciphertext are decrypted and verified agains the retrieved data from `memo.lock_info`
-/// Returning ZeiError::BogusAssetTracerMemo in case a TracerMemo decrypts inconsistent information, and
-/// ZeiError::InconsistentStructureError if amount or asset_type cannot be found.
-/// Return Vector of RecordData = (amount, asset_type, identity attributes, public key)
+/// Decrypt each memo with the decryption keys.
 pub(crate) fn extract_tracing_info(
     memos: &[(&BlindAssetRecord, &TracerMemo)],
     dec_key: &AssetTracerDecKeys,

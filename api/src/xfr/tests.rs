@@ -17,10 +17,10 @@ use rand_chacha::ChaChaRng;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_crypto::basic::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
+    ristretto_pedersen_comm::RistrettoPedersenCommitment,
 };
 
 pub(crate) fn create_xfr(
@@ -63,6 +63,7 @@ fn do_transfer_tests_single_asset(
     let input_amount = 100u64 * outputs_template.len() as u64;
     let total_amount = input_amount * inputs_template.len() as u64;
     let output_amount = total_amount / outputs_template.len() as u64;
+
     // make sure no truncation during integer division, and that total input == total output
     assert_eq!(total_amount, output_amount * outputs_template.len() as u64);
 
@@ -681,10 +682,6 @@ mod keys {
 }
 
 mod identity_tracing {
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-    ////    Tests with identity tracing                                                          ////
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-
     use super::*;
     use crate::xfr::{structs::TracingPolicies, XfrNotePoliciesRef};
 
@@ -813,10 +810,6 @@ mod identity_tracing {
 }
 
 mod asset_tracing {
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-    ////    Tests with asset tracing                                                              ///
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-
     use super::*;
     use crate::xfr::{
         structs::XfrAmount::NonConfidential,

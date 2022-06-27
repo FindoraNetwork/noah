@@ -12,6 +12,7 @@ use zei_algebra::{
 use zei_crypto::bulletproofs::mix::{mix, MixCommitment, MixValue};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+/// The asset mixing proof.
 pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
 
 impl PartialEq for AssetMixProof {
@@ -22,7 +23,7 @@ impl PartialEq for AssetMixProof {
 
 impl Eq for AssetMixProof {}
 
-/// I compute a proof that the assets were mixed correctly
+/// Prove asset mixing.
 /// # Example
 /// ```
 /// use zei_algebra::ristretto::RistrettoScalar;
@@ -119,13 +120,17 @@ pub fn prove_asset_mixing(
     Ok(AssetMixProof(proof))
 }
 
+/// An instance of asset mixing.
 pub struct AssetMixingInstance<'a> {
+    /// A list of Bulletproofs data commmitments for the inputs.
     pub inputs: Vec<(CompressedRistretto, CompressedRistretto)>,
+    /// A list of Bulletproofs data commitments for the outputs.
     pub outputs: Vec<(CompressedRistretto, CompressedRistretto)>,
+    /// The asset mixing proof.
     pub proof: &'a AssetMixProof,
 }
 
-/// I verify that the assets were mixed correctly
+/// Batch-verify asset mixing.
 /// # Example
 /// ```
 /// use zei_algebra::ristretto::{RistrettoScalar, CompressedRistretto};
@@ -180,7 +185,7 @@ pub struct AssetMixingInstance<'a> {
 pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
-    instances: &[AssetMixingInstance],
+    instances: &[AssetMixingInstance<'_>],
 ) -> Result<()> {
     let mut max_circuit_size = 0;
     let mut transcripts = Vec::with_capacity(instances.len());
@@ -209,7 +214,7 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
 
 pub(crate) fn prepare_asset_mixer_verifier(
     verifier: &mut Verifier<&mut Transcript>,
-    instance: &AssetMixingInstance,
+    instance: &AssetMixingInstance<'_>,
 ) -> Result<usize> {
     let in_cloak = instance
         .inputs
@@ -238,8 +243,7 @@ pub(crate) fn prepare_asset_mixer_verifier(
         .map(|com| com.commit_verifier(verifier))
         .collect_vec();
 
-    zei_crypto::bulletproofs::mix::mix(verifier, &in_vars, None, &out_vars, None)
-        .c(d!(ZeiError::AssetMixerVerificationError))
+    mix(verifier, &in_vars, None, &out_vars, None).c(d!(ZeiError::AssetMixerVerificationError))
 }
 
 fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
@@ -273,9 +277,10 @@ mod test {
     use crate::setup::BulletproofParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use ruc::*;
-    use zei_algebra::ristretto::{CompressedRistretto, RistrettoScalar};
+    use zei_algebra::{
+        prelude::*,
+        ristretto::{CompressedRistretto, RistrettoScalar},
+    };
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     #[test]

@@ -12,5 +12,3 @@ pub mod pedersen_elgamal;
 pub mod rescue;
 /// The module for the Pedersen commitments over the Ristretto group.
 pub mod ristretto_pedersen_comm;
-/// The module for the Schnorr signature.
-pub mod schnorr;

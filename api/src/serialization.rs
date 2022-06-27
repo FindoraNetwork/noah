@@ -3,7 +3,6 @@ use crate::xfr::{
     structs::{AssetType, ASSET_TYPE_LENGTH},
 };
 use ed25519_dalek::{PublicKey, SecretKey};
-use ruc::*;
 use serde::Serializer;
 use zei_algebra::prelude::*;
 
@@ -150,13 +149,13 @@ mod test {
         assert_eq!(
             true,
             keypair
-                .pub_key()
+                .get_pub_key()
                 .serialize(&mut Serializer::new(&mut pk_mp_vec))
                 .is_ok()
         );
         let mut de = Deserializer::new(&pk_mp_vec[..]);
         let pk2: AXfrPubKey = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(keypair.pub_key(), pk2);
+        assert_eq!(keypair.get_pub_key(), pk2);
 
         let mut keypair_mp_vec = vec![];
         assert_eq!(

@@ -1,62 +1,79 @@
 use zei_algebra::collections::BTreeMap;
 
 #[cfg(not(feature = "no_urs"))]
+/// The Bulletproofs URS.
 pub static BULLETPROOF_URS: Option<&'static [u8]> =
     Some(include_bytes!("../parameters/bulletproof-urs.bin"));
 
 #[cfg(feature = "no_urs")]
+/// The Bulletproofs URS.
 pub static BULLETPROOF_URS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_srs"))]
+/// The SRS.
 pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs.bin"));
 
 #[cfg(feature = "no_srs")]
+/// The SRS.
 pub static SRS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
+/// The common part of the verifier parameters for anonymous transfer.
 pub static VERIFIER_COMMON_PARAMS: Option<&'static [u8]> =
     Some(include_bytes!("../parameters/transfer-vk-common.bin"));
 
 #[cfg(feature = "no_vk")]
+/// The common part of the verifier parameters for anonymous transfer.
 pub static VERIFIER_COMMON_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
-pub static VERIFIER_SPECIALS_PARAMS: Option<&'static [u8]> =
-    Some(include_bytes!("../parameters/transfer-vk-specials.bin"));
+/// The specific part of the verifier parameters for anonymous transfer.
+pub static VERIFIER_SPECIFIC_PARAMS: Option<&'static [u8]> =
+    Some(include_bytes!("../parameters/transfer-vk-specific.bin"));
 
 #[cfg(feature = "no_vk")]
-pub static VERIFIER_SPECIALS_PARAMS: Option<&'static [u8]> = None;
+/// The specific part of the verifier parameters for anonymous transfer.
+pub static VERIFIER_SPECIFIC_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for anonymous to confidential.
 pub static ABAR_TO_BAR_VERIFIER_PARAMS: Option<&'static [u8]> =
     Some(include_bytes!("../parameters/abar-to-bar-vk.bin"));
 
 #[cfg(feature = "no_vk")]
+/// The verifier parameters for anonymous to confidential.
 pub static ABAR_TO_BAR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for confidential to anonymous.
 pub static BAR_TO_ABAR_VERIFIER_PARAMS: Option<&'static [u8]> =
     Some(include_bytes!("../parameters/bar-to-abar-vk.bin"));
 
 #[cfg(feature = "no_vk")]
+/// The verifier parameters for confidential to anonymous.
 pub static BAR_TO_ABAR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for transparent to anonymous.
 pub static AR_TO_ABAR_VERIFIER_PARAMS: Option<&'static [u8]> =
     Some(include_bytes!("../parameters/ar-to-abar-vk.bin"));
 
 #[cfg(feature = "no_vk")]
+/// The verifier parameters for transparent to anonymous.
 pub static AR_TO_ABAR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for anonymous to transparent.
 pub static ABAR_TO_AR_VERIFIER_PARAMS: Option<&'static [u8]> =
     Some(include_bytes!("../parameters/abar-to-ar-vk.bin"));
 
 #[cfg(feature = "no_vk")]
+/// The verifier parameters for anonymous to transparent.
 pub static ABAR_TO_AR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(feature = "no_srs")]
 lazy_static! {
+    /// The Lagrange format of the SRS.
     pub static ref LAGRANGE_BASES: BTreeMap<usize, &'static [u8]> = BTreeMap::default();
 }
 
@@ -71,6 +88,7 @@ static LAGRANGE_BASE_32768: &'static [u8] = include_bytes!("../parameters/lagran
 
 #[cfg(not(feature = "no_srs"))]
 lazy_static! {
+    /// The Lagrange format of the SRS.
     pub static ref LAGRANGE_BASES: BTreeMap<usize, &'static [u8]> = {
         let mut m = BTreeMap::new();
         m.insert(4096, LAGRANGE_BASE_4096);
