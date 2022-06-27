@@ -279,15 +279,15 @@ pub(crate) fn verify_xfr(
 
 /// The witness of an anonymous transfer.
 #[derive(Debug)]
-pub(crate) struct AMultiXfrWitness {
-    pub(crate) payers_secrets: Vec<PayerWitness>,
-    pub(crate) payees_secrets: Vec<PayeeWitness>,
-    pub(crate) fee: u32,
+pub struct AMultiXfrWitness {
+    pub payers_secrets: Vec<PayerWitness>,
+    pub payees_secrets: Vec<PayeeWitness>,
+    pub fee: u32,
 }
 
 impl AMultiXfrWitness {
     /// Create a fake `AMultiXfrWitness` for testing.
-    pub(crate) fn fake(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
+    pub fn fake(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
         let bls_zero = BLSScalar::zero();
 
         let node = MTNode {
@@ -321,15 +321,15 @@ impl AMultiXfrWitness {
 
 /// Public inputs of an anonymous transfer.
 #[derive(Debug)]
-pub(crate) struct AMultiXfrPubInputs {
-    pub(crate) payers_inputs: Vec<Nullifier>,
-    pub(crate) payees_commitments: Vec<Commitment>,
-    pub(crate) merkle_root: BLSScalar,
-    pub(crate) fee: u32,
+pub struct AMultiXfrPubInputs {
+    pub payers_inputs: Vec<Nullifier>,
+    pub payees_commitments: Vec<Commitment>,
+    pub merkle_root: BLSScalar,
+    pub fee: u32,
 }
 
 impl AMultiXfrPubInputs {
-    pub(crate) fn to_vec(&self) -> Vec<BLSScalar> {
+    pub fn to_vec(&self) -> Vec<BLSScalar> {
         let mut result = vec![];
         for nullifier in &self.payers_inputs {
             result.push(*nullifier);
@@ -342,7 +342,7 @@ impl AMultiXfrPubInputs {
         result
     }
 
-    pub(crate) fn from_witness(witness: &AMultiXfrWitness) -> Self {
+    pub fn from_witness(witness: &AMultiXfrWitness) -> Self {
         let hash = RescueInstance::new();
         let base = JubjubPoint::get_base();
         let zero = BLSScalar::zero();

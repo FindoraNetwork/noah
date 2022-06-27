@@ -22,7 +22,7 @@ impl PartialEq for AssetMixProof {
 
 impl Eq for AssetMixProof {}
 
-/// I compute a proof that the assets were mixed correctly
+/// Prove asset mixing.
 /// # Example
 /// ```
 /// use zei_algebra::ristretto::RistrettoScalar;
@@ -119,13 +119,14 @@ pub fn prove_asset_mixing(
     Ok(AssetMixProof(proof))
 }
 
+/// An instance of asset mixing.
 pub struct AssetMixingInstance<'a> {
     pub inputs: Vec<(CompressedRistretto, CompressedRistretto)>,
     pub outputs: Vec<(CompressedRistretto, CompressedRistretto)>,
     pub proof: &'a AssetMixProof,
 }
 
-/// I verify that the assets were mixed correctly
+/// Batch-verify asset mixing.
 /// # Example
 /// ```
 /// use zei_algebra::ristretto::{RistrettoScalar, CompressedRistretto};
@@ -272,9 +273,10 @@ mod test {
     use crate::setup::BulletproofParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
     use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
-    use ruc::*;
-    use zei_algebra::ristretto::{CompressedRistretto, RistrettoScalar};
+    use zei_algebra::{
+        prelude::*,
+        ristretto::{CompressedRistretto, RistrettoScalar},
+    };
     use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     #[test]

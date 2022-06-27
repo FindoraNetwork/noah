@@ -12,7 +12,7 @@ use crate::xfr::{
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
-/// AssetRecord confidentiality flags. Indicated if amount and/or assettype should be confidential
+/// AssetRecord confidentiality flags. Indicated if amount and/or asset type should be confidential
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum AssetRecordType {
@@ -23,8 +23,8 @@ pub enum AssetRecordType {
 }
 
 impl AssetRecordType {
-    /// Return (true,_) if amount is confidential,
-    /// Return (_,false) if type is confidential,
+    /// Return `(true,_)` if amount is confidential,
+    /// Return `(_, true)` if asset type is confidential,
     pub fn get_flags(self) -> (bool, bool) {
         // confidential amount, confidential asset type
         match self {
@@ -69,7 +69,7 @@ impl AssetRecordType {
 
 impl AssetRecord {
     /// Build a record input from OpenAssetRecord with no associated policy
-    /// Important: It assumes that RecordInput will be used as an input to xfr_note_gen and not as an output
+    /// Important: It assumes that RecordInput will be used as an input and not as an output
     /// since OpenAsset record was recovered from a BlindAsset record. This means owner_memo field is None.
     pub fn from_open_asset_record_no_asset_tracing(oar: OpenAssetRecord) -> AssetRecord {
         AssetRecord {
@@ -82,7 +82,7 @@ impl AssetRecord {
     }
 
     /// Build a record input from OpenAssetRecord with an associated policy that has no identity tracing
-    /// Important: It assumes that RecordInput will be used as an input to xfr_note_gen and not as an output
+    /// Important: It assumes that RecordInput will be used as an input and not as an output
     /// since OpenAsset record was recovered from a BlindAsset record. This means owner_memo field is be None.
     pub fn from_open_asset_record_with_asset_tracing_but_no_identity<R: CryptoRng + RngCore>(
         prng: &mut R,
@@ -92,7 +92,7 @@ impl AssetRecord {
         let mut memos = vec![];
         let mut identity_proofs = vec![];
         for asset_tracing_policy in asset_tracing_policies.get_policies().iter() {
-            // 1. check for inconsistency errors
+            // 1. Check for inconsistency.
             if asset_tracing_policy.identity_tracing.is_some() {
                 return Err(eg!(ZeiError::ParameterError)); // should use from_open_asset_record_with_identity_tracing method
             }
@@ -140,10 +140,9 @@ impl AssetRecord {
     }
 
     /// Build a record input from OpenAssetRecord with associated policies for asset *and* identity tracing
-    /// Important: It assumes that RecordInput will be used as an input to xfr_note_gen and not as an output
+    /// Important: It assumes that RecordInput will be used as an input and not as an output
     /// since OpenAsset record was recovered from a BlindAsset record. This means owner_memo field is None.
     pub fn from_open_asset_record_with_tracing<R: CryptoRng + RngCore>(
-        // TODO (fernando): currently support a single credential, but many policies
         prng: &mut R,
         oar: OpenAssetRecord,
         asset_tracing_policies: TracingPolicies,
@@ -154,7 +153,7 @@ impl AssetRecord {
         let mut memos = vec![];
         let mut identity_proofs = vec![];
         for asset_tracing_policy in asset_tracing_policies.get_policies().iter() {
-            // 1. compute tracer_memo
+            // 1. Compute `tracer_memo`.
             let (amount_info, asset_type_info) = if asset_tracing_policy.asset_tracing {
                 let amount_info = match oar.get_record_type() {
                     AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
@@ -181,7 +180,7 @@ impl AssetRecord {
 
             let (attrs_and_ctexts, proof) = match asset_tracing_policy.identity_tracing.as_ref() {
                 Some(id_policy) => {
-                    // 1. check for inconsistency errors
+                    // 1. Check for inconsistency.
                     if credential.ipk != id_policy.cred_issuer_pub_key {
                         return Err(eg!(ZeiError::ParameterError));
                     }
@@ -277,7 +276,7 @@ impl AssetRecord {
 }
 
 impl AssetRecordTemplate {
-    /// Creates a AssetRecordTemplate with no associated asset tracing policy
+    /// Create an `AssetRecordTemplate` with no associated asset tracing policy
     pub fn with_no_asset_tracing(
         amount: u64,
         asset_type: AssetType,
@@ -292,6 +291,8 @@ impl AssetRecordTemplate {
             asset_tracing_policies: TracingPolicies::new(),
         }
     }
+
+    /// Create an `AssetRecordTemplate` with asset tracing policies
     pub fn with_asset_tracing(
         amount: u64,
         asset_type: AssetType,
@@ -309,6 +310,7 @@ impl AssetRecordTemplate {
         template
     }
 }
+
 fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
     pc_gens: &RistrettoPedersenCommitment,
@@ -321,7 +323,6 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     Vec<TracerMemo>,
     Option<OwnerMemo>,
 ) {
-    // use enum matching instead of nested if else clause for readability and clarity
     let (xfr_amount, xfr_asset_type, amount_blinds, asset_type_blind, owner_memo) =
         match asset_record.asset_record_type {
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => (
@@ -397,7 +398,6 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
         asset_type: xfr_asset_type,
     };
 
-    // TODO: (alex) API for asset tracer to be improved
     let mut tracer_memos = vec![];
     let tracing_policies = &asset_record.asset_tracing_policies.0;
     for (policy, attr_ctexts) in tracing_policies.iter().zip(attrs_and_ctexts) {
@@ -430,13 +430,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     )
 }
 
-/// Build OpenAssetRecord and associated memos from an Asset Record Template
-/// and encrypted identity attributes to confidentially reveal (if policy indicates so).
-/// Used to create outputs blind asset record from an asset record template.
-/// Return:
-///  - OpenAssetRecord,
-///  - Option<TracerMemo> // Some(memo) if required by asset_record.asset_tracing policy
-///  - Option<OwnerMemo> // Some(memo)  if asset_record.asset_record_type has a confidential flag
+/// Build open asset record from the template and identity attributes.
 pub fn build_open_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
     pc_gens: &RistrettoPedersenCommitment,
@@ -457,13 +451,7 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(
     (open_asset_record, asset_tracing_memos, owner_memo)
 }
 
-/// Build BlindAssetRecord and associated memos  from an Asset Record Template
-/// and encrypted identity attributes to confidentially reveal (if policy indicates so).
-/// Used to create outputs blind asset record from an asset record template.
-/// Return:
-///  - BlindAssetRecord,
-///  - Option<TracerMemo> // Some(memo) if required by asset_record.asset_tracing policy
-///  - Option<OwnerMemo> // Some(memo)  if asset_record.asset_record_type has a confidential flag
+/// Build blind asset record from the template and identity attributes.
 pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
     pc_gens: &RistrettoPedersenCommitment,
@@ -476,10 +464,8 @@ pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
     (blind_asset_record, asset_tracing_memos, owner_memo)
 }
 
-/// Open a blind asset record using owner secret key and associated owner's memo.
-/// Return Ok(OpenAssetRecord) or
-/// ZeiError if case of decryption error or inconsistent plaintext error.
-/// Used by transfers receivers
+/// Open a blind asset record to obtain the open asset record.
+/// The caller needs to have the key to decrypt the owner memo if some fields are confidential.
 pub fn open_blind_asset_record(
     input: &BlindAssetRecord,
     owner_memo: &Option<OwnerMemo>,
@@ -533,7 +519,7 @@ pub fn open_blind_asset_record(
             (amount, asset_type, amount_blinds, asset_type_blind)
         }
     };
-    // TODO check correctness of BlindAssetRecord
+
     Ok(OpenAssetRecord {
         blind_asset_record: input.clone(),
         amount,

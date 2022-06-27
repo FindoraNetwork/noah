@@ -4,18 +4,22 @@ use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use wasm_bindgen::prelude::*;
-use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN};
 use zei_algebra::prelude::*;
+use zei_algebra::{
+    bls12_381::BLSScalar,
+    jubjub::{JubjubPoint, JubjubScalar, JUBJUB_SCALAR_LEN},
+};
 use zei_crypto::basic::rescue::RescueInstance;
 
 pub const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
 pub const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
 
+// The value is 30456836461354188666588397637966466954730199316260348475646977510813971733359
 pub fn get_view_key_domain_separator() -> BLSScalar {
     let mut hasher = Sha512::new();
     hasher.update(b"Viewing key domain separator");
     let hash = BLSScalar::from_hash(hasher);
+    println!("{:?}", hash);
     hash
 }
 

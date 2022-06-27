@@ -1,13 +1,17 @@
-use crate::anon_xfr::decrypt_memo;
-use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrViewKey};
+use crate::anon_xfr::{
+    decrypt_memo,
+    keys::{AXfrKeyPair, AXfrPubKey, AXfrViewKey},
+};
 use crate::xfr::structs::AssetType;
-use aes_gcm::aead::Aead;
-use aes_gcm::NewAead;
+use aes_gcm::{aead::Aead, NewAead};
 use digest::{generic_array::GenericArray, Digest};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::jubjub::{JubjubPoint, JubjubScalar};
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+use zei_algebra::{
+    bls12_381::BLSScalar,
+    jubjub::{JubjubPoint, JubjubScalar},
+    prelude::*,
+};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::constraint_system::VarIndex;
 
