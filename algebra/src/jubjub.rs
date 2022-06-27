@@ -15,7 +15,7 @@ use digest::{generic_array::typenum::U64, Digest};
 pub const JUBJUB_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `ark_ed_on_bls12_381::Fr`
-#[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Default, Debug, Hash)]
 pub struct JubjubScalar(pub Fr);
 
 /// The wrapped struct for `ark_ed_on_bls12_381::EdwardsProjective`

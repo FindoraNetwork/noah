@@ -15,6 +15,8 @@ use zei_crypto::basic::rescue::RescueInstance;
 pub const AXFR_SECRET_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
 /// The length of the public key for anonymous transfer.
 pub const AXFR_PUBLIC_KEY_LENGTH: usize = JubjubPoint::COMPRESSED_LEN;
+/// The length of the view key for anonymous transfer.
+pub const AXFR_VIEW_KEY_LENGTH: usize = JUBJUB_SCALAR_LEN;
 
 /// Obtain the viewing key domain separator.
 // The value is 30456836461354188666588397637966466954730199316260348475646977510813971733359
@@ -27,15 +29,18 @@ pub fn get_view_key_domain_separator() -> BLSScalar {
 
 /// The spending key.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
-pub struct AXfrSpendKey(pub BLSScalar);
+pub struct AXfrSpendKey(pub(crate) BLSScalar);
 
 /// The viewing key.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct AXfrViewKey(pub JubjubScalar);
-
 #[wasm_bindgen]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
+pub struct AXfrViewKey(pub(crate) JubjubScalar);
+
 /// The public key.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
+#[wasm_bindgen]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default, Hash,
+)]
 pub struct AXfrPubKey(pub(crate) JubjubPoint);
 
 impl ZeiFromToBytes for AXfrPubKey {
@@ -49,6 +54,23 @@ impl ZeiFromToBytes for AXfrPubKey {
             let group_element = JubjubPoint::from_compressed_bytes(bytes);
             match group_element {
                 Ok(g) => Ok(AXfrPubKey(g)),
+                _ => Err(eg!(ZeiError::ParameterError)),
+            }
+        }
+    }
+}
+
+impl ZeiFromToBytes for AXfrViewKey {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        self.0.to_bytes()
+    }
+    fn zei_from_bytes(bytes: &[u8]) -> Result<AXfrViewKey> {
+        if bytes.len() != AXFR_VIEW_KEY_LENGTH {
+            Err(eg!(ZeiError::DeserializationError))
+        } else {
+            let element = JubjubScalar::from_bytes(bytes);
+            match element {
+                Ok(g) => Ok(AXfrViewKey(g)),
                 _ => Err(eg!(ZeiError::ParameterError)),
             }
         }
