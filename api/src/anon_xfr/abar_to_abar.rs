@@ -2,13 +2,12 @@ use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::structs::AxfrOwnerMemo;
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots,
-    commit_in_cs_with_native_address, compute_merkle_root, compute_non_malleability_tag,
+    commit_in_cs_with_native_address, compute_merkle_root_variables, compute_non_malleability_tag,
     keys::get_view_key_domain_separator,
     nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{
-        AccElemVars, AnonBlindAssetRecord, Commitment, MTNode, MTPath, Nullifier,
-        NullifierInputVars, OpenAnonBlindAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness,
-        PayerWitnessVars,
+        AccElemVars, AnonAssetRecord, Commitment, MTNode, MTPath, Nullifier, NullifierInputVars,
+        OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
     },
     AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN, FEE_TYPE, SK_LEN,
 };
@@ -53,7 +52,7 @@ pub struct AXfrBody {
     /// The inputs, in terms of nullifiers.
     pub inputs: Vec<Nullifier>,
     /// The outputs, in terms of new anonymous asset records.
-    pub outputs: Vec<AnonBlindAssetRecord>,
+    pub outputs: Vec<AnonAssetRecord>,
     /// The Merkle tree root.
     pub merkle_root: BLSScalar,
     /// An index of the Merkle tree root in the ledger.
@@ -68,8 +67,8 @@ pub struct AXfrBody {
 pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
-    inputs: &[OpenAnonBlindAssetRecord],
-    outputs: &[OpenAnonBlindAssetRecord],
+    inputs: &[OpenAnonAssetRecord],
+    outputs: &[OpenAnonAssetRecord],
     fee: u32,
     input_keypairs: &[AXfrKeyPair],
 ) -> Result<AXfrNote> {
@@ -117,14 +116,14 @@ pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
         })
         .collect();
 
-    let secret_inputs = AMultiXfrWitness {
-        payers_secrets,
-        payees_secrets,
+    let secret_inputs = AXfrWitness {
+        payers_witnesses: payers_secrets,
+        payees_witnesses: payees_secrets,
         fee,
     };
     let out_abars = outputs
         .iter()
-        .map(AnonBlindAssetRecord::from_oabar)
+        .map(AnonAssetRecord::from_oabar)
         .collect_vec();
     let out_memos: Result<Vec<AxfrOwnerMemo>> = outputs
         .iter()
@@ -182,7 +181,7 @@ pub fn verify_anon_xfr_note(
         .iter()
         .map(|output| output.commitment)
         .collect();
-    let pub_inputs = AMultiXfrPubInputs {
+    let pub_inputs = AXfrPubInputs {
         payers_inputs: note.body.inputs.clone(),
         payees_commitments,
         merkle_root: *merkle_root,
@@ -211,7 +210,7 @@ pub fn verify_anon_xfr_note(
 pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    secret_inputs: AMultiXfrWitness,
+    secret_inputs: AXfrWitness,
     hash: &BLSScalar,
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
@@ -219,11 +218,11 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
     transcript.append_u64(
         N_INPUTS_TRANSCRIPT,
-        secret_inputs.payers_secrets.len() as u64,
+        secret_inputs.payers_witnesses.len() as u64,
     );
     transcript.append_u64(
         N_OUTPUTS_TRANSCRIPT,
-        secret_inputs.payees_secrets.len() as u64,
+        secret_inputs.payees_witnesses.len() as u64,
     );
 
     let fee_type = FEE_TYPE.as_scalar();
@@ -251,7 +250,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
 /// Verify a Plonk proof for anonymous transfer.
 pub(crate) fn verify_xfr(
     params: &VerifierParams,
-    pub_inputs: &AMultiXfrPubInputs,
+    pub_inputs: &AXfrPubInputs,
     proof: &AXfrPlonkPf,
     hash: &BLSScalar,
     non_malleability_tag: &BLSScalar,
@@ -279,14 +278,17 @@ pub(crate) fn verify_xfr(
 
 /// The witness of an anonymous transfer.
 #[derive(Debug)]
-pub struct AMultiXfrWitness {
-    pub payers_secrets: Vec<PayerWitness>,
-    pub payees_secrets: Vec<PayeeWitness>,
+pub struct AXfrWitness {
+    /// The payers' witnesses.
+    pub payers_witnesses: Vec<PayerWitness>,
+    /// The payees' witnesses.
+    pub payees_witnesses: Vec<PayeeWitness>,
+    /// The fee.
     pub fee: u32,
 }
 
-impl AMultiXfrWitness {
-    /// Create a fake `AMultiXfrWitness` for testing.
+impl AXfrWitness {
+    /// Create a fake `AXfrWitness` for testing.
     pub fn fake(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
         let bls_zero = BLSScalar::zero();
 
@@ -296,7 +298,7 @@ impl AMultiXfrWitness {
             is_left_child: 0,
             is_right_child: 0,
         };
-        let payer_secret = PayerWitness {
+        let payer_witness = PayerWitness {
             spend_key: bls_zero,
             uid: 0,
             amount: 0,
@@ -304,16 +306,16 @@ impl AMultiXfrWitness {
             path: MTPath::new(vec![node; tree_depth]),
             blind: bls_zero,
         };
-        let payee_secret = PayeeWitness {
+        let payee_witness = PayeeWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
             pubkey_x: bls_zero,
         };
 
-        AMultiXfrWitness {
-            payers_secrets: vec![payer_secret; n_payers],
-            payees_secrets: vec![payee_secret; n_payees],
+        AXfrWitness {
+            payers_witnesses: vec![payer_witness; n_payers],
+            payees_witnesses: vec![payee_witness; n_payees],
             fee,
         }
     }
@@ -321,14 +323,19 @@ impl AMultiXfrWitness {
 
 /// Public inputs of an anonymous transfer.
 #[derive(Debug)]
-pub struct AMultiXfrPubInputs {
+pub struct AXfrPubInputs {
+    /// The payers' inputs.
     pub payers_inputs: Vec<Nullifier>,
+    /// The payees' commitments.
     pub payees_commitments: Vec<Commitment>,
+    /// The Merkle tree root.
     pub merkle_root: BLSScalar,
+    /// The fee.
     pub fee: u32,
 }
 
-impl AMultiXfrPubInputs {
+impl AXfrPubInputs {
+    /// Convert the public inputs into a vector of scalars.
     pub fn to_vec(&self) -> Vec<BLSScalar> {
         let mut result = vec![];
         for nullifier in &self.payers_inputs {
@@ -342,12 +349,13 @@ impl AMultiXfrPubInputs {
         result
     }
 
-    pub fn from_witness(witness: &AMultiXfrWitness) -> Self {
+    /// Convert from the witness.
+    pub fn from_witness(witness: &AXfrWitness) -> Self {
         let hash = RescueInstance::new();
         let base = JubjubPoint::get_base();
         let zero = BLSScalar::zero();
         let payers_inputs: Vec<Nullifier> = witness
-            .payers_secrets
+            .payers_witnesses
             .iter()
             .map(|sec| {
                 let view_key = JubjubScalar::from_bytes(
@@ -374,7 +382,7 @@ impl AMultiXfrPubInputs {
         let hash = RescueInstance::new();
         let zero = BLSScalar::zero();
         let payees_commitments: Vec<Commitment> = witness
-            .payees_secrets
+            .payees_witnesses
             .iter()
             .map(|sec| {
                 let cur = hash.rescue(&[
@@ -387,7 +395,7 @@ impl AMultiXfrPubInputs {
             })
             .collect();
 
-        let payer = &witness.payers_secrets[0];
+        let payer = &witness.payers_witnesses[0];
         let spend_key = JubjubScalar::from_bytes(
             &hash.rescue(&[get_view_key_domain_separator(), payer.spend_key, zero, zero])[0]
                 .to_bytes(),
@@ -424,18 +432,18 @@ impl AMultiXfrPubInputs {
 
 /// Instantiate the constraint system for anonymous transfer.
 pub(crate) fn build_multi_xfr_cs(
-    witness: AMultiXfrWitness,
+    witness: AXfrWitness,
     fee_type: BLSScalar,
     hash: &BLSScalar,
     non_malleability_randomizer: &BLSScalar,
     non_malleability_tag: &BLSScalar,
 ) -> (TurboPlonkCS, usize) {
-    assert_ne!(witness.payers_secrets.len(), 0);
-    assert_ne!(witness.payees_secrets.len(), 0);
+    assert_ne!(witness.payers_witnesses.len(), 0);
+    assert_ne!(witness.payees_witnesses.len(), 0);
 
     let mut cs = TurboCS::new();
-    let payers_secrets = add_payers_witnesses(&mut cs, &witness.payers_secrets);
-    let payees_secrets = add_payees_witnesses(&mut cs, &witness.payees_secrets);
+    let payers_secrets = add_payers_witnesses(&mut cs, &witness.payers_witnesses);
+    let payees_secrets = add_payees_witnesses(&mut cs, &witness.payees_witnesses);
 
     let hash_var = cs.new_variable(*hash);
     let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
@@ -493,7 +501,7 @@ pub(crate) fn build_multi_xfr_cs(
             uid: payer.uid,
             commitment: com_abar_in_var,
         };
-        let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payer.path);
+        let tmp_root_var = compute_merkle_root_variables(&mut cs, acc_elem, &payer.path);
 
         // additional safegaurd to check the payer's amount, although in theory this is not needed.
         cs.range_check(payer.amount, AMOUNT_LEN);
@@ -764,15 +772,15 @@ mod tests {
     use crate::anon_xfr::{
         abar_to_abar::{
             asset_mixing, build_multi_xfr_cs, gen_anon_xfr_note, prove_xfr, verify_anon_xfr_note,
-            verify_xfr, AMultiXfrPubInputs, AMultiXfrWitness,
+            verify_xfr, AXfrPubInputs, AXfrWitness,
         },
-        add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root,
+        add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root_variables,
         compute_non_malleability_tag,
         keys::{get_view_key_domain_separator, AXfrKeyPair, AXfrSpendKey},
         nullify_in_cs_with_native_address, sort,
         structs::{
-            AccElemVars, AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, NullifierInputVars,
-            OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder, PayeeWitness, PayerWitness,
+            AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, NullifierInputVars,
+            OpenAnonAssetRecord, OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
         },
         FEE_TYPE, TREE_DEPTH,
     };
@@ -961,7 +969,7 @@ mod tests {
         // build cs
         let secret_inputs =
             new_multi_xfr_witness_for_test(inputs.to_vec(), outputs.to_vec(), fee, [0u8; 32]);
-        let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
+        let pub_inputs = AXfrPubInputs::from_witness(&secret_inputs);
         let params = ProverParams::new(n_payers, n_payees, Some(1)).unwrap();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
@@ -969,7 +977,7 @@ mod tests {
         prng.fill_bytes(&mut msg);
 
         let input_keypairs: Vec<AXfrKeyPair> = secret_inputs
-            .payers_secrets
+            .payers_witnesses
             .iter()
             .map(|x| AXfrKeyPair::from_spend_key(AXfrSpendKey(x.spend_key)))
             .collect();
@@ -1001,7 +1009,7 @@ mod tests {
         .is_ok());
 
         // An unmatched input should fail the verification.
-        let bad_secret_inputs = AMultiXfrPubInputs::from_witness(&new_multi_xfr_witness_for_test(
+        let bad_secret_inputs = AXfrPubInputs::from_witness(&new_multi_xfr_witness_for_test(
             inputs.to_vec(),
             outputs.to_vec(),
             fee,
@@ -1056,7 +1064,7 @@ mod tests {
 
         // sample an input anonymous asset record for testing.
         let (oabar, keypair_in) = gen_oabar_and_keys(&mut prng, input_amount, asset_type);
-        let abar = AnonBlindAssetRecord::from_oabar(&oabar);
+        let abar = AnonAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair_in.get_pub_key(), *oabar.pub_key_ref());
 
         let owner_memo = oabar.get_owner_memo().unwrap();
@@ -1083,17 +1091,16 @@ mod tests {
 
         let (note, merkle_root) = {
             // prover scope
-            let oabar_in =
-                OpenAnonBlindAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair_in)
-                    .unwrap()
-                    .mt_leaf_info(mt_leaf_info)
-                    .build()
-                    .unwrap();
+            let oabar_in = OpenAnonAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair_in)
+                .unwrap()
+                .mt_leaf_info(mt_leaf_info)
+                .build()
+                .unwrap();
             assert_eq!(input_amount, oabar_in.get_amount());
             assert_eq!(asset_type, oabar_in.get_asset_type());
             assert_eq!(keypair_in.get_pub_key(), oabar_in.pub_key);
 
-            let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
+            let oabar_out = OpenAnonAssetRecordBuilder::new()
                 .amount(output_amount)
                 .asset_type(asset_type)
                 .pub_key(&keypair_out.get_pub_key())
@@ -1115,7 +1122,7 @@ mod tests {
         };
         {
             // owner scope
-            let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
+            let oabar = OpenAnonAssetRecordBuilder::from_abar(
                 &note.body.outputs[0],
                 note.body.owner_memos[0].clone(),
                 &keypair_out,
@@ -1139,7 +1146,7 @@ mod tests {
 
         // add some random anonymous asset records to the tree.
 
-        let mut abar = AnonBlindAssetRecord {
+        let mut abar = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
 
@@ -1147,7 +1154,7 @@ mod tests {
         mt.commit()?;
 
         for _i in 0..n - 1 {
-            abar = AnonBlindAssetRecord {
+            abar = AnonAssetRecord {
                 commitment: BLSScalar::random(&mut prng),
             };
 
@@ -1183,7 +1190,7 @@ mod tests {
         let mut mt = PersistentMerkleTree::new(store).unwrap();
         build_new_merkle_tree(5, &mut mt).unwrap();
 
-        let abar = AnonBlindAssetRecord::from_oabar(&oabar);
+        let abar = AnonAssetRecord::from_oabar(&oabar);
         let uid = mt
             .add_commitment_hash(compute_merkle_leaf_value(mt.entry_count(), &abar))
             .unwrap();
@@ -1196,17 +1203,16 @@ mod tests {
 
         let (note, _merkle_root) = {
             // prover scope
-            let oabar_in =
-                OpenAnonBlindAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair_in)
-                    .unwrap()
-                    .mt_leaf_info(create_mt_leaf_info(mt_proof.clone()))
-                    .build()
-                    .unwrap();
+            let oabar_in = OpenAnonAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair_in)
+                .unwrap()
+                .mt_leaf_info(create_mt_leaf_info(mt_proof.clone()))
+                .build()
+                .unwrap();
             assert_eq!(input_amount, oabar_in.get_amount());
             assert_eq!(asset_type, oabar_in.get_asset_type());
             assert_eq!(keypair_in.get_pub_key(), oabar_in.pub_key);
 
-            let oabar_out = OpenAnonBlindAssetRecordBuilder::new()
+            let oabar_out = OpenAnonAssetRecordBuilder::new()
                 .amount(output_amount)
                 .asset_type(asset_type)
                 .pub_key(&keypair_out.get_pub_key())
@@ -1228,7 +1234,7 @@ mod tests {
         };
         {
             // owner scope
-            let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
+            let oabar = OpenAnonAssetRecordBuilder::from_abar(
                 &note.body.outputs[0],
                 note.body.owner_memos[0].clone(),
                 &keypair_out,
@@ -1298,7 +1304,7 @@ mod tests {
         let mut in_owner_memos = vec![];
         for i in 0..n_payers {
             let (oabar, keypair) = gen_oabar_and_keys(&mut prng, amounts_in[i], asset_types_in[i]);
-            let abar = AnonBlindAssetRecord::from_oabar(&oabar);
+            let abar = AnonAssetRecord::from_oabar(&oabar);
             let owner_memo = oabar.get_owner_memo().unwrap();
             in_abars.push(abar);
             in_keypairs.push(keypair);
@@ -1342,7 +1348,7 @@ mod tests {
         let mut outputs = vec![];
         for i in 0..n_payees {
             outputs.push(
-                OpenAnonBlindAssetRecordBuilder::new()
+                OpenAnonAssetRecordBuilder::new()
                     .amount(amounts_out[i])
                     .asset_type(asset_types_out[i])
                     .pub_key(&keypairs_out[i].get_pub_key())
@@ -1355,7 +1361,7 @@ mod tests {
 
         let (note, merkle_root) = {
             // prover scope
-            let mut open_abars_in: Vec<OpenAnonBlindAssetRecord> = (0..n_payers)
+            let mut open_abars_in: Vec<OpenAnonAssetRecord> = (0..n_payers)
                 .map(|uid| {
                     let mt_leaf_info = MTLeafInfo {
                         path: MTPath {
@@ -1365,7 +1371,7 @@ mod tests {
                         uid: uid as u64,
                         root_version: 0,
                     };
-                    let open_abar_in = OpenAnonBlindAssetRecordBuilder::from_abar(
+                    let open_abar_in = OpenAnonAssetRecordBuilder::from_abar(
                         &in_abars[uid],
                         in_owner_memos[uid].clone(),
                         &in_keypairs[uid],
@@ -1382,7 +1388,7 @@ mod tests {
 
             let open_abars_out = (0..n_payees)
                 .map(|i| {
-                    OpenAnonBlindAssetRecordBuilder::new()
+                    OpenAnonAssetRecordBuilder::new()
                         .amount(amounts_out[i])
                         .asset_type(asset_types_out[i])
                         .pub_key(&keypairs_out[i].get_pub_key())
@@ -1454,7 +1460,7 @@ mod tests {
         {
             // owner scope
             for i in 0..n_payees {
-                let oabar_out = OpenAnonBlindAssetRecordBuilder::from_abar(
+                let oabar_out = OpenAnonAssetRecordBuilder::from_abar(
                     &note.body.outputs[i],
                     note.body.owner_memos[i].clone(),
                     &keypairs_out[i],
@@ -1483,9 +1489,9 @@ mod tests {
         prng: &mut R,
         amount: u64,
         asset_type: AssetType,
-    ) -> (OpenAnonBlindAssetRecord, AXfrKeyPair) {
+    ) -> (OpenAnonAssetRecord, AXfrKeyPair) {
         let keypair = AXfrKeyPair::generate(prng);
-        let oabar = OpenAnonBlindAssetRecordBuilder::new()
+        let oabar = OpenAnonAssetRecordBuilder::new()
             .amount(amount)
             .asset_type(asset_type)
             .pub_key(&keypair.get_pub_key())
@@ -2232,7 +2238,7 @@ mod tests {
         // compute the constraints.
         let path = MTPath::new(vec![path_node2, path_node1]);
         let path_vars = add_merkle_path_variables(&mut cs, path);
-        let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
+        let root_var = compute_merkle_root_variables(&mut cs, elem, &path_vars);
 
         // check Merkle root correctness.
         let mut witness = cs.get_and_clear_witness();
@@ -2297,7 +2303,7 @@ mod tests {
         outputs: Vec<(u64, BLSScalar, BLSScalar)>,
         fee: u32,
         seed: [u8; 32],
-    ) -> AMultiXfrWitness {
+    ) -> AXfrWitness {
         let n_payers = inputs.len();
         assert!(n_payers <= 3);
         let mut prng = ChaChaRng::from_seed(seed);
@@ -2382,9 +2388,9 @@ mod tests {
             })
             .collect();
 
-        AMultiXfrWitness {
-            payers_secrets,
-            payees_secrets,
+        AXfrWitness {
+            payers_witnesses: payers_secrets,
+            payees_witnesses: payees_secrets,
             fee,
         }
     }
@@ -2463,7 +2469,7 @@ mod tests {
         fee: u32,
     ) {
         let secret_inputs = new_multi_xfr_witness_for_test(inputs, outputs, fee, [0u8; 32]);
-        let pub_inputs = AMultiXfrPubInputs::from_witness(&secret_inputs);
+        let pub_inputs = AXfrPubInputs::from_witness(&secret_inputs);
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
@@ -2471,7 +2477,7 @@ mod tests {
         prng.fill_bytes(&mut msg);
 
         let input_keypairs: Vec<AXfrKeyPair> = secret_inputs
-            .payers_secrets
+            .payers_witnesses
             .iter()
             .map(|x| AXfrKeyPair::from_spend_key(AXfrSpendKey(x.spend_key)))
             .collect();
@@ -2500,7 +2506,7 @@ mod tests {
     }
 
     /// Compute the commitment hash for the Merkle tree leaf for an anonymous asset
-    fn compute_merkle_leaf_value(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
+    fn compute_merkle_leaf_value(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
         let hash = RescueInstance::new();
         hash.rescue(&[
             BLSScalar::from(uid),

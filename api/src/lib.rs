@@ -4,7 +4,7 @@
 #![deny(trivial_numeric_casts, private_in_public)]
 #![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
 #![deny(unused_attributes, unused_imports, unused_mut)]
-//#![deny(missing_docs)]
+#![deny(missing_docs)]
 #![deny(renamed_and_removed_lints, stable_features, unused_allocation)]
 #![deny(unused_comparisons, bare_trait_objects, unused_must_use, const_err)]
 #![forbid(unsafe_code)]
@@ -29,11 +29,15 @@ extern crate lazy_static;
 
 /// The wrapper for anonymous credentials.
 pub mod anon_creds;
+/// Module for anonymous transfer.
 pub mod anon_xfr;
 /// The wrapper of the parameters.
 pub mod parameters;
+/// Module for serialization.
 pub mod serialization;
+/// Module for generating parameters.
 pub mod setup;
+/// Module for confidential transfer.
 pub mod xfr;
 
 pub use zei_algebra::errors;

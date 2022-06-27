@@ -6,13 +6,18 @@ use zei_algebra::{
 };
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
+/// Module for asset mixing.
 pub mod asset_mixer;
+/// Module for asset records.
 pub mod asset_record;
+/// Module for asset tracing.
 pub mod asset_tracer;
+/// Module for zero-knowledge proofs.
 pub mod proofs;
+/// Module for signatures.
 pub mod sig;
+/// Module for shared structures.
 pub mod structs;
-pub mod test_utils;
 
 #[cfg(test)]
 pub(crate) mod tests;
@@ -26,7 +31,7 @@ use self::{
     },
     proofs::{
         asset_amount_tracing_proofs, asset_proof, batch_verify_confidential_amount,
-        batch_verify_confidential_asset, batch_verify_tracer_tracing_proof, range_proof,
+        batch_verify_confidential_asset, batch_verify_tracer_tracing_proof, gen_range_proof,
     },
     sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey},
     structs::*,
@@ -381,7 +386,7 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
     match xfr_type {
         XfrType::NonConfidential_SingleAsset => Ok(AssetTypeAndAmountProof::NoProof),
         XfrType::ConfidentialAmount_NonConfidentialAssetType_SingleAsset => Ok(
-            AssetTypeAndAmountProof::ConfAmount(range_proof(inputs, outputs).c(d!())?),
+            AssetTypeAndAmountProof::ConfAmount(gen_range_proof(inputs, outputs).c(d!())?),
         ),
         XfrType::NonConfidentialAmount_ConfidentialAssetType_SingleAsset => {
             Ok(AssetTypeAndAmountProof::ConfAsset(Box::new(
@@ -389,7 +394,7 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
             )))
         }
         XfrType::Confidential_SingleAsset => Ok(AssetTypeAndAmountProof::ConfAll(Box::new((
-            range_proof(inputs, outputs).c(d!())?,
+            gen_range_proof(inputs, outputs).c(d!())?,
             asset_proof(prng, &pc_gens, inputs, outputs).c(d!())?,
         )))),
         _ => Err(eg!(ZeiError::XfrCreationAssetAmountError)), // Type cannot be multi asset
@@ -556,6 +561,7 @@ pub struct XfrNotePoliciesRef<'b> {
 }
 
 impl<'b> XfrNotePoliciesRef<'b> {
+    /// Create a new reference of the policies.
     pub fn new(
         inputs_tracing_policies: Vec<&'b TracingPolicies>,
         inputs_sig_commitments: Vec<Option<&'b ACCommitment>>,
@@ -583,10 +589,15 @@ pub(crate) fn if_some_closure(x: &Option<ACCommitment>) -> Option<&ACCommitment>
 /// Tracing policies for an asset record.
 #[derive(Clone, Default, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct XfrNotePolicies {
-    pub valid: bool, // allows to implement Default, if false (as after Default), then use empty_policies to create a "valid" XfrNotePolicies struct with empty policies
+    /// Whether the structure is valid and has policies.
+    pub valid: bool, // default to false
+    /// The tracing policies
     pub inputs_tracing_policies: Vec<TracingPolicies>,
+    /// The attribute commitments for each input.
     pub inputs_sig_commitments: Vec<Option<ACCommitment>>,
+    /// The tracing policies for each output.
     pub outputs_tracing_policies: Vec<TracingPolicies>,
+    /// The attribute commitments for each output.
     pub outputs_sig_commitments: Vec<Option<ACCommitment>>,
 }
 

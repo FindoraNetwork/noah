@@ -1,4 +1,6 @@
 // The Public Setup needed for Proofs
+use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
+use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
     abar_to_ar::build_abar_to_ar_cs,
     abar_to_bar::build_abar_to_bar_cs,
@@ -10,7 +12,7 @@ use crate::anon_xfr::{
 use crate::parameters::{
     ABAR_TO_AR_VERIFIER_PARAMS, ABAR_TO_BAR_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS,
     BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS,
-    VERIFIER_SPECIALS_PARAMS,
+    VERIFIER_SPECIFIC_PARAMS,
 };
 use bulletproofs::BulletproofGens;
 use serde::Deserialize;
@@ -29,54 +31,69 @@ use zei_plonk::{
     },
     poly_commit::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
 };
-// The Public Setup needed for Proofs
-use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AMultiXfrWitness};
-// The Public Setup needed for Proofs
-use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 
-// Shared by all members of the ledger
+/// The Bulletproofs URS.
 #[derive(Serialize, Deserialize)]
 pub struct BulletproofParams {
+    /// The Bulletproofs generators.
     pub bp_gens: BulletproofGens,
+    /// The Bulletproofs circuit generators.
     pub bp_circuit_gens: BulletproofGens,
+    /// The number of bits in the range proof.
     pub range_proof_bits: usize,
 }
 
 #[derive(Serialize, Deserialize)]
+/// The prover parameters.
 pub struct ProverParams {
-    pub bp_params: BulletproofParams,
+    /// The full SRS for the polynomial commitment scheme.
     pub pcs: KZGCommitmentSchemeBLS,
+    /// The Lagrange basis format of SRS.
     pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
+    /// The constraint system.
     pub cs: TurboPlonkCS,
+    /// The TurboPlonk proving key.
     pub prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
 }
 
 #[derive(Serialize, Deserialize)]
+/// The verifier parameters.
 pub struct VerifierParams {
-    pub bp_params: BulletproofParams,
+    /// The shrunk version of the polynomial commitment scheme.
     pub pcs: KZGCommitmentSchemeBLS,
+    /// The shrunk version of the constraint system.
     pub cs: TurboPlonkCS,
+    /// The TurboPlonk verifying key.
     pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct NodeParamsSplitCommon {
-    pub bp_params: BulletproofParams,
+/// The common part of the verifier parameters.
+pub struct VerifierParamsSplitCommon {
+    /// The shrunk version of the polynomial commitment scheme.
     pub pcs: KZGCommitmentSchemeBLS,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct NodeParamsSplitSpecial {
+/// The specific part of the verifier parameters.
+pub struct VerifierParamsSplitSpecific {
+    /// The shrunk version of the constraint system.
     pub cs: TurboPlonkCS,
+    /// The verifier parameters.
     pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
 
+/// The range in the Bulletproofs range check.
 pub const BULLET_PROOF_RANGE: usize = 32;
-pub const MAX_PARTY_NUMBER: usize = 128;
-pub const PRECOMPUTED_PARTY_NUMBER: usize = 5;
+/// The maximal number
+pub const MAX_CONFIDENTIAL_RECORD_NUMBER: usize = 128;
+/// The maximal number of inputs and outputs supported by this setup program.
+pub const MAX_ANONYMOUS_RECORD_NUMBER: usize = 5;
+/// The default number of Bulletproofs generators
 pub const DEFAULT_BP_NUM_GENS: usize = 256;
 
 impl BulletproofParams {
+    /// Load the URS for Bulletproofs.
     pub fn new() -> Result<BulletproofParams> {
         let urs = BULLETPROOF_URS.c(d!(ZeiError::MissingSRSError))?;
 
@@ -86,7 +103,7 @@ impl BulletproofParams {
         Ok(pp)
     }
 
-    /// Has no effect if new_size.next_power_of_two() is less or equal than current capacity
+    /// Increase the Bulletproofs URS on demand.
     pub fn increase_circuit_gens(&mut self, new_size: usize) {
         self.bp_circuit_gens
             .increase_capacity(new_size.next_power_of_two());
@@ -95,7 +112,8 @@ impl BulletproofParams {
 
 impl Default for BulletproofParams {
     fn default() -> Self {
-        let range_generators = BulletproofGens::new(BULLET_PROOF_RANGE, MAX_PARTY_NUMBER);
+        let range_generators =
+            BulletproofGens::new(BULLET_PROOF_RANGE, MAX_CONFIDENTIAL_RECORD_NUMBER);
         let circuit_generators = BulletproofGens::new(DEFAULT_BP_NUM_GENS, 1);
 
         BulletproofParams {
@@ -107,6 +125,7 @@ impl Default for BulletproofParams {
 }
 
 impl ProverParams {
+    /// Obtain the parameters for anonymous transfer for a given number of inputs and a given number of outputs.
     pub fn new(
         n_payers: usize,
         n_payees: usize,
@@ -122,14 +141,14 @@ impl ProverParams {
 
         let (cs, _) = match tree_depth {
             Some(depth) => build_multi_xfr_cs(
-                AMultiXfrWitness::fake(n_payers, n_payees, depth, 0),
+                AXfrWitness::fake(n_payers, n_payees, depth, 0),
                 FEE_TYPE.as_scalar(),
                 &hash,
                 &non_malleability_randomizer,
                 &non_malleability_tag,
             ),
             None => build_multi_xfr_cs(
-                AMultiXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
+                AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
                 FEE_TYPE.as_scalar(),
                 &hash,
                 &non_malleability_randomizer,
@@ -145,7 +164,6 @@ impl ProverParams {
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
-            bp_params: BulletproofParams::new()?,
             pcs,
             lagrange_pcs,
             cs,
@@ -153,6 +171,7 @@ impl ProverParams {
         })
     }
 
+    /// Obtain the parameters for confidential to anonymous.
     pub fn bar_to_abar_params() -> Result<ProverParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let zero = BLSScalar::zero();
@@ -179,7 +198,6 @@ impl ProverParams {
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
-            bp_params: BulletproofParams::new()?,
             pcs,
             lagrange_pcs,
             cs,
@@ -187,6 +205,7 @@ impl ProverParams {
         })
     }
 
+    /// Obtain the parameters for anonymous to confidential.
     pub fn abar_to_bar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
 
@@ -232,7 +251,6 @@ impl ProverParams {
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
-            bp_params: BulletproofParams::new()?,
             pcs,
             lagrange_pcs,
             cs,
@@ -240,6 +258,7 @@ impl ProverParams {
         })
     }
 
+    /// Obtain the parameters for transparent to anonymous.
     pub fn ar_to_abar_params() -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
         let dummy_payee = PayeeWitness {
@@ -260,7 +279,6 @@ impl ProverParams {
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
-            bp_params: BulletproofParams::new()?,
             pcs,
             lagrange_pcs,
             cs,
@@ -268,6 +286,7 @@ impl ProverParams {
         })
     }
 
+    /// Obtain the parameters for anonymous to transparent.
     pub fn abar_to_ar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
 
@@ -306,7 +325,6 @@ impl ProverParams {
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
 
         Ok(ProverParams {
-            bp_params: BulletproofParams::new()?,
             pcs,
             lagrange_pcs,
             cs,
@@ -339,6 +357,7 @@ fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
 }
 
 impl VerifierParams {
+    /// Create the verifier parameters for a given number of inputs and a given number of outputs.
     pub fn create(
         n_payers: usize,
         n_payees: usize,
@@ -348,21 +367,20 @@ impl VerifierParams {
         Ok(Self::from(prover_params))
     }
 
-    /// anon transfer verifier parameters.
+    /// Load the verifier parameters for a given number of inputs and a given number of outputs.
     pub fn load(n_payers: usize, n_payees: usize) -> Result<VerifierParams> {
-        if n_payees > PRECOMPUTED_PARTY_NUMBER || n_payers > PRECOMPUTED_PARTY_NUMBER {
+        if n_payees > MAX_ANONYMOUS_RECORD_NUMBER || n_payers > MAX_ANONYMOUS_RECORD_NUMBER {
             Err(SimpleError::new(d!(ZeiError::MissingVerifierParamsError), None).into())
         } else {
-            match (VERIFIER_COMMON_PARAMS, VERIFIER_SPECIALS_PARAMS) {
+            match (VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS) {
                 (Some(c_bytes), Some(s_bytes)) => {
-                    let common: NodeParamsSplitCommon =
+                    let common: VerifierParamsSplitCommon =
                         bincode::deserialize(c_bytes).c(d!(ZeiError::DeserializationError))?;
                     let specials: Vec<Vec<Vec<u8>>> = bincode::deserialize(s_bytes).unwrap();
-                    let special: NodeParamsSplitSpecial =
+                    let special: VerifierParamsSplitSpecific =
                         bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
                             .c(d!(ZeiError::DeserializationError))?;
                     Ok(VerifierParams {
-                        bp_params: common.bp_params,
                         pcs: common.pcs,
                         cs: special.cs,
                         verifier_params: special.verifier_params,
@@ -373,7 +391,7 @@ impl VerifierParams {
         }
     }
 
-    /// abar to bar transfer verifier parameters.
+    /// Obtain the parameters for anonymous to confidential.
     pub fn abar_to_bar_params() -> Result<VerifierParams> {
         if let Some(bytes) = ABAR_TO_BAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
@@ -383,7 +401,7 @@ impl VerifierParams {
         }
     }
 
-    /// bar to abar transfer verifier parameters.
+    /// Obtain the parameters for confidential to anonymous.
     pub fn bar_to_abar_params() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
@@ -393,7 +411,7 @@ impl VerifierParams {
         }
     }
 
-    /// ar to abar transfer verifier parameters.
+    /// Obtain the parameters for transparent to anonymous.
     pub fn ar_to_abar_params() -> Result<VerifierParams> {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
@@ -403,7 +421,7 @@ impl VerifierParams {
         }
     }
 
-    /// abar to ar transfer verifier parameters.
+    /// Obtain the parameters for anonymous to transparent.
     pub fn abar_to_ar_params() -> Result<VerifierParams> {
         if let Some(bytes) = ABAR_TO_AR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
@@ -413,22 +431,22 @@ impl VerifierParams {
         }
     }
 
+    /// Shrink the verifier parameters.
     pub fn shrink(self) -> Result<VerifierParams> {
         Ok(VerifierParams {
-            bp_params: self.bp_params,
             pcs: self.pcs.shrink_to_verifier_only()?,
             cs: self.cs.shrink_to_verifier_only()?,
             verifier_params: self.verifier_params,
         })
     }
 
-    pub fn split(self) -> Result<(NodeParamsSplitCommon, NodeParamsSplitSpecial)> {
+    /// Split the verifier parameters to the common part and the sspecific part.
+    pub fn split(self) -> Result<(VerifierParamsSplitCommon, VerifierParamsSplitSpecific)> {
         Ok((
-            NodeParamsSplitCommon {
-                bp_params: self.bp_params,
+            VerifierParamsSplitCommon {
                 pcs: self.pcs.shrink_to_verifier_only()?,
             },
-            NodeParamsSplitSpecial {
+            VerifierParamsSplitSpecific {
                 cs: self.cs.shrink_to_verifier_only()?,
                 verifier_params: self.verifier_params,
             },
@@ -439,7 +457,6 @@ impl VerifierParams {
 impl From<ProverParams> for VerifierParams {
     fn from(params: ProverParams) -> Self {
         VerifierParams {
-            bp_params: params.bp_params,
             pcs: params.pcs,
             cs: params.cs,
             verifier_params: params.prover_params.get_verifier_params(),

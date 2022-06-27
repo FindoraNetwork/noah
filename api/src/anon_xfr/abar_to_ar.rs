@@ -1,9 +1,9 @@
 use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
 use crate::anon_xfr::keys::{get_view_key_domain_separator, AXfrKeyPair};
 use crate::anon_xfr::{
-    commit_in_cs_with_native_address, compute_merkle_root, compute_non_malleability_tag,
+    commit_in_cs_with_native_address, compute_merkle_root_variables, compute_non_malleability_tag,
     nullify_in_cs_with_native_address, nullify_with_native_address,
-    structs::{AccElemVars, Nullifier, NullifierInputVars, OpenAnonBlindAssetRecord, PayerWitness},
+    structs::{AccElemVars, Nullifier, NullifierInputVars, OpenAnonAssetRecord, PayerWitness},
     AXfrPlonkPf, TurboPlonkCS, SK_LEN,
 };
 use crate::setup::{ProverParams, VerifierParams};
@@ -57,7 +57,7 @@ pub struct AbarToArBody {
 pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
-    oabar: &OpenAnonBlindAssetRecord,
+    oabar: &OpenAnonAssetRecord,
     abar_keypair: &AXfrKeyPair,
     ar_pub_key: &XfrPublicKey,
 ) -> Result<AbarToArNote> {
@@ -275,7 +275,7 @@ pub fn build_abar_to_ar_cs(
         uid: payers_witness_vars.uid,
         commitment: com_abar_in_var,
     };
-    let tmp_root_var = compute_merkle_root(&mut cs, acc_elem, &payers_witness_vars.path);
+    let tmp_root_var = compute_merkle_root_variables(&mut cs, acc_elem, &payers_witness_vars.path);
 
     if let Some(root) = root_var {
         cs.equal(root, tmp_root_var);
@@ -322,9 +322,7 @@ mod tests {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
         abar_to_ar::{gen_abar_to_ar_note, verify_abar_to_ar_note},
-        structs::{
-            AnonBlindAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonBlindAssetRecordBuilder,
-        },
+        structs::{AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecordBuilder},
         TREE_DEPTH,
     };
     use crate::setup::{ProverParams, VerifierParams};
@@ -359,7 +357,7 @@ mod tests {
         let store = PrefixedStore::new("my_store", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-        let mut oabar = OpenAnonBlindAssetRecordBuilder::new()
+        let mut oabar = OpenAnonAssetRecordBuilder::new()
             .pub_key(&sender.get_pub_key())
             .amount(1234u64)
             .asset_type(AssetType::from_identical_byte(0u8))
@@ -368,7 +366,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let abar = AnonBlindAssetRecord::from_oabar(&oabar);
+        let abar = AnonAssetRecord::from_oabar(&oabar);
         mt.add_commitment_hash(hash_abar(0, &abar)).unwrap();
         mt.commit().unwrap();
         let proof = mt.generate_proof(0).unwrap();
@@ -390,7 +388,7 @@ mod tests {
         assert!(verify_abar_to_ar_note(&node_params, &note_wrong_nullifier, &proof.root,).is_err());
     }
 
-    fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
+    fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
         let hash = RescueInstance::new();
         hash.rescue(&[
             BLSScalar::from(uid),

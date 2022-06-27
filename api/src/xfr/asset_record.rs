@@ -12,17 +12,22 @@ use crate::xfr::{
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
-/// AssetRecord confidentiality flags. Indicated if amount and/or asset type should be confidential
+/// AssetRecord confidentiality flags. Indicated if amount and/or asset type should be confidential.
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum AssetRecordType {
+    /// Transparent amount, confidential asset type.
     NonConfidentialAmount_ConfidentialAssetType,
+    /// Confidential amount, transparent asset type.
     ConfidentialAmount_NonConfidentialAssetType,
+    /// Confidential amount, confidential asset type.
     ConfidentialAmount_ConfidentialAssetType,
+    /// Transparent amount, transparent asset type.
     NonConfidentialAmount_NonConfidentialAssetType,
 }
 
 impl AssetRecordType {
+    /// Return flgas that indicate the level of confidentiality.
     /// Return `(true,_)` if amount is confidential,
     /// Return `(_, true)` if asset type is confidential,
     pub fn get_flags(self) -> (bool, bool) {
@@ -35,6 +40,7 @@ impl AssetRecordType {
         }
     }
 
+    /// Return if the amount is confidential.
     pub fn is_confidential_amount(self) -> bool {
         matches!(
             self,
@@ -42,6 +48,8 @@ impl AssetRecordType {
                 | AssetRecordType::ConfidentialAmount_NonConfidentialAssetType
         )
     }
+
+    /// Return if the asset type is confidential.
     pub fn is_confidential_asset_type(self) -> bool {
         matches!(
             self,
@@ -50,6 +58,7 @@ impl AssetRecordType {
         )
     }
 
+    /// Return if both the amount and the asset type are confidential.
     pub fn is_confidential_amount_and_asset_type(self) -> bool {
         matches!(
             self,
@@ -57,6 +66,7 @@ impl AssetRecordType {
         )
     }
 
+    /// Compute the record type from the level of confidentiality.
     pub fn from_flags(conf_amt: bool, conf_type: bool) -> Self {
         match (conf_amt, conf_type) {
             (false, false) => AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
@@ -225,6 +235,7 @@ impl AssetRecord {
         })
     }
 
+    /// Create the asset record using a template, without identity tracing.
     pub fn from_template_no_identity_tracing<R: CryptoRng + RngCore>(
         prng: &mut R,
         template: &AssetRecordTemplate,
@@ -239,6 +250,7 @@ impl AssetRecord {
             .c(d!())
     }
 
+    /// Create the asset record using a template, with identity tracing.
     pub fn from_template_with_identity_tracing<R: CryptoRng + RngCore>(
         prng: &mut R,
         template: &AssetRecordTemplate,
@@ -529,9 +541,7 @@ pub fn open_blind_asset_record(
     })
 }
 
-/// Generates an RecordInput from an asset_record using identity proof of identity tracing
-/// and corresponding ciphertexts.
-/// This function is used to generate an output for gen_xfr_note/body
+/// Helper function to generate assemble asset record from templates.
 fn build_record_input_from_template<R: CryptoRng + RngCore>(
     prng: &mut R,
     asset_record: &AssetRecordTemplate,

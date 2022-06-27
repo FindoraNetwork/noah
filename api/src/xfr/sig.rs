@@ -7,21 +7,30 @@ use zei_algebra::{
     ristretto::{CompressedEdwardsY, RistrettoScalar},
 };
 
+/// The length of the secret key for confidential transfer.
 pub const XFR_SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default)]
+/// The public key for confidential transfer.
 pub struct XfrPublicKey(pub(crate) PublicKey);
+
 #[derive(Debug)]
+/// The secret key for confidential transfer.
 pub struct XfrSecretKey(pub(crate) SecretKey);
+
 #[wasm_bindgen]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+/// The keypair for confidential transfer.
 pub struct XfrKeyPair {
+    /// The public key.
     pub pub_key: XfrPublicKey,
+    /// The secret key.
     pub(crate) sec_key: XfrSecretKey,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// The signature for confidential transfer.
 pub struct XfrSignature(pub Signature);
 
 impl Eq for XfrPublicKey {}
@@ -51,17 +60,19 @@ impl Hash for XfrPublicKey {
 }
 
 impl XfrPublicKey {
-    /// returns XfrPublicKey as a compressed edwards point
+    /// Convert into the twisted Edwards format.
     pub fn as_compressed_edwards_point(&self) -> CompressedEdwardsY {
         CompressedEdwardsY::from_slice(self.0.as_bytes())
     }
 
+    /// Verify a signature.
     pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<()> {
         self.0
             .verify(message, &signature.0)
             .c(d!(ZeiError::SignatureError))
     }
 
+    /// Convert into bytes.
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_bytes()
     }
@@ -104,6 +115,7 @@ impl Hash for XfrSecretKey {
 
 impl XfrSecretKey {
     #[inline(always)]
+    /// Convert into a keypair.
     pub fn into_keypair(self) -> XfrKeyPair {
         XfrKeyPair {
             pub_key: XfrPublicKey(ed25519_dalek::PublicKey::from(&self.0)),
@@ -111,6 +123,7 @@ impl XfrSecretKey {
         }
     }
 
+    /// Sign a message.
     pub fn sign(&self, message: &[u8], public_key: &XfrPublicKey) -> XfrSignature {
         let expanded: ExpandedSecretKey = (&self.0).into();
         let sign = expanded.sign(message, &public_key.0);
@@ -118,7 +131,6 @@ impl XfrSecretKey {
         XfrSignature(sign)
     }
 
-    /// Returns SecretKey as a RistrettoScalar
     pub(crate) fn as_scalar(&self) -> RistrettoScalar {
         let expanded: ExpandedSecretKey = (&self.0).into();
         // expanded.key is not public, thus extract it via serialization
@@ -129,6 +141,7 @@ impl XfrSecretKey {
 }
 
 impl XfrKeyPair {
+    /// Generate a key pair.
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         let kp = ed25519_dalek::Keypair::generate(prng);
         XfrKeyPair {
@@ -137,26 +150,31 @@ impl XfrKeyPair {
         }
     }
 
+    /// Sign a message.
     pub fn sign(&self, msg: &[u8]) -> XfrSignature {
         self.sec_key.sign(msg, &self.pub_key)
     }
 
     #[inline(always)]
+    /// Return the public key.
     pub fn get_pk(&self) -> XfrPublicKey {
         self.pub_key
     }
 
     #[inline(always)]
+    /// Return a reference of the public key.
     pub fn get_pk_ref(&self) -> &XfrPublicKey {
         &self.pub_key
     }
 
     #[inline(always)]
+    /// Return the secret key.
     pub fn get_sk(&self) -> XfrSecretKey {
         self.sec_key.clone()
     }
 
     #[inline(always)]
+    /// Return a reference of the secret key.
     pub fn get_sk_ref(&self) -> &XfrSecretKey {
         &self.sec_key
     }
@@ -178,16 +196,15 @@ impl ZeiFromToBytes for XfrKeyPair {
     }
 }
 
-////Primitive for multisignatures /////
-///A multisignature is defined as a signature on a message that must verify against a list of public keys instead of one
-// naive implementation below
+/// Multisignatures (aka multisig), which is now a list of signatures under each signer.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct XfrMultiSig {
+    /// The list of signatures.
     pub signatures: Vec<XfrSignature>,
 }
 
 impl XfrMultiSig {
-    /// Sign a multisig under a list of keypairs
+    /// Sign a multisig under a list of key pairs.
     pub fn sign(keypairs: &[&XfrKeyPair], message: &[u8]) -> Self {
         // sort the key pairs based on alphabetical order of their public keys
         let mut sorted = keypairs.to_owned();
@@ -196,7 +213,7 @@ impl XfrMultiSig {
         XfrMultiSig { signatures }
     }
 
-    /// Verify a multisig
+    /// Verify a multisig.
     pub fn verify(&self, pubkeys: &[&XfrPublicKey], message: &[u8]) -> Result<()> {
         if pubkeys.len() != self.signatures.len() {
             return Err(eg!(ZeiError::SignatureError));

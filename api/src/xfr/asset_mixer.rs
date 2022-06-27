@@ -12,6 +12,7 @@ use zei_algebra::{
 use zei_crypto::bulletproofs::mix::{mix, MixCommitment, MixValue};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+/// The asset mixing proof.
 pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
 
 impl PartialEq for AssetMixProof {
@@ -121,8 +122,11 @@ pub fn prove_asset_mixing(
 
 /// An instance of asset mixing.
 pub struct AssetMixingInstance<'a> {
+    /// A list of Bulletproofs data commmitments for the inputs.
     pub inputs: Vec<(CompressedRistretto, CompressedRistretto)>,
+    /// A list of Bulletproofs data commitments for the outputs.
     pub outputs: Vec<(CompressedRistretto, CompressedRistretto)>,
+    /// The asset mixing proof.
     pub proof: &'a AssetMixProof,
 }
 

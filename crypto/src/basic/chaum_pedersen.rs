@@ -144,7 +144,7 @@ fn init_chaum_pedersen_multiple(transcript: &mut Transcript, commitments: &[Rist
     transcript.init_sigma(b"ChaumPedersenMultiple", &[], public_elems.as_slice())
 }
 
-/// Creates a zero-knowledge proof of knowledge for equality of a set of commitments
+/// Create a zero-knowledge proof of knowledge for equality of a set of commitments
 pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,

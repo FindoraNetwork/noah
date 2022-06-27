@@ -1,7 +1,7 @@
-use zei_algebra::traits::Pairing;
 use zei_algebra::{
     bls12_381::{BLSPairingEngine, BLSScalar, BLSG1, BLSG2},
     prelude::*,
+    traits::Pairing,
 };
 use zei_crypto::{
     anon_creds::{Attribute, CommOutput},
@@ -11,32 +11,35 @@ use zei_crypto::{
 type G1 = BLSG1;
 type G2 = BLSG2;
 type S = BLSScalar;
+
+/// The isssuer's public key.
 pub type ACIssuerPublicKey = zei_crypto::anon_creds::CredentialIssuerPK<G1, G2>;
+/// The isssuer's secret key.
 pub type ACIssuerSecretKey = zei_crypto::anon_creds::CredentialIssuerSK<G1, S>;
-
+/// The signature.
 pub type ACSignature = zei_crypto::anon_creds::CredentialSig<G1>;
-
+/// The user's public key.
 pub type ACUserPublicKey = zei_crypto::anon_creds::CredentialUserPK<G1>;
-
+/// The user's secret key.
 pub type ACUserSecretKey = zei_crypto::anon_creds::CredentialUserSK<S>;
-
+/// The signature opening proof.
 pub type ACRevealSig = zei_crypto::anon_creds::CredentialSigOpenProof<G1, G2, S>;
-
+/// The proof of knowledge.
 pub type ACPoK = zei_crypto::anon_creds::CredentialPoK<G2, S>;
-
+/// The commitment randomizer.
 pub type ACCommitmentKey = zei_crypto::anon_creds::CredentialCommRandomizer<S>;
-
+/// The commitment.
 pub type ACCommitment = zei_crypto::anon_creds::CredentialComm<G1>;
-
+/// The credential.
 pub type Credential = zei_crypto::anon_creds::Credential<G1, G2, Attr>;
-
+/// The commitment opening proof.
 pub type ACRevealProof = zei_crypto::anon_creds::CredentialCommOpenProof<G2, S>;
-
+/// The confidential opening proof.
 pub type ACConfidentialRevealProof = zei_crypto::confidential_anon_creds::CACPoK<G1, G2, S>;
-
+/// The attribute types.
 pub type Attr = u32;
 
-/// Generates e key pair for a credential issuer
+/// Generate e key pair for a credential issuer.
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
@@ -53,8 +56,7 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(
     zei_crypto::anon_creds::issuer_keygen::<_, BLSPairingEngine>(prng, num_attrs)
 }
 
-/// Generates a credential user key pair for a given credential issuer
-///
+/// Generate a credential user key pair for a given credential issuer.
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
@@ -71,7 +73,7 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(
     zei_crypto::anon_creds::user_keygen::<_, BLSPairingEngine>(prng, issuer_pk)
 }
 
-/// Computes a credential signature for a set of attributes.
+/// Compute a credential signature for a set of attributes.
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
@@ -101,7 +103,7 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
     .c(d!())
 }
 
-/// Produces opening key for credential commitment creation and attribute opening
+/// Produce an opening key for credential commitment creation and attribute opening
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
@@ -162,7 +164,7 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
         .c(d!())
 }
 
-/// Produces a AttrsRevealProof, bitmap indicates which attributes are revealed
+/// Produce an AttrsRevealProof, bitmap indicates which attributes are revealed
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
@@ -210,7 +212,7 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
     zei_crypto::anon_creds::commit::<_, BLSPairingEngine>(prng, user_sk, &c, key, msg).c(d!())
 }
 
-/// Verifies that the underlying credential is valid and that the commitment was issued using the
+/// Verify that the underlying credential is valid and that the commitment was issued using the
 /// message msg in particular.
 pub fn ac_verify_commitment(
     issuer_pub_key: &ACIssuerPublicKey,
@@ -222,7 +224,7 @@ pub fn ac_verify_commitment(
         .c(d!())
 }
 
-/// Produces a AttrsRevealProof for a committed credential produced using key. bitmap indicates which attributes are revealed
+/// Produce an AttrsRevealProof for a committed credential produced using key.
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
@@ -266,10 +268,7 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
         .c(d!())
 }
 
-/// Produces a ACRevealSig for a credential. ACRevealSig includes new commitment to the credential,
-/// and a AttrRevealProof for the revealed attributed.
-/// bitmap indicates which attributes are revealed.
-/// Calling ac_reveal is analogous to calling ac_commit and then ac_open_commitment.
+/// Produce a ACRevealSig for a credential.
 pub fn ac_reveal<R: CryptoRng + RngCore>(
     prng: &mut R,
     user_sk: &ACUserSecretKey,
@@ -339,22 +338,17 @@ pub fn ac_verify(
     .c(d!())
 }
 
+/// The attribute encryption key.
 pub type AttributeEncKey = zei_crypto::basic::elgamal::ElGamalEncKey<G1>;
+/// The attribute decryption key.
 pub type AttributeDecKey = zei_crypto::basic::elgamal::ElGamalDecKey<S>;
+/// The ciphertext of an attribute.
 pub type AttributeCiphertext = zei_crypto::basic::elgamal::ElGamalCiphertext<G1>;
 
+/// Confidential anonymous credential
 pub type ConfidentialAC = zei_crypto::confidential_anon_creds::ConfidentialAC<G1, G2, S>;
 
-/// Produced a Confidential Anonymous Credential Reveal Proof for a single instance of a confidential anonymous reveal. Proof asserts
-/// that a list of attributes can be decrypted from a list of ciphertexts under recv_enc_pub_key,
-/// and that these attributed verify an anonymous credential reveal proof.
-/// * `prng` - randomness source
-/// * `cred_issuer_pk` - (signing) public key of the credential issuer
-/// * `enc_key` - encryption public key of the receiver
-/// * `attrs` - attributes to prove knowledge of
-/// * `reveal_map` - indicates position of each attribute to prove
-/// * `ac_reveal_sig` - proof that the issuer has signed some attributes
-/// * `returns` - proof that the ciphertexts contains the attributes that have been signed by some issuer for the user.
+/// Produce a confidential anonymous credential revealing proof.
 /// # Example
 /// ```
 /// use zei::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit};
@@ -406,16 +400,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
     .c(d!())
 }
 
-/// Verifies a Confidential Anonymous Credential reveal proof. Proof asserts
-/// that a list of ciphertexts encodes attributes under `enc_key` such that
-/// these verify an anonymous credential reveal proof.
-/// * `prng` - randomness source
-/// * `issuer_pk` - (signing) public key of the credential issuer
-/// * `enc_key` - encryption public key of the receiver
-/// * `reveal_map` - indicates position of each attribute to prove
-/// * `cac` - List of ciphertext and the corresponding proof
-/// # Example
-/// see zei::anon_creds::ac_confidential_open_commitment;
+/// Verify a confidential anonymous credential reveal proof.
 pub fn ac_confidential_verify(
     issuer_pk: &ACIssuerPublicKey,
     enc_key: &AttributeEncKey,
@@ -437,6 +422,7 @@ pub fn ac_confidential_verify(
     .c(d!())
 }
 
+/// Generate encryptiion key for confidential anonymous credentials.
 pub fn ac_confidential_gen_encryption_keys<R: CryptoRng + RngCore>(
     prng: &mut R,
 ) -> (AttributeDecKey, AttributeEncKey) {

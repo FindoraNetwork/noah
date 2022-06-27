@@ -15,30 +15,39 @@ use zei_algebra::{
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::constraint_system::VarIndex;
 
+/// The nullifier.
 pub type Nullifier = BLSScalar;
+/// The commitment.
 pub type Commitment = BLSScalar;
+/// The blinding factor.
 pub type BlindFactor = BLSScalar;
 
 /// A Merkle tree node.
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTNode {
+    /// The first sibling in a three-ary tree.
     pub siblings1: BLSScalar,
+    /// The second sibling in a tree-ary tree.
     pub siblings2: BLSScalar,
+    /// Whether this node is the left chlid of the parent.
     pub is_left_child: u8,
+    /// Whether this node is the right child of the parent.
     pub is_right_child: u8,
 }
 
 /// Asset record to be put as leaves on the tree.
 #[wasm_bindgen]
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
-pub struct AnonBlindAssetRecord {
+pub struct AnonAssetRecord {
+    /// The commitment.
     pub commitment: BLSScalar,
 }
 
-impl AnonBlindAssetRecord {
-    pub fn from_oabar(oabar: &OpenAnonBlindAssetRecord) -> AnonBlindAssetRecord {
-        AnonBlindAssetRecord {
+impl AnonAssetRecord {
+    /// Generate the anonymous asset record from the opened version.
+    pub fn from_oabar(oabar: &OpenAnonAssetRecord) -> AnonAssetRecord {
+        AnonAssetRecord {
             commitment: oabar.compute_commitment(),
         }
     }
@@ -47,9 +56,13 @@ impl AnonBlindAssetRecord {
 /// A Merkle tree leaf.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MTLeafInfo {
+    /// The Merkle tree path.
     pub path: MTPath,
+    /// The root hash.
     pub root: BLSScalar,
+    /// The version of the Merkle tree.
     pub root_version: u64,
+    /// The ID of the commitment.
     pub uid: u64,
 }
 
@@ -65,7 +78,8 @@ impl Default for MTLeafInfo {
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
-pub struct OpenAnonBlindAssetRecord {
+/// An opened anonymous asset record.
+pub struct OpenAnonAssetRecord {
     pub(crate) amount: u64,
     pub(crate) asset_type: AssetType,
     pub(crate) blind: BLSScalar,
@@ -74,13 +88,14 @@ pub struct OpenAnonBlindAssetRecord {
     pub(crate) mt_leaf_info: Option<MTLeafInfo>,
 }
 
-impl OpenAnonBlindAssetRecord {
+impl OpenAnonAssetRecord {
+    /// Set the Merkle tree leaf information.
     pub fn update_mt_leaf_info(&mut self, mt_leat_info: MTLeafInfo) {
         self.mt_leaf_info = Some(mt_leat_info);
     }
 }
 
-impl OpenAnonBlindAssetRecord {
+impl OpenAnonAssetRecord {
     /// Get record amount
     pub fn get_amount(&self) -> u64 {
         self.amount
@@ -101,7 +116,7 @@ impl OpenAnonBlindAssetRecord {
         self.owner_memo.clone()
     }
 
-    /// computes record's amount||asset type||pub key commitment
+    /// Compute the record's amount||asset type||pub key commitment
     pub fn compute_commitment(&self) -> Commitment {
         let hash = RescueInstance::new();
         let cur = hash.rescue(&[
@@ -120,15 +135,15 @@ impl OpenAnonBlindAssetRecord {
 }
 
 #[derive(Default)]
-pub struct OpenAnonBlindAssetRecordBuilder {
-    pub(crate) oabar: OpenAnonBlindAssetRecord,
+/// The builder for an opened anonymous asset record.
+pub struct OpenAnonAssetRecordBuilder {
+    pub(crate) oabar: OpenAnonAssetRecord,
 }
 
-// Builder pattern
-impl OpenAnonBlindAssetRecordBuilder {
+impl OpenAnonAssetRecordBuilder {
     /// Created new OpenAnonBlindAssetRecord builder
     pub fn new() -> Self {
-        OpenAnonBlindAssetRecordBuilder {
+        OpenAnonAssetRecordBuilder {
             ..Default::default()
         }
     }
@@ -177,22 +192,22 @@ impl OpenAnonBlindAssetRecordBuilder {
     }
 
     /// Run a sanity check and if ok, return Ok(OpenBlindAssetRecord)
-    pub fn build(self) -> Result<OpenAnonBlindAssetRecord> {
+    pub fn build(self) -> Result<OpenAnonAssetRecord> {
         self.sanity_check().c(d!())?;
         Ok(self.oabar)
     }
 }
 
-impl OpenAnonBlindAssetRecordBuilder {
-    /// Builds an OpenAssetRecord from an BlindAssetRecord, opening keys, owner memo and decryption keys
+impl OpenAnonAssetRecordBuilder {
+    /// Build an OpenAssetRecord from an BlindAssetRecord, opening keys, owner memo and decryption keys
     /// Return error if decrypted `owner_memo` is inconsistent with `record`
     pub fn from_abar(
-        record: &AnonBlindAssetRecord,
+        record: &AnonAssetRecord,
         owner_memo: AxfrOwnerMemo,
         key_pair: &AXfrKeyPair,
     ) -> Result<Self> {
         let (amount, asset_type, blind) = decrypt_memo(&owner_memo, key_pair, record).c(d!())?;
-        let mut builder = OpenAnonBlindAssetRecordBuilder::new()
+        let mut builder = OpenAnonAssetRecordBuilder::new()
             .pub_key(&key_pair.get_pub_key())
             .amount(amount)
             .asset_type(asset_type);
@@ -219,10 +234,12 @@ impl OpenAnonBlindAssetRecordBuilder {
 /// An authentication path of a ternary Merkle tree.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTPath {
+    /// A list of tree nodes.
     pub nodes: Vec<MTNode>,
 }
 
 impl MTPath {
+    /// Create a new Merkle path.
     pub fn new(nodes: Vec<MTNode>) -> Self {
         Self { nodes }
     }
@@ -244,26 +261,32 @@ pub(crate) struct PayeeWitnessVars {
     pub(crate) pubkey_x: VarIndex,
 }
 
-// cs variables for a Merkle node
+/// The allocated variables for a Merkle tree node.
 pub struct MerkleNodeVars {
+    /// The allocated variable for the first sibling.
     pub siblings1: VarIndex,
+    /// The allocated variable for the second sibling.
     pub siblings2: VarIndex,
+    /// Whether this node is the left child of its parent.
     pub is_left_child: VarIndex,
+    /// Whether this node is the right child of its parent.
     pub is_right_child: VarIndex,
 }
 
-// cs variables for a merkle authentication path
+/// The allocated variables for a Merkle tree path.
 pub struct MerklePathVars {
+    /// The list of allocated Merkle tree nodes.
     pub nodes: Vec<MerkleNodeVars>,
 }
 
-// cs variables for an accumulated element
+/// The allocated variables for a Merkle tree leaf.
 pub struct AccElemVars {
+    /// The ID of this commitment.
     pub uid: VarIndex,
+    /// The commitment.
     pub commitment: VarIndex,
 }
 
-// cs variables for the nullifier PRF inputs
 pub(crate) struct NullifierInputVars {
     pub(crate) uid_amount: VarIndex,
     pub(crate) asset_type: VarIndex,
@@ -271,31 +294,46 @@ pub(crate) struct NullifierInputVars {
 }
 
 #[derive(Debug, Clone)]
+/// The witness for the payer.
 pub struct PayerWitness {
+    /// The spending key.
     pub spend_key: BLSScalar,
+    /// The amount.
     pub amount: u64,
+    /// The asset type.
     pub asset_type: BLSScalar,
+    /// The ID of the commitment to be nullified.
     pub uid: u64,
+    /// The Merkle tree path.
     pub path: MTPath,
+    /// The blinding factor in the output commitment.
     pub blind: BlindFactor,
 }
 
 #[derive(Debug, Clone)]
+/// The witness for the payee.
 pub struct PayeeWitness {
+    /// The amount.
     pub amount: u64,
+    /// The blinding factor in the output commitment.
     pub blind: BlindFactor,
+    /// The asset type.
     pub asset_type: BLSScalar,
+    /// The x coordinate of the public key.
     pub pubkey_x: BLSScalar,
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AxfrOwnerMemo {
-    pub share: JubjubPoint,
+    /// The random point used to generate the shared point.
+    pub point: JubjubPoint,
+    /// The ciphertext.
     pub ctext: Vec<u8>,
 }
 
 impl AxfrOwnerMemo {
+    /// Crate an encrypted memo using the public key.
     pub fn new<R: CryptoRng + RngCore>(
         prng: &mut R,
         pub_key: &AXfrPubKey,
@@ -318,7 +356,6 @@ impl AxfrOwnerMemo {
             let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
 
             if res.is_err() {
-                println!("here!");
                 return Err(eg!(ZeiError::EncryptionError));
             }
 
@@ -335,11 +372,15 @@ impl AxfrOwnerMemo {
             res.unwrap()
         };
 
-        Ok(Self { share, ctext })
+        Ok(Self {
+            point: share,
+            ctext,
+        })
     }
 
+    /// Decrypt a memo using the viewing key.
     pub fn decrypt(&self, view_key: &AXfrViewKey) -> Result<Vec<u8>> {
-        let dh = self.share.mul(&view_key.0);
+        let dh = self.point.mul(&view_key.0);
 
         let mut hasher = sha2::Sha512::new();
         hasher.update(&dh.to_compressed_bytes());

@@ -1,12 +1,11 @@
-use crate::anon_xfr::structs::AxfrOwnerMemo;
 use crate::anon_xfr::{
     keys::AXfrPubKey,
-    structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
-    AXfrPlonkPf, TurboPlonkCS,
+    structs::{AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecord, OpenAnonAssetRecordBuilder},
+    AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
 };
 use crate::setup::{ProverParams, VerifierParams};
-use crate::xfr::asset_record::AssetRecordType;
 use crate::xfr::{
+    asset_record::AssetRecordType,
     sig::{XfrKeyPair, XfrPublicKey, XfrSignature},
     structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
 };
@@ -28,21 +27,26 @@ use zei_plonk::plonk::{
 };
 
 const BAR_TO_ABAR_TRANSCRIPT: &[u8] = b"BAR to ABAR proof";
-pub const TWO_POW_32: u64 = 1 << 32;
 
-/// The confidential-to-anonymous note.
+/// A confidential-to-anonymous note.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct BarToAbarNote {
+    /// The confidential-to-anonymous body.
     pub body: BarToAbarBody,
+    /// The signature.
     pub signature: XfrSignature,
 }
 
-/// The confidential-to-anonymous body.
+/// A confidential-to-anonymous body.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
 pub struct BarToAbarBody {
+    /// The input, as a blind asset record.
     pub input: BlindAssetRecord,
-    pub output: AnonBlindAssetRecord,
+    /// The output, as an anonymous asset record.
+    pub output: AnonAssetRecord,
+    /// The zero-knowledge proofs.
     pub proof: (DelegatedChaumPedersenProof, AXfrPlonkPf),
+    /// The owner memo.
     pub memo: AxfrOwnerMemo,
 }
 
@@ -64,7 +68,7 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
         prove_bar_to_abar(prng, params, record, abar_pubkey).c(d!())?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
-        output: AnonBlindAssetRecord::from_oabar(&open_abar),
+        output: AnonAssetRecord::from_oabar(&open_abar),
         proof: (delegated_cp_proof, inspector_proof),
         memo: open_abar.owner_memo.unwrap(),
     };
@@ -102,7 +106,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     obar: &OpenAssetRecord,
     abar_pubkey: &AXfrPubKey,
 ) -> Result<(
-    OpenAnonBlindAssetRecord,
+    OpenAnonAssetRecord,
     DelegatedChaumPedersenProof,
     AXfrPlonkPf,
 )> {
@@ -111,7 +115,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     let pc_gens = RistrettoPedersenCommitment::default();
 
     // 1. Construct ABAR.
-    let oabar = OpenAnonBlindAssetRecordBuilder::new()
+    let oabar = OpenAnonAssetRecordBuilder::new()
         .amount(oabar_amount)
         .asset_type(obar.asset_type)
         .pub_key(abar_pubkey)
@@ -179,7 +183,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
 pub(crate) fn verify_bar_to_abar(
     params: &VerifierParams,
     bar: &BlindAssetRecord,
-    abar: &AnonBlindAssetRecord,
+    abar: &AnonAssetRecord,
     proof: &(DelegatedChaumPedersenProof, AXfrPlonkPf),
 ) -> Result<()> {
     let pc_gens = RistrettoPedersenCommitment::default();
@@ -552,7 +556,7 @@ mod test {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
         bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
-        structs::{AnonBlindAssetRecord, OpenAnonBlindAssetRecordBuilder},
+        structs::{AnonAssetRecord, OpenAnonAssetRecordBuilder},
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::{
@@ -607,7 +611,7 @@ mod test {
         let (oabar_conf, delegated_cp_proof_conf, inspector_proof_conf) =
             super::prove_bar_to_abar(&mut prng, &params, &obar, &abar_keypair.get_pub_key())
                 .unwrap();
-        let abar_conf = AnonBlindAssetRecord::from_oabar(&oabar_conf);
+        let abar_conf = AnonAssetRecord::from_oabar(&oabar_conf);
 
         let verifier_params = VerifierParams::from(params);
         assert!(super::verify_bar_to_abar(
@@ -647,7 +651,7 @@ mod test {
         .unwrap();
 
         // 1. check that abar_keypair opens the note
-        let oabar = OpenAnonBlindAssetRecordBuilder::from_abar(
+        let oabar = OpenAnonAssetRecordBuilder::from_abar(
             &note.body.output,
             note.body.memo.clone(),
             &abar_keypair,

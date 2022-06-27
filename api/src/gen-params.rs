@@ -10,7 +10,7 @@ use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
-use zei::setup::{BulletproofParams, ProverParams, VerifierParams, PRECOMPUTED_PARTY_NUMBER};
+use zei::setup::{BulletproofParams, ProverParams, VerifierParams, MAX_ANONYMOUS_RECORD_NUMBER};
 use zei_algebra::utils::save_to_file;
 use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 
@@ -42,8 +42,6 @@ enum Actions {
     BULLETPROOF { directory: PathBuf },
 }
 
-// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params
-#[allow(dead_code)]
 fn main() {
     use Actions::*;
     let action = Actions::from_args();
@@ -76,7 +74,7 @@ fn main() {
 fn gen_transfer_vk(directory: PathBuf) {
     println!(
         "Generating verifying keys for anonymous transfer for 1..{} payers, 1..{} payees ...",
-        PRECOMPUTED_PARTY_NUMBER, PRECOMPUTED_PARTY_NUMBER
+        MAX_ANONYMOUS_RECORD_NUMBER, MAX_ANONYMOUS_RECORD_NUMBER
     );
 
     let transfer_params = VerifierParams::create(1, 1, Some(TREE_DEPTH)).unwrap();
@@ -87,11 +85,11 @@ fn gen_transfer_vk(directory: PathBuf) {
     common_path.push("transfer-vk-common.bin");
     save_to_file(&common_ser, common_path);
 
-    let is: Vec<usize> = (1..=PRECOMPUTED_PARTY_NUMBER).map(|i| i).collect();
+    let is: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER).map(|i| i).collect();
     let mut bytes: HashMap<usize, Vec<Vec<u8>>> = is
         .par_iter()
         .map(|i| {
-            let js: Vec<usize> = (1..=PRECOMPUTED_PARTY_NUMBER).map(|j| j).collect();
+            let js: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER).map(|j| j).collect();
             let mut bytes: HashMap<usize, Vec<u8>> = js
                 .par_iter()
                 .map(|j| {
@@ -102,7 +100,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                 })
                 .collect();
             let mut ordered = vec![];
-            for i in 1..=PRECOMPUTED_PARTY_NUMBER {
+            for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER {
                 ordered.push(bytes.remove(&i).unwrap())
             }
             (*i, ordered)
@@ -110,13 +108,13 @@ fn gen_transfer_vk(directory: PathBuf) {
         .collect();
 
     let mut specials = vec![];
-    for i in 1..=PRECOMPUTED_PARTY_NUMBER {
+    for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER {
         specials.push(bytes.remove(&i).unwrap())
     }
 
     let specials_ser = bincode::serialize(&specials).unwrap();
     let mut specials_path = directory.clone();
-    specials_path.push("transfer-vk-specials.bin");
+    specials_path.push("transfer-vk-specific.bin");
     save_to_file(&specials_ser, specials_path);
 }
 

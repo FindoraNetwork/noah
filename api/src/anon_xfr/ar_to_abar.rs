@@ -2,8 +2,7 @@ use crate::anon_xfr::{
     commit_in_cs_with_native_address,
     keys::AXfrPubKey,
     structs::{
-        AnonBlindAssetRecord, AxfrOwnerMemo, OpenAnonBlindAssetRecordBuilder, PayeeWitness,
-        PayeeWitnessVars,
+        AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
     },
     AXfrPlonkPf, TurboPlonkCS,
 };
@@ -35,7 +34,7 @@ pub struct ArToAbarBody {
     /// The input transparent asset note, requiring both amounts and asset types to be transparent.
     pub input: BlindAssetRecord,
     /// The output anonymous asset record.
-    pub output: AnonBlindAssetRecord,
+    pub output: AnonAssetRecord,
     /// The proof that the output matches the input.
     pub proof: AXfrPlonkPf,
     /// memo to hold the blinding factor of commitment
@@ -84,7 +83,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     let oabar_amount = obar.amount;
 
     // 1. Construct ABAR.
-    let oabar = OpenAnonBlindAssetRecordBuilder::new()
+    let oabar = OpenAnonAssetRecordBuilder::new()
         .amount(oabar_amount)
         .asset_type(obar.asset_type)
         .pub_key(abar_pubkey)
@@ -117,7 +116,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
 
     let body = ArToAbarBody {
         input: obar.blind_asset_record.clone(),
-        output: AnonBlindAssetRecord::from_oabar(&oabar),
+        output: AnonAssetRecord::from_oabar(&oabar),
         proof,
         memo: oabar.owner_memo.unwrap(),
     };

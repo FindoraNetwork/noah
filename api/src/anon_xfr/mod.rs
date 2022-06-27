@@ -1,6 +1,6 @@
 use crate::anon_xfr::structs::{
-    AccElemVars, AnonBlindAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
-    NullifierInputVars, OpenAnonBlindAssetRecord,
+    AccElemVars, AnonAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
+    NullifierInputVars, OpenAnonAssetRecord,
 };
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
 use digest::Digest;
@@ -15,6 +15,8 @@ use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::constraint_system::{rescue::StateVar, TurboCS, VarIndex};
 use zei_plonk::plonk::indexer::PlonkPf;
 use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
+
+pub(crate) const TWO_POW_32: u64 = 1 << 32;
 
 /// Module for general-purpose anonymous payment.
 pub mod abar_to_abar;
@@ -36,13 +38,13 @@ const ASSET_TYPE_FRA: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
 /// FRA as the token used to pay the fee.
 pub const FEE_TYPE: AssetType = ASSET_TYPE_FRA;
 
-pub type TurboPlonkCS = TurboCS<BLSScalar>;
+pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 
 /// The Plonk proof type.
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 
 /// Check that inputs have Merkle tree witness and matching key pairs.
-fn check_inputs(inputs: &[OpenAnonBlindAssetRecord], keypairs: &[AXfrKeyPair]) -> Result<()> {
+fn check_inputs(inputs: &[OpenAnonAssetRecord], keypairs: &[AXfrKeyPair]) -> Result<()> {
     if inputs.len() != keypairs.len() {
         return Err(eg!(ZeiError::ParameterError));
     }
@@ -57,8 +59,8 @@ fn check_inputs(inputs: &[OpenAnonBlindAssetRecord], keypairs: &[AXfrKeyPair]) -
 /// Check that for each asset type total input amount == total output amount
 /// and for FRA, total input amount == total output amount + fees.
 fn check_asset_amount(
-    inputs: &[OpenAnonBlindAssetRecord],
-    outputs: &[OpenAnonBlindAssetRecord],
+    inputs: &[OpenAnonAssetRecord],
+    outputs: &[OpenAnonAssetRecord],
     fee: u32,
 ) -> Result<()> {
     let fee_asset_type = FEE_TYPE;
@@ -97,7 +99,7 @@ fn check_asset_amount(
 
 /// Check that the Merkle roots in input asset records are the same
 /// `inputs` is guaranteed to have at least one asset record.
-fn check_roots(inputs: &[OpenAnonBlindAssetRecord]) -> Result<()> {
+fn check_roots(inputs: &[OpenAnonAssetRecord]) -> Result<()> {
     let root = inputs[0]
         .mt_leaf_info
         .as_ref()
@@ -173,7 +175,7 @@ pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
 pub fn decrypt_memo(
     memo: &AxfrOwnerMemo,
     key_pair: &AXfrKeyPair,
-    abar: &AnonBlindAssetRecord,
+    abar: &AnonAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
     let plaintext = memo.decrypt(&key_pair.get_view_key())?;
     if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
@@ -333,7 +335,7 @@ fn sort(
 }
 
 /// Compute the Merkle tree root given the path information.
-pub fn compute_merkle_root(
+pub fn compute_merkle_root_variables(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,

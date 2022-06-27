@@ -3,6 +3,8 @@
 pub(crate) mod examples {
     use rand_chacha::ChaChaRng;
     use wasm_bindgen::__rt::std::collections::HashMap;
+    use zei::xfr::asset_record::build_blind_asset_record;
+    use zei::xfr::structs::{BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType};
     use zei::{
         anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
         setup::BulletproofParams,
@@ -14,13 +16,11 @@ pub(crate) mod examples {
                 AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType,
                 IdentityRevealPolicy, TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
             },
-            test_utils::{
-                conf_blind_asset_record_from_ledger, non_conf_blind_asset_record_from_ledger,
-            },
             trace_assets, verify_xfr_note, RecordData, XfrNotePolicies, XfrNotePoliciesRef,
         },
     };
     use zei_algebra::prelude::*;
+    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 
     pub const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
     pub const ASSET2_TYPE: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
@@ -1183,5 +1183,43 @@ pub(crate) mod examples {
             vec![8u32, 9, 11], // expect first, second and last attribute of user 3
             &user3_key_pair1.pub_key,
         );
+    }
+
+    // Simulate getting a BlindAssetRecord from Ledger
+    #[allow(clippy::clone_on_copy)]
+    pub fn non_conf_blind_asset_record_from_ledger(
+        key: &XfrPublicKey,
+        amount: u64,
+        asset_type: AssetType,
+    ) -> BlindAssetRecord {
+        BlindAssetRecord {
+            amount: XfrAmount::NonConfidential(amount),
+            asset_type: XfrAssetType::NonConfidential(asset_type),
+            public_key: key.clone(),
+        }
+    }
+
+    /// Simulate getting a BlindAssetRecord from Ledger
+    pub fn conf_blind_asset_record_from_ledger(
+        key: &XfrPublicKey,
+        amount: u64,
+        asset_type: AssetType,
+    ) -> (BlindAssetRecord, OwnerMemo) {
+        let mut prng = ChaChaRng::from_seed([1u8; 32]);
+        let template = AssetRecordTemplate {
+            amount,
+            asset_type,
+            public_key: key.clone(),
+            asset_record_type: AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+            asset_tracing_policies: Default::default(),
+        };
+        let (bar, _, owner) = build_blind_asset_record(
+            &mut prng,
+            &RistrettoPedersenCommitment::default(),
+            &template,
+            vec![],
+        );
+
+        (bar, owner.unwrap())
     }
 }

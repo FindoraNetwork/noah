@@ -14,15 +14,18 @@ use zei_crypto::basic::{
     hybrid_encryption::{hybrid_decrypt_with_x25519_secret_key, hybrid_encrypt_x25519},
 };
 
+/// The encryption key for the record data.
 pub type RecordDataEncKey = ElGamalEncKey<RistrettoPoint>;
+/// The decryption key for the record data.
 pub type RecordDataDecKey = ElGamalDecKey<RistrettoScalar>;
+/// The ciphertext of the record data.
 pub type RecordDataCiphertext = ElGamalCiphertext<RistrettoPoint>;
 type DecryptedAssetMemo = (Option<u64>, Option<AssetType>, Vec<Attr>);
 
 const U32_BYTES: usize = 4;
 
 impl TracerMemo {
-    /// Sample a new TracerMemo
+    /// Sample a new TracerMemo.
     /// amount_info is (amount_low, amount_high, amount_blind_low, amount_blind_high) tuple
     /// asset_type_info is (asset_type, asset_type_blind) tuple
     pub fn new<R: CryptoRng + RngCore>(
@@ -130,9 +133,9 @@ impl TracerMemo {
         Ok((amount, asset_type, attrs))
     }
 
-    /// Check if the amount encrypted in self.lock_amount is expected
-    /// If self.lock_amount is None, return Err(ZeiError::ParameterError)
-    /// Otherwise, if decrypted amount is not expected amount, return Err(ZeiError::AssetTracingExtractionError), else Ok(())
+    /// Check if the amount encrypted in self.lock_amount is expected.
+    /// If self.lock_amount is None, return Err(ZeiError::ParameterError),
+    /// Otherwise, if decrypted amount is not expected amount, return Err(ZeiError::AssetTracingExtractionError), else Ok(()).
     pub fn verify_amount(
         &self,
         dec_key: &ElGamalDecKey<RistrettoScalar>,
@@ -155,9 +158,9 @@ impl TracerMemo {
         }
     }
 
-    // check if the asset type encrypted in self.lock_asset_type is expected
-    // returns Err if lock_asset_type is None or the decrypted is not as expected, else returns Ok
-    fn verify_asset_type(
+    /// Check if the asset type encrypted in self.lock_asset_type is expected.
+    /// return Err if lock_asset_type is None or the decrypted is not as expected, else returns Ok.
+    pub fn verify_asset_type(
         &self,
         dec_key: &ElGamalDecKey<RistrettoScalar>,
         expected: &AssetType,
@@ -173,8 +176,8 @@ impl TracerMemo {
         }
     }
 
-    /// Decrypt asset_type in self.lock_asset_type via a linear scan over candidate_asset_types
-    /// If self.lock_asset_type is None, return Err(ZeiError::ParameterError)
+    /// Decrypt asset_type in self.lock_asset_type via a linear scan over candidate_asset_types.
+    /// If self.lock_asset_type is None, return Err(ZeiError::ParameterError),
     /// Otherwise, if decrypted asset_type is not in the candidate list return Err(ZeiError::AssetTracingExtractionError),
     /// else return the decrypted asset_type.
     pub fn extract_asset_type(
@@ -193,8 +196,8 @@ impl TracerMemo {
         Err(eg!(ZeiError::AssetTracingExtractionError))
     }
 
-    /// Check is the attributes encrypted in self.lock_attrs are the same as in expected_attributes
-    /// If self.lock_attrs is None or if attribute length doesn't match expected list, return Err(ZeiError::ParameterError)
+    /// Check is the attributes encrypted in self.lock_attrs are the same as in expected_attributes,
+    /// If self.lock_attrs is None or if attribute length doesn't match expected list, return Err(ZeiError::ParameterError),
     /// Otherwise, it returns a boolean vector indicating true for every positive match and false otherwise.
     pub fn verify_identity_attributes(
         &self,

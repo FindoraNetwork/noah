@@ -13,8 +13,8 @@ pub(crate) mod merkle_tree_test {
     };
     use zei::anon_xfr::structs::AccElemVars;
     use zei::anon_xfr::{
-        add_merkle_path_variables, compute_merkle_root,
-        structs::{AnonBlindAssetRecord, MTNode, MTPath, OpenAnonBlindAssetRecord},
+        add_merkle_path_variables, compute_merkle_root_variables,
+        structs::{AnonAssetRecord, MTNode, MTPath, OpenAnonAssetRecord},
     };
     use zei_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
@@ -33,7 +33,7 @@ pub(crate) mod merkle_tree_test {
 
         assert_eq!(mt.get_root().unwrap(), BLSScalar::zero(),);
 
-        let abar = AnonBlindAssetRecord::from_oabar(&OpenAnonBlindAssetRecord::default());
+        let abar = AnonAssetRecord::from_oabar(&OpenAnonAssetRecord::default());
         assert!(mt
             .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
             .is_ok());
@@ -75,7 +75,7 @@ pub(crate) mod merkle_tree_test {
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let abar = AnonBlindAssetRecord {
+        let abar = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
@@ -107,7 +107,7 @@ pub(crate) mod merkle_tree_test {
                     .collect(),
             },
         );
-        let root_var = compute_merkle_root(&mut cs, elem, &path_vars);
+        let root_var = compute_merkle_root_variables(&mut cs, elem, &path_vars);
 
         // Check Merkle root correctness
         let witness = cs.get_and_clear_witness();
@@ -134,7 +134,7 @@ pub(crate) mod merkle_tree_test {
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let mut abar = AnonBlindAssetRecord {
+        let mut abar = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
@@ -142,7 +142,7 @@ pub(crate) mod merkle_tree_test {
             .is_ok());
         mt.commit().unwrap();
 
-        abar = AnonBlindAssetRecord {
+        abar = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
@@ -150,7 +150,7 @@ pub(crate) mod merkle_tree_test {
             .is_ok());
         mt.commit().unwrap();
 
-        abar = AnonBlindAssetRecord {
+        abar = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
@@ -158,7 +158,7 @@ pub(crate) mod merkle_tree_test {
             .is_ok());
         mt.commit().unwrap();
 
-        abar = AnonBlindAssetRecord {
+        abar = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
         assert!(mt
@@ -203,13 +203,13 @@ pub(crate) mod merkle_tree_test {
         let mut pmt = PersistentMerkleTree::new(store).unwrap();
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let abar0 = AnonBlindAssetRecord {
+        let abar0 = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
-        let abar1 = AnonBlindAssetRecord {
+        let abar1 = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
-        let abar2 = AnonBlindAssetRecord {
+        let abar2 = AnonAssetRecord {
             commitment: BLSScalar::random(&mut prng),
         };
 
@@ -240,7 +240,7 @@ pub(crate) mod merkle_tree_test {
         pmt.commit().unwrap();
     }
 
-    fn hash_abar(uid: u64, abar: &AnonBlindAssetRecord) -> BLSScalar {
+    fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
         let hash = RescueInstance::new();
 
         hash.rescue(&[
