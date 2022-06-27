@@ -324,13 +324,12 @@ pub struct PayeeWitness {
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
-#[wasm_bindgen]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AxfrOwnerMemo {
     /// The random point used to generate the shared point.
-    pub(crate) point: JubjubPoint,
+    pub point: JubjubPoint,
     /// The ciphertext.
-    pub(crate) ctext: Vec<u8>,
+    pub ctext: Vec<u8>,
 }
 
 impl AxfrOwnerMemo {
