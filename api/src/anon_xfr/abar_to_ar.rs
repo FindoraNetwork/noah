@@ -1,4 +1,4 @@
-use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
+use crate::anon_xfr::abar_to_abar::{add_payers_witnesses, AXfrPreNote};
 use crate::anon_xfr::keys::{get_view_key_domain_separator, AXfrKeyPair};
 use crate::anon_xfr::{
     commit_in_cs_with_native_address, compute_merkle_root_variables, compute_non_malleability_tag,
@@ -38,6 +38,17 @@ pub struct AbarToArNote {
     pub non_malleability_tag: BLSScalar,
 }
 
+/// The anonymous-to-transparent note without proof or non-malleability tag.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AbarToArPreNote {
+    /// The body part of ABAR to AR.
+    pub body: AbarToArBody,
+    /// Witness.
+    pub witness: PayerWitness,
+    /// Input key pair.
+    pub input_keypair: AXfrKeyPair,
+}
+
 /// The anonymous-to-transparent body.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToArBody {
@@ -54,13 +65,11 @@ pub struct AbarToArBody {
 }
 
 /// Generate an anonymous-to-transparent note.
-pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
-    prng: &mut R,
-    params: &ProverParams,
+pub fn init_abar_to_ar_note(
     oabar: &OpenAnonAssetRecord,
     abar_keypair: &AXfrKeyPair,
     ar_pub_key: &XfrPublicKey,
-) -> Result<AbarToArNote> {
+) -> Result<AbarToArPreNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.get_pub_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
     }
@@ -104,17 +113,33 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
         memo: owner_memo,
     };
 
-    let msg = bincode::serialize(&body)
-        .c(d!(ZeiError::SerializationError))
-        .c(d!())?;
+    Ok(AbarToArPreNote {
+        body,
+        witness: payers_secret,
+        input_keypair: AXfrKeyPair,
+    })
+}
 
-    let (hash, non_malleability_randomizer, non_malleability_tag) =
-        compute_non_malleability_tag(prng, b"AbarToAr", &msg, &[&abar_keypair]);
+/// Finalize an anonymous-to-transparent note.
+pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> + Default>(
+    prng: &mut R,
+    params: &ProverParams,
+    pre_note: AbarToArPreNote,
+    hash: &D,
+) -> Result<AbarToArNote> {
+    let AbarToArPreNote {
+        body,
+        witness,
+        input_keypair,
+    } = pre_note;
+
+    let (non_malleability_randomizer, non_malleability_tag) =
+        compute_non_malleability_tag(prng, hash, &[&input_keypair]);
 
     let proof = prove_abar_to_ar(
         prng,
         params,
-        payers_secret,
+        witness,
         &hash,
         &non_malleability_randomizer,
         &non_malleability_tag,

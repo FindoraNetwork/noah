@@ -46,6 +46,17 @@ pub struct AbarToBarNote {
     pub non_malleability_tag: BLSScalar,
 }
 
+/// An anonymous-to-confidential note without the proof or non-malleability tag..
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AbarToBarPreNote {
+    /// The anonymous-to-confidential body.
+    pub body: AbarToBarBody,
+    /// Witness
+    pub witness: PayerWitness,
+    /// The non-malleability tag.
+    pub non_malleability_tag: BLSScalar,
+}
+
 /// An anonymous-to-confidential body.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToBarBody {

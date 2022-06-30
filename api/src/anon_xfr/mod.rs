@@ -120,22 +120,20 @@ fn check_roots(inputs: &[OpenAnonAssetRecord]) -> Result<()> {
 }
 
 /// Compute the non-malleability tag given the information and the secret keys.
-pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
+pub fn compute_non_malleability_tag<
+    R: CryptoRng + RngCore,
+    D: Digest<OutputSize = U64> + Default,
+>(
     prng: &mut R,
-    domain_separator: &[u8],
-    msg: &[u8],
+    hash: D,
     secret_keys: &[&AXfrKeyPair],
-) -> (BLSScalar, BLSScalar, BLSScalar) {
-    let mut hasher = Sha512::new();
-    hasher.update(domain_separator);
-    hasher.update(msg);
-
-    let hash = BLSScalar::from_hash(hasher);
+) -> (BLSScalar, BLSScalar) {
+    let hash_scalar = BLSScalar::from_hash::<D>(hash);
     let randomizer = BLSScalar::random(prng);
 
     let mut input_to_rescue = vec![];
     input_to_rescue.push(BLSScalar::from(secret_keys.len() as u64));
-    input_to_rescue.push(hash);
+    input_to_rescue.push(hash_scalar);
     input_to_rescue.push(randomizer);
     for secret_key in secret_keys.iter() {
         input_to_rescue.push(secret_key.get_spend_key_scalar());
@@ -163,7 +161,7 @@ pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
         acc = rescue.rescue(&[acc, chunk[0], chunk[1], chunk[2]])[0];
     }
 
-    (hash, randomizer, acc)
+    (randomizer, acc)
 }
 
 /// Decrypts the owner memo.

@@ -51,10 +51,10 @@ pub struct AXfrNote {
 pub struct AXfrPreNote<'a> {
     /// The anonymous transfer body.
     pub body: AXfrBody,
-    /// The reference to the prover parameters.
-    pub params: &'a ProverParams,
     /// Witness.
     pub witness: AXfrWitness,
+    /// Input key pairs.
+    pub input_keypairs: Vec<AXfrKeyPair>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
@@ -74,124 +74,13 @@ pub struct AXfrBody {
     pub owner_memos: Vec<AxfrOwnerMemo>,
 }
 
-/// Build an anonymous transfer note.
-#[deprecated(
-    since = "0.2",
-    note = "For transaction-level non-malleability instead of \
-operation-level non-malleability, the note requires a two-step building process consisting of \
-`init_anon_transfer_note` which generates `AXfrPreNote` and `finish_anon_transfer_note` which \
-generates `AXfrPreNote` given the transaction-level hash."
-)]
-pub fn gen_anon_xfr_note<R: CryptoRng + RngCore>(
-    prng: &mut R,
-    params: &ProverParams,
+/// Build an anonymous transfer note without generating the proof and applying non-malleability protection.
+pub fn init_anon_xfr_note(
     inputs: &[OpenAnonAssetRecord],
     outputs: &[OpenAnonAssetRecord],
     fee: u32,
     input_keypairs: &[AXfrKeyPair],
-) -> Result<AXfrNote> {
-    // 1. check input correctness
-    if inputs.is_empty() || outputs.is_empty() {
-        return Err(eg!(ZeiError::AXfrProverParamsError));
-    }
-    check_inputs(inputs, input_keypairs).c(d!())?;
-    check_asset_amount(inputs, outputs, fee).c(d!())?;
-    check_roots(inputs).c(d!())?;
-
-    // 2. build input witness information
-    let nullifiers = inputs
-        .iter()
-        .zip(input_keypairs.iter())
-        .map(|(input, keypair)| {
-            let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
-            nullify_with_native_address(&keypair, input.amount, &input.asset_type, mt_leaf_info.uid)
-        })
-        .collect();
-
-    // 3. build proof
-    let payers_secrets = inputs
-        .iter()
-        .zip(input_keypairs.iter())
-        .map(|(input, keypair)| {
-            let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
-            PayerWitness {
-                spend_key: keypair.get_spend_key_scalar(),
-                uid: mt_leaf_info.uid,
-                amount: input.amount,
-                asset_type: input.asset_type.as_scalar(),
-                path: mt_leaf_info.path.clone(),
-                blind: input.blind,
-            }
-        })
-        .collect();
-    let payees_secrets = outputs
-        .iter()
-        .map(|output| PayeeWitness {
-            amount: output.amount,
-            blind: output.blind,
-            asset_type: output.asset_type.as_scalar(),
-            pubkey_x: output.pub_key.0.get_x(),
-        })
-        .collect();
-
-    let secret_inputs = AXfrWitness {
-        payers_witnesses: payers_secrets,
-        payees_witnesses: payees_secrets,
-        fee,
-    };
-    let out_abars = outputs
-        .iter()
-        .map(AnonAssetRecord::from_oabar)
-        .collect_vec();
-    let out_memos: Result<Vec<AxfrOwnerMemo>> = outputs
-        .iter()
-        .map(|output| output.owner_memo.clone().c(d!(ZeiError::ParameterError)))
-        .collect();
-
-    let mt_info_temp = inputs[0].mt_leaf_info.as_ref().unwrap();
-    let body = AXfrBody {
-        inputs: nullifiers,
-        outputs: out_abars,
-        merkle_root: mt_info_temp.root,
-        merkle_root_version: mt_info_temp.root_version,
-        fee,
-        owner_memos: out_memos.c(d!())?,
-    };
-
-    let msg = bincode::serialize(&body)
-        .c(d!(ZeiError::SerializationError))
-        .c(d!())?;
-
-    let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
-
-    let (hash, non_malleability_randomizer, non_malleability_tag) =
-        compute_non_malleability_tag(prng, b"AnonXfr", &msg, &input_keypairs_ref);
-
-    let proof = prove_xfr(
-        prng,
-        params,
-        secret_inputs,
-        &hash,
-        &non_malleability_randomizer,
-        &non_malleability_tag,
-    )
-    .c(d!())?;
-
-    Ok(AXfrNote {
-        body,
-        anon_xfr_proof: proof,
-        non_malleability_tag,
-    })
-}
-
-pub fn init_anon_xfr_note<'a, R: CryptoRng + RngCore>(
-    prng: &mut R,
-    params: &'a ProverParams,
-    inputs: &[OpenAnonAssetRecord],
-    outputs: &[OpenAnonAssetRecord],
-    fee: u32,
-    input_keypairs: &[AXfrKeyPair],
-) -> Result<AXfrPreNote<'a>> {
+) -> Result<AXfrPreNote> {
     // 1. check input correctness
     if inputs.is_empty() || outputs.is_empty() {
         return Err(eg!(ZeiError::AXfrProverParamsError));
@@ -262,39 +151,45 @@ pub fn init_anon_xfr_note<'a, R: CryptoRng + RngCore>(
 
     Ok(AXfrPreNote {
         body,
-        params,
         witness: secret_inputs,
+        input_keypairs: input_keypairs.to_vec(),
     })
 }
 
-/*
+/// Build an anonymous transfer note without generating the proof or non-malleability tag.
+pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> + Default>(
+    prng: &mut R,
+    params: &ProverParams,
+    pre_note: AXfrPreNote,
+    hash: &D,
+) -> Result<AXfrNote> {
+    let AXfrPreNote {
+        body,
+        witness,
+        input_keypairs,
+    } = pre_note;
 
+    let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
 
-   let msg = bincode::serialize(&body)
-       .c(d!(ZeiError::SerializationError))
-       .c(d!())?;
+    let (non_malleability_randomizer, non_malleability_tag) =
+        compute_non_malleability_tag(prng, hash, &input_keypairs_ref);
 
-   let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
+    let proof = prove_xfr(
+        prng,
+        params,
+        witness,
+        &hash,
+        &non_malleability_randomizer,
+        &non_malleability_tag,
+    )
+    .c(d!())?;
 
-   let (hash, non_malleability_randomizer, non_malleability_tag) =
-       compute_non_malleability_tag(prng, b"AnonXfr", &msg, &input_keypairs_ref);
-
-   let proof = prove_xfr(
-       prng,
-       params,
-       secret_inputs,
-       &hash,
-       &non_malleability_randomizer,
-       &non_malleability_tag,
-   )
-       .c(d!())?;
-
-   Ok(AXfrNote {
-       body,
-       anon_xfr_proof: proof,
-       non_malleability_tag,
-   })
-*/
+    Ok(AXfrNote {
+        body: body,
+        anon_xfr_proof: proof,
+        non_malleability_tag,
+    })
+}
 
 /// Verify an anonymous transfer note.
 pub fn verify_anon_xfr_note(
