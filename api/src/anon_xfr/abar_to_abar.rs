@@ -13,9 +13,8 @@ use crate::anon_xfr::{
 };
 use crate::errors::ZeiError;
 use crate::setup::{ProverParams, VerifierParams};
-use digest::Digest;
+use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use sha2::Sha512;
 use zei_algebra::{
     bls12_381::BLSScalar,
     jubjub::{JubjubPoint, JubjubScalar},
@@ -47,8 +46,8 @@ pub struct AXfrNote {
 }
 
 /// Anonymous transfer pre-note without proof and non-malleability tag.
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clond, Eq)]
-pub struct AXfrPreNote<'a> {
+#[derive(Debug, Clone)]
+pub struct AXfrPreNote {
     /// The anonymous transfer body.
     pub body: AXfrBody,
     /// Witness.
@@ -161,7 +160,7 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     prng: &mut R,
     params: &ProverParams,
     pre_note: AXfrPreNote,
-    hash: &D,
+    hash: D,
 ) -> Result<AXfrNote> {
     let AXfrPreNote {
         body,
@@ -171,14 +170,16 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
 
     let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
 
+    let hash_scalar = BLSScalar::from_hash::<D>(hash);
+
     let (non_malleability_randomizer, non_malleability_tag) =
-        compute_non_malleability_tag(prng, hash, &input_keypairs_ref);
+        compute_non_malleability_tag(prng, hash_scalar, &input_keypairs_ref);
 
     let proof = prove_xfr(
         prng,
         params,
         witness,
-        &hash,
+        &hash_scalar,
         &non_malleability_randomizer,
         &non_malleability_tag,
     )
@@ -192,10 +193,11 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
 }
 
 /// Verify an anonymous transfer note.
-pub fn verify_anon_xfr_note(
+pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     params: &VerifierParams,
     note: &AXfrNote,
     merkle_root: &BLSScalar,
+    hash: D,
 ) -> Result<()> {
     if *merkle_root != note.body.merkle_root {
         return Err(eg!(ZeiError::AXfrVerificationError));
@@ -213,19 +215,13 @@ pub fn verify_anon_xfr_note(
         fee: note.body.fee,
     };
 
-    let msg = bincode::serialize(&note.body)
-        .c(d!(ZeiError::SerializationError))
-        .c(d!())?;
-    let mut hasher = Sha512::new();
-    hasher.update(b"AnonXfr");
-    hasher.update(&msg);
-    let hash = BLSScalar::from_hash(hasher);
+    let hash_scalar = BLSScalar::from_hash::<D>(hash);
 
     verify_xfr(
         params,
         &pub_inputs,
         &note.anon_xfr_proof,
-        &hash,
+        &hash_scalar,
         &note.non_malleability_tag,
     )
     .c(d!(ZeiError::AXfrVerificationError))
@@ -302,7 +298,7 @@ pub(crate) fn verify_xfr(
 }
 
 /// The witness of an anonymous transfer.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AXfrWitness {
     /// The payers' witnesses.
     pub payers_witnesses: Vec<PayerWitness>,
@@ -794,10 +790,11 @@ pub(crate) fn add_payees_witnesses(
 
 #[cfg(test)]
 mod tests {
+    use crate::anon_xfr::abar_to_abar::{finish_anon_xfr_note, init_anon_xfr_note, AXfrNote};
     use crate::anon_xfr::{
         abar_to_abar::{
-            asset_mixing, build_multi_xfr_cs, gen_anon_xfr_note, prove_xfr, verify_anon_xfr_note,
-            verify_xfr, AXfrPubInputs, AXfrWitness,
+            asset_mixing, build_multi_xfr_cs, prove_xfr, verify_anon_xfr_note, verify_xfr,
+            AXfrPubInputs, AXfrWitness,
         },
         add_merkle_path_variables, commit_in_cs_with_native_address, compute_merkle_root_variables,
         compute_non_malleability_tag,
@@ -811,9 +808,11 @@ mod tests {
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
+    use digest::{consts::U64, Digest};
     use mem_db::MemoryDB;
     use parking_lot::lock_api::RwLock;
     use rand_chacha::ChaChaRng;
+    use sha2::Sha512;
     use std::sync::Arc;
     use storage::{
         state::{ChainState, State},
@@ -998,8 +997,14 @@ mod tests {
         let params = ProverParams::new(n_payers, n_payees, Some(1)).unwrap();
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let mut msg = [0u8; 32];
-        prng.fill_bytes(&mut msg);
+        let test_non_malleability_hash = {
+            let mut hasher = Sha512::new();
+            let mut random_bytes = [0u8; 32];
+            prng.fill_bytes(&mut random_bytes);
+            hasher.update(&random_bytes);
+            hasher
+        };
+        let hash_scalar = BLSScalar::from_hash(test_non_malleability_hash);
 
         let input_keypairs: Vec<AXfrKeyPair> = secret_inputs
             .payers_witnesses
@@ -1009,14 +1014,14 @@ mod tests {
 
         let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
 
-        let (hash, non_malleability_randomizer, non_malleability_tag) =
-            compute_non_malleability_tag(&mut prng, b"AnonXfr", &msg, &input_keypairs_ref);
+        let (non_malleability_randomizer, non_malleability_tag) =
+            compute_non_malleability_tag(&mut prng, hash_scalar, &input_keypairs_ref);
 
         let proof = prove_xfr(
             &mut prng,
             &params,
             secret_inputs,
-            &hash,
+            &hash_scalar,
             &non_malleability_randomizer,
             &non_malleability_tag,
         )
@@ -1028,7 +1033,7 @@ mod tests {
             &node_params,
             &pub_inputs,
             &proof,
-            &hash,
+            &hash_scalar,
             &non_malleability_tag
         )
         .is_ok());
@@ -1045,7 +1050,7 @@ mod tests {
             &node_params,
             &bad_secret_inputs,
             &proof,
-            &hash,
+            &hash_scalar,
             &non_malleability_tag
         )
         .is_err());
@@ -1114,6 +1119,14 @@ mod tests {
         // sample output keys for testing.
         let keypair_out = AXfrKeyPair::generate(&mut prng);
 
+        let test_non_malleability_hash = {
+            let mut hasher = Sha512::new();
+            let mut random_bytes = [0u8; 32];
+            prng.fill_bytes(&mut random_bytes);
+            hasher.update(&random_bytes);
+            hasher
+        };
+
         let (note, merkle_root) = {
             // prover scope
             let oabar_in = OpenAnonAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair_in)
@@ -1141,6 +1154,7 @@ mod tests {
                 &[oabar_out],
                 fee_amount,
                 &[keypair_in],
+                test_non_malleability_hash.clone(),
             )
             .unwrap();
             (note, merkle_root)
@@ -1161,7 +1175,13 @@ mod tests {
         {
             // verifier scope
             let verifier_params = VerifierParams::from(user_params);
-            assert!(verify_anon_xfr_note(&verifier_params, &note, &merkle_root).is_ok());
+            assert!(verify_anon_xfr_note(
+                &verifier_params,
+                &note,
+                &merkle_root,
+                test_non_malleability_hash.clone()
+            )
+            .is_ok());
         }
     }
 
@@ -1226,6 +1246,14 @@ mod tests {
         // sample output keys for testing.
         let keypair_out = AXfrKeyPair::generate(&mut prng);
 
+        let test_non_malleability_hash = {
+            let mut hasher = Sha512::new();
+            let mut random_bytes = [0u8; 32];
+            prng.fill_bytes(&mut random_bytes);
+            hasher.update(&random_bytes);
+            hasher
+        };
+
         let (note, _merkle_root) = {
             // prover scope
             let oabar_in = OpenAnonAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair_in)
@@ -1253,6 +1281,7 @@ mod tests {
                 &[oabar_out],
                 fee_amount,
                 &[keypair_in],
+                test_non_malleability_hash.clone(),
             )
             .unwrap();
             (note, mt_proof.root)
@@ -1294,14 +1323,31 @@ mod tests {
         {
             // verifier scope
             let verifier_params = VerifierParams::from(user_params);
-            let t = verify_anon_xfr_note(&verifier_params, &note, &mt.get_root().unwrap());
+            let t = verify_anon_xfr_note(
+                &verifier_params,
+                &note,
+                &mt.get_root().unwrap(),
+                test_non_malleability_hash.clone(),
+            );
             assert!(t.is_ok());
 
             let vk1 = verifier_params.shrink().unwrap();
-            assert!(verify_anon_xfr_note(&vk1, &note, &mt.get_root().unwrap()).is_ok());
+            assert!(verify_anon_xfr_note(
+                &vk1,
+                &note,
+                &mt.get_root().unwrap(),
+                test_non_malleability_hash.clone()
+            )
+            .is_ok());
 
             let vk2 = VerifierParams::load(1, 1).unwrap();
-            assert!(verify_anon_xfr_note(&vk2, &note, &mt.get_root().unwrap()).is_ok());
+            assert!(verify_anon_xfr_note(
+                &vk2,
+                &note,
+                &mt.get_root().unwrap(),
+                test_non_malleability_hash.clone()
+            )
+            .is_ok());
         }
     }
 
@@ -1335,6 +1381,14 @@ mod tests {
             in_keypairs.push(keypair);
             in_owner_memos.push(owner_memo);
         }
+
+        let test_non_malleability_hash = {
+            let mut hasher = Sha512::new();
+            let mut random_bytes = [0u8; 32];
+            prng.fill_bytes(&mut random_bytes);
+            hasher.update(&random_bytes);
+            hasher
+        };
 
         // simulate Merkle tree state with these inputs for testing.
         let hash = RescueInstance::new();
@@ -1427,8 +1481,16 @@ mod tests {
             // empty inputs/outputs
             msg_eq!(
                 ZeiError::AXfrProverParamsError,
-                gen_anon_xfr_note(&mut prng, &user_params, &[], &open_abars_out, 15, &[])
-                    .unwrap_err(),
+                gen_anon_xfr_note(
+                    &mut prng,
+                    &user_params,
+                    &[],
+                    &open_abars_out,
+                    15,
+                    &[],
+                    test_non_malleability_hash.clone()
+                )
+                .unwrap_err(),
             );
             msg_eq!(
                 ZeiError::AXfrProverParamsError,
@@ -1438,7 +1500,8 @@ mod tests {
                     &open_abars_in,
                     &[],
                     15,
-                    &in_keypairs
+                    &in_keypairs,
+                    test_non_malleability_hash.clone()
                 )
                 .unwrap_err(),
             );
@@ -1450,7 +1513,8 @@ mod tests {
                 &open_abars_in,
                 &open_abars_out,
                 15,
-                &in_keypairs
+                &in_keypairs,
+                test_non_malleability_hash.clone()
             )
             .is_err());
             open_abars_in[0].amount -= 1;
@@ -1464,7 +1528,8 @@ mod tests {
                 &open_abars_in,
                 &open_abars_out,
                 15,
-                &in_keypairs
+                &in_keypairs,
+                test_non_malleability_hash.clone()
             )
             .is_err());
             let mut mt_info = open_abars_in[0].mt_leaf_info.clone().unwrap();
@@ -1478,6 +1543,7 @@ mod tests {
                 &open_abars_out,
                 15,
                 &in_keypairs,
+                test_non_malleability_hash.clone(),
             )
             .unwrap();
             (note, merkle_root)
@@ -1500,9 +1566,21 @@ mod tests {
         {
             // verifier scope
             let verifier_params = VerifierParams::from(user_params);
-            assert!(verify_anon_xfr_note(&verifier_params, &note, &merkle_root).is_ok());
+            assert!(verify_anon_xfr_note(
+                &verifier_params,
+                &note,
+                &merkle_root,
+                test_non_malleability_hash.clone()
+            )
+            .is_ok());
             // inconsistent merkle roots
-            assert!(verify_anon_xfr_note(&verifier_params, &note, &zero).is_err());
+            assert!(verify_anon_xfr_note(
+                &verifier_params,
+                &note,
+                &zero,
+                test_non_malleability_hash.clone()
+            )
+            .is_err());
         }
     }
 
@@ -2498,8 +2576,14 @@ mod tests {
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
-        let mut msg = [0u8; 32];
-        prng.fill_bytes(&mut msg);
+        let test_non_malleability_hash = {
+            let mut hasher = Sha512::new();
+            let mut random_bytes = [0u8; 32];
+            prng.fill_bytes(&mut random_bytes);
+            hasher.update(&random_bytes);
+            hasher
+        };
+        let hash_scalar = BLSScalar::from_hash(test_non_malleability_hash);
 
         let input_keypairs: Vec<AXfrKeyPair> = secret_inputs
             .payers_witnesses
@@ -2507,20 +2591,21 @@ mod tests {
             .map(|x| AXfrKeyPair::from_spend_key(AXfrSpendKey(x.spend_key)))
             .collect();
         let input_keypairs_ref: Vec<&AXfrKeyPair> = input_keypairs.iter().collect();
-        let (hash, non_malleability_randomizer, non_malleability_tag) =
-            compute_non_malleability_tag(&mut prng, b"AnonXfr", &msg, &input_keypairs_ref);
+
+        let (non_malleability_randomizer, non_malleability_tag) =
+            compute_non_malleability_tag(&mut prng, hash_scalar.clone(), &input_keypairs_ref);
 
         // check the constraints.
         let (mut cs, _) = build_multi_xfr_cs(
             secret_inputs,
             fee_type,
-            &hash,
+            &hash_scalar,
             &non_malleability_randomizer,
             &non_malleability_tag,
         );
         let witness = cs.get_and_clear_witness();
         let mut online_inputs = pub_inputs.to_vec();
-        online_inputs.push(hash);
+        online_inputs.push(hash_scalar);
         online_inputs.push(non_malleability_tag);
         let verify = cs.verify_witness(&witness, &online_inputs);
         if witness_is_valid {
@@ -2539,5 +2624,20 @@ mod tests {
             BLSScalar::zero(),
             BLSScalar::zero(),
         ])[0]
+    }
+
+    /// Helper function that resembles the original `gen_anon_xfr_note`
+    fn gen_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> + Default>(
+        prng: &mut R,
+        params: &ProverParams,
+        inputs: &[OpenAnonAssetRecord],
+        outputs: &[OpenAnonAssetRecord],
+        fee: u32,
+        input_keypairs: &[AXfrKeyPair],
+        hash: D,
+    ) -> Result<AXfrNote> {
+        let pre_note = init_anon_xfr_note(inputs, outputs, fee, input_keypairs)?;
+        let note = finish_anon_xfr_note(prng, params, pre_note, hash)?;
+        Ok(note)
     }
 }

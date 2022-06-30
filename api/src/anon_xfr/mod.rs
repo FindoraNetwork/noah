@@ -3,9 +3,7 @@ use crate::anon_xfr::structs::{
     NullifierInputVars, OpenAnonAssetRecord,
 };
 use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
-use digest::Digest;
 use keys::AXfrKeyPair;
-use sha2::Sha512;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
@@ -120,15 +118,11 @@ fn check_roots(inputs: &[OpenAnonAssetRecord]) -> Result<()> {
 }
 
 /// Compute the non-malleability tag given the information and the secret keys.
-pub fn compute_non_malleability_tag<
-    R: CryptoRng + RngCore,
-    D: Digest<OutputSize = U64> + Default,
->(
+pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
     prng: &mut R,
-    hash: D,
+    hash_scalar: BLSScalar,
     secret_keys: &[&AXfrKeyPair],
 ) -> (BLSScalar, BLSScalar) {
-    let hash_scalar = BLSScalar::from_hash::<D>(hash);
     let randomizer = BLSScalar::random(prng);
 
     let mut input_to_rescue = vec![];
