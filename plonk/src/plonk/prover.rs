@@ -213,7 +213,7 @@ pub fn prover_with_lagrange<
     let t_poly =
         t_poly::<PCS, CS>(cs, prover_params, &w_polys, &z_poly, &challenges, &pi).c(d!())?;
     let (cm_t_vec, t_polys) =
-        split_t_and_commit(pcs, &t_poly, n_wires_per_gate, n_constraints + 2).c(d!())?;
+        split_t_and_commit(prng, pcs, &t_poly, n_wires_per_gate, n_constraints + 2).c(d!())?;
 
     for cm_t in cm_t_vec.iter() {
         transcript.append_commitment::<PCS::Commitment>(cm_t);
