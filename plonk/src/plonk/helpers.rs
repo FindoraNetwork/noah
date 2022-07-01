@@ -524,7 +524,8 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
 }
 
 /// Split the t polynomial into `n_wires_per_gate` degree-`n` polynomials and commit.
-pub(crate) fn split_t_and_commit<PCS: PolyComScheme>(
+pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
+    prng: &mut R,
     pcs: &PCS,
     t: &FpPolynomial<PCS::Field>,
     n_wires_per_gate: usize,
@@ -534,6 +535,9 @@ pub(crate) fn split_t_and_commit<PCS: PolyComScheme>(
     let mut t_polys = vec![];
     let coefs_len = t.get_coefs_ref().len();
 
+    let zero = PCS::Field::zero();
+    let mut prev_coef = zero;
+
     for i in 0..n_wires_per_gate {
         let coefs_start = i * n;
         let coefs_end = if i == n_wires_per_gate - 1 {
@@ -541,11 +545,26 @@ pub(crate) fn split_t_and_commit<PCS: PolyComScheme>(
         } else {
             (i + 1) * n
         };
-        let coefs = if coefs_start < coefs_len {
+        let mut coefs = if coefs_start < coefs_len {
             t.get_coefs_ref()[coefs_start..min(coefs_len, coefs_end)].to_vec()
         } else {
             vec![]
         };
+
+        let rand = PCS::Field::random(prng);
+        if i != n_wires_per_gate - 1 {
+            coefs.resize(n + 1, zero);
+            coefs[n].add_assign(&rand);
+            coefs[0].sub_assign(&prev_coef);
+        } else {
+            if coefs.len() == 0 {
+                coefs = vec![prev_coef.neg()];
+            } else {
+                coefs[0].sub_assign(&prev_coef);
+            }
+        }
+        prev_coef = rand;
+
         let t_poly = FpPolynomial::from_coefs(coefs);
         let cm_t = pcs.commit(&t_poly).c(d!(PlonkError::CommitmentError))?;
         cm_t_vec.push(cm_t);
