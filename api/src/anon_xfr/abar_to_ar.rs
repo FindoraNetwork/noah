@@ -1,7 +1,7 @@
-use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
-use crate::anon_xfr::keys::{get_view_key_domain_separator, AXfrKeyPair};
 use crate::anon_xfr::{
+    abar_to_abar::add_payers_witnesses,
     commit_in_cs_with_native_address, compute_merkle_root_variables, compute_non_malleability_tag,
+    keys::{get_view_key_domain_separator, AXfrKeyPair},
     nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{AccElemVars, Nullifier, NullifierInputVars, OpenAnonAssetRecord, PayerWitness},
     AXfrPlonkPf, TurboPlonkCS, SK_LEN,
@@ -14,9 +14,8 @@ use crate::xfr::{
     sig::XfrPublicKey,
     structs::{AssetRecordTemplate, BlindAssetRecord, OwnerMemo},
 };
-use digest::Digest;
+use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use sha2::Sha512;
 use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
 use zei_plonk::plonk::{
@@ -38,6 +37,17 @@ pub struct AbarToArNote {
     pub non_malleability_tag: BLSScalar,
 }
 
+/// The anonymous-to-transparent note without proof or non-malleability tag.
+#[derive(Clone, Debug)]
+pub struct AbarToArPreNote {
+    /// The body part of ABAR to AR.
+    pub body: AbarToArBody,
+    /// Witness.
+    pub witness: PayerWitness,
+    /// Input key pair.
+    pub input_keypair: AXfrKeyPair,
+}
+
 /// The anonymous-to-transparent body.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToArBody {
@@ -53,14 +63,13 @@ pub struct AbarToArBody {
     pub memo: Option<OwnerMemo>,
 }
 
-/// Generate an anonymous-to-transparent note.
-pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
+/// Generate an anonymous-to-transparent pre-note.
+pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
-    params: &ProverParams,
     oabar: &OpenAnonAssetRecord,
     abar_keypair: &AXfrKeyPair,
     ar_pub_key: &XfrPublicKey,
-) -> Result<AbarToArNote> {
+) -> Result<AbarToArPreNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.get_pub_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
     }
@@ -104,18 +113,36 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
         memo: owner_memo,
     };
 
-    let msg = bincode::serialize(&body)
-        .c(d!(ZeiError::SerializationError))
-        .c(d!())?;
+    Ok(AbarToArPreNote {
+        body,
+        witness: payers_secret,
+        input_keypair: abar_keypair.clone(),
+    })
+}
 
-    let (hash, non_malleability_randomizer, non_malleability_tag) =
-        compute_non_malleability_tag(prng, b"AbarToAr", &msg, &[&abar_keypair]);
+/// Finalize an anonymous-to-transparent note.
+pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> + Default>(
+    prng: &mut R,
+    params: &ProverParams,
+    pre_note: AbarToArPreNote,
+    hash: D,
+) -> Result<AbarToArNote> {
+    let AbarToArPreNote {
+        body,
+        witness,
+        input_keypair,
+    } = pre_note;
+
+    let hash_scalar = BLSScalar::from_hash::<D>(hash);
+
+    let (non_malleability_randomizer, non_malleability_tag) =
+        compute_non_malleability_tag(prng, hash_scalar, &[&input_keypair]);
 
     let proof = prove_abar_to_ar(
         prng,
         params,
-        payers_secret,
-        &hash,
+        witness,
+        &hash_scalar,
         &non_malleability_randomizer,
         &non_malleability_tag,
     )
@@ -129,10 +156,11 @@ pub fn gen_abar_to_ar_note<R: CryptoRng + RngCore>(
 }
 
 /// Verify the anonymous-to-transparent note.
-pub fn verify_abar_to_ar_note(
+pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     params: &VerifierParams,
     note: &AbarToArNote,
     merkle_root: &BLSScalar,
+    hash: D,
 ) -> Result<()> {
     // require the output amount & asset type are non-confidential
     if note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential() {
@@ -146,13 +174,7 @@ pub fn verify_abar_to_ar_note(
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
-    let msg = bincode::serialize(&note.body)
-        .c(d!(ZeiError::SerializationError))
-        .c(d!())?;
-    let mut hasher = Sha512::new();
-    hasher.update(b"AbarToAr");
-    hasher.update(msg.as_slice());
-    let hash = BLSScalar::from_hash(hasher);
+    let hash_scalar = BLSScalar::from_hash::<D>(hash);
 
     let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
     let mut online_inputs = vec![];
@@ -160,7 +182,7 @@ pub fn verify_abar_to_ar_note(
     online_inputs.push(merkle_root.clone());
     online_inputs.push(BLSScalar::from(payer_amount));
     online_inputs.push(payer_asset_type.as_scalar());
-    online_inputs.push(hash);
+    online_inputs.push(hash_scalar);
     online_inputs.push(note.non_malleability_tag);
 
     verifier(
@@ -321,15 +343,17 @@ pub fn build_abar_to_ar_cs(
 mod tests {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
-        abar_to_ar::{gen_abar_to_ar_note, verify_abar_to_ar_note},
+        abar_to_ar::{finish_abar_to_ar_note, init_abar_to_ar_note, verify_abar_to_ar_note},
         structs::{AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecordBuilder},
         TREE_DEPTH,
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::{sig::XfrKeyPair, structs::AssetType};
+    use digest::Digest;
     use mem_db::MemoryDB;
     use parking_lot::RwLock;
     use rand_chacha::ChaChaRng;
+    use sha2::Sha512;
     use std::sync::Arc;
     use storage::{
         state::{ChainState, State},
@@ -373,19 +397,49 @@ mod tests {
 
         oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone()));
 
-        let note = gen_abar_to_ar_note(&mut prng, &params, &oabar.clone(), &sender, &recv.pub_key)
-            .unwrap();
+        let pre_note =
+            init_abar_to_ar_note(&mut prng, &oabar.clone(), &sender, &recv.pub_key).unwrap();
+
+        let hash = {
+            let mut hasher = Sha512::new();
+            let mut random_bytes = [0u8; 32];
+            prng.fill_bytes(&mut random_bytes);
+            hasher.update(&random_bytes);
+            hasher
+        };
+
+        let note = finish_abar_to_ar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
 
         let node_params = VerifierParams::abar_to_ar_params().unwrap();
-        verify_abar_to_ar_note(&node_params, &note, &proof.root).unwrap();
+        verify_abar_to_ar_note(&node_params, &note, &proof.root, hash.clone()).unwrap();
 
-        assert!(
-            verify_abar_to_ar_note(&node_params, &note, &BLSScalar::random(&mut prng),).is_err()
-        );
+        assert!(verify_abar_to_ar_note(
+            &node_params,
+            &note,
+            &BLSScalar::random(&mut prng),
+            hash.clone()
+        )
+        .is_err());
 
         let mut note_wrong_nullifier = note.clone();
         note_wrong_nullifier.body.input = BLSScalar::random(&mut prng);
-        assert!(verify_abar_to_ar_note(&node_params, &note_wrong_nullifier, &proof.root,).is_err());
+        assert!(verify_abar_to_ar_note(
+            &node_params,
+            &note_wrong_nullifier,
+            &proof.root,
+            hash.clone()
+        )
+        .is_err());
+
+        let hash2 = {
+            let mut hasher = Sha512::new();
+            let mut random_bytes = [0u8; 32];
+            prng.fill_bytes(&mut random_bytes);
+            hasher.update(&random_bytes);
+            hasher
+        };
+
+        assert!(verify_abar_to_ar_note(&node_params, &note, &proof.root, hash2).is_err())
     }
 
     fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
