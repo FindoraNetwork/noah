@@ -1,4 +1,3 @@
-use crate::plonk::transcript::transcript_get_plonk_challenge_u;
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
@@ -8,8 +7,8 @@ use crate::plonk::{
     indexer::{PlonkPK, PlonkPf, PlonkProof},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
-        transcript_get_plonk_challenge_gamma, transcript_get_plonk_challenge_zeta,
-        transcript_init_plonk,
+        transcript_get_plonk_challenge_gamma, transcript_get_plonk_challenge_u,
+        transcript_get_plonk_challenge_zeta, transcript_init_plonk,
     },
 };
 use crate::poly_commit::{
