@@ -3,7 +3,7 @@ use crate::anon_xfr::{
     keys::{AXfrKeyPair, AXfrPubKey, AXfrViewKey},
 };
 use crate::xfr::structs::AssetType;
-use aes_gcm::{aead::Aead, KeyInit};
+use aes_gcm::{aead::Aead, NewAead};
 use digest::{generic_array::GenericArray, Digest};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
