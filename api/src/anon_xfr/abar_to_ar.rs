@@ -364,7 +364,7 @@ mod tests {
     use zei_crypto::basic::rescue::RescueInstance;
 
     #[test]
-    fn test_abar_to_ar_conversion() {
+    fn test_abar_to_ar() {
         let mut prng = ChaChaRng::from_seed([5u8; 32]);
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
 
@@ -374,7 +374,7 @@ mod tests {
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(
             fdb,
-            "test_abar_to_ar_conversion_db".to_string(),
+            "test_abar_to_ar_db".to_string(),
             0,
         )));
         let mut state = State::new(cs, false);
