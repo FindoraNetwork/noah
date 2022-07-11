@@ -9,9 +9,13 @@ pub static BULLETPROOF_URS: Option<&'static [u8]> =
 /// The Bulletproofs URS.
 pub static BULLETPROOF_URS: Option<&'static [u8]> = None;
 
-#[cfg(not(feature = "no_srs"))]
+#[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
 /// The SRS.
 pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs.bin"));
+
+#[cfg(all(not(feature = "no_srs"), feature = "lightweight"))]
+/// The SRS.
+pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs-lw.bin"));
 
 #[cfg(feature = "no_srs")]
 /// The SRS.
@@ -79,11 +83,11 @@ lazy_static! {
 
 #[cfg(not(feature = "no_srs"))]
 static LAGRANGE_BASE_4096: &'static [u8] = include_bytes!("../parameters/lagrange-srs-4096.bin");
-#[cfg(not(feature = "no_srs"))]
+#[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
 static LAGRANGE_BASE_8192: &'static [u8] = include_bytes!("../parameters/lagrange-srs-8192.bin");
-#[cfg(not(feature = "no_srs"))]
+#[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
 static LAGRANGE_BASE_16384: &'static [u8] = include_bytes!("../parameters/lagrange-srs-16384.bin");
-#[cfg(not(feature = "no_srs"))]
+#[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
 static LAGRANGE_BASE_32768: &'static [u8] = include_bytes!("../parameters/lagrange-srs-32768.bin");
 
 #[cfg(not(feature = "no_srs"))]
@@ -92,9 +96,12 @@ lazy_static! {
     pub static ref LAGRANGE_BASES: BTreeMap<usize, &'static [u8]> = {
         let mut m = BTreeMap::new();
         m.insert(4096, LAGRANGE_BASE_4096);
-        m.insert(8192, LAGRANGE_BASE_8192);
-        m.insert(16384, LAGRANGE_BASE_16384);
-        m.insert(32768, LAGRANGE_BASE_32768);
+        #[cfg(not(feature = "lightweight"))]
+        {
+            m.insert(8192, LAGRANGE_BASE_8192);
+            m.insert(16384, LAGRANGE_BASE_16384);
+            m.insert(32768, LAGRANGE_BASE_32768);
+        }
         m
     };
 }
