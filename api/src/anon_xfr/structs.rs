@@ -4,15 +4,9 @@ use crate::anon_xfr::{
 };
 use crate::primitives::asymmetric_encryption::{dh_decrypt, dh_encrypt};
 use crate::xfr::structs::AssetType;
-use aes_gcm::{aead::Aead, NewAead};
-use digest::{generic_array::GenericArray, Digest};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::{
-    bls12_381::BLSScalar,
-    jubjub::{JubjubPoint, JubjubScalar},
-    prelude::*,
-};
+use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::constraint_system::VarIndex;
 
