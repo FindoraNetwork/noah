@@ -158,28 +158,27 @@ pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
     (randomizer, acc)
 }
 
-/// Decrypts the owner memo.
-/// * `memo` - Owner memo to decrypt
-/// * `dec_key` - Decryption key
+/// Parse the owner memo from bytes.
+/// * `bytes` - the memo bytes.
+/// * `key_pair` - the memo bytes.
 /// * `abar` - Associated anonymous blind asset record to check memo info against.
-/// Return Error if memo info does not match the commitment or public key.
+/// Return Error if memo info does not match the commitment.
 /// Return Ok(amount, asset_type, blinding) otherwise.
-pub fn decrypt_memo(
-    memo: &AxfrOwnerMemo,
+pub fn parse_memo(
+    bytes: &[u8],
     key_pair: &AXfrKeyPair,
     abar: &AnonAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
-    let plaintext = memo.decrypt(&key_pair.get_view_key())?;
-    if plaintext.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
+    if bytes.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
         return Err(eg!(ZeiError::ParameterError));
     }
-    let amount = u8_le_slice_to_u64(&plaintext[0..8]);
+    let amount = u8_le_slice_to_u64(&bytes[0..8]);
     let mut i = 8;
     let mut asset_type_array = [0u8; ASSET_TYPE_LENGTH];
-    asset_type_array.copy_from_slice(&plaintext[i..i + ASSET_TYPE_LENGTH]);
+    asset_type_array.copy_from_slice(&bytes[i..i + ASSET_TYPE_LENGTH]);
     let asset_type = AssetType(asset_type_array);
     i += ASSET_TYPE_LENGTH;
-    let blind = BLSScalar::from_bytes(&plaintext[i..i + BLS12_381_SCALAR_LEN])
+    let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])
         .c(d!(ZeiError::ParameterError))?;
 
     let hash = RescueInstance::new();
@@ -202,6 +201,21 @@ pub fn decrypt_memo(
     }
 
     Ok((amount, asset_type, blind))
+}
+
+/// Decrypts the owner memo.
+/// * `memo` - Owner memo to decrypt
+/// * `dec_key` - Decryption key
+/// * `abar` - Associated anonymous blind asset record to check memo info against.
+/// Return Error if memo info does not match the commitment or public key.
+/// Return Ok(amount, asset_type, blinding) otherwise.
+pub fn decrypt_memo(
+    memo: &AxfrOwnerMemo,
+    key_pair: &AXfrKeyPair,
+    abar: &AnonAssetRecord,
+) -> Result<(u64, AssetType, BLSScalar)> {
+    let plaintext = memo.decrypt(&key_pair.get_view_key())?;
+    parse_memo(&plaintext, key_pair, abar)
 }
 
 /// Compute the nullifier.

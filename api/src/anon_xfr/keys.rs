@@ -1,3 +1,4 @@
+use crate::primitives::asymmetric_encryption::dh_keypair;
 use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
@@ -124,16 +125,13 @@ impl AXfrKeyPair {
 
         // Viewing key in Jubjub = Viewing key in BLS12-381 mod Jubjub's r.
         // `from_bytes` will allow so because the number of `bytes` are the same, although it may (very likely) go beyond.
-        let view_key =
-            AXfrViewKey(JubjubScalar::from_bytes(&viewing_key_in_bls12_381.to_bytes()).unwrap());
-
-        let base = JubjubPoint::get_base();
-        let pub_key = AXfrPubKey(base.mul(&view_key.0));
+        let view_sk = JubjubScalar::from_bytes(&viewing_key_in_bls12_381.to_bytes()).unwrap();
+        let (dh_sk, dh_pk) = dh_keypair(view_sk);
 
         Self {
             spend_key,
-            view_key,
-            pub_key,
+            view_key: AXfrViewKey(dh_sk),
+            pub_key: AXfrPubKey(dh_pk),
         }
     }
 
