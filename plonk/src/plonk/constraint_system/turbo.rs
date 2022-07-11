@@ -799,9 +799,15 @@ mod test {
         // The secret inputs: [a, b] = [1, 1]
         cs.new_variable(num[1]);
         cs.new_variable(num[1]);
-        let c_idx = cs.add(0, 1);
-        let d_idx = cs.mul(0, 1);
-        let e_idx = cs.linear_combine(&[0, 1, c_idx, d_idx], num[1], num[1], num[1], num[1]);
+        let c_idx = cs.add(0 + 2, 1 + 2);
+        let d_idx = cs.mul(0 + 2, 1 + 2);
+        let e_idx = cs.linear_combine(
+            &[0 + 2, 1 + 2, c_idx, d_idx],
+            num[1],
+            num[1],
+            num[1],
+            num[1],
+        );
 
         cs.range_check(e_idx, 3);
 
@@ -813,7 +819,18 @@ mod test {
         // set e_binary = [1, 1, 1]
         assert!(cs
             .verify_witness(
-                &[num[1], num[2], num[3], num[2], eight, num[1], num[1], num[1]],
+                &[
+                    F::zero(),
+                    F::one(),
+                    num[1],
+                    num[2],
+                    num[3],
+                    num[2],
+                    eight,
+                    num[1],
+                    num[1],
+                    num[1]
+                ],
                 &[]
             )
             .is_err());
