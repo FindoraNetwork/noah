@@ -2,16 +2,11 @@ use crate::anon_xfr::{
     decrypt_memo,
     keys::{AXfrKeyPair, AXfrPubKey, AXfrViewKey},
 };
+use crate::primitives::asymmetric_encryption::{dh_decrypt, dh_encrypt};
 use crate::xfr::structs::AssetType;
-use aes_gcm::{aead::Aead, NewAead};
-use digest::{generic_array::GenericArray, Digest};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::{
-    bls12_381::BLSScalar,
-    jubjub::{JubjubPoint, JubjubScalar},
-    prelude::*,
-};
+use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::constraint_system::VarIndex;
 
@@ -339,77 +334,13 @@ impl AxfrOwnerMemo {
         pub_key: &AXfrPubKey,
         msg: &[u8],
     ) -> Result<Self> {
-        let share_scalar = JubjubScalar::random(prng);
-        let share = JubjubPoint::get_base().mul(&share_scalar);
-
-        let dh = pub_key.0.mul(&share_scalar);
-
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(&dh.to_compressed_bytes());
-
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
-
-        let nonce = GenericArray::from_slice(&[0u8; 12]);
-
-        let gcm = {
-            let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
-
-            if res.is_err() {
-                return Err(eg!(ZeiError::EncryptionError));
-            }
-
-            res.unwrap()
-        };
-
-        let ctext = {
-            let res = gcm.encrypt(nonce, msg);
-
-            if res.is_err() {
-                return Err(eg!(ZeiError::EncryptionError));
-            }
-
-            res.unwrap()
-        };
-
-        Ok(Self {
-            point: share,
-            ctext,
-        })
+        let (point, ctext) = dh_encrypt(prng, &pub_key.0, msg)?;
+        Ok(Self { point, ctext })
     }
 
     /// Decrypt a memo using the viewing key.
     pub fn decrypt(&self, view_key: &AXfrViewKey) -> Result<Vec<u8>> {
-        let dh = self.point.mul(&view_key.0);
-
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(&dh.to_compressed_bytes());
-
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
-
-        let nonce = GenericArray::from_slice(&[0u8; 12]);
-
-        let gcm = {
-            let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
-
-            if res.is_err() {
-                return Err(eg!(ZeiError::DecryptionError));
-            }
-
-            res.unwrap()
-        };
-
-        let res = {
-            let res = gcm.decrypt(nonce, self.ctext.as_slice());
-
-            if res.is_err() {
-                return Err(eg!(ZeiError::DecryptionError));
-            }
-
-            res.unwrap()
-        };
-        Ok(res)
+        dh_decrypt(&view_key.0, &self.point, &self.ctext)
     }
 }
 
