@@ -83,6 +83,55 @@ impl SimFrParams for SimFrParamsRistretto {
     }
 }
 
+/// The parameters for field simulation for BS-257.
+#[derive(Clone, Default, Eq, PartialEq, Debug)]
+pub struct SimFrParamsBS257;
+
+impl SimFrParams for SimFrParamsBS257 {
+    const NUM_OF_LIMBS: usize = 6;
+    const BIT_PER_LIMB: usize = 44;
+    const BIT_IN_TOP_LIMB: usize = 36;
+    const NUM_OF_GROUPS: usize = 6;
+
+    fn scalar_field_in_biguint() -> BigUint {
+        BigUint::from_str(
+            "115792089237316195423570985008687907853269984665640564039457584007908834671663",
+        )
+        .unwrap()
+    }
+
+    fn scalar_field_in_limbs() -> Vec<BLSScalar> {
+        [
+            BLSScalar::from_str("17587891076143").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("68719476735").unwrap(),
+        ]
+        .to_vec()
+    }
+
+    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSScalar> {
+        [
+            BLSScalar::from_str("35175782152286").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("137438953470").unwrap(),
+        ]
+        .to_vec()
+    }
+
+    fn scalar_field_sub_pad_in_biguint() -> BigUint {
+        BigUint::from_str(
+            "231584178474632390847141970017375815706539969331281128078915168015817669343326",
+        )
+        .unwrap()
+    }
+}
+
 /// A precise indicator of the reducibility in a simulate element.
 #[derive(Eq, PartialEq, Clone)]
 pub enum SimReducibility {

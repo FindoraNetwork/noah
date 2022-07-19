@@ -15,6 +15,7 @@ ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra" }
 ark-std = { git = "https://github.com/FindoraNetwork/ark-std" }
 ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
 ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
+ark-algebra-test-templates = { git = "https://github.com/FindoraNetwork/ark-algebra" }
 curve25519-dalek = { git = "https://github.com/FindoraNetwork/curve25519-dalek" }
 ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek" }
 x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek" }

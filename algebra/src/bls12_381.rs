@@ -8,6 +8,7 @@ use ark_ff::{
     BigInteger, BigInteger256, FftField, FftParameters, Field, Fp12, FpParameters, PrimeField,
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::collections::BTreeMap;
 use ark_std::{
     fmt::{Debug, Display, Formatter},
     result::Result as StdResult,
@@ -16,7 +17,6 @@ use ark_std::{
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_integer::Integer;
-use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "parallel")]
