@@ -89,11 +89,11 @@ default-features = false
 
 [dev-dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v0.2.1'
+branch = 'feat-evm-stack'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v0.2.1'
+branch = 'feat-evm-stack'
 
 [features]
 default = [
