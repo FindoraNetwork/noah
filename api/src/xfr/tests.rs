@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 use zei_crypto::basic::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
+    pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
-    ristretto_pedersen_comm::RistrettoPedersenCommitment,
 };
 
 pub(crate) fn create_xfr(
@@ -98,7 +98,7 @@ fn do_transfer_tests_single_asset(
         })
         .collect_vec();
 
-    let pc_gens = RistrettoPedersenCommitment::default();
+    let pc_gens = PedersenCommitmentRistretto::default();
 
     let tuple = create_xfr(
         &mut prng,
@@ -822,7 +822,7 @@ mod asset_tracing {
         ristretto::{RistrettoPoint, RistrettoScalar},
     };
     use zei_crypto::basic::elgamal::ElGamalCiphertext;
-    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
@@ -831,7 +831,7 @@ mod asset_tracing {
         let m = RistrettoScalar::from(10u32);
         let r = RistrettoScalar::from(7657u32);
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
+        let pc_gens = PedersenCommitmentRistretto::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
 
@@ -872,7 +872,7 @@ mod asset_tracing {
 
         let input_amount = 100u64;
 
-        let pc_gens = RistrettoPedersenCommitment::default();
+        let pc_gens = PedersenCommitmentRistretto::default();
 
         let in_keys = gen_key_pair_vec(input_templates.len(), &mut prng);
         let in_keys_ref = in_keys.iter().collect_vec();
@@ -965,7 +965,7 @@ mod asset_tracing {
                 .unwrap()
                 .clone();
 
-            let new_enc = old_enc.e2.add(&pc_gens.B); //adding 1 to the exponent
+            let new_enc = old_enc.e2.add(&pc_gens.generator()); //adding 1 to the exponent
 
             let tracer_memo = TracerMemo {
                 lock_asset_type: Some(ElGamalCiphertext {

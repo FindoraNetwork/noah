@@ -20,7 +20,7 @@ pub(crate) mod examples {
         },
     };
     use zei_algebra::prelude::*;
-    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     pub const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
     pub const ASSET2_TYPE: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
@@ -1215,7 +1215,7 @@ pub(crate) mod examples {
         };
         let (bar, _, owner) = build_blind_asset_record(
             &mut prng,
-            &RistrettoPedersenCommitment::default(),
+            &PedersenCommitmentRistretto::default(),
             &template,
             vec![],
         );

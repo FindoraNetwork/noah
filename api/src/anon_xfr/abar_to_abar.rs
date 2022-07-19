@@ -1,13 +1,12 @@
-use crate::anon_xfr::keys::AXfrKeyPair;
-use crate::anon_xfr::structs::AxfrOwnerMemo;
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots,
     commit_in_cs_with_native_address, compute_merkle_root_variables, compute_non_malleability_tag,
-    keys::get_view_key_domain_separator,
+    keys::{get_view_key_domain_separator, AXfrKeyPair},
     nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{
-        AccElemVars, AnonAssetRecord, Commitment, MTNode, MTPath, Nullifier, NullifierInputVars,
-        OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
+        AccElemVars, AnonAssetRecord, AxfrOwnerMemo, Commitment, MTNode, MTPath, Nullifier,
+        NullifierInputVars, OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness,
+        PayerWitnessVars,
     },
     AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN, FEE_TYPE, SK_LEN,
 };

@@ -156,6 +156,11 @@ impl Scalar for RistrettoScalar {
     }
 
     #[inline]
+    fn capacity() -> usize {
+        252
+    }
+
+    #[inline]
     fn multiplicative_generator() -> Self {
         Self(curve25519_dalek::scalar::Scalar::from(2u8))
     }

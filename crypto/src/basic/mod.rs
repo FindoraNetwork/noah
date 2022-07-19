@@ -11,4 +11,4 @@ pub mod pedersen_elgamal;
 /// The module for the Rescue hash function.
 pub mod rescue;
 /// The module for the Pedersen commitments over the Ristretto group.
-pub mod ristretto_pedersen_comm;
+pub mod pedersen_comm;

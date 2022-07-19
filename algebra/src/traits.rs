@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 /// The trait for scalars
 pub trait Scalar:
     Copy
+    + Default
     + Debug
     + PartialEq
     + Eq
@@ -42,6 +43,9 @@ pub trait Scalar:
     /// Return multiplicative generator of order r,
     /// which is also required to be a quadratic nonresidue
     fn multiplicative_generator() -> Self;
+
+    /// Return the capacity.
+    fn capacity() -> usize;
 
     /// Return the little-endian byte representations of the field size
     fn get_field_size_le_bytes() -> Vec<u8>;
@@ -92,6 +96,7 @@ pub trait Scalar:
 /// The trait for group elements
 pub trait Group:
     Debug
+    + Default
     + Copy
     + Sized
     + PartialEq

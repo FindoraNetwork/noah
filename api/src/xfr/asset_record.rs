@@ -10,7 +10,7 @@ use crate::xfr::{
     },
 };
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
 /// AssetRecord confidentiality flags. Indicated if amount and/or asset type should be confidential.
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -325,7 +325,7 @@ impl AssetRecordTemplate {
 
 fn sample_blind_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
+    pc_gens: &PedersenCommitmentRistretto,
     asset_record: &AssetRecordTemplate,
     attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>,
 ) -> (
@@ -445,7 +445,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 /// Build open asset record from the template and identity attributes.
 pub fn build_open_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
+    pc_gens: &PedersenCommitmentRistretto,
     asset_record: &AssetRecordTemplate,
     attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>,
 ) -> (OpenAssetRecord, Vec<TracerMemo>, Option<OwnerMemo>) {
@@ -466,7 +466,7 @@ pub fn build_open_asset_record<R: CryptoRng + RngCore>(
 /// Build blind asset record from the template and identity attributes.
 pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
+    pc_gens: &PedersenCommitmentRistretto,
     asset_record: &AssetRecordTemplate,
     attrs_and_ctexts: Vec<Vec<(Attr, AttributeCiphertext)>>,
 ) -> (BlindAssetRecord, Vec<TracerMemo>, Option<OwnerMemo>) {
@@ -550,7 +550,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
     if asset_record.asset_tracing_policies.len() != identity_proofs_and_attrs.len() {
         return Err(eg!(ZeiError::ParameterError));
     }
-    let pc_gens = RistrettoPedersenCommitment::default();
+    let pc_gens = PedersenCommitmentRistretto::default();
     let mut attrs_ctexts = vec![];
     let mut reveal_proofs = vec![];
     let tracing_policy = asset_record.asset_tracing_policies.get_policies();
@@ -598,12 +598,12 @@ mod test {
     };
     use rand_chacha::ChaChaRng;
     use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
     fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracing: bool) {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
+        let pc_gens = PedersenCommitmentRistretto::default();
 
         let amount = 100u64;
         let asset_type = AssetType::from_identical_byte(0u8);
@@ -738,7 +738,7 @@ mod test {
     fn do_test_open_asset_record(record_type: AssetRecordType) {
         let mut prng: ChaChaRng;
         prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
+        let pc_gens = PedersenCommitmentRistretto::default();
 
         let asset_type = AssetType::from_identical_byte(1u8);
 
@@ -829,7 +829,7 @@ mod test {
 
     fn build_and_open_blind_record(record_type: AssetRecordType, amt: u64, asset_type: AssetType) {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
+        let pc_gens = PedersenCommitmentRistretto::default();
 
         let keypair = XfrKeyPair::generate(&mut prng);
         let ar = AssetRecordTemplate::with_no_asset_tracing(
@@ -883,7 +883,7 @@ mod test {
     #[test]
     fn open_blind_asset_record_error() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
+        let pc_gens = PedersenCommitmentRistretto::default();
 
         let keypair = XfrKeyPair::generate(&mut prng);
         let asset_type: AssetType = AssetType(prng.gen());

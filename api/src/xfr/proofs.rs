@@ -17,6 +17,7 @@ use zei_algebra::{
     ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar},
     utils::{min_greater_equal_power_of_two, u64_to_u32_pair},
 };
+use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 use zei_crypto::{
     basic::{
         chaum_pedersen::{
@@ -28,7 +29,6 @@ use zei_crypto::{
             pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_batch_verify,
             PedersenElGamalEqProof, PedersenElGamalProofInstance,
         },
-        ristretto_pedersen_comm::RistrettoPedersenCommitment,
     },
     bulletproofs::range::{batch_verify_ranges, prove_ranges},
 };
@@ -621,7 +621,7 @@ fn extract_value_commitments(
             ),
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
-                let pc_gens = RistrettoPedersenCommitment::default();
+                let pc_gens = PedersenCommitmentRistretto::default();
                 let com_low = pc_gens.commit(RistrettoScalar::from(low), RistrettoScalar::zero());
                 let com_high = pc_gens.commit(RistrettoScalar::from(high), RistrettoScalar::zero());
                 (com_low, com_high)
@@ -640,7 +640,7 @@ fn extract_value_commitments(
             ),
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
-                let pc_gens = RistrettoPedersenCommitment::default();
+                let pc_gens = PedersenCommitmentRistretto::default();
                 let com_low = pc_gens.commit(RistrettoScalar::from(low), RistrettoScalar::zero());
                 let com_high = pc_gens.commit(RistrettoScalar::from(high), RistrettoScalar::zero());
                 (com_low, com_high)
@@ -688,7 +688,7 @@ fn extract_value_commitments(
 /// Compute an asset proof for confidential asset transfers
 pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
     prng: &mut R,
-    pc_gens: &RistrettoPedersenCommitment,
+    pc_gens: &PedersenCommitmentRistretto,
     open_inputs: &[&OpenAssetRecord],
     open_outputs: &[&OpenAssetRecord],
 ) -> Result<ChaumPedersenProofX> {
@@ -725,7 +725,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
         &ChaumPedersenProofX,
     )],
 ) -> Result<()> {
-    let pc_gens = RistrettoPedersenCommitment::default();
+    let pc_gens = PedersenCommitmentRistretto::default();
     let mut transcript = Transcript::new(b"AssetEquality");
     let mut proof_instances = Vec::with_capacity(instances.len());
     for (inputs, outputs, proof) in instances {

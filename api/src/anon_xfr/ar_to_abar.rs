@@ -196,12 +196,12 @@ mod test {
     };
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     fn build_ar(
         pubkey: &XfrPublicKey,
         prng: &mut ChaChaRng,
-        pc_gens: &RistrettoPedersenCommitment,
+        pc_gens: &PedersenCommitmentRistretto,
         amt: u64,
         asset_type: AssetType,
         ar_type: AssetRecordType,
@@ -214,7 +214,7 @@ mod test {
     #[test]
     fn test_ar_to_abar() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = RistrettoPedersenCommitment::default();
+        let pc_gens = PedersenCommitmentRistretto::default();
 
         let bar_keypair = XfrKeyPair::generate(&mut prng);
         let abar_keypair = AXfrKeyPair::generate(&mut prng);
