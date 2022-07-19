@@ -40,7 +40,7 @@ impl PedersenCommitment<RistrettoPoint> for PedersenCommitmentRistretto {
     fn blinding_generator(&self) -> RistrettoPoint {
         self.B_blinding
     }
-    
+
     fn commit(&self, value: RistrettoScalar, blinding: RistrettoScalar) -> RistrettoPoint {
         RistrettoPoint(
             curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(

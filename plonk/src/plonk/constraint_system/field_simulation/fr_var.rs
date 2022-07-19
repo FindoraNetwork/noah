@@ -4,7 +4,7 @@ use zei_algebra::{
     cmp::{max, min},
     prelude::*,
 };
-use zei_crypto::field_simulation::{SimFr, SimReducibility, SimFrParams};
+use zei_crypto::field_simulation::{SimFr, SimFrParams, SimReducibility};
 
 /// `SimFrVar` is the variable for `SimFr` in
 /// `TurboConstraintSystem<BLSScalar>`
@@ -13,7 +13,7 @@ pub struct SimFrVar<P: SimFrParams> {
     /// the `SimFr` value.
     pub val: SimFr<P>,
     /// the `SimFr` variables.
-    pub var: Vec<VarIndex>
+    pub var: Vec<VarIndex>,
 }
 
 impl<P: SimFrParams> SimFrVar<P> {
@@ -325,7 +325,8 @@ mod test {
         {
             let mut cs = TurboCS::<BLSScalar>::new();
 
-            let a_sim_fr_var = SimFrVarTest::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+            let a_sim_fr_var =
+                SimFrVarTest::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
 
             test_sim_fr_equality(cs, &a_sim_fr_var);
         }

@@ -351,11 +351,11 @@ mod test {
     use crate::basic::elgamal::{
         elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey,
     };
+    use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
     use crate::basic::pedersen_elgamal::{
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
         pedersen_elgamal_batch_verify, PedersenElGamalProofInstance,
     };
-    use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use zei_algebra::prelude::*;

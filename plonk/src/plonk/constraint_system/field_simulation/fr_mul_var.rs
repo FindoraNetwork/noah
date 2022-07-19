@@ -312,7 +312,7 @@ mod test {
     use num_bigint::{BigUint, RandBigInt};
     use rand_chacha::ChaCha20Rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::field_simulation::{SimFrParamsRistretto, SimFr, SimFrParams};
+    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 
     type SimFrTest = SimFr<SimFrParamsRistretto>;
     type SimFrVarTest = SimFrVar<SimFrParamsRistretto>;
@@ -379,7 +379,8 @@ mod test {
         let ab_fr = &a * &b;
         let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
         let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
-        let ab_reduced_manipulated_val = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
+        let ab_reduced_manipulated_val =
+            SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
 
         let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);
         zero_supposed_manipulated.enforce_zero(&mut cs);

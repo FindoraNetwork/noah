@@ -1,11 +1,11 @@
-use std::marker::PhantomData;
-use crate::basic::rescue::RescueInstance;
 use crate::basic::pedersen_comm::PedersenCommitment;
+use crate::basic::rescue::RescueInstance;
 use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
 use num_bigint::BigUint;
 use rand_chacha::ChaChaRng;
 use serde::Deserialize;
+use std::marker::PhantomData;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
@@ -69,7 +69,13 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedChaumPedersen
 }
 
 /// Generate a proof in the delegated Chaum-Pedersen protocol.
-pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore, S: Scalar, G: Group<ScalarType = S>, P: SimFrParams, PC: PedersenCommitment<G>>(
+pub fn prove_delegated_chaum_pedersen<
+    R: CryptoRng + RngCore,
+    S: Scalar,
+    G: Group<ScalarType = S>,
+    P: SimFrParams,
+    PC: PedersenCommitment<G>,
+>(
     rng: &mut R,
     x: &S,
     gamma: &S,
@@ -145,12 +151,7 @@ pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore, S: Scalar, G: Grou
         let input = input[4..].to_vec();
 
         for chunk in input.chunks(3) {
-            h = comm_instance.rescue(&[
-                h,
-                chunk[0],
-                chunk[1],
-                chunk[2],
-            ])[0];
+            h = comm_instance.rescue(&[h, chunk[0], chunk[1], chunk[2]])[0];
         }
 
         h
@@ -222,7 +223,12 @@ pub fn prove_delegated_chaum_pedersen<R: CryptoRng + RngCore, S: Scalar, G: Grou
 }
 
 /// Verify a proof in the delegated Chaum-Pedersen protocol.
-pub fn verify_delegated_chaum_pedersen<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams, PC: PedersenCommitment<G>>(
+pub fn verify_delegated_chaum_pedersen<
+    S: Scalar,
+    G: Group<ScalarType = S>,
+    P: SimFrParams,
+    PC: PedersenCommitment<G>,
+>(
     pc_gens: &PC,
     point_p: &G,
     point_q: &G,
@@ -291,17 +297,17 @@ pub fn verify_delegated_chaum_pedersen<S: Scalar, G: Group<ScalarType = S>, P: S
 
 #[cfg(test)]
 mod test {
-    use crate::basic::rescue::RescueInstance;
     use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+    use crate::basic::rescue::RescueInstance;
     use crate::delegated_chaum_pedersen::{
         prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
     };
+    use crate::field_simulation::SimFrParamsRistretto;
     use num_bigint::BigUint;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use zei_algebra::ristretto::RistrettoScalar;
     use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
-    use crate::field_simulation::SimFrParamsRistretto;
 
     #[test]
     fn test_correctness() {
@@ -331,10 +337,11 @@ mod test {
                 BLSScalar::zero(),
             ])[0];
 
-            let (proof, _, _, _) = prove_delegated_chaum_pedersen::<_, _, _, SimFrParamsRistretto, _>(
-                &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
-            )
-            .unwrap();
+            let (proof, _, _, _) =
+                prove_delegated_chaum_pedersen::<_, _, _, SimFrParamsRistretto, _>(
+                    &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
+                )
+                .unwrap();
 
             let _ =
                 verify_delegated_chaum_pedersen(&pc_gens, &point_p, &point_q, &z, &proof).unwrap();

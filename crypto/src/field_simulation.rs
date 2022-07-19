@@ -1,6 +1,6 @@
-use std::marker::PhantomData;
 use num_bigint::BigUint;
 use num_integer::Integer;
+use std::marker::PhantomData;
 use zei_algebra::bls12_381::BLSScalar;
 use zei_algebra::prelude::*;
 use zei_algebra::str::FromStr;
@@ -48,7 +48,7 @@ impl SimFrParams for SimFrParamsRistretto {
         BigUint::from_str(
             "7237005577332262213973186563042994240857116359379907606001950938285454250989",
         )
-            .unwrap()
+        .unwrap()
     }
 
     fn scalar_field_in_limbs() -> Vec<BLSScalar> {
@@ -59,7 +59,8 @@ impl SimFrParams for SimFrParamsRistretto {
             BLSScalar::from_str("0").unwrap(),
             BLSScalar::from_str("0").unwrap(),
             BLSScalar::from_str("137438953472").unwrap(),
-        ].to_vec()
+        ]
+        .to_vec()
     }
 
     fn scalar_field_sub_pad_in_limbs() -> Vec<BLSScalar> {
@@ -70,14 +71,15 @@ impl SimFrParams for SimFrParamsRistretto {
             BLSScalar::from_str("17592186044415").unwrap(),
             BLSScalar::from_str("17592186044414").unwrap(),
             BLSScalar::from_str("412316860414").unwrap(),
-        ].to_vec()
+        ]
+        .to_vec()
     }
 
     fn scalar_field_sub_pad_in_biguint() -> BigUint {
         BigUint::from_str(
             "21711016731996786641919559689128982722571349078139722818005852814856362752967",
         )
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -113,7 +115,7 @@ pub struct SimFr<P: SimFrParams> {
     /// The reducibility of this simulated field element.
     pub num_of_additions_over_normal_form: SimReducibility,
     /// PhantomData for the parameters.
-    pub params_phantom: PhantomData<P>
+    pub params_phantom: PhantomData<P>,
 }
 
 impl<P: SimFrParams> Default for SimFr<P> {
@@ -122,7 +124,7 @@ impl<P: SimFrParams> Default for SimFr<P> {
             limbs: vec![BLSScalar::zero(); P::NUM_OF_LIMBS],
             val: BigUint::zero(),
             num_of_additions_over_normal_form: SimReducibility::StrictlyNotReducible,
-            params_phantom: PhantomData::default()
+            params_phantom: PhantomData::default(),
         }
     }
 }
@@ -233,7 +235,7 @@ pub struct SimFrMul<P: SimFrParams> {
     /// The product of the num of additions over two original field elements.
     pub prod_of_num_of_additions: BigUint,
     /// PhantomData for the parameters.
-    pub params_phantom: PhantomData<P>
+    pub params_phantom: PhantomData<P>,
 }
 
 impl<P: SimFrParams> Default for SimFrMul<P> {
@@ -242,7 +244,7 @@ impl<P: SimFrParams> Default for SimFrMul<P> {
             limbs: vec![BLSScalar::zero(); P::NUM_OF_LIMBS_MUL],
             val: BigUint::zero(),
             prod_of_num_of_additions: BigUint::zero(),
-            params_phantom: PhantomData::default()
+            params_phantom: PhantomData::default(),
         }
     }
 }
@@ -430,7 +432,7 @@ impl<P: SimFrParams> SimFrMul<P> {
 
 #[cfg(test)]
 mod test {
-    use crate::field_simulation::{SimFrParamsRistretto, SimFr, SimFrParams};
+    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
     use rand_chacha::ChaCha20Rng;
