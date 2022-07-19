@@ -30,7 +30,7 @@
 //!
 //! Details of the cryptographic protocol will follow.
 
-use crate::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 use bulletproofs::r1cs::{
     ConstraintSystem, LinearCombination, Prover, R1CSError, RandomizableConstraintSystem,
     RandomizedConstraintSystem, Variable, Verifier,
@@ -82,7 +82,7 @@ impl MixValue {
     /// Commit to amount and asset type using user-provided blinding factors.
     pub fn commit(
         &self,
-        pc_gens: &RistrettoPedersenCommitment,
+        pc_gens: &PedersenCommitmentRistretto,
         blinds: &MixValue,
     ) -> MixCommitment {
         MixCommitment {

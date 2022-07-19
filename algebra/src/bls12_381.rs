@@ -39,18 +39,18 @@ impl Debug for BLSScalar {
 
 /// The wrapped struct for `ark_bls12_381::G1Projective`
 #[wasm_bindgen]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
 pub struct BLSG1(pub(crate) G1Projective);
 
 /// The wrapped struct for `ark_bls12_381::G2Projective`
 #[wasm_bindgen]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
 pub struct BLSG2(pub(crate) G2Projective);
 
 /// The wrapped struct for `Fp12<ark_bls12_381::Fq12Parameters>`,
 /// which is the pairing result
 #[wasm_bindgen]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
 pub struct BLSGt(pub(crate) Fp12<Fq12Parameters>);
 
 impl FromStr for BLSScalar {
@@ -207,6 +207,11 @@ impl Scalar for BLSScalar {
     {
         let mut prng = derive_prng_from_hash::<D>(hash);
         Self::random(&mut prng)
+    }
+
+    #[inline]
+    fn capacity() -> usize {
+        ark_bls12_381::FrParameters::CAPACITY as usize
     }
 
     #[inline]

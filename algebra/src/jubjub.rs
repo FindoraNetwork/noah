@@ -7,7 +7,7 @@ use crate::{
 };
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ed_on_bls12_381::{EdwardsAffine as AffinePoint, EdwardsProjective, Fr};
-use ark_ff::{BigInteger, Field, PrimeField};
+use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use digest::{generic_array::typenum::U64, Digest};
 
@@ -176,6 +176,11 @@ impl Scalar for JubjubScalar {
     {
         let mut prng = derive_prng_from_hash::<D>(hash);
         Self::random(&mut prng)
+    }
+
+    #[inline]
+    fn capacity() -> usize {
+        ark_ed_on_bls12_381::FrParameters::CAPACITY as usize
     }
 
     #[inline]

@@ -4,7 +4,7 @@ use zei_algebra::{
     prelude::*,
     ristretto::{CompressedRistretto, RistrettoScalar},
 };
-use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
 /// Module for asset mixing.
 pub mod asset_mixer;
@@ -381,7 +381,7 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
     outputs: &[&OpenAssetRecord],
     xfr_type: XfrType,
 ) -> Result<AssetTypeAndAmountProof> {
-    let pc_gens = RistrettoPedersenCommitment::default();
+    let pc_gens = PedersenCommitmentRistretto::default();
 
     match xfr_type {
         XfrType::NonConfidential_SingleAsset => Ok(AssetTypeAndAmountProof::NoProof),
@@ -804,7 +804,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
                         c2.decompress().c(d!(ZeiError::DecompressElementError)),
                     ),
                     XfrAmount::NonConfidential(amount) => {
-                        let pc_gens = RistrettoPedersenCommitment::default();
+                        let pc_gens = PedersenCommitmentRistretto::default();
                         let (low, high) = u64_to_u32_pair(amount);
                         (
                             Ok(pc_gens.commit(RistrettoScalar::from(low), RistrettoScalar::zero())),
@@ -821,7 +821,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
                         let com_type = match x.asset_type {
                             XfrAssetType::Confidential(c) => c,
                             XfrAssetType::NonConfidential(asset_type) => {
-                                let pc_gens = RistrettoPedersenCommitment::default();
+                                let pc_gens = PedersenCommitmentRistretto::default();
                                 pc_gens
                                     .commit(asset_type.as_scalar(), RistrettoScalar::zero())
                                     .compress()

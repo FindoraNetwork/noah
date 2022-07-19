@@ -140,7 +140,7 @@ pub struct AssetMixingInstance<'a> {
 /// use rand::thread_rng;
 /// use ruc::err::*;
 /// use zei::setup::BulletproofParams;
-/// use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+/// use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 /// let input = [
 ///            (60u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
 ///            (100u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10001u32), RistrettoScalar::from(200001u32)),
@@ -158,7 +158,7 @@ pub struct AssetMixingInstance<'a> {
 ///        ];
 ///
 /// let proof = prove_asset_mixing(&input, &output).unwrap();
-/// let pc_gens = RistrettoPedersenCommitment::default();
+/// let pc_gens = PedersenCommitmentRistretto::default();
 /// let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
 ///      input.iter()
 ///           .map(|(amount, typ, blind_a, blind_typ)| {
@@ -281,11 +281,11 @@ mod test {
         prelude::*,
         ristretto::{CompressedRistretto, RistrettoScalar},
     };
-    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
     #[test]
     fn test_asset_mixer() {
-        let pc_gens = RistrettoPedersenCommitment::default();
+        let pc_gens = PedersenCommitmentRistretto::default();
 
         // asset type set to not match errors
         let input = [

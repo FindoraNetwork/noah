@@ -19,7 +19,7 @@ pub(crate) mod xfr_note_complex_variable_size {
         xfr::{gen_xfr_body, structs::TracingPolicies, verify_xfr_body, XfrNotePoliciesRef},
     };
     use zei_algebra::prelude::*;
-    use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+    use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     /// Test asset one, which is also FRA.
     const ASSET_TYPE_1: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
@@ -242,7 +242,7 @@ pub(crate) mod xfr_note_complex_variable_size {
         };
         let (bar, _, owner) = build_blind_asset_record(
             &mut prng,
-            &RistrettoPedersenCommitment::default(),
+            &PedersenCommitmentRistretto::default(),
             &template,
             vec![],
         );

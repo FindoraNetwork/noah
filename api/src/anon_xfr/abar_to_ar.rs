@@ -17,7 +17,7 @@ use crate::xfr::{
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
-use zei_crypto::basic::ristretto_pedersen_comm::RistrettoPedersenCommitment;
+use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use zei_plonk::plonk::{
     constraint_system::{rescue::StateVar, TurboCS, VarIndex},
     prover::prover_with_lagrange,
@@ -77,7 +77,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     let oar_amount = oabar.amount;
     let oar_type = oabar.asset_type;
 
-    let pc_gens = RistrettoPedersenCommitment::default();
+    let pc_gens = PedersenCommitmentRistretto::default();
     let art = AssetRecordTemplate::with_no_asset_tracing(
         oar_amount,
         oar_type,

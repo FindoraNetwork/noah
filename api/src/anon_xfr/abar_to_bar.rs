@@ -1,7 +1,7 @@
-use crate::anon_xfr::abar_to_abar::add_payers_witnesses;
-use crate::anon_xfr::keys::{get_view_key_domain_separator, AXfrKeyPair};
 use crate::anon_xfr::{
+    abar_to_abar::add_payers_witnesses,
     commit_in_cs_with_native_address, compute_merkle_root_variables, compute_non_malleability_tag,
+    keys::{get_view_key_domain_separator, AXfrKeyPair},
     nullify_in_cs_with_native_address, nullify_with_native_address,
     structs::{AccElemVars, Nullifier, NullifierInputVars, OpenAnonAssetRecord, PayerWitness},
     AXfrPlonkPf, TurboPlonkCS, SK_LEN, TWO_POW_32,
@@ -16,15 +16,18 @@ use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use num_bigint::BigUint;
 use zei_algebra::{
-    bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*, ristretto::RistrettoScalar,
+    bls12_381::BLSScalar,
+    jubjub::JubjubPoint,
+    prelude::*,
+    ristretto::{RistrettoPoint, RistrettoScalar},
 };
 use zei_crypto::{
-    basic::ristretto_pedersen_comm::RistrettoPedersenCommitment,
+    basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_chaum_pedersen::{
         prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
         DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
     },
-    field_simulation::{SimFr, BIT_PER_LIMB, NUM_OF_LIMBS},
+    field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
 use zei_plonk::plonk::{
     constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex},
@@ -55,7 +58,8 @@ pub struct AbarToBarPreNote {
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
     /// Inspection data in the delegated Chaum-Pedersen proof.
-    pub inspection: DelegatedChaumPedersenInspection,
+    pub inspection:
+        DelegatedChaumPedersenInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     /// Beta.
     pub beta: RistrettoScalar,
     /// Lambda.
@@ -70,7 +74,8 @@ pub struct AbarToBarBody {
     /// The new BAR to be created.
     pub output: BlindAssetRecord,
     /// The inspector's proof.
-    pub delegated_cp_proof: DelegatedChaumPedersenProof,
+    pub delegated_cp_proof:
+        DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     /// The Merkle root hash.
     pub merkle_root: BLSScalar,
     /// The Merkle root version.
@@ -100,7 +105,7 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     let obar_amount = oabar.amount;
     let obar_type = oabar.asset_type;
 
-    let pc_gens = RistrettoPedersenCommitment::default();
+    let pc_gens = PedersenCommitmentRistretto::default();
     let art = AssetRecordTemplate::with_no_asset_tracing(
         obar_amount,
         obar_type,
@@ -127,7 +132,7 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
         .add(&obar.amount_blinds.1.mul(&RistrettoScalar::from(TWO_POW_32)));
     let delta = obar.type_blind;
 
-    let pc_gens = RistrettoPedersenCommitment::default();
+    let pc_gens = PedersenCommitmentRistretto::default();
 
     let point_p = pc_gens.commit(x, gamma);
     let point_q = pc_gens.commit(y, delta);
@@ -232,7 +237,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     }
 
     let bar = note.body.output.clone();
-    let pc_gens = RistrettoPedersenCommitment::default();
+    let pc_gens = PedersenCommitmentRistretto::default();
 
     // Reject anonymous-to-confidential notes whose outputs are transparent.
     if note.body.output.get_record_type()
@@ -294,11 +299,14 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let beta_lambda = beta * &lambda;
     let s1_plus_lambda_s2 = delegated_cp_proof.s_1 + delegated_cp_proof.s_2 * &lambda;
 
-    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-    let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
-    let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
+    let beta_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+    let lambda_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+    let beta_lambda_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
     let s1_plus_lambda_s2_sim_fr =
-        SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
     let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
     let mut online_inputs = vec![];
@@ -328,8 +336,12 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: PayerWitness,
-    proof: &DelegatedChaumPedersenProof,
-    inspection: &DelegatedChaumPedersenInspection,
+    proof: &DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    inspection: &DelegatedChaumPedersenInspection<
+        RistrettoScalar,
+        RistrettoPoint,
+        SimFrParamsRistretto,
+    >,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     hash: &BLSScalar,
@@ -365,8 +377,12 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
     payers_witness: PayerWitness,
-    proof: &DelegatedChaumPedersenProof,
-    inspection: &DelegatedChaumPedersenInspection,
+    proof: &DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    inspection: &DelegatedChaumPedersenInspection<
+        RistrettoScalar,
+        RistrettoPoint,
+        SimFrParamsRistretto,
+    >,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     hash: &BLSScalar,
@@ -385,11 +401,11 @@ pub fn build_abar_to_bar_cs(
     let zero_var = cs.zero_var();
     let one_var = cs.one_var();
     let mut root_var: Option<VarIndex> = None;
-    let step_1 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB));
-    let step_2 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 2));
-    let step_3 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 3));
-    let step_4 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 4));
-    let step_5 = BLSScalar::from(&BigUint::one().shl(BIT_PER_LIMB * 5));
+    let step_1 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB));
+    let step_2 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 2));
+    let step_3 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 3));
+    let step_4 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 4));
+    let step_5 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 5));
 
     let hash_var = cs.new_variable(*hash);
     let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
@@ -458,21 +474,28 @@ pub fn build_abar_to_bar_cs(
     }
 
     // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2.
-    let x_sim_fr = SimFr::from(&BigUint::from_bytes_le(&inspection.x.to_bytes()));
-    let y_sim_fr = SimFr::from(&BigUint::from_bytes_le(&inspection.y.to_bytes()));
-    let a_sim_fr = SimFr::from(&BigUint::from_bytes_le(&inspection.a.to_bytes()));
-    let b_sim_fr = SimFr::from(&BigUint::from_bytes_le(&inspection.b.to_bytes()));
+    let x_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&inspection.x.to_bytes()));
+    let y_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&inspection.y.to_bytes()));
+    let a_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&inspection.a.to_bytes()));
+    let b_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&inspection.b.to_bytes()));
     let comm = proof.inspection_comm;
     let r = inspection.r;
-    let beta_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-    let lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+    let beta_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+    let lambda_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
 
     let beta_lambda = *beta * lambda;
-    let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
+    let beta_lambda_sim_fr =
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
 
     let s1_plus_lambda_s2 = proof.s_1 + proof.s_2 * lambda;
     let s1_plus_lambda_s2_sim_fr =
-        SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
+        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
     let x_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
     let y_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
@@ -486,13 +509,13 @@ pub fn build_abar_to_bar_cs(
     let s1_plus_lambda_s2_sim_fr_var = SimFrVar::alloc_input(&mut cs, &s1_plus_lambda_s2_sim_fr);
 
     // 3. Merge the limbs for x, y, a, b.
-    let mut all_limbs = Vec::with_capacity(4 * NUM_OF_LIMBS);
+    let mut all_limbs = Vec::with_capacity(4 * SimFrParamsRistretto::NUM_OF_LIMBS);
     all_limbs.extend_from_slice(&x_sim_fr.limbs);
     all_limbs.extend_from_slice(&y_sim_fr.limbs);
     all_limbs.extend_from_slice(&a_sim_fr.limbs);
     all_limbs.extend_from_slice(&b_sim_fr.limbs);
 
-    let mut all_limbs_var = Vec::with_capacity(4 * NUM_OF_LIMBS);
+    let mut all_limbs_var = Vec::with_capacity(4 * SimFrParamsRistretto::NUM_OF_LIMBS);
     all_limbs_var.extend_from_slice(&x_sim_fr_var.var);
     all_limbs_var.extend_from_slice(&y_sim_fr_var.var);
     all_limbs_var.extend_from_slice(&a_sim_fr_var.var);
@@ -503,7 +526,10 @@ pub fn build_abar_to_bar_cs(
     for (limbs, limbs_var) in all_limbs.chunks(5).zip(all_limbs_var.chunks(5)) {
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
-            sum.add_assign(<&BLSScalar as Into<BigUint>>::into(limb).shl(BIT_PER_LIMB * i));
+            sum.add_assign(
+                <&BLSScalar as Into<BigUint>>::into(limb)
+                    .shl(SimFrParamsRistretto::BIT_PER_LIMB * i),
+            );
         }
         compressed_limbs.push(BLSScalar::from(&sum));
 
@@ -644,16 +670,16 @@ pub fn build_abar_to_bar_cs(
 
     cs.prepare_pi_variable(comm_var);
 
-    for i in 0..NUM_OF_LIMBS {
+    for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
         cs.prepare_pi_variable(beta_sim_fr_var.var[i]);
     }
-    for i in 0..NUM_OF_LIMBS {
+    for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
         cs.prepare_pi_variable(lambda_sim_fr_var.var[i]);
     }
-    for i in 0..NUM_OF_LIMBS {
+    for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
         cs.prepare_pi_variable(beta_lambda_sim_fr_var.var[i]);
     }
-    for i in 0..NUM_OF_LIMBS {
+    for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
         cs.prepare_pi_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
     }
 
