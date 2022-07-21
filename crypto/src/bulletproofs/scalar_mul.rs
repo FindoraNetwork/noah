@@ -15,6 +15,7 @@ use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha3::Sha3_512;
+use zei_algebra::bs257::BS257Scalar;
 use zei_algebra::{
     bs257::BS257G1,
     prelude::*,
@@ -252,7 +253,7 @@ impl ScalarMulProof {
         scalar: &SECP256K1Scalar,
         point_r_divided_by_r: &SECP256K1G1,
         point_g_times_z_divided_by_r: &SECP256K1G1,
-    ) -> Result<(ScalarMulProof, Vec<BS257G1>)> {
+    ) -> Result<(ScalarMulProof, Vec<BS257G1>, Vec<BS257Scalar>)> {
         let public_key = public_key.get_raw();
         let scalar = scalar.get_raw();
         let point_r_divided_by_r = point_r_divided_by_r.get_raw();
@@ -271,8 +272,10 @@ impl ScalarMulProof {
         let mut prover = Prover::new(&pc_gens, transcript);
 
         // 4. Allocate `public_key`.
-        let (x_comm, x_var) = prover.commit(public_key.x, Fq::rand(prng));
-        let (y_comm, y_var) = prover.commit(public_key.y, Fq::rand(prng));
+        let x_blinding = Fq::rand(prng);
+        let y_blinding = Fq::rand(prng);
+        let (x_comm, x_var) = prover.commit(public_key.x, x_blinding.clone());
+        let (y_comm, y_var) = prover.commit(public_key.y, y_blinding.clone());
 
         let public_key_var = PointVar::new(x_var, y_var);
 
@@ -281,7 +284,8 @@ impl ScalarMulProof {
         // We can do this because Fq is larger than Fr.
         let scalar_fq = Fq::from_le_bytes_mod_order(&scalar.into_repr().to_bytes_le());
 
-        let (scalar_fq_comm, scalar_fq_var) = prover.commit(scalar_fq, Fq::rand(prng));
+        let scalar_blinding = Fq::rand(prng);
+        let (scalar_fq_comm, scalar_fq_var) = prover.commit(scalar_fq, scalar_blinding.clone());
 
         let scalar_var = ScalarVar(scalar_fq_var);
 
@@ -303,6 +307,11 @@ impl ScalarMulProof {
                 BS257G1::from_raw(x_comm.clone()),
                 BS257G1::from_raw(y_comm.clone()),
                 BS257G1::from_raw(scalar_fq_comm.clone()),
+            ],
+            vec![
+                BS257Scalar::from_raw(x_blinding),
+                BS257Scalar::from_raw(y_blinding),
+                BS257Scalar::from_raw(scalar_blinding),
             ],
         ))
     }
@@ -373,7 +382,7 @@ fn scalar_mul_test() {
         .into_affine()
         .add(public_key.neg());
 
-    let (proof, commitments) = {
+    let (proof, commitments, _) = {
         let mut prover_transcript = Transcript::new(b"ScalarMulProofTest");
         ScalarMulProof::prove(
             &mut rng,

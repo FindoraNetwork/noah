@@ -319,7 +319,7 @@ mod test_ristretto {
         let mut cs = TurboCS::<BLSScalar>::new();
 
         let zero_fr = SimFrTest::from(&BigUint::zero());
-        let zero_fr_val = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
+        let (zero_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
         let zero_fr_mul_val = zero_fr_val.mul(&mut cs, &zero_fr_val);
 
         zero_fr_mul_val.enforce_zero(&mut cs);
@@ -339,15 +339,15 @@ mod test_ristretto {
             let a_fr = SimFrTest::from(&a);
             let b_fr = SimFrTest::from(&b);
 
-            let a_fr_val = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
-            let b_fr_val = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+            let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+            let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
 
             let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
 
             let ab_fr = &a * &b;
             let ab_fr_reduced = &ab_fr % &r_biguint;
             let ab_reduced = SimFrTest::from(&ab_fr_reduced);
-            let ab_reduced_val = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
+            let (ab_reduced_val, _) = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
 
             let zero_supposed = ab_fr_mul_val.sub(&mut cs, &ab_reduced_val);
             zero_supposed.enforce_zero(&mut cs);
@@ -368,15 +368,15 @@ mod test_ristretto {
         let a_fr = SimFrTest::from(&a);
         let b_fr = SimFrTest::from(&b);
 
-        let a_fr_val = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
-        let b_fr_val = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+        let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+        let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
 
         let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
 
         let ab_fr = &a * &b;
         let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
         let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
-        let ab_reduced_manipulated_val =
+        let (ab_reduced_manipulated_val, _) =
             SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
 
         let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);
@@ -400,7 +400,7 @@ mod test_bs257 {
         let mut cs = TurboCS::<BLSScalar>::new();
 
         let zero_fr = SimFrTest::from(&BigUint::zero());
-        let zero_fr_val = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
+        let (zero_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
         let zero_fr_mul_val = zero_fr_val.mul(&mut cs, &zero_fr_val);
 
         zero_fr_mul_val.enforce_zero(&mut cs);
@@ -420,15 +420,15 @@ mod test_bs257 {
             let a_fr = SimFrTest::from(&a);
             let b_fr = SimFrTest::from(&b);
 
-            let a_fr_val = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
-            let b_fr_val = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+            let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+            let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
 
             let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
 
             let ab_fr = &a * &b;
             let ab_fr_reduced = &ab_fr % &r_biguint;
             let ab_reduced = SimFrTest::from(&ab_fr_reduced);
-            let ab_reduced_val = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
+            let (ab_reduced_val, _) = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
 
             let zero_supposed = ab_fr_mul_val.sub(&mut cs, &ab_reduced_val);
             zero_supposed.enforce_zero(&mut cs);
@@ -449,15 +449,15 @@ mod test_bs257 {
         let a_fr = SimFrTest::from(&a);
         let b_fr = SimFrTest::from(&b);
 
-        let a_fr_val = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
-        let b_fr_val = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+        let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+        let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
 
         let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
 
         let ab_fr = &a * &b;
         let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
         let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
-        let ab_reduced_manipulated_val =
+        let (ab_reduced_manipulated_val, _) =
             SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
 
         let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);

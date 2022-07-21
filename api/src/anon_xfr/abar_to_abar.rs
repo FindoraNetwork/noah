@@ -1,3 +1,4 @@
+use crate::anon_xfr::address_folding::AXfrAddressFoldingInstance;
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit_in_cs,
     compute_merkle_root_variables, compute_non_malleability_tag,
@@ -59,14 +60,8 @@ pub struct AXfrNote {
     pub body: AXfrBody,
     /// The spending proof (assuming non-malleability).
     pub spending_proof: AXfrPlonkPf,
-    /// The inspector's proof.
-    pub delegated_cp_proof: DelegatedChaumPedersenProof<BS257Scalar, BS257G1, SimFrParamsBS257>,
-    /// The commitments generated during the scalar mul proof, used in delegated CP.
-    pub scalar_mul_commitments: Vec<BS257G1>,
-    /// The scalar mul proof.
-    pub scalar_mul_proof: ScalarMulProof,
-    /// The instance part of the signature.
-    pub sig_instance: AXfrSignatureInstance,
+    /// The address folding instance.
+    pub address_folding: AXfrAddressFoldingInstance,
 }
 
 /// Anonymous transfer pre-note without proofs and signatures.
