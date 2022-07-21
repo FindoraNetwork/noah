@@ -32,6 +32,8 @@ pub mod abar_to_abar;
 pub mod abar_to_ar;
 /// Module for converting anonymous assets to confidential assets.
 pub mod abar_to_bar;
+/// Module for designs related to address folding.
+pub mod address_folding;
 /// Module for converting transparent assets to anonymous assets.
 pub mod ar_to_abar;
 /// Module for converting confidential assets to anonymous assets.

@@ -10,7 +10,7 @@ use zei_algebra::prelude::*;
 pub const N_WIRES_PER_GATE: usize = 5;
 
 /// The selectors number in Turbo CS.
-pub const N_SELECTORS: usize = 13;
+pub const N_SELECTORS: usize = 12;
 
 /// Turbo PLONK Constraint System.
 #[derive(Serialize, Deserialize)]
@@ -85,7 +85,6 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     /// The equation is
     /// ```text
     ///     q1*w1 + q2*w2 + q3*w3 + q4*w4 + qm1(w1*w2) + qm2(w3*w4) + qc + PI
-    ///     + q_ecc*[w1*w2*w3*w4*wo]
     ///     + q_hash_1 * w1^5 + q_hash_2 * w2^5 + q_hash_3 * w3^5 + q_hash_4 * w4^5
     ///     - qo * wo = 0
     /// ```
@@ -100,25 +99,18 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         let mul1 = sel_vals[4].mul(wire_vals[0].mul(wire_vals[1]));
         let mul2 = sel_vals[5].mul(wire_vals[2].mul(wire_vals[3]));
         let constant = sel_vals[6].add(pub_input);
-        let ecc = sel_vals[7]
-            .mul(wire_vals[0])
-            .mul(wire_vals[1])
-            .mul(wire_vals[2])
-            .mul(wire_vals[3])
-            .mul(wire_vals[4]);
         let five = &[5u64];
-        let hash1 = sel_vals[8].mul(wire_vals[0].pow(five));
-        let hash2 = sel_vals[9].mul(wire_vals[1].pow(five));
-        let hash3 = sel_vals[10].mul(wire_vals[2].pow(five));
-        let hash4 = sel_vals[11].mul(wire_vals[3].pow(five));
-        let out = sel_vals[12].mul(wire_vals[4]);
+        let hash1 = sel_vals[7].mul(wire_vals[0].pow(five));
+        let hash2 = sel_vals[8].mul(wire_vals[1].pow(five));
+        let hash3 = sel_vals[9].mul(wire_vals[2].pow(five));
+        let hash4 = sel_vals[10].mul(wire_vals[3].pow(five));
+        let out = sel_vals[11].mul(wire_vals[4]);
         let mut r = add1;
         r.add_assign(&add2);
         r.add_assign(&add3);
         r.add_assign(&add4);
         r.add_assign(&mul1);
         r.add_assign(&mul2);
-        r.add_assign(&ecc);
         r.add_assign(&hash1);
         r.add_assign(&hash2);
         r.add_assign(&hash3);
@@ -129,17 +121,12 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     }
 
     /// The coefficients are
-    /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1*w2*w3*w4*wo, w1^5, w2^5, w3^5, w4^5, -w4)
+    /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1^5, w2^5, w3^5, w4^5, -w4)
     fn eval_selector_multipliers(wire_vals: &[&F]) -> Result<Vec<F>> {
         if wire_vals.len() < N_WIRES_PER_GATE {
             return Err(eg!(PlonkError::FuncParamsError));
         }
         let five = &[5u64];
-        let mut w0w1w2w3w4 = *wire_vals[0];
-        w0w1w2w3w4.mul_assign(wire_vals[1]);
-        w0w1w2w3w4.mul_assign(wire_vals[2]);
-        w0w1w2w3w4.mul_assign(wire_vals[3]);
-        w0w1w2w3w4.mul_assign(wire_vals[4]);
         Ok(vec![
             *wire_vals[0],
             *wire_vals[1],
@@ -148,7 +135,6 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             wire_vals[0].mul(wire_vals[1]),
             wire_vals[2].mul(wire_vals[3]),
             F::one(),
-            w0w1w2w3w4,
             wire_vals[0].pow(five),
             wire_vals[1].pow(five),
             wire_vals[2].pow(five),
@@ -246,7 +232,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(q1, q2, q3, q4);
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(zero);
-        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
         for (i, wire) in wires_in.iter().enumerate() {
@@ -289,7 +274,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(zero, zero, zero, zero);
         self.push_mul_selectors(F::one(), zero);
         self.push_constant_selector(zero);
-        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
         self.wiring[0].push(left_var);
@@ -457,7 +441,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(zero, one, zero, zero);
         self.push_mul_selectors(one.neg(), one);
         self.push_constant_selector(zero);
-        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
         let out = if self.witness[bit] == zero {
@@ -522,7 +505,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(zero, zero, zero, zero);
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(constant);
-        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
         for i in 0..N_WIRES_PER_GATE {
@@ -570,22 +552,17 @@ impl<F: Scalar> TurboCS<F> {
         self.selectors[6].push(q_c);
     }
 
-    /// Add an ECC selectors.
-    pub fn push_ecc_selector(&mut self, q_ecc: F) {
-        self.selectors[7].push(q_ecc);
-    }
-
     /// Add a Rescue selectors.
     pub fn push_rescue_selectors(&mut self, q_hash_1: F, q_hash_2: F, q_hash_3: F, q_hash_4: F) {
-        self.selectors[8].push(q_hash_1);
-        self.selectors[9].push(q_hash_2);
-        self.selectors[10].push(q_hash_3);
-        self.selectors[11].push(q_hash_4);
+        self.selectors[7].push(q_hash_1);
+        self.selectors[8].push(q_hash_2);
+        self.selectors[9].push(q_hash_3);
+        self.selectors[10].push(q_hash_4);
     }
 
     /// Add an Out selectors.
     pub fn push_out_selector(&mut self, q_out: F) {
-        self.selectors[12].push(q_out);
+        self.selectors[11].push(q_out);
     }
 
     /// Return the witness index for given wire and cs index.
@@ -672,7 +649,7 @@ mod test {
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use std::str::FromStr;
-    use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
 
@@ -1077,7 +1054,6 @@ mod test {
     fn test_turbo_plonk_kzg_slow() {
         let mut prng = ChaChaRng::from_seed([1u8; 32]);
         let pcs = KZGCommitmentScheme::new(260, &mut prng);
-        test_turbo_plonk_ecc_gates(&pcs, &mut prng);
         test_turbo_plonk_rescue_gates(&pcs, &mut prng);
     }
 
@@ -1160,29 +1136,6 @@ mod test {
         cs.range_check(e_idx, 4);
         cs.pad();
 
-        let witness = cs.get_and_clear_witness();
-        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
-        check_turbo_plonk_proof(pcs, prng, &cs, &witness, &[]);
-    }
-
-    fn test_turbo_plonk_ecc_gates<PCS: PolyComScheme<Field = BLSScalar>, R: CryptoRng + RngCore>(
-        pcs: &PCS,
-        prng: &mut R,
-    ) {
-        let mut cs = TurboCS::new();
-
-        // Compute secret scalar and public base point.
-        let scalar_bytes: [u8; 32] = [
-            47, 113, 87, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
-        ];
-        let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
-        let base_ext = JubjubPoint::get_base();
-
-        // The circuit: P = [scalar] * G
-        let scalar_var = cs.new_variable(scalar);
-        cs.scalar_mul(base_ext, scalar_var, 64);
-        cs.pad();
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness[..], &[]).is_ok());
         check_turbo_plonk_proof(pcs, prng, &cs, &witness, &[]);

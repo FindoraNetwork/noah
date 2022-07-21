@@ -1,11 +1,14 @@
-use ark_ec::ProjectiveCurve;
 use curve25519_dalek::traits::MultiscalarMul;
 use digest::Digest;
+use rand_chacha::ChaChaRng;
 use sha3::Sha3_512;
-use std::ops::{Add, Mul};
 use zei_algebra::bs257::{BS257Scalar, BS257G1};
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use zei_algebra::traits::Group;
+use zei_algebra::{
+    ops::{Add, Mul},
+    rand::SeedableRng,
+};
 
 /// Trait for Pedersen commitment.
 pub trait PedersenCommitment<G: Group>: Default {
@@ -82,7 +85,11 @@ impl Default for PedersenCommitmentBS257 {
         Digest::update(&mut hash, base.to_compressed_bytes());
         let h = hash.finalize();
 
-        let blinding = BS257G1::from_hash(h);
+        let mut res = [0u8; 32];
+        res.copy_from_slice(&h[..32]);
+
+        let mut prng = ChaChaRng::from_seed(res);
+        let blinding = BS257G1::random(&mut prng);
 
         Self {
             B: base,

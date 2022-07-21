@@ -45,7 +45,6 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.push_add_selectors(one, zero, one, zero);
             cs.push_mul_selectors(zero, zero);
             cs.push_constant_selector(zero);
-            cs.push_ecc_selector(zero);
             cs.push_rescue_selectors(zero, zero, zero, zero);
             cs.push_out_selector(one);
 
@@ -86,7 +85,6 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                     .add(&r_limbs[i])
                     .add(&r_limbs[i]),
             );
-            cs.push_ecc_selector(zero);
             cs.push_rescue_selectors(zero, zero, zero, zero);
             cs.push_out_selector(one);
 
@@ -255,14 +253,14 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 (num_limbs_in_this_group + 1) * P::BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
             let pad_limb = BLSScalar::from(&pad);
-            assert!(pad > <&BLSScalar as Into<BigUint>>::into(right_group_limb));
+            assert!(pad > <BLSScalar as Into<BigUint>>::into(right_group_limb.clone()));
 
             // Compute the carry number for the next cycle
             let mut carry = left_group_limb
                 .add(&carry_in)
                 .add(&pad_limb)
                 .sub(&right_group_limb);
-            let carry_biguint: BigUint = (&carry).into();
+            let carry_biguint: BigUint = carry.clone().into();
             carry = BLSScalar::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
 
@@ -281,7 +279,6 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 cs.push_add_selectors(minus_one, minus_one, one, carry_shift);
                 cs.push_mul_selectors(zero, zero);
                 cs.push_constant_selector(pad_limb.neg().add(&remainder));
-                cs.push_ecc_selector(zero);
                 cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(zero);
 
