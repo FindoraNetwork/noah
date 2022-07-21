@@ -1,18 +1,28 @@
-use crate::anon_xfr::structs::{
-    AccElemVars, AnonAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
-    NullifierInputVars, OpenAnonAssetRecord,
+use crate::anon_xfr::keys::AXfrPubKey;
+use crate::anon_xfr::structs::Commitment;
+use crate::{
+    anon_xfr::{
+        keys::AXfrKeyPair,
+        structs::{
+            AccElemVars, AnonAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
+            NullifierInputVars, OpenAnonAssetRecord,
+        },
+    },
+    xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
 };
-use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
-use keys::AXfrKeyPair;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
     prelude::*,
 };
 use zei_crypto::basic::rescue::RescueInstance;
-use zei_plonk::plonk::constraint_system::{rescue::StateVar, TurboCS, VarIndex};
-use zei_plonk::plonk::indexer::PlonkPf;
-use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
+use zei_plonk::{
+    plonk::{
+        constraint_system::{rescue::StateVar, TurboCS, VarIndex},
+        indexer::PlonkPf,
+    },
+    poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
+};
 
 pub(crate) const TWO_POW_32: u64 = 1 << 32;
 
@@ -41,13 +51,10 @@ pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 /// The Plonk proof type.
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 
-/// Check that inputs have Merkle tree witness and matching key pairs.
-fn check_inputs(inputs: &[OpenAnonAssetRecord], keypairs: &[AXfrKeyPair]) -> Result<()> {
-    if inputs.len() != keypairs.len() {
-        return Err(eg!(ZeiError::ParameterError));
-    }
-    for (input, keypair) in inputs.iter().zip(keypairs.iter()) {
-        if input.mt_leaf_info.is_none() || keypair.get_pub_key() != input.pub_key {
+/// Check that inputs have Merkle tree witness and matching key pair.
+fn check_inputs(inputs: &[OpenAnonAssetRecord], keypair: &AXfrKeyPair) -> Result<()> {
+    for input in inputs.iter() {
+        if input.mt_leaf_info.is_none() || keypair.get_public_key() != input.pub_key {
             return Err(eg!(ZeiError::ParameterError));
         }
     }
@@ -117,47 +124,6 @@ fn check_roots(inputs: &[OpenAnonAssetRecord]) -> Result<()> {
     Ok(())
 }
 
-/// Compute the non-malleability tag given the information and the secret keys.
-pub fn compute_non_malleability_tag<R: CryptoRng + RngCore>(
-    prng: &mut R,
-    hash_scalar: BLSScalar,
-    secret_keys: &[&AXfrKeyPair],
-) -> (BLSScalar, BLSScalar) {
-    let randomizer = BLSScalar::random(prng);
-
-    let mut input_to_rescue = vec![];
-    input_to_rescue.push(BLSScalar::from(secret_keys.len() as u64));
-    input_to_rescue.push(hash_scalar);
-    input_to_rescue.push(randomizer);
-    for secret_key in secret_keys.iter() {
-        input_to_rescue.push(secret_key.get_spend_key_scalar());
-    }
-
-    if input_to_rescue.len() < 4 {
-        // pad to 4
-        input_to_rescue.resize(4, BLSScalar::zero());
-    } else {
-        // pad to 4 + 3k
-        input_to_rescue.resize(
-            1 + (input_to_rescue.len() - 1 + 2) / 3 * 3,
-            BLSScalar::zero(),
-        );
-    }
-
-    let rescue = RescueInstance::new();
-    let mut acc = rescue.rescue(&[
-        input_to_rescue[0],
-        input_to_rescue[1],
-        input_to_rescue[2],
-        input_to_rescue[3],
-    ])[0];
-    for chunk in input_to_rescue[4..].chunks_exact(3) {
-        acc = rescue.rescue(&[acc, chunk[0], chunk[1], chunk[2]])[0];
-    }
-
-    (randomizer, acc)
-}
-
 /// Parse the owner memo from bytes.
 /// * `bytes` - the memo bytes.
 /// * `key_pair` - the memo bytes.
@@ -181,18 +147,20 @@ pub fn parse_memo(
     let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])
         .c(d!(ZeiError::ParameterError))?;
 
+    let public_key_scalars = key_pair.get_public_key().get_public_key_scalars()?;
+
     let hash = RescueInstance::new();
     let expected_commitment = {
         let cur = hash.rescue(&[
             blind,
             BLSScalar::from(amount),
             asset_type.as_scalar(),
-            BLSScalar::zero(),
+            public_key_scalars[0],
         ])[0];
         hash.rescue(&[
             cur,
-            key_pair.get_pub_key().0.get_x(),
-            BLSScalar::zero(),
+            public_key_scalars[1],
+            public_key_scalars[2],
             BLSScalar::zero(),
         ])[0]
     };
@@ -214,38 +182,39 @@ pub fn decrypt_memo(
     key_pair: &AXfrKeyPair,
     abar: &AnonAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
-    let plaintext = memo.decrypt(&key_pair.get_view_key())?;
+    let plaintext = memo.decrypt(&key_pair.get_secret_key())?;
     parse_memo(&plaintext, key_pair, abar)
 }
 
 /// Compute the nullifier.
-pub fn nullify_with_native_address(
+pub fn nullify(
     key_pair: &AXfrKeyPair,
     amount: u64,
     asset_type: &AssetType,
     uid: u64,
-) -> BLSScalar {
-    let pub_key = key_pair.get_pub_key();
-    let pub_key_point = &pub_key.0;
-    let pub_key_x = pub_key_point.get_x();
+) -> Result<BLSScalar> {
+    let pub_key = key_pair.get_public_key();
 
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
     let uid_shifted = BLSScalar::from(uid).mul(&pow_2_64);
     let uid_amount = uid_shifted.add(&BLSScalar::from(amount));
 
+    let public_key_scalars = pub_key.get_public_key_scalars()?;
+    let secret_key_scalars = key_pair.get_secret_key().get_secret_key_scalars()?;
+
     let hash = RescueInstance::new();
     let cur = hash.rescue(&[
         uid_amount,
         asset_type.as_scalar(),
-        BLSScalar::zero(),
-        pub_key_x,
+        public_key_scalars[0],
+        public_key_scalars[1],
     ])[0];
-    hash.rescue(&[
+    Ok(hash.rescue(&[
         cur,
-        key_pair.get_spend_key_scalar(),
-        BLSScalar::zero(),
-        BLSScalar::zero(),
-    ])[0]
+        public_key_scalars[2],
+        secret_key_scalars[0],
+        secret_key_scalars[1],
+    ])[0])
 }
 
 /// Length of the secret key in anonymous payment (in bits).
@@ -259,33 +228,67 @@ pub const TREE_DEPTH: usize = 20;
 
 /// Add the commitment constraints to the constraint system:
 /// comm = hash(hash(blinding, amount, asset_type, 0), pubkey_x, 0, 0).
-pub fn commit_in_cs_with_native_address(
+pub fn commit_in_cs(
     cs: &mut TurboPlonkCS,
     blinding_var: VarIndex,
     amount_var: VarIndex,
     asset_var: VarIndex,
-    pubkey_x_var: VarIndex,
+    public_key_scalars: [VarIndex; 3],
 ) -> VarIndex {
-    let input_var = StateVar::new([blinding_var, amount_var, asset_var, cs.zero_var()]);
+    let input_var = StateVar::new([blinding_var, amount_var, asset_var, public_key_scalars[0]]);
     let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([cur, pubkey_x_var, cs.zero_var(), cs.zero_var()]);
+    let input_var = StateVar::new([cur, pubkey_scalars[1], pubkey_scalars[2], cs.zero_var()]);
     cs.rescue_hash(&input_var)[0]
 }
 
+/// Compute the record's amount||asset type||pub key commitment
+pub fn commit(
+    public_key: &AXfrPubKey,
+    blind: &BLSScalar,
+    amount: u64,
+    asset_type: &AssetType,
+) -> Result<Commitment> {
+    let public_key_scalars = public_key.get_public_key_scalars()?;
+
+    let hash = RescueInstance::new();
+    let cur = hash.rescue(&[
+        blind.clone(),
+        BLSScalar::from(amount),
+        asset_type.as_scalar(),
+        public_key_scalars[0],
+    ])[0];
+    Ok(hash.rescue(&[
+        cur,
+        public_key_scalars[1],
+        public_key_scalars[2],
+        BLSScalar::zero(),
+    ])[0])
+}
+
 /// Add the nullifier constraints to the constraint system.
-pub(crate) fn nullify_in_cs_with_native_address(
+pub(crate) fn nullify_in_cs(
     cs: &mut TurboPlonkCS,
-    sk_var: VarIndex,
+    secret_key_scalars: [VarIndex; 2],
     nullifier_input_vars: NullifierInputVars,
 ) -> VarIndex {
-    let (uid_amount, asset_type, pub_key_x) = (
+    let (uid_amount, asset_type, public_key_scalars) = (
         nullifier_input_vars.uid_amount,
         nullifier_input_vars.asset_type,
-        nullifier_input_vars.pub_key_x,
+        nullifier_input_vars.public_key_scalars,
     );
-    let input_var = StateVar::new([uid_amount, asset_type, cs.zero_var(), pub_key_x]);
+    let input_var = StateVar::new([
+        uid_amount,
+        asset_type,
+        public_key_scalars[0],
+        public_key_scalars[1],
+    ]);
     let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([cur, sk_var, cs.zero_var(), cs.zero_var()]);
+    let input_var = StateVar::new([
+        cur,
+        pubkey_scalars[2],
+        secret_key_scalars[0],
+        secret_key_scalars[1],
+    ]);
     cs.rescue_hash(&input_var)[0]
 }
 

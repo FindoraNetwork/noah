@@ -1,8 +1,8 @@
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
-    commit_in_cs_with_native_address, compute_merkle_root_variables, compute_non_malleability_tag,
+    commit_in_cs, compute_merkle_root_variables, compute_non_malleability_tag,
     keys::{get_view_key_domain_separator, AXfrKeyPair},
-    nullify_in_cs_with_native_address, nullify_with_native_address,
+    nullify, nullify_in_cs,
     structs::{AccElemVars, Nullifier, NullifierInputVars, OpenAnonAssetRecord, PayerWitness},
     AXfrPlonkPf, TurboPlonkCS, SK_LEN,
 };
@@ -70,7 +70,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     abar_keypair: &AXfrKeyPair,
     ar_pub_key: &XfrPublicKey,
 ) -> Result<AbarToArPreNote> {
-    if oabar.mt_leaf_info.is_none() || abar_keypair.get_pub_key() != oabar.pub_key {
+    if oabar.mt_leaf_info.is_none() || abar_keypair.get_public_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
     }
 
@@ -87,7 +87,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     let (oar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
 
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let this_nullifier = nullify_with_native_address(
+    let this_nullifier = nullify(
         &abar_keypair,
         oabar.amount,
         &oabar.asset_type,
@@ -95,7 +95,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     );
 
     let payers_secret = PayerWitness {
-        spend_key: abar_keypair.get_spend_key_scalar(),
+        secret_key: abar_keypair.get_secret_key_scalar(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
         asset_type: oabar.asset_type.as_scalar(),
@@ -259,7 +259,7 @@ pub fn build_abar_to_ar_cs(
     let pk_x = pk_var.get_x();
 
     // commitments
-    let com_abar_in_var = commit_in_cs_with_native_address(
+    let com_abar_in_var = commit_in_cs(
         &mut cs,
         payers_witness_vars.blind,
         payers_witness_vars.amount,
@@ -286,11 +286,7 @@ pub fn build_abar_to_ar_cs(
         asset_type: payers_witness_vars.asset_type,
         pub_key_x: pk_x,
     };
-    let nullifier_var = nullify_in_cs_with_native_address(
-        &mut cs,
-        payers_witness_vars.spend_key,
-        nullifier_input_vars,
-    );
+    let nullifier_var = nullify_in_cs(&mut cs, payers_witness_vars.spend_key, nullifier_input_vars);
 
     // Merkle path authentication
     let acc_elem = AccElemVars {
@@ -382,7 +378,7 @@ mod tests {
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         let mut oabar = OpenAnonAssetRecordBuilder::new()
-            .pub_key(&sender.get_pub_key())
+            .pub_key(&sender.get_public_key())
             .amount(1234u64)
             .asset_type(AssetType::from_identical_byte(0u8))
             .finalize(&mut prng)

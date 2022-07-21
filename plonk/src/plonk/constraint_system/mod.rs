@@ -1,8 +1,5 @@
 use zei_algebra::prelude::*;
 
-/// Module for ECC Constrain System.
-pub mod ecc;
-
 /// Module for Field Simulation Constrain System.
 pub mod field_simulation;
 

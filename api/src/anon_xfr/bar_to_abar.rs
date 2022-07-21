@@ -648,7 +648,7 @@ mod test {
         );
         let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
         let (oabar_conf, delegated_cp_proof_conf, inspector_proof_conf) =
-            super::prove_bar_to_abar(&mut prng, &params, &obar, &abar_keypair.get_pub_key())
+            super::prove_bar_to_abar(&mut prng, &params, &obar, &abar_keypair.get_public_key())
                 .unwrap();
         let abar_conf = AnonAssetRecord::from_oabar(&oabar_conf);
 
@@ -685,7 +685,7 @@ mod test {
             &params,
             &obar,
             &bar_keypair,
-            &abar_keypair.get_pub_key(),
+            &abar_keypair.get_public_key(),
         )
         .unwrap();
 

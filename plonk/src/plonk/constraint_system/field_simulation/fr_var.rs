@@ -181,15 +181,14 @@ impl<P: SimFrParams> SimFrVar<P> {
 }
 
 #[cfg(test)]
-mod test {
+mod test_ristretto {
     use crate::plonk::constraint_system::{
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboCS,
     };
     use num_bigint::{BigUint, RandBigInt};
     use rand_chacha::ChaCha20Rng;
-    use std::ops::Shl;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use zei_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
     use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 
     type SimFrTest = SimFr<SimFrParamsRistretto>;
@@ -278,6 +277,158 @@ mod test {
     fn test_mul() {
         let mut rng = ChaCha20Rng::from_entropy();
         let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+
+            let a_sim_fr = SimFrTest::from(&a);
+            let b_sim_fr = SimFrTest::from(&b);
+
+            {
+                let mut cs = TurboCS::<BLSScalar>::new();
+
+                let a_sim_fr_var = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                let b_sim_fr_var = SimFrVarTest::alloc_witness(&mut cs, &b_sim_fr);
+
+                let c_sim_fr_mul_var = a_sim_fr_var.mul(&mut cs, &b_sim_fr_var);
+                test_sim_fr_mul_equality(cs, &c_sim_fr_mul_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_bounded_allocated_witness() {
+        let mut rng = ChaCha20Rng::from_entropy();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint(240);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BLSScalar>::new();
+
+                let a_sim_fr_var =
+                    SimFrVarTest::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_bounded_allocated_witness_bad() {
+        let a = BigUint::from(1u32).shl(240);
+        let a_sim_fr = SimFrTest::from(&a);
+
+        {
+            let mut cs = TurboCS::<BLSScalar>::new();
+
+            let a_sim_fr_var =
+                SimFrVarTest::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+
+            test_sim_fr_equality(cs, &a_sim_fr_var);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_bs257 {
+    use crate::plonk::constraint_system::{
+        field_simulation::{SimFrMulVar, SimFrVar},
+        TurboCS,
+    };
+    use num_bigint::{BigUint, RandBigInt};
+    use rand_chacha::ChaCha20Rng;
+    use zei_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
+    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBS257};
+
+    type SimFrTest = SimFr<SimFrParamsBS257>;
+    type SimFrVarTest = SimFrVar<SimFrParamsBS257>;
+    type SimFrMulVarTest = SimFrMulVar<SimFrParamsBS257>;
+
+    fn test_sim_fr_equality(cs: TurboCS<BLSScalar>, val: &SimFrVarTest) {
+        let mut cs = cs;
+        for i in 0..SimFrParamsBS257::NUM_OF_LIMBS {
+            cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
+        }
+
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
+    }
+
+    fn test_sim_fr_mul_equality(cs: TurboCS<BLSScalar>, val: &SimFrMulVarTest) {
+        let mut cs = cs;
+        for i in 0..SimFrParamsBS257::NUM_OF_LIMBS_MUL {
+            cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
+        }
+
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
+    }
+
+    #[test]
+    fn test_alloc_constant() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let p_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BLSScalar>::new();
+                let a_sim_fr_var = SimFrVarTest::alloc_constant(&mut cs, &a_sim_fr);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_alloc_witness() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let p_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BLSScalar>::new();
+                let a_sim_fr_var = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_sub() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let p_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+
+            let a_sim_fr = SimFrTest::from(&a);
+            let b_sim_fr = SimFrTest::from(&b);
+
+            {
+                let mut cs = TurboCS::<BLSScalar>::new();
+
+                let a_sim_fr_var = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                let b_sim_fr_var = SimFrVarTest::alloc_witness(&mut cs, &b_sim_fr);
+
+                let c_sim_fr_var = a_sim_fr_var.sub(&mut cs, &b_sim_fr_var);
+                test_sim_fr_equality(cs, &c_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mul() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let p_biguint = SimFrParamsBS257::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);

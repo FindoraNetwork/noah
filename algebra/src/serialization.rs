@@ -3,7 +3,6 @@ use crate::secp256k1::{SECP256K1Scalar, SECP256K1G1};
 use crate::{
     bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2},
     bs257::BS257Scalar,
-    jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
 };
@@ -28,7 +27,6 @@ macro_rules! to_from_bytes_scalar {
 }
 
 to_from_bytes_scalar!(RistrettoScalar);
-to_from_bytes_scalar!(JubjubScalar);
 to_from_bytes_scalar!(BLSScalar);
 to_from_bytes_scalar!(BS257Scalar);
 to_from_bytes_scalar!(SECP256K1Scalar);
@@ -62,7 +60,6 @@ impl ZeiFromToBytes for CompressedEdwardsY {
 serialize_deserialize!(CompressedRistretto);
 serialize_deserialize!(CompressedEdwardsY);
 serialize_deserialize!(RistrettoScalar);
-serialize_deserialize!(JubjubScalar);
 serialize_deserialize!(BLSScalar);
 serialize_deserialize!(BS257Scalar);
 serialize_deserialize!(SECP256K1Scalar);
@@ -82,7 +79,6 @@ macro_rules! to_from_bytes_group {
 }
 
 to_from_bytes_group!(RistrettoPoint);
-to_from_bytes_group!(JubjubPoint);
 to_from_bytes_group!(BLSG1);
 to_from_bytes_group!(BLSG2);
 to_from_bytes_group!(BLSGt);
@@ -90,7 +86,6 @@ to_from_bytes_group!(BS257G1);
 to_from_bytes_group!(SECP256K1G1);
 
 serialize_deserialize!(RistrettoPoint);
-serialize_deserialize!(JubjubPoint);
 serialize_deserialize!(BLSG1);
 serialize_deserialize!(BLSG2);
 serialize_deserialize!(BLSGt);

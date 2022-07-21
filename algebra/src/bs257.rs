@@ -1,6 +1,6 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
-use ark_ec::ProjectiveCurve;
+use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, FftField, FftParameters, Field, FpParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
@@ -13,6 +13,7 @@ use ark_std::{
 use bulletproofs_bs257::curve::bs257::{Fr, FrParameters, G1Affine, G1Projective};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
+use num_traits::Num;
 use ruc::eg;
 use wasm_bindgen::prelude::*;
 
@@ -47,18 +48,6 @@ impl FromStr for BS257Scalar {
         } else {
             Err(AlgebraError::DeserializationError)
         }
-    }
-}
-
-impl Into<BigUint> for &BS257Scalar {
-    fn into(self) -> BigUint {
-        self.0.into_repr().into()
-    }
-}
-
-impl From<&BigUint> for BS257Scalar {
-    fn from(src: &BigUint) -> Self {
-        Self(Fr::from(src.clone()))
     }
 }
 
@@ -196,6 +185,15 @@ impl Scalar for BS257Scalar {
     }
 
     #[inline]
+    fn get_field_size_biguint() -> BigUint {
+        BigUint::from_str_radix(
+            "115792089237316195423570985008687907853269984665640564039457584007908834671663",
+            10,
+        )
+        .unwrap()
+    }
+
+    #[inline]
     fn get_field_size_le_bytes() -> Vec<u8> {
         [
             0x2f, 0xfc, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -251,6 +249,26 @@ impl Scalar for BS257Scalar {
         let mut array = [0u64; 5];
         array[..len].copy_from_slice(exponent);
         Self(self.0.pow(&array))
+    }
+}
+
+impl BS257Scalar {
+    /// Get the raw data.
+    pub fn get_raw(&self) -> Fr {
+        self.0.clone()
+    }
+
+    /// From the raw data.
+    pub fn from_raw(raw: Fr) -> Self {
+        Self(raw)
+    }
+}
+
+impl Neg for BS257G1 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self(self.0.neg())
     }
 }
 
@@ -348,6 +366,33 @@ impl Group for BS257G1 {
         );
 
         Self(ark_ec::msm::VariableBase::msm(&points_raw, &scalars_raw))
+    }
+}
+
+impl Into<BigUint> for BS257Scalar {
+    #[inline]
+    fn into(self) -> BigUint {
+        let value: BigUint = self.0.into_repr().into();
+        value
+    }
+}
+
+impl<'a> From<&'a BigUint> for BS257Scalar {
+    #[inline]
+    fn from(value: &'a BigUint) -> Self {
+        Self(Fr::from(value.clone()))
+    }
+}
+
+impl BS257G1 {
+    /// Get the raw data.
+    pub fn get_raw(&self) -> G1Affine {
+        self.0.into_affine()
+    }
+
+    /// From the raw data.
+    pub fn from_raw(raw: G1Affine) -> Self {
+        Self(raw.into_projective())
     }
 }
 

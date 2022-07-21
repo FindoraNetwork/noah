@@ -252,7 +252,7 @@ impl<P: SimFrParams> Into<BigUint> for &SimFr<P> {
         let mut res = BigUint::zero();
         for limb in self.limbs.iter().rev() {
             res.mul_assign(&step);
-            res.add_assign(&limb.into());
+            res.add_assign(&limb.clone().into());
         }
         assert_eq!(res, self.val);
         res
@@ -304,7 +304,7 @@ impl<P: SimFrParams> Into<BigUint> for &SimFrMul<P> {
         let mut res = BigUint::zero();
         for limb in self.limbs.iter().rev() {
             res.mul_assign(&step);
-            res.add_assign(&limb.into());
+            res.add_assign(&limb.clone().into());
         }
         assert_eq!(self.val, res);
         res
@@ -438,14 +438,14 @@ impl<P: SimFrParams> SimFrMul<P> {
                 (num_limbs_in_this_group + 1) * P::BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
             let pad_limb = BLSScalar::from(&pad);
-            assert!(pad > <&BLSScalar as Into<BigUint>>::into(right_group_limb));
+            assert!(pad > <BLSScalar as Into<BigUint>>::into(right_group_limb.clone()));
 
             // Compute the carry number for the next cycle
             let mut carry = left_group_limb
                 .add(&carry_in)
                 .add(&pad_limb)
                 .sub(&right_group_limb);
-            let carry_biguint: BigUint = (&carry).into();
+            let carry_biguint: BigUint = carry.into();
             carry = BLSScalar::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
 
@@ -473,14 +473,14 @@ impl<P: SimFrParams> SimFrMul<P> {
                 // bound the size of carry
                 assert!(BigUint::from(1u32)
                     .shl(surfeit + P::BIT_PER_LIMB * 2)
-                    .gt(&(&carry).into()));
+                    .gt(&carry.into()));
             }
         }
     }
 }
 
 #[cfg(test)]
-mod test {
+mod test_ristretto {
     use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
@@ -584,6 +584,130 @@ mod test {
     fn test_enforce_zero_panic() {
         let mut rng = ChaCha20Rng::from_entropy();
         let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+
+        let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+        let a_fr = SimFrTest::from(&a);
+        let b_fr = SimFrTest::from(&b);
+
+        let ab_fr_mul = &a_fr * &b_fr;
+        let ab_fr = &a * &b;
+        assert_eq!(ab_fr, (&ab_fr_mul).into());
+
+        let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
+        let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
+
+        let zero_supposed_manipulated = &ab_fr_mul - &ab_reduced_manipulated;
+        zero_supposed_manipulated.enforce_zero();
+    }
+}
+
+#[cfg(test)]
+mod test_bs257 {
+    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsBS257};
+    use num_bigint::{BigUint, RandBigInt};
+    use num_integer::Integer;
+    use rand_chacha::ChaCha20Rng;
+    use zei_algebra::prelude::*;
+
+    type SimFrTest = SimFr<SimFrParamsBS257>;
+
+    #[test]
+    fn test_sim_fr_biguint_conversion() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let a_sim_fr = SimFrTest::from(&a);
+            let a_recovered: BigUint = (&a_sim_fr).into();
+
+            assert_eq!(a, a_recovered);
+        }
+    }
+
+    #[test]
+    fn test_sub() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_sim_fr = SimFrTest::from(&a);
+            let b_sim_fr = SimFrTest::from(&b);
+            let sum_sim_fr = &a_sim_fr - &b_sim_fr;
+
+            let (_, sum) = a.add(&r_biguint).sub(&b).div_rem(&r_biguint);
+            let (_, sum_recovered) =
+                <&SimFrTest as Into<BigUint>>::into(&sum_sim_fr).div_rem(&r_biguint);
+
+            assert_eq!(sum, sum_recovered);
+        }
+    }
+
+    #[test]
+    fn test_mul() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_sim_fr = SimFrTest::from(&a);
+            let b_sim_fr = SimFrTest::from(&b);
+
+            let prod_sim_fr_mul = a_sim_fr.mul(&b_sim_fr);
+            let prod_sim_fr_mul_recovered: BigUint = (&prod_sim_fr_mul).into();
+
+            let prod = &a * &b;
+
+            assert_eq!(prod, prod_sim_fr_mul_recovered);
+        }
+    }
+
+    #[test]
+    fn test_enforce_zero_trivial() {
+        let zero_fr = SimFrTest::from(&BigUint::zero());
+        let zero_fr_mul = (&zero_fr) * (&zero_fr);
+
+        zero_fr_mul.enforce_zero();
+    }
+
+    #[test]
+    fn test_enforce_zero() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+
+        for _ in 0..1000 {
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_fr = SimFrTest::from(&a);
+            let b_fr = SimFrTest::from(&b);
+
+            let ab_fr_mul = &a_fr * &b_fr;
+            let ab_fr = &a * &b;
+            assert_eq!(ab_fr, (&ab_fr_mul).into());
+
+            let ab_fr_reduced = &ab_fr % &r_biguint;
+            let ab_reduced = SimFrTest::from(&ab_fr_reduced);
+
+            let zero_supposed = &ab_fr_mul - &ab_reduced;
+            let zero_supposed_biguint: BigUint = (&zero_supposed).into();
+            assert_eq!(BigUint::zero(), &zero_supposed_biguint % &r_biguint);
+            zero_supposed.enforce_zero();
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_enforce_zero_panic() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
 
         let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
         let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);

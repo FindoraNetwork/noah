@@ -70,6 +70,9 @@ default-features = false
 [dependencies.num-bigint]
 version = '0.4'
 
+[dependencies.num-traits]
+version = "0.2"
+
 [dependencies.num-integer]
 version = "0.1"
 

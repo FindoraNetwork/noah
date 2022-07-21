@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    commit_in_cs_with_native_address,
+    commit_in_cs,
     keys::AXfrPubKey,
     structs::{
         AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
@@ -167,7 +167,7 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeWitness) -> (TurboPlonkCS, usize) {
         pubkey_x,
     };
     // commitment
-    let com_abar_out_var = commit_in_cs_with_native_address(
+    let com_abar_out_var = commit_in_cs(
         &mut cs,
         payee.blind,
         payee.amount,
@@ -236,7 +236,7 @@ mod test {
             &params,
             &obar,
             &bar_keypair,
-            &abar_keypair.get_pub_key(),
+            &abar_keypair.get_public_key(),
         )
         .unwrap();
 

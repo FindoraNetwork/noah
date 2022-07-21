@@ -1,16 +1,16 @@
 use aes_gcm::{aead::Aead, NewAead};
 use digest::{generic_array::GenericArray, Digest};
 use zei_algebra::{
-    jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
+    secp256k1::{SECP256K1Scalar, SECP256K1G1},
 };
 
 /// The keypair on Jubjub for DH encryption.
 /// return secret key and public key.
 #[inline]
-pub fn dh_generate<R: CryptoRng + RngCore>(prng: &mut R) -> (JubjubScalar, JubjubPoint) {
-    let secret_key = JubjubScalar::random(prng);
-    let base = JubjubPoint::get_base();
+pub fn dh_generate<R: CryptoRng + RngCore>(prng: &mut R) -> (SECP256K1Scalar, SECP256K1G1) {
+    let secret_key = SECP256K1Scalar::random(prng);
+    let base = SECP256K1G1::get_base();
     let public_key = base.mul(&secret_key);
     (secret_key, public_key)
 }
@@ -18,8 +18,8 @@ pub fn dh_generate<R: CryptoRng + RngCore>(prng: &mut R) -> (JubjubScalar, Jubju
 /// The keypair from secret key.
 /// return secret key and public key.
 #[inline]
-pub fn dh_keypair(secret_key: JubjubScalar) -> (JubjubScalar, JubjubPoint) {
-    let base = JubjubPoint::get_base();
+pub fn dh_keypair(secret_key: SECP256K1Scalar) -> (SECP256K1Scalar, SECP256K1G1) {
+    let base = SECP256K1G1::get_base();
     let public_key = base.mul(&secret_key);
     (secret_key, public_key)
 }
@@ -28,11 +28,11 @@ pub fn dh_keypair(secret_key: JubjubScalar) -> (JubjubScalar, JubjubPoint) {
 #[inline]
 pub fn dh_encrypt<R: CryptoRng + RngCore>(
     prng: &mut R,
-    public_key: &JubjubPoint,
+    public_key: &SECP256K1G1,
     msg: &[u8],
 ) -> Result<(JubjubPoint, Vec<u8>)> {
-    let share_scalar = JubjubScalar::random(prng);
-    let share = JubjubPoint::get_base().mul(&share_scalar);
+    let share_scalar = SECP256K1Scalar::random(prng);
+    let share = SECP256K1G1::get_base().mul(&share_scalar);
 
     let dh = public_key.mul(&share_scalar);
 
@@ -69,7 +69,11 @@ pub fn dh_encrypt<R: CryptoRng + RngCore>(
 
 /// Decrypt data using the secret key.
 #[inline]
-pub fn dh_decrypt(secret_key: &JubjubScalar, share: &JubjubPoint, ctext: &[u8]) -> Result<Vec<u8>> {
+pub fn dh_decrypt(
+    secret_key: &SECP256K1Scalar,
+    share: &SECP256K1G1,
+    ctext: &[u8],
+) -> Result<Vec<u8>> {
     let dh = share.mul(secret_key);
 
     let mut hasher = sha2::Sha512::new();

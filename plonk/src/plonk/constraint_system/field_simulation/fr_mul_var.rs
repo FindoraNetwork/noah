@@ -307,7 +307,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
 }
 
 #[cfg(test)]
-mod test {
+mod test_ristretto {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
     use num_bigint::{BigUint, RandBigInt};
     use rand_chacha::ChaCha20Rng;
@@ -362,6 +362,87 @@ mod test {
     fn test_enforce_zero_panic() {
         let mut rng = ChaCha20Rng::from_entropy();
         let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+
+        let mut cs = TurboCS::<BLSScalar>::new();
+
+        let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+        let a_fr = SimFrTest::from(&a);
+        let b_fr = SimFrTest::from(&b);
+
+        let a_fr_val = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+        let b_fr_val = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+
+        let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
+
+        let ab_fr = &a * &b;
+        let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
+        let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
+        let ab_reduced_manipulated_val =
+            SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
+
+        let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);
+        zero_supposed_manipulated.enforce_zero(&mut cs);
+    }
+}
+
+#[cfg(test)]
+mod test_bs257 {
+    use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
+    use num_bigint::{BigUint, RandBigInt};
+    use rand_chacha::ChaCha20Rng;
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBS257};
+
+    type SimFrTest = SimFr<SimFrParamsBS257>;
+    type SimFrVarTest = SimFrVar<SimFrParamsBS257>;
+
+    #[test]
+    fn test_enforce_zero_trivial() {
+        let mut cs = TurboCS::<BLSScalar>::new();
+
+        let zero_fr = SimFrTest::from(&BigUint::zero());
+        let zero_fr_val = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
+        let zero_fr_mul_val = zero_fr_val.mul(&mut cs, &zero_fr_val);
+
+        zero_fr_mul_val.enforce_zero(&mut cs);
+    }
+
+    #[test]
+    fn test_enforce_zero() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+
+        for _ in 0..1000 {
+            let mut cs = TurboCS::<BLSScalar>::new();
+
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_fr = SimFrTest::from(&a);
+            let b_fr = SimFrTest::from(&b);
+
+            let a_fr_val = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+            let b_fr_val = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+
+            let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
+
+            let ab_fr = &a * &b;
+            let ab_fr_reduced = &ab_fr % &r_biguint;
+            let ab_reduced = SimFrTest::from(&ab_fr_reduced);
+            let ab_reduced_val = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
+
+            let zero_supposed = ab_fr_mul_val.sub(&mut cs, &ab_reduced_val);
+            zero_supposed.enforce_zero(&mut cs);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_enforce_zero_panic() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
 
         let mut cs = TurboCS::<BLSScalar>::new();
 

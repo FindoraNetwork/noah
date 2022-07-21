@@ -35,9 +35,6 @@ pub mod errors;
 /// Module for traits
 pub mod traits;
 
-/// Module for the Jubjub curve
-pub mod jubjub;
-
 /// Module for the Ristretto group
 pub mod ristretto;
 
@@ -51,7 +48,8 @@ pub mod utils;
 pub mod prelude;
 
 pub use ark_std::{
-    borrow, cmp, collections, fs, hash, io, iter, ops, path, rand, str, One, UniformRand, Zero,
+    borrow, cmp, collections, fs, hash, io, iter, ops, path, rand, result, str, One, UniformRand,
+    Zero,
 };
 
 /// check if the error messages equal

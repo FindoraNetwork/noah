@@ -1,4 +1,4 @@
-use crate::{errors::AlgebraError, jubjub::JubjubScalar, prelude::*, traits::Pairing};
+use crate::{errors::AlgebraError, prelude::*, traits::Pairing};
 use ark_bls12_381::{
     fr::FrParameters, Bls12_381 as Bls12381pairing, Fq, Fq12Parameters, Fr, G1Affine, G1Projective,
     G2Affine, G2Projective,
@@ -17,6 +17,7 @@ use ark_std::{
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_integer::Integer;
+use num_traits::Num;
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "parallel")]
@@ -67,20 +68,15 @@ impl FromStr for BLSScalar {
     }
 }
 
-impl From<&JubjubScalar> for BLSScalar {
-    fn from(scalar: &JubjubScalar) -> Self {
-        let bytes = scalar.to_bytes();
-        BLSScalar::from_bytes(&bytes).unwrap()
-    }
-}
-
-impl Into<BigUint> for &BLSScalar {
+impl Into<BigUint> for BLSScalar {
+    #[inline]
     fn into(self) -> BigUint {
         self.0.into_repr().into()
     }
 }
 
-impl From<&BigUint> for BLSScalar {
+impl<'a> From<&'a BigUint> for BLSScalar {
+    #[inline]
     fn from(src: &BigUint) -> Self {
         Self(Fr::from(src.clone()))
     }
@@ -217,6 +213,15 @@ impl Scalar for BLSScalar {
     #[inline]
     fn multiplicative_generator() -> Self {
         Self(Fr::multiplicative_generator())
+    }
+
+    #[inline]
+    fn get_field_size_biguint() -> BigUint {
+        BigUint::from_str_radix(
+            "52435875175126190479447740508185965837690552500527637822603658699938581184513",
+            10,
+        )
+        .unwrap()
     }
 
     #[inline]
@@ -644,6 +649,14 @@ impl<'a> MulAssign<&'a BLSScalar> for BLSG1 {
     }
 }
 
+impl Neg for BLSG1 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self(self.0.neg())
+    }
+}
+
 impl Group for BLSG2 {
     type ScalarType = BLSScalar;
     const COMPRESSED_LEN: usize = 96;
@@ -727,6 +740,14 @@ impl Group for BLSG2 {
     }
 }
 
+impl Neg for BLSG2 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self(self.0.neg())
+    }
+}
+
 impl<'a> Add<&'a BLSG2> for BLSG2 {
     type Output = BLSG2;
 
@@ -780,6 +801,16 @@ impl Pairing for BLSPairingEngine {
     #[inline]
     fn pairing(a: &Self::G1, b: &Self::G2) -> Self::Gt {
         BLSGt(Bls12381pairing::pairing(a.0, b.0))
+    }
+}
+
+impl Neg for BLSGt {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        let mut v = self.0;
+        v.conjugate();
+        Self(v)
     }
 }
 

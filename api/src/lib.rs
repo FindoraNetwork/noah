@@ -38,7 +38,7 @@ pub mod primitives;
 /// Module for serialization.
 pub mod serialization;
 /// Module for generating parameters.
-pub mod setup;
+// TODO pub mod setup;
 /// Module for confidential transfer.
 pub mod xfr;
 
