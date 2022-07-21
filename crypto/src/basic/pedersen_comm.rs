@@ -1,5 +1,9 @@
-use bulletproofs::PedersenGens;
+use ark_ec::ProjectiveCurve;
 use curve25519_dalek::traits::MultiscalarMul;
+use digest::Digest;
+use sha3::Sha3_512;
+use std::ops::{Add, Mul};
+use zei_algebra::bs257::{BS257Scalar, BS257G1};
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use zei_algebra::traits::Group;
 
@@ -25,7 +29,7 @@ pub struct PedersenCommitmentRistretto {
 
 impl Default for PedersenCommitmentRistretto {
     fn default() -> Self {
-        let pc_gens = PedersenGens::default();
+        let pc_gens = bulletproofs::PedersenGens::default();
         Self {
             B: RistrettoPoint(pc_gens.B),
             B_blinding: RistrettoPoint(pc_gens.B_blinding),
@@ -51,11 +55,61 @@ impl PedersenCommitment<RistrettoPoint> for PedersenCommitmentRistretto {
     }
 }
 
-impl From<&PedersenCommitmentRistretto> for PedersenGens {
+impl From<&PedersenCommitmentRistretto> for bulletproofs::PedersenGens {
     fn from(rp: &PedersenCommitmentRistretto) -> Self {
-        PedersenGens {
+        bulletproofs::PedersenGens {
             B: rp.B.0,
             B_blinding: rp.B_blinding.0,
+        }
+    }
+}
+
+#[allow(non_snake_case)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// The Pedersen commitment implementation for the BS257 group.
+pub struct PedersenCommitmentBS257 {
+    /// The generator for the value part.
+    pub B: BS257G1,
+    /// The generator for the blinding part.
+    pub B_blinding: BS257G1,
+}
+
+impl Default for PedersenCommitmentBS257 {
+    fn default() -> Self {
+        let base = BS257G1::get_base();
+
+        let mut hash = Sha3_512::new();
+        Digest::update(&mut hash, base.to_compressed_bytes());
+        let h = hash.finalize();
+
+        let blinding = BS257G1::from_hash(h);
+
+        Self {
+            B: base,
+            B_blinding: blinding,
+        }
+    }
+}
+
+impl PedersenCommitment<BS257G1> for PedersenCommitmentBS257 {
+    fn generator(&self) -> BS257G1 {
+        self.B
+    }
+
+    fn blinding_generator(&self) -> BS257G1 {
+        self.B_blinding
+    }
+
+    fn commit(&self, value: BS257Scalar, blinding: BS257Scalar) -> BS257G1 {
+        self.B.mul(&value).add(&self.B_blinding.mul(&blinding))
+    }
+}
+
+impl From<&PedersenCommitmentBS257> for bulletproofs_bs257::PedersenGens {
+    fn from(rp: &PedersenCommitmentBS257) -> Self {
+        bulletproofs_bs257::PedersenGens {
+            B: rp.B.get_raw(),
+            B_blinding: rp.B_blinding.get_raw(),
         }
     }
 }

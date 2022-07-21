@@ -17,10 +17,17 @@ use crate::errors::ZeiError;
 use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
+use num_bigint::BigUint;
+use zei_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1};
 use zei_algebra::{
     bls12_381::BLSScalar,
     bs257::{BS257Scalar, BS257G1},
     prelude::*,
+};
+use zei_crypto::basic::pedersen_comm::PedersenCommitmentBS257;
+use zei_crypto::bulletproofs::scalar_mul::ScalarMulProof;
+use zei_crypto::delegated_chaum_pedersen::{
+    prove_delegated_chaum_pedersen, DelegatedChaumPedersenInspection,
 };
 use zei_crypto::{
     basic::rescue::RescueInstance, delegated_chaum_pedersen::DelegatedChaumPedersenProof,
@@ -32,12 +39,18 @@ use zei_plonk::plonk::{
     verifier::verifier,
 };
 
-/// The domain separator for anonymous transfer.
-const ANON_XFR_TRANSCRIPT: &[u8] = b"Anon Xfr";
+/// The domain separator for anonymous transfer, for the spending proof.
+const ANON_XFR_SPENDING_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Spending Proof";
+/// The domain separator for anonymous transfer, for the delegated Chaum-Pedersen proof.
+const ANON_XFR_DELEGATED_CP_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Delegated Chaum-Pedersen Proof";
+/// The domain separator for anonymous transfer, for scalar multiplication proof.
+const ANON_XFR_SCALAR_MUL_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Scalar Mul Proof";
 /// The domain separator for the number of inputs.
 const N_INPUTS_TRANSCRIPT: &[u8] = b"Number of input ABARs";
 /// The domain separator for the number of outputs.
 const N_OUTPUTS_TRANSCRIPT: &[u8] = b"Number of output ABARs";
+/// The number of the Bulletproofs generators needed for anonymous transfer.
+const ANON_XFR_BP_GENS_LEN: usize = 2048;
 
 /// Anonymous transfer note.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
@@ -45,12 +58,18 @@ pub struct AXfrNote {
     /// The anonymous transfer body.
     pub body: AXfrBody,
     /// The spending proof (assuming non-malleability).
-    pub anon_xfr_proof: AXfrPlonkPf,
+    pub spending_proof: AXfrPlonkPf,
+    /// The inspector's proof.
+    pub delegated_cp_proof: DelegatedChaumPedersenProof<BS257Scalar, BS257G1, SimFrParamsBS257>,
+    /// The commitments generated during the scalar mul proof, used in delegated CP.
+    pub scalar_mul_commitments: Vec<BS257G1>,
+    /// The scalar mul proof.
+    pub scalar_mul_proof: ScalarMulProof,
     /// The instance part of the signature.
     pub sig_instance: AXfrSignatureInstance,
 }
 
-/// Anonymous transfer pre-note without proof and non-malleability tag.
+/// Anonymous transfer pre-note without proofs and signatures.
 #[derive(Debug, Clone)]
 pub struct AXfrPreNote {
     /// The anonymous transfer body.
@@ -76,8 +95,6 @@ pub struct AXfrBody {
     pub fee: u32,
     /// The owner memos.
     pub owner_memos: Vec<AxfrOwnerMemo>,
-    /// The inspector's proof.
-    pub delegated_cp_proof: DelegatedChaumPedersenProof<BS257Scalar, BS257G1, SimFrParamsBS257>,
 }
 
 /// Build an anonymous transfer note without generating the proof and applying non-malleability protection.
@@ -178,17 +195,70 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
         input_keypair,
     } = pre_note;
 
-    let sig = input_keypair.get_secret_key().sign(prng, hash)?;
+    let sig = input_keypair.get_secret_key().sign(prng, hash.clone())?;
 
     let (sig_instance, sig_witness) =
-        sig.to_instance_and_witness(input_keypair.get_public_key())?;
+        sig.to_instance_and_witness(&input_keypair.get_public_key())?;
 
-    let proof = prove_xfr(prng, params, witness, &sig_witness).c(d!())?;
+    let pc_gens = bulletproofs_bs257::PedersenGens::default();
+
+    let (scalar_mul_proof, scalar_mul_commitments) = {
+        let mut transcript = Transcript::new(ANON_XFR_SCALAR_MUL_PROOF_TRANSCRIPT);
+        let bp_gens = bulletproofs_bs257::BulletproofGens::new(ANON_XFR_BP_GENS_LEN, 1);
+
+        let r = sig_instance.scalar_r.clone();
+
+        let reconstructed_r: BigUint = if sig_instance.recovery & 2 == 0 {
+            r.into()
+        } else {
+            SECP256K1Scalar::get_field_size_biguint() + r.into()
+        };
+
+        let reconstructed_x = BS257Scalar::from(&reconstructed_r);
+
+        let mut z_bytes = [0u8; 32];
+        z_bytes.copy_from_slice(&hash.finalize().as_slice());
+        let z_biguint = BigUint::from_bytes_le(&z_bytes);
+        let z = SECP256K1Scalar::from(&z_biguint);
+
+        let mut point_r_divided_by_r = SECP256K1G1::get_point_from_x(&reconstructed_x)?;
+        let mut point_g_times_z_divided_by_r = SECP256K1G1::get_base().mul(&z).mul(&r.inv()?);
+
+        ScalarMulProof::prove(
+            prng,
+            &pc_gens,
+            &bp_gens,
+            &mut transcript,
+            &input_keypair.get_public_key().0,
+            &input_keypair.get_secret_key().0,
+            &point_r_divided_by_r,
+            &point_g_times_z_divided_by_r,
+        )?
+    };
+
+    let delegated_cp_proof = let (delegated_cp_proof, delegated_cp_inspection, beta, lambda) =
+        prove_delegated_chaum_pedersen(
+            prng,
+            &x,
+            &gamma,
+            &y,
+            &delta,
+            &pc_gens,
+            &point_p,
+            &point_q,
+            &this_nullifier,
+        )
+            .c(d!())?;
+
+    let spending_proof = prove_xfr(prng, params, witness, &sig_witness).c(d!())?;
 
     Ok(AXfrNote {
         body: body,
-        anon_xfr_proof: proof,
-        non_malleability_tag,
+        spending_proof,
+        delegated_cp_proof: Default::default(),
+        scalar_mul_commitments,
+        scalar_mul_proof,
+        sig_instance,
     })
 }
 
@@ -220,7 +290,7 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     verify_xfr(
         params,
         &pub_inputs,
-        &note.anon_xfr_proof,
+        &note.spending_proof,
         &hash_scalar,
         &note.non_malleability_tag,
     )
@@ -234,7 +304,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     secret_inputs: AXfrWitness,
     sig_witness: &AXfrSignatureWitness,
 ) -> Result<AXfrPlonkPf> {
-    let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ANON_XFR_SPENDING_PROOF_TRANSCRIPT);
     transcript.append_u64(
         N_INPUTS_TRANSCRIPT,
         secret_inputs.payers_witnesses.len() as u64,
@@ -267,7 +337,7 @@ pub(crate) fn verify_xfr(
     proof: &AXfrPlonkPf,
     sig_instance: &AXfrSignatureInstance,
 ) -> Result<()> {
-    let mut transcript = Transcript::new(ANON_XFR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ANON_XFR_SPENDING_PROOF_TRANSCRIPT);
     transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);
     transcript.append_u64(
         N_OUTPUTS_TRANSCRIPT,

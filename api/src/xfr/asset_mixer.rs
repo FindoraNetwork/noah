@@ -257,7 +257,7 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
     let shuffle_mid = 3 * max - 2; // max to bind amount and asset to same variable (2*max-2)  mult gates
     let merge_input_mid_wires = n_input - 2; // merge require n_input - 2 additional wires
     let merge_output_mid_wires = n_output - 2; // merge require n_input - 2 additional wires
-    let merge_input = 2 * n_input - 1; // n_input additional wires n_input - 1 mult gates // TODO (fernando) why do we need additional wires here
+    let merge_input = 2 * n_input - 1; // n_input additional wires n_input - 1 mult gates
     let merge_output = 2 * n_output - 1; // n_output additional wires n_output - 1 mult gates
     let range_proof = 64 * n_output; // 64 gates per output
 

@@ -7,9 +7,12 @@ use crate::primitives::asymmetric_encryption::{dh_decrypt, dh_encrypt};
 use crate::xfr::structs::AssetType;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
+use zei_algebra::bs257::{BS257Scalar, BS257G1};
 use zei_algebra::secp256k1::SECP256K1Scalar;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*, secp256k1::SECP256K1G1};
 use zei_crypto::basic::rescue::RescueInstance;
+use zei_crypto::delegated_chaum_pedersen::DelegatedChaumPedersenInspection;
+use zei_crypto::field_simulation::SimFrParamsBS257;
 use zei_plonk::plonk::constraint_system::VarIndex;
 
 /// The nullifier.
@@ -301,6 +304,16 @@ pub struct PayeeWitness {
     pub asset_type: BLSScalar,
     /// The public key.
     pub public_key: AXfrPubKey,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DelegatedCPWitness {
+    /// Inspection data in the delegated Chaum-Pedersen proof.
+    pub inspection: DelegatedChaumPedersenInspection<BS257Scalar, BS257G1, SimFrParamsBS257>,
+    /// Beta.
+    pub beta: BS257Scalar,
+    /// Lambda.
+    pub lambda: BS257Scalar,
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
