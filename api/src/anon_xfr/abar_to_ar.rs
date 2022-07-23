@@ -21,7 +21,6 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use std::time::Instant;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use zei_plonk::plonk::{
@@ -143,8 +142,6 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
         input_keypair,
     } = pre_note;
 
-    let time = Instant::now();
-
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
     let (folding_instance, folding_witness) = create_address_folding(
         prng,
@@ -155,8 +152,6 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     )?;
 
     let proof = prove_abar_to_ar(prng, params, witness, &folding_witness).c(d!())?;
-
-    println!("abar to ar time: {}", time.elapsed().as_secs_f64());
 
     Ok(AbarToArNote {
         body,
