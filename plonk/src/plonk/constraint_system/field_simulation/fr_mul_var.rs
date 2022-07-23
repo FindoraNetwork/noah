@@ -53,7 +53,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
             cs.wiring[4].push(res.var[i]);
-            cs.size += 1;
+            cs.finish_new_gate();
         }
 
         res
@@ -93,7 +93,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
             cs.wiring[4].push(res.var[i]);
-            cs.size += 1;
+            cs.finish_new_gate();
         }
 
         res
@@ -105,6 +105,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
         let surfeit = 5;
 
         let cur_val: BigUint = (&self.val).into();
+
         let r_biguint = P::scalar_field_in_biguint();
 
         let zero = BLSScalar::zero();
@@ -114,10 +115,10 @@ impl<P: SimFrParams> SimFrMulVar<P> {
         let zero_var = cs.zero_var();
 
         let (k, rem) = cur_val.div_rem(&r_biguint);
-        assert!(rem.is_zero());
+        debug_assert!(rem.is_zero());
 
         // For safety, make sure `k` is not too big.
-        assert!(k.lt(&r_biguint.shl(5u32)));
+        debug_assert!(k.lt(&r_biguint.shl(5u32)));
 
         let r_limbs = P::scalar_field_in_limbs().to_vec();
         let k_limbs = SimFr::<P>::from(&k).limbs.to_vec();
@@ -260,14 +261,17 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 .add(&carry_in)
                 .add(&pad_limb)
                 .sub(&right_group_limb);
+
             let carry_biguint: BigUint = carry.clone().into();
             carry = BLSScalar::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
+
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
 
             let carry_var = cs.new_variable(carry);
 
             let (new_accumulated_extra, remainder_biguint) = accumulated_extra
                 .div_rem(&BigUint::from(1u64).shl(P::BIT_PER_LIMB * num_limbs_in_this_group));
+
             let remainder = BLSScalar::from(&remainder_biguint);
 
             let carry_shift =
@@ -287,7 +291,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 cs.wiring[2].push(*right_group_limb_var);
                 cs.wiring[3].push(carry_var);
                 cs.wiring[4].push(zero_var);
-                cs.size += 1;
+                cs.finish_new_gate();
             }
 
             accumulated_extra = new_accumulated_extra;

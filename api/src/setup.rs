@@ -1,11 +1,15 @@
 // The Public Setup needed for Proofs
+#![allow(unused)]
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
+use crate::anon_xfr::address_folding::AXfrAddressFoldingWitness;
+use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
     abar_to_ar::build_abar_to_ar_cs,
     abar_to_bar::build_abar_to_bar_cs,
     ar_to_abar::build_ar_to_abar_cs,
     bar_to_abar::build_bar_to_abar_cs,
+    keys,
     structs::{MTNode, MTPath},
     TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
@@ -15,7 +19,9 @@ use crate::parameters::{
     VERIFIER_SPECIFIC_PARAMS,
 };
 use bulletproofs::BulletproofGens;
+use rand_chacha::ChaChaRng;
 use serde::Deserialize;
+use zei_algebra::ristretto::RistrettoPoint;
 use zei_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     prelude::*,
@@ -24,6 +30,7 @@ use zei_algebra::{
 use zei_crypto::delegated_chaum_pedersen::{
     DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
 };
+use zei_crypto::field_simulation::SimFrParamsRistretto;
 use zei_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,
@@ -133,28 +140,22 @@ impl ProverParams {
     ) -> Result<ProverParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
 
-        let zero = BLSScalar::zero();
-
-        let hash = zero;
-        let non_malleability_randomizer = zero;
-        let non_malleability_tag = zero;
+        let folding_witness = AXfrAddressFoldingWitness::default();
 
         let (cs, _) = match tree_depth {
             Some(depth) => build_multi_xfr_cs(
                 AXfrWitness::fake(n_payers, n_payees, depth, 0),
                 FEE_TYPE.as_scalar(),
-                &hash,
-                &non_malleability_randomizer,
-                &non_malleability_tag,
+                &folding_witness,
             ),
             None => build_multi_xfr_cs(
                 AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
                 FEE_TYPE.as_scalar(),
-                &hash,
-                &non_malleability_randomizer,
-                &non_malleability_tag,
+                &folding_witness,
             ),
         };
+
+        println!("{} {} {}", n_payers, n_payees, cs.size());
 
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
@@ -175,15 +176,43 @@ impl ProverParams {
     pub fn bar_to_abar_params() -> Result<ProverParams> {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let zero = BLSScalar::zero();
-        let proof = DelegatedChaumPedersenProof::default();
-        let non_zk_state = DelegatedChaumPedersenInspection::default();
+
+        let proof =
+            DelegatedChaumPedersenProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
+                inspection_comm: Default::default(),
+                randomizers: vec![RistrettoPoint::default(); 3],
+                response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
+                params_phantom: Default::default(),
+            };
+
+        let non_zk_state = DelegatedChaumPedersenInspection::<
+            RistrettoScalar,
+            RistrettoPoint,
+            SimFrParamsRistretto,
+        > {
+            committed_data_and_randomizer: vec![
+                (
+                    RistrettoScalar::default(),
+                    RistrettoScalar::default()
+                );
+                3
+            ],
+            r: BLSScalar::default(),
+            params_phantom: Default::default(),
+            group_phantom: Default::default(),
+        };
+
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
+
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair = AXfrKeyPair::generate(&mut prng);
+
         let (cs, _) = build_bar_to_abar_cs(
             zero,
             zero,
             zero,
-            zero,
+            &keypair.get_public_key(),
             &proof,
             &non_zk_state,
             &beta,
@@ -209,13 +238,36 @@ impl ProverParams {
     pub fn abar_to_bar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
 
-        let proof = DelegatedChaumPedersenProof::default();
-        let non_zk_state = DelegatedChaumPedersenInspection::default();
+        let proof =
+            DelegatedChaumPedersenProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
+                inspection_comm: Default::default(),
+                randomizers: vec![RistrettoPoint::default(); 3],
+                response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
+                params_phantom: Default::default(),
+            };
+
+        let non_zk_state = DelegatedChaumPedersenInspection::<
+            RistrettoScalar,
+            RistrettoPoint,
+            SimFrParamsRistretto,
+        > {
+            committed_data_and_randomizer: vec![
+                (
+                    RistrettoScalar::default(),
+                    RistrettoScalar::default()
+                );
+                3
+            ],
+            r: BLSScalar::default(),
+            params_phantom: Default::default(),
+            group_phantom: Default::default(),
+        };
+
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
-        let hash = bls_zero;
-        let non_malleability_randomizer = bls_zero;
-        let non_malleability_tag = bls_zero;
+
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair = AXfrKeyPair::generate(&mut prng);
 
         let node = MTNode {
             siblings1: bls_zero,
@@ -224,7 +276,7 @@ impl ProverParams {
             is_right_child: 0,
         };
         let payer_secret = PayerWitness {
-            spend_key: bls_zero,
+            secret_key: keypair.get_secret_key(),
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -232,15 +284,15 @@ impl ProverParams {
             blind: bls_zero,
         };
 
+        let folding_witness = AXfrAddressFoldingWitness::default();
+
         let (cs, _) = build_abar_to_bar_cs(
             payer_secret,
             &proof,
             &non_zk_state,
             &beta,
             &lambda,
-            &hash,
-            &non_malleability_randomizer,
-            &non_malleability_tag,
+            &folding_witness,
         );
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
@@ -261,11 +313,13 @@ impl ProverParams {
     /// Obtain the parameters for transparent to anonymous.
     pub fn ar_to_abar_params() -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair = AXfrKeyPair::generate(&mut prng);
         let dummy_payee = PayeeWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
-            pubkey_x: bls_zero,
+            public_key: keypair.get_public_key(),
         };
 
         let (cs, _) = build_ar_to_abar_cs(dummy_payee);
@@ -290,9 +344,8 @@ impl ProverParams {
     pub fn abar_to_ar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
 
-        let hash = bls_zero;
-        let non_malleability_randomizer = bls_zero;
-        let non_malleability_tag = bls_zero;
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let keypair = AXfrKeyPair::generate(&mut prng);
 
         let node = MTNode {
             siblings1: bls_zero,
@@ -301,7 +354,7 @@ impl ProverParams {
             is_right_child: 0,
         };
         let payer_secret = PayerWitness {
-            spend_key: bls_zero,
+            secret_key: keypair.get_secret_key(),
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -309,12 +362,9 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let (cs, _) = build_abar_to_ar_cs(
-            payer_secret,
-            &hash,
-            &non_malleability_randomizer,
-            &non_malleability_tag,
-        );
+        let folding_witness = AXfrAddressFoldingWitness::default();
+
+        let (cs, _) = build_abar_to_ar_cs(payer_secret, &folding_witness);
 
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)

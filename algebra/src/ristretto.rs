@@ -9,12 +9,13 @@ use curve25519_dalek::{
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
+use std::fmt::{Debug, Formatter};
 
 /// The number of bytes for a scalar value over BLS12-381
 pub const RISTRETTO_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `curve25519_dalek::scalar::Scalar`
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
 pub struct RistrettoScalar(pub curve25519_dalek::scalar::Scalar);
 
 /// The wrapped struct for `curve25519_dalek::ristretto::CompressedRistretto`
@@ -28,6 +29,12 @@ pub struct CompressedEdwardsY(pub curve25519_dalek::edwards::CompressedEdwardsY)
 /// The wrapped struct for `curve25519_dalek::ristretto::RistrettoPoint`
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoPoint(pub RPoint);
+
+impl Debug for RistrettoScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        <curve25519_dalek::scalar::Scalar as Debug>::fmt(&self.0, f)
+    }
+}
 
 impl From<u128> for RistrettoScalar {
     #[inline]

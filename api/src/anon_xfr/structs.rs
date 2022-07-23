@@ -1,18 +1,13 @@
 use crate::anon_xfr::keys::AXfrSecretKey;
 use crate::anon_xfr::{
-    decrypt_memo,
+    commit, decrypt_memo,
     keys::{AXfrKeyPair, AXfrPubKey},
 };
 use crate::primitives::asymmetric_encryption::{dh_decrypt, dh_encrypt};
 use crate::xfr::structs::AssetType;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::bs257::{BS257Scalar, BS257G1};
-use zei_algebra::secp256k1::SECP256K1Scalar;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*, secp256k1::SECP256K1G1};
-use zei_crypto::basic::rescue::RescueInstance;
-use zei_crypto::delegated_chaum_pedersen::DelegatedChaumPedersenInspection;
-use zei_crypto::field_simulation::SimFrParamsBS257;
 use zei_plonk::plonk::constraint_system::VarIndex;
 
 /// The nullifier.
@@ -48,7 +43,13 @@ impl AnonAssetRecord {
     /// Generate the anonymous asset record from the opened version.
     pub fn from_oabar(oabar: &OpenAnonAssetRecord) -> AnonAssetRecord {
         AnonAssetRecord {
-            commitment: oabar.compute_commitment(),
+            commitment: commit(
+                oabar.pub_key_ref(),
+                &oabar.get_blind(),
+                oabar.get_amount(),
+                &oabar.get_asset_type(),
+            )
+            .unwrap(),
         }
     }
 }
@@ -109,6 +110,11 @@ impl OpenAnonAssetRecord {
     /// Get record public_key
     pub fn pub_key_ref(&self) -> &AXfrPubKey {
         &self.pub_key
+    }
+
+    /// Get the blinding value
+    pub fn get_blind(&self) -> BLSScalar {
+        self.blind
     }
 
     /// Get record's owner memo
@@ -229,7 +235,6 @@ impl MTPath {
 }
 
 pub(crate) struct PayerWitnessVars {
-    pub(crate) spend_key: VarIndex,
     pub(crate) uid: VarIndex,
     pub(crate) amount: VarIndex,
     pub(crate) asset_type: VarIndex,
@@ -241,7 +246,7 @@ pub(crate) struct PayeeWitnessVars {
     pub(crate) amount: VarIndex,
     pub(crate) blind: VarIndex,
     pub(crate) asset_type: VarIndex,
-    pub(crate) pubkey_x: VarIndex,
+    pub(crate) public_key_scalars: [VarIndex; 3],
 }
 
 /// The allocated variables for a Merkle tree node.
@@ -268,12 +273,6 @@ pub struct AccElemVars {
     pub uid: VarIndex,
     /// The commitment.
     pub commitment: VarIndex,
-}
-
-pub(crate) struct NullifierInputVars {
-    pub(crate) uid_amount: VarIndex,
-    pub(crate) asset_type: VarIndex,
-    pub(crate) public_key_scalars: [VarIndex; 3],
 }
 
 #[derive(Debug, Clone)]
@@ -304,16 +303,6 @@ pub struct PayeeWitness {
     pub asset_type: BLSScalar,
     /// The public key.
     pub public_key: AXfrPubKey,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct DelegatedCPWitness {
-    /// Inspection data in the delegated Chaum-Pedersen proof.
-    pub inspection: DelegatedChaumPedersenInspection<BS257Scalar, BS257G1, SimFrParamsBS257>,
-    /// Beta.
-    pub beta: BS257Scalar,
-    /// Lambda.
-    pub lambda: BS257Scalar,
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord

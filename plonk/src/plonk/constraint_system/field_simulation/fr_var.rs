@@ -54,7 +54,7 @@ impl<P: SimFrParams> SimFrVar<P> {
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
             cs.wiring[4].push(res.var[i]);
-            cs.size += 1;
+            cs.finish_new_gate();
         }
 
         res
@@ -97,7 +97,7 @@ impl<P: SimFrParams> SimFrVar<P> {
                 cs.wiring[2].push(self.var[left]);
                 cs.wiring[3].push(other.var[i - left]);
                 cs.wiring[4].push(res);
-                cs.size += 1;
+                cs.finish_new_gate();
 
                 prior_res = res;
                 prior_res_val = res_val;

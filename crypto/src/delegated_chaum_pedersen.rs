@@ -8,7 +8,7 @@ use serde::Deserialize;
 use std::marker::PhantomData;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
-#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The non-interactive proof provided to the verifier.
 pub struct DelegatedChaumPedersenProof<S, G, P> {
     /// The commitment of the non-ZK verifier's state.
@@ -21,7 +21,7 @@ pub struct DelegatedChaumPedersenProof<S, G, P> {
     pub params_phantom: PhantomData<P>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The state of the inspector.
 pub struct DelegatedChaumPedersenInspection<S, G, P> {
     /// The committed value and their corresponding randomizer
@@ -34,7 +34,31 @@ pub struct DelegatedChaumPedersenInspection<S, G, P> {
     pub group_phantom: PhantomData<G>,
 }
 
+impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams>
+    DelegatedChaumPedersenInspection<S, G, P>
+{
+    /// Create a dummy new one.
+    pub fn new() -> Self {
+        Self {
+            committed_data_and_randomizer: vec![],
+            params_phantom: PhantomData,
+            r: BLSScalar::default(),
+            group_phantom: PhantomData,
+        }
+    }
+}
+
 impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedChaumPedersenProof<S, G, P> {
+    /// Create a dummy new one.
+    pub fn new() -> Self {
+        Self {
+            inspection_comm: BLSScalar::default(),
+            randomizers: vec![],
+            response_scalars: vec![],
+            params_phantom: PhantomData,
+        }
+    }
+
     /// Represent the information needed by zk-SNARKs in its format.
     pub fn to_verifier_input(&self) -> Vec<BLSScalar> {
         let response_scalars_sim_fr_limbs = self
@@ -72,7 +96,7 @@ pub fn prove_delegated_chaum_pedersen<
     committed_data: &Vec<(S, S)>,
     pc_gens: &PC,
     commitments: &Vec<G>,
-    aux_info: &BLSScalar,
+    transcript: &mut Transcript,
 ) -> Result<(
     DelegatedChaumPedersenProof<S, G, P>,
     DelegatedChaumPedersenInspection<S, G, P>,
@@ -82,9 +106,8 @@ pub fn prove_delegated_chaum_pedersen<
     assert_eq!(committed_data.len(), commitments.len());
     let len = committed_data.len();
 
-    let mut proof = DelegatedChaumPedersenProof::default();
-    let mut inspection = DelegatedChaumPedersenInspection::default();
-    let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
+    let mut proof = DelegatedChaumPedersenProof::new();
+    let mut inspection = DelegatedChaumPedersenInspection::new();
 
     // 1. sample the scalars for the randomizers.
     let mut randomizer_scalars = Vec::<(S, S)>::with_capacity(len);
@@ -143,12 +166,7 @@ pub fn prove_delegated_chaum_pedersen<
         input.push(r);
         input.resize((input.len() - 1 + 2) / 3 * 3 + 1, BLSScalar::zero());
 
-        let mut h = comm_instance.rescue(&[
-            compressed_limbs[0],
-            compressed_limbs[1],
-            compressed_limbs[2],
-            compressed_limbs[3],
-        ])[0];
+        let mut h = comm_instance.rescue(&[input[0], input[1], input[2], input[3]])[0];
 
         let input = input[4..].to_vec();
 
@@ -178,10 +196,6 @@ pub fn prove_delegated_chaum_pedersen<
     commitments.iter().for_each(|p| {
         transcript.append_message(b"Commitment", &p.to_compressed_bytes());
     });
-    transcript.append_message(
-        b"Auxiliary information (Rescue commitment z, or a nullifier)",
-        &aux_info.to_bytes(),
-    );
     transcript.append_message(b"Inspector state commitment comm", &comm.to_bytes());
     randomizers
         .iter()
@@ -202,6 +216,7 @@ pub fn prove_delegated_chaum_pedersen<
         .map(|((ll, lr), (rl, rr))| {
             let s_first = beta.mul(ll).add(rl);
             let s_second = beta.mul(lr).add(rr);
+
             (s_first, s_second)
         })
         .collect::<Vec<(S, S)>>();
@@ -241,8 +256,8 @@ pub fn verify_delegated_chaum_pedersen<
 >(
     pc_gens: &PC,
     commitments: &Vec<G>,
-    aux_info: &BLSScalar,
     proof: &DelegatedChaumPedersenProof<S, G, P>,
+    transcript: &mut Transcript,
 ) -> Result<(S, S)> {
     assert_eq!(commitments.len(), proof.randomizers.len());
     assert_eq!(commitments.len(), proof.response_scalars.len());
@@ -250,8 +265,6 @@ pub fn verify_delegated_chaum_pedersen<
     let len = commitments.len();
 
     // 1. Fiat-Shamir transform
-    let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
-
     transcript.append_message(b"PC base", &pc_gens.generator().to_compressed_bytes());
     transcript.append_message(
         b"PC base blinding",
@@ -261,10 +274,6 @@ pub fn verify_delegated_chaum_pedersen<
     commitments.iter().for_each(|p| {
         transcript.append_message(b"Commitment", &p.to_compressed_bytes());
     });
-    transcript.append_message(
-        b"Auxiliary information (Rescue commitment z, or a nullifier)",
-        &aux_info.to_bytes(),
-    );
     transcript.append_message(
         b"Inspector state commitment comm",
         &proof.inspection_comm.to_bytes(),
@@ -316,16 +325,14 @@ pub fn verify_delegated_chaum_pedersen<
 #[cfg(test)]
 mod test {
     use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
-    use crate::basic::rescue::RescueInstance;
     use crate::delegated_chaum_pedersen::{
         prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
     };
     use crate::field_simulation::SimFrParamsRistretto;
-    use num_bigint::BigUint;
+    use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_algebra::ristretto::RistrettoScalar;
-    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
+    use zei_algebra::{ristretto::RistrettoScalar, traits::Scalar};
 
     #[test]
     fn test_correctness() {
@@ -342,18 +349,7 @@ mod test {
             let point_p = pc_gens.commit(x, gamma);
             let point_q = pc_gens.commit(y, delta);
 
-            let z_randomizer = BLSScalar::random(&mut rng);
-            let z_instance = RescueInstance::<BLSScalar>::new();
-
-            let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
-            let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
-
-            let z = z_instance.rescue(&[
-                z_randomizer,
-                x_in_bls12_381,
-                y_in_bls12_381,
-                BLSScalar::zero(),
-            ])[0];
+            let mut transcript = Transcript::new(b"Test");
 
             let (proof, _, _, _) =
                 prove_delegated_chaum_pedersen::<_, _, _, SimFrParamsRistretto, _>(
@@ -361,12 +357,19 @@ mod test {
                     &vec![(x, gamma), (y, delta)],
                     &pc_gens,
                     &vec![point_p, point_q],
-                    &z,
+                    &mut transcript,
                 )
                 .unwrap();
 
-            let _ = verify_delegated_chaum_pedersen(&pc_gens, &vec![point_p, point_q], &z, &proof)
-                .unwrap();
+            let mut transcript = Transcript::new(b"Test");
+
+            let _ = verify_delegated_chaum_pedersen(
+                &pc_gens,
+                &vec![point_p, point_q],
+                &proof,
+                &mut transcript,
+            )
+            .unwrap();
         }
     }
 }

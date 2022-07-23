@@ -229,9 +229,9 @@ impl<P: SimFrParams> Mul<&SimFr<P>> for &SimFr<P> {
 
 impl<P: SimFrParams> From<&BigUint> for SimFr<P> {
     fn from(src: &BigUint) -> Self {
+        let mut rem = src.clone();
+
         let step = BigUint::from(1u32).shl(P::BIT_PER_LIMB);
-        let p_biguint = P::scalar_field_in_biguint();
-        let (_, mut rem) = src.div_rem(&p_biguint);
 
         let mut res = SimFr::<P>::default();
         res.val = rem.clone();
@@ -386,7 +386,7 @@ impl<P: SimFrParams> SimFrMul<P> {
         // compute `k`
         let (k, rem) = cur_val.div_rem(&r_biguint);
         assert!(rem.is_zero());
-        assert!(k <= r_biguint.shl(5u32));
+        assert!(k <= r_biguint.clone().shl(5u32));
 
         // compute the limbs for `k * r`
         let r_limbs = P::scalar_field_in_limbs().to_vec();

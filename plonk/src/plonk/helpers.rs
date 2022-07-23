@@ -598,14 +598,15 @@ mod test {
         let four = three.add(&one);
         let five = four.add(&one);
         let six = five.add(&one);
+        let seven = six.add(&one);
 
-        let witness = [one, three, five, four, two, two, two, six, three];
+        let witness = [one, three, five, four, two, two, seven, six, three];
         cs.add_variables(&witness);
 
-        cs.insert_add_gate(0, 4, 1);
-        cs.insert_add_gate(1, 4, 2);
-        cs.insert_add_gate(2, 4, 6);
-        cs.insert_add_gate(3, 5, 7);
+        cs.insert_add_gate(0 + 2, 4 + 2, 1 + 2);
+        cs.insert_add_gate(1 + 2, 4 + 2, 2 + 2);
+        cs.insert_add_gate(2 + 2, 4 + 2, 6 + 2);
+        cs.insert_add_gate(3 + 2, 5 + 2, 7 + 2);
         cs.pad();
 
         let mut prng = ChaChaRng::from_seed([0_u8; 32]);

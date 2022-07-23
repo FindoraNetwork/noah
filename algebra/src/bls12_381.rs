@@ -33,20 +33,34 @@ pub struct BLSScalar(pub(crate) Fr);
 
 impl Debug for BLSScalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let biguint = BigUint::from(self.0.clone());
-        <BigUint as Display>::fmt(&biguint, f)
+        <BigUint as Debug>::fmt(
+            &<BigInteger256 as Into<BigUint>>::into(self.0.into_repr()),
+            f,
+        )
     }
 }
 
 /// The wrapped struct for `ark_bls12_381::G1Projective`
 #[wasm_bindgen]
-#[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Default, Clone, PartialEq, Eq)]
 pub struct BLSG1(pub(crate) G1Projective);
+
+impl Debug for BLSG1 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        <G1Affine as Display>::fmt(&self.0.into_affine(), f)
+    }
+}
 
 /// The wrapped struct for `ark_bls12_381::G2Projective`
 #[wasm_bindgen]
-#[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Default, Clone, PartialEq, Eq)]
 pub struct BLSG2(pub(crate) G2Projective);
+
+impl Debug for BLSG2 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        <G2Affine as Display>::fmt(&self.0.into_affine(), f)
+    }
+}
 
 /// The wrapped struct for `Fp12<ark_bls12_381::Fq12Parameters>`,
 /// which is the pairing result

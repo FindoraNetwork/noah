@@ -1,7 +1,9 @@
 //! Module for the Bulletproof scalar mul proof scheme
 
+use crate::basic::pedersen_comm::PedersenCommitmentBS257;
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
+use bulletproofs_bs257::BulletproofGens;
 use bulletproofs_bs257::{
     curve::bs257::G1Affine as G1AffineBig,
     curve::secp256k1::{Fq, FrParameters, G1Affine},
@@ -9,7 +11,6 @@ use bulletproofs_bs257::{
         LinearCombination, Prover, R1CSProof, RandomizableConstraintSystem, Variable, Verifier,
     },
 };
-use bulletproofs_bs257::{BulletproofGens, PedersenGens};
 use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
@@ -51,19 +52,26 @@ impl PointVar {
 }
 
 /// A proof of scalar multiplication.
-pub struct ScalarMulProof(R1CSProof);
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ScalarMulProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
+
+impl PartialEq for ScalarMulProof {
+    fn eq(&self, other: &ScalarMulProof) -> bool {
+        self.0.to_bytes() == other.0.to_bytes()
+    }
+}
+
+impl Eq for ScalarMulProof {}
 
 impl ScalarMulProof {
     fn gadget<CS: RandomizableConstraintSystem>(
         cs: &mut CS,
         public_key_var: &PointVar,
-        scalar_var: &ScalarVar,
+        secret_key_var: &ScalarVar,
         public_key: &Option<G1Affine>,
-        scalar: &Option<Fq>,
-        point_r_divided_by_r: &G1Affine,
-        point_g_times_z_divided_by_r: &G1Affine,
+        secret_key: &Option<Fq>,
     ) -> Result<()> {
-        assert_eq!(public_key.is_some(), scalar.is_some());
+        assert_eq!(public_key.is_some(), secret_key.is_some());
 
         // 1. Initialize the point.
         let dummy_point = {
@@ -97,14 +105,9 @@ impl ScalarMulProof {
         cs.constrain(cur_var.x_var - dummy_point.x.clone());
         cs.constrain(cur_var.y_var - dummy_point.y.clone());
 
-        // 2. Compute `point_g_times_z_divided_by_r` + `public_key_var`.
-        let point_constant = point_g_times_z_divided_by_r.add(dummy_point);
-        let (_, rhs_var) =
-            Self::point_add_constant(cs, public_key_var, public_key, &point_constant)?;
-
-        // 3. Compute the bit decomposition of `scalar`.
-        let (bits, bits_var) = if let Some(scalar) = scalar {
-            let mut bits = scalar.into_repr().to_bits_le();
+        // 2. Compute the bit decomposition of `secret_key`.
+        let (bits, bits_var) = if let Some(secret_key) = secret_key {
+            let mut bits = secret_key.into_repr().to_bits_le();
             let mut bits_var = Vec::new();
 
             bits.truncate(FrParameters::MODULUS_BITS as usize);
@@ -147,12 +150,12 @@ impl ScalarMulProof {
         }
 
         let sum = LinearCombination::from_iter(lc.iter());
-        cs.constrain(sum - scalar_var.0);
+        cs.constrain(sum - secret_key_var.0);
 
         // 4. Generate the points.
         let points = {
             let mut v = Vec::new();
-            let mut cur = point_r_divided_by_r.into_projective();
+            let mut cur = SECP256K1G1::get_base().get_raw().into_projective();
             for _ in 0..FrParameters::MODULUS_BITS {
                 v.push(cur.into_affine());
                 ProjectiveCurve::double_in_place(&mut cur);
@@ -171,6 +174,7 @@ impl ScalarMulProof {
         }
 
         // 6. Check if the points are equal.
+        let (_, rhs_var) = Self::point_add_constant(cs, public_key_var, public_key, &dummy_point)?;
         cs.constrain(cur_var.x_var - rhs_var.x_var);
         cs.constrain(cur_var.y_var - rhs_var.y_var);
 
@@ -246,30 +250,27 @@ impl ScalarMulProof {
     /// Returns a tuple `(proof, x_comm || y_comm || scalar_fq_comm )`.
     pub fn prove<'a, 'b, R: CryptoRng + RngCore>(
         prng: &mut R,
-        pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
         public_key: &SECP256K1G1,
-        scalar: &SECP256K1Scalar,
-        point_r_divided_by_r: &SECP256K1G1,
-        point_g_times_z_divided_by_r: &SECP256K1G1,
+        secret_key: &SECP256K1Scalar,
     ) -> Result<(ScalarMulProof, Vec<BS257G1>, Vec<BS257Scalar>)> {
+        let pc_gens = PedersenCommitmentBS257::default();
+
         let public_key = public_key.get_raw();
-        let scalar = scalar.get_raw();
-        let point_r_divided_by_r = point_r_divided_by_r.get_raw();
-        let point_g_times_z_divided_by_r = point_g_times_z_divided_by_r.get_raw();
+        let secret_key = secret_key.get_raw();
+
+        let base = SECP256K1G1::get_base();
 
         // 1. Sanity-check if the statement is valid.
-        assert_eq!(
-            point_r_divided_by_r.mul(scalar.into_repr()),
-            point_g_times_z_divided_by_r.add(public_key.clone())
-        );
+        assert_eq!(base.get_raw().mul(secret_key.into_repr()), public_key,);
 
         // 2. Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
 
         // 3. Initialize the prover.
-        let mut prover = Prover::new(&pc_gens, transcript);
+        let pc_gens_for_prover = bulletproofs_bs257::PedersenGens::from(&pc_gens);
+        let mut prover = Prover::new(&pc_gens_for_prover, transcript);
 
         // 4. Allocate `public_key`.
         let x_blinding = Fq::rand(prng);
@@ -279,39 +280,39 @@ impl ScalarMulProof {
 
         let public_key_var = PointVar::new(x_var, y_var);
 
-        // 5. Allocate `scalar`.
-
+        // 5. Allocate `secret_key`.
         // We can do this because Fq is larger than Fr.
-        let scalar_fq = Fq::from_le_bytes_mod_order(&scalar.into_repr().to_bytes_le());
+        let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.into_repr().to_bytes_le());
 
-        let scalar_blinding = Fq::rand(prng);
-        let (scalar_fq_comm, scalar_fq_var) = prover.commit(scalar_fq, scalar_blinding.clone());
+        let secret_key_blinding = Fq::rand(prng);
+        let (secret_key_comm, secret_key_var) =
+            prover.commit(secret_key_fq, secret_key_blinding.clone());
 
-        let scalar_var = ScalarVar(scalar_fq_var);
+        let secret_key_var = ScalarVar(secret_key_var);
 
         ScalarMulProof::gadget(
             &mut prover,
             &public_key_var,
-            &scalar_var,
+            &secret_key_var,
             &Some(public_key.clone()),
-            &Some(scalar_fq.clone()),
-            &point_r_divided_by_r,
-            &point_g_times_z_divided_by_r,
+            &Some(secret_key_fq.clone()),
         )?;
 
-        let proof = prover.prove(&bp_gens).c(d!(ZeiError::R1CSProofError))?;
+        let proof = prover
+            .prove(prng, &bp_gens)
+            .c(d!(ZeiError::R1CSProofError))?;
 
         Ok((
             ScalarMulProof(proof),
             vec![
                 BS257G1::from_raw(x_comm.clone()),
                 BS257G1::from_raw(y_comm.clone()),
-                BS257G1::from_raw(scalar_fq_comm.clone()),
+                BS257G1::from_raw(secret_key_comm.clone()),
             ],
             vec![
                 BS257Scalar::from_raw(x_blinding),
                 BS257Scalar::from_raw(y_blinding),
-                BS257Scalar::from_raw(scalar_blinding),
+                BS257Scalar::from_raw(secret_key_blinding),
             ],
         ))
     }
@@ -321,19 +322,15 @@ impl ScalarMulProof {
     /// Attempt to verify a `ScalarMulProof`.
     pub fn verify<'a, 'b>(
         &self,
-        pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
         commitments: &Vec<BS257G1>,
-        point_r_divided_by_r: &SECP256K1G1,
-        point_g_times_z_divided_by_r: &SECP256K1G1,
     ) -> Result<()> {
+        let pc_gens = PedersenCommitmentBS257::default();
         let commitments = commitments
             .iter()
             .map(|x| x.get_raw())
             .collect::<Vec<G1AffineBig>>();
-        let point_r_divided_by_r = point_r_divided_by_r.get_raw().clone();
-        let point_g_times_z_divided_by_r = point_g_times_z_divided_by_r.get_raw().clone();
 
         // Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
@@ -345,21 +342,20 @@ impl ScalarMulProof {
         let s_var = verifier.commit(commitments[2].clone());
 
         let public_key_var = PointVar::new(x_var, y_var);
-        let scalar_var = ScalarVar(s_var);
+        let secret_key_var = ScalarVar(s_var);
 
         ScalarMulProof::gadget(
             &mut verifier,
             &public_key_var,
-            &scalar_var,
+            &secret_key_var,
             &None,
             &None,
-            &point_r_divided_by_r,
-            &point_g_times_z_divided_by_r,
         )
         .c(d!(ZeiError::R1CSProofError))?;
 
+        let pc_gens_for_verifier = bulletproofs_bs257::PedersenGens::from(&pc_gens);
         verifier
-            .verify(&self.0, &pc_gens, &bp_gens)
+            .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
             .c(d!(ZeiError::R1CSProofError))?;
         Ok(())
     }
@@ -369,30 +365,23 @@ impl ScalarMulProof {
 fn scalar_mul_test() {
     use bulletproofs_bs257::curve::secp256k1::Fr;
 
-    let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(2048, 1);
 
     let mut rng = rand::thread_rng();
 
-    let public_key = G1Affine::rand(&mut rng);
-    let point_r_divided_by_r = G1Affine::rand(&mut rng);
-    let scalar = Fr::rand(&mut rng);
-    let point_g_times_z_divided_by_r = point_r_divided_by_r
-        .mul(scalar.into_repr())
-        .into_affine()
-        .add(public_key.neg());
+    let secert_key = Fr::rand(&mut rng);
+    let public_key = G1Affine::prime_subgroup_generator()
+        .mul(secert_key.into_repr())
+        .into_affine();
 
     let (proof, commitments, _) = {
         let mut prover_transcript = Transcript::new(b"ScalarMulProofTest");
         ScalarMulProof::prove(
             &mut rng,
-            &pc_gens,
             &bp_gens,
             &mut prover_transcript,
             &SECP256K1G1::from_raw(public_key),
-            &SECP256K1Scalar::from_raw(scalar),
-            &SECP256K1G1::from_raw(point_r_divided_by_r.clone()),
-            &SECP256K1G1::from_raw(point_g_times_z_divided_by_r.clone()),
+            &SECP256K1Scalar::from_raw(secert_key),
         )
         .unwrap()
     };
@@ -400,14 +389,7 @@ fn scalar_mul_test() {
     {
         let mut verifier_transcript = Transcript::new(b"ScalarMulProofTest");
         assert!(proof
-            .verify(
-                &pc_gens,
-                &bp_gens,
-                &mut verifier_transcript,
-                &commitments,
-                &SECP256K1G1::from_raw(point_r_divided_by_r),
-                &SECP256K1G1::from_raw(point_g_times_z_divided_by_r)
-            )
+            .verify(&bp_gens, &mut verifier_transcript, &commitments,)
             .is_ok());
     }
 }

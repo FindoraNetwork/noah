@@ -3,10 +3,10 @@ use crate::errors::AlgebraError;
 use crate::prelude::*;
 use ark_ec::short_weierstrass_jacobian::GroupProjective;
 use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{BigInteger, FftField, FftParameters, Field, FpParameters, PrimeField};
+use ark_ff::{BigInteger, BigInteger320, FftField, FftParameters, Field, FpParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
-    fmt::{Debug, Display, Formatter},
+    fmt::{Debug, Formatter},
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     result::Result as StdResult,
     str::FromStr,
@@ -29,14 +29,16 @@ pub struct SECP256K1Scalar(pub(crate) Fr);
 
 impl Debug for SECP256K1Scalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let biguint = BigUint::from(self.0.clone());
-        <BigUint as Display>::fmt(&biguint, f)
+        <BigUint as Debug>::fmt(
+            &<BigInteger320 as Into<BigUint>>::into(self.0.into_repr()),
+            f,
+        )
     }
 }
 
 /// The wrapped struct for `bulletproofs_bs257::curve::secp256k1::G1Projective`
 #[wasm_bindgen]
-#[derive(Copy, Default, Clone, PartialEq, Eq, Debug, Hash)]
+#[derive(Copy, Default, Clone, PartialEq, Eq, Hash)]
 pub struct SECP256K1G1(pub(crate) G1Projective);
 
 impl FromStr for SECP256K1Scalar {
@@ -283,12 +285,12 @@ impl SECP256K1Scalar {
 impl SECP256K1G1 {
     /// Obtain the x coordinate in the affine representation.
     pub fn get_x(&self) -> BS257Scalar {
-        BS257Scalar((self.0.x).clone())
+        BS257Scalar((self.0.into_affine().x).clone())
     }
 
     /// Obtain the y coordinate in the affine representation.
     pub fn get_y(&self) -> BS257Scalar {
-        BS257Scalar((self.0.y).clone())
+        BS257Scalar((self.0.into_affine().y).clone())
     }
 
     /// Obtain a point using the x coordinate (which would be BS257Scalar).
@@ -310,9 +312,15 @@ impl SECP256K1G1 {
     }
 }
 
+impl Debug for SECP256K1G1 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0.into_affine(), f)
+    }
+}
+
 impl Group for SECP256K1G1 {
     type ScalarType = SECP256K1Scalar;
-    const COMPRESSED_LEN: usize = 32;
+    const COMPRESSED_LEN: usize = 33;
 
     #[inline]
     fn double(&self) -> Self {

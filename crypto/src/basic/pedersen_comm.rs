@@ -1,14 +1,8 @@
 use curve25519_dalek::traits::MultiscalarMul;
-use digest::Digest;
-use rand_chacha::ChaChaRng;
-use sha3::Sha3_512;
 use zei_algebra::bs257::{BS257Scalar, BS257G1};
+use zei_algebra::ops::{Add, Mul};
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use zei_algebra::traits::Group;
-use zei_algebra::{
-    ops::{Add, Mul},
-    rand::SeedableRng,
-};
 
 /// Trait for Pedersen commitment.
 pub trait PedersenCommitment<G: Group>: Default {
@@ -79,21 +73,10 @@ pub struct PedersenCommitmentBS257 {
 
 impl Default for PedersenCommitmentBS257 {
     fn default() -> Self {
-        let base = BS257G1::get_base();
-
-        let mut hash = Sha3_512::new();
-        Digest::update(&mut hash, base.to_compressed_bytes());
-        let h = hash.finalize();
-
-        let mut res = [0u8; 32];
-        res.copy_from_slice(&h[..32]);
-
-        let mut prng = ChaChaRng::from_seed(res);
-        let blinding = BS257G1::random(&mut prng);
-
+        let pc_gens = bulletproofs_bs257::PedersenGens::default();
         Self {
-            B: base,
-            B_blinding: blinding,
+            B: BS257G1::from_raw(pc_gens.B),
+            B_blinding: BS257G1::from_raw(pc_gens.B_blinding),
         }
     }
 }

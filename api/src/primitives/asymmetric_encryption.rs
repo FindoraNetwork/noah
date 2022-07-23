@@ -30,7 +30,7 @@ pub fn dh_encrypt<R: CryptoRng + RngCore>(
     prng: &mut R,
     public_key: &SECP256K1G1,
     msg: &[u8],
-) -> Result<(JubjubPoint, Vec<u8>)> {
+) -> Result<(SECP256K1G1, Vec<u8>)> {
     let share_scalar = SECP256K1Scalar::random(prng);
     let share = SECP256K1G1::get_base().mul(&share_scalar);
 

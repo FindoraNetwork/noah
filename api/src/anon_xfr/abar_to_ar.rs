@@ -1,10 +1,15 @@
+use crate::anon_xfr::address_folding::{
+    create_address_folding, prepare_verifier_input, prove_address_folding_in_cs,
+    verify_address_folding, AXfrAddressFoldingWitness,
+};
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
-    commit_in_cs, compute_merkle_root_variables, compute_non_malleability_tag,
-    keys::{get_view_key_domain_separator, AXfrKeyPair},
+    address_folding::AXfrAddressFoldingInstance,
+    commit_in_cs, compute_merkle_root_variables,
+    keys::AXfrKeyPair,
     nullify, nullify_in_cs,
-    structs::{AccElemVars, Nullifier, NullifierInputVars, OpenAnonAssetRecord, PayerWitness},
-    AXfrPlonkPf, TurboPlonkCS, SK_LEN,
+    structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
+    AXfrPlonkPf, TurboPlonkCS, ANON_XFR_BP_GENS_LEN,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -16,10 +21,10 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
+use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use zei_plonk::plonk::{
-    constraint_system::{rescue::StateVar, TurboCS, VarIndex},
+    constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
@@ -31,10 +36,10 @@ const ABAR_TO_AR_TRANSCRIPT: &[u8] = b"ABAR to AR proof";
 pub struct AbarToArNote {
     /// The body part of ABAR to AR.
     pub body: AbarToArBody,
-    /// The spending proof (assuming non-malleability).
+    /// The Plonk proof (assuming non-malleability).
     pub proof: AXfrPlonkPf,
-    /// The non-malleability tag.
-    pub non_malleability_tag: BLSScalar,
+    /// The address folding instance.
+    pub folding_instance: AXfrAddressFoldingInstance,
 }
 
 /// The anonymous-to-transparent note without proof or non-malleability tag.
@@ -92,10 +97,10 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
         oabar.amount,
         &oabar.asset_type,
         mt_leaf_info.uid,
-    );
+    )?;
 
     let payers_secret = PayerWitness {
-        secret_key: abar_keypair.get_secret_key_scalar(),
+        secret_key: abar_keypair.get_secret_key(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
         asset_type: oabar.asset_type.as_scalar(),
@@ -133,25 +138,21 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
         input_keypair,
     } = pre_note;
 
-    let hash_scalar = BLSScalar::from_hash::<D>(hash);
-
-    let (non_malleability_randomizer, non_malleability_tag) =
-        compute_non_malleability_tag(prng, hash_scalar, &[&input_keypair]);
-
-    let proof = prove_abar_to_ar(
+    let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
+    let (folding_instance, folding_witness) = create_address_folding(
         prng,
-        params,
-        witness,
-        &hash_scalar,
-        &non_malleability_randomizer,
-        &non_malleability_tag,
-    )
-    .c(d!())?;
+        hash,
+        &mut transcript,
+        ANON_XFR_BP_GENS_LEN,
+        &input_keypair,
+    )?;
+
+    let proof = prove_abar_to_ar(prng, params, witness, &folding_witness).c(d!())?;
 
     Ok(AbarToArNote {
         body,
         proof,
-        non_malleability_tag,
+        folding_instance,
     })
 }
 
@@ -167,6 +168,17 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(ZeiError::ParameterError));
     }
 
+    let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
+    let (beta, lambda) = verify_address_folding(
+        hash,
+        &mut transcript,
+        ANON_XFR_BP_GENS_LEN,
+        &note.folding_instance,
+    )?;
+
+    let address_folding_public_input =
+        prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+
     let payer_amount = note.body.output.amount.get_amount().unwrap();
     let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
 
@@ -174,16 +186,13 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
-    let hash_scalar = BLSScalar::from_hash::<D>(hash);
-
     let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
     let mut online_inputs = vec![];
     online_inputs.push(note.body.input.clone());
     online_inputs.push(merkle_root.clone());
     online_inputs.push(BLSScalar::from(payer_amount));
     online_inputs.push(payer_asset_type.as_scalar());
-    online_inputs.push(hash_scalar);
-    online_inputs.push(note.non_malleability_tag);
+    online_inputs.extend_from_slice(&address_folding_public_input);
 
     verifier(
         &mut transcript,
@@ -200,18 +209,11 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: PayerWitness,
-    hash: &BLSScalar,
-    non_malleability_randomizer: &BLSScalar,
-    non_malleability_tag: &BLSScalar,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
 
-    let (mut cs, _) = build_abar_to_ar_cs(
-        payers_witness,
-        hash,
-        non_malleability_randomizer,
-        non_malleability_tag,
-    );
+    let (mut cs, _) = build_abar_to_ar_cs(payers_witness, &folding_witness);
     let witness = cs.get_and_clear_witness();
 
     prover_with_lagrange(
@@ -229,34 +231,31 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
     payers_witness: PayerWitness,
-    hash: &BLSScalar,
-    non_malleability_randomizer: &BLSScalar,
-    non_malleability_tag: &BLSScalar,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
     let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
 
-    let base = JubjubPoint::get_base();
+    let keypair = folding_witness.keypair.clone();
+    let public_key_scalars = keypair.get_public_key().get_public_key_scalars().unwrap();
+    let secret_key_scalars = keypair.get_secret_key().get_secret_key_scalars().unwrap();
+
+    let public_key_scalars_vars = [
+        cs.new_variable(public_key_scalars[0]),
+        cs.new_variable(public_key_scalars[1]),
+        cs.new_variable(public_key_scalars[2]),
+    ];
+    let secret_key_scalars_vars = [
+        cs.new_variable(secret_key_scalars[0]),
+        cs.new_variable(secret_key_scalars[1]),
+    ];
+
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
-
-    let view_key_domain_separator = get_view_key_domain_separator();
-    let view_key_domain_separator_var = cs.new_variable(view_key_domain_separator);
-    cs.insert_constant_gate(view_key_domain_separator_var, view_key_domain_separator);
-
-    // prove knowledge of payer's secret key: pk = base^{sk}.
-    let view_key = cs.rescue_hash(&StateVar::new([
-        view_key_domain_separator_var,
-        payers_witness_vars.spend_key,
-        zero_var,
-        zero_var,
-    ]))[0];
-    let pk_var = cs.scalar_mul(base, view_key, SK_LEN);
-    let pk_x = pk_var.get_x();
 
     // commitments
     let com_abar_in_var = commit_in_cs(
@@ -264,7 +263,7 @@ pub fn build_abar_to_ar_cs(
         payers_witness_vars.blind,
         payers_witness_vars.amount,
         payers_witness_vars.asset_type,
-        pk_x,
+        &public_key_scalars_vars,
     );
 
     // prove pre-image of the nullifier
@@ -281,12 +280,13 @@ pub fn build_abar_to_ar_cs(
         zero,
         zero,
     );
-    let nullifier_input_vars = NullifierInputVars {
+    let nullifier_var = nullify_in_cs(
+        &mut cs,
+        &secret_key_scalars_vars,
         uid_amount,
-        asset_type: payers_witness_vars.asset_type,
-        pub_key_x: pk_x,
-    };
-    let nullifier_var = nullify_in_cs(&mut cs, payers_witness_vars.spend_key, nullifier_input_vars);
+        payers_witness_vars.asset_type,
+        &public_key_scalars_vars,
+    );
 
     // Merkle path authentication
     let acc_elem = AccElemVars {
@@ -301,23 +301,6 @@ pub fn build_abar_to_ar_cs(
         root_var = Some(tmp_root_var);
     }
 
-    // Check the non-malleability tag
-    let one_var = cs.one_var();
-    let hash_var = cs.new_variable(*hash);
-    let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
-    let non_malleability_tag_var = cs.new_variable(*non_malleability_tag);
-
-    {
-        let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
-            one_var,
-            hash_var,
-            non_malleability_randomizer_var,
-            payers_witness_vars.spend_key,
-        ]))[0];
-
-        cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
-    }
-
     // prepare public inputs variables
     cs.prepare_pi_variable(nullifier_var);
     cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
@@ -325,8 +308,13 @@ pub fn build_abar_to_ar_cs(
     cs.prepare_pi_variable(payers_witness_vars.amount);
     cs.prepare_pi_variable(payers_witness_vars.asset_type);
 
-    cs.prepare_pi_variable(hash_var);
-    cs.prepare_pi_variable(non_malleability_tag_var);
+    prove_address_folding_in_cs(
+        &mut cs,
+        &public_key_scalars_vars,
+        &secret_key_scalars_vars,
+        &folding_witness,
+    )
+    .unwrap();
 
     // pad the number of constraints to power of two
     cs.pad();

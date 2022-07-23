@@ -152,7 +152,7 @@ impl TurboCS<BLSScalar> {
         self.wiring[2].push(0);
         self.wiring[3].push(0);
         self.wiring[4].push(out_var);
-        self.size += 1;
+        self.finish_new_gate();
         out_var
     }
 
@@ -182,7 +182,7 @@ impl TurboCS<BLSScalar> {
             self.wiring[i].push(*var);
         }
         self.wiring[4].push(out_var);
-        self.size += 1;
+        self.finish_new_gate();
 
         out_var
     }
@@ -213,7 +213,7 @@ impl TurboCS<BLSScalar> {
             self.wiring[i].push(*var);
         }
         self.wiring[4].push(out_var);
-        self.size += 1;
+        self.finish_new_gate();
 
         out_var
     }
@@ -237,7 +237,7 @@ impl TurboCS<BLSScalar> {
         }
         self.wiring[3].push(out_var);
         self.wiring[4].push(var);
-        self.size += 1;
+        self.finish_new_gate();
         out_var
     }
 }

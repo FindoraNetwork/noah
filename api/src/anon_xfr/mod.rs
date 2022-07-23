@@ -5,7 +5,7 @@ use crate::{
         keys::AXfrKeyPair,
         structs::{
             AccElemVars, AnonAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
-            NullifierInputVars, OpenAnonAssetRecord,
+            OpenAnonAssetRecord,
         },
     },
     xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
@@ -23,8 +23,6 @@ use zei_plonk::{
     },
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
-
-pub(crate) const TWO_POW_32: u64 = 1 << 32;
 
 /// Module for general-purpose anonymous payment.
 pub mod abar_to_abar;
@@ -47,6 +45,8 @@ pub mod structs;
 const ASSET_TYPE_FRA: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
 /// FRA as the token used to pay the fee.
 pub const FEE_TYPE: AssetType = ASSET_TYPE_FRA;
+/// A constant 2^{32}.
+pub const TWO_POW_32: u64 = 1 << 32;
 
 pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 
@@ -219,9 +219,6 @@ pub fn nullify(
     ])[0])
 }
 
-/// Length of the secret key in anonymous payment (in bits).
-pub(crate) const SK_LEN: usize = 256;
-
 /// Length of the amount allowed in anonymous assets.
 pub(crate) const AMOUNT_LEN: usize = 64;
 
@@ -235,11 +232,16 @@ pub fn commit_in_cs(
     blinding_var: VarIndex,
     amount_var: VarIndex,
     asset_var: VarIndex,
-    public_key_scalars: [VarIndex; 3],
+    public_key_scalars: &[VarIndex; 3],
 ) -> VarIndex {
     let input_var = StateVar::new([blinding_var, amount_var, asset_var, public_key_scalars[0]]);
     let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([cur, pubkey_scalars[1], pubkey_scalars[2], cs.zero_var()]);
+    let input_var = StateVar::new([
+        cur,
+        public_key_scalars[1],
+        public_key_scalars[2],
+        cs.zero_var(),
+    ]);
     cs.rescue_hash(&input_var)[0]
 }
 
@@ -270,14 +272,11 @@ pub fn commit(
 /// Add the nullifier constraints to the constraint system.
 pub(crate) fn nullify_in_cs(
     cs: &mut TurboPlonkCS,
-    secret_key_scalars: [VarIndex; 2],
-    nullifier_input_vars: NullifierInputVars,
+    secret_key_scalars: &[VarIndex; 2],
+    uid_amount: VarIndex,
+    asset_type: VarIndex,
+    public_key_scalars: &[VarIndex; 3],
 ) -> VarIndex {
-    let (uid_amount, asset_type, public_key_scalars) = (
-        nullifier_input_vars.uid_amount,
-        nullifier_input_vars.asset_type,
-        nullifier_input_vars.public_key_scalars,
-    );
     let input_var = StateVar::new([
         uid_amount,
         asset_type,
@@ -287,7 +286,7 @@ pub(crate) fn nullify_in_cs(
     let cur = cs.rescue_hash(&input_var)[0];
     let input_var = StateVar::new([
         cur,
-        pubkey_scalars[2],
+        public_key_scalars[2],
         secret_key_scalars[0],
         secret_key_scalars[1],
     ]);
@@ -368,3 +367,6 @@ pub fn compute_merkle_root_variables(
     }
     node_var
 }
+
+/// The number of the Bulletproofs generators needed for anonymous transfer.
+pub const ANON_XFR_BP_GENS_LEN: usize = 2048;

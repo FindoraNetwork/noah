@@ -29,7 +29,7 @@ pub struct TurboCS<F> {
     pub public_vars_witness_indices: Vec<VarIndex>,
     /// only for verifier use.
     pub verifier_only: bool,
-    /// A private witness for the circuit, cleared after computing a proof
+    /// A private witness for the circuit, cleared after computing a proof.
     pub witness: Vec<F>,
 }
 
@@ -238,7 +238,7 @@ impl<F: Scalar> TurboCS<F> {
             self.wiring[i].push(*wire);
         }
         self.wiring[4].push(wire_out);
-        self.size += 1;
+        self.finish_new_gate();
     }
 
     /// Add an Add gate. (left, right, out).
@@ -281,7 +281,7 @@ impl<F: Scalar> TurboCS<F> {
         self.wiring[2].push(0);
         self.wiring[3].push(0);
         self.wiring[4].push(out_var);
-        self.size += 1;
+        self.finish_new_gate();
     }
 
     /// Add a variable (with actual value `value`) into the constraint system.
@@ -297,6 +297,72 @@ impl<F: Scalar> TurboCS<F> {
         for value in values.iter() {
             self.witness.push(*value);
         }
+    }
+
+    /// Check if the gate is satisfied.
+    #[cfg(feature = "debug")]
+    pub fn finish_new_gate(&mut self) {
+        self.size += 1;
+        // does not work for the gate created for input.
+
+        let wiring_0 = self.witness[self.wiring[0][self.size - 1]];
+        let wiring_1 = self.witness[self.wiring[1][self.size - 1]];
+        let wiring_2 = self.witness[self.wiring[2][self.size - 1]];
+        let wiring_3 = self.witness[self.wiring[3][self.size - 1]];
+        let wiring_4 = self.witness[self.wiring[4][self.size - 1]];
+
+        let selector_0 = self.selectors[0][self.size - 1];
+        let selector_1 = self.selectors[1][self.size - 1];
+        let selector_2 = self.selectors[2][self.size - 1];
+        let selector_3 = self.selectors[3][self.size - 1];
+        let selector_4 = self.selectors[4][self.size - 1];
+        let selector_5 = self.selectors[5][self.size - 1];
+        let selector_6 = self.selectors[6][self.size - 1];
+        let selector_7 = self.selectors[7][self.size - 1];
+        let selector_8 = self.selectors[8][self.size - 1];
+        let selector_9 = self.selectors[9][self.size - 1];
+        let selector_10 = self.selectors[10][self.size - 1];
+        let selector_11 = self.selectors[11][self.size - 1];
+
+        let add1 = selector_0.mul(wiring_0);
+        let add2 = selector_1.mul(wiring_1);
+        let add3 = selector_2.mul(wiring_2);
+        let add4 = selector_3.mul(wiring_3);
+        let mul1 = selector_4.mul(wiring_0.mul(wiring_1));
+        let mul2 = selector_5.mul(wiring_2.mul(wiring_3));
+        let constant = selector_6;
+        let five = &[5u64];
+        let hash1 = selector_7.mul(wiring_0.pow(five));
+        let hash2 = selector_8.mul(wiring_1.pow(five));
+        let hash3 = selector_9.mul(wiring_2.pow(five));
+        let hash4 = selector_10.mul(wiring_3.pow(five));
+        let out = selector_11.mul(wiring_4);
+        let mut r = add1;
+        r.add_assign(&add2);
+        r.add_assign(&add3);
+        r.add_assign(&add4);
+        r.add_assign(&mul1);
+        r.add_assign(&mul2);
+        r.add_assign(&hash1);
+        r.add_assign(&hash2);
+        r.add_assign(&hash3);
+        r.add_assign(&hash4);
+        r.add_assign(&constant);
+        r.sub_assign(&out);
+
+        if !r.is_zero() {
+            #[cfg(feature = "backtrace")]
+            {
+                println!("{}", std::backtrace::Backtrace::capture());
+            }
+            println!("cs constraint not satisfied.");
+        }
+    }
+    #[cfg(not(feature = "debug"))]
+    #[inline]
+    /// Increase the gate count without checking.
+    pub fn finish_new_gate(&mut self) {
+        self.size += 1;
     }
 
     /// Create an output variable and insert a linear combination gate.
@@ -454,7 +520,7 @@ impl<F: Scalar> TurboCS<F> {
         self.wiring[2].push(bit);
         self.wiring[3].push(var1);
         self.wiring[4].push(out_var);
-        self.size += 1;
+        self.finish_new_gate();
         out_var
     }
 
@@ -510,6 +576,21 @@ impl<F: Scalar> TurboCS<F> {
         for i in 0..N_WIRES_PER_GATE {
             self.wiring[i].push(var);
         }
+        self.finish_new_gate();
+    }
+
+    /// Add a constant constraint: wo = constant, for prepare_pi_variable.
+    pub fn insert_constant_gate_for_input(&mut self, var: VarIndex, constant: F) {
+        assert!(var < self.num_vars, "variable index out of bound");
+        let zero = F::zero();
+        self.push_add_selectors(zero, zero, zero, zero);
+        self.push_mul_selectors(zero, zero);
+        self.push_constant_selector(constant);
+        self.push_rescue_selectors(zero, zero, zero, zero);
+        self.push_out_selector(F::one());
+        for i in 0..N_WIRES_PER_GATE {
+            self.wiring[i].push(var);
+        }
         self.size += 1;
     }
 
@@ -517,7 +598,7 @@ impl<F: Scalar> TurboCS<F> {
     pub fn prepare_pi_variable(&mut self, var: VarIndex) {
         self.public_vars_witness_indices.push(var);
         self.public_vars_constraint_indices.push(self.size);
-        self.insert_constant_gate(var, F::zero());
+        self.insert_constant_gate_for_input(var, F::zero());
     }
 
     /// Pad the number of constraints to a power of two.

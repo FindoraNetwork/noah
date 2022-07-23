@@ -1,10 +1,10 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
 use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{BigInteger, FftField, FftParameters, Field, FpParameters, PrimeField};
+use ark_ff::{BigInteger, BigInteger320, FftField, FftParameters, Field, FpParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
-    fmt::{Debug, Display, Formatter},
+    fmt::{Debug, Formatter},
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     result::Result as StdResult,
     str::FromStr,
@@ -18,7 +18,7 @@ use ruc::eg;
 use wasm_bindgen::prelude::*;
 
 /// The number of bytes for a scalar value over BS-257
-pub const BS257_SCALAR_LEN: usize = 33;
+pub const BS257_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `bulletproofs_bs257::curve::bs257::Fr`
 #[wasm_bindgen]
@@ -27,15 +27,23 @@ pub struct BS257Scalar(pub(crate) Fr);
 
 impl Debug for BS257Scalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let biguint = BigUint::from(self.0.clone());
-        <BigUint as Display>::fmt(&biguint, f)
+        <BigUint as Debug>::fmt(
+            &<BigInteger320 as Into<BigUint>>::into(self.0.into_repr()),
+            f,
+        )
     }
 }
 
 /// The wrapped struct for `bulletproofs_bs257::curve::bs257::G1Projective`
 #[wasm_bindgen]
-#[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Default, Clone, PartialEq, Eq)]
 pub struct BS257G1(pub(crate) G1Projective);
+
+impl Debug for BS257G1 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0.into_affine(), f)
+    }
+}
 
 impl FromStr for BS257Scalar {
     type Err = AlgebraError;

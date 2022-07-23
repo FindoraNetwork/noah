@@ -1,4 +1,5 @@
 use crate::anon_xfr::{
+    commit, commit_in_cs,
     keys::AXfrPubKey,
     structs::{AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecord, OpenAnonAssetRecordBuilder},
     AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
@@ -17,10 +18,7 @@ use zei_algebra::{
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
 use zei_crypto::{
-    basic::{
-        pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
-        rescue::RescueInstance,
-    },
+    basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_chaum_pedersen::{
         prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
         DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
@@ -145,30 +143,22 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     let point_p = pc_gens.commit(x, gamma);
     let point_q = pc_gens.commit(y, delta);
 
-    let z_randomizer = oabar.blind;
-    let z_instance = RescueInstance::<BLSScalar>::new();
-
     let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
     let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-    let z = {
-        let cur = z_instance.rescue(&[
-            z_randomizer,
-            x_in_bls12_381,
-            y_in_bls12_381,
-            BLSScalar::zero(),
-        ])[0];
-        z_instance.rescue(&[
-            cur,
-            abar_pubkey.0.get_x(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-        ])[0]
-    };
+    let comm = commit(abar_pubkey, &oabar.blind, oabar_amount, &obar.asset_type)?;
+
+    let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+    // important: address folding relies significantly on the Fiat-Shamir transform.
+    transcript.append_message(b"commitment", &comm.to_bytes());
 
     // 3. Compute the delegated Chaum-Pedersen proof.
     let (delegated_cp_proof, inspection, beta, lambda) = prove_delegated_chaum_pedersen(
-        prng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
+        prng,
+        &vec![(x, gamma), (y, delta)],
+        &pc_gens,
+        &vec![point_p, point_q],
+        &mut transcript,
     )
     .c(d!())?;
 
@@ -179,7 +169,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         x_in_bls12_381,
         y_in_bls12_381,
         oabar.blind,
-        abar_pubkey.0.get_x(),
+        abar_pubkey,
         &delegated_cp_proof,
         &inspection,
         &beta,
@@ -240,13 +230,17 @@ pub(crate) fn verify_bar_to_abar(
         }
     };
 
+    let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+
+    // important: address folding relies significantly on the Fiat-Shamir transform.
+    transcript.append_message(b"commitment", &abar.commitment.to_bytes());
+
     // 2. Verify the delegated Chaum-Pedersen proof.
     let (beta, lambda) = verify_delegated_chaum_pedersen(
         &pc_gens,
-        &com_amount,
-        &com_asset_type,
-        &abar.commitment,
+        &vec![com_amount, com_asset_type],
         &proof.0,
+        &mut transcript,
     )
     .c(d!())?;
 
@@ -261,7 +255,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
     amount: BLSScalar,
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
-    pubkey_x: BLSScalar,
+    pubkey: &AXfrPubKey,
     delegated_cp_proof: &DelegatedChaumPedersenProof<
         RistrettoScalar,
         RistrettoPoint,
@@ -280,7 +274,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
         amount,
         asset_type,
         blind_hash,
-        pubkey_x,
+        pubkey,
         delegated_cp_proof,
         inspection,
         beta,
@@ -326,7 +320,8 @@ pub(crate) fn verify_inspection(
     let beta_lambda_sim_fr =
         SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
 
-    let s1_plus_lambda_s2 = proof_zk_part.s_1 + proof_zk_part.s_2 * lambda;
+    let s1_plus_lambda_s2 =
+        proof_zk_part.response_scalars[0].0 + proof_zk_part.response_scalars[1].0 * lambda;
     let s1_plus_lambda_s2_sim_fr =
         SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
@@ -351,7 +346,7 @@ pub(crate) fn build_bar_to_abar_cs(
     amount: BLSScalar,
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
-    pubkey_x: BLSScalar,
+    pubkey: &AXfrPubKey,
     proof: &DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     non_zk_state: &DelegatedChaumPedersenInspection<
         RistrettoScalar,
@@ -376,17 +371,27 @@ pub(crate) fn build_bar_to_abar_cs(
     let amount_var = cs.new_variable(amount);
     let at_var = cs.new_variable(asset_type);
     let blind_hash_var = cs.new_variable(blind_hash);
-    let pubkey_x_var = cs.new_variable(pubkey_x);
+
+    let public_key_scalars = pubkey.get_public_key_scalars().unwrap();
+    let public_key_scalars_vars = [
+        cs.new_variable(public_key_scalars[0]),
+        cs.new_variable(public_key_scalars[1]),
+        cs.new_variable(public_key_scalars[2]),
+    ];
 
     // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2.
-    let x_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&non_zk_state.x.to_bytes()));
-    let y_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&non_zk_state.y.to_bytes()));
-    let a_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&non_zk_state.a.to_bytes()));
-    let b_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&non_zk_state.b.to_bytes()));
+    let x_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+        &non_zk_state.committed_data_and_randomizer[0].0.to_bytes(),
+    ));
+    let y_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+        &non_zk_state.committed_data_and_randomizer[1].0.to_bytes(),
+    ));
+    let a_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+        &non_zk_state.committed_data_and_randomizer[0].1.to_bytes(),
+    ));
+    let b_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+        &non_zk_state.committed_data_and_randomizer[1].1.to_bytes(),
+    ));
     let comm = proof.inspection_comm;
     let r = non_zk_state.r;
 
@@ -396,14 +401,14 @@ pub(crate) fn build_bar_to_abar_cs(
     let beta_lambda = *beta * lambda;
     let beta_lambda_sim_fr = SimFr::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
 
-    let s1_plus_lambda_s2 = proof.s_1 + proof.s_2 * lambda;
+    let s1_plus_lambda_s2 = proof.response_scalars[0].0 + proof.response_scalars[1].0 * lambda;
     let s1_plus_lambda_s2_sim_fr =
         SimFr::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
-    let x_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
-    let y_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
-    let a_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
-    let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
+    let (x_sim_fr_var, _) = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
+    let (y_sim_fr_var, _) = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
+    let (a_sim_fr_var, _) = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
+    let (b_sim_fr_var, _) = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
     let comm_var = cs.new_variable(comm);
     let r_var = cs.new_variable(r);
     let beta_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_sim_fr);
@@ -430,7 +435,7 @@ pub(crate) fn build_bar_to_abar_cs(
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <&BLSScalar as Into<BigUint>>::into(limb)
+                <BLSScalar as Into<BigUint>>::into(*limb)
                     .shl(SimFrParamsRistretto::BIT_PER_LIMB * i),
             );
         }
@@ -556,15 +561,13 @@ pub(crate) fn build_bar_to_abar_cs(
     }
 
     // 7. Rescue commitment
-    let rescue_comm_var = {
-        let cur = cs.rescue_hash(&StateVar::new([
-            blind_hash_var,
-            amount_var,
-            at_var,
-            zero_var,
-        ]))[0];
-        cs.rescue_hash(&StateVar::new([cur, pubkey_x_var, zero_var, zero_var]))[0]
-    };
+    let rescue_comm_var = commit_in_cs(
+        &mut cs,
+        blind_hash_var,
+        amount_var,
+        at_var,
+        &public_key_scalars_vars,
+    );
 
     // prepare public inputs.
     cs.prepare_pi_variable(rescue_comm_var);
@@ -592,9 +595,11 @@ pub(crate) fn build_bar_to_abar_cs(
 
 #[cfg(test)]
 mod test {
+    use crate::anon_xfr::bar_to_abar::BAR_TO_ABAR_TRANSCRIPT;
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
         bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
+        commit,
         structs::{AnonAssetRecord, OpenAnonAssetRecordBuilder},
     };
     use crate::setup::{ProverParams, VerifierParams};
@@ -603,8 +608,9 @@ mod test {
         sig::{XfrKeyPair, XfrPublicKey},
         structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo},
     };
+    use merlin::Transcript;
     use num_bigint::BigUint;
-    use num_traits::{One, Zero};
+    use num_traits::One;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use std::ops::AddAssign;
@@ -612,7 +618,6 @@ mod test {
     use zei_algebra::ristretto::RistrettoScalar;
     use zei_algebra::traits::Scalar;
     use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
-    use zei_crypto::basic::rescue::RescueInstance;
     use zei_crypto::delegated_chaum_pedersen::prove_delegated_chaum_pedersen;
     use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 
@@ -717,11 +722,15 @@ mod test {
         let pc_gens = PedersenCommitmentRistretto::default();
 
         // 1. compute the parameters
-        let amount = BLSScalar::from(71u32);
-        let asset_type = BLSScalar::from(52u32);
+        let amount = 71u64;
+        let asset_type = AssetType::from_identical_byte(1u8);
 
-        let x = RistrettoScalar::from_bytes(&amount.to_bytes()).unwrap();
-        let y = RistrettoScalar::from_bytes(&asset_type.to_bytes()).unwrap();
+        let amount_bls12_381 = BLSScalar::from(amount);
+        let asset_type_bls12_381: BLSScalar = asset_type.as_scalar();
+
+        let x = RistrettoScalar::from_bytes(&amount_bls12_381.to_bytes()).unwrap();
+        let y: RistrettoScalar =
+            RistrettoScalar::from_bytes(&asset_type_bls12_381.to_bytes()).unwrap();
 
         let gamma = RistrettoScalar::random(&mut rng);
         let delta = RistrettoScalar::random(&mut rng);
@@ -730,35 +739,31 @@ mod test {
         let point_q = pc_gens.commit(y, delta);
 
         let z_randomizer = BLSScalar::random(&mut rng);
-        let z_instance = RescueInstance::<BLSScalar>::new();
+        let keypair = AXfrKeyPair::generate(&mut rng);
+        let pubkey = keypair.get_public_key();
 
-        let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
-        let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
-
-        let pubkey_x = BLSScalar::random(&mut rng);
-
-        let z = {
-            let cur = z_instance.rescue(&[
-                z_randomizer,
-                x_in_bls12_381,
-                y_in_bls12_381,
-                BLSScalar::zero(),
-            ])[0];
-            z_instance.rescue(&[cur, pubkey_x, BLSScalar::zero(), BLSScalar::zero()])[0]
-        };
+        let z = commit(&pubkey, &z_randomizer, 71u64, &asset_type).unwrap();
 
         // 2. compute the ZK part of the proof
+
+        let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+        transcript.append_message(b"commitment", &z.to_bytes());
+
         let (proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
-            &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
+            &mut rng,
+            &vec![(x, gamma), (y, delta)],
+            &pc_gens,
+            &vec![point_p, point_q],
+            &mut transcript,
         )
         .unwrap();
 
         // compute cs
         let (mut cs, _) = super::build_bar_to_abar_cs(
-            amount,
-            asset_type,
+            amount_bls12_381,
+            asset_type_bls12_381,
             z_randomizer,
-            pubkey_x,
+            &pubkey,
             &proof,
             &non_zk_state,
             &beta,
@@ -779,7 +784,7 @@ mod test {
         let beta_lambda_sim_fr =
             SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
 
-        let s1_plus_lambda_s2 = proof.s_1 + proof.s_2 * lambda;
+        let s1_plus_lambda_s2 = proof.response_scalars[0].0 + proof.response_scalars[1].0 * lambda;
         let s1_plus_lambda_s2_sim_fr = SimFr::<SimFrParamsRistretto>::from(
             &BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()),
         );

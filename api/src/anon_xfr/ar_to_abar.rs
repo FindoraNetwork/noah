@@ -96,7 +96,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         amount: oabar.get_amount(),
         blind: oabar.blind.clone(),
         asset_type: oabar.asset_type.as_scalar(),
-        pubkey_x: oabar.pub_key.0.get_x(),
+        public_key: abar_pubkey.clone(),
     };
 
     let mut transcript = Transcript::new(AR_TO_ABAR_TRANSCRIPT);
@@ -159,20 +159,28 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeWitness) -> (TurboPlonkCS, usize) {
     cs.prepare_pi_variable(ar_asset_var);
 
     let blind = cs.new_variable(payee_data.blind);
-    let pubkey_x = cs.new_variable(payee_data.pubkey_x);
+
+    let public_key_scalars = payee_data.public_key.get_public_key_scalars().unwrap();
+    let public_key_scalars_vars = [
+        cs.new_variable(public_key_scalars[0]),
+        cs.new_variable(public_key_scalars[1]),
+        cs.new_variable(public_key_scalars[2]),
+    ];
+
     let payee = PayeeWitnessVars {
         amount: ar_amount_var,
         blind,
         asset_type: ar_asset_var,
-        pubkey_x,
+        public_key_scalars: public_key_scalars_vars.clone(),
     };
+
     // commitment
     let com_abar_out_var = commit_in_cs(
         &mut cs,
         payee.blind,
         payee.amount,
         payee.asset_type,
-        payee.pubkey_x,
+        &public_key_scalars_vars,
     );
 
     // prepare the public input for the output commitment
