@@ -455,7 +455,7 @@ impl<'a> MulAssign<&'a CanaanScalar> for CanaanG1 {
 #[cfg(test)]
 mod canaan_groups_test {
     use crate::{
-        canaan::{CanaanScalar, CanaanG1},
+        canaan::{CanaanG1, CanaanScalar},
         prelude::*,
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };

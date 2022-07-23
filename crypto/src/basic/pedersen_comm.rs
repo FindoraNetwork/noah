@@ -1,5 +1,5 @@
 use curve25519_dalek::traits::MultiscalarMul;
-use zei_algebra::canaan::{CanaanScalar, CanaanG1};
+use zei_algebra::canaan::{CanaanG1, CanaanScalar};
 use zei_algebra::ops::{Add, Mul};
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use zei_algebra::traits::Group;
