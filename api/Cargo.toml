@@ -105,7 +105,7 @@ default = [
     'std',
     'u64_backend',
 ]
-std = ['curve25519-dalek/std', 'bulletproofs/std']
+std = ['curve25519-dalek/std', 'bulletproofs/std', 'bulletproofs-canaan/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',
