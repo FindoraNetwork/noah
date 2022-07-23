@@ -73,7 +73,7 @@ pub struct AXfrBody {
     pub owner_memos: Vec<AxfrOwnerMemo>,
 }
 
-/// Build an anonymous transfer note without generating the proof and applying non-malleability protection.
+/// Build an anonymous transfer note without generating the proof.
 pub fn init_anon_xfr_note(
     inputs: &[OpenAnonAssetRecord],
     outputs: &[OpenAnonAssetRecord],

@@ -55,7 +55,7 @@ pub struct AbarToBarNote {
     pub folding_instance: AXfrAddressFoldingInstance,
 }
 
-/// An anonymous-to-confidential note without the proof or non-malleability tag..
+/// An anonymous-to-confidential note without the proof.
 #[derive(Clone, Debug)]
 pub struct AbarToBarPreNote {
     /// The anonymous-to-confidential body.
