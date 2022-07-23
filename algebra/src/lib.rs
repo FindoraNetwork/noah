@@ -23,8 +23,8 @@
 /// Module for the BLS12-381 curve
 pub mod bls12_381;
 
-/// Module for the BS-257 curve
-pub mod bs257;
+/// Module for the Canaan curve
+pub mod canaan;
 
 /// Module for the secp256k1 curve
 pub mod secp256k1;

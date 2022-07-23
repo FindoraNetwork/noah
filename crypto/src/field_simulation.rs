@@ -83,11 +83,11 @@ impl SimFrParams for SimFrParamsRistretto {
     }
 }
 
-/// The parameters for field simulation for BS-257.
+/// The parameters for field simulation for the Canaan scalar field.
 #[derive(Clone, Default, Eq, PartialEq, Debug)]
-pub struct SimFrParamsBS257;
+pub struct SimFrParamsCanaan;
 
-impl SimFrParams for SimFrParamsBS257 {
+impl SimFrParams for SimFrParamsCanaan {
     const NUM_OF_LIMBS: usize = 6;
     const BIT_PER_LIMB: usize = 44;
     const BIT_IN_TOP_LIMB: usize = 36;
@@ -604,19 +604,19 @@ mod test_ristretto {
 }
 
 #[cfg(test)]
-mod test_bs257 {
-    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsBS257};
+mod test_canaan {
+    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsCanaan};
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
     use rand_chacha::ChaCha20Rng;
     use zei_algebra::prelude::*;
 
-    type SimFrTest = SimFr<SimFrParamsBS257>;
+    type SimFrTest = SimFr<SimFrParamsCanaan>;
 
     #[test]
     fn test_sim_fr_biguint_conversion() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -630,7 +630,7 @@ mod test_bs257 {
     #[test]
     fn test_sub() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -651,7 +651,7 @@ mod test_bs257 {
     #[test]
     fn test_mul() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -680,7 +680,7 @@ mod test_bs257 {
     #[test]
     fn test_enforce_zero() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -707,7 +707,7 @@ mod test_bs257 {
     #[should_panic]
     fn test_enforce_zero_panic() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let r_biguint = SimFrParamsBS257::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
 
         let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
         let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);

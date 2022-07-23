@@ -1,11 +1,11 @@
 //! Module for the Bulletproof scalar mul proof scheme
 
-use crate::basic::pedersen_comm::PedersenCommitmentBS257;
+use crate::basic::pedersen_comm::PedersenCommitmentCanaan;
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
-use bulletproofs_bs257::BulletproofGens;
-use bulletproofs_bs257::{
-    curve::bs257::G1Affine as G1AffineBig,
+use bulletproofs_canaan::BulletproofGens;
+use bulletproofs_canaan::{
+    curve::canaan::G1Affine as G1AffineBig,
     curve::secp256k1::{Fq, FrParameters, G1Affine},
     r1cs::{
         LinearCombination, Prover, R1CSProof, RandomizableConstraintSystem, Variable, Verifier,
@@ -16,9 +16,9 @@ use merlin::Transcript;
 use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha3::Sha3_512;
-use zei_algebra::bs257::BS257Scalar;
+use zei_algebra::canaan::CanaanScalar;
 use zei_algebra::{
-    bs257::BS257G1,
+    canaan::CanaanG1,
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
 };
@@ -254,8 +254,8 @@ impl ScalarMulProof {
         transcript: &'a mut Transcript,
         public_key: &SECP256K1G1,
         secret_key: &SECP256K1Scalar,
-    ) -> Result<(ScalarMulProof, Vec<BS257G1>, Vec<BS257Scalar>)> {
-        let pc_gens = PedersenCommitmentBS257::default();
+    ) -> Result<(ScalarMulProof, Vec<CanaanG1>, Vec<CanaanScalar>)> {
+        let pc_gens = PedersenCommitmentCanaan::default();
 
         let public_key = public_key.get_raw();
         let secret_key = secret_key.get_raw();
@@ -269,7 +269,7 @@ impl ScalarMulProof {
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
 
         // 3. Initialize the prover.
-        let pc_gens_for_prover = bulletproofs_bs257::PedersenGens::from(&pc_gens);
+        let pc_gens_for_prover = bulletproofs_canaan::PedersenGens::from(&pc_gens);
         let mut prover = Prover::new(&pc_gens_for_prover, transcript);
 
         // 4. Allocate `public_key`.
@@ -305,14 +305,14 @@ impl ScalarMulProof {
         Ok((
             ScalarMulProof(proof),
             vec![
-                BS257G1::from_raw(x_comm.clone()),
-                BS257G1::from_raw(y_comm.clone()),
-                BS257G1::from_raw(secret_key_comm.clone()),
+                CanaanG1::from_raw(x_comm.clone()),
+                CanaanG1::from_raw(y_comm.clone()),
+                CanaanG1::from_raw(secret_key_comm.clone()),
             ],
             vec![
-                BS257Scalar::from_raw(x_blinding),
-                BS257Scalar::from_raw(y_blinding),
-                BS257Scalar::from_raw(secret_key_blinding),
+                CanaanScalar::from_raw(x_blinding),
+                CanaanScalar::from_raw(y_blinding),
+                CanaanScalar::from_raw(secret_key_blinding),
             ],
         ))
     }
@@ -324,9 +324,9 @@ impl ScalarMulProof {
         &self,
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
-        commitments: &Vec<BS257G1>,
+        commitments: &Vec<CanaanG1>,
     ) -> Result<()> {
-        let pc_gens = PedersenCommitmentBS257::default();
+        let pc_gens = PedersenCommitmentCanaan::default();
         let commitments = commitments
             .iter()
             .map(|x| x.get_raw())
@@ -353,7 +353,7 @@ impl ScalarMulProof {
         )
         .c(d!(ZeiError::R1CSProofError))?;
 
-        let pc_gens_for_verifier = bulletproofs_bs257::PedersenGens::from(&pc_gens);
+        let pc_gens_for_verifier = bulletproofs_canaan::PedersenGens::from(&pc_gens);
         verifier
             .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
             .c(d!(ZeiError::R1CSProofError))?;
@@ -363,7 +363,7 @@ impl ScalarMulProof {
 
 #[test]
 fn scalar_mul_test() {
-    use bulletproofs_bs257::curve::secp256k1::Fr;
+    use bulletproofs_canaan::curve::secp256k1::Fr;
 
     let bp_gens = BulletproofGens::new(2048, 1);
 

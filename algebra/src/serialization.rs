@@ -1,8 +1,8 @@
-use crate::bs257::BS257G1;
+use crate::canaan::CanaanG1;
 use crate::secp256k1::{SECP256K1Scalar, SECP256K1G1};
 use crate::{
     bls12_381::{BLSGt, BLSScalar, BLSG1, BLSG2},
-    bs257::BS257Scalar,
+    canaan::CanaanScalar,
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
 };
@@ -27,7 +27,7 @@ macro_rules! to_from_bytes_scalar {
 
 to_from_bytes_scalar!(RistrettoScalar);
 to_from_bytes_scalar!(BLSScalar);
-to_from_bytes_scalar!(BS257Scalar);
+to_from_bytes_scalar!(CanaanScalar);
 to_from_bytes_scalar!(SECP256K1Scalar);
 
 impl ZeiFromToBytes for CompressedRistretto {
@@ -60,7 +60,7 @@ serialize_deserialize!(CompressedRistretto);
 serialize_deserialize!(CompressedEdwardsY);
 serialize_deserialize!(RistrettoScalar);
 serialize_deserialize!(BLSScalar);
-serialize_deserialize!(BS257Scalar);
+serialize_deserialize!(CanaanScalar);
 serialize_deserialize!(SECP256K1Scalar);
 
 macro_rules! to_from_bytes_group {
@@ -81,14 +81,14 @@ to_from_bytes_group!(RistrettoPoint);
 to_from_bytes_group!(BLSG1);
 to_from_bytes_group!(BLSG2);
 to_from_bytes_group!(BLSGt);
-to_from_bytes_group!(BS257G1);
+to_from_bytes_group!(CanaanG1);
 to_from_bytes_group!(SECP256K1G1);
 
 serialize_deserialize!(RistrettoPoint);
 serialize_deserialize!(BLSG1);
 serialize_deserialize!(BLSG2);
 serialize_deserialize!(BLSGt);
-serialize_deserialize!(BS257G1);
+serialize_deserialize!(CanaanG1);
 serialize_deserialize!(SECP256K1G1);
 
 /// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
@@ -120,12 +120,12 @@ impl ZeiFromToBytes for bulletproofs::r1cs::R1CSProof {
     }
 }
 
-impl ZeiFromToBytes for bulletproofs_bs257::r1cs::R1CSProof {
+impl ZeiFromToBytes for bulletproofs_canaan::r1cs::R1CSProof {
     fn zei_to_bytes(&self) -> Vec<u8> {
         self.to_bytes().unwrap()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<bulletproofs_bs257::r1cs::R1CSProof> {
-        bulletproofs_bs257::r1cs::R1CSProof::from_bytes(bytes)
+    fn zei_from_bytes(bytes: &[u8]) -> Result<bulletproofs_canaan::r1cs::R1CSProof> {
+        bulletproofs_canaan::r1cs::R1CSProof::from_bytes(bytes)
             .map_err(|_| eg!(ZeiError::DeserializationError))
     }
 }

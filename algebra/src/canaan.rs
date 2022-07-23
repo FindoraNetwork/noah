@@ -10,22 +10,22 @@ use ark_std::{
     str::FromStr,
     One, UniformRand, Zero,
 };
-use bulletproofs_bs257::curve::bs257::{Fr, FrParameters, G1Affine, G1Projective};
+use bulletproofs_canaan::curve::canaan::{Fr, FrParameters, G1Affine, G1Projective};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
 use ruc::eg;
 use wasm_bindgen::prelude::*;
 
-/// The number of bytes for a scalar value over BS-257
-pub const BS257_SCALAR_LEN: usize = 32;
+/// The number of bytes for a scalar value over the Canaan curve
+pub const CANAAN_SCALAR_LEN: usize = 32;
 
-/// The wrapped struct for `bulletproofs_bs257::curve::bs257::Fr`
+/// The wrapped struct for `bulletproofs_canaan::curve::canaan::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
-pub struct BS257Scalar(pub(crate) Fr);
+pub struct CanaanScalar(pub(crate) Fr);
 
-impl Debug for BS257Scalar {
+impl Debug for CanaanScalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         <BigUint as Debug>::fmt(
             &<BigInteger320 as Into<BigUint>>::into(self.0.into_repr()),
@@ -34,18 +34,18 @@ impl Debug for BS257Scalar {
     }
 }
 
-/// The wrapped struct for `bulletproofs_bs257::curve::bs257::G1Projective`
+/// The wrapped struct for `bulletproofs_canaan::curve::canaan::G1Projective`
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq)]
-pub struct BS257G1(pub(crate) G1Projective);
+pub struct CanaanG1(pub(crate) G1Projective);
 
-impl Debug for BS257G1 {
+impl Debug for CanaanG1 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.0.into_affine(), f)
     }
 }
 
-impl FromStr for BS257Scalar {
+impl FromStr for CanaanScalar {
     type Err = AlgebraError;
 
     fn from_str(string: &str) -> StdResult<Self, AlgebraError> {
@@ -59,14 +59,14 @@ impl FromStr for BS257Scalar {
     }
 }
 
-impl One for BS257Scalar {
+impl One for CanaanScalar {
     #[inline]
     fn one() -> Self {
-        BS257Scalar(Fr::one())
+        CanaanScalar(Fr::one())
     }
 }
 
-impl Zero for BS257Scalar {
+impl Zero for CanaanScalar {
     #[inline]
     fn zero() -> Self {
         Self(Fr::zero())
@@ -78,8 +78,8 @@ impl Zero for BS257Scalar {
     }
 }
 
-impl Add for BS257Scalar {
-    type Output = BS257Scalar;
+impl Add for CanaanScalar {
+    type Output = CanaanScalar;
 
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
@@ -87,8 +87,8 @@ impl Add for BS257Scalar {
     }
 }
 
-impl Mul for BS257Scalar {
-    type Output = BS257Scalar;
+impl Mul for CanaanScalar {
+    type Output = CanaanScalar;
 
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
@@ -96,8 +96,8 @@ impl Mul for BS257Scalar {
     }
 }
 
-impl<'a> Add<&'a BS257Scalar> for BS257Scalar {
-    type Output = BS257Scalar;
+impl<'a> Add<&'a CanaanScalar> for CanaanScalar {
+    type Output = CanaanScalar;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -105,15 +105,15 @@ impl<'a> Add<&'a BS257Scalar> for BS257Scalar {
     }
 }
 
-impl<'a> AddAssign<&'a BS257Scalar> for BS257Scalar {
+impl<'a> AddAssign<&'a CanaanScalar> for CanaanScalar {
     #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         (self.0).add_assign(&rhs.0);
     }
 }
 
-impl<'a> Sub<&'a BS257Scalar> for BS257Scalar {
-    type Output = BS257Scalar;
+impl<'a> Sub<&'a CanaanScalar> for CanaanScalar {
+    type Output = CanaanScalar;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -121,15 +121,15 @@ impl<'a> Sub<&'a BS257Scalar> for BS257Scalar {
     }
 }
 
-impl<'a> SubAssign<&'a BS257Scalar> for BS257Scalar {
+impl<'a> SubAssign<&'a CanaanScalar> for CanaanScalar {
     #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         (self.0).sub_assign(&rhs.0);
     }
 }
 
-impl<'a> Mul<&'a BS257Scalar> for BS257Scalar {
-    type Output = BS257Scalar;
+impl<'a> Mul<&'a CanaanScalar> for CanaanScalar {
+    type Output = CanaanScalar;
 
     #[inline]
     fn mul(self, rhs: &Self) -> Self::Output {
@@ -137,15 +137,15 @@ impl<'a> Mul<&'a BS257Scalar> for BS257Scalar {
     }
 }
 
-impl<'a> MulAssign<&'a BS257Scalar> for BS257Scalar {
+impl<'a> MulAssign<&'a CanaanScalar> for CanaanScalar {
     #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         (self.0).mul_assign(&rhs.0);
     }
 }
 
-impl Neg for BS257Scalar {
-    type Output = BS257Scalar;
+impl Neg for CanaanScalar {
+    type Output = CanaanScalar;
 
     #[inline]
     fn neg(self) -> Self {
@@ -153,21 +153,21 @@ impl Neg for BS257Scalar {
     }
 }
 
-impl From<u32> for BS257Scalar {
+impl From<u32> for CanaanScalar {
     #[inline]
     fn from(value: u32) -> Self {
         Self::from(value as u64)
     }
 }
 
-impl From<u64> for BS257Scalar {
+impl From<u64> for CanaanScalar {
     #[inline]
     fn from(value: u64) -> Self {
         Self(Fr::from(value))
     }
 }
 
-impl Scalar for BS257Scalar {
+impl Scalar for CanaanScalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         Self(Fr::rand(rng))
@@ -184,7 +184,7 @@ impl Scalar for BS257Scalar {
 
     #[inline]
     fn capacity() -> usize {
-        bulletproofs_bs257::curve::bs257::FrParameters::CAPACITY as usize
+        bulletproofs_canaan::curve::canaan::FrParameters::CAPACITY as usize
     }
 
     #[inline]
@@ -224,12 +224,12 @@ impl Scalar for BS257Scalar {
 
     #[inline]
     fn bytes_len() -> usize {
-        BS257_SCALAR_LEN
+        CANAAN_SCALAR_LEN
     }
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        self.0.into_repr().to_bytes_le()[..BS257_SCALAR_LEN].to_vec()
+        self.0.into_repr().to_bytes_le()[..CANAAN_SCALAR_LEN].to_vec()
     }
 
     #[inline]
@@ -260,7 +260,7 @@ impl Scalar for BS257Scalar {
     }
 }
 
-impl BS257Scalar {
+impl CanaanScalar {
     /// Get the raw data.
     pub fn get_raw(&self) -> Fr {
         self.0.clone()
@@ -272,7 +272,7 @@ impl BS257Scalar {
     }
 }
 
-impl Neg for BS257G1 {
+impl Neg for CanaanG1 {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -280,8 +280,8 @@ impl Neg for BS257G1 {
     }
 }
 
-impl Group for BS257G1 {
-    type ScalarType = BS257Scalar;
+impl Group for CanaanG1 {
+    type ScalarType = CanaanScalar;
     const COMPRESSED_LEN: usize = 33;
 
     #[inline]
@@ -301,7 +301,7 @@ impl Group for BS257G1 {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&BS257Scalar::random(prng))
+        Self::get_base().mul(&CanaanScalar::random(prng))
     }
 
     #[inline]
@@ -377,7 +377,7 @@ impl Group for BS257G1 {
     }
 }
 
-impl Into<BigUint> for BS257Scalar {
+impl Into<BigUint> for CanaanScalar {
     #[inline]
     fn into(self) -> BigUint {
         let value: BigUint = self.0.into_repr().into();
@@ -385,14 +385,14 @@ impl Into<BigUint> for BS257Scalar {
     }
 }
 
-impl<'a> From<&'a BigUint> for BS257Scalar {
+impl<'a> From<&'a BigUint> for CanaanScalar {
     #[inline]
     fn from(value: &'a BigUint) -> Self {
         Self(Fr::from(value.clone()))
     }
 }
 
-impl BS257G1 {
+impl CanaanG1 {
     /// Get the raw data.
     pub fn get_raw(&self) -> G1Affine {
         self.0.into_affine()
@@ -404,8 +404,8 @@ impl BS257G1 {
     }
 }
 
-impl<'a> Add<&'a BS257G1> for BS257G1 {
-    type Output = BS257G1;
+impl<'a> Add<&'a CanaanG1> for CanaanG1 {
+    type Output = CanaanG1;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -413,8 +413,8 @@ impl<'a> Add<&'a BS257G1> for BS257G1 {
     }
 }
 
-impl<'a> Sub<&'a BS257G1> for BS257G1 {
-    type Output = BS257G1;
+impl<'a> Sub<&'a CanaanG1> for CanaanG1 {
+    type Output = CanaanG1;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -422,60 +422,60 @@ impl<'a> Sub<&'a BS257G1> for BS257G1 {
     }
 }
 
-impl<'a> Mul<&'a BS257Scalar> for BS257G1 {
-    type Output = BS257G1;
+impl<'a> Mul<&'a CanaanScalar> for CanaanG1 {
+    type Output = CanaanG1;
 
     #[inline]
-    fn mul(self, rhs: &BS257Scalar) -> Self::Output {
+    fn mul(self, rhs: &CanaanScalar) -> Self::Output {
         Self(self.0.mul(&rhs.0.into_repr()))
     }
 }
 
-impl<'a> AddAssign<&'a BS257G1> for BS257G1 {
+impl<'a> AddAssign<&'a CanaanG1> for CanaanG1 {
     #[inline]
-    fn add_assign(&mut self, rhs: &'a BS257G1) {
+    fn add_assign(&mut self, rhs: &'a CanaanG1) {
         self.0.add_assign(&rhs.0)
     }
 }
 
-impl<'a> SubAssign<&'a BS257G1> for BS257G1 {
+impl<'a> SubAssign<&'a CanaanG1> for CanaanG1 {
     #[inline]
-    fn sub_assign(&mut self, rhs: &'a BS257G1) {
+    fn sub_assign(&mut self, rhs: &'a CanaanG1) {
         self.0.sub_assign(&rhs.0)
     }
 }
 
-impl<'a> MulAssign<&'a BS257Scalar> for BS257G1 {
+impl<'a> MulAssign<&'a CanaanScalar> for CanaanG1 {
     #[inline]
-    fn mul_assign(&mut self, rhs: &'a BS257Scalar) {
+    fn mul_assign(&mut self, rhs: &'a CanaanScalar) {
         self.0.mul_assign(rhs.0.clone())
     }
 }
 
 #[cfg(test)]
-mod bs257_groups_test {
+mod canaan_groups_test {
     use crate::{
-        bs257::{BS257Scalar, BS257G1},
+        canaan::{CanaanScalar, CanaanG1},
         prelude::*,
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
     use ark_ec::ProjectiveCurve;
-    use bulletproofs_bs257::curve::bs257::G1Affine;
+    use bulletproofs_canaan::curve::canaan::G1Affine;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_scalar_ops() {
-        test_scalar_operations::<BS257Scalar>();
+        test_scalar_operations::<CanaanScalar>();
     }
 
     #[test]
     fn scalar_deser() {
-        test_scalar_serialization::<BS257Scalar>();
+        test_scalar_serialization::<CanaanScalar>();
     }
 
     #[test]
     fn scalar_from_to_bytes() {
-        let small_value = BS257Scalar::from(165747u32);
+        let small_value = CanaanScalar::from(165747u32);
         let small_value_bytes = small_value.to_bytes();
         let expected_small_value_bytes: [u8; 32] = [
             115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -483,7 +483,7 @@ mod bs257_groups_test {
         ];
         assert_eq!(small_value_bytes, expected_small_value_bytes);
 
-        let small_value_from_bytes = BS257Scalar::from_bytes(&small_value_bytes).unwrap();
+        let small_value_from_bytes = CanaanScalar::from_bytes(&small_value_bytes).unwrap();
         assert_eq!(small_value_from_bytes, small_value);
     }
 
@@ -491,12 +491,12 @@ mod bs257_groups_test {
     fn curve_points_respresentation_of_g1() {
         let mut rng = ChaCha20Rng::from_entropy();
 
-        let g1 = BS257G1::get_base();
-        let s1 = BS257Scalar::from(50 + rng.next_u32() % 50);
+        let g1 = CanaanG1::get_base();
+        let s1 = CanaanScalar::from(50 + rng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = BS257G1::random(&mut rng);
+        let g1_prime = CanaanG1::random(&mut rng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -520,9 +520,9 @@ mod bs257_groups_test {
     fn test_serialization_of_points() {
         let mut rng = ChaCha20Rng::from_entropy();
 
-        let g1 = BS257G1::random(&mut rng);
+        let g1 = CanaanG1::random(&mut rng);
         let g1_bytes = g1.to_compressed_bytes();
-        let g1_recovered = BS257G1::from_compressed_bytes(&g1_bytes).unwrap();
+        let g1_recovered = CanaanG1::from_compressed_bytes(&g1_bytes).unwrap();
         assert_eq!(g1, g1_recovered);
     }
 }

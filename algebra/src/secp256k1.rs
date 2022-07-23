@@ -1,4 +1,4 @@
-use crate::bs257::BS257Scalar;
+use crate::canaan::CanaanScalar;
 use crate::errors::AlgebraError;
 use crate::prelude::*;
 use ark_ec::short_weierstrass_jacobian::GroupProjective;
@@ -12,7 +12,7 @@ use ark_std::{
     str::FromStr,
     One, UniformRand, Zero,
 };
-use bulletproofs_bs257::curve::secp256k1::{Fr, FrParameters, G1Affine, G1Projective};
+use bulletproofs_canaan::curve::secp256k1::{Fr, FrParameters, G1Affine, G1Projective};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -22,7 +22,7 @@ use wasm_bindgen::prelude::*;
 /// The number of bytes for a scalar value over secp256k1
 pub const SECP256K1_SCALAR_LEN: usize = 32;
 
-/// The wrapped struct for `bulletproofs_bs257::curve::secp256k1::Fr`
+/// The wrapped struct for `bulletproofs_canaan::curve::secp256k1::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct SECP256K1Scalar(pub(crate) Fr);
@@ -36,7 +36,7 @@ impl Debug for SECP256K1Scalar {
     }
 }
 
-/// The wrapped struct for `bulletproofs_bs257::curve::secp256k1::G1Projective`
+/// The wrapped struct for `bulletproofs_canaan::curve::secp256k1::G1Projective`
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq, Hash)]
 pub struct SECP256K1G1(pub(crate) G1Projective);
@@ -195,7 +195,7 @@ impl Scalar for SECP256K1Scalar {
 
     #[inline]
     fn capacity() -> usize {
-        bulletproofs_bs257::curve::secp256k1::FrParameters::CAPACITY as usize
+        bulletproofs_canaan::curve::secp256k1::FrParameters::CAPACITY as usize
     }
 
     #[inline]
@@ -284,17 +284,17 @@ impl SECP256K1Scalar {
 
 impl SECP256K1G1 {
     /// Obtain the x coordinate in the affine representation.
-    pub fn get_x(&self) -> BS257Scalar {
-        BS257Scalar((self.0.into_affine().x).clone())
+    pub fn get_x(&self) -> CanaanScalar {
+        CanaanScalar((self.0.into_affine().x).clone())
     }
 
     /// Obtain the y coordinate in the affine representation.
-    pub fn get_y(&self) -> BS257Scalar {
-        BS257Scalar((self.0.into_affine().y).clone())
+    pub fn get_y(&self) -> CanaanScalar {
+        CanaanScalar((self.0.into_affine().y).clone())
     }
 
-    /// Obtain a point using the x coordinate (which would be BS257Scalar).
-    pub fn get_point_from_x(x: &BS257Scalar) -> Result<Self> {
+    /// Obtain a point using the x coordinate (which would be CanaanScalar).
+    pub fn get_point_from_x(x: &CanaanScalar) -> Result<Self> {
         let point = G1Affine::get_point_from_x(x.0.clone(), false)
             .ok_or(eg!(ZeiError::DeserializationError))?
             .into_projective();
@@ -480,7 +480,7 @@ mod secp256k1_groups_test {
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
     use ark_ec::ProjectiveCurve;
-    use bulletproofs_bs257::curve::secp256k1::G1Affine;
+    use bulletproofs_canaan::curve::secp256k1::G1Affine;
     use rand_chacha::ChaCha20Rng;
 
     #[test]

@@ -64,8 +64,8 @@ version = '^0.3.0'
 default-features = false
 features = ['asm']
 
-[dependencies.bulletproofs-bs257]
-git = "https://github.com/FindoraNetwork/bulletproofs-bs257"
+[dependencies.bulletproofs-canaan]
+git = "https://github.com/FindoraNetwork/bulletproofs-canaan"
 default-features = false
 features = ["yoloproofs"]
 
@@ -81,7 +81,7 @@ default = [
     'std',
     'u64_backend',
 ]
-std = ['curve25519-dalek/std', 'bulletproofs-bs257/std']
+std = ['curve25519-dalek/std', 'bulletproofs-canaan/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',

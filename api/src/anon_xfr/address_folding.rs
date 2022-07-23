@@ -5,16 +5,16 @@ use merlin::Transcript;
 use num_bigint::BigUint;
 use rand_core::{CryptoRng, RngCore};
 use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::bs257::{BS257Scalar, BS257G1};
+use zei_algebra::canaan::{CanaanScalar, CanaanG1};
 use zei_algebra::prelude::*;
 use zei_algebra::secp256k1::SECP256K1Scalar;
-use zei_crypto::basic::pedersen_comm::PedersenCommitmentBS257;
+use zei_crypto::basic::pedersen_comm::PedersenCommitmentCanaan;
 use zei_crypto::bulletproofs::scalar_mul::ScalarMulProof;
 use zei_crypto::delegated_chaum_pedersen::{
     prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
     DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
 };
-use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBS257};
+use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsCanaan};
 use zei_plonk::plonk::constraint_system::field_simulation::SimFrVar;
 use zei_plonk::plonk::constraint_system::rescue::StateVar;
 use zei_plonk::plonk::constraint_system::VarIndex;
@@ -23,9 +23,9 @@ use zei_plonk::plonk::constraint_system::VarIndex;
 /// The instance for address folding.
 pub struct AXfrAddressFoldingInstance {
     /// The inspector's proof.
-    pub delegated_cp_proof: DelegatedChaumPedersenProof<BS257Scalar, BS257G1, SimFrParamsBS257>,
+    pub delegated_cp_proof: DelegatedChaumPedersenProof<CanaanScalar, CanaanG1, SimFrParamsCanaan>,
     /// The commitments generated during the scalar mul proof, used in delegated CP.
-    pub scalar_mul_commitments: Vec<BS257G1>,
+    pub scalar_mul_commitments: Vec<CanaanG1>,
     /// The scalar mul proof.
     pub scalar_mul_proof: ScalarMulProof,
 }
@@ -36,35 +36,35 @@ pub struct AXfrAddressFoldingWitness {
     /// The key pair
     pub keypair: AXfrKeyPair,
     /// Blinding factors of the commitments
-    pub blinding_factors: Vec<BS257Scalar>,
+    pub blinding_factors: Vec<CanaanScalar>,
     /// The inspector's proof.
-    pub delegated_cp_proof: DelegatedChaumPedersenProof<BS257Scalar, BS257G1, SimFrParamsBS257>,
+    pub delegated_cp_proof: DelegatedChaumPedersenProof<CanaanScalar, CanaanG1, SimFrParamsCanaan>,
     /// Inspection data in the delegated Chaum-Pedersen proof.
     pub delegated_cp_inspection:
-        DelegatedChaumPedersenInspection<BS257Scalar, BS257G1, SimFrParamsBS257>,
+        DelegatedChaumPedersenInspection<CanaanScalar, CanaanG1, SimFrParamsCanaan>,
     /// Beta.
-    pub beta: BS257Scalar,
+    pub beta: CanaanScalar,
     /// Lambda.
-    pub lambda: BS257Scalar,
+    pub lambda: CanaanScalar,
 }
 
 impl Default for AXfrAddressFoldingWitness {
     fn default() -> Self {
         let keypair = AXfrKeyPair::default();
-        let blinding_factors = vec![BS257Scalar::default(); 3];
+        let blinding_factors = vec![CanaanScalar::default(); 3];
 
         let delegated_cp_proof =
-            DelegatedChaumPedersenProof::<BS257Scalar, BS257G1, SimFrParamsBS257> {
+            DelegatedChaumPedersenProof::<CanaanScalar, CanaanG1, SimFrParamsCanaan> {
                 inspection_comm: Default::default(),
-                randomizers: vec![BS257G1::default(); 3],
-                response_scalars: vec![(BS257Scalar::default(), BS257Scalar::default()); 3],
+                randomizers: vec![CanaanG1::default(); 3],
+                response_scalars: vec![(CanaanScalar::default(), CanaanScalar::default()); 3],
                 params_phantom: Default::default(),
             };
 
         let delegated_cp_inspection =
-            DelegatedChaumPedersenInspection::<BS257Scalar, BS257G1, SimFrParamsBS257> {
+            DelegatedChaumPedersenInspection::<CanaanScalar, CanaanG1, SimFrParamsCanaan> {
                 committed_data_and_randomizer: vec![
-                    (BS257Scalar::default(), BS257Scalar::default());
+                    (CanaanScalar::default(), CanaanScalar::default());
                     3
                 ],
                 r: BLSScalar::default(),
@@ -72,8 +72,8 @@ impl Default for AXfrAddressFoldingWitness {
                 group_phantom: Default::default(),
             };
 
-        let beta = BS257Scalar::default();
-        let lambda = BS257Scalar::default();
+        let beta = CanaanScalar::default();
+        let lambda = CanaanScalar::default();
 
         Self {
             keypair,
@@ -94,8 +94,8 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     bp_gens_len: usize,
     keypair: &AXfrKeyPair,
 ) -> Result<(AXfrAddressFoldingInstance, AXfrAddressFoldingWitness)> {
-    let pc_gens = PedersenCommitmentBS257::default();
-    let bp_gens = bulletproofs_bs257::BulletproofGens::new(bp_gens_len, 1);
+    let pc_gens = PedersenCommitmentCanaan::default();
+    let bp_gens = bulletproofs_canaan::BulletproofGens::new(bp_gens_len, 1);
 
     let public_key = keypair.get_public_key();
     let secret_key = keypair.get_secret_key();
@@ -107,7 +107,7 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
         { ScalarMulProof::prove(prng, &bp_gens, transcript, &public_key.0, &secret_key.0)? };
 
     let (delegated_cp_proof, delegated_cp_inspection, beta, lambda) = {
-        let secret_key_in_fq = BS257Scalar::from_bytes(&secret_key.0.to_bytes())?;
+        let secret_key_in_fq = CanaanScalar::from_bytes(&secret_key.0.to_bytes())?;
 
         prove_delegated_chaum_pedersen(
             prng,
@@ -147,9 +147,9 @@ pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
     transcript: &mut Transcript,
     bp_gens_len: usize,
     instance: &AXfrAddressFoldingInstance,
-) -> Result<(BS257Scalar, BS257Scalar)> {
-    let pc_gens = PedersenCommitmentBS257::default();
-    let bp_gens = bulletproofs_bs257::BulletproofGens::new(bp_gens_len, 1);
+) -> Result<(CanaanScalar, CanaanScalar)> {
+    let pc_gens = PedersenCommitmentCanaan::default();
+    let bp_gens = bulletproofs_canaan::BulletproofGens::new(bp_gens_len, 1);
 
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"hash", hash.finalize().as_slice());
@@ -308,14 +308,14 @@ pub fn prove_address_folding_in_cs(
 
     // 3. allocate the simulated field elements and obtain their bit representations.
     let x_sim_fr =
-        SimFr::<SimFrParamsBS257>::from(&witness.keypair.get_public_key().0.get_x().into());
+        SimFr::<SimFrParamsCanaan>::from(&witness.keypair.get_public_key().0.get_x().into());
     let (x_sim_fr_var, x_sim_bits_vars) = SimFrVar::alloc_witness(cs, &x_sim_fr);
     let y_sim_fr =
-        SimFr::<SimFrParamsBS257>::from(&witness.keypair.get_public_key().0.get_y().into());
+        SimFr::<SimFrParamsCanaan>::from(&witness.keypair.get_public_key().0.get_y().into());
     let (y_sim_fr_var, y_sim_bits_vars) = SimFrVar::alloc_witness(cs, &y_sim_fr);
 
     // we can do so only because the secp256k1's order is smaller than its base field modulus.
-    let s_sim_fr = SimFr::<SimFrParamsBS257>::from(&witness.keypair.get_secret_key().0.into());
+    let s_sim_fr = SimFr::<SimFrParamsCanaan>::from(&witness.keypair.get_secret_key().0.into());
     let (s_sim_fr_var, s_sim_bits_vars) = SimFrVar::alloc_witness(cs, &s_sim_fr);
 
     // 4. check that the bit representations are the same as the one provided through scalars.
@@ -339,31 +339,31 @@ pub fn prove_address_folding_in_cs(
     // 5. allocate the simulated field elements for the delegated Chaum-Pedersen protocol.
     // note: the verifier will combine the challenges using the power series of lambda.
     let lambda_series = vec![
-        BS257Scalar::one(),
+        CanaanScalar::one(),
         witness.lambda,
         witness.lambda * witness.lambda,
     ];
     let beta_lambda_series = lambda_series
         .iter()
         .map(|v| *v * witness.beta)
-        .collect::<Vec<BS257Scalar>>();
+        .collect::<Vec<CanaanScalar>>();
 
     // skip the first one
     let mut lambda_series_vars_skip_first = vec![];
     for lambda_series_val in lambda_series.iter().skip(1) {
-        let sim_fr = SimFr::<SimFrParamsBS257>::from(&<BS257Scalar as Into<BigUint>>::into(
+        let sim_fr = SimFr::<SimFrParamsCanaan>::from(&<CanaanScalar as Into<BigUint>>::into(
             *lambda_series_val,
         ));
-        lambda_series_vars_skip_first.push(SimFrVar::<SimFrParamsBS257>::alloc_input(cs, &sim_fr));
+        lambda_series_vars_skip_first.push(SimFrVar::<SimFrParamsCanaan>::alloc_input(cs, &sim_fr));
     }
 
     // include the first one
     let mut beta_lambda_series_vars = vec![];
     for beta_lambda_series_var in beta_lambda_series.iter() {
-        let sim_fr = SimFr::<SimFrParamsBS257>::from(&<BS257Scalar as Into<BigUint>>::into(
+        let sim_fr = SimFr::<SimFrParamsCanaan>::from(&<CanaanScalar as Into<BigUint>>::into(
             *beta_lambda_series_var,
         ));
-        beta_lambda_series_vars.push(SimFrVar::<SimFrParamsBS257>::alloc_input(cs, &sim_fr));
+        beta_lambda_series_vars.push(SimFrVar::<SimFrParamsCanaan>::alloc_input(cs, &sim_fr));
     }
 
     let query_vars = [x_sim_fr_var, y_sim_fr_var, s_sim_fr_var]
@@ -375,24 +375,24 @@ pub fn prove_address_folding_in_cs(
                 .iter(),
         )
         .map(|(v_var, (_, blinding_factor))| {
-            let sim_fr = SimFr::<SimFrParamsBS257>::from(&<BS257Scalar as Into<BigUint>>::into(
+            let sim_fr = SimFr::<SimFrParamsCanaan>::from(&<CanaanScalar as Into<BigUint>>::into(
                 *blinding_factor,
             ));
-            let (blinding_factor_var, _) = SimFrVar::<SimFrParamsBS257>::alloc_witness(cs, &sim_fr);
+            let (blinding_factor_var, _) = SimFrVar::<SimFrParamsCanaan>::alloc_witness(cs, &sim_fr);
 
             (v_var.clone(), blinding_factor_var)
         })
-        .collect::<Vec<(SimFrVar<SimFrParamsBS257>, SimFrVar<SimFrParamsBS257>)>>();
+        .collect::<Vec<(SimFrVar<SimFrParamsCanaan>, SimFrVar<SimFrParamsCanaan>)>>();
 
     let combined_response_scalar = witness.delegated_cp_proof.response_scalars[0].0
         + witness.delegated_cp_proof.response_scalars[1].0 * witness.lambda
         + witness.delegated_cp_proof.response_scalars[2].0 * witness.lambda * witness.lambda;
     let combined_response_scalar_sim_fr =
-        SimFr::<SimFrParamsBS257>::from(&<BS257Scalar as Into<BigUint>>::into(
+        SimFr::<SimFrParamsCanaan>::from(&<CanaanScalar as Into<BigUint>>::into(
             combined_response_scalar,
         ));
     let combined_response_scalar_var =
-        SimFrVar::<SimFrParamsBS257>::alloc_input(cs, &combined_response_scalar_sim_fr);
+        SimFrVar::<SimFrParamsCanaan>::alloc_input(cs, &combined_response_scalar_sim_fr);
 
     let mut lhs = query_vars[0].0.mul(cs, &beta_lambda_series_vars[0]);
 
@@ -419,9 +419,9 @@ pub fn prove_address_folding_in_cs(
     res.enforce_zero(cs);
 
     // 6. merge limbs of the committed data as well as the randomizer scalars.
-    let mut all_limbs = Vec::with_capacity(2 * query_vars.len() * SimFrParamsBS257::NUM_OF_LIMBS);
+    let mut all_limbs = Vec::with_capacity(2 * query_vars.len() * SimFrParamsCanaan::NUM_OF_LIMBS);
     let mut all_limbs_var =
-        Vec::with_capacity(2 * query_vars.len() * SimFrParamsBS257::NUM_OF_LIMBS);
+        Vec::with_capacity(2 * query_vars.len() * SimFrParamsCanaan::NUM_OF_LIMBS);
 
     // append all the data
     for (v, _) in query_vars.iter() {
@@ -438,10 +438,10 @@ pub fn prove_address_folding_in_cs(
     let mut compressed_limbs = Vec::new();
     let mut compressed_limbs_var = Vec::new();
 
-    let num_limbs_compressed = BLSScalar::capacity() / SimFrParamsBS257::BIT_PER_LIMB;
+    let num_limbs_compressed = BLSScalar::capacity() / SimFrParamsCanaan::BIT_PER_LIMB;
 
     let step_vec = (1..=num_limbs_compressed)
-        .map(|i| BLSScalar::from(&BigUint::one().shl(SimFrParamsBS257::BIT_PER_LIMB * i)))
+        .map(|i| BLSScalar::from(&BigUint::one().shl(SimFrParamsCanaan::BIT_PER_LIMB * i)))
         .collect::<Vec<BLSScalar>>();
 
     for (limbs, limbs_var) in all_limbs
@@ -451,7 +451,7 @@ pub fn prove_address_folding_in_cs(
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <BLSScalar as Into<BigUint>>::into(*limb).shl(SimFrParamsBS257::BIT_PER_LIMB * i),
+                <BLSScalar as Into<BigUint>>::into(*limb).shl(SimFrParamsCanaan::BIT_PER_LIMB * i),
             );
         }
         compressed_limbs.push(BLSScalar::from(&sum));
@@ -521,18 +521,18 @@ pub fn prove_address_folding_in_cs(
     cs.prepare_pi_variable(comm_var);
 
     for fr_var in lambda_series_vars_skip_first.iter() {
-        for i in 0..SimFrParamsBS257::NUM_OF_LIMBS {
+        for i in 0..SimFrParamsCanaan::NUM_OF_LIMBS {
             cs.prepare_pi_variable(fr_var.var[i]);
         }
     }
 
     for fr_var in beta_lambda_series_vars.iter() {
-        for i in 0..SimFrParamsBS257::NUM_OF_LIMBS {
+        for i in 0..SimFrParamsCanaan::NUM_OF_LIMBS {
             cs.prepare_pi_variable(fr_var.var[i]);
         }
     }
 
-    for i in 0..SimFrParamsBS257::NUM_OF_LIMBS {
+    for i in 0..SimFrParamsCanaan::NUM_OF_LIMBS {
         cs.prepare_pi_variable(combined_response_scalar_var.var[i]);
     }
 
@@ -542,26 +542,26 @@ pub fn prove_address_folding_in_cs(
 /// Convert the instance into input to the Plonk verifier.
 pub fn prepare_verifier_input(
     instance: &AXfrAddressFoldingInstance,
-    beta: &BS257Scalar,
-    lambda: &BS257Scalar,
+    beta: &CanaanScalar,
+    lambda: &CanaanScalar,
 ) -> Vec<BLSScalar> {
     let mut v = vec![instance.delegated_cp_proof.inspection_comm];
 
-    let lambda_series = vec![BS257Scalar::one(), *lambda, *lambda * lambda];
+    let lambda_series = vec![CanaanScalar::one(), *lambda, *lambda * lambda];
     let beta_lambda_series = lambda_series
         .iter()
         .map(|v| *v * beta)
-        .collect::<Vec<BS257Scalar>>();
+        .collect::<Vec<CanaanScalar>>();
 
     for lambda_series_val in lambda_series.iter().skip(1) {
-        let sim_fr = SimFr::<SimFrParamsBS257>::from(&<BS257Scalar as Into<BigUint>>::into(
+        let sim_fr = SimFr::<SimFrParamsCanaan>::from(&<CanaanScalar as Into<BigUint>>::into(
             *lambda_series_val,
         ));
         v.extend_from_slice(&sim_fr.limbs);
     }
 
     for beta_lambda_series_val in beta_lambda_series.iter() {
-        let sim_fr = SimFr::<SimFrParamsBS257>::from(&<BS257Scalar as Into<BigUint>>::into(
+        let sim_fr = SimFr::<SimFrParamsCanaan>::from(&<CanaanScalar as Into<BigUint>>::into(
             *beta_lambda_series_val,
         ));
         v.extend_from_slice(&sim_fr.limbs);
@@ -571,7 +571,7 @@ pub fn prepare_verifier_input(
         + instance.delegated_cp_proof.response_scalars[1].0 * lambda
         + instance.delegated_cp_proof.response_scalars[2].0 * lambda * lambda;
     let combined_response_scalar_sim_fr =
-        SimFr::<SimFrParamsBS257>::from(&<BS257Scalar as Into<BigUint>>::into(
+        SimFr::<SimFrParamsCanaan>::from(&<CanaanScalar as Into<BigUint>>::into(
             combined_response_scalar,
         ));
     v.extend_from_slice(&combined_response_scalar_sim_fr.limbs);
