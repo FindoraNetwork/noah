@@ -39,7 +39,10 @@ use zei_plonk::plonk::{
     verifier::verifier,
 };
 
-const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"ABAR to BAR proof";
+/// The domain separator for anonymous-to-confidential, for the Plonk proof.
+const ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"ABAR to BAR Plonk Proof";
+/// The domain separator for anonymous-to-confidential, for address folding.
+const ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT: &[u8] = b"ABAR to BAR Folding Proof";
 
 /// An anonymous-to-confidential note.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -143,7 +146,7 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
 
     // 4. Compute the inspector's proof.
     let (delegated_cp_proof, delegated_cp_inspection, beta, lambda) = {
-        let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
+        let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
         transcript.append_message(b"nullifier", &this_nullifier.to_bytes());
         prove_delegated_chaum_pedersen(
             prng,
@@ -202,7 +205,7 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
         lambda,
     } = pre_note;
 
-    let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
     let (folding_instance, folding_witness) = create_address_folding(
         prng,
         hash,
@@ -287,7 +290,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 
     let input = note.body.input;
 
-    let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
 
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"nullifier", &note.body.input.to_bytes());
@@ -301,7 +304,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     )
     .c(d!())?;
 
-    let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
     let (beta_folding, lambda_folding) = verify_address_folding(
         hash,
         &mut transcript,
@@ -326,7 +329,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let s1_plus_lambda_s2_sim_fr =
         SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
-    let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
     let mut online_inputs = vec![];
 
     online_inputs.push(input.clone());
@@ -363,7 +366,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     lambda: &RistrettoScalar,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
-    let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
 
     let (mut cs, _) = build_abar_to_bar_cs(
         payers_witness,

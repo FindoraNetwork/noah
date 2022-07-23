@@ -21,6 +21,7 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
+use std::time::Instant;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use zei_plonk::plonk::{
@@ -29,7 +30,11 @@ use zei_plonk::plonk::{
     verifier::verifier,
 };
 
-const ABAR_TO_AR_TRANSCRIPT: &[u8] = b"ABAR to AR proof";
+/// The domain separator for anonymous-to-transparent, for the Plonk proof.
+const ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"ABAR to AR Plonk Proof";
+
+/// The domain separator for anonymous-to-transparent, for address folding.
+const ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT: &[u8] = b"ABAR to AR Folding Proof";
 
 /// The anonymous-to-transparent note.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -42,7 +47,7 @@ pub struct AbarToArNote {
     pub folding_instance: AXfrAddressFoldingInstance,
 }
 
-/// The anonymous-to-transparent note without proof or non-malleability tag.
+/// The anonymous-to-transparent note without proof.
 #[derive(Clone, Debug)]
 pub struct AbarToArPreNote {
     /// The body part of ABAR to AR.
@@ -138,7 +143,9 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
         input_keypair,
     } = pre_note;
 
-    let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
+    let time = Instant::now();
+
+    let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
     let (folding_instance, folding_witness) = create_address_folding(
         prng,
         hash,
@@ -148,6 +155,8 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     )?;
 
     let proof = prove_abar_to_ar(prng, params, witness, &folding_witness).c(d!())?;
+
+    println!("abar to ar time: {}", time.elapsed().as_secs_f64());
 
     Ok(AbarToArNote {
         body,
@@ -168,7 +177,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(ZeiError::ParameterError));
     }
 
-    let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
     let (beta, lambda) = verify_address_folding(
         hash,
         &mut transcript,
@@ -186,7 +195,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
-    let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
     let mut online_inputs = vec![];
     online_inputs.push(note.body.input.clone());
     online_inputs.push(merkle_root.clone());
@@ -211,7 +220,7 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     payers_witness: PayerWitness,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
-    let mut transcript = Transcript::new(ABAR_TO_AR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
 
     let (mut cs, _) = build_abar_to_ar_cs(payers_witness, &folding_witness);
     let witness = cs.get_and_clear_witness();

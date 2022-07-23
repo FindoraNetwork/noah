@@ -25,8 +25,8 @@ use zei_plonk::plonk::{
     verifier::verifier,
 };
 
-/// The domain separator for anonymous transfer, for the spending proof.
-const ANON_XFR_SPENDING_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Spending Proof";
+/// The domain separator for anonymous transfer, for the Plonk proof.
+const ANON_XFR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Plonk Proof";
 /// The domain separator for anonymous transfer, for address folding.
 const ANON_XFR_FOLDING_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Folding Proof";
 /// The domain separator for the number of inputs.
@@ -239,7 +239,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     secret_inputs: AXfrWitness,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
-    let mut transcript = Transcript::new(ANON_XFR_SPENDING_PROOF_TRANSCRIPT);
+    let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(
         N_INPUTS_TRANSCRIPT,
         secret_inputs.payers_witnesses.len() as u64,
@@ -272,7 +272,7 @@ pub(crate) fn verify_xfr(
     proof: &AXfrPlonkPf,
     address_folding_public_input: &Vec<BLSScalar>,
 ) -> Result<()> {
-    let mut transcript = Transcript::new(ANON_XFR_SPENDING_PROOF_TRANSCRIPT);
+    let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);
     transcript.append_u64(
         N_OUTPUTS_TRANSCRIPT,

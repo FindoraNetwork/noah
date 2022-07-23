@@ -31,7 +31,7 @@ use zei_plonk::plonk::{
     verifier::verifier,
 };
 
-const BAR_TO_ABAR_TRANSCRIPT: &[u8] = b"BAR to ABAR proof";
+const BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"BAR to ABAR Plonk Proof";
 
 /// A confidential-to-anonymous note.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
@@ -148,7 +148,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
 
     let comm = commit(abar_pubkey, &oabar.blind, oabar_amount, &obar.asset_type)?;
 
-    let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"commitment", &comm.to_bytes());
 
@@ -230,7 +230,7 @@ pub(crate) fn verify_bar_to_abar(
         }
     };
 
-    let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
 
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"commitment", &abar.commitment.to_bytes());
@@ -269,7 +269,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> Result<AXfrPlonkPf> {
-    let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_bar_to_abar_cs(
         amount,
         asset_type,
@@ -307,7 +307,7 @@ pub(crate) fn verify_inspection(
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> Result<()> {
-    let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let mut online_inputs = Vec::with_capacity(2 + 3 * SimFrParamsRistretto::NUM_OF_LIMBS);
     online_inputs.push(hash_comm);
     online_inputs.push(proof_zk_part.inspection_comm);
@@ -595,7 +595,7 @@ pub(crate) fn build_bar_to_abar_cs(
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::bar_to_abar::BAR_TO_ABAR_TRANSCRIPT;
+    use crate::anon_xfr::bar_to_abar::BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT;
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
         bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
@@ -746,7 +746,7 @@ mod test {
 
         // 2. compute the ZK part of the proof
 
-        let mut transcript = Transcript::new(BAR_TO_ABAR_TRANSCRIPT);
+        let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
         transcript.append_message(b"commitment", &z.to_bytes());
 
         let (proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(

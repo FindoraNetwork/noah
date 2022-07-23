@@ -17,7 +17,8 @@ use zei_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };
 
-const AR_TO_ABAR_TRANSCRIPT: &[u8] = b"AR to ABAR proof";
+/// The domain separator for transparent-to-anonymous, for the Plonk proof.
+const AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"AR to ABAR Plonk Proof";
 
 /// The transparent-to-anonymous note.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
@@ -99,7 +100,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         public_key: abar_pubkey.clone(),
     };
 
-    let mut transcript = Transcript::new(AR_TO_ABAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_ar_to_abar_cs(payee_witness);
     let witness = cs.get_and_clear_witness();
 
@@ -132,7 +133,7 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     let amount = body.input.amount.get_amount().unwrap();
     let asset_type = body.input.asset_type.get_asset_type().unwrap();
 
-    let mut transcript = Transcript::new(AR_TO_ABAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let mut online_inputs: Vec<BLSScalar> = vec![];
     online_inputs.push(BLSScalar::from(amount));
     online_inputs.push(asset_type.as_scalar());
