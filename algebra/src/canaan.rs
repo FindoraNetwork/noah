@@ -1,5 +1,6 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
+use ark_bulletproofs_canaan::curve::canaan::{Fr, FrParameters, G1Affine, G1Projective};
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, BigInteger320, FftField, FftParameters, Field, FpParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -10,7 +11,6 @@ use ark_std::{
     str::FromStr,
     One, UniformRand, Zero,
 };
-use bulletproofs_canaan::curve::canaan::{Fr, FrParameters, G1Affine, G1Projective};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::*;
 /// The number of bytes for a scalar value over the Canaan curve
 pub const CANAAN_SCALAR_LEN: usize = 32;
 
-/// The wrapped struct for `bulletproofs_canaan::curve::canaan::Fr`
+/// The wrapped struct for `ark_bulletproofs_canaan::curve::canaan::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct CanaanScalar(pub(crate) Fr);
@@ -34,7 +34,7 @@ impl Debug for CanaanScalar {
     }
 }
 
-/// The wrapped struct for `bulletproofs_canaan::curve::canaan::G1Projective`
+/// The wrapped struct for `ark_bulletproofs_canaan::curve::canaan::G1Projective`
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq)]
 pub struct CanaanG1(pub(crate) G1Projective);
@@ -184,7 +184,7 @@ impl Scalar for CanaanScalar {
 
     #[inline]
     fn capacity() -> usize {
-        bulletproofs_canaan::curve::canaan::FrParameters::CAPACITY as usize
+        ark_bulletproofs_canaan::curve::canaan::FrParameters::CAPACITY as usize
     }
 
     #[inline]
@@ -459,8 +459,8 @@ mod canaan_groups_test {
         prelude::*,
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
+    use ark_bulletproofs_canaan::curve::canaan::G1Affine;
     use ark_ec::ProjectiveCurve;
-    use bulletproofs_canaan::curve::canaan::G1Affine;
     use rand_chacha::ChaCha20Rng;
 
     #[test]

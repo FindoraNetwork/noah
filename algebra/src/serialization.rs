@@ -120,12 +120,12 @@ impl ZeiFromToBytes for bulletproofs::r1cs::R1CSProof {
     }
 }
 
-impl ZeiFromToBytes for bulletproofs_canaan::r1cs::R1CSProof {
+impl ZeiFromToBytes for ark_bulletproofs_canaan::r1cs::R1CSProof {
     fn zei_to_bytes(&self) -> Vec<u8> {
         self.to_bytes().unwrap()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<bulletproofs_canaan::r1cs::R1CSProof> {
-        bulletproofs_canaan::r1cs::R1CSProof::from_bytes(bytes)
+    fn zei_from_bytes(bytes: &[u8]) -> Result<ark_bulletproofs_canaan::r1cs::R1CSProof> {
+        ark_bulletproofs_canaan::r1cs::R1CSProof::from_bytes(bytes)
             .map_err(|_| eg!(ZeiError::DeserializationError))
     }
 }

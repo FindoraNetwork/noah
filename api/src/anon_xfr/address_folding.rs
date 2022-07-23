@@ -98,7 +98,7 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     keypair: &AXfrKeyPair,
 ) -> Result<(AXfrAddressFoldingInstance, AXfrAddressFoldingWitness)> {
     let pc_gens = PedersenCommitmentCanaan::default();
-    let bp_gens = bulletproofs_canaan::BulletproofGens::new(bp_gens_len, 1);
+    let bp_gens = ark_bulletproofs_canaan::BulletproofGens::new(bp_gens_len, 1);
 
     let public_key = keypair.get_public_key();
     let secret_key = keypair.get_secret_key();
@@ -152,7 +152,7 @@ pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
     instance: &AXfrAddressFoldingInstance,
 ) -> Result<(CanaanScalar, CanaanScalar)> {
     let pc_gens = PedersenCommitmentCanaan::default();
-    let bp_gens = bulletproofs_canaan::BulletproofGens::new(bp_gens_len, 1);
+    let bp_gens = ark_bulletproofs_canaan::BulletproofGens::new(bp_gens_len, 1);
 
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"hash", hash.finalize().as_slice());

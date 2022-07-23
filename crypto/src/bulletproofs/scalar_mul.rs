@@ -1,16 +1,16 @@
 //! Module for the Bulletproof scalar mul proof scheme
 
 use crate::basic::pedersen_comm::PedersenCommitmentCanaan;
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
-use bulletproofs_canaan::BulletproofGens;
-use bulletproofs_canaan::{
+use ark_bulletproofs_canaan::BulletproofGens;
+use ark_bulletproofs_canaan::{
     curve::canaan::G1Affine as G1AffineBig,
     curve::secp256k1::{Fq, FrParameters, G1Affine},
     r1cs::{
         LinearCombination, Prover, R1CSProof, RandomizableConstraintSystem, Variable, Verifier,
     },
 };
+use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
 use rand_chacha::ChaChaRng;
@@ -269,7 +269,7 @@ impl ScalarMulProof {
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
 
         // 3. Initialize the prover.
-        let pc_gens_for_prover = bulletproofs_canaan::PedersenGens::from(&pc_gens);
+        let pc_gens_for_prover = ark_bulletproofs_canaan::PedersenGens::from(&pc_gens);
         let mut prover = Prover::new(&pc_gens_for_prover, transcript);
 
         // 4. Allocate `public_key`.
@@ -353,7 +353,7 @@ impl ScalarMulProof {
         )
         .c(d!(ZeiError::R1CSProofError))?;
 
-        let pc_gens_for_verifier = bulletproofs_canaan::PedersenGens::from(&pc_gens);
+        let pc_gens_for_verifier = ark_bulletproofs_canaan::PedersenGens::from(&pc_gens);
         verifier
             .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
             .c(d!(ZeiError::R1CSProofError))?;
@@ -363,7 +363,7 @@ impl ScalarMulProof {
 
 #[test]
 fn scalar_mul_test() {
-    use bulletproofs_canaan::curve::secp256k1::Fr;
+    use ark_bulletproofs_canaan::curve::secp256k1::Fr;
 
     let bp_gens = BulletproofGens::new(2048, 1);
 

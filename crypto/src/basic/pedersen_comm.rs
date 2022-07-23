@@ -73,7 +73,7 @@ pub struct PedersenCommitmentCanaan {
 
 impl Default for PedersenCommitmentCanaan {
     fn default() -> Self {
-        let pc_gens = bulletproofs_canaan::PedersenGens::default();
+        let pc_gens = ark_bulletproofs_canaan::PedersenGens::default();
         Self {
             B: CanaanG1::from_raw(pc_gens.B),
             B_blinding: CanaanG1::from_raw(pc_gens.B_blinding),
@@ -95,9 +95,9 @@ impl PedersenCommitment<CanaanG1> for PedersenCommitmentCanaan {
     }
 }
 
-impl From<&PedersenCommitmentCanaan> for bulletproofs_canaan::PedersenGens {
+impl From<&PedersenCommitmentCanaan> for ark_bulletproofs_canaan::PedersenGens {
     fn from(rp: &PedersenCommitmentCanaan) -> Self {
-        bulletproofs_canaan::PedersenGens {
+        ark_bulletproofs_canaan::PedersenGens {
             B: rp.B.get_raw(),
             B_blinding: rp.B_blinding.get_raw(),
         }

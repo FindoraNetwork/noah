@@ -95,8 +95,8 @@ tag = 'v0.2.1'
 git = 'https://github.com/FindoraNetwork/storage.git'
 tag = 'v0.2.1'
 
-[dependencies.bulletproofs-canaan]
-git = "https://github.com/FindoraNetwork/bulletproofs-canaan"
+[dependencies.ark-bulletproofs-canaan]
+git = "https://github.com/FindoraNetwork/ark-bulletproofs-canaan"
 default-features = false
 features = ["yoloproofs"]
 
@@ -105,7 +105,7 @@ default = [
     'std',
     'u64_backend',
 ]
-std = ['curve25519-dalek/std', 'bulletproofs/std', 'bulletproofs-canaan/std']
+std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs-canaan/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',
