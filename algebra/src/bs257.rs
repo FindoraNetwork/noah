@@ -477,9 +477,9 @@ mod bs257_groups_test {
     fn scalar_from_to_bytes() {
         let small_value = BS257Scalar::from(165747u32);
         let small_value_bytes = small_value.to_bytes();
-        let expected_small_value_bytes: [u8; 33] = [
+        let expected_small_value_bytes: [u8; 32] = [
             115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
+            0, 0, 0, 0,
         ];
         assert_eq!(small_value_bytes, expected_small_value_bytes);
 
