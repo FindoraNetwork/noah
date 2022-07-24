@@ -92,7 +92,6 @@ pub fn elgamal_partial_decrypt<G: Group>(
 mod elgamal_test {
     use rand_chacha::ChaChaRng;
     use zei_algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
-    use zei_algebra::jubjub::JubjubPoint;
     use zei_algebra::prelude::*;
     use zei_algebra::ristretto::RistrettoPoint;
 
@@ -134,7 +133,6 @@ mod elgamal_test {
         verification::<BLSG1>();
         verification::<BLSG2>();
         verification::<BLSGt>();
-        verification::<JubjubPoint>();
     }
 
     #[test]
@@ -143,6 +141,5 @@ mod elgamal_test {
         decryption::<BLSG1>();
         decryption::<BLSG2>();
         decryption::<BLSGt>();
-        decryption::<JubjubPoint>();
     }
 }

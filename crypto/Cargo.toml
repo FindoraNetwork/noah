@@ -23,6 +23,7 @@ serde_derive = '1.0'
 sha2 = '0.10'
 x25519-dalek = '1.1'
 ruc = '1.0'
+sha3 = { version = "0.10", default-features = false }
 
 [dependencies.zei-algebra]
 path = '../algebra'
@@ -54,6 +55,20 @@ version = '0.2.12'
 version = '0.4.0'
 features = ['rand']
 
+[dependencies.ark-ec]
+version = '^0.3.0'
+default-features = false
+
+[dependencies.ark-ff]
+version = '^0.3.0'
+default-features = false
+features = ['asm']
+
+[dependencies.ark-bulletproofs-canaan]
+git = "https://github.com/FindoraNetwork/ark-bulletproofs-canaan"
+default-features = false
+features = ["yoloproofs"]
+
 [dev-dependencies]
 bit-array = '0.4.3'
 lazy_static = '1.4.0'
@@ -66,7 +81,7 @@ default = [
     'std',
     'u64_backend',
 ]
-std = ['curve25519-dalek/std']
+std = ['curve25519-dalek/std', 'ark-bulletproofs-canaan/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',

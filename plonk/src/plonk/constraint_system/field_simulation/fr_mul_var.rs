@@ -45,7 +45,6 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.push_add_selectors(one, zero, one, zero);
             cs.push_mul_selectors(zero, zero);
             cs.push_constant_selector(zero);
-            cs.push_ecc_selector(zero);
             cs.push_rescue_selectors(zero, zero, zero, zero);
             cs.push_out_selector(one);
 
@@ -54,7 +53,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
             cs.wiring[4].push(res.var[i]);
-            cs.size += 1;
+            cs.finish_new_gate();
         }
 
         res
@@ -86,7 +85,6 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                     .add(&r_limbs[i])
                     .add(&r_limbs[i]),
             );
-            cs.push_ecc_selector(zero);
             cs.push_rescue_selectors(zero, zero, zero, zero);
             cs.push_out_selector(one);
 
@@ -95,7 +93,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
             cs.wiring[4].push(res.var[i]);
-            cs.size += 1;
+            cs.finish_new_gate();
         }
 
         res
@@ -107,6 +105,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
         let surfeit = 5;
 
         let cur_val: BigUint = (&self.val).into();
+
         let r_biguint = P::scalar_field_in_biguint();
 
         let zero = BLSScalar::zero();
@@ -116,10 +115,10 @@ impl<P: SimFrParams> SimFrMulVar<P> {
         let zero_var = cs.zero_var();
 
         let (k, rem) = cur_val.div_rem(&r_biguint);
-        assert!(rem.is_zero());
+        debug_assert!(rem.is_zero());
 
         // For safety, make sure `k` is not too big.
-        assert!(k.lt(&r_biguint.shl(5u32)));
+        debug_assert!(k.lt(&r_biguint.shl(5u32)));
 
         let r_limbs = P::scalar_field_in_limbs().to_vec();
         let k_limbs = SimFr::<P>::from(&k).limbs.to_vec();
@@ -255,21 +254,24 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 (num_limbs_in_this_group + 1) * P::BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
             let pad_limb = BLSScalar::from(&pad);
-            assert!(pad > <&BLSScalar as Into<BigUint>>::into(right_group_limb));
+            assert!(pad > <BLSScalar as Into<BigUint>>::into(right_group_limb.clone()));
 
             // Compute the carry number for the next cycle
             let mut carry = left_group_limb
                 .add(&carry_in)
                 .add(&pad_limb)
                 .sub(&right_group_limb);
-            let carry_biguint: BigUint = (&carry).into();
+
+            let carry_biguint: BigUint = carry.clone().into();
             carry = BLSScalar::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
+
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
 
             let carry_var = cs.new_variable(carry);
 
             let (new_accumulated_extra, remainder_biguint) = accumulated_extra
                 .div_rem(&BigUint::from(1u64).shl(P::BIT_PER_LIMB * num_limbs_in_this_group));
+
             let remainder = BLSScalar::from(&remainder_biguint);
 
             let carry_shift =
@@ -281,7 +283,6 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 cs.push_add_selectors(minus_one, minus_one, one, carry_shift);
                 cs.push_mul_selectors(zero, zero);
                 cs.push_constant_selector(pad_limb.neg().add(&remainder));
-                cs.push_ecc_selector(zero);
                 cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(zero);
 
@@ -290,7 +291,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 cs.wiring[2].push(*right_group_limb_var);
                 cs.wiring[3].push(carry_var);
                 cs.wiring[4].push(zero_var);
-                cs.size += 1;
+                cs.finish_new_gate();
             }
 
             accumulated_extra = new_accumulated_extra;
@@ -307,7 +308,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
 }
 
 #[cfg(test)]
-mod test {
+mod test_ristretto {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
     use num_bigint::{BigUint, RandBigInt};
     use rand_chacha::ChaCha20Rng;
@@ -322,7 +323,7 @@ mod test {
         let mut cs = TurboCS::<BLSScalar>::new();
 
         let zero_fr = SimFrTest::from(&BigUint::zero());
-        let zero_fr_val = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
+        let (zero_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
         let zero_fr_mul_val = zero_fr_val.mul(&mut cs, &zero_fr_val);
 
         zero_fr_mul_val.enforce_zero(&mut cs);
@@ -342,15 +343,15 @@ mod test {
             let a_fr = SimFrTest::from(&a);
             let b_fr = SimFrTest::from(&b);
 
-            let a_fr_val = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
-            let b_fr_val = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+            let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+            let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
 
             let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
 
             let ab_fr = &a * &b;
             let ab_fr_reduced = &ab_fr % &r_biguint;
             let ab_reduced = SimFrTest::from(&ab_fr_reduced);
-            let ab_reduced_val = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
+            let (ab_reduced_val, _) = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
 
             let zero_supposed = ab_fr_mul_val.sub(&mut cs, &ab_reduced_val);
             zero_supposed.enforce_zero(&mut cs);
@@ -371,15 +372,96 @@ mod test {
         let a_fr = SimFrTest::from(&a);
         let b_fr = SimFrTest::from(&b);
 
-        let a_fr_val = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
-        let b_fr_val = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+        let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+        let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
 
         let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
 
         let ab_fr = &a * &b;
         let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
         let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
-        let ab_reduced_manipulated_val =
+        let (ab_reduced_manipulated_val, _) =
+            SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
+
+        let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);
+        zero_supposed_manipulated.enforce_zero(&mut cs);
+    }
+}
+
+#[cfg(test)]
+mod test_canaan {
+    use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
+    use num_bigint::{BigUint, RandBigInt};
+    use rand_chacha::ChaCha20Rng;
+    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsCanaan};
+
+    type SimFrTest = SimFr<SimFrParamsCanaan>;
+    type SimFrVarTest = SimFrVar<SimFrParamsCanaan>;
+
+    #[test]
+    fn test_enforce_zero_trivial() {
+        let mut cs = TurboCS::<BLSScalar>::new();
+
+        let zero_fr = SimFrTest::from(&BigUint::zero());
+        let (zero_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
+        let zero_fr_mul_val = zero_fr_val.mul(&mut cs, &zero_fr_val);
+
+        zero_fr_mul_val.enforce_zero(&mut cs);
+    }
+
+    #[test]
+    fn test_enforce_zero() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
+
+        for _ in 0..1000 {
+            let mut cs = TurboCS::<BLSScalar>::new();
+
+            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_fr = SimFrTest::from(&a);
+            let b_fr = SimFrTest::from(&b);
+
+            let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+            let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+
+            let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
+
+            let ab_fr = &a * &b;
+            let ab_fr_reduced = &ab_fr % &r_biguint;
+            let ab_reduced = SimFrTest::from(&ab_fr_reduced);
+            let (ab_reduced_val, _) = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
+
+            let zero_supposed = ab_fr_mul_val.sub(&mut cs, &ab_reduced_val);
+            zero_supposed.enforce_zero(&mut cs);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_enforce_zero_panic() {
+        let mut rng = ChaCha20Rng::from_entropy();
+        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
+
+        let mut cs = TurboCS::<BLSScalar>::new();
+
+        let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+        let a_fr = SimFrTest::from(&a);
+        let b_fr = SimFrTest::from(&b);
+
+        let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+        let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+
+        let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
+
+        let ab_fr = &a * &b;
+        let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
+        let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
+        let (ab_reduced_manipulated_val, _) =
             SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
 
         let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);

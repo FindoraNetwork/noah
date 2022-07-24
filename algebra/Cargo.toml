@@ -70,11 +70,14 @@ default-features = false
 [dependencies.num-bigint]
 version = '0.4'
 
+[dependencies.num-traits]
+version = "0.2"
+
 [dependencies.num-integer]
 version = "0.1"
 
-[dependencies.bulletproofs-bs257]
-git = "https://github.com/FindoraNetwork/bulletproofs-bs257"
+[dependencies.ark-bulletproofs-canaan]
+git = "https://github.com/FindoraNetwork/ark-bulletproofs-canaan"
 default-features = false
 features = ['yoloproofs']
 
@@ -91,7 +94,7 @@ std = [
     'ark-std/std',
     'ark-ff/std',
     'ark-serialize/std',
-    'bulletproofs-bs257/std'
+    'ark-bulletproofs-canaan/std'
 ]
 alloc = ['curve25519-dalek/alloc']
 nightly = ['curve25519-dalek/nightly']
@@ -102,6 +105,6 @@ parallel = [
     'rayon',
     'ark-ec/parallel',
     'ark-ff/parallel',
-    'bulletproofs-bs257/parallel'
+    'ark-bulletproofs-canaan/parallel'
 ]
 asm = ['ark-ff/asm']
