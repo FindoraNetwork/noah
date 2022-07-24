@@ -2,7 +2,6 @@ use crate::xfr::{
     sig::{XfrPublicKey, XfrSecretKey, XfrSignature},
     structs::{AssetType, ASSET_TYPE_LENGTH},
 };
-use ed25519_dalek::{PublicKey, SecretKey};
 use serde::Serializer;
 use zei_algebra::prelude::*;
 
@@ -24,25 +23,22 @@ impl ZeiFromToBytes for AssetType {
 
 impl ZeiFromToBytes for XfrPublicKey {
     fn zei_to_bytes(&self) -> Vec<u8> {
-        self.0.as_bytes().to_vec()
+        self.to_bytes().to_vec()
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        let pk = PublicKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?;
-        Ok(XfrPublicKey(pk))
+        XfrPublicKey::from_bytes(bytes)
     }
 }
 serialize_deserialize!(XfrPublicKey);
 
 impl ZeiFromToBytes for XfrSecretKey {
     fn zei_to_bytes(&self) -> Vec<u8> {
-        self.0.as_bytes().to_vec()
+        self.to_bytes().to_vec()
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(XfrSecretKey(
-            SecretKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?,
-        ))
+        XfrSecretKey::from_bytes(bytes)
     }
 }
 
@@ -50,17 +46,11 @@ serialize_deserialize!(XfrSecretKey);
 
 impl ZeiFromToBytes for XfrSignature {
     fn zei_to_bytes(&self) -> Vec<u8> {
-        let bytes = self.0.to_bytes();
-        let mut vec = vec![];
-        vec.extend_from_slice(&bytes[..]);
-        vec
+        self.to_bytes().to_vec()
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        match ed25519_dalek::Signature::from_bytes(bytes) {
-            Ok(e) => Ok(XfrSignature(e)),
-            Err(_) => Err(eg!(ZeiError::DeserializationError)),
-        }
+        XfrSignature::from_bytes(bytes)
     }
 }
 

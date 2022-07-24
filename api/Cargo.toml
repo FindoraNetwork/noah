@@ -22,6 +22,7 @@ bulletproofs = "2.0"
 digest = '0.10'
 ed25519-dalek = '1.0.0'
 lazy_static = "1.4.0"
+libsecp256k1 = '0.7'
 linear-map = '1.2.0'
 merlin = '3.0'
 rand_chacha = '0.3'
@@ -31,6 +32,7 @@ serde = '1.0'
 serde_derive = '1.0'
 serde_str = '0.1.0'
 sha2 = '0.10'
+sha3 = '0.10'
 
 [dependencies.zei-algebra]
 path = '../algebra'

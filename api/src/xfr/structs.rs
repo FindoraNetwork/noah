@@ -6,7 +6,7 @@ use crate::xfr::{
     asset_mixer::AssetMixProof,
     asset_record::AssetRecordType,
     asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey},
-    sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey},
+    sig::{KeyType, XfrKeyPair, XfrMultiSig, XfrPublicKey},
 };
 use bulletproofs::RangeProof;
 use digest::Digest;
@@ -19,7 +19,7 @@ use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use zei_crypto::basic::{
     chaum_pedersen::ChaumPedersenProofX,
     elgamal::elgamal_key_gen,
-    hybrid_encryption::{self, XPublicKey, XSecretKey, ZeiHybridCiphertext},
+    hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCiphertext},
     pedersen_comm::PedersenCommitment,
     pedersen_elgamal::PedersenElGamalEqProof,
 };
@@ -384,8 +384,10 @@ pub struct TracerMemo {
 /// Information directed to the recipient.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OwnerMemo {
+    /// The signature used curve type.
+    pub key_type: KeyType,
     /// The random point used to compute the shared point.
-    pub blind_share: CompressedEdwardsY,
+    pub blind_share: Vec<u8>,
     /// The hybrid encryption of the memo information.
     pub lock: ZeiHybridCiphertext,
 }
@@ -397,15 +399,20 @@ impl OwnerMemo {
         amount: u64,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar))> {
-        let (r, blind_share) = RistrettoScalar::random_scalar_with_compressed_edwards(prng);
+        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_edwards(prng);
         let shared_point =
-            OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())
-                .c(d!())?;
+            OwnerMemo::derive_shared_edwards_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
-        let lock =
-            hybrid_encryption::hybrid_encrypt_ed25519(prng, &pub_key.0, &amount.to_be_bytes());
-        Ok((OwnerMemo { blind_share, lock }, amount_blinds))
+        let lock = pub_key.hybrid_encrypt(prng, &amount.to_be_bytes());
+        Ok((
+            OwnerMemo {
+                key_type,
+                blind_share,
+                lock,
+            },
+            amount_blinds,
+        ))
     }
 
     /// Construct an `OwnerMemo` for an asset record with only confidential asset type.
@@ -414,14 +421,20 @@ impl OwnerMemo {
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, RistrettoScalar)> {
-        let (r, blind_share) = RistrettoScalar::random_scalar_with_compressed_edwards(prng);
+        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_edwards(prng);
         let shared_point =
-            OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())
-                .c(d!())?;
+            OwnerMemo::derive_shared_edwards_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
-        let lock = hybrid_encryption::hybrid_encrypt_ed25519(prng, &pub_key.0, &asset_type.0);
-        Ok((OwnerMemo { blind_share, lock }, asset_type_blind))
+        let lock = pub_key.hybrid_encrypt(prng, &asset_type.0);
+        Ok((
+            OwnerMemo {
+                key_type,
+                blind_share,
+                lock,
+            },
+            asset_type_blind,
+        ))
     }
 
     /// Construct an `OwnerMemo` for an asset record with both confidential amount and confidential asset type.
@@ -431,23 +444,22 @@ impl OwnerMemo {
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar), RistrettoScalar)> {
-        let (r, blind_share) = RistrettoScalar::random_scalar_with_compressed_edwards(prng);
+        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_edwards(prng);
         let shared_point =
-            OwnerMemo::derive_shared_edwards_point(&r, &pub_key.as_compressed_edwards_point())
-                .c(d!())?;
+            OwnerMemo::derive_shared_edwards_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
         let mut amount_asset_type_plaintext = vec![];
         amount_asset_type_plaintext.extend_from_slice(&amount.to_be_bytes()[..]);
         amount_asset_type_plaintext.extend_from_slice(&asset_type.0[..]);
-        let lock = hybrid_encryption::hybrid_encrypt_ed25519(
-            prng,
-            &pub_key.0,
-            &amount_asset_type_plaintext,
-        );
+        let lock = pub_key.hybrid_encrypt(prng, &amount_asset_type_plaintext);
         Ok((
-            OwnerMemo { blind_share, lock },
+            OwnerMemo {
+                key_type,
+                blind_share,
+                lock,
+            },
             amount_blinds,
             asset_type_blind,
         ))
@@ -501,17 +513,17 @@ impl OwnerMemo {
         &self,
         keypair: &XfrKeyPair,
     ) -> Result<(RistrettoScalar, RistrettoScalar)> {
+        let (key_type, s) = keypair.sec_key.as_scalar_bytes();
         let shared_point =
-            OwnerMemo::derive_shared_edwards_point(&keypair.sec_key.as_scalar(), &self.blind_share)
-                .c(d!())?;
+            OwnerMemo::derive_shared_edwards_point(&key_type, &s, &self.blind_share)?;
         Ok(OwnerMemo::calc_amount_blinds(&shared_point))
     }
 
     /// Return the asset type blind
     pub fn derive_asset_type_blind(&self, keypair: &XfrKeyPair) -> Result<RistrettoScalar> {
+        let (key_type, s) = keypair.sec_key.as_scalar_bytes();
         let shared_point =
-            OwnerMemo::derive_shared_edwards_point(&keypair.sec_key.as_scalar(), &self.blind_share)
-                .c(d!())?;
+            OwnerMemo::derive_shared_edwards_point(&key_type, &s, &self.blind_share)?;
         Ok(OwnerMemo::calc_asset_type_blind(&shared_point))
     }
 }
@@ -519,11 +531,11 @@ impl OwnerMemo {
 impl OwnerMemo {
     // Decrypt the lock.
     fn decrypt(&self, keypair: &XfrKeyPair) -> Vec<u8> {
-        hybrid_encryption::hybrid_decrypt_with_ed25519_secret_key(&self.lock, &keypair.sec_key.0)
+        keypair.hybrid_decrypt(&self.lock)
     }
 
     // Given a shared point, calculate the amount blinds.
-    fn calc_amount_blinds(shared_point: &CompressedEdwardsY) -> (RistrettoScalar, RistrettoScalar) {
+    fn calc_amount_blinds(shared_point: &[u8]) -> (RistrettoScalar, RistrettoScalar) {
         (
             OwnerMemo::hash_to_scalar(&shared_point, b"amount_low"),
             OwnerMemo::hash_to_scalar(&shared_point, b"amount_high"),
@@ -531,24 +543,29 @@ impl OwnerMemo {
     }
 
     // Given a shared point, calculate the asset type blind.
-    fn calc_asset_type_blind(shared_point: &CompressedEdwardsY) -> RistrettoScalar {
+    fn calc_asset_type_blind(shared_point: &[u8]) -> RistrettoScalar {
         OwnerMemo::hash_to_scalar(&shared_point, b"asset_type")
     }
 
     // Return the shared point.
-    fn derive_shared_edwards_point(
-        s: &RistrettoScalar,
-        point: &CompressedEdwardsY,
-    ) -> Result<CompressedEdwardsY> {
-        let shared_edwards_point =
-            s.0 * point.decompress().c(d!(ZeiError::DecompressElementError))?;
-        Ok(CompressedEdwardsY(shared_edwards_point.compress()))
+    fn derive_shared_edwards_point(key_type: &KeyType, s: &[u8], p: &[u8]) -> Result<Vec<u8>> {
+        match key_type {
+            KeyType::Ed25519 => {
+                let scalar = RistrettoScalar::from_bytes(s)?;
+                let point = CompressedEdwardsY::from_slice(p);
+                let shared_edwards_point =
+                    scalar.0 * point.decompress().c(d!(ZeiError::DecompressElementError))?;
+                let d = CompressedEdwardsY(shared_edwards_point.compress());
+                Ok(d.0.as_bytes().to_vec())
+            }
+            _ => todo!(),
+        }
     }
 
     // Derive scalars from the shared point.
-    fn hash_to_scalar(point: &CompressedEdwardsY, aux: &'static [u8]) -> RistrettoScalar {
+    fn hash_to_scalar(point: &[u8], aux: &'static [u8]) -> RistrettoScalar {
         let mut hasher = Sha512::new();
-        hasher.update(point.0.as_bytes());
+        hasher.update(point);
         hasher.update(aux);
         RistrettoScalar::from_hash(hasher)
     }
