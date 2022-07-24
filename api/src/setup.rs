@@ -1,5 +1,4 @@
 // The Public Setup needed for Proofs
-#![allow(unused)]
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
 use crate::anon_xfr::address_folding::AXfrAddressFoldingWitness;
 use crate::anon_xfr::keys::AXfrKeyPair;
@@ -9,7 +8,6 @@ use crate::anon_xfr::{
     abar_to_bar::build_abar_to_bar_cs,
     ar_to_abar::build_ar_to_abar_cs,
     bar_to_abar::build_bar_to_abar_cs,
-    keys,
     structs::{MTNode, MTPath},
     TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
