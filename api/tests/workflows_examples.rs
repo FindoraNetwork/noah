@@ -451,7 +451,7 @@ pub(crate) mod examples {
     fn xfr_note_confidential_two_inputs_one_output_asset_tracing_and_identity_tracking_on_inputs() {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = BulletproofParams::default();
-        let mut AIR: HashMap<&[u8], _> = HashMap::new();
+        let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
         let amount_in1 = 50u64;
         let amount_in2 = 75u64;
         let amount_out1 = 125u64;
@@ -504,14 +504,14 @@ pub(crate) mod examples {
             &mut prng,
             &user1_ac_sk,
             &credential_user1,
-            user1_keypair.pub_key.as_bytes(),
+            &user1_keypair.pub_key.to_bytes(),
         )
         .unwrap();
         let (commitment_user2, proof_user2, commitment_key_user2) = ac_commit(
             &mut prng,
             &user2_ac_sk,
             &credential_user2,
-            user2_keypair.pub_key.as_bytes(),
+            &user2_keypair.pub_key.to_bytes(),
         )
         .unwrap();
 
@@ -520,18 +520,18 @@ pub(crate) mod examples {
             &cred_issuer_pk,
             &commitment_user1,
             &proof_user1,
-            user1_pubkey.as_bytes()
+            &user1_pubkey.to_bytes()
         )
         .is_ok());
-        AIR.insert(user1_pubkey.as_bytes(), commitment_user1);
+        AIR.insert(user1_pubkey.to_bytes().to_vec(), commitment_user1);
         assert!(ac_verify_commitment(
             &cred_issuer_pk,
             &commitment_user2,
             &proof_user2,
-            user2_pubkey.as_bytes()
+            &user2_pubkey.to_bytes()
         )
         .is_ok());
-        AIR.insert(user2_pubkey.as_bytes(), commitment_user2);
+        AIR.insert(user2_pubkey.to_bytes().to_vec(), commitment_user2);
 
         // 3. Prepare input AssetRecord
         // 3.1 get blind asset records "from ledger" and open them
@@ -587,8 +587,8 @@ pub(crate) mod examples {
         let policies = XfrNotePoliciesRef::new(
             vec![&policies, &policies],
             vec![
-                Some(&AIR[xfr_note.body.inputs[0].public_key.as_bytes()]),
-                Some(&AIR[xfr_note.body.inputs[1].public_key.as_bytes()]),
+                Some(&AIR[&xfr_note.body.inputs[0].public_key.to_bytes().to_vec()]),
+                Some(&AIR[&xfr_note.body.inputs[1].public_key.to_bytes().to_vec()]),
             ],
             vec![&no_policies],
             vec![None],
@@ -643,7 +643,7 @@ pub(crate) mod examples {
     {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = BulletproofParams::default();
-        let mut AIR: HashMap<&[u8], _> = HashMap::new();
+        let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
         let amount_in1 = 100u64;
         let amount_out1 = 75u64;
         let amount_out2 = 25u64;
@@ -700,14 +700,14 @@ pub(crate) mod examples {
             &mut prng,
             &recv_user1_ac_sk,
             &credential_user1,
-            recv_user1_keypair.pub_key.as_bytes(),
+            &recv_user1_keypair.pub_key.to_bytes(),
         )
         .unwrap();
         let (commitment_user2, proof_user2, commitment_key_user2) = ac_commit(
             &mut prng,
             &recv_user2_ac_sk,
             &credential_user2,
-            recv_user2_keypair.pub_key.as_bytes(),
+            &recv_user2_keypair.pub_key.to_bytes(),
         )
         .unwrap();
 
@@ -716,18 +716,18 @@ pub(crate) mod examples {
             &cred_issuer_pk,
             &commitment_user1,
             &proof_user1,
-            recv_user1_pub_key.as_bytes()
+            &recv_user1_pub_key.to_bytes()
         )
         .is_ok());
-        AIR.insert(recv_user1_pub_key.as_bytes(), commitment_user1);
+        AIR.insert(recv_user1_pub_key.to_bytes().to_vec(), commitment_user1);
         assert!(ac_verify_commitment(
             &cred_issuer_pk,
             &commitment_user2,
             &proof_user2,
-            recv_user2_pub_key.as_bytes()
+            &recv_user2_pub_key.to_bytes()
         )
         .is_ok());
-        AIR.insert(recv_user2_pub_key.as_bytes(), commitment_user2);
+        AIR.insert(recv_user2_pub_key.to_bytes().to_vec(), commitment_user2);
 
         // 3. Prepare input AssetRecord
         // 3.1 get blind asset records "from ledger" and open them
@@ -786,8 +786,8 @@ pub(crate) mod examples {
             vec![None],
             vec![&policies, &policies],
             vec![
-                Some(&AIR[xfr_note.body.outputs[0].public_key.as_bytes()]),
-                Some(&AIR[xfr_note.body.outputs[1].public_key.as_bytes()]),
+                Some(&AIR[&xfr_note.body.outputs[0].public_key.to_bytes().to_vec()]),
+                Some(&AIR[&xfr_note.body.outputs[1].public_key.to_bytes().to_vec()]),
             ],
         );
 
@@ -872,7 +872,7 @@ pub(crate) mod examples {
 
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = BulletproofParams::default();
-        let mut AIR: HashMap<&[u8], _> = HashMap::new();
+        let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
         let amount_asset1_in1 = 25;
         let amount_asset2_in2 = 50;
         let amount_asset3_in3 = 75;
@@ -955,65 +955,77 @@ pub(crate) mod examples {
             &mut prng,
             &user1_ac_sk,
             &credential_user1,
-            user1_key_pair1.pub_key.as_bytes(),
+            &user1_key_pair1.pub_key.to_bytes(),
         )
         .unwrap();
         assert!(ac_verify_commitment(
             &cred_issuer_pk,
             &commitment_user1_addr1,
             &proof,
-            user1_key_pair1.pub_key.as_bytes()
+            &user1_key_pair1.pub_key.to_bytes()
         )
         .is_ok());
-        AIR.insert(user1_key_pair1.pub_key.as_bytes(), commitment_user1_addr1);
+        AIR.insert(
+            user1_key_pair1.pub_key.to_bytes().to_vec(),
+            commitment_user1_addr1,
+        );
 
         let (commitment_user2_addr1, proof, _commitment_user2_addr1_key) = ac_commit(
             &mut prng,
             &user2_ac_sk,
             &credential_user2,
-            user2_key_pair1.pub_key.as_bytes(),
+            &user2_key_pair1.pub_key.to_bytes(),
         )
         .unwrap();
         assert!(ac_verify_commitment(
             &cred_issuer_pk,
             &commitment_user2_addr1,
             &proof,
-            user2_key_pair1.pub_key.as_bytes()
+            &user2_key_pair1.pub_key.to_bytes()
         )
         .is_ok());
-        AIR.insert(user2_key_pair1.pub_key.as_bytes(), commitment_user2_addr1);
+        AIR.insert(
+            user2_key_pair1.pub_key.to_bytes().to_vec(),
+            commitment_user2_addr1,
+        );
 
         let (commitment_user3_addr1, proof, commitment_user3_addr1_key) = ac_commit(
             &mut prng,
             &user3_ac_sk,
             &credential_user3,
-            user3_key_pair1.pub_key.as_bytes(),
+            &user3_key_pair1.pub_key.to_bytes(),
         )
         .unwrap();
         assert!(ac_verify_commitment(
             &cred_issuer_pk,
             &commitment_user3_addr1,
             &proof,
-            user3_key_pair1.pub_key.as_bytes()
+            &user3_key_pair1.pub_key.to_bytes()
         )
         .is_ok());
-        AIR.insert(user3_key_pair1.pub_key.as_bytes(), commitment_user3_addr1);
+        AIR.insert(
+            user3_key_pair1.pub_key.to_bytes().to_vec(),
+            commitment_user3_addr1,
+        );
 
         let (commitment_user4_addr1, proof, _commitment_user4_addr1_key) = ac_commit(
             &mut prng,
             &user4_ac_sk,
             &credential_user4,
-            user4_key_pair1.pub_key.as_bytes(),
+            &user4_key_pair1.pub_key.to_bytes(),
         )
         .unwrap();
         assert!(ac_verify_commitment(
             &cred_issuer_pk,
             &commitment_user4_addr1,
             &proof,
-            user4_key_pair1.pub_key.as_bytes()
+            &user4_key_pair1.pub_key.to_bytes()
         )
         .is_ok());
-        AIR.insert(user4_key_pair1.pub_key.as_bytes(), commitment_user4_addr1);
+        AIR.insert(
+            user4_key_pair1.pub_key.to_bytes().to_vec(),
+            commitment_user4_addr1,
+        );
 
         // 1.5 Define asset issuer tracing policies
         let id_tracing_policy1 = IdentityRevealPolicy {
@@ -1141,11 +1153,13 @@ pub(crate) mod examples {
 
         // 5. Verify xfr_note
         let no_policy = TracingPolicies::new();
-        let input1_credential_commitment = &AIR[xfr_note.body.inputs[0].public_key.as_bytes()];
+        let input1_credential_commitment =
+            &AIR[&xfr_note.body.inputs[0].public_key.to_bytes().to_vec()];
         let input_policies = vec![&asset_tracing_policy_asset1_input, &no_policy, &no_policy];
         let inputs_sig_commitments = vec![Some(input1_credential_commitment), None, None];
 
-        let output3_credential_commitment = &AIR[xfr_note.body.outputs[2].public_key.as_bytes()];
+        let output3_credential_commitment =
+            &AIR[&xfr_note.body.outputs[2].public_key.to_bytes().to_vec()];
         let output_policies = vec![
             &no_policy,
             &no_policy,

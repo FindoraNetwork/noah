@@ -26,13 +26,13 @@ pub fn dh_keypair(secret_key: JubjubScalar) -> (JubjubScalar, JubjubPoint) {
 
 /// Encrypted data using the public key.
 #[inline]
-pub fn dh_encrypt<R: CryptoRng + RngCore>(
+pub fn dh_encrypt<R: CryptoRng + RngCore, G: Group>(
     prng: &mut R,
-    public_key: &JubjubPoint,
+    public_key: &G,
     msg: &[u8],
-) -> Result<(JubjubPoint, Vec<u8>)> {
-    let share_scalar = JubjubScalar::random(prng);
-    let share = JubjubPoint::get_base().mul(&share_scalar);
+) -> Result<(G, Vec<u8>)> {
+    let share_scalar = G::ScalarType::random(prng);
+    let share = G::get_base().mul(&share_scalar);
 
     let dh = public_key.mul(&share_scalar);
 
@@ -69,7 +69,7 @@ pub fn dh_encrypt<R: CryptoRng + RngCore>(
 
 /// Decrypt data using the secret key.
 #[inline]
-pub fn dh_decrypt(secret_key: &JubjubScalar, share: &JubjubPoint, ctext: &[u8]) -> Result<Vec<u8>> {
+pub fn dh_decrypt<G: Group>(secret_key: &G::ScalarType, share: &G, ctext: &[u8]) -> Result<Vec<u8>> {
     let dh = share.mul(secret_key);
 
     let mut hasher = sha2::Sha512::new();

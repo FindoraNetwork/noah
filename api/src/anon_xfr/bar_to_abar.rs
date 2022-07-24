@@ -706,7 +706,7 @@ mod test {
 
         let mut note = note;
         let message = b"anymesage";
-        let bad_sig = bar_keypair.sign(message);
+        let bad_sig = bar_keypair.sign(message).unwrap();
         note.signature = bad_sig;
         assert!(verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key).is_err())
     }

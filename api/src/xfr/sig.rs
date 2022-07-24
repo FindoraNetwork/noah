@@ -1,3 +1,4 @@
+use crate::primitives::asymmetric_encryption;
 use ed25519_dalek::{
     ExpandedSecretKey, PublicKey as Ed25519PublicKey, SecretKey as Ed25519SecretKey,
     Signature as Ed25519Signature, Verifier,
@@ -12,6 +13,7 @@ use zei_algebra::{
     hash::{Hash, Hasher},
     prelude::*,
     ristretto::RistrettoScalar,
+    secp256k1::{SECP256K1Scalar, SECP256K1G1},
 };
 use zei_crypto::basic::hybrid_encryption::{
     hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, ZeiHybridCiphertext,
@@ -127,7 +129,10 @@ impl XfrPublicKey {
                 let (s, p) = RistrettoScalar::random_scalar_with_compressed_edwards(prng);
                 (KeyType::Ed25519, s.to_bytes(), p.0.to_bytes().to_vec())
             }
-            _ => todo!(),
+            XfrPublicKey::Secp256k1(_) => {
+                let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_edwards(prng);
+                (KeyType::Secp256k1, s.to_bytes(), p.to_compressed_bytes())
+            }
         }
     }
 
@@ -144,10 +149,19 @@ impl XfrPublicKey {
         &self,
         prng: &mut R,
         msg: &[u8],
-    ) -> ZeiHybridCiphertext {
+    ) -> Result<Vec<u8>> {
         match self {
-            XfrPublicKey::Ed25519(pk) => hybrid_encrypt_ed25519(prng, pk, msg),
-            _ => todo!(),
+            XfrPublicKey::Ed25519(pk) => Ok(hybrid_encrypt_ed25519(prng, pk, msg).zei_to_bytes()),
+            XfrPublicKey::Secp256k1(pk) => {
+                let bytes = pk.serialize_compressed();
+                // bytes[0] is to check is even or odd.
+                let gp = SECP256K1G1::from_compressed_bytes(&bytes[1..])?;
+                let (p, mut ctext) = asymmetric_encryption::dh_encrypt(prng, &gp, msg)?;
+                let mut bytes = vec![];
+                bytes.append(&mut p.to_compressed_bytes());
+                bytes.append(&mut ctext);
+                Ok(bytes)
+            }
         }
     }
 
@@ -257,8 +271,8 @@ impl XfrSecretKey {
     pub fn into_keypair(self) -> XfrKeyPair {
         let pk = match self {
             XfrSecretKey::Ed25519(ref sk) => XfrPublicKey::Ed25519(sk.into()),
-            XfrSecretKey::Secp256k1(sk) => {
-                XfrPublicKey::Secp256k1(Secp256k1PublicKey::from_secret_key(&sk))
+            XfrSecretKey::Secp256k1(ref sk) => {
+                XfrPublicKey::Secp256k1(Secp256k1PublicKey::from_secret_key(sk))
             }
         };
         XfrKeyPair {
@@ -268,10 +282,17 @@ impl XfrSecretKey {
     }
 
     /// Hybrid decryption
-    pub fn hybrid_decrypt(&self, lock: &ZeiHybridCiphertext) -> Vec<u8> {
+    pub fn hybrid_decrypt(&self, lock: &[u8]) -> Result<Vec<u8>> {
         match self {
-            XfrSecretKey::Ed25519(sk) => hybrid_decrypt_with_ed25519_secret_key(lock, sk),
-            _ => todo!(),
+            XfrSecretKey::Ed25519(sk) => {
+                let ctext = ZeiHybridCiphertext::zei_from_bytes(lock)?;
+                Ok(hybrid_decrypt_with_ed25519_secret_key(&ctext, sk))
+            }
+            XfrSecretKey::Secp256k1(sk) => {
+                let gs = SECP256K1Scalar::from_bytes(&sk.serialize())?;
+                let point = SECP256K1G1::from_compressed_bytes(&lock[0..32])?;
+                asymmetric_encryption::dh_decrypt(&gs, &point, &lock[32..])
+            }
         }
     }
 
@@ -349,7 +370,12 @@ impl XfrSecretKey {
 }
 
 impl XfrKeyPair {
-    /// Generate a key pair.
+    /// Default generate a key pair.
+    pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+        Self::generate_ed25519(prng)
+    }
+
+    /// Generate a Ed25519 key pair.
     pub fn generate_ed25519<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         let kp = ed25519_dalek::Keypair::generate(prng);
         XfrKeyPair {
@@ -358,7 +384,7 @@ impl XfrKeyPair {
         }
     }
 
-    /// Generate a key pair.
+    /// Generate a Secp256k1 key pair.
     pub fn generate_secp256k1<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         let sk = Secp256k1SecretKey::random(prng);
         let pk = Secp256k1PublicKey::from_secret_key(&sk);
@@ -369,7 +395,7 @@ impl XfrKeyPair {
     }
 
     /// Hybrid decryption
-    pub fn hybrid_decrypt(&self, lock: &ZeiHybridCiphertext) -> Vec<u8> {
+    pub fn hybrid_decrypt(&self, lock: &[u8]) -> Result<Vec<u8>> {
         self.sec_key.hybrid_decrypt(lock)
     }
 
@@ -512,23 +538,23 @@ mod test {
     fn signatures() {
         let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
 
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = XfrKeyPair::generate_secp256k1(&mut prng);
         let message = "";
 
-        let sig = keypair.sign(message.as_bytes());
+        let sig = keypair.sign(message.as_bytes()).unwrap();
         pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
         //same test with secret key
-        let sig = keypair.sec_key.sign(message.as_bytes(), &keypair.pub_key);
+        let sig = keypair.sec_key.sign(message.as_bytes()).unwrap();
         pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
 
         //test again with fresh same key
         let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = XfrKeyPair::generate_secp256k1(&mut prng);
         pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
 
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = XfrKeyPair::generate_ed25519(&mut prng);
         let message = [10u8; 500];
-        let sig = keypair.sign(&message);
+        let sig = keypair.sign(&message).unwrap();
         msg_eq!(
             dbg!(ZeiError::SignatureError),
             dbg!(keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err()),
@@ -536,7 +562,7 @@ mod test {
         );
         pnk!(keypair.pub_key.verify(&message, &sig));
         //test again with secret key
-        let sig = keypair.sec_key.sign(&message, &keypair.pub_key);
+        let sig = keypair.sec_key.sign(&message).unwrap();
         msg_eq!(
             ZeiError::SignatureError,
             keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
@@ -545,7 +571,7 @@ mod test {
         pnk!(keypair.pub_key.verify(&message, &sig));
 
         // test with different keys
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = XfrKeyPair::generate_ed25519(&mut prng);
         msg_eq!(
             ZeiError::SignatureError,
             keypair.pub_key.verify(&message, &sig).unwrap_err(),
@@ -556,7 +582,7 @@ mod test {
     fn generate_keypairs(prng: &mut ChaChaRng, n: usize) -> Vec<XfrKeyPair> {
         let mut v = vec![];
         for _ in 0..n {
-            v.push(XfrKeyPair::generate(prng));
+            v.push(XfrKeyPair::generate_secp256k1(prng));
         }
         v
     }
@@ -571,6 +597,7 @@ mod test {
         let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
         assert!(
             XfrMultiSig::sign(&keypairs_refs, &msg)
+                .unwrap()
                 .verify(&pubkeys, &msg)
                 .is_ok(),
             "Multisignature should have verify correctly for a single key"
@@ -582,6 +609,7 @@ mod test {
         let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
         assert!(
             XfrMultiSig::sign(&keypairs_refs, &msg)
+                .unwrap()
                 .verify(&pubkeys, &msg)
                 .is_ok(),
             "Multisignature should have verify correctly for 10 keys"
@@ -595,6 +623,7 @@ mod test {
         pubkeys.swap(4, 9);
         assert!(
             XfrMultiSig::sign(&keypairs_refs, &msg)
+                .unwrap()
                 .verify(&pubkeys, &msg)
                 .is_ok(),
             "Multisignature should have verify correctly even when keylist is unordered"

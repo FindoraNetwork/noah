@@ -108,7 +108,7 @@ mod test {
             blind_asset_record: BlindAssetRecord {
                 amount: blind_amount,
                 asset_type: blind_type,
-                public_key: Default::default(),
+                public_key: XfrPublicKey::Ed25519(Default::default()),
             },
             amount: amt,
             amount_blinds: (Default::default(), Default::default()),
@@ -204,7 +204,7 @@ mod test {
         let keypair = XfrKeyPair::generate(&mut prng);
         let message = [10u8; 55];
 
-        let signature = keypair.sign(&message);
+        let signature = keypair.sign(&message).unwrap();
 
         let mut vec = vec![];
         assert_eq!(
@@ -218,7 +218,7 @@ mod test {
         assert_eq!(signature, signature2);
     }
 
-    #[derive(Serialize, Deserialize, Default)]
+    #[derive(Serialize, Deserialize)]
     struct StructWithPubKey {
         key: XfrPublicKey,
     }

@@ -14,6 +14,7 @@ use sha2::Sha512;
 use zei_algebra::{
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar},
+    secp256k1::{SECP256K1Scalar, SECP256K1G1},
 };
 use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use zei_crypto::basic::{
@@ -388,8 +389,27 @@ pub struct OwnerMemo {
     pub key_type: KeyType,
     /// The random point used to compute the shared point.
     pub blind_share: Vec<u8>,
+    /// The ciphertext of the memo information.
+    pub lock: Vec<u8>,
+}
+
+/// Information directed to the recipient.
+#[derive(Deserialize, Serialize)]
+pub struct OldOwnerMemo {
+    /// The random point used to compute the shared point.
+    pub blind_share: CompressedEdwardsY,
     /// The hybrid encryption of the memo information.
     pub lock: ZeiHybridCiphertext,
+}
+
+impl From<OldOwnerMemo> for OwnerMemo {
+    fn from(memo: OldOwnerMemo) -> OwnerMemo {
+        OwnerMemo {
+            key_type: KeyType::Ed25519,
+            blind_share: memo.blind_share.0.to_bytes().to_vec(),
+            lock: memo.lock.zei_to_bytes(),
+        }
+    }
 }
 
 impl OwnerMemo {
@@ -404,7 +424,7 @@ impl OwnerMemo {
             OwnerMemo::derive_shared_edwards_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
-        let lock = pub_key.hybrid_encrypt(prng, &amount.to_be_bytes());
+        let lock = pub_key.hybrid_encrypt(prng, &amount.to_be_bytes())?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -426,7 +446,7 @@ impl OwnerMemo {
             OwnerMemo::derive_shared_edwards_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
-        let lock = pub_key.hybrid_encrypt(prng, &asset_type.0);
+        let lock = pub_key.hybrid_encrypt(prng, &asset_type.0)?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -453,7 +473,7 @@ impl OwnerMemo {
         let mut amount_asset_type_plaintext = vec![];
         amount_asset_type_plaintext.extend_from_slice(&amount.to_be_bytes()[..]);
         amount_asset_type_plaintext.extend_from_slice(&asset_type.0[..]);
-        let lock = pub_key.hybrid_encrypt(prng, &amount_asset_type_plaintext);
+        let lock = pub_key.hybrid_encrypt(prng, &amount_asset_type_plaintext)?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -468,7 +488,7 @@ impl OwnerMemo {
     /// Decrypt the `OwnerMemo.lock` which encrypts only the confidential amount
     /// returns error if the decrypted bytes length doesn't match.
     pub fn decrypt_amount(&self, keypair: &XfrKeyPair) -> Result<u64> {
-        let decrypted_bytes = self.decrypt(&keypair);
+        let decrypted_bytes = self.decrypt(&keypair)?;
         // amount is u64, thus u64.to_be_bytes should be 8 bytes
         if decrypted_bytes.len() != 8 {
             return Err(eg!(ZeiError::InconsistentStructureError));
@@ -481,7 +501,7 @@ impl OwnerMemo {
     /// Decrypt the `OwnerMemo.lock` which encrypts only the confidential asset type
     /// returns error if the decrypted bytes length doesn't match.
     pub fn decrypt_asset_type(&self, keypair: &XfrKeyPair) -> Result<AssetType> {
-        let decrypted_bytes = self.decrypt(&keypair);
+        let decrypted_bytes = self.decrypt(&keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH {
             return Err(eg!(ZeiError::InconsistentStructureError));
         }
@@ -493,7 +513,7 @@ impl OwnerMemo {
     /// Decrypt the `OwnerMemo.lock` which encrypts "amount || asset type", both amount and asset type
     /// are confidential.
     pub fn decrypt_amount_and_asset_type(&self, keypair: &XfrKeyPair) -> Result<(u64, AssetType)> {
-        let decrypted_bytes = self.decrypt(&keypair);
+        let decrypted_bytes = self.decrypt(&keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH + 8 {
             return Err(eg!(ZeiError::InconsistentStructureError));
         }
@@ -530,7 +550,7 @@ impl OwnerMemo {
 
 impl OwnerMemo {
     // Decrypt the lock.
-    fn decrypt(&self, keypair: &XfrKeyPair) -> Vec<u8> {
+    fn decrypt(&self, keypair: &XfrKeyPair) -> Result<Vec<u8>> {
         keypair.hybrid_decrypt(&self.lock)
     }
 
@@ -558,7 +578,12 @@ impl OwnerMemo {
                 let d = CompressedEdwardsY(shared_edwards_point.compress());
                 Ok(d.0.as_bytes().to_vec())
             }
-            _ => todo!(),
+            KeyType::Secp256k1 => {
+                let scalar = SECP256K1Scalar::from_bytes(s)?;
+                let point = SECP256K1G1::from_compressed_bytes(p)?;
+                let shared_edwards_point = point.mul(&scalar);
+                Ok(shared_edwards_point.to_compressed_bytes())
+            }
         }
     }
 
