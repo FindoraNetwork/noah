@@ -69,7 +69,11 @@ pub fn dh_encrypt<R: CryptoRng + RngCore, G: Group>(
 
 /// Decrypt data using the secret key.
 #[inline]
-pub fn dh_decrypt<G: Group>(secret_key: &G::ScalarType, share: &G, ctext: &[u8]) -> Result<Vec<u8>> {
+pub fn dh_decrypt<G: Group>(
+    secret_key: &G::ScalarType,
+    share: &G,
+    ctext: &[u8],
+) -> Result<Vec<u8>> {
     let dh = share.mul(secret_key);
 
     let mut hasher = sha2::Sha512::new();

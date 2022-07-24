@@ -136,7 +136,10 @@ impl ZeiFromToBytes for ZeiHybridCiphertext {
         } else {
             let ephemeral_public_key = XPublicKey::zei_from_bytes(&bytes[0..32])?;
             let ciphertext = Ctext::zei_from_bytes(&bytes[32..])?;
-            Ok(Self { ciphertext, ephemeral_public_key })
+            Ok(Self {
+                ciphertext,
+                ephemeral_public_key,
+            })
         }
     }
 }
