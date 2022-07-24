@@ -252,7 +252,10 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     // Compute the evaluations of the quotient polynomial on the coset.
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
     let alpha = challenges.get_alpha().unwrap();
-    let alpha_sq = alpha.mul(alpha);
+    let alpha_pow_2 = alpha.mul(alpha);
+    let alpha_pow_3 = alpha_pow_2.mul(alpha);
+    let alpha_pow_4 = alpha_pow_3.mul(alpha);
+    let alpha_pow_5 = alpha_pow_4.mul(alpha);
     let mut t_coset_evals = vec![];
 
     for point in 0..m {
@@ -290,11 +293,39 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
         }
 
         // alpha^2 * (z(X) - 1) * L_1(X)
-        let term4 = alpha_sq
+        let term4 = alpha_pow_2
             .mul(&prover_params.l1_coset_evals[point])
             .mul(&z_coset_evals[point].sub(&PCS::Field::one()));
 
-        let numerator = term1.add(&term2).add(&term4.sub(&term3));
+        let qb_eval_point = prover_params.qb_coset_eval[point];
+
+        // alpha^3 * qb(X) (w[1] (1 - w[1]))
+        let w1_eval_point = w_polys_coset_evals[1][point];
+        let term5 = alpha_pow_3
+            .mul(&qb_eval_point)
+            .mul(&w1_eval_point)
+            .mul(&w1_eval_point.sub(&PCS::Field::one()));
+
+        // alpha^4 * qb(X) (w[2] (1 - w[2]))
+        let w2_eval_point = w_polys_coset_evals[2][point];
+        let term6 = alpha_pow_4
+            .mul(&qb_eval_point)
+            .mul(&w2_eval_point)
+            .mul(&w2_eval_point.sub(&PCS::Field::one()));
+
+        // alpha^5 * qb(X) (w[3] (1 - w[3]))
+        let w3_eval_point = w_polys_coset_evals[3][point];
+        let term7 = alpha_pow_5
+            .mul(&qb_eval_point)
+            .mul(&w3_eval_point)
+            .mul(&w3_eval_point.sub(&PCS::Field::one()));
+
+        let numerator = term1
+            .add(&term2)
+            .add(&term4.sub(&term3))
+            .add(&term5)
+            .add(&term6)
+            .add(&term7);
         t_coset_evals.push(numerator.mul(&prover_params.z_h_inv_coset_evals[point]));
     }
 
@@ -307,6 +338,7 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     w: &[F],
     n: usize,
     q_polys_or_comms: &[PCSType],
+    qb_poly_or_comm: &PCSType,
     k: &[F],
     last_s_poly_or_comm: &PCSType,
     z_poly_or_comm: &PCSType,
@@ -320,6 +352,11 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
     let alpha = challenges.get_alpha().unwrap();
     let zeta = challenges.get_zeta().unwrap();
+
+    let alpha_pow_2 = alpha.mul(alpha);
+    let alpha_pow_3 = alpha_pow_2.mul(alpha);
+    let alpha_pow_4 = alpha_pow_3.mul(alpha);
+    let alpha_pow_5 = alpha_pow_4.mul(alpha);
 
     // 1. sum_{i=1..n_selectors} wi * qi(X)
     let mut l = q_polys_or_comms[0].mul(&w[0]);
@@ -346,6 +383,12 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     // 4. subtract the combined t polynomial
     let mut z_h_eval_zeta = zeta.pow(&[n as u64]);
     z_h_eval_zeta.sub_assign(&F::one());
+
+    // 5. + qb(X) * (w[1] (1 - w[1]) + w[2] (1 - w[2]) + w[3] (1 - w[3]))
+    let w1_part = w[1].mul(&(w[1] - &F::one())).mul(&alpha_pow_3);
+    let w2_part = w[2].mul(&(w[2] - &F::one())).mul(&alpha_pow_4);
+    let w3_part = w[3].mul(&(w[3] - &F::one())).mul(&alpha_pow_5);
+    l.add_assign(&qb_poly_or_comm.mul(&w1_part.add(w2_part).add(w3_part)));
 
     let factor = zeta.pow(&[n_t_polys as u64]);
     let mut exponent = z_h_eval_zeta * factor;
@@ -374,6 +417,7 @@ pub(super) fn r_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
         &w,
         prover_params.group.len(),
         &prover_params.q_polys,
+        &prover_params.qb_poly,
         &prover_params.verifier_params.k,
         &prover_params.s_polys[CS::n_wires_per_gate() - 1],
         z,
@@ -402,6 +446,7 @@ pub(super) fn r_commitment<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
         &w,
         verifier_params.cs_size,
         &verifier_params.cm_q_vec,
+        &verifier_params.cm_qb,
         &verifier_params.k,
         &verifier_params.cm_s_vec[CS::n_wires_per_gate() - 1],
         cm_z,

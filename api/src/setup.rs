@@ -95,7 +95,7 @@ pub const BULLET_PROOF_RANGE: usize = 32;
 /// The maximal number
 pub const MAX_CONFIDENTIAL_RECORD_NUMBER: usize = 128;
 /// The maximal number of inputs and outputs supported by this setup program.
-pub const MAX_ANONYMOUS_RECORD_NUMBER: usize = 5;
+pub const MAX_ANONYMOUS_RECORD_NUMBER: usize = 6;
 /// The default number of Bulletproofs generators
 pub const DEFAULT_BP_NUM_GENS: usize = 256;
 

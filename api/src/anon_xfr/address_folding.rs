@@ -228,20 +228,14 @@ pub fn prove_address_folding_in_cs(
         .zip(modulus_bits.iter())
         .rev()
     {
-        let modulus_bit_var = cs.new_variable(BLSScalar::from(*modulus_bit as u32));
-        cs.insert_constant_gate(modulus_bit_var, BLSScalar::from(*modulus_bit as u32));
-
-        let meet_different_bit_var =
-            cs.is_not_equal(secret_key_bit_var.clone(), modulus_bit_var.clone());
-        let meet_different_bit = secret_key_bit != modulus_bit;
-
-        // If this is the first time we see different bits, then we can set `flag_smaller_than_modulus` to true if the corresponding
-        // modulus bit is true (which implies that the secret key bit is false).
-        //
-        // In other situations, however, `flag_smaller_than_modulus` remains unchanged.
-        flag_smaller_than_modulus = flag_smaller_than_modulus
-            || (meet_different_bit && *modulus_bit && !flag_meet_first_different_bit);
         if *modulus_bit {
+            // If this is the first time we see different bits, then we can set `flag_smaller_than_modulus` to true if the corresponding
+            // modulus bit is true (which implies that the secret key bit is false).
+            //
+            // In other situations, however, `flag_smaller_than_modulus` remains unchanged.
+            flag_smaller_than_modulus =
+                flag_smaller_than_modulus || (!secret_key_bit && !flag_meet_first_different_bit);
+
             flag_smaller_than_modulus_var = {
                 let res = cs.new_variable(BLSScalar::from(flag_smaller_than_modulus as u32));
 
@@ -249,45 +243,71 @@ pub fn prove_address_folding_in_cs(
                 let one = BLSScalar::one();
                 let zero_var = cs.zero_var();
 
-                cs.push_add_selectors(zero, one, one, zero);
-                cs.push_mul_selectors(one.neg(), zero);
-                cs.push_constant_selector(zero);
+                cs.push_add_selectors(one.neg(), one.neg(), one, zero);
+                cs.push_mul_selectors(one, zero);
+                cs.push_constant_selector(one);
                 cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(one);
                 cs.wiring[0].push(flag_meet_first_different_bit_var);
-                cs.wiring[1].push(meet_different_bit_var);
+                cs.wiring[1].push(*secret_key_bit_var);
                 cs.wiring[2].push(flag_smaller_than_modulus_var);
                 cs.wiring[3].push(zero_var);
                 cs.wiring[4].push(res);
                 cs.finish_new_gate();
 
                 res
-            }
+            };
+
+            // Track if we have already met different bits.
+            flag_meet_first_different_bit = flag_meet_first_different_bit || !secret_key_bit;
+
+            flag_meet_first_different_bit_var = {
+                let res = cs.new_variable(BLSScalar::from(flag_meet_first_different_bit as u32));
+
+                let zero = BLSScalar::zero();
+                let one = BLSScalar::one();
+                let zero_var = cs.zero_var();
+
+                cs.push_add_selectors(zero, one.neg(), zero, zero);
+                cs.push_mul_selectors(one, zero);
+                cs.push_constant_selector(one);
+                cs.push_rescue_selectors(zero, zero, zero, zero);
+                cs.push_out_selector(one);
+                cs.wiring[0].push(flag_meet_first_different_bit_var);
+                cs.wiring[1].push(*secret_key_bit_var);
+                cs.wiring[2].push(zero_var);
+                cs.wiring[3].push(zero_var);
+                cs.wiring[4].push(res);
+                cs.finish_new_gate();
+
+                res
+            };
+        } else {
+            // Track if we have already met different bits.
+            flag_meet_first_different_bit = flag_meet_first_different_bit || *secret_key_bit;
+
+            flag_meet_first_different_bit_var = {
+                let res = cs.new_variable(BLSScalar::from(flag_meet_first_different_bit as u32));
+
+                let zero = BLSScalar::zero();
+                let one = BLSScalar::one();
+                let zero_var = cs.zero_var();
+
+                cs.push_add_selectors(one, one, zero, zero);
+                cs.push_mul_selectors(one.neg(), zero);
+                cs.push_constant_selector(zero);
+                cs.push_rescue_selectors(zero, zero, zero, zero);
+                cs.push_out_selector(one);
+                cs.wiring[0].push(flag_meet_first_different_bit_var);
+                cs.wiring[1].push(*secret_key_bit_var);
+                cs.wiring[2].push(zero_var);
+                cs.wiring[3].push(zero_var);
+                cs.wiring[4].push(res);
+                cs.finish_new_gate();
+
+                res
+            };
         }
-
-        // Track if we have already met different bits.
-        flag_meet_first_different_bit = flag_meet_first_different_bit || meet_different_bit;
-        flag_meet_first_different_bit_var = {
-            let res = cs.new_variable(BLSScalar::from(flag_meet_first_different_bit as u32));
-
-            let zero = BLSScalar::zero();
-            let one = BLSScalar::one();
-            let zero_var = cs.zero_var();
-
-            cs.push_add_selectors(one, one, zero, zero);
-            cs.push_mul_selectors(one.neg(), zero);
-            cs.push_constant_selector(zero);
-            cs.push_rescue_selectors(zero, zero, zero, zero);
-            cs.push_out_selector(one);
-            cs.wiring[0].push(flag_meet_first_different_bit_var);
-            cs.wiring[1].push(meet_different_bit_var);
-            cs.wiring[2].push(zero_var);
-            cs.wiring[3].push(zero_var);
-            cs.wiring[4].push(res);
-            cs.finish_new_gate();
-
-            res
-        };
     }
 
     // Enforce `flag_smaller_than_modulus_var = true` and `flag_meet_first_different_bit_var = true`

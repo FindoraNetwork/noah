@@ -368,7 +368,6 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         if left_pairing_eval == right_pairing_eval {
             Ok(())
         } else {
-            println!("not equal");
             Err(eg!(PolyComSchemeError::PCSProveEvalError))
         }
     }

@@ -27,6 +27,8 @@ pub struct TurboCS<F> {
     pub public_vars_constraint_indices: Vec<CsIndex>,
     /// the public witness variables indices.
     pub public_vars_witness_indices: Vec<VarIndex>,
+    /// the gates with boolean constraint.
+    pub boolean_constraint_indices: Vec<CsIndex>,
     /// only for verifier use.
     pub verifier_only: bool,
     /// A private witness for the circuit, cleared after computing a proof.
@@ -73,6 +75,10 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
 
     fn public_vars_witness_indices(&self) -> &[VarIndex] {
         &self.public_vars_witness_indices
+    }
+
+    fn boolean_constraint_indices(&self) -> &[CsIndex] {
+        &self.boolean_constraint_indices
     }
 
     fn selector(&self, index: usize) -> Result<&[F]> {
@@ -155,6 +161,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             size: self.size,
             public_vars_constraint_indices: vec![],
             public_vars_witness_indices: vec![],
+            boolean_constraint_indices: vec![],
             verifier_only: true,
             witness: vec![],
         })
@@ -198,6 +205,7 @@ impl<F: Scalar> TurboCS<F> {
             size: 0,
             public_vars_constraint_indices: vec![],
             public_vars_witness_indices: vec![],
+            boolean_constraint_indices: vec![],
             verifier_only: false,
             witness: vec![F::zero(), F::one()],
         }
@@ -351,7 +359,7 @@ impl<F: Scalar> TurboCS<F> {
         r.sub_assign(&out);
 
         if !r.is_zero() {
-            #[cfg(feature = "backtrace")]
+            #[cfg(nightly)]
             {
                 println!("{}", std::backtrace::Backtrace::capture());
             }
@@ -453,9 +461,6 @@ impl<F: Scalar> TurboCS<F> {
             .map(|val| self.new_variable(val))
             .collect();
 
-        for elem in b.iter() {
-            self.insert_boolean_gate(*elem);
-        }
         let one = F::one();
         let two = one.add(&one);
         let four = two.add(&two);
@@ -463,6 +468,7 @@ impl<F: Scalar> TurboCS<F> {
         let bin = vec![one, two, four, eight];
 
         let mut acc = b[n_bits - 1];
+        self.insert_boolean_gate(b[n_bits - 1]);
         let m = (n_bits - 2) / 3;
         for i in 0..m {
             acc = self.linear_combine(
@@ -477,6 +483,7 @@ impl<F: Scalar> TurboCS<F> {
                 bin[1],
                 bin[0],
             );
+            self.attach_boolean_constraint_to_gate();
         }
         let zero = F::zero();
         match (n_bits - 1) - 3 * m {
@@ -491,6 +498,7 @@ impl<F: Scalar> TurboCS<F> {
                 bin[0],
             ),
         }
+        self.attach_boolean_constraint_to_gate();
         b
     }
 
@@ -599,6 +607,11 @@ impl<F: Scalar> TurboCS<F> {
         self.public_vars_witness_indices.push(var);
         self.public_vars_constraint_indices.push(self.size);
         self.insert_constant_gate_for_input(var, F::zero());
+    }
+
+    /// Add constraint that certain values must be one or zero.
+    pub fn attach_boolean_constraint_to_gate(&mut self) {
+        self.boolean_constraint_indices.push(self.size - 1);
     }
 
     /// Pad the number of constraints to a power of two.
@@ -892,44 +905,6 @@ mod test {
                 &[]
             )
             .is_err());
-
-        /*
-        // Bad witness: a + b != c
-        assert!(cs.verify_witness(&[num[1].clone(),
-                                    num[1].clone(),
-                                    num[1].clone(),
-                                    num[1].clone(),
-                                    num[4].clone(),
-                                    num[0].clone(),
-                                    num[0].clone(),
-                                    num[1].clone()],
-                                  &[])
-                  .is_err());
-
-        // Bad witness: a * b != d
-        assert!(cs.verify_witness(&[num[1].clone(),
-                                    num[1].clone(),
-                                    num[2].clone(),
-                                    num[0].clone(),
-                                    num[4].clone(),
-                                    num[0].clone(),
-                                    num[0].clone(),
-                                    num[1].clone()],
-                                  &[])
-                  .is_err());
-        // Bad witness: a + b + c + d != e
-        assert!(cs.verify_witness(&[num[1].clone(),
-                                    num[1].clone(),
-                                    num[2].clone(),
-                                    num[1].clone(),
-                                    num[4].clone(),
-                                    num[0].clone(),
-                                    num[0].clone(),
-                                    num[1].clone()],
-                                  &[])
-                  .is_err());
-
-         */
     }
 
     #[test]
