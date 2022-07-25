@@ -1,4 +1,5 @@
 use crate::primitives::asymmetric_encryption;
+use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use ed25519_dalek::{
     ExpandedSecretKey, PublicKey as Ed25519PublicKey, SecretKey as Ed25519SecretKey,
     Signature as Ed25519Signature, Verifier,
@@ -140,7 +141,10 @@ impl XfrPublicKey {
     pub fn as_compressed_point(&self) -> Vec<u8> {
         match self {
             XfrPublicKey::Ed25519(pk) => pk.as_bytes().to_vec(),
-            XfrPublicKey::Secp256k1(pk) => pk.serialize_compressed().to_vec(),
+            XfrPublicKey::Secp256k1(pk) => {
+                let be_bytes = pk.serialize_compressed();
+                convert_point_libsecp256k1_to_algebra(&be_bytes)
+            }
         }
     }
 
@@ -153,12 +157,12 @@ impl XfrPublicKey {
         match self {
             XfrPublicKey::Ed25519(pk) => Ok(hybrid_encrypt_ed25519(prng, pk, msg).zei_to_bytes()),
             XfrPublicKey::Secp256k1(pk) => {
-                let bytes = pk.serialize_compressed();
-                // bytes[0] is to check is even or odd.
-                let gp = SECP256K1G1::from_compressed_bytes(&bytes[1..])?;
+                let be_bytes = pk.serialize_compressed();
+                let bytes = convert_point_libsecp256k1_to_algebra(&be_bytes);
+                let gp = SECP256K1G1::from_compressed_bytes(&bytes)?;
                 let (p, mut ctext) = asymmetric_encryption::dh_encrypt(prng, &gp, msg)?;
                 let mut bytes = vec![];
-                bytes.append(&mut p.to_compressed_bytes());
+                bytes.append(&mut p.to_compressed_bytes()); // 33-size
                 bytes.append(&mut ctext);
                 Ok(bytes)
             }
@@ -289,9 +293,11 @@ impl XfrSecretKey {
                 Ok(hybrid_decrypt_with_ed25519_secret_key(&ctext, sk))
             }
             XfrSecretKey::Secp256k1(sk) => {
-                let gs = SECP256K1Scalar::from_bytes(&sk.serialize())?;
-                let point = SECP256K1G1::from_compressed_bytes(&lock[0..32])?;
-                asymmetric_encryption::dh_decrypt(&gs, &point, &lock[32..])
+                let be_bytes = sk.serialize();
+                let bytes = convert_scalar_libsecp256k1_to_algebra(&be_bytes);
+                let gs = SECP256K1Scalar::from_bytes(&bytes)?;
+                let point = SECP256K1G1::from_compressed_bytes(&lock[0..33])?;
+                asymmetric_encryption::dh_decrypt(&gs, &point, &lock[33..])
             }
         }
     }
@@ -325,7 +331,11 @@ impl XfrSecretKey {
                 key_bytes.extend_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
                 (KeyType::Ed25519, key_bytes)
             }
-            XfrSecretKey::Secp256k1(sk) => (KeyType::Secp256k1, sk.serialize().to_vec()),
+            XfrSecretKey::Secp256k1(sk) => {
+                let be_bytes = sk.serialize();
+                let bytes = convert_scalar_libsecp256k1_to_algebra(&be_bytes);
+                (KeyType::Secp256k1, bytes)
+            }
         }
     }
 
@@ -530,6 +540,31 @@ impl XfrMultiSig {
         }
         Ok(())
     }
+}
+
+use ark_serialize::{Flags, SWFlags};
+fn convert_point_libsecp256k1_to_algebra(be_bytes: &[u8; 33]) -> Vec<u8> {
+    let flag = if be_bytes[0] == libsecp256k1::util::TAG_PUBKEY_ODD {
+        SWFlags::NegativeY.u8_bitmask()
+    } else {
+        SWFlags::PositiveY.u8_bitmask()
+    };
+    let mut bytes = convert_scalar_libsecp256k1_to_algebra(&be_bytes[1..33]);
+    bytes.push(flag);
+    bytes
+}
+
+fn convert_scalar_libsecp256k1_to_algebra(be_bytes: &[u8]) -> Vec<u8> {
+    let b_0 = BigEndian::read_u64(&be_bytes[0..8]);
+    let b_1 = BigEndian::read_u64(&be_bytes[8..16]);
+    let b_2 = BigEndian::read_u64(&be_bytes[16..24]);
+    let b_3 = BigEndian::read_u64(&be_bytes[24..32]);
+    let mut bytes = [0u8; 32];
+    LittleEndian::write_u64(&mut bytes[0..8], b_0);
+    LittleEndian::write_u64(&mut bytes[8..16], b_1);
+    LittleEndian::write_u64(&mut bytes[16..24], b_2);
+    LittleEndian::write_u64(&mut bytes[24..32], b_3);
+    bytes.to_vec()
 }
 
 #[cfg(test)]
