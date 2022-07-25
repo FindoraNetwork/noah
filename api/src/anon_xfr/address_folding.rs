@@ -539,6 +539,8 @@ pub fn prove_address_folding_in_cs(
                 chunk_var[2],
             ]))[0];
         }
+
+        cs.equal(comm_var, h_var);
     }
 
     cs.prepare_pi_variable(comm_var);
