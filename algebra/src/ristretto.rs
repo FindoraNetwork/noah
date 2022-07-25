@@ -291,6 +291,12 @@ impl CompressedEdwardsY {
         Self(CEY::from_slice(bytes))
     }
 
+    /// Convert into bytes.
+    #[inline]
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.to_bytes()
+    }
+
     /// Recover the point from the `CompressedEdwardsY`
     #[inline]
     pub fn decompress(&self) -> Option<EdwardsPoint> {
@@ -406,6 +412,16 @@ impl<'a> Mul<&'a RistrettoScalar> for RistrettoPoint {
     #[inline]
     fn mul(self, rhs: &RistrettoScalar) -> Self::Output {
         Self(self.0 * rhs.0)
+    }
+}
+
+impl<'a> Mul<&'a RistrettoScalar> for CompressedEdwardsY {
+    type Output = CompressedEdwardsY;
+
+    #[inline]
+    fn mul(self, rhs: &RistrettoScalar) -> Self::Output {
+        let p = self.decompress().unwrap().mul(rhs.0);
+        CompressedEdwardsY(p.compress())
     }
 }
 

@@ -127,7 +127,7 @@ impl XfrPublicKey {
         match self {
             XfrPublicKey::Ed25519(_) => {
                 let (s, p) = RistrettoScalar::random_scalar_with_compressed_point(prng);
-                (KeyType::Ed25519, s.to_bytes(), p.0.to_bytes().to_vec())
+                (KeyType::Ed25519, s.to_bytes(), p.to_bytes().to_vec())
             }
             XfrPublicKey::Secp256k1(_) => {
                 let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_point(prng);
@@ -139,7 +139,7 @@ impl XfrPublicKey {
     /// Convert into the point format.
     pub fn as_compressed_point(&self) -> Vec<u8> {
         match self {
-            XfrPublicKey::Ed25519(pk) => pk.to_bytes().to_vec(),
+            XfrPublicKey::Ed25519(pk) => pk.as_bytes().to_vec(),
             XfrPublicKey::Secp256k1(pk) => pk.serialize_compressed().to_vec(),
         }
     }
@@ -319,7 +319,12 @@ impl XfrSecretKey {
     /// Convert into scalar bytes.
     pub fn as_scalar_bytes(&self) -> (KeyType, Vec<u8>) {
         match self {
-            XfrSecretKey::Ed25519(sk) => (KeyType::Ed25519, sk.as_bytes().to_vec()),
+            XfrSecretKey::Ed25519(sk) => {
+                let expanded: ExpandedSecretKey = (sk).into();
+                let mut key_bytes = vec![];
+                key_bytes.extend_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
+                (KeyType::Ed25519, key_bytes)
+            }
             XfrSecretKey::Secp256k1(sk) => (KeyType::Secp256k1, sk.serialize().to_vec()),
         }
     }
