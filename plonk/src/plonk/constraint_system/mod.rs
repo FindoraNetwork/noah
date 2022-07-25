@@ -1,8 +1,5 @@
 use zei_algebra::prelude::*;
 
-/// Module for ECC Constrain System.
-pub mod ecc;
-
 /// Module for Field Simulation Constrain System.
 pub mod field_simulation;
 
@@ -85,6 +82,9 @@ pub trait ConstraintSystem: Sized {
 
     /// Compute the indices of the witnesses related to public inputs.
     fn public_vars_witness_indices(&self) -> &[usize];
+
+    /// Compute the indices of the constraints that need a boolean constraint of the second, third, and fourth inputs.
+    fn boolean_constraint_indices(&self) -> &[CsIndex];
 
     /// Map the witnesses into the wires of the circuit.
     /// The (i * size + j)-th output element is the value of the i-th wire on the j-th gate.

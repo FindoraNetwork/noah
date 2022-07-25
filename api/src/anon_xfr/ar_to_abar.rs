@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    commit_in_cs_with_native_address,
+    commit_in_cs,
     keys::AXfrPubKey,
     structs::{
         AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
@@ -17,7 +17,8 @@ use zei_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };
 
-const AR_TO_ABAR_TRANSCRIPT: &[u8] = b"AR to ABAR proof";
+/// The domain separator for transparent-to-anonymous, for the Plonk proof.
+const AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"AR to ABAR Plonk Proof";
 
 /// The transparent-to-anonymous note.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
@@ -96,10 +97,10 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         amount: oabar.get_amount(),
         blind: oabar.blind.clone(),
         asset_type: oabar.asset_type.as_scalar(),
-        pubkey_x: oabar.pub_key.0.get_x(),
+        public_key: abar_pubkey.clone(),
     };
 
-    let mut transcript = Transcript::new(AR_TO_ABAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_ar_to_abar_cs(payee_witness);
     let witness = cs.get_and_clear_witness();
 
@@ -132,7 +133,7 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     let amount = body.input.amount.get_amount().unwrap();
     let asset_type = body.input.asset_type.get_asset_type().unwrap();
 
-    let mut transcript = Transcript::new(AR_TO_ABAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let mut online_inputs: Vec<BLSScalar> = vec![];
     online_inputs.push(BLSScalar::from(amount));
     online_inputs.push(asset_type.as_scalar());
@@ -159,20 +160,28 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeWitness) -> (TurboPlonkCS, usize) {
     cs.prepare_pi_variable(ar_asset_var);
 
     let blind = cs.new_variable(payee_data.blind);
-    let pubkey_x = cs.new_variable(payee_data.pubkey_x);
+
+    let public_key_scalars = payee_data.public_key.get_public_key_scalars().unwrap();
+    let public_key_scalars_vars = [
+        cs.new_variable(public_key_scalars[0]),
+        cs.new_variable(public_key_scalars[1]),
+        cs.new_variable(public_key_scalars[2]),
+    ];
+
     let payee = PayeeWitnessVars {
         amount: ar_amount_var,
         blind,
         asset_type: ar_asset_var,
-        pubkey_x,
+        public_key_scalars: public_key_scalars_vars.clone(),
     };
+
     // commitment
-    let com_abar_out_var = commit_in_cs_with_native_address(
+    let com_abar_out_var = commit_in_cs(
         &mut cs,
         payee.blind,
         payee.amount,
         payee.asset_type,
-        payee.pubkey_x,
+        &public_key_scalars_vars,
     );
 
     // prepare the public input for the output commitment
@@ -236,7 +245,7 @@ mod test {
             &params,
             &obar,
             &bar_keypair,
-            &abar_keypair.get_pub_key(),
+            &abar_keypair.get_public_key(),
         )
         .unwrap();
 

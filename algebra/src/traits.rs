@@ -5,6 +5,7 @@ use crate::{
 };
 use ark_std::fmt::Debug;
 use digest::{generic_array::typenum::U64, Digest};
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 /// The trait for scalars
@@ -16,6 +17,8 @@ pub trait Scalar:
     + Eq
     + Serialize
     + for<'de> Deserialize<'de>
+    + Into<BigUint>
+    + for<'a> From<&'a BigUint>
     + Clone
     + One
     + Zero
@@ -49,6 +52,9 @@ pub trait Scalar:
 
     /// Return the little-endian byte representations of the field size
     fn get_field_size_le_bytes() -> Vec<u8>;
+
+    /// Return the field size as a BigUint
+    fn get_field_size_biguint() -> BigUint;
 
     /// Return the little-endian byte representation of `(field_size - 1) / 2`,
     /// assuming that `field_size` is odd
@@ -108,6 +114,7 @@ pub trait Group:
     + for<'a> AddAssign<&'a Self>
     + for<'a> SubAssign<&'a Self>
     + Serialize
+    + Neg
     + for<'de> Deserialize<'de>
 {
     /// The scalar type
@@ -368,6 +375,9 @@ pub(crate) mod group_tests {
         let c = a.pow(&b[..]);
         let d = S::from(3486784401u64);
         assert_eq!(c, d);
+
+        let v = S::get_field_size_biguint().to_bytes_le();
+        assert_eq!(v, S::get_field_size_le_bytes());
     }
 
     pub(crate) fn test_scalar_serialization<S: Scalar>() {

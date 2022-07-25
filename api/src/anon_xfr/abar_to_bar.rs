@@ -1,10 +1,15 @@
+use crate::anon_xfr::address_folding::{
+    create_address_folding, prepare_verifier_input, prove_address_folding_in_cs,
+    verify_address_folding, AXfrAddressFoldingWitness,
+};
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
-    commit_in_cs_with_native_address, compute_merkle_root_variables, compute_non_malleability_tag,
-    keys::{get_view_key_domain_separator, AXfrKeyPair},
-    nullify_in_cs_with_native_address, nullify_with_native_address,
-    structs::{AccElemVars, Nullifier, NullifierInputVars, OpenAnonAssetRecord, PayerWitness},
-    AXfrPlonkPf, TurboPlonkCS, SK_LEN, TWO_POW_32,
+    address_folding::AXfrAddressFoldingInstance,
+    commit_in_cs, compute_merkle_root_variables,
+    keys::AXfrKeyPair,
+    nullify, nullify_in_cs,
+    structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
+    AXfrPlonkPf, TurboPlonkCS, ANON_XFR_BP_GENS_LEN, TWO_POW_32,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -17,7 +22,6 @@ use merlin::Transcript;
 use num_bigint::BigUint;
 use zei_algebra::{
     bls12_381::BLSScalar,
-    jubjub::JubjubPoint,
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
@@ -35,20 +39,23 @@ use zei_plonk::plonk::{
     verifier::verifier,
 };
 
-const ABAR_TO_BAR_TRANSCRIPT: &[u8] = b"ABAR to BAR proof";
+/// The domain separator for anonymous-to-confidential, for the Plonk proof.
+const ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"ABAR to BAR Plonk Proof";
+/// The domain separator for anonymous-to-confidential, for address folding.
+const ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT: &[u8] = b"ABAR to BAR Folding Proof";
 
 /// An anonymous-to-confidential note.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AbarToBarNote {
     /// The anonymous-to-confidential body.
     pub body: AbarToBarBody,
-    /// The proof (assuming non-malleability).
+    /// The PLonk proof (assuming non-malleability).
     pub proof: AXfrPlonkPf,
-    /// The non-malleability tag.
-    pub non_malleability_tag: BLSScalar,
+    /// The address folding instance.
+    pub folding_instance: AXfrAddressFoldingInstance,
 }
 
-/// An anonymous-to-confidential note without the proof or non-malleability tag..
+/// An anonymous-to-confidential note without the proof.
 #[derive(Clone, Debug)]
 pub struct AbarToBarPreNote {
     /// The anonymous-to-confidential body.
@@ -57,12 +64,12 @@ pub struct AbarToBarPreNote {
     pub witness: PayerWitness,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
-    /// Inspection data in the delegated Chaum-Pedersen proof.
+    /// Inspection data in the delegated Chaum-Pedersen proof on Ristretto.
     pub inspection:
         DelegatedChaumPedersenInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
-    /// Beta.
+    /// Beta on Ristretto.
     pub beta: RistrettoScalar,
-    /// Lambda.
+    /// Lambda on Ristretto.
     pub lambda: RistrettoScalar,
 }
 
@@ -73,7 +80,7 @@ pub struct AbarToBarBody {
     pub input: Nullifier,
     /// The new BAR to be created.
     pub output: BlindAssetRecord,
-    /// The inspector's proof.
+    /// The inspector's proof on Ristretto.
     pub delegated_cp_proof:
         DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     /// The Merkle root hash.
@@ -92,7 +99,7 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     bar_pub_key: &XfrPublicKey,
     asset_record_type: AssetRecordType,
 ) -> Result<AbarToBarPreNote> {
-    if oabar.mt_leaf_info.is_none() || abar_keypair.get_pub_key() != oabar.pub_key {
+    if oabar.mt_leaf_info.is_none() || abar_keypair.get_public_key() != oabar.pub_key {
         return Err(eg!(ZeiError::ParameterError));
     }
 
@@ -116,12 +123,12 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
 
     // 1. Build input witness info.
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let this_nullifier = nullify_with_native_address(
+    let this_nullifier = nullify(
         &abar_keypair,
         oabar.amount,
         &oabar.asset_type,
         mt_leaf_info.uid,
-    );
+    )?;
 
     // 2. Construct the equality proof.
     let x = RistrettoScalar::from(oabar.amount);
@@ -138,23 +145,22 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     let point_q = pc_gens.commit(y, delta);
 
     // 4. Compute the inspector's proof.
-    let (delegated_cp_proof, delegated_cp_inspection, beta, lambda) =
+    let (delegated_cp_proof, delegated_cp_inspection, beta, lambda) = {
+        let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
+        transcript.append_message(b"nullifier", &this_nullifier.to_bytes());
         prove_delegated_chaum_pedersen(
             prng,
-            &x,
-            &gamma,
-            &y,
-            &delta,
+            &vec![(x, gamma), (y, delta)],
             &pc_gens,
-            &point_p,
-            &point_q,
-            &this_nullifier,
+            &vec![point_p, point_q],
+            &mut transcript,
         )
-        .c(d!())?;
+        .c(d!())?
+    };
 
     // 5. Build the Plonk proof.
     let payers_witness = PayerWitness {
-        spend_key: abar_keypair.get_spend_key_scalar(),
+        secret_key: abar_keypair.get_secret_key(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
         asset_type: oabar.asset_type.as_scalar(),
@@ -199,10 +205,14 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
         lambda,
     } = pre_note;
 
-    let hash_scalar = BLSScalar::from_hash::<D>(hash);
-
-    let (non_malleability_randomizer, non_malleability_tag) =
-        compute_non_malleability_tag(prng, hash_scalar, &[&input_keypair]);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
+    let (folding_instance, folding_witness) = create_address_folding(
+        prng,
+        hash,
+        &mut transcript,
+        ANON_XFR_BP_GENS_LEN,
+        &input_keypair,
+    )?;
 
     let proof = prove_abar_to_bar(
         prng,
@@ -212,16 +222,14 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
         &inspection,
         &beta,
         &lambda,
-        &hash_scalar,
-        &non_malleability_randomizer,
-        &non_malleability_tag,
+        &folding_witness,
     )
     .c(d!())?;
 
     Ok(AbarToBarNote {
         body,
         proof,
-        non_malleability_tag,
+        folding_instance,
     })
 }
 
@@ -282,22 +290,35 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 
     let input = note.body.input;
 
+    let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
+
+    // important: address folding relies significantly on the Fiat-Shamir transform.
+    transcript.append_message(b"nullifier", &note.body.input.to_bytes());
+
     // 2. Verify the delegated Chaum-Pedersen proof.
     let (beta, lambda) = verify_delegated_chaum_pedersen(
         &pc_gens,
-        &com_amount,
-        &com_asset_type,
-        &input,
+        &vec![com_amount, com_asset_type],
         &note.body.delegated_cp_proof,
+        &mut transcript,
     )
     .c(d!())?;
 
-    let hash_scalar = BLSScalar::from_hash::<D>(hash);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
+    let (beta_folding, lambda_folding) = verify_address_folding(
+        hash,
+        &mut transcript,
+        ANON_XFR_BP_GENS_LEN,
+        &note.folding_instance,
+    )?;
+    let address_folding_public_input =
+        prepare_verifier_input(&note.folding_instance, &beta_folding, &lambda_folding);
 
     let delegated_cp_proof = note.body.delegated_cp_proof.clone();
 
     let beta_lambda = beta * &lambda;
-    let s1_plus_lambda_s2 = delegated_cp_proof.s_1 + delegated_cp_proof.s_2 * &lambda;
+    let s1_plus_lambda_s2 = delegated_cp_proof.response_scalars[0].0
+        + delegated_cp_proof.response_scalars[1].0 * &lambda;
 
     let beta_sim_fr =
         SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta.to_bytes()));
@@ -308,7 +329,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let s1_plus_lambda_s2_sim_fr =
         SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
-    let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
     let mut online_inputs = vec![];
 
     online_inputs.push(input.clone());
@@ -318,8 +339,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
     online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
     online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
-    online_inputs.push(hash_scalar);
-    online_inputs.push(note.non_malleability_tag);
+    online_inputs.extend_from_slice(&address_folding_public_input);
 
     verifier(
         &mut transcript,
@@ -344,11 +364,9 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     >,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    hash: &BLSScalar,
-    non_malleability_randomizer: &BLSScalar,
-    non_malleability_tag: &BLSScalar,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
-    let mut transcript = Transcript::new(ABAR_TO_BAR_TRANSCRIPT);
+    let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
 
     let (mut cs, _) = build_abar_to_bar_cs(
         payers_witness,
@@ -356,9 +374,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
         inspection,
         beta,
         lambda,
-        hash,
-        non_malleability_randomizer,
-        non_malleability_tag,
+        folding_witness,
     );
     let witness = cs.get_and_clear_witness();
 
@@ -385,53 +401,46 @@ pub fn build_abar_to_bar_cs(
     >,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    hash: &BLSScalar,
-    non_malleability_randomizer: &BLSScalar,
-    non_malleability_tag: &BLSScalar,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
 
     let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
 
-    let base = JubjubPoint::get_base();
+    let keypair = folding_witness.keypair.clone();
+    let public_key_scalars = keypair.get_public_key().get_public_key_scalars().unwrap();
+    let secret_key_scalars = keypair.get_secret_key().get_secret_key_scalars().unwrap();
+
+    let public_key_scalars_vars = [
+        cs.new_variable(public_key_scalars[0]),
+        cs.new_variable(public_key_scalars[1]),
+        cs.new_variable(public_key_scalars[2]),
+    ];
+    let secret_key_scalars_vars = [
+        cs.new_variable(secret_key_scalars[0]),
+        cs.new_variable(secret_key_scalars[1]),
+    ];
+
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
     let zero = BLSScalar::zero();
     let one = BLSScalar::one();
     let zero_var = cs.zero_var();
-    let one_var = cs.one_var();
     let mut root_var: Option<VarIndex> = None;
+
     let step_1 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB));
     let step_2 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 2));
     let step_3 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 3));
     let step_4 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 4));
     let step_5 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 5));
 
-    let hash_var = cs.new_variable(*hash);
-    let non_malleability_randomizer_var = cs.new_variable(*non_malleability_randomizer);
-    let non_malleability_tag_var = cs.new_variable(*non_malleability_tag);
-
-    let view_key_domain_separator = get_view_key_domain_separator();
-    let view_key_domain_separator_var = cs.new_variable(view_key_domain_separator);
-    cs.insert_constant_gate(view_key_domain_separator_var, view_key_domain_separator);
-
-    // Prove knowledge of payer's secret key: pk = base^{sk}.
-    let view_key = cs.rescue_hash(&StateVar::new([
-        view_key_domain_separator_var,
-        payers_witness_vars.spend_key,
-        zero_var,
-        zero_var,
-    ]))[0];
-    let pk_var = cs.scalar_mul(base, view_key, SK_LEN);
-    let pk_x = pk_var.get_x();
-
     // Commit.
-    let com_abar_in_var = commit_in_cs_with_native_address(
+    let com_abar_in_var = commit_in_cs(
         &mut cs,
         payers_witness_vars.blind,
         payers_witness_vars.amount,
         payers_witness_vars.asset_type,
-        pk_x,
+        &public_key_scalars_vars,
     );
 
     // Nullify.
@@ -448,15 +457,12 @@ pub fn build_abar_to_bar_cs(
         zero,
         zero,
     );
-    let nullifier_input_vars = NullifierInputVars {
-        uid_amount,
-        asset_type: payers_witness_vars.asset_type,
-        pub_key_x: pk_x,
-    };
-    let nullifier_var = nullify_in_cs_with_native_address(
+    let nullifier_var = nullify_in_cs(
         &mut cs,
-        payers_witness_vars.spend_key,
-        nullifier_input_vars,
+        &secret_key_scalars_vars,
+        uid_amount,
+        payers_witness_vars.asset_type,
+        &public_key_scalars_vars,
     );
 
     // Merkle path authentication.
@@ -474,14 +480,18 @@ pub fn build_abar_to_bar_cs(
     }
 
     // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2.
-    let x_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&inspection.x.to_bytes()));
-    let y_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&inspection.y.to_bytes()));
-    let a_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&inspection.a.to_bytes()));
-    let b_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&inspection.b.to_bytes()));
+    let x_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+        &inspection.committed_data_and_randomizer[0].0.to_bytes(),
+    ));
+    let y_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+        &inspection.committed_data_and_randomizer[1].0.to_bytes(),
+    ));
+    let a_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+        &inspection.committed_data_and_randomizer[0].1.to_bytes(),
+    ));
+    let b_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+        &inspection.committed_data_and_randomizer[1].1.to_bytes(),
+    ));
     let comm = proof.inspection_comm;
     let r = inspection.r;
     let beta_sim_fr =
@@ -493,14 +503,14 @@ pub fn build_abar_to_bar_cs(
     let beta_lambda_sim_fr =
         SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
 
-    let s1_plus_lambda_s2 = proof.s_1 + proof.s_2 * lambda;
+    let s1_plus_lambda_s2 = proof.response_scalars[0].0 + proof.response_scalars[1].0 * lambda;
     let s1_plus_lambda_s2_sim_fr =
         SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
 
-    let x_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
-    let y_sim_fr_var = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
-    let a_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
-    let b_sim_fr_var = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
+    let (x_sim_fr_var, _) = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
+    let (y_sim_fr_var, _) = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
+    let (a_sim_fr_var, _) = SimFrVar::alloc_witness(&mut cs, &a_sim_fr);
+    let (b_sim_fr_var, _) = SimFrVar::alloc_witness(&mut cs, &b_sim_fr);
     let comm_var = cs.new_variable(comm);
     let r_var = cs.new_variable(r);
     let beta_sim_fr_var = SimFrVar::alloc_input(&mut cs, &beta_sim_fr);
@@ -527,7 +537,7 @@ pub fn build_abar_to_bar_cs(
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <&BLSScalar as Into<BigUint>>::into(limb)
+                <BLSScalar as Into<BigUint>>::into(*limb)
                     .shl(SimFrParamsRistretto::BIT_PER_LIMB * i),
             );
         }
@@ -652,18 +662,6 @@ pub fn build_abar_to_bar_cs(
         cs.equal(y_in_bls12_381, payers_witness_vars.asset_type);
     }
 
-    // 7. Check the non-malleability tag.
-    {
-        let non_malleability_tag_var_supposed = cs.rescue_hash(&StateVar::new([
-            one_var,
-            hash_var,
-            non_malleability_randomizer_var,
-            payers_witness_vars.spend_key,
-        ]))[0];
-
-        cs.equal(non_malleability_tag_var_supposed, non_malleability_tag_var);
-    }
-
     // prepare public inputs variables.
     cs.prepare_pi_variable(nullifier_var);
     cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
@@ -683,8 +681,13 @@ pub fn build_abar_to_bar_cs(
         cs.prepare_pi_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
     }
 
-    cs.prepare_pi_variable(hash_var);
-    cs.prepare_pi_variable(non_malleability_tag_var);
+    prove_address_folding_in_cs(
+        &mut cs,
+        &public_key_scalars_vars,
+        &secret_key_scalars_vars,
+        &folding_witness,
+    )
+    .unwrap();
 
     // pad the number of constraints to power of two
     cs.pad();
@@ -739,7 +742,7 @@ mod tests {
         let mut mt = PersistentMerkleTree::new(store).unwrap();
 
         let mut oabar = OpenAnonAssetRecordBuilder::new()
-            .pub_key(&sender.get_pub_key())
+            .pub_key(&sender.get_public_key())
             .amount(1234u64)
             .asset_type(AssetType::from_identical_byte(0u8))
             .finalize(&mut prng)

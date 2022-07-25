@@ -8,38 +8,24 @@ use serde::Deserialize;
 use std::marker::PhantomData;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
-#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The non-interactive proof provided to the verifier.
 pub struct DelegatedChaumPedersenProof<S, G, P> {
     /// The commitment of the non-ZK verifier's state.
     pub inspection_comm: BLSScalar,
-    /// The first randomizer point.
-    pub point_r: G,
-    /// The second randomizer point.
-    pub point_s: G,
-    /// The response scalar `s_1`.
-    pub s_1: S,
-    /// The response scalar `s_2`.
-    pub s_2: S,
-    /// The response scalar `s_3`.
-    pub s_3: S,
-    /// The response scalar `s_4`.
-    pub s_4: S,
+    /// The randomizer points
+    pub randomizers: Vec<G>,
+    /// The response scalars (two per pair)
+    pub response_scalars: Vec<(S, S)>,
     /// PhantomData for the parameters.
     pub params_phantom: PhantomData<P>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The state of the inspector.
 pub struct DelegatedChaumPedersenInspection<S, G, P> {
-    /// The committed value of the first Pedersen commitment.
-    pub x: S,
-    /// The committed value of the second Pedersen commitment.
-    pub y: S,
-    /// The committed value of the randomizer for the first Pedersen commitment.
-    pub a: S,
-    /// The committed value of the randomizer for the second Pedersen commitment.
-    pub b: S,
+    /// The committed value and their corresponding randomizer
+    pub committed_data_and_randomizer: Vec<(S, S)>,
     /// The randomizer used to make the Rescue hash function a commitment scheme.
     pub r: BLSScalar,
     /// PhantomData for the parameters.
@@ -48,22 +34,52 @@ pub struct DelegatedChaumPedersenInspection<S, G, P> {
     pub group_phantom: PhantomData<G>,
 }
 
+impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams>
+    DelegatedChaumPedersenInspection<S, G, P>
+{
+    /// Create a dummy new one.
+    pub fn new() -> Self {
+        Self {
+            committed_data_and_randomizer: vec![],
+            params_phantom: PhantomData,
+            r: BLSScalar::default(),
+            group_phantom: PhantomData,
+        }
+    }
+}
+
 impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedChaumPedersenProof<S, G, P> {
+    /// Create a dummy new one.
+    pub fn new() -> Self {
+        Self {
+            inspection_comm: BLSScalar::default(),
+            randomizers: vec![],
+            response_scalars: vec![],
+            params_phantom: PhantomData,
+        }
+    }
+
     /// Represent the information needed by zk-SNARKs in its format.
     pub fn to_verifier_input(&self) -> Vec<BLSScalar> {
-        let s_1_biguint = BigUint::from_bytes_le(&self.s_1.to_bytes());
-        let s_2_biguint = BigUint::from_bytes_le(&self.s_2.to_bytes());
+        let response_scalars_sim_fr_limbs = self
+            .response_scalars
+            .iter()
+            .flat_map(|(first, second)| {
+                let first_biguint: BigUint = first.clone().into();
+                let second_biguint: BigUint = second.clone().into();
 
-        let s_1_sim_fr = SimFr::<P>::from(&s_1_biguint);
-        let s_2_sim_fr = SimFr::<P>::from(&s_2_biguint);
+                let first_sim_fr = SimFr::<P>::from(&first_biguint);
+                let second_sim_fr = SimFr::<P>::from(&second_biguint);
 
-        let mut res = Vec::with_capacity(1 + P::NUM_OF_LIMBS * 2);
-        res[0] = self.inspection_comm;
-        for i in 0..P::NUM_OF_LIMBS {
-            res[i + 1] = s_1_sim_fr.limbs[i];
-            res[i + P::NUM_OF_LIMBS + 1] = s_2_sim_fr.limbs[i];
-        }
+                let mut v = first_sim_fr.limbs;
+                v.extend_from_slice(&second_sim_fr.limbs);
+                v
+            })
+            .collect::<Vec<BLSScalar>>();
 
+        let mut res = Vec::with_capacity(1 + P::NUM_OF_LIMBS * response_scalars_sim_fr_limbs.len());
+        res.push(self.inspection_comm);
+        res.extend_from_slice(&response_scalars_sim_fr_limbs);
         res
     }
 }
@@ -77,76 +93,80 @@ pub fn prove_delegated_chaum_pedersen<
     PC: PedersenCommitment<G>,
 >(
     rng: &mut R,
-    x: &S,
-    gamma: &S,
-    y: &S,
-    delta: &S,
+    committed_data: &Vec<(S, S)>,
     pc_gens: &PC,
-    point_p: &G,
-    point_q: &G,
-    aux_info: &BLSScalar,
+    commitments: &Vec<G>,
+    transcript: &mut Transcript,
 ) -> Result<(
     DelegatedChaumPedersenProof<S, G, P>,
     DelegatedChaumPedersenInspection<S, G, P>,
     S,
     S,
 )> {
-    let mut proof = DelegatedChaumPedersenProof::default();
-    let mut inspection = DelegatedChaumPedersenInspection::default();
-    let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
+    assert_eq!(committed_data.len(), commitments.len());
+    let len = committed_data.len();
 
-    // 1. sample a, b, c, d
-    let a = S::random(rng);
-    let b = S::random(rng);
-    let c = S::random(rng);
-    let d = S::random(rng);
+    let mut proof = DelegatedChaumPedersenProof::new();
+    let mut inspection = DelegatedChaumPedersenInspection::new();
+
+    // 1. sample the scalars for the randomizers.
+    let mut randomizer_scalars = Vec::<(S, S)>::with_capacity(len);
+    for _ in 0..len {
+        randomizer_scalars.push((S::random(rng), S::random(rng)));
+    }
     let r = BLSScalar::random(rng);
 
-    // 2. generate x, y, a, b; these are the non-ZK verifier's state
-    let x_biguint = BigUint::from_bytes_le(&x.to_bytes());
-    let y_biguint = BigUint::from_bytes_le(&y.to_bytes());
-    let a_biguint = BigUint::from_bytes_le(&a.to_bytes());
-    let b_biguint = BigUint::from_bytes_le(&b.to_bytes());
+    // 2. convert the first part of each entry in the committed data into biguint and sim_fr; these are in the inspector's state.
+    let committed_data_biguint = committed_data
+        .iter()
+        .map(|(v, _)| <S as Into<BigUint>>::into(v.clone()))
+        .collect::<Vec<BigUint>>();
+    let committed_data_sim_fr = committed_data_biguint
+        .iter()
+        .map(|v| SimFr::<P>::from(v))
+        .collect::<Vec<SimFr<P>>>();
 
-    let x_sim_fr = SimFr::<P>::from(&x_biguint);
-    let y_sim_fr = SimFr::<P>::from(&y_biguint);
-    let a_sim_fr = SimFr::<P>::from(&a_biguint);
-    let b_sim_fr = SimFr::<P>::from(&b_biguint);
+    // 3. convert the first part of each pair of randomizer scalars; these are in the inspector's state.
+    let randomizer_biguint = randomizer_scalars
+        .iter()
+        .map(|(v, _)| <S as Into<BigUint>>::into(v.clone()))
+        .collect::<Vec<BigUint>>();
+    let randomizer_sim_fr = randomizer_biguint
+        .iter()
+        .map(|v| SimFr::<P>::from(v))
+        .collect::<Vec<SimFr<P>>>();
 
-    // 3. merge limbs of x, y, a, b
-    let mut all_limbs = Vec::with_capacity(4 * P::NUM_OF_LIMBS);
-    all_limbs.extend_from_slice(&x_sim_fr.limbs);
-    all_limbs.extend_from_slice(&y_sim_fr.limbs);
-    all_limbs.extend_from_slice(&a_sim_fr.limbs);
-    all_limbs.extend_from_slice(&b_sim_fr.limbs);
+    // 3. merge limbs of the committed data as well as the randomizer scalars
+    let mut all_limbs = Vec::with_capacity(2 * len * P::NUM_OF_LIMBS);
+    committed_data_sim_fr
+        .iter()
+        .for_each(|v| all_limbs.extend_from_slice(&v.limbs));
+    randomizer_sim_fr
+        .iter()
+        .for_each(|v| all_limbs.extend_from_slice(&v.limbs));
 
+    // 4. compress these limbs for public input.
     let num_limbs_compressed = BLSScalar::capacity() / P::BIT_PER_LIMB;
-
-    let mut compressed_limbs = Vec::with_capacity(num_limbs_compressed);
+    let mut compressed_limbs = Vec::new();
     for limbs in all_limbs.chunks(num_limbs_compressed) {
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <&BLSScalar as Into<BigUint>>::into(limb)
+                <BLSScalar as Into<BigUint>>::into(limb.clone())
                     .mul(&BigUint::from(1u32).shl(P::BIT_PER_LIMB * i)),
             );
         }
         compressed_limbs.push(BLSScalar::from(&sum));
     }
 
-    // 4. compute comm, which is the commitment of the non-ZK verifier's state
+    // 5. compute comm, which is the commitment of the non-ZK verifier's state
     let comm_instance = RescueInstance::<BLSScalar>::new();
     let comm = {
         let mut input = compressed_limbs.clone();
         input.push(r);
         input.resize((input.len() - 1 + 2) / 3 * 3 + 1, BLSScalar::zero());
 
-        let mut h = comm_instance.rescue(&[
-            compressed_limbs[0],
-            compressed_limbs[1],
-            compressed_limbs[2],
-            compressed_limbs[3],
-        ])[0];
+        let mut h = comm_instance.rescue(&[input[0], input[1], input[2], input[3]])[0];
 
         let input = input[4..].to_vec();
 
@@ -158,28 +178,28 @@ pub fn prove_delegated_chaum_pedersen<
     };
     proof.inspection_comm = comm;
 
-    // 5. compute the two blinding points
-    let point_r = pc_gens.commit(a, c);
-    let point_s = pc_gens.commit(b, d);
+    // 6. compute the randomizer points.
+    let randomizers = randomizer_scalars
+        .iter()
+        .map(|(v, r)| pc_gens.commit(v.clone(), r.clone()))
+        .collect::<Vec<G>>();
 
-    proof.point_r = point_r;
-    proof.point_s = point_s;
+    proof.randomizers = randomizers.clone();
 
-    // 6. Fiat-Shamir transform
+    // 7. Fiat-Shamir transform.
     transcript.append_message(b"PC base", &pc_gens.generator().to_compressed_bytes());
     transcript.append_message(
         b"PC base blinding",
         &pc_gens.blinding_generator().to_compressed_bytes(),
     );
-    transcript.append_message(b"Point P", &point_p.to_compressed_bytes());
-    transcript.append_message(b"Point Q", &point_q.to_compressed_bytes());
-    transcript.append_message(
-        b"Auxiliary information (Rescue commitment z, or a nullifier)",
-        &aux_info.to_bytes(),
-    );
+    transcript.append_message(b"Number of points", &len.to_le_bytes());
+    commitments.iter().for_each(|p| {
+        transcript.append_message(b"Commitment", &p.to_compressed_bytes());
+    });
     transcript.append_message(b"Inspector state commitment comm", &comm.to_bytes());
-    transcript.append_message(b"Point R", &point_r.to_compressed_bytes());
-    transcript.append_message(b"Point S", &point_s.to_compressed_bytes());
+    randomizers
+        .iter()
+        .for_each(|p| transcript.append_message(b"Randomizer", &p.to_compressed_bytes()));
 
     let mut bytes = [0u8; 32];
     transcript.challenge_bytes(b"challenge", &mut bytes);
@@ -189,16 +209,32 @@ pub fn prove_delegated_chaum_pedersen<
     rng.fill_bytes(&mut rand_bytes);
     let beta = S::from_bytes(&rand_bytes).unwrap();
 
-    // 7. compute the responses
-    let s_1 = beta.mul(x).add(&a);
-    let s_2 = beta.mul(y).add(&b);
-    let s_3 = beta.mul(gamma).add(&c);
-    let s_4 = beta.mul(delta).add(&d);
+    // 8. compute the responses.
+    let response_scalars = committed_data
+        .iter()
+        .zip(randomizer_scalars.iter())
+        .map(|((ll, lr), (rl, rr))| {
+            let s_first = beta.mul(ll).add(rl);
+            let s_second = beta.mul(lr).add(rr);
 
-    transcript.append_message(b"Response s1", &s_1.to_bytes());
-    transcript.append_message(b"Response s2", &s_2.to_bytes());
-    transcript.append_message(b"Response s3", &s_3.to_bytes());
-    transcript.append_message(b"Response s4", &s_4.to_bytes());
+            (s_first, s_second)
+        })
+        .collect::<Vec<(S, S)>>();
+
+    response_scalars.iter().for_each(|(l, r)| {
+        transcript.append_message(b"Response", &l.to_bytes());
+        transcript.append_message(b"Response", &r.to_bytes());
+    });
+
+    proof.response_scalars = response_scalars;
+
+    // 9. assemble the inspector's state.
+    inspection.committed_data_and_randomizer = committed_data
+        .iter()
+        .zip(randomizer_scalars.iter())
+        .map(|((ll, _), (rl, _))| (ll.clone(), rl.clone()))
+        .collect::<Vec<(S, S)>>();
+    inspection.r = r;
 
     let mut bytes = [0u8; 32];
     transcript.challenge_bytes(b"challenge", &mut bytes);
@@ -207,17 +243,6 @@ pub fn prove_delegated_chaum_pedersen<
     let mut rand_bytes = [0u8; 16];
     rng.fill_bytes(&mut rand_bytes);
     let lambda = S::from_bytes(&rand_bytes).unwrap();
-
-    proof.s_1 = s_1;
-    proof.s_2 = s_2;
-    proof.s_3 = s_3;
-    proof.s_4 = s_4;
-
-    inspection.x = *x;
-    inspection.y = *y;
-    inspection.a = a;
-    inspection.b = b;
-    inspection.r = r;
 
     Ok((proof, inspection, beta, lambda))
 }
@@ -230,31 +255,33 @@ pub fn verify_delegated_chaum_pedersen<
     PC: PedersenCommitment<G>,
 >(
     pc_gens: &PC,
-    point_p: &G,
-    point_q: &G,
-    aux_info: &BLSScalar,
+    commitments: &Vec<G>,
     proof: &DelegatedChaumPedersenProof<S, G, P>,
+    transcript: &mut Transcript,
 ) -> Result<(S, S)> {
-    // 1. Fiat-Shamir transform
-    let mut transcript = Transcript::new(b"Pedersen Eq Rescure Split Verifier -- ZK Verifier Part");
+    assert_eq!(commitments.len(), proof.randomizers.len());
+    assert_eq!(commitments.len(), proof.response_scalars.len());
 
+    let len = commitments.len();
+
+    // 1. Fiat-Shamir transform
     transcript.append_message(b"PC base", &pc_gens.generator().to_compressed_bytes());
     transcript.append_message(
         b"PC base blinding",
         &pc_gens.blinding_generator().to_compressed_bytes(),
     );
-    transcript.append_message(b"Point P", &point_p.to_compressed_bytes());
-    transcript.append_message(b"Point Q", &point_q.to_compressed_bytes());
-    transcript.append_message(
-        b"Auxiliary information (Rescue commitment z, or a nullifier)",
-        &aux_info.to_bytes(),
-    );
+    transcript.append_message(b"Number of points", &len.to_le_bytes());
+    commitments.iter().for_each(|p| {
+        transcript.append_message(b"Commitment", &p.to_compressed_bytes());
+    });
     transcript.append_message(
         b"Inspector state commitment comm",
         &proof.inspection_comm.to_bytes(),
     );
-    transcript.append_message(b"Point R", &proof.point_r.to_compressed_bytes());
-    transcript.append_message(b"Point S", &proof.point_s.to_compressed_bytes());
+    proof
+        .randomizers
+        .iter()
+        .for_each(|p| transcript.append_message(b"Randomizer", &p.to_compressed_bytes()));
 
     let mut bytes = [0u8; 32];
     transcript.challenge_bytes(b"challenge", &mut bytes);
@@ -264,10 +291,10 @@ pub fn verify_delegated_chaum_pedersen<
     rng.fill_bytes(&mut rand_bytes);
     let beta = S::from_bytes(&rand_bytes).unwrap();
 
-    transcript.append_message(b"Response s1", &proof.s_1.to_bytes());
-    transcript.append_message(b"Response s2", &proof.s_2.to_bytes());
-    transcript.append_message(b"Response s3", &proof.s_3.to_bytes());
-    transcript.append_message(b"Response s4", &proof.s_4.to_bytes());
+    proof.response_scalars.iter().for_each(|(l, r)| {
+        transcript.append_message(b"Response", &l.to_bytes());
+        transcript.append_message(b"Response", &r.to_bytes());
+    });
 
     let mut bytes = [0u8; 32];
     transcript.challenge_bytes(b"challenge", &mut bytes);
@@ -278,18 +305,18 @@ pub fn verify_delegated_chaum_pedersen<
     let lambda = S::from_bytes(&rand_bytes).unwrap();
 
     // 2. check the group relationships
-    let first_eqn_left = pc_gens.commit(proof.s_1, proof.s_3);
-    let first_eqn_right = point_p.mul(&beta).add(&proof.point_r);
+    for ((scalars, committed_data), randomizer) in proof
+        .response_scalars
+        .iter()
+        .zip(commitments.iter())
+        .zip(proof.randomizers.iter())
+    {
+        let eqn_left = pc_gens.commit(scalars.0, scalars.1);
+        let eqn_right = committed_data.mul(&beta).add(&randomizer);
 
-    if first_eqn_left.ne(&first_eqn_right) {
-        return Err(eg!(ZeiError::ZKProofVerificationError));
-    }
-
-    let second_eqn_left = pc_gens.commit(proof.s_2, proof.s_4);
-    let second_eqn_right = point_q.mul(&beta).add(&proof.point_s);
-
-    if second_eqn_left.ne(&second_eqn_right) {
-        return Err(eg!(ZeiError::ZKProofVerificationError));
+        if eqn_left.ne(&eqn_right) {
+            return Err(eg!(ZeiError::ZKProofVerificationError));
+        }
     }
 
     Ok((beta, lambda))
@@ -298,16 +325,14 @@ pub fn verify_delegated_chaum_pedersen<
 #[cfg(test)]
 mod test {
     use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
-    use crate::basic::rescue::RescueInstance;
     use crate::delegated_chaum_pedersen::{
         prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
     };
     use crate::field_simulation::SimFrParamsRistretto;
-    use num_bigint::BigUint;
+    use merlin::Transcript;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
-    use zei_algebra::ristretto::RistrettoScalar;
-    use zei_algebra::{bls12_381::BLSScalar, traits::Scalar, Zero};
+    use zei_algebra::{ristretto::RistrettoScalar, traits::Scalar};
 
     #[test]
     fn test_correctness() {
@@ -324,27 +349,27 @@ mod test {
             let point_p = pc_gens.commit(x, gamma);
             let point_q = pc_gens.commit(y, delta);
 
-            let z_randomizer = BLSScalar::random(&mut rng);
-            let z_instance = RescueInstance::<BLSScalar>::new();
-
-            let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
-            let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
-
-            let z = z_instance.rescue(&[
-                z_randomizer,
-                x_in_bls12_381,
-                y_in_bls12_381,
-                BLSScalar::zero(),
-            ])[0];
+            let mut transcript = Transcript::new(b"Test");
 
             let (proof, _, _, _) =
                 prove_delegated_chaum_pedersen::<_, _, _, SimFrParamsRistretto, _>(
-                    &mut rng, &x, &gamma, &y, &delta, &pc_gens, &point_p, &point_q, &z,
+                    &mut rng,
+                    &vec![(x, gamma), (y, delta)],
+                    &pc_gens,
+                    &vec![point_p, point_q],
+                    &mut transcript,
                 )
                 .unwrap();
 
-            let _ =
-                verify_delegated_chaum_pedersen(&pc_gens, &point_p, &point_q, &z, &proof).unwrap();
+            let mut transcript = Transcript::new(b"Test");
+
+            let _ = verify_delegated_chaum_pedersen(
+                &pc_gens,
+                &vec![point_p, point_q],
+                &proof,
+                &mut transcript,
+            )
+            .unwrap();
         }
     }
 }

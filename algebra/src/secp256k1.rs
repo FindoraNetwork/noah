@@ -1,33 +1,38 @@
+use crate::canaan::CanaanScalar;
 use crate::errors::AlgebraError;
 use crate::prelude::*;
-use ark_ec::ProjectiveCurve;
-use ark_ff::{BigInteger, FftField, FftParameters, Field, FpParameters, PrimeField};
+use ark_bulletproofs_canaan::curve::secp256k1::{Fr, FrParameters, G1Affine, G1Projective};
+use ark_ec::short_weierstrass_jacobian::GroupProjective;
+use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ff::{BigInteger, BigInteger320, FftField, FftParameters, Field, FpParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
-    fmt::{Debug, Display, Formatter},
+    fmt::{Debug, Formatter},
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     result::Result as StdResult,
     str::FromStr,
     One, UniformRand, Zero,
 };
-use bulletproofs_bs257::curve::secp256k1::{Fr, FrParameters, G1Affine, G1Projective};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
+use num_traits::Num;
 use ruc::eg;
 use wasm_bindgen::prelude::*;
 
 /// The number of bytes for a scalar value over secp256k1
 pub const SECP256K1_SCALAR_LEN: usize = 32;
 
-/// The wrapped struct for `bulletproofs_bs257::curve::secp256k1::Fr`
+/// The wrapped struct for `ark_bulletproofs_canaan::curve::secp256k1::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct SECP256K1Scalar(pub(crate) Fr);
 
 impl Debug for SECP256K1Scalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let biguint = BigUint::from(self.0.clone());
-        <BigUint as Display>::fmt(&biguint, f)
+        <BigUint as Debug>::fmt(
+            &<BigInteger320 as Into<BigUint>>::into(self.0.into_repr()),
+            f,
+        )
     }
 }
 
@@ -35,7 +40,7 @@ impl SECP256K1Scalar {
     /// Return a tuple of (r, g^r)
     /// where r is a random `Scalar`, and g is the `BASEPOINT_POINT`
     #[inline]
-    pub fn random_scalar_with_compressed_edwards<R: CryptoRng + RngCore>(
+    pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
         prng: &mut R,
     ) -> (Self, SECP256K1G1) {
         let r = Self::random(prng);
@@ -44,9 +49,9 @@ impl SECP256K1Scalar {
     }
 }
 
-/// The wrapped struct for `bulletproofs_bs257::curve::secp256k1::G1Projective`
+/// The wrapped struct for `ark_bulletproofs_canaan::curve::secp256k1::G1Projective`
 #[wasm_bindgen]
-#[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Default, Clone, PartialEq, Eq, Hash)]
 pub struct SECP256K1G1(pub(crate) G1Projective);
 
 impl FromStr for SECP256K1Scalar {
@@ -60,18 +65,6 @@ impl FromStr for SECP256K1Scalar {
         } else {
             Err(AlgebraError::DeserializationError)
         }
-    }
-}
-
-impl Into<BigUint> for &SECP256K1Scalar {
-    fn into(self) -> BigUint {
-        self.0.into_repr().into()
-    }
-}
-
-impl From<&BigUint> for SECP256K1Scalar {
-    fn from(src: &BigUint) -> Self {
-        Self(Fr::from(src.clone()))
     }
 }
 
@@ -183,6 +176,21 @@ impl From<u64> for SECP256K1Scalar {
     }
 }
 
+impl Into<BigUint> for SECP256K1Scalar {
+    #[inline]
+    fn into(self) -> BigUint {
+        let value: BigUint = self.0.into_repr().into();
+        value
+    }
+}
+
+impl<'a> From<&'a BigUint> for SECP256K1Scalar {
+    #[inline]
+    fn from(value: &'a BigUint) -> Self {
+        Self(Fr::from(value.clone()))
+    }
+}
+
 impl Scalar for SECP256K1Scalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
@@ -200,12 +208,21 @@ impl Scalar for SECP256K1Scalar {
 
     #[inline]
     fn capacity() -> usize {
-        bulletproofs_bs257::curve::secp256k1::FrParameters::CAPACITY as usize
+        ark_bulletproofs_canaan::curve::secp256k1::FrParameters::CAPACITY as usize
     }
 
     #[inline]
     fn multiplicative_generator() -> Self {
         Self(Fr::multiplicative_generator())
+    }
+
+    #[inline]
+    fn get_field_size_biguint() -> BigUint {
+        BigUint::from_str_radix(
+            "115792089237316195423570985008687907852837564279074904382605163141518161494337",
+            10,
+        )
+        .unwrap()
     }
 
     #[inline]
@@ -266,9 +283,57 @@ impl Scalar for SECP256K1Scalar {
     }
 }
 
+impl SECP256K1Scalar {
+    /// Get the raw data.
+    pub fn get_raw(&self) -> Fr {
+        self.0.clone()
+    }
+
+    /// From the raw data.
+    pub fn from_raw(raw: Fr) -> Self {
+        Self(raw)
+    }
+}
+
+impl SECP256K1G1 {
+    /// Obtain the x coordinate in the affine representation.
+    pub fn get_x(&self) -> CanaanScalar {
+        CanaanScalar((self.0.into_affine().x).clone())
+    }
+
+    /// Obtain the y coordinate in the affine representation.
+    pub fn get_y(&self) -> CanaanScalar {
+        CanaanScalar((self.0.into_affine().y).clone())
+    }
+
+    /// Obtain a point using the x coordinate (which would be CanaanScalar).
+    pub fn get_point_from_x(x: &CanaanScalar) -> Result<Self> {
+        let point = G1Affine::get_point_from_x(x.0.clone(), false)
+            .ok_or(eg!(ZeiError::DeserializationError))?
+            .into_projective();
+        Ok(Self(point))
+    }
+
+    /// Get the raw data.
+    pub fn get_raw(&self) -> G1Affine {
+        self.0.into_affine()
+    }
+
+    /// From the raw data.
+    pub fn from_raw(raw: G1Affine) -> Self {
+        Self(raw.into_projective())
+    }
+}
+
+impl Debug for SECP256K1G1 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0.into_affine(), f)
+    }
+}
+
 impl Group for SECP256K1G1 {
     type ScalarType = SECP256K1Scalar;
-    const COMPRESSED_LEN: usize = 32;
+    const COMPRESSED_LEN: usize = 33;
 
     #[inline]
     fn double(&self) -> Self {
@@ -363,6 +428,15 @@ impl Group for SECP256K1G1 {
     }
 }
 
+impl Neg for SECP256K1G1 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        let point = self.0.clone();
+        Self(GroupProjective::neg(point))
+    }
+}
+
 impl<'a> Add<&'a SECP256K1G1> for SECP256K1G1 {
     type Output = SECP256K1G1;
 
@@ -418,8 +492,8 @@ mod secp256k1_groups_test {
         secp256k1::{SECP256K1Scalar, SECP256K1G1},
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
+    use ark_bulletproofs_canaan::curve::secp256k1::G1Affine;
     use ark_ec::ProjectiveCurve;
-    use bulletproofs_bs257::curve::secp256k1::G1Affine;
     use rand_chacha::ChaCha20Rng;
 
     #[test]

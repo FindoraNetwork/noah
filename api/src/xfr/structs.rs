@@ -419,7 +419,7 @@ impl OwnerMemo {
         amount: u64,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar))> {
-        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_edwards(prng);
+        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
             OwnerMemo::derive_shared_edwards_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
@@ -441,7 +441,7 @@ impl OwnerMemo {
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, RistrettoScalar)> {
-        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_edwards(prng);
+        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
             OwnerMemo::derive_shared_edwards_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
@@ -464,7 +464,7 @@ impl OwnerMemo {
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar), RistrettoScalar)> {
-        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_edwards(prng);
+        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
             OwnerMemo::derive_shared_edwards_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);

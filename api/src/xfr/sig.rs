@@ -120,17 +120,17 @@ impl Hash for XfrPublicKey {
 
 impl XfrPublicKey {
     /// random a scalar and the compressed point.
-    pub fn random_scalar_with_compressed_edwards<R: CryptoRng + RngCore>(
+    pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
         &self,
         prng: &mut R,
     ) -> (KeyType, Vec<u8>, Vec<u8>) {
         match self {
             XfrPublicKey::Ed25519(_) => {
-                let (s, p) = RistrettoScalar::random_scalar_with_compressed_edwards(prng);
+                let (s, p) = RistrettoScalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Ed25519, s.to_bytes(), p.0.to_bytes().to_vec())
             }
             XfrPublicKey::Secp256k1(_) => {
-                let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_edwards(prng);
+                let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Secp256k1, s.to_bytes(), p.to_compressed_bytes())
             }
         }

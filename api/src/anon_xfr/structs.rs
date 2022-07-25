@@ -1,13 +1,13 @@
+use crate::anon_xfr::keys::AXfrSecretKey;
 use crate::anon_xfr::{
-    decrypt_memo,
-    keys::{AXfrKeyPair, AXfrPubKey, AXfrViewKey},
+    commit, decrypt_memo,
+    keys::{AXfrKeyPair, AXfrPubKey},
 };
 use crate::primitives::asymmetric_encryption::{dh_decrypt, dh_encrypt};
 use crate::xfr::structs::AssetType;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
-use zei_crypto::basic::rescue::RescueInstance;
+use zei_algebra::{bls12_381::BLSScalar, prelude::*, secp256k1::SECP256K1G1};
 use zei_plonk::plonk::constraint_system::VarIndex;
 
 /// The nullifier.
@@ -43,7 +43,13 @@ impl AnonAssetRecord {
     /// Generate the anonymous asset record from the opened version.
     pub fn from_oabar(oabar: &OpenAnonAssetRecord) -> AnonAssetRecord {
         AnonAssetRecord {
-            commitment: oabar.compute_commitment(),
+            commitment: commit(
+                oabar.pub_key_ref(),
+                &oabar.get_blind(),
+                oabar.get_amount(),
+                &oabar.get_asset_type(),
+            )
+            .unwrap(),
         }
     }
 }
@@ -106,26 +112,14 @@ impl OpenAnonAssetRecord {
         &self.pub_key
     }
 
+    /// Get the blinding value
+    pub fn get_blind(&self) -> BLSScalar {
+        self.blind
+    }
+
     /// Get record's owner memo
     pub fn get_owner_memo(&self) -> Option<AxfrOwnerMemo> {
         self.owner_memo.clone()
-    }
-
-    /// Compute the record's amount||asset type||pub key commitment
-    pub fn compute_commitment(&self) -> Commitment {
-        let hash = RescueInstance::new();
-        let cur = hash.rescue(&[
-            self.blind,
-            BLSScalar::from(self.amount),
-            self.asset_type.as_scalar(),
-            BLSScalar::zero(),
-        ])[0];
-        hash.rescue(&[
-            cur,
-            self.pub_key.0.get_x(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-        ])[0]
     }
 }
 
@@ -203,7 +197,7 @@ impl OpenAnonAssetRecordBuilder {
     ) -> Result<Self> {
         let (amount, asset_type, blind) = decrypt_memo(&owner_memo, key_pair, record).c(d!())?;
         let mut builder = OpenAnonAssetRecordBuilder::new()
-            .pub_key(&key_pair.get_pub_key())
+            .pub_key(&key_pair.get_public_key())
             .amount(amount)
             .asset_type(asset_type);
 
@@ -241,7 +235,6 @@ impl MTPath {
 }
 
 pub(crate) struct PayerWitnessVars {
-    pub(crate) spend_key: VarIndex,
     pub(crate) uid: VarIndex,
     pub(crate) amount: VarIndex,
     pub(crate) asset_type: VarIndex,
@@ -253,7 +246,7 @@ pub(crate) struct PayeeWitnessVars {
     pub(crate) amount: VarIndex,
     pub(crate) blind: VarIndex,
     pub(crate) asset_type: VarIndex,
-    pub(crate) pubkey_x: VarIndex,
+    pub(crate) public_key_scalars: [VarIndex; 3],
 }
 
 /// The allocated variables for a Merkle tree node.
@@ -282,17 +275,11 @@ pub struct AccElemVars {
     pub commitment: VarIndex,
 }
 
-pub(crate) struct NullifierInputVars {
-    pub(crate) uid_amount: VarIndex,
-    pub(crate) asset_type: VarIndex,
-    pub(crate) pub_key_x: VarIndex,
-}
-
 #[derive(Debug, Clone)]
 /// The witness for the payer.
 pub struct PayerWitness {
-    /// The spending key.
-    pub spend_key: BLSScalar,
+    /// The secret key.
+    pub secret_key: AXfrSecretKey,
     /// The amount.
     pub amount: u64,
     /// The asset type.
@@ -314,15 +301,15 @@ pub struct PayeeWitness {
     pub blind: BlindFactor,
     /// The asset type.
     pub asset_type: BLSScalar,
-    /// The x coordinate of the public key.
-    pub pubkey_x: BLSScalar,
+    /// The public key.
+    pub public_key: AXfrPubKey,
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AxfrOwnerMemo {
     /// The random point used to generate the shared point.
-    pub point: JubjubPoint,
+    pub point: SECP256K1G1,
     /// The ciphertext.
     pub ctext: Vec<u8>,
 }
@@ -339,8 +326,8 @@ impl AxfrOwnerMemo {
     }
 
     /// Decrypt a memo using the viewing key.
-    pub fn decrypt(&self, view_key: &AXfrViewKey) -> Result<Vec<u8>> {
-        dh_decrypt(&view_key.0, &self.point, &self.ctext)
+    pub fn decrypt(&self, secret_key: &AXfrSecretKey) -> Result<Vec<u8>> {
+        dh_decrypt(&secret_key.0, &self.point, &self.ctext)
     }
 }
 
@@ -356,7 +343,7 @@ mod test {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
 
-        let pub_key: AXfrPubKey = keypair.get_pub_key();
+        let pub_key: AXfrPubKey = keypair.get_public_key();
 
         let bytes = pub_key.zei_to_bytes();
         assert_ne!(bytes.len(), 0);

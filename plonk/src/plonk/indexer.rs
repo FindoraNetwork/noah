@@ -42,6 +42,8 @@ pub struct PlonkProverParams<O, C, F> {
     pub q_polys: Vec<O>,
     /// the polynomials of perm1, perm2, ..., perm_{n_wires_per_gate}.
     pub s_polys: Vec<O>,
+    /// the polynomial for boolean constraints.
+    pub qb_poly: O,
     /// the Plonk verifier parameters.
     pub verifier_params: PlonkVerifierParams<C, F>,
     /// the elements of the group.
@@ -62,6 +64,8 @@ pub struct PlonkProverParams<O, C, F> {
     pub q_coset_evals: Vec<Vec<F>>,
     /// the permutation polynomials' FFT of the polynomial of unity root set.
     pub s_coset_evals: Vec<Vec<F>>,
+    /// the boolean constraint polynomial's FFT of the polynomial of unity root set.
+    pub qb_coset_eval: Vec<F>,
 }
 
 /// Prover parameters over a particular polynomial commitment scheme.
@@ -90,6 +94,8 @@ pub struct PlonkVerifierParams<C, F> {
     pub cm_q_vec: Vec<C>,
     /// the commitments of perm1, perm2, ..., perm_{n_wires_per_gate}.
     pub cm_s_vec: Vec<C>,
+    /// the commitment of the boolean selector.
+    pub cm_qb: C,
     /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub k: Vec<F>,
     /// a primitive n-th root of unity.
@@ -275,9 +281,38 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         lagrange_constants.push(compute_lagrange_constant(&group, *constraint_index));
     }
 
+    // Step 4: commit `boolean_constraint_indices`.
+    let (qb_coset_eval, qb_poly, cm_qb) = if let Some(lagrange_pcs) = lagrange_pcs {
+        let mut qb = vec![PCS::Field::zero(); n];
+        for i in cs.boolean_constraint_indices().iter() {
+            qb[*i] = PCS::Field::one();
+        }
+        let qb_coef = FpPolynomial::ffti(&root, &qb, n);
+        let qb_eval = FpPolynomial::from_coefs(qb);
+        let qb_coset_eval = qb_coef.coset_fft_with_unity_root(&root_m, m, &k[1]);
+
+        let cm_qb = lagrange_pcs
+            .commit(&qb_eval)
+            .c(d!(PlonkError::SetupError))?;
+
+        (qb_coset_eval, qb_coef, cm_qb)
+    } else {
+        let mut qb = vec![PCS::Field::zero(); n];
+        for i in cs.boolean_constraint_indices().iter() {
+            qb[*i] = PCS::Field::one();
+        }
+        let qb_coef = FpPolynomial::ffti(&root, &qb, n);
+        let qb_coset_eval = qb_coef.coset_fft_with_unity_root(&root_m, m, &k[1]);
+
+        let cm_qb = pcs.commit(&qb_coef).c(d!(PlonkError::SetupError))?;
+
+        (qb_coset_eval, qb_coef, cm_qb)
+    };
+
     let verifier_params = PlonkVerifierParams {
         cm_q_vec,
         cm_s_vec,
+        cm_qb,
         k,
         root,
         cs_size: n,
@@ -288,6 +323,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     Ok(PlonkProverParams {
         q_polys,
         s_polys,
+        qb_poly,
         verifier_params,
         group,
         coset_quotient,
@@ -298,6 +334,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         z_h_inv_coset_evals,
         q_coset_evals,
         s_coset_evals,
+        qb_coset_eval,
     })
 }
 

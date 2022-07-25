@@ -139,13 +139,13 @@ mod test {
         assert_eq!(
             true,
             keypair
-                .get_pub_key()
+                .get_public_key()
                 .serialize(&mut Serializer::new(&mut pk_mp_vec))
                 .is_ok()
         );
         let mut de = Deserializer::new(&pk_mp_vec[..]);
         let pk2: AXfrPubKey = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(keypair.get_pub_key(), pk2);
+        assert_eq!(keypair.get_public_key(), pk2);
 
         let mut keypair_mp_vec = vec![];
         assert_eq!(

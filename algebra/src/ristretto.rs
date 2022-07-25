@@ -7,12 +7,15 @@ use curve25519_dalek::{
     traits::Identity,
 };
 use digest::{generic_array::typenum::U64, Digest};
+use num_bigint::BigUint;
+use num_traits::Num;
+use std::fmt::{Debug, Formatter};
 
 /// The number of bytes for a scalar value over BLS12-381
 pub const RISTRETTO_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `curve25519_dalek::scalar::Scalar`
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
 pub struct RistrettoScalar(pub curve25519_dalek::scalar::Scalar);
 
 /// The wrapped struct for `curve25519_dalek::ristretto::CompressedRistretto`
@@ -26,6 +29,12 @@ pub struct CompressedEdwardsY(pub curve25519_dalek::edwards::CompressedEdwardsY)
 /// The wrapped struct for `curve25519_dalek::ristretto::RistrettoPoint`
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoPoint(pub RPoint);
+
+impl Debug for RistrettoScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        <curve25519_dalek::scalar::Scalar as Debug>::fmt(&self.0, f)
+    }
+}
 
 impl From<u128> for RistrettoScalar {
     #[inline]
@@ -136,8 +145,30 @@ impl From<u32> for RistrettoScalar {
 }
 
 impl From<u64> for RistrettoScalar {
+    #[inline]
     fn from(value: u64) -> Self {
         Self(curve25519_dalek::scalar::Scalar::from(value))
+    }
+}
+
+impl Into<BigUint> for RistrettoScalar {
+    #[inline]
+    fn into(self) -> BigUint {
+        BigUint::from_bytes_le(self.0.as_bytes())
+    }
+}
+
+impl<'a> From<&'a BigUint> for RistrettoScalar {
+    #[inline]
+    fn from(x: &BigUint) -> Self {
+        let biguint = x % RistrettoScalar::get_field_size_biguint();
+
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(&biguint.to_bytes_le()[0..32]);
+
+        Self(curve25519_dalek::scalar::Scalar::from_bytes_mod_order(
+            bytes,
+        ))
     }
 }
 
@@ -163,6 +194,15 @@ impl Scalar for RistrettoScalar {
     #[inline]
     fn multiplicative_generator() -> Self {
         Self(curve25519_dalek::scalar::Scalar::from(2u8))
+    }
+
+    #[inline]
+    fn get_field_size_biguint() -> BigUint {
+        BigUint::from_str_radix(
+            "7237005577332262213973186563042994240857116359379907606001950938285454250989",
+            10,
+        )
+        .unwrap()
     }
 
     #[inline]
@@ -213,7 +253,7 @@ impl RistrettoScalar {
     /// Return a tuple of (r, g^r)
     /// where r is a random `RistrettoScalar`, and g is the `ED25519_BASEPOINT_POINT`
     #[inline]
-    pub fn random_scalar_with_compressed_edwards<R: CryptoRng + RngCore>(
+    pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
         prng: &mut R,
     ) -> (Self, CompressedEdwardsY) {
         let r = Self::random(prng);
@@ -261,6 +301,14 @@ impl CompressedEdwardsY {
     #[inline]
     pub fn scalar_mul_basepoint(s: &RistrettoScalar) -> Self {
         Self((s.0 * ED25519_BASEPOINT_POINT).compress())
+    }
+}
+
+impl Neg for RistrettoPoint {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self(self.0.neg())
     }
 }
 
