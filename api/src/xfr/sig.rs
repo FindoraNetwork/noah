@@ -173,8 +173,10 @@ impl XfrPublicKey {
                 pk.verify(message, sign).c(d!(ZeiError::SignatureError))
             }
             (XfrPublicKey::Secp256k1(pk), XfrSignature::Secp256k1(sign)) => {
+                // If the Ethereum sign is used outside,
+                // it needs to be dealt with first, only hash in zei.
                 let mut hasher = Sha3_256::new();
-                hasher.update(message); // TODO if need with append message (Ethereum).
+                hasher.update(message);
                 let res = hasher.finalize();
                 let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
                 if secp256k1_verify(&msg, sign, pk) {
@@ -309,6 +311,8 @@ impl XfrSecretKey {
                 Ok(XfrSignature::Ed25519(sign))
             }
             XfrSecretKey::Secp256k1(sk) => {
+                // If the Ethereum sign is used outside,
+                // it needs to be dealt with first, only hash in zei.
                 let mut hasher = Sha3_256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
