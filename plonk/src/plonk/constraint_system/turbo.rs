@@ -328,9 +328,9 @@ impl<F: Scalar> TurboCS<F> {
 
         #[cfg(all(feature = "debug", nightly))]
         {
-            for i in self.num_vars - values.len()..self.num_vars {
+            for var in self.num_vars - values.len()..self.num_vars {
                 self.witness_backtrace
-                    .insert(i, std::backtrace::Backtrace::capture());
+                    .insert(var, std::backtrace::Backtrace::capture());
             }
         }
     }
@@ -892,8 +892,8 @@ mod test {
         cs.new_variable(one);
         cs.new_variable(two);
         cs.new_variable(three);
-        let add = cs.add(0, 2);
-        let sub = cs.sub(3, 1);
+        let add = cs.add(0 + 2, 2 + 2);
+        let sub = cs.sub(3 + 2, 1 + 2);
         cs.equal(add, sub);
 
         let witness = cs.get_and_clear_witness();
@@ -913,9 +913,9 @@ mod test {
         cs.new_variable(one);
         cs.new_variable(two);
         cs.new_variable(two);
-        let one_equals_two = cs.is_equal(0, 1);
+        let one_equals_two = cs.is_equal(0 + 2, 1 + 2);
         assert_eq!(cs.witness[one_equals_two], zero);
-        let two_equals_two = cs.is_equal(1, 2);
+        let two_equals_two = cs.is_equal(1 + 2, 2 + 2);
         assert_eq!(cs.witness[two_equals_two], one);
 
         let mut witness = cs.get_and_clear_witness();
