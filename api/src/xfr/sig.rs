@@ -69,8 +69,7 @@ pub enum XfrPublicKey {
 
 impl Default for XfrPublicKey {
     fn default() -> Self {
-        let secret_key = Secp256k1SecretKey::default();
-        XfrPublicKey::Secp256k1(Secp256k1PublicKey::from_secret_key(&secret_key))
+        XfrPublicKey::Ed25519(Ed25519PublicKey::default())
     }
 }
 
