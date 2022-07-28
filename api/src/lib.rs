@@ -33,8 +33,6 @@ pub mod anon_creds;
 pub mod anon_xfr;
 /// The wrapper of the parameters.
 pub mod parameters;
-/// Module for primitives of cryptography algorithm.
-pub mod primitives;
 /// Module for serialization.
 pub mod serialization;
 /// Module for generating parameters.
