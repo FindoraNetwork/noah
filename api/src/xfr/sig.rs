@@ -98,6 +98,7 @@ pub enum XfrSignature {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[wasm_bindgen]
 /// The keypair for confidential transfer.
 pub struct XfrKeyPair {
     /// The public key.
