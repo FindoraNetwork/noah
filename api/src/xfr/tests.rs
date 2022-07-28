@@ -46,7 +46,7 @@ pub(crate) fn create_xfr(
 pub(crate) fn gen_key_pair_vec(size: usize, prng: &mut ChaChaRng) -> Vec<XfrKeyPair> {
     let mut keys = vec![];
     for _i in 0..size {
-        keys.push(XfrKeyPair::generate(prng));
+        keys.push(XfrKeyPair::generate_secp256k1(prng));
     }
     keys
 }

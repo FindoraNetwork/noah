@@ -2,7 +2,6 @@ use crate::xfr::{
     sig::{XfrPublicKey, XfrSecretKey, XfrSignature},
     structs::{AssetType, ASSET_TYPE_LENGTH},
 };
-use ed25519_dalek::{PublicKey, SecretKey};
 use serde::Serializer;
 use zei_algebra::prelude::*;
 
@@ -24,25 +23,22 @@ impl ZeiFromToBytes for AssetType {
 
 impl ZeiFromToBytes for XfrPublicKey {
     fn zei_to_bytes(&self) -> Vec<u8> {
-        self.0.as_bytes().to_vec()
+        self.to_bytes().to_vec()
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        let pk = PublicKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?;
-        Ok(XfrPublicKey(pk))
+        XfrPublicKey::from_bytes(bytes)
     }
 }
 serialize_deserialize!(XfrPublicKey);
 
 impl ZeiFromToBytes for XfrSecretKey {
     fn zei_to_bytes(&self) -> Vec<u8> {
-        self.0.as_bytes().to_vec()
+        self.to_bytes().to_vec()
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(XfrSecretKey(
-            SecretKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?,
-        ))
+        XfrSecretKey::from_bytes(bytes)
     }
 }
 
@@ -50,17 +46,11 @@ serialize_deserialize!(XfrSecretKey);
 
 impl ZeiFromToBytes for XfrSignature {
     fn zei_to_bytes(&self) -> Vec<u8> {
-        let bytes = self.0.to_bytes();
-        let mut vec = vec![];
-        vec.extend_from_slice(&bytes[..]);
-        vec
+        self.to_bytes().to_vec()
     }
 
     fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
-        match ed25519_dalek::Signature::from_bytes(bytes) {
-            Ok(e) => Ok(XfrSignature(e)),
-            Err(_) => Err(eg!(ZeiError::DeserializationError)),
-        }
+        XfrSignature::from_bytes(bytes)
     }
 }
 
@@ -118,7 +108,7 @@ mod test {
             blind_asset_record: BlindAssetRecord {
                 amount: blind_amount,
                 asset_type: blind_type,
-                public_key: Default::default(),
+                public_key: XfrPublicKey::Ed25519(Default::default()),
             },
             amount: amt,
             amount_blinds: (Default::default(), Default::default()),
@@ -126,13 +116,22 @@ mod test {
             type_blind: Default::default(),
         };
         let actual_to_string_res = serde_json::to_string(&oar).unwrap();
-        let expected_to_string_res = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
+        let expected_to_string_res = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
         assert_eq!(actual_to_string_res, expected_to_string_res);
     }
 
     #[test]
+    fn oar_amount_u64_from_compatible_string_serde() {
+        let serialized_str = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
+        let oar: OpenAssetRecord =
+            serde_json::from_str::<OpenAssetRecord>(&serialized_str).unwrap();
+        let val = 1844674407370955161_u64;
+        assert_eq!(val, *oar.get_amount());
+    }
+
+    #[test]
     fn oar_amount_u64_from_string_serde() {
-        let serialized_str = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
+        let serialized_str = r##"{"blind_asset_record":{"amount":{"Confidential":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]},"asset_type":{"Confidential":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"public_key":"AAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="},"amount":"1844674407370955161","amount_blinds":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="],"asset_type":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"type_blind":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}"##;
         let oar: OpenAssetRecord =
             serde_json::from_str::<OpenAssetRecord>(&serialized_str).unwrap();
         let val = 1844674407370955161_u64;
@@ -214,7 +213,7 @@ mod test {
         let keypair = XfrKeyPair::generate(&mut prng);
         let message = [10u8; 55];
 
-        let signature = keypair.sign(&message);
+        let signature = keypair.sign(&message).unwrap();
 
         let mut vec = vec![];
         assert_eq!(
@@ -228,7 +227,7 @@ mod test {
         assert_eq!(signature, signature2);
     }
 
-    #[derive(Serialize, Deserialize, Default)]
+    #[derive(Serialize, Deserialize)]
     struct StructWithPubKey {
         key: XfrPublicKey,
     }

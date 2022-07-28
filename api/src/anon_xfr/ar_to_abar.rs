@@ -56,7 +56,7 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     let msg = bincode::serialize(&body)
         .map_err(|_| ZeiError::SerializationError)
         .c(d!())?;
-    let signature = bar_keypair.sign(&msg);
+    let signature = bar_keypair.sign(&msg)?;
 
     let note = ArToAbarNote { body, signature };
     Ok(note)

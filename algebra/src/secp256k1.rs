@@ -36,6 +36,19 @@ impl Debug for SECP256K1Scalar {
     }
 }
 
+impl SECP256K1Scalar {
+    /// Return a tuple of (r, g^r)
+    /// where r is a random `Scalar`, and g is the `BASEPOINT_POINT`
+    #[inline]
+    pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
+        prng: &mut R,
+    ) -> (Self, SECP256K1G1) {
+        let r = Self::random(prng);
+        let p = SECP256K1G1::get_base().mul(&r);
+        (r, p)
+    }
+}
+
 /// The wrapped struct for `ark_bulletproofs_canaan::curve::secp256k1::G1Projective`
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq, Hash)]
