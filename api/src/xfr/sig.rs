@@ -173,8 +173,6 @@ impl XfrPublicKey {
                 pk.verify(message, sign).c(d!(ZeiError::SignatureError))
             }
             (XfrPublicKey::Secp256k1(pk), XfrSignature::Secp256k1(sign)) => {
-                // If the Ethereum sign is used outside,
-                // it needs to be dealt with first, only hash in zei.
                 let mut hasher = Sha3_256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
