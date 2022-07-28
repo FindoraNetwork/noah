@@ -1,4 +1,4 @@
-use crate::primitives::asymmetric_encryption;
+use crate::anon_xfr::keys::{AXfrPubKey, AXfrSecretKey};
 use ark_serialize::{Flags, SWFlags};
 use ed25519_dalek::{
     ExpandedSecretKey, PublicKey as Ed25519PublicKey, SecretKey as Ed25519SecretKey,
@@ -171,10 +171,10 @@ impl XfrPublicKey {
             }
             XfrPublicKeyInner::Secp256k1(pk) => {
                 let bytes = convert_point_libsecp256k1_to_algebra(&pk);
-                let gp = SECP256K1G1::from_compressed_bytes(&bytes)?;
-                let (p, mut ctext) = asymmetric_encryption::dh_encrypt(prng, &gp, msg)?;
+                let gp = AXfrPubKey(SECP256K1G1::from_compressed_bytes(&bytes)?);
+                let (p, mut ctext) = gp.encrypt(prng, msg)?;
                 let mut bytes = vec![];
-                bytes.append(&mut p.to_compressed_bytes()); // 33-size
+                bytes.append(&mut p.0.to_compressed_bytes());
                 bytes.append(&mut ctext);
                 Ok(bytes)
             }
@@ -307,9 +307,10 @@ impl XfrSecretKey {
             XfrSecretKey::Secp256k1(sk) => {
                 let s: LibSecp256k1Scalar = (*sk).into();
                 let bytes = convert_scalar_libsecp256k1_to_algebra(&s.0);
-                let gs = SECP256K1Scalar::from_bytes(&bytes)?;
-                let point = SECP256K1G1::from_compressed_bytes(&lock[0..33])?;
-                asymmetric_encryption::dh_decrypt(&gs, &point, &lock[33..])
+                let sk = AXfrSecretKey(SECP256K1Scalar::from_bytes(&bytes)?);
+                let share = AXfrPubKey(SECP256K1G1::from_compressed_bytes(&lock[0..33])?);
+
+                sk.decrypt(&share, &lock[33..])
             }
         }
     }
