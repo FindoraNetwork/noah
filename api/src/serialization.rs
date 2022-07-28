@@ -61,6 +61,7 @@ mod test {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
     use crate::ristretto::CompressedRistretto;
     use crate::serialization::ZeiFromToBytes;
+    use crate::xfr::sig::XfrPublicKeyInner;
     use crate::xfr::{
         asset_tracer::RecordDataEncKey,
         sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature},
@@ -108,7 +109,7 @@ mod test {
             blind_asset_record: BlindAssetRecord {
                 amount: blind_amount,
                 asset_type: blind_type,
-                public_key: XfrPublicKey::Ed25519(Default::default()),
+                public_key: XfrPublicKey(XfrPublicKeyInner::Ed25519(Default::default())),
             },
             amount: amt,
             amount_blinds: (Default::default(), Default::default()),

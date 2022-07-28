@@ -10,6 +10,7 @@ use libsecp256k1::{
     SecretKey as Secp256k1SecretKey, Signature as Secp256k1Signature,
 };
 use sha3::{Digest, Sha3_256};
+use wasm_bindgen::prelude::*;
 use zei_algebra::{
     cmp::Ordering,
     hash::{Hash, Hasher},
@@ -59,8 +60,13 @@ impl KeyType {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[wasm_bindgen]
+/// The public key wrapper for confidential transfer, for WASM compatability.
+pub struct XfrPublicKey(pub(crate) XfrPublicKeyInner);
+
+#[derive(Clone, Copy, Debug)]
 /// The public key for confidential transfer.
-pub enum XfrPublicKey {
+pub enum XfrPublicKeyInner {
     /// Ed25519 Public Key
     Ed25519(Ed25519PublicKey),
     /// Secp256k1 Public Key
@@ -69,7 +75,7 @@ pub enum XfrPublicKey {
 
 impl Default for XfrPublicKey {
     fn default() -> Self {
-        XfrPublicKey::Ed25519(Ed25519PublicKey::default())
+        XfrPublicKey(XfrPublicKeyInner::Ed25519(Ed25519PublicKey::default()))
     }
 }
 
@@ -132,12 +138,12 @@ impl XfrPublicKey {
         &self,
         prng: &mut R,
     ) -> (KeyType, Vec<u8>, Vec<u8>) {
-        match self {
-            XfrPublicKey::Ed25519(_) => {
+        match self.0 {
+            XfrPublicKeyInner::Ed25519(_) => {
                 let (s, p) = RistrettoScalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Ed25519, s.to_bytes(), p.to_bytes().to_vec())
             }
-            XfrPublicKey::Secp256k1(_) => {
+            XfrPublicKeyInner::Secp256k1(_) => {
                 let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Secp256k1, s.to_bytes(), p.to_compressed_bytes())
             }
@@ -146,9 +152,9 @@ impl XfrPublicKey {
 
     /// Convert into the point format.
     pub fn as_compressed_point(&self) -> Vec<u8> {
-        match self {
-            XfrPublicKey::Ed25519(pk) => pk.as_bytes().to_vec(),
-            XfrPublicKey::Secp256k1(pk) => convert_point_libsecp256k1_to_algebra(pk),
+        match self.0 {
+            XfrPublicKeyInner::Ed25519(pk) => pk.as_bytes().to_vec(),
+            XfrPublicKeyInner::Secp256k1(pk) => convert_point_libsecp256k1_to_algebra(&pk),
         }
     }
 
@@ -158,10 +164,12 @@ impl XfrPublicKey {
         prng: &mut R,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
-        match self {
-            XfrPublicKey::Ed25519(pk) => Ok(hybrid_encrypt_ed25519(prng, pk, msg).zei_to_bytes()),
-            XfrPublicKey::Secp256k1(pk) => {
-                let bytes = convert_point_libsecp256k1_to_algebra(pk);
+        match self.0 {
+            XfrPublicKeyInner::Ed25519(pk) => {
+                Ok(hybrid_encrypt_ed25519(prng, &pk, msg).zei_to_bytes())
+            }
+            XfrPublicKeyInner::Secp256k1(pk) => {
+                let bytes = convert_point_libsecp256k1_to_algebra(&pk);
                 let gp = SECP256K1G1::from_compressed_bytes(&bytes)?;
                 let (p, mut ctext) = asymmetric_encryption::dh_encrypt(prng, &gp, msg)?;
                 let mut bytes = vec![];
@@ -174,16 +182,16 @@ impl XfrPublicKey {
 
     /// Verify a signature.
     pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<()> {
-        match (self, signature) {
-            (XfrPublicKey::Ed25519(pk), XfrSignature::Ed25519(sign)) => {
+        match (self.0, signature) {
+            (XfrPublicKeyInner::Ed25519(pk), XfrSignature::Ed25519(sign)) => {
                 pk.verify(message, sign).c(d!(ZeiError::SignatureError))
             }
-            (XfrPublicKey::Secp256k1(pk), XfrSignature::Secp256k1(sign)) => {
+            (XfrPublicKeyInner::Secp256k1(pk), XfrSignature::Secp256k1(sign)) => {
                 let mut hasher = Sha3_256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
                 let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
-                if secp256k1_verify(&msg, sign, pk) {
+                if secp256k1_verify(&msg, sign, &pk) {
                     Ok(())
                 } else {
                     Err(eg!(ZeiError::SignatureError))
@@ -196,12 +204,12 @@ impl XfrPublicKey {
     /// Convert into bytes.
     pub fn to_bytes(&self) -> [u8; XFR_PUBLIC_KEY_LENGTH] {
         let mut bytes = [0u8; XFR_PUBLIC_KEY_LENGTH];
-        match self {
-            XfrPublicKey::Ed25519(pk) => {
+        match self.0 {
+            XfrPublicKeyInner::Ed25519(pk) => {
                 bytes[0] = KeyType::Ed25519.to_byte();
                 bytes[1..XFR_PUBLIC_KEY_LENGTH - 1].copy_from_slice(pk.as_bytes());
             }
-            XfrPublicKey::Secp256k1(pk) => {
+            XfrPublicKeyInner::Secp256k1(pk) => {
                 bytes[0] = KeyType::Secp256k1.to_byte();
                 bytes[1..XFR_PUBLIC_KEY_LENGTH].copy_from_slice(&pk.serialize_compressed());
             }
@@ -213,9 +221,9 @@ impl XfrPublicKey {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // Compatible with old data.
         if bytes.len() == XFR_PUBLIC_KEY_LENGTH - 2 {
-            return Ok(XfrPublicKey::Ed25519(
+            return Ok(XfrPublicKey(XfrPublicKeyInner::Ed25519(
                 Ed25519PublicKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?,
-            ));
+            )));
         }
 
         if bytes.len() != XFR_PUBLIC_KEY_LENGTH {
@@ -227,14 +235,14 @@ impl XfrPublicKey {
             KeyType::Ed25519 => {
                 let pk = Ed25519PublicKey::from_bytes(&bytes[1..XFR_PUBLIC_KEY_LENGTH - 1])
                     .c(d!(ZeiError::DeserializationError))?;
-                Ok(XfrPublicKey::Ed25519(pk))
+                Ok(XfrPublicKey(XfrPublicKeyInner::Ed25519(pk)))
             }
             KeyType::Secp256k1 => {
                 let mut pk_byte = [0u8; XFR_PUBLIC_KEY_LENGTH - 1];
                 pk_byte.copy_from_slice(&bytes[1..]);
                 let pk = Secp256k1PublicKey::parse_compressed(&pk_byte)
                     .c(d!(ZeiError::DeserializationError))?;
-                Ok(XfrPublicKey::Secp256k1(pk))
+                Ok(XfrPublicKey(XfrPublicKeyInner::Secp256k1(pk)))
             }
         }
     }
@@ -277,10 +285,10 @@ impl XfrSecretKey {
     /// Convert into a keypair.
     pub fn into_keypair(self) -> XfrKeyPair {
         let pk = match self {
-            XfrSecretKey::Ed25519(ref sk) => XfrPublicKey::Ed25519(sk.into()),
-            XfrSecretKey::Secp256k1(ref sk) => {
-                XfrPublicKey::Secp256k1(Secp256k1PublicKey::from_secret_key(sk))
-            }
+            XfrSecretKey::Ed25519(ref sk) => XfrPublicKey(XfrPublicKeyInner::Ed25519(sk.into())),
+            XfrSecretKey::Secp256k1(ref sk) => XfrPublicKey(XfrPublicKeyInner::Secp256k1(
+                Secp256k1PublicKey::from_secret_key(sk),
+            )),
         };
         XfrKeyPair {
             pub_key: pk,
@@ -401,7 +409,7 @@ impl XfrKeyPair {
     pub fn generate_ed25519<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
         let kp = ed25519_dalek::Keypair::generate(prng);
         XfrKeyPair {
-            pub_key: XfrPublicKey::Ed25519(kp.public),
+            pub_key: XfrPublicKey(XfrPublicKeyInner::Ed25519(kp.public)),
             sec_key: XfrSecretKey::Ed25519(kp.secret),
         }
     }
@@ -411,7 +419,7 @@ impl XfrKeyPair {
         let sk = Secp256k1SecretKey::random(prng);
         let pk = Secp256k1PublicKey::from_secret_key(&sk);
         XfrKeyPair {
-            pub_key: XfrPublicKey::Secp256k1(pk),
+            pub_key: XfrPublicKey(XfrPublicKeyInner::Secp256k1(pk)),
             sec_key: XfrSecretKey::Secp256k1(sk),
         }
     }
