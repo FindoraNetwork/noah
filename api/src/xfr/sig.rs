@@ -67,6 +67,12 @@ pub enum XfrPublicKey {
     Secp256k1(Secp256k1PublicKey),
 }
 
+impl Default for XfrPublicKey {
+    fn default() -> Self {
+        XfrPublicKey::Ed25519(Ed25519PublicKey::default())
+    }
+}
+
 #[derive(Debug)]
 /// The secret key for confidential transfer.
 pub enum XfrSecretKey {
