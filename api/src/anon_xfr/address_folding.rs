@@ -540,7 +540,7 @@ pub fn prove_address_folding_in_cs(
             ]))[0];
         }
 
-        // cs.equal(comm_var, h_var);
+        cs.equal(comm_var, h_var);
     }
 
     cs.prepare_pi_variable(comm_var);
