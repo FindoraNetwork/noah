@@ -632,11 +632,16 @@ impl<F: Scalar> TurboCS<F> {
             self.wiring[i].push(var);
         }
 
+    
+        //The constant will be removed when participating in other gate operations
+        //so keep it at this time
+        //first，save the variable to be removed
         #[cfg(all(feature = "debug", nightly))]
         let backtrace = { self.witness_backtrace.remove(&var) };
 
         self.finish_new_gate();
 
+        //second, insert when it exists
         #[cfg(all(feature = "debug", nightly))]
         {
             match backtrace {
