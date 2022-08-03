@@ -36,7 +36,7 @@ pub struct TurboCS<F> {
     pub verifier_only: bool,
     /// A private witness for the circuit, cleared after computing a proof.
     pub witness: Vec<F>,
-    /// record witness backtracking info for checking dangleing witness
+    /// record witness backtracking info for checking dangling witness
     #[cfg(all(feature = "debug", nightly))]
     #[serde(skip)]
     pub witness_backtrace: HashMap<VarIndex, std::backtrace::Backtrace>,
@@ -632,15 +632,15 @@ impl<F: Scalar> TurboCS<F> {
             self.wiring[i].push(var);
         }
 
-        //The constant will be removed when participating in other gate operations
-        //so keep it at this time
-        //first，save the variable to be removed
+        // The constant should be used somewhere else so it should be removed by another gate.
+        // 
+        // Therefore, here we save the backtrace information,  so that `finish_new_gate` does not 
+        // delete such information, and then put it back to the list of witness backtrace.
         #[cfg(all(feature = "debug", nightly))]
         let backtrace = { self.witness_backtrace.remove(&var) };
 
         self.finish_new_gate();
 
-        //second, insert when it exists
         #[cfg(all(feature = "debug", nightly))]
         {
             match backtrace {
@@ -693,7 +693,7 @@ impl<F: Scalar> TurboCS<F> {
         {
             if !self.witness_backtrace.is_empty() {
                 for (_, v) in &self.witness_backtrace {
-                    panic!("dangling wintness:\n{}", v);
+                    panic!("dangling witness:\n{}", v);
                 }
             }
         }
@@ -1345,7 +1345,7 @@ mod test {
 
     #[test]
     #[cfg(all(feature = "debug", nightly))]
-    fn test_dangling_wintness_without_panic() {
+    fn test_dangling_witness_without_panic() {
         let one = F::one();
         let two = one.add(&one);
         let three = one.add(&two);
@@ -1378,7 +1378,7 @@ mod test {
     #[test]
     #[cfg(all(feature = "debug", nightly))]
     #[should_panic]
-    fn test_dangling_wintness_should_panic() {
+    fn test_dangling_witness_should_panic() {
         use crate::plonk::constraint_system::rescue::StateVar;
         use zei_crypto::basic::rescue::RescueInstance;
 
@@ -1398,7 +1398,8 @@ mod test {
         let comm_var = cs.new_variable(comm);
         cs.prepare_pi_variable(comm_var);
         let _h_var = cs.rescue_hash(&StateVar::new([var_0, var_1, var_2, var_3]))[0];
-        //cs.equal(comm_var, h_var)
+        // This step is intentionally omitted.
+        // cs.equal(comm_var, h_var)
         cs.pad()
     }
 }
