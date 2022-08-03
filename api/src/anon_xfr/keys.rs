@@ -1,4 +1,5 @@
-use crate::primitives::asymmetric_encryption::dh_keypair;
+use aes_gcm::{aead::Aead, NewAead};
+use digest::{generic_array::GenericArray, Digest};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use zei_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1, SECP256K1_SCALAR_LEN};
@@ -65,11 +66,9 @@ impl AXfrKeyPair {
 
     /// Return the key pair from the spending key.
     pub fn from_secret_key(secret_key: AXfrSecretKey) -> Self {
-        let (dh_sk, dh_pk) = dh_keypair(secret_key.0);
-
         Self {
-            secret_key: AXfrSecretKey(dh_sk),
-            pub_key: AXfrPubKey(dh_pk),
+            secret_key: secret_key.clone(),
+            pub_key: AXfrPubKey(SECP256K1G1::get_base().mul(&secret_key.0)),
         }
     }
 }
@@ -83,6 +82,41 @@ impl AXfrSecretKey {
         let second = BLSScalar::from_bytes(&bytes[31..])?;
 
         Ok([first, second])
+    }
+
+    #[inline]
+    /// Decrypt a ciphertext.
+    pub fn decrypt(&self, share: &AXfrPubKey, ctext: &[u8]) -> Result<Vec<u8>> {
+        let dh = share.0.mul(&self.0);
+
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(&dh.to_compressed_bytes());
+
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+        let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+        let gcm = {
+            let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+            if res.is_err() {
+                return Err(eg!(ZeiError::DecryptionError));
+            }
+
+            res.unwrap()
+        };
+
+        let res = {
+            let res = gcm.decrypt(nonce, ctext);
+
+            if res.is_err() {
+                return Err(eg!(ZeiError::DecryptionError));
+            }
+
+            res.unwrap()
+        };
+        Ok(res)
     }
 }
 
@@ -103,6 +137,48 @@ impl AXfrPubKey {
         let third = BLSScalar::from_bytes(&bytes[62..])?;
 
         Ok([first, second, third])
+    }
+
+    /// Encrypt the message
+    pub fn encrypt<R: CryptoRng + RngCore>(
+        &self,
+        prng: &mut R,
+        msg: &[u8],
+    ) -> Result<(Self, Vec<u8>)> {
+        let share_scalar = SECP256K1Scalar::random(prng);
+        let share = SECP256K1G1::get_base().mul(&share_scalar);
+
+        let dh = self.0.mul(&share_scalar);
+
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(&dh.to_compressed_bytes());
+
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+        let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+        let gcm = {
+            let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+            if res.is_err() {
+                return Err(eg!(ZeiError::EncryptionError));
+            }
+
+            res.unwrap()
+        };
+
+        let ctext = {
+            let res = gcm.encrypt(nonce, msg);
+
+            if res.is_err() {
+                return Err(eg!(ZeiError::EncryptionError));
+            }
+
+            res.unwrap()
+        };
+
+        Ok((AXfrPubKey(share), ctext))
     }
 }
 

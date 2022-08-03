@@ -3,11 +3,10 @@ use crate::anon_xfr::{
     commit, decrypt_memo,
     keys::{AXfrKeyPair, AXfrPubKey},
 };
-use crate::primitives::asymmetric_encryption::{dh_decrypt, dh_encrypt};
 use crate::xfr::structs::AssetType;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::{bls12_381::BLSScalar, prelude::*, secp256k1::SECP256K1G1};
+use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_plonk::plonk::constraint_system::VarIndex;
 
 /// The nullifier.
@@ -309,7 +308,7 @@ pub struct PayeeWitness {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AxfrOwnerMemo {
     /// The random point used to generate the shared point.
-    pub point: SECP256K1G1,
+    pub point: AXfrPubKey,
     /// The ciphertext.
     pub ctext: Vec<u8>,
 }
@@ -321,13 +320,13 @@ impl AxfrOwnerMemo {
         pub_key: &AXfrPubKey,
         msg: &[u8],
     ) -> Result<Self> {
-        let (point, ctext) = dh_encrypt(prng, &pub_key.0, msg)?;
+        let (point, ctext) = pub_key.encrypt(prng, msg)?;
         Ok(Self { point, ctext })
     }
 
     /// Decrypt a memo using the viewing key.
     pub fn decrypt(&self, secret_key: &AXfrSecretKey) -> Result<Vec<u8>> {
-        dh_decrypt(&secret_key.0, &self.point, &self.ctext)
+        secret_key.decrypt(&self.point, &self.ctext)
     }
 }
 

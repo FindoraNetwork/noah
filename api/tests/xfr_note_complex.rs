@@ -198,7 +198,7 @@ pub(crate) mod xfr_note_complex_variable_size {
                 &mut prng,
                 &user_ac_sk,
                 &credential_user.clone(),
-                user_key_pair.pub_key.as_bytes(),
+                &user_key_pair.pub_key.to_bytes(),
             )
             .unwrap();
             ac_commitment_keys.push(key.unwrap());

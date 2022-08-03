@@ -122,6 +122,28 @@ pub struct ZeiHybridCiphertext {
     pub(crate) ephemeral_public_key: XPublicKey,
 }
 
+impl ZeiFromToBytes for ZeiHybridCiphertext {
+    fn zei_to_bytes(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        bytes.append(&mut self.ephemeral_public_key.zei_to_bytes());
+        bytes.append(&mut self.ciphertext.zei_to_bytes());
+        bytes
+    }
+
+    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() < 32 {
+            Err(eg!(ZeiError::DeserializationError))
+        } else {
+            let ephemeral_public_key = XPublicKey::zei_from_bytes(&bytes[0..32])?;
+            let ciphertext = Ctext::zei_from_bytes(&bytes[32..])?;
+            Ok(Self {
+                ciphertext,
+                ephemeral_public_key,
+            })
+        }
+    }
+}
+
 /// encrypt a message over X25519
 pub fn hybrid_encrypt_x25519<R: CryptoRng + RngCore>(
     prng: &mut R,

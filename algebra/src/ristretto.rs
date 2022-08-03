@@ -253,7 +253,7 @@ impl RistrettoScalar {
     /// Return a tuple of (r, g^r)
     /// where r is a random `RistrettoScalar`, and g is the `ED25519_BASEPOINT_POINT`
     #[inline]
-    pub fn random_scalar_with_compressed_edwards<R: CryptoRng + RngCore>(
+    pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
         prng: &mut R,
     ) -> (Self, CompressedEdwardsY) {
         let r = Self::random(prng);
@@ -289,6 +289,12 @@ impl CompressedEdwardsY {
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Self {
         Self(CEY::from_slice(bytes))
+    }
+
+    /// Convert into bytes.
+    #[inline]
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.to_bytes()
     }
 
     /// Recover the point from the `CompressedEdwardsY`
@@ -406,6 +412,16 @@ impl<'a> Mul<&'a RistrettoScalar> for RistrettoPoint {
     #[inline]
     fn mul(self, rhs: &RistrettoScalar) -> Self::Output {
         Self(self.0 * rhs.0)
+    }
+}
+
+impl<'a> Mul<&'a RistrettoScalar> for CompressedEdwardsY {
+    type Output = CompressedEdwardsY;
+
+    #[inline]
+    fn mul(self, rhs: &RistrettoScalar) -> Self::Output {
+        let p = self.decompress().unwrap().mul(rhs.0);
+        CompressedEdwardsY(p.compress())
     }
 }
 

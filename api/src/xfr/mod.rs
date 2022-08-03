@@ -451,7 +451,7 @@ pub(crate) fn compute_transfer_multisig(
     let mut bytes = vec![];
     body.serialize(&mut rmp_serde::Serializer::new(&mut bytes))
         .c(d!(ZeiError::SerializationError))?;
-    Ok(XfrMultiSig::sign(&keys, &bytes))
+    Ok(XfrMultiSig::sign(&keys, &bytes)?)
 }
 
 /// Verify the multisignature over the body.
