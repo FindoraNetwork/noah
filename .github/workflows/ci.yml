@@ -63,3 +63,31 @@ jobs:
         with:
             command: test
             args: "--workspace"
+
+  dangling_check:
+      name: Check dangling
+      runs-on: ubuntu-latest
+      env:
+        RUSTFLAGS: -Dwarnings
+        RUST_BACKTRACE: 1
+      strategy:
+        matrix:
+          rust:
+            - nightly
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v2
+
+        - name: Install Rust (${{ matrix.rust }})
+          uses: actions-rs/toolchain@v1
+          with:
+            profile: minimal
+            toolchain: ${{ matrix.rust }}
+            override: true
+
+        - name: Test
+          uses: actions-rs/cargo@v1
+          with:
+            toolchain: ${{ matrix.rust }}
+            command: test
+            args: "-p zei"
