@@ -633,8 +633,8 @@ impl<F: Scalar> TurboCS<F> {
         }
 
         // The constant should be used somewhere else so it should be removed by another gate.
-        // 
-        // Therefore, here we save the backtrace information,  so that `finish_new_gate` does not 
+        //
+        // Therefore, here we save the backtrace information,  so that `finish_new_gate` does not
         // delete such information, and then put it back to the list of witness backtrace.
         #[cfg(all(feature = "debug", nightly))]
         let backtrace = { self.witness_backtrace.remove(&var) };
