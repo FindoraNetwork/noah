@@ -111,6 +111,7 @@ default = [
     'std',
     'u64_backend',
 ]
+debug = [ 'zei-plonk/debug' ]
 std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs-canaan/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
