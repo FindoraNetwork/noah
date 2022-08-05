@@ -136,7 +136,7 @@ impl fmt::Display for ZeiError {
             ParameterError => "Unexpected parameter for method or function",
             SignatureError => "Signature verification failed",
             XfrVerifyAssetAmountError => "Invalid total amount per asset in non confidential asset transfer",
-            XfrVerifyConfidentialAmountError => "Invalid asset type in non confidential asset transfer",
+            XfrVerifyConfidentialAmountError => "Invalid amount in non confidential asset transfer",
             XfrVerifyAssetTracingAssetAmountError => "Asset Tracking error. Asset commitment and asset ciphertext do not match",
             XfrVerifyAssetTracingIdentityError => "Asset Tracking error. Identity reveal proof does not hold",
             XfrVerifyAssetTracingEmptyProofError => "Asset Tracking error. Tracked assets must contain asset tracking proof",
