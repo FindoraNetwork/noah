@@ -6,10 +6,11 @@ use ed25519_dalek::{
 };
 use libsecp256k1::{
     curve::{Affine as LibSecp256k1G1, FieldStorage, Scalar as LibSecp256k1Scalar},
-    sign as secp256k1_sign, verify as secp256k1_verify, Message, PublicKey as Secp256k1PublicKey,
-    SecretKey as Secp256k1SecretKey, Signature as Secp256k1Signature,
+    recover, sign as secp256k1_sign, verify as secp256k1_verify, Message,
+    PublicKey as Secp256k1PublicKey, RecoveryId, SecretKey as Secp256k1SecretKey,
+    Signature as Secp256k1Signature,
 };
-use sha3::{Digest, Sha3_256};
+use sha3::{Digest, Keccak256};
 use wasm_bindgen::prelude::*;
 use zei_algebra::{
     cmp::Ordering,
@@ -29,7 +30,7 @@ pub const XFR_SECRET_KEY_LENGTH: usize = 33; // KeyType + 32 bytes
 pub const XFR_PUBLIC_KEY_LENGTH: usize = 34; // KeyType + 33 bytes
 
 /// The length of the public key for confidential transfer.
-pub const XFR_SIGNATURE_LENGTH: usize = 65; // KeyType + 64 bytes
+pub const XFR_SIGNATURE_LENGTH: usize = 66; // KeyType + 64 bytes + 1 recovery
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 /// Supported signature schemes.
@@ -38,6 +39,8 @@ pub enum KeyType {
     Ed25519,
     /// Secp256k1
     Secp256k1,
+    /// Secp256k1 address
+    Address,
 }
 
 impl KeyType {
@@ -46,6 +49,7 @@ impl KeyType {
         match self {
             KeyType::Ed25519 => 0,
             KeyType::Secp256k1 => 1,
+            KeyType::Address => 2,
         }
     }
 
@@ -54,6 +58,7 @@ impl KeyType {
         match byte {
             0u8 => KeyType::Ed25519,
             1u8 => KeyType::Secp256k1,
+            2u8 => KeyType::Address,
             _ => KeyType::Ed25519,
         }
     }
@@ -71,6 +76,8 @@ pub enum XfrPublicKeyInner {
     Ed25519(Ed25519PublicKey),
     /// Secp256k1 Public Key
     Secp256k1(Secp256k1PublicKey),
+    /// Hash of the secp256k1 public key.
+    Address([u8; 20]),
 }
 
 impl Default for XfrPublicKey {
@@ -86,6 +93,8 @@ pub enum XfrSecretKey {
     Ed25519(Ed25519SecretKey),
     /// Secp256k1 Secret Key
     Secp256k1(Secp256k1SecretKey),
+    /// Secp256k1 Secret Key with address
+    Address(Secp256k1SecretKey),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -95,6 +104,9 @@ pub enum XfrSignature {
     Ed25519(Ed25519Signature),
     /// Secp256k1 Signature
     Secp256k1(Secp256k1Signature),
+    /// Secp256k1 Signature with recovery.
+    /// params is r, s, v
+    Address(Secp256k1Signature, RecoveryId),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -144,7 +156,7 @@ impl XfrPublicKey {
                 let (s, p) = RistrettoScalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Ed25519, s.to_bytes(), p.to_bytes().to_vec())
             }
-            XfrPublicKeyInner::Secp256k1(_) => {
+            XfrPublicKeyInner::Secp256k1(_) | XfrPublicKeyInner::Address(_) => {
                 let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Secp256k1, s.to_bytes(), p.to_compressed_bytes())
             }
@@ -156,6 +168,7 @@ impl XfrPublicKey {
         match self.0 {
             XfrPublicKeyInner::Ed25519(pk) => pk.as_bytes().to_vec(),
             XfrPublicKeyInner::Secp256k1(pk) => convert_point_libsecp256k1_to_algebra(&pk),
+            XfrPublicKeyInner::Address(_) => panic!("Address not supported"),
         }
     }
 
@@ -178,6 +191,7 @@ impl XfrPublicKey {
                 bytes.append(&mut ctext);
                 Ok(bytes)
             }
+            XfrPublicKeyInner::Address(_) => panic!("Address not supported"),
         }
     }
 
@@ -188,11 +202,24 @@ impl XfrPublicKey {
                 pk.verify(message, sign).c(d!(ZeiError::SignatureError))
             }
             (XfrPublicKeyInner::Secp256k1(pk), XfrSignature::Secp256k1(sign)) => {
-                let mut hasher = Sha3_256::new();
+                let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
                 let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
                 if secp256k1_verify(&msg, sign, &pk) {
+                    Ok(())
+                } else {
+                    Err(eg!(ZeiError::SignatureError))
+                }
+            }
+            (XfrPublicKeyInner::Address(hash), XfrSignature::Address(sign, rec)) => {
+                let mut hasher = Keccak256::new();
+                hasher.update(message);
+                let res = hasher.finalize();
+                let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
+                let pk = recover(&msg, sign, rec).c(d!(ZeiError::SignatureError))?;
+                let other = convert_libsecp256k1_public_key_to_address(&pk);
+                if hash == other {
                     Ok(())
                 } else {
                     Err(eg!(ZeiError::SignatureError))
@@ -213,6 +240,10 @@ impl XfrPublicKey {
             XfrPublicKeyInner::Secp256k1(pk) => {
                 bytes[0] = KeyType::Secp256k1.to_byte();
                 bytes[1..XFR_PUBLIC_KEY_LENGTH].copy_from_slice(&pk.serialize_compressed());
+            }
+            XfrPublicKeyInner::Address(hash) => {
+                bytes[0] = KeyType::Address.to_byte();
+                bytes[1..21].copy_from_slice(&hash);
             }
         }
         bytes
@@ -239,11 +270,16 @@ impl XfrPublicKey {
                 Ok(XfrPublicKey(XfrPublicKeyInner::Ed25519(pk)))
             }
             KeyType::Secp256k1 => {
-                let mut pk_byte = [0u8; XFR_PUBLIC_KEY_LENGTH - 1];
-                pk_byte.copy_from_slice(&bytes[1..]);
-                let pk = Secp256k1PublicKey::parse_compressed(&pk_byte)
+                let mut pk_bytes = [0u8; XFR_PUBLIC_KEY_LENGTH - 1];
+                pk_bytes.copy_from_slice(&bytes[1..]);
+                let pk = Secp256k1PublicKey::parse_compressed(&pk_bytes)
                     .c(d!(ZeiError::DeserializationError))?;
                 Ok(XfrPublicKey(XfrPublicKeyInner::Secp256k1(pk)))
+            }
+            KeyType::Address => {
+                let mut hash_bytes = [0u8; 20];
+                hash_bytes.copy_from_slice(&bytes[1..21]);
+                Ok(XfrPublicKey(XfrPublicKeyInner::Address(hash_bytes)))
             }
         }
     }
@@ -290,6 +326,12 @@ impl XfrSecretKey {
             XfrSecretKey::Secp256k1(ref sk) => XfrPublicKey(XfrPublicKeyInner::Secp256k1(
                 Secp256k1PublicKey::from_secret_key(sk),
             )),
+            XfrSecretKey::Address(ref sk) => {
+                let pk = Secp256k1PublicKey::from_secret_key(sk);
+                XfrPublicKey(XfrPublicKeyInner::Address(
+                    convert_libsecp256k1_public_key_to_address(&pk),
+                ))
+            }
         };
         XfrKeyPair {
             pub_key: pk,
@@ -312,6 +354,7 @@ impl XfrSecretKey {
 
                 sk.decrypt(&share, &lock[33..])
             }
+            XfrSecretKey::Address(_) => panic!("Address not supported"),
         }
     }
 
@@ -327,12 +370,22 @@ impl XfrSecretKey {
             XfrSecretKey::Secp256k1(sk) => {
                 // If the Ethereum sign is used outside,
                 // it needs to be dealt with first, only hash in zei.
-                let mut hasher = Sha3_256::new();
+                let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
                 let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
-                let (sign, _recv) = secp256k1_sign(&msg, sk);
+                let (sign, _rec) = secp256k1_sign(&msg, sk);
                 Ok(XfrSignature::Secp256k1(sign))
+            }
+            XfrSecretKey::Address(sk) => {
+                // If the Ethereum sign is used outside,
+                // it needs to be dealt with first, only hash in zei.
+                let mut hasher = Keccak256::new();
+                hasher.update(message);
+                let res = hasher.finalize();
+                let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
+                let (sign, rec) = secp256k1_sign(&msg, sk);
+                Ok(XfrSignature::Address(sign, rec))
             }
         }
     }
@@ -353,6 +406,13 @@ impl XfrSecretKey {
                     convert_scalar_libsecp256k1_to_algebra(&s.0),
                 )
             }
+            XfrSecretKey::Address(sk) => {
+                let s: LibSecp256k1Scalar = (*sk).into();
+                (
+                    KeyType::Address,
+                    convert_scalar_libsecp256k1_to_algebra(&s.0),
+                )
+            }
         }
     }
 
@@ -366,6 +426,10 @@ impl XfrSecretKey {
             }
             XfrSecretKey::Secp256k1(sk) => {
                 bytes[0] = KeyType::Secp256k1.to_byte();
+                bytes[1..].copy_from_slice(&sk.serialize());
+            }
+            XfrSecretKey::Address(sk) => {
+                bytes[0] = KeyType::Address.to_byte();
                 bytes[1..].copy_from_slice(&sk.serialize());
             }
         }
@@ -397,7 +461,18 @@ impl XfrSecretKey {
                     .c(d!(ZeiError::DeserializationError))?;
                 Ok(XfrSecretKey::Secp256k1(sk))
             }
+            KeyType::Address => {
+                let sk = Secp256k1SecretKey::parse_slice(&bytes[1..])
+                    .c(d!(ZeiError::DeserializationError))?;
+                Ok(XfrSecretKey::Address(sk))
+            }
         }
+    }
+
+    /// Convert from raw bytes used secp256k1 and use it with address.
+    pub fn from_secp256k1_with_address(bytes: &[u8]) -> Result<Self> {
+        let sk = Secp256k1SecretKey::parse_slice(bytes).c(d!(ZeiError::DeserializationError))?;
+        Ok(XfrSecretKey::Address(sk))
     }
 }
 
@@ -422,6 +497,18 @@ impl XfrKeyPair {
         let pk = Secp256k1PublicKey::from_secret_key(&sk);
         XfrKeyPair {
             pub_key: XfrPublicKey(XfrPublicKeyInner::Secp256k1(pk)),
+            sec_key: XfrSecretKey::Secp256k1(sk),
+        }
+    }
+
+    /// Generate a Secp256k1 key pair with address.
+    pub fn generate_address<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+        let sk = Secp256k1SecretKey::random(prng);
+        let pk = Secp256k1PublicKey::from_secret_key(&sk);
+        XfrKeyPair {
+            pub_key: XfrPublicKey(XfrPublicKeyInner::Address(
+                convert_libsecp256k1_public_key_to_address(&pk),
+            )),
             sec_key: XfrSecretKey::Secp256k1(sk),
         }
     }
@@ -484,11 +571,16 @@ impl XfrSignature {
         match self {
             XfrSignature::Ed25519(sign) => {
                 bytes[0] = KeyType::Ed25519.to_byte();
-                bytes[1..].copy_from_slice(&sign.to_bytes());
+                bytes[1..XFR_SIGNATURE_LENGTH - 1].copy_from_slice(&sign.to_bytes());
             }
             XfrSignature::Secp256k1(sign) => {
                 bytes[0] = KeyType::Secp256k1.to_byte();
-                bytes[1..].copy_from_slice(&sign.serialize());
+                bytes[1..XFR_SIGNATURE_LENGTH - 1].copy_from_slice(&sign.serialize());
+            }
+            XfrSignature::Address(sign, rec) => {
+                bytes[0] = KeyType::Address.to_byte();
+                bytes[1..XFR_SIGNATURE_LENGTH - 1].copy_from_slice(&sign.serialize());
+                bytes[XFR_SIGNATURE_LENGTH - 1] = rec.serialize();
             }
         }
         bytes
@@ -497,7 +589,7 @@ impl XfrSignature {
     /// Convert from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // Compatible with old data.
-        if bytes.len() == XFR_SIGNATURE_LENGTH - 1 {
+        if bytes.len() == XFR_SIGNATURE_LENGTH - 2 {
             let sign = Ed25519Signature::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?;
             return Ok(XfrSignature::Ed25519(sign));
         }
@@ -509,16 +601,25 @@ impl XfrSignature {
         let ktype = KeyType::from_byte(bytes[0]);
         match ktype {
             KeyType::Ed25519 => {
-                let sign = Ed25519Signature::from_bytes(&bytes[1..])
+                let sign = Ed25519Signature::from_bytes(&bytes[1..XFR_SIGNATURE_LENGTH - 1])
                     .c(d!(ZeiError::DeserializationError))?;
                 Ok(XfrSignature::Ed25519(sign))
             }
             KeyType::Secp256k1 => {
-                let mut s_bytes = [0u8; XFR_SIGNATURE_LENGTH - 1];
-                s_bytes.copy_from_slice(&bytes[1..]);
+                let mut s_bytes = [0u8; XFR_SIGNATURE_LENGTH - 2];
+                s_bytes.copy_from_slice(&bytes[1..XFR_SIGNATURE_LENGTH - 1]);
                 let sign = Secp256k1Signature::parse_standard(&s_bytes)
                     .c(d!(ZeiError::DeserializationError))?;
                 Ok(XfrSignature::Secp256k1(sign))
+            }
+            KeyType::Address => {
+                let mut s_bytes = [0u8; XFR_SIGNATURE_LENGTH - 2];
+                s_bytes.copy_from_slice(&bytes[1..XFR_SIGNATURE_LENGTH - 1]);
+                let sign = Secp256k1Signature::parse_standard(&s_bytes)
+                    .c(d!(ZeiError::DeserializationError))?;
+                let rec = RecoveryId::parse(bytes[XFR_SIGNATURE_LENGTH - 1]) // start from 0
+                    .c(d!(ZeiError::DeserializationError))?;
+                Ok(XfrSignature::Address(sign, rec))
             }
         }
     }
@@ -559,6 +660,28 @@ impl XfrMultiSig {
     }
 }
 
+/// Function helper for get recovery id from u64.
+pub fn recovery_id_from_u64(v: u64) -> u8 {
+    match v {
+        27 => 0,
+        28 => 1,
+        v if v >= 35 => ((v - 1) % 2) as u8,
+        _ => v as u8,
+    }
+}
+
+/// Function helper for convert secp256k1 public key to address.
+pub fn convert_libsecp256k1_public_key_to_address(pk: &Secp256k1PublicKey) -> [u8; 20] {
+    let public_key = pk.serialize();
+    debug_assert_eq!(public_key[0], 0x04);
+    let mut hasher = Keccak256::new();
+    hasher.update(&public_key[1..]);
+    let result = hasher.finalize();
+    let mut bytes = [0u8; 20];
+    bytes.copy_from_slice(&result[12..]);
+    bytes
+}
+
 fn convert_point_libsecp256k1_to_algebra(pk: &Secp256k1PublicKey) -> Vec<u8> {
     let p: LibSecp256k1G1 = (*pk).into();
     let (mut x, mut y) = (p.x, p.y);
@@ -590,7 +713,7 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
-    use crate::xfr::sig::{XfrKeyPair, XfrMultiSig};
+    use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKeyInner, XfrSecretKey};
     use rand_chacha::ChaChaRng;
     use ruc::err::*;
     use zei_algebra::prelude::*;
@@ -646,6 +769,22 @@ mod test {
             v.push(XfrKeyPair::generate_secp256k1(prng));
         }
         v
+    }
+
+    #[test]
+    fn secp256k1_address() {
+        let sk = "df57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e";
+        let address = "8626f6940e2eb28930efb4cef49b2d1f2c9c1199";
+        let xs = XfrSecretKey::from_secp256k1_with_address(&hex::decode(sk).unwrap()).unwrap();
+        let kp = xs.into_keypair();
+        match kp.pub_key.0 {
+            XfrPublicKeyInner::Address(hash) => {
+                assert_eq!(hash.to_vec(), hex::decode(address).unwrap())
+            }
+            _ => panic!("not secp256k1 address"),
+        }
+        let sign = kp.sign(b"message").unwrap();
+        kp.pub_key.verify(b"message", &sign).unwrap();
     }
 
     #[test]
