@@ -101,8 +101,8 @@ tag = 'v0.2.1'
 git = 'https://github.com/FindoraNetwork/storage.git'
 tag = 'v0.2.1'
 
-[dependencies.ark-bulletproofs-canaan]
-git = "https://github.com/FindoraNetwork/ark-bulletproofs-canaan"
+[dependencies.ark-bulletproofs-secq256k1]
+git = "https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1"
 default-features = false
 features = ["yoloproofs"]
 
@@ -112,7 +112,7 @@ default = [
     'u64_backend',
 ]
 debug = [ 'zei-plonk/debug' ]
-std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs-canaan/std']
+std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs-secq256k1/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',

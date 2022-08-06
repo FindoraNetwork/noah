@@ -1,6 +1,6 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
-use ark_bulletproofs_canaan::curve::canaan::{Fr, FrParameters, G1Affine, G1Projective};
+use ark_bulletproofs_secq256k1::curve::secq256k1::{Fr, FrParameters, G1Affine, G1Projective};
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, BigInteger320, FftField, FftParameters, Field, FpParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -17,15 +17,15 @@ use num_traits::Num;
 use ruc::eg;
 use wasm_bindgen::prelude::*;
 
-/// The number of bytes for a scalar value over the Canaan curve
-pub const CANAAN_SCALAR_LEN: usize = 32;
+/// The number of bytes for a scalar value over the secq256k1 curve
+pub const SECQ256K1_SCALAR_LEN: usize = 32;
 
-/// The wrapped struct for `ark_bulletproofs_canaan::curve::canaan::Fr`
+/// The wrapped struct for `ark_bulletproofs_secq256k1::curve::secq256k1::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
-pub struct CanaanScalar(pub(crate) Fr);
+pub struct SECQ256K1Scalar(pub(crate) Fr);
 
-impl Debug for CanaanScalar {
+impl Debug for SECQ256K1Scalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         <BigUint as Debug>::fmt(
             &<BigInteger320 as Into<BigUint>>::into(self.0.into_repr()),
@@ -34,18 +34,18 @@ impl Debug for CanaanScalar {
     }
 }
 
-/// The wrapped struct for `ark_bulletproofs_canaan::curve::canaan::G1Projective`
+/// The wrapped struct for `ark_bulletproofs_secq256k1::curve::secq256k1::G1Projective`
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq)]
-pub struct CanaanG1(pub(crate) G1Projective);
+pub struct SECQ256K1G1(pub(crate) G1Projective);
 
-impl Debug for CanaanG1 {
+impl Debug for SECQ256K1G1 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.0.into_affine(), f)
     }
 }
 
-impl FromStr for CanaanScalar {
+impl FromStr for SECQ256K1Scalar {
     type Err = AlgebraError;
 
     fn from_str(string: &str) -> StdResult<Self, AlgebraError> {
@@ -59,14 +59,14 @@ impl FromStr for CanaanScalar {
     }
 }
 
-impl One for CanaanScalar {
+impl One for SECQ256K1Scalar {
     #[inline]
     fn one() -> Self {
-        CanaanScalar(Fr::one())
+        SECQ256K1Scalar(Fr::one())
     }
 }
 
-impl Zero for CanaanScalar {
+impl Zero for SECQ256K1Scalar {
     #[inline]
     fn zero() -> Self {
         Self(Fr::zero())
@@ -78,8 +78,8 @@ impl Zero for CanaanScalar {
     }
 }
 
-impl Add for CanaanScalar {
-    type Output = CanaanScalar;
+impl Add for SECQ256K1Scalar {
+    type Output = SECQ256K1Scalar;
 
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
@@ -87,8 +87,8 @@ impl Add for CanaanScalar {
     }
 }
 
-impl Mul for CanaanScalar {
-    type Output = CanaanScalar;
+impl Mul for SECQ256K1Scalar {
+    type Output = SECQ256K1Scalar;
 
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
@@ -96,8 +96,8 @@ impl Mul for CanaanScalar {
     }
 }
 
-impl<'a> Add<&'a CanaanScalar> for CanaanScalar {
-    type Output = CanaanScalar;
+impl<'a> Add<&'a SECQ256K1Scalar> for SECQ256K1Scalar {
+    type Output = SECQ256K1Scalar;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -105,15 +105,15 @@ impl<'a> Add<&'a CanaanScalar> for CanaanScalar {
     }
 }
 
-impl<'a> AddAssign<&'a CanaanScalar> for CanaanScalar {
+impl<'a> AddAssign<&'a SECQ256K1Scalar> for SECQ256K1Scalar {
     #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         (self.0).add_assign(&rhs.0);
     }
 }
 
-impl<'a> Sub<&'a CanaanScalar> for CanaanScalar {
-    type Output = CanaanScalar;
+impl<'a> Sub<&'a SECQ256K1Scalar> for SECQ256K1Scalar {
+    type Output = SECQ256K1Scalar;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -121,15 +121,15 @@ impl<'a> Sub<&'a CanaanScalar> for CanaanScalar {
     }
 }
 
-impl<'a> SubAssign<&'a CanaanScalar> for CanaanScalar {
+impl<'a> SubAssign<&'a SECQ256K1Scalar> for SECQ256K1Scalar {
     #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         (self.0).sub_assign(&rhs.0);
     }
 }
 
-impl<'a> Mul<&'a CanaanScalar> for CanaanScalar {
-    type Output = CanaanScalar;
+impl<'a> Mul<&'a SECQ256K1Scalar> for SECQ256K1Scalar {
+    type Output = SECQ256K1Scalar;
 
     #[inline]
     fn mul(self, rhs: &Self) -> Self::Output {
@@ -137,15 +137,15 @@ impl<'a> Mul<&'a CanaanScalar> for CanaanScalar {
     }
 }
 
-impl<'a> MulAssign<&'a CanaanScalar> for CanaanScalar {
+impl<'a> MulAssign<&'a SECQ256K1Scalar> for SECQ256K1Scalar {
     #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         (self.0).mul_assign(&rhs.0);
     }
 }
 
-impl Neg for CanaanScalar {
-    type Output = CanaanScalar;
+impl Neg for SECQ256K1Scalar {
+    type Output = SECQ256K1Scalar;
 
     #[inline]
     fn neg(self) -> Self {
@@ -153,21 +153,21 @@ impl Neg for CanaanScalar {
     }
 }
 
-impl From<u32> for CanaanScalar {
+impl From<u32> for SECQ256K1Scalar {
     #[inline]
     fn from(value: u32) -> Self {
         Self::from(value as u64)
     }
 }
 
-impl From<u64> for CanaanScalar {
+impl From<u64> for SECQ256K1Scalar {
     #[inline]
     fn from(value: u64) -> Self {
         Self(Fr::from(value))
     }
 }
 
-impl Scalar for CanaanScalar {
+impl Scalar for SECQ256K1Scalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         Self(Fr::rand(rng))
@@ -184,7 +184,7 @@ impl Scalar for CanaanScalar {
 
     #[inline]
     fn capacity() -> usize {
-        ark_bulletproofs_canaan::curve::canaan::FrParameters::CAPACITY as usize
+        ark_bulletproofs_secq256k1::curve::secq256k1::FrParameters::CAPACITY as usize
     }
 
     #[inline]
@@ -224,12 +224,12 @@ impl Scalar for CanaanScalar {
 
     #[inline]
     fn bytes_len() -> usize {
-        CANAAN_SCALAR_LEN
+        SECQ256K1_SCALAR_LEN
     }
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        self.0.into_repr().to_bytes_le()[..CANAAN_SCALAR_LEN].to_vec()
+        self.0.into_repr().to_bytes_le()[..SECQ256K1_SCALAR_LEN].to_vec()
     }
 
     #[inline]
@@ -260,7 +260,7 @@ impl Scalar for CanaanScalar {
     }
 }
 
-impl CanaanScalar {
+impl SECQ256K1Scalar {
     /// Get the raw data.
     pub fn get_raw(&self) -> Fr {
         self.0.clone()
@@ -272,7 +272,7 @@ impl CanaanScalar {
     }
 }
 
-impl Neg for CanaanG1 {
+impl Neg for SECQ256K1G1 {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -280,8 +280,8 @@ impl Neg for CanaanG1 {
     }
 }
 
-impl Group for CanaanG1 {
-    type ScalarType = CanaanScalar;
+impl Group for SECQ256K1G1 {
+    type ScalarType = SECQ256K1Scalar;
     const COMPRESSED_LEN: usize = 33;
 
     #[inline]
@@ -301,7 +301,7 @@ impl Group for CanaanG1 {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&CanaanScalar::random(prng))
+        Self::get_base().mul(&SECQ256K1Scalar::random(prng))
     }
 
     #[inline]
@@ -377,7 +377,7 @@ impl Group for CanaanG1 {
     }
 }
 
-impl Into<BigUint> for CanaanScalar {
+impl Into<BigUint> for SECQ256K1Scalar {
     #[inline]
     fn into(self) -> BigUint {
         let value: BigUint = self.0.into_repr().into();
@@ -385,14 +385,14 @@ impl Into<BigUint> for CanaanScalar {
     }
 }
 
-impl<'a> From<&'a BigUint> for CanaanScalar {
+impl<'a> From<&'a BigUint> for SECQ256K1Scalar {
     #[inline]
     fn from(value: &'a BigUint) -> Self {
         Self(Fr::from(value.clone()))
     }
 }
 
-impl CanaanG1 {
+impl SECQ256K1G1 {
     /// Get the raw data.
     pub fn get_raw(&self) -> G1Affine {
         self.0.into_affine()
@@ -404,8 +404,8 @@ impl CanaanG1 {
     }
 }
 
-impl<'a> Add<&'a CanaanG1> for CanaanG1 {
-    type Output = CanaanG1;
+impl<'a> Add<&'a SECQ256K1G1> for SECQ256K1G1 {
+    type Output = SECQ256K1G1;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -413,8 +413,8 @@ impl<'a> Add<&'a CanaanG1> for CanaanG1 {
     }
 }
 
-impl<'a> Sub<&'a CanaanG1> for CanaanG1 {
-    type Output = CanaanG1;
+impl<'a> Sub<&'a SECQ256K1G1> for SECQ256K1G1 {
+    type Output = SECQ256K1G1;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -422,60 +422,60 @@ impl<'a> Sub<&'a CanaanG1> for CanaanG1 {
     }
 }
 
-impl<'a> Mul<&'a CanaanScalar> for CanaanG1 {
-    type Output = CanaanG1;
+impl<'a> Mul<&'a SECQ256K1Scalar> for SECQ256K1G1 {
+    type Output = SECQ256K1G1;
 
     #[inline]
-    fn mul(self, rhs: &CanaanScalar) -> Self::Output {
+    fn mul(self, rhs: &SECQ256K1Scalar) -> Self::Output {
         Self(self.0.mul(&rhs.0.into_repr()))
     }
 }
 
-impl<'a> AddAssign<&'a CanaanG1> for CanaanG1 {
+impl<'a> AddAssign<&'a SECQ256K1G1> for SECQ256K1G1 {
     #[inline]
-    fn add_assign(&mut self, rhs: &'a CanaanG1) {
+    fn add_assign(&mut self, rhs: &'a SECQ256K1G1) {
         self.0.add_assign(&rhs.0)
     }
 }
 
-impl<'a> SubAssign<&'a CanaanG1> for CanaanG1 {
+impl<'a> SubAssign<&'a SECQ256K1G1> for SECQ256K1G1 {
     #[inline]
-    fn sub_assign(&mut self, rhs: &'a CanaanG1) {
+    fn sub_assign(&mut self, rhs: &'a SECQ256K1G1) {
         self.0.sub_assign(&rhs.0)
     }
 }
 
-impl<'a> MulAssign<&'a CanaanScalar> for CanaanG1 {
+impl<'a> MulAssign<&'a SECQ256K1Scalar> for SECQ256K1G1 {
     #[inline]
-    fn mul_assign(&mut self, rhs: &'a CanaanScalar) {
+    fn mul_assign(&mut self, rhs: &'a SECQ256K1Scalar) {
         self.0.mul_assign(rhs.0.clone())
     }
 }
 
 #[cfg(test)]
-mod canaan_groups_test {
+mod secq256k1_groups_test {
     use crate::{
-        canaan::{CanaanG1, CanaanScalar},
         prelude::*,
+        secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
-    use ark_bulletproofs_canaan::curve::canaan::G1Affine;
+    use ark_bulletproofs_secq256k1::curve::secq256k1::G1Affine;
     use ark_ec::ProjectiveCurve;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_scalar_ops() {
-        test_scalar_operations::<CanaanScalar>();
+        test_scalar_operations::<SECQ256K1Scalar>();
     }
 
     #[test]
     fn scalar_deser() {
-        test_scalar_serialization::<CanaanScalar>();
+        test_scalar_serialization::<SECQ256K1Scalar>();
     }
 
     #[test]
     fn scalar_from_to_bytes() {
-        let small_value = CanaanScalar::from(165747u32);
+        let small_value = SECQ256K1Scalar::from(165747u32);
         let small_value_bytes = small_value.to_bytes();
         let expected_small_value_bytes: [u8; 32] = [
             115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -483,7 +483,7 @@ mod canaan_groups_test {
         ];
         assert_eq!(small_value_bytes, expected_small_value_bytes);
 
-        let small_value_from_bytes = CanaanScalar::from_bytes(&small_value_bytes).unwrap();
+        let small_value_from_bytes = SECQ256K1Scalar::from_bytes(&small_value_bytes).unwrap();
         assert_eq!(small_value_from_bytes, small_value);
     }
 
@@ -491,12 +491,12 @@ mod canaan_groups_test {
     fn curve_points_respresentation_of_g1() {
         let mut rng = ChaCha20Rng::from_entropy();
 
-        let g1 = CanaanG1::get_base();
-        let s1 = CanaanScalar::from(50 + rng.next_u32() % 50);
+        let g1 = SECQ256K1G1::get_base();
+        let s1 = SECQ256K1Scalar::from(50 + rng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = CanaanG1::random(&mut rng);
+        let g1_prime = SECQ256K1G1::random(&mut rng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -520,9 +520,9 @@ mod canaan_groups_test {
     fn test_serialization_of_points() {
         let mut rng = ChaCha20Rng::from_entropy();
 
-        let g1 = CanaanG1::random(&mut rng);
+        let g1 = SECQ256K1G1::random(&mut rng);
         let g1_bytes = g1.to_compressed_bytes();
-        let g1_recovered = CanaanG1::from_compressed_bytes(&g1_bytes).unwrap();
+        let g1_recovered = SECQ256K1G1::from_compressed_bytes(&g1_bytes).unwrap();
         assert_eq!(g1, g1_recovered);
     }
 }
