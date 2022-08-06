@@ -389,15 +389,15 @@ mod test_ristretto {
 }
 
 #[cfg(test)]
-mod test_canaan {
+mod test_secq256k1 {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
     use num_bigint::{BigUint, RandBigInt};
     use rand_chacha::ChaCha20Rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsCanaan};
+    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 
-    type SimFrTest = SimFr<SimFrParamsCanaan>;
-    type SimFrVarTest = SimFrVar<SimFrParamsCanaan>;
+    type SimFrTest = SimFr<SimFrParamsSecq256k1>;
+    type SimFrVarTest = SimFrVar<SimFrParamsSecq256k1>;
 
     #[test]
     fn test_enforce_zero_trivial() {
@@ -413,7 +413,7 @@ mod test_canaan {
     #[test]
     fn test_enforce_zero() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let mut cs = TurboCS::<BLSScalar>::new();
@@ -443,7 +443,7 @@ mod test_canaan {
     #[should_panic]
     fn test_enforce_zero_panic() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let r_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         let mut cs = TurboCS::<BLSScalar>::new();
 

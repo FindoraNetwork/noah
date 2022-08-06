@@ -1,7 +1,7 @@
 use curve25519_dalek::traits::MultiscalarMul;
-use zei_algebra::canaan::{CanaanG1, CanaanScalar};
 use zei_algebra::ops::{Add, Mul};
 use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+use zei_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
 use zei_algebra::traits::Group;
 
 /// Trait for Pedersen commitment.
@@ -63,41 +63,41 @@ impl From<&PedersenCommitmentRistretto> for bulletproofs::PedersenGens {
 
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-/// The Pedersen commitment implementation for the Canaan group.
-pub struct PedersenCommitmentCanaan {
+/// The Pedersen commitment implementation for the secq256k1 group.
+pub struct PedersenCommitmentSecq256k1 {
     /// The generator for the value part.
-    pub B: CanaanG1,
+    pub B: SECQ256K1G1,
     /// The generator for the blinding part.
-    pub B_blinding: CanaanG1,
+    pub B_blinding: SECQ256K1G1,
 }
 
-impl Default for PedersenCommitmentCanaan {
+impl Default for PedersenCommitmentSecq256k1 {
     fn default() -> Self {
-        let pc_gens = ark_bulletproofs_canaan::PedersenGens::default();
+        let pc_gens = ark_bulletproofs_secq256k1::PedersenGens::default();
         Self {
-            B: CanaanG1::from_raw(pc_gens.B),
-            B_blinding: CanaanG1::from_raw(pc_gens.B_blinding),
+            B: SECQ256K1G1::from_raw(pc_gens.B),
+            B_blinding: SECQ256K1G1::from_raw(pc_gens.B_blinding),
         }
     }
 }
 
-impl PedersenCommitment<CanaanG1> for PedersenCommitmentCanaan {
-    fn generator(&self) -> CanaanG1 {
+impl PedersenCommitment<SECQ256K1G1> for PedersenCommitmentSecq256k1 {
+    fn generator(&self) -> SECQ256K1G1 {
         self.B
     }
 
-    fn blinding_generator(&self) -> CanaanG1 {
+    fn blinding_generator(&self) -> SECQ256K1G1 {
         self.B_blinding
     }
 
-    fn commit(&self, value: CanaanScalar, blinding: CanaanScalar) -> CanaanG1 {
+    fn commit(&self, value: SECQ256K1Scalar, blinding: SECQ256K1Scalar) -> SECQ256K1G1 {
         self.B.mul(&value).add(&self.B_blinding.mul(&blinding))
     }
 }
 
-impl From<&PedersenCommitmentCanaan> for ark_bulletproofs_canaan::PedersenGens {
-    fn from(rp: &PedersenCommitmentCanaan) -> Self {
-        ark_bulletproofs_canaan::PedersenGens {
+impl From<&PedersenCommitmentSecq256k1> for ark_bulletproofs_secq256k1::PedersenGens {
+    fn from(rp: &PedersenCommitmentSecq256k1) -> Self {
+        ark_bulletproofs_secq256k1::PedersenGens {
             B: rp.B.get_raw(),
             B_blinding: rp.B_blinding.get_raw(),
         }

@@ -336,7 +336,7 @@ mod test_ristretto {
 }
 
 #[cfg(test)]
-mod test_canaan {
+mod test_secq256k1 {
     use crate::plonk::constraint_system::{
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboCS,
@@ -344,15 +344,15 @@ mod test_canaan {
     use num_bigint::{BigUint, RandBigInt};
     use rand_chacha::ChaCha20Rng;
     use zei_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
-    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsCanaan};
+    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 
-    type SimFrTest = SimFr<SimFrParamsCanaan>;
-    type SimFrVarTest = SimFrVar<SimFrParamsCanaan>;
-    type SimFrMulVarTest = SimFrMulVar<SimFrParamsCanaan>;
+    type SimFrTest = SimFr<SimFrParamsSecq256k1>;
+    type SimFrVarTest = SimFrVar<SimFrParamsSecq256k1>;
+    type SimFrMulVarTest = SimFrMulVar<SimFrParamsSecq256k1>;
 
     fn test_sim_fr_equality(cs: TurboCS<BLSScalar>, val: &SimFrVarTest) {
         let mut cs = cs;
-        for i in 0..SimFrParamsCanaan::NUM_OF_LIMBS {
+        for i in 0..SimFrParamsSecq256k1::NUM_OF_LIMBS {
             cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
         }
 
@@ -362,7 +362,7 @@ mod test_canaan {
 
     fn test_sim_fr_mul_equality(cs: TurboCS<BLSScalar>, val: &SimFrMulVarTest) {
         let mut cs = cs;
-        for i in 0..SimFrParamsCanaan::NUM_OF_LIMBS_MUL {
+        for i in 0..SimFrParamsSecq256k1::NUM_OF_LIMBS_MUL {
             cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
         }
 
@@ -373,7 +373,7 @@ mod test_canaan {
     #[test]
     fn test_alloc_constant() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let p_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -390,7 +390,7 @@ mod test_canaan {
     #[test]
     fn test_alloc_witness() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let p_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -407,7 +407,7 @@ mod test_canaan {
     #[test]
     fn test_sub() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let p_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -431,7 +431,7 @@ mod test_canaan {
     #[test]
     fn test_mul() {
         let mut rng = ChaCha20Rng::from_entropy();
-        let p_biguint = SimFrParamsCanaan::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);

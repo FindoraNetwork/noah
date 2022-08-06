@@ -64,8 +64,8 @@ version = '^0.3.0'
 default-features = false
 features = ['asm']
 
-[dependencies.ark-bulletproofs-canaan]
-git = "https://github.com/FindoraNetwork/ark-bulletproofs-canaan"
+[dependencies.ark-bulletproofs-secq256k1]
+git = "https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1"
 default-features = false
 features = ["yoloproofs"]
 
@@ -81,7 +81,7 @@ default = [
     'std',
     'u64_backend',
 ]
-std = ['curve25519-dalek/std', 'ark-bulletproofs-canaan/std']
+std = ['curve25519-dalek/std', 'ark-bulletproofs-secq256k1/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',
