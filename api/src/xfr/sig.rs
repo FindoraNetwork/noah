@@ -1,5 +1,6 @@
 use crate::anon_xfr::keys::{AXfrPubKey, AXfrSecretKey};
 use ark_serialize::{Flags, SWFlags};
+use digest::consts::U64;
 use ed25519_dalek::{
     ExpandedSecretKey, PublicKey as Ed25519PublicKey, SecretKey as Ed25519SecretKey,
     Signature as Ed25519Signature, Verifier,
@@ -282,6 +283,15 @@ impl XfrPublicKey {
                 Ok(XfrPublicKey(XfrPublicKeyInner::Address(hash_bytes)))
             }
         }
+    }
+
+    /// Create a (fake) public key through hashing-to-curve from arbitrary bytes
+    pub fn hash_from_bytes<D>(bytes: &[u8]) -> Self
+    where
+        D: Digest<OutputSize = U64> + Default,
+    {
+        let pk = Ed25519PublicKey::hash_from_bytes::<D>(bytes);
+        Self(XfrPublicKeyInner::Ed25519(pk))
     }
 }
 
