@@ -78,6 +78,13 @@ optional = true
 version = '0.3.26'
 optional = true
 
+[dependencies.web-sys]
+version = "0.3.4"
+features = [
+    'console',
+]
+
+
 [dev-dependencies]
 bit-array = '0.4.3'
 criterion = '0.3.1'

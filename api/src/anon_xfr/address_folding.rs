@@ -18,6 +18,7 @@ use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 use zei_plonk::plonk::constraint_system::field_simulation::SimFrVar;
 use zei_plonk::plonk::constraint_system::rescue::StateVar;
 use zei_plonk::plonk::constraint_system::VarIndex;
+use web_sys;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 /// The instance for address folding.
@@ -165,6 +166,15 @@ pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
     instance
         .scalar_mul_proof
         .verify(&bp_gens, transcript, &instance.scalar_mul_commitments)?;
+
+    web_sys::console::log_3(
+      &format!("{:?}",pc_gens.clone()).into(),
+      &format!("{:?}",&instance.scalar_mul_commitments).into(),
+      &format!("{:?}",&instance.delegated_cp_proof).into(),
+    );
+    println!("{:?}",pc_gens.clone());
+    println!("{:?}",&instance.scalar_mul_commitments);
+    println!("{:?}",&instance.delegated_cp_proof);
 
     let (beta, lambda) = verify_delegated_chaum_pedersen(
         &pc_gens,
