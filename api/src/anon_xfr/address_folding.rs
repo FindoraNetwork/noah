@@ -170,13 +170,12 @@ pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
     println!("{:?}",pc_gens.clone());
     println!("{:?}",&instance.scalar_mul_commitments);
     println!("{:?}",&instance.delegated_cp_proof);
-    if web_sys::window().is_some() {
-        web_sys::console::log_3(
-            &format!("{:?}", pc_gens.clone()).into(),
-            &format!("{:?}", &instance.scalar_mul_commitments).into(),
-            &format!("{:?}", &instance.delegated_cp_proof).into(),
-        );
-    }
+    web_sys::console::log_3(
+        &format!("{:?}", pc_gens.clone()).into(),
+        &format!("{:?}", &instance.scalar_mul_commitments).into(),
+        &format!("{:?}", &instance.delegated_cp_proof).into(),
+    );
+
 
     let (beta, lambda) = verify_delegated_chaum_pedersen(
         &pc_gens,
