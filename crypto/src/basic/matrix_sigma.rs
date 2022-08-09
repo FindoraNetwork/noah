@@ -28,8 +28,11 @@ impl SigmaTranscript for Transcript {
         public_scalars: &[&G::ScalarType],
         public_elems: &[G],
     ) {
-        self.append_message(b"Sigma Protocol domain", b"Sigma protocol single group");
-        self.append_message(b"instance name", instance_name);
+        self.append_message(
+            b"Sigma Protocol domain",
+            b"Sigma protocol single group v.0.1",
+        );
+        self.append_message(b"Sigma Protocol instance", instance_name);
         for scalar in public_scalars {
             self.append_message(b"public scalar", scalar.to_bytes().as_slice())
         }
