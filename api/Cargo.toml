@@ -81,6 +81,7 @@ optional = true
 [dependencies.web-sys]
 version = "0.3.4"
 features = [
+    'Window',
     'console',
 ]
 
