@@ -6,7 +6,7 @@ use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
 use zei_algebra::prelude::*;
 
-#[cfg(all(feature = "debug", nightly))]
+#[cfg(feature = "debug")]
 use std::collections::HashMap;
 
 /// The wires number of a gate in Turbo CS.
@@ -37,7 +37,7 @@ pub struct TurboCS<F> {
     /// A private witness for the circuit, cleared after computing a proof.
     pub witness: Vec<F>,
     /// record witness backtracking info for checking dangling witness
-    #[cfg(all(feature = "debug", nightly))]
+    #[cfg(feature = "debug")]
     #[serde(skip)]
     pub witness_backtrace: HashMap<VarIndex, std::backtrace::Backtrace>,
 }
@@ -172,7 +172,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             verifier_only: true,
             witness: vec![],
 
-            #[cfg(all(feature = "debug", nightly))]
+            #[cfg(feature = "debug")]
             witness_backtrace: HashMap::new(),
         })
     }
@@ -219,7 +219,7 @@ impl<F: Scalar> TurboCS<F> {
             verifier_only: false,
             witness: vec![F::zero(), F::one()],
 
-            #[cfg(all(feature = "debug", nightly))]
+            #[cfg(feature = "debug")]
             witness_backtrace: HashMap::new(),
         }
     }
@@ -310,7 +310,7 @@ impl<F: Scalar> TurboCS<F> {
         self.num_vars += 1;
         self.witness.push(value);
 
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         {
             self.witness_backtrace
                 .insert(self.num_vars - 1, std::backtrace::Backtrace::capture());
@@ -326,7 +326,7 @@ impl<F: Scalar> TurboCS<F> {
             self.witness.push(*value);
         }
 
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         {
             for var in self.num_vars - values.len()..self.num_vars {
                 self.witness_backtrace
@@ -392,14 +392,10 @@ impl<F: Scalar> TurboCS<F> {
         r.sub_assign(&out);
 
         if !r.is_zero() {
-            #[cfg(nightly)]
-            {
-                println!("{}", std::backtrace::Backtrace::capture());
-            }
+            println!("{}", std::backtrace::Backtrace::capture());
             println!("cs constraint not satisfied.");
         }
 
-        #[cfg(nightly)]
         for var in [
             wiring_0_var,
             wiring_1_var,
@@ -636,12 +632,12 @@ impl<F: Scalar> TurboCS<F> {
         //
         // Therefore, here we save the backtrace information,  so that `finish_new_gate` does not
         // delete such information, and then put it back to the list of witness backtrace.
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         let backtrace = { self.witness_backtrace.remove(&var) };
 
         self.finish_new_gate();
 
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         {
             match backtrace {
                 Some(v) => self.witness_backtrace.insert(var, v),
@@ -689,7 +685,7 @@ impl<F: Scalar> TurboCS<F> {
         }
         self.size += diff;
 
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         {
             if !self.witness_backtrace.is_empty() {
                 for (_, v) in &self.witness_backtrace {
@@ -1344,7 +1340,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(all(feature = "debug", nightly))]
+    #[cfg(feature = "debug")]
     fn test_dangling_witness_without_panic() {
         let one = F::one();
         let two = one.add(&one);
@@ -1376,7 +1372,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(all(feature = "debug", nightly))]
+    #[cfg(feature = "debug")]
     #[should_panic]
     fn test_dangling_witness_should_panic() {
         use crate::plonk::constraint_system::rescue::StateVar;
