@@ -192,7 +192,7 @@ pub fn prove_delegated_chaum_pedersen<
         b"PC base blinding",
         &pc_gens.blinding_generator().to_compressed_bytes(),
     );
-    transcript.append_message(b"Number of points", &len.to_le_bytes());
+    transcript.append_message(b"Number of points", &(len as u64).to_le_bytes());
     commitments.iter().for_each(|p| {
         transcript.append_message(b"Commitment", &p.to_compressed_bytes());
     });
@@ -270,7 +270,7 @@ pub fn verify_delegated_chaum_pedersen<
         b"PC base blinding",
         &pc_gens.blinding_generator().to_compressed_bytes(),
     );
-    transcript.append_message(b"Number of points", &len.to_le_bytes());
+    transcript.append_message(b"Number of points", &(len as u64).to_le_bytes());
     commitments.iter().for_each(|p| {
         transcript.append_message(b"Commitment", &p.to_compressed_bytes());
     });
