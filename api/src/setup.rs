@@ -153,8 +153,6 @@ impl ProverParams {
             ),
         };
 
-        println!("{} {} {}", n_payers, n_payees, cs.size());
-
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
 
