@@ -45,6 +45,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.push_add_selectors(one, zero, one, zero);
             cs.push_mul_selectors(zero, zero);
             cs.push_constant_selector(zero);
+            cs.push_ecc_selector(zero);
             cs.push_rescue_selectors(zero, zero, zero, zero);
             cs.push_out_selector(one);
 
@@ -85,6 +86,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                     .add(&r_limbs[i])
                     .add(&r_limbs[i]),
             );
+            cs.push_ecc_selector(zero);
             cs.push_rescue_selectors(zero, zero, zero, zero);
             cs.push_out_selector(one);
 
@@ -283,6 +285,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 cs.push_add_selectors(minus_one, minus_one, one, carry_shift);
                 cs.push_mul_selectors(zero, zero);
                 cs.push_constant_selector(pad_limb.neg().add(&remainder));
+                cs.push_ecc_selector(zero);
                 cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(zero);
 

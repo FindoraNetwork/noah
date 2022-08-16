@@ -18,7 +18,6 @@
     clippy::suspicious_op_assign_impl,
     clippy::upper_case_acronyms
 )]
-#![cfg_attr(nightly, feature(backtrace))]
 
 #[macro_use]
 extern crate serde_derive;
