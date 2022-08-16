@@ -29,6 +29,9 @@ pub mod secq256k1;
 /// Module for the secp256k1 curve
 pub mod secp256k1;
 
+/// Module for the Jubjub curve
+pub mod jubjub;
+
 /// Module for error handling
 pub mod errors;
 

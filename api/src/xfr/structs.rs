@@ -10,6 +10,8 @@ use crate::xfr::{
 };
 use bulletproofs::RangeProof;
 use digest::Digest;
+use serde::de::Visitor;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::Sha512;
 use zei_algebra::{
     prelude::*,
@@ -28,41 +30,137 @@ use zei_crypto::basic::{
 /// Asset Type identifier.
 pub const ASSET_TYPE_LENGTH: usize = 32;
 
-#[derive(
-    Deserialize, Serialize, Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord,
-)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 /// The system-wide asset type representation.
-pub struct AssetType(pub [u8; ASSET_TYPE_LENGTH]);
+pub struct AssetType {
+    pub flag: u8,
+    pub asset_type: [u8; ASSET_TYPE_LENGTH],
+}
+
+struct AssetTypeVisitor;
+
+impl<'a> Visitor<'a> for AssetTypeVisitor {
+    type Value = AssetType;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+        formatter.write_str("a borrowed asset type")
+    }
+
+    fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> core::result::Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        if v.len() == ASSET_TYPE_LENGTH {
+            let mut asset_type = [0u8; ASSET_TYPE_LENGTH];
+            asset_type.copy_from_slice(&v[..ASSET_TYPE_LENGTH]);
+
+            Ok(AssetType {
+                flag: 0,
+                asset_type,
+            })
+        } else if v.len() == ASSET_TYPE_LENGTH + 1 {
+            let mut asset_type = [0u8; ASSET_TYPE_LENGTH];
+            asset_type.copy_from_slice(&v[..ASSET_TYPE_LENGTH]);
+
+            Ok(AssetType {
+                flag: v[ASSET_TYPE_LENGTH],
+                asset_type,
+            })
+        } else {
+            Err(serde::de::Error::invalid_length(
+                v.len(),
+                "The expected length for ASSET_TYPE is 32 or 33 bytes",
+            ))
+        }
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'a str) -> core::result::Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        self.visit_borrowed_bytes(v.as_bytes())
+    }
+}
+
+impl Serialize for AssetType {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if self.flag == 0 {
+            self.asset_type.serialize(serializer)
+        } else {
+            let mut bytes = [0u8; ASSET_TYPE_LENGTH + 1];
+            bytes.copy_from_slice(&self.asset_type);
+            bytes[ASSET_TYPE_LENGTH] = self.flag;
+
+            bytes.serialize(serializer)
+        }
+    }
+}
+
+impl Deserialize for AssetType {
+    fn deserialize<'de, D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_bytes(AssetTypeVisitor)
+    }
+}
 
 impl AssetType {
     /// Helper function to generate an asset type with identical value in each byte.
     pub fn from_identical_byte(byte: u8) -> Self {
-        Self([byte; ASSET_TYPE_LENGTH])
+        Self {
+            flag: 0,
+            asset_type: [byte; ASSET_TYPE_LENGTH],
+        }
     }
 
-    /// Convert AssetType into a Scalar.
-    pub fn as_scalar<S: Scalar>(&self) -> S {
-        // Scalar representation length for JubjubScalar, RistrettoScalar, and BlsScalar
-        const MIN_SCALAR_LENGTH: usize = 32;
+    /// Convert AssetType into two Scalar values.
+    /// The second one is the flag.
+    pub fn as_scalar<S: Scalar>(&self) -> Result<(S, S)> {
+        if self.flag == 0 || self.flag == 1 {
+            let first_scalar = {
+                // Scalar representation length for RistrettoScalar and BlsScalar
+                const MIN_SCALAR_LENGTH: usize = 32;
 
-        /// Asset type representation length. must be less than MIN_SCALAR_LEN
-        /// All scalars in this code base are representable by 32 bytes, but
-        /// values are less than 2^256 -1.
-        const ASSET_TYPE_ZEI_REPR_LENGTH: usize = 30;
+                /// Asset type representation length. must be less than MIN_SCALAR_LEN
+                /// All scalars in this code base are representable by 32 bytes, but
+                /// values are less than 2^256 -1.
+                const ASSET_TYPE_ZEI_REPR_LENGTH: usize = 30;
 
-        let mut hash = sha2::Sha256::default();
-        hash.update(&self.0);
-        let array = hash.finalize();
-        let mut zei_repr = [0u8; MIN_SCALAR_LENGTH];
-        zei_repr[0..ASSET_TYPE_ZEI_REPR_LENGTH]
-            .copy_from_slice(&array[0..ASSET_TYPE_ZEI_REPR_LENGTH]);
+                let mut hash = sha2::Sha256::default();
+                hash.update(&self.0);
+                let array = hash.finalize();
+                let mut zei_repr = [0u8; MIN_SCALAR_LENGTH];
+                zei_repr[0..ASSET_TYPE_ZEI_REPR_LENGTH]
+                    .copy_from_slice(&array[0..ASSET_TYPE_ZEI_REPR_LENGTH]);
 
-        if MIN_SCALAR_LENGTH == S::bytes_len() {
-            return S::from_bytes(&zei_repr).unwrap(); //safe unwrap
+                if MIN_SCALAR_LENGTH == S::bytes_len() {
+                    return S::from_bytes(&zei_repr).unwrap(); //safe unwrap
+                }
+                let mut v = vec![0u8; S::bytes_len()];
+                v[0..ASSET_TYPE_ZEI_REPR_LENGTH].copy_from_slice(&zei_repr);
+                S::from_bytes(&v).unwrap()
+            };
+
+            let second_scalar = <S as From<u64>>::from(self.flag as u64);
+
+            Ok((first_scalar, second_scalar))
+        } else if self.flag == 2 {
+            // The asset type is the tracer's public key's y coordinate encoded in 32 bytes,
+            // with the flag, which would be a scalar value in BlsScalar.
+            //
+            // This public key will be over the Jubjub curve.
+
+            let first_scalar = S::from_bytes(&self.asset_type)?;
+            let second_scalar = <S as From<u64>>::from(self.flag as u64);
+
+            Ok((first_scalar, second_scalar))
+        } else {
+            Err(eg!(ZeiError::DeserializationError))
         }
-        let mut v = vec![0u8; S::bytes_len()];
-        v[0..ASSET_TYPE_ZEI_REPR_LENGTH].copy_from_slice(&zei_repr);
-        S::from_bytes(&v).unwrap()
     }
 }
 

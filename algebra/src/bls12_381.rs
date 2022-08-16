@@ -1,4 +1,4 @@
-use crate::{errors::AlgebraError, prelude::*, traits::Pairing};
+use crate::{errors::AlgebraError, jubjub::JubjubScalar, prelude::*, traits::Pairing};
 use ark_bls12_381::{
     fr::FrParameters, Bls12_381 as Bls12381pairing, Fq, Fq12Parameters, Fr, G1Affine, G1Projective,
     G2Affine, G2Projective,
@@ -37,6 +37,13 @@ impl Debug for BLSScalar {
             &<BigInteger256 as Into<BigUint>>::into(self.0.into_repr()),
             f,
         )
+    }
+}
+
+impl From<&JubjubScalar> for BLSScalar {
+    fn from(scalar: &JubjubScalar) -> Self {
+        let bytes = scalar.to_bytes();
+        BLSScalar::from_bytes(&bytes).unwrap()
     }
 }
 
