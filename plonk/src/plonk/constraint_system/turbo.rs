@@ -6,14 +6,14 @@ use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
 use zei_algebra::prelude::*;
 
-#[cfg(all(feature = "debug", nightly))]
+#[cfg(feature = "debug")]
 use std::collections::HashMap;
 
 /// The wires number of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;
 
 /// The selectors number in Turbo CS.
-pub const N_SELECTORS: usize = 12;
+pub const N_SELECTORS: usize = 13;
 
 /// Turbo PLONK Constraint System.
 #[derive(Serialize, Deserialize)]
@@ -37,7 +37,7 @@ pub struct TurboCS<F> {
     /// A private witness for the circuit, cleared after computing a proof.
     pub witness: Vec<F>,
     /// record witness backtracking info for checking dangling witness
-    #[cfg(all(feature = "debug", nightly))]
+    #[cfg(feature = "debug")]
     #[serde(skip)]
     pub witness_backtrace: HashMap<VarIndex, std::backtrace::Backtrace>,
 }
@@ -98,6 +98,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     /// The equation is
     /// ```text
     ///     q1*w1 + q2*w2 + q3*w3 + q4*w4 + qm1(w1*w2) + qm2(w3*w4) + qc + PI
+    ///     + q_ecc*[w1*w2*w3*w4*wo]
     ///     + q_hash_1 * w1^5 + q_hash_2 * w2^5 + q_hash_3 * w3^5 + q_hash_4 * w4^5
     ///     - qo * wo = 0
     /// ```
@@ -112,18 +113,25 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         let mul1 = sel_vals[4].mul(wire_vals[0].mul(wire_vals[1]));
         let mul2 = sel_vals[5].mul(wire_vals[2].mul(wire_vals[3]));
         let constant = sel_vals[6].add(pub_input);
+        let ecc = sel_vals[7]
+            .mul(wire_vals[0])
+            .mul(wire_vals[1])
+            .mul(wire_vals[2])
+            .mul(wire_vals[3])
+            .mul(wire_vals[4]);
         let five = &[5u64];
-        let hash1 = sel_vals[7].mul(wire_vals[0].pow(five));
-        let hash2 = sel_vals[8].mul(wire_vals[1].pow(five));
-        let hash3 = sel_vals[9].mul(wire_vals[2].pow(five));
-        let hash4 = sel_vals[10].mul(wire_vals[3].pow(five));
-        let out = sel_vals[11].mul(wire_vals[4]);
+        let hash1 = sel_vals[8].mul(wire_vals[0].pow(five));
+        let hash2 = sel_vals[9].mul(wire_vals[1].pow(five));
+        let hash3 = sel_vals[10].mul(wire_vals[2].pow(five));
+        let hash4 = sel_vals[11].mul(wire_vals[3].pow(five));
+        let out = sel_vals[12].mul(wire_vals[4]);
         let mut r = add1;
         r.add_assign(&add2);
         r.add_assign(&add3);
         r.add_assign(&add4);
         r.add_assign(&mul1);
         r.add_assign(&mul2);
+        r.add_assign(&ecc);
         r.add_assign(&hash1);
         r.add_assign(&hash2);
         r.add_assign(&hash3);
@@ -134,12 +142,19 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     }
 
     /// The coefficients are
-    /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1^5, w2^5, w3^5, w4^5, -w4)
+    /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1*w2*w3*w4*wo, w1^5, w2^5, w3^5, w4^5, -w4)
     fn eval_selector_multipliers(wire_vals: &[&F]) -> Result<Vec<F>> {
         if wire_vals.len() < N_WIRES_PER_GATE {
             return Err(eg!(PlonkError::FuncParamsError));
         }
         let five = &[5u64];
+
+        let mut w0w1w2w3w4 = *wire_vals[0];
+        w0w1w2w3w4.mul_assign(wire_vals[1]);
+        w0w1w2w3w4.mul_assign(wire_vals[2]);
+        w0w1w2w3w4.mul_assign(wire_vals[3]);
+        w0w1w2w3w4.mul_assign(wire_vals[4]);
+
         Ok(vec![
             *wire_vals[0],
             *wire_vals[1],
@@ -148,6 +163,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             wire_vals[0].mul(wire_vals[1]),
             wire_vals[2].mul(wire_vals[3]),
             F::one(),
+            w0w1w2w3w4,
             wire_vals[0].pow(five),
             wire_vals[1].pow(five),
             wire_vals[2].pow(five),
@@ -172,7 +188,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             verifier_only: true,
             witness: vec![],
 
-            #[cfg(all(feature = "debug", nightly))]
+            #[cfg(feature = "debug")]
             witness_backtrace: HashMap::new(),
         })
     }
@@ -219,7 +235,7 @@ impl<F: Scalar> TurboCS<F> {
             verifier_only: false,
             witness: vec![F::zero(), F::one()],
 
-            #[cfg(all(feature = "debug", nightly))]
+            #[cfg(feature = "debug")]
             witness_backtrace: HashMap::new(),
         }
     }
@@ -253,6 +269,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(q1, q2, q3, q4);
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(zero);
+        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
         for (i, wire) in wires_in.iter().enumerate() {
@@ -295,6 +312,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(zero, zero, zero, zero);
         self.push_mul_selectors(F::one(), zero);
         self.push_constant_selector(zero);
+        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
         self.wiring[0].push(left_var);
@@ -310,7 +328,7 @@ impl<F: Scalar> TurboCS<F> {
         self.num_vars += 1;
         self.witness.push(value);
 
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         {
             self.witness_backtrace
                 .insert(self.num_vars - 1, std::backtrace::Backtrace::capture());
@@ -326,7 +344,7 @@ impl<F: Scalar> TurboCS<F> {
             self.witness.push(*value);
         }
 
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         {
             for var in self.num_vars - values.len()..self.num_vars {
                 self.witness_backtrace
@@ -364,6 +382,7 @@ impl<F: Scalar> TurboCS<F> {
         let selector_9 = self.selectors[9][self.size - 1];
         let selector_10 = self.selectors[10][self.size - 1];
         let selector_11 = self.selectors[11][self.size - 1];
+        let selector_12 = self.selectors[12][self.size - 1];
 
         let add1 = selector_0.mul(wiring_0);
         let add2 = selector_1.mul(wiring_1);
@@ -372,18 +391,25 @@ impl<F: Scalar> TurboCS<F> {
         let mul1 = selector_4.mul(wiring_0.mul(wiring_1));
         let mul2 = selector_5.mul(wiring_2.mul(wiring_3));
         let constant = selector_6;
+        let ecc = selector_7
+            .mul(wiring_0)
+            .mul(wiring_1)
+            .mul(wiring_2)
+            .mul(wiring_3)
+            .mul(wiring_0);
         let five = &[5u64];
-        let hash1 = selector_7.mul(wiring_0.pow(five));
-        let hash2 = selector_8.mul(wiring_1.pow(five));
-        let hash3 = selector_9.mul(wiring_2.pow(five));
-        let hash4 = selector_10.mul(wiring_3.pow(five));
-        let out = selector_11.mul(wiring_4);
+        let hash1 = selector_8.mul(wiring_0.pow(five));
+        let hash2 = selector_9.mul(wiring_1.pow(five));
+        let hash3 = selector_10.mul(wiring_2.pow(five));
+        let hash4 = selector_11.mul(wiring_3.pow(five));
+        let out = selector_12.mul(wiring_4);
         let mut r = add1;
         r.add_assign(&add2);
         r.add_assign(&add3);
         r.add_assign(&add4);
         r.add_assign(&mul1);
         r.add_assign(&mul2);
+        r.add_assign(&ecc);
         r.add_assign(&hash1);
         r.add_assign(&hash2);
         r.add_assign(&hash3);
@@ -392,14 +418,10 @@ impl<F: Scalar> TurboCS<F> {
         r.sub_assign(&out);
 
         if !r.is_zero() {
-            #[cfg(nightly)]
-            {
-                println!("{}", std::backtrace::Backtrace::capture());
-            }
+            println!("{}", std::backtrace::Backtrace::capture());
             println!("cs constraint not satisfied.");
         }
 
-        #[cfg(nightly)]
         for var in [
             wiring_0_var,
             wiring_1_var,
@@ -562,6 +584,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(zero, one, zero, zero);
         self.push_mul_selectors(one.neg(), one);
         self.push_constant_selector(zero);
+        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
         let out = if self.witness[bit] == zero {
@@ -626,6 +649,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(zero, zero, zero, zero);
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(constant);
+        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
         for i in 0..N_WIRES_PER_GATE {
@@ -636,12 +660,12 @@ impl<F: Scalar> TurboCS<F> {
         //
         // Therefore, here we save the backtrace information,  so that `finish_new_gate` does not
         // delete such information, and then put it back to the list of witness backtrace.
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         let backtrace = { self.witness_backtrace.remove(&var) };
 
         self.finish_new_gate();
 
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         {
             match backtrace {
                 Some(v) => self.witness_backtrace.insert(var, v),
@@ -657,6 +681,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_add_selectors(zero, zero, zero, zero);
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(constant);
+        self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
         for i in 0..N_WIRES_PER_GATE {
@@ -689,7 +714,7 @@ impl<F: Scalar> TurboCS<F> {
         }
         self.size += diff;
 
-        #[cfg(all(feature = "debug", nightly))]
+        #[cfg(feature = "debug")]
         {
             if !self.witness_backtrace.is_empty() {
                 for (_, v) in &self.witness_backtrace {
@@ -718,17 +743,22 @@ impl<F: Scalar> TurboCS<F> {
         self.selectors[6].push(q_c);
     }
 
+    /// Add an ECC selectors.
+    pub fn push_ecc_selector(&mut self, q_ecc: F) {
+        self.selectors[7].push(q_ecc);
+    }
+
     /// Add a Rescue selectors.
     pub fn push_rescue_selectors(&mut self, q_hash_1: F, q_hash_2: F, q_hash_3: F, q_hash_4: F) {
-        self.selectors[7].push(q_hash_1);
-        self.selectors[8].push(q_hash_2);
-        self.selectors[9].push(q_hash_3);
-        self.selectors[10].push(q_hash_4);
+        self.selectors[8].push(q_hash_1);
+        self.selectors[9].push(q_hash_2);
+        self.selectors[10].push(q_hash_3);
+        self.selectors[11].push(q_hash_4);
     }
 
     /// Add an Out selectors.
     pub fn push_out_selector(&mut self, q_out: F) {
-        self.selectors[11].push(q_out);
+        self.selectors[12].push(q_out);
     }
 
     /// Return the witness index for given wire and cs index.
@@ -1344,7 +1374,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(all(feature = "debug", nightly))]
+    #[cfg(feature = "debug")]
     fn test_dangling_witness_without_panic() {
         let one = F::one();
         let two = one.add(&one);
@@ -1376,7 +1406,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(all(feature = "debug", nightly))]
+    #[cfg(feature = "debug")]
     #[should_panic]
     fn test_dangling_witness_should_panic() {
         use crate::plonk::constraint_system::rescue::StateVar;

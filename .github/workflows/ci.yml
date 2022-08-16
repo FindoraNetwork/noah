@@ -73,7 +73,7 @@ jobs:
       strategy:
         matrix:
           rust:
-            - nightly
+            - stable
       steps:
         - name: Checkout
           uses: actions/checkout@v2
