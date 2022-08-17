@@ -29,7 +29,7 @@ pub mod basic;
 pub mod bulletproofs;
 /// The module for confidential anonymous credentials.
 pub mod confidential_anon_creds;
-/// The module for the delegated Chaum-Pedersen protocol.
-pub mod delegated_chaum_pedersen;
+/// The module for the delegated Schnorr protocol.
+pub mod delegated_schnorr;
 /// The module for field simulation.
 pub mod field_simulation;

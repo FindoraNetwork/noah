@@ -27,9 +27,9 @@ use zei_algebra::{
 };
 use zei_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
-    delegated_chaum_pedersen::{
-        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
-        DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
+    delegated_schnorr::{
+        prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
+        DelegatedSchnorrProof,
     },
     field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
@@ -64,9 +64,9 @@ pub struct AbarToBarPreNote {
     pub witness: PayerWitness,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
-    /// Inspection data in the delegated Chaum-Pedersen proof on Ristretto.
+    /// Inspection data in the delegated Schnorr proof on Ristretto.
     pub inspection:
-        DelegatedChaumPedersenInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+        DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     /// Beta on Ristretto.
     pub beta: RistrettoScalar,
     /// Lambda on Ristretto.
@@ -81,8 +81,8 @@ pub struct AbarToBarBody {
     /// The new BAR to be created.
     pub output: BlindAssetRecord,
     /// The inspector's proof on Ristretto.
-    pub delegated_cp_proof:
-        DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    pub delegated_schnorr_proof:
+        DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     /// The Merkle root hash.
     pub merkle_root: BLSScalar,
     /// The Merkle root version.
@@ -145,10 +145,10 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     let point_q = pc_gens.commit(y, delta);
 
     // 4. Compute the inspector's proof.
-    let (delegated_cp_proof, delegated_cp_inspection, beta, lambda) = {
+    let (delegated_schnorr_proof, delegated_schnorr_inspection, beta, lambda) = {
         let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
         transcript.append_message(b"nullifier", &this_nullifier.to_bytes());
-        prove_delegated_chaum_pedersen(
+        prove_delegated_schnorr(
             prng,
             &vec![(x, gamma), (y, delta)],
             &pc_gens,
@@ -173,7 +173,7 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     let body = AbarToBarBody {
         input: this_nullifier,
         output: obar.blind_asset_record.clone(),
-        delegated_cp_proof: delegated_cp_proof.clone(),
+        delegated_schnorr_proof: delegated_schnorr_proof.clone(),
         merkle_root: mt_info_temp.root,
         merkle_root_version: mt_info_temp.root_version,
         memo: owner_memo,
@@ -183,7 +183,7 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
         body,
         witness: payers_witness,
         input_keypair: abar_keypair.clone(),
-        inspection: delegated_cp_inspection,
+        inspection: delegated_schnorr_inspection,
         beta,
         lambda,
     })
@@ -218,7 +218,7 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
         prng,
         params,
         witness,
-        &body.delegated_cp_proof,
+        &body.delegated_schnorr_proof,
         &inspection,
         &beta,
         &lambda,
@@ -295,11 +295,11 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"nullifier", &note.body.input.to_bytes());
 
-    // 2. Verify the delegated Chaum-Pedersen proof.
-    let (beta, lambda) = verify_delegated_chaum_pedersen(
+    // 2. Verify the delegated Schnorr proof.
+    let (beta, lambda) = verify_delegated_schnorr(
         &pc_gens,
         &vec![com_amount, com_asset_type],
-        &note.body.delegated_cp_proof,
+        &note.body.delegated_schnorr_proof,
         &mut transcript,
     )
     .c(d!())?;
@@ -314,11 +314,11 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let address_folding_public_input =
         prepare_verifier_input(&note.folding_instance, &beta_folding, &lambda_folding);
 
-    let delegated_cp_proof = note.body.delegated_cp_proof.clone();
+    let delegated_schnorr_proof = note.body.delegated_schnorr_proof.clone();
 
     let beta_lambda = beta * &lambda;
-    let s1_plus_lambda_s2 = delegated_cp_proof.response_scalars[0].0
-        + delegated_cp_proof.response_scalars[1].0 * &lambda;
+    let s1_plus_lambda_s2 = delegated_schnorr_proof.response_scalars[0].0
+        + delegated_schnorr_proof.response_scalars[1].0 * &lambda;
 
     let beta_sim_fr =
         SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta.to_bytes()));
@@ -334,7 +334,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 
     online_inputs.push(input.clone());
     online_inputs.push(merkle_root.clone());
-    online_inputs.push(delegated_cp_proof.inspection_comm);
+    online_inputs.push(delegated_schnorr_proof.inspection_comm);
     online_inputs.extend_from_slice(&beta_sim_fr.limbs);
     online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
     online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
@@ -356,12 +356,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: PayerWitness,
-    proof: &DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
-    inspection: &DelegatedChaumPedersenInspection<
-        RistrettoScalar,
-        RistrettoPoint,
-        SimFrParamsRistretto,
-    >,
+    proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     folding_witness: &AXfrAddressFoldingWitness,
@@ -393,12 +389,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
     payers_witness: PayerWitness,
-    proof: &DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
-    inspection: &DelegatedChaumPedersenInspection<
-        RistrettoScalar,
-        RistrettoPoint,
-        SimFrParamsRistretto,
-    >,
+    proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     folding_witness: &AXfrAddressFoldingWitness,
