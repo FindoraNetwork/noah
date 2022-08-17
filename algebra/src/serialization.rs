@@ -6,6 +6,8 @@ use crate::{
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
     secq256k1::SECQ256K1Scalar,
 };
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::io::Cursor;
 use bulletproofs::RangeProof;
 use serde::Serializer;
 
@@ -122,10 +124,12 @@ impl ZeiFromToBytes for bulletproofs::r1cs::R1CSProof {
 
 impl ZeiFromToBytes for ark_bulletproofs_secq256k1::r1cs::R1CSProof {
     fn zei_to_bytes(&self) -> Vec<u8> {
-        self.to_bytes().unwrap()
+        let mut cursor = Cursor::new(Vec::new());
+        self.serialize(&mut cursor).unwrap();
+        cursor.into_inner()
     }
     fn zei_from_bytes(bytes: &[u8]) -> Result<ark_bulletproofs_secq256k1::r1cs::R1CSProof> {
-        ark_bulletproofs_secq256k1::r1cs::R1CSProof::from_bytes(bytes)
+        ark_bulletproofs_secq256k1::r1cs::R1CSProof::deserialize(bytes)
             .map_err(|_| eg!(ZeiError::DeserializationError))
     }
 }
