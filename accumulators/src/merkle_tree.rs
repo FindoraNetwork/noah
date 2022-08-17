@@ -77,7 +77,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             store.set(&ENTRY_COUNT_KEY, 0u64.to_be_bytes().to_vec())?;
 
             if !store.state_mut().cache_mut().good2_commit() {
-                store.state_mut().cache_mut().discard();
+                store.state_mut().discard_session();
 
                 return Err(eg!("store commit no good"));
             }
@@ -248,7 +248,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         let height = self.store.height()?;
 
         if !self.store.state_mut().cache_mut().good2_commit() {
-            self.store.state_mut().cache_mut().discard();
+            self.store.state_mut().discard_session();
 
             return Err(eg!("store commit no good"));
         }
