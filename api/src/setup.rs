@@ -25,9 +25,7 @@ use zei_algebra::{
     prelude::*,
     ristretto::RistrettoScalar,
 };
-use zei_crypto::delegated_chaum_pedersen::{
-    DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
-};
+use zei_crypto::delegated_schnorr::{DelegatedSchnorrInspection, DelegatedSchnorrProof};
 use zei_crypto::field_simulation::SimFrParamsRistretto;
 use zei_plonk::{
     plonk::{
@@ -173,30 +171,26 @@ impl ProverParams {
         let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
         let zero = BLSScalar::zero();
 
-        let proof =
-            DelegatedChaumPedersenProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
-                inspection_comm: Default::default(),
-                randomizers: vec![RistrettoPoint::default(); 3],
-                response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
-                params_phantom: Default::default(),
-            };
-
-        let non_zk_state = DelegatedChaumPedersenInspection::<
-            RistrettoScalar,
-            RistrettoPoint,
-            SimFrParamsRistretto,
-        > {
-            committed_data_and_randomizer: vec![
-                (
-                    RistrettoScalar::default(),
-                    RistrettoScalar::default()
-                );
-                3
-            ],
-            r: BLSScalar::default(),
+        let proof = DelegatedSchnorrProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
+            inspection_comm: Default::default(),
+            randomizers: vec![RistrettoPoint::default(); 3],
+            response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
             params_phantom: Default::default(),
-            group_phantom: Default::default(),
         };
+
+        let non_zk_state =
+            DelegatedSchnorrInspection::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
+                committed_data_and_randomizer: vec![
+                    (
+                        RistrettoScalar::default(),
+                        RistrettoScalar::default()
+                    );
+                    3
+                ],
+                r: BLSScalar::default(),
+                params_phantom: Default::default(),
+                group_phantom: Default::default(),
+            };
 
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
@@ -234,30 +228,26 @@ impl ProverParams {
     pub fn abar_to_bar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
 
-        let proof =
-            DelegatedChaumPedersenProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
-                inspection_comm: Default::default(),
-                randomizers: vec![RistrettoPoint::default(); 3],
-                response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
-                params_phantom: Default::default(),
-            };
-
-        let non_zk_state = DelegatedChaumPedersenInspection::<
-            RistrettoScalar,
-            RistrettoPoint,
-            SimFrParamsRistretto,
-        > {
-            committed_data_and_randomizer: vec![
-                (
-                    RistrettoScalar::default(),
-                    RistrettoScalar::default()
-                );
-                3
-            ],
-            r: BLSScalar::default(),
+        let proof = DelegatedSchnorrProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
+            inspection_comm: Default::default(),
+            randomizers: vec![RistrettoPoint::default(); 3],
+            response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
             params_phantom: Default::default(),
-            group_phantom: Default::default(),
         };
+
+        let non_zk_state =
+            DelegatedSchnorrInspection::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
+                committed_data_and_randomizer: vec![
+                    (
+                        RistrettoScalar::default(),
+                        RistrettoScalar::default()
+                    );
+                    3
+                ],
+                r: BLSScalar::default(),
+                params_phantom: Default::default(),
+                group_phantom: Default::default(),
+            };
 
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();

@@ -10,9 +10,9 @@ use zei_algebra::secp256k1::SECP256K1Scalar;
 use zei_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
 use zei_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
 use zei_crypto::bulletproofs::scalar_mul::ScalarMulProof;
-use zei_crypto::delegated_chaum_pedersen::{
-    prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
-    DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
+use zei_crypto::delegated_schnorr::{
+    prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
+    DelegatedSchnorrProof,
 };
 use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 use zei_plonk::plonk::constraint_system::field_simulation::SimFrVar;
@@ -23,8 +23,8 @@ use zei_plonk::plonk::constraint_system::VarIndex;
 /// The instance for address folding.
 pub struct AXfrAddressFoldingInstance {
     /// The inspector's proof.
-    pub delegated_cp_proof:
-        DelegatedChaumPedersenProof<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1>,
+    pub delegated_schnorr_proof:
+        DelegatedSchnorrProof<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1>,
     /// The commitments generated during the scalar mul proof, used in delegated CP.
     pub scalar_mul_commitments: Vec<SECQ256K1G1>,
     /// The scalar mul proof.
@@ -39,11 +39,11 @@ pub struct AXfrAddressFoldingWitness {
     /// Blinding factors of the commitments
     pub blinding_factors: Vec<SECQ256K1Scalar>,
     /// The inspector's proof.
-    pub delegated_cp_proof:
-        DelegatedChaumPedersenProof<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1>,
-    /// Inspection data in the delegated Chaum-Pedersen proof.
-    pub delegated_cp_inspection:
-        DelegatedChaumPedersenInspection<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1>,
+    pub delegated_schnorr_proof:
+        DelegatedSchnorrProof<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1>,
+    /// Inspection data in the delegated Schnorr proof.
+    pub delegated_schnorr_inspection:
+        DelegatedSchnorrInspection<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1>,
     /// Beta.
     pub beta: SECQ256K1Scalar,
     /// Lambda.
@@ -55,30 +55,27 @@ impl Default for AXfrAddressFoldingWitness {
         let keypair = AXfrKeyPair::default();
         let blinding_factors = vec![SECQ256K1Scalar::default(); 3];
 
-        let delegated_cp_proof =
-            DelegatedChaumPedersenProof::<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1> {
+        let delegated_schnorr_proof =
+            DelegatedSchnorrProof::<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1> {
                 inspection_comm: Default::default(),
                 randomizers: vec![SECQ256K1G1::default(); 3],
                 response_scalars: vec![(SECQ256K1Scalar::default(), SECQ256K1Scalar::default()); 3],
                 params_phantom: Default::default(),
             };
 
-        let delegated_cp_inspection = DelegatedChaumPedersenInspection::<
-            SECQ256K1Scalar,
-            SECQ256K1G1,
-            SimFrParamsSecq256k1,
-        > {
-            committed_data_and_randomizer: vec![
-                (
-                    SECQ256K1Scalar::default(),
-                    SECQ256K1Scalar::default()
-                );
-                3
-            ],
-            r: BLSScalar::default(),
-            params_phantom: Default::default(),
-            group_phantom: Default::default(),
-        };
+        let delegated_schnorr_inspection =
+            DelegatedSchnorrInspection::<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1> {
+                committed_data_and_randomizer: vec![
+                    (
+                        SECQ256K1Scalar::default(),
+                        SECQ256K1Scalar::default()
+                    );
+                    3
+                ],
+                r: BLSScalar::default(),
+                params_phantom: Default::default(),
+                group_phantom: Default::default(),
+            };
 
         let beta = SECQ256K1Scalar::default();
         let lambda = SECQ256K1Scalar::default();
@@ -86,8 +83,8 @@ impl Default for AXfrAddressFoldingWitness {
         Self {
             keypair,
             blinding_factors,
-            delegated_cp_proof,
-            delegated_cp_inspection,
+            delegated_schnorr_proof,
+            delegated_schnorr_inspection,
             beta,
             lambda,
         }
@@ -114,10 +111,10 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     let (scalar_mul_proof, scalar_mul_commitments, blinding_factors) =
         { ScalarMulProof::prove(prng, &bp_gens, transcript, &public_key.0, &secret_key.0)? };
 
-    let (delegated_cp_proof, delegated_cp_inspection, beta, lambda) = {
+    let (delegated_schnorr_proof, delegated_schnorr_inspection, beta, lambda) = {
         let secret_key_in_fq = SECQ256K1Scalar::from_bytes(&secret_key.0.to_bytes())?;
 
-        prove_delegated_chaum_pedersen(
+        prove_delegated_schnorr(
             prng,
             &vec![
                 (public_key.0.get_x(), blinding_factors[0]),
@@ -132,7 +129,7 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     };
 
     let instance = AXfrAddressFoldingInstance {
-        delegated_cp_proof: delegated_cp_proof.clone(),
+        delegated_schnorr_proof: delegated_schnorr_proof.clone(),
         scalar_mul_commitments,
         scalar_mul_proof,
     };
@@ -140,8 +137,8 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     let witness = AXfrAddressFoldingWitness {
         keypair: keypair.clone(),
         blinding_factors,
-        delegated_cp_proof,
-        delegated_cp_inspection,
+        delegated_schnorr_proof,
+        delegated_schnorr_inspection,
         beta,
         lambda,
     };
@@ -166,10 +163,10 @@ pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
         .scalar_mul_proof
         .verify(&bp_gens, transcript, &instance.scalar_mul_commitments)?;
 
-    let (beta, lambda) = verify_delegated_chaum_pedersen(
+    let (beta, lambda) = verify_delegated_schnorr(
         &pc_gens,
         &instance.scalar_mul_commitments,
-        &instance.delegated_cp_proof,
+        &instance.delegated_schnorr_proof,
         transcript,
     )?;
 
@@ -368,7 +365,7 @@ pub fn prove_address_folding_in_cs(
         cs.equal(*sim_bit, *scalar_bit);
     }
 
-    // 5. allocate the simulated field elements for the delegated Chaum-Pedersen protocol.
+    // 5. allocate the simulated field elements for the delegated Schnorr protocol.
     // note: the verifier will combine the challenges using the power series of lambda.
     let lambda_series = vec![
         SECQ256K1Scalar::one(),
@@ -403,7 +400,7 @@ pub fn prove_address_folding_in_cs(
         .iter()
         .zip(
             witness
-                .delegated_cp_inspection
+                .delegated_schnorr_inspection
                 .committed_data_and_randomizer
                 .iter(),
         )
@@ -421,9 +418,9 @@ pub fn prove_address_folding_in_cs(
             SimFrVar<SimFrParamsSecq256k1>,
         )>>();
 
-    let combined_response_scalar = witness.delegated_cp_proof.response_scalars[0].0
-        + witness.delegated_cp_proof.response_scalars[1].0 * witness.lambda
-        + witness.delegated_cp_proof.response_scalars[2].0 * witness.lambda * witness.lambda;
+    let combined_response_scalar = witness.delegated_schnorr_proof.response_scalars[0].0
+        + witness.delegated_schnorr_proof.response_scalars[1].0 * witness.lambda
+        + witness.delegated_schnorr_proof.response_scalars[2].0 * witness.lambda * witness.lambda;
     let combined_response_scalar_sim_fr = SimFr::<SimFrParamsSecq256k1>::from(
         &<SECQ256K1Scalar as Into<BigUint>>::into(combined_response_scalar),
     );
@@ -528,9 +525,9 @@ pub fn prove_address_folding_in_cs(
     }
 
     // 7. compare with the inspector's state.
-    let r = witness.delegated_cp_inspection.r;
+    let r = witness.delegated_schnorr_inspection.r;
     let r_var = cs.new_variable(r);
-    let comm_var = cs.new_variable(witness.delegated_cp_proof.inspection_comm);
+    let comm_var = cs.new_variable(witness.delegated_schnorr_proof.inspection_comm);
 
     {
         let mut input_vars = compressed_limbs_var.clone();
@@ -585,7 +582,7 @@ pub fn prepare_verifier_input(
     beta: &SECQ256K1Scalar,
     lambda: &SECQ256K1Scalar,
 ) -> Vec<BLSScalar> {
-    let mut v = vec![instance.delegated_cp_proof.inspection_comm];
+    let mut v = vec![instance.delegated_schnorr_proof.inspection_comm];
 
     let lambda_series = vec![SECQ256K1Scalar::one(), *lambda, *lambda * lambda];
     let beta_lambda_series = lambda_series
@@ -607,9 +604,9 @@ pub fn prepare_verifier_input(
         v.extend_from_slice(&sim_fr.limbs);
     }
 
-    let combined_response_scalar = instance.delegated_cp_proof.response_scalars[0].0
-        + instance.delegated_cp_proof.response_scalars[1].0 * lambda
-        + instance.delegated_cp_proof.response_scalars[2].0 * lambda * lambda;
+    let combined_response_scalar = instance.delegated_schnorr_proof.response_scalars[0].0
+        + instance.delegated_schnorr_proof.response_scalars[1].0 * lambda
+        + instance.delegated_schnorr_proof.response_scalars[2].0 * lambda * lambda;
     let combined_response_scalar_sim_fr = SimFr::<SimFrParamsSecq256k1>::from(
         &<SECQ256K1Scalar as Into<BigUint>>::into(combined_response_scalar),
     );

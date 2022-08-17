@@ -10,7 +10,7 @@ use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The non-interactive proof provided to the verifier.
-pub struct DelegatedChaumPedersenProof<S, G, P> {
+pub struct DelegatedSchnorrProof<S, G, P> {
     /// The commitment of the non-ZK verifier's state.
     pub inspection_comm: BLSScalar,
     /// The randomizer points
@@ -23,7 +23,7 @@ pub struct DelegatedChaumPedersenProof<S, G, P> {
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The state of the inspector.
-pub struct DelegatedChaumPedersenInspection<S, G, P> {
+pub struct DelegatedSchnorrInspection<S, G, P> {
     /// The committed value and their corresponding randomizer
     pub committed_data_and_randomizer: Vec<(S, S)>,
     /// The randomizer used to make the Rescue hash function a commitment scheme.
@@ -34,9 +34,7 @@ pub struct DelegatedChaumPedersenInspection<S, G, P> {
     pub group_phantom: PhantomData<G>,
 }
 
-impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams>
-    DelegatedChaumPedersenInspection<S, G, P>
-{
+impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrInspection<S, G, P> {
     /// Create a dummy new one.
     pub fn new() -> Self {
         Self {
@@ -48,7 +46,7 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams>
     }
 }
 
-impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedChaumPedersenProof<S, G, P> {
+impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrProof<S, G, P> {
     /// Create a dummy new one.
     pub fn new() -> Self {
         Self {
@@ -84,8 +82,8 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedChaumPedersen
     }
 }
 
-/// Generate a proof in the delegated Chaum-Pedersen protocol.
-pub fn prove_delegated_chaum_pedersen<
+/// Generate a proof in the delegated Schnorr protocol.
+pub fn prove_delegated_schnorr<
     R: CryptoRng + RngCore,
     S: Scalar,
     G: Group<ScalarType = S>,
@@ -98,16 +96,16 @@ pub fn prove_delegated_chaum_pedersen<
     commitments: &Vec<G>,
     transcript: &mut Transcript,
 ) -> Result<(
-    DelegatedChaumPedersenProof<S, G, P>,
-    DelegatedChaumPedersenInspection<S, G, P>,
+    DelegatedSchnorrProof<S, G, P>,
+    DelegatedSchnorrInspection<S, G, P>,
     S,
     S,
 )> {
     assert_eq!(committed_data.len(), commitments.len());
     let len = committed_data.len();
 
-    let mut proof = DelegatedChaumPedersenProof::new();
-    let mut inspection = DelegatedChaumPedersenInspection::new();
+    let mut proof = DelegatedSchnorrProof::new();
+    let mut inspection = DelegatedSchnorrInspection::new();
 
     // 1. sample the scalars for the randomizers.
     let mut randomizer_scalars = Vec::<(S, S)>::with_capacity(len);
@@ -247,8 +245,8 @@ pub fn prove_delegated_chaum_pedersen<
     Ok((proof, inspection, beta, lambda))
 }
 
-/// Verify a proof in the delegated Chaum-Pedersen protocol.
-pub fn verify_delegated_chaum_pedersen<
+/// Verify a proof in the delegated Schnorr protocol.
+pub fn verify_delegated_schnorr<
     S: Scalar,
     G: Group<ScalarType = S>,
     P: SimFrParams,
@@ -256,7 +254,7 @@ pub fn verify_delegated_chaum_pedersen<
 >(
     pc_gens: &PC,
     commitments: &Vec<G>,
-    proof: &DelegatedChaumPedersenProof<S, G, P>,
+    proof: &DelegatedSchnorrProof<S, G, P>,
     transcript: &mut Transcript,
 ) -> Result<(S, S)> {
     assert_eq!(commitments.len(), proof.randomizers.len());
@@ -325,9 +323,7 @@ pub fn verify_delegated_chaum_pedersen<
 #[cfg(test)]
 mod test {
     use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
-    use crate::delegated_chaum_pedersen::{
-        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
-    };
+    use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
     use crate::field_simulation::SimFrParamsRistretto;
     use merlin::Transcript;
     use rand_chacha::ChaChaRng;
@@ -351,19 +347,18 @@ mod test {
 
             let mut transcript = Transcript::new(b"Test");
 
-            let (proof, _, _, _) =
-                prove_delegated_chaum_pedersen::<_, _, _, SimFrParamsRistretto, _>(
-                    &mut rng,
-                    &vec![(x, gamma), (y, delta)],
-                    &pc_gens,
-                    &vec![point_p, point_q],
-                    &mut transcript,
-                )
-                .unwrap();
+            let (proof, _, _, _) = prove_delegated_schnorr::<_, _, _, SimFrParamsRistretto, _>(
+                &mut rng,
+                &vec![(x, gamma), (y, delta)],
+                &pc_gens,
+                &vec![point_p, point_q],
+                &mut transcript,
+            )
+            .unwrap();
 
             let mut transcript = Transcript::new(b"Test");
 
-            let _ = verify_delegated_chaum_pedersen(
+            let _ = verify_delegated_schnorr(
                 &pc_gens,
                 &vec![point_p, point_q],
                 &proof,

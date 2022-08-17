@@ -19,9 +19,9 @@ use zei_algebra::{
 };
 use zei_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
-    delegated_chaum_pedersen::{
-        prove_delegated_chaum_pedersen, verify_delegated_chaum_pedersen,
-        DelegatedChaumPedersenInspection, DelegatedChaumPedersenProof,
+    delegated_schnorr::{
+        prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
+        DelegatedSchnorrProof,
     },
     field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
@@ -51,7 +51,7 @@ pub struct BarToAbarBody {
     pub output: AnonAssetRecord,
     /// The zero-knowledge proofs.
     pub proof: (
-        DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+        DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
         AXfrPlonkPf,
     ),
     /// The owner memo.
@@ -72,12 +72,12 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
         return Err(eg!(ZeiError::ParameterError));
     }
 
-    let (open_abar, delegated_cp_proof, inspector_proof) =
+    let (open_abar, delegated_schnorr_proof, inspector_proof) =
         prove_bar_to_abar(prng, params, record, abar_pubkey).c(d!())?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
         output: AnonAssetRecord::from_oabar(&open_abar),
-        proof: (delegated_cp_proof, inspector_proof),
+        proof: (delegated_schnorr_proof, inspector_proof),
         memo: open_abar.owner_memo.unwrap(),
     };
 
@@ -115,7 +115,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     abar_pubkey: &AXfrPubKey,
 ) -> Result<(
     OpenAnonAssetRecord,
-    DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     AXfrPlonkPf,
 )> {
     let oabar_amount = obar.amount;
@@ -152,8 +152,8 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"commitment", &comm.to_bytes());
 
-    // 3. Compute the delegated Chaum-Pedersen proof.
-    let (delegated_cp_proof, inspection, beta, lambda) = prove_delegated_chaum_pedersen(
+    // 3. Compute the delegated Schnorr proof.
+    let (delegated_schnorr_proof, inspection, beta, lambda) = prove_delegated_schnorr(
         prng,
         &vec![(x, gamma), (y, delta)],
         &pc_gens,
@@ -170,14 +170,14 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         y_in_bls12_381,
         oabar.blind,
         abar_pubkey,
-        &delegated_cp_proof,
+        &delegated_schnorr_proof,
         &inspection,
         &beta,
         &lambda,
     )
     .c(d!())?;
 
-    Ok((oabar, delegated_cp_proof, inspector_proof))
+    Ok((oabar, delegated_schnorr_proof, inspector_proof))
 }
 
 pub(crate) fn verify_bar_to_abar(
@@ -185,7 +185,7 @@ pub(crate) fn verify_bar_to_abar(
     bar: &BlindAssetRecord,
     abar: &AnonAssetRecord,
     proof: &(
-        DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+        DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
         AXfrPlonkPf,
     ),
 ) -> Result<()> {
@@ -235,8 +235,8 @@ pub(crate) fn verify_bar_to_abar(
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"commitment", &abar.commitment.to_bytes());
 
-    // 2. Verify the delegated Chaum-Pedersen proof.
-    let (beta, lambda) = verify_delegated_chaum_pedersen(
+    // 2. Verify the delegated Schnorr proof.
+    let (beta, lambda) = verify_delegated_schnorr(
         &pc_gens,
         &vec![com_amount, com_asset_type],
         &proof.0,
@@ -256,16 +256,12 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
     pubkey: &AXfrPubKey,
-    delegated_cp_proof: &DelegatedChaumPedersenProof<
+    delegated_schnorr_proof: &DelegatedSchnorrProof<
         RistrettoScalar,
         RistrettoPoint,
         SimFrParamsRistretto,
     >,
-    inspection: &DelegatedChaumPedersenInspection<
-        RistrettoScalar,
-        RistrettoPoint,
-        SimFrParamsRistretto,
-    >,
+    inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
 ) -> Result<AXfrPlonkPf> {
@@ -275,7 +271,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
         asset_type,
         blind_hash,
         pubkey,
-        delegated_cp_proof,
+        delegated_schnorr_proof,
         inspection,
         beta,
         lambda,
@@ -298,11 +294,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
 pub(crate) fn verify_inspection(
     params: &VerifierParams,
     hash_comm: BLSScalar,
-    proof_zk_part: &DelegatedChaumPedersenProof<
-        RistrettoScalar,
-        RistrettoPoint,
-        SimFrParamsRistretto,
-    >,
+    proof_zk_part: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     proof: &AXfrPlonkPf,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
@@ -347,8 +339,8 @@ pub(crate) fn build_bar_to_abar_cs(
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
     pubkey: &AXfrPubKey,
-    proof: &DelegatedChaumPedersenProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
-    non_zk_state: &DelegatedChaumPedersenInspection<
+    proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    non_zk_state: &DelegatedSchnorrInspection<
         RistrettoScalar,
         RistrettoPoint,
         SimFrParamsRistretto,
@@ -618,7 +610,7 @@ mod test {
     use zei_algebra::ristretto::RistrettoScalar;
     use zei_algebra::traits::Scalar;
     use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
-    use zei_crypto::delegated_chaum_pedersen::prove_delegated_chaum_pedersen;
+    use zei_crypto::delegated_schnorr::prove_delegated_schnorr;
     use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 
     fn build_bar(
@@ -652,7 +644,7 @@ mod test {
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         );
         let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
-        let (oabar_conf, delegated_cp_proof_conf, inspector_proof_conf) =
+        let (oabar_conf, delegated_schnorr_proof_conf, inspector_proof_conf) =
             super::prove_bar_to_abar(&mut prng, &params, &obar, &abar_keypair.get_public_key())
                 .unwrap();
         let abar_conf = AnonAssetRecord::from_oabar(&oabar_conf);
@@ -662,7 +654,7 @@ mod test {
             &verifier_params,
             &bar_conf,
             &abar_conf,
-            &(delegated_cp_proof_conf, inspector_proof_conf)
+            &(delegated_schnorr_proof_conf, inspector_proof_conf)
         )
         .is_ok());
     }
@@ -749,7 +741,7 @@ mod test {
         let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
         transcript.append_message(b"commitment", &z.to_bytes());
 
-        let (proof, non_zk_state, beta, lambda) = prove_delegated_chaum_pedersen(
+        let (proof, non_zk_state, beta, lambda) = prove_delegated_schnorr(
             &mut rng,
             &vec![(x, gamma), (y, delta)],
             &pc_gens,
