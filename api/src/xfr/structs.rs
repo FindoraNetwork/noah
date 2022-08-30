@@ -383,33 +383,14 @@ pub struct TracerMemo {
 }
 
 /// Information directed to the recipient.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct OwnerMemo {
     /// The signature used curve type.
     pub key_type: KeyType,
     /// The random point used to compute the shared point.
-    pub blind_share: Vec<u8>,
+    pub blind_share_bytes: Vec<u8>,
     /// The ciphertext of the memo information.
-    pub lock: Vec<u8>,
-}
-
-/// Information directed to the recipient.
-#[derive(Deserialize, Serialize)]
-pub struct OldOwnerMemo {
-    /// The random point used to compute the shared point.
-    pub blind_share: CompressedEdwardsY,
-    /// The hybrid encryption of the memo information.
-    pub lock: ZeiHybridCiphertext,
-}
-
-impl From<OldOwnerMemo> for OwnerMemo {
-    fn from(memo: OldOwnerMemo) -> OwnerMemo {
-        OwnerMemo {
-            key_type: KeyType::Ed25519,
-            blind_share: memo.blind_share.0.to_bytes().to_vec(),
-            lock: memo.lock.zei_to_bytes(),
-        }
-    }
+    pub lock_bytes: Vec<u8>,
 }
 
 impl OwnerMemo {
@@ -419,17 +400,17 @@ impl OwnerMemo {
         amount: u64,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar))> {
-        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_point(prng);
+        let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
-        let lock = pub_key.hybrid_encrypt(prng, &amount.to_be_bytes())?;
+        let lock_bytes = pub_key.hybrid_encrypt(prng, &amount.to_be_bytes())?;
         Ok((
             OwnerMemo {
                 key_type,
-                blind_share,
-                lock,
+                blind_share_bytes,
+                lock_bytes,
             },
             amount_blinds,
         ))
@@ -441,17 +422,17 @@ impl OwnerMemo {
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, RistrettoScalar)> {
-        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_point(prng);
+        let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
-        let lock = pub_key.hybrid_encrypt(prng, &asset_type.0)?;
+        let lock_bytes = pub_key.hybrid_encrypt(prng, &asset_type.0)?;
         Ok((
             OwnerMemo {
                 key_type,
-                blind_share,
-                lock,
+                blind_share_bytes,
+                lock_bytes,
             },
             asset_type_blind,
         ))
@@ -464,7 +445,7 @@ impl OwnerMemo {
         asset_type: &AssetType,
         pub_key: &XfrPublicKey,
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar), RistrettoScalar)> {
-        let (key_type, r, blind_share) = pub_key.random_scalar_with_compressed_point(prng);
+        let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point())?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
@@ -473,12 +454,12 @@ impl OwnerMemo {
         let mut amount_asset_type_plaintext = vec![];
         amount_asset_type_plaintext.extend_from_slice(&amount.to_be_bytes()[..]);
         amount_asset_type_plaintext.extend_from_slice(&asset_type.0[..]);
-        let lock = pub_key.hybrid_encrypt(prng, &amount_asset_type_plaintext)?;
+        let lock_bytes = pub_key.hybrid_encrypt(prng, &amount_asset_type_plaintext)?;
         Ok((
             OwnerMemo {
                 key_type,
-                blind_share,
-                lock,
+                blind_share_bytes,
+                lock_bytes,
             },
             amount_blinds,
             asset_type_blind,
@@ -534,14 +515,14 @@ impl OwnerMemo {
         keypair: &XfrKeyPair,
     ) -> Result<(RistrettoScalar, RistrettoScalar)> {
         let (key_type, s) = keypair.sec_key.as_scalar_bytes();
-        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share)?;
+        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes)?;
         Ok(OwnerMemo::calc_amount_blinds(&shared_point))
     }
 
     /// Return the asset type blind
     pub fn derive_asset_type_blind(&self, keypair: &XfrKeyPair) -> Result<RistrettoScalar> {
         let (key_type, s) = keypair.sec_key.as_scalar_bytes();
-        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share)?;
+        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes)?;
         Ok(OwnerMemo::calc_asset_type_blind(&shared_point))
     }
 }
@@ -549,7 +530,7 @@ impl OwnerMemo {
 impl OwnerMemo {
     // Decrypt the lock.
     fn decrypt(&self, keypair: &XfrKeyPair) -> Result<Vec<u8>> {
-        keypair.hybrid_decrypt(&self.lock)
+        keypair.hybrid_decrypt(&self.lock_bytes)
     }
 
     // Given a shared point, calculate the amount blinds.
@@ -717,3 +698,182 @@ impl PartialEq for XfrRangeProof {
 }
 
 impl Eq for XfrRangeProof {}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+enum CompatibleKeyType {
+    Old,
+    New(KeyType),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+enum CompatibleBlindShare {
+    Old(CompressedEdwardsY),
+    New(Vec<u8>),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+enum CompatibleLock {
+    Old(ZeiHybridCiphertext),
+    New(Vec<u8>),
+}
+
+use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
+
+impl<'de> Deserialize<'de> for OwnerMemo {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        enum Field {
+            KeyType,
+            BlindShare,
+            BlindShareBytes,
+            Lock,
+            LockBytes,
+        }
+
+        impl<'de> Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Field, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        formatter.write_str("`blind_share` or `lock` or `key_type`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "key_type" => Ok(Field::KeyType),
+                            "blind_share" => Ok(Field::BlindShare),
+                            "blind_share_bytes" => Ok(Field::BlindShareBytes),
+                            "lock" => Ok(Field::Lock),
+                            "lock_bytes" => Ok(Field::LockBytes),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct OwnerMemoVisitor;
+
+        impl<'de> Visitor<'de> for OwnerMemoVisitor {
+            type Value = OwnerMemo;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct OwnerMemo")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> std::result::Result<OwnerMemo, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let com_key_type = seq
+                    .next_element::<CompatibleKeyType>()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let key_type = match com_key_type {
+                    CompatibleKeyType::Old => KeyType::Ed25519,
+                    CompatibleKeyType::New(k) => k,
+                };
+                let com_blind_share = seq
+                    .next_element::<CompatibleBlindShare>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let blind_share_bytes = match com_blind_share {
+                    CompatibleBlindShare::Old(k) => k.0.to_bytes().to_vec(),
+                    CompatibleBlindShare::New(k) => k,
+                };
+                let com_lock = seq
+                    .next_element::<CompatibleLock>()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let lock_bytes = match com_lock {
+                    CompatibleLock::Old(k) => k.zei_to_bytes(),
+                    CompatibleLock::New(k) => k,
+                };
+                Ok(OwnerMemo {
+                    key_type,
+                    blind_share_bytes,
+                    lock_bytes,
+                })
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<OwnerMemo, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut key_type = None;
+                let mut blind_share_bytes = None;
+                let mut lock_bytes = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::KeyType => {
+                            if key_type.is_some() {
+                                return Err(de::Error::duplicate_field("key_type"));
+                            }
+                            key_type = Some(map.next_value()?);
+                        }
+                        Field::BlindShare => {
+                            if blind_share_bytes.is_some() {
+                                return Err(de::Error::duplicate_field("blind_share"));
+                            }
+                            let tmp = map.next_value::<CompressedEdwardsY>()?;
+                            blind_share_bytes = Some(tmp.0.to_bytes().to_vec());
+                        }
+                        Field::BlindShareBytes => {
+                            if blind_share_bytes.is_some() {
+                                return Err(de::Error::duplicate_field("blind_share"));
+                            }
+                            blind_share_bytes = Some(map.next_value()?);
+                        }
+                        Field::Lock => {
+                            if lock_bytes.is_some() {
+                                return Err(de::Error::duplicate_field("lock"));
+                            }
+                            let tmp = map.next_value::<ZeiHybridCiphertext>()?;
+                            lock_bytes = Some(tmp.zei_to_bytes());
+                        }
+                        Field::LockBytes => {
+                            if lock_bytes.is_some() {
+                                return Err(de::Error::duplicate_field("lock"));
+                            }
+                            lock_bytes = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let key_type = key_type.unwrap_or(KeyType::Ed25519);
+                let blind_share_bytes =
+                    blind_share_bytes.ok_or_else(|| de::Error::missing_field("blind_share"))?;
+                let lock_bytes = lock_bytes.ok_or_else(|| de::Error::missing_field("lock"))?;
+                Ok(OwnerMemo {
+                    key_type,
+                    blind_share_bytes,
+                    lock_bytes,
+                })
+            }
+        }
+
+        const FIELDS: &'static [&'static str] = &[
+            "key_type",
+            "blind_share",
+            "blind_share_bytes",
+            "lock",
+            "lock_bytes",
+        ];
+        deserializer.deserialize_struct("OwnerMemo", FIELDS, OwnerMemoVisitor)
+    }
+}
