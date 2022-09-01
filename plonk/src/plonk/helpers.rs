@@ -586,10 +586,14 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
     for i in 0..n_wires_per_gate {
         let coefs_start = i * n;
         let coefs_end = if i == n_wires_per_gate - 1 {
-            coefs_len
+            min(coefs_len, (i + 1) * n)
         } else {
             (i + 1) * n
         };
+        println!(
+            "DEBUG: coefs-start: {}, coefs-end: {}, coefs-len: {}",
+            coefs_start, coefs_end, coefs_len
+        );
         let mut coefs = if coefs_start < coefs_len {
             t.get_coefs_ref()[coefs_start..min(coefs_len, coefs_end)].to_vec()
         } else {

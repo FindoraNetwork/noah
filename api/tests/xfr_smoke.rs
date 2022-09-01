@@ -1,44 +1,7 @@
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaChaRng;
-use serde::{Deserialize, Serialize};
 use zei::setup::BulletproofParams;
 use zei::xfr::{structs::*, *};
-
-/// A confidential transfer body.
-#[derive(Deserialize, Serialize)]
-pub struct TmpXfrBody {
-    /// The list of input (blind) asset records.
-    pub inputs: Vec<BlindAssetRecord>,
-    /// The list of output (blind) asset records.
-    pub outputs: Vec<BlindAssetRecord>,
-    /// The list of proofs.
-    pub proofs: XfrProofs,
-    /// The memos for access tracers.
-    pub asset_tracing_memos: Vec<Vec<TracerMemo>>, // each input or output can have a set of tracing memos
-    /// The memos for the recipients.
-    pub owners_memos: Vec<Option<OldOwnerMemo>>, // If confidential amount or asset type, lock the amount and/or asset type to the public key in asset_record
-}
-
-impl From<TmpXfrBody> for XfrBody {
-    fn from(tmp: TmpXfrBody) -> XfrBody {
-        let mut owners_memos: Vec<Option<OwnerMemo>> = vec![];
-        for o in tmp.owners_memos {
-            if let Some(oo) = o {
-                owners_memos.push(Some(oo.into()))
-            } else {
-                owners_memos.push(None);
-            }
-        }
-
-        XfrBody {
-            owners_memos,
-            inputs: tmp.inputs,
-            outputs: tmp.outputs,
-            proofs: tmp.proofs,
-            asset_tracing_memos: tmp.asset_tracing_memos,
-        }
-    }
-}
 
 #[test]
 fn compatibility_v1_bar_to_bar_no_trancing() {
@@ -73,13 +36,12 @@ fn compatibility_v1_bar_to_bar_no_trancing() {
 }
 "##;
 
-    let xfr_body: TmpXfrBody = serde_json::from_str(&body).unwrap();
-    let body: XfrBody = xfr_body.into();
+    let body: XfrBody = serde_json::from_str(&body).unwrap();
 
     let mut params = BulletproofParams::default();
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let policies = XfrNotePolicies::empty_policies(body.inputs.len(), body.outputs.len());
     let policies_ref = policies.to_ref();
 
-    batch_verify_xfr_bodies(&mut prng, &mut params, &[&body], &[&policies_ref]).unwrap();
+    assert!(batch_verify_xfr_bodies(&mut prng, &mut params, &[&body], &[&policies_ref]).is_ok());
 }

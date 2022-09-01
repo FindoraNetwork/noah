@@ -218,6 +218,11 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let degree = polynomial.degree();
 
         if degree + 1 > self.public_parameter_group_1.len() {
+            println!(
+                "DEBUG: degree: {}, only: {}",
+                degree + 1,
+                self.public_parameter_group_1.len()
+            );
             return Err(eg!(PolyComSchemeError::DegreeError));
         }
 
