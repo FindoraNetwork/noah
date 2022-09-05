@@ -1,11 +1,13 @@
-use rand_chacha::rand_core::SeedableRng;
-use rand_chacha::ChaChaRng;
-use zei::setup::BulletproofParams;
-use zei::xfr::{structs::*, *};
+#[cfg(test)]
+mod smoke_xfr_compatibility {
+    use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaChaRng;
+    use zei::setup::BulletproofParams;
+    use zei::xfr::{structs::*, *};
 
-#[test]
-fn compatibility_v1_bar_to_bar_no_trancing() {
-    let body = r##"
+    #[test]
+    fn compatibility_v1_bar_to_bar_no_trancing() {
+        let body = r##"
 {
     "inputs":[
         {
@@ -36,12 +38,15 @@ fn compatibility_v1_bar_to_bar_no_trancing() {
 }
 "##;
 
-    let body: XfrBody = serde_json::from_str(&body).unwrap();
+        let body: XfrBody = serde_json::from_str(&body).unwrap();
 
-    let mut params = BulletproofParams::default();
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
-    let policies = XfrNotePolicies::empty_policies(body.inputs.len(), body.outputs.len());
-    let policies_ref = policies.to_ref();
+        let mut params = BulletproofParams::default();
+        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let policies = XfrNotePolicies::empty_policies(body.inputs.len(), body.outputs.len());
+        let policies_ref = policies.to_ref();
 
-    assert!(batch_verify_xfr_bodies(&mut prng, &mut params, &[&body], &[&policies_ref]).is_ok());
+        assert!(
+            batch_verify_xfr_bodies(&mut prng, &mut params, &[&body], &[&policies_ref]).is_ok()
+        );
+    }
 }
