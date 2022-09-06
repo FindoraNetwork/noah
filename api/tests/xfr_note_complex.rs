@@ -71,7 +71,7 @@ fn complex_transaction() {
     // 4 total users, 1 sender three receivers
     // 3 asset types, 2 different tracing policies and one with no policy
 
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut prng = ChaChaRng::from_entropy();
     let mut params = BulletproofParams::default();
     let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
 

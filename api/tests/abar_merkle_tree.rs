@@ -70,7 +70,7 @@ fn test_persistent_merkle_tree_proof_commitment() {
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut prng = ChaChaRng::from_entropy();
 
     let abar = AnonAssetRecord {
         commitment: BLSScalar::random(&mut prng),
@@ -129,7 +129,7 @@ fn test_persistent_merkle_tree_recovery() {
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut prng = ChaChaRng::from_entropy();
 
     let mut abar = AnonAssetRecord {
         commitment: BLSScalar::random(&mut prng),
@@ -199,7 +199,7 @@ pub fn test_merkle_proofs() {
     let store = PrefixedStore::new("mystore", &mut state);
     let mut pmt = PersistentMerkleTree::new(store).unwrap();
 
-    let mut prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut prng = ChaChaRng::from_entropy();
     let abar0 = AnonAssetRecord {
         commitment: BLSScalar::random(&mut prng),
     };

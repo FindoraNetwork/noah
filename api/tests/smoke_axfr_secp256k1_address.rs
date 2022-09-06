@@ -109,7 +109,7 @@ mod smoke_axfr_secp256k1_address {
 
     #[test]
     fn secp256k1_to_abar() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let pc_gens = PedersenCommitmentRistretto::default();
         let params = ProverParams::bar_to_abar_params().unwrap();
         let verify_params = VerifierParams::bar_to_abar_params().unwrap();
@@ -154,7 +154,7 @@ mod smoke_axfr_secp256k1_address {
 
     #[test]
     fn address_to_abar() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let pc_gens = PedersenCommitmentRistretto::default();
         let params = ProverParams::ar_to_abar_params().unwrap();
         let verify_params = VerifierParams::ar_to_abar_params().unwrap();
@@ -194,7 +194,7 @@ mod smoke_axfr_secp256k1_address {
 
     #[test]
     fn abar_to_address() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
@@ -241,7 +241,7 @@ mod smoke_axfr_secp256k1_address {
 
     #[test]
     fn abar_to_secp256k1() {
-        let mut prng = ChaChaRng::from_seed([5u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_bar_params().unwrap();
 

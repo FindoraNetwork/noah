@@ -41,7 +41,7 @@ mod smoke_xfr_compatibility {
         let body: XfrBody = serde_json::from_str(&body).unwrap();
 
         let mut params = BulletproofParams::default();
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let policies = XfrNotePolicies::empty_policies(body.inputs.len(), body.outputs.len());
         let policies_ref = policies.to_ref();
 

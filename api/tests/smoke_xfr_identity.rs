@@ -60,7 +60,7 @@ mod smoke_xfr_identity {
     #[test]
     #[allow(non_snake_case)]
     fn bar_identity_on_inputs() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let mut params = BulletproofParams::default();
         let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
 
@@ -236,7 +236,7 @@ mod smoke_xfr_identity {
     #[test]
     #[allow(non_snake_case)]
     fn bar_identity_on_outputs() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let mut params = BulletproofParams::default();
         let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
 

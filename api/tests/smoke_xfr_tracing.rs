@@ -56,7 +56,7 @@ mod smoke_xfr_tracing {
 
     #[test]
     fn bar_tracing_on_inputs() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let mut params = BulletproofParams::default();
 
         let amount_in1 = 50u64;
@@ -173,7 +173,7 @@ mod smoke_xfr_tracing {
 
     #[test]
     fn bar_tracing_on_outputs() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let mut params = BulletproofParams::default();
 
         let amount_in1 = 50u64;

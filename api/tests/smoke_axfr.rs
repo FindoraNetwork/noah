@@ -118,7 +118,7 @@ mod smoke_axfr {
 
     #[test]
     fn ar_to_abar() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let pc_gens = PedersenCommitmentRistretto::default();
         let params = ProverParams::ar_to_abar_params().unwrap();
         let verify_params = VerifierParams::ar_to_abar_params().unwrap();
@@ -158,7 +158,7 @@ mod smoke_axfr {
 
     #[test]
     fn bar_to_abar() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let pc_gens = PedersenCommitmentRistretto::default();
         let params = ProverParams::bar_to_abar_params().unwrap();
         let verify_params = VerifierParams::bar_to_abar_params().unwrap();
@@ -203,7 +203,7 @@ mod smoke_axfr {
 
     #[test]
     fn abar_to_ar() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
@@ -381,7 +381,7 @@ mod smoke_axfr {
         fee: u32,
         name: &str,
     ) {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         println!("inputs: {}, outputs: {}", inputs.len(), outputs.len());
         let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
         let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();

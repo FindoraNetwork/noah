@@ -61,7 +61,7 @@ mod smoke_xfr {
 
     #[test]
     fn ar_1in_1out_1asset() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let mut params = BulletproofParams::default();
 
         let sender = XfrKeyPair::generate(&mut prng);
@@ -100,7 +100,7 @@ mod smoke_xfr {
 
     #[test]
     fn bar_1in_1out_1asset() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let mut params = BulletproofParams::default();
 
         let sender = XfrKeyPair::generate(&mut prng);
@@ -141,7 +141,7 @@ mod smoke_xfr {
 
     #[test]
     fn bar_3in_4out_3asset() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let mut params = BulletproofParams::default();
 
         let amount_in1 = 100u64;

@@ -40,7 +40,7 @@ mod smoke_xfr_secp256k1_address {
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
-        let mut prng = ChaChaRng::from_seed([1u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let template = AssetRecordTemplate {
             amount,
             asset_type,
@@ -60,7 +60,7 @@ mod smoke_xfr_secp256k1_address {
 
     #[test]
     fn bar_secp256k1_address() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = ChaChaRng::from_entropy();
         let mut params = BulletproofParams::default();
 
         let sk = "df57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e";
