@@ -489,7 +489,7 @@ impl XfrSecretKey {
 impl XfrKeyPair {
     /// Default generate a key pair.
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::generate_ed25519(prng)
+        Self::generate_secp256k1(prng)
     }
 
     /// Generate a Ed25519 key pair.
