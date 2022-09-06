@@ -252,7 +252,6 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     let fee_type = FEE_TYPE.as_scalar();
     let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &folding_witness);
     let witness = cs.get_and_clear_witness();
-    println!("DEBUG-------ABAR-TO-ABAR CS: {}", cs.size());
 
     prover_with_lagrange(
         rng,

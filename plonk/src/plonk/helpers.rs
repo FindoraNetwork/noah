@@ -590,10 +590,6 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
         } else {
             (i + 1) * n
         };
-        println!(
-            "DEBUG: coefs-start: {}, coefs-end: {}, coefs-len: {}",
-            coefs_start, coefs_end, coefs_len
-        );
         let mut coefs = if coefs_start < coefs_len {
             t.get_coefs_ref()[coefs_start..min(coefs_len, coefs_end)].to_vec()
         } else {

@@ -154,7 +154,6 @@ impl ProverParams {
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(ZeiError::DeserializationError))?;
 
-        println!("DEBUG======== cs size: {}", cs.size());
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();

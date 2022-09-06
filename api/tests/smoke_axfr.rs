@@ -382,7 +382,6 @@ mod smoke_axfr {
         name: &str,
     ) {
         let mut prng = ChaChaRng::from_entropy();
-        println!("inputs: {}, outputs: {}", inputs.len(), outputs.len());
         let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
         let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 
@@ -421,12 +420,11 @@ mod smoke_axfr {
             .collect();
 
         let pre_note = init_anon_xfr_note(&oabars, &oabars_out, fee, &sender).unwrap();
-        println!("DEBUG ----init pre_note ok.");
         let hash = random_hasher(&mut prng);
         let note = finish_anon_xfr_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
-        println!("DEBUG ----finish pre_note ok.");
+
         verify_anon_xfr_note(&verifier_params, &note, &root, hash.clone()).unwrap();
-        println!("DEBUG ----verify note ok.");
+
         // check abar
         for i in 0..note.body.outputs.len() {
             let oabar = OpenAnonAssetRecordBuilder::from_abar(
