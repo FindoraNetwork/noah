@@ -147,6 +147,11 @@ impl Hash for XfrPublicKey {
 }
 
 impl XfrPublicKey {
+    /// Get the reference of the inner type
+    pub fn inner(&self) -> &XfrPublicKeyInner {
+        &self.0
+    }
+
     /// random a scalar and the compressed point.
     pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
         &self,

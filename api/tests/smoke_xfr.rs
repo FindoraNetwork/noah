@@ -35,7 +35,7 @@ mod smoke_xfr {
         }
     }
 
-    /// Simulate getting a BlindAssetRecord from Ledger
+    // Simulate getting a BlindAssetRecord from Ledger
     fn conf_blind_asset_record_from_ledger(
         key: &XfrPublicKey,
         amount: u64,
