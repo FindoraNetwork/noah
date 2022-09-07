@@ -68,7 +68,7 @@ impl KeyType {
 #[derive(Clone, Copy, Debug)]
 #[wasm_bindgen]
 /// The public key wrapper for confidential transfer, for WASM compatability.
-pub struct XfrPublicKey(pub(crate) XfrPublicKeyInner);
+pub struct XfrPublicKey(pub XfrPublicKeyInner);
 
 #[derive(Clone, Copy, Debug)]
 /// The public key for confidential transfer.
