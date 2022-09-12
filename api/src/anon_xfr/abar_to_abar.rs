@@ -20,7 +20,7 @@ use merlin::Transcript;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::{
-    constraint_system::{ConstraintSystem, TurboCS, VarIndex},
+    constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
