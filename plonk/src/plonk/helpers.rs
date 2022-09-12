@@ -586,7 +586,7 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
     for i in 0..n_wires_per_gate {
         let coefs_start = i * n;
         let coefs_end = if i == n_wires_per_gate - 1 {
-            min(coefs_len, (i + 1) * n)
+            coefs_len
         } else {
             (i + 1) * n
         };

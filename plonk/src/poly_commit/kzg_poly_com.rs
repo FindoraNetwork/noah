@@ -264,6 +264,11 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let eval = poly.eval(x);
 
         if poly.degree() > max_degree {
+            println!(
+                "polynomial degree = {}, max_degree = {}",
+                poly.degree(),
+                max_degree
+            );
             return Err(eg!(PolyComSchemeError::DegreeError));
         }
 
