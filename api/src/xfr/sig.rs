@@ -511,6 +511,7 @@ impl XfrKeyPair {
         }
     }
 
+    /// Generate a key pair from secret key bytes.
     pub fn generate_secp256k1_from_bytes(bytes: &[u8]) -> Result<Self> {
         let sk = Secp256k1SecretKey::parse_slice(bytes).c(d!())?;
         let pk = Secp256k1PublicKey::from_secret_key(&sk);
