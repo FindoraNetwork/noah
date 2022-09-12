@@ -147,6 +147,11 @@ impl Hash for XfrPublicKey {
 }
 
 impl XfrPublicKey {
+    /// Get the reference of the inner type
+    pub fn inner(&self) -> &XfrPublicKeyInner {
+        &self.0
+    }
+
     /// random a scalar and the compressed point.
     pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
         &self,
@@ -519,7 +524,7 @@ impl XfrKeyPair {
             pub_key: XfrPublicKey(XfrPublicKeyInner::Address(
                 convert_libsecp256k1_public_key_to_address(&pk),
             )),
-            sec_key: XfrSecretKey::Secp256k1(sk),
+            sec_key: XfrSecretKey::Address(sk),
         }
     }
 
@@ -699,10 +704,12 @@ fn convert_point_libsecp256k1_to_algebra(pk: &Secp256k1PublicKey) -> Vec<u8> {
     y.normalize();
     let f: FieldStorage = (x).into();
     let mut bytes = convert_scalar_libsecp256k1_to_algebra(&f.0);
-    let flag = if y.is_odd() {
-        SWFlags::NegativeY.u8_bitmask()
-    } else {
+    let mut y_neg = y.neg(1);
+    y_neg.normalize();
+    let flag = if y >= y_neg {
         SWFlags::PositiveY.u8_bitmask()
+    } else {
+        SWFlags::NegativeY.u8_bitmask()
     };
     bytes.push(flag);
     bytes
