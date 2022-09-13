@@ -85,7 +85,7 @@ default = [
     'std',
     'u64_backend',
 ]
-std = ['curve25519-dalek/std', 'ark-bulletproofs-secq256k1/std' ,'ark-std/std']
+std = ['curve25519-dalek/std', 'ark-bulletproofs-secq256k1/std', 'ark-std/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',
