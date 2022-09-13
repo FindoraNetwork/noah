@@ -325,20 +325,19 @@ mod test {
     use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
     use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
     use crate::field_simulation::SimFrParamsRistretto;
+    use ark_std::test_rng;
     use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use zei_algebra::{ristretto::RistrettoScalar, traits::Scalar};
 
     #[test]
     fn test_correctness() {
-        let mut rng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
 
         for _ in 0..10 {
-            let x = RistrettoScalar::random(&mut rng);
-            let gamma = RistrettoScalar::random(&mut rng);
-            let y = RistrettoScalar::random(&mut rng);
-            let delta = RistrettoScalar::random(&mut rng);
+            let x = RistrettoScalar::random(&mut prng);
+            let gamma = RistrettoScalar::random(&mut prng);
+            let y = RistrettoScalar::random(&mut prng);
+            let delta = RistrettoScalar::random(&mut prng);
 
             let pc_gens = PedersenCommitmentRistretto::default();
 
@@ -348,7 +347,7 @@ mod test {
             let mut transcript = Transcript::new(b"Test");
 
             let (proof, _, _, _) = prove_delegated_schnorr::<_, _, _, SimFrParamsRistretto, _>(
-                &mut rng,
+                &mut prng,
                 &vec![(x, gamma), (y, delta)],
                 &pc_gens,
                 &vec![point_p, point_q],

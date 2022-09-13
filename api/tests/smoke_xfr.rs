@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod smoke_xfr {
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei::{
         setup::BulletproofParams,
         xfr::{
@@ -14,7 +14,6 @@ mod smoke_xfr {
             verify_xfr_note, XfrNotePolicies,
         },
     };
-    use zei_algebra::prelude::*;
     use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     const AMOUNT: u64 = 10u64;
@@ -41,7 +40,7 @@ mod smoke_xfr {
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
-        let mut prng = ChaChaRng::from_seed([1u8; 32]);
+        let mut prng = test_rng();
         let template = AssetRecordTemplate {
             amount,
             asset_type,
@@ -61,7 +60,7 @@ mod smoke_xfr {
 
     #[test]
     fn ar_1in_1out_1asset() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
         let sender = XfrKeyPair::generate(&mut prng);
@@ -100,7 +99,7 @@ mod smoke_xfr {
 
     #[test]
     fn bar_1in_1out_1asset() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
         let sender = XfrKeyPair::generate(&mut prng);
@@ -141,7 +140,7 @@ mod smoke_xfr {
 
     #[test]
     fn bar_3in_4out_3asset() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
         let amount_in1 = 100u64;

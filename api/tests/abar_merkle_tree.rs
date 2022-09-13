@@ -1,6 +1,6 @@
+use ark_std::test_rng;
 use mem_db::MemoryDB;
 use parking_lot::RwLock;
-use rand_chacha::ChaChaRng;
 use std::env::temp_dir;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -70,7 +70,7 @@ fn test_persistent_merkle_tree_proof_commitment() {
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-    let mut prng = ChaChaRng::from_entropy();
+    let mut prng = test_rng();
 
     let abar = AnonAssetRecord {
         commitment: BLSScalar::random(&mut prng),
@@ -129,7 +129,7 @@ fn test_persistent_merkle_tree_recovery() {
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-    let mut prng = ChaChaRng::from_entropy();
+    let mut prng = test_rng();
 
     let mut abar = AnonAssetRecord {
         commitment: BLSScalar::random(&mut prng),
@@ -199,7 +199,7 @@ pub fn test_merkle_proofs() {
     let store = PrefixedStore::new("mystore", &mut state);
     let mut pmt = PersistentMerkleTree::new(store).unwrap();
 
-    let mut prng = ChaChaRng::from_entropy();
+    let mut prng = test_rng();
     let abar0 = AnonAssetRecord {
         commitment: BLSScalar::random(&mut prng),
     };

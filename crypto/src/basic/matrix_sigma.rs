@@ -222,8 +222,8 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
 
 #[cfg(test)]
 mod tests {
+    use ark_std::test_rng;
     use merlin::Transcript;
-    use rand_core::SeedableRng;
     use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
     use zei_algebra::{ops::*, traits::Group, Zero};
 
@@ -236,7 +236,7 @@ mod tests {
 
         let mut prover_transcript = Transcript::new(b"Test");
         let mut verifier_transcript = Transcript::new(b"Test");
-        let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         //test 1 simple dlog
         let elems = [G, H];

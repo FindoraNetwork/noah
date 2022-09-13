@@ -567,13 +567,13 @@ fn range_proof_64<CS: ConstraintSystem>(
 #[cfg(test)]
 pub mod tests {
     use crate::bulletproofs::mix::{allocate_mix_vector, MixCommitment, MixValue, MixVariable};
+    use ark_std::test_rng;
     use bulletproofs::{
         r1cs::{Prover, R1CSProof, Verifier},
         BulletproofGens, PedersenGens,
     };
     use lazy_static::lazy_static;
     use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
     use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
 
     #[test]
@@ -794,7 +794,7 @@ pub mod tests {
     }
 
     pub(crate) fn test_mix(inputs: &[MixValue], outputs: &[MixValue], pass: bool) {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let input_coms: Vec<MixCommitment>;
         let output_coms: Vec<MixCommitment>;
         let pc_gens = PedersenGens::default();

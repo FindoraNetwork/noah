@@ -523,13 +523,11 @@ pub(crate) fn verify_pok<P: Pairing>(
 pub(crate) mod credentials_tests {
     use super::*;
     use crate::anon_creds::Attribute::{Hidden, Revealed};
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
+    use ark_std::test_rng;
     use zei_algebra::bls12_381::BLSPairingEngine;
 
     fn check_signatures<P: Pairing>(n: usize) {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let ikeypair = issuer_keygen::<_, P>(&mut prng, n);
         let isk = &ikeypair.0;
@@ -552,8 +550,7 @@ pub(crate) mod credentials_tests {
 
     #[test]
     fn test_issuer_keygen() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let _ = issuer_keygen::<_, BLSPairingEngine>(&mut prng, 5);
         let _ = issuer_keygen::<_, BLSPairingEngine>(&mut prng, 0);
@@ -569,8 +566,7 @@ pub(crate) mod credentials_tests {
     fn reveal(reveal_map: &[bool]) {
         type P = BLSPairingEngine;
         let n = reveal_map.len();
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let ikeypair = issuer_keygen::<_, P>(&mut prng, n);
         let isk = &ikeypair.0;

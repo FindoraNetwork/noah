@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod smoke_xfr_identity {
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use wasm_bindgen::__rt::std::collections::HashMap;
     use zei::{
         anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
@@ -16,7 +16,6 @@ mod smoke_xfr_identity {
             trace_assets, verify_xfr_note, RecordData, XfrNotePoliciesRef,
         },
     };
-    use zei_algebra::prelude::*;
     use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
@@ -26,7 +25,7 @@ mod smoke_xfr_identity {
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
-        let mut prng = ChaChaRng::from_seed([1u8; 32]);
+        let mut prng = test_rng();
         let template = AssetRecordTemplate {
             amount,
             asset_type,
@@ -60,7 +59,7 @@ mod smoke_xfr_identity {
     #[test]
     #[allow(non_snake_case)]
     fn bar_identity_on_inputs() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
         let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
 
@@ -236,7 +235,7 @@ mod smoke_xfr_identity {
     #[test]
     #[allow(non_snake_case)]
     fn bar_identity_on_outputs() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
         let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
 

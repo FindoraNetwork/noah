@@ -313,8 +313,8 @@ impl<P: SimFrParams> SimFrMulVar<P> {
 #[cfg(test)]
 mod test_ristretto {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
+    use ark_std::test_rng;
     use num_bigint::{BigUint, RandBigInt};
-    use rand_chacha::ChaCha20Rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
     use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 
@@ -334,14 +334,14 @@ mod test_ristretto {
 
     #[test]
     fn test_enforce_zero() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let mut cs = TurboCS::<BLSScalar>::new();
 
-            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
-            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
 
             let a_fr = SimFrTest::from(&a);
             let b_fr = SimFrTest::from(&b);
@@ -364,13 +364,13 @@ mod test_ristretto {
     #[test]
     #[should_panic]
     fn test_enforce_zero_panic() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
 
         let mut cs = TurboCS::<BLSScalar>::new();
 
-        let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
-        let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
 
         let a_fr = SimFrTest::from(&a);
         let b_fr = SimFrTest::from(&b);
@@ -394,8 +394,8 @@ mod test_ristretto {
 #[cfg(test)]
 mod test_secq256k1 {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
+    use ark_std::test_rng;
     use num_bigint::{BigUint, RandBigInt};
-    use rand_chacha::ChaCha20Rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
     use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 
@@ -415,14 +415,14 @@ mod test_secq256k1 {
 
     #[test]
     fn test_enforce_zero() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let mut cs = TurboCS::<BLSScalar>::new();
 
-            let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
-            let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
 
             let a_fr = SimFrTest::from(&a);
             let b_fr = SimFrTest::from(&b);
@@ -445,13 +445,13 @@ mod test_secq256k1 {
     #[test]
     #[should_panic]
     fn test_enforce_zero_panic() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         let mut cs = TurboCS::<BLSScalar>::new();
 
-        let a = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
-        let b = rng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
 
         let a_fr = SimFrTest::from(&a);
         let b_fr = SimFrTest::from(&b);

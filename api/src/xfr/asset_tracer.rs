@@ -224,13 +224,13 @@ impl TracerMemo {
 #[cfg(test)]
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
     use zei_crypto::basic::elgamal::elgamal_encrypt;
 
     #[test]
     fn extract_amount_from_tracer_memo() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
         let memo = TracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, &[]);
         assert!(memo
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn extract_asset_type_from_tracer_memo() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
         let memo = TracerMemo::new(&mut prng, &tracer_keys.enc_key, None, None, &[]);
         assert!(memo
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn extract_identity_attributed_from_tracer_memo() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
         let attrs = [1u32, 2, 3];
 

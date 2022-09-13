@@ -212,12 +212,12 @@ impl ZeiFromToBytes for AXfrKeyPair {
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
+    use ark_std::test_rng;
     use zei_algebra::prelude::*;
     use zei_algebra::secp256k1::SECP256K1G1;
 
     fn check_from_to_bytes<G: Group>() {
-        let seed = [0_u8; 32];
-        let mut prng = rand_chacha::ChaChaRng::from_seed(seed);
+        let mut prng = test_rng();
         let key_pair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
 
         let public_key = key_pair.get_public_key();

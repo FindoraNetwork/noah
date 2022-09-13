@@ -43,10 +43,15 @@ features = ['derive']
 serde_json = '1.0'
 rand = "0.8"
 
+[dev-dependencies.ark-std]
+version = '^0.3.0'
+default-features = false
+
 [dev-dependencies.num-bigint]
 version = '0.4'
 features = ['rand']
 
 [features]
-default = []
+default = ["std"]
 debug = []
+std = ['ark-std/std']

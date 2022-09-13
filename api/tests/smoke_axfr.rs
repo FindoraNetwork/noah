@@ -1,10 +1,9 @@
 #[cfg(test)]
 mod smoke_axfr {
+    use ark_std::test_rng;
     use digest::Digest;
     use mem_db::MemoryDB;
     use parking_lot::RwLock;
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use sha2::Sha512;
     use std::sync::Arc;
     use storage::{
@@ -45,9 +44,9 @@ mod smoke_axfr {
     const ASSET5: AssetType = AssetType([2u8; ASSET_TYPE_LENGTH]);
     const ASSET6: AssetType = AssetType([2u8; ASSET_TYPE_LENGTH]);
 
-    fn build_bar(
+    fn build_bar<R: RngCore + CryptoRng>(
         pubkey: &XfrPublicKey,
-        prng: &mut ChaChaRng,
+        prng: &mut R,
         pc_gens: &PedersenCommitmentRistretto,
         amt: u64,
         asset_type: AssetType,
@@ -118,7 +117,7 @@ mod smoke_axfr {
 
     #[test]
     fn ar_to_abar() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
         let params = ProverParams::ar_to_abar_params().unwrap();
         let verify_params = VerifierParams::ar_to_abar_params().unwrap();
@@ -158,7 +157,7 @@ mod smoke_axfr {
 
     #[test]
     fn bar_to_abar() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
         let params = ProverParams::bar_to_abar_params().unwrap();
         let verify_params = VerifierParams::bar_to_abar_params().unwrap();
@@ -203,7 +202,7 @@ mod smoke_axfr {
 
     #[test]
     fn abar_to_ar() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
@@ -246,7 +245,7 @@ mod smoke_axfr {
 
     #[test]
     fn abar_to_bar() {
-        let mut prng = ChaChaRng::from_seed([5u8; 32]);
+        let mut prng = test_rng();
         let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_bar_params().unwrap();
 
@@ -381,7 +380,7 @@ mod smoke_axfr {
         fee: u32,
         name: &str,
     ) {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
         let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 

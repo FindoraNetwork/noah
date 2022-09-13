@@ -390,8 +390,8 @@ mod tests_kzg_impl {
         kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
+    use ark_std::test_rng;
     use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
     use zei_algebra::{
         bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
         prelude::*,
@@ -400,7 +400,7 @@ mod tests_kzg_impl {
 
     fn check_public_parameters_generation<P: Pairing>() {
         let param_size = 5;
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let kzg_scheme = KZGCommitmentScheme::<P>::new(param_size, &mut prng);
         let g1_power1 = kzg_scheme.public_parameter_group_1[1].clone();
         let g2_power1 = kzg_scheme.public_parameter_group_2[1].clone();
@@ -432,7 +432,7 @@ mod tests_kzg_impl {
     // Check the size of the KZG being generated.
     fn generation_of_crs<P: Pairing>() {
         let n = 1 << 5;
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let kzg_scheme = KZGCommitmentScheme::<P>::new(n, &mut prng);
         assert_eq!(kzg_scheme.public_parameter_group_1.len(), n + 1);
         assert_eq!(kzg_scheme.public_parameter_group_2.len(), 2);
@@ -440,7 +440,7 @@ mod tests_kzg_impl {
 
     #[test]
     fn test_homomorphic_poly_com_elem() {
-        let mut prng = ChaChaRng::from_seed([0_u8; 32]);
+        let mut prng = test_rng();
         let pcs = KZGCommitmentSchemeBLS::new(20, &mut prng);
         type Field = BLSScalar;
         let one = Field::one();
@@ -483,7 +483,7 @@ mod tests_kzg_impl {
 
     #[test]
     fn test_commit() {
-        let mut prng = ChaChaRng::from_seed([0_u8; 32]);
+        let mut prng = test_rng();
         let pcs = KZGCommitmentSchemeBLS::new(10, &mut prng);
         type Field = BLSScalar;
         let one = Field::one();
@@ -507,7 +507,7 @@ mod tests_kzg_impl {
 
     #[test]
     fn test_eval() {
-        let mut prng = ChaChaRng::from_seed([0_u8; 32]);
+        let mut prng = test_rng();
         let pcs = KZGCommitmentSchemeBLS::new(10, &mut prng);
         type Field = BLSScalar;
         let one = Field::one();

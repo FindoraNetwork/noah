@@ -281,14 +281,12 @@ fn symmetric_decrypt(key: &[u8; 32], ciphertext: &Ctext) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use ark_std::test_rng;
     use ed25519_dalek::Keypair;
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
 
     #[test]
     fn key_derivation() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let keypair = Keypair::generate(&mut prng);
         let (from_pk_key, encoded_rand) =
             symmetric_key_from_ed25519_public_key(&mut prng, &keypair.public);
@@ -311,8 +309,7 @@ mod test {
 
     #[test]
     fn hybrid_cipher() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let key_pair = Keypair::generate(&mut prng);
         let msg = b"this is another message";
 

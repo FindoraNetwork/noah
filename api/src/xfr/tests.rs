@@ -12,8 +12,8 @@ use crate::xfr::{
     },
     verify_xfr_body, verify_xfr_note, XfrNotePolicies,
 };
+use ark_std::test_rng;
 use merlin::Transcript;
-use rand_chacha::ChaChaRng;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
@@ -23,8 +23,8 @@ use zei_crypto::basic::{
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
 };
 
-pub(crate) fn create_xfr(
-    prng: &mut ChaChaRng,
+pub(crate) fn create_xfr<R: CryptoRng + RngCore>(
+    prng: &mut R,
     input_templates: &[AssetRecordTemplate],
     output_templates: &[AssetRecordTemplate],
     inkeys: &[&XfrKeyPair],
@@ -43,7 +43,10 @@ pub(crate) fn create_xfr(
     (xfr_note, inputs, outputs)
 }
 
-pub(crate) fn gen_key_pair_vec(size: usize, prng: &mut ChaChaRng) -> Vec<XfrKeyPair> {
+pub(crate) fn gen_key_pair_vec<R: CryptoRng + RngCore>(
+    size: usize,
+    prng: &mut R,
+) -> Vec<XfrKeyPair> {
     let mut keys = vec![];
     for _i in 0..size {
         keys.push(XfrKeyPair::generate_secp256k1(prng));
@@ -56,8 +59,7 @@ fn do_transfer_tests_single_asset(
     inputs_template: &[AssetRecordType],
     outputs_template: &[AssetRecordType],
 ) {
-    let mut prng: ChaChaRng;
-    prng = ChaChaRng::from_seed([0u8; 32]);
+    let mut prng = test_rng();
     let asset_type = AssetType::from_identical_byte(0u8);
 
     let input_amount = 100u64 * outputs_template.len() as u64;
@@ -471,9 +473,8 @@ mod multi_asset_no_tracing {
 
     #[test]
     fn do_multiasset_transfer_tests() {
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_type0 = AssetType::from_identical_byte(0u8);
         let asset_type1 = AssetType::from_identical_byte(1u8);
         let asset_type2 = AssetType::from_identical_byte(2u8);
@@ -624,7 +625,7 @@ mod keys {
         let mut outkeys = vec![];
         let mut inkeys = vec![];
         let mut in_asset_records = vec![];
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 
@@ -686,9 +687,8 @@ mod identity_tracing {
     use crate::xfr::{structs::TracingPolicies, XfrNotePoliciesRef};
 
     fn check_identity_tracing_for_asset_type(asset_record_type: AssetRecordType) {
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let addr = b"0x7789654"; // receiver address
 
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -829,7 +829,7 @@ mod asset_tracing {
     fn create_wrong_proof() -> PedersenElGamalEqProof {
         let m = RistrettoScalar::from(10u32);
         let r = RistrettoScalar::from(7657u32);
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
@@ -866,11 +866,8 @@ mod asset_tracing {
             AssetType,
         )],
     ) {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
-
+        let mut prng = test_rng();
         let input_amount = 100u64;
-
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let in_keys = gen_key_pair_vec(input_templates.len(), &mut prng);
@@ -1048,9 +1045,8 @@ mod asset_tracing {
 
     #[test]
     fn asset_tracing_for_non_conf_assets_should_work() {
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_type = AssetType::from_identical_byte(0u8);
 
         let asset_tracer_public_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -1107,9 +1103,8 @@ mod asset_tracing {
 
     #[test]
     fn test_one_input_one_output_all_confidential() {
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
             enc_keys: asset_tracer_keypair.enc_key.clone(),
@@ -1152,9 +1147,8 @@ mod asset_tracing {
 
     #[test]
     fn test_one_input_one_output_amount_confidential() {
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
@@ -1183,8 +1177,8 @@ mod asset_tracing {
 
     #[test]
     fn test_one_input_one_output_asset_confidential() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let mut params = BulletproofParams::default();
+        let mut prng = test_rng();
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
@@ -1218,9 +1212,8 @@ mod asset_tracing {
 
     #[test]
     fn test_two_inputs_two_outputs_all_confidential_tracing_on_inputs() {
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
@@ -1264,9 +1257,8 @@ mod asset_tracing {
 
     #[test]
     fn test_two_inputs_two_outputs_all_confidential_tracing_on_inputs_and_outputs() {
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
@@ -1310,9 +1302,8 @@ mod asset_tracing {
 
     #[test]
     fn test_single_asset_first_input_asset_tracing() {
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
@@ -1369,9 +1360,8 @@ mod asset_tracing {
     #[test]
     fn test_single_asset_two_first_input_asset_tracing() {
         // The first two inputs have asset tracing policies
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_tracer_keypair = AssetTracerKeyPair::generate(&mut prng);
 
         let tracing_policy = TracingPolicies::from_policy(TracingPolicy {
@@ -1438,9 +1428,8 @@ mod asset_tracing {
         // Multiple asset tracers
         // Mix of asset_tracing policies for inputs / outputs
         // Mix of asset record type for inputs /outputs
-        let mut prng: ChaChaRng;
         let mut params = BulletproofParams::default();
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let tracer1_keypair = AssetTracerKeyPair::generate(&mut prng);
         let tracer2_keypair = AssetTracerKeyPair::generate(&mut prng);
@@ -1532,8 +1521,7 @@ mod asset_tracing {
             ),
         ];
 
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let in_keys = gen_key_pair_vec(input_templates.len(), &mut prng);
         let in_keys_ref = in_keys.iter().collect_vec();
@@ -1643,8 +1631,7 @@ mod asset_tracing {
     }
 
     fn do_integer_overflow(asset_record_type: AssetRecordType) {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
         let asset_type = AssetType::from_identical_byte(0u8);

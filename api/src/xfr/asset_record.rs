@@ -596,13 +596,12 @@ mod test {
         },
         tests::{create_xfr, gen_key_pair_vec},
     };
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
     use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
     fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracing: bool) {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let amount = 100u64;
@@ -736,8 +735,7 @@ mod test {
     }
 
     fn do_test_open_asset_record(record_type: AssetRecordType) {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let asset_type = AssetType::from_identical_byte(1u8);
@@ -828,7 +826,7 @@ mod test {
     }
 
     fn build_and_open_blind_record(record_type: AssetRecordType, amt: u64, asset_type: AssetType) {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let keypair = XfrKeyPair::generate(&mut prng);
@@ -854,7 +852,7 @@ mod test {
 
     #[test]
     fn test_build_and_open_blind_record() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let asset_type: AssetType = AssetType(prng.gen());
         let amt: u64 = prng.gen();
 
@@ -882,7 +880,7 @@ mod test {
 
     #[test]
     fn open_blind_asset_record_error() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let keypair = XfrKeyPair::generate(&mut prng);

@@ -992,7 +992,7 @@ mod bls12_381_groups_test {
     };
     use ark_bls12_381::{G1Affine, G2Affine};
     use ark_ec::ProjectiveCurve;
-    use rand_chacha::ChaCha20Rng;
+    use ark_std::test_rng;
 
     #[test]
     fn test_scalar_ops() {
@@ -1033,10 +1033,10 @@ mod bls12_381_groups_test {
         let identity_gt = BLSGt::get_identity();
         assert_eq!(identity_gt, identity_gt_computed);
 
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
 
-        let s1 = BLSScalar::from(50 + rng.next_u32() % 50);
-        let s2 = BLSScalar::from(50 + rng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + prng.next_u32() % 50);
+        let s2 = BLSScalar::from(50 + prng.next_u32() % 50);
 
         let base_g1 = BLSG1::get_base();
         let base_g2 = BLSG2::get_base();
@@ -1065,14 +1065,14 @@ mod bls12_381_groups_test {
 
     #[test]
     fn curve_points_respresentation_of_g1() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
 
         let g1 = BLSG1::get_base();
-        let s1 = BLSScalar::from(50 + rng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + prng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = BLSG1::random(&mut rng);
+        let g1_prime = BLSG1::random(&mut prng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -1094,14 +1094,14 @@ mod bls12_381_groups_test {
 
     #[test]
     fn curve_points_respresentation_of_g2() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
 
         let g1 = BLSG2::get_base();
-        let s1 = BLSScalar::from(50 + rng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + prng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = BLSG2::random(&mut rng);
+        let g1_prime = BLSG2::random(&mut prng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -1123,19 +1123,19 @@ mod bls12_381_groups_test {
 
     #[test]
     fn test_serialization_of_points() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
 
-        let g1 = BLSG1::random(&mut rng);
+        let g1 = BLSG1::random(&mut prng);
         let g1_bytes = g1.to_compressed_bytes();
         let g1_recovered = BLSG1::from_compressed_bytes(&g1_bytes).unwrap();
         assert_eq!(g1, g1_recovered);
 
-        let g2 = BLSG2::random(&mut rng);
+        let g2 = BLSG2::random(&mut prng);
         let g2_bytes = g2.to_compressed_bytes();
         let g2_recovered = BLSG2::from_compressed_bytes(&g2_bytes).unwrap();
         assert_eq!(g2, g2_recovered);
 
-        let gt = BLSGt::random(&mut rng);
+        let gt = BLSGt::random(&mut prng);
         let gt_bytes = gt.to_compressed_bytes();
         let gt_recovered = BLSGt::from_compressed_bytes(&gt_bytes).unwrap();
         assert_eq!(gt, gt_recovered);

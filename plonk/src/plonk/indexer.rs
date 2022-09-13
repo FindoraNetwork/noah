@@ -167,6 +167,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     pcs: &PCS,
     lagrange_pcs: Option<&PCS>,
 ) -> Result<PlonkPK<PCS>> {
+    //It's okay to choose a fixed seed to generate quadratic non-residue.
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let n_wires_per_gate = CS::n_wires_per_gate();
     let n = cs.size();
@@ -341,14 +342,14 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 #[cfg(test)]
 mod test {
     use crate::plonk::indexer::choose_ks;
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
 
     #[test]
     fn test_choose_ks() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let m = 8;
         let k = choose_ks::<_, F>(&mut prng, m);
         let exp = u64_limbs_from_bytes(&F::field_size_minus_one_half());

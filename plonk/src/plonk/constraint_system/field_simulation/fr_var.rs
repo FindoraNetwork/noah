@@ -191,8 +191,8 @@ mod test_ristretto {
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboCS,
     };
+    use ark_std::test_rng;
     use num_bigint::{BigUint, RandBigInt};
-    use rand_chacha::ChaCha20Rng;
     use zei_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
     use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 
@@ -222,11 +222,11 @@ mod test_ristretto {
 
     #[test]
     fn test_alloc_constant() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
             let a_sim_fr = SimFrTest::from(&a);
 
             {
@@ -239,11 +239,11 @@ mod test_ristretto {
 
     #[test]
     fn test_alloc_witness() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
             let a_sim_fr = SimFrTest::from(&a);
 
             {
@@ -256,12 +256,12 @@ mod test_ristretto {
 
     #[test]
     fn test_sub() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
-            let b = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
 
             let a_sim_fr = SimFrTest::from(&a);
             let b_sim_fr = SimFrTest::from(&b);
@@ -280,12 +280,12 @@ mod test_ristretto {
 
     #[test]
     fn test_mul() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
-            let b = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
 
             let a_sim_fr = SimFrTest::from(&a);
             let b_sim_fr = SimFrTest::from(&b);
@@ -304,10 +304,10 @@ mod test_ristretto {
 
     #[test]
     fn test_bounded_allocated_witness() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint(240);
+            let a = prng.gen_biguint(240);
             let a_sim_fr = SimFrTest::from(&a);
 
             {
@@ -343,8 +343,8 @@ mod test_secq256k1 {
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboCS,
     };
+    use ark_std::test_rng;
     use num_bigint::{BigUint, RandBigInt};
-    use rand_chacha::ChaCha20Rng;
     use zei_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
     use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 
@@ -374,11 +374,11 @@ mod test_secq256k1 {
 
     #[test]
     fn test_alloc_constant() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
             let a_sim_fr = SimFrTest::from(&a);
 
             {
@@ -391,11 +391,11 @@ mod test_secq256k1 {
 
     #[test]
     fn test_alloc_witness() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
             let a_sim_fr = SimFrTest::from(&a);
 
             {
@@ -408,12 +408,12 @@ mod test_secq256k1 {
 
     #[test]
     fn test_sub() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
-            let b = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
 
             let a_sim_fr = SimFrTest::from(&a);
             let b_sim_fr = SimFrTest::from(&b);
@@ -432,12 +432,12 @@ mod test_secq256k1 {
 
     #[test]
     fn test_mul() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
         let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
-            let b = rng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
 
             let a_sim_fr = SimFrTest::from(&a);
             let b_sim_fr = SimFrTest::from(&b);
@@ -456,10 +456,10 @@ mod test_secq256k1 {
 
     #[test]
     fn test_bounded_allocated_witness() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
 
         for _ in 0..100 {
-            let a = rng.gen_biguint(240);
+            let a = prng.gen_biguint(240);
             let a_sim_fr = SimFrTest::from(&a);
 
             {

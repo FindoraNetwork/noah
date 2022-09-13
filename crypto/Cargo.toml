@@ -76,12 +76,16 @@ rmp-serde = '1.0.0'
 serde_json = '1.0'
 typenum = '1.11.2'
 
+[dev-dependencies.ark-std]
+version = '^0.3.0'
+default-features = false
+
 [features]
 default = [
     'std',
     'u64_backend',
 ]
-std = ['curve25519-dalek/std', 'ark-bulletproofs-secq256k1/std']
+std = ['curve25519-dalek/std', 'ark-bulletproofs-secq256k1/std' ,'ark-std/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',

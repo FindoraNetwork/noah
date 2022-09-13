@@ -222,13 +222,13 @@ mod test {
     use crate::poly_commit::{
         field_polynomial::FpPolynomial, kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme,
     };
+    use ark_std::test_rng;
     use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn test_pcs_eval() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         let two = one.add(&one);
@@ -253,7 +253,7 @@ mod test {
 
     #[test]
     fn test_pcs_batch_eval() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         type Field = BLSScalar;
         let zero = Field::zero();
         let one = Field::one();

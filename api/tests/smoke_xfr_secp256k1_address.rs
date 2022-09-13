@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod smoke_xfr_secp256k1_address {
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei::{
         setup::BulletproofParams,
         xfr::{
@@ -14,7 +14,6 @@ mod smoke_xfr_secp256k1_address {
             verify_xfr_note, XfrNotePolicies,
         },
     };
-    use zei_algebra::prelude::*;
     use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     const AMOUNT: u64 = 10u64;
@@ -40,7 +39,7 @@ mod smoke_xfr_secp256k1_address {
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let template = AssetRecordTemplate {
             amount,
             asset_type,
@@ -60,7 +59,7 @@ mod smoke_xfr_secp256k1_address {
 
     #[test]
     fn bar_secp256k1_address() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
         let sk = "df57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e";

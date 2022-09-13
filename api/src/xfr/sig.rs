@@ -731,13 +731,14 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKeyInner, XfrSecretKey};
-    use rand_chacha::ChaChaRng;
+    use ark_std::{env, test_rng};
     use ruc::err::*;
     use zei_algebra::prelude::*;
 
     #[test]
     fn signatures() {
-        let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
+        env::set_var("DETERMINISTIC_TEST_RNG", "1");
+        let mut prng = test_rng();
 
         let keypair = XfrKeyPair::generate_secp256k1(&mut prng);
         let message = "";
@@ -749,10 +750,12 @@ mod test {
         pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
 
         //test again with fresh same key
-        let mut prng = rand_chacha::ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let keypair = XfrKeyPair::generate_secp256k1(&mut prng);
         pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
 
+        env::set_var("DETERMINISTIC_TEST_RNG", "0");
+        let mut prng = test_rng();
         let keypair = XfrKeyPair::generate_ed25519(&mut prng);
         let message = [10u8; 500];
         let sig = keypair.sign(&message).unwrap();
@@ -780,7 +783,7 @@ mod test {
         );
     }
 
-    fn generate_keypairs(prng: &mut ChaChaRng, n: usize) -> Vec<XfrKeyPair> {
+    fn generate_keypairs<R: CryptoRng + RngCore>(prng: &mut R, n: usize) -> Vec<XfrKeyPair> {
         let mut v = vec![];
         for _ in 0..n {
             v.push(XfrKeyPair::generate_secp256k1(prng));
@@ -806,7 +809,7 @@ mod test {
 
     #[test]
     fn multisig() {
-        let mut prng = rand_chacha::ChaChaRng::from_seed([1u8; 32]);
+        let mut prng = test_rng();
         let msg = b"random message here!".to_vec();
         // test with one key
         let keypairs = generate_keypairs(&mut prng, 1);
