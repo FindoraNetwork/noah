@@ -494,7 +494,7 @@ impl XfrSecretKey {
 impl XfrKeyPair {
     /// Default generate a key pair.
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::generate_ed25519(prng)
+        Self::generate_secp256k1(prng)
     }
 
     /// Generate a Ed25519 key pair.
@@ -514,6 +514,16 @@ impl XfrKeyPair {
             pub_key: XfrPublicKey(XfrPublicKeyInner::Secp256k1(pk)),
             sec_key: XfrSecretKey::Secp256k1(sk),
         }
+    }
+
+    /// Generate a key pair from secret key bytes.
+    pub fn generate_secp256k1_from_bytes(bytes: &[u8]) -> Result<Self> {
+        let sk = Secp256k1SecretKey::parse_slice(bytes).c(d!())?;
+        let pk = Secp256k1PublicKey::from_secret_key(&sk);
+        Ok(XfrKeyPair {
+            pub_key: XfrPublicKey(XfrPublicKeyInner::Secp256k1(pk)),
+            sec_key: XfrSecretKey::Secp256k1(sk),
+        })
     }
 
     /// Generate a Secp256k1 key pair with address.
