@@ -167,7 +167,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     pcs: &PCS,
     lagrange_pcs: Option<&PCS>,
 ) -> Result<PlonkPK<PCS>> {
-    //It's okay to choose a fixed seed to generate quadratic non-residue.
+    // It's okay to choose a fixed seed to generate quadratic non-residue.
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let n_wires_per_gate = CS::n_wires_per_gate();
     let n = cs.size();
