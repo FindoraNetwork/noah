@@ -12,7 +12,7 @@ resolver = "2"
 ark-ec = { git = "https://github.com/FindoraNetwork/ark-algebra" }
 ark-ff = { git = "https://github.com/FindoraNetwork/ark-algebra" }
 ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra" }
-ark-std = { git = "https://github.com/FindoraNetwork/ark-std" , branch = "develop"}
+ark-std = { git = "https://github.com/FindoraNetwork/ark-std" }
 ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
 ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
 ark-algebra-test-templates = { git = "https://github.com/FindoraNetwork/ark-algebra" }
