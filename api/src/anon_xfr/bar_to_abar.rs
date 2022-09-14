@@ -587,126 +587,22 @@ pub(crate) fn build_bar_to_abar_cs(
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::bar_to_abar::BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT;
-    use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::{
-        bar_to_abar::{gen_bar_to_abar_note, verify_bar_to_abar_note},
-        commit,
-        structs::{AnonAssetRecord, OpenAnonAssetRecordBuilder},
+        bar_to_abar::BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT, commit, keys::AXfrKeyPair,
     };
-    use crate::setup::{ProverParams, VerifierParams};
-    use crate::xfr::{
-        asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
-        sig::{XfrKeyPair, XfrPublicKey},
-        structs::{AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo},
-    };
+    use crate::xfr::structs::AssetType;
     use merlin::Transcript;
     use num_bigint::BigUint;
     use num_traits::One;
     use rand_chacha::ChaChaRng;
     use rand_core::SeedableRng;
     use std::ops::AddAssign;
-    use zei_algebra::bls12_381::BLSScalar;
-    use zei_algebra::ristretto::RistrettoScalar;
-    use zei_algebra::traits::Scalar;
-    use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
-    use zei_crypto::delegated_schnorr::prove_delegated_schnorr;
-    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
-
-    fn build_bar(
-        pubkey: &XfrPublicKey,
-        prng: &mut ChaChaRng,
-        pc_gens: &PedersenCommitmentRistretto,
-        amt: u64,
-        asset_type: AssetType,
-        ar_type: AssetRecordType,
-    ) -> (BlindAssetRecord, Option<OwnerMemo>) {
-        let ar = AssetRecordTemplate::with_no_asset_tracing(amt, asset_type, ar_type, *pubkey);
-        let (bar, _, memo) = build_blind_asset_record(prng, &pc_gens, &ar, vec![]);
-        (bar, memo)
-    }
-
-    #[test]
-    fn test_bar_to_abar() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let pc_gens = PedersenCommitmentRistretto::default();
-        let bar_keypair = XfrKeyPair::generate(&mut prng);
-        let abar_keypair = AXfrKeyPair::generate(&mut prng);
-
-        let params = ProverParams::bar_to_abar_params().unwrap();
-
-        let (bar_conf, memo) = build_bar(
-            &bar_keypair.pub_key,
-            &mut prng,
-            &pc_gens,
-            10u64,
-            AssetType::from_identical_byte(1u8),
-            AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-        );
-        let obar = open_blind_asset_record(&bar_conf, &memo, &bar_keypair).unwrap();
-        let (oabar_conf, delegated_schnorr_proof_conf, inspector_proof_conf) =
-            super::prove_bar_to_abar(&mut prng, &params, &obar, &abar_keypair.get_public_key())
-                .unwrap();
-        let abar_conf = AnonAssetRecord::from_oabar(&oabar_conf);
-
-        let verifier_params = VerifierParams::from(params);
-        assert!(super::verify_bar_to_abar(
-            &verifier_params,
-            &bar_conf,
-            &abar_conf,
-            &(delegated_schnorr_proof_conf, inspector_proof_conf)
-        )
-        .is_ok());
-    }
-
-    #[test]
-    fn test_bar_to_abar_xfr_note() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let bar_keypair = XfrKeyPair::generate(&mut prng);
-        let abar_keypair = AXfrKeyPair::generate(&mut prng);
-        let pc_gens = PedersenCommitmentRistretto::default();
-        let amount = 10;
-        let asset_type = AssetType::from_identical_byte(1u8);
-        let (bar, memo) = build_bar(
-            &bar_keypair.pub_key,
-            &mut prng,
-            &pc_gens,
-            amount,
-            asset_type,
-            AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-        );
-        let obar = open_blind_asset_record(&bar, &memo, &bar_keypair).unwrap();
-        let params = ProverParams::bar_to_abar_params().unwrap();
-        let note = gen_bar_to_abar_note(
-            &mut prng,
-            &params,
-            &obar,
-            &bar_keypair,
-            &abar_keypair.get_public_key(),
-        )
-        .unwrap();
-
-        // 1. check that abar_keypair opens the note
-        let oabar = OpenAnonAssetRecordBuilder::from_abar(
-            &note.body.output,
-            note.body.memo.clone(),
-            &abar_keypair,
-        )
-        .unwrap()
-        .build()
-        .unwrap();
-        assert_eq!(oabar.amount, amount);
-        assert_eq!(oabar.asset_type, asset_type);
-
-        let node_params = VerifierParams::from(params);
-        assert!(verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key).is_ok());
-
-        let mut note = note;
-        let message = b"anymesage";
-        let bad_sig = bar_keypair.sign(message).unwrap();
-        note.signature = bad_sig;
-        assert!(verify_bar_to_abar_note(&node_params, &note, &bar_keypair.pub_key).is_err())
-    }
+    use zei_algebra::{bls12_381::BLSScalar, ristretto::RistrettoScalar, traits::Scalar};
+    use zei_crypto::{
+        basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
+        delegated_schnorr::prove_delegated_schnorr,
+        field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
+    };
 
     #[test]
     fn test_eq_committed_vals_cs() {
