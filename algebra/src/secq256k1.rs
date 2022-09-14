@@ -461,7 +461,7 @@ mod secq256k1_groups_test {
     };
     use ark_bulletproofs_secq256k1::curve::secq256k1::G1Affine;
     use ark_ec::ProjectiveCurve;
-    use rand_chacha::ChaCha20Rng;
+    use ark_std::test_rng;
 
     #[test]
     fn test_scalar_ops() {
@@ -489,14 +489,14 @@ mod secq256k1_groups_test {
 
     #[test]
     fn curve_points_respresentation_of_g1() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
 
         let g1 = SECQ256K1G1::get_base();
-        let s1 = SECQ256K1Scalar::from(50 + rng.next_u32() % 50);
+        let s1 = SECQ256K1Scalar::from(50 + prng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = SECQ256K1G1::random(&mut rng);
+        let g1_prime = SECQ256K1G1::random(&mut prng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -518,9 +518,9 @@ mod secq256k1_groups_test {
 
     #[test]
     fn test_serialization_of_points() {
-        let mut rng = ChaCha20Rng::from_entropy();
+        let mut prng = test_rng();
 
-        let g1 = SECQ256K1G1::random(&mut rng);
+        let g1 = SECQ256K1G1::random(&mut prng);
         let g1_bytes = g1.to_compressed_bytes();
         let g1_recovered = SECQ256K1G1::from_compressed_bytes(&g1_bytes).unwrap();
         assert_eq!(g1, g1_recovered);

@@ -627,7 +627,7 @@ mod test {
         indexer::indexer,
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
@@ -654,7 +654,7 @@ mod test {
         cs.insert_add_gate(3 + 2, 5 + 2, 7 + 2);
         cs.pad();
 
-        let mut prng = ChaChaRng::from_seed([0_u8; 32]);
+        let mut prng = test_rng();
         let pcs = KZGCommitmentScheme::new(20, &mut prng);
         let params = indexer(&cs, &pcs).unwrap();
 

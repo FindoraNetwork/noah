@@ -90,13 +90,13 @@ pub fn elgamal_partial_decrypt<G: Group>(
 
 #[cfg(test)]
 mod elgamal_test {
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
     use zei_algebra::prelude::*;
     use zei_algebra::ristretto::RistrettoPoint;
 
     fn verification<G: Group>() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let (secret_key, public_key) = super::elgamal_key_gen::<_, G>(&mut prng);
 
@@ -113,7 +113,7 @@ mod elgamal_test {
     }
 
     fn decryption<G: Group>() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let (secret_key, public_key) = super::elgamal_key_gen::<_, G>(&mut prng);
 
         let mu32 = 100u32;

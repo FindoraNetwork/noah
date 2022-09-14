@@ -1,4 +1,4 @@
-use rand_chacha::ChaChaRng;
+use ark_std::test_rng;
 use wasm_bindgen::__rt::std::collections::HashMap;
 use zei::{
     anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
@@ -14,7 +14,6 @@ use zei::{
         trace_assets, verify_xfr_note, RecordData, XfrNotePoliciesRef,
     },
 };
-use zei_algebra::prelude::*;
 use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
 const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
@@ -26,7 +25,7 @@ fn conf_blind_asset_record_from_ledger(
     amount: u64,
     asset_type: AssetType,
 ) -> (BlindAssetRecord, OwnerMemo) {
-    let mut prng = ChaChaRng::from_seed([1u8; 32]);
+    let mut prng = test_rng();
     let template = AssetRecordTemplate {
         amount,
         asset_type,
@@ -71,7 +70,7 @@ fn complex_transaction() {
     // 4 total users, 1 sender three receivers
     // 3 asset types, 2 different tracing policies and one with no policy
 
-    let mut prng = ChaChaRng::from_entropy();
+    let mut prng = test_rng();
     let mut params = BulletproofParams::default();
     let mut AIR: HashMap<Vec<u8>, _> = HashMap::new();
 

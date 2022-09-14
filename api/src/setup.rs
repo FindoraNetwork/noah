@@ -195,6 +195,7 @@ impl ProverParams {
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
 
+        // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair = AXfrKeyPair::generate(&mut prng);
 
@@ -252,6 +253,7 @@ impl ProverParams {
         let beta = RistrettoScalar::zero();
         let lambda = RistrettoScalar::zero();
 
+        // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair = AXfrKeyPair::generate(&mut prng);
 
@@ -299,6 +301,8 @@ impl ProverParams {
     /// Obtain the parameters for transparent to anonymous.
     pub fn ar_to_abar_params() -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
+
+        // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair = AXfrKeyPair::generate(&mut prng);
         let dummy_payee = PayeeWitness {
@@ -330,6 +334,7 @@ impl ProverParams {
     pub fn abar_to_ar_params(tree_depth: usize) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
 
+        // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair = AXfrKeyPair::generate(&mut prng);
 

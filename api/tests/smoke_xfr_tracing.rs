@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod smoke_xfr_tracing {
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei::{
         setup::BulletproofParams,
         xfr::{
@@ -14,7 +14,6 @@ mod smoke_xfr_tracing {
             trace_assets, verify_xfr_note, RecordData, XfrNotePoliciesRef,
         },
     };
-    use zei_algebra::prelude::*;
     use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
@@ -25,7 +24,7 @@ mod smoke_xfr_tracing {
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
-        let mut prng = ChaChaRng::from_seed([1u8; 32]);
+        let mut prng = test_rng();
         let template = AssetRecordTemplate {
             amount,
             asset_type,
@@ -56,7 +55,7 @@ mod smoke_xfr_tracing {
 
     #[test]
     fn bar_tracing_on_inputs() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
         let amount_in1 = 50u64;
@@ -173,7 +172,7 @@ mod smoke_xfr_tracing {
 
     #[test]
     fn bar_tracing_on_outputs() {
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
         let amount_in1 = 50u64;

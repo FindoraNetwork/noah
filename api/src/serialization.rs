@@ -67,8 +67,7 @@ mod test {
         sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature},
         structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
     };
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
+    use ark_std::test_rng;
     use rmp_serde::{Deserializer, Serializer};
     use ruc::*;
     use serde::{de::Deserialize, ser::Serialize};
@@ -141,8 +140,7 @@ mod test {
 
     #[test]
     fn anon_xfr_pub_key_serialization() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let keypair = AXfrKeyPair::generate(&mut prng);
 
         let mut pk_mp_vec = vec![];
@@ -171,8 +169,7 @@ mod test {
 
     #[test]
     fn public_key_message_pack_serialization() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let keypair = XfrKeyPair::generate(&mut prng);
 
         let mut pk_mp_vec = vec![];
@@ -191,8 +188,7 @@ mod test {
 
     #[test]
     fn x25519_public_key_message_pack_serialization() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let sk = XSecretKey::new(&mut prng);
         let pk = XPublicKey::from(&sk);
 
@@ -209,8 +205,7 @@ mod test {
 
     #[test]
     fn signature_message_pack_serialization() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let keypair = XfrKeyPair::generate(&mut prng);
         let message = [10u8; 55];
 
@@ -240,8 +235,7 @@ mod test {
 
     #[test]
     fn serialize_and_deserialize_as_json() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let keypair = XfrKeyPair::generate(&mut prng);
         let test_struct = StructWithPubKey {
             key: keypair.pub_key,
@@ -274,7 +268,7 @@ mod test {
 
     #[test]
     fn serialize_and_deserialize_elgamal() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let (_sk, xfr_pub_key) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
         let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
             res

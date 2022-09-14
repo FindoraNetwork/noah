@@ -357,7 +357,7 @@ pub(crate) mod test_helper {
     };
     use crate::basic::elgamal::elgamal_key_gen;
     use crate::confidential_anon_creds::{confidential_open_comm, confidential_verify_open};
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::prelude::*;
     use zei_algebra::traits::Pairing;
 
@@ -373,7 +373,7 @@ pub(crate) mod test_helper {
         let proof_msg = b"Some message";
         let credential_addr = b"Some address";
         let num_attr = reveal_map.len();
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let (isk, ipk) = issuer_keygen::<_, P>(&mut prng, num_attr);
         let (usk, upk) = user_keygen::<_, P>(&mut prng, &ipk);
         let (_, ek) = elgamal_key_gen::<_, P::G1>(&mut prng);

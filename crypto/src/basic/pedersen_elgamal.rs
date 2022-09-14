@@ -356,8 +356,8 @@ mod test {
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
         pedersen_elgamal_batch_verify, PedersenElGamalProofInstance,
     };
+    use ark_std::test_rng;
     use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
     use zei_algebra::prelude::*;
     use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 
@@ -365,7 +365,7 @@ mod test {
     fn good_proof_verify() {
         let m = RistrettoScalar::from(10u32);
         let r = RistrettoScalar::from(7657u32);
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
@@ -401,7 +401,7 @@ mod test {
         let m = RistrettoScalar::from(10u32);
         let m2 = RistrettoScalar::from(11u32);
         let r = RistrettoScalar::from(7657u32);
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
@@ -442,7 +442,7 @@ mod test {
         let r3 = RistrettoScalar::from(7659u32);
         let m4 = RistrettoScalar::from(14u32);
         let r4 = RistrettoScalar::from(7660u32);
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         let (_sk, pk) = elgamal_key_gen::<_, RistrettoPoint>(&mut prng);
@@ -615,11 +615,11 @@ mod test {
     fn batch_aggregate_eq_verify() {
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
-        let mut rng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        fn get_proof_instance<'a>(
+        fn get_proof_instance<'a, R: RngCore + CryptoRng>(
             transcript: &mut Transcript,
-            rng: &mut ChaChaRng,
+            prng: &mut R,
             pk: &'a ElGamalEncKey<RistrettoPoint>,
             plaintexts: &[RistrettoScalar],
             rands: &[RistrettoScalar],
@@ -641,7 +641,7 @@ mod test {
                 .collect_vec();
             let proof = pedersen_elgamal_aggregate_eq_proof(
                 transcript,
-                rng,
+                prng,
                 &plaintexts,
                 &rands,
                 &pk,
@@ -650,7 +650,7 @@ mod test {
             );
             (ctexts, commitments, proof)
         }
-        let (_, pk1) = elgamal_key_gen(&mut rng);
+        let (_, pk1) = elgamal_key_gen(&mut prng);
         let plaintexts1 = [
             RistrettoScalar::from(1u32),
             RistrettoScalar::from(2u32),
@@ -663,13 +663,13 @@ mod test {
         ];
         let (ctexts1, commitments1, proof1) = get_proof_instance(
             &mut prover_transcript.clone(),
-            &mut rng,
+            &mut prng,
             &pk1,
             &plaintexts1,
             &rands1,
             &pc_gens,
         );
-        let (_, pk2) = elgamal_key_gen(&mut rng);
+        let (_, pk2) = elgamal_key_gen(&mut prng);
         let plaintexts2 = [
             RistrettoScalar::from(100u32),
             RistrettoScalar::from(200u32),
@@ -682,7 +682,7 @@ mod test {
         ];
         let (ctexts2, commitments2, proof2) = get_proof_instance(
             &mut prover_transcript,
-            &mut rng,
+            &mut prng,
             &pk2,
             &plaintexts2,
             &rands2,
@@ -704,7 +704,7 @@ mod test {
             },
         ];
         assert!(
-            pedersen_elgamal_batch_verify(&mut verifier_transcript, &mut rng, &instances).is_ok()
+            pedersen_elgamal_batch_verify(&mut verifier_transcript, &mut prng, &instances).is_ok()
         );
     }
 }

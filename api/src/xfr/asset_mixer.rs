@@ -276,7 +276,7 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
 mod test {
     use crate::setup::BulletproofParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::{
         prelude::*,
         ristretto::{CompressedRistretto, RistrettoScalar},
@@ -429,7 +429,7 @@ mod test {
             outputs: output_coms,
             proof: &proof,
         };
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
         pnk!(super::batch_verify_asset_mixing(
             &mut prng,

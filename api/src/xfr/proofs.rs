@@ -751,13 +751,12 @@ mod tests {
         proofs::verify_identity_proofs,
         structs::{AssetTracerKeyPair, TracerMemo, TracingPolicies, TracingPolicy},
     };
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::prelude::*;
 
     #[test]
     fn verify_identity_proofs_structure() {
-        let mut prng: ChaChaRng;
-        prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         // Case where the number of asset tracing policies is 0
         let reveal_policies = vec![];

@@ -796,9 +796,9 @@ mod tests {
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
+    use ark_std::test_rng;
     use digest::{consts::U64, Digest};
     use merlin::Transcript;
-    use rand_chacha::ChaChaRng;
     use sha2::Sha512;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
     use zei_crypto::basic::rescue::RescueInstance;
@@ -844,11 +844,10 @@ mod tests {
         inputs: Vec<(u64, BLSScalar)>,
         outputs: Vec<(u64, BLSScalar)>,
         fee: u32,
-        seed: [u8; 32],
     ) -> (AXfrWitness, AXfrKeyPair) {
         let n_payers = inputs.len();
         assert!(n_payers <= 3);
-        let mut prng = ChaChaRng::from_seed(seed);
+        let mut prng = test_rng();
         let zero = BLSScalar::zero();
 
         let input_keypair = AXfrKeyPair::generate(&mut prng);
@@ -939,7 +938,7 @@ mod tests {
 
     #[test]
     fn test_anon_xfr() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let user_params = ProverParams::new(1, 1, Some(1)).unwrap();
 
@@ -1056,7 +1055,7 @@ mod tests {
 
     #[test]
     fn test_anon_xfr_multi_assets() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let n_payers = 3;
         let n_payees = 3;
         let user_params = ProverParams::new(n_payers, n_payees, Some(1)).unwrap();
@@ -1866,7 +1865,7 @@ mod tests {
         let amount = BLSScalar::from(7u32);
         let asset_type = BLSScalar::from(5u32);
         let hash = RescueInstance::new();
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let blind = BLSScalar::random(&mut prng);
 
         let keypair = AXfrKeyPair::generate(&mut prng);
@@ -1915,7 +1914,7 @@ mod tests {
         let one = BLSScalar::one();
         let zero = BLSScalar::zero();
         let mut cs = TurboCS::new();
-        let mut prng = ChaChaRng::from_seed([1u8; 32]);
+        let mut prng = test_rng();
         let bytes = vec![1u8; 32];
         let uid_amount = BLSScalar::from_bytes(&bytes[..]).unwrap(); // safe unwrap
         let asset_type = one;
@@ -2180,11 +2179,10 @@ mod tests {
         fee_type: BLSScalar,
         fee: u32,
     ) {
-        let (secret_inputs, keypair) =
-            new_multi_xfr_witness_for_test(inputs, outputs, fee, [0u8; 32]);
+        let (secret_inputs, keypair) = new_multi_xfr_witness_for_test(inputs, outputs, fee);
         let pub_inputs = AXfrPubInputs::from_witness(&secret_inputs);
 
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
 
         let test_hash = {
             let mut hasher = Sha512::new();

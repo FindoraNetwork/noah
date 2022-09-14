@@ -658,14 +658,14 @@ pub fn recursive_ifft<F: Scalar>(values: &[&F], root: &F) -> Vec<F> {
 #[cfg(test)]
 mod test {
     use crate::poly_commit::field_polynomial::FpPolynomial;
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn from_zeroes() {
         let n = 10;
         let mut zeroes = vec![];
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         for _ in 0..n {
             zeroes.push(BLSScalar::random(&mut prng));
         }
@@ -700,7 +700,7 @@ mod test {
 
     #[test]
     fn test_fft() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         let two = one.add(&one);

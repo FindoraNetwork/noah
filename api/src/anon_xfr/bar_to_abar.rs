@@ -591,11 +591,10 @@ mod test {
         bar_to_abar::BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT, commit, keys::AXfrKeyPair,
     };
     use crate::xfr::structs::AssetType;
+    use ark_std::test_rng;
     use merlin::Transcript;
     use num_bigint::BigUint;
     use num_traits::One;
-    use rand_chacha::ChaChaRng;
-    use rand_core::SeedableRng;
     use std::ops::AddAssign;
     use zei_algebra::{bls12_381::BLSScalar, ristretto::RistrettoScalar, traits::Scalar};
     use zei_crypto::{
@@ -606,7 +605,7 @@ mod test {
 
     #[test]
     fn test_eq_committed_vals_cs() {
-        let mut rng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         // 1. compute the parameters
@@ -620,14 +619,14 @@ mod test {
         let y: RistrettoScalar =
             RistrettoScalar::from_bytes(&asset_type_bls12_381.to_bytes()).unwrap();
 
-        let gamma = RistrettoScalar::random(&mut rng);
-        let delta = RistrettoScalar::random(&mut rng);
+        let gamma = RistrettoScalar::random(&mut prng);
+        let delta = RistrettoScalar::random(&mut prng);
 
         let point_p = pc_gens.commit(x, gamma);
         let point_q = pc_gens.commit(y, delta);
 
-        let z_randomizer = BLSScalar::random(&mut rng);
-        let keypair = AXfrKeyPair::generate(&mut rng);
+        let z_randomizer = BLSScalar::random(&mut prng);
+        let keypair = AXfrKeyPair::generate(&mut prng);
         let pubkey = keypair.get_public_key();
 
         let z = commit(&pubkey, &z_randomizer, 71u64, &asset_type).unwrap();
@@ -638,7 +637,7 @@ mod test {
         transcript.append_message(b"commitment", &z.to_bytes());
 
         let (proof, non_zk_state, beta, lambda) = prove_delegated_schnorr(
-            &mut rng,
+            &mut prng,
             &vec![(x, gamma), (y, delta)],
             &pc_gens,
             &vec![point_p, point_q],

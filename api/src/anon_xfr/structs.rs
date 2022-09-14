@@ -334,12 +334,12 @@ impl AxfrOwnerMemo {
 mod test {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::AXfrPubKey;
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei_algebra::prelude::*;
 
     #[test]
     fn test_axfr_pub_key_serialization() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
 
         let pub_key: AXfrPubKey = keypair.get_public_key();
@@ -353,7 +353,7 @@ mod test {
 
     #[test]
     fn test_axfr_key_pair_serialization() {
-        let mut prng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
 
         let bytes: Vec<u8> = keypair.zei_to_bytes();

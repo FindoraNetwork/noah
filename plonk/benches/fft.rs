@@ -1,10 +1,10 @@
-use rand_chacha::ChaChaRng;
+use ark_std::test_rng;
 use std::time::Instant;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_plonk::poly_commit::field_polynomial::{primitive_nth_root_of_unity, FpPolynomial};
 
 fn main() {
-    let mut prng = ChaChaRng::from_entropy();
+    let mut prng = test_rng();
     let n = 65536;
 
     let root = primitive_nth_root_of_unity::<BLSScalar>(n).unwrap();

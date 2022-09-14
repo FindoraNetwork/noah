@@ -1,12 +1,11 @@
-use ark_std::{rand::SeedableRng, time::Instant};
-use rand_chacha::ChaChaRng;
+use ark_std::{test_rng, time::Instant};
 use zei_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     traits::{Group, Scalar},
 };
 
 fn main() {
-    let mut prng = ChaChaRng::from_entropy();
+    let mut prng = test_rng();
 
     let count = 65536;
 

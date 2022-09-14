@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod smoke_xfr_compatibility {
-    use rand_chacha::rand_core::SeedableRng;
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
     use zei::setup::BulletproofParams;
     use zei::xfr::{structs::*, *};
 
@@ -41,7 +40,7 @@ mod smoke_xfr_compatibility {
         let body: XfrBody = serde_json::from_str(&body).unwrap();
 
         let mut params = BulletproofParams::default();
-        let mut prng = ChaChaRng::from_entropy();
+        let mut prng = test_rng();
         let policies = XfrNotePolicies::empty_policies(body.inputs.len(), body.outputs.len());
         let policies_ref = policies.to_ref();
 

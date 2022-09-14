@@ -414,12 +414,11 @@ fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<RistrettoScalar>
 mod test {
     use super::*;
     use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
-    use rand_chacha::ChaChaRng;
+    use ark_std::test_rng;
 
     #[test]
     pub(crate) fn test_chaum_pedersen_equality_commitment() {
-        let mut csprng: ChaChaRng;
-        csprng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
         let value1 = RistrettoScalar::from(16u32);
         let value2 = RistrettoScalar::from(32u32);
@@ -432,7 +431,7 @@ mod test {
 
         let proof = chaum_pedersen_prove_eq(
             &mut prover_transcript,
-            &mut csprng,
+            &mut prng,
             &value1,
             (&c1, &bf1),
             (&c2, &bf2),
@@ -441,14 +440,14 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"test");
         msg_eq!(
             ZeiError::ZKProofVerificationError,
-            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut csprng, &c1, &c2, &proof)
+            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut prng, &c1, &c2, &proof)
                 .unwrap_err()
         );
 
         let mut prover_transcript = Transcript::new(b"test");
         let proof = chaum_pedersen_prove_eq(
             &mut prover_transcript,
-            &mut csprng,
+            &mut prng,
             &value2,
             (&c1, &bf2),
             (&c2, &bf2),
@@ -456,7 +455,7 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"test");
         msg_eq!(
             ZeiError::ZKProofVerificationError,
-            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut csprng, &c1, &c2, &proof)
+            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut prng, &c1, &c2, &proof)
                 .unwrap_err()
         );
 
@@ -464,22 +463,20 @@ mod test {
         let c3 = pc_gens.commit(value1, bf2);
         let proof = chaum_pedersen_prove_eq(
             &mut prover_transcript,
-            &mut csprng,
+            &mut prng,
             &value1,
             (&c1, &bf1),
             (&c3, &bf2),
         );
         let mut verifier_transcript = Transcript::new(b"test");
         assert!(
-            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut csprng, &c1, &c3, &proof)
-                .is_ok()
+            chaum_pedersen_verify_eq(&mut verifier_transcript, &mut prng, &c1, &c3, &proof).is_ok()
         );
     }
 
     #[test]
     fn test_chaum_pedersen_multiple_eq_proof() {
-        let mut csprng: ChaChaRng;
-        csprng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let value1 = RistrettoScalar::from(16u32);
         let value2 = RistrettoScalar::from(32u32);
         let bf1 = RistrettoScalar::from(10u32);
@@ -496,7 +493,7 @@ mod test {
         let mut prover_transcript = Transcript::new(b"Test");
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut prover_transcript,
-            &mut csprng,
+            &mut prng,
             &value1,
             com_vec,
             &blind_vec,
@@ -506,13 +503,8 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"Test");
         msg_eq!(
             ZeiError::ZKProofVerificationError,
-            chaum_pedersen_verify_multiple_eq(
-                &mut verifier_transcript,
-                &mut csprng,
-                com_vec,
-                &proof
-            )
-            .unwrap_err()
+            chaum_pedersen_verify_multiple_eq(&mut verifier_transcript, &mut prng, com_vec, &proof)
+                .unwrap_err()
         );
 
         let c1 = pc_gens.commit(value1, bf1);
@@ -525,7 +517,7 @@ mod test {
         let mut prover_transcript = Transcript::new(b"Test");
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut prover_transcript,
-            &mut csprng,
+            &mut prng,
             &value1,
             com_vec,
             &blind_vec,
@@ -534,7 +526,7 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"Test");
         assert!(chaum_pedersen_verify_multiple_eq(
             &mut verifier_transcript,
-            &mut csprng,
+            &mut prng,
             com_vec,
             &proof
         )
@@ -543,8 +535,7 @@ mod test {
 
     #[test]
     fn test_chaum_pedersen_multiple_eq_proof_using_two() {
-        let mut csprng: ChaChaRng;
-        csprng = ChaChaRng::from_seed([0u8; 32]);
+        let mut prng = test_rng();
         let value1 = RistrettoScalar::from(16u32);
         let value2 = RistrettoScalar::from(32u32);
         let bf1 = RistrettoScalar::from(10u32);
@@ -559,7 +550,7 @@ mod test {
         let mut prover_transcript = Transcript::new(b"Test");
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut prover_transcript,
-            &mut csprng,
+            &mut prng,
             &value1,
             com_vec,
             &blind_vec,
@@ -569,13 +560,8 @@ mod test {
         let mut verifier_transcript = Transcript::new(b"Test");
         msg_eq!(
             ZeiError::ZKProofVerificationError,
-            chaum_pedersen_verify_multiple_eq(
-                &mut verifier_transcript,
-                &mut csprng,
-                com_vec,
-                &proof
-            )
-            .unwrap_err(),
+            chaum_pedersen_verify_multiple_eq(&mut verifier_transcript, &mut prng, com_vec, &proof)
+                .unwrap_err(),
             "Values were different"
         );
 
@@ -588,7 +574,7 @@ mod test {
         let mut prover_transcript = Transcript::new(b"Test");
         let proof = chaum_pedersen_prove_multiple_eq(
             &mut prover_transcript,
-            &mut csprng,
+            &mut prng,
             &value1,
             com_vec,
             &blind_vec,
@@ -596,13 +582,8 @@ mod test {
         .unwrap();
         let mut verifier_transcript = Transcript::new(b"Test");
         assert!(
-            chaum_pedersen_verify_multiple_eq(
-                &mut verifier_transcript,
-                &mut csprng,
-                com_vec,
-                &proof
-            )
-            .is_ok(),
+            chaum_pedersen_verify_multiple_eq(&mut verifier_transcript, &mut prng, com_vec, &proof)
+                .is_ok(),
             "Values are the same"
         );
     }
