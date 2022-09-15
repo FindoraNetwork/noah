@@ -104,7 +104,7 @@ pub enum XfrSignature {
     /// Ed25519 Signature
     Ed25519(Ed25519Signature),
     /// Secp256k1 Signature
-    Secp256k1(Secp256k1Signature),
+    Secp256k1(Secp256k1Signature, RecoveryId),
     /// Secp256k1 Signature with recovery.
     /// params is r, s, v
     Address(Secp256k1Signature, RecoveryId),
@@ -207,7 +207,7 @@ impl XfrPublicKey {
             (XfrPublicKeyInner::Ed25519(pk), XfrSignature::Ed25519(sign)) => {
                 pk.verify(message, sign).c(d!(ZeiError::SignatureError))
             }
-            (XfrPublicKeyInner::Secp256k1(pk), XfrSignature::Secp256k1(sign)) => {
+            (XfrPublicKeyInner::Secp256k1(pk), XfrSignature::Secp256k1(sign, _)) => {
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
@@ -389,8 +389,8 @@ impl XfrSecretKey {
                 hasher.update(message);
                 let res = hasher.finalize();
                 let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
-                let (sign, _rec) = secp256k1_sign(&msg, sk);
-                Ok(XfrSignature::Secp256k1(sign))
+                let (sign, rec) = secp256k1_sign(&msg, sk);
+                Ok(XfrSignature::Secp256k1(sign, rec))
             }
             XfrSecretKey::Address(sk) => {
                 // If the Ethereum sign is used outside,
@@ -598,9 +598,10 @@ impl XfrSignature {
                 bytes[0] = KeyType::Ed25519.to_byte();
                 bytes[1..XFR_SIGNATURE_LENGTH - 1].copy_from_slice(&sign.to_bytes());
             }
-            XfrSignature::Secp256k1(sign) => {
+            XfrSignature::Secp256k1(sign, rec) => {
                 bytes[0] = KeyType::Secp256k1.to_byte();
                 bytes[1..XFR_SIGNATURE_LENGTH - 1].copy_from_slice(&sign.serialize());
+                bytes[XFR_SIGNATURE_LENGTH - 1] = rec.serialize();
             }
             XfrSignature::Address(sign, rec) => {
                 bytes[0] = KeyType::Address.to_byte();
@@ -635,14 +636,16 @@ impl XfrSignature {
                 s_bytes.copy_from_slice(&bytes[1..XFR_SIGNATURE_LENGTH - 1]);
                 let sign = Secp256k1Signature::parse_standard(&s_bytes)
                     .c(d!(ZeiError::DeserializationError))?;
-                Ok(XfrSignature::Secp256k1(sign))
+                let rec = RecoveryId::parse(bytes[XFR_SIGNATURE_LENGTH - 1])
+                    .c(d!(ZeiError::DeserializationError))?;
+                Ok(XfrSignature::Secp256k1(sign, rec))
             }
             KeyType::Address => {
                 let mut s_bytes = [0u8; XFR_SIGNATURE_LENGTH - 2];
                 s_bytes.copy_from_slice(&bytes[1..XFR_SIGNATURE_LENGTH - 1]);
                 let sign = Secp256k1Signature::parse_standard(&s_bytes)
                     .c(d!(ZeiError::DeserializationError))?;
-                let rec = RecoveryId::parse(bytes[XFR_SIGNATURE_LENGTH - 1]) // start from 0
+                let rec = RecoveryId::parse(bytes[XFR_SIGNATURE_LENGTH - 1])
                     .c(d!(ZeiError::DeserializationError))?;
                 Ok(XfrSignature::Address(sign, rec))
             }
