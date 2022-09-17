@@ -53,28 +53,3 @@ fn test_merkle_tree() {
     );
     assert_eq!(mt.get_root_with_depth_and_version(10, v2).unwrap(), root2);
 }
-#[test]
-fn ttt() {
-    use mem_db::MemoryDB;
-    use parking_lot::RwLock;
-    use std::sync::Arc;
-    use storage::state::{ChainState, State};
-    use storage::store::PrefixedStore;
-    use zei_accumulators::merkle_tree::PersistentMerkleTree;
-    use zei_algebra::bls12_381::BLSScalar;
-
-    let fdb = MemoryDB::new();
-    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
-    let mut state = State::new(cs, false);
-    let store = PrefixedStore::new("my_store", &mut state);
-    let mut mt = PersistentMerkleTree::new(store).unwrap();
-    assert_eq!(0, mt.version());
-
-    let uid = mt.add_commitment_hash(BLSScalar::one()).unwrap();
-    let proof = mt.generate_proof(uid).unwrap();
-    assert_eq!(proof.uid, uid);
-    assert!(verify(BLSScalar::one(), &proof));
-    let v = mt.commit().unwrap();
-    assert_eq!(1, mt.version());
-    assert_eq!(1, v);
-}
