@@ -98,8 +98,7 @@ pub fn chaum_pedersen_verify_eq_scalars<R: CryptoRng + RngCore>(
 }
 
 /// Verify a Chaum-Pedersen equality proof. Return Ok() in case of success,
-/// Err(ZeiError::ZKVerificationError) in case of verification failure, and
-/// Err(Error::DecompressElementError) in case some CompressedRistretto can not be decompressed.
+/// Err([ZeiError::ZKProofVerificationError]) in case of verification failure.
 pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
@@ -191,7 +190,7 @@ pub fn chaum_pedersen_prove_multiple_eq<R: CryptoRng + RngCore>(
     // Note that a simpler way to prove that 'd' is a commitment to 0 consists in
     // proving knowledge of the discrete logarithm of 'z' given Z=g^z
     // However in this implementation it is convenient to have several Chaum-Pedersen proofs
-    //  because these proofs can be batched.
+    // because these proofs can be batched.
     // See for example api/src/api/proofs.rs:batch_verify_confidential_asset
     let proof_zero = chaum_pedersen_prove_eq(
         transcript,
@@ -275,8 +274,9 @@ pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
 }
 
 /// Verify a proof that all commitments are to the same value.
-///  * Return Ok() in case of success, Err(ZeiError:ZKVerificationError) in case of verification failure,
-///  * and Err(Error::DecompressElementError) in case some CompressedRistretto can not be decompressed
+/// Return Ok() in case of success,
+/// Err([ZeiError::ParameterError]) in case of parameter error,
+/// Err([ZeiError::ZKProofVerificationError]) in case of verification failure.
 pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
@@ -330,7 +330,7 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
 /// Batch verification of chaum pedersen equality of commitment proofs
 /// This function aggregates all instances using a random linear combination
 /// of each, grouping scalars and elements, and executing a single multiexponentiation.
-/// Returns ZeiError::ZKProofBatchVerificationError if at least one instance has an incorrect proof.
+/// Returns [ZeiError::ZKProofBatchVerificationError] if at least one instance has an incorrect proof.
 pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,

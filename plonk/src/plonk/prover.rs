@@ -17,10 +17,9 @@ use crate::poly_commit::{
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 
-/// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`
-/// Proof verifier must use a transcript with same state as prover and match the public parameters
-/// Returns PlonkErrorInvalidWitness if witness does not satisfy the the constraint system.
-/// It returns PlonkError if an error occurs in computing proof commitments, meaning parameters of the polynomial
+/// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
+/// Proof verifier must use a transcript with same state as prover and match the public parameters,
+/// It returns [PlonkError] if an error occurs in computing proof commitments, meaning parameters of the polynomial
 /// commitment scheme `pcs` do not match the constraint system parameters.
 /// # Example
 /// ```
@@ -47,7 +46,7 @@ use zei_algebra::prelude::*;
 /// let var_two = cs.new_variable(two);
 /// let var_three = cs.new_variable(three);
 /// cs.insert_add_gate(var_one, var_two, var_three);
-/// cs.pad();///
+/// cs.pad();
 ///
 /// let witness = cs.get_and_clear_witness();
 /// let prover_params = indexer(&cs, &pcs).unwrap();

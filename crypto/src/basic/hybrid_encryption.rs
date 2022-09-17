@@ -144,7 +144,7 @@ impl ZeiFromToBytes for ZeiHybridCiphertext {
     }
 }
 
-/// encrypt a message over X25519
+/// Encrypt a message over X25519
 pub fn hybrid_encrypt_x25519<R: CryptoRng + RngCore>(
     prng: &mut R,
     pub_key: &XPublicKey,
@@ -158,7 +158,7 @@ pub fn hybrid_encrypt_x25519<R: CryptoRng + RngCore>(
     }
 }
 
-/// encrypt a message over Ed25519
+/// Encrypt a message over Ed25519
 pub fn hybrid_encrypt_ed25519<R: CryptoRng + RngCore>(
     prng: &mut R,
     pub_key: &PublicKey,
@@ -173,7 +173,7 @@ pub fn hybrid_encrypt_ed25519<R: CryptoRng + RngCore>(
     }
 }
 
-/// decrypt a hybrid ciphertext over X25519
+/// Decrypt a hybrid ciphertext over X25519
 pub fn hybrid_decrypt_with_x25519_secret_key(
     ctext: &ZeiHybridCiphertext,
     sec_key: &XSecretKey,
@@ -182,7 +182,7 @@ pub fn hybrid_decrypt_with_x25519_secret_key(
     symmetric_decrypt(&key, &ctext.ciphertext)
 }
 
-/// decrypt a hybrid ciphertext over Ed25519
+/// Decrypt a hybrid ciphertext over Ed25519
 pub fn hybrid_decrypt_with_ed25519_secret_key(
     ctext: &ZeiHybridCiphertext,
     sec_key: &SecretKey,
@@ -191,7 +191,7 @@ pub fn hybrid_decrypt_with_ed25519_secret_key(
     symmetric_decrypt(&key, &ctext.ciphertext)
 }
 
-/// convert the shared secret to a symmetric key
+/// Convert the shared secret to a symmetric key
 fn shared_secret_to_symmetric_key(shared_secret: &x25519_dalek::SharedSecret) -> [u8; 32] {
     let mut hasher = sha2::Sha256::new();
     hasher.update(shared_secret.as_bytes());
@@ -201,7 +201,7 @@ fn shared_secret_to_symmetric_key(shared_secret: &x25519_dalek::SharedSecret) ->
     symmetric_key
 }
 
-/// derive a symmetric key from an X25519 public key
+/// Derive a symmetric key from an X25519 public key
 fn symmetric_key_from_x25519_public_key<R: CryptoRng + RngCore>(
     prng: &mut R,
     public_key: &x25519_dalek::PublicKey,
@@ -216,7 +216,7 @@ fn symmetric_key_from_x25519_public_key<R: CryptoRng + RngCore>(
     (symmetric_key, dh_pk)
 }
 
-/// derive a symmetric key from an Ed25519 public key
+/// Derive a symmetric key from an Ed25519 public key
 fn symmetric_key_from_ed25519_public_key<R>(
     prng: &mut R,
     public_key: &PublicKey,
@@ -239,7 +239,7 @@ fn sec_key_as_scalar(sk: &SecretKey) -> RistrettoScalar {
     RistrettoScalar::from_bytes(&key_bytes).unwrap() // safe unwrap
 }
 
-/// derive a symmetric key from a secret key over X25519
+/// Derive a symmetric key from a secret key over X25519
 fn symmetric_key_from_x25519_secret_key(
     sec_key: &x25519_dalek::StaticSecret,
     ephemeral_public_key: &x25519_dalek::PublicKey,
@@ -248,7 +248,7 @@ fn symmetric_key_from_x25519_secret_key(
     shared_secret_to_symmetric_key(&shared_key)
 }
 
-/// derive a symmetric key from a secret key over Ed25519
+/// Derive a symmetric key from a secret key over Ed25519
 fn symmetric_key_from_ed25519_secret_key(
     sec_key: &SecretKey,
     ephemeral_public_key: &x25519_dalek::PublicKey,

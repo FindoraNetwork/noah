@@ -10,6 +10,7 @@ pub mod rescue;
 pub mod turbo;
 
 /// Default used constraint system.
+#[doc(hidden)]
 pub use turbo::TurboCS;
 
 /// Variable index

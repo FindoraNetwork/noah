@@ -6,55 +6,55 @@ use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_chacha::ChaCha20Rng;
 
-/// convert an 8 byte array (big-endian) into a u64
+/// Convert a 8 byte array (big-endian) into a u64
 pub fn u8_be_slice_to_u64(slice: &[u8]) -> u64 {
     let mut a = [0u8; 8];
     a.copy_from_slice(slice);
     u64::from_be_bytes(a)
 }
 
-/// convert a 8 byte array (little-endian) into a u64
+/// Convert a 8 byte array (little-endian) into a u64
 pub fn u8_le_slice_to_u64(slice: &[u8]) -> u64 {
     let mut a = [0u8; 8];
     a.copy_from_slice(slice);
     u64::from_le_bytes(a)
 }
 
-/// convert a slice into a u32 (big-endian)
+/// Convert a slice into a u32 (big-endian)
 pub fn u8_be_slice_to_u32(slice: &[u8]) -> u32 {
     let mut a = [0u8; 4];
     a.copy_from_slice(slice);
     u32::from_be_bytes(a)
 }
 
-/// convert a slice into a u32 (little-endian)
+/// Convert a slice into a u32 (little-endian)
 pub fn u8_le_slice_to_u32(slice: &[u8]) -> u32 {
     let mut a = [0u8; 4];
     a.copy_from_slice(slice);
     u32::from_le_bytes(a)
 }
 
-/// compute the minimum power of two that is greater or equal to the input
+/// Compute the minimum power of two that is greater or equal to the input
 pub fn min_greater_equal_power_of_two(n: u32) -> u32 {
     2.0f64.powi((n as f64).log2().ceil() as i32) as u32
 }
 
-/// convert u64 into a pair of u32
+/// Convert u64 into a pair of u32
 pub fn u64_to_u32_pair(x: u64) -> (u32, u32) {
     ((x & 0xFFFF_FFFF) as u32, (x >> 32) as u32)
 }
 
-/// convert the input into the base64 encoding
+/// Convert the input into the base64 encoding
 pub fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
     base64::encode_config(input, base64::URL_SAFE)
 }
 
-/// reconstruct from the base64 encoding
+/// Reconstruct from the base64 encoding
 pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>> {
     base64::decode_config(input, base64::URL_SAFE).c(d!())
 }
 
-/// derive a ChaCha20Rng PRNG from a digest from a hash function
+/// Derive a ChaCha20Rng PRNG from a digest from a hash function
 pub fn derive_prng_from_hash<D>(hash: D) -> ChaCha20Rng
 where
     D: Digest<OutputSize = U64> + Default,
@@ -66,7 +66,7 @@ where
     ChaCha20Rng::from_seed(seed)
 }
 
-/// shift a big integer (represented as a little-endian bytes vector) by one bit.
+/// Shift a big integer (represented as a little-endian bytes vector) by one bit.
 pub fn shift_u8_vec(r: &mut Vec<u8>) {
     let mut next = 0u8;
     for e in r.iter_mut().rev() {
@@ -79,7 +79,7 @@ pub fn shift_u8_vec(r: &mut Vec<u8>) {
     }
 }
 
-/// convert a u64 slice into a shrink bytes (little-endian)
+/// Convert a u64 slice into a shrink bytes (little-endian)
 pub fn u64_lsf_to_bytes(slice: &[u64]) -> Vec<u8> {
     let mut bytes = vec![];
     for a in slice {
@@ -94,7 +94,7 @@ pub fn u64_lsf_to_bytes(slice: &[u64]) -> Vec<u8> {
     bytes
 }
 
-/// convert a u64 slice from a shrink bytes (little-endian)
+/// Convert a u64 slice from a shrink bytes (little-endian)
 pub fn u64_limbs_from_bytes(slice: &[u8]) -> Vec<u64> {
     let mut r: Vec<u64> = vec![];
     let n = slice.len() / 8;
@@ -112,7 +112,7 @@ pub fn u64_limbs_from_bytes(slice: &[u8]) -> Vec<u64> {
     r
 }
 
-/// save parameters to a file
+/// Save parameters to a file
 pub fn save_to_file(params_ser: &[u8], out_filename: PathBuf) {
     let filename = out_filename.to_str().unwrap();
     let mut f = File::create(&filename).expect("Unable to create file");
@@ -120,7 +120,7 @@ pub fn save_to_file(params_ser: &[u8], out_filename: PathBuf) {
     println!("Public parameters written in file {}.", filename);
 }
 
-/// a short-hand macro for not matching an expression
+/// A short-hand macro for not matching an expression
 #[macro_export]
 macro_rules! not_matches {
    ($expression:expr, $( $pattern:pat_param )|+ $( if $guard: expr )?) => {

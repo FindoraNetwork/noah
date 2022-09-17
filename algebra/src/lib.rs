@@ -6,6 +6,8 @@
 #![deny(unused_attributes, unused_imports, unused_mut, missing_docs)]
 #![deny(renamed_and_removed_lints, stable_features, unused_allocation)]
 #![deny(unused_comparisons, bare_trait_objects, unused_must_use, const_err)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/74745723?s=200&v=4")]
+#![doc(html_playground_url = "https://play.rust-lang.org")]
 #![forbid(unsafe_code)]
 #![warn(
     unused,
@@ -45,8 +47,10 @@ pub mod serialization;
 pub mod utils;
 
 /// Module for prelude
+#[doc(hidden)]
 pub mod prelude;
 
+#[doc(hidden)]
 pub use ark_std::{
     borrow, cmp, collections, fs, hash, io, iter, ops, path, rand, result, str, One, UniformRand,
     Zero,
@@ -63,7 +67,7 @@ macro_rules! msg_eq {
     };
 }
 
-/// implement serialization and deserialization
+/// Implement serialization and deserialization
 #[macro_export]
 macro_rules! serialize_deserialize {
     ($t:ident) => {

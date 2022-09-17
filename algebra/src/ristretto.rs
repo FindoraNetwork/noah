@@ -15,18 +15,22 @@ use std::fmt::{Debug, Formatter};
 pub const RISTRETTO_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `curve25519_dalek::scalar::Scalar`
+/// [link](https://docs.rs/curve25519-dalek/3.2.1/curve25519_dalek/scalar/struct.Scalar.html)
 #[derive(Copy, Clone, Default, PartialEq, Eq)]
 pub struct RistrettoScalar(pub curve25519_dalek::scalar::Scalar);
 
 /// The wrapped struct for `curve25519_dalek::ristretto::CompressedRistretto`
+/// [link](https://docs.rs/curve25519-dalek/3.2.1/curve25519_dalek/ristretto/struct.CompressedRistretto.html)
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CompressedRistretto(pub CR);
 
 /// The wrapped struct for `curve25519_dalek::edwards::CompressedEdwardsY`
+/// [link](https://docs.rs/curve25519-dalek/3.2.1/curve25519_dalek/edwards/struct.CompressedEdwardsY.html)
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CompressedEdwardsY(pub curve25519_dalek::edwards::CompressedEdwardsY);
 
 /// The wrapped struct for `curve25519_dalek::ristretto::RistrettoPoint`
+/// [link](https://docs.rs/curve25519-dalek/3.2.1/curve25519_dalek/ristretto/struct.RistrettoPoint.html)
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct RistrettoPoint(pub RPoint);
 

@@ -23,6 +23,7 @@ use wasm_bindgen::prelude::*;
 pub const SECP256K1_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `ark_bulletproofs_secq256k1::curve::secp256k1::Fr`
+/// [link](https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1/blob/main/src/curve/secp256k1/fr.rs)
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct SECP256K1Scalar(pub(crate) Fr);
@@ -50,6 +51,7 @@ impl SECP256K1Scalar {
 }
 
 /// The wrapped struct for `ark_bulletproofs_secq256k1::curve::secp256k1::G1Projective`
+/// [link](https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1/blob/main/src/curve/secp256k1/g1.rs)
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq, Hash)]
 pub struct SECP256K1G1(pub(crate) G1Projective);
