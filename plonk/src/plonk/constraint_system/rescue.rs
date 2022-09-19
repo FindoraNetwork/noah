@@ -15,11 +15,11 @@ const ALPHA_INV: [u8; 32] = [
     0x02, 0xF0, 0x73, 0x9D, 0x69, 0x56, 0x4A, 0xE1, 0x1C, 0x32, 0x72, 0xDD, 0xBA, 0x0F, 0x5F, 0x2E,
 ];
 
-/// the data structure of the variables of the sponge state
+/// The data structure of the variables of the sponge state
 #[derive(Clone)]
 pub struct StateVar(Vec<VarIndex>); // StateVar.0.len() == WIDTH
 
-/// the data structure of the values in the sponge
+/// The data structure of the values in the sponge
 #[derive(Clone)]
 pub struct State(Vec<BLSScalar>); // State.0.len() == WIDTH
 

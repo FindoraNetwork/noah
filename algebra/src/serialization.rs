@@ -175,7 +175,7 @@ pub mod zei_obj_serde {
     use serde::Deserializer;
     use serde::Serializer;
 
-    /// reader for serialized data
+    /// Reader for serialized data
     pub struct BytesVisitor;
 
     impl<'de> Visitor<'de> for BytesVisitor {
@@ -210,7 +210,7 @@ pub mod zei_obj_serde {
         }
     }
 
-    /// serialize the data
+    /// Serialize the data
     pub fn serialize<S, T>(obj: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -224,7 +224,7 @@ pub mod zei_obj_serde {
         }
     }
 
-    /// deserialize the data
+    /// Deserialize the data
     pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
     where
         D: Deserializer<'de>,

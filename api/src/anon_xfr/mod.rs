@@ -36,7 +36,7 @@ pub mod address_folding;
 pub mod ar_to_abar;
 /// Module for converting confidential assets to anonymous assets.
 pub mod bar_to_abar;
-/// Module for the spending key, the viewing key, and the public key.
+/// Module for the spending key and the public key.
 pub mod keys;
 /// Module for shared structures.
 pub mod structs;

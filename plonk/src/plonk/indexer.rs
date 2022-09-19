@@ -13,17 +13,17 @@ use zei_algebra::prelude::*;
 /// The data structure of a Plonk proof.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
 pub struct PlonkProof<C, F> {
-    /// the witness polynomial commitments.
+    /// The witness polynomial commitments.
     pub cm_w_vec: Vec<C>,
-    /// the split quotient polynomial commitments
+    /// The split quotient polynomial commitments
     pub cm_t_vec: Vec<C>,
-    /// the sigma polynomial commitment.
+    /// The sigma polynomial commitment.
     pub cm_z: C,
-    /// the openings of witness polynomials at \zeta.
+    /// The openings of witness polynomials at \zeta.
     pub w_polys_eval_zeta: Vec<F>,
-    /// the opening of z(X) at point \zeta * \omega.
+    /// The opening of z(X) at point \zeta * \omega.
     pub z_eval_zeta_omega: F,
-    /// the openings of permutation polynomials at \zeta.
+    /// The openings of permutation polynomials at \zeta.
     pub s_polys_eval_zeta: Vec<F>,
     /// The commitment for the first witness polynomial, for \zeta.
     pub opening_witness_zeta: C,
@@ -38,33 +38,33 @@ pub type PlonkPf<PCS> =
 /// Plonk prover parameters.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlonkProverParams<O, C, F> {
-    /// the polynomials of the selectors.
+    /// The polynomials of the selectors.
     pub q_polys: Vec<O>,
-    /// the polynomials of perm1, perm2, ..., perm_{n_wires_per_gate}.
+    /// The polynomials of perm1, perm2, ..., perm_{n_wires_per_gate}.
     pub s_polys: Vec<O>,
-    /// the polynomial for boolean constraints.
+    /// The polynomial for boolean constraints.
     pub qb_poly: O,
-    /// the Plonk verifier parameters.
+    /// The Plonk verifier parameters.
     pub verifier_params: PlonkVerifierParams<C, F>,
-    /// the elements of the group.
+    /// The elements of the group.
     pub group: Vec<F>,
     /// The evaluation domain for computing the quotient polynomial.
     pub coset_quotient: Vec<F>,
     /// The root for the domain of size m.
     pub root_m: F,
-    /// first lagrange basis.
+    /// First lagrange basis.
     pub l1_coefs: FpPolynomial<F>,
-    /// the l1's FFT of the polynomial of unity root set.
+    /// The l1's FFT of the polynomial of unity root set.
     pub l1_coset_evals: Vec<F>,
-    /// initialize [one.neg, zero, zero, ... zero, one] polynomial.
+    /// Initialize [one.neg, zero, zero, ... zero, one] polynomial.
     pub z_h_coefs: FpPolynomial<F>,
-    /// the z_h's FFT of the polynomial of unity root set.
+    /// The z_h's FFT of the polynomial of unity root set.
     pub z_h_inv_coset_evals: Vec<F>,
-    /// the selector polynomials' FFT of the polynomial of unity root set.
+    /// The selector polynomials' FFT of the polynomial of unity root set.
     pub q_coset_evals: Vec<Vec<F>>,
-    /// the permutation polynomials' FFT of the polynomial of unity root set.
+    /// The permutation polynomials' FFT of the polynomial of unity root set.
     pub s_coset_evals: Vec<Vec<F>>,
-    /// the boolean constraint polynomial's FFT of the polynomial of unity root set.
+    /// The boolean constraint polynomial's FFT of the polynomial of unity root set.
     pub qb_coset_eval: Vec<F>,
 }
 
@@ -90,21 +90,21 @@ impl<O, C, F> PlonkProverParams<O, C, F> {
 /// Plonk verifier parameters.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlonkVerifierParams<C, F> {
-    /// the commitments of the selectors.
+    /// The commitments of the selectors.
     pub cm_q_vec: Vec<C>,
-    /// the commitments of perm1, perm2, ..., perm_{n_wires_per_gate}.
+    /// The commitments of perm1, perm2, ..., perm_{n_wires_per_gate}.
     pub cm_s_vec: Vec<C>,
-    /// the commitment of the boolean selector.
+    /// The commitment of the boolean selector.
     pub cm_qb: C,
     /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub k: Vec<F>,
-    /// a primitive n-th root of unity.
+    /// A primitive n-th root of unity.
     pub root: F,
-    /// the size of constraint system.
+    /// The size of constraint system.
     pub cs_size: usize,
-    /// the public constrain variables indices.
+    /// The public constrain variables indices.
     pub public_vars_constraint_indices: Vec<usize>,
-    /// the constrain lagrange base by public constrain variables.
+    /// The constrain lagrange base by public constrain variables.
     pub lagrange_constants: Vec<F>,
 }
 
@@ -151,7 +151,7 @@ pub fn choose_ks<R: CryptoRng + RngCore, F: Scalar>(
 }
 
 /// Run the Plonk indexer.
-/// Before invoking index(), the constraint system `cs` should pad the number of
+/// Before invoking indexer function, the constraint system `cs` should pad the number of
 /// constraints to a power of two.
 ///
 pub fn indexer<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(

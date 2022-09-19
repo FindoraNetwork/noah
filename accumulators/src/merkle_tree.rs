@@ -25,36 +25,31 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 ///
 /// PersistentMerkleTree is a 3-ary merkle tree
 ///
-/// Usage:
-///    ```ignore
-///     use std::collections::HashMap;
-///     use mem_db::MemoryDB;
-///     use std::sync::Arc;
-///     use parking_lot::RwLock;
-///     use storage::state::{ChainState, State};
-///     use storage::store::PrefixedStore;
-///     use zei_accumulators::merkle_tree::PersistentMerkleTree;
-///     use zei_algebra::bls12_381::BLSScalar;
-///     use zei_algebra::groups::Zero;
-///     use zei_crypto::basic::hash::rescue::RescueInstance;
+/// # Example
+/// ```
 ///
-///     let hash = RescueInstance::new();
+/// use mem_db::MemoryDB;
+/// use parking_lot::RwLock;
+/// use std::sync::Arc;
+/// use storage::state::{ChainState, State};
+/// use storage::store::PrefixedStore;
+/// use zei_accumulators::merkle_tree::{PersistentMerkleTree, verify};
+/// use zei_algebra::{bls12_381::BLSScalar, One};
 ///
-///     let fdb = MemoryDB::new();
-///     let cs = Arc::new(RwLock::new(ChainState::new(
-///         fdb,
-///         "test_db".to_string(),
-///         0,
-///     )));
-///     let mut state = State::new(cs, false);
-///     let mut store = PrefixedStore::new("my_store", &mut state);
-///     let mut mt = PersistentMerkleTree::new(store).unwrap();
+/// let fdb = MemoryDB::new();
+/// let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+/// let mut state = State::new(cs, false);
+/// let store = PrefixedStore::new("my_store", &mut state);
+/// let mut mt = PersistentMerkleTree::new(store).unwrap();
+/// assert_eq!(0, mt.version());
 ///
-///     mt.get_current_root_hash();
-///
-///     mt.add_commitment_hash(BLSScalar::default());
-///     mt.commit();
-///     mt.generate_proof(0);
+/// let uid = mt.add_commitment_hash(BLSScalar::one()).unwrap();
+/// let proof = mt.generate_proof(uid).unwrap();
+/// assert_eq!(proof.uid, uid);
+/// assert!(verify(BLSScalar::one(), &proof));
+/// let v = mt.commit().unwrap();
+/// assert_eq!(1, mt.version());
+/// assert_eq!(1, v);
 ///
 /// ```
 pub struct PersistentMerkleTree<'a, D: MerkleDB> {

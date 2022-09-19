@@ -636,7 +636,7 @@ fn u32_limbs_to_u64_limbs(s: &[u32]) -> Vec<u64> {
     u64_limbs
 }
 
-/// given the the values of a polynomial at the n n-th root of unity,
+/// Given the values of a polynomial at the n n-th root of unity,
 /// and a primitive n-th root of unity if computes its coefficients.
 /// n is with the form 2^k or 3 * 2^k
 pub fn recursive_ifft<F: Scalar>(values: &[&F], root: &F) -> Vec<F> {

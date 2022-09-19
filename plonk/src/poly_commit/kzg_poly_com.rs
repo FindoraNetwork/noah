@@ -146,7 +146,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
         }
     }
 
-    /// serialize the parameters to unchecked bytes.
+    /// Serialize the parameters to unchecked bytes.
     pub fn to_unchecked_bytes(&self) -> Result<Vec<u8>> {
         let mut bytes = vec![];
         let len_1 = self.public_parameter_group_1.len() as u32;
@@ -163,7 +163,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
         Ok(bytes)
     }
 
-    /// deserialize the parameters from unchecked bytes.
+    /// Deserialize the parameters from unchecked bytes.
     pub fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 8 {
             return Err(eg!(ZeiError::DeserializationError));
