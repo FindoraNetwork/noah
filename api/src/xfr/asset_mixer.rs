@@ -13,7 +13,7 @@ use zei_crypto::bulletproofs::mix::{mix, MixCommitment, MixValue};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// The asset mixing proof.
-pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
+pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub R1CSProof);
 
 impl PartialEq for AssetMixProof {
     fn eq(&self, other: &AssetMixProof) -> bool {

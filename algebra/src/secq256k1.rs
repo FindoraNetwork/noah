@@ -20,8 +20,7 @@ use wasm_bindgen::prelude::*;
 /// The number of bytes for a scalar value over the secq256k1 curve
 pub const SECQ256K1_SCALAR_LEN: usize = 32;
 
-/// The wrapped struct for `ark_bulletproofs_secq256k1::curve::secq256k1::Fr`
-/// [link](https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1/blob/main/src/curve/secq256k1/fr.rs)
+/// The wrapped struct for [`ark_bulletproofs_secq256k1::curve::secq256k1::Fr`](https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1/blob/main/src/curve/secq256k1/fr.rs)
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct SECQ256K1Scalar(pub(crate) Fr);
@@ -35,8 +34,7 @@ impl Debug for SECQ256K1Scalar {
     }
 }
 
-/// The wrapped struct for `ark_bulletproofs_secq256k1::curve::secq256k1::G1Projective`
-/// [link](https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1/blob/main/src/curve/secq256k1/g1.rs)
+/// The wrapped struct for [`ark_bulletproofs_secq256k1::curve::secq256k1::G1Projective`](https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1/blob/main/src/curve/secq256k1/g1.rs)
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq)]
 pub struct SECQ256K1G1(pub(crate) G1Projective);

@@ -26,8 +26,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 /// The number of bytes for a scalar value over BLS12-381
 pub const BLS12_381_SCALAR_LEN: usize = 32;
 
-/// The wrapped struct for `ark_bls12_381::Fr`
-/// [link](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/fr/struct.FrParameters.html)
+/// The wrapped struct for [`ark_bls12_381::Fr`](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/fr/struct.FrParameters.html)
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct BLSScalar(pub(crate) Fr);
@@ -41,8 +40,7 @@ impl Debug for BLSScalar {
     }
 }
 
-/// The wrapped struct for `ark_bls12_381::G1Projective`
-/// [link](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/g1/type.G1Projective.html)
+/// The wrapped struct for [`ark_bls12_381::G1Projective`](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/g1/type.G1Projective.html)
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq)]
 pub struct BLSG1(pub(crate) G1Projective);
@@ -53,8 +51,7 @@ impl Debug for BLSG1 {
     }
 }
 
-/// The wrapped struct for `ark_bls12_381::G2Projective`
-/// [link](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/g2/type.G2Projective.html)
+/// The wrapped struct for [`ark_bls12_381::G2Projective`](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/g2/type.G2Projective.html)
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq)]
 pub struct BLSG2(pub(crate) G2Projective);
@@ -65,8 +62,7 @@ impl Debug for BLSG2 {
     }
 }
 
-/// The wrapped struct for `Fp12<ark_bls12_381::Fq12Parameters>`
-/// [link](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/fq12/struct.Fq12Parameters.html),
+/// The wrapped struct for [`Fp12<ark_bls12_381::Fq12Parameters>`](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/fq12/struct.Fq12Parameters.html),
 /// which is the pairing result
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
