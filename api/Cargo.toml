@@ -8,6 +8,11 @@ name = 'bulletproofs'
 path = 'benches/bulletproofs.rs'
 harness = false
 
+[[bench]]
+name = 'xfr'
+path = 'benches/xfr.rs'
+harness = false
+
 [package]
 name = 'zei'
 version = '0.2.0'
