@@ -18,13 +18,13 @@ use zei_crypto::{
 };
 
 fn main() {
-    // Measurement of the verification time and batch verification time of Mix Bulletproofs in Zei
+    // Measurement of the verification time and batch verification time of Mix Bulletproofs
     bench_verify_asset_mixer();
     for i in 1..10 {
         bench_batch_verify_asset_mixer(i);
     }
 
-    // Measurement of the verification time and batch verification time of Range Bulletproofs in Zei
+    // Measurement of the verification time and batch verification time of Range Bulletproofs
     bench_verify_range();
     for i in [1, 2, 4, 8, 16] {
         bench_multiple_verify_range(i)
@@ -69,8 +69,8 @@ fn bench_verify_asset_mixer() {
         assert!(v.0.verify(&v.1, &pc_gens, &bp_circuit_gens).is_ok());
     }
     println!(
-        "non-batch verify mix bulletproofs takes time: {} s",
-        start.elapsed().as_secs_f32() / COUNT as f32
+        "non-batch verify mix bulletproofs takes time: {} ms",
+        start.elapsed().as_secs_f32() / COUNT as f32 * 1000.0
     );
 }
 
@@ -145,9 +145,9 @@ fn bench_batch_verify_asset_mixer(count: usize) {
     let start = Instant::now();
     assert!(batch_verify(&mut prng, verifiers, &pc_gens, &params.bp_circuit_gens).is_ok());
     println!(
-        "batch verify of {} mix bulletproofs takes time: {} s",
+        "batch verify of {} mix bulletproofs takes time: {} ms",
         count,
-        start.elapsed().as_secs_f32() / count as f32
+        start.elapsed().as_secs_f32() / count as f32 * 1000.0
     );
 }
 
@@ -186,8 +186,8 @@ fn bench_verify_range() {
             .is_ok());
     }
     println!(
-        "single verify range bulletproofs takes time: {} s",
-        start.elapsed().as_secs_f32() / COUNT as f32
+        "non-batech verify range bulletproofs takes time: {} ms",
+        start.elapsed().as_secs_f32() / COUNT as f32 * 1000.0
     );
 }
 
@@ -228,9 +228,9 @@ fn bench_multiple_verify_range(count: usize) {
         )
         .is_ok());
     println!(
-        "multiple verify of {} range bulletproofs takes time: {} s",
+        "multiple verify of {} range bulletproofs takes time: {} ms",
         count,
-        start.elapsed().as_secs_f32() / count as f32
+        start.elapsed().as_secs_f32() / count as f32 * 1000.0
     );
 }
 
@@ -271,26 +271,21 @@ fn bench_batch_verify_range(count: usize) {
         verifier_transcripts.push(verifier_transcript);
     }
 
-    let mut committed_values_ref = vec![];
-    for i in &committed_values {
-        committed_values_ref.push(i.as_slice())
-    }
-
     let start = Instant::now();
     assert!(RangeProof::batch_verify(
         &mut prng,
-        &proofs.iter().map(|x| x).collect::<Vec<&RangeProof>>(),
+        &proofs.iter().collect_vec(),
         &mut verifier_transcripts,
-        &committed_values_ref,
+        &committed_values.iter().map(|x| x.as_slice()).collect_vec(),
         &bp_gens,
         &pc_gens,
         64,
     )
     .is_ok());
     println!(
-        "batch verify of {} range bulletproofs takes time: {} s",
+        "batch verify of {} range bulletproofs takes time: {} ms",
         count,
-        start.elapsed().as_secs_f32() / (count * 4) as f32
+        start.elapsed().as_secs_f32() / (count * 4) as f32 * 1000.0
     );
 }
 
