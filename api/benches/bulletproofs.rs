@@ -20,17 +20,17 @@ use zei_crypto::{
 fn main() {
     // Measurement of the verification time and batch verification time of Mix Bulletproofs
     bench_verify_asset_mixer();
-    for i in 1..10 {
-        bench_batch_verify_asset_mixer(i);
+    for batch_size in 1..10 {
+        bench_batch_verify_asset_mixer(batch_size);
     }
 
     // Measurement of the verification time and batch verification time of Range Bulletproofs
     bench_verify_range();
-    for i in [1, 2, 4, 8, 16] {
-        bench_multiple_verify_range(i)
+    for batch_size in [1, 2, 4, 8, 16] {
+        bench_multiple_verify_range(batch_size)
     }
-    for i in [1, 2, 4, 8, 16] {
-        bench_batch_verify_range(i);
+    for batch_size in [1, 2, 4, 8, 16] {
+        bench_batch_verify_range(batch_size);
     }
 }
 
@@ -74,11 +74,11 @@ fn bench_verify_asset_mixer() {
     );
 }
 
-fn bench_batch_verify_asset_mixer(count: usize) {
+fn bench_batch_verify_asset_mixer(batch_size: usize) {
     let mut asset_mix_instances = vec![];
     let mut proofs = vec![];
     let mut inputs_outputs = vec![];
-    for _ in 0..count {
+    for _ in 0..batch_size {
         let (inputs, outputs) = gen_inputs_outputs();
         let proof = prove_asset_mixing(&inputs, &outputs).unwrap();
         proofs.push(proof);
@@ -121,9 +121,9 @@ fn bench_batch_verify_asset_mixer(count: usize) {
     let mut params = BulletproofParams::default();
 
     let mut max_circuit_size = 0;
-    let mut transcripts = Vec::with_capacity(count);
-    let mut verifiers = Vec::with_capacity(count);
-    for _ in 0..count {
+    let mut transcripts = Vec::with_capacity(batch_size);
+    let mut verifiers = Vec::with_capacity(batch_size);
+    for _ in 0..batch_size {
         transcripts.push(Transcript::new(b"AssetMixingProof"));
     }
     for (instance, transcript) in asset_mix_instances.iter().zip(transcripts.iter_mut()) {
@@ -146,8 +146,8 @@ fn bench_batch_verify_asset_mixer(count: usize) {
     assert!(batch_verify(&mut prng, verifiers, &pc_gens, &params.bp_circuit_gens).is_ok());
     println!(
         "batch verify of {} mix bulletproofs takes time: {} ms",
-        count,
-        start.elapsed().as_secs_f32() / count as f32 * 1000.0
+        batch_size,
+        start.elapsed().as_secs_f32() / batch_size as f32 * 1000.0
     );
 }
 
@@ -191,14 +191,14 @@ fn bench_verify_range() {
     );
 }
 
-fn bench_multiple_verify_range(count: usize) {
+fn bench_multiple_verify_range(batch_size: usize) {
     let mut prng = test_rng();
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(64, 16);
     let mut values = vec![];
     let mut blindings = vec![];
 
-    for _ in 0..count {
+    for _ in 0..batch_size {
         let value = prng.gen_range(1u64..1000);
         let blinding = RistrettoScalar::random(&mut prng).0;
         values.push(value);
@@ -229,12 +229,12 @@ fn bench_multiple_verify_range(count: usize) {
         .is_ok());
     println!(
         "multiple verify of {} range bulletproofs takes time: {} ms",
-        count,
-        start.elapsed().as_secs_f32() / count as f32 * 1000.0
+        batch_size,
+        start.elapsed().as_secs_f32() / batch_size as f32 * 1000.0
     );
 }
 
-fn bench_batch_verify_range(count: usize) {
+fn bench_batch_verify_range(batch_size: usize) {
     let mut prng = test_rng();
     let bp_gens = BulletproofGens::new(64, 16);
     let pc_gens = PedersenGens::default();
@@ -242,7 +242,7 @@ fn bench_batch_verify_range(count: usize) {
     let mut committed_values = vec![];
     let mut verifier_transcripts = vec![];
 
-    for _ in 0..count {
+    for _ in 0..batch_size {
         let mut values = vec![];
         let mut blindings = vec![];
 
@@ -284,8 +284,8 @@ fn bench_batch_verify_range(count: usize) {
     .is_ok());
     println!(
         "batch verify of {} range bulletproofs takes time: {} ms",
-        count,
-        start.elapsed().as_secs_f32() / (count * 4) as f32 * 1000.0
+        batch_size,
+        start.elapsed().as_secs_f32() / (batch_size * 4) as f32 * 1000.0
     );
 }
 
