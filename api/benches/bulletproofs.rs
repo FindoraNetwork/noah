@@ -186,7 +186,7 @@ fn bench_verify_range() {
             .is_ok());
     }
     println!(
-        "non-batech verify range bulletproofs takes time: {} ms",
+        "non-batch verify range bulletproofs takes time: {} ms",
         start.elapsed().as_secs_f32() / COUNT as f32 * 1000.0
     );
 }

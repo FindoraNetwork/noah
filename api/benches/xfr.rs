@@ -15,7 +15,7 @@ use zei_algebra::prelude::*;
 
 const BATCHSIZE: [usize; 7] = [1, 2, 3, 6, 10, 20, 30];
 
-// Measurement of the verification time,batch verification time and xfrNote generation time of `NonConfidential_SingleAsset`.
+// Measurement of the verification time, batch verification time, and XfrNote generation time of `NonConfidential_SingleAsset.`
 fn bench_nonconfidential_single_asset(c: &mut Criterion) {
     let mut params = BulletproofParams::default();
     let inputs_template = [AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType; 6];
@@ -27,7 +27,7 @@ fn bench_nonconfidential_single_asset(c: &mut Criterion) {
     }
 }
 
-// Measurement of the verification time,batch verification time and xfrNote generation time of `ConfidentialAmount_NonConfidentialAssetType_SingleAsset`.
+// Measurement of the verification time, batch verification time, and XfrNote generation time of `ConfidentialAmount_NonConfidentialAssetType_SingleAsset.`
 fn bench_confidential_amount_nonconfidential_assettype_single_asset(c: &mut Criterion) {
     let mut params = BulletproofParams::default();
     let inputs_template = [AssetRecordType::ConfidentialAmount_NonConfidentialAssetType; 6];
@@ -39,7 +39,7 @@ fn bench_confidential_amount_nonconfidential_assettype_single_asset(c: &mut Crit
     }
 }
 
-// Measurement of the verification time,batch verification time and xfrNote generation time of `NonConfidentialAmount_ConfidentialAssetType_SingleAsset`.
+// Measurement of the verification time, batch verification time, and XfrNote generation time of `NonConfidentialAmount_ConfidentialAssetType_SingleAsset.`
 fn bench_nonconfidential_amount_confidential_asset_type_single_asset(c: &mut Criterion) {
     let mut params = BulletproofParams::default();
     let inputs_template = [AssetRecordType::NonConfidentialAmount_ConfidentialAssetType; 6];
@@ -51,7 +51,7 @@ fn bench_nonconfidential_amount_confidential_asset_type_single_asset(c: &mut Cri
     }
 }
 
-// Measurement of the verification time,batch verification time and xfrNote generation time of `Confidential_MultiAsset`.
+// Measurement of the verification time, batch verification time, and XfrNote generation time of `Confidential_MultiAsset.`
 fn bench_confidential_single_asset(c: &mut Criterion) {
     let mut params = BulletproofParams::default();
     let inputs_template = [AssetRecordType::ConfidentialAmount_ConfidentialAssetType; 6];
@@ -63,7 +63,7 @@ fn bench_confidential_single_asset(c: &mut Criterion) {
     }
 }
 
-// Measurement of the verification time,batch verification time and xfrNote generation time of `Confidential_SingleAsset`.
+// Measurement of the verification time, batch verification time, and XfrNote generation time of `Confidential_SingleAsset.`
 fn bench_confidential_multi_asset(c: &mut Criterion) {
     let asset_record_type = AssetRecordType::ConfidentialAmount_ConfidentialAssetType;
 
@@ -73,7 +73,7 @@ fn bench_confidential_multi_asset(c: &mut Criterion) {
     }
 }
 
-// Measurement of the verification time,batch verification time and xfrNote generation time of `NonConfidential_MultiAsset`.
+// Measurement of the verification time, batch verification time, and XfrNote generation time of `NonConfidential_MultiAsset.`
 fn bench_nonconfidential_multi_asset(c: &mut Criterion) {
     let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 
@@ -456,7 +456,7 @@ fn batch_verify_multi_asset_transfer(
     let mut batch_verify_xfr_note_group = c.benchmark_group("batch_verify_multi_asset");
     batch_verify_xfr_note_group.sample_size(30);
     batch_verify_xfr_note_group.bench_function(
-        format!("`{}` of batch size equal to {}", benchmark_id, batch_size),
+        format!("`{}` of batch size {}", benchmark_id, batch_size),
         |b| {
             b.iter(|| {
                 assert!(
@@ -479,17 +479,17 @@ fn gen_key_pair_vec<R: CryptoRng + RngCore>(size: usize, prng: &mut R) -> Vec<Xf
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]
 enum XfrType {
-    /// All inputs and outputs are revealed and all have the same asset type
+    /// All inputs and outputs are revealed, and all have the same asset type.
     NonConfidential_SingleAsset,
-    /// At least one input or output has a confidential amount and all asset types are revealed
+    /// At least one input or output has a confidential amount, and all asset types are revealed.
     ConfidentialAmount_NonConfidentialAssetType_SingleAsset,
-    /// At least one asset type is confidential and all the amounts are revealed
+    /// At least one asset type is confidential, and all the amounts are revealed.
     NonConfidentialAmount_ConfidentialAssetType_SingleAsset,
-    /// At least one input or output has both confidential amount and asset type
+    /// At least one input or output has both confidential amount and asset type.
     Confidential_SingleAsset,
-    /// At least one input or output has confidential amount and asset type and involves multiple asset types
+    /// At least one input or output has confidential amount and asset type, and the transfer involves multiple asset types.
     Confidential_MultiAsset,
-    /// All inputs and outputs reveal amounts and asset types
+    /// All inputs and outputs reveal amounts and asset types.
     NonConfidential_MultiAsset,
 }
 
