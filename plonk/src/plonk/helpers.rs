@@ -396,12 +396,8 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
 
     // 2. z(X) [ alpha * prod_{j=1..n_wires_per_gate} (fj(zeta) + beta * kj * zeta + gamma)
     //              + alpha^2 * L1(zeta)]
-    let z_scalar = compute_z_scalar_in_r(
-        w_polys_eval_zeta,
-        k,
-        challenges,
-        first_lagrange_eval_zeta,
-    );
+    let z_scalar =
+        compute_z_scalar_in_r(w_polys_eval_zeta, k, challenges, first_lagrange_eval_zeta);
     l.add_assign(&z_poly_or_comm.mul(&z_scalar));
 
     // 3. - perm_{n_wires_per_gate}(X) [alpha * z(zeta * omega) * beta
