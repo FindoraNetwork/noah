@@ -7,6 +7,8 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
+use ark_std::cfg_iter;
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::cmp::min;
 use zei_algebra::prelude::*;
 
@@ -30,6 +32,8 @@ pub(super) fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<
 #[derive(Default)]
 pub(super) struct PlonkChallenges<F> {
     challenges: Vec<F>,
+    alpha_square: F,
+    zeta_omega: F,
 }
 
 impl<F: Scalar> PlonkChallenges<F> {
@@ -37,6 +41,8 @@ impl<F: Scalar> PlonkChallenges<F> {
     pub(super) fn new() -> PlonkChallenges<F> {
         PlonkChallenges {
             challenges: Vec::with_capacity(4),
+            alpha_square: F::default(),
+            zeta_omega: F::default(),
         }
     }
 
@@ -81,6 +87,20 @@ impl<F: Scalar> PlonkChallenges<F> {
         }
     }
 
+    /// Insert alpha ^ 2.
+    pub(super) fn insert_alpha_square(&mut self) {
+        let alpha = self.get_alpha().unwrap();
+        let alpha_square = alpha.mul(alpha);
+        self.alpha_square = alpha_square
+    }
+
+    /// Insert zeta * omega.
+    pub(super) fn insert_zeta_omega(&mut self, omega: &F) {
+        let zeta = self.get_zeta().unwrap();
+        let zeta_omega = zeta.mul(omega);
+        self.zeta_omega = zeta_omega
+    }
+
     /// Return beta and gamma.
     pub(super) fn get_beta_gamma(&self) -> Result<(&F, &F)> {
         if self.challenges.len() > 1 {
@@ -115,6 +135,16 @@ impl<F: Scalar> PlonkChallenges<F> {
         } else {
             Err(eg!())
         }
+    }
+
+    /// Return alpha_square.
+    pub(super) fn get_alpha_square(&self) -> &F {
+        &self.alpha_square
+    }
+
+    /// Return  zeta_omega.
+    pub(super) fn get_zeta_omega(&self) -> &F {
+        &self.zeta_omega
     }
 }
 
@@ -347,13 +377,15 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     z_eval_zeta_omega: &F,
     challenges: &PlonkChallenges<F>,
     t_polys_or_comms: &[PCSType],
+    first_lagrange_eval_zeta: &F,
+    z_h_eval_zeta: &F,
     n_t_polys: usize,
 ) -> PCSType {
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
     let alpha = challenges.get_alpha().unwrap();
     let zeta = challenges.get_zeta().unwrap();
 
-    let alpha_pow_2 = alpha.mul(alpha);
+    let alpha_pow_2 = challenges.get_alpha_square();
     let alpha_pow_3 = alpha_pow_2.mul(alpha);
     let alpha_pow_4 = alpha_pow_3.mul(alpha);
     let alpha_pow_5 = alpha_pow_4.mul(alpha);
@@ -366,7 +398,13 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
 
     // 2. z(X) [ alpha * prod_{j=1..n_wires_per_gate} (fj(zeta) + beta * kj * zeta + gamma)
     //              + alpha^2 * L1(zeta)]
-    let z_scalar = compute_z_scalar_in_r(n, w_polys_eval_zeta, k, challenges);
+    let z_scalar = compute_z_scalar_in_r(
+        n,
+        w_polys_eval_zeta,
+        k,
+        challenges,
+        first_lagrange_eval_zeta,
+    );
     l.add_assign(&z_poly_or_comm.mul(&z_scalar));
 
     // 3. - perm_{n_wires_per_gate}(X) [alpha * z(zeta * omega) * beta
@@ -380,18 +418,14 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     }
     l.sub_assign(&last_s_poly_or_comm.mul(&s_last_poly_scalar));
 
-    // 4. subtract the combined t polynomial
-    let mut z_h_eval_zeta = zeta.pow(&[n as u64]);
-    z_h_eval_zeta.sub_assign(&F::one());
-
-    // 5. + qb(X) * (w[1] (1 - w[1]) + w[2] (1 - w[2]) + w[3] (1 - w[3]))
+    // 4. + qb(X) * (w[1] (1 - w[1]) + w[2] (1 - w[2]) + w[3] (1 - w[3]))
     let w1_part = w[1].mul(&(w[1] - &F::one())).mul(&alpha_pow_3);
     let w2_part = w[2].mul(&(w[2] - &F::one())).mul(&alpha_pow_4);
     let w3_part = w[3].mul(&(w[3] - &F::one())).mul(&alpha_pow_5);
     l.add_assign(&qb_poly_or_comm.mul(&w1_part.add(w2_part).add(w3_part)));
 
     let factor = zeta.pow(&[n_t_polys as u64]);
-    let mut exponent = z_h_eval_zeta * factor;
+    let mut exponent = z_h_eval_zeta.mul(factor);
     let mut t_poly_combined = t_polys_or_comms[0].clone().mul(&z_h_eval_zeta);
     for t_poly in t_polys_or_comms.iter().skip(1) {
         t_poly_combined.add_assign(&t_poly.mul(&exponent));
@@ -410,6 +444,8 @@ pub(super) fn r_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     z_eval_zeta_omega: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
     t_polys: &[FpPolynomial<PCS::Field>],
+    first_lagrange_eval_zeta: &PCS::Field,
+    z_h_eval_zeta: &PCS::Field,
     n_t_polys: usize,
 ) -> FpPolynomial<PCS::Field> {
     let w = CS::eval_selector_multipliers(w_polys_eval_zeta).unwrap(); // safe unwrap
@@ -426,6 +462,8 @@ pub(super) fn r_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
         z_eval_zeta_omega,
         challenges,
         t_polys,
+        first_lagrange_eval_zeta,
+        z_h_eval_zeta,
         n_t_polys,
     )
 }
@@ -439,6 +477,8 @@ pub(super) fn r_commitment<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
     z_eval_zeta_omega: &PCS::Field,
     challenges: &PlonkChallenges<PCS::Field>,
     t_polys: &[PCS::Commitment],
+    first_lagrange_eval_zeta: &PCS::Field,
+    z_h_eval_zeta: &PCS::Field,
     n_t_polys: usize,
 ) -> PCS::Commitment {
     let w = CS::eval_selector_multipliers(w_polys_eval_zeta).unwrap(); // safe unwrap
@@ -455,6 +495,8 @@ pub(super) fn r_commitment<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
         z_eval_zeta_omega,
         challenges,
         t_polys,
+        first_lagrange_eval_zeta,
+        z_h_eval_zeta,
         n_t_polys,
     )
 }
@@ -465,27 +507,21 @@ pub(super) fn r_commitment<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
 pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
     verifier_params: &PlonkVK<PCS>,
     public_inputs: &[PCS::Field],
+    z_h_eval_zeta: &PCS::Field,
     eval_point: &PCS::Field,
 ) -> PCS::Field {
-    let mut eval = PCS::Field::zero();
-    // compute X ^ n - 1
-    let x_to_n = eval_point.pow(&[verifier_params.cs_size as u64]);
-    let num = x_to_n.sub(&PCS::Field::one());
-
-    for ((constraint_index, public_value), lagrange_constant) in verifier_params
-        .public_vars_constraint_indices
-        .iter()
+    cfg_iter!(verifier_params.public_vars_constraint_indices)
         .zip(public_inputs)
-        .zip(verifier_params.lagrange_constants.iter())
-    {
-        // X - \omega^j j-th Lagrange denominator
-        let root_to_j = verifier_params.root.pow(&[*constraint_index as u64]);
-        let denominator = eval_point.sub(&root_to_j);
-        let denominator_inv = denominator.inv().unwrap();
-        let lagrange_i = lagrange_constant.mul(&denominator_inv);
-        eval.add_assign(&lagrange_i.mul(public_value));
-    }
-    eval.mul(&num)
+        .zip(&verifier_params.lagrange_constants)
+        .map(|((constraint_index, public_value), lagrange_constant)| {
+            let root_to_j = verifier_params.root.pow(&[*constraint_index as u64]);
+            let denominator = eval_point.sub(&root_to_j);
+            let denominator_inv = denominator.inv().unwrap();
+            let lagrange_i = lagrange_constant.mul(&denominator_inv);
+            lagrange_i.mul(public_value)
+        })
+        .reduce(|| PCS::Field::zero(), |x, y| x + y)
+        .mul(z_h_eval_zeta)
 }
 
 /// Compute constant c_j such that 1 = c_j * prod_{i != j} (\omega^j - \omega^i).
@@ -510,10 +546,12 @@ fn compute_z_scalar_in_r<F: Scalar>(
     w_polys_eval_zeta: &[&F],
     k: &[F],
     challenges: &PlonkChallenges<F>,
+    first_lagrange_eval_zeta: &F,
 ) -> F {
     let n_wires_per_gate = w_polys_eval_zeta.len();
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
     let alpha = challenges.get_alpha().unwrap();
+    let alpha_square = challenges.get_alpha_square();
     let zeta = challenges.get_zeta().unwrap();
 
     // 1. alpha * prod_{i=1..n_wires_per_gate}(fi(\zeta) + \beta * k_i * \zeta + \gamma)
@@ -525,25 +563,19 @@ fn compute_z_scalar_in_r<F: Scalar>(
     }
 
     // 2. alpha^2 * (beta^n - 1) / (beta - 1)
-    let alpha_sq = alpha.mul(alpha);
-    let zeta_pow_n = zeta.pow(&[n as u64]);
-    let l1_eval_zeta = zeta_pow_n
-        .sub(&F::one())
-        .mul(&zeta.sub(&F::one()).inv().unwrap());
-
-    z_scalar.add_assign(&l1_eval_zeta.mul(&alpha_sq));
+    z_scalar.add_assign(&first_lagrange_eval_zeta.mul(alpha_square));
     z_scalar
 }
 
 /// Evaluate the r polynomial at point \zeta.
 pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
-    verifier_params: &PlonkVK<PCS>,
     proof: &PlonkPf<PCS>,
     challenges: &PlonkChallenges<PCS::Field>,
     pi_eval_zeta: &PCS::Field,
+    first_lagrange_eval_zeta: &PCS::Field,
 ) -> PCS::Field {
-    let zeta = challenges.get_zeta().unwrap();
     let alpha = challenges.get_alpha().unwrap();
+    let alpha_square = challenges.get_alpha_square();
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
 
     let term0 = pi_eval_zeta;
@@ -557,13 +589,7 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     }
     term1.mul_assign(&proof.w_polys_eval_zeta[n_wires_per_gate - 1].add(gamma));
 
-    let one = PCS::Field::one();
-    let zeta_n = zeta.pow(&[verifier_params.cs_size as u64]);
-    let z_h_eval_zeta = zeta_n.sub(&one);
-    let zeta_minus_one = zeta.sub(&one);
-    let first_lagrange_eval_zeta = z_h_eval_zeta.mul(zeta_minus_one.inv().unwrap());
-    let term2 = first_lagrange_eval_zeta.mul(alpha.mul(alpha));
-
+    let term2 = first_lagrange_eval_zeta.mul(alpha_square);
     let term1_plus_term2 = term1.add(&term2);
     term1_plus_term2.sub(&term0)
 }
@@ -619,6 +645,20 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
     Ok((cm_t_vec, t_polys))
 }
 
+/// for a evaluation domain H, when x = 1, L_1(x) = (x^n-1) / (x-1) != 0,
+/// when x = a and a \in H different from 1, L_1(x) = 0.
+pub(super) fn first_lagrange_poly<PCS: PolyComScheme>(
+    challenges: &PlonkChallenges<PCS::Field>,
+    group_order: u64,
+) -> (PCS::Field, PCS::Field) {
+    let zeta = challenges.get_zeta().unwrap();
+    let one = PCS::Field::one();
+    let zeta_n = zeta.pow(&[group_order]);
+    let z_h_eval_zeta = zeta_n.sub(&one);
+    let zeta_minus_one = zeta.sub(&one);
+    let l1 = z_h_eval_zeta.mul(zeta_minus_one.inv().unwrap());
+    (z_h_eval_zeta, l1)
+}
 #[cfg(test)]
 mod test {
     use crate::plonk::{

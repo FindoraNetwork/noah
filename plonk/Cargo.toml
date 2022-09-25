@@ -24,6 +24,8 @@ merlin = '3.0.0'
 num-bigint = '0.4'
 num-integer = '0.1.43'
 serde_derive = '1.0.115'
+rayon = '1.5'
+ark-std  = { version = "^0.3.0", default-features = false }
 
 [dependencies.rand_chacha]
 version = '0.3'
@@ -43,15 +45,12 @@ features = ['derive']
 serde_json = '1.0'
 rand = "0.8"
 
-[dev-dependencies.ark-std]
-version = '^0.3.0'
-default-features = false
-
 [dev-dependencies.num-bigint]
 version = '0.4'
 features = ['rand']
 
 [features]
-default = ["std"]
+default = ["std", "parallel"]
 debug = []
 std = ['ark-std/std']
+parallel = ['ark-std/parallel']

@@ -44,7 +44,7 @@ pub trait HomomorphicPolyComElem: ToBytes + Clone {
 /// Trait for polynomial commitment scheme.
 pub trait PolyComScheme: Sized {
     /// Type of prime field.
-    type Field: Scalar + Debug;
+    type Field: Scalar + Debug + Sync + Send;
 
     /// Type of commitment produces, need to implement `HomomorphicPolyComElem`.
     type Commitment: HomomorphicPolyComElem<Scalar = Self::Field>
@@ -53,6 +53,7 @@ pub trait PolyComScheme: Sized {
         + Eq
         + Clone
         + Serialize
+        + Sync
         + for<'de> Deserialize<'de>;
 
     /// Return maximal supported degree
@@ -148,8 +149,8 @@ pub trait PolyComScheme: Sized {
         let mut cm_combined = Self::Commitment::get_identity();
         let mut eval_combined = Self::Field::zero();
         for (eval, cm) in evals.iter().zip(cm_vec) {
-            cm_combined = cm_combined.add(&cm.mul(&multiplier));
-            eval_combined.add_assign(&multiplier.mul(eval));
+            cm_combined.add_assign(&cm.mul(&multiplier));
+            eval_combined.add_assign(&eval.mul(multiplier));
             multiplier.mul_assign(&alpha);
         }
         (cm_combined, eval_combined)
