@@ -7,7 +7,6 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
-use ark_std::cfg_iter;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::cmp::min;
 use zei_algebra::prelude::*;
@@ -510,7 +509,9 @@ pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
     z_h_eval_zeta: &PCS::Field,
     eval_point: &PCS::Field,
 ) -> PCS::Field {
-    cfg_iter!(verifier_params.public_vars_constraint_indices)
+    verifier_params
+        .public_vars_constraint_indices
+        .par_iter()
         .zip(public_inputs)
         .zip(&verifier_params.lagrange_constants)
         .map(|((constraint_index, public_value), lagrange_constant)| {

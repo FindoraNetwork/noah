@@ -13,7 +13,7 @@ use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 
-/// Verify a proof
+/// Verify a proof.
 pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     transcript: &mut Transcript,
     pcs: &PCS,
@@ -45,7 +45,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         challenges.get_zeta().unwrap(),
     );
 
-    // 4. derive the linearization polynomial commitment
+    // 4. derive the linearization polynomial commitment.
     let r_eval_zeta =
         r_eval_zeta::<PCS>(proof, &challenges, &pi_eval_zeta, &first_lagrange_eval_zeta);
 
@@ -64,7 +64,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         verifier_params.cs_size + 2,
     );
 
-    // 5. verify opening proofs
+    // 5. verify opening proofs.
     let mut commitments: Vec<&PCS::Commitment> = proof
         .cm_w_vec
         .iter()
