@@ -365,7 +365,6 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
 /// Compute r polynomial or commitment.
 fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     w: &[F],
-    n: usize,
     q_polys_or_comms: &[PCSType],
     qb_poly_or_comm: &PCSType,
     k: &[F],
@@ -398,7 +397,6 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     // 2. z(X) [ alpha * prod_{j=1..n_wires_per_gate} (fj(zeta) + beta * kj * zeta + gamma)
     //              + alpha^2 * L1(zeta)]
     let z_scalar = compute_z_scalar_in_r(
-        n,
         w_polys_eval_zeta,
         k,
         challenges,
@@ -450,7 +448,6 @@ pub(super) fn r_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     let w = CS::eval_selector_multipliers(w_polys_eval_zeta).unwrap(); // safe unwrap
     r_poly_or_comm::<PCS::Field, FpPolynomial<PCS::Field>>(
         &w,
-        prover_params.group.len(),
         &prover_params.q_polys,
         &prover_params.qb_poly,
         &prover_params.verifier_params.k,
@@ -483,7 +480,6 @@ pub(super) fn r_commitment<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
     let w = CS::eval_selector_multipliers(w_polys_eval_zeta).unwrap(); // safe unwrap
     r_poly_or_comm::<PCS::Field, PCS::Commitment>(
         &w,
-        verifier_params.cs_size,
         &verifier_params.cm_q_vec,
         &verifier_params.cm_qb,
         &verifier_params.k,
@@ -543,7 +539,6 @@ pub(super) fn compute_lagrange_constant<F: Scalar>(group: &[F], base_index: usiz
 /// prod(fi(\zeta) + \beta * k_i * \zeta + \gamma) * \alpha
 ///       + (\zeta^n - 1) / (\zeta-1) * \alpha^2
 fn compute_z_scalar_in_r<F: Scalar>(
-    n: usize,
     w_polys_eval_zeta: &[&F],
     k: &[F],
     challenges: &PlonkChallenges<F>,
