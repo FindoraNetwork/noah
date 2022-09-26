@@ -135,11 +135,11 @@ mod smoke_axfr_secp256k1_address {
         )
         .unwrap();
         assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
-        let mut note = note;
-        let message = b"error_message";
-        let bad_sig = sender.sign(message).unwrap();
-        note.signature = bad_sig;
-        assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_err());
+
+        let verifier_params = vec![&verify_params; 6];
+        let notes = vec![&note; 6];
+        let pub_keys = vec![&sender.pub_key; 6];
+        assert!(batch_verify_bar_to_abar_note(&verifier_params, &notes, &pub_keys).is_ok());
 
         // check open ABAR
         let oabar =

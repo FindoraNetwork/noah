@@ -17,6 +17,7 @@ use crate::errors::ZeiError;
 use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::{
@@ -230,6 +231,67 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
         &address_folding_public_input,
     )
     .c(d!(ZeiError::AXfrVerificationError))
+}
+
+/// Batch verify anonymous transfer notes.
+pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
+    params: &[&VerifierParams],
+    notes: &[&AXfrNote],
+    merkle_roots: &[&BLSScalar],
+    hashes: Vec<D>,
+) -> Result<()> {
+    if merkle_roots
+        .par_iter()
+        .zip(notes)
+        .any(|(x, y)| **x != y.body.merkle_root)
+    {
+        return Err(eg!(ZeiError::AXfrVerificationError));
+    }
+
+    let is_success = params
+        .par_iter()
+        .zip(notes)
+        .zip(merkle_roots)
+        .zip(hashes)
+        .map(|(((param, note), merkle_root), hash)| {
+            let payees_commitments = note
+                .body
+                .outputs
+                .iter()
+                .map(|output| output.commitment)
+                .collect();
+            let pub_inputs = AXfrPubInputs {
+                payers_inputs: note.body.inputs.clone(),
+                payees_commitments,
+                merkle_root: **merkle_root,
+                fee: note.body.fee,
+            };
+
+            let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
+            let (beta, lambda) = verify_address_folding(
+                hash,
+                &mut transcript,
+                ANON_XFR_BP_GENS_LEN,
+                &note.folding_instance,
+            )?;
+
+            let address_folding_public_input =
+                prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+
+            verify_xfr(
+                *param,
+                &pub_inputs,
+                &note.proof,
+                &address_folding_public_input,
+            )
+        })
+        .all(|x| x.is_ok());
+
+    if is_success {
+        Ok(())
+    } else {
+        Err(eg!(ZeiError::AXfrVerificationError))
+    }
 }
 
 /// Generate a Plonk proof for anonymous transfer.
@@ -776,7 +838,8 @@ pub(crate) fn add_payees_witnesses(
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::abar_to_abar::{
-        finish_anon_xfr_note, init_anon_xfr_note, AXfrNote, ANON_XFR_FOLDING_PROOF_TRANSCRIPT,
+        batch_verify_anon_xfr_note, finish_anon_xfr_note, init_anon_xfr_note, AXfrNote,
+        ANON_XFR_FOLDING_PROOF_TRANSCRIPT,
     };
     use crate::anon_xfr::address_folding::{
         create_address_folding, prepare_verifier_input, verify_address_folding,
@@ -1045,10 +1108,19 @@ mod tests {
         }
         {
             // verifier scope
-            let verifier_params = VerifierParams::from(user_params);
+            let verifier_param = VerifierParams::from(user_params);
             assert!(
-                verify_anon_xfr_note(&verifier_params, &note, &merkle_root, test_hash.clone())
+                verify_anon_xfr_note(&verifier_param, &note, &merkle_root, test_hash.clone())
                     .is_ok()
+            );
+
+            let verifier_params = vec![&verifier_param; 6];
+            let notes = vec![&note; 6];
+            let merkle_roots = vec![&merkle_root; 6];
+            let hashes = vec![test_hash.clone(); 6];
+
+            assert!(
+                batch_verify_anon_xfr_note(&verifier_params, &notes, &merkle_roots, hashes).is_ok()
             );
         }
     }

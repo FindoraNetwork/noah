@@ -388,7 +388,7 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
             |x, y| ((x.0.mul(&y.0)), (x.1.mul(&y.1)), (x.2.add(&y.2))),
         );
 
-    // res.0 *  (w_{n_wires_per_gate}(zeta) + beta * k_{n_wires_per_gate} * zeta + gamma)
+    // res.0 * (w_{n_wires_per_gate}(zeta) + beta * k_{n_wires_per_gate} * zeta + gamma)
     res.0.mul_assign(
         &w_polys_eval_zeta[w_polys_eval_zeta.len() - 1]
             .add(k[k.len() - 1].mul(&beta_zeta))

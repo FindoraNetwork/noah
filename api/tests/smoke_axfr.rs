@@ -145,6 +145,10 @@ mod smoke_axfr {
         .unwrap();
         assert!(verify_ar_to_abar_note(&verify_params, &note).is_ok());
 
+        let verifier_params = vec![&verify_params; 6];
+        let notes = vec![&note; 6];
+        assert!(batch_verify_ar_to_abar_note(&verifier_params, &notes).is_ok());
+
         // check open abar
         let oabar =
             OpenAnonAssetRecordBuilder::from_abar(&note.body.output, note.body.memo, &receiver)
@@ -184,6 +188,12 @@ mod smoke_axfr {
         )
         .unwrap();
         assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
+
+        let verifier_params = vec![&verify_params; 6];
+        let notes = vec![&note; 6];
+        let pub_keys = vec![&sender.pub_key; 6];
+        assert!(batch_verify_bar_to_abar_note(&verifier_params, &notes, &pub_keys).is_ok());
+
         let mut note = note;
         let message = b"error_message";
         let bad_sig = sender.sign(message).unwrap();
@@ -226,6 +236,12 @@ mod smoke_axfr {
         let hash = random_hasher(&mut prng);
         let note = finish_abar_to_ar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_ar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
+
+        let verifier_params = vec![&verify_params; 6];
+        let notes = vec![&note; 6];
+        let merkle_roots = vec![&proof.root; 6];
+        let hashes = vec![hash.clone(); 6];
+        batch_verify_abar_to_ar_note(&verifier_params, &notes, &merkle_roots, hashes).unwrap();
 
         let err_root = BLSScalar::random(&mut prng);
         assert!(verify_abar_to_ar_note(&verify_params, &note, &err_root, hash.clone()).is_err());
@@ -277,6 +293,12 @@ mod smoke_axfr {
         let hash = random_hasher(&mut prng);
         let note = finish_abar_to_bar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_bar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
+
+        let verifier_params = vec![&verify_params; 6];
+        let notes = vec![&note; 6];
+        let merkle_roots = vec![&proof.root; 6];
+        let hashes = vec![hash.clone(); 6];
+        batch_verify_abar_to_bar_note(&verifier_params, &notes, &merkle_roots, hashes).unwrap();
 
         let err_root = BLSScalar::random(&mut prng);
         assert!(verify_abar_to_bar_note(&verify_params, &note, &err_root, hash.clone()).is_err());

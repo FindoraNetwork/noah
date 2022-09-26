@@ -12,6 +12,7 @@ use crate::xfr::{
     structs::{BlindAssetRecord, OpenAssetRecord},
 };
 use merlin::Transcript;
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{bls12_381::BLSScalar, errors::ZeiError, prelude::*};
 use zei_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
@@ -72,6 +73,33 @@ pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> R
         .c(d!())?;
 
     verify_ar_to_abar_body(params, &note.body).c(d!())
+}
+
+/// Batch verify transparent-to-anonymous notes.
+pub fn batch_verify_ar_to_abar_note(
+    params: &[&VerifierParams],
+    notes: &[&ArToAbarNote],
+) -> Result<()> {
+    let is_success = params
+        .par_iter()
+        .zip(notes)
+        .map(|(param, note)| {
+            let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+            note.body
+                .input
+                .public_key
+                .verify(&msg, &note.signature)
+                .c(d!())?;
+
+            verify_ar_to_abar_body(param, &note.body).c(d!())
+        })
+        .all(|x| x.is_ok());
+
+    if is_success {
+        Ok(())
+    } else {
+        Err(eg!())
+    }
 }
 
 /// Generate the transparent-to-anonymous body.

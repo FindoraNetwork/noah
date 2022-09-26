@@ -21,6 +21,7 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use zei_plonk::plonk::{
@@ -209,6 +210,73 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     .c(d!(ZeiError::AXfrVerificationError))
 }
 
+/// Batch verify the anonymous-to-transparent notes.
+pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
+    params: &[&VerifierParams],
+    notes: &[&AbarToArNote],
+    merkle_roots: &[&BLSScalar],
+    hashes: Vec<D>,
+) -> Result<()> {
+    // require the output amount & asset type are non-confidential
+    if notes.par_iter().any(|note| {
+        note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential()
+    }) {
+        return Err(eg!(ZeiError::ParameterError));
+    }
+
+    if merkle_roots
+        .par_iter()
+        .zip(notes)
+        .any(|(x, y)| **x != y.body.merkle_root)
+    {
+        return Err(eg!(ZeiError::AXfrVerificationError));
+    }
+
+    let is_success = params
+        .par_iter()
+        .zip(notes)
+        .zip(merkle_roots)
+        .zip(hashes)
+        .map(|(((param, note), merkle_root), hash)| {
+            let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
+            let (beta, lambda) = verify_address_folding(
+                hash,
+                &mut transcript,
+                ANON_XFR_BP_GENS_LEN,
+                &note.folding_instance,
+            )?;
+
+            let address_folding_public_input =
+                prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+
+            let payer_amount = note.body.output.amount.get_amount().unwrap();
+            let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
+
+            let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
+            let mut online_inputs = vec![];
+            online_inputs.push(note.body.input.clone());
+            online_inputs.push(*merkle_root.clone());
+            online_inputs.push(BLSScalar::from(payer_amount));
+            online_inputs.push(payer_asset_type.as_scalar());
+            online_inputs.extend_from_slice(&address_folding_public_input);
+
+            verifier(
+                &mut transcript,
+                &param.pcs,
+                &param.cs,
+                &param.verifier_params,
+                &online_inputs,
+                &note.proof,
+            )
+        })
+        .all(|x| x.is_ok());
+
+    if is_success {
+        Ok(())
+    } else {
+        Err(eg!(ZeiError::AXfrVerificationError))
+    }
+}
 fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
