@@ -11,7 +11,7 @@ pub trait ToBytes {
 }
 
 /// The trait for homomorphic polynomial commitment or polynomial.
-pub trait HomomorphicPolyComElem: ToBytes + Clone {
+pub trait HomomorphicPolyComElem: ToBytes + Clone + Sync + Send {
     /// This is the scalar field of the polynomial.
     type Scalar;
 

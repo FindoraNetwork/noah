@@ -34,6 +34,8 @@ pub trait Scalar:
     + From<u32>
     + From<u64>
     + Neg<Output = Self>
+    + Sync
+    + Send
 {
     /// Return a random scalar
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self;

@@ -31,8 +31,6 @@ pub(super) fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<
 #[derive(Default)]
 pub(super) struct PlonkChallenges<F> {
     challenges: Vec<F>,
-    alpha_square: F,
-    zeta_omega: F,
 }
 
 impl<F: Scalar> PlonkChallenges<F> {
@@ -40,8 +38,6 @@ impl<F: Scalar> PlonkChallenges<F> {
     pub(super) fn new() -> PlonkChallenges<F> {
         PlonkChallenges {
             challenges: Vec::with_capacity(4),
-            alpha_square: F::default(),
-            zeta_omega: F::default(),
         }
     }
 
@@ -86,20 +82,6 @@ impl<F: Scalar> PlonkChallenges<F> {
         }
     }
 
-    /// Insert alpha ^ 2.
-    pub(super) fn insert_alpha_square(&mut self) {
-        let alpha = self.get_alpha().unwrap();
-        let alpha_square = alpha.mul(alpha);
-        self.alpha_square = alpha_square
-    }
-
-    /// Insert zeta * omega.
-    pub(super) fn insert_zeta_omega(&mut self, omega: &F) {
-        let zeta = self.get_zeta().unwrap();
-        let zeta_omega = zeta.mul(omega);
-        self.zeta_omega = zeta_omega
-    }
-
     /// Return beta and gamma.
     pub(super) fn get_beta_gamma(&self) -> Result<(&F, &F)> {
         if self.challenges.len() > 1 {
@@ -134,16 +116,6 @@ impl<F: Scalar> PlonkChallenges<F> {
         } else {
             Err(eg!())
         }
-    }
-
-    /// Return alpha_square.
-    pub(super) fn get_alpha_square(&self) -> &F {
-        &self.alpha_square
-    }
-
-    /// Return  zeta_omega.
-    pub(super) fn get_zeta_omega(&self) -> &F {
-        &self.zeta_omega
     }
 }
 
@@ -380,42 +352,64 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     n_t_polys: usize,
 ) -> PCSType {
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
-    let alpha = challenges.get_alpha().unwrap();
     let zeta = challenges.get_zeta().unwrap();
+    let alpha = challenges.get_alpha().unwrap();
+    let alpha_neg = alpha.neg();
+    let beta_zeta = beta.mul(zeta);
+    let one = F::one();
+    let one_neg = one.neg();
+    let zero = F::zero();
 
-    let alpha_pow_2 = challenges.get_alpha_square();
+    let alpha_pow_2 = alpha.mul(alpha);
     let alpha_pow_3 = alpha_pow_2.mul(alpha);
     let alpha_pow_4 = alpha_pow_3.mul(alpha);
-    let alpha_pow_5 = alpha_pow_4.mul(alpha);
+    let alpha_pow = vec![&zero, &alpha_pow_2, &alpha_pow_3, &alpha_pow_4];
 
-    // 1. sum_{i=1..n_selectors} wi * qi(X)
-    let mut l = q_polys_or_comms[0].mul(&w[0]);
-    for i in 1..q_polys_or_comms.len() {
-        l.add_assign(&q_polys_or_comms[i].mul(&w[i]));
-    }
+    let mut polys_or_comms = q_polys_or_comms.iter().collect::<Vec<&PCSType>>();
+    let mut challenges = w.iter().collect::<Vec<&F>>();
 
-    // 2. z(X) [ alpha * prod_{j=1..n_wires_per_gate} (fj(zeta) + beta * kj * zeta + gamma)
-    //              + alpha^2 * L1(zeta)]
-    let z_scalar =
-        compute_z_scalar_in_r(w_polys_eval_zeta, k, challenges, first_lagrange_eval_zeta);
-    l.add_assign(&z_poly_or_comm.mul(&z_scalar));
+    // res.0 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * kj * zeta + gamma)
+    // res.1 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * perm_j(zeta) + gamma)
+    // res.2 = prod_{j=2..n_wires_per_gate-1} (wj(zeta) * (wj(zeta)-1) * alpha ^ 2 )
+    let mut res = w_polys_eval_zeta
+        .par_iter()
+        .take(w_polys_eval_zeta.len() - 1)
+        .zip(k)
+        .zip(s_polys_eval_zeta)
+        .zip(alpha_pow)
+        .map(|(((w, k), s), alpha_pow)| {
+            let term1 = w.add(k.mul(&beta_zeta)).add(gamma);
+            let term2 = w.add(beta.mul(*s)).add(gamma);
+            let term3 = w.mul(alpha_pow).mul(w.sub(&one));
+            (term1, term2, term3)
+        })
+        .reduce(
+            || (F::one(), F::one(), F::zero()),
+            |x, y| ((x.0.mul(&y.0)), (x.1.mul(&y.1)), (x.2.add(&y.2))),
+        );
 
-    // 3. - perm_{n_wires_per_gate}(X) [alpha * z(zeta * omega) * beta
-    //    * prod_{j=1..n_wires_per_gate-1}(fj(zeta) + beta * perm_j(zeta) + gamma)]
-    let mut s_last_poly_scalar = alpha.mul(&z_eval_zeta_omega.mul(beta));
-    for i in 0..w_polys_eval_zeta.len() - 1 {
-        let tmp = w_polys_eval_zeta[i]
-            .add(&beta.mul(s_polys_eval_zeta[i]))
-            .add(gamma);
-        s_last_poly_scalar.mul_assign(&tmp);
-    }
-    l.sub_assign(&last_s_poly_or_comm.mul(&s_last_poly_scalar));
+    // res.0 *  (w_{n_wires_per_gate}(zeta) + beta * k_{n_wires_per_gate} * zeta + gamma)
+    res.0.mul_assign(
+        &w_polys_eval_zeta[w_polys_eval_zeta.len() - 1]
+            .add(k[k.len() - 1].mul(&beta_zeta))
+            .add(gamma),
+    );
+    // res.0 + (L1(zeta) * alpha)
+    res.0.add_assign(&first_lagrange_eval_zeta.mul(alpha));
+    let x = z_poly_or_comm.mul(&res.0);
+    polys_or_comms.push(&x);
+    challenges.push(alpha);
 
-    // 4. + qb(X) * (w[1] (1 - w[1]) + w[2] (1 - w[2]) + w[3] (1 - w[3]))
-    let w1_part = w[1].mul(&(w[1] - &F::one())).mul(&alpha_pow_3);
-    let w2_part = w[2].mul(&(w[2] - &F::one())).mul(&alpha_pow_4);
-    let w3_part = w[3].mul(&(w[3] - &F::one())).mul(&alpha_pow_5);
-    l.add_assign(&qb_poly_or_comm.mul(&w1_part.add(w2_part).add(w3_part)));
+    // res.1 * perm_{n_wires_per_gate}(X)* z(zeta * omega) * beta
+    let s_last_poly_scalar = last_s_poly_or_comm
+        .mul(&res.1)
+        .mul(&z_eval_zeta_omega.mul(beta));
+    polys_or_comms.push(&s_last_poly_scalar);
+    challenges.push(&alpha_neg);
+
+    let qb = qb_poly_or_comm.mul(&res.2);
+    polys_or_comms.push(&qb);
+    challenges.push(alpha);
 
     let factor = zeta.pow(&[n_t_polys as u64]);
     let mut exponent = z_h_eval_zeta.mul(factor);
@@ -424,8 +418,15 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
         t_poly_combined.add_assign(&t_poly.mul(&exponent));
         exponent.mul_assign(&factor);
     }
-    l.sub_assign(&t_poly_combined);
-    l
+    polys_or_comms.push(&t_poly_combined);
+    challenges.push(&one_neg);
+
+    polys_or_comms
+        .par_iter()
+        .zip(challenges)
+        .map(|(polys_or_comm, challenge)| polys_or_comm.mul(challenge))
+        .reduce_with(|x, y| x.add(&y))
+        .unwrap()
 }
 
 /// Compute the r polynomial.
@@ -531,34 +532,6 @@ pub(super) fn compute_lagrange_constant<F: Scalar>(group: &[F], base_index: usiz
     constant_inv.inv().unwrap()
 }
 
-/// compute the scalar factor of z(X) in the r poly.
-/// prod(fi(\zeta) + \beta * k_i * \zeta + \gamma) * \alpha
-///       + (\zeta^n - 1) / (\zeta-1) * \alpha^2
-fn compute_z_scalar_in_r<F: Scalar>(
-    w_polys_eval_zeta: &[&F],
-    k: &[F],
-    challenges: &PlonkChallenges<F>,
-    first_lagrange_eval_zeta: &F,
-) -> F {
-    let n_wires_per_gate = w_polys_eval_zeta.len();
-    let (beta, gamma) = challenges.get_beta_gamma().unwrap();
-    let alpha = challenges.get_alpha().unwrap();
-    let alpha_square = challenges.get_alpha_square();
-    let zeta = challenges.get_zeta().unwrap();
-
-    // 1. alpha * prod_{i=1..n_wires_per_gate}(fi(\zeta) + \beta * k_i * \zeta + \gamma)
-    let beta_zeta = beta.mul(zeta);
-    let mut z_scalar = *alpha;
-    for i in 0..n_wires_per_gate {
-        let tmp = w_polys_eval_zeta[i].add(&k[i].mul(&beta_zeta)).add(gamma);
-        z_scalar.mul_assign(&tmp);
-    }
-
-    // 2. alpha^2 * (beta^n - 1) / (beta - 1)
-    z_scalar.add_assign(&first_lagrange_eval_zeta.mul(alpha_square));
-    z_scalar
-}
-
 /// Evaluate the r polynomial at point \zeta.
 pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     proof: &PlonkPf<PCS>,
@@ -567,7 +540,7 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     first_lagrange_eval_zeta: &PCS::Field,
 ) -> PCS::Field {
     let alpha = challenges.get_alpha().unwrap();
-    let alpha_square = challenges.get_alpha_square();
+    let alpha_square = alpha.mul(alpha);
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
 
     let term0 = pi_eval_zeta;

@@ -207,7 +207,6 @@ pub fn prover_with_lagrange<
     // 4. get challenge alpha
     let alpha = transcript_get_plonk_challenge_alpha(transcript, n_constraints);
     challenges.insert_alpha(alpha).unwrap();
-    challenges.insert_alpha_square();
 
     // 5. build t, split into `n_wires_per_gate` degree-(N+2) polynomials and commit
     let t_poly =
