@@ -75,7 +75,7 @@ pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> R
     verify_ar_to_abar_body(params, &note.body).c(d!())
 }
 
-/// Batch verify transparent-to-anonymous notes.
+/// Batch verify the transparent-to-anonymous notes.
 pub fn batch_verify_ar_to_abar_note(
     params: &[&VerifierParams],
     notes: &[&ArToAbarNote],

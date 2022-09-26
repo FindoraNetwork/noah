@@ -353,7 +353,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     .c(d!(ZeiError::AXfrVerificationError))
 }
 
-/// Batch verify the anonymous-to-confidential note.
+/// Batch verify the anonymous-to-confidential notes.
 pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &[&VerifierParams],
     notes: &[&AbarToBarNote],

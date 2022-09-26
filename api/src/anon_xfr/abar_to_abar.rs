@@ -233,7 +233,7 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     .c(d!(ZeiError::AXfrVerificationError))
 }
 
-/// Batch verify anonymous transfer notes.
+/// Batch verify the anonymous transfer notes.
 pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &[&VerifierParams],
     notes: &[&AXfrNote],

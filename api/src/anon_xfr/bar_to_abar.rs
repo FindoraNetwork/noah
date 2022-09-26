@@ -109,7 +109,7 @@ pub fn verify_bar_to_abar_note(
     bar_pub_key.verify(&msg, &note.signature).c(d!())
 }
 
-/// Batch verify confidential-to-anonymous notes.
+/// Batch verify the confidential-to-anonymous notes.
 pub fn batch_verify_bar_to_abar_note(
     params: &[&VerifierParams],
     notes: &[&BarToAbarNote],
