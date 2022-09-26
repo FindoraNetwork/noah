@@ -376,6 +376,8 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
+    let pc_gens = PedersenCommitmentRistretto::default();
+
     let is_success = params
         .par_iter()
         .zip(notes)
@@ -383,7 +385,6 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         .zip(hashes)
         .map(|(((param, note), merkle_root), hash)| {
             let bar = note.body.output.clone();
-            let pc_gens = PedersenCommitmentRistretto::default();
 
             // 1. Get commitments.
             // 1.1 Reconstruct total amount commitment from bar.
