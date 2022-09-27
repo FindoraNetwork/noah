@@ -191,11 +191,11 @@ mod smoke_axfr {
         .unwrap();
         assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
 
-        let mut note = note.clone();
+        let mut err_note = note.clone();
         let message = b"error_message";
         let bad_sig = sender.sign(message).unwrap();
-        note.signature = bad_sig;
-        assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_err());
+        err_note.signature = bad_sig;
+        assert!(verify_bar_to_abar_note(&verify_params, &err_note, &sender.pub_key).is_err());
 
         #[cfg(feature = "parallel")]
         {
@@ -203,7 +203,7 @@ mod smoke_axfr {
             let pub_keys = vec![&sender.pub_key; 6];
             assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok());
 
-            notes[5] = &note;
+            notes[5] = &err_note;
             assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_err());
         }
 
