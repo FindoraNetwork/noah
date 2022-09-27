@@ -396,8 +396,8 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     );
     // res.0 + (L1(zeta) * alpha)
     res.0.add_assign(&first_lagrange_eval_zeta.mul(alpha));
-    let x = z_poly_or_comm.mul(&res.0);
-    polys_or_comms.push(&x);
+    let z_poly_or_comm = z_poly_or_comm.mul(&res.0);
+    polys_or_comms.push(&z_poly_or_comm);
     challenges.push(alpha);
 
     // res.1 * perm_{n_wires_per_gate}(X)* z(zeta * omega) * beta
