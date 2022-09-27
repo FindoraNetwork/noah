@@ -80,7 +80,7 @@ pub fn batch_verify_ar_to_abar_note(
     params: &[&VerifierParams],
     notes: &[&ArToAbarNote],
 ) -> Result<()> {
-    let is_success = params
+    let is_ok = params
         .par_iter()
         .zip(notes)
         .map(|(param, note)| {
@@ -95,7 +95,7 @@ pub fn batch_verify_ar_to_abar_note(
         })
         .all(|x| x.is_ok());
 
-    if is_success {
+    if is_ok {
         Ok(())
     } else {
         Err(eg!())

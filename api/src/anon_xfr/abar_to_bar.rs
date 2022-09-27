@@ -378,7 +378,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
 
     let pc_gens = PedersenCommitmentRistretto::default();
 
-    let is_success = params
+    let is_ok = params
         .par_iter()
         .zip(notes)
         .zip(merkle_roots)
@@ -486,7 +486,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         })
         .all(|x| x.is_ok());
 
-    if is_success {
+    if is_ok {
         Ok(())
     } else {
         Err(eg!(ZeiError::AXfrVerificationError))

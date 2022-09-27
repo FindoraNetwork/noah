@@ -248,7 +248,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
         return Err(eg!(ZeiError::AXfrVerificationError));
     }
 
-    let is_success = params
+    let is_ok = params
         .par_iter()
         .zip(notes)
         .zip(merkle_roots)
@@ -287,7 +287,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
         })
         .all(|x| x.is_ok());
 
-    if is_success {
+    if is_ok {
         Ok(())
     } else {
         Err(eg!(ZeiError::AXfrVerificationError))
@@ -838,8 +838,7 @@ pub(crate) fn add_payees_witnesses(
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::abar_to_abar::{
-        batch_verify_anon_xfr_note, finish_anon_xfr_note, init_anon_xfr_note, AXfrNote,
-        ANON_XFR_FOLDING_PROOF_TRANSCRIPT,
+        finish_anon_xfr_note, init_anon_xfr_note, AXfrNote, ANON_XFR_FOLDING_PROOF_TRANSCRIPT,
     };
     use crate::anon_xfr::address_folding::{
         create_address_folding, prepare_verifier_input, verify_address_folding,
@@ -1108,19 +1107,10 @@ mod tests {
         }
         {
             // verifier scope
-            let verifier_param = VerifierParams::from(user_params);
+            let verifier_params = VerifierParams::from(user_params);
             assert!(
-                verify_anon_xfr_note(&verifier_param, &note, &merkle_root, test_hash.clone())
+                verify_anon_xfr_note(&verifier_params, &note, &merkle_root, test_hash.clone())
                     .is_ok()
-            );
-
-            let verifier_params = vec![&verifier_param; 6];
-            let notes = vec![&note; 6];
-            let merkle_roots = vec![&merkle_root; 6];
-            let hashes = vec![test_hash.clone(); 6];
-
-            assert!(
-                batch_verify_anon_xfr_note(&verifier_params, &notes, &merkle_roots, hashes).is_ok()
             );
         }
     }

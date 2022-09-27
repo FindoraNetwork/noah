@@ -115,7 +115,7 @@ pub fn batch_verify_bar_to_abar_note(
     notes: &[&BarToAbarNote],
     bar_pub_keys: &[&XfrPublicKey],
 ) -> Result<()> {
-    let is_success = params
+    let is_ok = params
         .par_iter()
         .zip(notes)
         .zip(bar_pub_keys)
@@ -128,7 +128,7 @@ pub fn batch_verify_bar_to_abar_note(
         })
         .all(|x| x.is_ok());
 
-    if is_success {
+    if is_ok {
         Ok(())
     } else {
         Err(eg!())
