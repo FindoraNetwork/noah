@@ -41,7 +41,6 @@ libsecp256k1 = '0.7'
 linear-map = '1.2.0'
 merlin = '3.0'
 rand_chacha = '0.3'
-rayon = "1.5"
 rmp-serde = '1.0.0'
 ruc = '1.0'
 serde = '1.0'
@@ -85,6 +84,10 @@ version = '0.2.12'
 [dependencies.num-bigint]
 version = '0.4.0'
 features = ['rand']
+
+[dependencies.rayon]
+version = '1.5'
+optional = true
 
 [dependencies.structopt]
 version = '0.3.26'
@@ -144,6 +147,7 @@ no_srs = []
 no_vk = []
 parallel = [
     'default',
+    'rayon',
     'zei-algebra/parallel',
 ]
 gen = ["parallel", "structopt"]

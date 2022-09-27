@@ -20,6 +20,7 @@ use crate::xfr::{
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use num_bigint::BigUint;
+#[cfg(feature = "parallel")]
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{
     bls12_381::BLSScalar,
@@ -354,6 +355,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 }
 
 /// Batch verify the anonymous-to-confidential notes.
+#[cfg(feature = "parallel")]
 pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &VerifierParams,
     notes: &[&AbarToBarNote],

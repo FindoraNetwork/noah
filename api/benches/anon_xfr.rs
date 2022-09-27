@@ -132,25 +132,28 @@ fn abar_to_abar(
     });
     single_group.finish();
 
-    for batch_size in BATCHSIZE {
-        let verifiers_params = vec![&verifier_params; batch_size];
-        let notes = vec![&note; batch_size];
-        let merkle_roots = vec![&root; batch_size];
-        let hashes = vec![hash.clone(); batch_size];
-        let mut batch_group = c.benchmark_group("abar_to_abar");
-        batch_group.sample_size(20);
-        batch_group.bench_function(format!("batch size {}", batch_size), |b| {
-            b.iter(|| {
-                assert!(batch_verify_anon_xfr_note(
-                    &verifiers_params,
-                    &notes,
-                    &merkle_roots,
-                    hashes.clone()
-                )
-                .is_ok())
+    #[cfg(feature = "parallel")]
+    {
+        for batch_size in BATCHSIZE {
+            let verifiers_params = vec![&verifier_params; batch_size];
+            let notes = vec![&note; batch_size];
+            let merkle_roots = vec![&root; batch_size];
+            let hashes = vec![hash.clone(); batch_size];
+            let mut batch_group = c.benchmark_group("abar_to_abar");
+            batch_group.sample_size(20);
+            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+                b.iter(|| {
+                    assert!(batch_verify_anon_xfr_note(
+                        &verifiers_params,
+                        &notes,
+                        &merkle_roots,
+                        hashes.clone()
+                    )
+                    .is_ok())
+                });
             });
-        });
-        batch_group.finish();
+            batch_group.finish();
+        }
     }
 }
 
@@ -190,25 +193,28 @@ fn abar_to_ar(c: &mut Criterion) {
     });
     single_group.finish();
 
-    for batch_size in BATCHSIZE {
-        let notes = vec![&note; batch_size];
-        let merkle_roots = vec![&proof.root; batch_size];
-        let hashes = vec![hash.clone(); batch_size];
+    #[cfg(feature = "parallel")]
+    {
+        for batch_size in BATCHSIZE {
+            let notes = vec![&note; batch_size];
+            let merkle_roots = vec![&proof.root; batch_size];
+            let hashes = vec![hash.clone(); batch_size];
 
-        let mut batch_group = c.benchmark_group("abar_to_abar");
-        batch_group.sample_size(20);
-        batch_group.bench_function(format!("batch size {}", batch_size), |b| {
-            b.iter(|| {
-                assert!(batch_verify_abar_to_ar_note(
-                    &verify_params,
-                    &notes,
-                    &merkle_roots,
-                    hashes.clone()
-                )
-                .is_ok())
+            let mut batch_group = c.benchmark_group("abar_to_abar");
+            batch_group.sample_size(20);
+            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+                b.iter(|| {
+                    assert!(batch_verify_abar_to_ar_note(
+                        &verify_params,
+                        &notes,
+                        &merkle_roots,
+                        hashes.clone()
+                    )
+                    .is_ok())
+                });
             });
-        });
-        batch_group.finish();
+            batch_group.finish();
+        }
     }
 }
 
@@ -256,25 +262,28 @@ fn abar_to_bar(c: &mut Criterion) {
     });
     single_group.finish();
 
-    for batch_size in BATCHSIZE {
-        let notes = vec![&note; batch_size];
-        let merkle_roots = vec![&proof.root; batch_size];
-        let hashes = vec![hash.clone(); batch_size];
+    #[cfg(feature = "parallel")]
+    {
+        for batch_size in BATCHSIZE {
+            let notes = vec![&note; batch_size];
+            let merkle_roots = vec![&proof.root; batch_size];
+            let hashes = vec![hash.clone(); batch_size];
 
-        let mut batch_group = c.benchmark_group("abar_to_bar");
-        batch_group.sample_size(20);
-        batch_group.bench_function(format!("batch size {}", batch_size), |b| {
-            b.iter(|| {
-                assert!(batch_verify_abar_to_bar_note(
-                    &verify_params,
-                    &notes,
-                    &merkle_roots,
-                    hashes.clone()
-                )
-                .is_ok())
+            let mut batch_group = c.benchmark_group("abar_to_bar");
+            batch_group.sample_size(20);
+            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+                b.iter(|| {
+                    assert!(batch_verify_abar_to_bar_note(
+                        &verify_params,
+                        &notes,
+                        &merkle_roots,
+                        hashes.clone()
+                    )
+                    .is_ok())
+                });
             });
-        });
-        batch_group.finish();
+            batch_group.finish();
+        }
     }
 }
 
@@ -316,15 +325,18 @@ fn ar_to_abar(c: &mut Criterion) {
     });
     single_group.finish();
 
-    for batch_size in BATCHSIZE {
-        let notes = vec![&note; batch_size];
+    #[cfg(feature = "parallel")]
+    {
+        for batch_size in BATCHSIZE {
+            let notes = vec![&note; batch_size];
 
-        let mut batch_group = c.benchmark_group("ar_to_abar");
-        batch_group.sample_size(20);
-        batch_group.bench_function(format!("batch size {}", batch_size), |b| {
-            b.iter(|| assert!(batch_verify_ar_to_abar_note(&verify_params, &notes).is_ok()));
-        });
-        batch_group.finish();
+            let mut batch_group = c.benchmark_group("ar_to_abar");
+            batch_group.sample_size(20);
+            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+                b.iter(|| assert!(batch_verify_ar_to_abar_note(&verify_params, &notes).is_ok()));
+            });
+            batch_group.finish();
+        }
     }
 }
 
@@ -366,18 +378,23 @@ fn bar_to_abar(c: &mut Criterion) {
     });
     single_group.finish();
 
-    for batch_size in BATCHSIZE {
-        let notes = vec![&note; batch_size];
-        let pub_keys = vec![&sender.pub_key; batch_size];
+    #[cfg(feature = "parallel")]
+    {
+        for batch_size in BATCHSIZE {
+            let notes = vec![&note; batch_size];
+            let pub_keys = vec![&sender.pub_key; batch_size];
 
-        let mut batch_group = c.benchmark_group("bar_to_abar");
-        batch_group.sample_size(20);
-        batch_group.bench_function(format!("batch size {}", batch_size), |b| {
-            b.iter(|| {
-                assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok())
+            let mut batch_group = c.benchmark_group("bar_to_abar");
+            batch_group.sample_size(20);
+            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+                b.iter(|| {
+                    assert!(
+                        batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok()
+                    )
+                });
             });
-        });
-        batch_group.finish();
+            batch_group.finish();
+        }
     }
 }
 

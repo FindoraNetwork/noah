@@ -24,7 +24,10 @@ merlin = '3.0.0'
 num-bigint = '0.4'
 num-integer = '0.1.43'
 serde_derive = '1.0.115'
-rayon = '1.5'
+
+[dependencies.rayon]
+version = '1.5'
+optional = true
 
 [dependencies.rand_chacha]
 version = '0.3'
@@ -56,3 +59,4 @@ features = ['rand']
 default = ["std"]
 debug = []
 std = ['ark-std/std']
+parallel = ['rayon']

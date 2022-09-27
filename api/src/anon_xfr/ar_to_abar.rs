@@ -12,6 +12,7 @@ use crate::xfr::{
     structs::{BlindAssetRecord, OpenAssetRecord},
 };
 use merlin::Transcript;
+#[cfg(feature = "parallel")]
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{bls12_381::BLSScalar, errors::ZeiError, prelude::*};
 use zei_plonk::plonk::{
@@ -76,6 +77,7 @@ pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> R
 }
 
 /// Batch verify the transparent-to-anonymous notes.
+#[cfg(feature = "parallel")]
 pub fn batch_verify_ar_to_abar_note(
     params: &VerifierParams,
     notes: &[&ArToAbarNote],

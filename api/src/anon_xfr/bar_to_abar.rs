@@ -12,6 +12,7 @@ use crate::xfr::{
 };
 use merlin::Transcript;
 use num_bigint::BigUint;
+#[cfg(feature = "parallel")]
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{
     bls12_381::BLSScalar,
@@ -110,6 +111,7 @@ pub fn verify_bar_to_abar_note(
 }
 
 /// Batch verify the confidential-to-anonymous notes.
+#[cfg(feature = "parallel")]
 pub fn batch_verify_bar_to_abar_note(
     params: &VerifierParams,
     notes: &[&BarToAbarNote],

@@ -145,8 +145,11 @@ mod smoke_axfr {
         .unwrap();
         assert!(verify_ar_to_abar_note(&verify_params, &note).is_ok());
 
-        let notes = vec![&note; 6];
-        assert!(batch_verify_ar_to_abar_note(&verify_params, &notes).is_ok());
+        #[cfg(feature = "parallel")]
+        {
+            let notes = vec![&note; 6];
+            assert!(batch_verify_ar_to_abar_note(&verify_params, &notes).is_ok());
+        }
 
         // check open abar
         let oabar =
@@ -188,18 +191,21 @@ mod smoke_axfr {
         .unwrap();
         assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
 
-        let mut notes = vec![&note; 6];
-        let pub_keys = vec![&sender.pub_key; 6];
-        assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok());
-
         let mut note = note.clone();
         let message = b"error_message";
         let bad_sig = sender.sign(message).unwrap();
         note.signature = bad_sig;
         assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_err());
 
-        notes[5] = &note;
-        assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_err());
+        #[cfg(feature = "parallel")]
+        {
+            let mut notes = vec![&note; 6];
+            let pub_keys = vec![&sender.pub_key; 6];
+            assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok());
+
+            notes[5] = &note;
+            assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_err());
+        }
 
         // check open ABAR
         let oabar =
@@ -238,38 +244,13 @@ mod smoke_axfr {
         let note = finish_abar_to_ar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_ar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
 
-        let mut notes = vec![&note; 6];
-        let mut merkle_roots = vec![&proof.root; 6];
-        let mut hashes = vec![hash.clone(); 6];
-        batch_verify_abar_to_ar_note(&verify_params, &notes, &merkle_roots, hashes.clone())
-            .unwrap();
-
         let err_root = BLSScalar::random(&mut prng);
         assert!(verify_abar_to_ar_note(&verify_params, &note, &err_root, hash.clone()).is_err());
-
-        merkle_roots[5] = &err_root;
-        assert!(batch_verify_abar_to_ar_note(
-            &verify_params,
-            &notes,
-            &merkle_roots,
-            hashes.clone()
-        )
-        .is_err());
 
         let err_hash = random_hasher(&mut prng);
         assert!(
             verify_abar_to_ar_note(&verify_params, &note, &proof.root, err_hash.clone()).is_err()
         );
-
-        merkle_roots[5] = &proof.root;
-        hashes[5] = err_hash;
-        assert!(batch_verify_abar_to_ar_note(
-            &verify_params,
-            &notes,
-            &merkle_roots,
-            hashes.clone()
-        )
-        .is_err());
 
         let mut err_nullifier = note.clone();
         err_nullifier.body.input = BLSScalar::random(&mut prng);
@@ -278,23 +259,51 @@ mod smoke_axfr {
                 .is_err()
         );
 
-        hashes[5] = hash.clone();
-        notes[5] = &err_nullifier;
-        assert!(batch_verify_abar_to_ar_note(
-            &verify_params,
-            &notes,
-            &merkle_roots,
-            hashes.clone()
-        )
-        .is_err());
-        notes[5] = &note;
-        assert!(batch_verify_abar_to_ar_note(
-            &verify_params,
-            &notes,
-            &merkle_roots,
-            hashes.clone()
-        )
-        .is_ok());
+        #[cfg(feature = "parallel")]
+        {
+            let mut notes = vec![&note; 6];
+            let mut merkle_roots = vec![&proof.root; 6];
+            let mut hashes = vec![hash.clone(); 6];
+            batch_verify_abar_to_ar_note(&verify_params, &notes, &merkle_roots, hashes.clone())
+                .unwrap();
+
+            merkle_roots[5] = &err_root;
+            assert!(batch_verify_abar_to_ar_note(
+                &verify_params,
+                &notes,
+                &merkle_roots,
+                hashes.clone()
+            )
+            .is_err());
+
+            merkle_roots[5] = &proof.root;
+            hashes[5] = err_hash;
+            assert!(batch_verify_abar_to_ar_note(
+                &verify_params,
+                &notes,
+                &merkle_roots,
+                hashes.clone()
+            )
+            .is_err());
+
+            hashes[5] = hash.clone();
+            notes[5] = &err_nullifier;
+            assert!(batch_verify_abar_to_ar_note(
+                &verify_params,
+                &notes,
+                &merkle_roots,
+                hashes.clone()
+            )
+            .is_err());
+            notes[5] = &note;
+            assert!(batch_verify_abar_to_ar_note(
+                &verify_params,
+                &notes,
+                &merkle_roots,
+                hashes.clone()
+            )
+            .is_ok());
+        }
 
         // check open AR
         let obar = open_blind_asset_record(&note.body.output, &note.body.memo, &receiver).unwrap();
@@ -337,38 +346,13 @@ mod smoke_axfr {
         let note = finish_abar_to_bar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_bar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
 
-        let mut notes = vec![&note; 6];
-        let mut merkle_roots = vec![&proof.root; 6];
-        let mut hashes = vec![hash.clone(); 6];
-        batch_verify_abar_to_bar_note(&verify_params, &notes, &merkle_roots, hashes.clone())
-            .unwrap();
-
         let err_root = BLSScalar::random(&mut prng);
         assert!(verify_abar_to_bar_note(&verify_params, &note, &err_root, hash.clone()).is_err());
-
-        merkle_roots[5] = &err_root;
-        assert!(batch_verify_abar_to_bar_note(
-            &verify_params,
-            &notes,
-            &merkle_roots,
-            hashes.clone()
-        )
-        .is_err());
 
         let err_hash = random_hasher(&mut prng);
         assert!(
             verify_abar_to_bar_note(&verify_params, &note, &proof.root, err_hash.clone()).is_err()
         );
-
-        merkle_roots[5] = &proof.root;
-        hashes[5] = err_hash;
-        assert!(batch_verify_abar_to_bar_note(
-            &verify_params,
-            &notes,
-            &merkle_roots,
-            hashes.clone()
-        )
-        .is_err());
 
         let mut err_nullifier = note.clone();
         err_nullifier.body.input = BLSScalar::random(&mut prng);
@@ -377,19 +361,48 @@ mod smoke_axfr {
                 .is_err()
         );
 
-        hashes[5] = hash;
-        notes[5] = &err_nullifier;
-        assert!(batch_verify_abar_to_bar_note(
-            &verify_params,
-            &notes,
-            &merkle_roots,
-            hashes.clone()
-        )
-        .is_err());
-        notes[5] = &note;
-        assert!(
-            batch_verify_abar_to_bar_note(&verify_params, &notes, &merkle_roots, hashes).is_ok()
-        );
+        #[cfg(feature = "parallel")]
+        {
+            let mut notes = vec![&note; 6];
+            let mut merkle_roots = vec![&proof.root; 6];
+            let mut hashes = vec![hash.clone(); 6];
+            batch_verify_abar_to_bar_note(&verify_params, &notes, &merkle_roots, hashes.clone())
+                .unwrap();
+
+            merkle_roots[5] = &err_root;
+            assert!(batch_verify_abar_to_bar_note(
+                &verify_params,
+                &notes,
+                &merkle_roots,
+                hashes.clone()
+            )
+            .is_err());
+
+            merkle_roots[5] = &proof.root;
+            hashes[5] = err_hash;
+            assert!(batch_verify_abar_to_bar_note(
+                &verify_params,
+                &notes,
+                &merkle_roots,
+                hashes.clone()
+            )
+            .is_err());
+
+            hashes[5] = hash;
+            notes[5] = &err_nullifier;
+            assert!(batch_verify_abar_to_bar_note(
+                &verify_params,
+                &notes,
+                &merkle_roots,
+                hashes.clone()
+            )
+            .is_err());
+            notes[5] = &note;
+            assert!(
+                batch_verify_abar_to_bar_note(&verify_params, &notes, &merkle_roots, hashes)
+                    .is_ok()
+            );
+        }
 
         // check open BAR
         let obar = open_blind_asset_record(&note.body.output, &note.body.memo, &receiver).unwrap();
@@ -525,14 +538,17 @@ mod smoke_axfr {
 
         verify_anon_xfr_note(&verifier_params, &note, &root, hash.clone()).unwrap();
 
-        let verifiers_params = vec![&verifier_params; 6];
-        let notes = vec![&note; 6];
-        let merkle_roots = vec![&root; 6];
-        let hashes = vec![hash.clone(); 6];
-
-        assert!(
-            batch_verify_anon_xfr_note(&verifiers_params, &notes, &merkle_roots, hashes).is_ok()
-        );
+        #[cfg(feature = "parallel")]
+        {
+            let verifiers_params = vec![&verifier_params; 6];
+            let notes = vec![&note; 6];
+            let merkle_roots = vec![&root; 6];
+            let hashes = vec![hash.clone(); 6];
+            assert!(
+                batch_verify_anon_xfr_note(&verifiers_params, &notes, &merkle_roots, hashes)
+                    .is_ok()
+            );
+        }
 
         // check abar
         for i in 0..note.body.outputs.len() {

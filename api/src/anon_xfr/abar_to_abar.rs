@@ -17,6 +17,7 @@ use crate::errors::ZeiError;
 use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
+#[cfg(feature = "parallel")]
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::rescue::RescueInstance;
@@ -234,6 +235,7 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
 }
 
 /// Batch verify the anonymous transfer notes.
+#[cfg(feature = "parallel")]
 pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &[&VerifierParams],
     notes: &[&AXfrNote],
