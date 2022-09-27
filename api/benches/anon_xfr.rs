@@ -191,7 +191,6 @@ fn abar_to_ar(c: &mut Criterion) {
     single_group.finish();
 
     for batch_size in BATCHSIZE {
-        let verifier_params = vec![&verify_params; batch_size];
         let notes = vec![&note; batch_size];
         let merkle_roots = vec![&proof.root; batch_size];
         let hashes = vec![hash.clone(); batch_size];
@@ -201,7 +200,7 @@ fn abar_to_ar(c: &mut Criterion) {
         batch_group.bench_function(format!("batch size {}", batch_size), |b| {
             b.iter(|| {
                 assert!(batch_verify_abar_to_ar_note(
-                    &verifier_params,
+                    &verify_params,
                     &notes,
                     &merkle_roots,
                     hashes.clone()
@@ -258,7 +257,6 @@ fn abar_to_bar(c: &mut Criterion) {
     single_group.finish();
 
     for batch_size in BATCHSIZE {
-        let verifier_params = vec![&verify_params; batch_size];
         let notes = vec![&note; batch_size];
         let merkle_roots = vec![&proof.root; batch_size];
         let hashes = vec![hash.clone(); batch_size];
@@ -268,7 +266,7 @@ fn abar_to_bar(c: &mut Criterion) {
         batch_group.bench_function(format!("batch size {}", batch_size), |b| {
             b.iter(|| {
                 assert!(batch_verify_abar_to_bar_note(
-                    &verifier_params,
+                    &verify_params,
                     &notes,
                     &merkle_roots,
                     hashes.clone()
@@ -319,13 +317,12 @@ fn ar_to_abar(c: &mut Criterion) {
     single_group.finish();
 
     for batch_size in BATCHSIZE {
-        let verifier_params = vec![&verify_params; batch_size];
         let notes = vec![&note; batch_size];
 
         let mut batch_group = c.benchmark_group("ar_to_abar");
         batch_group.sample_size(20);
         batch_group.bench_function(format!("batch size {}", batch_size), |b| {
-            b.iter(|| assert!(batch_verify_ar_to_abar_note(&verifier_params, &notes).is_ok()));
+            b.iter(|| assert!(batch_verify_ar_to_abar_note(&verify_params, &notes).is_ok()));
         });
         batch_group.finish();
     }
@@ -370,7 +367,6 @@ fn bar_to_abar(c: &mut Criterion) {
     single_group.finish();
 
     for batch_size in BATCHSIZE {
-        let verifier_params = vec![&verify_params; batch_size];
         let notes = vec![&note; batch_size];
         let pub_keys = vec![&sender.pub_key; batch_size];
 
@@ -378,7 +374,7 @@ fn bar_to_abar(c: &mut Criterion) {
         batch_group.sample_size(20);
         batch_group.bench_function(format!("batch size {}", batch_size), |b| {
             b.iter(|| {
-                assert!(batch_verify_bar_to_abar_note(&verifier_params, &notes, &pub_keys).is_ok())
+                assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok())
             });
         });
         batch_group.finish();

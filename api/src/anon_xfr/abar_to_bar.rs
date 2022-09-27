@@ -355,7 +355,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 
 /// Batch verify the anonymous-to-confidential notes.
 pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
-    params: &[&VerifierParams],
+    params: &VerifierParams,
     notes: &[&AbarToBarNote],
     merkle_roots: &[&BLSScalar],
     hashes: Vec<D>,
@@ -378,12 +378,11 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
 
     let pc_gens = PedersenCommitmentRistretto::default();
 
-    let is_ok = params
+    let is_ok = notes
         .par_iter()
-        .zip(notes)
         .zip(merkle_roots)
         .zip(hashes)
-        .map(|(((param, note), merkle_root), hash)| {
+        .map(|((note, merkle_root), hash)| {
             let bar = note.body.output.clone();
 
             // 1. Get commitments.
@@ -477,9 +476,9 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
 
             verifier(
                 &mut transcript,
-                &param.pcs,
-                &param.cs,
-                &param.verifier_params,
+                &params.pcs,
+                &params.cs,
+                &params.verifier_params,
                 &online_inputs,
                 &note.proof,
             )

@@ -111,17 +111,21 @@ pub fn verify_bar_to_abar_note(
 
 /// Batch verify the confidential-to-anonymous notes.
 pub fn batch_verify_bar_to_abar_note(
-    params: &[&VerifierParams],
+    params: &VerifierParams,
     notes: &[&BarToAbarNote],
     bar_pub_keys: &[&XfrPublicKey],
 ) -> Result<()> {
-    let is_ok = params
+    let is_ok = notes
         .par_iter()
-        .zip(notes)
         .zip(bar_pub_keys)
-        .map(|((param, note), bar_pub_key)| {
-            verify_bar_to_abar(param, &note.body.input, &note.body.output, &note.body.proof)
-                .c(d!())?;
+        .map(|(note, bar_pub_key)| {
+            verify_bar_to_abar(
+                params,
+                &note.body.input,
+                &note.body.output,
+                &note.body.proof,
+            )
+            .c(d!())?;
 
             let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
             bar_pub_key.verify(&msg, &note.signature)
