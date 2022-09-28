@@ -117,4 +117,4 @@ jobs:
           with:
             toolchain: ${{ matrix.rust }}
             command: test
-            args: "-p zei --feature parallel"
+            args: "-p zei --features parallel"
