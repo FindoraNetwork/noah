@@ -149,6 +149,7 @@ parallel = [
     'default',
     'rayon',
     'zei-algebra/parallel',
+    'zei-plonk/parallel'
 ]
 gen = ["parallel", "structopt"]
 lightweight = [] # Minimize size for only AR2ABAR and ABAR2AR.
