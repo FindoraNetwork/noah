@@ -82,6 +82,29 @@ impl FromStr for BLSScalar {
     }
 }
 
+impl BLSScalar {
+    /// Create a new scalar element from the arkworks-rs representation.
+    pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
+        type Params = <Fr as PrimeField>::Params;
+        BLSScalar(Fr::const_from_str(
+            &limbs,
+            is_positive,
+            Params::R2,
+            Params::MODULUS,
+            Params::INV,
+        ))
+    }
+}
+
+/// A convenient macro to initialize a field element over the BLS12-381 curve.
+#[macro_export]
+macro_rules! new_bls12_381 {
+    ($c0:expr) => {{
+        let (is_positive, limbs) = ark_ff::ark_ff_macros::to_sign_and_limbs!($c0);
+        BLSScalar::new(is_positive, &limbs)
+    }};
+}
+
 impl Into<BigUint> for BLSScalar {
     #[inline]
     fn into(self) -> BigUint {
@@ -133,6 +156,13 @@ impl Mul for BLSScalar {
     }
 }
 
+impl Sum<BLSScalar> for BLSScalar {
+    #[inline]
+    fn sum<I: Iterator<Item = BLSScalar>>(iter: I) -> Self {
+        iter.fold(Self::zero(), Add::add)
+    }
+}
+
 impl<'a> Add<&'a BLSScalar> for BLSScalar {
     type Output = BLSScalar;
 
@@ -181,6 +211,13 @@ impl<'a> MulAssign<&'a BLSScalar> for BLSScalar {
     }
 }
 
+impl<'a> Sum<&'a BLSScalar> for BLSScalar {
+    #[inline]
+    fn sum<I: Iterator<Item = &'a BLSScalar>>(iter: I) -> Self {
+        iter.fold(Self::zero(), Add::add)
+    }
+}
+
 impl Neg for BLSScalar {
     type Output = BLSScalar;
 
@@ -221,7 +258,7 @@ impl Scalar for BLSScalar {
 
     #[inline]
     fn capacity() -> usize {
-        ark_bls12_381::FrParameters::CAPACITY as usize
+        FrParameters::CAPACITY as usize
     }
 
     #[inline]
@@ -293,6 +330,10 @@ impl Scalar for BLSScalar {
         let mut array = [0u64; 4];
         array[..len].copy_from_slice(exponent);
         Self(self.0.pow(&array))
+    }
+
+    fn square(&self) -> Self {
+        Self(self.0.square())
     }
 }
 

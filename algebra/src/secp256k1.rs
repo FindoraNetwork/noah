@@ -105,6 +105,13 @@ impl Mul for SECP256K1Scalar {
     }
 }
 
+impl Sum<SECP256K1Scalar> for SECP256K1Scalar {
+    #[inline]
+    fn sum<I: Iterator<Item = SECP256K1Scalar>>(iter: I) -> Self {
+        iter.fold(Self::zero(), Add::add)
+    }
+}
+
 impl<'a> Add<&'a SECP256K1Scalar> for SECP256K1Scalar {
     type Output = SECP256K1Scalar;
 
@@ -150,6 +157,13 @@ impl<'a> MulAssign<&'a SECP256K1Scalar> for SECP256K1Scalar {
     #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         (self.0).mul_assign(&rhs.0);
+    }
+}
+
+impl<'a> Sum<&'a SECP256K1Scalar> for SECP256K1Scalar {
+    #[inline]
+    fn sum<I: Iterator<Item = &'a SECP256K1Scalar>>(iter: I) -> Self {
+        iter.fold(Self::zero(), Add::add)
     }
 }
 
@@ -280,6 +294,11 @@ impl Scalar for SECP256K1Scalar {
         let mut array = [0u64; 5];
         array[..len].copy_from_slice(exponent);
         Self(self.0.pow(&array))
+    }
+
+    #[inline]
+    fn square(&self) -> Self {
+        Self(self.0.square())
     }
 }
 
