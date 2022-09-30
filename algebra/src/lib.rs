@@ -52,8 +52,8 @@ pub mod prelude;
 
 #[doc(hidden)]
 pub use ark_std::{
-    borrow, cmp, collections, fs, hash, io, iter, ops, path, rand, result, str, One, UniformRand,
-    Zero,
+    borrow, cmp, collections, fmt, fs, hash, io, iter, ops, path, rand, result, str, One,
+    UniformRand, Zero,
 };
 
 /// check if the error messages equal

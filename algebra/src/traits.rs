@@ -25,12 +25,14 @@ pub trait Scalar:
     + Sized
     + Add<Self, Output = Self>
     + Mul<Self, Output = Self>
+    + Sum<Self>
     + for<'a> Add<&'a Self, Output = Self>
     + for<'a> AddAssign<&'a Self>
     + for<'a> Mul<&'a Self, Output = Self>
     + for<'a> MulAssign<&'a Self>
     + for<'a> Sub<&'a Self, Output = Self>
     + for<'a> SubAssign<&'a Self>
+    + for<'a> Sum<&'a Self>
     + From<u32>
     + From<u64>
     + Neg<Output = Self>
@@ -79,6 +81,9 @@ pub trait Scalar:
 
     /// Return the modular inverse of the scalar if it exists
     fn inv(&self) -> Result<Self>;
+
+    /// Return the square of the field element
+    fn square(&self) -> Self;
 
     /// exponent form: least significant limb first, with u64 limbs
     fn pow(&self, exponent: &[u64]) -> Self {
