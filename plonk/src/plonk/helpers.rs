@@ -29,7 +29,7 @@ pub(super) fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<
 }
 
 /// The data structure for challenges in Plonk.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub(super) struct PlonkChallenges<F> {
     challenges: Vec<F>,
 }

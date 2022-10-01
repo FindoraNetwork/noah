@@ -55,7 +55,7 @@ impl<P: SimFrParams> SimFrVar<P> {
             cs.wiring[1].push(zero_var);
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
-            cs.wiring[4].push(zero_var);
+            cs.wiring[5].push(zero_var);
             cs.wiring[OUT].push(res.var[i]);
             cs.finish_new_gate();
         }
@@ -100,7 +100,7 @@ impl<P: SimFrParams> SimFrVar<P> {
                 cs.wiring[1].push(zero_var);
                 cs.wiring[2].push(self.var[left]);
                 cs.wiring[3].push(other.var[i - left]);
-                cs.wiring[4].push(zero_var);
+                cs.wiring[5].push(zero_var);
                 cs.wiring[OUT].push(res);
                 cs.finish_new_gate();
 

@@ -209,6 +209,7 @@ pub fn prover_with_lagrange<
     challenges.insert_alpha(alpha).unwrap();
 
     // 5. build t, split into `n_wires_per_gate` degree-(N+2) polynomials and commit
+    println!("num of w_polys: {}", w_polys.len());
     let t_poly =
         t_poly::<PCS, CS>(cs, prover_params, &w_polys, &z_poly, &challenges, &pi).c(d!())?;
     let (cm_t_vec, t_polys) =
