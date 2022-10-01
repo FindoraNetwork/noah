@@ -1,3 +1,4 @@
+use crate::plonk::constraint_system::turbo::OUT;
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::rescue::RescueInstance;
@@ -152,7 +153,8 @@ impl TurboCS<BLSScalar> {
         self.wiring[1].push(0);
         self.wiring[2].push(0);
         self.wiring[3].push(0);
-        self.wiring[4].push(out_var);
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(out_var);
         self.finish_new_gate();
         out_var
     }
@@ -183,7 +185,8 @@ impl TurboCS<BLSScalar> {
         for (i, var) in vars.iter().enumerate() {
             self.wiring[i].push(*var);
         }
-        self.wiring[4].push(out_var);
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(out_var);
         self.finish_new_gate();
 
         out_var
@@ -215,7 +218,8 @@ impl TurboCS<BLSScalar> {
         for (i, var) in vars.iter().enumerate() {
             self.wiring[i].push(*var);
         }
-        self.wiring[4].push(out_var);
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(out_var);
         self.finish_new_gate();
 
         out_var
@@ -240,7 +244,8 @@ impl TurboCS<BLSScalar> {
             self.wiring[i].push(0);
         }
         self.wiring[3].push(out_var);
-        self.wiring[4].push(var);
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(var);
         self.finish_new_gate();
         out_var
     }

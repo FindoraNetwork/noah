@@ -1,4 +1,4 @@
-use crate::plonk::constraint_system::{TurboCS, VarIndex};
+use crate::plonk::constraint_system::{turbo::OUT, TurboCS, VarIndex};
 use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 
 type F = BLSScalar;
@@ -150,7 +150,8 @@ impl TurboCS<BLSScalar> {
         self.wiring[1].push(p2_var.1);
         self.wiring[2].push(p2_var.0);
         self.wiring[3].push(p1_var.1);
-        self.wiring[4].push(p_out_var.0);
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(p_out_var.0);
         self.size += 1;
 
         // y-coordinate constraint
@@ -165,8 +166,9 @@ impl TurboCS<BLSScalar> {
         self.wiring[1].push(p2_var.0);
         self.wiring[2].push(p1_var.1);
         self.wiring[3].push(p2_var.1);
-        self.wiring[4].push(p_out_var.1);
-        cs.finish_new_gate();
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(p_out_var.1);
+        self.finish_new_gate();
     }
 
     /// Given two elliptic curve point variables `[P1]` and `[P2]`, returns `[P1] + [P2]`
@@ -235,8 +237,9 @@ impl TurboCS<BLSScalar> {
         self.wiring[1].push(b1_var);
         self.wiring[2].push(0);
         self.wiring[3].push(0);
-        self.wiring[4].push(p_out_var.0);
-        cs.finish_new_gate();
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(p_out_var.0);
+        self.finish_new_gate();
 
         // y-coordinate constraint
         self.push_add_selectors(g1.1.sub(&one), g2.1.sub(&one), zero, zero);
@@ -249,8 +252,9 @@ impl TurboCS<BLSScalar> {
         self.wiring[1].push(b1_var);
         self.wiring[2].push(0);
         self.wiring[3].push(0);
-        self.wiring[4].push(p_out_var.1);
-        cs.finish_new_gate();
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(p_out_var.1);
+        self.finish_new_gate();
 
         ExtendedPointVar(p_out_var, p_out_ext)
     }

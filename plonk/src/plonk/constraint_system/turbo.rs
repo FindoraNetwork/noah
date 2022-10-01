@@ -10,10 +10,13 @@ use zei_algebra::prelude::*;
 use std::collections::HashMap;
 
 /// The wires number of a gate in Turbo CS.
-pub const N_WIRES_PER_GATE: usize = 5;
+pub const N_WIRES_PER_GATE: usize = 6;
 
 /// The selectors number in Turbo CS.
 pub const N_SELECTORS: usize = 13;
+
+/// The index of the output wire
+pub const OUT: usize = 5;
 
 /// Turbo PLONK Constraint System.
 #[derive(Serialize, Deserialize)]
@@ -118,13 +121,13 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             .mul(wire_vals[1])
             .mul(wire_vals[2])
             .mul(wire_vals[3])
-            .mul(wire_vals[4]);
+            .mul(wire_vals[OUT]);
         let five = &[5u64];
         let hash1 = sel_vals[8].mul(wire_vals[0].pow(five));
         let hash2 = sel_vals[9].mul(wire_vals[1].pow(five));
         let hash3 = sel_vals[10].mul(wire_vals[2].pow(five));
         let hash4 = sel_vals[11].mul(wire_vals[3].pow(five));
-        let out = sel_vals[12].mul(wire_vals[4]);
+        let out = sel_vals[12].mul(wire_vals[OUT]);
         let mut r = add1;
         r.add_assign(&add2);
         r.add_assign(&add3);
@@ -149,11 +152,11 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         }
         let five = &[5u64];
 
-        let mut w0w1w2w3w4 = *wire_vals[0];
-        w0w1w2w3w4.mul_assign(wire_vals[1]);
-        w0w1w2w3w4.mul_assign(wire_vals[2]);
-        w0w1w2w3w4.mul_assign(wire_vals[3]);
-        w0w1w2w3w4.mul_assign(wire_vals[4]);
+        let mut w0w1w2w3wo = *wire_vals[0];
+        w0w1w2w3wo.mul_assign(wire_vals[1]);
+        w0w1w2w3wo.mul_assign(wire_vals[2]);
+        w0w1w2w3wo.mul_assign(wire_vals[3]);
+        w0w1w2w3wo.mul_assign(wire_vals[OUT]);
 
         Ok(vec![
             *wire_vals[0],
@@ -163,12 +166,12 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             wire_vals[0].mul(wire_vals[1]),
             wire_vals[2].mul(wire_vals[3]),
             F::one(),
-            w0w1w2w3w4,
+            w0w1w2w3wo,
             wire_vals[0].pow(five),
             wire_vals[1].pow(five),
             wire_vals[2].pow(five),
             wire_vals[3].pow(five),
-            wire_vals[4].neg(),
+            wire_vals[OUT].neg(),
         ])
     }
 
@@ -179,7 +182,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     fn shrink_to_verifier_only(&self) -> Result<Self> {
         Ok(Self {
             selectors: vec![],
-            wiring: [vec![], vec![], vec![], vec![], vec![]],
+            wiring: [vec![], vec![], vec![], vec![], vec![], vec![]],
             num_vars: self.num_vars,
             size: self.size,
             public_vars_constraint_indices: vec![],
@@ -226,7 +229,7 @@ impl<F: Scalar> TurboCS<F> {
         let selectors: Vec<Vec<F>> = std::iter::repeat(vec![]).take(N_SELECTORS).collect();
         TurboCS {
             selectors,
-            wiring: [vec![], vec![], vec![], vec![], vec![]],
+            wiring: [vec![], vec![], vec![], vec![], vec![], vec![]],
             num_vars: 2,
             size: 0,
             public_vars_constraint_indices: vec![],
@@ -275,7 +278,8 @@ impl<F: Scalar> TurboCS<F> {
         for (i, wire) in wires_in.iter().enumerate() {
             self.wiring[i].push(*wire);
         }
-        self.wiring[4].push(wire_out);
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(wire_out);
         self.finish_new_gate();
     }
 
@@ -319,7 +323,8 @@ impl<F: Scalar> TurboCS<F> {
         self.wiring[1].push(right_var);
         self.wiring[2].push(0);
         self.wiring[3].push(0);
-        self.wiring[4].push(out_var);
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(out_var);
         self.finish_new_gate();
     }
 
@@ -364,11 +369,15 @@ impl<F: Scalar> TurboCS<F> {
         let wiring_2_var = self.wiring[2][self.size - 1];
         let wiring_3_var = self.wiring[3][self.size - 1];
         let wiring_4_var = self.wiring[4][self.size - 1];
+
+        let wiring_out_var = self.wiring[OUT][self.size - 1];
+
         let wiring_0 = self.witness[wiring_0_var];
         let wiring_1 = self.witness[wiring_1_var];
         let wiring_2 = self.witness[wiring_2_var];
         let wiring_3 = self.witness[wiring_3_var];
-        let wiring_4 = self.witness[wiring_4_var];
+        let _wiring_4 = self.witness[wiring_4_var];
+        let wiring_out = self.witness[wiring_out_var];
 
         let selector_0 = self.selectors[0][self.size - 1];
         let selector_1 = self.selectors[1][self.size - 1];
@@ -402,7 +411,7 @@ impl<F: Scalar> TurboCS<F> {
         let hash2 = selector_9.mul(wiring_1.pow(five));
         let hash3 = selector_10.mul(wiring_2.pow(five));
         let hash4 = selector_11.mul(wiring_3.pow(five));
-        let out = selector_12.mul(wiring_4);
+        let out = selector_12.mul(wiring_out);
         let mut r = add1;
         r.add_assign(&add2);
         r.add_assign(&add3);
@@ -428,6 +437,7 @@ impl<F: Scalar> TurboCS<F> {
             wiring_2_var,
             wiring_3_var,
             wiring_4_var,
+            wiring_out_var,
         ]
         .iter()
         {
@@ -597,7 +607,8 @@ impl<F: Scalar> TurboCS<F> {
         self.wiring[1].push(var0);
         self.wiring[2].push(bit);
         self.wiring[3].push(var1);
-        self.wiring[4].push(out_var);
+        self.wiring[4].push(0);
+        self.wiring[OUT].push(out_var);
         self.finish_new_gate();
         out_var
     }
@@ -652,9 +663,10 @@ impl<F: Scalar> TurboCS<F> {
         self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
-        for i in 0..N_WIRES_PER_GATE {
-            self.wiring[i].push(var);
+        for i in 0..N_WIRES_PER_GATE - 1 {
+            self.wiring[i].push(0);
         }
+        self.wiring[N_WIRES_PER_GATE - 1].push(var);
 
         // The constant should be used somewhere else so it should be removed by another gate.
         //
@@ -684,9 +696,10 @@ impl<F: Scalar> TurboCS<F> {
         self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
-        for i in 0..N_WIRES_PER_GATE {
-            self.wiring[i].push(var);
+        for i in 0..N_WIRES_PER_GATE - 1 {
+            self.wiring[i].push(0);
         }
+        self.wiring[N_WIRES_PER_GATE - 1].push(var);
         self.size += 1;
     }
 
@@ -807,8 +820,16 @@ impl<F: Scalar> TurboCS<F> {
             let w2_value = &witness[self.get_witness_index(1, cs_index)];
             let w3_value = &witness[self.get_witness_index(2, cs_index)];
             let w4_value = &witness[self.get_witness_index(3, cs_index)];
-            let w_out_value = &witness[self.get_witness_index(4, cs_index)];
-            let wire_vals = vec![w1_value, w2_value, w3_value, w4_value, w_out_value];
+            let w5_value = &witness[self.get_witness_index(4, cs_index)];
+            let w_out_value = &witness[self.get_witness_index(5, cs_index)];
+            let wire_vals = vec![
+                w1_value,
+                w2_value,
+                w3_value,
+                w4_value,
+                w5_value,
+                w_out_value,
+            ];
             let sel_vals: Vec<&F> = (0..self.num_selectors())
                 .map(|i| &self.selectors[i][cs_index])
                 .collect();

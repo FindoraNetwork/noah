@@ -1,3 +1,4 @@
+use crate::plonk::constraint_system::turbo::OUT;
 use crate::plonk::constraint_system::{field_simulation::SimFrVar, TurboCS, VarIndex};
 use core::{
     cmp::{max, min},
@@ -53,7 +54,8 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.wiring[1].push(zero_var);
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
-            cs.wiring[4].push(res.var[i]);
+            cs.wiring[4].push(zero_var);
+            cs.wiring[OUT].push(res.var[i]);
             cs.finish_new_gate();
         }
 
@@ -94,7 +96,8 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             cs.wiring[1].push(zero_var);
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
-            cs.wiring[4].push(res.var[i]);
+            cs.wiring[4].push(zero_var);
+            cs.wiring[OUT].push(res.var[i]);
             cs.finish_new_gate();
         }
 
@@ -294,6 +297,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 cs.wiring[2].push(*right_group_limb_var);
                 cs.wiring[3].push(carry_var);
                 cs.wiring[4].push(zero_var);
+                cs.wiring[OUT].push(zero_var);
                 cs.finish_new_gate();
             }
 

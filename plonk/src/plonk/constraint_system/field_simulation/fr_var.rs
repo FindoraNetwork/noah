@@ -1,3 +1,4 @@
+use crate::plonk::constraint_system::turbo::OUT;
 use crate::plonk::constraint_system::{field_simulation::SimFrMulVar, TurboCS, VarIndex};
 use zei_algebra::{
     bls12_381::BLSScalar,
@@ -54,7 +55,8 @@ impl<P: SimFrParams> SimFrVar<P> {
             cs.wiring[1].push(zero_var);
             cs.wiring[2].push(other.var[i]);
             cs.wiring[3].push(zero_var);
-            cs.wiring[4].push(res.var[i]);
+            cs.wiring[4].push(zero_var);
+            cs.wiring[OUT].push(res.var[i]);
             cs.finish_new_gate();
         }
 
@@ -98,7 +100,8 @@ impl<P: SimFrParams> SimFrVar<P> {
                 cs.wiring[1].push(zero_var);
                 cs.wiring[2].push(self.var[left]);
                 cs.wiring[3].push(other.var[i - left]);
-                cs.wiring[4].push(res);
+                cs.wiring[4].push(zero_var);
+                cs.wiring[OUT].push(res);
                 cs.finish_new_gate();
 
                 prior_res = res;
