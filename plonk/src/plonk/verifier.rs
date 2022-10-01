@@ -1,7 +1,7 @@
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
-    helpers::{eval_pi_poly, r_commitment, r_eval_zeta, PlonkChallenges},
+    helpers::{eval_pi_poly, first_lagrange_poly, r_commitment, r_eval_zeta, PlonkChallenges},
     indexer::{PlonkPf, PlonkVK},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
@@ -13,7 +13,7 @@ use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
 use merlin::Transcript;
 use zei_algebra::prelude::*;
 
-/// Verify a proof
+/// Verify a proof.
 pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     transcript: &mut Transcript,
     pcs: &PCS,
@@ -23,46 +23,25 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     proof: &PlonkPf<PCS>,
 ) -> Result<()> {
     transcript_init_plonk(transcript, verifier_params, pi);
-
     let mut challenges = PlonkChallenges::new();
+    // 1. compute all challenges such as gamma, beta, alpha, zeta and u.
+    compute_challenges::<PCS>(&mut challenges, transcript, &proof, cs.size());
 
-    // 1. compute gamma and delta challenges
-    for cm_w in proof.cm_w_vec.iter() {
-        transcript.append_commitment::<PCS::Commitment>(cm_w);
-    }
-    let beta = transcript_get_plonk_challenge_beta(transcript, cs.size());
-    let gamma = transcript_get_plonk_challenge_gamma(transcript, cs.size());
-    challenges.insert_beta_gamma(beta, gamma).unwrap();
+    // 2. compute Z_h(\zeta) and L_1(\zeta).
+    let (z_h_eval_zeta, first_lagrange_eval_zeta) =
+        first_lagrange_poly::<PCS>(&challenges, verifier_params.cs_size as u64);
 
-    // 2. compute alpha challenge
-    transcript.append_commitment::<PCS::Commitment>(&proof.cm_z);
-    let alpha = transcript_get_plonk_challenge_alpha(transcript, cs.size());
-    challenges.insert_alpha(alpha).unwrap();
-    for cm_t in &proof.cm_t_vec {
-        transcript.append_commitment::<PCS::Commitment>(&cm_t);
-    }
+    // 3. compute PI(\zeta).
+    let pi_eval_zeta = eval_pi_poly::<PCS>(
+        verifier_params,
+        pi,
+        &z_h_eval_zeta,
+        challenges.get_zeta().unwrap(),
+    );
 
-    // 3. compute zeta challenge
-    let zeta = transcript_get_plonk_challenge_zeta(transcript, cs.size());
-    challenges.insert_zeta(zeta).unwrap();
-    for eval_zeta in proof
-        .w_polys_eval_zeta
-        .iter()
-        .chain(proof.s_polys_eval_zeta.iter())
-    {
-        transcript.append_field_elem(eval_zeta);
-    }
-    transcript.append_field_elem(&proof.z_eval_zeta_omega);
-
-    let u = transcript_get_plonk_challenge_u(transcript, cs.size());
-    challenges.insert_u(u).unwrap();
-
-    let pi_eval_zeta = eval_pi_poly::<PCS>(verifier_params, pi, challenges.get_zeta().unwrap());
-
-    // 4. derive the linearization polynomial commitment
-    let zeta = challenges.get_zeta().unwrap();
-    let r_eval_zeta = r_eval_zeta::<PCS>(verifier_params, proof, &challenges, &pi_eval_zeta);
-    let zeta_omega = zeta.mul(&verifier_params.root);
+    // 4. derive the linearization polynomial commitment.
+    let r_eval_zeta =
+        r_eval_zeta::<PCS>(proof, &challenges, &pi_eval_zeta, &first_lagrange_eval_zeta);
 
     let w_polys_eval_zeta_as_ref: Vec<&PCS::Field> = proof.w_polys_eval_zeta.iter().collect();
     let s_eval_zeta_as_ref: Vec<&PCS::Field> = proof.s_polys_eval_zeta.iter().collect();
@@ -74,10 +53,12 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         &proof.z_eval_zeta_omega,
         &challenges,
         &proof.cm_t_vec[..],
+        &first_lagrange_eval_zeta,
+        &z_h_eval_zeta,
         verifier_params.cs_size + 2,
     );
 
-    // 5. verify opening proofs
+    // 5. verify opening proofs.
     let mut commitments: Vec<&PCS::Commitment> = proof
         .cm_w_vec
         .iter()
@@ -98,6 +79,8 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         .collect();
     values.push(r_eval_zeta);
 
+    let zeta = challenges.get_zeta().unwrap();
+    let zeta_omega = zeta.mul(&verifier_params.root);
     let (comm, val) = pcs.batch(
         transcript,
         &commitments[..],
@@ -118,4 +101,43 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         challenges.get_u().unwrap(),
     )
     .c(d!(PlonkError::VerificationError))
+}
+
+fn compute_challenges<PCS: PolyComScheme>(
+    challenges: &mut PlonkChallenges<PCS::Field>,
+    transcript: &mut Transcript,
+    proof: &PlonkPf<PCS>,
+    group_order: usize,
+) {
+    // 1. compute gamma and beta challenges.
+    for cm_w in proof.cm_w_vec.iter() {
+        transcript.append_commitment::<PCS::Commitment>(cm_w);
+    }
+    let beta = transcript_get_plonk_challenge_beta(transcript, group_order);
+    let gamma = transcript_get_plonk_challenge_gamma(transcript, group_order);
+    challenges.insert_beta_gamma(beta, gamma).unwrap();
+
+    // 2. compute alpha challenge.
+    transcript.append_commitment::<PCS::Commitment>(&proof.cm_z);
+    let alpha = transcript_get_plonk_challenge_alpha(transcript, group_order);
+    challenges.insert_alpha(alpha).unwrap();
+    for cm_t in &proof.cm_t_vec {
+        transcript.append_commitment::<PCS::Commitment>(&cm_t);
+    }
+
+    // 3. compute zeta challenge.
+    let zeta = transcript_get_plonk_challenge_zeta(transcript, group_order);
+    challenges.insert_zeta(zeta).unwrap();
+    for eval_zeta in proof
+        .w_polys_eval_zeta
+        .iter()
+        .chain(proof.s_polys_eval_zeta.iter())
+    {
+        transcript.append_field_elem(eval_zeta);
+    }
+    transcript.append_field_elem(&proof.z_eval_zeta_omega);
+
+    // 4. compute u challenge.
+    let u = transcript_get_plonk_challenge_u(transcript, group_order);
+    challenges.insert_u(u).unwrap();
 }

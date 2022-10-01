@@ -20,6 +20,8 @@ use crate::xfr::{
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use num_bigint::BigUint;
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{
     bls12_381::BLSScalar,
     prelude::*,
@@ -350,6 +352,147 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
         &note.proof,
     )
     .c(d!(ZeiError::AXfrVerificationError))
+}
+
+/// Batch verify the anonymous-to-confidential notes.
+/// Note: this function assumes that the correctness of the Merkle roots has been checked outside.
+#[cfg(feature = "parallel")]
+pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
+    params: &VerifierParams,
+    notes: &[&AbarToBarNote],
+    merkle_roots: &[&BLSScalar],
+    hashes: Vec<D>,
+) -> Result<()> {
+    if merkle_roots
+        .par_iter()
+        .zip(notes)
+        .any(|(x, y)| **x != y.body.merkle_root)
+    {
+        return Err(eg!(ZeiError::AXfrVerificationError));
+    }
+
+    // Reject anonymous-to-confidential notes whose outputs are transparent.
+    if notes.par_iter().any(|note| {
+        note.body.output.get_record_type()
+            == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
+    }) {
+        return Err(eg!(ZeiError::AXfrVerificationError));
+    }
+
+    let pc_gens = PedersenCommitmentRistretto::default();
+
+    let is_ok = notes
+        .par_iter()
+        .zip(merkle_roots)
+        .zip(hashes)
+        .map(|((note, merkle_root), hash)| {
+            let bar = note.body.output.clone();
+
+            // 1. Get commitments.
+            // 1.1 Reconstruct total amount commitment from bar.
+            let (com_low, com_high) = match bar.amount {
+                XfrAmount::Confidential((low, high)) => (
+                    low.decompress()
+                        .ok_or(ZeiError::DecompressElementError)
+                        .c(d!())?,
+                    high.decompress()
+                        .ok_or(ZeiError::DecompressElementError)
+                        .c(d!())?,
+                ),
+                XfrAmount::NonConfidential(amount) => {
+                    // Use a trivial commitment
+                    let (l, h) = u64_to_u32_pair(amount);
+                    (
+                        pc_gens.commit(RistrettoScalar::from(l), RistrettoScalar::zero()),
+                        pc_gens.commit(RistrettoScalar::from(h), RistrettoScalar::zero()),
+                    )
+                }
+            };
+
+            // 1.2 Get asset type commitment.
+            let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
+            let com_asset_type = match bar.asset_type {
+                XfrAssetType::Confidential(a) => a
+                    .decompress()
+                    .ok_or(ZeiError::DecompressElementError)
+                    .c(d!())?,
+                XfrAssetType::NonConfidential(a) => {
+                    // Use a trivial commitment
+                    pc_gens.commit(a.as_scalar(), RistrettoScalar::zero())
+                }
+            };
+
+            let input = note.body.input;
+
+            let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
+
+            // important: address folding relies significantly on the Fiat-Shamir transform.
+            transcript.append_message(b"nullifier", &note.body.input.to_bytes());
+
+            // 2. Verify the delegated Schnorr proof.
+            let (beta, lambda) = verify_delegated_schnorr(
+                &pc_gens,
+                &vec![com_amount, com_asset_type],
+                &note.body.delegated_schnorr_proof,
+                &mut transcript,
+            )
+            .c(d!())?;
+
+            let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
+            let (beta_folding, lambda_folding) = verify_address_folding(
+                hash,
+                &mut transcript,
+                ANON_XFR_BP_GENS_LEN,
+                &note.folding_instance,
+            )?;
+            let address_folding_public_input =
+                prepare_verifier_input(&note.folding_instance, &beta_folding, &lambda_folding);
+
+            let delegated_schnorr_proof = note.body.delegated_schnorr_proof.clone();
+
+            let beta_lambda = beta * &lambda;
+            let s1_plus_lambda_s2 = delegated_schnorr_proof.response_scalars[0].0
+                + delegated_schnorr_proof.response_scalars[1].0 * &lambda;
+
+            let beta_sim_fr =
+                SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta.to_bytes()));
+            let lambda_sim_fr =
+                SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+            let beta_lambda_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+                &beta_lambda.to_bytes(),
+            ));
+            let s1_plus_lambda_s2_sim_fr = SimFr::<SimFrParamsRistretto>::from(
+                &BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()),
+            );
+
+            let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
+            let mut online_inputs = vec![];
+
+            online_inputs.push(input.clone());
+            online_inputs.push(*merkle_root.clone());
+            online_inputs.push(delegated_schnorr_proof.inspection_comm);
+            online_inputs.extend_from_slice(&beta_sim_fr.limbs);
+            online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
+            online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
+            online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
+            online_inputs.extend_from_slice(&address_folding_public_input);
+
+            verifier(
+                &mut transcript,
+                &params.pcs,
+                &params.cs,
+                &params.verifier_params,
+                &online_inputs,
+                &note.proof,
+            )
+        })
+        .all(|x| x.is_ok());
+
+    if is_ok {
+        Ok(())
+    } else {
+        Err(eg!(ZeiError::AXfrVerificationError))
+    }
 }
 
 fn prove_abar_to_bar<R: CryptoRng + RngCore>(

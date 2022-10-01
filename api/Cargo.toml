@@ -13,6 +13,11 @@ name = 'xfr'
 path = 'benches/xfr.rs'
 harness = false
 
+[[bench]]
+name = 'anon_xfr'
+path = 'benches/anon_xfr.rs'
+harness = false
+
 [package]
 name = 'zei'
 version = '0.2.0'
@@ -81,7 +86,7 @@ version = '0.4.0'
 features = ['rand']
 
 [dependencies.rayon]
-version = '1'
+version = '1.5'
 optional = true
 
 [dependencies.structopt]
@@ -144,6 +149,7 @@ parallel = [
     'default',
     'rayon',
     'zei-algebra/parallel',
+    'zei-plonk/parallel'
 ]
 gen = ["parallel", "structopt"]
 lightweight = [] # Minimize size for only AR2ABAR and ABAR2AR.

@@ -12,6 +12,8 @@ use crate::xfr::{
 };
 use merlin::Transcript;
 use num_bigint::BigUint;
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use zei_algebra::{
     bls12_381::BLSScalar,
     prelude::*,
@@ -106,6 +108,37 @@ pub fn verify_bar_to_abar_note(
 
     let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
     bar_pub_key.verify(&msg, &note.signature).c(d!())
+}
+
+/// Batch verify the confidential-to-anonymous notes.
+#[cfg(feature = "parallel")]
+pub fn batch_verify_bar_to_abar_note(
+    params: &VerifierParams,
+    notes: &[&BarToAbarNote],
+    bar_pub_keys: &[&XfrPublicKey],
+) -> Result<()> {
+    let is_ok = notes
+        .par_iter()
+        .zip(bar_pub_keys)
+        .map(|(note, bar_pub_key)| {
+            verify_bar_to_abar(
+                params,
+                &note.body.input,
+                &note.body.output,
+                &note.body.proof,
+            )
+            .c(d!())?;
+
+            let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+            bar_pub_key.verify(&msg, &note.signature)
+        })
+        .all(|x| x.is_ok());
+
+    if is_ok {
+        Ok(())
+    } else {
+        Err(eg!())
+    }
 }
 
 pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(

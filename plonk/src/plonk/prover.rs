@@ -2,7 +2,8 @@ use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{
-        hide_polynomial, pi_poly, r_poly, split_t_and_commit, t_poly, z_poly, PlonkChallenges,
+        first_lagrange_poly, hide_polynomial, pi_poly, r_poly, split_t_and_commit, t_poly, z_poly,
+        PlonkChallenges,
     },
     indexer::{PlonkPK, PlonkPf, PlonkProof},
     transcript::{
@@ -248,6 +249,8 @@ pub fn prover_with_lagrange<
     let w_polys_eval_zeta_as_ref: Vec<&PCS::Field> = w_polys_eval_zeta.iter().collect();
     let s_poly_eval_zeta_as_ref: Vec<&PCS::Field> = s_polys_eval_zeta.iter().collect();
 
+    let (z_h_eval_zeta, first_lagrange_eval_zeta) =
+        first_lagrange_poly::<PCS>(&challenges, cs.size() as u64);
     let r_poly = r_poly::<PCS, CS>(
         prover_params,
         &z_poly,
@@ -256,6 +259,8 @@ pub fn prover_with_lagrange<
         &z_eval_zeta_omega,
         &challenges,
         &t_polys,
+        &first_lagrange_eval_zeta,
+        &z_h_eval_zeta,
         n_constraints + 2,
     );
 

@@ -259,7 +259,7 @@ fn batch_verify_single_asset_transfer(
     let mut batch_verify_group = c.benchmark_group("batch_verify_single_asset");
     batch_verify_group.sample_size(50);
     batch_verify_group.bench_function(
-        format!("`{}` of batch size equal to {}", benchmark_id, batch_size),
+        format!("`{}` of batch size {}", benchmark_id, batch_size),
         |b| {
             b.iter(|| {
                 assert!(batch_verify_xfr_notes(&mut prng, params, &xfr_notes, &policies).is_ok())
