@@ -355,6 +355,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 }
 
 /// Batch verify the anonymous-to-confidential notes.
+/// Note: this function assumes that the correctness of the Merkle roots has been checked outside.
 #[cfg(feature = "parallel")]
 pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &VerifierParams,

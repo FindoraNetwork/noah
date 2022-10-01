@@ -38,29 +38,29 @@ const AMOUNT: u64 = 10u64;
 const ASSET: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
 const BATCHSIZE: [usize; 7] = [1, 2, 3, 6, 10, 20, 30];
 
-// Measurement of the verification time and batch verification tim of `abar_to_abar`.
+// Measurement of the verification time and batch verification time of `abar_to_abar`.
 fn bench_abar_to_abar(c: &mut Criterion) {
     let outputs = vec![(5, FEE_TYPE), (15, FEE_TYPE), (30, ASSET)];
     let inputs = vec![(20 + 13 as u64, FEE_TYPE), (30, ASSET)];
     abar_to_abar(c, inputs, outputs, 13);
 }
 
-// Measurement of the verification time and batch verification tim of `abar_to_bar`.
+// Measurement of the verification time and batch verification time of `abar_to_bar`.
 fn bench_abar_to_bar(c: &mut Criterion) {
     abar_to_bar(c);
 }
 
-// Measurement of the verification time and batch verification tim of `abar_to_ar`.
+// Measurement of the verification time and batch verification time of `abar_to_ar`.
 fn bench_abar_to_ar(c: &mut Criterion) {
     abar_to_ar(c);
 }
 
-// Measurement of the verification time and batch verification tim of `bar_to_abar`.
+// Measurement of the verification time and batch verification time of `bar_to_abar`.
 fn bench_bar_to_abar(c: &mut Criterion) {
     bar_to_abar(c);
 }
 
-// Measurement of the verification time and batch verification tim of `ar_to_abar`.
+// Measurement of the verification time and batch verification time of `ar_to_abar`.
 fn bench_ar_to_abar(c: &mut Criterion) {
     ar_to_abar(c);
 }
