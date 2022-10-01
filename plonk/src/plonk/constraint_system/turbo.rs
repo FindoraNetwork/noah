@@ -776,7 +776,7 @@ impl<F: Scalar> TurboCS<F> {
 
     /// Return the witness index for given wire and cs index.
     fn get_witness_index(&self, wire_index: usize, cs_index: CsIndex) -> VarIndex {
-        assert!(wire_index < N_WIRES_PER_GATE + 1, "wire index out of bound");
+        assert!(wire_index < N_WIRES_PER_GATE, "wire index out of bound");
         assert!(cs_index < self.size, "constraint index out of bound");
         self.wiring[wire_index][cs_index]
     }
@@ -821,12 +821,14 @@ impl<F: Scalar> TurboCS<F> {
             let w3_value = &witness[self.get_witness_index(2, cs_index)];
             let w4_value = &witness[self.get_witness_index(3, cs_index)];
             let w5_value = &witness[self.get_witness_index(4, cs_index)];
+            let w6_value = &witness[self.get_witness_index(5, cs_index)];
             let wire_vals = vec![
                 w1_value,
                 w2_value,
                 w3_value,
                 w4_value,
                 w5_value,
+                w6_value,
             ];
             let sel_vals: Vec<&F> = (0..self.num_selectors())
                 .map(|i| &self.selectors[i][cs_index])
