@@ -8,7 +8,6 @@ use noah_algebra::prelude::*;
 
 #[cfg(feature = "debug")]
 use std::collections::HashMap;
-
 use noah_crypto::basic::anemoi_jive::AnemoiJive;
 
 /// The wires number of a gate in Turbo CS.
