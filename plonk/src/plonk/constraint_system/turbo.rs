@@ -8,6 +8,7 @@ use zei_algebra::prelude::*;
 
 #[cfg(feature = "debug")]
 use std::collections::HashMap;
+use zei_crypto::basic::jive::JiveCRH;
 
 /// The wires number of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;
@@ -22,6 +23,16 @@ pub struct TurboCS<F> {
     pub selectors: Vec<Vec<F>>,
     /// the wiring of the circuit.
     pub wiring: [Vec<VarIndex>; N_WIRES_PER_GATE],
+    /// the first part of the Anemoi preprocessed round keys.
+    pub anemoi_preprocessed_round_keys_x: [[F; 2]; 12],
+    /// the second part of the Anemoi preprocessed round keys.
+    pub anemoi_preprocessed_round_keys_y: [[F; 2]; 12],
+    /// the Anemoi generator.
+    pub anemoi_generator: F,
+    /// the Anemoi generator's inverse.
+    pub anemoi_generator_inv: F,
+    /// the gates with Anemoi constraints.
+    pub anemoi_constraints_indices: Vec<CsIndex>,
     /// the number of variable.
     pub num_vars: usize,
     /// the size of circuit.
@@ -36,7 +47,7 @@ pub struct TurboCS<F> {
     pub verifier_only: bool,
     /// A private witness for the circuit, cleared after computing a proof.
     pub witness: Vec<F>,
-    /// record witness backtracking info for checking dangling witness
+    /// record witness backtracing info for checking dangling witness.
     #[cfg(feature = "debug")]
     #[serde(skip)]
     pub witness_backtrace: HashMap<VarIndex, std::backtrace::Backtrace>,
@@ -59,9 +70,9 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
 
     /// `quot_eval_dom_size` divides (q-1), and should be larger than
     /// the degree of the quotient polynomial, i.e.,
-    /// `quot_eval_dom_size` > 5 * `self.size` + 7.
+    /// `quot_eval_dom_size` > 5 * `self.size` + 11.
     fn quot_eval_dom_size(&self) -> usize {
-        if self.size > 4 {
+        if self.size > 8 {
             self.size * 6
         } else {
             self.size * 16
@@ -180,6 +191,11 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         Ok(Self {
             selectors: vec![],
             wiring: [vec![], vec![], vec![], vec![], vec![]],
+            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 12],
+            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 12],
+            anemoi_generator: F::zero(),
+            anemoi_generator_inv: F::zero(),
+            anemoi_constraints_indices: vec![],
             num_vars: self.num_vars,
             size: self.size,
             public_vars_constraint_indices: vec![],
@@ -224,9 +240,14 @@ impl<F: Scalar> TurboCS<F> {
     /// With default witness [F::zero(), F::one()].
     pub fn new() -> TurboCS<F> {
         let selectors: Vec<Vec<F>> = std::iter::repeat(vec![]).take(N_SELECTORS).collect();
-        TurboCS {
+        Self {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
+            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 12],
+            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 12],
+            anemoi_generator: F::zero(),
+            anemoi_generator_inv: F::zero(),
+            anemoi_constraints_indices: vec![],
             num_vars: 2,
             size: 0,
             public_vars_constraint_indices: vec![],
@@ -272,6 +293,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
+
         for (i, wire) in wires_in.iter().enumerate() {
             self.wiring[i].push(*wire);
         }
@@ -315,6 +337,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
+
         self.wiring[0].push(left_var);
         self.wiring[1].push(right_var);
         self.wiring[2].push(0);
@@ -587,6 +610,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
+
         let out = if self.witness[bit] == zero {
             self.witness[var0]
         } else {
@@ -652,6 +676,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
+
         for i in 0..N_WIRES_PER_GATE {
             self.wiring[i].push(var);
         }
@@ -684,6 +709,7 @@ impl<F: Scalar> TurboCS<F> {
         self.push_ecc_selector(zero);
         self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
+
         for i in 0..N_WIRES_PER_GATE {
             self.wiring[i].push(var);
         }
@@ -700,6 +726,21 @@ impl<F: Scalar> TurboCS<F> {
     /// Add constraint that certain values must be one or zero.
     pub fn attach_boolean_constraint_to_gate(&mut self) {
         self.boolean_constraint_indices.push(self.size - 1);
+    }
+
+    /// Add constraints about the Anemoi/Jive hash function.
+    pub fn attach_anemoi_jive_constraints_to_gate(&mut self) {
+        debug_assert!(!self.anemoi_generator.is_zero());
+        self.anemoi_constraints_indices.push(self.size - 1);
+    }
+
+    /// Set the parameters for the Anemoi/Jive hash function.
+    pub fn load_anemoi_jive_parameters<H: JiveCRH<F, 2, 12>>(&mut self) {
+        self.anemoi_preprocessed_round_keys_x = H::PREPROCESSED_ROUND_KEYS_X;
+        self.anemoi_preprocessed_round_keys_y = H::PREPROCESSED_ROUND_KEYS_Y;
+
+        self.anemoi_generator = H::GENERATOR;
+        self.anemoi_generator_inv = H::GENERATOR_INV;
     }
 
     /// Pad the number of constraints to a power of two.

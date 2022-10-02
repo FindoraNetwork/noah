@@ -251,6 +251,7 @@ pub fn prove_address_folding_in_cs(
                 cs.push_ecc_selector(zero);
                 cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(one);
+
                 cs.wiring[0].push(flag_meet_first_different_bit_var);
                 cs.wiring[1].push(*secret_key_bit_var);
                 cs.wiring[2].push(flag_smaller_than_modulus_var);
@@ -277,6 +278,7 @@ pub fn prove_address_folding_in_cs(
                 cs.push_ecc_selector(zero);
                 cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(one);
+
                 cs.wiring[0].push(flag_meet_first_different_bit_var);
                 cs.wiring[1].push(*secret_key_bit_var);
                 cs.wiring[2].push(zero_var);
@@ -303,6 +305,7 @@ pub fn prove_address_folding_in_cs(
                 cs.push_ecc_selector(zero);
                 cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(one);
+
                 cs.wiring[0].push(flag_meet_first_different_bit_var);
                 cs.wiring[1].push(*secret_key_bit_var);
                 cs.wiring[2].push(zero_var);
@@ -327,6 +330,7 @@ pub fn prove_address_folding_in_cs(
         cs.push_ecc_selector(zero);
         cs.push_rescue_selectors(zero, zero, zero, zero);
         cs.push_out_selector(zero);
+
         cs.wiring[0].push(flag_smaller_than_modulus_var);
         cs.wiring[1].push(flag_meet_first_different_bit_var);
         cs.wiring[2].push(zero_var);
