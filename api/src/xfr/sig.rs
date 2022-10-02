@@ -747,7 +747,6 @@ mod test {
     use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKeyInner, XfrSecretKey};
     use ark_std::{env, test_rng};
     use noah_algebra::prelude::*;
-    use ruc::err::*;
 
     #[test]
     fn signatures() {
