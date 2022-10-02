@@ -4,7 +4,7 @@ use crate::poly_commit::{
     pcs::{HomomorphicPolyComElem, PolyComScheme, ToBytes},
 };
 use merlin::Transcript;
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
     prelude::*,
     traits::Pairing,
@@ -166,7 +166,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
     /// Deserialize the parameters from unchecked bytes.
     pub fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 8 {
-            return Err(eg!(ZeiError::DeserializationError));
+            return Err(eg!(NoahError::DeserializationError));
         }
         let mut len_1_bytes = [0u8; 4];
         let mut len_2_bytes = [0u8; 4];
@@ -392,7 +392,7 @@ mod tests_kzg_impl {
     };
     use ark_std::test_rng;
     use merlin::Transcript;
-    use zei_algebra::{
+    use noah_algebra::{
         bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
         prelude::*,
         traits::Pairing,

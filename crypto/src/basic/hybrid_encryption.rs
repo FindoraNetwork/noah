@@ -4,12 +4,12 @@ use aes::{
 };
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
+use noah_algebra::errors::NoahError;
+use noah_algebra::prelude::*;
+use noah_algebra::ristretto::RistrettoScalar;
 use serde::Serializer;
 use sha2::Digest;
 use wasm_bindgen::prelude::*;
-use zei_algebra::errors::ZeiError;
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::RistrettoScalar;
 
 type Aes256Ctr = ctr::Ctr64BE<Aes256>;
 
@@ -20,14 +20,14 @@ pub struct XPublicKey {
     pub(crate) key: x25519_dalek::PublicKey,
 }
 
-impl ZeiFromToBytes for XPublicKey {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for XPublicKey {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.key.as_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 32 {
-            Err(eg!(ZeiError::DeserializationError))
+            Err(eg!(NoahError::DeserializationError))
         } else {
             let mut array = [0u8; 32];
             array.copy_from_slice(bytes);
@@ -64,14 +64,14 @@ pub struct XSecretKey {
     pub(crate) key: x25519_dalek::StaticSecret,
 }
 
-impl ZeiFromToBytes for XSecretKey {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for XSecretKey {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.key.to_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 32 {
-            Err(eg!(ZeiError::DeserializationError))
+            Err(eg!(NoahError::DeserializationError))
         } else {
             let mut array = [0u8; 32];
             array.copy_from_slice(bytes);
@@ -104,12 +104,12 @@ impl Eq for XSecretKey {}
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 /// The ciphertext from the symmetric encryption.
 pub struct Ctext(pub Vec<u8>);
-impl ZeiFromToBytes for Ctext {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for Ctext {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.0.clone()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(Ctext(bytes.to_vec()))
     }
 }
@@ -117,25 +117,25 @@ serialize_deserialize!(Ctext);
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 /// A ciphertext of hybrid encryption.
-pub struct ZeiHybridCiphertext {
+pub struct NoahHybridCiphertext {
     pub(crate) ciphertext: Ctext,
     pub(crate) ephemeral_public_key: XPublicKey,
 }
 
-impl ZeiFromToBytes for ZeiHybridCiphertext {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for NoahHybridCiphertext {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         let mut bytes = vec![];
-        bytes.append(&mut self.ephemeral_public_key.zei_to_bytes());
-        bytes.append(&mut self.ciphertext.zei_to_bytes());
+        bytes.append(&mut self.ephemeral_public_key.noah_to_bytes());
+        bytes.append(&mut self.ciphertext.noah_to_bytes());
         bytes
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 32 {
-            Err(eg!(ZeiError::DeserializationError))
+            Err(eg!(NoahError::DeserializationError))
         } else {
-            let ephemeral_public_key = XPublicKey::zei_from_bytes(&bytes[0..32])?;
-            let ciphertext = Ctext::zei_from_bytes(&bytes[32..])?;
+            let ephemeral_public_key = XPublicKey::noah_from_bytes(&bytes[0..32])?;
+            let ciphertext = Ctext::noah_from_bytes(&bytes[32..])?;
             Ok(Self {
                 ciphertext,
                 ephemeral_public_key,
@@ -149,10 +149,10 @@ pub fn hybrid_encrypt_x25519<R: CryptoRng + RngCore>(
     prng: &mut R,
     pub_key: &XPublicKey,
     message: &[u8],
-) -> ZeiHybridCiphertext {
+) -> NoahHybridCiphertext {
     let (key, ephemeral_key) = symmetric_key_from_x25519_public_key(prng, &pub_key.key);
     let ciphertext = symmetric_encrypt(&key, message);
-    ZeiHybridCiphertext {
+    NoahHybridCiphertext {
         ciphertext,
         ephemeral_public_key: XPublicKey { key: ephemeral_key },
     }
@@ -163,11 +163,11 @@ pub fn hybrid_encrypt_ed25519<R: CryptoRng + RngCore>(
     prng: &mut R,
     pub_key: &PublicKey,
     message: &[u8],
-) -> ZeiHybridCiphertext {
+) -> NoahHybridCiphertext {
     let (key, ephemeral_key) = symmetric_key_from_ed25519_public_key(prng, pub_key);
     let ciphertext = symmetric_encrypt(&key, message);
 
-    ZeiHybridCiphertext {
+    NoahHybridCiphertext {
         ciphertext,
         ephemeral_public_key: XPublicKey { key: ephemeral_key },
     }
@@ -175,7 +175,7 @@ pub fn hybrid_encrypt_ed25519<R: CryptoRng + RngCore>(
 
 /// Decrypt a hybrid ciphertext over X25519
 pub fn hybrid_decrypt_with_x25519_secret_key(
-    ctext: &ZeiHybridCiphertext,
+    ctext: &NoahHybridCiphertext,
     sec_key: &XSecretKey,
 ) -> Vec<u8> {
     let key = symmetric_key_from_x25519_secret_key(&sec_key.key, &ctext.ephemeral_public_key.key);
@@ -184,7 +184,7 @@ pub fn hybrid_decrypt_with_x25519_secret_key(
 
 /// Decrypt a hybrid ciphertext over Ed25519
 pub fn hybrid_decrypt_with_ed25519_secret_key(
-    ctext: &ZeiHybridCiphertext,
+    ctext: &NoahHybridCiphertext,
     sec_key: &SecretKey,
 ) -> Vec<u8> {
     let key = symmetric_key_from_ed25519_secret_key(sec_key, &ctext.ephemeral_public_key.key);

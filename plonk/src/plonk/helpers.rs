@@ -7,10 +7,10 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
+use noah_algebra::prelude::*;
 #[cfg(feature = "parallel")]
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::cmp::min;
-use zei_algebra::prelude::*;
 
 /// Build the base group.
 pub(super) fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<Vec<F>> {
@@ -762,7 +762,7 @@ mod test {
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
     use ark_std::test_rng;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
 

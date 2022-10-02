@@ -1,6 +1,6 @@
 use crate::poly_commit::pcs::ToBytes;
 use merlin::Transcript;
-use zei_algebra::prelude::*;
+use noah_algebra::prelude::*;
 
 /// The trait for polynomial commitment transcript.
 pub trait PolyComTranscript {

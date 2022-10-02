@@ -4,15 +4,15 @@ path = 'benches/fft.rs'
 harness = false
 
 [package]
-name = 'zei-plonk'
+name = 'noah-plonk'
 version = '0.2.0'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
-description = 'Zei TurboPLONK protocol'
+description = 'Noah TurboPLONK protocol'
 build = "build.rs"
 
 [lib]
-name = 'zei_plonk'
+name = 'noah_plonk'
 crate-type = ['rlib']
 
 [build-dependencies]
@@ -33,10 +33,10 @@ optional = true
 version = '0.3'
 default-features = false
 
-[dependencies.zei-algebra]
+[dependencies.noah-algebra]
 path = '../algebra'
 
-[dependencies.zei-crypto]
+[dependencies.noah-crypto]
 path = '../crypto'
 
 [dependencies.serde]

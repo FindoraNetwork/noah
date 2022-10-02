@@ -1,7 +1,7 @@
 use ark_std::test_rng;
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_plonk::poly_commit::field_polynomial::{primitive_nth_root_of_unity, FpPolynomial};
 use std::time::Instant;
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-use zei_plonk::poly_commit::field_polynomial::{primitive_nth_root_of_unity, FpPolynomial};
 
 fn main() {
     let mut prng = test_rng();

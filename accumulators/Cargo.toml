@@ -1,12 +1,12 @@
 [package]
-name = 'zei-accumulators'
+name = 'noah-accumulators'
 version = '0.2.0'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
-description = 'Zei accumulators commons'
+description = 'Noah accumulators commons'
 
 [lib]
-name = 'zei_accumulators'
+name = 'noah_accumulators'
 crate-type = ['rlib']
 
 [dependencies]
@@ -14,10 +14,10 @@ itertools = '0.8.0'
 ruc = '1.0'
 parking_lot = '0.12'
 
-[dependencies.zei-algebra]
+[dependencies.noah-algebra]
 path = '../algebra'
 
-[dependencies.zei-crypto]
+[dependencies.noah-crypto]
 path = '../crypto'
 
 [dependencies.storage]

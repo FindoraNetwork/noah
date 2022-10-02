@@ -11,7 +11,7 @@ use crate::plonk::{
 };
 use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
 use merlin::Transcript;
-use zei_algebra::prelude::*;
+use noah_algebra::prelude::*;
 
 /// Verify a proof.
 pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
@@ -69,6 +69,8 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
                 .take(CS::n_wires_per_gate() - 1),
         )
         .collect();
+    commitments.push(&verifier_params.cm_prk_vec[2]);
+    commitments.push(&verifier_params.cm_prk_vec[3]);
     commitments.push(&cm_r);
 
     let mut values: Vec<PCS::Field> = proof
@@ -77,10 +79,13 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         .chain(proof.s_polys_eval_zeta.iter())
         .cloned()
         .collect();
+    values.push(proof.prk_3_poly_eval_zeta);
+    values.push(proof.prk_4_poly_eval_zeta);
     values.push(r_eval_zeta);
 
     let zeta = challenges.get_zeta().unwrap();
     let zeta_omega = zeta.mul(&verifier_params.root);
+
     let (comm, val) = pcs.batch(
         transcript,
         &commitments[..],
@@ -88,12 +93,31 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         &zeta,
         &values[..],
     );
+
+    let (comm_omega, val_omega) = pcs.batch(
+        transcript,
+        &[
+            &proof.cm_z,
+            &proof.cm_w_vec[0],
+            &proof.cm_w_vec[1],
+            &proof.cm_w_vec[2],
+        ],
+        verifier_params.cs_size + 2,
+        &zeta_omega,
+        &[
+            proof.z_eval_zeta_omega,
+            proof.w_polys_eval_zeta_omega[0],
+            proof.w_polys_eval_zeta_omega[1],
+            proof.w_polys_eval_zeta_omega[2],
+        ],
+    );
+
     pcs.batch_verify_diff_points(
         transcript,
-        &[comm, proof.cm_z.clone()],
-        verifier_params.cs_size + 2,
+        &[comm, comm_omega],
+        verifier_params.cs_size + 32,
         &[zeta.clone(), zeta_omega.clone()],
-        &[val, proof.z_eval_zeta_omega],
+        &[val, val_omega],
         &[
             proof.opening_witness_zeta.clone(),
             proof.opening_witness_zeta_omega.clone(),
@@ -135,7 +159,12 @@ fn compute_challenges<PCS: PolyComScheme>(
     {
         transcript.append_field_elem(eval_zeta);
     }
+    transcript.append_field_elem(&proof.prk_3_poly_eval_zeta);
+    transcript.append_field_elem(&proof.prk_4_poly_eval_zeta);
     transcript.append_field_elem(&proof.z_eval_zeta_omega);
+    for eval_zeta_omega in proof.w_polys_eval_zeta_omega.iter() {
+        transcript.append_field_elem(eval_zeta_omega);
+    }
 
     // 4. compute u challenge.
     let u = transcript_get_plonk_challenge_u(transcript, group_order);

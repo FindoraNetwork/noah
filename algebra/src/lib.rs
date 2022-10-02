@@ -1,4 +1,4 @@
-//! The crate for algebra for the Zei library, which unifies the interfaces of different curves
+//! The crate for algebra for the Noah library, which unifies the interfaces of different curves
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unused_import_braces, unused_qualifications, trivial_casts)]
 #![deny(trivial_numeric_casts, private_in_public)]
@@ -62,11 +62,14 @@ pub use ark_std::{
 /// check if the error messages equal
 #[macro_export]
 macro_rules! msg_eq {
-    ($zei_err: expr, $ruc_err: expr $(,)?) => {
-        assert!($ruc_err.msg_has_overloop(ruc::eg!($zei_err).as_ref()));
+    ($noah_err: expr, $ruc_err: expr $(,)?) => {
+        assert!($ruc_err.msg_has_overloop(ruc::eg!($noah_err).as_ref()));
     };
-    ($zei_err: expr, $ruc_err: expr, $msg: expr $(,)?) => {
-        assert!($ruc_err.msg_has_overloop(ruc::eg!($zei_err).as_ref()), $msg);
+    ($noah_err: expr, $ruc_err: expr, $msg: expr $(,)?) => {
+        assert!(
+            $ruc_err.msg_has_overloop(ruc::eg!($noah_err).as_ref()),
+            $msg
+        );
     };
 }
 
@@ -80,9 +83,9 @@ macro_rules! serialize_deserialize {
                 S: Serializer,
             {
                 if serializer.is_human_readable() {
-                    serializer.serialize_str(&b64enc(&self.zei_to_bytes()))
+                    serializer.serialize_str(&b64enc(&self.noah_to_bytes()))
                 } else {
-                    serializer.serialize_bytes(&self.zei_to_bytes())
+                    serializer.serialize_bytes(&self.noah_to_bytes())
                 }
             }
         }
@@ -93,11 +96,11 @@ macro_rules! serialize_deserialize {
                 D: serde::Deserializer<'de>,
             {
                 let bytes = if deserializer.is_human_readable() {
-                    deserializer.deserialize_str(zei_obj_serde::BytesVisitor)?
+                    deserializer.deserialize_str(noah_obj_serde::BytesVisitor)?
                 } else {
-                    deserializer.deserialize_bytes(zei_obj_serde::BytesVisitor)?
+                    deserializer.deserialize_bytes(noah_obj_serde::BytesVisitor)?
                 };
-                $t::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
+                $t::noah_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
             }
         }
     };

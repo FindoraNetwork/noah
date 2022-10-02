@@ -14,15 +14,15 @@ use serde::Serializer;
 
 macro_rules! to_from_bytes_scalar {
     ($t:ident) => {
-        impl ZeiFromToBytes for $t {
-            fn zei_to_bytes(&self) -> Vec<u8> {
+        impl NoahFromToBytes for $t {
+            fn noah_to_bytes(&self) -> Vec<u8> {
                 let mut v = vec![];
                 v.extend_from_slice(&self.to_bytes()[..]);
                 v
             }
-            fn zei_from_bytes(bytes: &[u8]) -> Result<$t> {
+            fn noah_from_bytes(bytes: &[u8]) -> Result<$t> {
                 $t::from_bytes(bytes)
-                    .map_err(|_| eg!(crate::errors::ZeiError::DeserializationError))
+                    .map_err(|_| eg!(crate::errors::NoahError::DeserializationError))
             }
         }
     };
@@ -34,26 +34,26 @@ to_from_bytes_scalar!(JubjubScalar);
 to_from_bytes_scalar!(SECQ256K1Scalar);
 to_from_bytes_scalar!(SECP256K1Scalar);
 
-impl ZeiFromToBytes for CompressedRistretto {
+impl NoahFromToBytes for CompressedRistretto {
     #[inline]
-    fn zei_to_bytes(&self) -> Vec<u8> {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
     #[inline]
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(Self(
             curve25519_dalek::ristretto::CompressedRistretto::from_slice(bytes),
         ))
     }
 }
 
-impl ZeiFromToBytes for CompressedEdwardsY {
+impl NoahFromToBytes for CompressedEdwardsY {
     #[inline]
-    fn zei_to_bytes(&self) -> Vec<u8> {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
     #[inline]
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(CompressedEdwardsY(
             curve25519_dalek::edwards::CompressedEdwardsY::from_slice(bytes),
         ))
@@ -70,13 +70,13 @@ serialize_deserialize!(SECP256K1Scalar);
 
 macro_rules! to_from_bytes_group {
     ($g:ident) => {
-        impl ZeiFromToBytes for $g {
-            fn zei_to_bytes(&self) -> Vec<u8> {
+        impl NoahFromToBytes for $g {
+            fn noah_to_bytes(&self) -> Vec<u8> {
                 self.to_compressed_bytes()
             }
-            fn zei_from_bytes(bytes: &[u8]) -> Result<$g> {
+            fn noah_from_bytes(bytes: &[u8]) -> Result<$g> {
                 $g::from_compressed_bytes(bytes)
-                    .map_err(|_| eg!(crate::errors::ZeiError::SerializationError))
+                    .map_err(|_| eg!(crate::errors::NoahError::SerializationError))
             }
         }
     };
@@ -98,56 +98,56 @@ serialize_deserialize!(JubjubPoint);
 serialize_deserialize!(SECQ256K1G1);
 serialize_deserialize!(SECP256K1G1);
 
-/// Helper trait to serialize zei and foreign objects that implement from/to bytes/bits
-pub trait ZeiFromToBytes: Sized {
+/// Helper trait to serialize Noah's and foreign objects that implement from/to bytes/bits
+pub trait NoahFromToBytes: Sized {
     /// convert to bytes
-    fn zei_to_bytes(&self) -> Vec<u8>;
+    fn noah_to_bytes(&self) -> Vec<u8>;
     /// reconstruct from bytes
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self>;
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self>;
 }
 
-impl ZeiFromToBytes for RangeProof {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for RangeProof {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         let mut v = vec![];
         v.extend_from_slice(&self.to_bytes()[..]);
         v
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<RangeProof> {
-        RangeProof::from_bytes(bytes).map_err(|_| eg!(ZeiError::DeserializationError))
+    fn noah_from_bytes(bytes: &[u8]) -> Result<RangeProof> {
+        RangeProof::from_bytes(bytes).map_err(|_| eg!(NoahError::DeserializationError))
     }
 }
 
-impl ZeiFromToBytes for bulletproofs::r1cs::R1CSProof {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for bulletproofs::r1cs::R1CSProof {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.to_bytes()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<bulletproofs::r1cs::R1CSProof> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<bulletproofs::r1cs::R1CSProof> {
         bulletproofs::r1cs::R1CSProof::from_bytes(bytes)
-            .map_err(|_| eg!(ZeiError::DeserializationError))
+            .map_err(|_| eg!(NoahError::DeserializationError))
     }
 }
 
-impl ZeiFromToBytes for ark_bulletproofs_secq256k1::r1cs::R1CSProof {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for ark_bulletproofs_secq256k1::r1cs::R1CSProof {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         let mut cursor = Cursor::new(Vec::new());
         self.serialize(&mut cursor).unwrap();
         cursor.into_inner()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<ark_bulletproofs_secq256k1::r1cs::R1CSProof> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<ark_bulletproofs_secq256k1::r1cs::R1CSProof> {
         ark_bulletproofs_secq256k1::r1cs::R1CSProof::deserialize(bytes)
-            .map_err(|_| eg!(ZeiError::DeserializationError))
+            .map_err(|_| eg!(NoahError::DeserializationError))
     }
 }
 
-impl ZeiFromToBytes for x25519_dalek::PublicKey {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for x25519_dalek::PublicKey {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         let mut v = vec![];
         v.extend_from_slice(self.as_bytes());
         v
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::PublicKey> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::PublicKey> {
         if bytes.len() < 32 {
-            return Err(eg!(ZeiError::SerializationError));
+            return Err(eg!(NoahError::SerializationError));
         }
         let mut array = [0u8; 32];
         array.copy_from_slice(&bytes[0..32]);
@@ -155,15 +155,15 @@ impl ZeiFromToBytes for x25519_dalek::PublicKey {
     }
 }
 
-impl ZeiFromToBytes for x25519_dalek::StaticSecret {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for x25519_dalek::StaticSecret {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         let mut v = vec![];
         v.extend_from_slice(&self.to_bytes()[..]);
         v
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::StaticSecret> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::StaticSecret> {
         if bytes.len() < 32 {
-            return Err(eg!(ZeiError::SerializationError));
+            return Err(eg!(NoahError::SerializationError));
         }
         let mut array = [0u8; 32];
         array.copy_from_slice(&bytes[0..32]);
@@ -171,9 +171,9 @@ impl ZeiFromToBytes for x25519_dalek::StaticSecret {
     }
 }
 
-/// Module for serialization for Zei objects
-pub mod zei_obj_serde {
-    use crate::serialization::ZeiFromToBytes;
+/// Module for serialization for Noah objects
+pub mod noah_obj_serde {
+    use crate::serialization::NoahFromToBytes;
     use crate::utils::{b64dec, b64enc};
     use serde::de::SeqAccess;
     use serde::de::Visitor;
@@ -187,7 +187,7 @@ pub mod zei_obj_serde {
         type Value = Vec<u8>;
 
         fn expecting(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> core::fmt::Result {
-            formatter.write_str("a valid ZeiFromTo Object")
+            formatter.write_str("a valid NoahFromTo Object")
         }
 
         fn visit_seq<V>(self, mut seq: V) -> Result<Vec<u8>, V::Error>
@@ -219,9 +219,9 @@ pub mod zei_obj_serde {
     pub fn serialize<S, T>(obj: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
-        T: ZeiFromToBytes,
+        T: NoahFromToBytes,
     {
-        let bytes = obj.zei_to_bytes();
+        let bytes = obj.noah_to_bytes();
         if serializer.is_human_readable() {
             serializer.serialize_str(&b64enc(&bytes))
         } else {
@@ -233,14 +233,14 @@ pub mod zei_obj_serde {
     pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
     where
         D: Deserializer<'de>,
-        T: ZeiFromToBytes,
+        T: NoahFromToBytes,
     {
         if deserializer.is_human_readable() {
             let bytes = deserializer.deserialize_str(BytesVisitor)?;
-            T::zei_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
+            T::noah_from_bytes(bytes.as_slice()).map_err(serde::de::Error::custom)
         } else {
             let v = deserializer.deserialize_bytes(BytesVisitor)?;
-            T::zei_from_bytes(v.as_slice()).map_err(serde::de::Error::custom)
+            T::noah_from_bytes(v.as_slice()).map_err(serde::de::Error::custom)
         }
     }
 }

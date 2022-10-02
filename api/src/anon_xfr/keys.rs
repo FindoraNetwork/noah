@@ -1,9 +1,9 @@
 use aes_gcm::{aead::Aead, NewAead};
 use digest::{generic_array::GenericArray, Digest};
+use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1, SECP256K1_SCALAR_LEN};
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
-use zei_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1, SECP256K1_SCALAR_LEN};
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
 /// The length of the secret key for anonymous transfer.
 pub const AXFR_SECRET_KEY_LENGTH: usize = SECP256K1_SCALAR_LEN;
@@ -19,18 +19,18 @@ pub struct AXfrSecretKey(pub(crate) SECP256K1Scalar);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
 pub struct AXfrPubKey(pub(crate) SECP256K1G1);
 
-impl ZeiFromToBytes for AXfrPubKey {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for AXfrPubKey {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.0.to_compressed_bytes()
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<AXfrPubKey> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<AXfrPubKey> {
         if bytes.len() != AXFR_PUBLIC_KEY_LENGTH {
-            Err(eg!(ZeiError::DeserializationError))
+            Err(eg!(NoahError::DeserializationError))
         } else {
             let group_element = SECP256K1G1::from_compressed_bytes(bytes);
             match group_element {
                 Ok(g) => Ok(AXfrPubKey(g)),
-                _ => Err(eg!(ZeiError::ParameterError)),
+                _ => Err(eg!(NoahError::ParameterError)),
             }
         }
     }
@@ -101,7 +101,7 @@ impl AXfrSecretKey {
             let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
 
             if res.is_err() {
-                return Err(eg!(ZeiError::DecryptionError));
+                return Err(eg!(NoahError::DecryptionError));
             }
 
             res.unwrap()
@@ -111,7 +111,7 @@ impl AXfrSecretKey {
             let res = gcm.decrypt(nonce, ctext);
 
             if res.is_err() {
-                return Err(eg!(ZeiError::DecryptionError));
+                return Err(eg!(NoahError::DecryptionError));
             }
 
             res.unwrap()
@@ -162,7 +162,7 @@ impl AXfrPubKey {
             let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
 
             if res.is_err() {
-                return Err(eg!(ZeiError::EncryptionError));
+                return Err(eg!(NoahError::EncryptionError));
             }
 
             res.unwrap()
@@ -172,7 +172,7 @@ impl AXfrPubKey {
             let res = gcm.encrypt(nonce, msg);
 
             if res.is_err() {
-                return Err(eg!(ZeiError::EncryptionError));
+                return Err(eg!(NoahError::EncryptionError));
             }
 
             res.unwrap()
@@ -182,17 +182,17 @@ impl AXfrPubKey {
     }
 }
 
-impl ZeiFromToBytes for AXfrKeyPair {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for AXfrKeyPair {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(self.get_secret_key().0.zei_to_bytes().as_slice());
-        vec.extend_from_slice(self.pub_key.zei_to_bytes().as_slice());
+        vec.extend_from_slice(self.get_secret_key().0.noah_to_bytes().as_slice());
+        vec.extend_from_slice(self.pub_key.noah_to_bytes().as_slice());
         vec
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != SECP256K1Scalar::bytes_len() + SECP256K1G1::COMPRESSED_LEN {
-            return Err(eg!(ZeiError::DeserializationError));
+            return Err(eg!(NoahError::DeserializationError));
         }
 
         let secret_key = AXfrSecretKey(
@@ -200,7 +200,7 @@ impl ZeiFromToBytes for AXfrKeyPair {
         );
 
         let offset = SECP256K1Scalar::bytes_len();
-        let pub_key = AXfrPubKey::zei_from_bytes(&bytes[offset..]).c(d!())?;
+        let pub_key = AXfrPubKey::noah_from_bytes(&bytes[offset..]).c(d!())?;
 
         Ok(AXfrKeyPair {
             secret_key,
@@ -213,8 +213,8 @@ impl ZeiFromToBytes for AXfrKeyPair {
 mod tests {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
     use ark_std::test_rng;
-    use zei_algebra::prelude::*;
-    use zei_algebra::secp256k1::SECP256K1G1;
+    use noah_algebra::prelude::*;
+    use noah_algebra::secp256k1::SECP256K1G1;
 
     fn check_from_to_bytes<G: Group>() {
         let mut prng = test_rng();
@@ -223,8 +223,8 @@ mod tests {
         let public_key = key_pair.get_public_key();
 
         // Public key
-        let public_key_bytes = public_key.zei_to_bytes();
-        let public_key_from_bytes = AXfrPubKey::zei_from_bytes(&public_key_bytes).unwrap();
+        let public_key_bytes = public_key.noah_to_bytes();
+        let public_key_from_bytes = AXfrPubKey::noah_from_bytes(&public_key_bytes).unwrap();
         assert_eq!(public_key, public_key_from_bytes);
     }
 

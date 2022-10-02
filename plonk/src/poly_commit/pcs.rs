@@ -1,8 +1,8 @@
 use crate::poly_commit::{field_polynomial::FpPolynomial, transcript::PolyComTranscript};
 use merlin::Transcript;
+use noah_algebra::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use zei_algebra::prelude::*;
 
 /// The trait for serialization to bytes
 pub trait ToBytes {
@@ -225,7 +225,7 @@ mod test {
     };
     use ark_std::test_rng;
     use merlin::Transcript;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn test_pcs_eval() {

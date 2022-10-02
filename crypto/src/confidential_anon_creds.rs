@@ -9,7 +9,7 @@ use crate::basic::{
     matrix_sigma::SigmaTranscript,
 };
 use merlin::Transcript;
-use zei_algebra::{prelude::*, traits::Pairing};
+use noah_algebra::{prelude::*, traits::Pairing};
 
 const CAC_REVEAL_PROOF_DOMAIN: &[u8] = b"Confidential AC Reveal PoK";
 const CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"Confidential AC Reveal PoK New Instance";
@@ -146,7 +146,7 @@ pub fn confidential_open_comm<R: CryptoRng + RngCore, P: Pairing>(
     let mut ct_rands = vec![];
     let mut revealed_attrs = vec![];
     if credential.attrs.len() != reveal_map.len() {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
     for (attr, b) in credential.attrs.iter().zip(reveal_map.iter()) {
         if *b {
@@ -200,14 +200,14 @@ pub fn confidential_verify_open<P: Pairing>(
         .iter()
         .fold(0, |sum, b| if *b { sum + 1 } else { sum });
     if reveal_map.len() != ipk.num_attrs() {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
     if n > ipk.num_attrs()
         || n != pok.cm_ct.len()
         || n != pok.response_rands.len()
         || n != revealed_count
     {
-        return Err(eg!(ZeiError::IdentityRevealVerifyError));
+        return Err(eg!(NoahError::IdentityRevealVerifyError));
     }
 
     let mut transcript = Transcript::new(CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
@@ -340,10 +340,10 @@ fn verify_ciphertext<P: Pairing>(
     for (ct, ct_cm, attr, rand) in izip!(cts.iter(), ct_cms.iter(), attrs.iter(), rands.iter()) {
         let enc = elgamal_encrypt::<P::G1>(attr, rand, ek);
         if enc.e1 != ct.e1.mul(challenge).add(&ct_cm.e1) {
-            return Err(eg!(ZeiError::IdentityRevealVerifyError));
+            return Err(eg!(NoahError::IdentityRevealVerifyError));
         }
         if enc.e2 != ct.e2.mul(challenge).add(&ct_cm.e2) {
-            return Err(eg!(ZeiError::IdentityRevealVerifyError));
+            return Err(eg!(NoahError::IdentityRevealVerifyError));
         }
     }
     Ok(())
@@ -358,8 +358,8 @@ pub(crate) mod test_helper {
     use crate::basic::elgamal::elgamal_key_gen;
     use crate::confidential_anon_creds::{confidential_open_comm, confidential_verify_open};
     use ark_std::test_rng;
-    use zei_algebra::prelude::*;
-    use zei_algebra::traits::Pairing;
+    use noah_algebra::prelude::*;
+    use noah_algebra::traits::Pairing;
 
     pub(super) fn byte_slice_to_scalar<S: Scalar>(slice: &[u8]) -> S {
         use digest::Digest;
@@ -441,7 +441,7 @@ pub(crate) mod test_helper {
             proof_msg,
         );
         msg_eq!(
-            ZeiError::IdentityRevealVerifyError,
+            NoahError::IdentityRevealVerifyError,
             res.unwrap_err(),
             "proof should fail, reveal map doesn't match"
         );
@@ -458,7 +458,7 @@ pub(crate) mod test_helper {
             proof_msg,
         );
         msg_eq!(
-            ZeiError::ParameterError,
+            NoahError::ParameterError,
             res.unwrap_err(),
             "proof should fail, bitmap length does not match number of attributes"
         );
@@ -475,7 +475,7 @@ pub(crate) mod test_helper {
             proof_msg,
         );
         msg_eq!(
-            ZeiError::IdentityRevealVerifyError,
+            NoahError::IdentityRevealVerifyError,
             res.unwrap_err(),
             "proof should fail, inconsistent issuer public key"
         );
@@ -492,7 +492,7 @@ pub(crate) mod test_helper {
             proof_msg,
         );
         msg_eq!(
-            ZeiError::IdentityRevealVerifyError,
+            NoahError::IdentityRevealVerifyError,
             res.unwrap_err(),
             "proof should fail, inconsistent encryption key"
         );
@@ -509,7 +509,7 @@ pub(crate) mod test_helper {
             wrong_message,
         );
         msg_eq!(
-            ZeiError::IdentityRevealVerifyError,
+            NoahError::IdentityRevealVerifyError,
             res.unwrap_err(),
             "proof should fail, bad sok message"
         );
@@ -519,7 +519,7 @@ pub(crate) mod test_helper {
 #[cfg(test)]
 mod test_bls12_381 {
     use crate::confidential_anon_creds::test_helper::test_confidential_ac_reveal;
-    use zei_algebra::bls12_381::BLSPairingEngine;
+    use noah_algebra::bls12_381::BLSPairingEngine;
 
     #[test]
     fn confidential_reveal_one_attr_hidden() {

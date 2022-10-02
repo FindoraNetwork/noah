@@ -31,7 +31,7 @@
 //   - key_injection_r = instance.K * key_injection_r' + instance.C
 //   - K_r = instance.M * S-box(K_r') + key_injection_r, used in second step of round r
 
-use zei_algebra::{bls12_381::BLSScalar, prelude::*, str::FromStr};
+use noah_algebra::{bls12_381::BLSScalar, prelude::*, str::FromStr};
 
 #[allow(non_snake_case)]
 /// The Rescue sponge.
@@ -333,7 +333,7 @@ impl RescueInstance<BLSScalar> {
 #[cfg(test)]
 mod test {
     use crate::basic::rescue::RescueInstance;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*, str::FromStr};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*, str::FromStr};
 
     // Hash output on zero inputs
     const H0: &str = "6038713180564719469093204954070454311200442976044511285254586065910759707410";

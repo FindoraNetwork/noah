@@ -4,16 +4,16 @@ use bulletproofs::{
     BulletproofGens, PedersenGens,
 };
 use merlin::Transcript;
-use wasm_bindgen::__rt::std::collections::HashSet;
-use zei_algebra::{
+use noah_algebra::{
     prelude::*,
     ristretto::{CompressedRistretto, RistrettoScalar},
 };
-use zei_crypto::bulletproofs::mix::{mix, MixCommitment, MixValue};
+use noah_crypto::bulletproofs::mix::{mix, MixCommitment, MixValue};
+use wasm_bindgen::__rt::std::collections::HashSet;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// The asset mixing proof.
-pub struct AssetMixProof(#[serde(with = "zei_obj_serde")] pub R1CSProof);
+pub struct AssetMixProof(#[serde(with = "noah_obj_serde")] pub R1CSProof);
 
 impl PartialEq for AssetMixProof {
     fn eq(&self, other: &AssetMixProof) -> bool {
@@ -26,9 +26,9 @@ impl Eq for AssetMixProof {}
 /// Prove asset mixing.
 /// # Example
 /// ```
-/// use zei_algebra::ristretto::RistrettoScalar;
-/// use zei::xfr::asset_mixer::prove_asset_mixing;
-/// use zei_algebra::prelude::*;
+/// use noah_algebra::ristretto::RistrettoScalar;
+/// use noah::xfr::asset_mixer::prove_asset_mixing;
+/// use noah_algebra::prelude::*;
 /// let input = [
 ///            (60u64, RistrettoScalar::zero(), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
 ///            (100u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10001u32), RistrettoScalar::from(200001u32)),
@@ -87,7 +87,7 @@ pub fn prove_asset_mixing(
         out_set.insert(out_value.asset_type.0);
     }
     if in_set != out_set {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     let in_vars = in_values
@@ -110,13 +110,13 @@ pub fn prove_asset_mixing(
         &out_vars,
         Some(&out_values),
     )
-    .c(d!(ZeiError::AssetMixerVerificationError))?;
+    .c(d!(NoahError::AssetMixerVerificationError))?;
 
     let num_gates = asset_mix_num_generators(n, m);
     let bp_gens = BulletproofGens::new(num_gates.next_power_of_two(), 1);
     let proof = prover
         .prove(&bp_gens)
-        .c(d!(ZeiError::AssetMixerVerificationError))?;
+        .c(d!(NoahError::AssetMixerVerificationError))?;
     Ok(AssetMixProof(proof))
 }
 
@@ -133,14 +133,14 @@ pub struct AssetMixingInstance<'a> {
 /// Batch-verify asset mixing.
 /// # Example
 /// ```
-/// use zei_algebra::ristretto::{RistrettoScalar, CompressedRistretto};
-/// use zei_algebra::prelude::*;
-/// use zei::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
+/// use noah_algebra::ristretto::{RistrettoScalar, CompressedRistretto};
+/// use noah_algebra::prelude::*;
+/// use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
 /// use ruc::err::*;
-/// use zei::setup::BulletproofParams;
-/// use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+/// use noah::setup::BulletproofParams;
+/// use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 /// let input = [
 ///            (60u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
 ///            (100u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10001u32), RistrettoScalar::from(200001u32)),
@@ -209,7 +209,7 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     }
     let pc_gens = PedersenGens::default();
     batch_verify(prng, verifiers, &pc_gens, &params.bp_circuit_gens)
-        .c(d!(ZeiError::AssetMixerVerificationError))
+        .c(d!(NoahError::AssetMixerVerificationError))
 }
 
 pub(crate) fn prepare_asset_mixer_verifier(
@@ -243,7 +243,7 @@ pub(crate) fn prepare_asset_mixer_verifier(
         .map(|com| com.commit_verifier(verifier))
         .collect_vec();
 
-    mix(verifier, &in_vars, None, &out_vars, None).c(d!(ZeiError::AssetMixerVerificationError))
+    mix(verifier, &in_vars, None, &out_vars, None).c(d!(NoahError::AssetMixerVerificationError))
 }
 
 fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
@@ -277,11 +277,11 @@ mod test {
     use crate::setup::BulletproofParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
     use ark_std::test_rng;
-    use zei_algebra::{
+    use noah_algebra::{
         prelude::*,
         ristretto::{CompressedRistretto, RistrettoScalar},
     };
-    use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+    use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
     #[test]
     fn test_asset_mixer() {

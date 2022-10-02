@@ -1,11 +1,11 @@
-use storage::db::MerkleDB;
-use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::BLSScalar,
     collections::{hash_map::Iter, HashMap},
     prelude::*,
 };
-use zei_crypto::basic::rescue::RescueInstance;
+use noah_crypto::basic::rescue::RescueInstance;
+use storage::db::MerkleDB;
+use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
 
 // ceil(log(u32::MAX, 3)) = 21
 // 3^0 + 3^1 + 3^2 + ... 3^20 < 2^64 (u64 can include all leaf & ancestor)
@@ -33,8 +33,8 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 /// use std::sync::Arc;
 /// use storage::state::{ChainState, State};
 /// use storage::store::PrefixedStore;
-/// use zei_accumulators::merkle_tree::{PersistentMerkleTree, verify};
-/// use zei_algebra::{bls12_381::BLSScalar, One};
+/// use noah_accumulators::merkle_tree::{PersistentMerkleTree, verify};
+/// use noah_algebra::{bls12_381::BLSScalar, One};
 ///
 /// let fdb = MemoryDB::new();
 /// let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
@@ -68,7 +68,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             ];
             entry_count = u64::from_be_bytes(array);
         } else {
-            store.set(&ROOT_KEY, BLSScalar::zero().zei_to_bytes())?;
+            store.set(&ROOT_KEY, BLSScalar::zero().noah_to_bytes())?;
             store.set(&ENTRY_COUNT_KEY, 0u64.to_be_bytes().to_vec())?;
 
             if !store.state_mut().cache_mut().good2_commit() {
@@ -92,18 +92,18 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         // 2. Hash ABAR and save leaf node
         let uid = self.entry_count;
-        cache.set(leaf.0, hash.zei_to_bytes());
+        cache.set(leaf.0, hash.noah_to_bytes());
 
         // 3. update hash of all ancestors of the new leaf
         for (index, (node_key, path)) in keys[0..TREE_DEPTH].iter().enumerate() {
             let parse_hash = |key: u64| -> Result<BLSScalar> {
                 if let Some(b) = cache.get(&key) {
-                    return BLSScalar::zei_from_bytes(b.as_slice());
+                    return BLSScalar::noah_from_bytes(b.as_slice());
                 }
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
                 match self.store.get(&store_key)? {
-                    Some(b) => BLSScalar::zei_from_bytes(b.as_slice()),
+                    Some(b) => BLSScalar::noah_from_bytes(b.as_slice()),
                     None => Ok(BLSScalar::zero()),
                 }
             };
@@ -128,7 +128,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
             let hasher = RescueInstance::new();
             let hash = hasher.rescue(&[sib0, sib1, sib2, BLSScalar::zero()])[0];
-            cache.set(keys[index + 1].0, BLSScalar::zei_to_bytes(&hash));
+            cache.set(keys[index + 1].0, BLSScalar::noah_to_bytes(&hash));
         }
 
         for (k, v) in cache.iter() {
@@ -180,12 +180,12 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 let mut store_key1 = KEY_PAD.to_vec();
                 store_key1.extend(sib1.to_be_bytes());
                 if let Some(b) = self.store.get(&store_key1)? {
-                    node.siblings1 = BLSScalar::zei_from_bytes(b.as_slice())?;
+                    node.siblings1 = BLSScalar::noah_from_bytes(b.as_slice())?;
                 }
                 let mut store_key2 = KEY_PAD.to_vec();
                 store_key2.extend(sib2.to_be_bytes());
                 if let Some(b) = self.store.get(&store_key2)? {
-                    node.siblings2 = BLSScalar::zei_from_bytes(b.as_slice())?;
+                    node.siblings2 = BLSScalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 Ok(node)
@@ -215,7 +215,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         store_key.extend(pos.to_be_bytes());
 
         match self.store.get(&store_key)? {
-            Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
+            Some(hash) => BLSScalar::noah_from_bytes(hash.as_slice()),
             None => Err(eg!("root hash key not found at this depth")),
         }
     }
@@ -233,7 +233,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(pos.to_be_bytes());
         match self.store.get_v(&store_key, version)? {
-            Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
+            Some(hash) => BLSScalar::noah_from_bytes(hash.as_slice()),
             None => Err(eg!("root hash key not found at this depth and version")),
         }
     }
@@ -258,7 +258,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         store_key.extend(uid.to_be_bytes());
 
         match self.store.get(&store_key)? {
-            Some(hash) => Ok(Some(BLSScalar::zei_from_bytes(hash.as_slice())?)),
+            Some(hash) => Ok(Some(BLSScalar::noah_from_bytes(hash.as_slice())?)),
             None => Ok(None),
         }
     }
@@ -336,12 +336,12 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                 let mut store_key1 = KEY_PAD.to_vec();
                 store_key1.extend(sib1.to_be_bytes());
                 if let Some(b) = self.store.get_v(&store_key1, v)? {
-                    node.siblings1 = BLSScalar::zei_from_bytes(b.as_slice())?;
+                    node.siblings1 = BLSScalar::noah_from_bytes(b.as_slice())?;
                 }
                 let mut store_key2 = KEY_PAD.to_vec();
                 store_key2.extend(sib2.to_be_bytes());
                 if let Some(b) = self.store.get_v(&store_key2, v)? {
-                    node.siblings2 = BLSScalar::zei_from_bytes(b.as_slice())?;
+                    node.siblings2 = BLSScalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 Ok(node)
@@ -380,7 +380,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(pos.to_be_bytes());
         match self.store.get_v(&store_key, version)? {
-            Some(hash) => BLSScalar::zei_from_bytes(hash.as_slice()),
+            Some(hash) => BLSScalar::noah_from_bytes(hash.as_slice()),
             None => Err(eg!("root hash key not found at this depth and version")),
         }
     }
@@ -392,7 +392,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         let v = self.version();
 
         match self.store.get_v(&store_key, v)? {
-            Some(hash) => Ok(Some(BLSScalar::zei_from_bytes(hash.as_slice())?)),
+            Some(hash) => Ok(Some(BLSScalar::noah_from_bytes(hash.as_slice())?)),
             None => Ok(None),
         }
     }

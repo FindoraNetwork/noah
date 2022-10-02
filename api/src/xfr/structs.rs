@@ -10,20 +10,20 @@ use crate::xfr::{
 };
 use bulletproofs::RangeProof;
 use digest::Digest;
-use sha2::Sha512;
-use zei_algebra::{
+use noah_algebra::{
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar},
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
 };
-use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
-use zei_crypto::basic::{
+use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+use noah_crypto::basic::{
     chaum_pedersen::ChaumPedersenProofX,
     elgamal::elgamal_key_gen,
-    hybrid_encryption::{XPublicKey, XSecretKey, ZeiHybridCiphertext},
+    hybrid_encryption::{NoahHybridCiphertext, XPublicKey, XSecretKey},
     pedersen_comm::PedersenCommitment,
     pedersen_elgamal::PedersenElGamalEqProof,
 };
+use sha2::Sha512;
 
 /// Asset Type identifier.
 pub const ASSET_TYPE_LENGTH: usize = 32;
@@ -48,20 +48,20 @@ impl AssetType {
         /// Asset type representation length. must be less than MIN_SCALAR_LEN
         /// All scalars in this code base are representable by 32 bytes, but
         /// values are less than 2^256 -1.
-        const ASSET_TYPE_ZEI_REPR_LENGTH: usize = 30;
+        const ASSET_TYPE_NOAH_REPR_LENGTH: usize = 30;
 
         let mut hash = sha2::Sha256::default();
         hash.update(&self.0);
         let array = hash.finalize();
-        let mut zei_repr = [0u8; MIN_SCALAR_LENGTH];
-        zei_repr[0..ASSET_TYPE_ZEI_REPR_LENGTH]
-            .copy_from_slice(&array[0..ASSET_TYPE_ZEI_REPR_LENGTH]);
+        let mut noah_repr = [0u8; MIN_SCALAR_LENGTH];
+        noah_repr[0..ASSET_TYPE_NOAH_REPR_LENGTH]
+            .copy_from_slice(&array[0..ASSET_TYPE_NOAH_REPR_LENGTH]);
 
         if MIN_SCALAR_LENGTH == S::bytes_len() {
-            return S::from_bytes(&zei_repr).unwrap(); //safe unwrap
+            return S::from_bytes(&noah_repr).unwrap(); //safe unwrap
         }
         let mut v = vec![0u8; S::bytes_len()];
-        v[0..ASSET_TYPE_ZEI_REPR_LENGTH].copy_from_slice(&zei_repr);
+        v[0..ASSET_TYPE_NOAH_REPR_LENGTH].copy_from_slice(&noah_repr);
         S::from_bytes(&v).unwrap()
     }
 }
@@ -126,8 +126,8 @@ impl XfrAmount {
     /// Return true only if amount is confidential.
     /// # Example:
     /// ```
-    /// use zei::xfr::structs::XfrAmount;
-    /// use zei_algebra::ristretto::CompressedRistretto;
+    /// use noah::xfr::structs::XfrAmount;
+    /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_amount = XfrAmount::Confidential((CompressedRistretto::default(), CompressedRistretto::default()));
     /// assert!(xfr_amount.is_confidential());
     /// let xfr_amount = XfrAmount::NonConfidential(100u64);
@@ -139,8 +139,8 @@ impl XfrAmount {
     /// Return Some(amount) if amount is non-confidential. Otherwise, return None
     /// # Example:
     /// ```
-    /// use zei::xfr::structs::XfrAmount;
-    /// use zei_algebra::ristretto::CompressedRistretto;
+    /// use noah::xfr::structs::XfrAmount;
+    /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_amount = XfrAmount::NonConfidential(100u64);
     /// assert_eq!(xfr_amount.get_amount().unwrap(), 100u64);
     /// let xfr_amount = XfrAmount::Confidential((CompressedRistretto::default(), CompressedRistretto::default()));
@@ -157,8 +157,8 @@ impl XfrAmount {
     /// if amount is confidential. Otherwise, return None
     /// # Example:
     /// ```
-    /// use zei::xfr::structs::XfrAmount;
-    /// use zei_algebra::ristretto::CompressedRistretto;
+    /// use noah::xfr::structs::XfrAmount;
+    /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_amount = XfrAmount::NonConfidential(100u64);
     /// assert!(xfr_amount.get_commitments().is_none());
     /// let xfr_amount = XfrAmount::Confidential((CompressedRistretto::default(), CompressedRistretto::default()));
@@ -202,8 +202,8 @@ impl XfrAssetType {
     /// Return true only if amount is confidential
     /// # Example:
     /// ```
-    /// use zei::xfr::structs::{AssetType, XfrAssetType};
-    /// use zei_algebra::ristretto::CompressedRistretto;
+    /// use noah::xfr::structs::{AssetType, XfrAssetType};
+    /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_asset_type = XfrAssetType::Confidential(CompressedRistretto::default());
     /// assert!(xfr_asset_type.is_confidential());
     /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
@@ -216,8 +216,8 @@ impl XfrAssetType {
     /// Return Some(asset_type) if asset_type is non-confidential. Otherwise, return None
     /// # Example:
     /// ```
-    /// use zei::xfr::structs::{AssetType, XfrAssetType};
-    /// use zei_algebra::ristretto::CompressedRistretto;
+    /// use noah::xfr::structs::{AssetType, XfrAssetType};
+    /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
     /// assert_eq!(xfr_asset_type.get_asset_type().unwrap(), AssetType::from_identical_byte(0u8));
     /// let xfr_asset_type = XfrAssetType::Confidential(CompressedRistretto::default());
@@ -234,8 +234,8 @@ impl XfrAssetType {
     /// if asset_type is confidential. Otherwise, return None.
     /// # Example:
     /// ```
-    /// use zei::xfr::structs::{AssetType, XfrAssetType};
-    /// use zei_algebra::ristretto::CompressedRistretto;
+    /// use noah::xfr::structs::{AssetType, XfrAssetType};
+    /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
     /// assert!(xfr_asset_type.get_commitment().is_none());
     /// let xfr_amount = XfrAssetType::Confidential(CompressedRistretto::default());
@@ -379,7 +379,7 @@ pub struct TracerMemo {
     /// The ciphertexts of the attributes.
     pub lock_attributes: Vec<AttributeCiphertext>,
     /// A hybrid encryption of amount, asset type, and attributes encrypted above for faster access.
-    pub lock_info: ZeiHybridCiphertext,
+    pub lock_info: NoahHybridCiphertext,
 }
 
 /// Information directed to the recipient.
@@ -472,7 +472,7 @@ impl OwnerMemo {
         let decrypted_bytes = self.decrypt(&keypair)?;
         // amount is u64, thus u64.to_be_bytes should be 8 bytes
         if decrypted_bytes.len() != 8 {
-            return Err(eg!(ZeiError::InconsistentStructureError));
+            return Err(eg!(NoahError::InconsistentStructureError));
         }
         let mut amt_be_bytes: [u8; 8] = Default::default();
         amt_be_bytes.copy_from_slice(&decrypted_bytes[..]);
@@ -484,7 +484,7 @@ impl OwnerMemo {
     pub fn decrypt_asset_type(&self, keypair: &XfrKeyPair) -> Result<AssetType> {
         let decrypted_bytes = self.decrypt(&keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH {
-            return Err(eg!(ZeiError::InconsistentStructureError));
+            return Err(eg!(NoahError::InconsistentStructureError));
         }
         let mut asset_type_bytes: [u8; ASSET_TYPE_LENGTH] = Default::default();
         asset_type_bytes.copy_from_slice(&decrypted_bytes[..]);
@@ -496,7 +496,7 @@ impl OwnerMemo {
     pub fn decrypt_amount_and_asset_type(&self, keypair: &XfrKeyPair) -> Result<(u64, AssetType)> {
         let decrypted_bytes = self.decrypt(&keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH + 8 {
-            return Err(eg!(ZeiError::InconsistentStructureError));
+            return Err(eg!(NoahError::InconsistentStructureError));
         }
         let mut amt_be_bytes: [u8; 8] = Default::default();
         amt_be_bytes.copy_from_slice(&decrypted_bytes[..8]);
@@ -669,7 +669,7 @@ pub struct XfrProofs {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct XfrRangeProof {
     /// The Bulletproofs range proof.
-    #[serde(with = "zei_obj_serde")]
+    #[serde(with = "noah_obj_serde")]
     pub range_proof: RangeProof,
     /// Lower 32 bits transfer amount difference commitment.
     pub xfr_diff_commitment_low: CompressedRistretto,
@@ -716,7 +716,7 @@ enum CompatibleBlindShare {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 enum CompatibleLock {
-    Old(ZeiHybridCiphertext),
+    Old(NoahHybridCiphertext),
     New(Vec<u8>),
 }
 
@@ -802,7 +802,7 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                     .next_element::<CompatibleLock>()?
                     .ok_or_else(|| de::Error::invalid_length(2, &self))?;
                 let lock_bytes = match com_lock {
-                    CompatibleLock::Old(k) => k.zei_to_bytes(),
+                    CompatibleLock::Old(k) => k.noah_to_bytes(),
                     CompatibleLock::New(k) => k,
                 };
                 Ok(OwnerMemo {
@@ -844,8 +844,8 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                             if lock_bytes.is_some() {
                                 return Err(de::Error::duplicate_field("lock"));
                             }
-                            let tmp = map.next_value::<ZeiHybridCiphertext>()?;
-                            lock_bytes = Some(tmp.zei_to_bytes());
+                            let tmp = map.next_value::<NoahHybridCiphertext>()?;
+                            lock_bytes = Some(tmp.noah_to_bytes());
                         }
                         Field::LockBytes => {
                             if lock_bytes.is_some() {

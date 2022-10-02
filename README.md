@@ -1,13 +1,13 @@
-![](https://tokei.rs/b1/github/FindoraNetwork/zei)
-![GitHub top language](https://img.shields.io/github/languages/top/FindoraNetwork/zei)
-![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/FindoraNetwork/zei)
-![GitHub issues](https://img.shields.io/github/issues-raw/FindoraNetwork/zei)
-![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/FindoraNetwork/zei)
+![](https://tokei.rs/b1/github/FindoraNetwork/noah)
+![GitHub top language](https://img.shields.io/github/languages/top/FindoraNetwork/noah)
+![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/FindoraNetwork/noah)
+![GitHub issues](https://img.shields.io/github/issues-raw/FindoraNetwork/noah)
+![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/FindoraNetwork/noah)
 ![License](https://img.shields.io/badge/license-BUSL--1.1-lightgreen)
 
-## Zei: Findora's Cryptographic Library
+## Noah: Findora's Cryptographic Library
 
-Zei is a library that provide tools to create and verify public transaction
+Noah is a library that provide tools to create and verify public transaction
 with confidential data.
 
 ### Basic Cryptographic tools:
@@ -43,4 +43,4 @@ with confidential data.
 
 ## Licensing
 
-The primary license for Zei is the Business Source License 1.1 (`BUSL-1.1`), see [`LICENSE`](./LICENSE).
+The primary license for Noah is the Business Source License 1.1 (`BUSL-1.1`), see [`LICENSE`](./LICENSE).

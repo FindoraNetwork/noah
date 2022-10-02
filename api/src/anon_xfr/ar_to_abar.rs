@@ -12,12 +12,12 @@ use crate::xfr::{
     structs::{BlindAssetRecord, OpenAssetRecord},
 };
 use merlin::Transcript;
-#[cfg(feature = "parallel")]
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
-use zei_algebra::{bls12_381::BLSScalar, errors::ZeiError, prelude::*};
-use zei_plonk::plonk::{
+use noah_algebra::{bls12_381::BLSScalar, errors::NoahError, prelude::*};
+use noah_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 /// The domain separator for transparent-to-anonymous, for the Plonk proof.
 const AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"AR to ABAR Plonk Proof";
@@ -56,7 +56,7 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     let body = gen_ar_to_abar_body(prng, params, record, &abar_pubkey).c(d!())?;
 
     let msg = bincode::serialize(&body)
-        .map_err(|_| ZeiError::SerializationError)
+        .map_err(|_| NoahError::SerializationError)
         .c(d!())?;
     let signature = bar_keypair.sign(&msg)?;
 
@@ -66,7 +66,7 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
 
 /// Verify a transparent-to-anonymous note.
 pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> Result<()> {
-    let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+    let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
     note.body
         .input
         .public_key
@@ -85,7 +85,7 @@ pub fn batch_verify_ar_to_abar_note(
     let is_ok = notes
         .par_iter()
         .map(|note| {
-            let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+            let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
             note.body
                 .input
                 .public_key
@@ -142,7 +142,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         &params.prover_params,
         &witness,
     )
-    .c(d!(ZeiError::AXfrProofError))?;
+    .c(d!(NoahError::AXfrProofError))?;
 
     let body = ArToAbarBody {
         input: obar.blind_asset_record.clone(),
@@ -156,7 +156,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
 /// Verify the transparent-to-anonymous body.
 pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> Result<()> {
     if body.input.amount.is_confidential() || body.input.asset_type.is_confidential() {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     let amount = body.input.amount.get_amount().unwrap();
@@ -176,7 +176,7 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
         &online_inputs,
         &body.proof,
     )
-    .c(d!(ZeiError::AXfrVerificationError))
+    .c(d!(NoahError::AXfrVerificationError))
 }
 
 /// Construct the transparent-to-anonymous constraint system.

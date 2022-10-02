@@ -2,12 +2,12 @@ use crate::anon_creds::{Attr, AttributeCiphertext};
 use crate::xfr::structs::{
     AssetTracerDecKeys, AssetTracerEncKeys, AssetType, TracerMemo, ASSET_TYPE_LENGTH,
 };
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
-use zei_crypto::basic::{
+use noah_crypto::basic::{
     elgamal::{
         elgamal_encrypt, elgamal_partial_decrypt, ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey,
     },
@@ -76,7 +76,7 @@ impl TracerMemo {
     }
 
     /// Decrypts the asset tracer memo:
-    /// Returns ZeiError:BogusAssetTracerMemo in case decrypted values are inconsistents
+    /// Returns NoahError:BogusAssetTracerMemo in case decrypted values are inconsistents
     pub fn decrypt(&self, dec_key: &AssetTracerDecKeys) -> Result<DecryptedAssetMemo> {
         let mut plaintext =
             hybrid_decrypt_with_x25519_secret_key(&self.lock_info, &dec_key.lock_info_dec_key);
@@ -84,13 +84,13 @@ impl TracerMemo {
         // decrypt and sanitize amount
         let amount = if self.lock_amount.is_some() {
             if plaintext.len() < 2 * U32_BYTES {
-                return Err(eg!(ZeiError::BogusAssetTracerMemo));
+                return Err(eg!(NoahError::BogusAssetTracerMemo));
             }
             let amount_low = u8_be_slice_to_u32(&plaintext[0..U32_BYTES]);
             let amount_high = u8_be_slice_to_u32(&plaintext[U32_BYTES..2 * U32_BYTES]);
             let amount = (amount_low as u64) + ((amount_high as u64) << 32);
             self.verify_amount(&dec_key.record_data_dec_key, amount)
-                .c(d!(ZeiError::BogusAssetTracerMemo))?;
+                .c(d!(NoahError::BogusAssetTracerMemo))?;
             plaintext = plaintext.split_off(2 * U32_BYTES);
             Some(amount)
         } else {
@@ -100,14 +100,14 @@ impl TracerMemo {
         // decrypt and sanitize asset type
         let asset_type = if self.lock_asset_type.is_some() {
             if plaintext.len() < ASSET_TYPE_LENGTH {
-                return Err(eg!(ZeiError::BogusAssetTracerMemo));
+                return Err(eg!(NoahError::BogusAssetTracerMemo));
             }
             let mut asset_type = [0u8; ASSET_TYPE_LENGTH];
             asset_type.copy_from_slice(&plaintext[0..ASSET_TYPE_LENGTH]);
             let asset_type = AssetType(asset_type);
 
             self.verify_asset_type(&dec_key.record_data_dec_key, &asset_type)
-                .c(d!(ZeiError::BogusAssetTracerMemo))?;
+                .c(d!(NoahError::BogusAssetTracerMemo))?;
             plaintext = plaintext.split_off(ASSET_TYPE_LENGTH);
             Some(asset_type)
         } else {
@@ -115,7 +115,7 @@ impl TracerMemo {
         };
 
         if plaintext.len() < self.lock_attributes.len() * U32_BYTES {
-            return Err(eg!(ZeiError::BogusAssetTracerMemo));
+            return Err(eg!(NoahError::BogusAssetTracerMemo));
         }
         let mut attrs = vec![];
         for attr_byte in plaintext.chunks(U32_BYTES) {
@@ -124,18 +124,18 @@ impl TracerMemo {
 
         if !self
             .verify_identity_attributes(&dec_key.attrs_dec_key, &attrs)
-            .c(d!(ZeiError::BogusAssetTracerMemo))?
+            .c(d!(NoahError::BogusAssetTracerMemo))?
             .iter()
             .all(|&x| x)
         {
-            return Err(eg!(ZeiError::BogusAssetTracerMemo));
+            return Err(eg!(NoahError::BogusAssetTracerMemo));
         }
         Ok((amount, asset_type, attrs))
     }
 
     /// Check if the amount encrypted in self.lock_amount is expected.
-    /// If self.lock_amount is None, return Err(ZeiError::ParameterError),
-    /// Otherwise, if decrypted amount is not expected amount, return Err(ZeiError::AssetTracingExtractionError), else Ok(()).
+    /// If self.lock_amount is None, return Err(NoahError::ParameterError),
+    /// Otherwise, if decrypted amount is not expected amount, return Err(NoahError::AssetTracingExtractionError), else Ok(()).
     pub fn verify_amount(
         &self,
         dec_key: &ElGamalDecKey<RistrettoScalar>,
@@ -149,12 +149,12 @@ impl TracerMemo {
             if base.mul(&RistrettoScalar::from(low)) != decrypted_low
                 || base.mul(&RistrettoScalar::from(high)) != decrypted_high
             {
-                Err(eg!(ZeiError::AssetTracingExtractionError))
+                Err(eg!(NoahError::AssetTracingExtractionError))
             } else {
                 Ok(())
             }
         } else {
-            Err(eg!(ZeiError::ParameterError)) // nothing to decrypt
+            Err(eg!(NoahError::ParameterError)) // nothing to decrypt
         }
     }
 
@@ -170,15 +170,15 @@ impl TracerMemo {
             if decrypted == RistrettoPoint::get_base().mul(&expected.as_scalar()) {
                 return Ok(());
             }
-            Err(eg!(ZeiError::AssetTracingExtractionError))
+            Err(eg!(NoahError::AssetTracingExtractionError))
         } else {
-            Err(eg!(ZeiError::ParameterError)) // nothing to decrypt
+            Err(eg!(NoahError::ParameterError)) // nothing to decrypt
         }
     }
 
     /// Decrypt asset_type in self.lock_asset_type via a linear scan over candidate_asset_types.
-    /// If self.lock_asset_type is None, return Err(ZeiError::ParameterError),
-    /// Otherwise, if decrypted asset_type is not in the candidate list return Err(ZeiError::AssetTracingExtractionError),
+    /// If self.lock_asset_type is None, return Err(NoahError::ParameterError),
+    /// Otherwise, if decrypted asset_type is not in the candidate list return Err(NoahError::AssetTracingExtractionError),
     /// else return the decrypted asset_type.
     pub fn extract_asset_type(
         &self,
@@ -186,18 +186,18 @@ impl TracerMemo {
         candidate_asset_types: &[AssetType],
     ) -> Result<AssetType> {
         if candidate_asset_types.is_empty() {
-            return Err(eg!(ZeiError::ParameterError));
+            return Err(eg!(NoahError::ParameterError));
         }
         for candidate in candidate_asset_types.iter() {
             if self.verify_asset_type(&dec_key, &candidate).is_ok() {
                 return Ok(*candidate);
             }
         }
-        Err(eg!(ZeiError::AssetTracingExtractionError))
+        Err(eg!(NoahError::AssetTracingExtractionError))
     }
 
     /// Check is the attributes encrypted in self.lock_attrs are the same as in expected_attributes,
-    /// If self.lock_attrs is None or if attribute length doesn't match expected list, return Err(ZeiError::ParameterError),
+    /// If self.lock_attrs is None or if attribute length doesn't match expected list, return Err(NoahError::ParameterError),
     /// Otherwise, it returns a boolean vector indicating true for every positive match and false otherwise.
     pub fn verify_identity_attributes(
         &self,
@@ -205,7 +205,7 @@ impl TracerMemo {
         expected_attributes: &[u32],
     ) -> Result<Vec<bool>> {
         if self.lock_attributes.len() != expected_attributes.len() {
-            return Err(eg!(ZeiError::ParameterError));
+            return Err(eg!(NoahError::ParameterError));
         }
         let mut result = vec![];
         for (ctext, expected) in self.lock_attributes.iter().zip(expected_attributes.iter()) {
@@ -225,8 +225,8 @@ impl TracerMemo {
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use ark_std::test_rng;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
-    use zei_crypto::basic::elgamal::elgamal_encrypt;
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
+    use noah_crypto::basic::elgamal::elgamal_encrypt;
 
     #[test]
     fn extract_amount_from_tracer_memo() {
@@ -275,12 +275,12 @@ mod tests {
         );
 
         msg_eq!(
-            ZeiError::ParameterError,
+            NoahError::ParameterError,
             memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[])
                 .unwrap_err(),
         );
         msg_eq!(
-            ZeiError::AssetTracingExtractionError,
+            NoahError::AssetTracingExtractionError,
             memo.extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
                 &[AssetType::from_identical_byte(0u8)]
@@ -288,7 +288,7 @@ mod tests {
             .unwrap_err(),
         );
         msg_eq!(
-            ZeiError::AssetTracingExtractionError,
+            NoahError::AssetTracingExtractionError,
             memo.extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
                 &[
@@ -360,12 +360,12 @@ mod tests {
         );
 
         msg_eq!(
-            ZeiError::ParameterError,
+            NoahError::ParameterError,
             memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32])
                 .unwrap_err(),
         );
         msg_eq!(
-            ZeiError::ParameterError,
+            NoahError::ParameterError,
             memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32, 2, 3, 4])
                 .unwrap_err(),
         );

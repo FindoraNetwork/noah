@@ -13,15 +13,15 @@ use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
-use sha3::Sha3_512;
-use zei_algebra::secq256k1::SECQ256K1Scalar;
-use zei_algebra::{
+use noah_algebra::secq256k1::SECQ256K1Scalar;
+use noah_algebra::{
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
     secq256k1::SECQ256K1G1,
 };
+use rand_chacha::ChaChaRng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
+use sha3::Sha3_512;
 
 /// A scalar variable.
 pub struct ScalarVar(Variable);
@@ -44,8 +44,8 @@ impl PointVar {
         x: &Option<Fq>,
         y: &Option<Fq>,
     ) -> Result<Self> {
-        let x_var = cs.allocate((*x).clone()).c(d!(ZeiError::R1CSProofError))?;
-        let y_var = cs.allocate((*y).clone()).c(d!(ZeiError::R1CSProofError))?;
+        let x_var = cs.allocate((*x).clone()).c(d!(NoahError::R1CSProofError))?;
+        let y_var = cs.allocate((*y).clone()).c(d!(NoahError::R1CSProofError))?;
 
         Ok(Self { x_var, y_var })
     }
@@ -53,7 +53,7 @@ impl PointVar {
 
 /// A proof of scalar multiplication.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ScalarMulProof(#[serde(with = "zei_obj_serde")] pub(crate) R1CSProof);
+pub struct ScalarMulProof(#[serde(with = "noah_obj_serde")] pub(crate) R1CSProof);
 
 impl PartialEq for ScalarMulProof {
     fn eq(&self, other: &ScalarMulProof) -> bool {
@@ -115,7 +115,7 @@ impl ScalarMulProof {
             for bit in bits.iter() {
                 let (bit_var, one_minus_bit_var, product) = cs
                     .allocate_multiplier(Some((Fq::from(*bit), Fq::from(1 - (*bit as u8)))))
-                    .c(d!(ZeiError::R1CSProofError))?;
+                    .c(d!(NoahError::R1CSProofError))?;
                 cs.constrain(product.into());
                 cs.constrain(bit_var + one_minus_bit_var - Fq::one());
 
@@ -131,7 +131,7 @@ impl ScalarMulProof {
             for _ in 0..FrParameters::MODULUS_BITS {
                 let (bit_var, one_minus_bit_var, product) = cs
                     .allocate_multiplier(None)
-                    .c(d!(ZeiError::R1CSProofError))?;
+                    .c(d!(NoahError::R1CSProofError))?;
                 cs.constrain(product.into());
                 cs.constrain(bit_var + one_minus_bit_var - Fq::one());
 
@@ -189,7 +189,7 @@ impl ScalarMulProof {
     ) -> Result<(Option<G1Affine>, PointVar)> {
         let (s_var, res_var, res) = if let Some(left) = left {
             let s = (left.y - &right.y) * (left.x - &right.x).inverse().unwrap();
-            let s_var = cs.allocate(Some(s)).c(d!(ZeiError::R1CSProofError))?;
+            let s_var = cs.allocate(Some(s)).c(d!(NoahError::R1CSProofError))?;
 
             let new_x = s * &s - &left.x - &right.x;
             let new_y = s * (left.x - &new_x) - &left.y;
@@ -199,8 +199,8 @@ impl ScalarMulProof {
 
             (s_var, res_var, Some(res))
         } else {
-            let s_var = cs.allocate(None).c(d!(ZeiError::R1CSProofError))?;
-            let res_var = PointVar::allocate(cs, &None, &None).c(d!(ZeiError::R1CSProofError))?;
+            let s_var = cs.allocate(None).c(d!(NoahError::R1CSProofError))?;
+            let res_var = PointVar::allocate(cs, &None, &None).c(d!(NoahError::R1CSProofError))?;
 
             (s_var, res_var, None)
         };
@@ -300,7 +300,7 @@ impl ScalarMulProof {
 
         let proof = prover
             .prove(prng, &bp_gens)
-            .c(d!(ZeiError::R1CSProofError))?;
+            .c(d!(NoahError::R1CSProofError))?;
 
         Ok((
             ScalarMulProof(proof),
@@ -351,12 +351,12 @@ impl ScalarMulProof {
             &None,
             &None,
         )
-        .c(d!(ZeiError::R1CSProofError))?;
+        .c(d!(NoahError::R1CSProofError))?;
 
         let pc_gens_for_verifier = ark_bulletproofs_secq256k1::PedersenGens::from(&pc_gens);
         verifier
             .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
-            .c(d!(ZeiError::R1CSProofError))?;
+            .c(d!(NoahError::R1CSProofError))?;
         Ok(())
     }
 }

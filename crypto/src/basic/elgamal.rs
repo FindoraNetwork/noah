@@ -1,5 +1,5 @@
-use zei_algebra::ristretto::RistrettoPoint;
-use zei_algebra::{
+use noah_algebra::ristretto::RistrettoPoint;
+use noah_algebra::{
     hash::{Hash, Hasher},
     prelude::*,
 };
@@ -27,18 +27,18 @@ impl Hash for ElGamalEncKey<RistrettoPoint> {
     }
 }
 
-impl ZeiFromToBytes for ElGamalCiphertext<RistrettoPoint> {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for ElGamalCiphertext<RistrettoPoint> {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         let mut v = vec![];
         v.extend_from_slice(self.e1.to_compressed_bytes().as_slice());
         v.extend_from_slice(self.e2.to_compressed_bytes().as_slice());
         v
     }
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         let e1 = RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN])
-            .c(d!(ZeiError::DeserializationError))?;
+            .c(d!(NoahError::DeserializationError))?;
         let e2 = RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..])
-            .c(d!(ZeiError::DeserializationError))?;
+            .c(d!(NoahError::DeserializationError))?;
         Ok(ElGamalCiphertext { e1, e2 })
     }
 }
@@ -76,7 +76,7 @@ pub fn elgamal_verify<G: Group>(
     if base.mul(m).add(&ctext.e1.mul(&sec_key.0)) == ctext.e2 {
         Ok(())
     } else {
-        Err(eg!(ZeiError::ElGamalVerificationError))
+        Err(eg!(NoahError::ElGamalVerificationError))
     }
 }
 
@@ -91,9 +91,9 @@ pub fn elgamal_partial_decrypt<G: Group>(
 #[cfg(test)]
 mod elgamal_test {
     use ark_std::test_rng;
-    use zei_algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
-    use zei_algebra::prelude::*;
-    use zei_algebra::ristretto::RistrettoPoint;
+    use noah_algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
+    use noah_algebra::prelude::*;
+    use noah_algebra::ristretto::RistrettoPoint;
 
     fn verification<G: Group>() {
         let mut prng = test_rng();
@@ -109,7 +109,7 @@ mod elgamal_test {
         let err = super::elgamal_verify(&wrong_m, &ctext, &secret_key)
             .err()
             .unwrap();
-        msg_eq!(ZeiError::ElGamalVerificationError, err);
+        msg_eq!(NoahError::ElGamalVerificationError, err);
     }
 
     fn decryption<G: Group>() {

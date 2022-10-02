@@ -31,7 +31,7 @@ impl fmt::Display for AlgebraError {
             IndexError => "Index out of bounds",
             ParameterError => "Unexpected parameter for method or function",
             SignatureError => "Signature verification failed",
-            InconsistentStructureError => "Zei Structure is inconsistent",
+            InconsistentStructureError => "Noah Structure is inconsistent",
             GroupInversionError => "Group Element not invertible",
         })
     }
@@ -51,7 +51,7 @@ impl error::Error for AlgebraError {
             IndexError => "Index out of bounds",
             ParameterError => "Unexpected parameter for method or function",
             SignatureError => "Signature verification failed",
-            InconsistentStructureError => "Zei Structure is inconsistent",
+            InconsistentStructureError => "Noah Structure is inconsistent",
             GroupInversionError => "Group Element not invertible",
         }
     }
@@ -59,7 +59,7 @@ impl error::Error for AlgebraError {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[allow(missing_docs)]
-pub enum ZeiError {
+pub enum NoahError {
     AXfrProverParamsError,
     AXfrVerifierParamsError,
     AXfrVerificationError,
@@ -112,9 +112,9 @@ pub enum ZeiError {
     AbarToBarParamsError,
 }
 
-impl fmt::Display for ZeiError {
+impl fmt::Display for NoahError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use ZeiError::*;
+        use NoahError::*;
         f.write_str(match self {
             AXfrProverParamsError => "Could not preprocess anonymous transfer prover",
             AXfrVerifierParamsError => "Could not preprocess anonymous transfer verifier",
@@ -144,7 +144,7 @@ impl fmt::Display for ZeiError {
             XfrCreationAssetAmountError => "Invalid total amount per asset in non confidential asset transfer",
             ElGamalVerificationError => "ElGamal Ciphertext not valid for proposed scalar message",
             ElGamalDecryptionError => "ElGamal Ciphertext could not be decrypted",
-            InconsistentStructureError => "Zei Structure is inconsistent",
+            InconsistentStructureError => "Noah Structure is inconsistent",
             IdentityRevealVerifyError => "Verification error for confidential identity reveal proof",
             AssetMixerVerificationError => "Verification error for asset mixing proof",
             XfrNotSupported => "Transaction type not supported",
@@ -163,11 +163,11 @@ impl fmt::Display for ZeiError {
             R1CSProofError =>  "Could not create R1CSProof",
             NoMemoInAssetTracerMemo => "Cannot decrypt asset tracer memo, try brute force decoding",
             BogusAssetTracerMemo => "AssetTracerMemo decryption yields inconsistent data, try brute force decoding",
-            MissingURSError => "The Zei library is compiled without URS. Such parameters must be created first",
-            MissingSRSError => "The Zei library is compiled without SRS, which prevents proof generation",
+            MissingURSError => "The Noah library is compiled without URS. Such parameters must be created first",
+            MissingSRSError => "The Noah library is compiled without SRS, which prevents proof generation",
             MissingVerifierParamsError => "The program is loading verifier parameters that are not hardcoded. Such parameters must be created first",
         })
     }
 }
 
-impl error::Error for ZeiError {}
+impl error::Error for NoahError {}

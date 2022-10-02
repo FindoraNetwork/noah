@@ -4,14 +4,14 @@ path = 'benches/msm.rs'
 harness = false
 
 [package]
-name = 'zei-algebra'
-description = 'Zei algebra library'
+name = 'noah-algebra'
+description = 'Noah algebra library'
 version = '0.2.0'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
 
 [lib]
-name = 'zei_algebra'
+name = 'noah_algebra'
 crate-type = ['rlib']
 
 [dependencies]

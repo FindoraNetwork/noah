@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod smoke_xfr_identity {
     use ark_std::test_rng;
-    use wasm_bindgen::__rt::std::collections::HashMap;
-    use zei::{
+    use noah::{
         anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
         setup::BulletproofParams,
         xfr::{
@@ -16,7 +15,8 @@ mod smoke_xfr_identity {
             trace_assets, verify_xfr_note, RecordData, XfrNotePoliciesRef,
         },
     };
-    use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+    use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+    use wasm_bindgen::__rt::std::collections::HashMap;
 
     const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
 

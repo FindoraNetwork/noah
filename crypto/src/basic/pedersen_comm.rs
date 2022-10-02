@@ -1,8 +1,8 @@
 use curve25519_dalek::traits::MultiscalarMul;
-use zei_algebra::ops::{Add, Mul};
-use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
-use zei_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
-use zei_algebra::traits::Group;
+use noah_algebra::ops::{Add, Mul};
+use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+use noah_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
+use noah_algebra::traits::Group;
 
 /// Trait for Pedersen commitment.
 pub trait PedersenCommitment<G: Group>: Default {

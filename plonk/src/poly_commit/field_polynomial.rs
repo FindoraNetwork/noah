@@ -1,6 +1,6 @@
+use noah_algebra::prelude::*;
 use num_bigint::{BigUint, ToBigUint};
 use num_integer::Integer;
-use zei_algebra::prelude::*;
 
 /// Field polynomial.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,9 +23,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Return the constant zero polynomial
     /// # Example
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One};
     /// let poly = FpPolynomial::<BLSScalar>::zero();
     /// let zero = BLSScalar::zero();
     /// assert_eq!(poly.degree(), 0);
@@ -39,9 +39,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Return the constant one polynomial
     /// # Example
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One};
     /// let poly = FpPolynomial::<BLSScalar>::one();
     /// let one = BLSScalar::one();
     /// assert_eq!(poly.degree(), 0);
@@ -56,9 +56,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// High-order zero coefficient are trimmed.
     /// # Example
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -83,9 +83,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Build a polynomial from its zeroes/roots.
     /// # Example
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -120,9 +120,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// coffiecient with probability 1/q is zero, and hence the degree could be less than `degree`
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::prelude::*;
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::prelude::*;
     /// use rand::thread_rng;
     /// let poly = FpPolynomial::<BLSScalar>::random(&mut thread_rng(), 10);
     /// assert!(poly.degree() <= 10)
@@ -146,9 +146,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Return degree of the polynomial
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One};
     /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::one(); 10]);
     /// assert_eq!(poly.degree(), 9);
     /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::zero(); 10]);
@@ -165,9 +165,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Test if polynomial is the zero polynomial.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One};
     /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::one(); 10]);
     /// assert!(!poly.is_zero());
     /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::zero(); 10]);
@@ -208,9 +208,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Add with another polynomial, producing a new polynomial.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -232,9 +232,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Subtracts another polynomial from self.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -274,9 +274,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Subtract another polynomial from self, producing a new polynomial.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -296,9 +296,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Negate the coefficients.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let minus_one = one.neg();
@@ -315,9 +315,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// negate the coefficients.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let minus_one = one.neg();
@@ -335,9 +335,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Add `coef` to the coefficient of order `order`.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let mut two = one;
@@ -364,9 +364,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Multiply polynomial by a constant scalar.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -388,9 +388,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Multiply polynomial by a constant scalar into a new polynomial.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -409,9 +409,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// mul_var(\sum a_i X^i, b) = \sum a_i b^i X^i
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -433,9 +433,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Multiply polynomial variable by a scalar
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let two = one.add(&one);
@@ -454,9 +454,9 @@ impl<F: Scalar> FpPolynomial<F> {
     /// Divide polynomial to produce the quotient and remainder polynomials.
     /// # Example:
     /// ```
-    /// use zei_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use zei_algebra::bls12_381::BLSScalar;
-    /// use zei_algebra::{Zero, One, ops::*};
+    /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::{Zero, One, ops::*};
     /// let zero = BLSScalar::zero();
     /// let one = BLSScalar::one();
     /// let mut poly = FpPolynomial::from_coefs(vec![one, one, one]);
@@ -659,7 +659,7 @@ pub fn recursive_ifft<F: Scalar>(values: &[&F], root: &F) -> Vec<F> {
 mod test {
     use crate::poly_commit::field_polynomial::FpPolynomial;
     use ark_std::test_rng;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
     fn from_zeroes() {

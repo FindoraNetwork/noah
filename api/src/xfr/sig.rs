@@ -11,18 +11,18 @@ use libsecp256k1::{
     PublicKey as Secp256k1PublicKey, RecoveryId, SecretKey as Secp256k1SecretKey,
     Signature as Secp256k1Signature,
 };
-use sha3::{Digest, Keccak256};
-use wasm_bindgen::prelude::*;
-use zei_algebra::{
+use noah_algebra::{
     cmp::Ordering,
     hash::{Hash, Hasher},
     prelude::*,
     ristretto::RistrettoScalar,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
 };
-use zei_crypto::basic::hybrid_encryption::{
-    hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, ZeiHybridCiphertext,
+use noah_crypto::basic::hybrid_encryption::{
+    hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
 };
+use sha3::{Digest, Keccak256};
+use wasm_bindgen::prelude::*;
 
 /// The length of the secret key for confidential transfer.
 pub const XFR_SECRET_KEY_LENGTH: usize = 33; // KeyType + 32 bytes
@@ -186,7 +186,7 @@ impl XfrPublicKey {
     ) -> Result<Vec<u8>> {
         match self.0 {
             XfrPublicKeyInner::Ed25519(pk) => {
-                Ok(hybrid_encrypt_ed25519(prng, &pk, msg).zei_to_bytes())
+                Ok(hybrid_encrypt_ed25519(prng, &pk, msg).noah_to_bytes())
             }
             XfrPublicKeyInner::Secp256k1(pk) => {
                 let bytes = convert_point_libsecp256k1_to_algebra(&pk);
@@ -205,33 +205,33 @@ impl XfrPublicKey {
     pub fn verify(&self, message: &[u8], signature: &XfrSignature) -> Result<()> {
         match (self.0, signature) {
             (XfrPublicKeyInner::Ed25519(pk), XfrSignature::Ed25519(sign)) => {
-                pk.verify(message, sign).c(d!(ZeiError::SignatureError))
+                pk.verify(message, sign).c(d!(NoahError::SignatureError))
             }
             (XfrPublicKeyInner::Secp256k1(pk), XfrSignature::Secp256k1(sign, _)) => {
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
-                let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
+                let msg = Message::parse_slice(&res[..]).c(d!(NoahError::SignatureError))?;
                 if secp256k1_verify(&msg, sign, &pk) {
                     Ok(())
                 } else {
-                    Err(eg!(ZeiError::SignatureError))
+                    Err(eg!(NoahError::SignatureError))
                 }
             }
             (XfrPublicKeyInner::Address(hash), XfrSignature::Address(sign, rec)) => {
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
-                let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
-                let pk = recover(&msg, sign, rec).c(d!(ZeiError::SignatureError))?;
+                let msg = Message::parse_slice(&res[..]).c(d!(NoahError::SignatureError))?;
+                let pk = recover(&msg, sign, rec).c(d!(NoahError::SignatureError))?;
                 let other = convert_libsecp256k1_public_key_to_address(&pk);
                 if hash == other {
                     Ok(())
                 } else {
-                    Err(eg!(ZeiError::SignatureError))
+                    Err(eg!(NoahError::SignatureError))
                 }
             }
-            _ => Err(eg!(ZeiError::SignatureError)),
+            _ => Err(eg!(NoahError::SignatureError)),
         }
     }
 
@@ -260,26 +260,26 @@ impl XfrPublicKey {
         // Compatible with old data.
         if bytes.len() == XFR_PUBLIC_KEY_LENGTH - 2 {
             return Ok(XfrPublicKey(XfrPublicKeyInner::Ed25519(
-                Ed25519PublicKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?,
+                Ed25519PublicKey::from_bytes(bytes).c(d!(NoahError::DeserializationError))?,
             )));
         }
 
         if bytes.len() != XFR_PUBLIC_KEY_LENGTH {
-            return Err(eg!(ZeiError::DeserializationError));
+            return Err(eg!(NoahError::DeserializationError));
         }
 
         let ktype = KeyType::from_byte(bytes[0]);
         match ktype {
             KeyType::Ed25519 => {
                 let pk = Ed25519PublicKey::from_bytes(&bytes[1..XFR_PUBLIC_KEY_LENGTH - 1])
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 Ok(XfrPublicKey(XfrPublicKeyInner::Ed25519(pk)))
             }
             KeyType::Secp256k1 => {
                 let mut pk_bytes = [0u8; XFR_PUBLIC_KEY_LENGTH - 1];
                 pk_bytes.copy_from_slice(&bytes[1..]);
                 let pk = Secp256k1PublicKey::parse_compressed(&pk_bytes)
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 Ok(XfrPublicKey(XfrPublicKeyInner::Secp256k1(pk)))
             }
             KeyType::Address => {
@@ -358,7 +358,7 @@ impl XfrSecretKey {
     pub fn hybrid_decrypt(&self, lock: &[u8]) -> Result<Vec<u8>> {
         match self {
             XfrSecretKey::Ed25519(sk) => {
-                let ctext = ZeiHybridCiphertext::zei_from_bytes(lock)?;
+                let ctext = NoahHybridCiphertext::noah_from_bytes(lock)?;
                 Ok(hybrid_decrypt_with_ed25519_secret_key(&ctext, sk))
             }
             XfrSecretKey::Secp256k1(sk) => {
@@ -384,21 +384,21 @@ impl XfrSecretKey {
             }
             XfrSecretKey::Secp256k1(sk) => {
                 // If the Ethereum sign is used outside,
-                // it needs to be dealt with first, only hash in zei.
+                // it needs to be dealt with first, only hash in Noah.
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
-                let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
+                let msg = Message::parse_slice(&res[..]).c(d!(NoahError::SignatureError))?;
                 let (sign, rec) = secp256k1_sign(&msg, sk);
                 Ok(XfrSignature::Secp256k1(sign, rec))
             }
             XfrSecretKey::Address(sk) => {
                 // If the Ethereum sign is used outside,
-                // it needs to be dealt with first, only hash in zei.
+                // it needs to be dealt with first, only hash in Noah.
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
-                let msg = Message::parse_slice(&res[..]).c(d!(ZeiError::SignatureError))?;
+                let msg = Message::parse_slice(&res[..]).c(d!(NoahError::SignatureError))?;
                 let (sign, rec) = secp256k1_sign(&msg, sk);
                 Ok(XfrSignature::Address(sign, rec))
             }
@@ -456,29 +456,29 @@ impl XfrSecretKey {
         // Compatible with old data.
         if bytes.len() == XFR_SECRET_KEY_LENGTH - 1 {
             return Ok(XfrSecretKey::Ed25519(
-                Ed25519SecretKey::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?,
+                Ed25519SecretKey::from_bytes(bytes).c(d!(NoahError::DeserializationError))?,
             ));
         }
 
         if bytes.len() != XFR_SECRET_KEY_LENGTH {
-            return Err(eg!(ZeiError::DeserializationError));
+            return Err(eg!(NoahError::DeserializationError));
         }
 
         let ktype = KeyType::from_byte(bytes[0]);
         match ktype {
             KeyType::Ed25519 => {
                 let sk = Ed25519SecretKey::from_bytes(&bytes[1..])
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 Ok(XfrSecretKey::Ed25519(sk))
             }
             KeyType::Secp256k1 => {
                 let sk = Secp256k1SecretKey::parse_slice(&bytes[1..])
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 Ok(XfrSecretKey::Secp256k1(sk))
             }
             KeyType::Address => {
                 let sk = Secp256k1SecretKey::parse_slice(&bytes[1..])
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 Ok(XfrSecretKey::Address(sk))
             }
         }
@@ -486,7 +486,7 @@ impl XfrSecretKey {
 
     /// Convert from raw bytes used secp256k1 and use it with address.
     pub fn from_secp256k1_with_address(bytes: &[u8]) -> Result<Self> {
-        let sk = Secp256k1SecretKey::parse_slice(bytes).c(d!(ZeiError::DeserializationError))?;
+        let sk = Secp256k1SecretKey::parse_slice(bytes).c(d!(NoahError::DeserializationError))?;
         Ok(XfrSecretKey::Address(sk))
     }
 }
@@ -573,18 +573,18 @@ impl XfrKeyPair {
     }
 }
 
-impl ZeiFromToBytes for XfrKeyPair {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for XfrKeyPair {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(self.sec_key.zei_to_bytes().as_slice());
-        vec.extend_from_slice(self.pub_key.zei_to_bytes().as_slice());
+        vec.extend_from_slice(self.sec_key.noah_to_bytes().as_slice());
+        vec.extend_from_slice(self.pub_key.noah_to_bytes().as_slice());
         vec
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(XfrKeyPair {
-            sec_key: XfrSecretKey::zei_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH]).c(d!())?,
-            pub_key: XfrPublicKey::zei_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..]).c(d!())?,
+            sec_key: XfrSecretKey::noah_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH]).c(d!())?,
+            pub_key: XfrPublicKey::noah_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..]).c(d!())?,
         })
     }
 }
@@ -616,37 +616,38 @@ impl XfrSignature {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // Compatible with old data.
         if bytes.len() == XFR_SIGNATURE_LENGTH - 2 {
-            let sign = Ed25519Signature::from_bytes(bytes).c(d!(ZeiError::DeserializationError))?;
+            let sign =
+                Ed25519Signature::from_bytes(bytes).c(d!(NoahError::DeserializationError))?;
             return Ok(XfrSignature::Ed25519(sign));
         }
 
         if bytes.len() != XFR_SIGNATURE_LENGTH {
-            return Err(eg!(ZeiError::DeserializationError));
+            return Err(eg!(NoahError::DeserializationError));
         }
 
         let ktype = KeyType::from_byte(bytes[0]);
         match ktype {
             KeyType::Ed25519 => {
                 let sign = Ed25519Signature::from_bytes(&bytes[1..XFR_SIGNATURE_LENGTH - 1])
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 Ok(XfrSignature::Ed25519(sign))
             }
             KeyType::Secp256k1 => {
                 let mut s_bytes = [0u8; XFR_SIGNATURE_LENGTH - 2];
                 s_bytes.copy_from_slice(&bytes[1..XFR_SIGNATURE_LENGTH - 1]);
                 let sign = Secp256k1Signature::parse_standard(&s_bytes)
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 let rec = RecoveryId::parse(bytes[XFR_SIGNATURE_LENGTH - 1])
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 Ok(XfrSignature::Secp256k1(sign, rec))
             }
             KeyType::Address => {
                 let mut s_bytes = [0u8; XFR_SIGNATURE_LENGTH - 2];
                 s_bytes.copy_from_slice(&bytes[1..XFR_SIGNATURE_LENGTH - 1]);
                 let sign = Secp256k1Signature::parse_standard(&s_bytes)
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 let rec = RecoveryId::parse(bytes[XFR_SIGNATURE_LENGTH - 1])
-                    .c(d!(ZeiError::DeserializationError))?;
+                    .c(d!(NoahError::DeserializationError))?;
                 Ok(XfrSignature::Address(sign, rec))
             }
         }
@@ -665,7 +666,7 @@ impl XfrMultiSig {
     pub fn sign(keypairs: &[&XfrKeyPair], message: &[u8]) -> Result<Self> {
         // sort the key pairs based on alphabetical order of their public keys
         let mut sorted = keypairs.to_owned();
-        sorted.sort_unstable_by_key(|kp| kp.pub_key.zei_to_bytes());
+        sorted.sort_unstable_by_key(|kp| kp.pub_key.noah_to_bytes());
         let mut signatures = vec![];
         for kp in sorted {
             signatures.push(kp.sign(message)?);
@@ -676,11 +677,11 @@ impl XfrMultiSig {
     /// Verify a multisig.
     pub fn verify(&self, pubkeys: &[&XfrPublicKey], message: &[u8]) -> Result<()> {
         if pubkeys.len() != self.signatures.len() {
-            return Err(eg!(ZeiError::SignatureError));
+            return Err(eg!(NoahError::SignatureError));
         }
         // sort the key pairs based on alphabetical order of their public keys
         let mut sorted = pubkeys.to_owned();
-        sorted.sort_unstable_by_key(|k| k.zei_to_bytes());
+        sorted.sort_unstable_by_key(|k| k.noah_to_bytes());
         for (pk, sig) in sorted.iter().zip(self.signatures.iter()) {
             pk.verify(&message, &sig).c(d!())?;
         }
@@ -745,8 +746,8 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
 mod test {
     use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKeyInner, XfrSecretKey};
     use ark_std::{env, test_rng};
+    use noah_algebra::prelude::*;
     use ruc::err::*;
-    use zei_algebra::prelude::*;
 
     #[test]
     fn signatures() {
@@ -773,7 +774,7 @@ mod test {
         let message = [10u8; 500];
         let sig = keypair.sign(&message).unwrap();
         msg_eq!(
-            dbg!(ZeiError::SignatureError),
+            dbg!(NoahError::SignatureError),
             dbg!(keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err()),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
@@ -781,7 +782,7 @@ mod test {
         //test again with secret key
         let sig = keypair.sec_key.sign(&message).unwrap();
         msg_eq!(
-            ZeiError::SignatureError,
+            NoahError::SignatureError,
             keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
@@ -790,7 +791,7 @@ mod test {
         // test with different keys
         let keypair = XfrKeyPair::generate_ed25519(&mut prng);
         msg_eq!(
-            ZeiError::SignatureError,
+            NoahError::SignatureError,
             keypair.pub_key.verify(&message, &sig).unwrap_err(),
             "Verifying sig on with a different key should have return Err(Signature Error)"
         );

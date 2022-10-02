@@ -13,19 +13,19 @@ use crate::anon_xfr::{
     },
     AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN, ANON_XFR_BP_GENS_LEN, FEE_TYPE,
 };
-use crate::errors::ZeiError;
+use crate::errors::NoahError;
 use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-#[cfg(feature = "parallel")]
-use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-use zei_crypto::basic::rescue::RescueInstance;
-use zei_plonk::plonk::{
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_crypto::basic::rescue::RescueInstance;
+use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// The domain separator for anonymous transfer, for the Plonk proof.
 const ANON_XFR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Plonk Proof";
@@ -84,7 +84,7 @@ pub fn init_anon_xfr_note(
 ) -> Result<AXfrPreNote> {
     // 1. check input correctness
     if inputs.is_empty() || outputs.is_empty() {
-        return Err(eg!(ZeiError::AXfrProverParamsError));
+        return Err(eg!(NoahError::AXfrProverParamsError));
     }
     check_inputs(inputs, input_keypair).c(d!())?;
     check_asset_amount(inputs, outputs, fee).c(d!())?;
@@ -141,7 +141,7 @@ pub fn init_anon_xfr_note(
         .collect_vec();
     let out_memos: Result<Vec<AxfrOwnerMemo>> = outputs
         .iter()
-        .map(|output| output.owner_memo.clone().c(d!(ZeiError::ParameterError)))
+        .map(|output| output.owner_memo.clone().c(d!(NoahError::ParameterError)))
         .collect();
 
     let mt_info_temp = inputs[0].mt_leaf_info.as_ref().unwrap();
@@ -199,7 +199,7 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     hash: D,
 ) -> Result<()> {
     if *merkle_root != note.body.merkle_root {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
     let payees_commitments = note
         .body
@@ -231,7 +231,7 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
         &note.proof,
         &address_folding_public_input,
     )
-    .c(d!(ZeiError::AXfrVerificationError))
+    .c(d!(NoahError::AXfrVerificationError))
 }
 
 /// Batch verify the anonymous transfer notes.
@@ -248,7 +248,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
         .zip(notes)
         .any(|(x, y)| **x != y.body.merkle_root)
     {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
 
     let is_ok = params
@@ -293,7 +293,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
     if is_ok {
         Ok(())
     } else {
-        Err(eg!(ZeiError::AXfrVerificationError))
+        Err(eg!(NoahError::AXfrVerificationError))
     }
 }
 
@@ -327,7 +327,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
         &params.prover_params,
         &witness,
     )
-    .c(d!(ZeiError::AXfrProofError))
+    .c(d!(NoahError::AXfrProofError))
 }
 
 /// Verify a Plonk proof for anonymous transfer.
@@ -355,7 +355,7 @@ pub(crate) fn verify_xfr(
         &online_inputs,
         proof,
     )
-    .c(d!(ZeiError::ZKProofVerificationError))
+    .c(d!(NoahError::ZKProofVerificationError))
 }
 
 /// The witness of an anonymous transfer.
@@ -864,10 +864,10 @@ mod tests {
     use ark_std::test_rng;
     use digest::{consts::U64, Digest};
     use merlin::Transcript;
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_crypto::basic::rescue::RescueInstance;
+    use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
     use sha2::Sha512;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basic::rescue::RescueInstance;
-    use zei_plonk::plonk::constraint_system::{TurboCS, VarIndex};
 
     fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R, n: usize) -> Vec<AXfrKeyPair> {
         (0..n).map(|_| AXfrKeyPair::generate(prng)).collect()
@@ -1247,7 +1247,7 @@ mod tests {
 
             // empty inputs/outputs
             msg_eq!(
-                ZeiError::AXfrProverParamsError,
+                NoahError::AXfrProverParamsError,
                 gen_anon_xfr_note(
                     &mut prng,
                     &user_params,
@@ -1260,7 +1260,7 @@ mod tests {
                 .unwrap_err(),
             );
             msg_eq!(
-                ZeiError::AXfrProverParamsError,
+                NoahError::AXfrProverParamsError,
                 gen_anon_xfr_note(
                     &mut prng,
                     &user_params,

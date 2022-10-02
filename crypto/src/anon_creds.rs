@@ -3,8 +3,8 @@
 
 use crate::{basic::matrix_sigma::SigmaTranscript, confidential_anon_creds::CACTranscript};
 use merlin::Transcript;
+use noah_algebra::{prelude::*, traits::Pairing};
 use serde_derive::{Deserialize, Serialize};
-use zei_algebra::{prelude::*, traits::Pairing};
 
 pub(crate) const REVEAL_PROOF_DOMAIN: &[u8] = b"AC Reveal PoK";
 pub(crate) const REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE: &[u8] = b"AC Reveal PoK Instance";
@@ -77,7 +77,7 @@ impl<G1: Group, G2: Group, AttrType: Copy> Credential<G1, G2, AttrType> {
     /// Apply the reveal map to get revealed attributes.
     pub fn get_revealed_attributes(&self, reveal_map: &[bool]) -> Result<Vec<AttrType>> {
         if reveal_map.len() != self.attrs.len() {
-            return Err(eg!(ZeiError::ParameterError));
+            return Err(eg!(NoahError::ParameterError));
         }
         Ok(self
             .attrs
@@ -230,7 +230,7 @@ pub fn grant_credential<R: CryptoRng + RngCore, P: Pairing>(
     let number_attributes_from_issuer_sk = isk.y.len();
     let n = attrs.len();
     if number_attributes_from_issuer_sk != n {
-        return Err(eg!(ZeiError::AnonymousCredentialSignError));
+        return Err(eg!(NoahError::AnonymousCredentialSignError));
     }
 
     let u = P::ScalarField::random(prng);
@@ -352,7 +352,7 @@ pub fn open_comm<R: CryptoRng + RngCore, P: Pairing>(
     reveal_map: &[bool],
 ) -> Result<CredentialCommOpenProof<P::G2, P::ScalarField>> {
     if credential.attrs.len() != reveal_map.len() {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     let revealed_attrs = credential
@@ -439,7 +439,7 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
                 gamma.push(gamma_i);
             }
             Attribute::Hidden(None) => {
-                return Err(eg!(ZeiError::ParameterError));
+                return Err(eg!(NoahError::ParameterError));
             }
             _ => {}
         }
@@ -497,7 +497,7 @@ pub(crate) fn verify_pok<P: Pairing>(
                 scalars.push(a);
             }
             None => {
-                let response = resp_attr_iter.next().c(d!(ZeiError::ParameterError))?;
+                let response = resp_attr_iter.next().c(d!(NoahError::ParameterError))?;
                 scalars.push(response);
             }
         }
@@ -515,7 +515,7 @@ pub(crate) fn verify_pok<P: Pairing>(
     if lhs == rhs {
         Ok(())
     } else {
-        Err(eg!(ZeiError::IdentityRevealVerifyError))
+        Err(eg!(NoahError::IdentityRevealVerifyError))
     }
 }
 
@@ -524,7 +524,7 @@ pub(crate) mod credentials_tests {
     use super::*;
     use crate::anon_creds::Attribute::{Hidden, Revealed};
     use ark_std::test_rng;
-    use zei_algebra::bls12_381::BLSPairingEngine;
+    use noah_algebra::bls12_381::BLSPairingEngine;
 
     fn check_signatures<P: Pairing>(n: usize) {
         let mut prng = test_rng();

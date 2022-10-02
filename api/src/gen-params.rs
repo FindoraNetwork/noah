@@ -6,20 +6,20 @@
 )]
 
 use bulletproofs::BulletproofGens;
+use noah::setup::{BulletproofParams, ProverParams, VerifierParams, MAX_ANONYMOUS_RECORD_NUMBER};
+use noah_algebra::utils::save_to_file;
+use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
-use zei::setup::{BulletproofParams, ProverParams, VerifierParams, MAX_ANONYMOUS_RECORD_NUMBER};
-use zei_algebra::utils::save_to_file;
-use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 
+use noah::anon_xfr::TREE_DEPTH;
 use rayon::prelude::*;
-use zei::anon_xfr::TREE_DEPTH;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
-    about = "Zei tool to generate necessary zero-knowledge proof parameters.",
+    about = "Noah tool to generate necessary zero-knowledge proof parameters.",
     rename_all = "kebab-case"
 )]
 enum Actions {

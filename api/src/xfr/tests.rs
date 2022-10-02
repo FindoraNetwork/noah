@@ -14,14 +14,14 @@ use crate::xfr::{
 };
 use ark_std::test_rng;
 use merlin::Transcript;
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
-use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
-use zei_crypto::basic::{
+use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
+use noah_crypto::basic::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
     pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
 };
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 pub(crate) fn create_xfr<R: CryptoRng + RngCore>(
     prng: &mut R,
@@ -146,7 +146,7 @@ fn do_transfer_tests_single_asset(
         inkeys_ref.as_slice(),
     );
     msg_eq!(
-        ZeiError::XfrCreationAssetAmountError,
+        NoahError::XfrCreationAssetAmountError,
         xfr_note.unwrap_err(),
         "Xfr cannot be build if output total amount is greater than input amounts"
     );
@@ -206,7 +206,7 @@ fn do_transfer_tests_single_asset(
         inkeys_ref.as_slice(),
     );
     msg_eq!(
-        ZeiError::XfrCreationAssetAmountError,
+        NoahError::XfrCreationAssetAmountError,
         xfr_note.unwrap_err(),
         "Xfr cannot be build if output asset types are different"
     );
@@ -266,7 +266,7 @@ fn do_transfer_tests_single_asset(
     );
 
     msg_eq!(
-        ZeiError::XfrCreationAssetAmountError,
+        NoahError::XfrCreationAssetAmountError,
         xfr_note.unwrap_err(),
         "Xfr cannot be build if output asset types are different"
     );
@@ -602,7 +602,7 @@ mod multi_asset_no_tracing {
             compute_transfer_multisig(&xfr_note.body, inkeys_ref.as_slice()).unwrap();
 
         msg_eq!(
-            ZeiError::XfrVerifyAssetAmountError,
+            NoahError::XfrVerifyAssetAmountError,
             verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()).unwrap_err(),
             "Multi asset transfer non confidential"
         );
@@ -667,7 +667,7 @@ mod keys {
             outputs.as_slice(),
             &[], //no keys
         );
-        msg_eq!(ZeiError::ParameterError, xfr_note.unwrap_err());
+        msg_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
 
         let key1 = XfrKeyPair::generate(&mut prng);
         let key2 = XfrKeyPair::generate(&mut prng);
@@ -678,7 +678,7 @@ mod keys {
             &[&key1, &key2],
         );
 
-        msg_eq!(ZeiError::ParameterError, xfr_note.unwrap_err());
+        msg_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
     }
 }
 
@@ -778,7 +778,7 @@ mod identity_tracing {
             vec![None; 1],
         );
         msg_eq!(
-            ZeiError::XfrVerifyAssetTracingIdentityError,
+            NoahError::XfrVerifyAssetTracingIdentityError,
             verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).unwrap_err(),
         );
 
@@ -816,12 +816,12 @@ mod asset_tracing {
         structs::{AssetTracerKeyPair, TracingPolicies},
         trace_assets, XfrNotePolicies, XfrNotePoliciesRef,
     };
-    use zei_algebra::{
+    use noah_algebra::{
         bls12_381::BLSScalar,
         ristretto::{RistrettoPoint, RistrettoScalar},
     };
-    use zei_crypto::basic::elgamal::ElGamalCiphertext;
-    use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+    use noah_crypto::basic::elgamal::ElGamalCiphertext;
+    use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
@@ -996,7 +996,7 @@ mod asset_tracing {
             );
 
             msg_eq!(
-                ZeiError::XfrVerifyAssetTracingAssetAmountError,
+                NoahError::XfrVerifyAssetTracingAssetAmountError,
                 verify_xfr_body(&mut prng, params, &new_xfr_body, &policies).unwrap_err(),
                 "Asset tracing verification fails as the ciphertext has been altered."
             );
@@ -1015,7 +1015,7 @@ mod asset_tracing {
         let check = verify_xfr_body(&mut prng, params, &new_xfr_body, &policies);
 
         msg_eq!(
-            ZeiError::XfrVerifyAssetTracingAssetAmountError,
+            NoahError::XfrVerifyAssetTracingAssetAmountError,
             check.unwrap_err(),
             "Transfer should fail without proof."
         );
@@ -1037,7 +1037,7 @@ mod asset_tracing {
         let check = verify_xfr_body(&mut prng, params, &new_xfr_body, &policies);
 
         msg_eq!(
-            ZeiError::XfrVerifyAssetTracingAssetAmountError,
+            NoahError::XfrVerifyAssetTracingAssetAmountError,
             check.unwrap_err(),
             "Transfer should fail as the proof is not correctly computed."
         );
@@ -1691,7 +1691,7 @@ mod asset_tracing {
         xfr_body_new.outputs[1].amount = NonConfidential(u64::max_value());
 
         msg_eq!(
-            ZeiError::XfrVerifyAssetAmountError,
+            NoahError::XfrVerifyAssetAmountError,
             verify_xfr_body(&mut prng, &mut params, &xfr_body_new, &policies_ref).unwrap_err(),
             "An integer overflow error must be raised"
         );
