@@ -40,6 +40,9 @@ pub mod traits;
 /// Module for the Ristretto group
 pub mod ristretto;
 
+/// Module for the Jubjub curve
+pub mod jubjub;
+
 /// Module for serialization of scalars and group elements
 pub mod serialization;
 
