@@ -4,9 +4,9 @@
 
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use merlin::Transcript;
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::CompressedRistretto;
-use zei_algebra::ristretto::RistrettoScalar as Scalar;
+use noah_algebra::prelude::*;
+use noah_algebra::ristretto::CompressedRistretto;
+use noah_algebra::ristretto::RistrettoScalar as Scalar;
 
 /// Generate a Bulletproof range proof that values committed using `blindings`
 /// are within [0..2^{`log_range_upper_bound`}-1].
@@ -27,7 +27,7 @@ pub fn prove_ranges(
         &blindings,
         log_range_upper_bound,
     )
-    .c(d!(ZeiError::RangeProofProveError))?;
+    .c(d!(NoahError::RangeProofProveError))?;
     let commitments = coms.iter().map(|x| CompressedRistretto(*x)).collect_vec();
     Ok((proof, commitments))
 }
@@ -62,5 +62,5 @@ pub fn batch_verify_ranges<R: CryptoRng + RngCore>(
         &pc_gens,
         log_range_upper_bound,
     )
-    .c(d!(ZeiError::RangeProofVerifyError))
+    .c(d!(NoahError::RangeProofVerifyError))
 }

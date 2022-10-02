@@ -1,6 +1,6 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-use zei_crypto::basic::rescue::RescueInstance;
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_crypto::basic::rescue::RescueInstance;
 
 /// state size.
 const WIDTH: usize = 4;
@@ -252,8 +252,8 @@ impl TurboCS<BLSScalar> {
 #[cfg(test)]
 mod test {
     use crate::plonk::constraint_system::{rescue::State, TurboCS};
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basic::rescue::RescueInstance;
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_crypto::basic::rescue::RescueInstance;
 
     type F = BLSScalar;
 

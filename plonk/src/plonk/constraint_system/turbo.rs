@@ -4,11 +4,11 @@
 //! ecc.rs and rescue.rs, respectively.
 use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
-use zei_algebra::prelude::*;
+use noah_algebra::prelude::*;
 
+use noah_crypto::basic::jive::JiveCRH;
 #[cfg(feature = "debug")]
 use std::collections::HashMap;
-use zei_crypto::basic::jive::JiveCRH;
 
 /// The wires number of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;
@@ -207,6 +207,27 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             #[cfg(feature = "debug")]
             witness_backtrace: HashMap::new(),
         })
+    }
+
+    fn compute_anemoi_jive_selectors(&self) -> [Vec<Self::Field>; 4] {
+        let empty_poly = vec![F::zero(); self.size];
+
+        let mut polys = [
+            empty_poly.clone(),
+            empty_poly.clone(),
+            empty_poly.clone(),
+            empty_poly,
+        ];
+        for i in self.anemoi_constraints_indices.iter() {
+            for j in 0..12 {
+                polys[0][*i + j] = self.anemoi_preprocessed_round_keys_x[j][0];
+                polys[1][*i + j] = self.anemoi_preprocessed_round_keys_x[j][1];
+                polys[2][*i + j] = self.anemoi_preprocessed_round_keys_y[j][0];
+                polys[3][*i + j] = self.anemoi_preprocessed_round_keys_y[j][1];
+            }
+        }
+
+        polys
     }
 }
 
@@ -885,8 +906,8 @@ mod test {
     use crate::poly_commit::{kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme};
     use ark_std::test_rng;
     use merlin::Transcript;
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use std::str::FromStr;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
 
@@ -1451,7 +1472,7 @@ mod test {
     #[should_panic]
     fn test_dangling_witness_should_panic() {
         use crate::plonk::constraint_system::rescue::StateVar;
-        use zei_crypto::basic::rescue::RescueInstance;
+        use noah_crypto::basic::rescue::RescueInstance;
 
         let one = F::one();
         let two = one.add(&one);

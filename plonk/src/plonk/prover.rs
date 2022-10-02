@@ -16,7 +16,7 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial, pcs::PolyComScheme, transcript::PolyComTranscript,
 };
 use merlin::Transcript;
-use zei_algebra::prelude::*;
+use noah_algebra::prelude::*;
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
 /// Proof verifier must use a transcript with same state as prover and match the public parameters,
@@ -24,16 +24,16 @@ use zei_algebra::prelude::*;
 /// commitment scheme `pcs` do not match the constraint system parameters.
 /// # Example
 /// ```
-/// use zei_plonk::plonk::{
+/// use noah_plonk::plonk::{
 ///     constraint_system::TurboCS,
 ///     verifier::verifier,
 ///     prover::prover,
 ///     indexer::indexer
 /// };
-/// use zei_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
+/// use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
 /// use merlin::Transcript;
 /// use rand_chacha::ChaChaRng;
-/// use zei_algebra::{prelude::*, bls12_381::BLSScalar};
+/// use noah_algebra::{prelude::*, bls12_381::BLSScalar};
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let pcs = KZGCommitmentScheme::new(20, &mut prng);
@@ -233,14 +233,28 @@ pub fn prover_with_lagrange<
         .map(|poly| pcs.eval(poly, &zeta))
         .collect();
 
+    let prk_3_poly_eval_zeta = pcs.eval(&prover_params.q_prk_polys[2], &zeta);
+    let prk_4_poly_eval_zeta = pcs.eval(&prover_params.q_prk_polys[3], &zeta);
+
     let zeta_omega = root.mul(&zeta);
     let z_eval_zeta_omega = pcs.eval(&z_poly, &zeta_omega);
+
+    let w_polys_eval_zeta_omega: Vec<PCS::Field> = w_polys
+        .iter()
+        .take(3)
+        .map(|poly| pcs.eval(poly, &zeta_omega))
+        .collect();
 
     //  b). build the r polynomial, and eval at zeta
     for eval_zeta in w_polys_eval_zeta.iter().chain(s_polys_eval_zeta.iter()) {
         transcript.append_field_elem(eval_zeta);
     }
+    transcript.append_field_elem(&prk_3_poly_eval_zeta);
+    transcript.append_field_elem(&prk_4_poly_eval_zeta);
     transcript.append_field_elem(&z_eval_zeta_omega);
+    for eval_zeta_omega in w_polys_eval_zeta_omega.iter() {
+        transcript.append_field_elem(eval_zeta_omega);
+    }
 
     // 8. get challenge u
     let u = transcript_get_plonk_challenge_u(transcript, cs.size());
@@ -273,6 +287,8 @@ pub fn prover_with_lagrange<
                 .take(CS::n_wires_per_gate() - 1),
         )
         .collect();
+    polys_to_open.push(&prover_params.q_prk_polys[2]);
+    polys_to_open.push(&prover_params.q_prk_polys[3]);
     polys_to_open.push(&r_poly);
 
     let zeta = challenges.get_zeta().unwrap();
@@ -281,8 +297,16 @@ pub fn prover_with_lagrange<
         .batch_prove(transcript, &polys_to_open[..], &zeta, n_constraints + 2)
         .c(d!(PlonkError::ProofError))?;
 
+    let polys_to_open: Vec<&FpPolynomial<PCS::Field>> =
+        vec![&z_poly, &w_polys[0], &w_polys[1], &w_polys[2]];
+
     let opening_witness_zeta_omega = pcs
-        .prove(transcript, &z_poly, &zeta_omega, n_constraints + 2)
+        .batch_prove(
+            transcript,
+            &polys_to_open[..],
+            &zeta_omega,
+            n_constraints + 2,
+        )
         .c(d!(PlonkError::ProofError))?;
 
     // return proof
@@ -290,7 +314,10 @@ pub fn prover_with_lagrange<
         cm_w_vec,
         cm_t_vec,
         cm_z,
+        prk_3_poly_eval_zeta,
+        prk_4_poly_eval_zeta,
         w_polys_eval_zeta,
+        w_polys_eval_zeta_omega,
         z_eval_zeta_omega,
         s_polys_eval_zeta,
         opening_witness_zeta,

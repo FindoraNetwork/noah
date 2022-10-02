@@ -1,4 +1,4 @@
-use zei_algebra::collections::BTreeMap;
+use noah_algebra::collections::BTreeMap;
 
 #[cfg(not(feature = "no_urs"))]
 /// The Bulletproofs URS.

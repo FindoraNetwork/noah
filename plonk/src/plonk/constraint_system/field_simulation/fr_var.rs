@@ -1,10 +1,10 @@
 use crate::plonk::constraint_system::{field_simulation::SimFrMulVar, TurboCS, VarIndex};
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::BLSScalar,
     cmp::{max, min},
     prelude::*,
 };
-use zei_crypto::field_simulation::{SimFr, SimFrParams, SimReducibility};
+use noah_crypto::field_simulation::{SimFr, SimFrParams, SimReducibility};
 
 /// `SimFrVar` is the variable for `SimFr` in
 /// `TurboConstraintSystem<BLSScalar>`
@@ -192,9 +192,9 @@ mod test_ristretto {
         TurboCS,
     };
     use ark_std::test_rng;
+    use noah_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
     use num_bigint::{BigUint, RandBigInt};
-    use zei_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
-    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 
     type SimFrTest = SimFr<SimFrParamsRistretto>;
     type SimFrVarTest = SimFrVar<SimFrParamsRistretto>;
@@ -344,9 +344,9 @@ mod test_secq256k1 {
         TurboCS,
     };
     use ark_std::test_rng;
+    use noah_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
     use num_bigint::{BigUint, RandBigInt};
-    use zei_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
-    use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 
     type SimFrTest = SimFr<SimFrParamsSecq256k1>;
     type SimFrVarTest = SimFrVar<SimFrParamsSecq256k1>;

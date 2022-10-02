@@ -1,7 +1,6 @@
 use ark_std::test_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::{CryptoRng, RngCore};
-use zei::{
+use noah::{
     setup::BulletproofParams,
     xfr::{
         asset_record::AssetRecordType,
@@ -11,7 +10,8 @@ use zei::{
         verify_xfr_note, XfrNotePolicies,
     },
 };
-use zei_algebra::prelude::*;
+use noah_algebra::prelude::*;
+use rand::{CryptoRng, RngCore};
 
 const BATCHSIZE: [usize; 7] = [1, 2, 3, 6, 10, 20, 30];
 

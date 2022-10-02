@@ -1,8 +1,8 @@
 use crate::plonk::indexer::PlonkVerifierParams;
 use crate::poly_commit::{pcs::ToBytes, transcript::PolyComTranscript};
 use merlin::Transcript;
+use noah_algebra::prelude::*;
 use rand_chacha::ChaChaRng;
-use zei_algebra::prelude::*;
 
 /// Initialize the transcript when compute PLONK proof.
 pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(

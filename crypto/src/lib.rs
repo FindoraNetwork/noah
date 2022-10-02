@@ -1,4 +1,4 @@
-//! The crate implements the cryptography primitives (except TurboPlonk) for the Zei library,
+//! The crate implements the cryptography primitives (except TurboPlonk) for the Noah library,
 //! including Bulletproofs.
 #![deny(unused_import_braces, unused_qualifications, trivial_casts)]
 #![deny(trivial_numeric_casts, private_in_public)]

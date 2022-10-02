@@ -2,22 +2,22 @@ use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::TurboPlonkCS;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use num_bigint::BigUint;
-use rand_core::{CryptoRng, RngCore};
-use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::prelude::*;
-use zei_algebra::secp256k1::SECP256K1Scalar;
-use zei_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
-use zei_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
-use zei_crypto::bulletproofs::scalar_mul::ScalarMulProof;
-use zei_crypto::delegated_schnorr::{
+use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::prelude::*;
+use noah_algebra::secp256k1::SECP256K1Scalar;
+use noah_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
+use noah_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
+use noah_crypto::bulletproofs::scalar_mul::ScalarMulProof;
+use noah_crypto::delegated_schnorr::{
     prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
     DelegatedSchnorrProof,
 };
-use zei_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
-use zei_plonk::plonk::constraint_system::field_simulation::SimFrVar;
-use zei_plonk::plonk::constraint_system::rescue::StateVar;
-use zei_plonk::plonk::constraint_system::VarIndex;
+use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
+use noah_plonk::plonk::constraint_system::field_simulation::SimFrVar;
+use noah_plonk::plonk::constraint_system::rescue::StateVar;
+use noah_plonk::plonk::constraint_system::VarIndex;
+use num_bigint::BigUint;
+use rand_core::{CryptoRng, RngCore};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 /// The instance for address folding.

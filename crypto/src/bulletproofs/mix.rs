@@ -36,7 +36,7 @@ use bulletproofs::r1cs::{
     RandomizedConstraintSystem, Variable, Verifier,
 };
 use merlin::Transcript;
-use zei_algebra::{
+use noah_algebra::{
     prelude::*,
     ristretto::{CompressedRistretto, RistrettoScalar},
 };
@@ -153,14 +153,14 @@ pub fn mix<CS: RandomizableConstraintSystem>(
 
     // pad input or output to be of same length
     if input_len < output_len {
-        pad(cs, output_len, &mut merged_input_vars).c(d!(ZeiError::R1CSProofError))?;
+        pad(cs, output_len, &mut merged_input_vars).c(d!(NoahError::R1CSProofError))?;
     } else {
-        pad(cs, input_len, &mut merged_output_vars).c(d!(ZeiError::R1CSProofError))?;
+        pad(cs, input_len, &mut merged_output_vars).c(d!(NoahError::R1CSProofError))?;
     }
 
     // do a proof of shuffle
     n_gates += mix_shuffle_gadget(cs, merged_input_vars, merged_output_vars)
-        .c(d!(ZeiError::R1CSProofError))?;
+        .c(d!(NoahError::R1CSProofError))?;
 
     // final range proof
     for (i, out) in output_vars.iter().enumerate() {
@@ -169,7 +169,7 @@ pub fn mix<CS: RandomizableConstraintSystem>(
             out.amount.into(),
             output_values.map(|out_values| out_values[i].amount),
         )
-        .c(d!(ZeiError::R1CSProofError))?;
+        .c(d!(NoahError::R1CSProofError))?;
     }
 
     Ok(n_gates)
@@ -294,9 +294,9 @@ fn sort_and_merge<CS: RandomizableConstraintSystem>(
         allocate_mix_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len).c(d!())?;
 
     n_gates += mix_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())
-        .c(d!(ZeiError::R1CSProofError))?;
+        .c(d!(NoahError::R1CSProofError))?;
     n_gates += mix_merge_or_not_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars)
-        .c(d!(ZeiError::R1CSProofError))?;
+        .c(d!(NoahError::R1CSProofError))?;
 
     Ok((n_gates, merged_vars))
 }
@@ -312,8 +312,8 @@ fn allocate_mix_vector<CS: ConstraintSystem>(
             let mut v = vec![];
             for _ in 0..len {
                 v.push(MixVariable {
-                    amount: cs.allocate(None).c(d!(ZeiError::R1CSProofError))?,
-                    asset_type: cs.allocate(None).c(d!(ZeiError::R1CSProofError))?,
+                    amount: cs.allocate(None).c(d!(NoahError::R1CSProofError))?,
+                    asset_type: cs.allocate(None).c(d!(NoahError::R1CSProofError))?,
                 });
             }
             v
@@ -324,10 +324,10 @@ fn allocate_mix_vector<CS: ConstraintSystem>(
                 vars.push(MixVariable {
                     amount: cs
                         .allocate(Some(v.amount.0))
-                        .c(d!(ZeiError::R1CSProofError))?,
+                        .c(d!(NoahError::R1CSProofError))?,
                     asset_type: cs
                         .allocate(Some(v.asset_type.0))
-                        .c(d!(ZeiError::R1CSProofError))?,
+                        .c(d!(NoahError::R1CSProofError))?,
                 });
             }
             vars
@@ -360,12 +360,12 @@ fn mix_merge_or_not_gadget<CS: RandomizableConstraintSystem>(
     assert_eq!(l, merged.len());
     assert_eq!(l, intermediate.len() + 2);
     let first_in = sorted[0];
-    let in1iter = zei_algebra::iter::once(&first_in).chain(intermediate.iter());
+    let in1iter = noah_algebra::iter::once(&first_in).chain(intermediate.iter());
     let in2iter = sorted[1..l].iter();
     let out1iter = merged[0..l - 1].iter();
     let out2iter = intermediate
         .iter()
-        .chain(zei_algebra::iter::once(&merged[l - 1]));
+        .chain(noah_algebra::iter::once(&merged[l - 1]));
 
     // consider `in2` to be the input, and `out1` to be the output
     // and consider `in1` and `out2` to be the immediate state that is being updated.
@@ -574,7 +574,7 @@ pub mod tests {
     };
     use lazy_static::lazy_static;
     use merlin::Transcript;
-    use zei_algebra::{prelude::*, ristretto::RistrettoScalar};
+    use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
 
     #[test]
     fn test_mix_merge() {

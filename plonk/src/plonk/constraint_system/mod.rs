@@ -1,4 +1,4 @@
-use zei_algebra::prelude::*;
+use noah_algebra::prelude::*;
 
 /// Module for Field Simulation Constrain System.
 pub mod field_simulation;
@@ -89,6 +89,9 @@ pub trait ConstraintSystem: Sized {
 
     /// Compute the indices of the constraints that need a boolean constraint of the second, third, and fourth inputs.
     fn boolean_constraint_indices(&self) -> &[CsIndex];
+
+    /// Compute the Anemoi selectors.
+    fn compute_anemoi_jive_selectors(&self) -> [Vec<Self::Field>; 4];
 
     /// Map the witnesses into the wires of the circuit.
     /// The (i * size + j)-th output element is the value of the i-th wire on the j-th gate.

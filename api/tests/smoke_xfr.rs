@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod smoke_xfr {
     use ark_std::test_rng;
-    use zei::{
+    use noah::{
         setup::BulletproofParams,
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
@@ -14,7 +14,7 @@ mod smoke_xfr {
             verify_xfr_note, XfrNotePolicies,
         },
     };
-    use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+    use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     const AMOUNT: u64 = 10u64;
     const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);

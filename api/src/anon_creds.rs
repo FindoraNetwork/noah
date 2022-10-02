@@ -1,9 +1,9 @@
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::{BLSPairingEngine, BLSScalar, BLSG1, BLSG2},
     prelude::*,
     traits::Pairing,
 };
-use zei_crypto::{
+use noah_crypto::{
     anon_creds::{Attribute, CommOutput},
     basic::elgamal::elgamal_key_gen,
 };
@@ -13,29 +13,29 @@ type G2 = BLSG2;
 type S = BLSScalar;
 
 /// The isssuer's public key.
-pub type ACIssuerPublicKey = zei_crypto::anon_creds::CredentialIssuerPK<G1, G2>;
+pub type ACIssuerPublicKey = noah_crypto::anon_creds::CredentialIssuerPK<G1, G2>;
 /// The isssuer's secret key.
-pub type ACIssuerSecretKey = zei_crypto::anon_creds::CredentialIssuerSK<G1, S>;
+pub type ACIssuerSecretKey = noah_crypto::anon_creds::CredentialIssuerSK<G1, S>;
 /// The signature.
-pub type ACSignature = zei_crypto::anon_creds::CredentialSig<G1>;
+pub type ACSignature = noah_crypto::anon_creds::CredentialSig<G1>;
 /// The user's public key.
-pub type ACUserPublicKey = zei_crypto::anon_creds::CredentialUserPK<G1>;
+pub type ACUserPublicKey = noah_crypto::anon_creds::CredentialUserPK<G1>;
 /// The user's secret key.
-pub type ACUserSecretKey = zei_crypto::anon_creds::CredentialUserSK<S>;
+pub type ACUserSecretKey = noah_crypto::anon_creds::CredentialUserSK<S>;
 /// The signature opening proof.
-pub type ACRevealSig = zei_crypto::anon_creds::CredentialSigOpenProof<G1, G2, S>;
+pub type ACRevealSig = noah_crypto::anon_creds::CredentialSigOpenProof<G1, G2, S>;
 /// The proof of knowledge.
-pub type ACPoK = zei_crypto::anon_creds::CredentialPoK<G2, S>;
+pub type ACPoK = noah_crypto::anon_creds::CredentialPoK<G2, S>;
 /// The commitment randomizer.
-pub type ACCommitmentKey = zei_crypto::anon_creds::CredentialCommRandomizer<S>;
+pub type ACCommitmentKey = noah_crypto::anon_creds::CredentialCommRandomizer<S>;
 /// The commitment.
-pub type ACCommitment = zei_crypto::anon_creds::CredentialComm<G1>;
+pub type ACCommitment = noah_crypto::anon_creds::CredentialComm<G1>;
 /// The credential.
-pub type Credential = zei_crypto::anon_creds::Credential<G1, G2, Attr>;
+pub type Credential = noah_crypto::anon_creds::Credential<G1, G2, Attr>;
 /// The commitment opening proof.
-pub type ACRevealProof = zei_crypto::anon_creds::CredentialCommOpenProof<G2, S>;
+pub type ACRevealProof = noah_crypto::anon_creds::CredentialCommOpenProof<G2, S>;
 /// The confidential opening proof.
-pub type ACConfidentialRevealProof = zei_crypto::confidential_anon_creds::CACPoK<G1, G2, S>;
+pub type ACConfidentialRevealProof = noah_crypto::confidential_anon_creds::CACPoK<G1, G2, S>;
 /// The attribute types.
 pub type Attr = u32;
 
@@ -44,7 +44,7 @@ pub type Attr = u32;
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::anon_creds::ac_keygen_issuer;
+/// use noah::anon_creds::ac_keygen_issuer;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 10;
 /// let keys = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -53,14 +53,14 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(
     prng: &mut R,
     num_attrs: usize,
 ) -> (ACIssuerSecretKey, ACIssuerPublicKey) {
-    zei_crypto::anon_creds::issuer_keygen::<_, BLSPairingEngine>(prng, num_attrs)
+    noah_crypto::anon_creds::issuer_keygen::<_, BLSPairingEngine>(prng, num_attrs)
 }
 
 /// Generate a credential user key pair for a given credential issuer.
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::anon_creds::{ac_keygen_issuer,ac_keygen_user};
+/// use noah::anon_creds::{ac_keygen_issuer,ac_keygen_user};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 10;
 /// let (_, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -70,16 +70,16 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(
     prng: &mut R,
     issuer_pk: &ACIssuerPublicKey,
 ) -> (ACUserSecretKey, ACUserPublicKey) {
-    zei_crypto::anon_creds::user_keygen::<_, BLSPairingEngine>(prng, issuer_pk)
+    noah_crypto::anon_creds::user_keygen::<_, BLSPairingEngine>(prng, issuer_pk)
 }
 
 /// Compute a credential signature for a set of attributes.
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
-/// use zei_algebra::bls12_381::BLSScalar;
-/// use zei_algebra::traits::Scalar;
+/// use noah::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
+/// use noah_algebra::bls12_381::BLSScalar;
+/// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -94,7 +94,7 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
     attrs: &[Attr],
 ) -> Result<ACSignature> {
     let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from(*x)).collect();
-    zei_crypto::anon_creds::grant_credential::<_, BLSPairingEngine>(
+    noah_crypto::anon_creds::grant_credential::<_, BLSPairingEngine>(
         prng,
         issuer_sk,
         user_pk,
@@ -108,12 +108,12 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::anon_creds::{ac_keygen_commitment};
+/// use noah::anon_creds::{ac_keygen_commitment};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let com_key = ac_keygen_commitment::<ChaChaRng>(&mut prng);
 /// ```
 pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmentKey {
-    zei_crypto::anon_creds::randomizer_gen::<_, BLSPairingEngine>(prng)
+    noah_crypto::anon_creds::randomizer_gen::<_, BLSPairingEngine>(prng)
 }
 
 /// Compute a commitment to a credential signature with a binding message, returning the opening key.
@@ -121,9 +121,9 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, Credential};
-/// use zei_algebra::bls12_381::BLSScalar;
-/// use zei_algebra::traits::Scalar;
+/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, Credential};
+/// use noah_algebra::bls12_381::BLSScalar;
+/// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -151,7 +151,7 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
         <BLSPairingEngine as Pairing>::ScalarField,
     >,
 > {
-    let c = zei_crypto::anon_creds::Credential {
+    let c = noah_crypto::anon_creds::Credential {
         sig: credential.sig.clone(),
         attrs: credential
             .attrs
@@ -160,8 +160,10 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
-    zei_crypto::anon_creds::commit_without_randomizer::<_, BLSPairingEngine>(prng, user_sk, &c, msg)
-        .c(d!())
+    noah_crypto::anon_creds::commit_without_randomizer::<_, BLSPairingEngine>(
+        prng, user_sk, &c, msg,
+    )
+    .c(d!())
 }
 
 /// Produce an AttrsRevealProof, bitmap indicates which attributes are revealed
@@ -169,9 +171,9 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, ac_keygen_commitment, ac_commit_with_key, Credential};
-/// use zei_algebra::bls12_381::BLSScalar;
-/// use zei_algebra::traits::Scalar;
+/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, ac_keygen_commitment, ac_commit_with_key, Credential};
+/// use noah_algebra::bls12_381::BLSScalar;
+/// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -200,7 +202,7 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
         <BLSPairingEngine as Pairing>::ScalarField,
     >,
 > {
-    let c = zei_crypto::anon_creds::Credential {
+    let c = noah_crypto::anon_creds::Credential {
         sig: credential.sig.clone(),
         attrs: credential
             .attrs
@@ -209,7 +211,7 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
-    zei_crypto::anon_creds::commit::<_, BLSPairingEngine>(prng, user_sk, &c, key, msg).c(d!())
+    noah_crypto::anon_creds::commit::<_, BLSPairingEngine>(prng, user_sk, &c, key, msg).c(d!())
 }
 
 /// Verify that the underlying credential is valid and that the commitment was issued using the
@@ -220,8 +222,13 @@ pub fn ac_verify_commitment(
     sok: &ACPoK,
     msg: &[u8],
 ) -> Result<()> {
-    zei_crypto::anon_creds::check_comm::<BLSPairingEngine>(issuer_pub_key, sig_commitment, sok, msg)
-        .c(d!())
+    noah_crypto::anon_creds::check_comm::<BLSPairingEngine>(
+        issuer_pub_key,
+        sig_commitment,
+        sok,
+        msg,
+    )
+    .c(d!())
 }
 
 /// Produce an AttrsRevealProof for a committed credential produced using key.
@@ -229,7 +236,7 @@ pub fn ac_verify_commitment(
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_commit, Credential};
+/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_commit, Credential};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer(&mut prng, num_attrs);
@@ -252,7 +259,7 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
     rand: &ACCommitmentKey,
     reveal_map: &[bool],
 ) -> Result<ACRevealProof> {
-    let c = zei_crypto::anon_creds::Credential {
+    let c = noah_crypto::anon_creds::Credential {
         sig: credential.sig.clone(),
         attrs: credential
             .attrs
@@ -264,7 +271,7 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
 
     let cm = ACCommitment::new(&credential.sig, &rand);
 
-    zei_crypto::anon_creds::open_comm::<_, BLSPairingEngine>(prng, usk, &c, &cm, &rand, reveal_map)
+    noah_crypto::anon_creds::open_comm::<_, BLSPairingEngine>(prng, usk, &c, &cm, &rand, reveal_map)
         .c(d!())
 }
 
@@ -275,7 +282,7 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
     credential: &Credential,
     reveal_bitmap: &[bool],
 ) -> Result<ACRevealSig> {
-    let c = zei_crypto::anon_creds::Credential {
+    let c = noah_crypto::anon_creds::Credential {
         sig: credential.sig.clone(),
         attrs: credential
             .attrs
@@ -284,17 +291,22 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
-    zei_crypto::anon_creds::open_credential::<_, BLSPairingEngine>(prng, user_sk, &c, reveal_bitmap)
-        .c(d!())
+    noah_crypto::anon_creds::open_credential::<_, BLSPairingEngine>(
+        prng,
+        user_sk,
+        &c,
+        reveal_bitmap,
+    )
+    .c(d!())
 }
 /// Verifies an anonymous credential reveal proof.
 /// # Example
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use zei_algebra::traits::Scalar;
-/// use zei_algebra::bls12_381::BLSScalar;
-/// use zei::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_verify, ac_reveal, Credential};
+/// use noah_algebra::traits::Scalar;
+/// use noah_algebra::bls12_381::BLSScalar;
+/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_verify, ac_reveal, Credential};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -329,7 +341,7 @@ pub fn ac_verify(
         })
         .collect();
 
-    zei_crypto::anon_creds::verify_open::<BLSPairingEngine>(
+    noah_crypto::anon_creds::verify_open::<BLSPairingEngine>(
         issuer_pub_key,
         &cm,
         &proof_open,
@@ -339,25 +351,25 @@ pub fn ac_verify(
 }
 
 /// The attribute encryption key.
-pub type AttributeEncKey = zei_crypto::basic::elgamal::ElGamalEncKey<G1>;
+pub type AttributeEncKey = noah_crypto::basic::elgamal::ElGamalEncKey<G1>;
 /// The attribute decryption key.
-pub type AttributeDecKey = zei_crypto::basic::elgamal::ElGamalDecKey<S>;
+pub type AttributeDecKey = noah_crypto::basic::elgamal::ElGamalDecKey<S>;
 /// The ciphertext of an attribute.
-pub type AttributeCiphertext = zei_crypto::basic::elgamal::ElGamalCiphertext<G1>;
+pub type AttributeCiphertext = noah_crypto::basic::elgamal::ElGamalCiphertext<G1>;
 
 /// Confidential anonymous credential
-pub type ConfidentialAC = zei_crypto::confidential_anon_creds::ConfidentialAC<G1, G2, S>;
+pub type ConfidentialAC = noah_crypto::confidential_anon_creds::ConfidentialAC<G1, G2, S>;
 
 /// Produce a confidential anonymous credential revealing proof.
 /// # Example
 /// ```
-/// use zei::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit};
-/// use zei::anon_creds::{ac_confidential_open_commitment, ac_confidential_verify, ac_confidential_gen_encryption_keys};
+/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit};
+/// use noah::anon_creds::{ac_confidential_open_commitment, ac_confidential_verify, ac_confidential_gen_encryption_keys};
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
-/// use zei_algebra::bls12_381::{BLSScalar, BLSG1};
-/// use zei_algebra::traits::Group;
-/// use zei::anon_creds::Credential;
+/// use noah_algebra::bls12_381::{BLSScalar, BLSG1};
+/// use noah_algebra::traits::Group;
+/// use noah::anon_creds::Credential;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, 3);
 /// let (user_sk, user_pk) = ac_keygen_user::<ChaChaRng>(&mut prng, &issuer_pk);
@@ -388,13 +400,13 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
         .iter()
         .map(|x| BLSScalar::from(*x))
         .collect_vec();
-    let c = zei_crypto::anon_creds::Credential {
+    let c = noah_crypto::anon_creds::Credential {
         sig: credential.sig.clone(),
         attrs: attrs_scalar,
         ipk: credential.ipk.clone(),
     };
     let cm = ACCommitment::new(&credential.sig, &rand);
-    zei_crypto::confidential_anon_creds::confidential_open_comm::<R, BLSPairingEngine>(
+    noah_crypto::confidential_anon_creds::confidential_open_comm::<R, BLSPairingEngine>(
         prng, usk, &c, &cm, rand, reveal_map, enc_key, msg,
     )
     .c(d!())
@@ -410,7 +422,7 @@ pub fn ac_confidential_verify(
     cac_proof: &ACConfidentialRevealProof,
     msg: &[u8],
 ) -> Result<()> {
-    zei_crypto::confidential_anon_creds::confidential_verify_open::<BLSPairingEngine>(
+    noah_crypto::confidential_anon_creds::confidential_verify_open::<BLSPairingEngine>(
         issuer_pk,
         enc_key,
         reveal_map,

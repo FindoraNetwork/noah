@@ -2,11 +2,11 @@ use crate::basic::pedersen_comm::PedersenCommitment;
 use crate::basic::rescue::RescueInstance;
 use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use num_bigint::BigUint;
 use rand_chacha::ChaChaRng;
 use serde::Deserialize;
 use std::marker::PhantomData;
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The non-interactive proof provided to the verifier.
@@ -313,7 +313,7 @@ pub fn verify_delegated_schnorr<
         let eqn_right = committed_data.mul(&beta).add(&randomizer);
 
         if eqn_left.ne(&eqn_right) {
-            return Err(eg!(ZeiError::ZKProofVerificationError));
+            return Err(eg!(NoahError::ZKProofVerificationError));
         }
     }
 
@@ -327,7 +327,7 @@ mod test {
     use crate::field_simulation::SimFrParamsRistretto;
     use ark_std::test_rng;
     use merlin::Transcript;
-    use zei_algebra::{ristretto::RistrettoScalar, traits::Scalar};
+    use noah_algebra::{ristretto::RistrettoScalar, traits::Scalar};
 
     #[test]
     fn test_correctness() {
