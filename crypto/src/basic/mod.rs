@@ -1,11 +1,11 @@
+/// The module for the Anemoi-Jive CRH.
+pub mod anemoi_jive;
 /// The module for the Chaum-Pedersen protocol.
 pub mod chaum_pedersen;
 /// The module for the ElGamal encryption.
 pub mod elgamal;
 /// The module for hybrid encryption.
 pub mod hybrid_encryption;
-/// The module for the Anemoi-Jive CRH.
-pub mod jive;
 /// The module for the matrix Sigma protocol.
 pub mod matrix_sigma;
 /// The module for the Pedersen commitments over the Ristretto group and secq256k1 group.

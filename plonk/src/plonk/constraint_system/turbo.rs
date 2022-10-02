@@ -8,7 +8,7 @@ use zei_algebra::prelude::*;
 
 #[cfg(feature = "debug")]
 use std::collections::HashMap;
-use zei_crypto::basic::jive::JiveCRH;
+use zei_crypto::basic::anemoi_jive::JiveCRH;
 
 /// The wires number of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;

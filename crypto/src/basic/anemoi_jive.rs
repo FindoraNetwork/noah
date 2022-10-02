@@ -62,6 +62,21 @@ impl<F: Scalar> ApplicableMDSMatrix<F, 2> for MDSMatrix<F, 2> {
     }
 }
 
+/// The structure for the trace of the Anemoi-Jive sponge hash function.
+pub struct AnemoiSpongeTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
+    /// The input sequence.
+    pub input: Vec<F>,
+    /// The state before each permutation.
+    pub before_permutation: Vec<([F; N], [F; N])>,
+    /// The intermediate values for each permutation.
+    pub intermediate_values_before_constant_additions:
+        Vec<([[F; N]; NUM_ROUNDS], [[F; N]; NUM_ROUNDS])>,
+    /// The state after each permutation.
+    pub after_permutation: Vec<([F; N], [F; N])>,
+    /// The output.
+    pub output: F,
+}
+
 /// The structure for the trace of the Anemio-Jive CRH.
 pub struct JiveTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
     /// The first half of the input.
