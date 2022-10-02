@@ -9,6 +9,9 @@ pub mod rescue;
 /// Module for Turbo PLONK Constrain System.
 pub mod turbo;
 
+/// Module for ECC.
+pub mod ecc;
+
 /// Default used constraint system.
 #[doc(hidden)]
 pub use turbo::TurboCS;
