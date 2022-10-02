@@ -1,6 +1,6 @@
-use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::new_bls12_381;
-use zei_algebra::prelude::*;
+use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::new_bls12_381;
+use noah_algebra::prelude::*;
 
 /// The MDS matrix
 pub struct MDSMatrix<F: Scalar, const N: usize>(pub [[F; N]; N]);
@@ -109,10 +109,10 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default for JiveTrace<F
     }
 }
 
-impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> zei_algebra::fmt::Debug
+impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
     for JiveTrace<F, N, NUM_ROUNDS>
 {
-    fn fmt(&self, f: &mut zei_algebra::fmt::Formatter<'_>) -> zei_algebra::fmt::Result {
+    fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
         f.write_str("input_x:\n")?;
         for (i, elem) in self.input_x.iter().enumerate() {
             f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;
@@ -665,7 +665,7 @@ impl JiveCRH<BLSScalar, 2usize, 12usize> for JiveCRH381 {
 #[cfg(test)]
 mod test {
     use super::*;
-    use zei_algebra::new_bls12_381;
+    use noah_algebra::new_bls12_381;
 
     #[test]
     fn test_jive() {

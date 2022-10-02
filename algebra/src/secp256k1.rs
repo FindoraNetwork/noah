@@ -328,7 +328,7 @@ impl SECP256K1G1 {
     /// Obtain a point using the x coordinate (which would be SECQ256K1Scalar).
     pub fn get_point_from_x(x: &SECQ256K1Scalar) -> Result<Self> {
         let point = G1Affine::get_point_from_x(x.0.clone(), false)
-            .ok_or(eg!(ZeiError::DeserializationError))?
+            .ok_or(eg!(NoahError::DeserializationError))?
             .into_projective();
         Ok(Self(point))
     }

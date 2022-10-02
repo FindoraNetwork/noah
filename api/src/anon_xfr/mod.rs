@@ -10,13 +10,13 @@ use crate::{
     },
     xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
 };
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
     prelude::*,
 };
-use zei_crypto::basic::rescue::RescueInstance;
-use zei_plonk::{
+use noah_crypto::basic::rescue::RescueInstance;
+use noah_plonk::{
     plonk::{
         constraint_system::{rescue::StateVar, TurboCS, VarIndex},
         indexer::PlonkPf,
@@ -57,7 +57,7 @@ pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 fn check_inputs(inputs: &[OpenAnonAssetRecord], keypair: &AXfrKeyPair) -> Result<()> {
     for input in inputs.iter() {
         if input.mt_leaf_info.is_none() || keypair.get_public_key() != input.pub_key {
-            return Err(eg!(ZeiError::ParameterError));
+            return Err(eg!(NoahError::ParameterError));
         }
     }
     Ok(())
@@ -92,11 +92,11 @@ fn check_asset_amount(
     for (&asset_type, &sum) in balances.iter() {
         if asset_type != fee_asset_type {
             if sum != 0i128 {
-                return Err(eg!(ZeiError::XfrCreationAssetAmountError));
+                return Err(eg!(NoahError::XfrCreationAssetAmountError));
             }
         } else {
             if sum != fee.into() {
-                return Err(eg!(ZeiError::XfrCreationAssetAmountError));
+                return Err(eg!(NoahError::XfrCreationAssetAmountError));
             }
         }
     }
@@ -110,17 +110,17 @@ fn check_roots(inputs: &[OpenAnonAssetRecord]) -> Result<()> {
     let root = inputs[0]
         .mt_leaf_info
         .as_ref()
-        .c(d!(ZeiError::ParameterError))?
+        .c(d!(NoahError::ParameterError))?
         .root;
     for input in inputs.iter().skip(1) {
         if input
             .mt_leaf_info
             .as_ref()
-            .c(d!(ZeiError::ParameterError))?
+            .c(d!(NoahError::ParameterError))?
             .root
             != root
         {
-            return Err(eg!(ZeiError::AXfrVerificationError));
+            return Err(eg!(NoahError::AXfrVerificationError));
         }
     }
     Ok(())
@@ -138,7 +138,7 @@ pub fn parse_memo(
     abar: &AnonAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
     if bytes.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
     let amount = u8_le_slice_to_u64(&bytes[0..8]);
     let mut i = 8;
@@ -147,7 +147,7 @@ pub fn parse_memo(
     let asset_type = AssetType(asset_type_array);
     i += ASSET_TYPE_LENGTH;
     let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])
-        .c(d!(ZeiError::ParameterError))?;
+        .c(d!(NoahError::ParameterError))?;
 
     let public_key_scalars = key_pair.get_public_key().get_public_key_scalars()?;
 
@@ -167,7 +167,7 @@ pub fn parse_memo(
         ])[0]
     };
     if expected_commitment != abar.commitment {
-        return Err(eg!(ZeiError::CommitmentVerificationError));
+        return Err(eg!(NoahError::CommitmentVerificationError));
     }
 
     Ok((amount, asset_type, blind))

@@ -11,15 +11,12 @@ use crate::xfr::{
     structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
 };
 use merlin::Transcript;
-use num_bigint::BigUint;
-#[cfg(feature = "parallel")]
-use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::BLSScalar,
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
-use zei_crypto::{
+use noah_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_schnorr::{
         prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
@@ -27,11 +24,14 @@ use zei_crypto::{
     },
     field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
-use zei_plonk::plonk::{
+use noah_plonk::plonk::{
     constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
+use num_bigint::BigUint;
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 const BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"BAR to ABAR Plonk Proof";
 
@@ -71,7 +71,7 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     // Reject confidential-to-anonymous note that actually has transparent input.
     // Should direct to ArToAbar.
     if record.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     let (open_abar, delegated_schnorr_proof, inspector_proof) =
@@ -84,7 +84,7 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     };
 
     let msg = bincode::serialize(&body)
-        .map_err(|_| ZeiError::SerializationError)
+        .map_err(|_| NoahError::SerializationError)
         .c(d!())?;
     let signature = bar_keypair.sign(&msg)?;
 
@@ -106,7 +106,7 @@ pub fn verify_bar_to_abar_note(
     )
     .c(d!())?;
 
-    let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+    let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
     bar_pub_key.verify(&msg, &note.signature).c(d!())
 }
 
@@ -129,7 +129,7 @@ pub fn batch_verify_bar_to_abar_note(
             )
             .c(d!())?;
 
-            let msg = bincode::serialize(&note.body).c(d!(ZeiError::SerializationError))?;
+            let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
             bar_pub_key.verify(&msg, &note.signature)
         })
         .all(|x| x.is_ok());
@@ -226,7 +226,7 @@ pub(crate) fn verify_bar_to_abar(
 
     // Reject confidential-to-anonymous notes whose inputs are transparent.
     if bar.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
 
     // 1. Get commitments.
@@ -234,10 +234,10 @@ pub(crate) fn verify_bar_to_abar(
     let (com_low, com_high) = match bar.amount {
         XfrAmount::Confidential((low, high)) => (
             low.decompress()
-                .ok_or(ZeiError::DecompressElementError)
+                .ok_or(NoahError::DecompressElementError)
                 .c(d!())?,
             high.decompress()
-                .ok_or(ZeiError::DecompressElementError)
+                .ok_or(NoahError::DecompressElementError)
                 .c(d!())?,
         ),
         XfrAmount::NonConfidential(amount) => {
@@ -255,7 +255,7 @@ pub(crate) fn verify_bar_to_abar(
     let com_asset_type = match bar.asset_type {
         XfrAssetType::Confidential(a) => a
             .decompress()
-            .ok_or(ZeiError::DecompressElementError)
+            .ok_or(NoahError::DecompressElementError)
             .c(d!())?,
         XfrAssetType::NonConfidential(a) => {
             // a trivial commitment
@@ -320,7 +320,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
         &params.prover_params,
         &witness,
     )
-    .c(d!(ZeiError::AXfrProofError))
+    .c(d!(NoahError::AXfrProofError))
 }
 
 /// Verify the inspector's proof.
@@ -363,7 +363,7 @@ pub(crate) fn verify_inspection(
         &online_inputs,
         proof,
     )
-    .c(d!(ZeiError::ZKProofVerificationError))
+    .c(d!(NoahError::ZKProofVerificationError))
 }
 
 /// Construct the confidential-to-anonymous constraint system.
@@ -626,15 +626,15 @@ mod test {
     use crate::xfr::structs::AssetType;
     use ark_std::test_rng;
     use merlin::Transcript;
-    use num_bigint::BigUint;
-    use num_traits::One;
-    use std::ops::AddAssign;
-    use zei_algebra::{bls12_381::BLSScalar, ristretto::RistrettoScalar, traits::Scalar};
-    use zei_crypto::{
+    use noah_algebra::{bls12_381::BLSScalar, ristretto::RistrettoScalar, traits::Scalar};
+    use noah_crypto::{
         basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
         delegated_schnorr::prove_delegated_schnorr,
         field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
     };
+    use num_bigint::BigUint;
+    use num_traits::One;
+    use std::ops::AddAssign;
 
     #[test]
     fn test_eq_committed_vals_cs() {

@@ -7,8 +7,8 @@ use crate::poly_commit::{
     field_polynomial::{primitive_nth_root_of_unity, FpPolynomial},
     pcs::PolyComScheme,
 };
+use noah_algebra::prelude::*;
 use rand_chacha::ChaChaRng;
-use zei_algebra::prelude::*;
 
 /// The data structure of a Plonk proof.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Clone)]
@@ -19,8 +19,14 @@ pub struct PlonkProof<C, F> {
     pub cm_t_vec: Vec<C>,
     /// The sigma polynomial commitment.
     pub cm_z: C,
+    /// The opening of the third preprocessed round key polynomial at \zeta.
+    pub prk_3_poly_eval_zeta: F,
+    /// The opening of the fourth preprocessed round key polynomial at \zeta.
+    pub prk_4_poly_eval_zeta: F,
     /// The openings of witness polynomials at \zeta.
     pub w_polys_eval_zeta: Vec<F>,
+    /// The openings of witness polynomials (first three) at \zeta * \omega.
+    pub w_polys_eval_zeta_omega: Vec<F>,
     /// The opening of z(X) at point \zeta * \omega.
     pub z_eval_zeta_omega: F,
     /// The openings of permutation polynomials at \zeta.
@@ -44,6 +50,8 @@ pub struct PlonkProverParams<O, C, F> {
     pub s_polys: Vec<O>,
     /// The polynomial for boolean constraints.
     pub qb_poly: O,
+    /// The four polynomials for the Anemoi/Jive constraints.
+    pub q_prk_polys: Vec<O>,
     /// The Plonk verifier parameters.
     pub verifier_params: PlonkVerifierParams<C, F>,
     /// The elements of the group.
@@ -66,6 +74,8 @@ pub struct PlonkProverParams<O, C, F> {
     pub s_coset_evals: Vec<Vec<F>>,
     /// The boolean constraint polynomial's FFT of the polynomial of unity root set.
     pub qb_coset_eval: Vec<F>,
+    /// The Anemoi/Jive polynomials' FFT of the polynomial of unity root set.
+    pub q_prk_coset_evals: Vec<Vec<F>>,
 }
 
 /// Prover parameters over a particular polynomial commitment scheme.
@@ -96,6 +106,8 @@ pub struct PlonkVerifierParams<C, F> {
     pub cm_s_vec: Vec<C>,
     /// The commitment of the boolean selector.
     pub cm_qb: C,
+    /// The commitments of the preprocessed round key selectors.
+    pub cm_prk_vec: Vec<C>,
     /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub k: Vec<F>,
     /// A primitive n-th root of unity.
@@ -310,10 +322,55 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         (qb_coset_eval, qb_coef, cm_qb)
     };
 
+    // Step 5: commit `anemoi_constraints_indices`
+    let (q_prk_coset_evals, q_prk_polys, cm_prk_vec) = if let Some(lagrange_pcs) = lagrange_pcs {
+        let q_prk_evals = cs.compute_anemoi_jive_selectors().to_vec();
+
+        let q_prk_polys: Vec<FpPolynomial<PCS::Field>> = q_prk_evals
+            .iter()
+            .map(|p| FpPolynomial::ffti(&root, &p, n))
+            .collect::<Vec<FpPolynomial<PCS::Field>>>();
+
+        let q_prk_coset_evals = q_prk_polys
+            .iter()
+            .map(|p| p.coset_fft_with_unity_root(&root_m, m, &k[1]))
+            .collect::<Vec<Vec<PCS::Field>>>();
+
+        let cm_prk_vec: Vec<PCS::Commitment> = q_prk_evals
+            .into_iter()
+            .map(|p| {
+                let q_eval = FpPolynomial::from_coefs(p);
+                lagrange_pcs.commit(&q_eval).c(d!(PlonkError::SetupError))
+            })
+            .collect::<Result<_>>()?;
+
+        (q_prk_coset_evals, q_prk_polys, cm_prk_vec)
+    } else {
+        let q_prk_evals = cs.compute_anemoi_jive_selectors().to_vec();
+
+        let q_prk_polys: Vec<FpPolynomial<PCS::Field>> = q_prk_evals
+            .iter()
+            .map(|p| FpPolynomial::ffti(&root, &p, n))
+            .collect::<Vec<FpPolynomial<PCS::Field>>>();
+
+        let q_prk_coset_evals = q_prk_polys
+            .iter()
+            .map(|p| p.coset_fft_with_unity_root(&root_m, m, &k[1]))
+            .collect::<Vec<Vec<PCS::Field>>>();
+
+        let cm_prk_vec: Vec<PCS::Commitment> = q_prk_polys
+            .iter()
+            .map(|p| pcs.commit(p).c(d!(PlonkError::SetupError)))
+            .collect::<Result<_>>()?;
+
+        (q_prk_coset_evals, q_prk_polys, cm_prk_vec)
+    };
+
     let verifier_params = PlonkVerifierParams {
         cm_q_vec,
         cm_s_vec,
         cm_qb,
+        cm_prk_vec,
         k,
         root,
         cs_size: n,
@@ -325,6 +382,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         q_polys,
         s_polys,
         qb_poly,
+        q_prk_polys,
         verifier_params,
         group,
         coset_quotient,
@@ -336,6 +394,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         q_coset_evals,
         s_coset_evals,
         qb_coset_eval,
+        q_prk_coset_evals,
     })
 }
 
@@ -343,7 +402,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 mod test {
     use crate::plonk::indexer::choose_ks;
     use ark_std::test_rng;
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
 

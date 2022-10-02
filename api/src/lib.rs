@@ -1,4 +1,4 @@
-//! The API interfaces of the Zei library
+//! The API interfaces of the Noah library
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unused_import_braces, unused_qualifications, trivial_casts)]
 #![deny(trivial_numeric_casts, private_in_public)]
@@ -42,5 +42,5 @@ pub mod setup;
 /// Module for confidential transfer.
 pub mod xfr;
 
-pub use zei_algebra::errors;
-pub use zei_algebra::ristretto;
+pub use noah_algebra::errors;
+pub use noah_algebra::ristretto;

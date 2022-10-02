@@ -1,6 +1,6 @@
 use digest::Digest;
 use merlin::Transcript;
-use zei_algebra::prelude::*;
+use noah_algebra::prelude::*;
 
 /// The transcript methods for the Sigma protocol.
 pub trait SigmaTranscript {
@@ -214,7 +214,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
     }
     let result = G::multi_exp(scalars_as_ref.as_slice(), me_elems.as_slice());
     if result != G::get_identity() {
-        Err(eg!(ZeiError::ZKProofVerificationError))
+        Err(eg!(NoahError::ZKProofVerificationError))
     } else {
         Ok(())
     }
@@ -224,8 +224,8 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
 mod tests {
     use ark_std::test_rng;
     use merlin::Transcript;
-    use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
-    use zei_algebra::{ops::*, traits::Group, Zero};
+    use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
+    use noah_algebra::{ops::*, traits::Group, Zero};
 
     #[test]
     #[allow(non_snake_case)]

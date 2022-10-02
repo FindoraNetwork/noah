@@ -19,14 +19,14 @@ path = 'benches/anon_xfr.rs'
 harness = false
 
 [package]
-name = 'zei'
+name = 'noah'
 version = '0.2.0'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
-description = 'Zei Platform Interface'
+description = 'Noah Platform Interface'
 
 [lib]
-name = 'zei'
+name = 'noah'
 crate-type = ['rlib']
 
 [dependencies]
@@ -53,13 +53,13 @@ sha3 = '0.10'
 version = '^0.3.0'
 default-features = false
 
-[dependencies.zei-algebra]
+[dependencies.noah-algebra]
 path = '../algebra'
 
-[dependencies.zei-crypto]
+[dependencies.noah-crypto]
 path = '../crypto'
 
-[dependencies.zei-plonk]
+[dependencies.noah-plonk]
 path = '../plonk'
 
 [dependencies.curve25519-dalek]
@@ -106,7 +106,7 @@ parking_lot = '0.12'
 version = '^0.3.0'
 default-features = false
 
-[dev-dependencies.zei-accumulators]
+[dev-dependencies.noah-accumulators]
 path = '../accumulators'
 
 [dev-dependencies.rand]
@@ -131,7 +131,7 @@ default = [
     'std',
     'u64_backend',
 ]
-debug = [ 'zei-plonk/debug' ]
+debug = [ 'noah-plonk/debug' ]
 std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs-secq256k1/std', 'ark-std/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
@@ -141,15 +141,15 @@ nightly = [
 u64_backend = ['curve25519-dalek/u64_backend']
 u32_backend = ['curve25519-dalek/u32_backend']
 avx2_backend = ['curve25519-dalek/avx2_backend']
-asm = ['zei-algebra/asm']
+asm = ['noah-algebra/asm']
 no_urs = []
 no_srs = []
 no_vk = []
 parallel = [
     'default',
     'rayon',
-    'zei-algebra/parallel',
-    'zei-plonk/parallel'
+    'noah-algebra/parallel',
+    'noah-plonk/parallel'
 ]
 gen = ["parallel", "structopt"]
 lightweight = [] # Minimize size for only AR2ABAR and ABAR2AR.

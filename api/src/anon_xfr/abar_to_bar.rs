@@ -19,15 +19,12 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use num_bigint::BigUint;
-#[cfg(feature = "parallel")]
-use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::BLSScalar,
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
-use zei_crypto::{
+use noah_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_schnorr::{
         prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
@@ -35,11 +32,14 @@ use zei_crypto::{
     },
     field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
-use zei_plonk::plonk::{
+use noah_plonk::plonk::{
     constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
+use num_bigint::BigUint;
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// The domain separator for anonymous-to-confidential, for the Plonk proof.
 const ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"ABAR to BAR Plonk Proof";
@@ -102,13 +102,13 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     asset_record_type: AssetRecordType,
 ) -> Result<AbarToBarPreNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.get_public_key() != oabar.pub_key {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     // Reject anonymous-to-confidential note that actually has transparent output.
     // Should direct to AbarToAr.
     if asset_record_type == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     let obar_amount = oabar.amount;
@@ -243,7 +243,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     hash: D,
 ) -> Result<()> {
     if *merkle_root != note.body.merkle_root {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
 
     let bar = note.body.output.clone();
@@ -253,7 +253,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     if note.body.output.get_record_type()
         == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
     {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
 
     // 1. Get commitments.
@@ -261,10 +261,10 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let (com_low, com_high) = match bar.amount {
         XfrAmount::Confidential((low, high)) => (
             low.decompress()
-                .ok_or(ZeiError::DecompressElementError)
+                .ok_or(NoahError::DecompressElementError)
                 .c(d!())?,
             high.decompress()
-                .ok_or(ZeiError::DecompressElementError)
+                .ok_or(NoahError::DecompressElementError)
                 .c(d!())?,
         ),
         XfrAmount::NonConfidential(amount) => {
@@ -282,7 +282,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let com_asset_type = match bar.asset_type {
         XfrAssetType::Confidential(a) => a
             .decompress()
-            .ok_or(ZeiError::DecompressElementError)
+            .ok_or(NoahError::DecompressElementError)
             .c(d!())?,
         XfrAssetType::NonConfidential(a) => {
             // Use a trivial commitment
@@ -351,7 +351,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
         &online_inputs,
         &note.proof,
     )
-    .c(d!(ZeiError::AXfrVerificationError))
+    .c(d!(NoahError::AXfrVerificationError))
 }
 
 /// Batch verify the anonymous-to-confidential notes.
@@ -368,7 +368,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         .zip(notes)
         .any(|(x, y)| **x != y.body.merkle_root)
     {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
 
     // Reject anonymous-to-confidential notes whose outputs are transparent.
@@ -376,7 +376,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         note.body.output.get_record_type()
             == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
     }) {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
 
     let pc_gens = PedersenCommitmentRistretto::default();
@@ -393,10 +393,10 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             let (com_low, com_high) = match bar.amount {
                 XfrAmount::Confidential((low, high)) => (
                     low.decompress()
-                        .ok_or(ZeiError::DecompressElementError)
+                        .ok_or(NoahError::DecompressElementError)
                         .c(d!())?,
                     high.decompress()
-                        .ok_or(ZeiError::DecompressElementError)
+                        .ok_or(NoahError::DecompressElementError)
                         .c(d!())?,
                 ),
                 XfrAmount::NonConfidential(amount) => {
@@ -414,7 +414,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             let com_asset_type = match bar.asset_type {
                 XfrAssetType::Confidential(a) => a
                     .decompress()
-                    .ok_or(ZeiError::DecompressElementError)
+                    .ok_or(NoahError::DecompressElementError)
                     .c(d!())?,
                 XfrAssetType::NonConfidential(a) => {
                     // Use a trivial commitment
@@ -491,7 +491,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
     if is_ok {
         Ok(())
     } else {
-        Err(eg!(ZeiError::AXfrVerificationError))
+        Err(eg!(NoahError::AXfrVerificationError))
     }
 }
 
@@ -526,7 +526,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
         &params.prover_params,
         &witness,
     )
-    .c(d!(ZeiError::AXfrProofError))
+    .c(d!(NoahError::AXfrProofError))
 }
 
 /// Construct the anonymous-to-confidential constraint system.

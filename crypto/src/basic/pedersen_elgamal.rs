@@ -3,23 +3,23 @@ use crate::basic::matrix_sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, 
 use crate::basic::pedersen_comm::PedersenCommitmentRistretto;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
-use zei_algebra::prelude::*;
-use zei_algebra::ristretto::RistrettoPoint;
-use zei_algebra::ristretto::RistrettoScalar;
+use noah_algebra::prelude::*;
+use noah_algebra::ristretto::RistrettoPoint;
+use noah_algebra::ristretto::RistrettoScalar;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 /// The Pedersen ElGamal equality proof.
 pub struct PedersenElGamalEqProof {
-    #[serde(with = "zei_obj_serde")]
+    #[serde(with = "noah_obj_serde")]
     /// `z1` = `c * m + r_1`.
     z1: RistrettoScalar,
-    #[serde(with = "zei_obj_serde")]
+    #[serde(with = "noah_obj_serde")]
     /// `z2` = `c * r + r_2`.
     z2: RistrettoScalar,
-    #[serde(with = "zei_obj_serde")]
+    #[serde(with = "noah_obj_serde")]
     /// `e1` is a ciphertext, `(r_2 * G, r_1 * G + r_2 * PK)`.
     e1: ElGamalCiphertext<RistrettoPoint>,
-    #[serde(with = "zei_obj_serde")]
+    #[serde(with = "noah_obj_serde")]
     /// `e2` = `r_1 * g + r_2 * H`.
     c1: RistrettoPoint,
 }
@@ -169,7 +169,7 @@ fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(
     );
 
     if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
-        Err(eg!(ZeiError::ZKProofVerificationError))
+        Err(eg!(NoahError::ZKProofVerificationError))
     } else {
         Ok(())
     }
@@ -320,7 +320,7 @@ pub fn pedersen_elgamal_batch_verify<'a, R: CryptoRng + RngCore>(
         all_elems.iter().map(|x| x.0),
     );
     if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
-        return Err(eg!(ZeiError::ZKProofBatchVerificationError));
+        return Err(eg!(NoahError::ZKProofBatchVerificationError));
     }
 
     Ok(())
@@ -342,7 +342,7 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
     };
 
     pedersen_elgamal_batch_verify(transcript, prng, &[instance])
-        .c(d!(ZeiError::ZKProofVerificationError))
+        .c(d!(NoahError::ZKProofVerificationError))
 }
 
 #[cfg(test)]
@@ -358,8 +358,8 @@ mod test {
     };
     use ark_std::test_rng;
     use merlin::Transcript;
-    use zei_algebra::prelude::*;
-    use zei_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+    use noah_algebra::prelude::*;
+    use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 
     #[test]
     fn good_proof_verify() {
@@ -429,7 +429,7 @@ mod test {
             &proof,
         );
         assert_eq!(true, verify.is_err());
-        msg_eq!(ZeiError::ZKProofVerificationError, verify.unwrap_err());
+        msg_eq!(NoahError::ZKProofVerificationError, verify.unwrap_err());
     }
 
     #[test]
@@ -563,7 +563,10 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        msg_eq!(ZeiError::ZKProofBatchVerificationError, verify.unwrap_err());
+        msg_eq!(
+            NoahError::ZKProofBatchVerificationError,
+            verify.unwrap_err()
+        );
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -585,7 +588,10 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        msg_eq!(ZeiError::ZKProofBatchVerificationError, verify.unwrap_err());
+        msg_eq!(
+            NoahError::ZKProofBatchVerificationError,
+            verify.unwrap_err()
+        );
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -608,7 +614,10 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        msg_eq!(ZeiError::ZKProofBatchVerificationError, verify.unwrap_err());
+        msg_eq!(
+            NoahError::ZKProofBatchVerificationError,
+            verify.unwrap_err()
+        );
     }
 
     #[test]

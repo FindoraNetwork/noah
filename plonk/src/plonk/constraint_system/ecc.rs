@@ -1,5 +1,5 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
-use zei_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
+use noah_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
 
 type F = BLSScalar;
 
@@ -327,7 +327,7 @@ impl TurboCS<BLSScalar> {
 #[cfg(test)]
 mod test {
     use crate::plonk::constraint_system::{ecc::Point, TurboCS};
-    use zei_algebra::{
+    use noah_algebra::{
         bls12_381::BLSScalar,
         jubjub::{JubjubPoint, JubjubScalar},
         prelude::*,

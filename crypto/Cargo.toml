@@ -1,12 +1,12 @@
 [package]
-name = 'zei-crypto'
+name = 'noah-crypto'
 version = '0.2.0'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
-description = 'Zei Cryptographic Primitives and Protocols'
+description = 'Noah Cryptographic Primitives and Protocols'
 
 [lib]
-name = 'zei_crypto'
+name = 'noah_crypto'
 crate-type = ['rlib']
 
 [dependencies]
@@ -25,7 +25,7 @@ x25519-dalek = '1.1'
 ruc = '1.0'
 sha3 = { version = "0.10", default-features = false }
 
-[dependencies.zei-algebra]
+[dependencies.noah-algebra]
 path = '../algebra'
 
 [dependencies.curve25519-dalek]

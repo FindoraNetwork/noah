@@ -1,10 +1,10 @@
-use serde::ser::Serialize;
-use zei_algebra::{
+use noah_algebra::{
     collections::HashMap,
     prelude::*,
     ristretto::{CompressedRistretto, RistrettoScalar},
 };
-use zei_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+use serde::ser::Serialize;
 
 /// Module for asset mixing.
 pub mod asset_mixer;
@@ -118,13 +118,13 @@ impl XfrType {
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
-/// use zei::xfr::sig::XfrKeyPair;
-/// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
-/// use zei::xfr::asset_record::AssetRecordType;
-/// use zei::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
-/// use zei_algebra::prelude::*;
+/// use noah::xfr::sig::XfrKeyPair;
+/// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
+/// use noah::xfr::asset_record::AssetRecordType;
+/// use noah::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
+/// use noah_algebra::prelude::*;
 /// use ruc::err::*;
-/// use zei::setup::BulletproofParams;
+/// use noah::setup::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = BulletproofParams::default();
@@ -181,7 +181,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
     input_key_pairs: &[&XfrKeyPair],
 ) -> Result<XfrNote> {
     if inputs.is_empty() {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     check_keys(inputs, input_key_pairs).c(d!())?;
@@ -198,11 +198,11 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// use rand_chacha::ChaChaRng;
 /// use ruc::{*, err::*};
 /// use rand_core::SeedableRng;
-/// use zei::xfr::sig::XfrKeyPair;
-/// use zei::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
-/// use zei::xfr::asset_record::AssetRecordType;
-/// use zei::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
-/// use zei::setup::BulletproofParams;
+/// use noah::xfr::sig::XfrKeyPair;
+/// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
+/// use noah::xfr::asset_record::AssetRecordType;
+/// use noah::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
+/// use noah::setup::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = BulletproofParams::default();
@@ -246,7 +246,7 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
     outputs: &[AssetRecord],
 ) -> Result<XfrBody> {
     if inputs.is_empty() {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
     let xfr_type = XfrType::from_inputs_outputs(inputs, outputs);
     check_asset_amount(inputs, outputs).c(d!())?;
@@ -326,12 +326,12 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
 
 fn check_keys(inputs: &[AssetRecord], input_key_pairs: &[&XfrKeyPair]) -> Result<()> {
     if inputs.len() != input_key_pairs.len() {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
     for (input, key) in inputs.iter().zip(input_key_pairs.iter()) {
         let inkey = &input.open_asset_record.blind_asset_record.public_key;
         if inkey != &key.pub_key {
-            return Err(eg!(ZeiError::ParameterError));
+            return Err(eg!(NoahError::ParameterError));
         }
     }
     Ok(())
@@ -371,7 +371,7 @@ fn gen_xfr_proofs_multi_asset(
             Ok(AssetTypeAndAmountProof::AssetMix(mix_proof))
         }
         XfrType::NonConfidential_MultiAsset => Ok(AssetTypeAndAmountProof::NoProof),
-        _ => Err(eg!(ZeiError::XfrCreationAssetAmountError)),
+        _ => Err(eg!(NoahError::XfrCreationAssetAmountError)),
     }
 }
 
@@ -397,7 +397,7 @@ fn gen_xfr_proofs_single_asset<R: CryptoRng + RngCore>(
             gen_range_proof(inputs, outputs).c(d!())?,
             asset_proof(prng, &pc_gens, inputs, outputs).c(d!())?,
         )))),
-        _ => Err(eg!(ZeiError::XfrCreationAssetAmountError)), // Type cannot be multi asset
+        _ => Err(eg!(NoahError::XfrCreationAssetAmountError)), // Type cannot be multi asset
     }
 }
 
@@ -436,7 +436,7 @@ fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result
     for (_, a) in amounts.iter() {
         let sum = a.iter().sum::<i128>();
         if sum != 0i128 {
-            return Err(eg!(ZeiError::XfrCreationAssetAmountError));
+            return Err(eg!(NoahError::XfrCreationAssetAmountError));
         }
     }
 
@@ -450,7 +450,7 @@ pub(crate) fn compute_transfer_multisig(
 ) -> Result<XfrMultiSig> {
     let mut bytes = vec![];
     body.serialize(&mut rmp_serde::Serializer::new(&mut bytes))
-        .c(d!(ZeiError::SerializationError))?;
+        .c(d!(NoahError::SerializationError))?;
     Ok(XfrMultiSig::sign(&keys, &bytes)?)
 }
 
@@ -460,7 +460,7 @@ pub(crate) fn verify_transfer_multisig(xfr_note: &XfrNote) -> Result<()> {
     xfr_note
         .body
         .serialize(&mut rmp_serde::Serializer::new(&mut bytes))
-        .c(d!(ZeiError::SerializationError))?;
+        .c(d!(NoahError::SerializationError))?;
     let pubkeys = xfr_note
         .body
         .inputs
@@ -683,18 +683,18 @@ fn safe_sum_u64(terms: &[u64]) -> u128 {
 fn verify_plain_amounts(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord]) -> Result<()> {
     let in_amount: Result<Vec<u64>> = inputs
         .iter()
-        .map(|x| x.amount.get_amount().c(d!(ZeiError::ParameterError)))
+        .map(|x| x.amount.get_amount().c(d!(NoahError::ParameterError)))
         .collect();
     let out_amount: Result<Vec<u64>> = outputs
         .iter()
-        .map(|x| x.amount.get_amount().c(d!(ZeiError::ParameterError)))
+        .map(|x| x.amount.get_amount().c(d!(NoahError::ParameterError)))
         .collect();
 
     let sum_inputs = safe_sum_u64(in_amount.c(d!())?.as_slice());
     let sum_outputs = safe_sum_u64(out_amount.c(d!())?.as_slice());
 
     if sum_inputs != sum_outputs {
-        return Err(eg!(ZeiError::XfrVerifyAssetAmountError));
+        return Err(eg!(NoahError::XfrVerifyAssetAmountError));
     }
 
     Ok(())
@@ -706,20 +706,20 @@ fn verify_plain_asset(inputs: &[BlindAssetRecord], outputs: &[BlindAssetRecord])
         list.push(
             x.asset_type
                 .get_asset_type()
-                .c(d!(ZeiError::ParameterError))?,
+                .c(d!(NoahError::ParameterError))?,
         );
     }
     for x in outputs.iter() {
         list.push(
             x.asset_type
                 .get_asset_type()
-                .c(d!(ZeiError::ParameterError))?,
+                .c(d!(NoahError::ParameterError))?,
         );
     }
     if list.iter().all_equal() {
         Ok(())
     } else {
-        Err(eg!(ZeiError::XfrVerifyAssetAmountError))
+        Err(eg!(NoahError::XfrVerifyAssetAmountError))
     }
 }
 
@@ -731,22 +731,28 @@ fn verify_plain_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetReco
             &record
                 .asset_type
                 .get_asset_type()
-                .c(d!(ZeiError::ParameterError))?,
+                .c(d!(NoahError::ParameterError))?,
         ) {
             None => {
                 amounts.insert(
                     record
                         .asset_type
                         .get_asset_type()
-                        .c(d!(ZeiError::ParameterError))?,
+                        .c(d!(NoahError::ParameterError))?,
                     vec![i128::from(
-                        record.amount.get_amount().c(d!(ZeiError::ParameterError))?,
+                        record
+                            .amount
+                            .get_amount()
+                            .c(d!(NoahError::ParameterError))?,
                     )],
                 );
             }
             Some(vec) => {
                 vec.push(i128::from(
-                    record.amount.get_amount().c(d!(ZeiError::ParameterError))?,
+                    record
+                        .amount
+                        .get_amount()
+                        .c(d!(NoahError::ParameterError))?,
                 ));
             }
         };
@@ -757,22 +763,28 @@ fn verify_plain_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetReco
             &record
                 .asset_type
                 .get_asset_type()
-                .c(d!(ZeiError::ParameterError))?,
+                .c(d!(NoahError::ParameterError))?,
         ) {
             None => {
                 amounts.insert(
                     record
                         .asset_type
                         .get_asset_type()
-                        .c(d!(ZeiError::ParameterError))?,
+                        .c(d!(NoahError::ParameterError))?,
                     vec![-i128::from(
-                        record.amount.get_amount().c(d!(ZeiError::ParameterError))?,
+                        record
+                            .amount
+                            .get_amount()
+                            .c(d!(NoahError::ParameterError))?,
                     )],
                 );
             }
             Some(vec) => {
                 vec.push(-i128::from(
-                    record.amount.get_amount().c(d!(ZeiError::ParameterError))?,
+                    record
+                        .amount
+                        .get_amount()
+                        .c(d!(NoahError::ParameterError))?,
                 ));
             }
         };
@@ -781,7 +793,7 @@ fn verify_plain_asset_mix(inputs: &[BlindAssetRecord], outputs: &[BlindAssetReco
     for (_, a) in amounts.iter() {
         let sum = a.iter().sum::<i128>();
         if sum != 0i128 {
-            return Err(eg!(ZeiError::XfrVerifyAssetAmountError));
+            return Err(eg!(NoahError::XfrVerifyAssetAmountError));
         }
     }
     Ok(())
@@ -800,8 +812,8 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
             .map(|x| {
                 let (com_amount_low, com_amount_high) = match x.amount {
                     XfrAmount::Confidential((c1, c2)) => (
-                        c1.decompress().c(d!(ZeiError::DecompressElementError)),
-                        c2.decompress().c(d!(ZeiError::DecompressElementError)),
+                        c1.decompress().c(d!(NoahError::DecompressElementError)),
+                        c2.decompress().c(d!(NoahError::DecompressElementError)),
                     ),
                     XfrAmount::NonConfidential(amount) => {
                         let pc_gens = PedersenCommitmentRistretto::default();
@@ -829,7 +841,7 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
                         };
                         Ok((com_amount, com_type))
                     }
-                    _ => Err(eg!(ZeiError::ParameterError)),
+                    _ => Err(eg!(NoahError::ParameterError)),
                 }
             })
             .collect()
@@ -856,7 +868,7 @@ pub fn find_tracing_memos<'a>(
 ) -> Result<Vec<(&'a BlindAssetRecord, &'a TracerMemo)>> {
     let mut result = vec![];
     if xfr_body.inputs.len() + xfr_body.outputs.len() != xfr_body.asset_tracing_memos.len() {
-        return Err(eg!(ZeiError::InconsistentStructureError));
+        return Err(eg!(NoahError::InconsistentStructureError));
     }
     for (blind_asset_record, bar_memos) in xfr_body
         .inputs
@@ -897,10 +909,10 @@ pub(crate) fn extract_tracing_info(
             None => blind_asset_record
                 .amount
                 .get_amount()
-                .c(d!(ZeiError::InconsistentStructureError))?,
+                .c(d!(NoahError::InconsistentStructureError))?,
             Some(_) => match amount_option {
                 None => {
-                    return Err(eg!(ZeiError::InconsistentStructureError));
+                    return Err(eg!(NoahError::InconsistentStructureError));
                 }
                 Some(amt) => amt,
             },
@@ -910,10 +922,10 @@ pub(crate) fn extract_tracing_info(
             None => blind_asset_record
                 .asset_type
                 .get_asset_type()
-                .c(d!(ZeiError::InconsistentStructureError))?,
+                .c(d!(NoahError::InconsistentStructureError))?,
             Some(_) => match asset_type_option {
                 None => {
-                    return Err(eg!(ZeiError::InconsistentStructureError));
+                    return Err(eg!(NoahError::InconsistentStructureError));
                 }
                 Some(asset_type) => asset_type,
             },

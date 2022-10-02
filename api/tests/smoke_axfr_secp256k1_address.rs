@@ -3,14 +3,7 @@ mod smoke_axfr_secp256k1_address {
     use ark_std::test_rng;
     use digest::Digest;
     use mem_db::MemoryDB;
-    use parking_lot::RwLock;
-    use sha2::Sha512;
-    use std::sync::Arc;
-    use storage::{
-        state::{ChainState, State},
-        store::PrefixedStore,
-    };
-    use zei::{
+    use noah::{
         anon_xfr::{
             abar_to_ar::*,
             abar_to_bar::*,
@@ -32,9 +25,16 @@ mod smoke_axfr_secp256k1_address {
             },
         },
     };
-    use zei_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-    use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-    use zei_crypto::basic::{pedersen_comm::PedersenCommitmentRistretto, rescue::RescueInstance};
+    use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_crypto::basic::{pedersen_comm::PedersenCommitmentRistretto, rescue::RescueInstance};
+    use parking_lot::RwLock;
+    use sha2::Sha512;
+    use std::sync::Arc;
+    use storage::{
+        state::{ChainState, State},
+        store::PrefixedStore,
+    };
 
     const AMOUNT: u64 = 10u64;
     const ASSET: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);

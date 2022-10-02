@@ -1,11 +1,11 @@
 use mem_db::MemoryDB;
+use noah_accumulators::merkle_tree::{verify, PersistentMerkleTree, TREE_DEPTH};
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::Instant;
 use storage::state::{ChainState, State};
 use storage::store::PrefixedStore;
-use zei_accumulators::merkle_tree::{verify, PersistentMerkleTree, TREE_DEPTH};
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 
 #[test]
 fn test_merkle_tree() {

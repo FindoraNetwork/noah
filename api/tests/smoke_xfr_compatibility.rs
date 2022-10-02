@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod smoke_xfr_compatibility {
     use ark_std::test_rng;
-    use zei::setup::BulletproofParams;
-    use zei::xfr::{structs::*, *};
+    use noah::setup::BulletproofParams;
+    use noah::xfr::{structs::*, *};
 
     #[test]
     fn compatibility_v1_bar_to_bar_no_trancing() {

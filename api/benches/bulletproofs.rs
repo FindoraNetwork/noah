@@ -6,13 +6,13 @@ use bulletproofs::{
 };
 use merlin::Transcript;
 use mix::MixValue;
-use zei::setup::BulletproofParams;
-use zei::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance};
-use zei_algebra::{
+use noah::setup::BulletproofParams;
+use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance};
+use noah_algebra::{
     prelude::*,
     ristretto::{CompressedRistretto, RistrettoScalar},
 };
-use zei_crypto::{
+use noah_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     bulletproofs::mix::{self, MixCommitment, MixVariable},
 };
@@ -425,7 +425,8 @@ fn prepare_asset_mixer_verifier(
         .map(|com| com.commit_verifier(verifier))
         .collect_vec();
 
-    mix::mix(verifier, &in_vars, None, &out_vars, None).c(d!(ZeiError::AssetMixerVerificationError))
+    mix::mix(verifier, &in_vars, None, &out_vars, None)
+        .c(d!(NoahError::AssetMixerVerificationError))
 }
 
 fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {

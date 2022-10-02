@@ -90,7 +90,7 @@ jobs:
           with:
             toolchain: ${{ matrix.rust }}
             command: test
-            args: "-p zei"
+            args: "-p noah"
 
   parallel_check:
       name: Check parallel
@@ -117,4 +117,4 @@ jobs:
           with:
             toolchain: ${{ matrix.rust }}
             command: test
-            args: "-p zei --features parallel"
+            args: "-p noah --features parallel"

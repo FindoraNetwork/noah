@@ -21,15 +21,15 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-#[cfg(feature = "parallel")]
-use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-use zei_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
-use zei_plonk::plonk::{
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// The domain separator for anonymous-to-transparent, for the Plonk proof.
 const ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"ABAR to AR Plonk Proof";
@@ -82,7 +82,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     ar_pub_key: &XfrPublicKey,
 ) -> Result<AbarToArPreNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.get_public_key() != oabar.pub_key {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     let oar_amount = oabar.amount;
@@ -171,7 +171,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
 ) -> Result<()> {
     // require the output amount & asset type are non-confidential
     if note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential() {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
@@ -189,7 +189,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
 
     if *merkle_root != note.body.merkle_root {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
@@ -208,7 +208,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
         &online_inputs,
         &note.proof,
     )
-    .c(d!(ZeiError::AXfrVerificationError))
+    .c(d!(NoahError::AXfrVerificationError))
 }
 
 /// Batch verify the anonymous-to-transparent notes.
@@ -224,7 +224,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
     if notes.par_iter().any(|note| {
         note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential()
     }) {
-        return Err(eg!(ZeiError::ParameterError));
+        return Err(eg!(NoahError::ParameterError));
     }
 
     if merkle_roots
@@ -232,7 +232,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
         .zip(notes)
         .any(|(x, y)| **x != y.body.merkle_root)
     {
-        return Err(eg!(ZeiError::AXfrVerificationError));
+        return Err(eg!(NoahError::AXfrVerificationError));
     }
 
     let is_ok = notes
@@ -276,7 +276,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
     if is_ok {
         Ok(())
     } else {
-        Err(eg!(ZeiError::AXfrVerificationError))
+        Err(eg!(NoahError::AXfrVerificationError))
     }
 }
 fn prove_abar_to_ar<R: CryptoRng + RngCore>(
@@ -299,7 +299,7 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
         &params.prover_params,
         &witness,
     )
-    .c(d!(ZeiError::AXfrProofError))
+    .c(d!(NoahError::AXfrProofError))
 }
 
 /// Construct the anonymous-to-transparent constraint system.

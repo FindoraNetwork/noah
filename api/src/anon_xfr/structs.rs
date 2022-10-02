@@ -4,10 +4,10 @@ use crate::anon_xfr::{
     keys::{AXfrKeyPair, AXfrPubKey},
 };
 use crate::xfr::structs::AssetType;
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_plonk::plonk::constraint_system::VarIndex;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
-use zei_algebra::{bls12_381::BLSScalar, prelude::*};
-use zei_plonk::plonk::constraint_system::VarIndex;
 
 /// The nullifier.
 pub type Nullifier = BLSScalar;
@@ -163,10 +163,10 @@ impl OpenAnonAssetRecordBuilder {
     /// Finalize builder:
     /// If built via constructor + builder methods, it samples commitment blinding and key randomization factor and
     /// creates associated owner memo.
-    /// If built via `Self::from_abar(...)`, return Err(ZeiError::InconsistentStructureError)
+    /// If built via `Self::from_abar(...)`, return Err(NoahError::InconsistentStructureError)
     pub fn finalize<R: CryptoRng + RngCore>(mut self, prng: &mut R) -> Result<Self> {
         if self.oabar.owner_memo.is_some() {
-            return Err(eg!(ZeiError::InconsistentStructureError));
+            return Err(eg!(NoahError::InconsistentStructureError));
         }
 
         self.oabar.blind = BLSScalar::random(prng);
@@ -208,12 +208,12 @@ impl OpenAnonAssetRecordBuilder {
     fn sanity_check(&self) -> Result<()> {
         // 1. check public key is non-default
         if self.oabar.pub_key == AXfrPubKey::default() {
-            return Err(eg!(ZeiError::InconsistentStructureError));
+            return Err(eg!(NoahError::InconsistentStructureError));
         }
 
         // 2. OwnerMemo is not None
         if self.oabar.owner_memo.is_none() {
-            return Err(eg!(ZeiError::InconsistentStructureError));
+            return Err(eg!(NoahError::InconsistentStructureError));
         }
         Ok(())
     }
@@ -335,7 +335,7 @@ mod test {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::AXfrPubKey;
     use ark_std::test_rng;
-    use zei_algebra::prelude::*;
+    use noah_algebra::prelude::*;
 
     #[test]
     fn test_axfr_pub_key_serialization() {
@@ -344,10 +344,10 @@ mod test {
 
         let pub_key: AXfrPubKey = keypair.get_public_key();
 
-        let bytes = pub_key.zei_to_bytes();
+        let bytes = pub_key.noah_to_bytes();
         assert_ne!(bytes.len(), 0);
 
-        let reformed_pub_key = AXfrPubKey::zei_from_bytes(bytes.as_slice()).unwrap();
+        let reformed_pub_key = AXfrPubKey::noah_from_bytes(bytes.as_slice()).unwrap();
         assert_eq!(pub_key, reformed_pub_key);
     }
 
@@ -356,10 +356,10 @@ mod test {
         let mut prng = test_rng();
         let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
 
-        let bytes: Vec<u8> = keypair.zei_to_bytes();
+        let bytes: Vec<u8> = keypair.noah_to_bytes();
         assert_ne!(bytes.len(), 0);
 
-        let reformed_key_pair = AXfrKeyPair::zei_from_bytes(bytes.as_slice()).unwrap();
+        let reformed_key_pair = AXfrKeyPair::noah_from_bytes(bytes.as_slice()).unwrap();
         assert_eq!(keypair, reformed_key_pair);
     }
 }

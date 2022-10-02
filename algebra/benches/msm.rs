@@ -1,5 +1,5 @@
 use ark_std::{test_rng, time::Instant};
-use zei_algebra::{
+use noah_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     traits::{Group, Scalar},
 };

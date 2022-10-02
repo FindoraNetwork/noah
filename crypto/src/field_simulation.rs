@@ -1,9 +1,9 @@
+use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::prelude::*;
+use noah_algebra::str::FromStr;
 use num_bigint::BigUint;
 use num_integer::Integer;
 use std::marker::PhantomData;
-use zei_algebra::bls12_381::BLSScalar;
-use zei_algebra::prelude::*;
-use zei_algebra::str::FromStr;
 
 /// The trait for parameters for field simulation.
 pub trait SimFrParams: Clone + Default {
@@ -483,9 +483,9 @@ impl<P: SimFrParams> SimFrMul<P> {
 mod test_ristretto {
     use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
     use ark_std::test_rng;
+    use noah_algebra::prelude::*;
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
-    use zei_algebra::prelude::*;
 
     type SimFrTest = SimFr<SimFrParamsRistretto>;
 
@@ -607,9 +607,9 @@ mod test_ristretto {
 mod test_secq256k1 {
     use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
     use ark_std::test_rng;
+    use noah_algebra::prelude::*;
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
-    use zei_algebra::prelude::*;
 
     type SimFrTest = SimFr<SimFrParamsSecq256k1>;
 

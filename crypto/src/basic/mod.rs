@@ -1,4 +1,4 @@
-/// The module for the Anemoi-Jive CRH.
+/// The module for the Anemoi-Jive hash functions.
 pub mod anemoi_jive;
 /// The module for the Chaum-Pedersen protocol.
 pub mod chaum_pedersen;

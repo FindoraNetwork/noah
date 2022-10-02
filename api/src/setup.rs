@@ -17,23 +17,23 @@ use crate::parameters::{
     VERIFIER_SPECIFIC_PARAMS,
 };
 use bulletproofs::BulletproofGens;
-use rand_chacha::ChaChaRng;
-use serde::Deserialize;
-use zei_algebra::ristretto::RistrettoPoint;
-use zei_algebra::{
+use noah_algebra::ristretto::RistrettoPoint;
+use noah_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     prelude::*,
     ristretto::RistrettoScalar,
 };
-use zei_crypto::delegated_schnorr::{DelegatedSchnorrInspection, DelegatedSchnorrProof};
-use zei_crypto::field_simulation::SimFrParamsRistretto;
-use zei_plonk::{
+use noah_crypto::delegated_schnorr::{DelegatedSchnorrInspection, DelegatedSchnorrProof};
+use noah_crypto::field_simulation::SimFrParamsRistretto;
+use noah_plonk::{
     plonk::{
         constraint_system::ConstraintSystem,
         indexer::{indexer_with_lagrange, PlonkPK, PlonkVK},
     },
     poly_commit::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
 };
+use rand_chacha::ChaChaRng;
+use serde::Deserialize;
 
 /// The Bulletproofs URS.
 #[derive(Serialize, Deserialize)]
@@ -98,10 +98,10 @@ pub const DEFAULT_BP_NUM_GENS: usize = 256;
 impl BulletproofParams {
     /// Load the URS for Bulletproofs.
     pub fn new() -> Result<BulletproofParams> {
-        let urs = BULLETPROOF_URS.c(d!(ZeiError::MissingSRSError))?;
+        let urs = BULLETPROOF_URS.c(d!(NoahError::MissingSRSError))?;
 
         let pp: BulletproofParams = bincode::deserialize(&urs)
-            .c(d!(ZeiError::DeserializationError))
+            .c(d!(NoahError::DeserializationError))
             .unwrap();
         Ok(pp)
     }
@@ -134,7 +134,7 @@ impl ProverParams {
         n_payees: usize,
         tree_depth: Option<usize>,
     ) -> Result<ProverParams> {
-        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
 
         let folding_witness = AXfrAddressFoldingWitness::default();
 
@@ -152,7 +152,7 @@ impl ProverParams {
         };
 
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(ZeiError::DeserializationError))?;
+            .c(d!(NoahError::DeserializationError))?;
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
@@ -168,7 +168,7 @@ impl ProverParams {
 
     /// Obtain the parameters for confidential to anonymous.
     pub fn bar_to_abar_params() -> Result<ProverParams> {
-        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
         let zero = BLSScalar::zero();
 
         let proof = DelegatedSchnorrProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
@@ -211,7 +211,7 @@ impl ProverParams {
         );
 
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(ZeiError::DeserializationError))?;
+            .c(d!(NoahError::DeserializationError))?;
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
@@ -282,9 +282,9 @@ impl ProverParams {
             &lambda,
             &folding_witness,
         );
-        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(ZeiError::DeserializationError))?;
+            .c(d!(NoahError::DeserializationError))?;
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
@@ -314,9 +314,9 @@ impl ProverParams {
 
         let (cs, _) = build_ar_to_abar_cs(dummy_payee);
 
-        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(ZeiError::DeserializationError))?;
+            .c(d!(NoahError::DeserializationError))?;
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
@@ -357,9 +357,9 @@ impl ProverParams {
 
         let (cs, _) = build_abar_to_ar_cs(payer_secret, &folding_witness);
 
-        let srs = SRS.c(d!(ZeiError::MissingSRSError))?;
+        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(ZeiError::DeserializationError))?;
+            .c(d!(NoahError::DeserializationError))?;
 
         let lagrange_pcs = load_lagrange_params(cs.size());
 
@@ -411,16 +411,16 @@ impl VerifierParams {
     /// Load the verifier parameters for a given number of inputs and a given number of outputs.
     pub fn load(n_payers: usize, n_payees: usize) -> Result<VerifierParams> {
         if n_payees > MAX_ANONYMOUS_RECORD_NUMBER || n_payers > MAX_ANONYMOUS_RECORD_NUMBER {
-            Err(SimpleError::new(d!(ZeiError::MissingVerifierParamsError), None).into())
+            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         } else {
             match (VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS) {
                 (Some(c_bytes), Some(s_bytes)) => {
                     let common: VerifierParamsSplitCommon =
-                        bincode::deserialize(c_bytes).c(d!(ZeiError::DeserializationError))?;
+                        bincode::deserialize(c_bytes).c(d!(NoahError::DeserializationError))?;
                     let specials: Vec<Vec<Vec<u8>>> = bincode::deserialize(s_bytes).unwrap();
                     let special: VerifierParamsSplitSpecific =
                         bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
-                            .c(d!(ZeiError::DeserializationError))?;
+                            .c(d!(NoahError::DeserializationError))?;
                     Ok(VerifierParams {
                         pcs: common.pcs,
                         cs: special.cs,
@@ -435,7 +435,7 @@ impl VerifierParams {
     /// Obtain the parameters for anonymous to confidential.
     pub fn abar_to_bar_params() -> Result<VerifierParams> {
         if let Some(bytes) = ABAR_TO_BAR_VERIFIER_PARAMS {
-            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+            bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
         } else {
             let prover_params = ProverParams::abar_to_bar_params(TREE_DEPTH)?;
             Ok(VerifierParams::from(prover_params))
@@ -445,7 +445,7 @@ impl VerifierParams {
     /// Obtain the parameters for confidential to anonymous.
     pub fn bar_to_abar_params() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
-            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+            bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
         } else {
             let prover_params = ProverParams::bar_to_abar_params()?;
             Ok(VerifierParams::from(prover_params))
@@ -455,7 +455,7 @@ impl VerifierParams {
     /// Obtain the parameters for transparent to anonymous.
     pub fn ar_to_abar_params() -> Result<VerifierParams> {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
-            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+            bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
         } else {
             let prover_params = ProverParams::ar_to_abar_params()?;
             Ok(VerifierParams::from(prover_params))
@@ -465,7 +465,7 @@ impl VerifierParams {
     /// Obtain the parameters for anonymous to transparent.
     pub fn abar_to_ar_params() -> Result<VerifierParams> {
         if let Some(bytes) = ABAR_TO_AR_VERIFIER_PARAMS {
-            bincode::deserialize(bytes).c(d!(ZeiError::DeserializationError))
+            bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
         } else {
             let prover_params = ProverParams::abar_to_ar_params(TREE_DEPTH)?;
             Ok(VerifierParams::from(prover_params))
@@ -510,11 +510,11 @@ mod test {
     use crate::anon_xfr::TREE_DEPTH;
     use crate::parameters::SRS;
     use crate::setup::{ProverParams, VerifierParams};
-    use zei_algebra::{
+    use noah_algebra::{
         bls12_381::{BLSScalar, BLSG1},
         prelude::*,
     };
-    use zei_plonk::poly_commit::{
+    use noah_plonk::poly_commit::{
         field_polynomial::FpPolynomial, kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme,
     };
 

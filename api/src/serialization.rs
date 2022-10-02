@@ -2,17 +2,17 @@ use crate::xfr::{
     sig::{XfrPublicKey, XfrSecretKey, XfrSignature},
     structs::{AssetType, ASSET_TYPE_LENGTH},
 };
+use noah_algebra::prelude::*;
 use serde::Serializer;
-use zei_algebra::prelude::*;
 
-impl ZeiFromToBytes for AssetType {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for AssetType {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.0.to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != ASSET_TYPE_LENGTH {
-            Err(eg!(ZeiError::DeserializationError))
+            Err(eg!(NoahError::DeserializationError))
         } else {
             let mut array = [0u8; ASSET_TYPE_LENGTH];
             array.copy_from_slice(bytes);
@@ -21,35 +21,35 @@ impl ZeiFromToBytes for AssetType {
     }
 }
 
-impl ZeiFromToBytes for XfrPublicKey {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for XfrPublicKey {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         XfrPublicKey::from_bytes(bytes)
     }
 }
 serialize_deserialize!(XfrPublicKey);
 
-impl ZeiFromToBytes for XfrSecretKey {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for XfrSecretKey {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         XfrSecretKey::from_bytes(bytes)
     }
 }
 
 serialize_deserialize!(XfrSecretKey);
 
-impl ZeiFromToBytes for XfrSignature {
-    fn zei_to_bytes(&self) -> Vec<u8> {
+impl NoahFromToBytes for XfrSignature {
+    fn noah_to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
 
-    fn zei_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         XfrSignature::from_bytes(bytes)
     }
 }
@@ -60,7 +60,7 @@ serialize_deserialize!(XfrSignature);
 mod test {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
     use crate::ristretto::CompressedRistretto;
-    use crate::serialization::ZeiFromToBytes;
+    use crate::serialization::NoahFromToBytes;
     use crate::xfr::sig::XfrPublicKeyInner;
     use crate::xfr::{
         asset_tracer::RecordDataEncKey,
@@ -68,15 +68,15 @@ mod test {
         structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
     };
     use ark_std::test_rng;
+    use noah_algebra::ristretto::RistrettoPoint;
+    use noah_crypto::basic::{
+        elgamal::elgamal_key_gen,
+        hybrid_encryption::{XPublicKey, XSecretKey},
+    };
     use rmp_serde::{Deserializer, Serializer};
     use ruc::*;
     use serde::{de::Deserialize, ser::Serialize};
     use std::convert::TryFrom;
-    use zei_algebra::ristretto::RistrettoPoint;
-    use zei_crypto::basic::{
-        elgamal::elgamal_key_gen,
-        hybrid_encryption::{XPublicKey, XSecretKey},
-    };
 
     #[test]
     fn xfr_amount_u64_to_string_serde() {
@@ -260,7 +260,10 @@ mod test {
             pnk!(Err(eg!("Failed to serialize XfrSecretKey to JSON")))
         };
         if let Ok(restored) = serde_json::from_str::<StructWithSecKey>(&as_json) {
-            assert_eq!(test_struct.key.zei_to_bytes(), restored.key.zei_to_bytes());
+            assert_eq!(
+                test_struct.key.noah_to_bytes(),
+                restored.key.noah_to_bytes()
+            );
         } else {
             pnk!(Err(eg!("Failed to deserialize XfrSecretKey from JSON")));
         }
