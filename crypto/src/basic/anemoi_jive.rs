@@ -77,6 +77,75 @@ pub struct AnemoiSpongeTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize>
     pub output: F,
 }
 
+impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default
+    for AnemoiSpongeTrace<F, N, NUM_ROUNDS>
+{
+    fn default() -> Self {
+        Self {
+            input: vec![],
+            before_permutation: vec![],
+            intermediate_values_before_constant_additions: vec![],
+            after_permutation: vec![],
+            output: F::default(),
+        }
+    }
+}
+
+impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
+    for AnemoiSpongeTrace<F, N, NUM_ROUNDS>
+{
+    fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
+        f.write_str("input:\n")?;
+        for (i, elem) in self.input.iter().enumerate() {
+            f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;
+        }
+
+        for r in 0..NUM_ROUNDS {
+            f.write_fmt(format_args!("round {}:\n", r))?;
+
+            f.write_str("\r before permutation:")?;
+
+            for (i, elem) in self.before_permutation[r].0.iter().enumerate() {
+                f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
+            }
+
+            for (i, elem) in self.before_permutation[r].1.iter().enumerate() {
+                f.write_fmt(format_args!("\r \r y[{}] = {:?}\n", i, elem))?;
+            }
+
+            f.write_str("\r intermediate permutation:")?;
+
+            for (i, elem) in self.intermediate_values_before_constant_additions[r]
+                .0
+                .iter()
+                .enumerate()
+            {
+                f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
+            }
+
+            for (i, elem) in self.intermediate_values_before_constant_additions[r]
+                .1
+                .iter()
+                .enumerate()
+            {
+                f.write_fmt(format_args!("\r\r y[{}] = {:?}\n", i, elem))?;
+            }
+
+            f.write_str("\r after permutation:")?;
+
+            for (i, elem) in self.after_permutation[r].0.iter().enumerate() {
+                f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
+            }
+
+            for (i, elem) in self.after_permutation[r].1.iter().enumerate() {
+                f.write_fmt(format_args!("\r \r y[{}] = {:?}\n", i, elem))?;
+            }
+        }
+
+        f.write_fmt(format_args!("output = {:?}\n", self.output))
+    }
+}
+
 /// The structure for the trace of the Anemio-Jive CRH.
 pub struct JiveTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
     /// The first half of the input.
@@ -155,8 +224,8 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debu
     }
 }
 
-/// The trait for the Anemoi-Jive CRH parameters.
-pub trait JiveCRH<F: Scalar, const N: usize, const NUM_ROUNDS: usize>
+/// The trait for the Anemoi-Jive parameters.
+pub trait AnemoiJive<F: Scalar, const N: usize, const NUM_ROUNDS: usize>
 where
     MDSMatrix<F, N>: ApplicableMDSMatrix<F, N>,
 {
@@ -190,8 +259,137 @@ where
     /// Return the inverse of alpha over `r - 1`.
     fn get_alpha_inv() -> Vec<u64>;
 
+    /// Eval the Anemoi sponge.
+    fn eval_sponge(input: &[F]) -> F {
+        let mut input = input.to_vec();
+
+        let mds = MDSMatrix::<F, N>(Self::MDS_MATRIX);
+        let alpha_inv = Self::get_alpha_inv();
+
+        let sigma = if input.len() % (2 * N - 1) == 0 && !input.is_empty() {
+            F::one()
+        } else {
+            input.push(F::one());
+            if input.len() % (2 * N - 1) != 0 {
+                input.extend_from_slice(
+                    &[F::zero()].repeat(2 * N - 1 - (input.len() % (2 * N - 1))),
+                );
+            }
+
+            F::zero()
+        };
+
+        // after the previous step, the length of input must be multiplies of `2 * N - 1`.
+        assert_eq!(input.len() % (2 * N - 1), 0);
+
+        // initialize the internal state.
+        let mut x = [F::zero(); N];
+        let mut y = [F::zero(); N];
+        for chuck in input.chunks_exact(2 * N - 1) {
+            for i in 0..N {
+                x[i] += &chuck[i];
+            }
+            for i in 0..(N - 1) {
+                y[i] += &chuck[N + i];
+            }
+
+            for r in 0..NUM_ROUNDS {
+                for i in 0..N {
+                    x[i] += &Self::ROUND_KEYS_X[r][i];
+                    y[i] += &Self::ROUND_KEYS_Y[r][i];
+                }
+                mds.permute_in_place(&mut x, &mut y);
+                for i in 0..N {
+                    x[i] -= &(Self::GENERATOR * &(y[i].square()));
+                    y[i] -= &x[i].pow(&alpha_inv);
+                    x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
+                }
+            }
+            mds.permute_in_place(&mut x, &mut y);
+        }
+        y[N - 1] += &sigma;
+        // This step can be omitted since we only get one element.
+        // For formality we keep it here.
+
+        x[0]
+    }
+
+    /// Eval the Anemoi sponge and return the trace.
+    fn eval_sponge_with_trace(input: &[F]) -> AnemoiSpongeTrace<F, N, NUM_ROUNDS> {
+        let mut trace = AnemoiSpongeTrace::<F, N, NUM_ROUNDS>::default();
+
+        let mut input = input.to_vec();
+        trace.input = input.clone();
+
+        let mds = MDSMatrix::<F, N>(Self::MDS_MATRIX);
+        let alpha_inv = Self::get_alpha_inv();
+
+        let sigma = if input.len() % (2 * N - 1) == 0 && !input.is_empty() {
+            F::one()
+        } else {
+            input.push(F::one());
+            if input.len() % (2 * N - 1) != 0 {
+                input.extend_from_slice(
+                    &[F::zero()].repeat(2 * N - 1 - (input.len() % (2 * N - 1))),
+                );
+            }
+
+            F::zero()
+        };
+
+        // after the previous step, the length of input must be multiplies of `2 * N - 1`.
+        assert_eq!(input.len() % (2 * N - 1), 0);
+
+        // initialize the internal state.
+        let mut x = [F::zero(); N];
+        let mut y = [F::zero(); N];
+        for chuck in input.chunks_exact(2 * N - 1) {
+            for i in 0..N {
+                x[i] += &chuck[i];
+            }
+            for i in 0..(N - 1) {
+                y[i] += &chuck[N + i];
+            }
+
+            trace.before_permutation.push((x.clone(), y.clone()));
+
+            let mut intermediate_values_before_constant_additions =
+                ([[F::zero(); N]; NUM_ROUNDS], [[F::zero(); N]; NUM_ROUNDS]);
+            for r in 0..NUM_ROUNDS {
+                for i in 0..N {
+                    x[i] += &Self::ROUND_KEYS_X[r][i];
+                    y[i] += &Self::ROUND_KEYS_Y[r][i];
+                }
+                mds.permute_in_place(&mut x, &mut y);
+                for i in 0..N {
+                    x[i] -= &(Self::GENERATOR * &(y[i].square()));
+                    y[i] -= &x[i].pow(&alpha_inv);
+                    x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
+                }
+
+                intermediate_values_before_constant_additions.0[r] = x.clone();
+                intermediate_values_before_constant_additions.1[r] = y.clone();
+            }
+
+            mds.permute_in_place(&mut x, &mut y);
+
+            trace
+                .intermediate_values_before_constant_additions
+                .push(intermediate_values_before_constant_additions);
+
+            trace.after_permutation.push((x.clone(), y.clone()));
+        }
+        y[N - 1] += &sigma;
+        // This step can be omitted since we only get one element.
+        // For formality we keep it here.
+
+        trace.output = x[0];
+
+        trace
+    }
+
     /// Eval the Anemoi-Jive hash function and return the result.
-    fn eval(x: &[F; N], y: &[F; N]) -> F {
+    fn eval_jive(x: &[F; N], y: &[F; N]) -> F {
         let mds = MDSMatrix::<F, N>(Self::MDS_MATRIX);
         let alpha_inv = Self::get_alpha_inv();
         let sum_before_perm: F = x.iter().sum::<F>() + y.iter().sum::<F>();
@@ -216,7 +414,7 @@ where
 
     /// Eval the Anemoi-Jive hash function and return the trace of execution,
     /// which is to be used for creating the zero-knowledge proof.
-    fn eval_with_trace(x: &[F; N], y: &[F; N]) -> JiveTrace<F, N, NUM_ROUNDS> {
+    fn eval_jive_with_trace(x: &[F; N], y: &[F; N]) -> JiveTrace<F, N, NUM_ROUNDS> {
         let mds = MDSMatrix::<F, N>(Self::MDS_MATRIX);
         let alpha_inv = Self::get_alpha_inv();
         let mut trace = JiveTrace::default();
@@ -249,9 +447,9 @@ where
 }
 
 /// The structure that stores the parameters for the Anemoi-Jive CRH for BLS12-381.
-pub struct JiveCRH381;
+pub struct AnemoiJive381;
 
-impl JiveCRH<BLSScalar, 2usize, 12usize> for JiveCRH381 {
+impl AnemoiJive<BLSScalar, 2usize, 12usize> for AnemoiJive381 {
     const ALPHA: u32 = 7u32;
     const GENERATOR: BLSScalar = new_bls12_381!("7");
     const GENERATOR_INV: BLSScalar = new_bls12_381!(
@@ -674,7 +872,7 @@ mod test {
         let input_x = [F::from(1u64), F::from(2u64)];
         let input_y = [F::from(3u64), F::from(4u64)];
 
-        let res = JiveCRH381::eval(&input_x, &input_y);
+        let res = AnemoiJive381::eval_jive(&input_x, &input_y);
         assert_eq!(
             res,
             new_bls12_381!(
@@ -690,7 +888,7 @@ mod test {
         let input_x = [F::from(1u64), F::from(2u64)];
         let input_y = [F::from(3u64), F::from(4u64)];
 
-        let trace = JiveCRH381::eval_with_trace(&input_x, &input_y);
+        let trace = AnemoiJive381::eval_jive_with_trace(&input_x, &input_y);
 
         // first round
         {
@@ -704,13 +902,13 @@ mod test {
             let c_i = trace.intermediate_y_before_constant_additions[0][0].clone();
             let d_i = trace.intermediate_y_before_constant_additions[0][1].clone();
 
-            let prk_i_a = JiveCRH381::PREPROCESSED_ROUND_KEYS_X[0][0].clone();
-            let prk_i_b = JiveCRH381::PREPROCESSED_ROUND_KEYS_X[0][1].clone();
-            let prk_i_c = JiveCRH381::PREPROCESSED_ROUND_KEYS_Y[0][0].clone();
-            let prk_i_d = JiveCRH381::PREPROCESSED_ROUND_KEYS_Y[0][1].clone();
+            let prk_i_a = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[0][0].clone();
+            let prk_i_b = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[0][1].clone();
+            let prk_i_c = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[0][0].clone();
+            let prk_i_d = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[0][1].clone();
 
-            let g = JiveCRH381::GENERATOR;
-            let g2 = JiveCRH381::GENERATOR_SQUARE_PLUS_ONE;
+            let g = AnemoiJive381::GENERATOR;
+            let g2 = AnemoiJive381::GENERATOR_SQUARE_PLUS_ONE;
 
             // equation 1
             let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
@@ -727,14 +925,14 @@ mod test {
             // equation 3
             let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
                 + g * c_i.square()
-                + JiveCRH381::GENERATOR_INV;
+                + AnemoiJive381::GENERATOR_INV;
             let right = a_i;
             assert_eq!(left, right);
 
             // equation 4
             let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
                 + g * d_i.square()
-                + JiveCRH381::GENERATOR_INV;
+                + AnemoiJive381::GENERATOR_INV;
             let right = b_i;
             assert_eq!(left, right);
         }
@@ -751,13 +949,13 @@ mod test {
             let c_i = trace.intermediate_y_before_constant_additions[r][0].clone();
             let d_i = trace.intermediate_y_before_constant_additions[r][1].clone();
 
-            let prk_i_a = JiveCRH381::PREPROCESSED_ROUND_KEYS_X[r][0].clone();
-            let prk_i_b = JiveCRH381::PREPROCESSED_ROUND_KEYS_X[r][1].clone();
-            let prk_i_c = JiveCRH381::PREPROCESSED_ROUND_KEYS_Y[r][0].clone();
-            let prk_i_d = JiveCRH381::PREPROCESSED_ROUND_KEYS_Y[r][1].clone();
+            let prk_i_a = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[r][0].clone();
+            let prk_i_b = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[r][1].clone();
+            let prk_i_c = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[r][0].clone();
+            let prk_i_d = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[r][1].clone();
 
-            let g = JiveCRH381::GENERATOR;
-            let g2 = JiveCRH381::GENERATOR_SQUARE_PLUS_ONE;
+            let g = AnemoiJive381::GENERATOR;
+            let g2 = AnemoiJive381::GENERATOR_SQUARE_PLUS_ONE;
 
             // equation 1
             let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
@@ -774,16 +972,180 @@ mod test {
             // equation 3
             let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
                 + g * c_i.square()
-                + JiveCRH381::GENERATOR_INV;
+                + AnemoiJive381::GENERATOR_INV;
             let right = a_i;
             assert_eq!(left, right);
 
             // equation 4
             let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
                 + g * d_i.square()
-                + JiveCRH381::GENERATOR_INV;
+                + AnemoiJive381::GENERATOR_INV;
             let right = b_i;
             assert_eq!(left, right);
         }
+    }
+
+    #[test]
+    fn test_anemoi_sponge() {
+        type F = BLSScalar;
+
+        let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
+
+        let res = AnemoiJive381::eval_sponge(&input);
+        assert_eq!(
+            res,
+            new_bls12_381!(
+                "17913626440896376279858183231538520765146521393387279167163788217724133906091"
+            )
+        );
+    }
+
+    #[test]
+    fn test_anemoi_sponge_flatten() {
+        type F = BLSScalar;
+
+        let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
+
+        let trace = AnemoiJive381::eval_sponge_with_trace(&input);
+
+        assert_eq!(trace.input, input.to_vec());
+
+        let mut input = input.to_vec();
+
+        let mds = MDSMatrix::<F, 2>(AnemoiJive381::MDS_MATRIX);
+        let alpha_inv = AnemoiJive381::get_alpha_inv();
+
+        if input.len() % (2 * 2 - 1) != 0 || input.is_empty() {
+            input.push(F::one());
+            if input.len() % (2 * 2 - 1) != 0 {
+                input.extend_from_slice(
+                    &[F::zero()].repeat(2 * 2 - 1 - (input.len() % (2 * 2 - 1))),
+                );
+            }
+        }
+
+        // after the previous step, the length of input must be multiplies of `2 * N - 1`.
+        assert_eq!(input.len() % (2 * 2 - 1), 0);
+
+        let mut x = [F::zero(); 2];
+        let mut y = [F::zero(); 2];
+        for (rr, chuck) in input.chunks_exact(2 * 2 - 1).enumerate() {
+            for i in 0..2 {
+                x[i] += &chuck[i];
+            }
+            for i in 0..(2 - 1) {
+                y[i] += &chuck[2 + i];
+            }
+
+            assert_eq!(x, trace.before_permutation[rr].0);
+            assert_eq!(y, trace.before_permutation[rr].1);
+
+            // first round
+            {
+                let a_i_minus_1 = trace.before_permutation[rr].0[0].clone();
+                let b_i_minus_1 = trace.before_permutation[rr].0[1].clone();
+                let c_i_minus_1 = trace.before_permutation[rr].1[0].clone();
+                let d_i_minus_1 = trace.before_permutation[rr].1[1].clone();
+
+                let a_i = trace.intermediate_values_before_constant_additions[rr].0[0][0].clone();
+                let b_i = trace.intermediate_values_before_constant_additions[rr].0[0][1].clone();
+                let c_i = trace.intermediate_values_before_constant_additions[rr].1[0][0].clone();
+                let d_i = trace.intermediate_values_before_constant_additions[rr].1[0][1].clone();
+
+                let prk_i_a = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[0][0].clone();
+                let prk_i_b = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[0][1].clone();
+                let prk_i_c = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[0][0].clone();
+                let prk_i_d = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[0][1].clone();
+
+                let g = AnemoiJive381::GENERATOR;
+                let g2 = AnemoiJive381::GENERATOR_SQUARE_PLUS_ONE;
+
+                // equation 1
+                let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                    + g * (d_i_minus_1 + g * c_i_minus_1 + prk_i_c).square();
+                let right = a_i_minus_1 + g * b_i_minus_1 + prk_i_a;
+                assert_eq!(left, right);
+
+                // equation 2
+                let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                    + g * (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d).square();
+                let right = g * a_i_minus_1 + g2 * b_i_minus_1 + prk_i_b;
+                assert_eq!(left, right);
+
+                // equation 3
+                let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                    + g * c_i.square()
+                    + AnemoiJive381::GENERATOR_INV;
+                let right = a_i;
+                assert_eq!(left, right);
+
+                // equation 4
+                let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                    + g * d_i.square()
+                    + AnemoiJive381::GENERATOR_INV;
+                let right = b_i;
+                assert_eq!(left, right);
+            }
+
+            // remaining rounds
+            for r in 1..12 {
+                let a_i_minus_1 =
+                    trace.intermediate_values_before_constant_additions[rr].0[r - 1][0].clone();
+                let b_i_minus_1 =
+                    trace.intermediate_values_before_constant_additions[rr].0[r - 1][1].clone();
+                let c_i_minus_1 =
+                    trace.intermediate_values_before_constant_additions[rr].1[r - 1][0].clone();
+                let d_i_minus_1 =
+                    trace.intermediate_values_before_constant_additions[rr].1[r - 1][1].clone();
+
+                let a_i = trace.intermediate_values_before_constant_additions[rr].0[r][0].clone();
+                let b_i = trace.intermediate_values_before_constant_additions[rr].0[r][1].clone();
+                let c_i = trace.intermediate_values_before_constant_additions[rr].1[r][0].clone();
+                let d_i = trace.intermediate_values_before_constant_additions[rr].1[r][1].clone();
+
+                let prk_i_a = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[r][0].clone();
+                let prk_i_b = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[r][1].clone();
+                let prk_i_c = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[r][0].clone();
+                let prk_i_d = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[r][1].clone();
+
+                let g = AnemoiJive381::GENERATOR;
+                let g2 = AnemoiJive381::GENERATOR_SQUARE_PLUS_ONE;
+
+                // equation 1
+                let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                    + g * (d_i_minus_1 + g * c_i_minus_1 + prk_i_c).square();
+                let right = a_i_minus_1 + g * b_i_minus_1 + prk_i_a;
+                assert_eq!(left, right);
+
+                // equation 2
+                let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                    + g * (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d).square();
+                let right = g * a_i_minus_1 + g2 * b_i_minus_1 + prk_i_b;
+                assert_eq!(left, right);
+
+                // equation 3
+                let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                    + g * c_i.square()
+                    + AnemoiJive381::GENERATOR_INV;
+                let right = a_i;
+                assert_eq!(left, right);
+
+                // equation 4
+                let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                    + g * d_i.square()
+                    + AnemoiJive381::GENERATOR_INV;
+                let right = b_i;
+                assert_eq!(left, right);
+            }
+
+            x = trace.intermediate_values_before_constant_additions[rr].0[12 - 1].clone();
+            y = trace.intermediate_values_before_constant_additions[rr].1[12 - 1].clone();
+            mds.permute_in_place(&mut x, &mut y);
+
+            assert_eq!(x, trace.after_permutation[rr].0);
+            assert_eq!(y, trace.after_permutation[rr].1);
+        }
+
+        assert_eq!(trace.output, x[0]);
     }
 }

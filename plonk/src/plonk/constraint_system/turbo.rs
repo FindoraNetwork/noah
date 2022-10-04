@@ -9,7 +9,7 @@ use noah_algebra::prelude::*;
 #[cfg(feature = "debug")]
 use std::collections::HashMap;
 
-use noah_crypto::basic::anemoi_jive::JiveCRH;
+use noah_crypto::basic::anemoi_jive::AnemoiJive;
 
 /// The wires number of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;
@@ -757,7 +757,7 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Set the parameters for the Anemoi/Jive hash function.
-    pub fn load_anemoi_jive_parameters<H: JiveCRH<F, 2, 12>>(&mut self) {
+    pub fn load_anemoi_jive_parameters<H: AnemoiJive<F, 2, 12>>(&mut self) {
         self.anemoi_preprocessed_round_keys_x = H::PREPROCESSED_ROUND_KEYS_X;
         self.anemoi_preprocessed_round_keys_y = H::PREPROCESSED_ROUND_KEYS_Y;
 
