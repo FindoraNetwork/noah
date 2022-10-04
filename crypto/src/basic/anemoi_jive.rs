@@ -1013,7 +1013,6 @@ mod test {
         let mut input = input.to_vec();
 
         let mds = MDSMatrix::<F, 2>(AnemoiJive381::MDS_MATRIX);
-        let alpha_inv = AnemoiJive381::get_alpha_inv();
 
         if input.len() % (2 * 2 - 1) != 0 || input.is_empty() {
             input.push(F::one());
