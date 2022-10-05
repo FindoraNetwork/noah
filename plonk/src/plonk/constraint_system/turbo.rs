@@ -6,9 +6,9 @@ use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
 use noah_algebra::prelude::*;
 
+use noah_crypto::basic::anemoi_jive::AnemoiJive;
 #[cfg(feature = "debug")]
 use std::collections::HashMap;
-use noah_crypto::basic::anemoi_jive::AnemoiJive;
 
 /// The wires number of a gate in Turbo CS.
 pub const N_WIRES_PER_GATE: usize = 5;
