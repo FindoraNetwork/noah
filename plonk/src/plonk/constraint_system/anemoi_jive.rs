@@ -76,7 +76,7 @@ impl TurboCS<BLSScalar> {
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_rescue_selectors(zero, zero, zero, zero);
-            self.push_out_selector(zero);
+            self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
             self.wiring[1].push(intermediate_var.0[11][1]); // b_r
@@ -100,7 +100,7 @@ impl TurboCS<BLSScalar> {
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_rescue_selectors(zero, zero, zero, zero);
-            self.push_out_selector(zero);
+            self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
             self.wiring[1].push(intermediate_var.0[11][1]); // b_r
@@ -124,7 +124,7 @@ impl TurboCS<BLSScalar> {
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_rescue_selectors(zero, zero, zero, zero);
-            self.push_out_selector(zero);
+            self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
             self.wiring[1].push(intermediate_var.0[11][1]); // b_r
@@ -148,7 +148,7 @@ impl TurboCS<BLSScalar> {
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_rescue_selectors(zero, zero, zero, zero);
-            self.push_out_selector(zero);
+            self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
             self.wiring[1].push(intermediate_var.0[11][1]); // b_r
@@ -207,10 +207,7 @@ impl TurboCS<BLSScalar> {
                 .extend_from_slice(&[zero_var].repeat(2 * 2 - 1 - (input_var.len() % (2 * 2 - 1))));
         }
 
-        assert_eq!(input_var.len(), trace.before_permutation.len());
-
-        // after the previous step, the length of input must be multiplies of `2 * N - 1`.
-        assert_eq!(input_var.len() % (2 * 2 - 1), 0);
+        assert_eq!(input_var.len(), trace.before_permutation.len() * (2 * 2 - 1));
 
         // initialize the internal state.
         let chunks = input_var
@@ -254,9 +251,9 @@ impl TurboCS<BLSScalar> {
                 x_var = new_x_var;
                 y_var = new_y_var;
 
-                x_var[0] += chunks[rr][0];
-                x_var[1] += chunks[rr][1];
-                y_var[0] += chunks[rr][2];
+                x_var[0] = self.add(x_var[0], chunks[rr][0]);
+                x_var[1] = self.add(x_var[1], chunks[rr][1]);
+                y_var[0] = self.add(y_var[0], chunks[rr][2]);
 
                 new_x_var = [
                     self.new_variable(trace.after_permutation[rr].0[0]),
@@ -283,6 +280,10 @@ impl TurboCS<BLSScalar> {
             {
                 x_var = new_x_var;
                 y_var = new_y_var;
+
+                x_var[0] = self.add(x_var[0], chunks[num_chunks - 1][0]);
+                x_var[1] = self.add(x_var[1], chunks[num_chunks - 1][1]);
+                y_var[0] = self.add(y_var[0], chunks[num_chunks - 1][2]);
 
                 self.anemoi_permutation_round(
                     &(x_var, y_var),
@@ -353,6 +354,32 @@ mod test {
         let three = cs.new_variable(BLSScalar::from(3u64));
 
         let _ = cs.jive_crh(&trace, &[one, two, three]);
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+    }
+
+    #[test]
+    fn test_anemoi_variable_length_hash_constraint_system() {
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(
+            &[BLSScalar::from(1u64), BLSScalar::from(2u64), BLSScalar::from(3u64), BLSScalar::from(4u64)],
+        );
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+        let one = cs.new_variable(BLSScalar::from(1u64));
+        let two = cs.new_variable(BLSScalar::from(2u64));
+        let three = cs.new_variable(BLSScalar::from(3u64));
+        let four = cs.new_variable(BLSScalar::from(4u64));
+
+        let output_var = cs.new_variable(trace.output);
+
+        let _ = cs.anemoi_variable_length_hash(
+            &trace,
+            &[one, two, three, four],
+            output_var
+        );
 
         let witness = cs.get_and_clear_witness();
         cs.verify_witness(&witness, &[]).unwrap();

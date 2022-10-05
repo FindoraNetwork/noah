@@ -343,12 +343,12 @@ where
         // initialize the internal state.
         let mut x = [F::zero(); N];
         let mut y = [F::zero(); N];
-        for chuck in input.chunks_exact(2 * N - 1) {
+        for chunk in input.chunks_exact(2 * N - 1) {
             for i in 0..N {
-                x[i] += &chuck[i];
+                x[i] += &chunk[i];
             }
             for i in 0..(N - 1) {
-                y[i] += &chuck[N + i];
+                y[i] += &chunk[N + i];
             }
 
             trace.before_permutation.push((x.clone(), y.clone()));
