@@ -63,7 +63,7 @@ impl<F: Scalar> ApplicableMDSMatrix<F, 2> for MDSMatrix<F, 2> {
 }
 
 /// The structure for the trace of the Anemoi-Jive sponge hash function.
-pub struct AnemoiSpongeTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
+pub struct AnemoiVLHTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
     /// The input sequence.
     pub input: Vec<F>,
     /// The state before each permutation.
@@ -78,7 +78,7 @@ pub struct AnemoiSpongeTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize>
 }
 
 impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default
-    for AnemoiSpongeTrace<F, N, NUM_ROUNDS>
+    for AnemoiVLHTrace<F, N, NUM_ROUNDS>
 {
     fn default() -> Self {
         Self {
@@ -92,7 +92,7 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default
 }
 
 impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
-    for AnemoiSpongeTrace<F, N, NUM_ROUNDS>
+    for AnemoiVLHTrace<F, N, NUM_ROUNDS>
 {
     fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
         f.write_str("input:\n")?;
@@ -260,7 +260,7 @@ where
     fn get_alpha_inv() -> Vec<u64>;
 
     /// Eval the Anemoi sponge.
-    fn eval_sponge(input: &[F]) -> F {
+    fn eval_variable_length_hash(input: &[F]) -> F {
         let mut input = input.to_vec();
 
         let mds = MDSMatrix::<F, N>(Self::MDS_MATRIX);
@@ -285,12 +285,12 @@ where
         // initialize the internal state.
         let mut x = [F::zero(); N];
         let mut y = [F::zero(); N];
-        for chuck in input.chunks_exact(2 * N - 1) {
+        for chunk in input.chunks_exact(2 * N - 1) {
             for i in 0..N {
-                x[i] += &chuck[i];
+                x[i] += &chunk[i];
             }
             for i in 0..(N - 1) {
-                y[i] += &chuck[N + i];
+                y[i] += &chunk[N + i];
             }
 
             for r in 0..NUM_ROUNDS {
@@ -315,8 +315,8 @@ where
     }
 
     /// Eval the Anemoi sponge and return the trace.
-    fn eval_sponge_with_trace(input: &[F]) -> AnemoiSpongeTrace<F, N, NUM_ROUNDS> {
-        let mut trace = AnemoiSpongeTrace::<F, N, NUM_ROUNDS>::default();
+    fn eval_variable_length_hash_with_trace(input: &[F]) -> AnemoiVLHTrace<F, N, NUM_ROUNDS> {
+        let mut trace = AnemoiVLHTrace::<F, N, NUM_ROUNDS>::default();
 
         let mut input = input.to_vec();
         trace.input = input.clone();
@@ -870,13 +870,13 @@ mod test {
         type F = BLSScalar;
 
         let input_x = [F::from(1u64), F::from(2u64)];
-        let input_y = [F::from(3u64), F::from(4u64)];
+        let input_y = [F::from(3u64), F::zero()];
 
         let res = AnemoiJive381::eval_jive(&input_x, &input_y);
         assert_eq!(
             res,
             new_bls12_381!(
-                "15310825324896690678862224905062651011708241493951982857730858125821609782555"
+                "40534080031161498828112599909199108154146698842441932527619782321134903095510"
             )
         );
     }
@@ -886,7 +886,7 @@ mod test {
         type F = BLSScalar;
 
         let input_x = [F::from(1u64), F::from(2u64)];
-        let input_y = [F::from(3u64), F::from(4u64)];
+        let input_y = [F::from(3u64), F::zero()];
 
         let trace = AnemoiJive381::eval_jive_with_trace(&input_x, &input_y);
 
@@ -986,12 +986,12 @@ mod test {
     }
 
     #[test]
-    fn test_anemoi_sponge() {
+    fn test_anemoi_variable_length_hash() {
         type F = BLSScalar;
 
         let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
 
-        let res = AnemoiJive381::eval_sponge(&input);
+        let res = AnemoiJive381::eval_variable_length_hash(&input);
         assert_eq!(
             res,
             new_bls12_381!(
@@ -1001,12 +1001,12 @@ mod test {
     }
 
     #[test]
-    fn test_anemoi_sponge_flatten() {
+    fn test_anemoi_variable_length_hash_flatten() {
         type F = BLSScalar;
 
         let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
 
-        let trace = AnemoiJive381::eval_sponge_with_trace(&input);
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&input);
 
         assert_eq!(trace.input, input.to_vec());
 
