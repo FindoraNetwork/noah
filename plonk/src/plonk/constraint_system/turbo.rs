@@ -885,13 +885,6 @@ impl<F: Scalar> TurboCS<F> {
             }
 
             if self.boolean_constraint_indices.contains(&cs_index) {
-                if !w1_value.is_zero() && !w1_value.is_one() {
-                    return Err(eg!(format!(
-                        "cs index {}: the first wire {:?} is not one or zero",
-                        cs_index, w1_value
-                    )));
-                }
-
                 if !w2_value.is_zero() && !w2_value.is_one() {
                     return Err(eg!(format!(
                         "cs index {}: the second wire {:?} is not one or zero",
@@ -903,6 +896,13 @@ impl<F: Scalar> TurboCS<F> {
                     return Err(eg!(format!(
                         "cs index {}: the third wire {:?} is not one or zero",
                         cs_index, w3_value
+                    )));
+                }
+
+                if !w4_value.is_zero() && !w4_value.is_one() {
+                    return Err(eg!(format!(
+                        "cs index {}: the fourth wire {:?} is not one or zero",
+                        cs_index, w4_value
                     )));
                 }
             }
