@@ -12,6 +12,9 @@ pub mod turbo;
 /// Module for ECC.
 pub mod ecc;
 
+/// Module for the Anemoi-Jive hash function.
+pub mod anemoi_jive;
+
 /// Default used constraint system.
 #[doc(hidden)]
 pub use turbo::TurboCS;
