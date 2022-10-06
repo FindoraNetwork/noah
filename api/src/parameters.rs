@@ -11,7 +11,7 @@ pub static BULLETPROOF_URS: Option<&'static [u8]> = None;
 
 #[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
 /// The SRS.
-pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs.bin"));
+pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs-padding.bin"));
 
 #[cfg(all(not(feature = "no_srs"), feature = "lightweight"))]
 /// The SRS.
