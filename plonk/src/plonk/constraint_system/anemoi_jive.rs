@@ -1,8 +1,8 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
 use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::ops::Neg;
 use noah_algebra::{One, Zero};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace};
-use noah_algebra::ops::Neg;
 
 impl TurboCS<BLSScalar> {
     /// Create constraints for the Anemoi permutation.
