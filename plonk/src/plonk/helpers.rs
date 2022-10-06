@@ -692,6 +692,7 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
 pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
     prng: &mut R,
     pcs: &PCS,
+    lagrange_pcs: Option<&PCS>,
     t: &FpPolynomial<PCS::Field>,
     n_wires_per_gate: usize,
     n: usize,
@@ -730,8 +731,39 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
         }
         prev_coef = rand;
 
-        let t_poly = FpPolynomial::from_coefs(coefs);
-        let cm_t = pcs.commit(&t_poly).c(d!(PlonkError::CommitmentError))?;
+        let (cm_t, t_poly) = if let Some(lagrange_pcs) = lagrange_pcs {
+            let degree = coefs.len();
+            let mut max_power_of_2 = degree;
+            for i in (0..=degree).rev() {
+                if (i & (i - 1)) == 0 {
+                    max_power_of_2 = i;
+                    break;
+                }
+            }
+
+            let mut blinds = vec![];
+            for i in &coefs[max_power_of_2..] {
+                blinds.push(i.neg());
+            }
+
+            let mut new_coefs = coefs[..max_power_of_2].to_vec();
+            for (i, v) in blinds.iter().enumerate() {
+                new_coefs[i] = new_coefs[i] - v;
+            }
+
+            let sub_q = FpPolynomial::from_coefs(new_coefs);
+            let (q_eval, _root) = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
+            let q_eval = FpPolynomial::from_coefs(q_eval);
+
+            let cm = lagrange_pcs.commit(&q_eval).c(d!())?;
+            let cm_t = pcs.apply_blind_factors(&cm, &blinds, max_power_of_2);
+            (cm_t, FpPolynomial::from_coefs(coefs))
+        } else {
+            let t_poly = FpPolynomial::from_coefs(coefs);
+            let cm_t = pcs.commit(&t_poly).c(d!(PlonkError::CommitmentError))?;
+            (cm_t, t_poly)
+        };
+
         cm_t_vec.push(cm_t);
         t_polys.push(t_poly);
     }

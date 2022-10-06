@@ -101,12 +101,12 @@ pub trait PolyComScheme: Sized {
     fn batch_prove(
         &self,
         transcript: &mut Transcript,
+        lagrange_pcs: Option<&Self>,
         polys: &[&FpPolynomial<Self::Field>],
         point: &Self::Field,
         max_degree: usize,
     ) -> Result<Self::Commitment> {
-        let n = polys.len();
-        assert!(n > 0);
+        assert!(polys.len() > 0);
 
         Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
 
@@ -129,8 +129,35 @@ pub trait PolyComScheme: Sized {
             return Err(eg!());
         }
 
-        let cm = self.commit(&q).c(d!())?;
-        Ok(cm)
+        if let Some(lagrange_pcs) = lagrange_pcs {
+            let degree = q.degree();
+            let mut max_power_of_2 = degree;
+            for i in (0..=degree).rev() {
+                if (i & (i - 1)) == 0 {
+                    max_power_of_2 = i;
+                    break;
+                }
+            }
+
+            let mut blinds = vec![];
+            for i in &q.coefs[max_power_of_2..] {
+                blinds.push(i.neg());
+            }
+
+            let mut new_coefs = q.coefs[..max_power_of_2].to_vec();
+            for (i, v) in blinds.iter().enumerate() {
+                new_coefs[i] = new_coefs[i] - v;
+            }
+
+            let sub_q = FpPolynomial::from_coefs(new_coefs);
+            let (q_eval, _root) = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
+            let q_eval = FpPolynomial::from_coefs(q_eval);
+
+            let cm = lagrange_pcs.commit(&q_eval).c(d!())?;
+            Ok(self.apply_blind_factors(&cm, &blinds, max_power_of_2))
+        } else {
+            self.commit(&q)
+        }
     }
 
     /// Combine multiple commitments into one commitment.
@@ -271,8 +298,14 @@ mod test {
         let point = Field::random(&mut prng);
         let proof = {
             let mut transcript = Transcript::new(b"TestPCS");
-            pcs.batch_prove(&mut transcript, &[&poly1, &poly2, &poly3], &point, degree)
-                .unwrap()
+            pcs.batch_prove(
+                &mut transcript,
+                None,
+                &[&poly1, &poly2, &poly3],
+                &point,
+                degree,
+            )
+            .unwrap()
         };
         let evals = vec![
             pcs.eval(&poly1, &point),
