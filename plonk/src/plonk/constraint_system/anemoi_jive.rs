@@ -207,7 +207,10 @@ impl TurboCS<BLSScalar> {
                 .extend_from_slice(&[zero_var].repeat(2 * 2 - 1 - (input_var.len() % (2 * 2 - 1))));
         }
 
-        assert_eq!(input_var.len(), trace.before_permutation.len() * (2 * 2 - 1));
+        assert_eq!(
+            input_var.len(),
+            trace.before_permutation.len() * (2 * 2 - 1)
+        );
 
         // initialize the internal state.
         let chunks = input_var
@@ -361,9 +364,12 @@ mod test {
 
     #[test]
     fn test_anemoi_variable_length_hash_constraint_system() {
-        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(
-            &[BLSScalar::from(1u64), BLSScalar::from(2u64), BLSScalar::from(3u64), BLSScalar::from(4u64)],
-        );
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            BLSScalar::from(1u64),
+            BLSScalar::from(2u64),
+            BLSScalar::from(3u64),
+            BLSScalar::from(4u64),
+        ]);
 
         let mut cs = TurboCS::new();
         cs.load_anemoi_jive_parameters::<AnemoiJive381>();
@@ -375,11 +381,7 @@ mod test {
 
         let output_var = cs.new_variable(trace.output);
 
-        let _ = cs.anemoi_variable_length_hash(
-            &trace,
-            &[one, two, three, four],
-            output_var
-        );
+        let _ = cs.anemoi_variable_length_hash(&trace, &[one, two, three, four], output_var);
 
         let witness = cs.get_and_clear_witness();
         cs.verify_witness(&witness, &[]).unwrap();
