@@ -369,7 +369,7 @@ impl TurboCS<BLSScalar> {
 mod test {
     use crate::plonk::constraint_system::TurboCS;
     use noah_algebra::bls12_381::BLSScalar;
-    use noah_crypto::basic::anemoi_jive::{ANEMOI_JIVE_381_SALTS, AnemoiJive, AnemoiJive381};
+    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
     #[test]
     fn test_jive_constraint_system() {
