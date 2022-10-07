@@ -1,6 +1,5 @@
-use noah_algebra::prelude::*;
-use num_bigint::{BigUint, ToBigUint};
-use num_integer::Integer;
+use ark_poly::{EvaluationDomain, MixedRadixEvaluationDomain};
+use noah_algebra::{prelude::*, traits::Domain};
 
 /// Field polynomial.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -9,7 +8,7 @@ pub struct FpPolynomial<F> {
     pub coefs: Vec<F>,
 }
 
-impl<F: Scalar> FpPolynomial<F> {
+impl<F: Domain> FpPolynomial<F> {
     /// Return the polynomial coefs reference.
     pub fn get_coefs_ref(&self) -> &[F] {
         self.coefs.as_slice()
@@ -500,166 +499,76 @@ impl<F: Scalar> FpPolynomial<F> {
         (q, r)
     }
 
-    /// Compute the FFT of the polynomial, return FFT and primitive the roof of unity used
-    /// n is with the form 2^k or 3 * 2^k.
-    pub fn fft(&self, num_points: usize) -> Option<(Vec<F>, F)> {
+    /// Construct a domain for evaluations of a polynomial having `num_coeffs` coefficients,
+    /// `num_coeffs` is with the form 2^k or 3 * 2^k.
+    pub fn evaluation_domain(num_coeffs: usize) -> Option<MixedRadixEvaluationDomain<F::Field>> {
         assert!(
-            num_points.is_power_of_two()
-                || ((num_points % 3 == 0) && (num_points / 3).is_power_of_two())
+            num_coeffs.is_power_of_two()
+                || ((num_coeffs % 3 == 0) && (num_coeffs / 3).is_power_of_two())
         );
-        let root = primitive_nth_root_of_unity(num_points)?;
-        Some((self.fft_with_unity_root(&root, num_points), root))
+        MixedRadixEvaluationDomain::<F::Field>::new(num_coeffs)
     }
 
-    /// Compute the FFT of the polynomial using given n-th root of unity
-    /// n is with the form 2^k or 3 * 2^k.
-    pub fn fft_with_unity_root(&self, root: &F, num_points: usize) -> Vec<F> {
+    /// Compute the FFT of the polynomial, `num_coeffs` is with the form 2^k or 3 * 2^k.
+    pub fn fft(&self, num_coeffs: usize) -> Option<(MixedRadixEvaluationDomain<F::Field>, Vec<F>)> {
         assert!(
-            num_points.is_power_of_two()
-                || ((num_points % 3 == 0) && (num_points / 3).is_power_of_two())
+            num_coeffs.is_power_of_two()
+                || ((num_coeffs % 3 == 0) && (num_coeffs / 3).is_power_of_two())
         );
-        let mut coefs: Vec<&F> = self.coefs.iter().collect();
-        let zero = F::zero();
-        if num_points + 1 > self.degree() {
-            let dummy = vec![&zero; num_points - self.degree() - 1];
-            coefs.extend(dummy);
-        }
-        recursive_fft(&coefs, &root)
+        let domain = MixedRadixEvaluationDomain::<F::Field>::new(num_coeffs)?;
+        let values = self.fft_with_domain(&domain);
+        Some((domain, values))
+    }
+
+    /// Compute the FFT of the polynomial with the given domain.
+    pub fn fft_with_domain(&self, domain: &MixedRadixEvaluationDomain<F::Field>) -> Vec<F> {
+        let coefs = self
+            .coefs
+            .iter()
+            .map(|coef| coef.get_field())
+            .collect::<Vec<F::Field>>();
+        let values = domain.fft(&coefs);
+        values.iter().map(|x| F::from_field(*x)).collect()
     }
 
     /// Compute the FFT of the polynomial on the set k * <root>.
-    pub fn coset_fft_with_unity_root(&self, root: &F, num_points: usize, k: &F) -> Vec<F> {
-        self.mul_var(k).fft_with_unity_root(root, num_points)
+    pub fn coset_fft_with_domain(
+        &self,
+        domain: &MixedRadixEvaluationDomain<F::Field>,
+        k: &F,
+    ) -> Vec<F> {
+        self.mul_var(k).fft_with_domain(&domain)
     }
 
-    /// Compute the polynomial given its evaluation values at the n n-th root of unity given a
-    /// primitive n-th root of unity.
-    pub fn ffti(root: &F, values: &[F], len: usize) -> Self {
-        let mut values: Vec<&F> = values.iter().collect();
-        let zero = F::zero();
-        values.resize(len, &zero);
+    /// Compute the polynomial given its evaluation values and domain.
+    pub fn ifft_with_domain(domain: &MixedRadixEvaluationDomain<F::Field>, values: &[F]) -> Self {
+        let values = values
+            .iter()
+            .map(|value| value.get_field())
+            .collect::<Vec<F::Field>>();
 
-        let coefs = recursive_ifft(&values, root);
+        let coefs = domain.ifft(&values);
+        let coefs = coefs.iter().map(|coef| F::from_field(*coef)).collect();
         Self::from_coefs(coefs)
     }
 
-    /// Compute the polynomial given its evaluation values at a coset k * H, where H are n n-th
-    /// root of unities and k_inv is the inverse of k.
-    pub fn coset_ffti(root: &F, values: &[F], k_inv: &F, len: usize) -> Self {
-        Self::ffti(root, values, len).mul_var(k_inv)
+    /// Compute the polynomial given its evaluation values at a coset k * H,
+    /// where H is evaluation domain and k_inv is the inverse of k.
+    pub fn coset_ifft_with_domain(
+        domain: &MixedRadixEvaluationDomain<F::Field>,
+        values: &[F],
+        k_inv: &F,
+    ) -> Self {
+        Self::ifft_with_domain(domain, values).mul_var(k_inv)
     }
-}
-
-/// given the coefs of a polynomial and a primitive n-th root of unity for field, compute its FFT
-/// n is with the form 2^k or 3 * 2^k
-fn recursive_fft<F: Scalar>(coefs: &[&F], root: &F) -> Vec<F> {
-    let n = coefs.len();
-    assert!(n.is_power_of_two() || ((n % 3 == 0) && (n / 3).is_power_of_two()));
-    if n == 1 {
-        return vec![*coefs[0]];
-    }
-    let root_sq = root.mul(root);
-    if n == 3 {
-        let root_quad = root_sq.mul(&root_sq);
-
-        let mut a0 = coefs[0].add(coefs[1]);
-        a0.add_assign(coefs[2]);
-
-        let c1_times_root = coefs[1].mul(root);
-        let c2_times_root_sq = coefs[2].mul(&root_sq);
-        let mut a1 = coefs[0].add(&c1_times_root);
-        a1.add_assign(&c2_times_root_sq);
-
-        let c1_times_root_sq = coefs[1].mul(&root_sq);
-        let c2_times_root_quad = coefs[2].mul(&root_quad);
-        let mut a2 = coefs[0].add(&c1_times_root_sq);
-        a2.add_assign(&c2_times_root_quad);
-
-        return vec![a0, a1, a2];
-    }
-    let even: Vec<&F> = coefs
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| i % 2 == 0)
-        .map(|(_, c)| *c)
-        .collect();
-    let odd: Vec<&F> = coefs
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| i % 2 == 1)
-        .map(|(_, c)| *c)
-        .collect();
-
-    let y_even = recursive_fft(&even, &root_sq);
-    let y_odd = recursive_fft(&odd, &root_sq);
-
-    let mut omega = F::one();
-    let mut fft = vec![F::zero(); n];
-    for (i, (e, o)) in y_even.iter().zip(y_odd.iter()).enumerate() {
-        let omega_o = omega.mul(o);
-        fft[i] = e.add(&omega_o);
-        fft[n / 2 + i] = e.sub(&omega_o);
-        omega.mul_assign(root);
-    }
-    fft
-}
-
-/// Compute the primitive the roof of unity used n.
-pub fn primitive_nth_root_of_unity<F: Scalar>(num_points: usize) -> Option<F> {
-    let q_minus_one = BigUint::from_bytes_le(F::get_field_size_le_bytes().as_slice()).sub(1u64);
-    let (exp, r) = q_minus_one.div_rem(&num_points.to_biguint().unwrap());
-    if !r.is_zero() {
-        None
-    } else {
-        let g = F::multiplicative_generator();
-        let exp_u32_limbs = exp.to_u32_digits();
-        let exp_u64_limbs = u32_limbs_to_u64_limbs(exp_u32_limbs.as_slice());
-        Some(g.pow(&exp_u64_limbs[..]))
-    }
-}
-
-/// Convert u32 slice to u64 vector.
-fn u32_limbs_to_u64_limbs(s: &[u32]) -> Vec<u64> {
-    let mut u64_limbs = vec![];
-    let mut even_limb = 0u64;
-    for (i, u32_limb) in s.iter().enumerate() {
-        if i % 2 == 0 {
-            even_limb = (*u32_limb) as u64;
-        } else {
-            u64_limbs.push(even_limb + ((*u32_limb as u64) << 32));
-            even_limb = 0u64;
-        }
-    }
-    if even_limb != 0 {
-        u64_limbs.push(even_limb);
-    }
-    u64_limbs
-}
-
-/// Given the values of a polynomial at the n n-th root of unity,
-/// and a primitive n-th root of unity if computes its coefficients.
-/// n is with the form 2^k or 3 * 2^k
-pub fn recursive_ifft<F: Scalar>(values: &[&F], root: &F) -> Vec<F> {
-    let n = values.len();
-    assert!(n.is_power_of_two() || ((n % 3 == 0) && (n / 3).is_power_of_two()));
-    let root_inv = root.pow(&[(n - 1) as u64]);
-    let n = F::from(n as u32);
-    let n_inv = n.inv().unwrap();
-    recursive_fft(values, &root_inv)
-        .into_iter()
-        .map(|x| {
-            let mut a = n_inv;
-            a.mul_assign(&x);
-            a
-        })
-        .collect()
 }
 
 #[cfg(test)]
 mod test {
     use crate::poly_commit::field_polynomial::FpPolynomial;
+    use ark_poly::MixedRadixEvaluationDomain;
     use ark_std::test_rng;
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*, traits::Domain};
 
     #[test]
     fn from_zeroes() {
@@ -681,19 +590,21 @@ mod test {
         }
     }
 
-    fn check_fft<F: Scalar>(poly: &FpPolynomial<F>, root: &F, fft: &[F]) -> bool {
-        let mut omega = F::one();
-        if !fft.len().is_power_of_two() {
-            return false;
-        }
-        if (fft.len() % 3 == 0) && !(fft.len() / 3).is_power_of_two() {
-            return false;
-        }
+    fn check_fft<F: Domain>(
+        poly: &FpPolynomial<F>,
+        domain: &MixedRadixEvaluationDomain<F::Field>,
+        fft: &[F],
+    ) -> bool {
+        let mut omega = F::one().get_field();
+        assert!(
+            fft.len().is_power_of_two()
+                || ((fft.len() % 3 == 0) && (fft.len() / 3).is_power_of_two())
+        );
         for fft_elem in fft {
-            if *fft_elem != poly.eval(&omega) {
+            if *fft_elem != poly.eval(&F::from_field(omega)) {
                 return false;
             }
-            omega.mul_assign(root);
+            omega.mul_assign(&domain.group_gen)
         }
         true
     }
@@ -703,36 +614,28 @@ mod test {
         let mut prng = test_rng();
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
-        let two = one.add(&one);
-        let three = two.add(&one);
-        let four = two.add(&two);
 
         let polynomial = FpPolynomial::from_coefs(vec![one]);
-        let (fft, root) = polynomial.fft(1).unwrap();
-        check_fft(&polynomial, &root, &fft);
+        let (domian, fft) = polynomial.fft(1).unwrap();
+        check_fft(&polynomial, &domian, &fft);
 
         let polynomial = FpPolynomial::from_coefs(vec![one, one]);
-        let (fft, root) = polynomial.fft(2).unwrap();
-        check_fft(&polynomial, &root, &fft);
+        let (domian, fft) = polynomial.fft(2).unwrap();
+        check_fft(&polynomial, &domian, &fft);
 
         let polynomial = FpPolynomial::from_coefs(vec![one, zero]);
-        let (fft, root) = polynomial.fft(2).unwrap();
-        check_fft(&polynomial, &root, &fft);
+        let (domian, fft) = polynomial.fft(2).unwrap();
+        check_fft(&polynomial, &domian, &fft);
 
         let polynomial = FpPolynomial::from_coefs(vec![zero, one]);
-        let (fft, root) = polynomial.fft(2).unwrap();
-        check_fft(&polynomial, &root, &fft);
+        let (domian, fft) = polynomial.fft(2).unwrap();
+        check_fft(&polynomial, &domian, &fft);
 
         let polynomial = FpPolynomial::from_coefs(vec![zero, one, one]);
-        let (fft, root) = polynomial.fft(3).unwrap();
-        check_fft(&polynomial, &root, &fft);
+        let (domian, fft) = polynomial.fft(3).unwrap();
+        check_fft(&polynomial, &domian, &fft);
 
-        let root = super::primitive_nth_root_of_unity(4).unwrap();
-        let polynomial = FpPolynomial::from_coefs(vec![one, two, three, four]);
-        let fft = polynomial.fft_with_unity_root(&root, 4);
-        check_fft(&polynomial, &root, &fft);
-
-        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 4);
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -740,8 +643,8 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (fft, root) = polynomial.fft(16).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 16);
+        let (domian, fft) = polynomial.fft(16).unwrap();
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -749,8 +652,8 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (fft, root) = polynomial.fft(32).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 32);
+        let (domian, fft) = polynomial.fft(32).unwrap();
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -758,8 +661,8 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (fft, root) = polynomial.fft(3).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 3);
+        let (domian, fft) = polynomial.fft(3).unwrap();
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -767,8 +670,8 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (fft, root) = polynomial.fft(48).unwrap();
-        let ffti_polynomial = FpPolynomial::ffti(&root, &fft, 48);
+        let (domian, fft) = polynomial.fft(48).unwrap();
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
         assert_eq!(ffti_polynomial, polynomial);
     }
 }

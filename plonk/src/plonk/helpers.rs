@@ -1,32 +1,17 @@
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
-    indexer::{PlonkPK, PlonkPf, PlonkVK},
+    indexer::{get_domain_and_root, PlonkPK, PlonkPf, PlonkVK},
 };
 use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
-use noah_algebra::cmp::min;
 use noah_algebra::prelude::*;
+use noah_algebra::{cmp::min, traits::Domain};
+
 // #[cfg(feature = "parallel")]
 // use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-
-/// Build the base group.
-pub(super) fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<Vec<F>> {
-    let mut elems = vec![F::one()];
-    let mut current_root = *generator;
-    let mut n = 1;
-    while current_root != F::one() {
-        if n == max_elems {
-            return Err(eg!(PlonkError::GroupNotFound(max_elems)));
-        }
-        elems.push(current_root);
-        current_root.mul_assign(&generator);
-        n += 1;
-    }
-    Ok(elems)
-}
 
 /// The data structure for challenges in Plonk.
 #[derive(Default)]
@@ -125,6 +110,7 @@ pub(super) fn pi_poly<PCS: PolyComScheme>(
     prover_params: &PlonkPK<PCS>,
     pi: &[PCS::Field],
 ) -> FpPolynomial<PCS::Field> {
+    let (domain, _) = get_domain_and_root::<PCS>(&prover_params.verifier_params.domain);
     let mut evals = Vec::with_capacity(prover_params.verifier_params.cs_size);
     for (i, _) in prover_params.group.iter().enumerate() {
         if let Some((pos, _)) = prover_params
@@ -139,11 +125,7 @@ pub(super) fn pi_poly<PCS: PolyComScheme>(
         }
     }
 
-    FpPolynomial::ffti(
-        &prover_params.verifier_params.root,
-        &evals,
-        prover_params.verifier_params.cs_size,
-    )
+    FpPolynomial::ifft_with_domain(&domain, &evals)
 }
 
 /// Add a random degree `num_hide_points`+`zeroing_degree` polynomial
@@ -151,7 +133,7 @@ pub(super) fn pi_poly<PCS: PolyComScheme>(
 /// `polynomial` maintaining output values for elements in a sub group
 /// of order N. Eg, when num_hide_points is 1, then it adds
 /// (r1 + r2*X) * (X^zeroing_degree - 1) to `polynomial.
-pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Scalar>(
+pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Domain>(
     prng: &mut R,
     polynomial: &mut FpPolynomial<F>,
     num_hide_points: usize,
@@ -240,16 +222,16 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     if n * factor != m {
         return Err(eg!(PlonkError::SetupError));
     }
-    let root_m = &prover_params.root_m;
+    let (domain_m, _) = get_domain_and_root::<PCS>(&prover_params.domain_m);
     let k = &prover_params.verifier_params.k;
 
     // Compute the evaluations of w/pi/z polynomials on the coset k[1] * <root_m>.
     let w_polys_coset_evals: Vec<Vec<PCS::Field>> = w_polys
         .iter()
-        .map(|poly| poly.coset_fft_with_unity_root(root_m, m, &k[1]))
+        .map(|poly| poly.coset_fft_with_domain(&domain_m, &k[1]))
         .collect();
-    let pi_coset_evals = pi.coset_fft_with_unity_root(root_m, m, &k[1]);
-    let z_coset_evals = z.coset_fft_with_unity_root(root_m, m, &k[1]);
+    let pi_coset_evals = pi.coset_fft_with_domain(&domain_m, &k[1]);
+    let z_coset_evals = z.coset_fft_with_domain(&domain_m, &k[1]);
 
     // Compute the evaluations of the quotient polynomial on the coset.
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
@@ -402,7 +384,12 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     }
 
     let k_inv = k[1].inv().c(d!(PlonkError::DivisionByZero))?;
-    Ok(FpPolynomial::coset_ffti(root_m, &t_coset_evals, &k_inv, m))
+
+    Ok(FpPolynomial::coset_ifft_with_domain(
+        &domain_m,
+        &t_coset_evals,
+        &k_inv,
+    ))
 }
 
 /// Compute r polynomial or commitment.
@@ -590,6 +577,7 @@ pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
     eval_point: &PCS::Field,
 ) -> PCS::Field {
     let mut eval = PCS::Field::zero();
+    let (_, root) = get_domain_and_root::<PCS>(&verifier_params.domain);
 
     for ((constraint_index, public_value), lagrange_constant) in verifier_params
         .public_vars_constraint_indices
@@ -598,7 +586,7 @@ pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
         .zip(verifier_params.lagrange_constants.iter())
     {
         // X - \omega^j j-th Lagrange denominator
-        let root_to_j = verifier_params.root.pow(&[*constraint_index as u64]);
+        let root_to_j = root.pow(&[*constraint_index as u64]);
         let denominator = eval_point.sub(&root_to_j);
         let denominator_inv = denominator.inv().unwrap();
         let lagrange_i = lagrange_constant.mul(&denominator_inv);

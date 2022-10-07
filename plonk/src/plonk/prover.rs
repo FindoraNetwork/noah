@@ -5,7 +5,7 @@ use crate::plonk::{
         first_lagrange_poly, hide_polynomial, pi_poly, r_poly, split_t_and_commit, t_poly, z_poly,
         PlonkChallenges,
     },
-    indexer::{PlonkPK, PlonkPf, PlonkProof},
+    indexer::{get_domain_and_root, PlonkPK, PlonkPf, PlonkProof},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
         transcript_get_plonk_challenge_gamma, transcript_get_plonk_challenge_u,
@@ -102,7 +102,7 @@ pub fn prover_with_lagrange<
     if cs.is_verifier_only() {
         return Err(eg!(PlonkError::FuncParamsError));
     }
-
+    let (domain, root) = get_domain_and_root::<PCS>(&prover_params.verifier_params.domain);
     let online_values: Vec<PCS::Field> = cs
         .public_vars_witness_indices()
         .iter()
@@ -113,6 +113,7 @@ pub fn prover_with_lagrange<
         transcript,
         &prover_params.verifier_params,
         &online_values,
+        &root,
     );
     let mut challenges = PlonkChallenges::new();
     let n_constraints = cs.size();
@@ -132,7 +133,6 @@ pub fn prover_with_lagrange<
     let pi = pi_poly::<PCS>(&prover_params, &online_values);
 
     // 1. build witness polynomials, hide them and commit
-    let root = &prover_params.verifier_params.root;
     let n_wires_per_gate = CS::n_wires_per_gate();
     let mut w_polys = vec![];
     let mut cm_w_vec = vec![];
@@ -141,10 +141,9 @@ pub fn prover_with_lagrange<
             let f_eval = FpPolynomial::from_coefs(
                 extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec(),
             );
-            let mut f_coefs = FpPolynomial::ffti(
-                root,
+            let mut f_coefs = FpPolynomial::ifft_with_domain(
+                &domain,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
-                n_constraints,
             );
             let blinds = hide_polynomial(prng, &mut f_coefs, 1, n_constraints);
             let cm_w = lagrange_pcs
@@ -157,10 +156,9 @@ pub fn prover_with_lagrange<
         }
     } else {
         for i in 0..n_wires_per_gate {
-            let mut f_coefs = FpPolynomial::ffti(
-                root,
+            let mut f_coefs = FpPolynomial::ifft_with_domain(
+                &domain,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
-                n_constraints,
             );
             let _ = hide_polynomial(prng, &mut f_coefs, 1, n_constraints);
             let cm_w = pcs.commit(&f_coefs).c(d!(PlonkError::CommitmentError))?;
@@ -178,11 +176,7 @@ pub fn prover_with_lagrange<
     // 3. build the z polynomial, hide it and commit
     let (cm_z, z_poly) = if let Some(lagrange_pcs) = lagrange_pcs {
         let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
-        let mut z_coefs = FpPolynomial::ffti(
-            &prover_params.verifier_params.root,
-            &z_evals.coefs,
-            n_constraints,
-        );
+        let mut z_coefs = FpPolynomial::ifft_with_domain(&domain, &z_evals.coefs);
         let blinds = hide_polynomial(prng, &mut z_coefs, 2, n_constraints);
         let cm_z = lagrange_pcs
             .commit(&z_evals)
@@ -192,11 +186,7 @@ pub fn prover_with_lagrange<
         (cm_z, z_coefs)
     } else {
         let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
-        let mut z_coefs = FpPolynomial::ffti(
-            &prover_params.verifier_params.root,
-            &z_evals.coefs,
-            n_constraints,
-        );
+        let mut z_coefs = FpPolynomial::ifft_with_domain(&domain, &z_evals.coefs);
         let _ = hide_polynomial(prng, &mut z_coefs, 2, n_constraints);
         let cm_z = pcs.commit(&z_coefs).c(d!(PlonkError::CommitmentError))?;
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
