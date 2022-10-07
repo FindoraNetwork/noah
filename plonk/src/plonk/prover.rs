@@ -108,7 +108,7 @@ pub fn prover_with_lagrange<
         .iter()
         .map(|index| w[*index])
         .collect();
-        
+
     // Init transcript
     transcript_init_plonk::<_, PCS::Field>(
         transcript,

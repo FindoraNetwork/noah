@@ -7,7 +7,7 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
-use ark_poly:: MixedRadixEvaluationDomain;
+use ark_poly::MixedRadixEvaluationDomain;
 use noah_algebra::prelude::*;
 use noah_algebra::{cmp::min, traits::Domain};
 
@@ -110,7 +110,7 @@ impl<F: Scalar> PlonkChallenges<F> {
 pub(super) fn pi_poly<PCS: PolyComScheme>(
     prover_params: &PlonkPK<PCS>,
     pi: &[PCS::Field],
-    domain : &MixedRadixEvaluationDomain<<PCS::Field as Domain>::Field>,
+    domain: &MixedRadixEvaluationDomain<<PCS::Field as Domain>::Field>,
 ) -> FpPolynomial<PCS::Field> {
     let mut evals = Vec::with_capacity(prover_params.verifier_params.cs_size);
     for (i, _) in prover_params.group.iter().enumerate() {
@@ -576,7 +576,7 @@ pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
     public_inputs: &[PCS::Field],
     z_h_eval_zeta: &PCS::Field,
     eval_point: &PCS::Field,
-    root : &PCS::Field,
+    root: &PCS::Field,
 ) -> PCS::Field {
     let mut eval = PCS::Field::zero();
 
