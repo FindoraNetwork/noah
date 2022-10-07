@@ -112,7 +112,7 @@ pub trait Domain: Scalar {
     /// The fft field.
     type Field: FftField;
 
-    /// Return fft Field.
+    /// Return fft field.
     fn get_field(&self) -> Self::Field;
 
     /// Sample a domain based on a fft field.
