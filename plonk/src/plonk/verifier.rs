@@ -38,6 +38,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         pi,
         &z_h_eval_zeta,
         challenges.get_zeta().unwrap(),
+        &root,
     );
 
     // 4. derive the linearization polynomial commitment.

@@ -125,7 +125,7 @@ pub struct PlonkVerifierParams<C, F> {
 pub type PlonkVK<PCS> =
     PlonkVerifierParams<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
 
-/// Get domain and root(a generator of the subgroup).
+/// Return domain and root(a generator of the subgroup) after deserialization.
 pub fn get_domain_and_root<PCS: PolyComScheme>(
     domain: &[u8],
 ) -> (

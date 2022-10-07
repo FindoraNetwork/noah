@@ -108,6 +108,7 @@ pub fn prover_with_lagrange<
         .iter()
         .map(|index| w[*index])
         .collect();
+        
     // Init transcript
     transcript_init_plonk::<_, PCS::Field>(
         transcript,
@@ -130,7 +131,7 @@ pub fn prover_with_lagrange<
 
     // Prepare extended witness
     let extended_witness = cs.extend_witness(w);
-    let pi = pi_poly::<PCS>(&prover_params, &online_values);
+    let pi = pi_poly::<PCS>(&prover_params, &online_values, &domain);
 
     // 1. build witness polynomials, hide them and commit
     let n_wires_per_gate = CS::n_wires_per_gate();
