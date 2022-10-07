@@ -9,8 +9,8 @@ use crate::poly_commit::{
 };
 use noah_algebra::cmp::min;
 use noah_algebra::prelude::*;
-#[cfg(feature = "parallel")]
-use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+// #[cfg(feature = "parallel")]
+// use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// Build the base group.
 pub(super) fn build_group<F: Scalar>(generator: &F, max_elems: usize) -> Result<Vec<F>> {
