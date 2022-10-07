@@ -108,6 +108,10 @@ pub struct PlonkVerifierParams<C, F> {
     pub cm_qb: C,
     /// The commitments of the preprocessed round key selectors.
     pub cm_prk_vec: Vec<C>,
+    /// the Anemoi generator.
+    pub anemoi_generator: F,
+    /// the Anemoi generator's inverse.
+    pub anemoi_generator_inv: F,
     /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub k: Vec<F>,
     /// A primitive n-th root of unity.
@@ -366,11 +370,15 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         (q_prk_coset_evals, q_prk_polys, cm_prk_vec)
     };
 
+    let (anemoi_generator, anemoi_generator_inv) = cs.get_anemoi_parameters()?;
+
     let verifier_params = PlonkVerifierParams {
         cm_q_vec,
         cm_s_vec,
         cm_qb,
         cm_prk_vec,
+        anemoi_generator,
+        anemoi_generator_inv,
         k,
         root,
         cs_size: n,

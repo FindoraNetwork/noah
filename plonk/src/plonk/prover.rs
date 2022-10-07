@@ -270,6 +270,7 @@ pub fn prover_with_lagrange<
         &z_poly,
         &w_polys_eval_zeta_as_ref[..],
         &s_poly_eval_zeta_as_ref[..],
+        &prk_3_poly_eval_zeta,
         &z_eval_zeta_omega,
         &challenges,
         &t_polys,

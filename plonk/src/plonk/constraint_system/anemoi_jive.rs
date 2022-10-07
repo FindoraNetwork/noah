@@ -418,3 +418,100 @@ mod test {
         cs.verify_witness(&witness, &[]).unwrap();
     }
 }
+
+#[cfg(test)]
+mod kzg_test {
+    use crate::plonk::constraint_system::{ConstraintSystem, TurboCS};
+    use crate::plonk::indexer::indexer;
+    use crate::plonk::prover::prover;
+    use crate::plonk::verifier::verifier;
+    use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
+    use crate::poly_commit::pcs::PolyComScheme;
+    use ark_std::test_rng;
+    use merlin::Transcript;
+    use noah_algebra::bls12_381::BLSScalar;
+    use noah_algebra::prelude::*;
+    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
+
+    #[test]
+    fn test_turbo_plonk_kzg_anemoi_jive() {
+        let mut prng = test_rng();
+        let pcs = KZGCommitmentScheme::new(260, &mut prng);
+        test_turbo_plonk_jive_crh(&pcs, &mut prng);
+    }
+
+    fn test_turbo_plonk_jive_crh<PCS: PolyComScheme<Field = BLSScalar>, R: CryptoRng + RngCore>(
+        pcs: &PCS,
+        prng: &mut R,
+    ) {
+        let salt = ANEMOI_JIVE_381_SALTS[10];
+
+        let trace = AnemoiJive381::eval_jive_with_trace(
+            &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
+            &[BLSScalar::from(3u64), salt],
+        );
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+        let one = cs.new_variable(BLSScalar::from(1u64));
+        let two = cs.new_variable(BLSScalar::from(2u64));
+        let three = cs.new_variable(BLSScalar::from(3u64));
+
+        let _ = cs.jive_crh(&trace, &[one, two, three], salt);
+        cs.pad();
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
+    }
+
+    fn check_turbo_plonk_proof<PCS: PolyComScheme, R: CryptoRng + RngCore>(
+        pcs: &PCS,
+        prng: &mut R,
+        cs: &TurboCS<PCS::Field>,
+        witness: &[PCS::Field],
+        online_vars: &[PCS::Field],
+    ) {
+        let prover_params = indexer(cs, pcs).unwrap();
+        let verifier_params_ref = &prover_params.verifier_params;
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        let proof = prover(prng, &mut transcript, pcs, cs, &prover_params, witness).unwrap();
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(verifier(
+            &mut transcript,
+            pcs,
+            cs,
+            verifier_params_ref,
+            online_vars,
+            &proof
+        )
+        .is_ok());
+
+        let prover_cs = cs.shrink_to_verifier_only().unwrap();
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(prover(
+            prng,
+            &mut transcript,
+            pcs,
+            &prover_cs,
+            &prover_params,
+            witness
+        )
+        .is_err());
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(verifier(
+            &mut transcript,
+            pcs,
+            &prover_cs,
+            verifier_params_ref,
+            online_vars,
+            &proof
+        )
+        .is_ok());
+    }
+}

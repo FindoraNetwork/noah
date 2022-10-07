@@ -130,4 +130,7 @@ pub trait ConstraintSystem: Sized {
 
     /// Shrink to only verifier use.
     fn shrink_to_verifier_only(&self) -> Result<Self>;
+
+    /// Get the Anemoi generator and generator inverse.
+    fn get_anemoi_parameters(&self) -> Result<(Self::Field, Self::Field)>;
 }

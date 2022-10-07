@@ -229,6 +229,10 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
 
         polys
     }
+
+    fn get_anemoi_parameters(&self) -> Result<(Self::Field, Self::Field)> {
+        Ok((self.anemoi_generator, self.anemoi_generator_inv))
+    }
 }
 
 /// A helper function that computes the little-endian binary

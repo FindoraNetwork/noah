@@ -40,8 +40,14 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     );
 
     // 4. derive the linearization polynomial commitment.
-    let r_eval_zeta =
-        r_eval_zeta::<PCS>(proof, &challenges, &pi_eval_zeta, &first_lagrange_eval_zeta);
+    let r_eval_zeta = r_eval_zeta::<PCS>(
+        proof,
+        &challenges,
+        &pi_eval_zeta,
+        &first_lagrange_eval_zeta,
+        verifier_params.anemoi_generator,
+        verifier_params.anemoi_generator_inv,
+    );
 
     let w_polys_eval_zeta_as_ref: Vec<&PCS::Field> = proof.w_polys_eval_zeta.iter().collect();
     let s_eval_zeta_as_ref: Vec<&PCS::Field> = proof.s_polys_eval_zeta.iter().collect();
@@ -50,6 +56,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         &proof.cm_z,
         &w_polys_eval_zeta_as_ref[..],
         &s_eval_zeta_as_ref[..],
+        &proof.prk_3_poly_eval_zeta,
         &proof.z_eval_zeta_omega,
         &challenges,
         &proof.cm_t_vec[..],
