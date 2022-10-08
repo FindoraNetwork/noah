@@ -441,13 +441,19 @@ mod kzg_test {
         test_turbo_plonk_jive_crh(&pcs, &mut prng);
     }
 
-    fn test_turbo_plonk_anemoi_variable_length_hash<PCS: PolyComScheme<Field = BLSScalar>, R: CryptoRng + RngCore>(
+    fn test_turbo_plonk_anemoi_variable_length_hash<
+        PCS: PolyComScheme<Field = BLSScalar>,
+        R: CryptoRng + RngCore,
+    >(
         pcs: &PCS,
         prng: &mut R,
     ) {
-        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(
-            &[BLSScalar::from(1u64), BLSScalar::from(2u64), BLSScalar::from(3u64), BLSScalar::from(4u64)],
-        );
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            BLSScalar::from(1u64),
+            BLSScalar::from(2u64),
+            BLSScalar::from(3u64),
+            BLSScalar::from(4u64),
+        ]);
 
         let mut cs = TurboCS::new();
         cs.load_anemoi_jive_parameters::<AnemoiJive381>();
