@@ -919,93 +919,87 @@ impl<F: Scalar> TurboCS<F> {
                     )));
                 }
             }
+        }
 
-            if !self.anemoi_constraints_indices.is_empty() {
-                assert!(!self.anemoi_generator.is_zero());
-            }
+        if !self.anemoi_constraints_indices.is_empty() {
+            assert!(!self.anemoi_generator.is_zero());
+        }
 
-            for cs_index in self.anemoi_constraints_indices.iter() {
-                for r in 0..12 {
-                    let a_i = witness[self.get_witness_index(0, cs_index + r)];
-                    let b_i = witness[self.get_witness_index(1, cs_index + r)];
-                    let c_i = witness[self.get_witness_index(2, cs_index + r)];
-                    let d_i = witness[self.get_witness_index(3, cs_index + r)];
-                    let o_i = witness[self.get_witness_index(4, cs_index + r)];
+        for cs_index in self.anemoi_constraints_indices.iter() {
+            for r in 0..12 {
+                let a_i = witness[self.get_witness_index(0, cs_index + r)];
+                let b_i = witness[self.get_witness_index(1, cs_index + r)];
+                let c_i = witness[self.get_witness_index(2, cs_index + r)];
+                let d_i = witness[self.get_witness_index(3, cs_index + r)];
+                let o_i = witness[self.get_witness_index(4, cs_index + r)];
 
-                    let a_i_next = witness[self.get_witness_index(0, cs_index + 1 + r)];
-                    let b_i_next = witness[self.get_witness_index(1, cs_index + 1 + r)];
-                    let c_i_next = witness[self.get_witness_index(2, cs_index + 1 + r)];
-                    let d_i_next = witness[self.get_witness_index(3, cs_index + 1 + r)];
+                let a_i_next = witness[self.get_witness_index(0, cs_index + 1 + r)];
+                let b_i_next = witness[self.get_witness_index(1, cs_index + 1 + r)];
+                let c_i_next = witness[self.get_witness_index(2, cs_index + 1 + r)];
+                let d_i_next = witness[self.get_witness_index(3, cs_index + 1 + r)];
 
-                    if o_i != d_i_next {
-                        return Err(eg!(format!(
+                if o_i != d_i_next {
+                    return Err(eg!(format!(
                         "cs index {} round {}: the output wire {:?} does not equal to the fourth wire {:?} in the next constraint",
                             cs_index,
                             r,
                             o_i,
                             d_i_next
                         )));
-                    }
+                }
 
-                    let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0].clone();
-                    let prk_i_b = self.anemoi_preprocessed_round_keys_x[r][1].clone();
-                    let prk_i_c = self.anemoi_preprocessed_round_keys_y[r][0].clone();
-                    let prk_i_d = self.anemoi_preprocessed_round_keys_y[r][1].clone();
+                let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0].clone();
+                let prk_i_b = self.anemoi_preprocessed_round_keys_x[r][1].clone();
+                let prk_i_c = self.anemoi_preprocessed_round_keys_y[r][0].clone();
+                let prk_i_d = self.anemoi_preprocessed_round_keys_y[r][1].clone();
 
-                    let g = self.anemoi_generator;
-                    let g2 = g.square().add(F::one());
+                let g = self.anemoi_generator;
+                let g2 = g.square().add(F::one());
 
-                    // equation 1
-                    let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
-                        + g * (d_i + g * c_i + prk_i_c).square();
-                    let right = a_i + g * b_i + prk_i_a;
-                    if left != right {
-                        return Err(eg!(format!(
-                            "cs index {} round {}: the first equation does not equal: {:?} != {:?}",
-                            cs_index, r, left, right
-                        )));
-                    }
+                // equation 1
+                let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
+                    + g * (d_i + g * c_i + prk_i_c).square();
+                let right = a_i + g * b_i + prk_i_a;
+                if left != right {
+                    return Err(eg!(format!(
+                        "cs index {} round {}: the first equation does not equal: {:?} != {:?}",
+                        cs_index, r, left, right
+                    )));
+                }
 
-                    // equation 2
-                    let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
-                        + g * (g * d_i + g2 * c_i + prk_i_d).square();
-                    let right = g * a_i + g2 * b_i + prk_i_b;
-                    if left != right {
-                        return Err(eg!(format!(
+                // equation 2
+                let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
+                    + g * (g * d_i + g2 * c_i + prk_i_d).square();
+                let right = g * a_i + g2 * b_i + prk_i_b;
+                if left != right {
+                    return Err(eg!(format!(
                         "cs index {} round {}: the second equation does not equal: {:?} != {:?}",
-                            cs_index,
-                            r,
-                            left,
-                            right
-                        )));
-                    }
+                        cs_index, r, left, right
+                    )));
+                }
 
-                    // equation 3
-                    let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
-                        + g * c_i_next.square()
-                        + self.anemoi_generator_inv;
-                    let right = a_i_next;
-                    if left != right {
-                        return Err(eg!(format!(
-                            "cs index {} round {}: the third equation does not equal: {:?} != {:?}",
-                            cs_index, r, left, right
-                        )));
-                    }
+                // equation 3
+                let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
+                    + g * c_i_next.square()
+                    + self.anemoi_generator_inv;
+                let right = a_i_next;
+                if left != right {
+                    return Err(eg!(format!(
+                        "cs index {} round {}: the third equation does not equal: {:?} != {:?}",
+                        cs_index, r, left, right
+                    )));
+                }
 
-                    // equation 4
-                    let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
-                        + g * d_i_next.square()
-                        + self.anemoi_generator_inv;
-                    let right = b_i_next;
-                    if left != right {
-                        return Err(eg!(format!(
+                // equation 4
+                let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
+                    + g * d_i_next.square()
+                    + self.anemoi_generator_inv;
+                let right = b_i_next;
+                if left != right {
+                    return Err(eg!(format!(
                         "cs index {} round {}: the fourth equation does not equal: {:?} != {:?}",
-                            cs_index,
-                            r,
-                            left,
-                            right
-                        )));
-                    }
+                        cs_index, r, left, right
+                    )));
                 }
             }
         }
