@@ -133,4 +133,7 @@ pub trait ConstraintSystem: Sized {
 
     /// Get the Anemoi generator and generator inverse.
     fn get_anemoi_parameters(&self) -> Result<(Self::Field, Self::Field)>;
+
+    /// Get the hiding degree for each witness polynomial.
+    fn get_hiding_degree(&self, idx: usize) -> usize;
 }
