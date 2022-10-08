@@ -154,11 +154,11 @@ pub(super) fn pi_poly<PCS: PolyComScheme>(
 pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Scalar>(
     prng: &mut R,
     polynomial: &mut FpPolynomial<F>,
-    num_hide_points: usize,
+    hiding_degree: usize,
     zeroing_degree: usize,
 ) -> Vec<F> {
     let mut blinds = Vec::new();
-    for i in 0..num_hide_points + 1 {
+    for i in 0..hiding_degree {
         let mut blind = F::random(prng);
         blinds.push(blind);
         polynomial.add_coef_assign(&blind, i);

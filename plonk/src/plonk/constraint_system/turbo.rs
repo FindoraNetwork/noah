@@ -233,6 +233,15 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     fn get_anemoi_parameters(&self) -> Result<(Self::Field, Self::Field)> {
         Ok((self.anemoi_generator, self.anemoi_generator_inv))
     }
+
+    fn get_hiding_degree(&self, idx: usize) -> usize {
+        // The first three wires, i.e., 0, 1, 2, would require a hiding degree of 3.
+        if idx < 3 {
+            return 3;
+        } else {
+            return 2;
+        }
+    }
 }
 
 /// A helper function that computes the little-endian binary
