@@ -147,7 +147,8 @@ pub fn prover_with_lagrange<
                 n_constraints,
             );
 
-            let blinds = hide_polynomial(prng, &mut f_coefs, cs.get_hiding_degree(i), n_constraints);
+            let blinds =
+                hide_polynomial(prng, &mut f_coefs, cs.get_hiding_degree(i), n_constraints);
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
