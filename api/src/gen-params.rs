@@ -95,6 +95,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                 .map(|j| {
                     println!("generating {} payers & {} payees", i, j);
                     let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
+                    println!("the size of the constraint system for {} payers & {} payees: {}", i, j, node_params.cs.size);
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
                 })
