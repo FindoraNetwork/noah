@@ -220,23 +220,23 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     } else {
         None
     };
+
     let domain =
         FpPolynomial::<PCS::Field>::evaluation_domain(n).c(d!(PlonkError::GroupNotFound(n)))?;
+    let domain_m =
+        FpPolynomial::<PCS::Field>::evaluation_domain(m).c(d!(PlonkError::GroupNotFound(m)))?;
     let group = domain
         .elements()
         .into_iter()
         .map(|x| PCS::Field::from_field(x))
-        .collect::<Vec<PCS::Field>>();
+        .collect::<Vec<_>>();
 
-    let domain_m =
-        FpPolynomial::<PCS::Field>::evaluation_domain(m).c(d!(PlonkError::GroupNotFound(m)))?;
-    let group_m = domain_m
+    let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
+    let coset_quotient = domain_m
         .elements()
         .into_iter()
-        .map(|x| PCS::Field::from_field(x))
-        .collect::<Vec<PCS::Field>>();
-    let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
-    let coset_quotient = group_m.iter().map(|x| k[1].mul(x)).collect();
+        .map(|x| k[1].mul(&PCS::Field::from_field(x)))
+        .collect();
 
     // Step 1: compute permutation polynomials and commit them.
     let raw_perm = cs.compute_permutation();
