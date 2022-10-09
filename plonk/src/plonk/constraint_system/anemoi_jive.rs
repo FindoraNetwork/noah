@@ -437,7 +437,40 @@ mod kzg_test {
     fn test_turbo_plonk_kzg_anemoi_jive() {
         let mut prng = test_rng();
         let pcs = KZGCommitmentScheme::new(260, &mut prng);
+        test_turbo_plonk_anemoi_variable_length_hash(&pcs, &mut prng);
         test_turbo_plonk_jive_crh(&pcs, &mut prng);
+    }
+
+    fn test_turbo_plonk_anemoi_variable_length_hash<
+        PCS: PolyComScheme<Field = BLSScalar>,
+        R: CryptoRng + RngCore,
+    >(
+        pcs: &PCS,
+        prng: &mut R,
+    ) {
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            BLSScalar::from(1u64),
+            BLSScalar::from(2u64),
+            BLSScalar::from(3u64),
+            BLSScalar::from(4u64),
+        ]);
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+        let one = cs.new_variable(BLSScalar::from(1u64));
+        let two = cs.new_variable(BLSScalar::from(2u64));
+        let three = cs.new_variable(BLSScalar::from(3u64));
+        let four = cs.new_variable(BLSScalar::from(4u64));
+
+        let output_var = cs.new_variable(trace.output);
+
+        let _ = cs.anemoi_variable_length_hash(&trace, &[one, two, three, four], output_var);
+        cs.pad();
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
     }
 
     fn test_turbo_plonk_jive_crh<PCS: PolyComScheme<Field = BLSScalar>, R: CryptoRng + RngCore>(

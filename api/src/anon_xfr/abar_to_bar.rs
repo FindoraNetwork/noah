@@ -24,6 +24,7 @@ use noah_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
+use noah_crypto::basic::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
 use noah_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_schnorr::{
@@ -64,6 +65,8 @@ pub struct AbarToBarPreNote {
     pub body: AbarToBarBody,
     /// Witness.
     pub witness: PayerWitness,
+    /// The trace of the nullifier.
+    pub nullifier_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
     /// Inspection data in the delegated Schnorr proof on Ristretto.
@@ -125,10 +128,10 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
 
     // 1. Build input witness info.
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let this_nullifier = nullify(
+    let (this_nullifier, this_trace) = nullify(
         &abar_keypair,
         oabar.amount,
-        &oabar.asset_type,
+        oabar.asset_type.as_scalar(),
         mt_leaf_info.uid,
     )?;
 
@@ -184,6 +187,7 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     Ok(AbarToBarPreNote {
         body,
         witness: payers_witness,
+        nullifier_trace: this_trace,
         input_keypair: abar_keypair.clone(),
         inspection: delegated_schnorr_inspection,
         beta,
@@ -201,6 +205,7 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
     let AbarToBarPreNote {
         body,
         witness,
+        nullifier_trace,
         input_keypair,
         inspection,
         beta,
@@ -220,6 +225,7 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
         prng,
         params,
         witness,
+        &nullifier_trace,
         &body.delegated_schnorr_proof,
         &inspection,
         &beta,
@@ -499,6 +505,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: PayerWitness,
+    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
@@ -509,6 +516,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 
     let (mut cs, _) = build_abar_to_bar_cs(
         payers_witness,
+        nullifier_trace,
         proof,
         inspection,
         beta,
@@ -532,6 +540,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
     payers_witness: PayerWitness,
+    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
@@ -539,6 +548,8 @@ pub fn build_abar_to_bar_cs(
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
+
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
     let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
@@ -598,6 +609,7 @@ pub fn build_abar_to_bar_cs(
         uid_amount,
         payers_witness_vars.asset_type,
         &public_key_scalars_vars,
+        &nullifier_trace,
     );
 
     // Merkle path authentication.

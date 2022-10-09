@@ -146,7 +146,9 @@ pub fn prover_with_lagrange<
                 &domain,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
             );
-            let blinds = hide_polynomial(prng, &mut f_coefs, 1, n_constraints);
+
+            let blinds =
+                hide_polynomial(prng, &mut f_coefs, cs.get_hiding_degree(i), n_constraints);
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
@@ -161,7 +163,7 @@ pub fn prover_with_lagrange<
                 &domain,
                 &extended_witness[i * n_constraints..(i + 1) * n_constraints],
             );
-            let _ = hide_polynomial(prng, &mut f_coefs, 1, n_constraints);
+            let _ = hide_polynomial(prng, &mut f_coefs, cs.get_hiding_degree(i), n_constraints);
             let cm_w = pcs.commit(&f_coefs).c(d!(PlonkError::CommitmentError))?;
             transcript.append_commitment::<PCS::Commitment>(&cm_w);
             w_polys.push(f_coefs);
@@ -178,17 +180,18 @@ pub fn prover_with_lagrange<
     let (cm_z, z_poly) = if let Some(lagrange_pcs) = lagrange_pcs {
         let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
         let mut z_coefs = FpPolynomial::ifft_with_domain(&domain, &z_evals.coefs);
-        let blinds = hide_polynomial(prng, &mut z_coefs, 2, n_constraints);
+        let blinds = hide_polynomial(prng, &mut z_coefs, 3, n_constraints);
         let cm_z = lagrange_pcs
             .commit(&z_evals)
             .c(d!(PlonkError::CommitmentError))?;
         let cm_z = pcs.apply_blind_factors(&cm_z, &blinds, n_constraints);
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
+        
         (cm_z, z_coefs)
     } else {
         let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
         let mut z_coefs = FpPolynomial::ifft_with_domain(&domain, &z_evals.coefs);
-        let _ = hide_polynomial(prng, &mut z_coefs, 2, n_constraints);
+        let _ = hide_polynomial(prng, &mut z_coefs, 3, n_constraints);
         let cm_z = pcs.commit(&z_coefs).c(d!(PlonkError::CommitmentError))?;
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
 

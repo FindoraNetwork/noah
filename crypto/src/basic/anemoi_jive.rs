@@ -63,6 +63,7 @@ impl<F: Scalar> ApplicableMDSMatrix<F, 2> for MDSMatrix<F, 2> {
 }
 
 /// The structure for the trace of the Anemoi-Jive sponge hash function.
+#[derive(Clone)]
 pub struct AnemoiVLHTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
     /// The input sequence.
     pub input: Vec<F>,
@@ -147,6 +148,7 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debu
 }
 
 /// The structure for the trace of the Anemio-Jive CRH.
+#[derive(Clone)]
 pub struct JiveTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
     /// The first half of the input.
     pub input_x: [F; N],
