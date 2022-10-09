@@ -594,11 +594,12 @@ mod test {
         domain: &MixedRadixEvaluationDomain<F::Field>,
         fft: &[F],
     ) -> bool {
-        let mut omega = F::one().get_field();
         assert!(
             fft.len().is_power_of_two()
                 || ((fft.len() % 3 == 0) && (fft.len() / 3).is_power_of_two())
         );
+
+        let mut omega = F::one().get_field();
         for fft_elem in fft {
             if *fft_elem != poly.eval(&F::from_field(omega)) {
                 return false;
@@ -616,23 +617,23 @@ mod test {
 
         let polynomial = FpPolynomial::from_coefs(vec![one]);
         let (domian, fft) = polynomial.fft(1).unwrap();
-        check_fft(&polynomial, &domian, &fft);
+        assert!(check_fft(&polynomial, &domian, &fft));
 
         let polynomial = FpPolynomial::from_coefs(vec![one, one]);
         let (domian, fft) = polynomial.fft(2).unwrap();
-        check_fft(&polynomial, &domian, &fft);
+        assert!(check_fft(&polynomial, &domian, &fft));
 
         let polynomial = FpPolynomial::from_coefs(vec![one, zero]);
         let (domian, fft) = polynomial.fft(2).unwrap();
-        check_fft(&polynomial, &domian, &fft);
+        assert!(check_fft(&polynomial, &domian, &fft));
 
         let polynomial = FpPolynomial::from_coefs(vec![zero, one]);
         let (domian, fft) = polynomial.fft(2).unwrap();
-        check_fft(&polynomial, &domian, &fft);
+        assert!(check_fft(&polynomial, &domian, &fft));
 
         let polynomial = FpPolynomial::from_coefs(vec![zero, one, one]);
         let (domian, fft) = polynomial.fft(3).unwrap();
-        check_fft(&polynomial, &domian, &fft);
+        assert!(check_fft(&polynomial, &domian, &fft));
 
         let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
         assert_eq!(ffti_polynomial, polynomial);
