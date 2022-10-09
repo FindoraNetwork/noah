@@ -179,7 +179,12 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
     let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-    let comm = commit(abar_pubkey, &oabar.blind, oabar_amount, &obar.asset_type)?;
+    let comm = commit(
+        abar_pubkey,
+        oabar.blind,
+        oabar_amount,
+        obar.asset_type.as_scalar(),
+    )?;
 
     let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     // important: address folding relies significantly on the Fiat-Shamir transform.
@@ -662,7 +667,7 @@ mod test {
         let keypair = AXfrKeyPair::generate(&mut prng);
         let pubkey = keypair.get_public_key();
 
-        let z = commit(&pubkey, &z_randomizer, 71u64, &asset_type).unwrap();
+        let z = commit(&pubkey, z_randomizer, 71u64, asset_type.as_scalar()).unwrap();
 
         // 2. compute the ZK part of the proof
 

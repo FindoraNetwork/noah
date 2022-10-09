@@ -15,7 +15,9 @@ use noah_algebra::{
     collections::HashMap,
     prelude::*,
 };
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace};
+use noah_crypto::basic::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
+};
 use noah_crypto::basic::rescue::RescueInstance;
 use noah_plonk::{
     plonk::{
@@ -251,17 +253,17 @@ pub fn commit_in_cs(
 /// Compute the record's amount||asset type||pub key commitment
 pub fn commit(
     public_key: &AXfrPubKey,
-    blind: &BLSScalar,
+    blind: BLSScalar,
     amount: u64,
-    asset_type: &AssetType,
+    asset_type_scalar: BLSScalar,
 ) -> Result<Commitment> {
     let public_key_scalars = public_key.get_public_key_scalars()?;
 
     let hash = RescueInstance::new();
     let cur = hash.rescue(&[
-        blind.clone(),
+        blind,
         BLSScalar::from(amount),
-        asset_type.as_scalar(),
+        asset_type_scalar,
         public_key_scalars[0],
     ])[0];
     Ok(hash.rescue(&[
@@ -331,14 +333,14 @@ pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerkleP
 /// If `node` is the left child of parent, output (`node`, `sib1`, `sib2`);
 /// if `node` is the right child of parent, output (`sib1`, `sib2`, `node`);
 /// otherwise, output (`sib1`, `node`, `sib2`).
-fn sort(
+fn parse_merkle_tree_path(
     cs: &mut TurboPlonkCS,
     node: VarIndex,
     sib1: VarIndex,
     sib2: VarIndex,
     is_left_child: VarIndex,
     is_right_child: VarIndex,
-) -> StateVar {
+) -> [VarIndex; 3] {
     let left = cs.select(sib1, node, is_left_child);
     let right = cs.select(sib2, node, is_right_child);
     let sum_left_right = cs.add(left, right);
@@ -350,7 +352,7 @@ fn sort(
         one,
         one.neg(),
     );
-    StateVar::new([left, mid, right, cs.zero_var()])
+    [left, mid, right]
 }
 
 /// Compute the Merkle tree root given the path information.
@@ -358,13 +360,14 @@ pub fn compute_merkle_root_variables(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
+    traces: &Vec<JiveTrace<BLSScalar, 2, 12>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
     let zero_var = cs.zero_var();
 
     let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, zero_var, zero_var]))[0];
-    for path_node in path_vars.nodes.iter() {
-        let input_var = sort(
+    for (idx, (path_node, trace)) in path_vars.nodes.iter().zip(traces.iter()).enumerate() {
+        let input_var = parse_merkle_tree_path(
             cs,
             node_var,
             path_node.siblings1,
@@ -372,7 +375,7 @@ pub fn compute_merkle_root_variables(
             path_node.is_left_child,
             path_node.is_right_child,
         );
-        node_var = cs.rescue_hash(&input_var)[0];
+        node_var = cs.jive_crh(trace, &input_var, ANEMOI_JIVE_381_SALTS[idx]);
     }
     node_var
 }

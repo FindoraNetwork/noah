@@ -3,7 +3,7 @@ use noah_algebra::{
     collections::{hash_map::Iter, HashMap},
     prelude::*,
 };
-use noah_crypto::basic::rescue::RescueInstance;
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 use storage::db::MerkleDB;
 use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
 
@@ -126,8 +126,8 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 ),
             };
 
-            let hasher = RescueInstance::new();
-            let hash = hasher.rescue(&[sib0, sib1, sib2, BLSScalar::zero()])[0];
+            let hash =
+                AnemoiJive381::eval_jive(&[sib0, sib1], &[sib2, ANEMOI_JIVE_381_SALTS[index]]);
             cache.set(keys[index + 1].0, BLSScalar::noah_to_bytes(&hash));
         }
 
@@ -238,7 +238,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         }
     }
 
-    /// commit to store and add the tree version
+    /// commit to store and add the tree version.
     pub fn commit(&mut self) -> Result<u64> {
         let height = self.store.height()?;
 
@@ -410,15 +410,17 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
 
 /// verify merkle proof.
 pub fn verify(leaf: BLSScalar, proof: &Proof) -> bool {
-    let hasher = RescueInstance::new();
     let mut next = leaf;
-    for node in proof.nodes.iter() {
+    if proof.nodes.len() != TREE_DEPTH {
+        return false;
+    }
+    for (i, node) in proof.nodes.iter().enumerate() {
         let (s1, s2, s3) = match node.path {
             TreePath::Left => (next, node.siblings1, node.siblings2),
             TreePath::Middle => (node.siblings1, next, node.siblings2),
             TreePath::Right => (node.siblings1, node.siblings2, next),
         };
-        let hash = hasher.rescue(&[s1, s2, s3, BLSScalar::zero()])[0];
+        let hash = AnemoiJive381::eval_jive(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
         next = hash
     }
     next == proof.root

@@ -7,6 +7,7 @@ use noah::anon_xfr::{
 };
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 use noah_crypto::basic::rescue::RescueInstance;
 use noah_plonk::plonk::constraint_system::TurboCS;
 use parking_lot::RwLock;
@@ -70,6 +71,8 @@ fn test_persistent_merkle_tree_proof_commitment() {
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
 
+    let zero = BLSScalar::zero();
+
     let mut prng = test_rng();
 
     let abar = AnonAssetRecord {
@@ -82,6 +85,8 @@ fn test_persistent_merkle_tree_proof_commitment() {
     let proof = mt.generate_proof(0).unwrap();
 
     let mut cs = TurboCS::new();
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
     let uid_var = cs.new_variable(BLSScalar::from(0u32));
     let comm_var = cs.new_variable(abar.commitment);
     let elem = AccElemVars {
@@ -104,7 +109,21 @@ fn test_persistent_merkle_tree_proof_commitment() {
                 .collect(),
         },
     );
-    let root_var = compute_merkle_root_variables(&mut cs, elem, &path_vars);
+
+    let hash = RescueInstance::new();
+    let mut path_traces = Vec::new();
+    let mut next = hash.rescue(&[BLSScalar::from(0u32), abar.commitment, zero, zero])[0];
+    for (i, mt_node) in proof.nodes.iter().enumerate() {
+        let (s1, s2, s3) = match mt_node.path {
+            TreePath::Left => (next, mt_node.siblings1, mt_node.siblings2),
+            TreePath::Middle => (mt_node.siblings1, next, mt_node.siblings2),
+            TreePath::Right => (mt_node.siblings1, mt_node.siblings2, next),
+        };
+        let trace = AnemoiJive381::eval_jive_with_trace(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
+        next = trace.output;
+        path_traces.push(trace);
+    }
+    let root_var = compute_merkle_root_variables(&mut cs, elem, &path_vars, &path_traces);
 
     // Check Merkle root correctness
     let witness = cs.get_and_clear_witness();

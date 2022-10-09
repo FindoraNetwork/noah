@@ -5,7 +5,7 @@ use crate::anon_xfr::address_folding::{
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
     address_folding::AXfrAddressFoldingInstance,
-    commit_in_cs, compute_merkle_root_variables,
+    commit, commit_in_cs, compute_merkle_root_variables,
     keys::AXfrKeyPair,
     nullify, nullify_in_cs,
     structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
@@ -22,8 +22,11 @@ use crate::xfr::{
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::basic::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
+use noah_crypto::basic::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
+};
 use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+use noah_crypto::basic::rescue::RescueInstance;
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
@@ -319,7 +322,7 @@ pub fn build_abar_to_ar_cs(
 
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_witness]);
+    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[&payers_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
 
     let keypair = folding_witness.keypair.clone();
@@ -379,7 +382,37 @@ pub fn build_abar_to_ar_cs(
         uid: payers_witness_vars.uid,
         commitment: com_abar_in_var,
     };
-    let tmp_root_var = compute_merkle_root_variables(&mut cs, acc_elem, &payers_witness_vars.path);
+
+    let hash = RescueInstance::new();
+
+    let mut path_traces = Vec::new();
+    let mut next = hash.rescue(&[
+        BLSScalar::from(payers_witness.uid),
+        commit(
+            &keypair.get_public_key(),
+            payers_witness.blind,
+            payers_witness.amount,
+            payers_witness.asset_type,
+        )
+        .unwrap(),
+        zero,
+        zero,
+    ])[0];
+    for (i, mt_node) in payers_witness.path.nodes.iter().enumerate() {
+        let (s1, s2, s3) = if mt_node.is_left_child != 0 {
+            (next, mt_node.siblings1, mt_node.siblings2)
+        } else if mt_node.is_right_child != 0 {
+            (mt_node.siblings1, mt_node.siblings2, next)
+        } else {
+            (mt_node.siblings1, next, mt_node.siblings2)
+        };
+        let trace = AnemoiJive381::eval_jive_with_trace(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
+        next = trace.output;
+        path_traces.push(trace);
+    }
+
+    let tmp_root_var =
+        compute_merkle_root_variables(&mut cs, acc_elem, &payers_witness_vars.path, &path_traces);
 
     if let Some(root) = root_var {
         cs.equal(root, tmp_root_var);
