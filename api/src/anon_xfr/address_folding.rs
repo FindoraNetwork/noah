@@ -6,6 +6,7 @@ use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
 use noah_algebra::secp256k1::SECP256K1Scalar;
 use noah_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
 use noah_crypto::bulletproofs::scalar_mul::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
@@ -14,11 +15,9 @@ use noah_crypto::delegated_schnorr::{
 };
 use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 use noah_plonk::plonk::constraint_system::field_simulation::SimFrVar;
-use noah_plonk::plonk::constraint_system::rescue::StateVar;
 use noah_plonk::plonk::constraint_system::VarIndex;
 use num_bigint::BigUint;
 use rand_core::{CryptoRng, RngCore};
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 /// The instance for address folding.

@@ -18,7 +18,6 @@ use storage::{
     state::{ChainState, State},
     store::PrefixedStore,
 };
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
 #[test]
 fn test_persistent_merkle_tree() {
@@ -37,11 +36,9 @@ fn test_persistent_merkle_tree() {
 
     assert_ne!(
         mt.get_root().unwrap(),
-        AnemoiJive381::eval_jive(&[
-            BLSScalar::zero(),
-            BLSScalar::zero()],
-            &[BLSScalar::zero(),
-                ANEMOI_JIVE_381_SALTS[0]]
+        AnemoiJive381::eval_jive(
+            &[BLSScalar::zero(), BLSScalar::zero()],
+            &[BLSScalar::zero(), ANEMOI_JIVE_381_SALTS[0]]
         )
     );
 
