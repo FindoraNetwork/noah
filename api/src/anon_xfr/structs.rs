@@ -44,9 +44,9 @@ impl AnonAssetRecord {
         AnonAssetRecord {
             commitment: commit(
                 oabar.pub_key_ref(),
-                &oabar.get_blind(),
+                oabar.get_blind(),
                 oabar.get_amount(),
-                &oabar.get_asset_type(),
+                oabar.get_asset_type().as_scalar(),
             )
             .unwrap(),
         }
@@ -54,7 +54,7 @@ impl AnonAssetRecord {
 }
 
 /// A Merkle tree leaf.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MTLeafInfo {
     /// The Merkle tree path.
     pub path: MTPath,
@@ -69,7 +69,7 @@ pub struct MTLeafInfo {
 impl Default for MTLeafInfo {
     fn default() -> Self {
         MTLeafInfo {
-            path: MTPath { nodes: vec![] },
+            path: MTPath::new(vec![]),
             root: BLSScalar::zero(),
             root_version: 0,
             uid: 0,
@@ -77,7 +77,7 @@ impl Default for MTLeafInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Clone)]
 /// An opened anonymous asset record.
 pub struct OpenAnonAssetRecord {
     pub(crate) amount: u64,

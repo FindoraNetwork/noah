@@ -36,20 +36,13 @@ fn test_merkle_tree() {
     assert_eq!(1, v1);
 
     let sid_x = mt.add_commitment_hash(BLSScalar::one()).unwrap();
-    let proofx = mt.generate_proof_with_depth(sid_x, 10).unwrap();
-    let v2 = mt.commit().unwrap();
-    assert_eq!(2, mt.version());
-    let root2 = mt.get_root_with_depth(10).unwrap();
+    let proofx = mt.generate_proof_with_depth(sid_x, TREE_DEPTH).unwrap();
 
     assert!(verify(BLSScalar::one(), &proofx));
-    let proof4 = mt.generate_proof_with_depth(sid_x, 14).unwrap();
-    assert!(verify(BLSScalar::one(), &proof4));
     assert!(mt.generate_proof_with_depth(sid_x, 21).is_err());
     assert!(mt.generate_proof_with_depth(sid_x, 2).is_err());
-
     assert_eq!(
         mt.get_root_with_depth_and_version(TREE_DEPTH, v1).unwrap(),
         root1
     );
-    assert_eq!(mt.get_root_with_depth_and_version(10, v2).unwrap(), root2);
 }
