@@ -186,7 +186,7 @@ pub fn prover_with_lagrange<
             .c(d!(PlonkError::CommitmentError))?;
         let cm_z = pcs.apply_blind_factors(&cm_z, &blinds, n_constraints);
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
-        
+
         (cm_z, z_coefs)
     } else {
         let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
