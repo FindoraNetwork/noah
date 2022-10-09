@@ -18,6 +18,7 @@ use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
 use noah_crypto::basic::rescue::RescueInstance;
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
@@ -54,6 +55,8 @@ pub struct AXfrPreNote {
     pub body: AXfrBody,
     /// Witness.
     pub witness: AXfrWitness,
+    /// The traces of the nullifiers.
+    pub nullifiers_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
 }
@@ -91,19 +94,19 @@ pub fn init_anon_xfr_note(
     check_roots(inputs).c(d!())?;
 
     // 2. build input witness information
-    let nullifiers = inputs
+    let (nullifiers, nullifiers_traces) = inputs
         .iter()
         .map(|input| {
             let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
             nullify(
-                &input_keypair,
+                input_keypair,
                 input.amount,
-                &input.asset_type,
+                input.asset_type.as_scalar(),
                 mt_leaf_info.uid,
             )
             .unwrap()
         })
-        .collect();
+        .unzip();
 
     // 3. build proof
     let payers_secrets = inputs
@@ -157,6 +160,7 @@ pub fn init_anon_xfr_note(
     Ok(AXfrPreNote {
         body,
         witness: secret_inputs,
+        nullifiers_traces,
         input_keypair: input_keypair.clone(),
     })
 }
@@ -171,6 +175,7 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     let AXfrPreNote {
         body,
         witness,
+        nullifiers_traces,
         input_keypair,
     } = pre_note;
 
@@ -182,7 +187,7 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
         ANON_XFR_BP_GENS_LEN,
         &input_keypair,
     )?;
-    let proof = prove_xfr(prng, params, witness, &folding_witness).c(d!())?;
+    let proof = prove_xfr(prng, params, witness, &nullifiers_traces, &folding_witness).c(d!())?;
 
     Ok(AXfrNote {
         body: body,
@@ -302,6 +307,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     secret_inputs: AXfrWitness,
+    nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
@@ -315,7 +321,8 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
 
     let fee_type = FEE_TYPE.as_scalar();
-    let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &folding_witness);
+    let (mut cs, _) =
+        build_multi_xfr_cs(secret_inputs, fee_type, nullifiers_traces, &folding_witness);
     let witness = cs.get_and_clear_witness();
 
     prover_with_lagrange(
@@ -380,6 +387,7 @@ impl AXfrWitness {
             is_left_child: 0,
             is_right_child: 0,
         };
+
         let payer_witness = PayerWitness {
             secret_key: AXfrSecretKey::default(),
             uid: 0,
@@ -433,31 +441,14 @@ impl AXfrPubInputs {
 
     /// Convert from the witness.
     pub fn from_witness(witness: &AXfrWitness) -> Self {
-        let hash = RescueInstance::new();
         let payers_inputs: Vec<Nullifier> = witness
             .payers_witnesses
             .iter()
             .map(|sec| {
                 let keypair = AXfrKeyPair::from_secret_key(sec.secret_key.clone());
-                let public_key_scalars = keypair.get_public_key().get_public_key_scalars().unwrap();
-                let secret_key_scalars = keypair.get_secret_key().get_secret_key_scalars().unwrap();
+                let (hash, _) = nullify(&keypair, sec.amount, sec.asset_type, sec.uid).unwrap();
 
-                let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
-                let uid_amount = pow_2_64
-                    .mul(&BLSScalar::from(sec.uid))
-                    .add(&BLSScalar::from(sec.amount));
-                let cur = hash.rescue(&[
-                    uid_amount,
-                    sec.asset_type,
-                    public_key_scalars[0],
-                    public_key_scalars[1],
-                ])[0];
-                hash.rescue(&[
-                    cur,
-                    public_key_scalars[2],
-                    secret_key_scalars[0],
-                    secret_key_scalars[1],
-                ])[0]
+                hash
             })
             .collect();
 
@@ -529,12 +520,16 @@ impl AXfrPubInputs {
 pub(crate) fn build_multi_xfr_cs(
     witness: AXfrWitness,
     fee_type: BLSScalar,
+    nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(witness.payers_witnesses.len(), 0);
     assert_ne!(witness.payees_witnesses.len(), 0);
 
     let mut cs = TurboCS::new();
+
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
     let payers_secrets = add_payers_witnesses(&mut cs, &witness.payers_witnesses);
     let payees_secrets = add_payees_witnesses(&mut cs, &witness.payees_witnesses);
 
@@ -558,7 +553,7 @@ pub(crate) fn build_multi_xfr_cs(
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
-    for payer in &payers_secrets {
+    for (payer, trace) in payers_secrets.iter().zip(nullifiers_traces.iter()) {
         // commitments.
         let com_abar_in_var = commit_in_cs(
             &mut cs,
@@ -583,6 +578,7 @@ pub(crate) fn build_multi_xfr_cs(
             uid_amount,
             payer.asset_type,
             &public_key_scalars_vars,
+            trace,
         );
 
         // Merkle path authentication.
@@ -852,7 +848,7 @@ mod tests {
         },
         add_merkle_path_variables, commit, commit_in_cs, compute_merkle_root_variables,
         keys::AXfrKeyPair,
-        nullify_in_cs, sort,
+        nullify, nullify_in_cs, sort,
         structs::{
             AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
@@ -865,6 +861,7 @@ mod tests {
     use digest::{consts::U64, Digest};
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace};
     use noah_crypto::basic::rescue::RescueInstance;
     use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
     use sha2::Sha512;
@@ -1979,6 +1976,9 @@ mod tests {
         let one = BLSScalar::one();
         let zero = BLSScalar::zero();
         let mut cs = TurboCS::new();
+
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
         let mut prng = test_rng();
         let bytes = vec![1u8; 32];
         let uid_amount = BLSScalar::from_bytes(&bytes[..]).unwrap(); // safe unwrap
@@ -1999,21 +1999,19 @@ mod tests {
             cs.new_variable(secret_key_scalars[1]),
         ];
 
-        let hash = RescueInstance::new();
-        let expected_output = {
-            let cur = hash.rescue(&[
-                uid_amount,
-                asset_type,
-                public_key_scalars[0],
-                public_key_scalars[1],
-            ])[0];
-            hash.rescue(&[
-                cur,
-                public_key_scalars[2],
-                secret_key_scalars[0],
-                secret_key_scalars[1],
-            ])[0]
-        };
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            zero,                  /* protocol version number */
+            uid_amount,            /* uid and amount */
+            asset_type,            /* asset type */
+            zero,                  /* address format number */
+            public_key_scalars[0], /* public key */
+            public_key_scalars[1], /* public key */
+            public_key_scalars[2], /* public key */
+            secret_key_scalars[0], /* secret key */
+            secret_key_scalars[1], /* secret key */
+        ]);
+
+        let expected_output = trace.output;
 
         let uid_amount_var = cs.new_variable(uid_amount);
         let asset_var = cs.new_variable(asset_type);
@@ -2024,6 +2022,7 @@ mod tests {
             uid_amount_var,
             asset_var,
             &public_key_scalars_vars,
+            &trace,
         );
         let mut witness = cs.get_and_clear_witness();
 
@@ -2267,8 +2266,25 @@ mod tests {
         )
         .unwrap();
 
+        let mut nullifiers_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
+        for payer_witness in secret_inputs.payers_witnesses.iter() {
+            let (_, nullifier_trace) = nullify(
+                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()),
+                payer_witness.amount,
+                payer_witness.asset_type,
+                payer_witness.uid,
+            )
+            .unwrap();
+            nullifiers_traces.push(nullifier_trace);
+        }
+
         // check the constraints.
-        let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &folding_witness);
+        let (mut cs, _) = build_multi_xfr_cs(
+            secret_inputs,
+            fee_type,
+            &nullifiers_traces,
+            &folding_witness,
+        );
         let witness = cs.get_and_clear_witness();
 
         let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);

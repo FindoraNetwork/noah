@@ -15,6 +15,7 @@ use noah_algebra::{
     collections::HashMap,
     prelude::*,
 };
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace};
 use noah_crypto::basic::rescue::RescueInstance;
 use noah_plonk::{
     plonk::{
@@ -192,9 +193,9 @@ pub fn decrypt_memo(
 pub fn nullify(
     key_pair: &AXfrKeyPair,
     amount: u64,
-    asset_type: &AssetType,
+    asset_type_scalar: BLSScalar,
     uid: u64,
-) -> Result<BLSScalar> {
+) -> Result<(BLSScalar, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
     let pub_key = key_pair.get_public_key();
 
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
@@ -204,19 +205,21 @@ pub fn nullify(
     let public_key_scalars = pub_key.get_public_key_scalars()?;
     let secret_key_scalars = key_pair.get_secret_key().get_secret_key_scalars()?;
 
-    let hash = RescueInstance::new();
-    let cur = hash.rescue(&[
-        uid_amount,
-        asset_type.as_scalar(),
-        public_key_scalars[0],
-        public_key_scalars[1],
-    ])[0];
-    Ok(hash.rescue(&[
-        cur,
-        public_key_scalars[2],
-        secret_key_scalars[0],
-        secret_key_scalars[1],
-    ])[0])
+    let zero = BLSScalar::zero();
+
+    let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        zero,                  /* protocol version number */
+        uid_amount,            /* uid and amount */
+        asset_type_scalar,     /* asset type */
+        zero,                  /* address format number */
+        public_key_scalars[0], /* public key */
+        public_key_scalars[1], /* public key */
+        public_key_scalars[2], /* public key */
+        secret_key_scalars[0], /* secret key */
+        secret_key_scalars[1], /* secret key */
+    ]);
+
+    Ok((trace.output, trace))
 }
 
 /// Length of the amount allowed in anonymous assets.
@@ -276,21 +279,27 @@ pub(crate) fn nullify_in_cs(
     uid_amount: VarIndex,
     asset_type: VarIndex,
     public_key_scalars: &[VarIndex; 3],
+    trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> VarIndex {
-    let input_var = StateVar::new([
-        uid_amount,
-        asset_type,
-        public_key_scalars[0],
-        public_key_scalars[1],
-    ]);
-    let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([
-        cur,
-        public_key_scalars[2],
-        secret_key_scalars[0],
-        secret_key_scalars[1],
-    ]);
-    cs.rescue_hash(&input_var)[0]
+    let output_var = cs.new_variable(trace.output);
+    let zero_var = cs.zero_var();
+
+    cs.anemoi_variable_length_hash(
+        trace,
+        &[
+            zero_var,
+            uid_amount,
+            asset_type,
+            zero_var,
+            public_key_scalars[0],
+            public_key_scalars[1],
+            public_key_scalars[2],
+            secret_key_scalars[0],
+            secret_key_scalars[1],
+        ],
+        output_var,
+    );
+    output_var
 }
 
 /// Add the Merkle tree path constraints to the constraint system.
