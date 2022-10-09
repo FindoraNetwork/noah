@@ -18,11 +18,10 @@ use storage::{
     state::{ChainState, State},
     store::PrefixedStore,
 };
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
 #[test]
 fn test_persistent_merkle_tree() {
-    let hash = RescueInstance::new();
-
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
     let mut state = State::new(cs, false);
@@ -38,12 +37,12 @@ fn test_persistent_merkle_tree() {
 
     assert_ne!(
         mt.get_root().unwrap(),
-        hash.rescue(&[
+        AnemoiJive381::eval_jive(&[
             BLSScalar::zero(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-            BLSScalar::zero()
-        ])[0]
+            BLSScalar::zero()],
+            &[BLSScalar::zero(),
+                ANEMOI_JIVE_381_SALTS[0]]
+        )
     );
 
     assert!(mt

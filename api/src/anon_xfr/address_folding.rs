@@ -18,6 +18,7 @@ use noah_plonk::plonk::constraint_system::rescue::StateVar;
 use noah_plonk::plonk::constraint_system::VarIndex;
 use num_bigint::BigUint;
 use rand_core::{CryptoRng, RngCore};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 /// The instance for address folding.
@@ -536,29 +537,13 @@ pub fn prove_address_folding_in_cs(
     {
         let mut input_vars = compressed_limbs_var.clone();
         input_vars.push(r_var);
-        input_vars.resize((input_vars.len() - 1 + 2) / 3 * 3 + 1, cs.zero_var());
 
-        let mut h_var = cs.rescue_hash(&StateVar::new([
-            input_vars[0],
-            input_vars[1],
-            input_vars[2],
-            input_vars[3],
-        ]))[0];
+        let mut input = compressed_limbs.clone();
+        input.push(r);
 
-        let input_vars = input_vars[4..].to_vec();
-
-        for chunk_var in input_vars.chunks(3) {
-            h_var = cs.rescue_hash(&StateVar::new([
-                h_var,
-                chunk_var[0],
-                chunk_var[1],
-                chunk_var[2],
-            ]))[0];
-        }
-
-        cs.equal(comm_var, h_var);
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&input);
+        cs.anemoi_variable_length_hash(&trace, &input_vars, comm_var);
     }
-
     cs.prepare_pi_variable(comm_var);
 
     for fr_var in lambda_series_vars_skip_first.iter() {
