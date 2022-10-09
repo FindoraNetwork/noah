@@ -1,3 +1,4 @@
+use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use crate::basic::pedersen_comm::PedersenCommitment;
 use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
@@ -6,7 +7,6 @@ use num_bigint::BigUint;
 use rand_chacha::ChaChaRng;
 use serde::Deserialize;
 use std::marker::PhantomData;
-use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The non-interactive proof provided to the verifier.
