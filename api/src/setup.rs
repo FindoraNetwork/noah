@@ -8,6 +8,7 @@ use crate::anon_xfr::{
     abar_to_bar::build_abar_to_bar_cs,
     ar_to_abar::build_ar_to_abar_cs,
     bar_to_abar::build_bar_to_abar_cs,
+    nullify,
     structs::{MTNode, MTPath},
     TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
@@ -138,18 +139,28 @@ impl ProverParams {
 
         let folding_witness = AXfrAddressFoldingWitness::default();
 
-        let (cs, _) = match tree_depth {
-            Some(depth) => build_multi_xfr_cs(
-                AXfrWitness::fake(n_payers, n_payees, depth, 0),
-                FEE_TYPE.as_scalar(),
-                &folding_witness,
-            ),
-            None => build_multi_xfr_cs(
-                AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
-                FEE_TYPE.as_scalar(),
-                &folding_witness,
-            ),
+        let fake_witness = match tree_depth {
+            Some(depth) => AXfrWitness::fake(n_payers, n_payees, depth, 0),
+            None => AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
         };
+
+        let mut nullifiers_traces = Vec::new();
+        for payer_witness in fake_witness.payers_witnesses.iter() {
+            let (_, trace) = nullify(
+                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()),
+                payer_witness.amount,
+                payer_witness.asset_type,
+                payer_witness.uid,
+            )?;
+            nullifiers_traces.push(trace);
+        }
+
+        let (cs, _) = build_multi_xfr_cs(
+            fake_witness,
+            FEE_TYPE.as_scalar(),
+            &nullifiers_traces,
+            &folding_witness,
+        );
 
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
             .c(d!(NoahError::DeserializationError))?;
@@ -274,8 +285,16 @@ impl ProverParams {
 
         let folding_witness = AXfrAddressFoldingWitness::default();
 
+        let (_, nullifier_trace) = nullify(
+            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()),
+            payer_secret.amount,
+            payer_secret.asset_type,
+            payer_secret.uid,
+        )?;
+
         let (cs, _) = build_abar_to_bar_cs(
             payer_secret,
+            &nullifier_trace,
             &proof,
             &non_zk_state,
             &beta,
@@ -355,7 +374,14 @@ impl ProverParams {
 
         let folding_witness = AXfrAddressFoldingWitness::default();
 
-        let (cs, _) = build_abar_to_ar_cs(payer_secret, &folding_witness);
+        let (_, nullifier_trace) = nullify(
+            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()),
+            payer_secret.amount,
+            payer_secret.asset_type,
+            payer_secret.uid,
+        )?;
+
+        let (cs, _) = build_abar_to_ar_cs(payer_secret, &nullifier_trace, &folding_witness);
 
         let srs = SRS.c(d!(NoahError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)

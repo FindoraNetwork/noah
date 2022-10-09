@@ -22,6 +22,7 @@ use crate::xfr::{
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
 use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
@@ -55,6 +56,8 @@ pub struct AbarToArPreNote {
     pub body: AbarToArBody,
     /// Witness.
     pub witness: PayerWitness,
+    /// The trace of the nullifier.
+    pub nullifier_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
 }
@@ -98,10 +101,10 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     let (oar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
 
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let this_nullifier = nullify(
+    let (this_nullifier, this_trace) = nullify(
         &abar_keypair,
         oabar.amount,
-        &oabar.asset_type,
+        oabar.asset_type.as_scalar(),
         mt_leaf_info.uid,
     )?;
 
@@ -127,6 +130,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     Ok(AbarToArPreNote {
         body,
         witness: payers_secret,
+        nullifier_trace: this_trace,
         input_keypair: abar_keypair.clone(),
     })
 }
@@ -141,6 +145,7 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     let AbarToArPreNote {
         body,
         witness,
+        nullifier_trace,
         input_keypair,
     } = pre_note;
 
@@ -153,7 +158,8 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
         &input_keypair,
     )?;
 
-    let proof = prove_abar_to_ar(prng, params, witness, &folding_witness).c(d!())?;
+    let proof =
+        prove_abar_to_ar(prng, params, witness, &nullifier_trace, &folding_witness).c(d!())?;
 
     Ok(AbarToArNote {
         body,
@@ -283,11 +289,12 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: PayerWitness,
+    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
 
-    let (mut cs, _) = build_abar_to_ar_cs(payers_witness, &folding_witness);
+    let (mut cs, _) = build_abar_to_ar_cs(payers_witness, nullifier_trace, &folding_witness);
     let witness = cs.get_and_clear_witness();
 
     prover_with_lagrange(
@@ -305,9 +312,13 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
     payers_witness: PayerWitness,
+    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
+
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
     let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
 
@@ -360,6 +371,7 @@ pub fn build_abar_to_ar_cs(
         uid_amount,
         payers_witness_vars.asset_type,
         &public_key_scalars_vars,
+        &nullifier_trace,
     );
 
     // Merkle path authentication
