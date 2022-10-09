@@ -37,7 +37,7 @@ use noah_crypto::{
     field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
 use noah_plonk::plonk::{
-    constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex},
+    constraint_system::{field_simulation::SimFrVar, TurboCS, VarIndex},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
@@ -753,20 +753,27 @@ pub fn build_abar_to_bar_cs(
 
     // 4. Check the inspector's state commitment.
     {
-        let h1_var = cs.rescue_hash(&StateVar::new([
-            compressed_limbs_var[0],
-            compressed_limbs_var[1],
-            compressed_limbs_var[2],
-            compressed_limbs_var[3],
-        ]))[0];
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            compressed_limbs[0],
+            compressed_limbs[1],
+            compressed_limbs[2],
+            compressed_limbs[3],
+            compressed_limbs[4],
+            r,
+        ]);
 
-        let h2_var = cs.rescue_hash(&StateVar::new([
-            h1_var,
-            compressed_limbs_var[4],
-            r_var,
-            zero_var,
-        ]))[0];
-        cs.equal(h2_var, comm_var);
+        cs.anemoi_variable_length_hash(
+            &trace,
+            &[
+                compressed_limbs_var[0],
+                compressed_limbs_var[1],
+                compressed_limbs_var[2],
+                compressed_limbs_var[3],
+                compressed_limbs_var[4],
+                r_var,
+            ],
+            comm_var,
+        );
     }
 
     // 5. Perform the check in field simulation.

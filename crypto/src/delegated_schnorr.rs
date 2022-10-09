@@ -1,5 +1,5 @@
+use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use crate::basic::pedersen_comm::PedersenCommitment;
-use crate::basic::rescue::RescueInstance;
 use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
@@ -158,21 +158,11 @@ pub fn prove_delegated_schnorr<
     }
 
     // 5. compute comm, which is the commitment of the non-ZK verifier's state
-    let comm_instance = RescueInstance::<BLSScalar>::new();
     let comm = {
         let mut input = compressed_limbs.clone();
         input.push(r);
-        input.resize((input.len() - 1 + 2) / 3 * 3 + 1, BLSScalar::zero());
 
-        let mut h = comm_instance.rescue(&[input[0], input[1], input[2], input[3]])[0];
-
-        let input = input[4..].to_vec();
-
-        for chunk in input.chunks(3) {
-            h = comm_instance.rescue(&[h, chunk[0], chunk[1], chunk[2]])[0];
-        }
-
-        h
+        AnemoiJive381::eval_variable_length_hash(&input)
     };
     proof.inspection_comm = comm;
 

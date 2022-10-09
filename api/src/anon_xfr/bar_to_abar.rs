@@ -16,6 +16,7 @@ use noah_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_schnorr::{
@@ -25,7 +26,7 @@ use noah_crypto::{
     field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
 use noah_plonk::plonk::{
-    constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS},
+    constraint_system::{field_simulation::SimFrVar, TurboCS},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
@@ -387,6 +388,8 @@ pub(crate) fn build_bar_to_abar_cs(
     lambda: &RistrettoScalar,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
     let zero_var = cs.zero_var();
 
     let zero = BLSScalar::zero();
@@ -502,20 +505,27 @@ pub(crate) fn build_bar_to_abar_cs(
 
     // 4. Open the inspector's state commitment.
     {
-        let h1_var = cs.rescue_hash(&StateVar::new([
-            compressed_limbs_var[0],
-            compressed_limbs_var[1],
-            compressed_limbs_var[2],
-            compressed_limbs_var[3],
-        ]))[0];
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            compressed_limbs[0],
+            compressed_limbs[1],
+            compressed_limbs[2],
+            compressed_limbs[3],
+            compressed_limbs[4],
+            r,
+        ]);
 
-        let h2_var = cs.rescue_hash(&StateVar::new([
-            h1_var,
-            compressed_limbs_var[4],
-            r_var,
-            zero_var,
-        ]))[0];
-        cs.equal(h2_var, comm_var);
+        cs.anemoi_variable_length_hash(
+            &trace,
+            &[
+                compressed_limbs_var[0],
+                compressed_limbs_var[1],
+                compressed_limbs_var[2],
+                compressed_limbs_var[3],
+                compressed_limbs_var[4],
+                r_var,
+            ],
+            comm_var,
+        );
     }
 
     // 5. Perform the check in field simulation.
@@ -642,7 +652,7 @@ mod test {
     use std::ops::AddAssign;
 
     #[test]
-    fn test_eq_committed_vals_cs() {
+    fn test_bar_to_abar() {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
