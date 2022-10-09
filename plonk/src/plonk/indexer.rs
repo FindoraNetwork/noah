@@ -111,7 +111,7 @@ pub struct PlonkVerifierParams<C, F> {
     pub anemoi_generator_inv: F,
     /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub k: Vec<F>,
-    /// The evaluation domain.
+    /// The primitive evaluation domain.
     pub domain: Vec<u8>,
     /// The size of constraint system.
     pub cs_size: usize,
@@ -125,7 +125,7 @@ pub struct PlonkVerifierParams<C, F> {
 pub type PlonkVK<PCS> =
     PlonkVerifierParams<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
 
-/// Return domain and root(a generator of the subgroup) after deserialization.
+/// Perform deserialization, then return domain and root(a generator of the subgroup).
 pub fn get_domain_and_root<PCS: PolyComScheme>(
     domain: &[u8],
 ) -> (

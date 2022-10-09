@@ -126,7 +126,7 @@ pub(super) fn pi_poly<PCS: PolyComScheme>(
         }
     }
 
-    FpPolynomial::ifft_with_domain(&domain, &evals)
+    FpPolynomial::ifft_with_domain(domain, &evals)
 }
 
 /// Add a random degree `num_hide_points`+`zeroing_degree` polynomial

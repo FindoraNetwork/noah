@@ -109,7 +109,7 @@ pub trait Scalar:
 
 /// The trait for domain.
 pub trait Domain: Scalar {
-    /// The fft field.
+    /// The field that is able to be used in FFTs.
     type Field: FftField;
 
     /// Return fft field.

@@ -500,7 +500,7 @@ impl<F: Domain> FpPolynomial<F> {
     }
 
     /// Construct a domain for evaluations of a polynomial having `num_coeffs` coefficients,
-    /// `num_coeffs` is with the form 2^k or 3 * 2^k.
+    /// where `num_coeffs` is with the form 2^k or 3 * 2^k.
     pub fn evaluation_domain(num_coeffs: usize) -> Option<MixedRadixEvaluationDomain<F::Field>> {
         assert!(
             num_coeffs.is_power_of_two()
@@ -509,24 +509,23 @@ impl<F: Domain> FpPolynomial<F> {
         MixedRadixEvaluationDomain::<F::Field>::new(num_coeffs)
     }
 
-    /// Compute the FFT of the polynomial, `num_coeffs` is with the form 2^k or 3 * 2^k.
+    /// Compute the FFT of the polynomial, the parameter `num_coeffs` is with the form 2^k or 3 * 2^k.
     pub fn fft(&self, num_coeffs: usize) -> Option<(MixedRadixEvaluationDomain<F::Field>, Vec<F>)> {
-        assert!(
-            num_coeffs.is_power_of_two()
-                || ((num_coeffs % 3 == 0) && (num_coeffs / 3).is_power_of_two())
-        );
-        let domain = MixedRadixEvaluationDomain::<F::Field>::new(num_coeffs)?;
+        assert!(num_coeffs > self.degree());
+        let domain = Self::evaluation_domain(num_coeffs)?;
         let values = self.fft_with_domain(&domain);
         Some((domain, values))
     }
 
     /// Compute the FFT of the polynomial with the given domain.
     pub fn fft_with_domain(&self, domain: &MixedRadixEvaluationDomain<F::Field>) -> Vec<F> {
+        assert!(domain.size > self.degree() as u64);
         let coefs = self
             .coefs
             .iter()
             .map(|coef| coef.get_field())
             .collect::<Vec<F::Field>>();
+
         let values = domain.fft(&coefs);
         values.iter().map(|x| F::from_field(*x)).collect()
     }
