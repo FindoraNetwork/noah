@@ -41,15 +41,15 @@ pub struct AnonAssetRecord {
 impl AnonAssetRecord {
     /// Generate the anonymous asset record from the opened version.
     pub fn from_oabar(oabar: &OpenAnonAssetRecord) -> AnonAssetRecord {
-        AnonAssetRecord {
-            commitment: commit(
-                oabar.pub_key_ref(),
-                oabar.get_blind(),
-                oabar.get_amount(),
-                oabar.get_asset_type().as_scalar(),
-            )
-            .unwrap(),
-        }
+        let (commitment, _) = commit(
+            oabar.pub_key_ref(),
+            oabar.get_blind(),
+            oabar.get_amount(),
+            oabar.get_asset_type().as_scalar(),
+        )
+        .unwrap();
+
+        AnonAssetRecord { commitment }
     }
 }
 

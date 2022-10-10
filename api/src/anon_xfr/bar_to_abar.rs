@@ -16,7 +16,7 @@ use noah_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace};
 use noah_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_schnorr::{
@@ -180,7 +180,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
     let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-    let comm = commit(
+    let (comm, comm_trace) = commit(
         abar_pubkey,
         oabar.blind,
         oabar_amount,
@@ -202,7 +202,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     .c(d!())?;
 
     // 4. Compute the inspector's proof.
-    let inspector_proof = prove_inspection(
+    let inspector_proof = prove_bar_to_abar_cs(
         prng,
         params,
         x_in_bls12_381,
@@ -213,6 +213,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         &inspection,
         &beta,
         &lambda,
+        &comm_trace,
     )
     .c(d!())?;
 
@@ -288,7 +289,7 @@ pub(crate) fn verify_bar_to_abar(
 }
 
 /// Generate the inspector's proof.
-pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
+pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     amount: BLSScalar,
@@ -303,6 +304,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
+    comm_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_bar_to_abar_cs(
@@ -314,6 +316,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
         inspection,
         beta,
         lambda,
+        comm_trace,
     );
     let witness = cs.get_and_clear_witness();
 
@@ -376,7 +379,7 @@ pub(crate) fn verify_inspection(
 pub(crate) fn build_bar_to_abar_cs(
     amount: BLSScalar,
     asset_type: BLSScalar,
-    blind_hash: BLSScalar,
+    blind: BLSScalar,
     pubkey: &AXfrPubKey,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     non_zk_state: &DelegatedSchnorrInspection<
@@ -386,6 +389,7 @@ pub(crate) fn build_bar_to_abar_cs(
     >,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
+    comm_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
@@ -403,7 +407,7 @@ pub(crate) fn build_bar_to_abar_cs(
     // 1. Input commitment witnesses.
     let amount_var = cs.new_variable(amount);
     let at_var = cs.new_variable(asset_type);
-    let blind_hash_var = cs.new_variable(blind_hash);
+    let blind_var = cs.new_variable(blind);
 
     let public_key_scalars = pubkey.get_public_key_scalars().unwrap();
     let public_key_scalars_vars = [
@@ -603,10 +607,11 @@ pub(crate) fn build_bar_to_abar_cs(
     // 7. Rescue commitment
     let rescue_comm_var = commit_in_cs(
         &mut cs,
-        blind_hash_var,
+        blind_var,
         amount_var,
         at_var,
         &public_key_scalars_vars,
+        comm_trace,
     );
 
     // prepare public inputs.
@@ -677,7 +682,8 @@ mod test {
         let keypair = AXfrKeyPair::generate(&mut prng);
         let pubkey = keypair.get_public_key();
 
-        let z = commit(&pubkey, z_randomizer, 71u64, asset_type.as_scalar()).unwrap();
+        let (z, output_commitment_trace) =
+            commit(&pubkey, z_randomizer, 71u64, asset_type.as_scalar()).unwrap();
 
         // 2. compute the ZK part of the proof
 
@@ -703,6 +709,7 @@ mod test {
             &non_zk_state,
             &beta,
             &lambda,
+            &output_commitment_trace,
         );
         let witness = cs.get_and_clear_witness();
 

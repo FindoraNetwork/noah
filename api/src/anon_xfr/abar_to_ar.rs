@@ -59,6 +59,8 @@ pub struct AbarToArPreNote {
     pub body: AbarToArBody,
     /// Witness.
     pub witness: PayerWitness,
+    /// The trace of the input commitment.
+    pub input_commitment_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
     /// The trace of the nullifier.
     pub nullifier_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
     /// Input key pair.
@@ -104,12 +106,20 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     let (oar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
 
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let (this_nullifier, this_trace) = nullify(
+    let (this_nullifier, this_nullifier_trace) = nullify(
         &abar_keypair,
         oabar.amount,
         oabar.asset_type.as_scalar(),
         mt_leaf_info.uid,
     )?;
+
+    let (_, this_commitment_trace) = commit(
+        &abar_keypair.get_public_key(),
+        oabar.blind,
+        oabar.amount,
+        oabar.asset_type.as_scalar(),
+    )
+    .unwrap();
 
     let payers_secret = PayerWitness {
         secret_key: abar_keypair.get_secret_key(),
@@ -133,7 +143,8 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     Ok(AbarToArPreNote {
         body,
         witness: payers_secret,
-        nullifier_trace: this_trace,
+        input_commitment_trace: this_commitment_trace,
+        nullifier_trace: this_nullifier_trace,
         input_keypair: abar_keypair.clone(),
     })
 }
@@ -148,6 +159,7 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     let AbarToArPreNote {
         body,
         witness,
+        input_commitment_trace,
         nullifier_trace,
         input_keypair,
     } = pre_note;
@@ -161,8 +173,15 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
         &input_keypair,
     )?;
 
-    let proof =
-        prove_abar_to_ar(prng, params, witness, &nullifier_trace, &folding_witness).c(d!())?;
+    let proof = prove_abar_to_ar(
+        prng,
+        params,
+        witness,
+        &nullifier_trace,
+        &input_commitment_trace,
+        &folding_witness,
+    )
+    .c(d!())?;
 
     Ok(AbarToArNote {
         body,
@@ -293,11 +312,17 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     params: &ProverParams,
     payers_witness: PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
 
-    let (mut cs, _) = build_abar_to_ar_cs(payers_witness, nullifier_trace, &folding_witness);
+    let (mut cs, _) = build_abar_to_ar_cs(
+        payers_witness,
+        nullifier_trace,
+        input_commitment_trace,
+        &folding_witness,
+    );
     let witness = cs.get_and_clear_witness();
 
     prover_with_lagrange(
@@ -314,16 +339,17 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
 
 /// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
-    payers_witness: PayerWitness,
+    payer_witness: PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
 
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[&payers_witness]);
-    let payers_witness_vars = &payers_witnesses_vars[0];
+    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[&payer_witness]);
+    let payer_witness_var = &payers_witnesses_vars[0];
 
     let keypair = folding_witness.keypair.clone();
     let public_key_scalars = keypair.get_public_key().get_public_key_scalars().unwrap();
@@ -348,18 +374,19 @@ pub fn build_abar_to_ar_cs(
     // commitments
     let com_abar_in_var = commit_in_cs(
         &mut cs,
-        payers_witness_vars.blind,
-        payers_witness_vars.amount,
-        payers_witness_vars.asset_type,
+        payer_witness_var.blind,
+        payer_witness_var.amount,
+        payer_witness_var.asset_type,
         &public_key_scalars_vars,
+        input_commitment_trace,
     );
 
     // prove pre-image of the nullifier
     // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`
     let uid_amount = cs.linear_combine(
         &[
-            payers_witness_vars.uid,
-            payers_witness_vars.amount,
+            payer_witness_var.uid,
+            payer_witness_var.amount,
             zero_var,
             zero_var,
         ],
@@ -372,33 +399,29 @@ pub fn build_abar_to_ar_cs(
         &mut cs,
         &secret_key_scalars_vars,
         uid_amount,
-        payers_witness_vars.asset_type,
+        payer_witness_var.asset_type,
         &public_key_scalars_vars,
         &nullifier_trace,
     );
 
     // Merkle path authentication
     let acc_elem = AccElemVars {
-        uid: payers_witness_vars.uid,
+        uid: payer_witness_var.uid,
         commitment: com_abar_in_var,
     };
 
     let hash = RescueInstance::new();
 
     let mut path_traces = Vec::new();
-    let mut next = hash.rescue(&[
-        BLSScalar::from(payers_witness.uid),
-        commit(
-            &keypair.get_public_key(),
-            payers_witness.blind,
-            payers_witness.amount,
-            payers_witness.asset_type,
-        )
-        .unwrap(),
-        zero,
-        zero,
-    ])[0];
-    for (i, mt_node) in payers_witness.path.nodes.iter().enumerate() {
+    let (commitment, _) = commit(
+        &keypair.get_public_key(),
+        payer_witness.blind,
+        payer_witness.amount,
+        payer_witness.asset_type,
+    )
+    .unwrap();
+    let mut next = hash.rescue(&[BLSScalar::from(payer_witness.uid), commitment, zero, zero])[0];
+    for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
         let (s1, s2, s3) = if mt_node.is_left_child != 0 {
             (next, mt_node.siblings1, mt_node.siblings2)
         } else if mt_node.is_right_child != 0 {
@@ -412,7 +435,7 @@ pub fn build_abar_to_ar_cs(
     }
 
     let tmp_root_var =
-        compute_merkle_root_variables(&mut cs, acc_elem, &payers_witness_vars.path, &path_traces);
+        compute_merkle_root_variables(&mut cs, acc_elem, &payer_witness_var.path, &path_traces);
 
     if let Some(root) = root_var {
         cs.equal(root, tmp_root_var);
@@ -424,8 +447,8 @@ pub fn build_abar_to_ar_cs(
     cs.prepare_pi_variable(nullifier_var);
     cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
-    cs.prepare_pi_variable(payers_witness_vars.amount);
-    cs.prepare_pi_variable(payers_witness_vars.asset_type);
+    cs.prepare_pi_variable(payer_witness_var.amount);
+    cs.prepare_pi_variable(payer_witness_var.asset_type);
 
     prove_address_folding_in_cs(
         &mut cs,

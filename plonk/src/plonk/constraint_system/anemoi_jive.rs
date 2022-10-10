@@ -211,8 +211,11 @@ impl TurboCS<BLSScalar> {
 
         if input_var.len() % (2 * 2 - 1) != 0 || input_var.is_empty() {
             input_var.push(one_var);
-            input_var
-                .extend_from_slice(&[zero_var].repeat(2 * 2 - 1 - (input_var.len() % (2 * 2 - 1))));
+            if input_var.len() % (2 * 2 - 1) != 0 {
+                input_var.extend_from_slice(
+                    &[zero_var].repeat(2 * 2 - 1 - (input_var.len() % (2 * 2 - 1))),
+                );
+            }
         }
 
         assert_eq!(
