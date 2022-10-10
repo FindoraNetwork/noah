@@ -468,11 +468,15 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
     } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
         .c(d!(NoahError::DeserializationError))?;
 
-    let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 4099)];
-    new_group_1[0..4099].copy_from_slice(&public_parameter_group_1[0..4099]);
+    let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 2051)];
+    new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
+
+    if size == 4096 {
+        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
+    }
 
     if size == 8192 {
-        new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[4099..4102]);
+        new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
     }
 
     Ok(KZGCommitmentSchemeBLS {
