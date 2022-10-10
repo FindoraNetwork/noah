@@ -985,7 +985,6 @@ mod test {
     use ark_std::test_rng;
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 
     type F = BLSScalar;
 
@@ -1517,6 +1516,7 @@ mod test {
     #[cfg(feature = "debug")]
     #[should_panic]
     fn test_dangling_witness_should_panic() {
+        use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
         let one = F::one();
         let two = one.add(&one);
         let three = one.add(&two);
