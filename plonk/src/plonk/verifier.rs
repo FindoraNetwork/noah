@@ -2,7 +2,7 @@ use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{eval_pi_poly, first_lagrange_poly, r_commitment, r_eval_zeta, PlonkChallenges},
-    indexer::{PlonkPf, PlonkVK},
+    indexer::{get_domain_and_root, PlonkPf, PlonkVK},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
         transcript_get_plonk_challenge_gamma, transcript_get_plonk_challenge_u,
@@ -22,7 +22,8 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     pi: &[PCS::Field],
     proof: &PlonkPf<PCS>,
 ) -> Result<()> {
-    transcript_init_plonk(transcript, verifier_params, pi);
+    let (_, root) = get_domain_and_root::<PCS>(&verifier_params.domain);
+    transcript_init_plonk(transcript, verifier_params, pi, &root);
     let mut challenges = PlonkChallenges::new();
     // 1. compute all challenges such as gamma, beta, alpha, zeta and u.
     compute_challenges::<PCS>(&mut challenges, transcript, &proof, cs.size());
@@ -37,6 +38,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         pi,
         &z_h_eval_zeta,
         challenges.get_zeta().unwrap(),
+        &root,
     );
 
     // 4. derive the linearization polynomial commitment.
@@ -91,7 +93,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     values.push(r_eval_zeta);
 
     let zeta = challenges.get_zeta().unwrap();
-    let zeta_omega = zeta.mul(&verifier_params.root);
+    let zeta_omega = zeta.mul(&root);
 
     let (comm, val) = pcs.batch(
         transcript,

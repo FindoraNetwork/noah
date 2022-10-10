@@ -1,6 +1,6 @@
 use crate::poly_commit::{field_polynomial::FpPolynomial, transcript::PolyComTranscript};
 use merlin::Transcript;
-use noah_algebra::prelude::*;
+use noah_algebra::{prelude::*, traits::Domain};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -44,7 +44,7 @@ pub trait HomomorphicPolyComElem: ToBytes + Clone + Sync + Send {
 /// Trait for polynomial commitment scheme.
 pub trait PolyComScheme: Sized {
     /// Type of prime field.
-    type Field: Scalar + Debug + Sync + Send;
+    type Field: Domain + Debug + Sync + Send;
 
     /// Type of commitment produces, need to implement `HomomorphicPolyComElem`.
     type Commitment: HomomorphicPolyComElem<Scalar = Self::Field>

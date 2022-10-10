@@ -37,6 +37,8 @@ use storage::{
 
 const AMOUNT: u64 = 10u64;
 const ASSET: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
+#[cfg(feature = "parallel")]
+const BATCHSIZE: [usize; 7] = [1, 2, 3, 6, 10, 20, 30];
 
 // Measurement of the verification time and batch verification time of `abar_to_abar`.
 fn bench_abar_to_abar(c: &mut Criterion) {

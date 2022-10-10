@@ -1,13 +1,10 @@
 use crate::plonk::{
-    constraint_system::ConstraintSystem,
-    errors::PlonkError,
-    helpers::{build_group, compute_lagrange_constant},
+    constraint_system::ConstraintSystem, errors::PlonkError, helpers::compute_lagrange_constant,
 };
-use crate::poly_commit::{
-    field_polynomial::{primitive_nth_root_of_unity, FpPolynomial},
-    pcs::PolyComScheme,
-};
-use noah_algebra::prelude::*;
+use crate::poly_commit::{field_polynomial::FpPolynomial, pcs::PolyComScheme};
+use ark_poly::{EvaluationDomain, MixedRadixEvaluationDomain};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use noah_algebra::{prelude::*, traits::Domain};
 use rand_chacha::ChaChaRng;
 
 /// The data structure of a Plonk proof.
@@ -58,8 +55,8 @@ pub struct PlonkProverParams<O, C, F> {
     pub group: Vec<F>,
     /// The evaluation domain for computing the quotient polynomial.
     pub coset_quotient: Vec<F>,
-    /// The root for the domain of size m.
-    pub root_m: F,
+    /// The evaluation domain of size m.
+    pub domain_m: Vec<u8>,
     /// First lagrange basis.
     pub l1_coefs: FpPolynomial<F>,
     /// The l1's FFT of the polynomial of unity root set.
@@ -114,8 +111,8 @@ pub struct PlonkVerifierParams<C, F> {
     pub anemoi_generator_inv: F,
     /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub k: Vec<F>,
-    /// A primitive n-th root of unity.
-    pub root: F,
+    /// The primitive evaluation domain.
+    pub domain: Vec<u8>,
     /// The size of constraint system.
     pub cs_size: usize,
     /// The public constrain variables indices.
@@ -127,6 +124,28 @@ pub struct PlonkVerifierParams<C, F> {
 /// Define the PLONK verifier params by given `PolyComScheme`.
 pub type PlonkVK<PCS> =
     PlonkVerifierParams<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
+
+/// Perform deserialization, then return domain and root(a generator of the subgroup).
+pub fn get_domain_and_root<PCS: PolyComScheme>(
+    domain: &[u8],
+) -> (
+    MixedRadixEvaluationDomain<<<PCS as PolyComScheme>::Field as Domain>::Field>,
+    PCS::Field,
+) {
+    let reader = ark_std::io::BufReader::new(domain);
+    let domain = MixedRadixEvaluationDomain::deserialize(reader).unwrap();
+    let root = PCS::Field::from_field(domain.group_gen);
+    (domain, root)
+}
+
+/// Convert the domain to bytes in the compressed representation.
+fn compress_domain<PCS: PolyComScheme>(
+    domain: &MixedRadixEvaluationDomain<<<PCS as PolyComScheme>::Field as Domain>::Field>,
+) -> Vec<u8> {
+    let mut buf = Vec::new();
+    domain.serialize(&mut buf).unwrap();
+    buf
+}
 
 /// Encode the permutation value, from an index to a group element.
 pub fn encode_perm_to_group<F: Scalar>(group: &[F], perm: &[usize], k: &[F]) -> Vec<F> {
@@ -201,13 +220,22 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     } else {
         None
     };
-    let root_m =
-        primitive_nth_root_of_unity::<PCS::Field>(m).c(d!(PlonkError::GroupNotFound(m)))?;
-    let group_m = build_group(&root_m, m)?;
-    let root = group_m[factor % m];
-    let group = build_group(&root, n)?;
+
+    let domain =
+        FpPolynomial::<PCS::Field>::evaluation_domain(n).c(d!(PlonkError::GroupNotFound(n)))?;
+    let domain_m =
+        FpPolynomial::<PCS::Field>::evaluation_domain(m).c(d!(PlonkError::GroupNotFound(m)))?;
+    let group = domain
+        .elements()
+        .into_iter()
+        .map(|x| PCS::Field::from_field(x))
+        .collect::<Vec<_>>();
     let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
-    let coset_quotient = group_m.iter().map(|x| k[1].mul(x)).collect();
+    let coset_quotient = domain_m
+        .elements()
+        .into_iter()
+        .map(|x| k[1].mul(&PCS::Field::from_field(x)))
+        .collect();
 
     // Step 1: compute permutation polynomials and commit them.
     let raw_perm = cs.compute_permutation();
@@ -226,9 +254,10 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     if let Some(lagrange_pcs) = lagrange_pcs {
         for i in 0..n_wires_per_gate {
             let s_evals = FpPolynomial::from_coefs(encoded_perm[i * n..(i + 1) * n].to_vec());
-            let s_coefs = FpPolynomial::ffti(&root, &encoded_perm[i * n..(i + 1) * n], n);
+            let s_coefs =
+                FpPolynomial::ifft_with_domain(&domain, &encoded_perm[i * n..(i + 1) * n]);
 
-            s_coset_evals[i].extend(s_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            s_coset_evals[i].extend(s_coefs.coset_fft_with_domain(&domain_m, &k[1]));
 
             let cm_s = lagrange_pcs
                 .commit(&s_evals)
@@ -238,9 +267,10 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         }
     } else {
         for i in 0..n_wires_per_gate {
-            let s_coefs = FpPolynomial::ffti(&root, &encoded_perm[i * n..(i + 1) * n], n);
+            let s_coefs =
+                FpPolynomial::ifft_with_domain(&domain, &encoded_perm[i * n..(i + 1) * n]);
 
-            s_coset_evals[i].extend(s_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            s_coset_evals[i].extend(s_coefs.coset_fft_with_domain(&domain_m, &k[1]));
 
             let cm_s = pcs.commit(&s_coefs).c(d!(PlonkError::SetupError))?;
             s_polys.push(s_coefs);
@@ -254,8 +284,8 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     if let Some(lagrange_pcs) = lagrange_pcs {
         for (i, q_coset_eval) in q_coset_evals.iter_mut().enumerate() {
             let q_evals = FpPolynomial::from_coefs(cs.selector(i)?.to_vec());
-            let q_coefs = FpPolynomial::ffti(&root, cs.selector(i)?, n);
-            q_coset_eval.extend(q_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            let q_coefs = FpPolynomial::ifft_with_domain(&domain, cs.selector(i)?);
+            q_coset_eval.extend(q_coefs.coset_fft_with_domain(&domain_m, &k[1]));
 
             let cm_q = lagrange_pcs
                 .commit(&q_evals)
@@ -265,8 +295,8 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         }
     } else {
         for (i, q_coset_eval) in q_coset_evals.iter_mut().enumerate() {
-            let q_coefs = FpPolynomial::ffti(&root, cs.selector(i)?, n);
-            q_coset_eval.extend(q_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]));
+            let q_coefs = FpPolynomial::ifft_with_domain(&domain, cs.selector(i)?);
+            q_coset_eval.extend(q_coefs.coset_fft_with_domain(&domain_m, &k[1]));
 
             let cm_q = pcs.commit(&q_coefs).c(d!(PlonkError::SetupError))?;
             cm_q_vec.push(cm_q);
@@ -277,8 +307,8 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     // Step 2: precompute two helper functions, L1 and Z_H.
     let mut l1_evals = FpPolynomial::from_coefs(vec![PCS::Field::zero(); group.len()]);
     l1_evals.coefs[0] = PCS::Field::from(n as u32); // X^n - 1 = (X - 1) (X^{n-1} + X^{n-2} + ... + 1)
-    let l1_coefs = FpPolynomial::ffti(&root, &l1_evals.coefs, n);
-    let l1_coset_evals = l1_coefs.coset_fft_with_unity_root(&root_m, m, &k[1]);
+    let l1_coefs = FpPolynomial::ifft_with_domain(&domain, &l1_evals.coefs);
+    let l1_coset_evals = l1_coefs.coset_fft_with_domain(&domain_m, &k[1]);
 
     let z_h_coefs = {
         let mut v = vec![PCS::Field::zero(); n + 1];
@@ -287,7 +317,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         FpPolynomial::from_coefs(v)
     };
     let z_h_inv_coset_evals = z_h_coefs
-        .coset_fft_with_unity_root(&root_m, m, &k[1])
+        .coset_fft_with_domain(&domain_m, &k[1])
         .into_iter()
         .map(|x| x.inv().unwrap())
         .collect();
@@ -304,9 +334,9 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         for i in cs.boolean_constraint_indices().iter() {
             qb[*i] = PCS::Field::one();
         }
-        let qb_coef = FpPolynomial::ffti(&root, &qb, n);
+        let qb_coef = FpPolynomial::ifft_with_domain(&domain, &qb);
         let qb_eval = FpPolynomial::from_coefs(qb);
-        let qb_coset_eval = qb_coef.coset_fft_with_unity_root(&root_m, m, &k[1]);
+        let qb_coset_eval = qb_coef.coset_fft_with_domain(&domain_m, &k[1]);
 
         let cm_qb = lagrange_pcs
             .commit(&qb_eval)
@@ -318,8 +348,8 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         for i in cs.boolean_constraint_indices().iter() {
             qb[*i] = PCS::Field::one();
         }
-        let qb_coef = FpPolynomial::ffti(&root, &qb, n);
-        let qb_coset_eval = qb_coef.coset_fft_with_unity_root(&root_m, m, &k[1]);
+        let qb_coef = FpPolynomial::ifft_with_domain(&domain, &qb);
+        let qb_coset_eval = qb_coef.coset_fft_with_domain(&domain_m, &k[1]);
 
         let cm_qb = pcs.commit(&qb_coef).c(d!(PlonkError::SetupError))?;
 
@@ -332,12 +362,12 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 
         let q_prk_polys: Vec<FpPolynomial<PCS::Field>> = q_prk_evals
             .iter()
-            .map(|p| FpPolynomial::ffti(&root, &p, n))
+            .map(|p| FpPolynomial::ifft_with_domain(&domain, &p))
             .collect::<Vec<FpPolynomial<PCS::Field>>>();
 
         let q_prk_coset_evals = q_prk_polys
             .iter()
-            .map(|p| p.coset_fft_with_unity_root(&root_m, m, &k[1]))
+            .map(|p| p.coset_fft_with_domain(&domain_m, &k[1]))
             .collect::<Vec<Vec<PCS::Field>>>();
 
         let cm_prk_vec: Vec<PCS::Commitment> = q_prk_evals
@@ -354,12 +384,12 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 
         let q_prk_polys: Vec<FpPolynomial<PCS::Field>> = q_prk_evals
             .iter()
-            .map(|p| FpPolynomial::ffti(&root, &p, n))
+            .map(|p| FpPolynomial::ifft_with_domain(&domain, &p))
             .collect::<Vec<FpPolynomial<PCS::Field>>>();
 
         let q_prk_coset_evals = q_prk_polys
             .iter()
-            .map(|p| p.coset_fft_with_unity_root(&root_m, m, &k[1]))
+            .map(|p| p.coset_fft_with_domain(&domain_m, &k[1]))
             .collect::<Vec<Vec<PCS::Field>>>();
 
         let cm_prk_vec: Vec<PCS::Commitment> = q_prk_polys
@@ -380,7 +410,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         anemoi_generator,
         anemoi_generator_inv,
         k,
-        root,
+        domain: compress_domain::<PCS>(&domain),
         cs_size: n,
         public_vars_constraint_indices: cs.public_vars_constraint_indices().to_vec(),
         lagrange_constants,
@@ -394,7 +424,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         verifier_params,
         group,
         coset_quotient,
-        root_m,
+        domain_m: compress_domain::<PCS>(&domain_m),
         l1_coefs,
         l1_coset_evals,
         z_h_coefs,

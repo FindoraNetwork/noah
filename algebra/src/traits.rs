@@ -3,6 +3,7 @@ use crate::{
     prelude::*,
     rand::{CryptoRng, RngCore},
 };
+use ark_ff::FftField;
 use ark_std::fmt::Debug;
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
@@ -104,6 +105,18 @@ pub trait Scalar:
         }
         result
     }
+}
+
+/// The trait for domain.
+pub trait Domain: Scalar {
+    /// The field that is able to be used in FFTs.
+    type Field: FftField;
+
+    /// Return fft field.
+    fn get_field(&self) -> Self::Field;
+
+    /// Sample a domain based on a fft field.
+    fn from_field(field: Self::Field) -> Self;
 }
 
 /// The trait for group elements
