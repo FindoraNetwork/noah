@@ -749,7 +749,7 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
             }
 
             let sub_q = FpPolynomial::from_coefs(new_coefs);
-            let (q_eval, _root) = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
+            let (_domian, q_eval) = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
             let q_eval = FpPolynomial::from_coefs(q_eval);
 
             let cm = lagrange_pcs.commit(&q_eval).c(d!())?;
