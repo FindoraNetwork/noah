@@ -18,7 +18,6 @@ use noah_algebra::{
 use noah_crypto::basic::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
 };
-use noah_crypto::basic::rescue::RescueInstance;
 use noah_plonk::{
     plonk::{
         constraint_system::{rescue::StateVar, TurboCS, VarIndex},
@@ -152,23 +151,12 @@ pub fn parse_memo(
     let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])
         .c(d!(NoahError::ParameterError))?;
 
-    let public_key_scalars = key_pair.get_public_key().get_public_key_scalars()?;
-
-    let hash = RescueInstance::new();
-    let expected_commitment = {
-        let cur = hash.rescue(&[
-            blind,
-            BLSScalar::from(amount),
-            asset_type.as_scalar(),
-            public_key_scalars[0],
-        ])[0];
-        hash.rescue(&[
-            cur,
-            public_key_scalars[1],
-            public_key_scalars[2],
-            BLSScalar::zero(),
-        ])[0]
-    };
+    let (expected_commitment, _) = commit(
+        &key_pair.get_public_key(),
+        blind,
+        amount,
+        asset_type.as_scalar(),
+    )?;
     if expected_commitment != abar.commitment {
         return Err(eg!(NoahError::CommitmentVerificationError));
     }
@@ -238,16 +226,26 @@ pub fn commit_in_cs(
     amount_var: VarIndex,
     asset_var: VarIndex,
     public_key_scalars: &[VarIndex; 3],
+    trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> VarIndex {
-    let input_var = StateVar::new([blinding_var, amount_var, asset_var, public_key_scalars[0]]);
-    let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([
-        cur,
-        public_key_scalars[1],
-        public_key_scalars[2],
-        cs.zero_var(),
-    ]);
-    cs.rescue_hash(&input_var)[0]
+    let output_var = cs.new_variable(trace.output);
+    let zero_var = cs.zero_var();
+
+    cs.anemoi_variable_length_hash(
+        trace,
+        &[
+            zero_var,
+            blinding_var,
+            amount_var,
+            asset_var,
+            zero_var,
+            public_key_scalars[0],
+            public_key_scalars[1],
+            public_key_scalars[2],
+        ],
+        output_var,
+    );
+    output_var
 }
 
 /// Compute the record's amount||asset type||pub key commitment
@@ -256,22 +254,22 @@ pub fn commit(
     blind: BLSScalar,
     amount: u64,
     asset_type_scalar: BLSScalar,
-) -> Result<Commitment> {
+) -> Result<(Commitment, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
+    let zero = BLSScalar::zero();
     let public_key_scalars = public_key.get_public_key_scalars()?;
 
-    let hash = RescueInstance::new();
-    let cur = hash.rescue(&[
+    let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        zero, /* protocol version number */
         blind,
         BLSScalar::from(amount),
         asset_type_scalar,
-        public_key_scalars[0],
-    ])[0];
-    Ok(hash.rescue(&[
-        cur,
-        public_key_scalars[1],
-        public_key_scalars[2],
-        BLSScalar::zero(),
-    ])[0])
+        zero,                  /* address format number */
+        public_key_scalars[0], /* public key */
+        public_key_scalars[1], /* public key */
+        public_key_scalars[2], /* public key */
+    ]);
+
+    Ok((trace.output, trace))
 }
 
 /// Add the nullifier constraints to the constraint system.

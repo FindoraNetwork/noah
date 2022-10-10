@@ -57,6 +57,10 @@ pub struct AXfrPreNote {
     pub body: AXfrBody,
     /// Witness.
     pub witness: AXfrWitness,
+    /// The traces of the input commitments.
+    pub input_commitments_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
+    /// The traces of the output commitments.
+    pub output_commitments_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
     /// The traces of the nullifiers.
     pub nullifiers_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
     /// Input key pair.
@@ -96,19 +100,34 @@ pub fn init_anon_xfr_note(
     check_roots(inputs).c(d!())?;
 
     // 2. build input witness information
-    let (nullifiers, nullifiers_traces) = inputs
-        .iter()
-        .map(|input| {
-            let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
-            nullify(
-                input_keypair,
-                input.amount,
-                input.asset_type.as_scalar(),
-                mt_leaf_info.uid,
-            )
-            .unwrap()
-        })
-        .unzip();
+    let mut nullifiers = Vec::new();
+    let mut nullifiers_traces = Vec::new();
+    let mut input_commitments_traces = Vec::new();
+
+    inputs.iter().for_each(|input| {
+        let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
+
+        let (nullifier, nullifier_trace) = nullify(
+            input_keypair,
+            input.amount,
+            input.asset_type.as_scalar(),
+            mt_leaf_info.uid,
+        )
+        .unwrap();
+
+        nullifiers.push(nullifier);
+        nullifiers_traces.push(nullifier_trace);
+
+        let (_, commitment_trace) = commit(
+            &input_keypair.get_public_key(),
+            input.blind,
+            input.amount,
+            input.asset_type.as_scalar(),
+        )
+        .unwrap();
+
+        input_commitments_traces.push(commitment_trace);
+    });
 
     // 3. build proof
     let payers_secrets = inputs
@@ -149,6 +168,21 @@ pub fn init_anon_xfr_note(
         .map(|output| output.owner_memo.clone().c(d!(NoahError::ParameterError)))
         .collect();
 
+    let output_commitments_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>> = outputs
+        .iter()
+        .map(|output| {
+            let (_, commitment_trace) = commit(
+                &output.pub_key,
+                output.blind,
+                output.amount,
+                output.asset_type.as_scalar(),
+            )
+            .unwrap();
+
+            commitment_trace
+        })
+        .collect();
+
     let mt_info_temp = inputs[0].mt_leaf_info.as_ref().unwrap();
     let body = AXfrBody {
         inputs: nullifiers,
@@ -162,6 +196,8 @@ pub fn init_anon_xfr_note(
     Ok(AXfrPreNote {
         body,
         witness: secret_inputs,
+        input_commitments_traces,
+        output_commitments_traces,
         nullifiers_traces,
         input_keypair: input_keypair.clone(),
     })
@@ -177,6 +213,8 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     let AXfrPreNote {
         body,
         witness,
+        input_commitments_traces,
+        output_commitments_traces,
         nullifiers_traces,
         input_keypair,
     } = pre_note;
@@ -189,7 +227,16 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
         ANON_XFR_BP_GENS_LEN,
         &input_keypair,
     )?;
-    let proof = prove_xfr(prng, params, witness, &nullifiers_traces, &folding_witness).c(d!())?;
+    let proof = prove_xfr(
+        prng,
+        params,
+        witness,
+        &nullifiers_traces,
+        &input_commitments_traces,
+        &output_commitments_traces,
+        &folding_witness,
+    )
+    .c(d!())?;
 
     Ok(AXfrNote {
         body: body,
@@ -310,6 +357,8 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     params: &ProverParams,
     secret_inputs: AXfrWitness,
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
+    input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
+    output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
@@ -323,8 +372,14 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
 
     let fee_type = FEE_TYPE.as_scalar();
-    let (mut cs, _) =
-        build_multi_xfr_cs(secret_inputs, fee_type, nullifiers_traces, &folding_witness);
+    let (mut cs, _) = build_multi_xfr_cs(
+        secret_inputs,
+        fee_type,
+        nullifiers_traces,
+        input_commitments_traces,
+        output_commitments_traces,
+        &folding_witness,
+    );
     let witness = cs.get_and_clear_witness();
 
     prover_with_lagrange(
@@ -460,44 +515,28 @@ impl AXfrPubInputs {
             .iter()
             .map(|sec| {
                 let public_key_scalars = sec.public_key.get_public_key_scalars().unwrap();
-
-                let cur = hash.rescue(&[
+                AnemoiJive381::eval_variable_length_hash(&[
+                    zero, /* protocol version number */
                     sec.blind,
                     BLSScalar::from(sec.amount),
                     sec.asset_type,
+                    zero, /* address format */
                     public_key_scalars[0],
-                ])[0];
-                hash.rescue(&[
-                    cur,
                     public_key_scalars[1],
                     public_key_scalars[2],
-                    BLSScalar::zero(),
-                ])[0]
+                ])
             })
             .collect();
 
         let payer = &witness.payers_witnesses[0];
 
-        let commitment = {
-            let payer_keypair = AXfrKeyPair::from_secret_key(payer.secret_key.clone());
-            let payer_public_key_scalars = payer_keypair
-                .get_public_key()
-                .get_public_key_scalars()
-                .unwrap();
-
-            let cur = hash.rescue(&[
-                payer.blind,
-                BLSScalar::from(payer.amount),
-                payer.asset_type,
-                payer_public_key_scalars[0],
-            ])[0];
-            hash.rescue(&[
-                cur,
-                payer_public_key_scalars[1],
-                payer_public_key_scalars[2],
-                BLSScalar::zero(),
-            ])[0]
-        };
+        let (commitment, _) = commit(
+            &AXfrKeyPair::from_secret_key(payer.secret_key.clone()).get_public_key(),
+            payer.blind,
+            payer.amount,
+            payer.asset_type,
+        )
+        .unwrap();
         let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0];
         for (idx, path_node) in payer.path.nodes.iter().enumerate() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
@@ -525,6 +564,8 @@ pub(crate) fn build_multi_xfr_cs(
     witness: AXfrWitness,
     fee_type: BLSScalar,
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
+    input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
+    output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(witness.payers_witnesses.len(), 0);
@@ -560,10 +601,12 @@ pub(crate) fn build_multi_xfr_cs(
 
     let hash = RescueInstance::new();
 
-    for ((payer_witness_var, trace), payer_witness) in payers_secrets
-        .iter()
-        .zip(nullifiers_traces.iter())
-        .zip(witness.payers_witnesses.iter())
+    for (((payer_witness_var, input_commitment_trace), nullifier_trace), payer_witness) in
+        payers_secrets
+            .iter()
+            .zip(input_commitments_traces.iter())
+            .zip(nullifiers_traces.iter())
+            .zip(witness.payers_witnesses.iter())
     {
         // commitments.
         let com_abar_in_var = commit_in_cs(
@@ -572,6 +615,7 @@ pub(crate) fn build_multi_xfr_cs(
             payer_witness_var.amount,
             payer_witness_var.asset_type,
             &public_key_scalars_vars,
+            &input_commitment_trace,
         );
 
         // prove pre-image of the nullifier.
@@ -594,7 +638,7 @@ pub(crate) fn build_multi_xfr_cs(
             uid_amount,
             payer_witness_var.asset_type,
             &public_key_scalars_vars,
-            trace,
+            nullifier_trace,
         );
 
         // Merkle path authentication.
@@ -603,18 +647,15 @@ pub(crate) fn build_multi_xfr_cs(
             commitment: com_abar_in_var,
         };
         let mut path_traces = Vec::new();
-        let mut next = hash.rescue(&[
-            BLSScalar::from(payer_witness.uid),
-            commit(
-                &keypair.get_public_key(),
-                payer_witness.blind,
-                payer_witness.amount,
-                payer_witness.asset_type,
-            )
-            .unwrap(),
-            zero,
-            zero,
-        ])[0];
+        let (commitment, _) = commit(
+            &keypair.get_public_key(),
+            payer_witness.blind,
+            payer_witness.amount,
+            payer_witness.asset_type,
+        )
+        .unwrap();
+        let mut next =
+            hash.rescue(&[BLSScalar::from(payer_witness.uid), commitment, zero, zero])[0];
         for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
             let (s1, s2, s3) = if mt_node.is_left_child != 0 {
                 (next, mt_node.siblings1, mt_node.siblings2)
@@ -646,7 +687,9 @@ pub(crate) fn build_multi_xfr_cs(
     // prepare the public input for merkle_root.
     cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
-    for payee in &payees_secrets {
+    for (payee, output_commitment_trace) in
+        payees_secrets.iter().zip(output_commitments_traces.iter())
+    {
         // commitment.
         let com_abar_out_var = commit_in_cs(
             &mut cs,
@@ -654,6 +697,7 @@ pub(crate) fn build_multi_xfr_cs(
             payee.amount,
             payee.asset_type,
             &payee.public_key_scalars,
+            &output_commitment_trace,
         );
 
         // Range check `amount`.
@@ -986,7 +1030,6 @@ mod tests {
             .collect();
 
         let public_key = input_keypair.get_public_key();
-        let public_key_scalars = public_key.get_public_key_scalars().unwrap();
 
         // compute the merkle leaves and update the merkle paths if there are more than 1 payers.
         if n_payers > 1 {
@@ -994,18 +1037,8 @@ mod tests {
             let leafs: Vec<BLSScalar> = payers_secrets
                 .iter()
                 .map(|payer| {
-                    let cur = hash.rescue(&[
-                        payer.blind,
-                        BLSScalar::from(payer.amount),
-                        payer.asset_type,
-                        public_key_scalars[0],
-                    ])[0];
-                    let commitment = hash.rescue(&[
-                        cur,
-                        public_key_scalars[1],
-                        public_key_scalars[2],
-                        BLSScalar::zero(),
-                    ])[0];
+                    let (commitment, _) =
+                        commit(&public_key, payer.blind, payer.amount, payer.asset_type).unwrap();
                     hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0]
                 })
                 .collect();
@@ -1077,7 +1110,7 @@ mod tests {
         };
         let hash = RescueInstance::new();
 
-        let commitment = commit(
+        let (commitment, _) = commit(
             oabar.pub_key_ref(),
             oabar.get_blind(),
             oabar.get_amount(),
@@ -1974,9 +2007,9 @@ mod tests {
     #[test]
     fn test_commit() {
         let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
         let amount = BLSScalar::from(7u32);
         let asset_type = BLSScalar::from(5u32);
-        let hash = RescueInstance::new();
         let mut prng = test_rng();
         let blind = BLSScalar::random(&mut prng);
 
@@ -1989,15 +2022,8 @@ mod tests {
             cs.new_variable(public_key_scalars[2]),
         ];
 
-        let commitment = {
-            let cur = hash.rescue(&[blind, amount, asset_type, public_key_scalars[0]])[0];
-            hash.rescue(&[
-                cur,
-                public_key_scalars[1],
-                public_key_scalars[2],
-                BLSScalar::zero(),
-            ])[0]
-        };
+        let (commitment, input_commitment_trace) =
+            commit(&keypair.get_public_key(), blind, 7, asset_type).unwrap();
 
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);
@@ -2008,6 +2034,7 @@ mod tests {
             amount_var,
             asset_var,
             &public_key_scalars_vars,
+            &input_commitment_trace,
         );
         let mut witness = cs.get_and_clear_witness();
 
@@ -2325,6 +2352,7 @@ mod tests {
         .unwrap();
 
         let mut nullifiers_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
+        let mut input_commitments_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
         for payer_witness in secret_inputs.payers_witnesses.iter() {
             let (_, nullifier_trace) = nullify(
                 &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()),
@@ -2334,6 +2362,27 @@ mod tests {
             )
             .unwrap();
             nullifiers_traces.push(nullifier_trace);
+
+            let (_, input_commitment_trace) = commit(
+                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()).get_public_key(),
+                payer_witness.blind,
+                payer_witness.amount,
+                payer_witness.asset_type,
+            )
+            .unwrap();
+            input_commitments_traces.push(input_commitment_trace);
+        }
+
+        let mut output_commitments_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
+        for payee_witness in secret_inputs.payees_witnesses.iter() {
+            let (_, output_commitment_trace) = commit(
+                &payee_witness.public_key,
+                payee_witness.blind,
+                payee_witness.amount,
+                payee_witness.asset_type,
+            )
+            .unwrap();
+            output_commitments_traces.push(output_commitment_trace);
         }
 
         // check the constraints.
@@ -2341,6 +2390,8 @@ mod tests {
             secret_inputs,
             fee_type,
             &nullifiers_traces,
+            &input_commitments_traces,
+            &output_commitments_traces,
             &folding_witness,
         );
         let witness = cs.get_and_clear_witness();

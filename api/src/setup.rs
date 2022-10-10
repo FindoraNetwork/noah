@@ -8,7 +8,7 @@ use crate::anon_xfr::{
     abar_to_bar::build_abar_to_bar_cs,
     ar_to_abar::build_ar_to_abar_cs,
     bar_to_abar::build_bar_to_abar_cs,
-    nullify,
+    commit, nullify,
     structs::{MTNode, MTPath},
     TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
@@ -145,6 +145,8 @@ impl ProverParams {
         };
 
         let mut nullifiers_traces = Vec::new();
+        let mut input_commitments_traces = Vec::new();
+        let mut output_commitments_traces = Vec::new();
         for payer_witness in fake_witness.payers_witnesses.iter() {
             let (_, trace) = nullify(
                 &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()),
@@ -153,12 +155,32 @@ impl ProverParams {
                 payer_witness.uid,
             )?;
             nullifiers_traces.push(trace);
+
+            let (_, trace) = commit(
+                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()).get_public_key(),
+                payer_witness.blind,
+                payer_witness.amount,
+                payer_witness.asset_type,
+            )?;
+            input_commitments_traces.push(trace);
+        }
+
+        for payee_witness in fake_witness.payees_witnesses.iter() {
+            let (_, trace) = commit(
+                &payee_witness.public_key,
+                payee_witness.blind,
+                payee_witness.amount,
+                payee_witness.asset_type,
+            )?;
+            output_commitments_traces.push(trace);
         }
 
         let (cs, _) = build_multi_xfr_cs(
             fake_witness,
             FEE_TYPE.as_scalar(),
             &nullifiers_traces,
+            &input_commitments_traces,
+            &output_commitments_traces,
             &folding_witness,
         );
 
@@ -210,6 +232,8 @@ impl ProverParams {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair = AXfrKeyPair::generate(&mut prng);
 
+        let (_, output_commitment_trace) = commit(&keypair.get_public_key(), zero, 0, zero)?;
+
         let (cs, _) = build_bar_to_abar_cs(
             zero,
             zero,
@@ -219,6 +243,7 @@ impl ProverParams {
             &non_zk_state,
             &beta,
             &lambda,
+            &output_commitment_trace,
         );
 
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
@@ -292,9 +317,17 @@ impl ProverParams {
             payer_secret.uid,
         )?;
 
+        let (_, input_commitment_trace) = commit(
+            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()).get_public_key(),
+            payer_secret.blind,
+            payer_secret.amount,
+            payer_secret.asset_type,
+        )?;
+
         let (cs, _) = build_abar_to_bar_cs(
             payer_secret,
             &nullifier_trace,
+            &input_commitment_trace,
             &proof,
             &non_zk_state,
             &beta,
@@ -331,7 +364,14 @@ impl ProverParams {
             public_key: keypair.get_public_key(),
         };
 
-        let (cs, _) = build_ar_to_abar_cs(dummy_payee);
+        let (_, input_commitment_trace) = commit(
+            &dummy_payee.public_key,
+            dummy_payee.blind,
+            dummy_payee.amount,
+            dummy_payee.asset_type,
+        )?;
+
+        let (cs, _) = build_ar_to_abar_cs(dummy_payee, &input_commitment_trace);
 
         let srs = SRS.c(d!(NoahError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
@@ -381,7 +421,19 @@ impl ProverParams {
             payer_secret.uid,
         )?;
 
-        let (cs, _) = build_abar_to_ar_cs(payer_secret, &nullifier_trace, &folding_witness);
+        let (_, input_commitment_trace) = commit(
+            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()).get_public_key(),
+            payer_secret.blind,
+            payer_secret.amount,
+            payer_secret.asset_type,
+        )?;
+
+        let (cs, _) = build_abar_to_ar_cs(
+            payer_secret,
+            &nullifier_trace,
+            &input_commitment_trace,
+            &folding_witness,
+        );
 
         let srs = SRS.c(d!(NoahError::MissingSRSError))?;
         let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
