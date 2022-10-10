@@ -604,8 +604,8 @@ pub(crate) fn build_bar_to_abar_cs(
         cs.equal(y_in_bls12_381, at_var);
     }
 
-    // 7. Rescue commitment
-    let rescue_comm_var = commit_in_cs(
+    // 7. Coin commitment
+    let coin_comm_var = commit_in_cs(
         &mut cs,
         blind_var,
         amount_var,
@@ -615,7 +615,7 @@ pub(crate) fn build_bar_to_abar_cs(
     );
 
     // prepare public inputs.
-    cs.prepare_pi_variable(rescue_comm_var);
+    cs.prepare_pi_variable(coin_comm_var);
     cs.prepare_pi_variable(comm_var);
 
     for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {

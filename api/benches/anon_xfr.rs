@@ -25,7 +25,8 @@ use noah::{
 };
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::basic::{pedersen_comm::PedersenCommitmentRistretto, rescue::RescueInstance};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use parking_lot::RwLock;
 use sha2::Sha512;
 use std::sync::Arc;
@@ -36,7 +37,6 @@ use storage::{
 
 const AMOUNT: u64 = 10u64;
 const ASSET: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
-const BATCHSIZE: [usize; 7] = [1, 2, 3, 6, 10, 20, 30];
 
 // Measurement of the verification time and batch verification time of `abar_to_abar`.
 fn bench_abar_to_abar(c: &mut Criterion) {
@@ -415,13 +415,7 @@ fn build_oabar<R: CryptoRng + RngCore>(
 }
 
 fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
-    let hash = RescueInstance::new();
-    hash.rescue(&[
-        BLSScalar::from(uid),
-        abar.commitment,
-        BLSScalar::zero(),
-        BLSScalar::zero(),
-    ])[0]
+    AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(uid), abar.commitment])
 }
 
 fn build_mt_leaf_info_from_proof(proof: Proof, uid: u64) -> MTLeafInfo {

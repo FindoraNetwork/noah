@@ -26,7 +26,6 @@ use noah_crypto::basic::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
 };
 use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
-use noah_crypto::basic::rescue::RescueInstance;
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
@@ -410,8 +409,6 @@ pub fn build_abar_to_ar_cs(
         commitment: com_abar_in_var,
     };
 
-    let hash = RescueInstance::new();
-
     let mut path_traces = Vec::new();
     let (commitment, _) = commit(
         &keypair.get_public_key(),
@@ -420,7 +417,11 @@ pub fn build_abar_to_ar_cs(
         payer_witness.asset_type,
     )
     .unwrap();
-    let mut next = hash.rescue(&[BLSScalar::from(payer_witness.uid), commitment, zero, zero])[0];
+    let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        BLSScalar::from(payer_witness.uid),
+        commitment,
+    ]);
+    let mut next = leaf_trace.output;
     for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
         let (s1, s2, s3) = if mt_node.is_left_child != 0 {
             (next, mt_node.siblings1, mt_node.siblings2)
@@ -434,8 +435,13 @@ pub fn build_abar_to_ar_cs(
         path_traces.push(trace);
     }
 
-    let tmp_root_var =
-        compute_merkle_root_variables(&mut cs, acc_elem, &payer_witness_var.path, &path_traces);
+    let tmp_root_var = compute_merkle_root_variables(
+        &mut cs,
+        acc_elem,
+        &payer_witness_var.path,
+        &leaf_trace,
+        &path_traces,
+    );
 
     if let Some(root) = root_var {
         cs.equal(root, tmp_root_var);
