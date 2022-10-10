@@ -143,7 +143,6 @@ impl TurboCS<BLSScalar> {
         self.push_mul_selectors(one, one);
         self.push_constant_selector(zero);
         self.push_ecc_selector(edwards_d.neg());
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
 
         self.wiring[0].push(p1_var.0);
@@ -158,7 +157,6 @@ impl TurboCS<BLSScalar> {
         self.push_mul_selectors(one, one);
         self.push_constant_selector(zero);
         self.push_ecc_selector(edwards_d);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
 
         self.wiring[0].push(p1_var.0);
@@ -229,7 +227,6 @@ impl TurboCS<BLSScalar> {
         self.push_add_selectors(g1.0, g2.0, zero, zero);
         self.push_constant_selector(zero);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
 
         self.wiring[0].push(b0_var);
@@ -244,7 +241,6 @@ impl TurboCS<BLSScalar> {
         self.push_mul_selectors(g3.1.add(&one).sub(&g1.1.add(&g2.1)), zero);
         self.push_constant_selector(one);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
 
         self.wiring[0].push(b0_var);

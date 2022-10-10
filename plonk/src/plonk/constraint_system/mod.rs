@@ -3,9 +3,6 @@ use noah_algebra::prelude::*;
 /// Module for Field Simulation Constrain System.
 pub mod field_simulation;
 
-/// Module for Rescue Constrain System.
-pub mod rescue;
-
 /// Module for Turbo PLONK Constrain System.
 pub mod turbo;
 

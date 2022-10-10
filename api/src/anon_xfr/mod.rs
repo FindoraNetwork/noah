@@ -20,7 +20,7 @@ use noah_crypto::basic::anemoi_jive::{
 };
 use noah_plonk::{
     plonk::{
-        constraint_system::{rescue::StateVar, TurboCS, VarIndex},
+        constraint_system::{TurboCS, VarIndex},
         indexer::PlonkPf,
     },
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
@@ -358,12 +358,13 @@ pub fn compute_merkle_root_variables(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
+    leaf_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     traces: &Vec<JiveTrace<BLSScalar, 2, 12>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
-    let zero_var = cs.zero_var();
 
-    let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, zero_var, zero_var]))[0];
+    let mut node_var = cs.new_variable(leaf_trace.output);
+    cs.anemoi_variable_length_hash(leaf_trace, &[uid, commitment], node_var);
     for (idx, (path_node, trace)) in path_vars.nodes.iter().zip(traces.iter()).enumerate() {
         let input_var = parse_merkle_tree_path(
             cs,

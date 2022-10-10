@@ -12,5 +12,3 @@ pub mod matrix_sigma;
 pub mod pedersen_comm;
 /// The module for the equality proof between a Pedersen commitment and an ElGamal ciphertext.
 pub mod pedersen_elgamal;
-/// The module for the Rescue hash function.
-pub mod rescue;

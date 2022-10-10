@@ -26,7 +26,7 @@ pub struct DelegatedSchnorrProof<S, G, P> {
 pub struct DelegatedSchnorrInspection<S, G, P> {
     /// The committed value and their corresponding randomizer
     pub committed_data_and_randomizer: Vec<(S, S)>,
-    /// The randomizer used to make the Rescue hash function a commitment scheme.
+    /// The randomizer used to make the hash function a commitment scheme.
     pub r: BLSScalar,
     /// PhantomData for the parameters.
     pub params_phantom: PhantomData<P>,

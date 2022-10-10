@@ -41,7 +41,6 @@ impl TurboCS<BLSScalar> {
 
         self.push_mul_selectors(zero, zero);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(zero);
 
         self.wiring[0].push(input_var.0[0]); // a_0
@@ -59,7 +58,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(zero);
 
             self.wiring[0].push(intermediate_var.0[r - 1][0]); // a_i
@@ -83,7 +81,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -107,7 +104,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -131,7 +127,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -155,7 +150,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -179,7 +173,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -354,7 +347,6 @@ impl TurboCS<BLSScalar> {
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(salt);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
 
         self.wiring[0].push(sum_output_var);

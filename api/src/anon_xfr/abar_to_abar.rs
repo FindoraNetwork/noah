@@ -21,7 +21,6 @@ use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use noah_crypto::basic::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
 };
-use noah_crypto::basic::rescue::RescueInstance;
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
@@ -508,7 +507,6 @@ impl AXfrPubInputs {
             })
             .collect();
 
-        let hash = RescueInstance::new();
         let zero = BLSScalar::zero();
         let payees_commitments: Vec<Commitment> = witness
             .payees_witnesses
@@ -537,7 +535,8 @@ impl AXfrPubInputs {
             payer.asset_type,
         )
         .unwrap();
-        let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0];
+        let mut node =
+            AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(payer.uid), commitment]);
         for (idx, path_node) in payer.path.nodes.iter().enumerate() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
                 (1, 0) => vec![node, path_node.siblings1, path_node.siblings2],
@@ -599,8 +598,6 @@ pub(crate) fn build_multi_xfr_cs(
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
-    let hash = RescueInstance::new();
-
     for (((payer_witness_var, input_commitment_trace), nullifier_trace), payer_witness) in
         payers_secrets
             .iter()
@@ -654,8 +651,11 @@ pub(crate) fn build_multi_xfr_cs(
             payer_witness.asset_type,
         )
         .unwrap();
-        let mut next =
-            hash.rescue(&[BLSScalar::from(payer_witness.uid), commitment, zero, zero])[0];
+        let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            BLSScalar::from(payer_witness.uid),
+            commitment,
+        ]);
+        let mut next = leaf_trace.output;
         for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
             let (s1, s2, s3) = if mt_node.is_left_child != 0 {
                 (next, mt_node.siblings1, mt_node.siblings2)
@@ -669,8 +669,13 @@ pub(crate) fn build_multi_xfr_cs(
             next = trace.output;
             path_traces.push(trace);
         }
-        let tmp_root_var =
-            compute_merkle_root_variables(&mut cs, acc_elem, &payer_witness_var.path, &path_traces);
+        let tmp_root_var = compute_merkle_root_variables(
+            &mut cs,
+            acc_elem,
+            &payer_witness_var.path,
+            &leaf_trace,
+            &path_traces,
+        );
 
         // additional safegaurd to check the payer's amount, although in theory this is not needed.
         cs.range_check(payer_witness_var.amount, AMOUNT_LEN);
@@ -951,7 +956,6 @@ mod tests {
     use noah_crypto::basic::anemoi_jive::{
         AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
     };
-    use noah_crypto::basic::rescue::RescueInstance;
     use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
     use sha2::Sha512;
 
@@ -1033,13 +1037,15 @@ mod tests {
 
         // compute the merkle leaves and update the merkle paths if there are more than 1 payers.
         if n_payers > 1 {
-            let hash = RescueInstance::new();
             let leafs: Vec<BLSScalar> = payers_secrets
                 .iter()
                 .map(|payer| {
                     let (commitment, _) =
                         commit(&public_key, payer.blind, payer.amount, payer.asset_type).unwrap();
-                    hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0]
+                    AnemoiJive381::eval_variable_length_hash(&[
+                        BLSScalar::from(payer.uid),
+                        commitment,
+                    ])
                 })
                 .collect();
             payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
@@ -1081,8 +1087,6 @@ mod tests {
         let mut prng = test_rng();
 
         let user_params = ProverParams::new(1, 1, Some(1)).unwrap();
-
-        let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         let two = one.add(&one);
 
@@ -1108,7 +1112,6 @@ mod tests {
             is_left_child: 0u8,
             is_right_child: 1u8,
         };
-        let hash = RescueInstance::new();
 
         let (commitment, _) = commit(
             oabar.pub_key_ref(),
@@ -1118,7 +1121,7 @@ mod tests {
         )
         .unwrap();
 
-        let leaf = hash.rescue(&[/*uid=*/ two, commitment, zero, zero])[0];
+        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, commitment]);
         let merkle_root = AnemoiJive381::eval_jive(
             &[/*sib1[0]=*/ one, /*sib2[0]=*/ two],
             &[leaf, ANEMOI_JIVE_381_SALTS[0]],
@@ -1237,12 +1240,14 @@ mod tests {
         };
 
         // simulate Merkle tree state with these inputs for testing.
-        let hash = RescueInstance::new();
         let leafs: Vec<BLSScalar> = in_abars
             .iter()
             .enumerate()
             .map(|(uid, in_abar)| {
-                hash.rescue(&[BLSScalar::from(uid as u32), in_abar.commitment, zero, zero])[0]
+                AnemoiJive381::eval_variable_length_hash(&[
+                    BLSScalar::from(uid as u32),
+                    in_abar.commitment,
+                ])
             })
             .collect();
         let node0 = MTNode {
@@ -2151,7 +2156,6 @@ mod tests {
 
     #[test]
     fn test_merkle_root() {
-        let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         let two = one.add(&one);
         let three = two.add(&one);
@@ -2181,8 +2185,10 @@ mod tests {
         };
 
         // compute the root value.
-        let hash = RescueInstance::new();
-        let leaf = hash.rescue(&[/*uid=*/ one, /*comm=*/ two, zero, zero])[0];
+        let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            /*uid=*/ one, /*comm=*/ two,
+        ]);
+        let leaf = leaf_trace.output;
         // leaf is the right child of node1.
         let trace1 = AnemoiJive381::eval_jive_with_trace(
             &[path_node2.siblings1, path_node2.siblings2],
@@ -2200,8 +2206,13 @@ mod tests {
         let path = MTPath::new(vec![path_node2, path_node1]);
         let path_vars = add_merkle_path_variables(&mut cs, path);
 
-        let root_var =
-            compute_merkle_root_variables(&mut cs, elem, &path_vars, &vec![trace1, trace2]);
+        let root_var = compute_merkle_root_variables(
+            &mut cs,
+            elem,
+            &path_vars,
+            &leaf_trace,
+            &vec![trace1, trace2],
+        );
 
         // check Merkle root correctness.
         let mut witness = cs.get_and_clear_witness();
