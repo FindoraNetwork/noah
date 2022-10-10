@@ -2,13 +2,15 @@ use crate::plonk::indexer::PlonkVerifierParams;
 use crate::poly_commit::{pcs::ToBytes, transcript::PolyComTranscript};
 use merlin::Transcript;
 use noah_algebra::prelude::*;
+use noah_algebra::traits::Domain;
 use rand_chacha::ChaChaRng;
 
 /// Initialize the transcript when compute PLONK proof.
-pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(
+pub(crate) fn transcript_init_plonk<C: ToBytes, F: Domain>(
     transcript: &mut Transcript,
     params: &PlonkVerifierParams<C, F>,
     pi_values: &[F],
+    root: &F,
 ) {
     transcript.append_message(b"New Domain", b"PLONK");
 
@@ -20,7 +22,7 @@ pub(crate) fn transcript_init_plonk<C: ToBytes, F: Scalar>(
     for p in params.cm_s_vec.iter() {
         transcript.append_commitment(p);
     }
-    transcript.append_field_elem(&params.root);
+    transcript.append_field_elem(root);
     for generator in params.k.iter() {
         transcript.append_field_elem(generator);
     }

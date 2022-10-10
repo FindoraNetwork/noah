@@ -7,7 +7,7 @@ use merlin::Transcript;
 use noah_algebra::{
     bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
     prelude::*,
-    traits::Pairing,
+    traits::{Domain, Pairing},
 };
 
 /// KZG commitment scheme over the `Group`.
@@ -64,7 +64,7 @@ impl<F: Scalar> ToBytes for FpPolynomial<F> {
     }
 }
 
-impl<F: Scalar> HomomorphicPolyComElem for FpPolynomial<F> {
+impl<F: Domain> HomomorphicPolyComElem for FpPolynomial<F> {
     type Scalar = F;
 
     fn get_base() -> Self {

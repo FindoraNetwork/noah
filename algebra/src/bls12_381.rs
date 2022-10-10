@@ -1,4 +1,8 @@
-use crate::{errors::AlgebraError, prelude::*, traits::Pairing};
+use crate::{
+    errors::AlgebraError,
+    prelude::*,
+    traits::{Domain, Pairing},
+};
 use ark_bls12_381::{
     fr::FrParameters, Bls12_381 as Bls12381pairing, Fq, Fq12Parameters, Fr, G1Affine, G1Projective,
     G2Affine, G2Projective,
@@ -334,6 +338,20 @@ impl Scalar for BLSScalar {
 
     fn square(&self) -> Self {
         Self(self.0.square())
+    }
+}
+
+impl Domain for BLSScalar {
+    type Field = Fr;
+
+    #[inline]
+    fn get_field(&self) -> Self::Field {
+        self.0
+    }
+
+    #[inline]
+    fn from_field(field: Self::Field) -> Self {
+        Self(field)
     }
 }
 
