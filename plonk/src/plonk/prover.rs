@@ -205,8 +205,15 @@ pub fn prover_with_lagrange<
     // 5. build t, split into `n_wires_per_gate` degree-(N+2) polynomials and commit
     let t_poly =
         t_poly::<PCS, CS>(cs, prover_params, &w_polys, &z_poly, &challenges, &pi).c(d!())?;
-    let (cm_t_vec, t_polys) =
-        split_t_and_commit(prng, pcs, &t_poly, n_wires_per_gate, n_constraints + 2).c(d!())?;
+    let (cm_t_vec, t_polys) = split_t_and_commit(
+        prng,
+        pcs,
+        lagrange_pcs,
+        &t_poly,
+        n_wires_per_gate,
+        n_constraints + 2,
+    )
+    .c(d!())?;
 
     for cm_t in cm_t_vec.iter() {
         transcript.append_commitment::<PCS::Commitment>(cm_t);
@@ -289,7 +296,13 @@ pub fn prover_with_lagrange<
     let zeta = challenges.get_zeta().unwrap();
 
     let opening_witness_zeta = pcs
-        .batch_prove(transcript, &polys_to_open[..], &zeta, n_constraints + 2)
+        .batch_prove(
+            transcript,
+            lagrange_pcs,
+            &polys_to_open[..],
+            &zeta,
+            n_constraints + 2,
+        )
         .c(d!(PlonkError::ProofError))?;
 
     let polys_to_open: Vec<&FpPolynomial<PCS::Field>> =
@@ -298,6 +311,7 @@ pub fn prover_with_lagrange<
     let opening_witness_zeta_omega = pcs
         .batch_prove(
             transcript,
+            lagrange_pcs,
             &polys_to_open[..],
             &zeta_omega,
             n_constraints + 2,

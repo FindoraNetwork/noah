@@ -135,8 +135,6 @@ impl ProverParams {
         n_payees: usize,
         tree_depth: Option<usize>,
     ) -> Result<ProverParams> {
-        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
-
         let folding_witness = AXfrAddressFoldingWitness::default();
 
         let fake_witness = match tree_depth {
@@ -184,9 +182,7 @@ impl ProverParams {
             &folding_witness,
         );
 
-        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(NoahError::DeserializationError))?;
-
+        let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
@@ -201,7 +197,6 @@ impl ProverParams {
 
     /// Obtain the parameters for confidential to anonymous.
     pub fn bar_to_abar_params() -> Result<ProverParams> {
-        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
         let zero = BLSScalar::zero();
 
         let proof = DelegatedSchnorrProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
@@ -246,9 +241,7 @@ impl ProverParams {
             &output_commitment_trace,
         );
 
-        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(NoahError::DeserializationError))?;
-
+        let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
@@ -334,10 +327,8 @@ impl ProverParams {
             &lambda,
             &folding_witness,
         );
-        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
-        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(NoahError::DeserializationError))?;
 
+        let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
@@ -373,10 +364,7 @@ impl ProverParams {
 
         let (cs, _) = build_ar_to_abar_cs(dummy_payee, &input_commitment_trace);
 
-        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
-        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(NoahError::DeserializationError))?;
-
+        let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
@@ -435,10 +423,7 @@ impl ProverParams {
             &folding_witness,
         );
 
-        let srs = SRS.c(d!(NoahError::MissingSRSError))?;
-        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-            .c(d!(NoahError::DeserializationError))?;
-
+        let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
 
         let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
@@ -473,6 +458,31 @@ fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
             })
         }
     }
+}
+
+fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
+    let srs = SRS.c(d!(NoahError::MissingSRSError))?;
+    let KZGCommitmentSchemeBLS {
+        public_parameter_group_1,
+        public_parameter_group_2,
+    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+        .c(d!(NoahError::DeserializationError))?;
+
+    let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 2051)];
+    new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
+
+    if size == 4096 {
+        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
+    }
+
+    if size == 8192 {
+        new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
+    }
+
+    Ok(KZGCommitmentSchemeBLS {
+        public_parameter_group_2,
+        public_parameter_group_1: new_group_1,
+    })
 }
 
 impl VerifierParams {
@@ -585,16 +595,14 @@ impl From<ProverParams> for VerifierParams {
 
 #[cfg(test)]
 mod test {
+    use super::load_srs_params;
     use crate::anon_xfr::TREE_DEPTH;
-    use crate::parameters::SRS;
     use crate::setup::{ProverParams, VerifierParams};
     use noah_algebra::{
         bls12_381::{BLSScalar, BLSG1},
         prelude::*,
     };
-    use noah_plonk::poly_commit::{
-        field_polynomial::FpPolynomial, kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme,
-    };
+    use noah_plonk::poly_commit::{field_polynomial::FpPolynomial, pcs::PolyComScheme};
 
     #[test]
     fn test_params_serialization() {
@@ -620,7 +628,8 @@ mod test {
 
     #[test]
     fn test_crs_commit() {
-        let pcs = KZGCommitmentSchemeBLS::from_unchecked_bytes(&SRS.unwrap()).unwrap();
+        let pcs = load_srs_params(16).unwrap();
+
         let one = BLSScalar::one();
         let two = one.add(&one);
         let three = two.add(&one);

@@ -9,13 +9,9 @@ pub static BULLETPROOF_URS: Option<&'static [u8]> =
 /// The Bulletproofs URS.
 pub static BULLETPROOF_URS: Option<&'static [u8]> = None;
 
-#[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
+#[cfg(not(feature = "no_srs"))]
 /// The SRS.
-pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs.bin"));
-
-#[cfg(all(not(feature = "no_srs"), feature = "lightweight"))]
-/// The SRS.
-pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs-lw.bin"));
+pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../parameters/srs-padding.bin"));
 
 #[cfg(feature = "no_srs")]
 /// The SRS.
