@@ -5,41 +5,23 @@
 ![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/FindoraNetwork/noah)
 ![License](https://img.shields.io/badge/license-BUSL--1.1-lightgreen)
 
-## Noah: Findora's Cryptographic Library
+## Noah: A Cryptographic Library for Privacy Assets
 
-Noah is a library that provide tools to create and verify public transaction
-with confidential data.
+Noah is a Rust library that implements various cryptographic primitives for privacy assets. It implements two 
+constructions:
 
-### Basic Cryptographic tools:
-  - ElGamal Encryption in the exponent over generic groups.
-  - A Naive Multisignature (concatenation of ed25519 signatures)
-  - BLS multisignatures (not currently integrated with Xfr creation)
-  - Hybrid Encryption using signature key 
+- **Maxwell construction.** In 2015, a renowned blockchain developer Gregory Maxwell presented a construction of 
+confidential transactions (CT) for a UTXO chain. We implemented it with:
+   - Secp256k1 or Ed25519 for digital signatures
+   - The Ristretto group over Curve25519 for Pedersen commitments
+   - Bulletproofs over Curve25519 
 
-### Advanced Cryptographic tools:
-  - Anonymous Credentials based on David Pointcheval and Olivier Sanders.
-    Short Randomizable Signatures. CT RSA 2015. https://eprint.iacr.org/2015/525.pdf.
-    It currently uses BLS12_381 as the underlying pairing
-  - Confidential Anonymous Credential Reveal: Allows to encrypt credential attributes
-    so that a verifier can check a credential signature without learning the attributes.
-    This functionality allows for identity attributes tracking over a public ledger.
-  - Chaum Pedersen proofs: Allows to prove in zero-knowledge that a set of Pedersen
-    commitments open to the same value. Used in transfers to prove that the input confidential asset
-    is the same as the output asset type.
-  - Pedersen-ElGamal Equality Proofs: Allows to prove in zero-knowledge that the
-    decryption of an Elgamal ciphertexts correctly opens a pedersen commitment.
-    Use in transfers that allow tracking amounts and asset type without publicly
-    revealing these values.
-  - Dlog: Simple proof of knowlege of discrete logarithms over generic groups.
-
-### Xfr multi-input multi-output UTXO transfers
-  - Plain: XfrNote reveal amount and asset type
-  - Confidential amount and/or asset type: XfrNote hides amount and/or asset type
-  - AssetType mixing: Allows for multiple asset types in a confidential transaction
-    Implemented via the Cloak protocol. Currently using Interstellar spacesuite prototype
-  - Tracking policies: Allow tracking of amount, asset type, and/or identity
-    of asset holders. That is, confidential Xfrs need to provide ciphertexts of
-    amount/asset_type and/or identity and prove that this are correctly formed.
+- **Zerocash construction.** Improved over a prior protocol Zerocoin, the Zerocash construction, firstly proposed by 
+Ben-Sasson, Chiesa, Garman, Green, Miers, Tromer, and Virza and improved subsequently by the Zcash 
+Foundation and Electric Coin Company (ECC), is another privacy-preserving transfer protocol over a UTXO chain. We implemented it with:
+   - Secp256k1 or Ed25519 (incoming) for digital signatures
+   - An inhouse variant of TurboPlonk with various optimization tricks
+   - The European technique for efficient memory in zk-SNARK, using the Anemoi-Jive hashes
 
 ## Licensing
 
