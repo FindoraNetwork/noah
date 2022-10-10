@@ -7,7 +7,7 @@ use noah::anon_xfr::{
 };
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::basic::rescue::RescueInstance;
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 use noah_plonk::plonk::constraint_system::TurboCS;
 use parking_lot::RwLock;
 use std::env::temp_dir;
@@ -20,8 +20,6 @@ use storage::{
 
 #[test]
 fn test_persistent_merkle_tree() {
-    let hash = RescueInstance::new();
-
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
     let mut state = State::new(cs, false);
@@ -37,12 +35,10 @@ fn test_persistent_merkle_tree() {
 
     assert_ne!(
         mt.get_root().unwrap(),
-        hash.rescue(&[
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-            BLSScalar::zero(),
-            BLSScalar::zero()
-        ])[0]
+        AnemoiJive381::eval_jive(
+            &[BLSScalar::zero(), BLSScalar::zero()],
+            &[BLSScalar::zero(), ANEMOI_JIVE_381_SALTS[0]]
+        )
     );
 
     assert!(mt
@@ -82,6 +78,8 @@ fn test_persistent_merkle_tree_proof_commitment() {
     let proof = mt.generate_proof(0).unwrap();
 
     let mut cs = TurboCS::new();
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
     let uid_var = cs.new_variable(BLSScalar::from(0u32));
     let comm_var = cs.new_variable(abar.commitment);
     let elem = AccElemVars {
@@ -104,7 +102,25 @@ fn test_persistent_merkle_tree_proof_commitment() {
                 .collect(),
         },
     );
-    let root_var = compute_merkle_root_variables(&mut cs, elem, &path_vars);
+
+    let mut path_traces = Vec::new();
+    let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        BLSScalar::from(0u32),
+        abar.commitment,
+    ]);
+    let mut next = leaf_trace.output;
+    for (i, mt_node) in proof.nodes.iter().enumerate() {
+        let (s1, s2, s3) = match mt_node.path {
+            TreePath::Left => (next, mt_node.siblings1, mt_node.siblings2),
+            TreePath::Middle => (mt_node.siblings1, next, mt_node.siblings2),
+            TreePath::Right => (mt_node.siblings1, mt_node.siblings2, next),
+        };
+        let trace = AnemoiJive381::eval_jive_with_trace(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
+        next = trace.output;
+        path_traces.push(trace);
+    }
+    let root_var =
+        compute_merkle_root_variables(&mut cs, elem, &path_vars, &leaf_trace, &path_traces);
 
     // Check Merkle root correctness
     let witness = cs.get_and_clear_witness();
@@ -238,12 +254,5 @@ pub fn test_merkle_proofs() {
 }
 
 fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
-    let hash = RescueInstance::new();
-
-    hash.rescue(&[
-        BLSScalar::from(uid),
-        abar.commitment,
-        BLSScalar::zero(),
-        BLSScalar::zero(),
-    ])[0]
+    AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(uid), abar.commitment])
 }

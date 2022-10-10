@@ -47,7 +47,6 @@ impl<P: SimFrParams> SimFrVar<P> {
             cs.push_mul_selectors(zero, zero);
             cs.push_constant_selector(r_limbs[i]);
             cs.push_ecc_selector(zero);
-            cs.push_rescue_selectors(zero, zero, zero, zero);
             cs.push_out_selector(one);
 
             cs.wiring[0].push(self.var[i]);
@@ -91,7 +90,6 @@ impl<P: SimFrParams> SimFrVar<P> {
                 cs.push_mul_selectors(zero, one);
                 cs.push_constant_selector(zero);
                 cs.push_ecc_selector(zero);
-                cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(one);
 
                 cs.wiring[0].push(prior_res);

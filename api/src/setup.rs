@@ -8,6 +8,7 @@ use crate::anon_xfr::{
     abar_to_bar::build_abar_to_bar_cs,
     ar_to_abar::build_ar_to_abar_cs,
     bar_to_abar::build_bar_to_abar_cs,
+    commit, nullify,
     structs::{MTNode, MTPath},
     TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
@@ -136,18 +137,50 @@ impl ProverParams {
     ) -> Result<ProverParams> {
         let folding_witness = AXfrAddressFoldingWitness::default();
 
-        let (cs, _) = match tree_depth {
-            Some(depth) => build_multi_xfr_cs(
-                AXfrWitness::fake(n_payers, n_payees, depth, 0),
-                FEE_TYPE.as_scalar(),
-                &folding_witness,
-            ),
-            None => build_multi_xfr_cs(
-                AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
-                FEE_TYPE.as_scalar(),
-                &folding_witness,
-            ),
+        let fake_witness = match tree_depth {
+            Some(depth) => AXfrWitness::fake(n_payers, n_payees, depth, 0),
+            None => AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
         };
+
+        let mut nullifiers_traces = Vec::new();
+        let mut input_commitments_traces = Vec::new();
+        let mut output_commitments_traces = Vec::new();
+        for payer_witness in fake_witness.payers_witnesses.iter() {
+            let (_, trace) = nullify(
+                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()),
+                payer_witness.amount,
+                payer_witness.asset_type,
+                payer_witness.uid,
+            )?;
+            nullifiers_traces.push(trace);
+
+            let (_, trace) = commit(
+                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()).get_public_key(),
+                payer_witness.blind,
+                payer_witness.amount,
+                payer_witness.asset_type,
+            )?;
+            input_commitments_traces.push(trace);
+        }
+
+        for payee_witness in fake_witness.payees_witnesses.iter() {
+            let (_, trace) = commit(
+                &payee_witness.public_key,
+                payee_witness.blind,
+                payee_witness.amount,
+                payee_witness.asset_type,
+            )?;
+            output_commitments_traces.push(trace);
+        }
+
+        let (cs, _) = build_multi_xfr_cs(
+            fake_witness,
+            FEE_TYPE.as_scalar(),
+            &nullifiers_traces,
+            &input_commitments_traces,
+            &output_commitments_traces,
+            &folding_witness,
+        );
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
@@ -194,6 +227,8 @@ impl ProverParams {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
         let keypair = AXfrKeyPair::generate(&mut prng);
 
+        let (_, output_commitment_trace) = commit(&keypair.get_public_key(), zero, 0, zero)?;
+
         let (cs, _) = build_bar_to_abar_cs(
             zero,
             zero,
@@ -203,6 +238,7 @@ impl ProverParams {
             &non_zk_state,
             &beta,
             &lambda,
+            &output_commitment_trace,
         );
 
         let pcs = load_srs_params(cs.size())?;
@@ -267,8 +303,24 @@ impl ProverParams {
 
         let folding_witness = AXfrAddressFoldingWitness::default();
 
+        let (_, nullifier_trace) = nullify(
+            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()),
+            payer_secret.amount,
+            payer_secret.asset_type,
+            payer_secret.uid,
+        )?;
+
+        let (_, input_commitment_trace) = commit(
+            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()).get_public_key(),
+            payer_secret.blind,
+            payer_secret.amount,
+            payer_secret.asset_type,
+        )?;
+
         let (cs, _) = build_abar_to_bar_cs(
             payer_secret,
+            &nullifier_trace,
+            &input_commitment_trace,
             &proof,
             &non_zk_state,
             &beta,
@@ -303,7 +355,14 @@ impl ProverParams {
             public_key: keypair.get_public_key(),
         };
 
-        let (cs, _) = build_ar_to_abar_cs(dummy_payee);
+        let (_, input_commitment_trace) = commit(
+            &dummy_payee.public_key,
+            dummy_payee.blind,
+            dummy_payee.amount,
+            dummy_payee.asset_type,
+        )?;
+
+        let (cs, _) = build_ar_to_abar_cs(dummy_payee, &input_commitment_trace);
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
@@ -343,7 +402,26 @@ impl ProverParams {
 
         let folding_witness = AXfrAddressFoldingWitness::default();
 
-        let (cs, _) = build_abar_to_ar_cs(payer_secret, &folding_witness);
+        let (_, nullifier_trace) = nullify(
+            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()),
+            payer_secret.amount,
+            payer_secret.asset_type,
+            payer_secret.uid,
+        )?;
+
+        let (_, input_commitment_trace) = commit(
+            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()).get_public_key(),
+            payer_secret.blind,
+            payer_secret.amount,
+            payer_secret.asset_type,
+        )?;
+
+        let (cs, _) = build_abar_to_ar_cs(
+            payer_secret,
+            &nullifier_trace,
+            &input_commitment_trace,
+            &folding_witness,
+        );
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());

@@ -6,6 +6,7 @@ use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
 use noah_algebra::secp256k1::SECP256K1Scalar;
 use noah_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
 use noah_crypto::bulletproofs::scalar_mul::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
@@ -14,7 +15,6 @@ use noah_crypto::delegated_schnorr::{
 };
 use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 use noah_plonk::plonk::constraint_system::field_simulation::SimFrVar;
-use noah_plonk::plonk::constraint_system::rescue::StateVar;
 use noah_plonk::plonk::constraint_system::VarIndex;
 use num_bigint::BigUint;
 use rand_core::{CryptoRng, RngCore};
@@ -249,7 +249,6 @@ pub fn prove_address_folding_in_cs(
                 cs.push_mul_selectors(one, zero);
                 cs.push_constant_selector(one);
                 cs.push_ecc_selector(zero);
-                cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(one);
 
                 cs.wiring[0].push(flag_meet_first_different_bit_var);
@@ -276,7 +275,6 @@ pub fn prove_address_folding_in_cs(
                 cs.push_mul_selectors(one, zero);
                 cs.push_constant_selector(one);
                 cs.push_ecc_selector(zero);
-                cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(one);
 
                 cs.wiring[0].push(flag_meet_first_different_bit_var);
@@ -303,7 +301,6 @@ pub fn prove_address_folding_in_cs(
                 cs.push_mul_selectors(one.neg(), zero);
                 cs.push_constant_selector(zero);
                 cs.push_ecc_selector(zero);
-                cs.push_rescue_selectors(zero, zero, zero, zero);
                 cs.push_out_selector(one);
 
                 cs.wiring[0].push(flag_meet_first_different_bit_var);
@@ -328,7 +325,6 @@ pub fn prove_address_folding_in_cs(
         cs.push_mul_selectors(one.neg(), zero);
         cs.push_constant_selector(one);
         cs.push_ecc_selector(zero);
-        cs.push_rescue_selectors(zero, zero, zero, zero);
         cs.push_out_selector(zero);
 
         cs.wiring[0].push(flag_smaller_than_modulus_var);
@@ -536,29 +532,13 @@ pub fn prove_address_folding_in_cs(
     {
         let mut input_vars = compressed_limbs_var.clone();
         input_vars.push(r_var);
-        input_vars.resize((input_vars.len() - 1 + 2) / 3 * 3 + 1, cs.zero_var());
 
-        let mut h_var = cs.rescue_hash(&StateVar::new([
-            input_vars[0],
-            input_vars[1],
-            input_vars[2],
-            input_vars[3],
-        ]))[0];
+        let mut input = compressed_limbs.clone();
+        input.push(r);
 
-        let input_vars = input_vars[4..].to_vec();
-
-        for chunk_var in input_vars.chunks(3) {
-            h_var = cs.rescue_hash(&StateVar::new([
-                h_var,
-                chunk_var[0],
-                chunk_var[1],
-                chunk_var[2],
-            ]))[0];
-        }
-
-        cs.equal(comm_var, h_var);
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&input);
+        cs.anemoi_variable_length_hash(&trace, &input_vars, comm_var);
     }
-
     cs.prepare_pi_variable(comm_var);
 
     for fr_var in lambda_series_vars_skip_first.iter() {

@@ -95,6 +95,10 @@ fn gen_transfer_vk(directory: PathBuf) {
                 .map(|j| {
                     println!("generating {} payers & {} payees", i, j);
                     let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
+                    println!(
+                        "the size of the constraint system for {} payers & {} payees: {}",
+                        i, j, node_params.cs.size
+                    );
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
                 })
@@ -124,6 +128,10 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
 
     let user_params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    println!(
+        "the size of the constraint system for ABAR TO BAR: {}",
+        node_params.cs.size
+    );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-bar-vk.bin");
     save_to_file(&bytes, path);
@@ -140,6 +148,10 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
 
     let user_params = ProverParams::bar_to_abar_params().unwrap();
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    println!(
+        "the size of the constraint system for BAR TO ABAR: {}",
+        node_params.cs.size
+    );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("bar-to-abar-vk.bin");
     save_to_file(&bytes, path);
@@ -156,6 +168,10 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
 
     let user_params = ProverParams::ar_to_abar_params().unwrap();
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    println!(
+        "the size of the constraint system for AR TO ABAR: {}",
+        node_params.cs.size
+    );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("ar-to-abar-vk.bin");
     save_to_file(&bytes, path);
@@ -172,6 +188,10 @@ fn gen_abar_to_ar_vk(mut path: PathBuf) {
 
     let user_params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    println!(
+        "the size of the constraint system for ABAR TO AR: {}",
+        node_params.cs.size
+    );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-ar-vk.bin");
     save_to_file(&bytes, path);

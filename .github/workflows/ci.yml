@@ -12,6 +12,11 @@ jobs:
   style:
     name: Check Style
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        rust:
+          - stable
     steps:
 
     - name: Checkout
@@ -36,6 +41,7 @@ jobs:
     env:
       RUSTFLAGS: -Dwarnings
     strategy:
+      fail-fast: true
       matrix:
         rust:
           - stable
@@ -71,6 +77,7 @@ jobs:
         RUSTFLAGS: -Dwarnings
         RUST_BACKTRACE: 1
       strategy:
+        fail-fast: true
         matrix:
           rust:
             - stable
@@ -98,6 +105,7 @@ jobs:
       env:
         RUSTFLAGS: -Dwarnings
       strategy:
+        fail-fast: true
         matrix:
           rust:
             - stable

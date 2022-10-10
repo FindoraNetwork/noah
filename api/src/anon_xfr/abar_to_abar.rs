@@ -3,7 +3,7 @@ use crate::anon_xfr::address_folding::{
     verify_address_folding, AXfrAddressFoldingInstance, AXfrAddressFoldingWitness,
 };
 use crate::anon_xfr::{
-    add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit_in_cs,
+    add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit, commit_in_cs,
     compute_merkle_root_variables,
     keys::{AXfrKeyPair, AXfrPubKey, AXfrSecretKey},
     nullify, nullify_in_cs,
@@ -18,7 +18,9 @@ use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::basic::rescue::RescueInstance;
+use noah_crypto::basic::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
+};
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
@@ -54,6 +56,12 @@ pub struct AXfrPreNote {
     pub body: AXfrBody,
     /// Witness.
     pub witness: AXfrWitness,
+    /// The traces of the input commitments.
+    pub input_commitments_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
+    /// The traces of the output commitments.
+    pub output_commitments_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
+    /// The traces of the nullifiers.
+    pub nullifiers_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
 }
@@ -91,19 +99,34 @@ pub fn init_anon_xfr_note(
     check_roots(inputs).c(d!())?;
 
     // 2. build input witness information
-    let nullifiers = inputs
-        .iter()
-        .map(|input| {
-            let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
-            nullify(
-                &input_keypair,
-                input.amount,
-                &input.asset_type,
-                mt_leaf_info.uid,
-            )
-            .unwrap()
-        })
-        .collect();
+    let mut nullifiers = Vec::new();
+    let mut nullifiers_traces = Vec::new();
+    let mut input_commitments_traces = Vec::new();
+
+    inputs.iter().for_each(|input| {
+        let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
+
+        let (nullifier, nullifier_trace) = nullify(
+            input_keypair,
+            input.amount,
+            input.asset_type.as_scalar(),
+            mt_leaf_info.uid,
+        )
+        .unwrap();
+
+        nullifiers.push(nullifier);
+        nullifiers_traces.push(nullifier_trace);
+
+        let (_, commitment_trace) = commit(
+            &input_keypair.get_public_key(),
+            input.blind,
+            input.amount,
+            input.asset_type.as_scalar(),
+        )
+        .unwrap();
+
+        input_commitments_traces.push(commitment_trace);
+    });
 
     // 3. build proof
     let payers_secrets = inputs
@@ -144,6 +167,21 @@ pub fn init_anon_xfr_note(
         .map(|output| output.owner_memo.clone().c(d!(NoahError::ParameterError)))
         .collect();
 
+    let output_commitments_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>> = outputs
+        .iter()
+        .map(|output| {
+            let (_, commitment_trace) = commit(
+                &output.pub_key,
+                output.blind,
+                output.amount,
+                output.asset_type.as_scalar(),
+            )
+            .unwrap();
+
+            commitment_trace
+        })
+        .collect();
+
     let mt_info_temp = inputs[0].mt_leaf_info.as_ref().unwrap();
     let body = AXfrBody {
         inputs: nullifiers,
@@ -157,6 +195,9 @@ pub fn init_anon_xfr_note(
     Ok(AXfrPreNote {
         body,
         witness: secret_inputs,
+        input_commitments_traces,
+        output_commitments_traces,
+        nullifiers_traces,
         input_keypair: input_keypair.clone(),
     })
 }
@@ -171,6 +212,9 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     let AXfrPreNote {
         body,
         witness,
+        input_commitments_traces,
+        output_commitments_traces,
+        nullifiers_traces,
         input_keypair,
     } = pre_note;
 
@@ -182,7 +226,16 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
         ANON_XFR_BP_GENS_LEN,
         &input_keypair,
     )?;
-    let proof = prove_xfr(prng, params, witness, &folding_witness).c(d!())?;
+    let proof = prove_xfr(
+        prng,
+        params,
+        witness,
+        &nullifiers_traces,
+        &input_commitments_traces,
+        &output_commitments_traces,
+        &folding_witness,
+    )
+    .c(d!())?;
 
     Ok(AXfrNote {
         body: body,
@@ -302,6 +355,9 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     secret_inputs: AXfrWitness,
+    nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
+    input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
+    output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
@@ -315,7 +371,14 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
 
     let fee_type = FEE_TYPE.as_scalar();
-    let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &folding_witness);
+    let (mut cs, _) = build_multi_xfr_cs(
+        secret_inputs,
+        fee_type,
+        nullifiers_traces,
+        input_commitments_traces,
+        output_commitments_traces,
+        &folding_witness,
+    );
     let witness = cs.get_and_clear_witness();
 
     prover_with_lagrange(
@@ -433,87 +496,57 @@ impl AXfrPubInputs {
 
     /// Convert from the witness.
     pub fn from_witness(witness: &AXfrWitness) -> Self {
-        let hash = RescueInstance::new();
         let payers_inputs: Vec<Nullifier> = witness
             .payers_witnesses
             .iter()
             .map(|sec| {
                 let keypair = AXfrKeyPair::from_secret_key(sec.secret_key.clone());
-                let public_key_scalars = keypair.get_public_key().get_public_key_scalars().unwrap();
-                let secret_key_scalars = keypair.get_secret_key().get_secret_key_scalars().unwrap();
+                let (hash, _) = nullify(&keypair, sec.amount, sec.asset_type, sec.uid).unwrap();
 
-                let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
-                let uid_amount = pow_2_64
-                    .mul(&BLSScalar::from(sec.uid))
-                    .add(&BLSScalar::from(sec.amount));
-                let cur = hash.rescue(&[
-                    uid_amount,
-                    sec.asset_type,
-                    public_key_scalars[0],
-                    public_key_scalars[1],
-                ])[0];
-                hash.rescue(&[
-                    cur,
-                    public_key_scalars[2],
-                    secret_key_scalars[0],
-                    secret_key_scalars[1],
-                ])[0]
+                hash
             })
             .collect();
 
-        let hash = RescueInstance::new();
         let zero = BLSScalar::zero();
         let payees_commitments: Vec<Commitment> = witness
             .payees_witnesses
             .iter()
             .map(|sec| {
                 let public_key_scalars = sec.public_key.get_public_key_scalars().unwrap();
-
-                let cur = hash.rescue(&[
+                AnemoiJive381::eval_variable_length_hash(&[
+                    zero, /* protocol version number */
                     sec.blind,
                     BLSScalar::from(sec.amount),
                     sec.asset_type,
+                    zero, /* address format */
                     public_key_scalars[0],
-                ])[0];
-                hash.rescue(&[
-                    cur,
                     public_key_scalars[1],
                     public_key_scalars[2],
-                    BLSScalar::zero(),
-                ])[0]
+                ])
             })
             .collect();
 
         let payer = &witness.payers_witnesses[0];
 
-        let commitment = {
-            let payer_keypair = AXfrKeyPair::from_secret_key(payer.secret_key.clone());
-            let payer_public_key_scalars = payer_keypair
-                .get_public_key()
-                .get_public_key_scalars()
-                .unwrap();
-
-            let cur = hash.rescue(&[
-                payer.blind,
-                BLSScalar::from(payer.amount),
-                payer.asset_type,
-                payer_public_key_scalars[0],
-            ])[0];
-            hash.rescue(&[
-                cur,
-                payer_public_key_scalars[1],
-                payer_public_key_scalars[2],
-                BLSScalar::zero(),
-            ])[0]
-        };
-        let mut node = hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0];
-        for path_node in payer.path.nodes.iter() {
+        let (commitment, _) = commit(
+            &AXfrKeyPair::from_secret_key(payer.secret_key.clone()).get_public_key(),
+            payer.blind,
+            payer.amount,
+            payer.asset_type,
+        )
+        .unwrap();
+        let mut node =
+            AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(payer.uid), commitment]);
+        for (idx, path_node) in payer.path.nodes.iter().enumerate() {
             let input = match (path_node.is_left_child, path_node.is_right_child) {
-                (1, 0) => vec![node, path_node.siblings1, path_node.siblings2, zero],
-                (0, 0) => vec![path_node.siblings1, node, path_node.siblings2, zero],
-                _ => vec![path_node.siblings1, path_node.siblings2, node, zero],
+                (1, 0) => vec![node, path_node.siblings1, path_node.siblings2],
+                (0, 0) => vec![path_node.siblings1, node, path_node.siblings2],
+                _ => vec![path_node.siblings1, path_node.siblings2, node],
             };
-            node = hash.rescue(&input)[0];
+            node = AnemoiJive381::eval_jive(
+                &[input[0], input[1]],
+                &[input[2], ANEMOI_JIVE_381_SALTS[idx]],
+            );
         }
 
         Self {
@@ -529,13 +562,20 @@ impl AXfrPubInputs {
 pub(crate) fn build_multi_xfr_cs(
     witness: AXfrWitness,
     fee_type: BLSScalar,
+    nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
+    input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
+    output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(witness.payers_witnesses.len(), 0);
     assert_ne!(witness.payees_witnesses.len(), 0);
 
     let mut cs = TurboCS::new();
-    let payers_secrets = add_payers_witnesses(&mut cs, &witness.payers_witnesses);
+
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+    let payers_secrets =
+        add_payers_witnesses(&mut cs, &witness.payers_witnesses.iter().collect_vec());
     let payees_secrets = add_payees_witnesses(&mut cs, &witness.payees_witnesses);
 
     let keypair = folding_witness.keypair.clone();
@@ -558,20 +598,32 @@ pub(crate) fn build_multi_xfr_cs(
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
-    for payer in &payers_secrets {
+    for (((payer_witness_var, input_commitment_trace), nullifier_trace), payer_witness) in
+        payers_secrets
+            .iter()
+            .zip(input_commitments_traces.iter())
+            .zip(nullifiers_traces.iter())
+            .zip(witness.payers_witnesses.iter())
+    {
         // commitments.
         let com_abar_in_var = commit_in_cs(
             &mut cs,
-            payer.blind,
-            payer.amount,
-            payer.asset_type,
+            payer_witness_var.blind,
+            payer_witness_var.amount,
+            payer_witness_var.asset_type,
             &public_key_scalars_vars,
+            &input_commitment_trace,
         );
 
         // prove pre-image of the nullifier.
         // 0 <= `amount` < 2^64, so we can encode (`uid`||`amount`) to `uid` * 2^64 + `amount`.
         let uid_amount = cs.linear_combine(
-            &[payer.uid, payer.amount, zero_var, zero_var],
+            &[
+                payer_witness_var.uid,
+                payer_witness_var.amount,
+                zero_var,
+                zero_var,
+            ],
             pow_2_64,
             one,
             zero,
@@ -581,19 +633,52 @@ pub(crate) fn build_multi_xfr_cs(
             &mut cs,
             &secret_key_scalars_vars,
             uid_amount,
-            payer.asset_type,
+            payer_witness_var.asset_type,
             &public_key_scalars_vars,
+            nullifier_trace,
         );
 
         // Merkle path authentication.
         let acc_elem = AccElemVars {
-            uid: payer.uid,
+            uid: payer_witness_var.uid,
             commitment: com_abar_in_var,
         };
-        let tmp_root_var = compute_merkle_root_variables(&mut cs, acc_elem, &payer.path);
+        let mut path_traces = Vec::new();
+        let (commitment, _) = commit(
+            &keypair.get_public_key(),
+            payer_witness.blind,
+            payer_witness.amount,
+            payer_witness.asset_type,
+        )
+        .unwrap();
+        let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            BLSScalar::from(payer_witness.uid),
+            commitment,
+        ]);
+        let mut next = leaf_trace.output;
+        for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
+            let (s1, s2, s3) = if mt_node.is_left_child != 0 {
+                (next, mt_node.siblings1, mt_node.siblings2)
+            } else if mt_node.is_right_child != 0 {
+                (mt_node.siblings1, mt_node.siblings2, next)
+            } else {
+                (mt_node.siblings1, next, mt_node.siblings2)
+            };
+            let trace =
+                AnemoiJive381::eval_jive_with_trace(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
+            next = trace.output;
+            path_traces.push(trace);
+        }
+        let tmp_root_var = compute_merkle_root_variables(
+            &mut cs,
+            acc_elem,
+            &payer_witness_var.path,
+            &leaf_trace,
+            &path_traces,
+        );
 
         // additional safegaurd to check the payer's amount, although in theory this is not needed.
-        cs.range_check(payer.amount, AMOUNT_LEN);
+        cs.range_check(payer_witness_var.amount, AMOUNT_LEN);
 
         if let Some(root) = root_var {
             cs.equal(root, tmp_root_var);
@@ -607,7 +692,9 @@ pub(crate) fn build_multi_xfr_cs(
     // prepare the public input for merkle_root.
     cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 
-    for payee in &payees_secrets {
+    for (payee, output_commitment_trace) in
+        payees_secrets.iter().zip(output_commitments_traces.iter())
+    {
         // commitment.
         let com_abar_out_var = commit_in_cs(
             &mut cs,
@@ -615,6 +702,7 @@ pub(crate) fn build_multi_xfr_cs(
             payee.amount,
             payee.asset_type,
             &payee.public_key_scalars,
+            &output_commitment_trace,
         );
 
         // Range check `amount`.
@@ -788,7 +876,7 @@ fn match_select(
 /// Allocate payers' witnesses.
 pub(crate) fn add_payers_witnesses(
     cs: &mut TurboPlonkCS,
-    secrets: &[PayerWitness],
+    secrets: &[&PayerWitness],
 ) -> Vec<PayerWitnessVars> {
     secrets
         .iter()
@@ -852,7 +940,7 @@ mod tests {
         },
         add_merkle_path_variables, commit, commit_in_cs, compute_merkle_root_variables,
         keys::AXfrKeyPair,
-        nullify_in_cs, sort,
+        nullify, nullify_in_cs, parse_merkle_tree_path,
         structs::{
             AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
@@ -865,7 +953,9 @@ mod tests {
     use digest::{consts::U64, Digest};
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-    use noah_crypto::basic::rescue::RescueInstance;
+    use noah_crypto::basic::anemoi_jive::{
+        AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
+    };
     use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
     use sha2::Sha512;
 
@@ -944,27 +1034,18 @@ mod tests {
             .collect();
 
         let public_key = input_keypair.get_public_key();
-        let public_key_scalars = public_key.get_public_key_scalars().unwrap();
 
         // compute the merkle leaves and update the merkle paths if there are more than 1 payers.
         if n_payers > 1 {
-            let hash = RescueInstance::new();
             let leafs: Vec<BLSScalar> = payers_secrets
                 .iter()
                 .map(|payer| {
-                    let cur = hash.rescue(&[
-                        payer.blind,
-                        BLSScalar::from(payer.amount),
-                        payer.asset_type,
-                        public_key_scalars[0],
-                    ])[0];
-                    let commitment = hash.rescue(&[
-                        cur,
-                        public_key_scalars[1],
-                        public_key_scalars[2],
-                        BLSScalar::zero(),
-                    ])[0];
-                    hash.rescue(&[BLSScalar::from(payer.uid), commitment, zero, zero])[0]
+                    let (commitment, _) =
+                        commit(&public_key, payer.blind, payer.amount, payer.asset_type).unwrap();
+                    AnemoiJive381::eval_variable_length_hash(&[
+                        BLSScalar::from(payer.uid),
+                        commitment,
+                    ])
                 })
                 .collect();
             payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
@@ -1006,8 +1087,6 @@ mod tests {
         let mut prng = test_rng();
 
         let user_params = ProverParams::new(1, 1, Some(1)).unwrap();
-
-        let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         let two = one.add(&one);
 
@@ -1033,20 +1112,23 @@ mod tests {
             is_left_child: 0u8,
             is_right_child: 1u8,
         };
-        let hash = RescueInstance::new();
 
-        let commitment = commit(
+        let (commitment, _) = commit(
             oabar.pub_key_ref(),
-            &oabar.get_blind(),
+            oabar.get_blind(),
             oabar.get_amount(),
-            &oabar.get_asset_type(),
+            oabar.get_asset_type().as_scalar(),
         )
         .unwrap();
 
-        let leaf = hash.rescue(&[/*uid=*/ two, commitment, zero, zero])[0];
-        let merkle_root = hash.rescue(&[/*sib1[0]=*/ one, /*sib2[0]=*/ two, leaf, zero])[0];
+        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, commitment]);
+        let merkle_root = AnemoiJive381::eval_jive(
+            &[/*sib1[0]=*/ one, /*sib2[0]=*/ two],
+            &[leaf, ANEMOI_JIVE_381_SALTS[0]],
+        );
+
         let mt_leaf_info = MTLeafInfo {
-            path: MTPath { nodes: vec![node] },
+            path: MTPath::new(vec![node]),
             root: merkle_root,
             uid: 2,
             root_version: 0,
@@ -1158,12 +1240,14 @@ mod tests {
         };
 
         // simulate Merkle tree state with these inputs for testing.
-        let hash = RescueInstance::new();
         let leafs: Vec<BLSScalar> = in_abars
             .iter()
             .enumerate()
             .map(|(uid, in_abar)| {
-                hash.rescue(&[BLSScalar::from(uid as u32), in_abar.commitment, zero, zero])[0]
+                AnemoiJive381::eval_variable_length_hash(&[
+                    BLSScalar::from(uid as u32),
+                    in_abar.commitment,
+                ])
             })
             .collect();
         let node0 = MTNode {
@@ -1185,7 +1269,8 @@ mod tests {
             is_right_child: 1u8,
         };
         let nodes = vec![node0, node1, node2];
-        let merkle_root = hash.rescue(&[leafs[0], leafs[1], leafs[2], zero])[0];
+        let merkle_root =
+            AnemoiJive381::eval_jive(&[leafs[0], leafs[1]], &[leafs[2], ANEMOI_JIVE_381_SALTS[0]]);
 
         // generate some output records for testing.
         let keypairs_out = gen_keys(&mut prng, n_payees);
@@ -1927,9 +2012,9 @@ mod tests {
     #[test]
     fn test_commit() {
         let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
         let amount = BLSScalar::from(7u32);
         let asset_type = BLSScalar::from(5u32);
-        let hash = RescueInstance::new();
         let mut prng = test_rng();
         let blind = BLSScalar::random(&mut prng);
 
@@ -1942,15 +2027,8 @@ mod tests {
             cs.new_variable(public_key_scalars[2]),
         ];
 
-        let commitment = {
-            let cur = hash.rescue(&[blind, amount, asset_type, public_key_scalars[0]])[0];
-            hash.rescue(&[
-                cur,
-                public_key_scalars[1],
-                public_key_scalars[2],
-                BLSScalar::zero(),
-            ])[0]
-        };
+        let (commitment, input_commitment_trace) =
+            commit(&keypair.get_public_key(), blind, 7, asset_type).unwrap();
 
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);
@@ -1961,6 +2039,7 @@ mod tests {
             amount_var,
             asset_var,
             &public_key_scalars_vars,
+            &input_commitment_trace,
         );
         let mut witness = cs.get_and_clear_witness();
 
@@ -1979,6 +2058,9 @@ mod tests {
         let one = BLSScalar::one();
         let zero = BLSScalar::zero();
         let mut cs = TurboCS::new();
+
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
         let mut prng = test_rng();
         let bytes = vec![1u8; 32];
         let uid_amount = BLSScalar::from_bytes(&bytes[..]).unwrap(); // safe unwrap
@@ -1999,21 +2081,19 @@ mod tests {
             cs.new_variable(secret_key_scalars[1]),
         ];
 
-        let hash = RescueInstance::new();
-        let expected_output = {
-            let cur = hash.rescue(&[
-                uid_amount,
-                asset_type,
-                public_key_scalars[0],
-                public_key_scalars[1],
-            ])[0];
-            hash.rescue(&[
-                cur,
-                public_key_scalars[2],
-                secret_key_scalars[0],
-                secret_key_scalars[1],
-            ])[0]
-        };
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            zero,                  /* protocol version number */
+            uid_amount,            /* uid and amount */
+            asset_type,            /* asset type */
+            zero,                  /* address format number */
+            public_key_scalars[0], /* public key */
+            public_key_scalars[1], /* public key */
+            public_key_scalars[2], /* public key */
+            secret_key_scalars[0], /* secret key */
+            secret_key_scalars[1], /* secret key */
+        ]);
+
+        let expected_output = trace.output;
 
         let uid_amount_var = cs.new_variable(uid_amount);
         let asset_var = cs.new_variable(asset_type);
@@ -2024,6 +2104,7 @@ mod tests {
             uid_amount_var,
             asset_var,
             &public_key_scalars_vars,
+            &trace,
         );
         let mut witness = cs.get_and_clear_witness();
 
@@ -2046,7 +2127,7 @@ mod tests {
         let sib2_var = cs.new_variable(num[4]);
         let is_left_var = cs.new_variable(num[0]);
         let is_right_var = cs.new_variable(num[1]);
-        let out_state = sort(
+        let out_state = parse_merkle_tree_path(
             &mut cs,
             node_var,
             sib1_var,
@@ -2062,12 +2143,7 @@ mod tests {
             .collect();
 
         // node_var is at the right position.
-        let expected_output = vec![
-            witness[sib1_var],
-            witness[sib2_var],
-            witness[node_var],
-            witness[cs.zero_var()],
-        ];
+        let expected_output = vec![witness[sib1_var], witness[sib2_var], witness[node_var]];
         // check output correctness.
         assert_eq!(output, expected_output);
 
@@ -2080,12 +2156,14 @@ mod tests {
 
     #[test]
     fn test_merkle_root() {
-        let zero = BLSScalar::zero();
         let one = BLSScalar::one();
         let two = one.add(&one);
         let three = two.add(&one);
         let four = two.add(&two);
+
         let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
         let uid_var = cs.new_variable(one);
         let comm_var = cs.new_variable(two);
         let elem = AccElemVars {
@@ -2107,17 +2185,34 @@ mod tests {
         };
 
         // compute the root value.
-        let hash = RescueInstance::new();
-        let leaf = hash.rescue(&[/*uid=*/ one, /*comm=*/ two, zero, zero])[0];
+        let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            /*uid=*/ one, /*comm=*/ two,
+        ]);
+        let leaf = leaf_trace.output;
         // leaf is the right child of node1.
-        let node1 = hash.rescue(&[path_node2.siblings1, path_node2.siblings2, leaf, zero])[0];
+        let trace1 = AnemoiJive381::eval_jive_with_trace(
+            &[path_node2.siblings1, path_node2.siblings2],
+            &[leaf, ANEMOI_JIVE_381_SALTS[0]],
+        );
+        let node1 = trace1.output;
         // node1 is the left child of the root.
-        let root = hash.rescue(&[node1, path_node1.siblings1, path_node1.siblings2, zero])[0];
+        let trace2 = AnemoiJive381::eval_jive_with_trace(
+            &[node1, path_node1.siblings1],
+            &[path_node1.siblings2, ANEMOI_JIVE_381_SALTS[1]],
+        );
+        let root = trace2.output;
 
         // compute the constraints.
         let path = MTPath::new(vec![path_node2, path_node1]);
         let path_vars = add_merkle_path_variables(&mut cs, path);
-        let root_var = compute_merkle_root_variables(&mut cs, elem, &path_vars);
+
+        let root_var = compute_merkle_root_variables(
+            &mut cs,
+            elem,
+            &path_vars,
+            &leaf_trace,
+            &vec![trace1, trace2],
+        );
 
         // check Merkle root correctness.
         let mut witness = cs.get_and_clear_witness();
@@ -2267,8 +2362,49 @@ mod tests {
         )
         .unwrap();
 
+        let mut nullifiers_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
+        let mut input_commitments_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
+        for payer_witness in secret_inputs.payers_witnesses.iter() {
+            let (_, nullifier_trace) = nullify(
+                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()),
+                payer_witness.amount,
+                payer_witness.asset_type,
+                payer_witness.uid,
+            )
+            .unwrap();
+            nullifiers_traces.push(nullifier_trace);
+
+            let (_, input_commitment_trace) = commit(
+                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()).get_public_key(),
+                payer_witness.blind,
+                payer_witness.amount,
+                payer_witness.asset_type,
+            )
+            .unwrap();
+            input_commitments_traces.push(input_commitment_trace);
+        }
+
+        let mut output_commitments_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
+        for payee_witness in secret_inputs.payees_witnesses.iter() {
+            let (_, output_commitment_trace) = commit(
+                &payee_witness.public_key,
+                payee_witness.blind,
+                payee_witness.amount,
+                payee_witness.asset_type,
+            )
+            .unwrap();
+            output_commitments_traces.push(output_commitment_trace);
+        }
+
         // check the constraints.
-        let (mut cs, _) = build_multi_xfr_cs(secret_inputs, fee_type, &folding_witness);
+        let (mut cs, _) = build_multi_xfr_cs(
+            secret_inputs,
+            fee_type,
+            &nullifiers_traces,
+            &input_commitments_traces,
+            &output_commitments_traces,
+            &folding_witness,
+        );
         let witness = cs.get_and_clear_witness();
 
         let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);

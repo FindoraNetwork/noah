@@ -1,5 +1,6 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
 use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::ops::Neg;
 use noah_algebra::{One, Zero};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace};
 
@@ -11,6 +12,7 @@ impl TurboCS<BLSScalar> {
         output_var: &([Option<VarIndex>; 2], [Option<VarIndex>; 2]),
         intermediate_val: &([[BLSScalar; 2]; 12], [[BLSScalar; 2]; 12]),
         checksum: Option<BLSScalar>,
+        salt: Option<BLSScalar>,
     ) -> Option<VarIndex> {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
@@ -29,11 +31,16 @@ impl TurboCS<BLSScalar> {
         }
 
         // Create the first gate --- which puts the initial value
-        self.push_add_selectors(zero, zero, zero, zero);
+        if salt.is_some() {
+            self.push_add_selectors(zero, zero, zero, one);
+            self.push_constant_selector(salt.unwrap().neg());
+        } else {
+            self.push_add_selectors(zero, zero, zero, zero);
+            self.push_constant_selector(zero);
+        }
+
         self.push_mul_selectors(zero, zero);
-        self.push_constant_selector(zero);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(zero);
 
         self.wiring[0].push(input_var.0[0]); // a_0
@@ -51,7 +58,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(zero);
 
             self.wiring[0].push(intermediate_var.0[r - 1][0]); // a_i
@@ -75,7 +81,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -99,7 +104,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -123,7 +127,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -147,7 +150,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -171,7 +173,6 @@ impl TurboCS<BLSScalar> {
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
-            self.push_rescue_selectors(zero, zero, zero, zero);
             self.push_out_selector(one);
 
             self.wiring[0].push(intermediate_var.0[11][0]); // a_r
@@ -203,8 +204,11 @@ impl TurboCS<BLSScalar> {
 
         if input_var.len() % (2 * 2 - 1) != 0 || input_var.is_empty() {
             input_var.push(one_var);
-            input_var
-                .extend_from_slice(&[zero_var].repeat(2 * 2 - 1 - (input_var.len() % (2 * 2 - 1))));
+            if input_var.len() % (2 * 2 - 1) != 0 {
+                input_var.extend_from_slice(
+                    &[zero_var].repeat(2 * 2 - 1 - (input_var.len() % (2 * 2 - 1))),
+                );
+            }
         }
 
         assert_eq!(
@@ -228,6 +232,7 @@ impl TurboCS<BLSScalar> {
                 &([Some(output_var), None], [None, None]),
                 &trace.intermediate_values_before_constant_additions[0],
                 None,
+                None,
             );
         } else {
             let mut new_x_var = [
@@ -247,6 +252,7 @@ impl TurboCS<BLSScalar> {
                     [Some(new_y_var[0]), Some(new_y_var[1])],
                 ),
                 &trace.intermediate_values_before_constant_additions[0],
+                None,
                 None,
             );
 
@@ -276,6 +282,7 @@ impl TurboCS<BLSScalar> {
                     ),
                     &trace.intermediate_values_before_constant_additions[rr],
                     None,
+                    None,
                 );
             }
 
@@ -293,6 +300,7 @@ impl TurboCS<BLSScalar> {
                     &([Some(output_var), None], [None, None]),
                     &trace.intermediate_values_before_constant_additions[num_chunks - 1],
                     None,
+                    None,
                 );
             }
         }
@@ -303,12 +311,13 @@ impl TurboCS<BLSScalar> {
         &mut self,
         trace: &JiveTrace<BLSScalar, 2, 12>,
         input_var: &[VarIndex; 3],
+        salt: BLSScalar,
     ) -> VarIndex {
         let one = BLSScalar::one();
-        let zero_var = self.zero_var();
+        let zero = BLSScalar::zero();
 
         let x_var = [input_var[0], input_var[1]];
-        let y_var = [input_var[2], zero_var];
+        let y_var = [input_var[2], self.new_variable(salt)];
 
         let sum_output_val =
             trace.final_x[0] + trace.final_x[1] + trace.final_y[0] + trace.final_y[1];
@@ -322,16 +331,32 @@ impl TurboCS<BLSScalar> {
                     trace.intermediate_y_before_constant_additions,
                 ),
                 Some(sum_output_val),
+                Some(salt),
             )
             .unwrap();
 
-        self.linear_combine(
-            &[sum_output_var, input_var[0], input_var[1], input_var[2]],
-            one,
-            one,
-            one,
-            one,
-        )
+        let wire_out = self.new_variable(
+            sum_output_val
+                + self.witness[input_var[0]]
+                + self.witness[input_var[1]]
+                + self.witness[input_var[2]]
+                + salt,
+        );
+
+        self.push_add_selectors(one, one, one, one);
+        self.push_mul_selectors(zero, zero);
+        self.push_constant_selector(salt);
+        self.push_ecc_selector(zero);
+        self.push_out_selector(one);
+
+        self.wiring[0].push(sum_output_var);
+        self.wiring[1].push(input_var[0]);
+        self.wiring[2].push(input_var[1]);
+        self.wiring[3].push(input_var[2]);
+        self.wiring[4].push(wire_out);
+        self.finish_new_gate();
+
+        wire_out
     }
 }
 
@@ -339,14 +364,15 @@ impl TurboCS<BLSScalar> {
 mod test {
     use crate::plonk::constraint_system::TurboCS;
     use noah_algebra::bls12_381::BLSScalar;
-    use noah_algebra::Zero;
-    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
     #[test]
     fn test_jive_constraint_system() {
+        let salt = ANEMOI_JIVE_381_SALTS[10];
+
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
-            &[BLSScalar::from(3u64), BLSScalar::zero()],
+            &[BLSScalar::from(3u64), salt],
         );
 
         let mut cs = TurboCS::new();
@@ -356,7 +382,7 @@ mod test {
         let two = cs.new_variable(BLSScalar::from(2u64));
         let three = cs.new_variable(BLSScalar::from(3u64));
 
-        let _ = cs.jive_crh(&trace, &[one, two, three]);
+        let _ = cs.jive_crh(&trace, &[one, two, three], salt);
 
         let witness = cs.get_and_clear_witness();
         cs.verify_witness(&witness, &[]).unwrap();
@@ -385,5 +411,135 @@ mod test {
 
         let witness = cs.get_and_clear_witness();
         cs.verify_witness(&witness, &[]).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod kzg_test {
+    use crate::plonk::constraint_system::{ConstraintSystem, TurboCS};
+    use crate::plonk::indexer::indexer;
+    use crate::plonk::prover::prover;
+    use crate::plonk::verifier::verifier;
+    use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
+    use crate::poly_commit::pcs::PolyComScheme;
+    use ark_std::test_rng;
+    use merlin::Transcript;
+    use noah_algebra::bls12_381::BLSScalar;
+    use noah_algebra::prelude::*;
+    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
+
+    #[test]
+    fn test_turbo_plonk_kzg_anemoi_jive() {
+        let mut prng = test_rng();
+        let pcs = KZGCommitmentScheme::new(260, &mut prng);
+        test_turbo_plonk_anemoi_variable_length_hash(&pcs, &mut prng);
+        test_turbo_plonk_jive_crh(&pcs, &mut prng);
+    }
+
+    fn test_turbo_plonk_anemoi_variable_length_hash<
+        PCS: PolyComScheme<Field = BLSScalar>,
+        R: CryptoRng + RngCore,
+    >(
+        pcs: &PCS,
+        prng: &mut R,
+    ) {
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            BLSScalar::from(1u64),
+            BLSScalar::from(2u64),
+            BLSScalar::from(3u64),
+            BLSScalar::from(4u64),
+        ]);
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+        let one = cs.new_variable(BLSScalar::from(1u64));
+        let two = cs.new_variable(BLSScalar::from(2u64));
+        let three = cs.new_variable(BLSScalar::from(3u64));
+        let four = cs.new_variable(BLSScalar::from(4u64));
+
+        let output_var = cs.new_variable(trace.output);
+
+        let _ = cs.anemoi_variable_length_hash(&trace, &[one, two, three, four], output_var);
+        cs.pad();
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
+    }
+
+    fn test_turbo_plonk_jive_crh<PCS: PolyComScheme<Field = BLSScalar>, R: CryptoRng + RngCore>(
+        pcs: &PCS,
+        prng: &mut R,
+    ) {
+        let salt = ANEMOI_JIVE_381_SALTS[10];
+
+        let trace = AnemoiJive381::eval_jive_with_trace(
+            &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
+            &[BLSScalar::from(3u64), salt],
+        );
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+        let one = cs.new_variable(BLSScalar::from(1u64));
+        let two = cs.new_variable(BLSScalar::from(2u64));
+        let three = cs.new_variable(BLSScalar::from(3u64));
+
+        let _ = cs.jive_crh(&trace, &[one, two, three], salt);
+        cs.pad();
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
+    }
+
+    fn check_turbo_plonk_proof<PCS: PolyComScheme, R: CryptoRng + RngCore>(
+        pcs: &PCS,
+        prng: &mut R,
+        cs: &TurboCS<PCS::Field>,
+        witness: &[PCS::Field],
+        online_vars: &[PCS::Field],
+    ) {
+        let prover_params = indexer(cs, pcs).unwrap();
+        let verifier_params_ref = &prover_params.verifier_params;
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        let proof = prover(prng, &mut transcript, pcs, cs, &prover_params, witness).unwrap();
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(verifier(
+            &mut transcript,
+            pcs,
+            cs,
+            verifier_params_ref,
+            online_vars,
+            &proof
+        )
+        .is_ok());
+
+        let prover_cs = cs.shrink_to_verifier_only().unwrap();
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(prover(
+            prng,
+            &mut transcript,
+            pcs,
+            &prover_cs,
+            &prover_params,
+            witness
+        )
+        .is_err());
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(verifier(
+            &mut transcript,
+            pcs,
+            &prover_cs,
+            verifier_params_ref,
+            online_vars,
+            &proof
+        )
+        .is_ok());
     }
 }

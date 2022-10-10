@@ -1,7 +1,5 @@
 //! It also implements a set of arithmetic/boolean/range gates that
-//! will be used in Anonymous transfer. The gates for elliptic curve
-//! operations and Rescue cipher/hash functions are implemented in
-//! ecc.rs and rescue.rs, respectively.
+//! will be used in anonymous transfer.
 use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
 use noah_algebra::prelude::*;
@@ -14,7 +12,7 @@ use std::collections::HashMap;
 pub const N_WIRES_PER_GATE: usize = 5;
 
 /// The selectors number in Turbo CS.
-pub const N_SELECTORS: usize = 13;
+pub const N_SELECTORS: usize = 9;
 
 /// Turbo PLONK Constraint System.
 #[derive(Serialize, Deserialize)]
@@ -130,12 +128,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             .mul(wire_vals[2])
             .mul(wire_vals[3])
             .mul(wire_vals[4]);
-        let five = &[5u64];
-        let hash1 = sel_vals[8].mul(wire_vals[0].pow(five));
-        let hash2 = sel_vals[9].mul(wire_vals[1].pow(five));
-        let hash3 = sel_vals[10].mul(wire_vals[2].pow(five));
-        let hash4 = sel_vals[11].mul(wire_vals[3].pow(five));
-        let out = sel_vals[12].mul(wire_vals[4]);
+        let out = sel_vals[8].mul(wire_vals[4]);
         let mut r = add1;
         r.add_assign(&add2);
         r.add_assign(&add3);
@@ -143,22 +136,17 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         r.add_assign(&mul1);
         r.add_assign(&mul2);
         r.add_assign(&ecc);
-        r.add_assign(&hash1);
-        r.add_assign(&hash2);
-        r.add_assign(&hash3);
-        r.add_assign(&hash4);
         r.add_assign(&constant);
         r.sub_assign(&out);
         Ok(r)
     }
 
     /// The coefficients are
-    /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1*w2*w3*w4*wo, w1^5, w2^5, w3^5, w4^5, -w4)
+    /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1*w2*w3*w4*wo, -w4)
     fn eval_selector_multipliers(wire_vals: &[&F]) -> Result<Vec<F>> {
         if wire_vals.len() < N_WIRES_PER_GATE {
             return Err(eg!(PlonkError::FuncParamsError));
         }
-        let five = &[5u64];
 
         let mut w0w1w2w3w4 = *wire_vals[0];
         w0w1w2w3w4.mul_assign(wire_vals[1]);
@@ -175,10 +163,6 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             wire_vals[2].mul(wire_vals[3]),
             F::one(),
             w0w1w2w3w4,
-            wire_vals[0].pow(five),
-            wire_vals[1].pow(five),
-            wire_vals[2].pow(five),
-            wire_vals[3].pow(five),
             wire_vals[4].neg(),
         ])
     }
@@ -228,6 +212,19 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         }
 
         polys
+    }
+
+    fn get_anemoi_parameters(&self) -> Result<(Self::Field, Self::Field)> {
+        Ok((self.anemoi_generator, self.anemoi_generator_inv))
+    }
+
+    fn get_hiding_degree(&self, idx: usize) -> usize {
+        // The first three wires, i.e., 0, 1, 2, would require a hiding degree of 3.
+        if idx < 3 {
+            return 3;
+        } else {
+            return 2;
+        }
     }
 }
 
@@ -312,7 +309,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(zero);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
 
         for (i, wire) in wires_in.iter().enumerate() {
@@ -356,7 +352,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_mul_selectors(F::one(), zero);
         self.push_constant_selector(zero);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
 
         self.wiring[0].push(left_var);
@@ -423,10 +418,6 @@ impl<F: Scalar> TurboCS<F> {
         let selector_6 = self.selectors[6][self.size - 1];
         let selector_7 = self.selectors[7][self.size - 1];
         let selector_8 = self.selectors[8][self.size - 1];
-        let selector_9 = self.selectors[9][self.size - 1];
-        let selector_10 = self.selectors[10][self.size - 1];
-        let selector_11 = self.selectors[11][self.size - 1];
-        let selector_12 = self.selectors[12][self.size - 1];
 
         let add1 = selector_0.mul(wiring_0);
         let add2 = selector_1.mul(wiring_1);
@@ -441,12 +432,7 @@ impl<F: Scalar> TurboCS<F> {
             .mul(wiring_2)
             .mul(wiring_3)
             .mul(wiring_0);
-        let five = &[5u64];
-        let hash1 = selector_8.mul(wiring_0.pow(five));
-        let hash2 = selector_9.mul(wiring_1.pow(five));
-        let hash3 = selector_10.mul(wiring_2.pow(five));
-        let hash4 = selector_11.mul(wiring_3.pow(five));
-        let out = selector_12.mul(wiring_4);
+        let out = selector_8.mul(wiring_4);
         let mut r = add1;
         r.add_assign(&add2);
         r.add_assign(&add3);
@@ -454,10 +440,6 @@ impl<F: Scalar> TurboCS<F> {
         r.add_assign(&mul1);
         r.add_assign(&mul2);
         r.add_assign(&ecc);
-        r.add_assign(&hash1);
-        r.add_assign(&hash2);
-        r.add_assign(&hash3);
-        r.add_assign(&hash4);
         r.add_assign(&constant);
         r.sub_assign(&out);
 
@@ -629,7 +611,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_mul_selectors(one.neg(), one);
         self.push_constant_selector(zero);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(one);
 
         let out = if self.witness[bit] == zero {
@@ -695,7 +676,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(constant);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
 
         for i in 0..N_WIRES_PER_GATE {
@@ -728,7 +708,6 @@ impl<F: Scalar> TurboCS<F> {
         self.push_mul_selectors(zero, zero);
         self.push_constant_selector(constant);
         self.push_ecc_selector(zero);
-        self.push_rescue_selectors(zero, zero, zero, zero);
         self.push_out_selector(F::one());
 
         for i in 0..N_WIRES_PER_GATE {
@@ -810,17 +789,9 @@ impl<F: Scalar> TurboCS<F> {
         self.selectors[7].push(q_ecc);
     }
 
-    /// Add a Rescue selectors.
-    pub fn push_rescue_selectors(&mut self, q_hash_1: F, q_hash_2: F, q_hash_3: F, q_hash_4: F) {
-        self.selectors[8].push(q_hash_1);
-        self.selectors[9].push(q_hash_2);
-        self.selectors[10].push(q_hash_3);
-        self.selectors[11].push(q_hash_4);
-    }
-
     /// Add an Out selectors.
     pub fn push_out_selector(&mut self, q_out: F) {
-        self.selectors[12].push(q_out);
+        self.selectors[8].push(q_out);
     }
 
     /// Return the witness index for given wire and cs index.
@@ -906,93 +877,87 @@ impl<F: Scalar> TurboCS<F> {
                     )));
                 }
             }
+        }
 
-            if !self.anemoi_constraints_indices.is_empty() {
-                assert!(!self.anemoi_generator.is_zero());
-            }
+        if !self.anemoi_constraints_indices.is_empty() {
+            assert!(!self.anemoi_generator.is_zero());
+        }
 
-            for cs_index in self.anemoi_constraints_indices.iter() {
-                for r in 0..12 {
-                    let a_i = witness[self.get_witness_index(0, cs_index + r)];
-                    let b_i = witness[self.get_witness_index(1, cs_index + r)];
-                    let c_i = witness[self.get_witness_index(2, cs_index + r)];
-                    let d_i = witness[self.get_witness_index(3, cs_index + r)];
-                    let o_i = witness[self.get_witness_index(4, cs_index + r)];
+        for cs_index in self.anemoi_constraints_indices.iter() {
+            for r in 0..12 {
+                let a_i = witness[self.get_witness_index(0, cs_index + r)];
+                let b_i = witness[self.get_witness_index(1, cs_index + r)];
+                let c_i = witness[self.get_witness_index(2, cs_index + r)];
+                let d_i = witness[self.get_witness_index(3, cs_index + r)];
+                let o_i = witness[self.get_witness_index(4, cs_index + r)];
 
-                    let a_i_next = witness[self.get_witness_index(0, cs_index + 1 + r)];
-                    let b_i_next = witness[self.get_witness_index(1, cs_index + 1 + r)];
-                    let c_i_next = witness[self.get_witness_index(2, cs_index + 1 + r)];
-                    let d_i_next = witness[self.get_witness_index(3, cs_index + 1 + r)];
+                let a_i_next = witness[self.get_witness_index(0, cs_index + 1 + r)];
+                let b_i_next = witness[self.get_witness_index(1, cs_index + 1 + r)];
+                let c_i_next = witness[self.get_witness_index(2, cs_index + 1 + r)];
+                let d_i_next = witness[self.get_witness_index(3, cs_index + 1 + r)];
 
-                    if o_i != d_i_next {
-                        return Err(eg!(format!(
+                if o_i != d_i_next {
+                    return Err(eg!(format!(
                         "cs index {} round {}: the output wire {:?} does not equal to the fourth wire {:?} in the next constraint",
                             cs_index,
                             r,
                             o_i,
                             d_i_next
                         )));
-                    }
+                }
 
-                    let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0].clone();
-                    let prk_i_b = self.anemoi_preprocessed_round_keys_x[r][1].clone();
-                    let prk_i_c = self.anemoi_preprocessed_round_keys_y[r][0].clone();
-                    let prk_i_d = self.anemoi_preprocessed_round_keys_y[r][1].clone();
+                let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0].clone();
+                let prk_i_b = self.anemoi_preprocessed_round_keys_x[r][1].clone();
+                let prk_i_c = self.anemoi_preprocessed_round_keys_y[r][0].clone();
+                let prk_i_d = self.anemoi_preprocessed_round_keys_y[r][1].clone();
 
-                    let g = self.anemoi_generator;
-                    let g2 = g.square().add(F::one());
+                let g = self.anemoi_generator;
+                let g2 = g.square().add(F::one());
 
-                    // equation 1
-                    let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
-                        + g * (d_i + g * c_i + prk_i_c).square();
-                    let right = a_i + g * b_i + prk_i_a;
-                    if left != right {
-                        return Err(eg!(format!(
-                            "cs index {} round {}: the first equation does not equal: {:?} != {:?}",
-                            cs_index, r, left, right
-                        )));
-                    }
+                // equation 1
+                let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
+                    + g * (d_i + g * c_i + prk_i_c).square();
+                let right = a_i + g * b_i + prk_i_a;
+                if left != right {
+                    return Err(eg!(format!(
+                        "cs index {} round {}: the first equation does not equal: {:?} != {:?}",
+                        cs_index, r, left, right
+                    )));
+                }
 
-                    // equation 2
-                    let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
-                        + g * (g * d_i + g2 * c_i + prk_i_d).square();
-                    let right = g * a_i + g2 * b_i + prk_i_b;
-                    if left != right {
-                        return Err(eg!(format!(
+                // equation 2
+                let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
+                    + g * (g * d_i + g2 * c_i + prk_i_d).square();
+                let right = g * a_i + g2 * b_i + prk_i_b;
+                if left != right {
+                    return Err(eg!(format!(
                         "cs index {} round {}: the second equation does not equal: {:?} != {:?}",
-                            cs_index,
-                            r,
-                            left,
-                            right
-                        )));
-                    }
+                        cs_index, r, left, right
+                    )));
+                }
 
-                    // equation 3
-                    let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
-                        + g * c_i_next.square()
-                        + self.anemoi_generator_inv;
-                    let right = a_i_next;
-                    if left != right {
-                        return Err(eg!(format!(
-                            "cs index {} round {}: the third equation does not equal: {:?} != {:?}",
-                            cs_index, r, left, right
-                        )));
-                    }
+                // equation 3
+                let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
+                    + g * c_i_next.square()
+                    + self.anemoi_generator_inv;
+                let right = a_i_next;
+                if left != right {
+                    return Err(eg!(format!(
+                        "cs index {} round {}: the third equation does not equal: {:?} != {:?}",
+                        cs_index, r, left, right
+                    )));
+                }
 
-                    // equation 4
-                    let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
-                        + g * d_i_next.square()
-                        + self.anemoi_generator_inv;
-                    let right = b_i_next;
-                    if left != right {
-                        return Err(eg!(format!(
+                // equation 4
+                let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
+                    + g * d_i_next.square()
+                    + self.anemoi_generator_inv;
+                let right = b_i_next;
+                if left != right {
+                    return Err(eg!(format!(
                         "cs index {} round {}: the fourth equation does not equal: {:?} != {:?}",
-                            cs_index,
-                            r,
-                            left,
-                            right
-                        )));
-                    }
+                        cs_index, r, left, right
+                    )));
                 }
             }
         }
@@ -1011,7 +976,7 @@ impl<F: Scalar> TurboCS<F> {
 #[cfg(test)]
 mod test {
     use crate::plonk::{
-        constraint_system::{rescue::State, ConstraintSystem, TurboCS},
+        constraint_system::{ConstraintSystem, TurboCS},
         indexer::indexer,
         prover::prover,
         verifier::verifier,
@@ -1020,7 +985,6 @@ mod test {
     use ark_std::test_rng;
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-    use std::str::FromStr;
 
     type F = BLSScalar;
 
@@ -1383,13 +1347,6 @@ mod test {
         test_turbo_plonk_arithmetic_gates(&pcs, &mut prng);
     }
 
-    #[test]
-    fn test_turbo_plonk_kzg_slow() {
-        let mut prng = test_rng();
-        let pcs = KZGCommitmentScheme::new(260, &mut prng);
-        test_turbo_plonk_rescue_gates(&pcs, &mut prng);
-    }
-
     fn test_turbo_plonk_with_constant_and_online_values<
         PCS: PolyComScheme,
         R: CryptoRng + RngCore,
@@ -1472,31 +1429,6 @@ mod test {
         let witness = cs.get_and_clear_witness();
         assert!(cs.verify_witness(&witness[..], &[]).is_ok());
         check_turbo_plonk_proof(pcs, prng, &cs, &witness, &[]);
-    }
-
-    fn test_turbo_plonk_rescue_gates<
-        PCS: PolyComScheme<Field = BLSScalar>,
-        R: CryptoRng + RngCore,
-    >(
-        pcs: &PCS,
-        prng: &mut R,
-    ) {
-        let zero_vec = [PCS::Field::zero(); 4];
-        let mut cs = TurboCS::<PCS::Field>::new();
-        // Prove the knowledge of hash pre-image.
-        let input_state = State::new(zero_vec);
-        let input_var = cs.new_rescue_state_variable(input_state);
-        let out_var = cs.rescue_hash(&input_var)[0];
-        cs.prepare_pi_variable(out_var);
-        cs.pad();
-
-        let online_vars = [PCS::Field::from_str(
-            "6038713180564719469093204954070454311200442976044511285254586065910759707410",
-        )
-        .unwrap()];
-        let witness = cs.get_and_clear_witness();
-        assert!(cs.verify_witness(&witness, &online_vars).is_ok());
-        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &online_vars[..]);
     }
 
     fn check_turbo_plonk_proof<PCS: PolyComScheme, R: CryptoRng + RngCore>(
@@ -1584,9 +1516,7 @@ mod test {
     #[cfg(feature = "debug")]
     #[should_panic]
     fn test_dangling_witness_should_panic() {
-        use crate::plonk::constraint_system::rescue::StateVar;
-        use noah_crypto::basic::rescue::RescueInstance;
-
+        use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
         let one = F::one();
         let two = one.add(&one);
         let three = one.add(&two);
@@ -1598,11 +1528,14 @@ mod test {
         let var_2 = cs.new_variable(three);
         let var_3 = cs.new_variable(four);
 
-        let hash = RescueInstance::new();
-        let comm = hash.rescue(&[one, two, three, four])[0];
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[one, two, three, four]);
+        let comm = trace.output;
+
         let comm_var = cs.new_variable(comm);
         cs.prepare_pi_variable(comm_var);
-        let _h_var = cs.rescue_hash(&StateVar::new([var_0, var_1, var_2, var_3]))[0];
+
+        let h_var = cs.new_variable(comm);
+        cs.anemoi_variable_length_hash(&trace, &[var_0, var_1, var_2, var_3], h_var);
         // This step is intentionally omitted.
         // cs.equal(comm_var, h_var)
         cs.pad()

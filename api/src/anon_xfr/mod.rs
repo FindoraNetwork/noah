@@ -15,10 +15,12 @@ use noah_algebra::{
     collections::HashMap,
     prelude::*,
 };
-use noah_crypto::basic::rescue::RescueInstance;
+use noah_crypto::basic::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
+};
 use noah_plonk::{
     plonk::{
-        constraint_system::{rescue::StateVar, TurboCS, VarIndex},
+        constraint_system::{TurboCS, VarIndex},
         indexer::PlonkPf,
     },
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
@@ -149,23 +151,12 @@ pub fn parse_memo(
     let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])
         .c(d!(NoahError::ParameterError))?;
 
-    let public_key_scalars = key_pair.get_public_key().get_public_key_scalars()?;
-
-    let hash = RescueInstance::new();
-    let expected_commitment = {
-        let cur = hash.rescue(&[
-            blind,
-            BLSScalar::from(amount),
-            asset_type.as_scalar(),
-            public_key_scalars[0],
-        ])[0];
-        hash.rescue(&[
-            cur,
-            public_key_scalars[1],
-            public_key_scalars[2],
-            BLSScalar::zero(),
-        ])[0]
-    };
+    let (expected_commitment, _) = commit(
+        &key_pair.get_public_key(),
+        blind,
+        amount,
+        asset_type.as_scalar(),
+    )?;
     if expected_commitment != abar.commitment {
         return Err(eg!(NoahError::CommitmentVerificationError));
     }
@@ -192,9 +183,9 @@ pub fn decrypt_memo(
 pub fn nullify(
     key_pair: &AXfrKeyPair,
     amount: u64,
-    asset_type: &AssetType,
+    asset_type_scalar: BLSScalar,
     uid: u64,
-) -> Result<BLSScalar> {
+) -> Result<(BLSScalar, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
     let pub_key = key_pair.get_public_key();
 
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
@@ -204,19 +195,21 @@ pub fn nullify(
     let public_key_scalars = pub_key.get_public_key_scalars()?;
     let secret_key_scalars = key_pair.get_secret_key().get_secret_key_scalars()?;
 
-    let hash = RescueInstance::new();
-    let cur = hash.rescue(&[
-        uid_amount,
-        asset_type.as_scalar(),
-        public_key_scalars[0],
-        public_key_scalars[1],
-    ])[0];
-    Ok(hash.rescue(&[
-        cur,
-        public_key_scalars[2],
-        secret_key_scalars[0],
-        secret_key_scalars[1],
-    ])[0])
+    let zero = BLSScalar::zero();
+
+    let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        zero,                  /* protocol version number */
+        uid_amount,            /* uid and amount */
+        asset_type_scalar,     /* asset type */
+        zero,                  /* address format number */
+        public_key_scalars[0], /* public key */
+        public_key_scalars[1], /* public key */
+        public_key_scalars[2], /* public key */
+        secret_key_scalars[0], /* secret key */
+        secret_key_scalars[1], /* secret key */
+    ]);
+
+    Ok((trace.output, trace))
 }
 
 /// Length of the amount allowed in anonymous assets.
@@ -233,40 +226,50 @@ pub fn commit_in_cs(
     amount_var: VarIndex,
     asset_var: VarIndex,
     public_key_scalars: &[VarIndex; 3],
+    trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> VarIndex {
-    let input_var = StateVar::new([blinding_var, amount_var, asset_var, public_key_scalars[0]]);
-    let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([
-        cur,
-        public_key_scalars[1],
-        public_key_scalars[2],
-        cs.zero_var(),
-    ]);
-    cs.rescue_hash(&input_var)[0]
+    let output_var = cs.new_variable(trace.output);
+    let zero_var = cs.zero_var();
+
+    cs.anemoi_variable_length_hash(
+        trace,
+        &[
+            zero_var,
+            blinding_var,
+            amount_var,
+            asset_var,
+            zero_var,
+            public_key_scalars[0],
+            public_key_scalars[1],
+            public_key_scalars[2],
+        ],
+        output_var,
+    );
+    output_var
 }
 
 /// Compute the record's amount||asset type||pub key commitment
 pub fn commit(
     public_key: &AXfrPubKey,
-    blind: &BLSScalar,
+    blind: BLSScalar,
     amount: u64,
-    asset_type: &AssetType,
-) -> Result<Commitment> {
+    asset_type_scalar: BLSScalar,
+) -> Result<(Commitment, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
+    let zero = BLSScalar::zero();
     let public_key_scalars = public_key.get_public_key_scalars()?;
 
-    let hash = RescueInstance::new();
-    let cur = hash.rescue(&[
-        blind.clone(),
+    let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        zero, /* protocol version number */
+        blind,
         BLSScalar::from(amount),
-        asset_type.as_scalar(),
-        public_key_scalars[0],
-    ])[0];
-    Ok(hash.rescue(&[
-        cur,
-        public_key_scalars[1],
-        public_key_scalars[2],
-        BLSScalar::zero(),
-    ])[0])
+        asset_type_scalar,
+        zero,                  /* address format number */
+        public_key_scalars[0], /* public key */
+        public_key_scalars[1], /* public key */
+        public_key_scalars[2], /* public key */
+    ]);
+
+    Ok((trace.output, trace))
 }
 
 /// Add the nullifier constraints to the constraint system.
@@ -276,21 +279,27 @@ pub(crate) fn nullify_in_cs(
     uid_amount: VarIndex,
     asset_type: VarIndex,
     public_key_scalars: &[VarIndex; 3],
+    trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> VarIndex {
-    let input_var = StateVar::new([
-        uid_amount,
-        asset_type,
-        public_key_scalars[0],
-        public_key_scalars[1],
-    ]);
-    let cur = cs.rescue_hash(&input_var)[0];
-    let input_var = StateVar::new([
-        cur,
-        public_key_scalars[2],
-        secret_key_scalars[0],
-        secret_key_scalars[1],
-    ]);
-    cs.rescue_hash(&input_var)[0]
+    let output_var = cs.new_variable(trace.output);
+    let zero_var = cs.zero_var();
+
+    cs.anemoi_variable_length_hash(
+        trace,
+        &[
+            zero_var,
+            uid_amount,
+            asset_type,
+            zero_var,
+            public_key_scalars[0],
+            public_key_scalars[1],
+            public_key_scalars[2],
+            secret_key_scalars[0],
+            secret_key_scalars[1],
+        ],
+        output_var,
+    );
+    output_var
 }
 
 /// Add the Merkle tree path constraints to the constraint system.
@@ -322,14 +331,14 @@ pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerkleP
 /// If `node` is the left child of parent, output (`node`, `sib1`, `sib2`);
 /// if `node` is the right child of parent, output (`sib1`, `sib2`, `node`);
 /// otherwise, output (`sib1`, `node`, `sib2`).
-fn sort(
+fn parse_merkle_tree_path(
     cs: &mut TurboPlonkCS,
     node: VarIndex,
     sib1: VarIndex,
     sib2: VarIndex,
     is_left_child: VarIndex,
     is_right_child: VarIndex,
-) -> StateVar {
+) -> [VarIndex; 3] {
     let left = cs.select(sib1, node, is_left_child);
     let right = cs.select(sib2, node, is_right_child);
     let sum_left_right = cs.add(left, right);
@@ -341,7 +350,7 @@ fn sort(
         one,
         one.neg(),
     );
-    StateVar::new([left, mid, right, cs.zero_var()])
+    [left, mid, right]
 }
 
 /// Compute the Merkle tree root given the path information.
@@ -349,13 +358,15 @@ pub fn compute_merkle_root_variables(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
+    leaf_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    traces: &Vec<JiveTrace<BLSScalar, 2, 12>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
-    let zero_var = cs.zero_var();
 
-    let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, zero_var, zero_var]))[0];
-    for path_node in path_vars.nodes.iter() {
-        let input_var = sort(
+    let mut node_var = cs.new_variable(leaf_trace.output);
+    cs.anemoi_variable_length_hash(leaf_trace, &[uid, commitment], node_var);
+    for (idx, (path_node, trace)) in path_vars.nodes.iter().zip(traces.iter()).enumerate() {
+        let input_var = parse_merkle_tree_path(
             cs,
             node_var,
             path_node.siblings1,
@@ -363,7 +374,7 @@ pub fn compute_merkle_root_variables(
             path_node.is_left_child,
             path_node.is_right_child,
         );
-        node_var = cs.rescue_hash(&input_var)[0];
+        node_var = cs.jive_crh(trace, &input_var, ANEMOI_JIVE_381_SALTS[idx]);
     }
     node_var
 }

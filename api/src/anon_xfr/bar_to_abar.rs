@@ -16,6 +16,7 @@ use noah_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
+use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace};
 use noah_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_schnorr::{
@@ -25,7 +26,7 @@ use noah_crypto::{
     field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
 use noah_plonk::plonk::{
-    constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS},
+    constraint_system::{field_simulation::SimFrVar, TurboCS},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
@@ -179,7 +180,12 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
     let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
-    let comm = commit(abar_pubkey, &oabar.blind, oabar_amount, &obar.asset_type)?;
+    let (comm, comm_trace) = commit(
+        abar_pubkey,
+        oabar.blind,
+        oabar_amount,
+        obar.asset_type.as_scalar(),
+    )?;
 
     let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     // important: address folding relies significantly on the Fiat-Shamir transform.
@@ -196,7 +202,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     .c(d!())?;
 
     // 4. Compute the inspector's proof.
-    let inspector_proof = prove_inspection(
+    let inspector_proof = prove_bar_to_abar_cs(
         prng,
         params,
         x_in_bls12_381,
@@ -207,6 +213,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         &inspection,
         &beta,
         &lambda,
+        &comm_trace,
     )
     .c(d!())?;
 
@@ -282,7 +289,7 @@ pub(crate) fn verify_bar_to_abar(
 }
 
 /// Generate the inspector's proof.
-pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
+pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     amount: BLSScalar,
@@ -297,6 +304,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
+    comm_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_bar_to_abar_cs(
@@ -308,6 +316,7 @@ pub(crate) fn prove_inspection<R: CryptoRng + RngCore>(
         inspection,
         beta,
         lambda,
+        comm_trace,
     );
     let witness = cs.get_and_clear_witness();
 
@@ -370,7 +379,7 @@ pub(crate) fn verify_inspection(
 pub(crate) fn build_bar_to_abar_cs(
     amount: BLSScalar,
     asset_type: BLSScalar,
-    blind_hash: BLSScalar,
+    blind: BLSScalar,
     pubkey: &AXfrPubKey,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     non_zk_state: &DelegatedSchnorrInspection<
@@ -380,8 +389,11 @@ pub(crate) fn build_bar_to_abar_cs(
     >,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
+    comm_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
     let zero_var = cs.zero_var();
 
     let zero = BLSScalar::zero();
@@ -395,7 +407,7 @@ pub(crate) fn build_bar_to_abar_cs(
     // 1. Input commitment witnesses.
     let amount_var = cs.new_variable(amount);
     let at_var = cs.new_variable(asset_type);
-    let blind_hash_var = cs.new_variable(blind_hash);
+    let blind_var = cs.new_variable(blind);
 
     let public_key_scalars = pubkey.get_public_key_scalars().unwrap();
     let public_key_scalars_vars = [
@@ -497,20 +509,27 @@ pub(crate) fn build_bar_to_abar_cs(
 
     // 4. Open the inspector's state commitment.
     {
-        let h1_var = cs.rescue_hash(&StateVar::new([
-            compressed_limbs_var[0],
-            compressed_limbs_var[1],
-            compressed_limbs_var[2],
-            compressed_limbs_var[3],
-        ]))[0];
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            compressed_limbs[0],
+            compressed_limbs[1],
+            compressed_limbs[2],
+            compressed_limbs[3],
+            compressed_limbs[4],
+            r,
+        ]);
 
-        let h2_var = cs.rescue_hash(&StateVar::new([
-            h1_var,
-            compressed_limbs_var[4],
-            r_var,
-            zero_var,
-        ]))[0];
-        cs.equal(h2_var, comm_var);
+        cs.anemoi_variable_length_hash(
+            &trace,
+            &[
+                compressed_limbs_var[0],
+                compressed_limbs_var[1],
+                compressed_limbs_var[2],
+                compressed_limbs_var[3],
+                compressed_limbs_var[4],
+                r_var,
+            ],
+            comm_var,
+        );
     }
 
     // 5. Perform the check in field simulation.
@@ -585,17 +604,18 @@ pub(crate) fn build_bar_to_abar_cs(
         cs.equal(y_in_bls12_381, at_var);
     }
 
-    // 7. Rescue commitment
-    let rescue_comm_var = commit_in_cs(
+    // 7. Coin commitment
+    let coin_comm_var = commit_in_cs(
         &mut cs,
-        blind_hash_var,
+        blind_var,
         amount_var,
         at_var,
         &public_key_scalars_vars,
+        comm_trace,
     );
 
     // prepare public inputs.
-    cs.prepare_pi_variable(rescue_comm_var);
+    cs.prepare_pi_variable(coin_comm_var);
     cs.prepare_pi_variable(comm_var);
 
     for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
@@ -637,7 +657,7 @@ mod test {
     use std::ops::AddAssign;
 
     #[test]
-    fn test_eq_committed_vals_cs() {
+    fn test_bar_to_abar() {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
@@ -662,7 +682,8 @@ mod test {
         let keypair = AXfrKeyPair::generate(&mut prng);
         let pubkey = keypair.get_public_key();
 
-        let z = commit(&pubkey, &z_randomizer, 71u64, &asset_type).unwrap();
+        let (z, output_commitment_trace) =
+            commit(&pubkey, z_randomizer, 71u64, asset_type.as_scalar()).unwrap();
 
         // 2. compute the ZK part of the proof
 
@@ -688,6 +709,7 @@ mod test {
             &non_zk_state,
             &beta,
             &lambda,
+            &output_commitment_trace,
         );
         let witness = cs.get_and_clear_witness();
 

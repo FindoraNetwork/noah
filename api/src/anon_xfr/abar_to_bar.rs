@@ -5,7 +5,7 @@ use crate::anon_xfr::address_folding::{
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
     address_folding::AXfrAddressFoldingInstance,
-    commit_in_cs, compute_merkle_root_variables,
+    commit, commit_in_cs, compute_merkle_root_variables,
     keys::AXfrKeyPair,
     nullify, nullify_in_cs,
     structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
@@ -24,6 +24,9 @@ use noah_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
+use noah_crypto::basic::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
+};
 use noah_crypto::{
     basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     delegated_schnorr::{
@@ -33,7 +36,7 @@ use noah_crypto::{
     field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
 };
 use noah_plonk::plonk::{
-    constraint_system::{field_simulation::SimFrVar, rescue::StateVar, TurboCS, VarIndex},
+    constraint_system::{field_simulation::SimFrVar, TurboCS, VarIndex},
     prover::prover_with_lagrange,
     verifier::verifier,
 };
@@ -64,6 +67,10 @@ pub struct AbarToBarPreNote {
     pub body: AbarToBarBody,
     /// Witness.
     pub witness: PayerWitness,
+    /// The trace of the input commitment.
+    pub input_commitment_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
+    /// The trace of the nullifier.
+    pub nullifier_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
     /// Inspection data in the delegated Schnorr proof on Ristretto.
@@ -125,12 +132,20 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
 
     // 1. Build input witness info.
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
-    let this_nullifier = nullify(
+    let (this_nullifier, this_nullifier_trace) = nullify(
         &abar_keypair,
         oabar.amount,
-        &oabar.asset_type,
+        oabar.asset_type.as_scalar(),
         mt_leaf_info.uid,
     )?;
+
+    let (_, this_commitment_trace) = commit(
+        &abar_keypair.get_public_key(),
+        oabar.blind,
+        oabar.amount,
+        oabar.asset_type.as_scalar(),
+    )
+    .unwrap();
 
     // 2. Construct the equality proof.
     let x = RistrettoScalar::from(oabar.amount);
@@ -184,6 +199,8 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     Ok(AbarToBarPreNote {
         body,
         witness: payers_witness,
+        input_commitment_trace: this_commitment_trace,
+        nullifier_trace: this_nullifier_trace,
         input_keypair: abar_keypair.clone(),
         inspection: delegated_schnorr_inspection,
         beta,
@@ -201,6 +218,8 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
     let AbarToBarPreNote {
         body,
         witness,
+        input_commitment_trace,
+        nullifier_trace,
         input_keypair,
         inspection,
         beta,
@@ -220,6 +239,8 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
         prng,
         params,
         witness,
+        &nullifier_trace,
+        &input_commitment_trace,
         &body.delegated_schnorr_proof,
         &inspection,
         &beta,
@@ -499,6 +520,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: PayerWitness,
+    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
@@ -509,6 +532,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 
     let (mut cs, _) = build_abar_to_bar_cs(
         payers_witness,
+        nullifier_trace,
+        input_commitment_trace,
         proof,
         inspection,
         beta,
@@ -531,7 +556,9 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 
 /// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
-    payers_witness: PayerWitness,
+    payer_witness: PayerWitness,
+    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
@@ -540,7 +567,9 @@ pub fn build_abar_to_bar_cs(
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
 
-    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payers_witness]);
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[&payer_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
 
     let keypair = folding_witness.keypair.clone();
@@ -576,6 +605,7 @@ pub fn build_abar_to_bar_cs(
         payers_witness_vars.amount,
         payers_witness_vars.asset_type,
         &public_key_scalars_vars,
+        input_commitment_trace,
     );
 
     // Nullify.
@@ -598,6 +628,7 @@ pub fn build_abar_to_bar_cs(
         uid_amount,
         payers_witness_vars.asset_type,
         &public_key_scalars_vars,
+        &nullifier_trace,
     );
 
     // Merkle path authentication.
@@ -606,7 +637,39 @@ pub fn build_abar_to_bar_cs(
         commitment: com_abar_in_var,
     };
 
-    let tmp_root_var = compute_merkle_root_variables(&mut cs, acc_elem, &payers_witness_vars.path);
+    let mut path_traces = Vec::new();
+    let (commitment, _) = commit(
+        &keypair.get_public_key(),
+        payer_witness.blind,
+        payer_witness.amount,
+        payer_witness.asset_type,
+    )
+    .unwrap();
+    let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        BLSScalar::from(payer_witness.uid),
+        commitment,
+    ]);
+    let mut next = leaf_trace.output;
+    for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
+        let (s1, s2, s3) = if mt_node.is_left_child != 0 {
+            (next, mt_node.siblings1, mt_node.siblings2)
+        } else if mt_node.is_right_child != 0 {
+            (mt_node.siblings1, mt_node.siblings2, next)
+        } else {
+            (mt_node.siblings1, next, mt_node.siblings2)
+        };
+        let trace = AnemoiJive381::eval_jive_with_trace(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
+        next = trace.output;
+        path_traces.push(trace);
+    }
+
+    let tmp_root_var = compute_merkle_root_variables(
+        &mut cs,
+        acc_elem,
+        &payers_witness_vars.path,
+        &leaf_trace,
+        &path_traces,
+    );
 
     if let Some(root) = root_var {
         cs.equal(root, tmp_root_var);
@@ -709,20 +772,27 @@ pub fn build_abar_to_bar_cs(
 
     // 4. Check the inspector's state commitment.
     {
-        let h1_var = cs.rescue_hash(&StateVar::new([
-            compressed_limbs_var[0],
-            compressed_limbs_var[1],
-            compressed_limbs_var[2],
-            compressed_limbs_var[3],
-        ]))[0];
+        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+            compressed_limbs[0],
+            compressed_limbs[1],
+            compressed_limbs[2],
+            compressed_limbs[3],
+            compressed_limbs[4],
+            r,
+        ]);
 
-        let h2_var = cs.rescue_hash(&StateVar::new([
-            h1_var,
-            compressed_limbs_var[4],
-            r_var,
-            zero_var,
-        ]))[0];
-        cs.equal(h2_var, comm_var);
+        cs.anemoi_variable_length_hash(
+            &trace,
+            &[
+                compressed_limbs_var[0],
+                compressed_limbs_var[1],
+                compressed_limbs_var[2],
+                compressed_limbs_var[3],
+                compressed_limbs_var[4],
+                r_var,
+            ],
+            comm_var,
+        );
     }
 
     // 5. Perform the check in field simulation.

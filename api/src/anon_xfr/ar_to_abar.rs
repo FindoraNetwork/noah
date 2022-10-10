@@ -1,5 +1,5 @@
 use crate::anon_xfr::{
-    commit_in_cs,
+    commit, commit_in_cs,
     keys::AXfrPubKey,
     structs::{
         AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
@@ -13,6 +13,7 @@ use crate::xfr::{
 };
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, errors::NoahError, prelude::*};
+use noah_crypto::basic::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
 use noah_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };
@@ -129,8 +130,16 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         public_key: abar_pubkey.clone(),
     };
 
+    let (_, output_trace) = commit(
+        &abar_pubkey,
+        oabar.blind,
+        oabar.amount,
+        oabar.asset_type.as_scalar(),
+    )
+    .unwrap();
+
     let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
-    let (mut cs, _) = build_ar_to_abar_cs(payee_witness);
+    let (mut cs, _) = build_ar_to_abar_cs(payee_witness, &output_trace);
     let witness = cs.get_and_clear_witness();
 
     let proof = prover_with_lagrange(
@@ -180,8 +189,12 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
 }
 
 /// Construct the transparent-to-anonymous constraint system.
-pub fn build_ar_to_abar_cs(payee_data: PayeeWitness) -> (TurboPlonkCS, usize) {
+pub fn build_ar_to_abar_cs(
+    payee_data: PayeeWitness,
+    output_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
+    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
     let ar_amount_var = cs.new_variable(BLSScalar::from(payee_data.amount));
     cs.prepare_pi_variable(ar_amount_var);
@@ -211,6 +224,7 @@ pub fn build_ar_to_abar_cs(payee_data: PayeeWitness) -> (TurboPlonkCS, usize) {
         payee.amount,
         payee.asset_type,
         &public_key_scalars_vars,
+        &output_trace,
     );
 
     // prepare the public input for the output commitment

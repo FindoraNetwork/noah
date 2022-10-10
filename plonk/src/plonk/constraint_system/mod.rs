@@ -3,9 +3,6 @@ use noah_algebra::prelude::*;
 /// Module for Field Simulation Constrain System.
 pub mod field_simulation;
 
-/// Module for Rescue Constrain System.
-pub mod rescue;
-
 /// Module for Turbo PLONK Constrain System.
 pub mod turbo;
 
@@ -130,4 +127,10 @@ pub trait ConstraintSystem: Sized {
 
     /// Shrink to only verifier use.
     fn shrink_to_verifier_only(&self) -> Result<Self>;
+
+    /// Get the Anemoi generator and generator inverse.
+    fn get_anemoi_parameters(&self) -> Result<(Self::Field, Self::Field)>;
+
+    /// Get the hiding degree for each witness polynomial.
+    fn get_hiding_degree(&self, idx: usize) -> usize;
 }
