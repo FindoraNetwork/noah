@@ -257,15 +257,9 @@ mod test {
         let pcs = KZGCommitmentScheme::new(degree, &mut prng);
         let com = pcs.commit(&poly).unwrap();
         let point = BLSScalar::random(&mut prng);
-        let proof = {
-            let mut transcript = Transcript::new(b"TestPCS");
-            pcs.prove(&poly, &point, degree).unwrap()
-        };
+        let proof = pcs.prove(&poly, &point, degree).unwrap();
         let eval = pcs.eval(&poly, &point);
-        {
-            let mut transcript = Transcript::new(b"TestPCS");
-            assert!(pcs.verify(&com, degree, &point, &eval, &proof).is_ok());
-        }
+        assert!(pcs.verify(&com, degree, &point, &eval, &proof).is_ok());
     }
 
     #[test]
