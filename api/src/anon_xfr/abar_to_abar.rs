@@ -1103,8 +1103,6 @@ mod tests {
         let abar = AnonAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair.get_public_key(), *oabar.pub_key_ref());
 
-        let owner_memo = oabar.get_owner_memo().unwrap();
-
         // simulate Merkle tree state with that input record for testing.
         let node = MTNode {
             siblings1: one,
@@ -1113,15 +1111,7 @@ mod tests {
             is_right_child: 1u8,
         };
 
-        let (commitment, _) = commit(
-            oabar.pub_key_ref(),
-            oabar.get_blind(),
-            oabar.get_amount(),
-            oabar.get_asset_type().as_scalar(),
-        )
-        .unwrap();
-
-        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, commitment]);
+        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, abar.commitment]);
         let merkle_root = AnemoiJive381::eval_jive(
             &[/*sib1[0]=*/ one, /*sib2[0]=*/ two],
             &[leaf, ANEMOI_JIVE_381_SALTS[0]],
@@ -1147,6 +1137,7 @@ mod tests {
 
         let (note, merkle_root) = {
             // prover scope
+            let owner_memo = oabar.get_owner_memo().unwrap();
             let oabar_in = OpenAnonAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair)
                 .unwrap()
                 .mt_leaf_info(mt_leaf_info)

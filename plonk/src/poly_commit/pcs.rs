@@ -68,7 +68,6 @@ pub trait PolyComScheme: Sized {
     /// Evaluate the polynomial producing a proof for it.
     fn prove(
         &self,
-        transcript: &mut Transcript,
         polynomial: &FpPolynomial<Self::Field>,
         point: &Self::Field,
         max_degree: usize,
@@ -78,7 +77,6 @@ pub trait PolyComScheme: Sized {
     /// evaluates to `value` on input `point `.
     fn verify(
         &self,
-        transcript: &mut Transcript,
         commitment: &Self::Commitment,
         degree: usize,
         point: &Self::Field,
@@ -197,7 +195,6 @@ pub trait PolyComScheme: Sized {
             self.batch(transcript, commitments, max_degree, point, values);
 
         self.verify(
-            transcript,
             &cm_combined,
             max_degree,
             &point,
@@ -268,13 +265,13 @@ mod test {
         let point = BLSScalar::random(&mut prng);
         let proof = {
             let mut transcript = Transcript::new(b"TestPCS");
-            pcs.prove(&mut transcript, &poly, &point, degree).unwrap()
+            pcs.prove( &poly, &point, degree).unwrap()
         };
         let eval = pcs.eval(&poly, &point);
         {
             let mut transcript = Transcript::new(b"TestPCS");
             assert!(pcs
-                .verify(&mut transcript, &com, degree, &point, &eval, &proof)
+                .verify( &com, degree, &point, &eval, &proof)
                 .is_ok());
         }
     }
