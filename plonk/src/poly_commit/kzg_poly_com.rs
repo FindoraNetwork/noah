@@ -11,7 +11,7 @@ use noah_algebra::{
 };
 
 /// KZG commitment scheme over the `Group`.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct KZGCommitment<G>(pub G);
 
 impl<'a, G> ToBytes for KZGCommitment<G>
@@ -389,7 +389,6 @@ mod tests_kzg_impl {
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
     use ark_std::test_rng;
-    use merlin::Transcript;
     use noah_algebra::{
         bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
         prelude::*,
@@ -523,44 +522,20 @@ mod tests_kzg_impl {
 
         // Check that an error is returned if the degree of the polynomial exceeds the maximum degree.
         let wrong_max_degree = 1;
-        let res = pcs.prove(
-            &fq_poly,
-            &point,
-            wrong_max_degree,
-        );
+        let res = pcs.prove(&fq_poly, &point, wrong_max_degree);
         assert!(res.is_err());
 
-        let proof = pcs
-            .prove(&fq_poly, &point, max_degree)
-            .unwrap();
+        let proof = pcs.prove(&fq_poly, &point, max_degree).unwrap();
 
-        let res = pcs.verify(
-            &commitment_value,
-            degree,
-            &point,
-            &seven,
-            &proof,
-        );
+        let res = pcs.verify(&commitment_value, degree, &point, &seven, &proof);
         pnk!(res);
 
         let new_pcs = pcs.shrink_to_verifier_only().unwrap();
-        let res = new_pcs.verify(
-            &commitment_value,
-            degree,
-            &point,
-            &seven,
-            &proof,
-        );
+        let res = new_pcs.verify(&commitment_value, degree, &point, &seven, &proof);
         pnk!(res);
 
         let wrong_eval = one;
-        let res = pcs.verify(
-            &commitment_value,
-            degree,
-            &point,
-            &wrong_eval,
-            &proof,
-        );
+        let res = pcs.verify(&commitment_value, degree, &point, &wrong_eval, &proof);
         assert!(res.is_err());
     }
 }
