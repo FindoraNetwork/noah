@@ -511,7 +511,7 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
 
     // res.0 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * kj * zeta + gamma)
     // res.1 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * perm_j(zeta) + gamma)
-    // res.2 = prod_{j=2..n_wires_per_gate-1} (wj(zeta) * (wj(zeta)-1) * alpha ^ j )
+    // res.2 = prod_{j=2..n_wires_per_gate-1} (wj(zeta) * (wj(zeta)-1) * alpha ^ j)
     let mut res = w_polys_eval_zeta
         .par_iter()
         .take(w_polys_eval_zeta.len() - 1)
@@ -539,7 +539,7 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     );
 
     // (res.0 + (L1(zeta) * alpha)) * alpha * z(x)
-    //   = res.0 * alpha * z(x) + L1(zeta) * alpha ^ 2 * z(x)
+    //  = res.0 * alpha * z(x) + L1(zeta) * alpha ^ 2 * z(x)
     res.0.add_assign(&first_lagrange_eval_zeta.mul(alpha));
     res.0.mul_assign(alpha);
     polys_or_comms.push(&z_poly_or_comm);
@@ -557,13 +557,13 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
 
     // q_{prk1}(X) * q_{prk3}(eval zeta) * alpha ^ 6
     polys_or_comms.push(&q_prk1_poly_or_comm);
-    let q_pow_6 = q_prk3_eval_zeta.mul(alpha_pow_6);
-    challenges.push(&q_pow_6);
+    let q_prk3_pow_6 = q_prk3_eval_zeta.mul(alpha_pow_6);
+    challenges.push(&q_prk3_pow_6);
 
     // q_{prk2}(X) * q_{prk3}(eval zeta) * alpha ^ 7
     polys_or_comms.push(&q_prk2_poly_or_comm);
-    let q_pow_7 = q_pow_6.mul(alpha);
-    challenges.push(&q_pow_7);
+    let q_prk3_pow_7 = q_prk3_pow_6.mul(alpha);
+    challenges.push(&q_prk3_pow_7);
 
     // - z_h(zeta) * t_0(x) - \sum_{j=1..t_polys_or_comms.len()-1} (t_j(x) * (zeta) ^ (n_t_polys * j) * z_h(zeta))
     let mut exponents = Vec::new();
@@ -574,8 +574,8 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
         exponents.push(exponent);
         exponent.mul_assign(&factor);
     }
-    for (t_poly, exp) in t_polys_or_comms.iter().zip(&exponents) {
-        polys_or_comms.push(t_poly);
+    for (t_poly_or_comm, exp) in t_polys_or_comms.iter().zip(&exponents) {
+        polys_or_comms.push(t_poly_or_comm);
         challenges.push(exp);
     }
 
