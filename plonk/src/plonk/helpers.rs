@@ -509,30 +509,19 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     let mut polys_or_comms = q_polys_or_comms.iter().collect::<Vec<&PCSType>>();
     let mut challenges = w.iter().collect::<Vec<&F>>();
 
-    // res.0 = prod_{j=1..n_wires_per_gate} (wj(zeta) + beta * kj * zeta + gamma)
-    // res.1 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * perm_j(zeta) + gamma) * z(zeta * omega) * beta
+    // res.0 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * kj * zeta + gamma)
+    // res.1 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * perm_j(zeta) + gamma)
     // res.2 = prod_{j=2..n_wires_per_gate-1} (wj(zeta) * (wj(zeta)-1) * alpha ^ j )
     let mut res = w_polys_eval_zeta
         .par_iter()
         .take(w_polys_eval_zeta.len() - 1)
-        .enumerate()
         .zip(k)
         .zip(s_polys_eval_zeta)
         .zip(alpha_pow)
-        .map(|((((j, wj), kj), sj), alpha_pow)| {
-            let mut term1 = wj.add(kj.mul(&beta_zeta)).add(gamma);
-            let mut term2 = wj.add(beta.mul(*sj)).add(gamma);
+        .map(|(((wj, kj), sj), alpha_pow)| {
+            let term1 = wj.add(kj.mul(&beta_zeta)).add(gamma);
+            let term2 = wj.add(beta.mul(*sj)).add(gamma);
             let term3 = wj.mul(alpha_pow).mul(wj.sub(&one));
-
-            if j == 0 {
-                term1.mul_assign(
-                    &w_polys_eval_zeta[w_polys_eval_zeta.len() - 1]
-                        .add(k[k.len() - 1].mul(&beta_zeta))
-                        .add(gamma),
-                );
-
-                term2.mul_assign(&z_eval_zeta_omega.mul(beta).mul(&alpha_neg));
-            }
 
             (term1, term2, term3)
         })
@@ -541,6 +530,14 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
             |x, y| ((x.0.mul(&y.0)), (x.1.mul(&y.1)), (x.2.add(&y.2))),
         );
 
+    // res.0 * (w_{n_wires_per_gate}(zeta) + beta * k_{n_wires_per_gate} * zeta + gamma)
+    //  = prod_{j=1..n_wires_per_gate} (wj(zeta) + beta * kj * zeta + gamma)
+    res.0.mul_assign(
+        &w_polys_eval_zeta[w_polys_eval_zeta.len() - 1]
+            .add(k[k.len() - 1].mul(&beta_zeta))
+            .add(gamma),
+    );
+
     // (res.0 + (L1(zeta) * alpha)) * alpha * z(x)
     //   = res.0 * alpha * z(x) + L1(zeta) * alpha ^ 2 * z(x)
     res.0.add_assign(&first_lagrange_eval_zeta.mul(alpha));
@@ -548,8 +545,10 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     polys_or_comms.push(&z_poly_or_comm);
     challenges.push(&res.0);
 
-    // res.1 * perm_{n_wires_per_gate}(X)
+    // res.1 * z(zeta * omega) * beta * perm_{n_wires_per_gate}(X)
     polys_or_comms.push(last_s_poly_or_comm);
+    res.1
+        .mul_assign(&z_eval_zeta_omega.mul(beta).mul(&alpha_neg));
     challenges.push(&res.1);
 
     // res.2 * qb(X)
