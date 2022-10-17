@@ -137,9 +137,12 @@ impl ProverParams {
     ) -> Result<ProverParams> {
         let folding_witness = AXfrAddressFoldingWitness::default();
 
-        let fake_witness = match tree_depth {
-            Some(depth) => AXfrWitness::fake(n_payers, n_payees, depth, 0),
-            None => AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
+        let (fake_witness, depth) = match tree_depth {
+            Some(depth) => (AXfrWitness::fake(n_payers, n_payees, depth, 0), depth),
+            None => (
+                AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
+                TREE_DEPTH,
+            ),
         };
 
         let mut nullifiers_traces = Vec::new();
@@ -184,9 +187,13 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::load_prepare(n_payers, n_payees)
-            .map(|v| v.verifier_params)
-            .ok();
+        let verifier = if depth == TREE_DEPTH {
+            VerifierParams::load_prepare(n_payers, n_payees)
+                .map(|v| v.verifier_params)
+                .ok()
+        } else {
+            None
+        };
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
@@ -338,9 +345,13 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::abar_to_bar_params_prepare()
-            .map(|v| v.verifier_params)
-            .ok();
+        let verifier = if tree_depth == TREE_DEPTH {
+            VerifierParams::abar_to_bar_params_prepare()
+                .map(|v| v.verifier_params)
+                .ok()
+        } else {
+            None
+        };
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
@@ -441,9 +452,13 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::abar_to_ar_params_prepare()
-            .map(|v| v.verifier_params)
-            .ok();
+        let verifier = if tree_depth == TREE_DEPTH {
+            VerifierParams::abar_to_ar_params_prepare()
+                .map(|v| v.verifier_params)
+                .ok()
+        } else {
+            None
+        };
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
