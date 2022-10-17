@@ -184,7 +184,7 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::load(n_payers, n_payees)
+        let verifier = VerifierParams::load_prepare(n_payers, n_payees)
             .map(|v| v.verifier_params)
             .ok();
 
@@ -247,7 +247,7 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::bar_to_abar_params()
+        let verifier = VerifierParams::bar_to_abar_params_prepare()
             .map(|v| v.verifier_params)
             .ok();
 
@@ -338,7 +338,7 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::abar_to_bar_params()
+        let verifier = VerifierParams::abar_to_bar_params_prepare()
             .map(|v| v.verifier_params)
             .ok();
 
@@ -378,7 +378,7 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::ar_to_abar_params()
+        let verifier = VerifierParams::ar_to_abar_params_prepare()
             .map(|v| v.verifier_params)
             .ok();
 
@@ -441,7 +441,7 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::abar_to_ar_params()
+        let verifier = VerifierParams::abar_to_ar_params_prepare()
             .map(|v| v.verifier_params)
             .ok();
 
@@ -521,62 +521,110 @@ impl VerifierParams {
         if n_payees > MAX_ANONYMOUS_RECORD_NUMBER || n_payers > MAX_ANONYMOUS_RECORD_NUMBER {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         } else {
-            match (VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS) {
-                (Some(c_bytes), Some(s_bytes)) => {
-                    let common: VerifierParamsSplitCommon =
-                        bincode::deserialize(c_bytes).c(d!(NoahError::DeserializationError))?;
-                    let specials: Vec<Vec<Vec<u8>>> = bincode::deserialize(s_bytes).unwrap();
-                    let special: VerifierParamsSplitSpecific =
-                        bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
-                            .c(d!(NoahError::DeserializationError))?;
-                    Ok(VerifierParams {
-                        pcs: common.pcs,
-                        cs: special.cs,
-                        verifier_params: special.verifier_params,
-                    })
-                }
-                _ => Self::create(n_payers, n_payees, None),
+            match Self::load_prepare(n_payers, n_payees) {
+                Ok(vk) => Ok(vk),
+                Err(_e) => Self::create(n_payers, n_payees, None),
             }
+        }
+    }
+
+    /// Load the verifier parameters from prepare.
+    pub fn load_prepare(n_payers: usize, n_payees: usize) -> Result<VerifierParams> {
+        match (VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS) {
+            (Some(c_bytes), Some(s_bytes)) => {
+                let common: VerifierParamsSplitCommon =
+                    bincode::deserialize(c_bytes).c(d!(NoahError::DeserializationError))?;
+                let specials: Vec<Vec<Vec<u8>>> = bincode::deserialize(s_bytes).unwrap();
+                let special: VerifierParamsSplitSpecific =
+                    bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
+                        .c(d!(NoahError::DeserializationError))?;
+                Ok(VerifierParams {
+                    pcs: common.pcs,
+                    cs: special.cs,
+                    verifier_params: special.verifier_params,
+                })
+            }
+            _ => Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into()),
         }
     }
 
     /// Obtain the parameters for anonymous to confidential.
     pub fn abar_to_bar_params() -> Result<VerifierParams> {
+        match Self::abar_to_bar_params_prepare() {
+            Ok(vk) => Ok(vk),
+            _ => {
+                let prover_params = ProverParams::abar_to_bar_params(TREE_DEPTH)?;
+                Ok(VerifierParams::from(prover_params))
+            }
+        }
+    }
+
+    /// Obtain the parameters for anonymous to confidential from prepare.
+    pub fn abar_to_bar_params_prepare() -> Result<VerifierParams> {
         if let Some(bytes) = ABAR_TO_BAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
         } else {
-            let prover_params = ProverParams::abar_to_bar_params(TREE_DEPTH)?;
-            Ok(VerifierParams::from(prover_params))
+            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
     }
 
     /// Obtain the parameters for confidential to anonymous.
     pub fn bar_to_abar_params() -> Result<VerifierParams> {
+        match Self::bar_to_abar_params_prepare() {
+            Ok(vk) => Ok(vk),
+            _ => {
+                let prover_params = ProverParams::bar_to_abar_params()?;
+                Ok(VerifierParams::from(prover_params))
+            }
+        }
+    }
+
+    /// Obtain the parameters for confidential to anonymous from prepare.
+    pub fn bar_to_abar_params_prepare() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
         } else {
-            let prover_params = ProverParams::bar_to_abar_params()?;
-            Ok(VerifierParams::from(prover_params))
+            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
     }
 
     /// Obtain the parameters for transparent to anonymous.
     pub fn ar_to_abar_params() -> Result<VerifierParams> {
+        match Self::ar_to_abar_params_prepare() {
+            Ok(vk) => Ok(vk),
+            _ => {
+                let prover_params = ProverParams::ar_to_abar_params()?;
+                Ok(VerifierParams::from(prover_params))
+            }
+        }
+    }
+
+    /// Obtain the parameters for transparent to anonymous from prepare.
+    pub fn ar_to_abar_params_prepare() -> Result<VerifierParams> {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
         } else {
-            let prover_params = ProverParams::ar_to_abar_params()?;
-            Ok(VerifierParams::from(prover_params))
+            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
     }
 
     /// Obtain the parameters for anonymous to transparent.
     pub fn abar_to_ar_params() -> Result<VerifierParams> {
+        match Self::abar_to_ar_params_prepare() {
+            Ok(vk) => Ok(vk),
+            _ => {
+                let prover_params = ProverParams::abar_to_ar_params(TREE_DEPTH)?;
+                Ok(VerifierParams::from(prover_params))
+            }
+        }
+    }
+
+    /// Obtain the parameters for anonymous to transparent from prepare.
+    pub fn abar_to_ar_params_prepare() -> Result<VerifierParams> {
         if let Some(bytes) = ABAR_TO_AR_VERIFIER_PARAMS {
             bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
         } else {
-            let prover_params = ProverParams::abar_to_ar_params(TREE_DEPTH)?;
-            Ok(VerifierParams::from(prover_params))
+            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
     }
 
