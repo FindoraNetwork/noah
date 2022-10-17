@@ -81,7 +81,7 @@ fn main() {
     };
 }
 
-// cargo run --release --features="gen no_vk" --bin gen-params transfer "./api/parameters"
+// cargo run --release --features="gen no_vk" --bin gen-params transfer "./parameters"
 fn gen_transfer_vk(directory: PathBuf) {
     println!(
         "Generating verifying keys for anonymous transfer for 1..{} payers, 1..{} payees ...",
@@ -133,7 +133,7 @@ fn gen_transfer_vk(directory: PathBuf) {
     save_to_file(&specials_ser, specials_path);
 }
 
-// cargo run --release --features="gen no_vk" --bin gen-params abar-to-bar "./api/parameters"
+// cargo run --release --features="gen no_vk" --bin gen-params abar-to-bar "./parameters"
 fn gen_abar_to_bar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for ABAR TO BAR ...");
 
@@ -153,7 +153,7 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
-// cargo run --release --features="gen no_vk" --bin gen-params bar-to-abar "./api/parameters"
+// cargo run --release --features="gen no_vk" --bin gen-params bar-to-abar "./parameters"
 fn gen_bar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for BAR TO ABAR ...");
 
@@ -173,7 +173,7 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
-// cargo run --release --features="gen no_vk" --bin gen-params ar-to-abar "./api/parameters"
+// cargo run --release --features="gen no_vk" --bin gen-params ar-to-abar "./parameters"
 fn gen_ar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for AR TO ABAR ...");
 
@@ -193,7 +193,7 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
-// cargo run --release --features="gen no_vk" --bin gen-params abar-to-ar "./api/parameters"
+// cargo run --release --features="gen no_vk" --bin gen-params abar-to-ar "./parameters"
 fn gen_abar_to_ar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for ABAR TO AR ...");
 
@@ -213,7 +213,7 @@ fn gen_abar_to_ar_vk(mut path: PathBuf) {
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
-// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof-over-curve25519 "./api/parameters"
+// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof-over-curve25519 "./parameters"
 fn gen_bulletproof_curve25519_urs(mut path: PathBuf) {
     println!("Generating Bulletproof(over the Curve25519 curve) uniform reference string ...");
 
@@ -228,7 +228,7 @@ fn gen_bulletproof_curve25519_urs(mut path: PathBuf) {
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
-// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof-over-secq256k1 "./api/parameters"
+// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof-over-secq256k1 "./parameters"
 fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
     println!("Generating Bulletproof(over the Secq256k1 curve) uniform reference string ...");
 
