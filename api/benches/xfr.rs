@@ -152,8 +152,9 @@ fn verify_single_asset_transfer(
         .collect_vec();
 
     let benchmark_id = XfrType::gen_id_from_inputs_outputs(&inputs_record, &outputs_record);
-    let mut gen_xfr_note_group = c.benchmark_group("single_asset");
-    gen_xfr_note_group.bench_function(format!("`{}_Gen_Xfr_Note`", benchmark_id), |b| {
+    let mut single_asset_group = c.benchmark_group("single_asset");
+    single_asset_group.sample_size(10);
+    single_asset_group.bench_function(format!("{}/generate xfr note", benchmark_id), |b| {
         b.iter(|| {
             assert!(gen_xfr_note(
                 &mut prng,
@@ -164,7 +165,6 @@ fn verify_single_asset_transfer(
             .is_ok())
         });
     });
-    gen_xfr_note_group.finish();
 
     let xfr_note = gen_xfr_note(
         &mut prng,
@@ -175,13 +175,12 @@ fn verify_single_asset_transfer(
     .unwrap();
     let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
 
-    let mut verify_xfr_note_group = c.benchmark_group("single_asset");
-    verify_xfr_note_group.bench_function(format!("`{}_Verify_Xfr_Note`", benchmark_id), |b| {
+    single_asset_group.bench_function(format!("{}/non batch verify xfr note", benchmark_id), |b| {
         b.iter(|| {
             assert!(verify_xfr_note(&mut prng, params, &xfr_note, &policies.to_ref()).is_ok())
         });
     });
-    verify_xfr_note_group.finish();
+    single_asset_group.finish();
 }
 
 fn batch_verify_single_asset_transfer(
@@ -256,10 +255,10 @@ fn batch_verify_single_asset_transfer(
     let xfr_notes = vec![&xfr_note; batch_size];
 
     let benchmark_id = XfrType::gen_id_from_inputs_outputs(&inputs_record, &outputs_record);
-    let mut batch_verify_group = c.benchmark_group("batch_verify_single_asset");
-    batch_verify_group.sample_size(50);
+    let mut batch_verify_group = c.benchmark_group("single_asset");
+    batch_verify_group.sample_size(10);
     batch_verify_group.bench_function(
-        format!("`{}` of batch size {}", benchmark_id, batch_size),
+        format!("{}/batch verify of {}", benchmark_id, batch_size),
         |b| {
             b.iter(|| {
                 assert!(batch_verify_xfr_notes(&mut prng, params, &xfr_notes, &policies).is_ok())
@@ -337,8 +336,9 @@ fn verify_multi_asset_transfer(c: &mut Criterion, asset_record_type: AssetRecord
         .collect_vec();
 
     let benchmark_id = XfrType::gen_id_from_inputs_outputs(&inputs_record, &outputs_record);
-    let mut gen_xfr_note_group = c.benchmark_group("multi_asset");
-    gen_xfr_note_group.bench_function(format!("`{}_Gen_Xfr_Note`", benchmark_id), |b| {
+    let mut multi_asset_group = c.benchmark_group("multi_asset");
+    multi_asset_group.sample_size(10);
+    multi_asset_group.bench_function(format!("{}/generate xfr note", benchmark_id), |b| {
         b.iter(|| {
             assert!(gen_xfr_note(
                 &mut prng,
@@ -349,7 +349,6 @@ fn verify_multi_asset_transfer(c: &mut Criterion, asset_record_type: AssetRecord
             .is_ok())
         });
     });
-    gen_xfr_note_group.finish();
 
     let xfr_note = gen_xfr_note(
         &mut prng,
@@ -360,13 +359,12 @@ fn verify_multi_asset_transfer(c: &mut Criterion, asset_record_type: AssetRecord
     .unwrap();
     let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
 
-    let mut verify_xfr_note_group = c.benchmark_group("multi_asset");
-    verify_xfr_note_group.bench_function(format!("`{}_Verify_Xfr_Note`", benchmark_id), |b| {
+    multi_asset_group.bench_function(format!("{}/non batch verify xfr note", benchmark_id), |b| {
         b.iter(|| {
             assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()).is_ok())
         });
     });
-    verify_xfr_note_group.finish();
+    multi_asset_group.finish();
 }
 
 fn batch_verify_multi_asset_transfer(
@@ -453,10 +451,10 @@ fn batch_verify_multi_asset_transfer(
     let xfr_notes = vec![&xfr_note; batch_size];
 
     let benchmark_id = XfrType::gen_id_from_inputs_outputs(&inputs_record, &outputs_record);
-    let mut batch_verify_xfr_note_group = c.benchmark_group("batch_verify_multi_asset");
-    batch_verify_xfr_note_group.sample_size(30);
-    batch_verify_xfr_note_group.bench_function(
-        format!("`{}` of batch size {}", benchmark_id, batch_size),
+    let mut multi_asset_group = c.benchmark_group("multi_asset");
+    multi_asset_group.sample_size(10);
+    multi_asset_group.bench_function(
+        format!("{}/batch verify of {}", benchmark_id, batch_size),
         |b| {
             b.iter(|| {
                 assert!(
@@ -465,7 +463,7 @@ fn batch_verify_multi_asset_transfer(
             });
         },
     );
-    batch_verify_xfr_note_group.finish();
+    multi_asset_group.finish();
 }
 
 fn gen_key_pair_vec<R: CryptoRng + RngCore>(size: usize, prng: &mut R) -> Vec<XfrKeyPair> {
