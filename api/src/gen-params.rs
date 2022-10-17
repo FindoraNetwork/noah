@@ -9,7 +9,7 @@ use ark_bulletproofs_secq256k1::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bulletproofs::BulletproofGens;
 use noah::setup::{
-    BulletproofParams, BulletproofURSGens, ProverParams, VerifierParams,
+    BulletproofParams, BulletproofURSGens, ProverParams, VerifierParams, ANON_XFR_BP_GENS_LEN,
     MAX_ANONYMOUS_RECORD_NUMBER,
 };
 use noah_algebra::utils::save_to_file;
@@ -232,7 +232,7 @@ fn gen_bulletproof_curve25519_urs(mut path: PathBuf) {
 fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
     println!("Generating Bulletproof(over the Secq256k1 curve) uniform reference string ...");
 
-    let bp_gens = BulletproofGensOverSecq256k1::new(2048, 1);
+    let bp_gens = BulletproofGensOverSecq256k1::new(ANON_XFR_BP_GENS_LEN, 1);
     let mut bytes = Vec::new();
     bp_gens.serialize_unchecked(&mut bytes).unwrap();
     path.push("bulletproof-secq256k1-urs.bin");

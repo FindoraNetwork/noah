@@ -130,7 +130,6 @@ features = ["yoloproofs"]
 default = [
     'std',
     'u64_backend',
-    'parallel'
 ]
 debug = [ 'noah-plonk/debug' ]
 std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs-secq256k1/std', 'ark-std/std']
