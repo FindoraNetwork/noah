@@ -39,9 +39,9 @@ use rand_chacha::ChaChaRng;
 use serde::Deserialize;
 
 /// The trait for Bulletproofs that can be used in Bulletproofs generators.
-pub trait BulletproofURSGens {
+pub trait BulletproofURS {
     /// Load the URS for Bulletproofs.
-    fn urs() -> Result<Self>
+    fn load() -> Result<Self>
     where
         Self: Sized;
 
@@ -110,8 +110,8 @@ pub const DEFAULT_BP_NUM_GENS: usize = 256;
 /// The number of the Bulletproofs(over the Secq256k1 curve) generators needed for anonymous transfer.
 pub const ANON_XFR_BP_GENS_LEN: usize = 2048;
 
-impl BulletproofURSGens for BulletproofParams {
-    fn urs() -> Result<BulletproofParams> {
+impl BulletproofURS for BulletproofParams {
+    fn load() -> Result<BulletproofParams> {
         let urs = BULLETPROOF_CURVE25519_URS.c(d!(NoahError::MissingSRSError))?;
 
         let pp: BulletproofParams = bincode::deserialize(&urs)
@@ -140,8 +140,8 @@ impl Default for BulletproofParams {
     }
 }
 
-impl BulletproofURSGens for BulletproofGensOverSecq256k1 {
-    fn urs() -> Result<Self> {
+impl BulletproofURS for BulletproofGensOverSecq256k1 {
+    fn load() -> Result<Self> {
         let urs = BULLETPROOF_SECQ256K1_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);

@@ -9,7 +9,7 @@ use ark_bulletproofs_secq256k1::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bulletproofs::BulletproofGens;
 use noah::setup::{
-    BulletproofParams, BulletproofURSGens, ProverParams, VerifierParams, ANON_XFR_BP_GENS_LEN,
+    BulletproofParams, BulletproofURS, ProverParams, VerifierParams, ANON_XFR_BP_GENS_LEN,
     MAX_ANONYMOUS_RECORD_NUMBER,
 };
 use noah_algebra::utils::save_to_file;

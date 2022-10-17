@@ -6,7 +6,7 @@ use bulletproofs::{
 };
 use merlin::Transcript;
 use mix::MixValue;
-use noah::setup::{BulletproofParams, BulletproofURSGens};
+use noah::setup::{BulletproofParams, BulletproofURS};
 use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance};
 use noah_algebra::{
     prelude::*,

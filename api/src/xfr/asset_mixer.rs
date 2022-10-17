@@ -1,4 +1,4 @@
-use crate::setup::{BulletproofParams, BulletproofURSGens};
+use crate::setup::{BulletproofParams, BulletproofURS};
 use bulletproofs::{
     r1cs::{batch_verify, Prover, R1CSProof, Verifier},
     BulletproofGens, PedersenGens,
