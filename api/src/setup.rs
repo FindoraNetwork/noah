@@ -14,9 +14,11 @@ use crate::anon_xfr::{
 };
 use crate::parameters::{
     ABAR_TO_AR_VERIFIER_PARAMS, ABAR_TO_BAR_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS,
-    BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS,
-    VERIFIER_SPECIFIC_PARAMS,
+    BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS,
+    LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS,
 };
+use ark_bulletproofs_secq256k1::BulletproofGens as BulletproofGensOverSecq256k1;
+use ark_serialize::CanonicalDeserialize;
 use bulletproofs::BulletproofGens;
 use noah_algebra::ristretto::RistrettoPoint;
 use noah_algebra::{
@@ -35,6 +37,17 @@ use noah_plonk::{
 };
 use rand_chacha::ChaChaRng;
 use serde::Deserialize;
+
+/// The trait for Bulletproofs that can be used in Bulletproofs generators.
+pub trait BulletproofURSGens {
+    /// Load the URS for Bulletproofs.
+    fn urs() -> Result<Self>
+    where
+        Self: Sized;
+
+    /// Increase the Bulletproofs URS on demand.
+    fn increase_circuit_gens(&mut self, new_size: usize);
+}
 
 /// The Bulletproofs URS.
 #[derive(Serialize, Deserialize)]
@@ -70,7 +83,6 @@ pub struct VerifierParams {
     /// The TurboPlonk verifying key.
     pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
-
 #[derive(Serialize, Deserialize)]
 /// The common part of the verifier parameters.
 pub struct VerifierParamsSplitCommon {
@@ -95,11 +107,12 @@ pub const MAX_CONFIDENTIAL_RECORD_NUMBER: usize = 128;
 pub const MAX_ANONYMOUS_RECORD_NUMBER: usize = 6;
 /// The default number of Bulletproofs generators
 pub const DEFAULT_BP_NUM_GENS: usize = 256;
+/// The number of the Bulletproofs(over the Secq256k1 curve) generators needed for anonymous transfer.
+pub const ANON_XFR_BP_GENS_LEN: usize = 2048;
 
-impl BulletproofParams {
-    /// Load the URS for Bulletproofs.
-    pub fn new() -> Result<BulletproofParams> {
-        let urs = BULLETPROOF_URS.c(d!(NoahError::MissingSRSError))?;
+impl BulletproofURSGens for BulletproofParams {
+    fn urs() -> Result<BulletproofParams> {
+        let urs = BULLETPROOF_CURVE25519_URS.c(d!(NoahError::MissingSRSError))?;
 
         let pp: BulletproofParams = bincode::deserialize(&urs)
             .c(d!(NoahError::DeserializationError))
@@ -107,8 +120,7 @@ impl BulletproofParams {
         Ok(pp)
     }
 
-    /// Increase the Bulletproofs URS on demand.
-    pub fn increase_circuit_gens(&mut self, new_size: usize) {
+    fn increase_circuit_gens(&mut self, new_size: usize) {
         self.bp_circuit_gens
             .increase_capacity(new_size.next_power_of_two());
     }
@@ -125,6 +137,22 @@ impl Default for BulletproofParams {
             bp_circuit_gens: circuit_generators,
             range_proof_bits: BULLET_PROOF_RANGE,
         }
+    }
+}
+
+impl BulletproofURSGens for BulletproofGensOverSecq256k1 {
+    fn urs() -> Result<Self> {
+        let urs = BULLETPROOF_SECQ256K1_URS.c(d!(NoahError::MissingSRSError))?;
+
+        let reader = ark_std::io::BufReader::new(urs);
+        let bp_gens = BulletproofGensOverSecq256k1::deserialize_unchecked(reader)
+            .c(d!(NoahError::DeserializationError))
+            .unwrap();
+        Ok(bp_gens)
+    }
+
+    fn increase_circuit_gens(&mut self, new_size: usize) {
+        self.increase_capacity(new_size.next_power_of_two());
     }
 }
 

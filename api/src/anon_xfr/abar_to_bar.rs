@@ -9,7 +9,7 @@ use crate::anon_xfr::{
     keys::AXfrKeyPair,
     nullify, nullify_in_cs,
     structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
-    AXfrPlonkPf, TurboPlonkCS, ANON_XFR_BP_GENS_LEN, TWO_POW_32,
+    AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
 };
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
@@ -227,13 +227,8 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
     } = pre_note;
 
     let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
-    let (folding_instance, folding_witness) = create_address_folding(
-        prng,
-        hash,
-        &mut transcript,
-        ANON_XFR_BP_GENS_LEN,
-        &input_keypair,
-    )?;
+    let (folding_instance, folding_witness) =
+        create_address_folding(prng, hash, &mut transcript, &input_keypair)?;
 
     let proof = prove_abar_to_bar(
         prng,
@@ -328,12 +323,8 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     .c(d!())?;
 
     let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
-    let (beta_folding, lambda_folding) = verify_address_folding(
-        hash,
-        &mut transcript,
-        ANON_XFR_BP_GENS_LEN,
-        &note.folding_instance,
-    )?;
+    let (beta_folding, lambda_folding) =
+        verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
     let address_folding_public_input =
         prepare_verifier_input(&note.folding_instance, &beta_folding, &lambda_folding);
 
@@ -460,12 +451,8 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             .c(d!())?;
 
             let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
-            let (beta_folding, lambda_folding) = verify_address_folding(
-                hash,
-                &mut transcript,
-                ANON_XFR_BP_GENS_LEN,
-                &note.folding_instance,
-            )?;
+            let (beta_folding, lambda_folding) =
+                verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
             let address_folding_public_input =
                 prepare_verifier_input(&note.folding_instance, &beta_folding, &lambda_folding);
 

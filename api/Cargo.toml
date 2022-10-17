@@ -102,7 +102,7 @@ serde_json = '1.0'
 typenum = '1.11.2'
 parking_lot = '0.12'
 
-[dev-dependencies.ark-std]
+[dependencies.ark-std]
 version = '^0.3.0'
 default-features = false
 
@@ -130,6 +130,7 @@ features = ["yoloproofs"]
 default = [
     'std',
     'u64_backend',
+    'parallel'
 ]
 debug = [ 'noah-plonk/debug' ]
 std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs-secq256k1/std', 'ark-std/std']

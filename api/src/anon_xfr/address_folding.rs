@@ -1,5 +1,6 @@
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::TurboPlonkCS;
+use crate::setup::BulletproofURSGens;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::bls12_381::BLSScalar;
@@ -96,11 +97,10 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     prng: &mut R,
     hash: D,
     transcript: &mut Transcript,
-    bp_gens_len: usize,
     keypair: &AXfrKeyPair,
 ) -> Result<(AXfrAddressFoldingInstance, AXfrAddressFoldingWitness)> {
     let pc_gens = PedersenCommitmentSecq256k1::default();
-    let bp_gens = ark_bulletproofs_secq256k1::BulletproofGens::new(bp_gens_len, 1);
+    let bp_gens = ark_bulletproofs_secq256k1::BulletproofGens::urs().unwrap();
 
     let public_key = keypair.get_public_key();
     let secret_key = keypair.get_secret_key();
@@ -150,11 +150,10 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
 pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
     hash: D,
     transcript: &mut Transcript,
-    bp_gens_len: usize,
     instance: &AXfrAddressFoldingInstance,
 ) -> Result<(SECQ256K1Scalar, SECQ256K1Scalar)> {
     let pc_gens = PedersenCommitmentSecq256k1::default();
-    let bp_gens = ark_bulletproofs_secq256k1::BulletproofGens::new(bp_gens_len, 1);
+    let bp_gens = ark_bulletproofs_secq256k1::BulletproofGens::urs().unwrap();
 
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"hash", hash.finalize().as_slice());
