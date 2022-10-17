@@ -11,7 +11,7 @@ use noah_algebra::{
 };
 
 /// KZG commitment scheme over the `Group`.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct KZGCommitment<G>(pub G);
 
 impl<'a, G> ToBytes for KZGCommitment<G>

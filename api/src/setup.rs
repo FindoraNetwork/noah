@@ -184,8 +184,12 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
+        let verifier = VerifierParams::load(n_payers, n_payees)
+            .map(|v| v.verifier_params)
+            .ok();
 
-        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params =
+            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
 
         Ok(ProverParams {
             pcs,
@@ -243,8 +247,12 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
+        let verifier = VerifierParams::bar_to_abar_params()
+            .map(|v| v.verifier_params)
+            .ok();
 
-        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params =
+            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
 
         Ok(ProverParams {
             pcs,
@@ -330,8 +338,12 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
+        let verifier = VerifierParams::abar_to_bar_params()
+            .map(|v| v.verifier_params)
+            .ok();
 
-        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params =
+            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
 
         Ok(ProverParams {
             pcs,
@@ -366,8 +378,12 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
+        let verifier = VerifierParams::ar_to_abar_params()
+            .map(|v| v.verifier_params)
+            .ok();
 
-        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params =
+            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
 
         Ok(ProverParams {
             pcs,
@@ -425,8 +441,12 @@ impl ProverParams {
 
         let pcs = load_srs_params(cs.size())?;
         let lagrange_pcs = load_lagrange_params(cs.size());
+        let verifier = VerifierParams::abar_to_ar_params()
+            .map(|v| v.verifier_params)
+            .ok();
 
-        let prover_params = indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref()).unwrap();
+        let prover_params =
+            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
 
         Ok(ProverParams {
             pcs,
