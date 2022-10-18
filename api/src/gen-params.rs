@@ -81,7 +81,7 @@ fn main() {
         BULLETPROOF_OVER_CURVE25519 { directory } => gen_bulletproof_curve25519_urs(directory),
 
         BULLETPROOF_OVER_SECQ256K1 { directory } => gen_bulletproof_secq256k1_urs(directory),
-        
+
         ALL { directory } => gen_all(directory),
     };
 }
