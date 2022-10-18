@@ -11,7 +11,7 @@ pub trait ToBytes {
 }
 
 /// The trait for homomorphic polynomial commitment or polynomial.
-pub trait HomomorphicPolyComElem: ToBytes + Clone + Sync + Send {
+pub trait HomomorphicPolyComElem: ToBytes + Clone + Sync + Send + Default {
     /// This is the scalar field of the polynomial.
     type Scalar;
 
@@ -69,7 +69,6 @@ pub trait PolyComScheme: Sized {
     /// Evaluate the polynomial producing a proof for it.
     fn prove(
         &self,
-        transcript: &mut Transcript,
         polynomial: &FpPolynomial<Self::Field>,
         point: &Self::Field,
         max_degree: usize,
@@ -79,7 +78,6 @@ pub trait PolyComScheme: Sized {
     /// evaluates to `value` on input `point `.
     fn verify(
         &self,
-        transcript: &mut Transcript,
         commitment: &Self::Commitment,
         degree: usize,
         point: &Self::Field,
@@ -197,15 +195,8 @@ pub trait PolyComScheme: Sized {
         let (cm_combined, eval_combined) =
             self.batch(transcript, commitments, max_degree, point, values);
 
-        self.verify(
-            transcript,
-            &cm_combined,
-            max_degree,
-            &point,
-            &eval_combined,
-            &proof,
-        )
-        .c(d!())
+        self.verify(&cm_combined, max_degree, &point, &eval_combined, &proof)
+            .c(d!())
     }
 
     /// Batch verify a list of proofs with different points.
@@ -267,17 +258,9 @@ mod test {
         let pcs = KZGCommitmentScheme::new(degree, &mut prng);
         let com = pcs.commit(&poly).unwrap();
         let point = BLSScalar::random(&mut prng);
-        let proof = {
-            let mut transcript = Transcript::new(b"TestPCS");
-            pcs.prove(&mut transcript, &poly, &point, degree).unwrap()
-        };
+        let proof = pcs.prove(&poly, &point, degree).unwrap();
         let eval = pcs.eval(&poly, &point);
-        {
-            let mut transcript = Transcript::new(b"TestPCS");
-            assert!(pcs
-                .verify(&mut transcript, &com, degree, &point, &eval, &proof)
-                .is_ok());
-        }
+        assert!(pcs.verify(&com, degree, &point, &eval, &proof).is_ok());
     }
 
     #[test]

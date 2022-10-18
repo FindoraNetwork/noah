@@ -11,8 +11,8 @@ use ark_poly::MixedRadixEvaluationDomain;
 use noah_algebra::prelude::*;
 use noah_algebra::{cmp::min, traits::Domain};
 
-// #[cfg(feature = "parallel")]
-// use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// The data structure for challenges in Plonk.
 #[derive(Default)]
@@ -394,6 +394,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
 }
 
 /// Compute r polynomial or commitment.
+#[cfg(not(feature = "parallel"))]
 fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     w: &[F],
     q_polys_or_comms: &[PCSType],
@@ -468,9 +469,128 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
     l
 }
 
+/// Compute r polynomial or commitment.
+#[cfg(feature = "parallel")]
+fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
+    w: &[F],
+    q_polys_or_comms: &[PCSType],
+    qb_poly_or_comm: &PCSType,
+    q_prk1_poly_or_comm: &PCSType,
+    q_prk2_poly_or_comm: &PCSType,
+    k: &[F],
+    last_s_poly_or_comm: &PCSType,
+    z_poly_or_comm: &PCSType,
+    w_polys_eval_zeta: &[&F],
+    s_polys_eval_zeta: &[&F],
+    q_prk3_eval_zeta: &F,
+    z_eval_zeta_omega: &F,
+    challenges: &PlonkChallenges<F>,
+    t_polys_or_comms: &[PCSType],
+    first_lagrange_eval_zeta: &F,
+    z_h_eval_zeta: &F,
+    n_t_polys: usize,
+) -> PCSType {
+    let (beta, gamma) = challenges.get_beta_gamma().unwrap();
+    let zeta = challenges.get_zeta().unwrap();
+    let alpha = challenges.get_alpha().unwrap();
+    let alpha_neg = alpha.neg();
+    let beta_zeta = beta.mul(zeta);
+    let one = F::one();
+    let zero = F::zero();
+    let z_h_eval_zeta_neg = z_h_eval_zeta.neg();
+
+    let alpha_pow_2 = alpha.mul(alpha);
+    let alpha_pow_3 = alpha_pow_2.mul(alpha);
+    let alpha_pow_4 = alpha_pow_3.mul(alpha);
+    let alpha_pow_5 = alpha_pow_4.mul(alpha);
+    let alpha_pow_6 = alpha_pow_5.mul(alpha);
+    let alpha_pow = vec![&zero, &alpha_pow_3, &alpha_pow_4, &alpha_pow_5];
+
+    let mut polys_or_comms = q_polys_or_comms.iter().collect::<Vec<&PCSType>>();
+    let mut challenges = w.iter().collect::<Vec<&F>>();
+
+    // res.0 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * kj * zeta + gamma)
+    // res.1 = prod_{j=1..n_wires_per_gate-1} (wj(zeta) + beta * perm_j(zeta) + gamma)
+    // res.2 = prod_{j=2..n_wires_per_gate-1} (wj(zeta) * (wj(zeta)-1) * alpha ^ j)
+    let mut res = w_polys_eval_zeta
+        .par_iter()
+        .take(w_polys_eval_zeta.len() - 1)
+        .zip(k)
+        .zip(s_polys_eval_zeta)
+        .zip(alpha_pow)
+        .map(|(((wj, kj), sj), alpha_pow)| {
+            let term1 = wj.add(kj.mul(&beta_zeta)).add(gamma);
+            let term2 = wj.add(beta.mul(*sj)).add(gamma);
+            let term3 = wj.mul(alpha_pow).mul(wj.sub(&one));
+
+            (term1, term2, term3)
+        })
+        .reduce(
+            || (one, one, zero),
+            |x, y| ((x.0.mul(&y.0)), (x.1.mul(&y.1)), (x.2.add(&y.2))),
+        );
+
+    // res.0 * (w_{n_wires_per_gate}(zeta) + beta * k_{n_wires_per_gate} * zeta + gamma)
+    //  = prod_{j=1..n_wires_per_gate} (wj(zeta) + beta * kj * zeta + gamma)
+    res.0.mul_assign(
+        &w_polys_eval_zeta[w_polys_eval_zeta.len() - 1]
+            .add(k[k.len() - 1].mul(&beta_zeta))
+            .add(gamma),
+    );
+
+    // (res.0 + (L1(zeta) * alpha)) * alpha * z(x)
+    //  = res.0 * alpha * z(x) + L1(zeta) * alpha ^ 2 * z(x)
+    res.0.add_assign(&first_lagrange_eval_zeta.mul(alpha));
+    res.0.mul_assign(alpha);
+    polys_or_comms.push(&z_poly_or_comm);
+    challenges.push(&res.0);
+
+    // res.1 * z(zeta * omega) * beta * perm_{n_wires_per_gate}(X)
+    polys_or_comms.push(last_s_poly_or_comm);
+    res.1
+        .mul_assign(&z_eval_zeta_omega.mul(beta).mul(&alpha_neg));
+    challenges.push(&res.1);
+
+    // res.2 * qb(X)
+    polys_or_comms.push(&qb_poly_or_comm);
+    challenges.push(&res.2);
+
+    // q_{prk1}(X) * q_{prk3}(eval zeta) * alpha ^ 6
+    polys_or_comms.push(&q_prk1_poly_or_comm);
+    let q_prk3_pow_6 = q_prk3_eval_zeta.mul(alpha_pow_6);
+    challenges.push(&q_prk3_pow_6);
+
+    // q_{prk2}(X) * q_{prk3}(eval zeta) * alpha ^ 7
+    polys_or_comms.push(&q_prk2_poly_or_comm);
+    let q_prk3_pow_7 = q_prk3_pow_6.mul(alpha);
+    challenges.push(&q_prk3_pow_7);
+
+    // - z_h(zeta) * t_0(x) - \sum_{j=1..t_polys_or_comms.len()-1} (t_j(x) * (zeta) ^ (n_t_polys * j) * z_h(zeta))
+    let mut exponents = Vec::new();
+    exponents.push(z_h_eval_zeta_neg);
+    let factor = zeta.pow(&[n_t_polys as u64]);
+    let mut exponent = factor.mul(&z_h_eval_zeta_neg);
+    for _ in 0..t_polys_or_comms.len() - 1 {
+        exponents.push(exponent);
+        exponent.mul_assign(&factor);
+    }
+    for (t_poly_or_comm, exp) in t_polys_or_comms.iter().zip(&exponents) {
+        polys_or_comms.push(t_poly_or_comm);
+        challenges.push(exp);
+    }
+
+    // sum_{j=0..polys_or_comms.len()} (polys_or_comms[j] * challenges[j])
+    polys_or_comms
+        .par_iter()
+        .zip(challenges)
+        .map(|(polys_or_comm, challenge)| polys_or_comm.mul(challenge))
+        .reduce(|| PCSType::default(), |x, y| x.add(&y))
+}
+
 /// compute the scalar factor of z(X) in the r poly.
 /// prod(fi(\zeta) + \beta * k_i * \zeta + \gamma) * \alpha
 ///       + (\zeta^n - 1) / (\zeta-1) * \alpha^2
+#[cfg(not(feature = "parallel"))]
 fn compute_z_scalar_in_r<F: Scalar>(
     w_polys_eval_zeta: &[&F],
     k: &[F],
@@ -571,6 +691,7 @@ pub(super) fn r_commitment<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS:
 /// Compute sum_{i=1}^\ell w_i L_j(X), where j is the constraint
 /// index for the i-th public value. L_j(X) = (X^n-1) / (X - \omega^j) is
 /// the j-th lagrange base (zero for every X = \omega^i, except when i == j)
+#[cfg(not(feature = "parallel"))]
 pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
     verifier_params: &PlonkVK<PCS>,
     public_inputs: &[PCS::Field],
@@ -595,6 +716,33 @@ pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
     }
 
     eval.mul(z_h_eval_zeta)
+}
+
+/// Compute sum_{i=1}^\ell w_i L_j(X), where j is the constraint
+/// index for the i-th public value. L_j(X) = (X^n-1) / (X - \omega^j) is
+/// the j-th lagrange base (zero for every X = \omega^i, except when i == j)
+#[cfg(feature = "parallel")]
+pub(super) fn eval_pi_poly<PCS: PolyComScheme>(
+    verifier_params: &PlonkVK<PCS>,
+    public_inputs: &[PCS::Field],
+    z_h_eval_zeta: &PCS::Field,
+    eval_point: &PCS::Field,
+    root: &PCS::Field,
+) -> PCS::Field {
+    verifier_params
+        .public_vars_constraint_indices
+        .par_iter()
+        .zip(public_inputs)
+        .zip(&verifier_params.lagrange_constants)
+        .map(|((constraint_index, public_value), lagrange_constant)| {
+            let root_to_j = root.pow(&[*constraint_index as u64]);
+            let denominator = eval_point.sub(&root_to_j);
+            let denominator_inv = denominator.inv().unwrap();
+            let lagrange_i = lagrange_constant.mul(&denominator_inv);
+            lagrange_i.mul(public_value)
+        })
+        .reduce(|| PCS::Field::zero(), |x, y| x.add(y))
+        .mul(z_h_eval_zeta)
 }
 
 /// Compute constant c_j such that 1 = c_j * prod_{i != j} (\omega^j - \omega^i).
@@ -779,8 +927,8 @@ pub(super) fn first_lagrange_poly<PCS: PolyComScheme>(
     let zeta_n = zeta.pow(&[group_order]);
     let z_h_eval_zeta = zeta_n.sub(&one);
     let zeta_minus_one = zeta.sub(&one);
-    let l1 = z_h_eval_zeta.mul(zeta_minus_one.inv().unwrap());
-    (z_h_eval_zeta, l1)
+    let l1_eval_zeta = z_h_eval_zeta.mul(zeta_minus_one.inv().unwrap());
+    (z_h_eval_zeta, l1_eval_zeta)
 }
 #[cfg(test)]
 mod test {
