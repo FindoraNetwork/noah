@@ -158,18 +158,9 @@ jobs:
 
         - name: Check changed files in the parameters folder
           id: changed-files
-          uses: tj-actions/changed-files@v32
-          with:
-            files: |
-              ./api/parameters/**
-
-        - name: List all changed files
-          run: |
-            for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-              echo "$file was changed"
-            done
+          uses: UnicornGlobal/has-changes-action@v1.0.12
 
         - name: Break if any file(s) change
-          if: steps.changed-files.outputs.any_changed == 'true'
+          if: steps.changed-files.outputs.changed == 1
           run: |
             exit 1
