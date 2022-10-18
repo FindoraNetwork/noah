@@ -247,6 +247,7 @@ fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
     let reader = ark_std::io::BufReader::new(bytes.as_slice());
     let _bp_gens = BulletproofGensOverSecq256k1::deserialize_unchecked(reader).unwrap();
     println!("Deserialize time: {:.2?}", start.elapsed());
+}
 
 // cargo run --release --features="gen no_vk" --bin gen-params all "./parameters"
 fn gen_all(directory: PathBuf) {
