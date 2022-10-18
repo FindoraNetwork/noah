@@ -95,7 +95,7 @@ impl<O, C, F> PlonkProverParams<O, C, F> {
 }
 
 /// Plonk verifier parameters.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct PlonkVerifierParams<C, F> {
     /// The commitments of the selectors.
     pub cm_q_vec: Vec<C>,
@@ -193,7 +193,7 @@ pub fn indexer<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     cs: &CS,
     pcs: &PCS,
 ) -> Result<PlonkPK<PCS>> {
-    indexer_with_lagrange(cs, pcs, None)
+    indexer_with_lagrange(cs, pcs, None, None)
 }
 
 /// The Plonk indexer that leverages Lagrange bases
@@ -201,7 +201,10 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     cs: &CS,
     pcs: &PCS,
     lagrange_pcs: Option<&PCS>,
+    verifier_params: Option<PlonkVK<PCS>>,
 ) -> Result<PlonkPK<PCS>> {
+    let no_verifier = verifier_params.is_none();
+
     // It's okay to choose a fixed seed to generate quadratic non-residue.
     let mut prng = ChaChaRng::from_seed([0u8; 32]);
     let n_wires_per_gate = CS::n_wires_per_gate();
@@ -253,16 +256,19 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 
     if let Some(lagrange_pcs) = lagrange_pcs {
         for i in 0..n_wires_per_gate {
-            let s_evals = FpPolynomial::from_coefs(encoded_perm[i * n..(i + 1) * n].to_vec());
             let s_coefs =
                 FpPolynomial::ifft_with_domain(&domain, &encoded_perm[i * n..(i + 1) * n]);
 
             s_coset_evals[i].extend(s_coefs.coset_fft_with_domain(&domain_m, &k[1]));
 
-            let cm_s = lagrange_pcs
-                .commit(&s_evals)
-                .c(d!(PlonkError::SetupError))?;
-            cm_s_vec.push(cm_s);
+            if no_verifier {
+                let s_evals = FpPolynomial::from_coefs(encoded_perm[i * n..(i + 1) * n].to_vec());
+                let cm_s = lagrange_pcs
+                    .commit(&s_evals)
+                    .c(d!(PlonkError::SetupError))?;
+                cm_s_vec.push(cm_s);
+            }
+
             s_polys.push(s_coefs);
         }
     } else {
@@ -272,9 +278,11 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 
             s_coset_evals[i].extend(s_coefs.coset_fft_with_domain(&domain_m, &k[1]));
 
-            let cm_s = pcs.commit(&s_coefs).c(d!(PlonkError::SetupError))?;
+            if no_verifier {
+                let cm_s = pcs.commit(&s_coefs).c(d!(PlonkError::SetupError))?;
+                cm_s_vec.push(cm_s);
+            }
             s_polys.push(s_coefs);
-            cm_s_vec.push(cm_s);
         }
     }
 
@@ -283,14 +291,16 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     let mut cm_q_vec = vec![];
     if let Some(lagrange_pcs) = lagrange_pcs {
         for (i, q_coset_eval) in q_coset_evals.iter_mut().enumerate() {
-            let q_evals = FpPolynomial::from_coefs(cs.selector(i)?.to_vec());
             let q_coefs = FpPolynomial::ifft_with_domain(&domain, cs.selector(i)?);
             q_coset_eval.extend(q_coefs.coset_fft_with_domain(&domain_m, &k[1]));
 
-            let cm_q = lagrange_pcs
-                .commit(&q_evals)
-                .c(d!(PlonkError::SetupError))?;
-            cm_q_vec.push(cm_q);
+            if no_verifier {
+                let q_evals = FpPolynomial::from_coefs(cs.selector(i)?.to_vec());
+                let cm_q = lagrange_pcs
+                    .commit(&q_evals)
+                    .c(d!(PlonkError::SetupError))?;
+                cm_q_vec.push(cm_q);
+            }
             q_polys.push(q_coefs);
         }
     } else {
@@ -298,8 +308,10 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
             let q_coefs = FpPolynomial::ifft_with_domain(&domain, cs.selector(i)?);
             q_coset_eval.extend(q_coefs.coset_fft_with_domain(&domain_m, &k[1]));
 
-            let cm_q = pcs.commit(&q_coefs).c(d!(PlonkError::SetupError))?;
-            cm_q_vec.push(cm_q);
+            if no_verifier {
+                let cm_q = pcs.commit(&q_coefs).c(d!(PlonkError::SetupError))?;
+                cm_q_vec.push(cm_q);
+            }
             q_polys.push(q_coefs);
         }
     }
@@ -324,8 +336,10 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 
     // Step 3: compute the Lagrange interpolation constants.
     let mut lagrange_constants = vec![];
-    for constraint_index in cs.public_vars_constraint_indices().iter() {
-        lagrange_constants.push(compute_lagrange_constant(&group, *constraint_index));
+    if no_verifier {
+        for constraint_index in cs.public_vars_constraint_indices().iter() {
+            lagrange_constants.push(compute_lagrange_constant(&group, *constraint_index));
+        }
     }
 
     // Step 4: commit `boolean_constraint_indices`.
@@ -335,12 +349,16 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
             qb[*i] = PCS::Field::one();
         }
         let qb_coef = FpPolynomial::ifft_with_domain(&domain, &qb);
-        let qb_eval = FpPolynomial::from_coefs(qb);
         let qb_coset_eval = qb_coef.coset_fft_with_domain(&domain_m, &k[1]);
 
-        let cm_qb = lagrange_pcs
-            .commit(&qb_eval)
-            .c(d!(PlonkError::SetupError))?;
+        let cm_qb = if no_verifier {
+            let qb_eval = FpPolynomial::from_coefs(qb);
+            lagrange_pcs
+                .commit(&qb_eval)
+                .c(d!(PlonkError::SetupError))?
+        } else {
+            Default::default()
+        };
 
         (qb_coset_eval, qb_coef, cm_qb)
     } else {
@@ -351,7 +369,11 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         let qb_coef = FpPolynomial::ifft_with_domain(&domain, &qb);
         let qb_coset_eval = qb_coef.coset_fft_with_domain(&domain_m, &k[1]);
 
-        let cm_qb = pcs.commit(&qb_coef).c(d!(PlonkError::SetupError))?;
+        let cm_qb = if no_verifier {
+            pcs.commit(&qb_coef).c(d!(PlonkError::SetupError))?
+        } else {
+            Default::default()
+        };
 
         (qb_coset_eval, qb_coef, cm_qb)
     };
@@ -370,13 +392,17 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
             .map(|p| p.coset_fft_with_domain(&domain_m, &k[1]))
             .collect::<Vec<Vec<PCS::Field>>>();
 
-        let cm_prk_vec: Vec<PCS::Commitment> = q_prk_evals
-            .into_iter()
-            .map(|p| {
-                let q_eval = FpPolynomial::from_coefs(p);
-                lagrange_pcs.commit(&q_eval).c(d!(PlonkError::SetupError))
-            })
-            .collect::<Result<_>>()?;
+        let cm_prk_vec: Vec<PCS::Commitment> = if no_verifier {
+            q_prk_evals
+                .into_iter()
+                .map(|p| {
+                    let q_eval = FpPolynomial::from_coefs(p);
+                    lagrange_pcs.commit(&q_eval).c(d!(PlonkError::SetupError))
+                })
+                .collect::<Result<_>>()?
+        } else {
+            vec![]
+        };
 
         (q_prk_coset_evals, q_prk_polys, cm_prk_vec)
     } else {
@@ -392,28 +418,35 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
             .map(|p| p.coset_fft_with_domain(&domain_m, &k[1]))
             .collect::<Vec<Vec<PCS::Field>>>();
 
-        let cm_prk_vec: Vec<PCS::Commitment> = q_prk_polys
-            .iter()
-            .map(|p| pcs.commit(p).c(d!(PlonkError::SetupError)))
-            .collect::<Result<_>>()?;
+        let cm_prk_vec: Vec<PCS::Commitment> = if no_verifier {
+            q_prk_polys
+                .iter()
+                .map(|p| pcs.commit(p).c(d!(PlonkError::SetupError)))
+                .collect::<Result<_>>()?
+        } else {
+            vec![]
+        };
 
         (q_prk_coset_evals, q_prk_polys, cm_prk_vec)
     };
 
-    let (anemoi_generator, anemoi_generator_inv) = cs.get_anemoi_parameters()?;
-
-    let verifier_params = PlonkVerifierParams {
-        cm_q_vec,
-        cm_s_vec,
-        cm_qb,
-        cm_prk_vec,
-        anemoi_generator,
-        anemoi_generator_inv,
-        k,
-        domain: compress_domain::<PCS>(&domain),
-        cs_size: n,
-        public_vars_constraint_indices: cs.public_vars_constraint_indices().to_vec(),
-        lagrange_constants,
+    let verifier_params = if let Some(verifier) = verifier_params {
+        verifier
+    } else {
+        let (anemoi_generator, anemoi_generator_inv) = cs.get_anemoi_parameters()?;
+        PlonkVerifierParams {
+            cm_q_vec,
+            cm_s_vec,
+            cm_qb,
+            cm_prk_vec,
+            anemoi_generator,
+            anemoi_generator_inv,
+            k,
+            domain: compress_domain::<PCS>(&domain),
+            cs_size: n,
+            public_vars_constraint_indices: cs.public_vars_constraint_indices().to_vec(),
+            lagrange_constants,
+        }
     };
 
     Ok(PlonkProverParams {

@@ -49,6 +49,7 @@ pub trait PolyComScheme: Sized {
     /// Type of commitment produces, need to implement `HomomorphicPolyComElem`.
     type Commitment: HomomorphicPolyComElem<Scalar = Self::Field>
         + Debug
+        + Default
         + PartialEq
         + Eq
         + Clone

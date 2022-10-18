@@ -49,6 +49,9 @@ enum Actions {
 
     /// Generates the uniform reference string for Bulletproof(over the Secq256k1 curve).
     BULLETPROOF_OVER_SECQ256K1 { directory: PathBuf },
+
+    /// Generates all necessary parameters
+    ALL { directory: PathBuf },
 }
 
 fn main() {
@@ -78,6 +81,8 @@ fn main() {
         BULLETPROOF_OVER_CURVE25519 { directory } => gen_bulletproof_curve25519_urs(directory),
 
         BULLETPROOF_OVER_SECQ256K1 { directory } => gen_bulletproof_secq256k1_urs(directory),
+        
+        ALL { directory } => gen_all(directory),
     };
 }
 
@@ -242,4 +247,14 @@ fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
     let reader = ark_std::io::BufReader::new(bytes.as_slice());
     let _bp_gens = BulletproofGensOverSecq256k1::deserialize_unchecked(reader).unwrap();
     println!("Deserialize time: {:.2?}", start.elapsed());
+
+// cargo run --release --features="gen no_vk" --bin gen-params all "./parameters"
+fn gen_all(directory: PathBuf) {
+    gen_transfer_vk(directory.clone());
+    gen_abar_to_bar_vk(directory.clone());
+    gen_bar_to_abar_vk(directory.clone());
+    gen_ar_to_abar_vk(directory.clone());
+    gen_abar_to_ar_vk(directory.clone());
+    gen_bulletproof_curve25519_urs(directory.clone());
+    gen_bulletproof_secq256k1_urs(directory)
 }
