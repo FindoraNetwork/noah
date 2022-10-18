@@ -40,6 +40,9 @@ enum Actions {
 
     /// Generates the uniform reference string for Bulletproof
     BULLETPROOF { directory: PathBuf },
+
+    /// Generates all necessary parameters
+    ALL { directory: PathBuf },
 }
 
 fn main() {
@@ -67,6 +70,8 @@ fn main() {
         }
 
         BULLETPROOF { directory } => gen_bulletproof_urs(directory),
+
+        ALL { directory } => gen_all(directory),
     };
 }
 
@@ -215,4 +220,14 @@ fn gen_bulletproof_urs(mut path: PathBuf) {
     let _n: BulletproofParams = bincode::deserialize(&bytes).unwrap();
     let elapsed = start.elapsed();
     println!("Deserialize time: {:.2?}", elapsed);
+}
+
+// cargo run --release --features="gen no_vk" --bin gen-params all "./parameters"
+fn gen_all(directory: PathBuf) {
+    gen_transfer_vk(directory.clone());
+    gen_abar_to_bar_vk(directory.clone());
+    gen_bar_to_abar_vk(directory.clone());
+    gen_ar_to_abar_vk(directory.clone());
+    gen_abar_to_ar_vk(directory.clone());
+    gen_bulletproof_urs(directory);
 }
