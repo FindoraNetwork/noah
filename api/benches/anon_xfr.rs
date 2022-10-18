@@ -126,8 +126,8 @@ fn abar_to_abar(
     let note = finish_anon_xfr_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
 
     let mut single_group = c.benchmark_group("abar_to_abar");
-    single_group.sample_size(20);
-    single_group.bench_function("non-batch".to_string(), |b| {
+    single_group.sample_size(10);
+    single_group.bench_function("non batch verify".to_string(), |b| {
         b.iter(|| {
             assert!(verify_anon_xfr_note(&verifier_params, &note, &root, hash.clone()).is_ok())
         });
@@ -142,8 +142,8 @@ fn abar_to_abar(
             let merkle_roots = vec![&root; batch_size];
             let hashes = vec![hash.clone(); batch_size];
             let mut batch_group = c.benchmark_group("abar_to_abar");
-            batch_group.sample_size(20);
-            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+            batch_group.sample_size(10);
+            batch_group.bench_function(format!("batch verify of {}", batch_size), |b| {
                 b.iter(|| {
                     assert!(batch_verify_anon_xfr_note(
                         &verifiers_params,
@@ -185,8 +185,8 @@ fn abar_to_ar(c: &mut Criterion) {
     let note = finish_abar_to_ar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
 
     let mut single_group = c.benchmark_group("abar_to_ar");
-    single_group.sample_size(20);
-    single_group.bench_function("non-batch".to_string(), |b| {
+    single_group.sample_size(10);
+    single_group.bench_function("non batch verify".to_string(), |b| {
         b.iter(|| {
             assert!(
                 verify_abar_to_ar_note(&verify_params, &note, &proof.root, hash.clone()).is_ok()
@@ -203,8 +203,8 @@ fn abar_to_ar(c: &mut Criterion) {
             let hashes = vec![hash.clone(); batch_size];
 
             let mut batch_group = c.benchmark_group("abar_to_abar");
-            batch_group.sample_size(20);
-            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+            batch_group.sample_size(10);
+            batch_group.bench_function(format!("batch verify of {}", batch_size), |b| {
                 b.iter(|| {
                     assert!(batch_verify_abar_to_ar_note(
                         &verify_params,
@@ -236,7 +236,7 @@ fn abar_to_bar(c: &mut Criterion) {
 
     let mut oabar = build_oabar(&mut prng, AMOUNT, ASSET, &sender);
     let abar = AnonAssetRecord::from_oabar(&oabar);
-    mt.add_commitment_hash(hash_abar(0, &abar)).unwrap(); // mock
+    mt.add_commitment_hash(hash_abar(0, &abar)).unwrap();
     mt.add_commitment_hash(hash_abar(1, &abar)).unwrap();
     mt.commit().unwrap();
     let proof = mt.generate_proof(1).unwrap();
@@ -254,8 +254,7 @@ fn abar_to_bar(c: &mut Criterion) {
     let note = finish_abar_to_bar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
 
     let mut single_group = c.benchmark_group("abar_to_bar");
-    single_group.sample_size(20);
-    single_group.bench_function("non-batch".to_string(), |b| {
+    single_group.bench_function("non batch verify".to_string(), |b| {
         b.iter(|| {
             assert!(
                 verify_abar_to_bar_note(&verify_params, &note, &proof.root, hash.clone()).is_ok()
@@ -272,8 +271,8 @@ fn abar_to_bar(c: &mut Criterion) {
             let hashes = vec![hash.clone(); batch_size];
 
             let mut batch_group = c.benchmark_group("abar_to_bar");
-            batch_group.sample_size(20);
-            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+            batch_group.sample_size(10);
+            batch_group.bench_function(format!("batch verify of {}", batch_size), |b| {
                 b.iter(|| {
                     assert!(batch_verify_abar_to_bar_note(
                         &verify_params,
@@ -321,8 +320,8 @@ fn ar_to_abar(c: &mut Criterion) {
     .unwrap();
 
     let mut single_group = c.benchmark_group("ar_to_abar");
-    single_group.sample_size(20);
-    single_group.bench_function("non-batch".to_string(), |b| {
+    single_group.sample_size(10);
+    single_group.bench_function("non batch verify".to_string(), |b| {
         b.iter(|| assert!(verify_ar_to_abar_note(&verify_params, &note).is_ok()));
     });
     single_group.finish();
@@ -333,8 +332,8 @@ fn ar_to_abar(c: &mut Criterion) {
             let notes = vec![&note; batch_size];
 
             let mut batch_group = c.benchmark_group("ar_to_abar");
-            batch_group.sample_size(20);
-            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+            batch_group.sample_size(10);
+            batch_group.bench_function(format!("batch verify of {}", batch_size), |b| {
                 b.iter(|| assert!(batch_verify_ar_to_abar_note(&verify_params, &notes).is_ok()));
             });
             batch_group.finish();
@@ -374,8 +373,8 @@ fn bar_to_abar(c: &mut Criterion) {
     assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
 
     let mut single_group = c.benchmark_group("bar_to_abar");
-    single_group.sample_size(20);
-    single_group.bench_function("non-batch".to_string(), |b| {
+    single_group.sample_size(10);
+    single_group.bench_function("non batch verify".to_string(), |b| {
         b.iter(|| assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok()));
     });
     single_group.finish();
@@ -387,8 +386,8 @@ fn bar_to_abar(c: &mut Criterion) {
             let pub_keys = vec![&sender.pub_key; batch_size];
 
             let mut batch_group = c.benchmark_group("bar_to_abar");
-            batch_group.sample_size(20);
-            batch_group.bench_function(format!("batch size {}", batch_size), |b| {
+            batch_group.sample_size(10);
+            batch_group.bench_function(format!("batch verify of {}", batch_size), |b| {
                 b.iter(|| {
                     assert!(
                         batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok()

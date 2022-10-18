@@ -1,13 +1,24 @@
 use noah_algebra::collections::BTreeMap;
 
 #[cfg(not(feature = "no_urs"))]
-/// The Bulletproofs URS.
-pub static BULLETPROOF_URS: Option<&'static [u8]> =
-    Some(include_bytes!("../parameters/bulletproof-urs.bin"));
+/// The Bulletproofs(over the Curve25519 curve) URS.
+pub static BULLETPROOF_CURVE25519_URS: Option<&'static [u8]> = Some(include_bytes!(
+    "../parameters/bulletproof-curve25519-urs.bin"
+));
 
 #[cfg(feature = "no_urs")]
-/// The Bulletproofs URS.
-pub static BULLETPROOF_URS: Option<&'static [u8]> = None;
+/// The Bulletproofs(over the Curve25519 curve) URS.
+pub static BULLETPROOF_CURVE25519_URS: Option<&'static [u8]> = None;
+
+#[cfg(not(feature = "no_urs"))]
+/// The Bulletproofs(over the Secq256k1 curve) URS.
+pub static BULLETPROOF_SECQ256K1_URS: Option<&'static [u8]> = Some(include_bytes!(
+    "../parameters/bulletproof-secq256k1-urs.bin"
+));
+
+#[cfg(feature = "no_urs")]
+/// The Bulletproofs(over the Secq256k1 curve) URS.
+pub static BULLETPROOF_SECQ256K1_URS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_srs"))]
 /// The SRS.

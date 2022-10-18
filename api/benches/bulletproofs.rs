@@ -6,7 +6,7 @@ use bulletproofs::{
 };
 use merlin::Transcript;
 use mix::MixValue;
-use noah::setup::BulletproofParams;
+use noah::setup::{BulletproofParams, BulletproofURS};
 use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance};
 use noah_algebra::{
     prelude::*,
@@ -20,7 +20,7 @@ use noah_crypto::{
 fn main() {
     // Measurement of the verification time and batch verification time of Mix Bulletproofs
     bench_verify_asset_mixer();
-    for batch_size in 1..10 {
+    for batch_size in [1, 2, 4, 8, 16] {
         bench_batch_verify_asset_mixer(batch_size);
     }
 
@@ -69,7 +69,7 @@ fn bench_verify_asset_mixer() {
         assert!(v.0.verify(&v.1, &pc_gens, &bp_circuit_gens).is_ok());
     }
     println!(
-        "non-batch verify mix bulletproofs takes time: {} ms",
+        "mix bulletproofs/non batch verify : {:.2} ms",
         start.elapsed().as_secs_f32() / COUNT as f32 * 1000.0
     );
 }
@@ -145,7 +145,7 @@ fn bench_batch_verify_asset_mixer(batch_size: usize) {
     let start = Instant::now();
     assert!(batch_verify(&mut prng, verifiers, &pc_gens, &params.bp_circuit_gens).is_ok());
     println!(
-        "batch verify of {} mix bulletproofs takes time: {} ms",
+        "mix bulletproofs/batch verify of {} : {:.2} ms",
         batch_size,
         start.elapsed().as_secs_f32() / batch_size as f32 * 1000.0
     );
@@ -186,7 +186,7 @@ fn bench_verify_range() {
             .is_ok());
     }
     println!(
-        "non-batch verify range bulletproofs takes time: {} ms",
+        "range bulletproofs/non batch verify : {:.2} ms",
         start.elapsed().as_secs_f32() / COUNT as f32 * 1000.0
     );
 }
@@ -228,7 +228,7 @@ fn bench_multiple_verify_range(batch_size: usize) {
         )
         .is_ok());
     println!(
-        "multiple verify of {} range bulletproofs takes time: {} ms",
+        "range bulletproofs/multiple verify of {} : {:.2} ms",
         batch_size,
         start.elapsed().as_secs_f32() / batch_size as f32 * 1000.0
     );
@@ -283,7 +283,7 @@ fn bench_batch_verify_range(batch_size: usize) {
     )
     .is_ok());
     println!(
-        "batch verify of {} range bulletproofs takes time: {} ms",
+        "range bulletproofs/batch verify of {} : {:.2} ms",
         batch_size,
         start.elapsed().as_secs_f32() / (batch_size * 4) as f32 * 1000.0
     );

@@ -133,7 +133,7 @@ pub fn get_domain_and_root<PCS: PolyComScheme>(
     PCS::Field,
 ) {
     let reader = ark_std::io::BufReader::new(domain);
-    let domain = MixedRadixEvaluationDomain::deserialize(reader).unwrap();
+    let domain = MixedRadixEvaluationDomain::deserialize_unchecked(reader).unwrap();
     let root = PCS::Field::from_field(domain.group_gen);
     (domain, root)
 }
@@ -143,7 +143,7 @@ fn compress_domain<PCS: PolyComScheme>(
     domain: &MixedRadixEvaluationDomain<<<PCS as PolyComScheme>::Field as Domain>::Field>,
 ) -> Vec<u8> {
     let mut buf = Vec::new();
-    domain.serialize(&mut buf).unwrap();
+    domain.serialize_unchecked(&mut buf).unwrap();
     buf
 }
 
