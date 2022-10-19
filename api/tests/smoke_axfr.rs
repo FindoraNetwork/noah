@@ -531,6 +531,8 @@ mod smoke_axfr {
         let hash = random_hasher(&mut prng);
         let note = finish_anon_xfr_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
 
+        println!("proof size: {}", bincode::serialize(&note.proof).unwrap().len());
+
         verify_anon_xfr_note(&verifier_params, &note, &root, hash.clone()).unwrap();
 
         #[cfg(feature = "parallel")]

@@ -237,6 +237,8 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     )
     .c(d!())?;
 
+    println!("proof size in bytes: {}", bincode::serialize(proof.clone()).len());
+
     Ok(AXfrNote {
         body: body,
         proof,
@@ -656,6 +658,7 @@ pub(crate) fn build_multi_xfr_cs(
             commitment,
         ]);
         let mut next = leaf_trace.output;
+        println!("merkle size: {}", cs.size);
         for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
             let (s1, s2, s3) = if mt_node.is_left_child != 0 {
                 (next, mt_node.siblings1, mt_node.siblings2)
@@ -676,6 +679,7 @@ pub(crate) fn build_multi_xfr_cs(
             &leaf_trace,
             &path_traces,
         );
+        println!("merkle size ended: {}", cs.size);
 
         // additional safegaurd to check the payer's amount, although in theory this is not needed.
         cs.range_check(payer_witness_var.amount, AMOUNT_LEN);
@@ -735,6 +739,7 @@ pub(crate) fn build_multi_xfr_cs(
 
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
 
+    println!("total cs size: {}", cs.size);
     // pad the number of constraints to power of two.
     cs.pad();
 
