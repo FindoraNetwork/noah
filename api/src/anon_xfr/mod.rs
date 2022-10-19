@@ -353,9 +353,10 @@ pub fn compute_merkle_root_variables(
     let (uid, commitment) = (elem.uid, elem.commitment);
     let zero_var = cs.zero_var();
 
+    println!("merkle size: {}", cs.size);
     let mut node_var = cs.rescue_hash(&StateVar::new([uid, commitment, zero_var, zero_var]))[0];
     for path_node in path_vars.nodes.iter() {
-        println!("merkle size: {}", cs.size);
+
         let input_var = sort(
             cs,
             node_var,
@@ -365,8 +366,9 @@ pub fn compute_merkle_root_variables(
             path_node.is_right_child,
         );
         node_var = cs.rescue_hash(&input_var)[0];
-        println!("merkle size ended: {}", cs.size);
     }
+
+    println!("merkle size ended: {}", cs.size);
     node_var
 }
 
