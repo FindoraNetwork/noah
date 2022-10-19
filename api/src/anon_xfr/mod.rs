@@ -378,6 +378,3 @@ pub fn compute_merkle_root_variables(
     }
     node_var
 }
-
-/// The number of the Bulletproofs generators needed for anonymous transfer.
-pub const ANON_XFR_BP_GENS_LEN: usize = 2048;

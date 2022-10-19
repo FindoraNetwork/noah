@@ -201,7 +201,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
     }
 }
 
-/// KZG commitment scheme over theb BLS12-381 curve
+/// KZG commitment scheme over the BLS12-381 curve
 pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
 
 impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
@@ -256,7 +256,6 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 
     fn prove(
         &self,
-        _transcript: &mut Transcript,
         poly: &FpPolynomial<Self::Field>,
         x: &Self::Field,
         max_degree: usize,
@@ -292,7 +291,6 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
 
     fn verify(
         &self,
-        _transcript: &mut Transcript,
         cm: &Self::Commitment,
         _degree: usize,
         point: &Self::Field,
@@ -391,7 +389,6 @@ mod tests_kzg_impl {
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
     use ark_std::test_rng;
-    use merlin::Transcript;
     use noah_algebra::{
         bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
         prelude::*,
@@ -520,55 +517,25 @@ mod tests_kzg_impl {
         let point = one;
         let max_degree = fq_poly.degree();
 
-        let mut not_needed_transcript = Transcript::new(b"transcript_not_needed");
-
         let degree = fq_poly.degree();
         let commitment_value = pcs.commit(&fq_poly).unwrap();
 
         // Check that an error is returned if the degree of the polynomial exceeds the maximum degree.
         let wrong_max_degree = 1;
-        let res = pcs.prove(
-            &mut not_needed_transcript,
-            &fq_poly,
-            &point,
-            wrong_max_degree,
-        );
+        let res = pcs.prove(&fq_poly, &point, wrong_max_degree);
         assert!(res.is_err());
 
-        let proof = pcs
-            .prove(&mut not_needed_transcript, &fq_poly, &point, max_degree)
-            .unwrap();
+        let proof = pcs.prove(&fq_poly, &point, max_degree).unwrap();
 
-        let res = pcs.verify(
-            &mut not_needed_transcript,
-            &commitment_value,
-            degree,
-            &point,
-            &seven,
-            &proof,
-        );
+        let res = pcs.verify(&commitment_value, degree, &point, &seven, &proof);
         pnk!(res);
 
         let new_pcs = pcs.shrink_to_verifier_only().unwrap();
-        let res = new_pcs.verify(
-            &mut not_needed_transcript,
-            &commitment_value,
-            degree,
-            &point,
-            &seven,
-            &proof,
-        );
+        let res = new_pcs.verify(&commitment_value, degree, &point, &seven, &proof);
         pnk!(res);
 
         let wrong_eval = one;
-        let res = pcs.verify(
-            &mut not_needed_transcript,
-            &commitment_value,
-            degree,
-            &point,
-            &wrong_eval,
-            &proof,
-        );
+        let res = pcs.verify(&commitment_value, degree, &point, &wrong_eval, &proof);
         assert!(res.is_err());
     }
 }

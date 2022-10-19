@@ -2,7 +2,7 @@ use ark_poly::{EvaluationDomain, MixedRadixEvaluationDomain};
 use noah_algebra::{prelude::*, traits::Domain};
 
 /// Field polynomial.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct FpPolynomial<F> {
     /// Coefficients (or evaluations) of the polynomial
     pub coefs: Vec<F>,

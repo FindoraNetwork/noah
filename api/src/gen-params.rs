@@ -5,9 +5,15 @@
     allow(unused)
 )]
 
+use ark_bulletproofs_secq256k1::BulletproofGens as BulletproofGensOverSecq256k1;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bulletproofs::BulletproofGens;
-use noah::setup::{BulletproofParams, ProverParams, VerifierParams, MAX_ANONYMOUS_RECORD_NUMBER};
+use noah::setup::{
+    BulletproofParams, BulletproofURS, ProverParams, VerifierParams, ANON_XFR_BP_GENS_LEN,
+    MAX_ANONYMOUS_RECORD_NUMBER,
+};
 use noah_algebra::utils::save_to_file;
+use noah_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
 use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
@@ -38,8 +44,14 @@ enum Actions {
     /// Generates the verifying key for ABAR to AR transform
     ABAR_TO_AR { directory: PathBuf },
 
-    /// Generates the uniform reference string for Bulletproof
-    BULLETPROOF { directory: PathBuf },
+    /// Generates the uniform reference string for Bulletproof(over the Curve25519 curve).
+    BULLETPROOF_OVER_CURVE25519 { directory: PathBuf },
+
+    /// Generates the uniform reference string for Bulletproof(over the Secq256k1 curve).
+    BULLETPROOF_OVER_SECQ256K1 { directory: PathBuf },
+
+    /// Generates all necessary parameters
+    ALL { directory: PathBuf },
 }
 
 fn main() {
@@ -66,7 +78,11 @@ fn main() {
             gen_abar_to_ar_vk(directory);
         }
 
-        BULLETPROOF { directory } => gen_bulletproof_urs(directory),
+        BULLETPROOF_OVER_CURVE25519 { directory } => gen_bulletproof_curve25519_urs(directory),
+
+        BULLETPROOF_OVER_SECQ256K1 { directory } => gen_bulletproof_secq256k1_urs(directory),
+
+        ALL { directory } => gen_all(directory),
     };
 }
 
@@ -202,17 +218,44 @@ fn gen_abar_to_ar_vk(mut path: PathBuf) {
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
-// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof "./parameters"
-fn gen_bulletproof_urs(mut path: PathBuf) {
-    println!("Generating Bulletproof uniform reference string ...");
+// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof-over-curve25519 "./parameters"
+fn gen_bulletproof_curve25519_urs(mut path: PathBuf) {
+    println!("Generating Bulletproof(over the Curve25519 curve) uniform reference string ...");
 
     let pp = BulletproofParams::default();
     let bytes = bincode::serialize(&pp).unwrap();
-    path.push("bulletproof-urs.bin");
+    path.push("bulletproof-curve25519-urs.bin");
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
     let _n: BulletproofParams = bincode::deserialize(&bytes).unwrap();
     let elapsed = start.elapsed();
     println!("Deserialize time: {:.2?}", elapsed);
+}
+
+// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof-over-secq256k1 "./parameters"
+fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
+    println!("Generating Bulletproof(over the Secq256k1 curve) uniform reference string ...");
+
+    let bp_gens = BulletproofGensOverSecq256k1::new(ANON_XFR_BP_GENS_LEN, 1);
+    let mut bytes = Vec::new();
+    bp_gens.serialize_unchecked(&mut bytes).unwrap();
+    path.push("bulletproof-secq256k1-urs.bin");
+    save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let reader = ark_std::io::BufReader::new(bytes.as_slice());
+    let _bp_gens = BulletproofGensOverSecq256k1::deserialize_unchecked(reader).unwrap();
+    println!("Deserialize time: {:.2?}", start.elapsed());
+}
+
+// cargo run --release --features="gen no_vk" --bin gen-params all "./parameters"
+fn gen_all(directory: PathBuf) {
+    gen_transfer_vk(directory.clone());
+    gen_abar_to_bar_vk(directory.clone());
+    gen_bar_to_abar_vk(directory.clone());
+    gen_ar_to_abar_vk(directory.clone());
+    gen_abar_to_ar_vk(directory.clone());
+    gen_bulletproof_curve25519_urs(directory.clone());
+    gen_bulletproof_secq256k1_urs(directory);
 }

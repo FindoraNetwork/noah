@@ -11,7 +11,7 @@ use crate::anon_xfr::{
         AccElemVars, AnonAssetRecord, AxfrOwnerMemo, Commitment, MTNode, MTPath, Nullifier,
         OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
     },
-    AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN, ANON_XFR_BP_GENS_LEN, FEE_TYPE,
+    AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN, FEE_TYPE,
 };
 use crate::errors::NoahError;
 use crate::setup::{ProverParams, VerifierParams};
@@ -219,13 +219,8 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     } = pre_note;
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-    let (folding_instance, folding_witness) = create_address_folding(
-        prng,
-        hash,
-        &mut transcript,
-        ANON_XFR_BP_GENS_LEN,
-        &input_keypair,
-    )?;
+    let (folding_instance, folding_witness) =
+        create_address_folding(prng, hash, &mut transcript, &input_keypair)?;
     let proof = prove_xfr(
         prng,
         params,
@@ -270,12 +265,7 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     };
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-    let (beta, lambda) = verify_address_folding(
-        hash,
-        &mut transcript,
-        ANON_XFR_BP_GENS_LEN,
-        &note.folding_instance,
-    )?;
+    let (beta, lambda) = verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
 
     let address_folding_public_input =
         prepare_verifier_input(&note.folding_instance, &beta, &lambda);
@@ -326,12 +316,8 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
             };
 
             let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-            let (beta, lambda) = verify_address_folding(
-                hash,
-                &mut transcript,
-                ANON_XFR_BP_GENS_LEN,
-                &note.folding_instance,
-            )?;
+            let (beta, lambda) =
+                verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
 
             let address_folding_public_input =
                 prepare_verifier_input(&note.folding_instance, &beta, &lambda);
@@ -950,7 +936,7 @@ mod tests {
             AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
         },
-        ANON_XFR_BP_GENS_LEN, FEE_TYPE,
+        FEE_TYPE,
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
@@ -1108,8 +1094,6 @@ mod tests {
         let abar = AnonAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair.get_public_key(), *oabar.pub_key_ref());
 
-        let owner_memo = oabar.get_owner_memo().unwrap();
-
         // simulate Merkle tree state with that input record for testing.
         let node = MTNode {
             siblings1: one,
@@ -1118,15 +1102,7 @@ mod tests {
             is_right_child: 1u8,
         };
 
-        let (commitment, _) = commit(
-            oabar.pub_key_ref(),
-            oabar.get_blind(),
-            oabar.get_amount(),
-            oabar.get_asset_type().as_scalar(),
-        )
-        .unwrap();
-
-        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, commitment]);
+        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, abar.commitment]);
         let merkle_root = AnemoiJive381::eval_jive(
             &[/*sib1[0]=*/ one, /*sib2[0]=*/ two],
             &[leaf, ANEMOI_JIVE_381_SALTS[0]],
@@ -1152,6 +1128,7 @@ mod tests {
 
         let (note, merkle_root) = {
             // prover scope
+            let owner_memo = oabar.get_owner_memo().unwrap();
             let oabar_in = OpenAnonAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair)
                 .unwrap()
                 .mt_leaf_info(mt_leaf_info)
@@ -2358,14 +2335,9 @@ mod tests {
         };
 
         let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-        let (folding_instance, folding_witness) = create_address_folding(
-            &mut prng,
-            test_hash.clone(),
-            &mut transcript,
-            ANON_XFR_BP_GENS_LEN,
-            &keypair,
-        )
-        .unwrap();
+        let (folding_instance, folding_witness) =
+            create_address_folding(&mut prng, test_hash.clone(), &mut transcript, &keypair)
+                .unwrap();
 
         let mut nullifiers_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
         let mut input_commitments_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
@@ -2413,13 +2385,8 @@ mod tests {
         let witness = cs.get_and_clear_witness();
 
         let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-        let (beta, lambda) = verify_address_folding(
-            test_hash,
-            &mut transcript,
-            ANON_XFR_BP_GENS_LEN,
-            &folding_instance,
-        )
-        .unwrap();
+        let (beta, lambda) =
+            verify_address_folding(test_hash, &mut transcript, &folding_instance).unwrap();
         let address_folding_public_input =
             prepare_verifier_input(&folding_instance, &beta, &lambda);
 
