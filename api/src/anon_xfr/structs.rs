@@ -54,7 +54,7 @@ impl AnonAssetRecord {
 }
 
 /// A Merkle tree leaf.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MTLeafInfo {
     /// The Merkle tree path.
     pub path: MTPath,
