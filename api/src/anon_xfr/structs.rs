@@ -77,7 +77,7 @@ impl Default for MTLeafInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 /// An opened anonymous asset record.
 pub struct OpenAnonAssetRecord {
     pub(crate) amount: u64,
