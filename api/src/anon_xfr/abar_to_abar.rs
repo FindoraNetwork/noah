@@ -19,6 +19,7 @@ use digest::{consts::U64, Digest};
 use merlin::Transcript;
 #[cfg(feature = "parallel")]
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use std::time::Instant;
 use zei_algebra::{bls12_381::BLSScalar, prelude::*};
 use zei_crypto::basic::rescue::RescueInstance;
 use zei_plonk::plonk::{
@@ -182,7 +183,15 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
         ANON_XFR_BP_GENS_LEN,
         &input_keypair,
     )?;
+
+    let timer = Instant::now();
     let proof = prove_xfr(prng, params, witness, &folding_witness).c(d!())?;
+
+    println!("prover time: {} s", timer.elapsed().as_secs_f64());
+    println!(
+        "proof size in bytes: {}",
+        bincode::serialize(&proof).unwrap().len()
+    );
 
     Ok(AXfrNote {
         body: body,
@@ -225,13 +234,18 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     let address_folding_public_input =
         prepare_verifier_input(&note.folding_instance, &beta, &lambda);
 
-    verify_xfr(
+    let timer = Instant::now();
+    let result = verify_xfr(
         params,
         &pub_inputs,
         &note.proof,
         &address_folding_public_input,
     )
-    .c(d!(ZeiError::AXfrVerificationError))
+    .c(d!(ZeiError::AXfrVerificationError));
+
+    println!("verifier time: {} s", timer.elapsed().as_secs_f64());
+
+    result
 }
 
 /// Batch verify the anonymous transfer notes.
@@ -646,6 +660,8 @@ pub(crate) fn build_multi_xfr_cs(
     .unwrap();
 
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
+
+    println!("total cs size: {}", cs.size);
 
     // pad the number of constraints to power of two.
     cs.pad();
