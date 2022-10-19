@@ -1,3 +1,4 @@
+use std::time::Instant;
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
 use crate::anon_xfr::address_folding::AXfrAddressFoldingWitness;
@@ -223,8 +224,15 @@ impl ProverParams {
             None
         };
 
+        let timer = Instant::now();
         let prover_params =
-            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier.clone()).unwrap();
+
+        if verifier.is_some() {
+            println!("re-indexer time: {} s", timer.elapsed().as_secs_f64());
+        } else {
+            println!("indexer time: {} s", timer.elapsed().as_secs_f64());
+        }
 
         Ok(ProverParams {
             pcs,

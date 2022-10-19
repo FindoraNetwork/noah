@@ -95,7 +95,7 @@ impl<O, C, F> PlonkProverParams<O, C, F> {
 }
 
 /// Plonk verifier parameters.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct PlonkVerifierParams<C, F> {
     /// The commitments of the selectors.
     pub cm_q_vec: Vec<C>,

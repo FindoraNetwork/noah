@@ -28,6 +28,7 @@ use noah_plonk::plonk::{
 };
 #[cfg(feature = "parallel")]
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use std::time::Instant;
 
 /// The domain separator for anonymous transfer, for the Plonk proof.
 const ANON_XFR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Plonk Proof";
@@ -221,6 +222,8 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
     let (folding_instance, folding_witness) =
         create_address_folding(prng, hash, &mut transcript, &input_keypair)?;
+
+    let timer = Instant::now();
     let proof = prove_xfr(
         prng,
         params,
@@ -231,8 +234,11 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
         &folding_witness,
     )
     .c(d!())?;
-
-    println!("proof size in bytes: {}", bincode::serialize(proof.clone()).len());
+    println!("prover time: {} s", timer.elapsed().as_secs_f64());
+    println!(
+        "proof size in bytes: {}",
+        bincode::serialize(&proof).unwrap().len()
+    );
 
     Ok(AXfrNote {
         body: body,
@@ -270,13 +276,18 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     let address_folding_public_input =
         prepare_verifier_input(&note.folding_instance, &beta, &lambda);
 
-    verify_xfr(
+    let timer = Instant::now();
+    let result = verify_xfr(
         params,
         &pub_inputs,
         &note.proof,
         &address_folding_public_input,
     )
-    .c(d!(NoahError::AXfrVerificationError))
+    .c(d!(NoahError::AXfrVerificationError));
+
+    println!("verifier time: {} s", timer.elapsed().as_secs_f64());
+
+    result
 }
 
 /// Batch verify the anonymous transfer notes.
