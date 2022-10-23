@@ -35,7 +35,7 @@ aes-gcm = '=0.10.0-pre'
 bincode = '1.3.1'
 bulletproofs = "2.0"
 digest = '0.10'
-ed25519-dalek = '1.0.0'
+ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek", tag = "v1.0.1-f" }
 lazy_static = "1.4.0"
 libsecp256k1 = '0.7'
 linear-map = '1.2.0'
@@ -63,7 +63,8 @@ path = '../crypto'
 path = '../plonk'
 
 [dependencies.curve25519-dalek]
-version = '3.0.0'
+git = "https://github.com/FindoraNetwork/curve25519-dalek"
+tag = "v3.2.0-f"
 features = ['serde']
 
 [dependencies.rand_core]
