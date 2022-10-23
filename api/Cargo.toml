@@ -63,7 +63,8 @@ path = '../crypto'
 path = '../plonk'
 
 [dependencies.curve25519-dalek]
-version = '3.0.0'
+git = "https://github.com/FindoraNetwork/curve25519-dalek"
+tag = "v3.2.0-f"
 features = ['serde']
 
 [dependencies.rand_core]

@@ -21,7 +21,7 @@ rand_chacha = '0.3'
 serde = '1.0'
 serde_derive = '1.0'
 sha2 = '0.10'
-x25519-dalek = '1.1'
+x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek", tag = "v1.2.2-f" }
 ruc = '1.0'
 sha3 = { version = "0.10", default-features = false }
 
@@ -29,7 +29,8 @@ sha3 = { version = "0.10", default-features = false }
 path = '../algebra'
 
 [dependencies.curve25519-dalek]
-version = '3.0.0'
+git = "https://github.com/FindoraNetwork/curve25519-dalek"
+tag = "v3.2.0-f"
 features = ['serde']
 
 [dependencies.rand_core]
