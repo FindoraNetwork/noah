@@ -248,7 +248,7 @@ mod smoke_axfr_secp256k1_address {
             fdb,
             "abar_secp256k1".to_owned(),
             0,
-            false
+            false,
         )));
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);

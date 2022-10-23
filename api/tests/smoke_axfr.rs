@@ -222,7 +222,12 @@ mod smoke_axfr {
         let receiver = XfrKeyPair::generate(&mut prng);
 
         let fdb = MemoryDB::new();
-        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0, false)));
+        let cs = Arc::new(RwLock::new(ChainState::new(
+            fdb,
+            "abar_ar".to_owned(),
+            0,
+            false,
+        )));
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
@@ -316,7 +321,12 @@ mod smoke_axfr {
         let receiver = XfrKeyPair::generate(&mut prng);
 
         let fdb = MemoryDB::new();
-        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0, false)));
+        let cs = Arc::new(RwLock::new(ChainState::new(
+            fdb,
+            "abar_bar".to_owned(),
+            0,
+            false,
+        )));
         let mut state = State::new(cs, false);
         let store = PrefixedStore::new("my_store", &mut state);
         let mut mt = PersistentMerkleTree::new(store).unwrap();
