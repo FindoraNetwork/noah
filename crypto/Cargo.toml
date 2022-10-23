@@ -14,7 +14,7 @@ aes = '0.8.1'
 bulletproofs = "2.0"
 ctr = '0.9.1'
 digest = '0.10'
-ed25519-dalek = '1.0.0'
+ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek", tag = "v1.0.1-f" }
 itertools = '0.10.3'
 merlin = '3.0'
 rand_chacha = '0.3'
