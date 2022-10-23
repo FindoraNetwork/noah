@@ -10,8 +10,8 @@ name = 'noah_accumulators'
 crate-type = ['rlib']
 
 [dependencies]
-itertools = '0.8.0'
-ruc = '1.0'
+itertools = "0.10.5"
+ruc = "3.0.0"
 parking_lot = '0.12'
 
 [dependencies.noah-algebra]
@@ -22,8 +22,8 @@ path = '../crypto'
 
 [dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.0.2'
+tag = 'v1.1.0'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.0.2'
+tag = 'v1.1.0'
