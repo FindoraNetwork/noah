@@ -15,6 +15,7 @@ fn test_merkle_tree() {
         fdb,
         "test_db".to_string(),
         ver_window,
+        false
     )));
     let mut state = State::new(cs, false);
     let store = PrefixedStore::new("my_store", &mut state);

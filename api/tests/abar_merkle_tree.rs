@@ -21,7 +21,7 @@ use storage::{
 #[test]
 fn test_persistent_merkle_tree() {
     let fdb = MemoryDB::new();
-    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0, false)));
     let mut state = State::new(cs, false);
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
@@ -61,7 +61,7 @@ fn test_persistent_merkle_tree() {
 #[test]
 fn test_persistent_merkle_tree_proof_commitment() {
     let fdb = MemoryDB::new();
-    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0, false)));
     let mut state = State::new(cs, false);
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
@@ -140,7 +140,7 @@ fn test_persistent_merkle_tree_recovery() {
     path.push(format!("temp-memorydb–{}", time));
 
     let fdb = MemoryDB::open(path.clone()).unwrap();
-    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0, false)));
     let mut state = State::new(cs, false);
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
@@ -181,7 +181,7 @@ fn test_persistent_merkle_tree_recovery() {
 
     // test recovery
     let fdb2 = MemoryDB::open(path).unwrap();
-    let cs2 = Arc::new(RwLock::new(ChainState::new(fdb2, "test_db".to_string(), 0)));
+    let cs2 = Arc::new(RwLock::new(ChainState::new(fdb2, "test_db".to_string(), 0, false)));
     let mut state2 = State::new(cs2, false);
     let store2 = PrefixedStore::new("mystore", &mut state2);
     let mt2 = PersistentMerkleTree::new(store2).unwrap();
@@ -193,7 +193,7 @@ fn test_persistent_merkle_tree_recovery() {
 #[test]
 fn test_init_tree() {
     let fdb = MemoryDB::new();
-    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0, false)));
     let mut state = State::new(cs, false);
 
     build_tree(&mut state);
@@ -209,7 +209,7 @@ fn build_tree(state: &mut State<MemoryDB>) {
 #[test]
 pub fn test_merkle_proofs() {
     let fdb = MemoryDB::new();
-    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
+    let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0, false)));
     let mut state = State::new(cs, false);
 
     let store = PrefixedStore::new("mystore", &mut state);
