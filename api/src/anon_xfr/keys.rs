@@ -1,4 +1,4 @@
-use aes_gcm::{aead::Aead, NewAead};
+use aes_gcm::{aead::Aead, KeyInit};
 use digest::{generic_array::GenericArray, Digest};
 use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1, SECP256K1_SCALAR_LEN};
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
