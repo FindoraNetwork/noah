@@ -120,7 +120,7 @@ tag = 'v0.2.2'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v0.2.2'
+tag = 'v1.1.0'
 
 [dependencies.ark-bulletproofs-secq256k1]
 git = "https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1"
