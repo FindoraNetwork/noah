@@ -4,7 +4,7 @@
 #![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
 #![deny(unused_attributes, unused_imports, unused_mut, missing_docs)]
 #![deny(renamed_and_removed_lints, stable_features, unused_allocation)]
-#![deny(unused_comparisons, bare_trait_objects, unused_must_use)]
+#![deny(unused_comparisons, bare_trait_objects, unused_must_use, const_err)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/74745723?s=200&v=4")]
 #![doc(html_playground_url = "https://play.rust-lang.org")]
 #![forbid(unsafe_code)]

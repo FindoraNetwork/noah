@@ -37,7 +37,7 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 /// use noah_algebra::{bls12_381::BLSScalar, One};
 ///
 /// let fdb = MemoryDB::new();
-/// let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0, false)));
+/// let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
 /// let mut state = State::new(cs, false);
 /// let store = PrefixedStore::new("my_store", &mut state);
 /// let mut mt = PersistentMerkleTree::new(store).unwrap();
