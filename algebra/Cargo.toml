@@ -19,7 +19,7 @@ base64 = "0.13"
 bulletproofs = "2.0"
 digest = '0.10'
 itertools = '0.10.0'
-ruc = "3.0.0"
+ruc = '1.0'
 serde = '1.0'
 x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek", tag = "v1.2.2-f" }
 rayon = { version = "1", optional = true }
