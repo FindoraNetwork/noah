@@ -1,4 +1,3 @@
-use ark_std::test_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 use digest::Digest;
 use mem_db::MemoryDB;

@@ -281,7 +281,6 @@ fn symmetric_decrypt(key: &[u8; 32], ciphertext: &Ctext) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ark_std::test_rng;
     use ed25519_dalek::Keypair;
 
     #[test]

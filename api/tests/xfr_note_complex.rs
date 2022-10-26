@@ -1,4 +1,3 @@
-use ark_std::test_rng;
 use noah::{
     anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
     setup::BulletproofParams,
@@ -13,6 +12,7 @@ use noah::{
         trace_assets, verify_xfr_note, RecordData, XfrNotePoliciesRef,
     },
 };
+use noah_algebra::prelude::*;
 use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use wasm_bindgen::__rt::std::collections::HashMap;
 

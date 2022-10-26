@@ -276,7 +276,6 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
 mod test {
     use crate::setup::BulletproofParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
-    use ark_std::test_rng;
     use noah_algebra::{
         prelude::*,
         ristretto::{CompressedRistretto, RistrettoScalar},

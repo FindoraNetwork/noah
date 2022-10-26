@@ -388,7 +388,6 @@ mod tests_kzg_impl {
         kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
-    use ark_std::test_rng;
     use noah_algebra::{
         bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
         prelude::*,

@@ -334,7 +334,6 @@ impl AxfrOwnerMemo {
 mod test {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::AXfrPubKey;
-    use ark_std::test_rng;
     use noah_algebra::prelude::*;
 
     #[test]

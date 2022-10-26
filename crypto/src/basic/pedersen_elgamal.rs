@@ -356,7 +356,6 @@ mod test {
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
         pedersen_elgamal_batch_verify, PedersenElGamalProofInstance,
     };
-    use ark_std::test_rng;
     use merlin::Transcript;
     use noah_algebra::prelude::*;
     use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};

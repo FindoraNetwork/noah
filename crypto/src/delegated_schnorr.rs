@@ -315,9 +315,8 @@ mod test {
     use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
     use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
     use crate::field_simulation::SimFrParamsRistretto;
-    use ark_std::test_rng;
     use merlin::Transcript;
-    use noah_algebra::{ristretto::RistrettoScalar, traits::Scalar};
+    use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
 
     #[test]
     fn test_correctness() {

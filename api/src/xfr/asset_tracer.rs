@@ -224,7 +224,6 @@ impl TracerMemo {
 #[cfg(test)]
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
-    use ark_std::test_rng;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::basic::elgamal::elgamal_encrypt;
 

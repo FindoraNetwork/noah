@@ -222,10 +222,11 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
 
 #[cfg(test)]
 mod tests {
-    use ark_std::test_rng;
     use merlin::Transcript;
-    use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar as Scalar};
-    use noah_algebra::{ops::*, traits::Group, Zero};
+    use noah_algebra::{
+        prelude::*,
+        ristretto::{RistrettoPoint, RistrettoScalar as Scalar},
+    };
 
     #[test]
     #[allow(non_snake_case)]
