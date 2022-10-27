@@ -1,4 +1,3 @@
-use ark_std::test_rng;
 use mem_db::MemoryDB;
 use noah::anon_xfr::structs::AccElemVars;
 use noah::anon_xfr::{

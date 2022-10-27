@@ -1,4 +1,3 @@
-use ark_std::test_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use noah_plonk::poly_commit::field_polynomial::FpPolynomial;

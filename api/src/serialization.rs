@@ -67,14 +67,12 @@ mod test {
         sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature},
         structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
     };
-    use ark_std::test_rng;
-    use noah_algebra::ristretto::RistrettoPoint;
+    use noah_algebra::{prelude::*, ristretto::RistrettoPoint};
     use noah_crypto::basic::{
         elgamal::elgamal_key_gen,
         hybrid_encryption::{XPublicKey, XSecretKey},
     };
     use rmp_serde::{Deserializer, Serializer};
-    use ruc::*;
     use serde::{de::Deserialize, ser::Serialize};
     use std::convert::TryFrom;
 

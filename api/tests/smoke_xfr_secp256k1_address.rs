@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod smoke_xfr_secp256k1_address {
-    use ark_std::test_rng;
     use noah::{
         setup::BulletproofParams,
         xfr::{
@@ -14,6 +13,7 @@ mod smoke_xfr_secp256k1_address {
             verify_xfr_note, XfrNotePolicies,
         },
     };
+    use noah_algebra::prelude::*;
     use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 
     const AMOUNT: u64 = 10u64;

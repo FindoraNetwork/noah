@@ -746,7 +746,7 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
 #[cfg(test)]
 mod test {
     use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKeyInner, XfrSecretKey};
-    use ark_std::{env, test_rng};
+    use ark_std::env;
     use noah_algebra::prelude::*;
 
     #[test]

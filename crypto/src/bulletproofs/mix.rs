@@ -567,7 +567,6 @@ fn range_proof_64<CS: ConstraintSystem>(
 #[cfg(test)]
 pub mod tests {
     use crate::bulletproofs::mix::{allocate_mix_vector, MixCommitment, MixValue, MixVariable};
-    use ark_std::test_rng;
     use bulletproofs::{
         r1cs::{Prover, R1CSProof, Verifier},
         BulletproofGens, PedersenGens,

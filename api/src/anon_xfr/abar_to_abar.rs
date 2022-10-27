@@ -935,7 +935,6 @@ mod tests {
     };
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
-    use ark_std::test_rng;
     use digest::{consts::U64, Digest};
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};

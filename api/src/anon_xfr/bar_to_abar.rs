@@ -644,9 +644,8 @@ mod test {
         bar_to_abar::BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT, commit, keys::AXfrKeyPair,
     };
     use crate::xfr::structs::AssetType;
-    use ark_std::test_rng;
     use merlin::Transcript;
-    use noah_algebra::{bls12_381::BLSScalar, ristretto::RistrettoScalar, traits::Scalar};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::{
         basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
         delegated_schnorr::prove_delegated_schnorr,

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod smoke_xfr_compatibility {
-    use ark_std::test_rng;
     use noah::setup::BulletproofParams;
     use noah::xfr::{structs::*, *};
+    use noah_algebra::prelude::*;
 
     #[test]
     fn compatibility_v1_bar_to_bar_no_trancing() {

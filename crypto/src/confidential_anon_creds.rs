@@ -357,7 +357,6 @@ pub(crate) mod test_helper {
     };
     use crate::basic::elgamal::elgamal_key_gen;
     use crate::confidential_anon_creds::{confidential_open_comm, confidential_verify_open};
-    use ark_std::test_rng;
     use noah_algebra::prelude::*;
     use noah_algebra::traits::Pairing;
 

@@ -53,6 +53,9 @@ pub mod utils;
 #[doc(hidden)]
 pub mod prelude;
 
+/// Module for test rng
+pub mod rand_helper;
+
 #[doc(hidden)]
 pub use ark_std::{
     borrow, cmp, collections, fmt, fs, hash, io, iter, ops, path, rand, result, str, One,

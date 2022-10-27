@@ -12,7 +12,6 @@ use crate::xfr::{
     },
     verify_xfr_body, verify_xfr_note, XfrNotePolicies,
 };
-use ark_std::test_rng;
 use merlin::Transcript;
 use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
 use noah_crypto::basic::{

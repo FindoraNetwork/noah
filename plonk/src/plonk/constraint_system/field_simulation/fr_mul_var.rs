@@ -310,7 +310,6 @@ impl<P: SimFrParams> SimFrMulVar<P> {
 #[cfg(test)]
 mod test_ristretto {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
-    use ark_std::test_rng;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
     use num_bigint::{BigUint, RandBigInt};
@@ -391,7 +390,6 @@ mod test_ristretto {
 #[cfg(test)]
 mod test_secq256k1 {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
-    use ark_std::test_rng;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
     use num_bigint::{BigUint, RandBigInt};
