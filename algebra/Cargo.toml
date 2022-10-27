@@ -16,7 +16,7 @@ crate-type = ['rlib']
 
 [dependencies]
 base64 = "0.13"
-bulletproofs = "2.0"
+bulletproofs = { git = "https://github.com/FindoraNetwork/bp", tag = "v1.0.2-f"  }
 digest = '0.10'
 itertools = '0.10.0'
 ruc = '1.0'
@@ -104,6 +104,7 @@ u32_backend = ['curve25519-dalek/u32_backend']
 avx2_backend = ['curve25519-dalek/avx2_backend']
 parallel = [
     'rayon',
+    'ark-std/parallel',
     'ark-ec/parallel',
     'ark-ff/parallel',
     'ark-bulletproofs-secq256k1/parallel'
