@@ -16,7 +16,7 @@ crate-type = ['rlib']
 
 [dependencies]
 base64 = "0.13"
-bulletproofs = "2.0"
+bulletproofs = { git = "https://github.com/FindoraNetwork/bp", tag = "v1.0.2-f"  }
 digest = '0.10'
 itertools = '0.10.0'
 ruc = '1.0'
