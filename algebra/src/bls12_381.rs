@@ -1051,7 +1051,6 @@ mod bls12_381_groups_test {
     };
     use ark_bls12_381::{G1Affine, G2Affine};
     use ark_ec::ProjectiveCurve;
-    use ark_std::test_rng;
 
     #[test]
     fn test_scalar_ops() {

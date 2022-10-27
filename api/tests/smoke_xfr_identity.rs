@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod smoke_xfr_identity {
-    use ark_std::test_rng;
     use noah::{
         anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
         setup::BulletproofParams,
@@ -15,6 +14,7 @@ mod smoke_xfr_identity {
             trace_assets, verify_xfr_note, RecordData, XfrNotePoliciesRef,
         },
     };
+    use noah_algebra::prelude::*;
     use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
     use wasm_bindgen::__rt::std::collections::HashMap;
 

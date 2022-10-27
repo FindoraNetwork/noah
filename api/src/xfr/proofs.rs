@@ -755,7 +755,6 @@ mod tests {
         proofs::verify_identity_proofs,
         structs::{AssetTracerKeyPair, TracerMemo, TracingPolicies, TracingPolicy},
     };
-    use ark_std::test_rng;
     use noah_algebra::prelude::*;
 
     #[test]

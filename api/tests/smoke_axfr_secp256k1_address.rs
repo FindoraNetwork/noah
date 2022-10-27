@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod smoke_axfr_secp256k1_address {
-    use ark_std::test_rng;
     use digest::Digest;
     use mem_db::MemoryDB;
     use noah::{

@@ -189,7 +189,6 @@ mod test_ristretto {
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboCS,
     };
-    use ark_std::test_rng;
     use noah_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
     use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
     use num_bigint::{BigUint, RandBigInt};
@@ -341,7 +340,6 @@ mod test_secq256k1 {
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboCS,
     };
-    use ark_std::test_rng;
     use noah_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
     use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
     use num_bigint::{BigUint, RandBigInt};

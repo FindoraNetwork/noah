@@ -482,7 +482,6 @@ impl<P: SimFrParams> SimFrMul<P> {
 #[cfg(test)]
 mod test_ristretto {
     use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
-    use ark_std::test_rng;
     use noah_algebra::prelude::*;
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
@@ -606,7 +605,6 @@ mod test_ristretto {
 #[cfg(test)]
 mod test_secq256k1 {
     use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
-    use ark_std::test_rng;
     use noah_algebra::prelude::*;
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;

@@ -422,10 +422,8 @@ mod kzg_test {
     use crate::plonk::verifier::verifier;
     use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
     use crate::poly_commit::pcs::PolyComScheme;
-    use ark_std::test_rng;
     use merlin::Transcript;
-    use noah_algebra::bls12_381::BLSScalar;
-    use noah_algebra::prelude::*;
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
     #[test]

@@ -212,9 +212,7 @@ impl NoahFromToBytes for AXfrKeyPair {
 #[cfg(test)]
 mod tests {
     use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
-    use ark_std::test_rng;
-    use noah_algebra::prelude::*;
-    use noah_algebra::secp256k1::SECP256K1G1;
+    use noah_algebra::{prelude::*, secp256k1::SECP256K1G1};
 
     fn check_from_to_bytes<G: Group>() {
         let mut prng = test_rng();

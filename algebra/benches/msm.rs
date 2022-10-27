@@ -1,7 +1,7 @@
-use ark_std::{test_rng, time::Instant};
+use ark_std::time::Instant;
 use noah_algebra::{
     bls12_381::{BLSScalar, BLSG1},
-    traits::{Group, Scalar},
+    prelude::*,
 };
 
 fn main() {
