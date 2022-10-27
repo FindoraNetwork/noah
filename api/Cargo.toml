@@ -18,6 +18,11 @@ name = 'anon_xfr'
 path = 'benches/anon_xfr.rs'
 harness = false
 
+[[bench]]
+name = 'merkle_tree'
+path = 'benches/merkle_tree.rs'
+harness = false
+
 [package]
 name = 'noah'
 version = '0.2.0'
