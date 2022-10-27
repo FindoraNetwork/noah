@@ -140,7 +140,6 @@ pub fn compute_merkle_root_variables_2_20(
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 
-    let a = cs.size;
     let mut node_var = cs.new_variable(leaf_trace.output);
     cs.anemoi_variable_length_hash(leaf_trace, &[uid, commitment], node_var);
     for (idx, (path_node, trace)) in path_vars
@@ -160,7 +159,6 @@ pub fn compute_merkle_root_variables_2_20(
         );
         node_var = cs.jive_crh(trace, &input_var, ANEMOI_JIVE_381_SALTS[idx]);
     }
-    println!("{}", cs.size - a);
     node_var
 }
 
