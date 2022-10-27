@@ -4,7 +4,7 @@ use crate::{
     traits::{Domain, Pairing},
 };
 use ark_bls12_381::{
-    fr::FrParameters, Bls12_381 as Bls12381pairing, Fq, Fq12Parameters, Fr, G1Affine, G1Projective,
+    fr::FrParameters, Bls12_381 as Bls12381pairing, Fq12Parameters, Fr, G1Affine, G1Projective,
     G2Affine, G2Projective,
 };
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
@@ -12,7 +12,6 @@ use ark_ff::{
     BigInteger, BigInteger256, FftField, FftParameters, Field, Fp12, FpParameters, PrimeField,
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::collections::BTreeMap;
 use ark_std::{
     fmt::{Debug, Display, Formatter},
     result::Result as StdResult,
@@ -20,12 +19,8 @@ use ark_std::{
 };
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
-use num_integer::Integer;
 use num_traits::Num;
 use wasm_bindgen::prelude::*;
-
-#[cfg(feature = "parallel")]
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 /// The number of bytes for a scalar value over BLS12-381
 pub const BLS12_381_SCALAR_LEN: usize = 32;
@@ -450,228 +445,6 @@ impl Group for BLSG1 {
 
         Self(ark_ec::msm::VariableBase::msm(&points_raw, &scalars_raw))
     }
-
-    #[inline]
-    fn multi_exp_unsafe(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
-        let scalars_raw = scalars
-            .iter()
-            .map(|r| r.0.into_repr())
-            .collect::<Vec<<FrParameters as FftParameters>::BigInt>>();
-        let points_raw = G1Projective::batch_normalization_into_affine(
-            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
-        );
-
-        Self(msm_unsafe(&points_raw, &scalars_raw))
-    }
-}
-
-/// The result of this function is only approximately `ln(a)`
-/// [`Explanation of usage`]
-///
-/// [`Explanation of usage`]: https://github.com/scipr-lab/zexe/issues/79#issue-556220473
-fn ln_without_floats(a: usize) -> usize {
-    // log2(a) * ln(2)
-    (ark_std::log2(a) * 69 / 100) as usize
-}
-
-/// Bucketed MSM
-pub fn msm_unsafe(bases: &[G1Affine], scalars: &[BigInteger256]) -> G1Projective {
-    let size = ark_std::cmp::min(bases.len(), scalars.len());
-    let scalars = &scalars[..size];
-    let bases = &bases[..size];
-
-    let num_non_zero_entries: usize = scalars
-        .iter()
-        .map(|x| if x.is_zero() { 0 } else { 1 })
-        .sum();
-
-    let scalars_and_bases_iter = scalars.iter().zip(bases).filter(|(s, _)| !s.is_zero());
-
-    let c = if num_non_zero_entries < 512 {
-        3
-    } else {
-        ln_without_floats(num_non_zero_entries) - 3
-    };
-
-    let num_bits = <Fr as PrimeField>::Params::MODULUS_BITS as usize;
-    let fr_one = Fr::one().into_repr();
-
-    let zero = G1Projective::zero();
-    let window_starts: Vec<_> = (0..num_bits).step_by(c).collect();
-
-    // Each window is of size `c`.
-    // We divide up the bits 0..num_bits into windows of size `c`, and
-    // in parallel process each such window.
-    let window_sums: Vec<_> = ark_std::cfg_into_iter!(window_starts)
-        .map(|w_start| {
-            let mut buckets = Vec::new();
-            for _ in 0..(1 << c) {
-                let v = Vec::<G1Affine>::with_capacity(num_non_zero_entries);
-                buckets.push(v);
-            }
-            // This clone is cheap, because the iterator contains just a
-            // pointer and an index into the original vectors.
-            scalars_and_bases_iter.clone().for_each(|(&scalar, base)| {
-                if scalar == fr_one {
-                    // We only process unit scalars once in the first window.
-                    if w_start == 0 {
-                        buckets[0].push(base.clone());
-                    }
-                } else {
-                    let mut scalar = scalar;
-
-                    // We right-shift by w_start, thus getting rid of the
-                    // lower bits.
-                    scalar.divn(w_start as u32);
-
-                    // We mod the remaining bits by 2^{window size}, thus taking `c` bits.
-                    let scalar = scalar.as_ref()[0] % (1 << c);
-
-                    // If the scalar is non-zero, we update the corresponding
-                    // bucket.
-                    // (Recall that `buckets` doesn't have a zero bucket.)
-                    if scalar != 0 {
-                        buckets[scalar as usize].push(base.clone());
-                    }
-                }
-            });
-
-            // Prepare to sum all the buckets
-            let buckets_sum = reduce_buckets(&mut buckets);
-
-            // Compute sum_{i in 0..num_buckets} (sum_{j in i..num_buckets} bucket[j])
-            // This is computed below for b buckets, using 2b curve additions.
-            //
-            // We could first normalize `buckets` and then use mixed-addition
-            // here, but that's slower for the kinds of groups we care about
-            // (Short Weierstrass curves and Twisted Edwards curves).
-            // In the case of Short Weierstrass curves,
-            // mixed addition saves ~4 field multiplications per addition.
-            // However normalization (with the inversion batched) takes ~6
-            // field multiplications per element,
-            // hence batch normalization is a slowdown.
-
-            // `running_sum` = sum_{j in i..num_buckets} bucket[j],
-            // where we iterate backward from i = num_buckets to 0.
-            let mut res = buckets_sum[0].clone();
-            let mut running_sum = G1Projective::zero();
-            buckets_sum[1..].into_iter().rev().for_each(|b| {
-                running_sum += b;
-                res += &running_sum;
-            });
-            res
-        })
-        .collect();
-
-    // We store the sum for the lowest window.
-    let lowest = *window_sums.first().unwrap();
-
-    // We're traversing windows from high to low.
-    lowest
-        + &window_sums[1..]
-            .iter()
-            .rev()
-            .fold(zero, |mut total, sum_i| {
-                total += sum_i;
-                for _ in 0..c {
-                    total.double_in_place();
-                }
-                total
-            })
-}
-
-/// Reduce the buckets
-pub fn reduce_buckets(buckets: &mut Vec<Vec<G1Affine>>) -> Vec<G1Projective> {
-    const THRESHOLD: usize = 16;
-
-    let mut res = vec![G1Projective::zero(); buckets.len()];
-
-    loop {
-        let mut flag_all_below_threshold = true;
-
-        // construct a list of divisors
-        let mut divisors_all_buckets = BTreeMap::<usize, Vec<Fq>>::new();
-        let mut num_divisors = 0usize;
-        for (i, bucket) in buckets.iter_mut().enumerate() {
-            let len = bucket.len();
-            if len > THRESHOLD {
-                flag_all_below_threshold = false;
-                let mut divisors = Vec::with_capacity(len / 2);
-
-                if len.is_odd() {
-                    for chunk in bucket[1..].chunks_exact(2) {
-                        divisors.push(chunk[1].x.clone() - &chunk[0].x);
-                    }
-                } else {
-                    for chunk in bucket.chunks_exact(2) {
-                        divisors.push(chunk[1].x.clone() - &chunk[0].x);
-                    }
-                }
-                num_divisors += divisors.len();
-                divisors_all_buckets.insert(i, divisors);
-            } else if len != 0 {
-                let mut sum = G1Projective::zero();
-                bucket.iter().for_each(|x| sum.add_assign_mixed(x));
-                bucket.clear();
-                res[i] = sum;
-            }
-        }
-
-        if flag_all_below_threshold {
-            break;
-        }
-
-        // compute the batch inversion
-        let mut sketchpad = Vec::<Fq>::with_capacity(num_divisors);
-        for (_, divisors) in divisors_all_buckets.iter() {
-            sketchpad.extend_from_slice(&divisors);
-        }
-        ark_ff::batch_inversion(&mut sketchpad);
-        let mut idx = 0;
-        for (_, divisors) in divisors_all_buckets.iter_mut() {
-            let divisors_len = divisors.len();
-            *divisors = sketchpad[idx..idx + divisors_len].to_vec();
-            idx += divisors_len;
-        }
-
-        for (i, bucket) in divisors_all_buckets.iter() {
-            let len = buckets[*i].len();
-
-            let src: &[G1Affine] = if len.is_odd() {
-                &buckets[*i][1..]
-            } else {
-                &buckets[*i][..]
-            };
-
-            let dest: Vec<G1Affine> = src
-                .chunks_exact(2)
-                .enumerate()
-                .map(|(i, points)| {
-                    let x2_minus_x1_inv: Fq = bucket[i].clone();
-                    let y2_minus_y1: Fq = points[1].y.clone() - &points[0].y;
-
-                    let m = y2_minus_y1 * x2_minus_x1_inv;
-                    let x_3 = m.square() - &points[0].x - &points[1].x;
-                    let y_3 = m * (points[0].x - &x_3) - &points[0].y;
-
-                    G1Affine {
-                        x: x_3,
-                        y: y_3,
-                        infinity: false,
-                    }
-                })
-                .collect();
-
-            if len.is_odd() {
-                buckets[*i].truncate(1);
-                buckets[*i].extend_from_slice(&dest);
-            } else {
-                buckets[*i] = dest;
-            }
-        }
-    }
-
-    res
 }
 
 impl<'a> Add<&'a BLSG1> for BLSG1 {

@@ -17,10 +17,6 @@ ark-std = { git = "https://github.com/FindoraNetwork/ark-std", tag = "stable-202
 ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves", tag = "stable-2022" }
 ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves", tag = "stable-2022" }
 ark-algebra-test-templates = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
-curve25519-dalek = { git = "https://github.com/FindoraNetwork/curve25519-dalek", tag = "v3.2.0-f" }
-ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek", tag = "v1.0.1-f" }
-x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek", tag = "v1.2.2-f" }
-bulletproofs = { git = "https://github.com/FindoraNetwork/bp", tag = "v1.0.1-f" }
 
 [profile.release]
 opt-level = 3
