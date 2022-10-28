@@ -93,9 +93,11 @@ fn test_persistent_merkle_tree_proof_commitment() {
                 .nodes
                 .iter()
                 .map(|e| MTNode {
-                    siblings1: e.siblings1,
-                    siblings2: e.siblings2,
+                    left: e.left,
+                    mid: e.mid,
+                    right: e.right,
                     is_left_child: (e.path == TreePath::Left) as u8,
+                    is_mid_child: (e.path == TreePath::Middle) as u8,
                     is_right_child: (e.path == TreePath::Right) as u8,
                 })
                 .collect(),
@@ -107,15 +109,11 @@ fn test_persistent_merkle_tree_proof_commitment() {
         BLSScalar::from(0u32),
         abar.commitment,
     ]);
-    let mut next = leaf_trace.output;
     for (i, mt_node) in proof.nodes.iter().enumerate() {
-        let (s1, s2, s3) = match mt_node.path {
-            TreePath::Left => (next, mt_node.siblings1, mt_node.siblings2),
-            TreePath::Middle => (mt_node.siblings1, next, mt_node.siblings2),
-            TreePath::Right => (mt_node.siblings1, mt_node.siblings2, next),
-        };
-        let trace = AnemoiJive381::eval_jive_with_trace(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
-        next = trace.output;
+        let trace = AnemoiJive381::eval_jive_with_trace(
+            &[mt_node.left, mt_node.mid],
+            &[mt_node.right, ANEMOI_JIVE_381_SALTS[i]],
+        );
         path_traces.push(trace);
     }
     let root_var =

@@ -308,20 +308,33 @@ pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerkleP
         .nodes
         .into_iter()
         .map(|node| MerkleNodeVars {
-            siblings1: cs.new_variable(node.siblings1),
-            siblings2: cs.new_variable(node.siblings2),
+            left: cs.new_variable(node.left),
+            mid: cs.new_variable(node.mid),
+            right: cs.new_variable(node.right),
             is_left_child: cs.new_variable(BLSScalar::from(node.is_left_child as u32)),
+            is_mid_child: cs.new_variable(BLSScalar::from(node.is_mid_child as u32)),
             is_right_child: cs.new_variable(BLSScalar::from(node.is_right_child as u32)),
         })
         .collect();
     // Boolean-constrain `is_left_child` and `is_right_child`
     for node_var in path_vars.iter() {
-        cs.insert_boolean_gate(node_var.is_left_child);
-        cs.insert_boolean_gate(node_var.is_right_child);
-        // 0 <= is_left_child[i] + is_right_child[i] <= 1 for every i,
-        // because a node can't simultaneously be the left and right child of its parent
-        let left_add_right = cs.add(node_var.is_left_child, node_var.is_right_child);
-        cs.insert_boolean_gate(left_add_right);
+        let zero = BLSScalar::zero();
+        let one = BLSScalar::one();
+        cs.push_add_selectors(zero, one, one, one);
+        cs.push_mul_selectors(zero, zero);
+        cs.push_constant_selector(one.neg());
+        cs.push_ecc_selector(zero);
+        cs.push_out_selector(zero);
+
+        let zero_var = cs.zero_var();
+        cs.wiring[0].push(zero_var);
+        cs.wiring[1].push(node_var.is_left_child);
+        cs.wiring[2].push(node_var.is_mid_child);
+        cs.wiring[3].push(node_var.is_right_child);
+        cs.wiring[4].push(zero_var);
+        cs.finish_new_gate();
+
+        cs.attach_boolean_constraint_to_gate();
     }
 
     MerklePathVars { nodes: path_vars }
@@ -331,26 +344,58 @@ pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerkleP
 /// If `node` is the left child of parent, output (`node`, `sib1`, `sib2`);
 /// if `node` is the right child of parent, output (`sib1`, `sib2`, `node`);
 /// otherwise, output (`sib1`, `node`, `sib2`).
-fn parse_merkle_tree_path(
+fn check_merkle_tree_validity(
     cs: &mut TurboPlonkCS,
-    node: VarIndex,
-    sib1: VarIndex,
-    sib2: VarIndex,
+    present: VarIndex,
+    left: VarIndex,
+    mid: VarIndex,
+    right: VarIndex,
     is_left_child: VarIndex,
+    is_mid_child: VarIndex,
     is_right_child: VarIndex,
-) -> [VarIndex; 3] {
-    let left = cs.select(sib1, node, is_left_child);
-    let right = cs.select(sib2, node, is_right_child);
-    let sum_left_right = cs.add(left, right);
+) {
+    let zero = BLSScalar::zero();
     let one = BLSScalar::one();
-    let mid = cs.linear_combine(
-        &[node, sib1, sib2, sum_left_right],
-        one,
-        one,
-        one,
-        one.neg(),
-    );
-    [left, mid, right]
+
+    let sum = if cs.witness[is_right_child].is_one() {
+        zero
+    } else {
+        if cs.witness[is_left_child].is_one() {
+            cs.witness[left]
+        } else {
+            cs.witness[mid]
+        }
+    };
+
+    let sum_var = cs.new_variable(sum);
+
+    cs.push_add_selectors(zero, zero, zero, zero);
+    cs.push_mul_selectors(one, one);
+    cs.push_constant_selector(zero);
+    cs.push_ecc_selector(zero);
+    cs.push_out_selector(one);
+
+    cs.wiring[0].push(left);
+    cs.wiring[1].push(is_left_child);
+    cs.wiring[2].push(mid);
+    cs.wiring[3].push(is_mid_child);
+    cs.wiring[4].push(sum_var);
+    cs.finish_new_gate();
+
+    let zero_var = cs.zero_var();
+
+    cs.push_add_selectors(zero, zero, one, zero);
+    cs.push_mul_selectors(one, zero);
+    cs.push_constant_selector(zero);
+    cs.push_ecc_selector(zero);
+    cs.push_out_selector(one);
+
+    cs.wiring[0].push(right);
+    cs.wiring[1].push(is_right_child);
+    cs.wiring[2].push(sum_var);
+    cs.wiring[3].push(zero_var);
+    cs.wiring[4].push(present);
+    cs.finish_new_gate();
 }
 
 /// Compute the Merkle tree root given the path information.
@@ -366,15 +411,21 @@ pub fn compute_merkle_root_variables(
     let mut node_var = cs.new_variable(leaf_trace.output);
     cs.anemoi_variable_length_hash(leaf_trace, &[uid, commitment], node_var);
     for (idx, (path_node, trace)) in path_vars.nodes.iter().zip(traces.iter()).enumerate() {
-        let input_var = parse_merkle_tree_path(
+        check_merkle_tree_validity(
             cs,
             node_var,
-            path_node.siblings1,
-            path_node.siblings2,
+            path_node.left,
+            path_node.mid,
+            path_node.right,
             path_node.is_left_child,
+            path_node.is_mid_child,
             path_node.is_right_child,
         );
-        node_var = cs.jive_crh(trace, &input_var, ANEMOI_JIVE_381_SALTS[idx]);
+        node_var = cs.jive_crh(
+            trace,
+            &[path_node.left, path_node.mid, path_node.right],
+            ANEMOI_JIVE_381_SALTS[idx],
+        );
     }
     node_var
 }
