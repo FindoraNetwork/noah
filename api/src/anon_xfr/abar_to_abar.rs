@@ -1103,7 +1103,7 @@ mod tests {
             mid: two,
             right: leaf,
             is_left_child: 0u8,
-            is_mid_child: 0,
+            is_mid_child: 0u8,
             is_right_child: 1u8,
         };
 
