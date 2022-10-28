@@ -242,7 +242,6 @@ mod test {
     use crate::poly_commit::{
         field_polynomial::FpPolynomial, kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme,
     };
-    use ark_std::test_rng;
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 

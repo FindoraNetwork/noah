@@ -1,4 +1,3 @@
-use ark_std::test_rng;
 use ark_std::time::Instant;
 use bulletproofs::{
     r1cs::{batch_verify, Prover, R1CSProof, Verifier},

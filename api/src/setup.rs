@@ -338,9 +338,11 @@ impl ProverParams {
         let keypair = AXfrKeyPair::generate(&mut prng);
 
         let node = MTNode {
-            siblings1: bls_zero,
-            siblings2: bls_zero,
+            left: bls_zero,
+            mid: bls_zero,
+            right: bls_zero,
             is_left_child: 0,
+            is_mid_child: 0,
             is_right_child: 0,
         };
         let payer_secret = PayerWitness {
@@ -449,9 +451,11 @@ impl ProverParams {
         let keypair = AXfrKeyPair::generate(&mut prng);
 
         let node = MTNode {
-            siblings1: bls_zero,
-            siblings2: bls_zero,
+            left: bls_zero,
+            mid: bls_zero,
+            right: bls_zero,
             is_left_child: 0,
+            is_mid_child: 0,
             is_right_child: 0,
         };
         let payer_secret = PayerWitness {

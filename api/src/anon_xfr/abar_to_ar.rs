@@ -407,17 +407,11 @@ pub fn build_abar_to_ar_cs(
         BLSScalar::from(payer_witness.uid),
         commitment,
     ]);
-    let mut next = leaf_trace.output;
     for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
-        let (s1, s2, s3) = if mt_node.is_left_child != 0 {
-            (next, mt_node.siblings1, mt_node.siblings2)
-        } else if mt_node.is_right_child != 0 {
-            (mt_node.siblings1, mt_node.siblings2, next)
-        } else {
-            (mt_node.siblings1, next, mt_node.siblings2)
-        };
-        let trace = AnemoiJive381::eval_jive_with_trace(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
-        next = trace.output;
+        let trace = AnemoiJive381::eval_jive_with_trace(
+            &[mt_node.left, mt_node.mid],
+            &[mt_node.right, ANEMOI_JIVE_381_SALTS[i]],
+        );
         path_traces.push(trace);
     }
 

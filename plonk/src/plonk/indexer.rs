@@ -404,7 +404,6 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 #[cfg(test)]
 mod test {
     use crate::plonk::indexer::choose_ks;
-    use ark_std::test_rng;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;

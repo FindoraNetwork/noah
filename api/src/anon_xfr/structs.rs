@@ -20,12 +20,16 @@ pub type BlindFactor = BLSScalar;
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTNode {
-    /// The first sibling in a three-ary tree.
-    pub siblings1: BLSScalar,
-    /// The second sibling in a tree-ary tree.
-    pub siblings2: BLSScalar,
-    /// Whether this node is the left chlid of the parent.
+    /// The left child of its parent in a three-ary tree.
+    pub left: BLSScalar,
+    /// The mid child of its parent in a three-ary tree.
+    pub mid: BLSScalar,
+    /// The right child of its parent in a three-ary tree.
+    pub right: BLSScalar,
+    /// Whether this node is the left child of the parent.
     pub is_left_child: u8,
+    /// Whether this node is the mid child of the parent.
+    pub is_mid_child: u8,
     /// Whether this node is the right child of the parent.
     pub is_right_child: u8,
 }
@@ -54,7 +58,7 @@ impl AnonAssetRecord {
 }
 
 /// A Merkle tree leaf.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MTLeafInfo {
     /// The Merkle tree path.
     pub path: MTPath,
@@ -77,7 +81,7 @@ impl Default for MTLeafInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 /// An opened anonymous asset record.
 pub struct OpenAnonAssetRecord {
     pub(crate) amount: u64,
@@ -250,12 +254,16 @@ pub(crate) struct PayeeWitnessVars {
 
 /// The allocated variables for a Merkle tree node.
 pub struct MerkleNodeVars {
-    /// The allocated variable for the first sibling.
-    pub siblings1: VarIndex,
-    /// The allocated variable for the second sibling.
-    pub siblings2: VarIndex,
+    /// The allocated variable for the left.
+    pub left: VarIndex,
+    /// The allocated variable for the mid.
+    pub mid: VarIndex,
+    /// The allocated variable for the right.
+    pub right: VarIndex,
     /// Whether this node is the left child of its parent.
     pub is_left_child: VarIndex,
+    /// Whether this node is the mid child of its parent
+    pub is_mid_child: VarIndex,
     /// Whether this node is the right child of its parent.
     pub is_right_child: VarIndex,
 }
@@ -334,7 +342,6 @@ impl AxfrOwnerMemo {
 mod test {
     use crate::anon_xfr::keys::AXfrKeyPair;
     use crate::anon_xfr::structs::AXfrPubKey;
-    use ark_std::test_rng;
     use noah_algebra::prelude::*;
 
     #[test]

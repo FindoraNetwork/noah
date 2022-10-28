@@ -9,18 +9,14 @@ members = [
 resolver = "2"
 
 [patch.crates-io]
-ark-ec = { git = "https://github.com/FindoraNetwork/ark-algebra" }
-ark-ff = { git = "https://github.com/FindoraNetwork/ark-algebra" }
-ark-poly = { git = "https://github.com/FindoraNetwork/ark-algebra" }
-ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra" }
-ark-std = { git = "https://github.com/FindoraNetwork/ark-std" }
-ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
-ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves" }
-ark-algebra-test-templates = { git = "https://github.com/FindoraNetwork/ark-algebra" }
-curve25519-dalek = { git = "https://github.com/FindoraNetwork/curve25519-dalek" }
-ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek" }
-x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek" }
-bulletproofs = { git = "https://github.com/FindoraNetwork/bp" }
+ark-ec = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
+ark-ff = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
+ark-poly = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
+ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
+ark-std = { git = "https://github.com/FindoraNetwork/ark-std", tag = "stable-2022" }
+ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves", tag = "stable-2022" }
+ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves", tag = "stable-2022" }
+ark-algebra-test-templates = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
 
 [profile.release]
 opt-level = 3

@@ -414,7 +414,6 @@ fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<RistrettoScalar>
 mod test {
     use super::*;
     use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
-    use ark_std::test_rng;
 
     #[test]
     pub(crate) fn test_chaum_pedersen_equality_commitment() {

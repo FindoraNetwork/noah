@@ -938,7 +938,6 @@ mod test {
         indexer::indexer,
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
-    use ark_std::test_rng;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;

@@ -566,7 +566,6 @@ impl<F: Domain> FpPolynomial<F> {
 mod test {
     use crate::poly_commit::field_polynomial::FpPolynomial;
     use ark_poly::MixedRadixEvaluationDomain;
-    use ark_std::test_rng;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, traits::Domain};
 
     #[test]

@@ -480,7 +480,6 @@ mod secq256k1_groups_test {
     };
     use ark_bulletproofs_secq256k1::curve::secq256k1::G1Affine;
     use ark_ec::ProjectiveCurve;
-    use ark_std::test_rng;
 
     #[test]
     fn test_scalar_ops() {

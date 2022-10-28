@@ -16,12 +16,12 @@ crate-type = ['rlib']
 
 [dependencies]
 base64 = "0.13"
-bulletproofs = "2.0"
+bulletproofs = { git = "https://github.com/FindoraNetwork/bp", tag = "v1.0.2-f"  }
 digest = '0.10'
 itertools = '0.10.0'
 ruc = '1.0'
 serde = '1.0'
-x25519-dalek = '1.1'
+x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek", tag = "v1.2.2-f" }
 rayon = { version = "1", optional = true }
 
 [dependencies.byteorder]
@@ -30,7 +30,8 @@ default-features = false
 features = ['i128']
 
 [dependencies.curve25519-dalek]
-version = '3.0.0'
+git = "https://github.com/FindoraNetwork/curve25519-dalek"
+tag = "v3.2.0-f"
 features = ['serde']
 
 [dependencies.wasm-bindgen]
@@ -103,6 +104,7 @@ u32_backend = ['curve25519-dalek/u32_backend']
 avx2_backend = ['curve25519-dalek/avx2_backend']
 parallel = [
     'rayon',
+    'ark-std/parallel',
     'ark-ec/parallel',
     'ark-ff/parallel',
     'ark-bulletproofs-secq256k1/parallel'

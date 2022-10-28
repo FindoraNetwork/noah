@@ -596,7 +596,6 @@ mod test {
         },
         tests::{create_xfr, gen_key_pair_vec},
     };
-    use ark_std::test_rng;
     use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 

@@ -226,7 +226,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             .iter()
             .collect();
 
-        let commitment_value = BLSG1::multi_exp_unsafe(
+        let commitment_value = BLSG1::multi_exp(
             &coefs_poly_bls_scalar_ref[..],
             &pub_param_group_1_as_ref[..],
         );
@@ -388,7 +388,6 @@ mod tests_kzg_impl {
         kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
-    use ark_std::test_rng;
     use noah_algebra::{
         bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
         prelude::*,
