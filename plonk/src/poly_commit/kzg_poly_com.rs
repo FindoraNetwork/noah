@@ -1,3 +1,4 @@
+use std::time::Instant;
 use crate::poly_commit::{
     errors::PolyComSchemeError,
     field_polynomial::FpPolynomial,
@@ -213,6 +214,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
     }
 
     fn commit(&self, polynomial: &FpPolynomial<BLSScalar>) -> Result<Self::Commitment> {
+        let time = Instant::now();
         let coefs = polynomial.get_coefs_ref();
 
         let degree = polynomial.degree();
@@ -230,6 +232,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             &coefs_poly_bls_scalar_ref[..],
             &pub_param_group_1_as_ref[..],
         );
+        println!("poly commit: {}", time.elapsed().as_secs_f64());
 
         Ok(KZGCommitment(commitment_value))
     }
