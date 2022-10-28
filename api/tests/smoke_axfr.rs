@@ -431,6 +431,34 @@ mod smoke_axfr {
     }
 
     #[test]
+    fn abar_2in_2out_1asset() {
+        // supported max inputs and outputs
+        let fee_amount = mock_fee(2, 2);
+        let outputs = vec![(1, FEE_TYPE), (666666, FEE_TYPE)];
+        let inputs = vec![(1, FEE_TYPE), (666666 + fee_amount as u64, FEE_TYPE)];
+        test_abar(inputs, outputs, fee_amount, "abar-2-2-1");
+    }
+
+    #[test]
+    fn abar_4in_4out_1asset() {
+        // supported max inputs and outputs
+        let fee_amount = mock_fee(2, 2);
+        let outputs = vec![
+            (1, FEE_TYPE),
+            (22, FEE_TYPE),
+            (333, FEE_TYPE),
+            (666666, FEE_TYPE),
+        ];
+        let inputs = vec![
+            (1, FEE_TYPE),
+            (22, FEE_TYPE),
+            (333, FEE_TYPE),
+            (666666 + fee_amount as u64, FEE_TYPE),
+        ];
+        test_abar(inputs, outputs, fee_amount, "abar-4-4-1");
+    }
+
+    #[test]
     fn abar_6in_6out_1asset() {
         // supported max inputs and outputs
         let fee_amount = mock_fee(6, 6);
@@ -531,6 +559,11 @@ mod smoke_axfr {
         let pre_note = init_anon_xfr_note(&oabars, &oabars_out, fee, &sender).unwrap();
         let hash = random_hasher(&mut prng);
         let note = finish_anon_xfr_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
+
+        println!(
+            "proof size: {}",
+            bincode::serialize(&note.proof).unwrap().len()
+        );
 
         verify_anon_xfr_note(&verifier_params, &note, &root, hash.clone()).unwrap();
 

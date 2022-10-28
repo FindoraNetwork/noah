@@ -28,6 +28,7 @@ use noah_plonk::plonk::{
 };
 #[cfg(feature = "parallel")]
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use std::time::Instant;
 
 /// The domain separator for anonymous transfer, for the Plonk proof.
 const ANON_XFR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Plonk Proof";
@@ -221,6 +222,8 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
     let (folding_instance, folding_witness) =
         create_address_folding(prng, hash, &mut transcript, &input_keypair)?;
+
+    let timer = Instant::now();
     let proof = prove_xfr(
         prng,
         params,
@@ -231,6 +234,11 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
         &folding_witness,
     )
     .c(d!())?;
+    println!("prover time: {} s", timer.elapsed().as_secs_f64());
+    println!(
+        "proof size in bytes: {}",
+        bincode::serialize(&proof).unwrap().len()
+    );
 
     Ok(AXfrNote {
         body: body,
@@ -268,13 +276,18 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     let address_folding_public_input =
         prepare_verifier_input(&note.folding_instance, &beta, &lambda);
 
-    verify_xfr(
+    let timer = Instant::now();
+    let result = verify_xfr(
         params,
         &pub_inputs,
         &note.proof,
         &address_folding_public_input,
     )
-    .c(d!(NoahError::AXfrVerificationError))
+    .c(d!(NoahError::AXfrVerificationError));
+
+    println!("verifier time: {} s", timer.elapsed().as_secs_f64());
+
+    result
 }
 
 /// Batch verify the anonymous transfer notes.
@@ -631,6 +644,7 @@ pub(crate) fn build_multi_xfr_cs(
             BLSScalar::from(payer_witness.uid),
             commitment,
         ]);
+        println!("merkle size: {}", cs.size);
         for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
             let trace = AnemoiJive381::eval_jive_with_trace(
                 &[mt_node.left, mt_node.mid],
@@ -645,6 +659,7 @@ pub(crate) fn build_multi_xfr_cs(
             &leaf_trace,
             &path_traces,
         );
+        println!("merkle size ended: {}", cs.size);
 
         // additional safegaurd to check the payer's amount, although in theory this is not needed.
         cs.range_check(payer_witness_var.amount, AMOUNT_LEN);
@@ -704,6 +719,7 @@ pub(crate) fn build_multi_xfr_cs(
 
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
 
+    println!("total cs size: {}", cs.size);
     // pad the number of constraints to power of two.
     cs.pad();
 
