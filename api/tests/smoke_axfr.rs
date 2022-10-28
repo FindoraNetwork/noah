@@ -84,16 +84,18 @@ mod smoke_axfr {
                     .nodes
                     .iter()
                     .map(|e| MTNode {
-                        siblings1: e.siblings1,
-                        siblings2: e.siblings2,
+                        left: e.left,
+                        mid: e.mid,
+                        right: e.right,
                         is_left_child: (e.path == TreePath::Left) as u8,
+                        is_mid_child: (e.path == TreePath::Middle) as u8,
                         is_right_child: (e.path == TreePath::Right) as u8,
                     })
                     .collect(),
             },
             root: proof.root,
             root_version: proof.root_version,
-            uid: uid,
+            uid,
         };
     }
 

@@ -424,9 +424,11 @@ impl AXfrWitness {
         let bls_zero = BLSScalar::zero();
 
         let node = MTNode {
-            siblings1: bls_zero,
-            siblings2: bls_zero,
+            left: bls_zero,
+            mid: bls_zero,
+            right: bls_zero,
             is_left_child: 0,
+            is_mid_child: 0,
             is_right_child: 0,
         };
         let payer_witness = PayerWitness {
@@ -514,31 +516,19 @@ impl AXfrPubInputs {
 
         let payer = &witness.payers_witnesses[0];
 
-        let (commitment, _) = commit(
-            &AXfrKeyPair::from_secret_key(payer.secret_key.clone()).get_public_key(),
-            payer.blind,
-            payer.amount,
-            payer.asset_type,
-        )
-        .unwrap();
-        let mut node =
-            AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(payer.uid), commitment]);
-        for (idx, path_node) in payer.path.nodes.iter().enumerate() {
-            let input = match (path_node.is_left_child, path_node.is_right_child) {
-                (1, 0) => vec![node, path_node.siblings1, path_node.siblings2],
-                (0, 0) => vec![path_node.siblings1, node, path_node.siblings2],
-                _ => vec![path_node.siblings1, path_node.siblings2, node],
-            };
-            node = AnemoiJive381::eval_jive(
-                &[input[0], input[1]],
-                &[input[2], ANEMOI_JIVE_381_SALTS[idx]],
-            );
-        }
+        let node = payer.path.nodes.last().unwrap();
+        let merkle_root = AnemoiJive381::eval_jive(
+            &[node.left, node.mid],
+            &[
+                node.right,
+                ANEMOI_JIVE_381_SALTS[payer.path.nodes.len() - 1],
+            ],
+        );
 
         Self {
             payers_inputs,
             payees_commitments,
-            merkle_root: node,
+            merkle_root,
             fee: witness.fee,
         }
     }
@@ -641,18 +631,11 @@ pub(crate) fn build_multi_xfr_cs(
             BLSScalar::from(payer_witness.uid),
             commitment,
         ]);
-        let mut next = leaf_trace.output;
         for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
-            let (s1, s2, s3) = if mt_node.is_left_child != 0 {
-                (next, mt_node.siblings1, mt_node.siblings2)
-            } else if mt_node.is_right_child != 0 {
-                (mt_node.siblings1, mt_node.siblings2, next)
-            } else {
-                (mt_node.siblings1, next, mt_node.siblings2)
-            };
-            let trace =
-                AnemoiJive381::eval_jive_with_trace(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
-            next = trace.output;
+            let trace = AnemoiJive381::eval_jive_with_trace(
+                &[mt_node.left, mt_node.mid],
+                &[mt_node.right, ANEMOI_JIVE_381_SALTS[i]],
+            );
             path_traces.push(trace);
         }
         let tmp_root_var = compute_merkle_root_variables(
@@ -924,9 +907,10 @@ mod tests {
         abar_to_abar::{
             asset_mixing, build_multi_xfr_cs, verify_anon_xfr_note, AXfrPubInputs, AXfrWitness,
         },
-        add_merkle_path_variables, commit, commit_in_cs, compute_merkle_root_variables,
+        add_merkle_path_variables, check_merkle_tree_validity, commit, commit_in_cs,
+        compute_merkle_root_variables,
         keys::AXfrKeyPair,
-        nullify, nullify_in_cs, parse_merkle_tree_path,
+        nullify, nullify_in_cs,
         structs::{
             AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
@@ -996,15 +980,34 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &(amount, asset_type))| {
-                let (is_left_child, is_right_child) = match i % 3 {
-                    0 => (1, 0),
-                    1 => (0, 0),
-                    _ => (0, 1),
+                let (is_left_child, is_mid_child, is_right_child) = match i % 3 {
+                    0 => (1, 0, 0),
+                    1 => (0, 1, 0),
+                    _ => (0, 0, 1),
                 };
+                let blind = BLSScalar::random(&mut prng);
+
+                let (commitment, _) =
+                    commit(&input_keypair.get_public_key(), blind, amount, asset_type).unwrap();
+
+                let mut left = zero;
+                let mut mid = zero;
+                let mut right = zero;
+
+                if is_left_child == 1 {
+                    left = commitment;
+                } else if is_right_child == 1 {
+                    right = commitment;
+                } else {
+                    mid = commitment;
+                }
+
                 let node = MTNode {
-                    siblings1: zero,
-                    siblings2: zero,
+                    left,
+                    mid,
+                    right,
                     is_left_child,
+                    is_mid_child,
                     is_right_child,
                 };
                 PayerWitness {
@@ -1013,7 +1016,7 @@ mod tests {
                     amount,
                     asset_type,
                     path: MTPath::new(vec![node]),
-                    blind: BLSScalar::random(&mut prng),
+                    blind,
                 }
             })
             .collect();
@@ -1033,17 +1036,21 @@ mod tests {
                     ])
                 })
                 .collect();
-            payers_secrets[0].path.nodes[0].siblings1 = leafs[1];
+            payers_secrets[0].path.nodes[0].left = leafs[0];
+            payers_secrets[0].path.nodes[0].mid = leafs[1];
             if n_payers == 2 {
-                payers_secrets[0].path.nodes[0].siblings2 = zero;
-                payers_secrets[1].path.nodes[0].siblings1 = leafs[0];
-                payers_secrets[1].path.nodes[0].siblings2 = zero;
+                payers_secrets[0].path.nodes[0].right = zero;
+                payers_secrets[1].path.nodes[0].left = leafs[0];
+                payers_secrets[1].path.nodes[0].mid = leafs[1];
+                payers_secrets[1].path.nodes[0].right = zero;
             } else {
-                payers_secrets[0].path.nodes[0].siblings2 = leafs[2];
-                payers_secrets[1].path.nodes[0].siblings1 = leafs[0];
-                payers_secrets[1].path.nodes[0].siblings2 = leafs[2];
-                payers_secrets[2].path.nodes[0].siblings1 = leafs[0];
-                payers_secrets[2].path.nodes[0].siblings2 = leafs[1];
+                payers_secrets[0].path.nodes[0].right = leafs[2];
+                payers_secrets[1].path.nodes[0].left = leafs[0];
+                payers_secrets[1].path.nodes[0].mid = leafs[1];
+                payers_secrets[1].path.nodes[0].right = leafs[2];
+                payers_secrets[2].path.nodes[0].left = leafs[0];
+                payers_secrets[2].path.nodes[0].mid = leafs[1];
+                payers_secrets[2].path.nodes[0].right = leafs[2];
             }
         }
 
@@ -1088,15 +1095,18 @@ mod tests {
         let abar = AnonAssetRecord::from_oabar(&oabar);
         assert_eq!(keypair.get_public_key(), *oabar.pub_key_ref());
 
+        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, abar.commitment]);
+
         // simulate Merkle tree state with that input record for testing.
         let node = MTNode {
-            siblings1: one,
-            siblings2: two,
+            left: one,
+            mid: two,
+            right: leaf,
             is_left_child: 0u8,
+            is_mid_child: 0,
             is_right_child: 1u8,
         };
 
-        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, abar.commitment]);
         let merkle_root = AnemoiJive381::eval_jive(
             &[/*sib1[0]=*/ one, /*sib2[0]=*/ two],
             &[leaf, ANEMOI_JIVE_381_SALTS[0]],
@@ -1227,21 +1237,27 @@ mod tests {
             })
             .collect();
         let node0 = MTNode {
-            siblings1: leafs[1],
-            siblings2: leafs[2],
+            left: leafs[0],
+            mid: leafs[1],
+            right: leafs[2],
             is_left_child: 1u8,
+            is_mid_child: 0u8,
             is_right_child: 0u8,
         };
         let node1 = MTNode {
-            siblings1: leafs[0],
-            siblings2: leafs[2],
+            left: leafs[0],
+            mid: leafs[1],
+            right: leafs[2],
             is_left_child: 0u8,
+            is_mid_child: 1u8,
             is_right_child: 0u8,
         };
         let node2 = MTNode {
-            siblings1: leafs[0],
-            siblings2: leafs[1],
+            left: leafs[0],
+            mid: leafs[1],
+            right: leafs[2],
             is_left_child: 0u8,
+            is_mid_child: 0u8,
             is_right_child: 1u8,
         };
         let nodes = vec![node0, node1, node2];
@@ -2097,36 +2113,43 @@ mod tests {
     #[test]
     fn test_sort() {
         let mut cs = TurboCS::new();
-        let num: Vec<BLSScalar> = (0..5).map(|x| BLSScalar::from(x as u32)).collect();
-        let node_var = cs.new_variable(num[2]);
-        let sib1_var = cs.new_variable(num[3]);
-        let sib2_var = cs.new_variable(num[4]);
+        let num: Vec<BLSScalar> = (0u32..5u32).map(|x| BLSScalar::from(x)).collect();
+        let node_var = cs.new_variable(num[4]);
+        let left_var = cs.new_variable(num[2]);
+        let mid_var = cs.new_variable(num[3]);
+        let right_var = cs.new_variable(num[4]);
         let is_left_var = cs.new_variable(num[0]);
+        let is_mid_var = cs.new_variable(num[0]);
         let is_right_var = cs.new_variable(num[1]);
-        let out_state = parse_merkle_tree_path(
+
+        // note: check_merkle_tree_validity assumes `is_left_var`, `is_mid_var`, and `is_right_var`
+        // are already checked to be binary
+        check_merkle_tree_validity(
             &mut cs,
             node_var,
-            sib1_var,
-            sib2_var,
+            left_var,
+            mid_var,
+            right_var,
             is_left_var,
+            is_mid_var,
             is_right_var,
         );
         let mut witness = cs.get_and_clear_witness();
-        let output: Vec<BLSScalar> = out_state
+        let output: Vec<BLSScalar> = [left_var, mid_var, right_var]
             .as_slice()
             .iter()
             .map(|&idx| witness[idx])
             .collect();
 
         // node_var is at the right position.
-        let expected_output = vec![witness[sib1_var], witness[sib2_var], witness[node_var]];
+        let expected_output = vec![witness[left_var], witness[mid_var], witness[node_var]];
         // check output correctness.
         assert_eq!(output, expected_output);
 
         // check constraints.
         assert!(cs.verify_witness(&witness, &[]).is_ok());
         // incorrect witness.
-        witness[sib1_var] = BLSScalar::one();
+        witness[node_var] = num[2];
         assert!(cs.verify_witness(&witness, &[]).is_err());
     }
 
@@ -2147,34 +2170,39 @@ mod tests {
             commitment: comm_var,
         };
 
-        let path_node1 = MTNode {
-            siblings1: one,
-            siblings2: three,
-            is_left_child: 1u8,
-            is_right_child: 0u8,
-        };
-        let path_node2 = MTNode {
-            siblings1: two,
-            siblings2: four,
-            is_left_child: 0u8,
-            is_right_child: 1u8,
-        };
-
         // compute the root value.
         let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
             /*uid=*/ one, /*comm=*/ two,
         ]);
+
         let leaf = leaf_trace.output;
-        // leaf is the right child of node1.
+
+        let path_node2 = MTNode {
+            left: two,
+            mid: four,
+            right: leaf,
+            is_left_child: 0u8,
+            is_mid_child: 0u8,
+            is_right_child: 1u8,
+        };
+
         let trace1 = AnemoiJive381::eval_jive_with_trace(
-            &[path_node2.siblings1, path_node2.siblings2],
+            &[path_node2.left, path_node2.mid],
             &[leaf, ANEMOI_JIVE_381_SALTS[0]],
         );
-        let node1 = trace1.output;
-        // node1 is the left child of the root.
+
+        let path_node1 = MTNode {
+            left: trace1.output,
+            mid: one,
+            right: three,
+            is_left_child: 1u8,
+            is_mid_child: 0,
+            is_right_child: 0u8,
+        };
+
         let trace2 = AnemoiJive381::eval_jive_with_trace(
-            &[node1, path_node1.siblings1],
-            &[path_node1.siblings2, ANEMOI_JIVE_381_SALTS[1]],
+            &[path_node1.left, path_node1.mid],
+            &[path_node1.right, ANEMOI_JIVE_381_SALTS[1]],
         );
         let root = trace2.output;
 
@@ -2206,12 +2234,14 @@ mod tests {
         let zero = BLSScalar::zero();
         let one = BLSScalar::one();
 
-        // happy path: `is_left_child`/`is_right_child`/`is_left_child + is_right_child` are boolean
+        // happy path: `is_left_child`/`is_mid_child`/`is_right_child` are boolean
         let mut cs = TurboCS::new();
         let node = MTNode {
-            siblings1: one,
-            siblings2: zero,
+            left: zero,
+            mid: one,
+            right: zero,
             is_left_child: 1u8,
+            is_mid_child: 0u8,
             is_right_child: 0u8,
         };
         let path = MTPath::new(vec![node]);
@@ -2223,9 +2253,11 @@ mod tests {
         let mut cs = TurboCS::new();
         // is_left is not boolean
         let node = MTNode {
-            siblings1: one,
-            siblings2: zero,
+            left: zero,
+            mid: one,
+            right: zero,
             is_left_child: 2u8,
+            is_mid_child: 0u8,
             is_right_child: 0u8,
         };
         let path = MTPath::new(vec![node]);
@@ -2237,9 +2269,11 @@ mod tests {
         let mut cs = TurboCS::new();
         // `is_left` and `is_right` are both 1
         let node = MTNode {
-            siblings1: one,
-            siblings2: zero,
+            left: zero,
+            mid: one,
+            right: zero,
             is_left_child: 1u8,
+            is_mid_child: 0u8,
             is_right_child: 1u8,
         };
         let path = MTPath::new(vec![node]);

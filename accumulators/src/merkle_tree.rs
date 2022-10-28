@@ -108,7 +108,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 }
             };
 
-            let (sib0, sib1, sib2) = match path {
+            let (left, mid, right) = match path {
                 TreePath::Left => (
                     parse_hash(*node_key)?,
                     parse_hash(node_key + 1)?,
@@ -127,7 +127,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             };
 
             let hash =
-                AnemoiJive381::eval_jive(&[sib0, sib1], &[sib2, ANEMOI_JIVE_381_SALTS[index]]);
+                AnemoiJive381::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_381_SALTS[index]]);
             cache.set(keys[index + 1].0, BLSScalar::noah_to_bytes(&hash));
         }
 
@@ -158,34 +158,43 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         let nodes: Vec<ProofNode> = keys[0..depth]
             .iter()
-            .map(|(key, path)| {
-                // if current node is not present in store then it is not a valid uid to generate
-                let mut store_key = KEY_PAD.to_vec();
-                store_key.extend(key.to_be_bytes());
-                if !self.store.exists(&store_key)? {
-                    return Err(eg!("uid not found in tree, cannot generate proof"));
-                }
+            .map(|(key_id, path)| {
+                let (left_key_id, mid_key_id, right_key_id) = match path {
+                    TreePath::Left => (*key_id, key_id + 1, key_id + 2),
+                    TreePath::Middle => (key_id - 1, *key_id, key_id + 1),
+                    TreePath::Right => (key_id - 2, key_id - 1, *key_id),
+                };
 
                 let mut node = ProofNode {
-                    siblings1: Default::default(),
-                    siblings2: Default::default(),
+                    left: Default::default(),
+                    mid: Default::default(),
+                    right: Default::default(),
                     path: *path,
                 };
 
-                let (sib1, sib2) = match path {
-                    TreePath::Left => (key + 1, key + 2),
-                    TreePath::Middle => (key - 1, key + 1),
-                    TreePath::Right => (key - 2, key - 1),
-                };
-                let mut store_key1 = KEY_PAD.to_vec();
-                store_key1.extend(sib1.to_be_bytes());
-                if let Some(b) = self.store.get(&store_key1)? {
-                    node.siblings1 = BLSScalar::noah_from_bytes(b.as_slice())?;
+                // if current node is not present in store then it is not a valid uid to generate
+                let mut cur_key = KEY_PAD.to_vec();
+                cur_key.extend(key_id.to_be_bytes());
+                if !self.store.exists(&cur_key)? {
+                    return Err(eg!("uid not found in tree, cannot generate proof"));
                 }
-                let mut store_key2 = KEY_PAD.to_vec();
-                store_key2.extend(sib2.to_be_bytes());
-                if let Some(b) = self.store.get(&store_key2)? {
-                    node.siblings2 = BLSScalar::noah_from_bytes(b.as_slice())?;
+
+                let mut left_key = KEY_PAD.to_vec();
+                left_key.extend(left_key_id.to_be_bytes());
+                if let Some(b) = self.store.get(&left_key)? {
+                    node.left = BLSScalar::noah_from_bytes(b.as_slice())?;
+                }
+
+                let mut mid_key = KEY_PAD.to_vec();
+                mid_key.extend(mid_key_id.to_be_bytes());
+                if let Some(b) = self.store.get(&mid_key)? {
+                    node.mid = BLSScalar::noah_from_bytes(b.as_slice())?;
+                }
+
+                let mut right_key = KEY_PAD.to_vec();
+                right_key.extend(right_key_id.to_be_bytes());
+                if let Some(b) = self.store.get(&right_key)? {
+                    node.right = BLSScalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 Ok(node)
@@ -314,34 +323,43 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
 
         let nodes: Vec<ProofNode> = keys[0..TREE_DEPTH]
             .iter()
-            .map(|(key, path)| {
-                // if current node is not present in store then it is not a valid uid to generate
-                let mut store_key = KEY_PAD.to_vec();
-                store_key.extend(key.to_be_bytes());
-                if !self.store.exists(&store_key)? {
-                    return Err(eg!("uid not found in tree, cannot generate proof"));
-                }
+            .map(|(key_id, path)| {
+                let (left_key_id, mid_key_id, right_key_id) = match path {
+                    TreePath::Left => (*key_id, key_id + 1, key_id + 2),
+                    TreePath::Middle => (key_id - 1, *key_id, key_id + 1),
+                    TreePath::Right => (key_id - 2, key_id - 1, *key_id),
+                };
 
                 let mut node = ProofNode {
-                    siblings1: Default::default(),
-                    siblings2: Default::default(),
+                    left: Default::default(),
+                    mid: Default::default(),
+                    right: Default::default(),
                     path: *path,
                 };
 
-                let (sib1, sib2) = match path {
-                    TreePath::Left => (key + 1, key + 2),
-                    TreePath::Middle => (key - 1, key + 1),
-                    TreePath::Right => (key - 2, key - 1),
-                };
-                let mut store_key1 = KEY_PAD.to_vec();
-                store_key1.extend(sib1.to_be_bytes());
-                if let Some(b) = self.store.get_v(&store_key1, v)? {
-                    node.siblings1 = BLSScalar::noah_from_bytes(b.as_slice())?;
+                // if current node is not present in store then it is not a valid uid to generate
+                let mut cur_key = KEY_PAD.to_vec();
+                cur_key.extend(key_id.to_be_bytes());
+                if !self.store.exists(&cur_key)? {
+                    return Err(eg!("uid not found in tree, cannot generate proof"));
                 }
-                let mut store_key2 = KEY_PAD.to_vec();
-                store_key2.extend(sib2.to_be_bytes());
-                if let Some(b) = self.store.get_v(&store_key2, v)? {
-                    node.siblings2 = BLSScalar::noah_from_bytes(b.as_slice())?;
+
+                let mut left_key = KEY_PAD.to_vec();
+                left_key.extend(left_key_id.to_be_bytes());
+                if let Some(b) = self.store.get_v(&left_key, v)? {
+                    node.left = BLSScalar::noah_from_bytes(b.as_slice())?;
+                }
+
+                let mut mid_key = KEY_PAD.to_vec();
+                mid_key.extend(mid_key_id.to_be_bytes());
+                if let Some(b) = self.store.get_v(&mid_key, v)? {
+                    node.mid = BLSScalar::noah_from_bytes(b.as_slice())?;
+                }
+
+                let mut right_key = KEY_PAD.to_vec();
+                right_key.extend(right_key_id.to_be_bytes());
+                if let Some(b) = self.store.get_v(&right_key, v)? {
+                    node.right = BLSScalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 Ok(node)
@@ -349,7 +367,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
             .collect::<Result<Vec<ProofNode>>>()?;
 
         Ok(Proof {
-            nodes: nodes,
+            nodes,
             root: self.get_root_with_depth(depth)?,
             root_version: self.version(),
             uid: id,
@@ -415,12 +433,10 @@ pub fn verify(leaf: BLSScalar, proof: &Proof) -> bool {
         return false;
     }
     for (i, node) in proof.nodes.iter().enumerate() {
-        let (s1, s2, s3) = match node.path {
-            TreePath::Left => (next, node.siblings1, node.siblings2),
-            TreePath::Middle => (node.siblings1, next, node.siblings2),
-            TreePath::Right => (node.siblings1, node.siblings2, next),
-        };
-        let hash = AnemoiJive381::eval_jive(&[s1, s2], &[s3, ANEMOI_JIVE_381_SALTS[i]]);
+        let hash = AnemoiJive381::eval_jive(
+            &[node.left, node.mid],
+            &[node.right, ANEMOI_JIVE_381_SALTS[i]],
+        );
         next = hash
     }
     next == proof.root
@@ -443,10 +459,12 @@ pub struct Proof {
 /// so every leaf has two siblings and own position.
 #[derive(Clone, Debug)]
 pub struct ProofNode {
-    /// siblings 1.
-    pub siblings1: BLSScalar,
-    /// siblings 2.
-    pub siblings2: BLSScalar,
+    /// left.
+    pub left: BLSScalar,
+    /// mid.
+    pub mid: BLSScalar,
+    /// right.
+    pub right: BLSScalar,
     /// representative the own position in the branch.
     pub path: TreePath,
 }
