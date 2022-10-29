@@ -7,7 +7,7 @@ pub struct MDSMatrix<F: Scalar, const N: usize>(pub [[F; N]; N]);
 
 impl<F: Scalar, const N: usize> Default for MDSMatrix<F, N> {
     fn default() -> Self {
-        Self([[F::default(); N]; N])
+                   Self([[F::default(); N]; N])
     }
 }
 
