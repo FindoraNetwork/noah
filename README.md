@@ -7,6 +7,8 @@
 
 ## Noah: A Cryptographic Library for Privacy Assets
 
+<img src=".github/banner.png" width="500"/>
+
 Noah is a Rust library that implements various cryptographic primitives for privacy assets. It implements two 
 constructions:
 
