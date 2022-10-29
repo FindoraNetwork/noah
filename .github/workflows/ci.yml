@@ -20,7 +20,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - run: cargo fmt --all -- --check
+      - name: fmt
+        run: cargo fmt --all -- --check
 
   test:
     name: Test
@@ -41,7 +42,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test
-      - run: cargo test --workspace
+        run: cargo test --workspace
 
   dangling_check:
       name: Check dangling
@@ -54,7 +55,8 @@ jobs:
       steps:
         - uses: actions/checkout@v3
         - uses: dtolnay/rust-toolchain@stable
-        - run: cargo test -p noah
+        - name: dangling
+          run: cargo test -p noah
 
    parallel_check:
       name: Check parallel
@@ -66,7 +68,8 @@ jobs:
       steps:
         - uses: actions/checkout@v3
         - uses: dtolnay/rust-toolchain@stable
-        - run: cargo test -p noah --features parallel
+        - name: parallel_
+          run: cargo test -p noah --features parallel
 
   consistency_check:
       name: Check verifier parameters
@@ -80,7 +83,7 @@ jobs:
         - uses: dtolnay/rust-toolchain@stable
 
         - name: Build verifier parameters
-        - run: cargo run --release -p noah --features=gen,no_vk --bin gen-params all ./api/parameters
+          run: cargo run --release -p noah --features=gen,no_vk --bin gen-params all ./api/parameters
 
         - name: Check changed files in the parameters folder
           id: changed-files
