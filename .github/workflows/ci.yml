@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - develop-refactoring
+      - actions
 env:
   RUST_BACKTRACE: 1
 
@@ -14,26 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
-      matrix:
-        rust:
-          - stable
     steps:
-
-    - name: Checkout
-      uses: actions/checkout@v1
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
-        components: rustfmt
-
-    - name: cargo fmt --check
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --all -- --check
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
 
   test:
     name: Test
@@ -42,20 +29,9 @@ jobs:
       RUSTFLAGS: -Dwarnings
     strategy:
       fail-fast: true
-      matrix:
-        rust:
-          - stable
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install Rust (${{ matrix.rust }})
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
-
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/cache@v2
         with:
           path: |
@@ -65,10 +41,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-            command: test
-            args: "--workspace"
+      - run: cargo test --workspace
 
   dangling_check:
       name: Check dangling
@@ -78,54 +51,22 @@ jobs:
         RUST_BACKTRACE: 1
       strategy:
         fail-fast: true
-        matrix:
-          rust:
-            - stable
       steps:
-        - name: Checkout
-          uses: actions/checkout@v2
+        - uses: actions/checkout@v3
+        - uses: dtolnay/rust-toolchain@stable
+        - run: cargo test -p noah
 
-        - name: Install Rust (${{ matrix.rust }})
-          uses: actions-rs/toolchain@v1
-          with:
-            profile: minimal
-            toolchain: ${{ matrix.rust }}
-            override: true
-
-        - name: Test
-          uses: actions-rs/cargo@v1
-          with:
-            toolchain: ${{ matrix.rust }}
-            command: test
-            args: "-p noah"
-
-  parallel_check:
+   parallel_check:
       name: Check parallel
       runs-on: ubuntu-latest
       env:
         RUSTFLAGS: -Dwarnings
       strategy:
         fail-fast: true
-        matrix:
-          rust:
-            - stable
       steps:
-        - name: Checkout
-          uses: actions/checkout@v2
-
-        - name: Install Rust (${{ matrix.rust }})
-          uses: actions-rs/toolchain@v1
-          with:
-            profile: minimal
-            toolchain: ${{ matrix.rust }}
-            override: true
-
-        - name: Test
-          uses: actions-rs/cargo@v1
-          with:
-            toolchain: ${{ matrix.rust }}
-            command: test
-            args: "-p noah --features parallel"
+        - uses: actions/checkout@v3
+        - uses: dtolnay/rust-toolchain@stable
+        - run: cargo test -p noah --features parallel
 
   consistency_check:
       name: Check verifier parameters
@@ -134,27 +75,12 @@ jobs:
         RUSTFLAGS: -Dwarnings
       strategy:
         fail-fast: true
-        matrix:
-          rust:
-            - stable
       steps:
         - uses: actions/checkout@v3
-          with:
-            fetch-depth: 0
-
-        - name: Install Rust (${{ matrix.rust }})
-          uses: actions-rs/toolchain@v1
-          with:
-            profile: minimal
-            toolchain: ${{ matrix.rust }}
-            override: true
+        - uses: dtolnay/rust-toolchain@stable
 
         - name: Build verifier parameters
-          uses: actions-rs/cargo@v1
-          with:
-            toolchain: ${{ matrix.rust }}
-            command: run
-            args: "--release -p noah --features=gen,no_vk --bin gen-params all ./api/parameters"
+        - run: cargo run --release -p noah --features=gen,no_vk --bin gen-params all ./api/parameters
 
         - name: Check changed files in the parameters folder
           id: changed-files
