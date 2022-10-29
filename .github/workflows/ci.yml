@@ -58,7 +58,7 @@ jobs:
         - name: dangling
           run: cargo test -p noah
 
-   parallel_check:
+  parallel_check:
       name: Check parallel
       runs-on: ubuntu-latest
       env:
