@@ -103,8 +103,12 @@ pub struct VerifierParamsSplitSpecific {
 pub const BULLET_PROOF_RANGE: usize = 32;
 /// The maximal number
 pub const MAX_CONFIDENTIAL_RECORD_NUMBER: usize = 128;
-/// The maximal number of inputs and outputs supported by this setup program.
-pub const MAX_ANONYMOUS_RECORD_NUMBER: usize = 6;
+/// The maximal number of inputs and outputs supported by this setup program, for standard payments.
+pub const MAX_ANONYMOUS_RECORD_NUMBER_STANDARD: usize = 6;
+/// The maximal number of inputs supported by this setup program, for consolidation.
+pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER: usize = 9;
+/// The maximal number of outputs supported by this setup program, for consolidation.
+pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER: usize = 3;
 /// The default number of Bulletproofs generators
 pub const DEFAULT_BP_NUM_GENS: usize = 256;
 /// The number of the Bulletproofs(over the Secq256k1 curve) generators needed for anonymous transfer.
@@ -546,6 +550,10 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
         new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
     }
 
+    if size > 8192 {
+        return Err(SimpleError::new(d!(NoahError::ParameterError), None).into());
+    }
+
     Ok(KZGCommitmentSchemeBLS {
         public_parameter_group_2,
         public_parameter_group_1: new_group_1,
@@ -565,7 +573,11 @@ impl VerifierParams {
 
     /// Load the verifier parameters for a given number of inputs and a given number of outputs.
     pub fn load(n_payers: usize, n_payees: usize) -> Result<VerifierParams> {
-        if n_payees > MAX_ANONYMOUS_RECORD_NUMBER || n_payers > MAX_ANONYMOUS_RECORD_NUMBER {
+        if (n_payees > MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+            || n_payers > MAX_ANONYMOUS_RECORD_NUMBER_STANDARD)
+            && (n_payers > MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER
+                || n_payees > MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER)
+        {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         } else {
             match Self::load_prepare(n_payers, n_payees) {
