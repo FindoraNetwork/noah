@@ -1108,7 +1108,6 @@ mod test {
 
     #[test]
     fn test_anemoi_variable_length_hash_flatten() {
-        assert!(false);
         type F = BLSScalar;
 
         let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
