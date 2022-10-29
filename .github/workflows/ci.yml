@@ -67,7 +67,7 @@ jobs:
       steps:
         - uses: actions/checkout@v3
         - uses: dtolnay/rust-toolchain@stable
-        - name: parallel_
+        - name: parallel
           run: cargo test -p noah --features parallel
 
   consistency_check:
