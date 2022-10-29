@@ -195,7 +195,6 @@ mod smoke_axfr {
 
         #[cfg(feature = "parallel")]
         {
-            assert!(false);
             let mut notes = vec![&note; 6];
             let pub_keys = vec![&sender.pub_key; 6];
             assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok());
