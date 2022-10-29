@@ -484,6 +484,42 @@ mod smoke_axfr {
         test_abar(inputs, outputs, fee_amount, "abar-6-6-6");
     }
 
+    #[test]
+    fn abar_9in_2out_2asset() {
+        let fee_amount = mock_fee(9, 2);
+        let outputs = vec![(20, FEE_TYPE), (30, ASSET)];
+        let inputs = vec![
+            (15 + fee_amount as u64, FEE_TYPE),
+            (1, FEE_TYPE),
+            (4, FEE_TYPE),
+            (5, ASSET),
+            (5, ASSET),
+            (1, ASSET),
+            (3, ASSET),
+            (6, ASSET),
+            (10, ASSET),
+        ];
+        test_abar(inputs, outputs, fee_amount, "abar-9-2-2");
+    }
+
+    #[test]
+    fn abar_9in_3out_2asset() {
+        let fee_amount = mock_fee(9, 3);
+        let outputs = vec![(5, FEE_TYPE), (15, FEE_TYPE), (30, ASSET)];
+        let inputs = vec![
+            (15 + fee_amount as u64, FEE_TYPE),
+            (1, FEE_TYPE),
+            (4, FEE_TYPE),
+            (5, ASSET),
+            (5, ASSET),
+            (1, ASSET),
+            (3, ASSET),
+            (6, ASSET),
+            (10, ASSET),
+        ];
+        test_abar(inputs, outputs, fee_amount, "abar-9-3-2");
+    }
+
     fn test_abar(
         inputs: Vec<(u64, AssetType)>,
         outputs: Vec<(u64, AssetType)>,

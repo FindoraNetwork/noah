@@ -10,7 +10,8 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bulletproofs::BulletproofGens;
 use noah::setup::{
     BulletproofParams, BulletproofURS, ProverParams, VerifierParams, ANON_XFR_BP_GENS_LEN,
-    MAX_ANONYMOUS_RECORD_NUMBER,
+    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
+    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
 };
 use noah_algebra::utils::save_to_file;
 use noah_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
@@ -90,7 +91,7 @@ fn main() {
 fn gen_transfer_vk(directory: PathBuf) {
     println!(
         "Generating verifying keys for anonymous transfer for 1..{} payers, 1..{} payees ...",
-        MAX_ANONYMOUS_RECORD_NUMBER, MAX_ANONYMOUS_RECORD_NUMBER
+        MAX_ANONYMOUS_RECORD_NUMBER_STANDARD, MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
     );
 
     let transfer_params = VerifierParams::create(1, 1, Some(TREE_DEPTH)).unwrap();
@@ -101,11 +102,15 @@ fn gen_transfer_vk(directory: PathBuf) {
     common_path.push("transfer-vk-common.bin");
     save_to_file(&common_ser, common_path);
 
-    let is: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER).map(|i| i).collect();
+    let is: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER_STANDARD)
+        .map(|i| i)
+        .collect();
     let mut bytes: HashMap<usize, Vec<Vec<u8>>> = is
         .par_iter()
         .map(|i| {
-            let js: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER).map(|j| j).collect();
+            let js: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER_STANDARD)
+                .map(|j| j)
+                .collect();
             let mut bytes: HashMap<usize, Vec<u8>> = js
                 .par_iter()
                 .map(|j| {
@@ -120,7 +125,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                 })
                 .collect();
             let mut ordered = vec![];
-            for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER {
+            for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER_STANDARD {
                 ordered.push(bytes.remove(&i).unwrap())
             }
             (*i, ordered)
@@ -128,7 +133,44 @@ fn gen_transfer_vk(directory: PathBuf) {
         .collect();
 
     let mut specials = vec![];
-    for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER {
+    for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER_STANDARD {
+        specials.push(bytes.remove(&i).unwrap())
+    }
+
+    let is: Vec<usize> = (MAX_ANONYMOUS_RECORD_NUMBER_STANDARD + 1
+        ..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER)
+        .map(|i| i)
+        .collect();
+    let mut bytes: HashMap<usize, Vec<Vec<u8>>> = is
+        .par_iter()
+        .map(|i| {
+            let js: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER)
+                .map(|j| j)
+                .collect();
+            let mut bytes: HashMap<usize, Vec<u8>> = js
+                .par_iter()
+                .map(|j| {
+                    println!("generating {} payers & {} payees", i, j);
+                    let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
+                    println!(
+                        "the size of the constraint system for {} payers & {} payees: {}",
+                        i, j, node_params.cs.size
+                    );
+                    let (_, special) = node_params.split().unwrap();
+                    (*j, bincode::serialize(&special).unwrap())
+                })
+                .collect();
+            let mut ordered = vec![];
+            for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER {
+                ordered.push(bytes.remove(&i).unwrap())
+            }
+            (*i, ordered)
+        })
+        .collect();
+
+    for i in
+        MAX_ANONYMOUS_RECORD_NUMBER_STANDARD + 1..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER
+    {
         specials.push(bytes.remove(&i).unwrap())
     }
 
