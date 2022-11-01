@@ -41,9 +41,9 @@ jobs:
           key: ${{ runner.os }}-accumulator-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test
-        run:
-          - cd accumulators/
-          - cargo test
+        run: |
+          cd accumulators/
+          cargo test
 
   test-algebra:
     name: Test (algebra/)
@@ -64,9 +64,9 @@ jobs:
           key: ${{ runner.os }}-algebra-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test
-        run:
-          - cd algebra/
-          - cargo test
+        run: |
+          cd algebra/
+          cargo test
 
   test-api:
     name: Test (api/)
@@ -87,9 +87,9 @@ jobs:
           key: ${{ runner.os }}-api-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test
-        run:
-          - cd api/
-          - cargo test
+        run: |
+          cd api/
+          cargo test
 
   test-crypto:
     name: Test (crypto/)
@@ -110,9 +110,9 @@ jobs:
           key: ${{ runner.os }}-crypto-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test
-        run:
-          - cd crypto/
-          - cargo test
+        run: |
+          cd crypto/
+          cargo test
 
   test-plonk:
     name: Test (plonk/)
@@ -133,9 +133,9 @@ jobs:
           key: ${{ runner.os }}-plonk-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test
-        run:
-          - cd plonk/
-          - cargo test
+        run: |
+          cd plonk/
+          cargo test
 
   dangling_check:
       name: Check dangling
