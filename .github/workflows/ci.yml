@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
     strategy:
       fail-fast: true
     steps:
@@ -39,17 +40,20 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-accumulator-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
 
       - name: Test
         run: |
           cd accumulators/
-          cargo test
+          cargo nextest run
+          cargo test --doc
 
   test-algebra:
     name: Test (algebra/)
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
     strategy:
       fail-fast: true
     steps:
@@ -62,17 +66,20 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-algebra-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
 
       - name: Test
         run: |
           cd algebra/
-          cargo test
+          cargo nextest run
+          cargo test --doc
 
   test-api:
     name: Test (api/)
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
     strategy:
       fail-fast: true
     steps:
@@ -85,17 +92,20 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-api-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
 
       - name: Test
         run: |
           cd api/
-          cargo test
+          cargo nextest run
+          cargo test --doc
 
   test-smoke-tests:
     name: Test (smoke-tests/)
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
     strategy:
       fail-fast: true
     steps:
@@ -108,17 +118,20 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-api-smoke-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
 
       - name: Test
         run: |
           cd smoke-tests/
-          cargo test
+          cargo nextest run
+          cargo test --doc
 
   test-crypto:
     name: Test (crypto/)
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
     strategy:
       fail-fast: true
     steps:
@@ -131,17 +144,20 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-crypto-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
 
       - name: Test
         run: |
           cd crypto/
-          cargo test
+          cargo nextest run
+          cargo test --doc
 
   test-plonk:
     name: Test (plonk/)
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
     strategy:
       fail-fast: true
     steps:
@@ -154,17 +170,20 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-plonk-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
 
       - name: Test
         run: |
           cd plonk/
-          cargo test
+          cargo nextest run
+          cargo test --doc
 
   dangling_check:
       name: Check dangling
       runs-on: ubuntu-latest
       env:
         RUSTFLAGS: -Dwarnings
+        CARGO_TERM_COLOR: always
         RUST_BACKTRACE: 1
       strategy:
         fail-fast: true
@@ -175,25 +194,30 @@ jobs:
             profile: minimal
             toolchain: nightly
             override: true
+        - uses: taiki-e/install-action@nextest
         - name: dangling
           run: | 
-            cd api/
-            cargo test smoke_axfr --features=debug
+            cd smoke-tests/
+            cargo nextest run --features=debug
+            cargo test --doc
 
   parallel_check:
       name: Check parallel
       runs-on: ubuntu-latest
       env:
         RUSTFLAGS: -Dwarnings
+        CARGO_TERM_COLOR: always
       strategy:
         fail-fast: true
       steps:
         - uses: actions/checkout@v3
         - uses: dtolnay/rust-toolchain@stable
+        - uses: taiki-e/install-action@nextest
         - name: parallel
           run: |
-            cd api/
-            cargo test smoke_axfr --features parallel
+            cd smoke-tests/
+            cargo nextest run --features=parallel
+            cargo test --doc
 
   consistency_check:
       name: Check verifier parameters
