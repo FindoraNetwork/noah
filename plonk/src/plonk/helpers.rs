@@ -8,11 +8,15 @@ use crate::poly_commit::{
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
 use ark_poly::MixedRadixEvaluationDomain;
+use noah_algebra::cfg_into_iter;
 use noah_algebra::prelude::*;
 use noah_algebra::{cmp::min, traits::Domain};
 
 #[cfg(feature = "parallel")]
-use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::{
+    iter::IntoParallelIterator,
+    prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator},
+};
 
 /// The data structure for challenges in Plonk.
 #[derive(Default)]
@@ -247,142 +251,143 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     let alpha_pow_8 = alpha_pow_7.mul(alpha);
     let alpha_pow_9 = alpha_pow_8.mul(alpha);
 
-    let mut t_coset_evals = vec![];
+    let t_coset_evals = cfg_into_iter!(0..m)
+        .map(|point| {
+            let w_vals: Vec<&PCS::Field> = w_polys_coset_evals
+                .iter()
+                .map(|poly_coset_evals| &poly_coset_evals[point])
+                .collect();
+            let q_vals: Vec<&PCS::Field> = prover_params
+                .q_coset_evals
+                .iter()
+                .map(|poly_coset_evals| &poly_coset_evals[point])
+                .collect();
+            // q * w
+            let term1 = CS::eval_gate_func(&w_vals, &q_vals, &pi_coset_evals[point]).unwrap();
 
-    for point in 0..m {
-        let w_vals: Vec<&PCS::Field> = w_polys_coset_evals
-            .iter()
-            .map(|poly_coset_evals| &poly_coset_evals[point])
-            .collect();
-        let q_vals: Vec<&PCS::Field> = prover_params
-            .q_coset_evals
-            .iter()
-            .map(|poly_coset_evals| &poly_coset_evals[point])
-            .collect();
-        // q * w
-        let term1 = CS::eval_gate_func(&w_vals, &q_vals, &pi_coset_evals[point])?;
+            // alpha * [z(X)\prod_j (fj(X) + beta * kj * X + gamma)]
+            let mut term2 = alpha.mul(&z_coset_evals[point]);
+            for j in 0..CS::n_wires_per_gate() {
+                let tmp = w_polys_coset_evals[j][point]
+                    .add(gamma)
+                    .add(&beta.mul(&k[j].mul(&prover_params.coset_quotient[point])));
+                term2.mul_assign(&tmp);
+            } // alpha * [z(\omega * X)\prod_j (fj(X) + beta * perm_j(X) + gamma)]
+            let mut term3 = alpha.mul(&z_coset_evals[(point + factor) % m]);
+            for (w_poly_coset_evals, s_coset_evals) in w_polys_coset_evals
+                .iter()
+                .zip(prover_params.s_coset_evals.iter())
+            {
+                let tmp = &w_poly_coset_evals[point]
+                    .add(gamma)
+                    .add(&beta.mul(&s_coset_evals[point]));
+                term3.mul_assign(&tmp);
+            }
 
-        // alpha * [z(X)\prod_j (fj(X) + beta * kj * X + gamma)]
-        let mut term2 = alpha.mul(&z_coset_evals[point]);
-        for j in 0..CS::n_wires_per_gate() {
-            let tmp = w_polys_coset_evals[j][point]
-                .add(gamma)
-                .add(&beta.mul(&k[j].mul(&prover_params.coset_quotient[point])));
-            term2.mul_assign(&tmp);
-        }
+            // alpha^2 * (z(X) - 1) * L_1(X)
+            let term4 = alpha_pow_2
+                .mul(&prover_params.l1_coset_evals[point])
+                .mul(&z_coset_evals[point].sub(&PCS::Field::one()));
 
-        // alpha * [z(\omega * X)\prod_j (fj(X) + beta * perm_j(X) + gamma)]
-        let mut term3 = alpha.mul(&z_coset_evals[(point + factor) % m]);
-        for (w_poly_coset_evals, s_coset_evals) in w_polys_coset_evals
-            .iter()
-            .zip(prover_params.s_coset_evals.iter())
-        {
-            let tmp = &w_poly_coset_evals[point]
-                .add(gamma)
-                .add(&beta.mul(&s_coset_evals[point]));
-            term3.mul_assign(&tmp);
-        }
+            let qb_eval_point = prover_params.qb_coset_eval[point];
 
-        // alpha^2 * (z(X) - 1) * L_1(X)
-        let term4 = alpha_pow_2
-            .mul(&prover_params.l1_coset_evals[point])
-            .mul(&z_coset_evals[point].sub(&PCS::Field::one()));
+            // alpha^3 * qb(X) (w[1] (w[1] - 1))
+            let w1_eval_point = w_polys_coset_evals[1][point];
+            let term5 = alpha_pow_3
+                .mul(&qb_eval_point)
+                .mul(&w1_eval_point)
+                .mul(&w1_eval_point.sub(&PCS::Field::one()));
 
-        let qb_eval_point = prover_params.qb_coset_eval[point];
+            // alpha^4 * qb(X) (w[2] (w[2] - 1))
+            let w2_eval_point = w_polys_coset_evals[2][point];
+            let term6 = alpha_pow_4
+                .mul(&qb_eval_point)
+                .mul(&w2_eval_point)
+                .mul(&w2_eval_point.sub(&PCS::Field::one()));
 
-        // alpha^3 * qb(X) (w[1] (w[1] - 1))
-        let w1_eval_point = w_polys_coset_evals[1][point];
-        let term5 = alpha_pow_3
-            .mul(&qb_eval_point)
-            .mul(&w1_eval_point)
-            .mul(&w1_eval_point.sub(&PCS::Field::one()));
+            // alpha^5 * qb(X) (w[3] (w[3] - 1))
+            let w3_eval_point = w_polys_coset_evals[3][point];
+            let term7 = alpha_pow_5
+                .mul(&qb_eval_point)
+                .mul(&w3_eval_point)
+                .mul(&w3_eval_point.sub(&PCS::Field::one()));
 
-        // alpha^4 * qb(X) (w[2] (w[2] - 1))
-        let w2_eval_point = w_polys_coset_evals[2][point];
-        let term6 = alpha_pow_4
-            .mul(&qb_eval_point)
-            .mul(&w2_eval_point)
-            .mul(&w2_eval_point.sub(&PCS::Field::one()));
+            let w0_eval_point = w_polys_coset_evals[0][point];
+            let wo_eval_point = w_polys_coset_evals[4][point];
+            let w0_eval_point_next = w_polys_coset_evals[0][(point + factor) % m];
+            let w1_eval_point_next = w_polys_coset_evals[1][(point + factor) % m];
+            let w2_eval_point_next = w_polys_coset_evals[2][(point + factor) % m];
+            let q_prk1_eval_point = prover_params.q_prk_coset_evals[0][point];
+            let q_prk2_eval_point = prover_params.q_prk_coset_evals[1][point];
+            let q_prk3_eval_point = prover_params.q_prk_coset_evals[2][point];
+            let q_prk4_eval_point = prover_params.q_prk_coset_evals[3][point];
+            let g = prover_params.verifier_params.anemoi_generator;
+            let g_square_plus_one = g.square().add(PCS::Field::one());
+            let g_inv = prover_params.verifier_params.anemoi_generator_inv;
+            let five = &[5u64];
 
-        // alpha^5 * qb(X) (w[3] (w[3] - 1))
-        let w3_eval_point = w_polys_coset_evals[3][point];
-        let term7 = alpha_pow_5
-            .mul(&qb_eval_point)
-            .mul(&w3_eval_point)
-            .mul(&w3_eval_point.sub(&PCS::Field::one()));
+            let tmp = w3_eval_point + &(g * &w2_eval_point) + &q_prk3_eval_point;
 
-        let w0_eval_point = w_polys_coset_evals[0][point];
-        let wo_eval_point = w_polys_coset_evals[4][point];
-        let w0_eval_point_next = w_polys_coset_evals[0][(point + factor) % m];
-        let w1_eval_point_next = w_polys_coset_evals[1][(point + factor) % m];
-        let w2_eval_point_next = w_polys_coset_evals[2][(point + factor) % m];
-        let q_prk1_eval_point = prover_params.q_prk_coset_evals[0][point];
-        let q_prk2_eval_point = prover_params.q_prk_coset_evals[1][point];
-        let q_prk3_eval_point = prover_params.q_prk_coset_evals[2][point];
-        let q_prk4_eval_point = prover_params.q_prk_coset_evals[3][point];
-        let g = prover_params.verifier_params.anemoi_generator;
-        let g_square_plus_one = g.square().add(PCS::Field::one());
-        let g_inv = prover_params.verifier_params.anemoi_generator_inv;
-        let five = &[5u64];
+            // - alpha^6 * q_{prk3} *
+            //  (
+            //    (w[3] + g * w[2] + q_{prk3} - w_next[2]) ^ 5
+            //    + g * (w[3] + g * w[2] + q_{prk3}) ^ 2
+            //    - (w[0] + g * w[1] + q_{prk1})
+            //  )
+            let term8 = alpha_pow_6.mul(&q_prk3_eval_point).mul(
+                (tmp - &w2_eval_point_next).pow(five) + &(g * tmp.square())
+                    - &(w0_eval_point + g * w1_eval_point + &q_prk1_eval_point),
+            );
+            // - alpha^8 * q_{prk3} *
+            //  (
+            //    (w[3] + g * w[2] + q_{prk3} - w_next[2]) ^ 5
+            //    + g * w_next[2] ^ 2 + g^-1
+            //    - w_next[0]
+            //  )
+            let term10 = alpha_pow_8.mul(&q_prk3_eval_point).mul(
+                (tmp - &w2_eval_point_next).pow(five) + &(g * w2_eval_point_next.square()) + g_inv
+                    - &w0_eval_point_next,
+            );
 
-        let tmp = w3_eval_point + &(g * &w2_eval_point) + &q_prk3_eval_point;
+            // - alpha^7 * q_{prk3} *
+            //  (
+            //    (g * w[3] + (g^2 + 1) * w[2] + q_{prk4} - w[4]) ^ 5
+            //    + g * (g * w[3] + (g^2 + 1) * w[2] + q_{prk4}) ^ 2
+            //    - (g * w[0] + (g^2 + 1) * w[1] + q_{prk2})
+            //  )
+            let tmp =
+                g * &w3_eval_point + &(g_square_plus_one * &w2_eval_point) + &q_prk4_eval_point;
+            let term9 = alpha_pow_7.mul(&q_prk3_eval_point).mul(
+                (tmp - &wo_eval_point).pow(five) + &(g * tmp.square())
+                    - &(g * &w0_eval_point
+                        + g_square_plus_one * w1_eval_point
+                        + &q_prk2_eval_point),
+            );
 
-        // - alpha^6 * q_{prk3} *
-        //  (
-        //    (w[3] + g * w[2] + q_{prk3} - w_next[2]) ^ 5
-        //    + g * (w[3] + g * w[2] + q_{prk3}) ^ 2
-        //    - (w[0] + g * w[1] + q_{prk1})
-        //  )
-        let term8 = alpha_pow_6.mul(&q_prk3_eval_point).mul(
-            (tmp - &w2_eval_point_next).pow(five) + &(g * tmp.square())
-                - &(w0_eval_point + g * w1_eval_point + &q_prk1_eval_point),
-        );
-        // - alpha^8 * q_{prk3} *
-        //  (
-        //    (w[3] + g * w[2] + q_{prk3} - w_next[2]) ^ 5
-        //    + g * w_next[2] ^ 2 + g^-1
-        //    - w_next[0]
-        //  )
-        let term10 = alpha_pow_8.mul(&q_prk3_eval_point).mul(
-            (tmp - &w2_eval_point_next).pow(five) + &(g * w2_eval_point_next.square()) + g_inv
-                - &w0_eval_point_next,
-        );
+            // - alpha^9 * q_{prk3} *
+            //  (
+            //    (g * w[3] + (g^2 + 1) * w[2] + q_{prk4} - w[4]) ^ 5
+            //    + g * w[4] ^ 2 + g^-1
+            //    - w_next[1]
+            //  )
+            let term11 = alpha_pow_9.mul(&q_prk3_eval_point).mul(
+                (tmp - &wo_eval_point).pow(five) + &(g * wo_eval_point.square()) + g_inv
+                    - &w1_eval_point_next,
+            );
 
-        // - alpha^7 * q_{prk3} *
-        //  (
-        //    (g * w[3] + (g^2 + 1) * w[2] + q_{prk4} - w[4]) ^ 5
-        //    + g * (g * w[3] + (g^2 + 1) * w[2] + q_{prk4}) ^ 2
-        //    - (g * w[0] + (g^2 + 1) * w[1] + q_{prk2})
-        //  )
-        let tmp = g * &w3_eval_point + &(g_square_plus_one * &w2_eval_point) + &q_prk4_eval_point;
-        let term9 = alpha_pow_7.mul(&q_prk3_eval_point).mul(
-            (tmp - &wo_eval_point).pow(five) + &(g * tmp.square())
-                - &(g * &w0_eval_point + g_square_plus_one * w1_eval_point + &q_prk2_eval_point),
-        );
-
-        // - alpha^9 * q_{prk3} *
-        //  (
-        //    (g * w[3] + (g^2 + 1) * w[2] + q_{prk4} - w[4]) ^ 5
-        //    + g * w[4] ^ 2 + g^-1
-        //    - w_next[1]
-        //  )
-        let term11 = alpha_pow_9.mul(&q_prk3_eval_point).mul(
-            (tmp - &wo_eval_point).pow(five) + &(g * wo_eval_point.square()) + g_inv
-                - &w1_eval_point_next,
-        );
-
-        let numerator = term1
-            .add(&term2)
-            .add(&term4.sub(&term3))
-            .add(&term5)
-            .add(&term6)
-            .add(&term7)
-            .sub(&term8)
-            .sub(&term9)
-            .sub(&term10)
-            .sub(&term11);
-        t_coset_evals.push(numerator.mul(&prover_params.z_h_inv_coset_evals[point]));
-    }
+            let numerator = term1
+                .add(&term2)
+                .add(&term4.sub(&term3))
+                .add(&term5)
+                .add(&term6)
+                .add(&term7)
+                .sub(&term8)
+                .sub(&term9)
+                .sub(&term10)
+                .sub(&term11);
+            numerator.mul(&prover_params.z_h_inv_coset_evals[point])
+        })
+        .collect::<Vec<PCS::Field>>();
 
     let k_inv = k[1].inv().c(d!(PlonkError::DivisionByZero))?;
 
