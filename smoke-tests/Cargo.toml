@@ -8,7 +8,6 @@ description = 'Noah smoke tests'
 [dependencies.noah]
 path = '../api'
 
-
 [dependencies]
 aes = '0.8.1'
 aes-gcm = '0.10.1'
@@ -111,5 +110,12 @@ features = ["yoloproofs"]
 default = [
     'std'
 ]
-debug = [ 'noah/debug' ]
-std = ['noah/std']
+debug = [ 'noah-plonk/debug', 'noad/debug' ]
+std = ['curve25519-dalek/std', 'noah/std', 'bulletproofs/std', 'ark-bulletproofs-secq256k1/std', 'ark-std/std']
+parallel = [
+    'default',
+    'rayon',
+    'noah/parallel',
+    'noah-algebra/parallel',
+    'noah-plonk/parallel'
+]
