@@ -116,11 +116,11 @@ default-features = false
 
 [dev-dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.0.1'
+tag = 'v1.0.2'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.0.1'
+tag = 'v1.0.2'
 
 [dependencies.ark-bulletproofs-secq256k1]
 git = "https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1"
