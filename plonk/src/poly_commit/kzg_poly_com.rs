@@ -1,4 +1,3 @@
-use std::time::Instant;
 use crate::poly_commit::{
     errors::PolyComSchemeError,
     field_polynomial::FpPolynomial,
@@ -10,6 +9,7 @@ use noah_algebra::{
     prelude::*,
     traits::{Domain, Pairing},
 };
+use std::time::Instant;
 
 /// KZG commitment scheme over the `Group`.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Default)]

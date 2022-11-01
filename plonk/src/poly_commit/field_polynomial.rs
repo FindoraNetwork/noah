@@ -1,6 +1,9 @@
 use ark_poly::{EvaluationDomain, MixedRadixEvaluationDomain};
 use noah_algebra::{prelude::*, traits::Domain};
 
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IntoParallelRefMutIterator, ParallelIterator};
+
 /// Field polynomial.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct FpPolynomial<F> {
@@ -378,8 +381,17 @@ impl<F: Domain> FpPolynomial<F> {
     /// assert!(poly.is_zero());
     /// ```
     pub fn mul_scalar_assign(&mut self, scalar: &F) {
-        for coef in self.coefs.iter_mut() {
-            coef.mul_assign(scalar)
+        #[cfg(not(feature = "parallel"))]
+        {
+            for coef in self.coefs.iter_mut() {
+                coef.mul_assign(scalar)
+            }
+        }
+        #[cfg(feature = "parallel")]
+        {
+            self.coefs
+                .par_iter_mut()
+                .for_each(|coef| coef.mul_assign(scalar));
         }
         self.trim_coefs();
     }
