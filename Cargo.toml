@@ -5,6 +5,7 @@ members = [
  "crypto",
  "plonk",
  "api",
+ "smoke-tests"
 ]
 resolver = "2"
 
