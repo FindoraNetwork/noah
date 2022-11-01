@@ -22,11 +22,12 @@ jobs:
       - name: fmt
         run: cargo fmt --all -- --check
 
-  test:
-    name: Test
+  test-accumulators:
+    name: Test (accumulators/)
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
     strategy:
       fail-fast: true
     steps:
@@ -38,37 +39,185 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-accumulator-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
 
       - name: Test
-        run: cargo test --workspace
+        run: |
+          cd accumulators/
+          cargo nextest run
+          cargo test --doc
+
+  test-algebra:
+    name: Test (algebra/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-algebra-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
+
+      - name: Test
+        run: |
+          cd algebra/
+          cargo nextest run
+          cargo test --doc
+
+  test-api:
+    name: Test (api/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-api-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
+
+      - name: Test
+        run: |
+          cd api/
+          cargo nextest run
+          cargo test --doc
+
+  test-smoke-tests:
+    name: Test (smoke-tests/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-api-smoke-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
+
+      - name: Test
+        run: |
+          cd smoke-tests/
+          cargo nextest run
+          cargo test --doc
+
+  test-crypto:
+    name: Test (crypto/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-crypto-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
+
+      - name: Test
+        run: |
+          cd crypto/
+          cargo nextest run
+          cargo test --doc
+
+  test-plonk:
+    name: Test (plonk/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-plonk-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@nextest
+
+      - name: Test
+        run: |
+          cd plonk/
+          cargo nextest run
+          cargo test --doc
 
   dangling_check:
       name: Check dangling
       runs-on: ubuntu-latest
       env:
         RUSTFLAGS: -Dwarnings
+        CARGO_TERM_COLOR: always
         RUST_BACKTRACE: 1
       strategy:
         fail-fast: true
       steps:
         - uses: actions/checkout@v3
         - uses: dtolnay/rust-toolchain@stable
-        - name: dangling
-          run: cargo test -p noah
+          with:
+            profile: minimal
+            toolchain: nightly
+            override: true
+        - uses: taiki-e/install-action@nextest
+        - name: Dangling test
+          run: | 
+            cd smoke-tests/
+            cargo nextest run --features=debug
+            cargo test --doc
 
   parallel_check:
       name: Check parallel
       runs-on: ubuntu-latest
       env:
         RUSTFLAGS: -Dwarnings
+        CARGO_TERM_COLOR: always
       strategy:
         fail-fast: true
       steps:
         - uses: actions/checkout@v3
         - uses: dtolnay/rust-toolchain@stable
-        - name: parallel
-          run: cargo test -p noah --features parallel
+        - uses: taiki-e/install-action@nextest
+        - name: Parallel test
+          run: |
+            cd smoke-tests/
+            cargo nextest run --features=parallel
+            cargo test --doc
 
   consistency_check:
       name: Check verifier parameters
