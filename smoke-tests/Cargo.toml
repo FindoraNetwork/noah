@@ -110,7 +110,7 @@ features = ["yoloproofs"]
 default = [
     'std'
 ]
-debug = [ 'noah-plonk/debug', 'noad/debug' ]
+debug = [ 'noah-plonk/debug', 'noah/debug' ]
 std = ['curve25519-dalek/std', 'noah/std', 'bulletproofs/std', 'ark-bulletproofs-secq256k1/std', 'ark-std/std']
 parallel = [
     'default',
