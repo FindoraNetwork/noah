@@ -22,8 +22,8 @@ jobs:
       - name: fmt
         run: cargo fmt --all -- --check
 
-  test:
-    name: Test
+  test-accumulators:
+    name: Test (accumulators/)
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
@@ -38,10 +38,104 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-accumulator-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test
-        run: cargo test --workspace
+        run:
+          - cd accumulators/
+          - cargo test
+
+  test-algebra:
+    name: Test (algebra/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-algebra-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Test
+        run:
+          - cd algebra/
+          - cargo test
+
+  test-api:
+    name: Test (api/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-api-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Test
+        run:
+          - cd api/
+          - cargo test
+
+  test-crypto:
+    name: Test (crypto/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-crypto-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Test
+        run:
+          - cd crypto/
+          - cargo test
+
+  test-plonk:
+    name: Test (plonk/)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-plonk-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Test
+        run:
+          - cd plonk/
+          - cargo test
 
   dangling_check:
       name: Check dangling
