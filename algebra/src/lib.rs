@@ -58,8 +58,8 @@ pub mod rand_helper;
 
 #[doc(hidden)]
 pub use ark_std::{
-    borrow, cmp, collections, fmt, fs, hash, io, iter, ops, path, rand, result, str, One,
-    UniformRand, Zero,
+    borrow, cfg_into_iter, cmp, collections, end_timer, fmt, fs, hash, io, iter, ops, path, rand,
+    result, start_timer, str, One, UniformRand, Zero,
 };
 
 /// check if the error messages equal

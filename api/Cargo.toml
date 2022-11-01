@@ -159,3 +159,4 @@ parallel = [
 ]
 gen = ["parallel", "structopt"]
 lightweight = [] # Minimize size for only AR2ABAR and ABAR2AR.
+print-trace = ['noah-algebra/print-trace']
