@@ -95,3 +95,4 @@ nightly = [
 u64_backend = ['curve25519-dalek/u64_backend']
 u32_backend = ['curve25519-dalek/u32_backend']
 avx2_backend = ['curve25519-dalek/avx2_backend']
+print-trace = ['noah-algebra/print-trace']

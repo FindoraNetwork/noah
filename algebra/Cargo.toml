@@ -110,3 +110,4 @@ parallel = [
     'ark-bulletproofs-secq256k1/parallel'
 ]
 asm = ['ark-ff/asm']
+print-trace = ['ark-std/print-trace']
