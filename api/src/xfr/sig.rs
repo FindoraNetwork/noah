@@ -258,7 +258,7 @@ impl XfrPublicKey {
     /// Convert from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // Compatible with old data.
-        if bytes.len() == XFR_PUBLIC_KEY_LENGTH - 2 {
+        if bytes.len() == 32 {
             return Ok(XfrPublicKey(XfrPublicKeyInner::Ed25519(
                 Ed25519PublicKey::from_bytes(bytes).c(d!(NoahError::DeserializationError))?,
             )));
@@ -455,7 +455,7 @@ impl XfrSecretKey {
     /// Convert from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // Compatible with old data.
-        if bytes.len() == XFR_SECRET_KEY_LENGTH - 1 {
+        if bytes.len() == 32 {
             return Ok(XfrSecretKey::Ed25519(
                 Ed25519SecretKey::from_bytes(bytes).c(d!(NoahError::DeserializationError))?,
             ));
@@ -583,10 +583,23 @@ impl NoahFromToBytes for XfrKeyPair {
     }
 
     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(XfrKeyPair {
-            sec_key: XfrSecretKey::noah_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH]).c(d!())?,
-            pub_key: XfrPublicKey::noah_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..]).c(d!())?,
-        })
+        if bytes.len() == 64 {
+            Ok(XfrKeyPair {
+                sec_key: XfrSecretKey::Ed25519(
+                    Ed25519SecretKey::from_bytes(&bytes[0..32])
+                        .c(d!(NoahError::DeserializationError))?,
+                ),
+                pub_key: XfrPublicKey(XfrPublicKeyInner::Ed25519(
+                    Ed25519PublicKey::from_bytes(&bytes[32..64])
+                        .c(d!(NoahError::DeserializationError))?,
+                )),
+            })
+        } else {
+            Ok(XfrKeyPair {
+                sec_key: XfrSecretKey::noah_from_bytes(&bytes[0..XFR_SECRET_KEY_LENGTH]).c(d!())?,
+                pub_key: XfrPublicKey::noah_from_bytes(&bytes[XFR_SECRET_KEY_LENGTH..]).c(d!())?,
+            })
+        }
     }
 }
 
@@ -616,7 +629,7 @@ impl XfrSignature {
     /// Convert from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // Compatible with old data.
-        if bytes.len() == XFR_SIGNATURE_LENGTH - 2 {
+        if bytes.len() == 64 {
             let sign =
                 Ed25519Signature::from_bytes(bytes).c(d!(NoahError::DeserializationError))?;
             return Ok(XfrSignature::Ed25519(sign));
@@ -745,7 +758,7 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
-    use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKeyInner, XfrSecretKey};
+    use crate::xfr::sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey, XfrPublicKeyInner, XfrSecretKey};
     use ark_std::env;
     use noah_algebra::prelude::*;
 
@@ -819,6 +832,16 @@ mod test {
         }
         let sign = kp.sign(b"message").unwrap();
         kp.pub_key.verify(b"message", &sign).unwrap();
+    }
+
+    #[test]
+    fn compatible_olddata() {
+        let keypair = "54f72a37fc9166a027122034b8ac0bd68322083bf36c5bdd33037e358063577347c2e8cb4b9dc155f9cb24e436208ad5d28e9b62ceef7bfad81f3c254d623229";
+        let pubkey = "47c2e8cb4b9dc155f9cb24e436208ad5d28e9b62ceef7bfad81f3c254d623229";
+        let new_pk = XfrPublicKey::noah_from_bytes(&hex::decode(&pubkey).unwrap()).unwrap();
+        let new_kp = XfrKeyPair::noah_from_bytes(&hex::decode(&keypair).unwrap()).unwrap();
+        assert_eq!(new_kp.sec_key.into_keypair().pub_key, new_kp.pub_key);
+        assert_eq!(new_kp.pub_key, new_pk);
     }
 
     #[test]
