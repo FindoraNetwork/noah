@@ -49,6 +49,8 @@ pub struct PlonkProverParams<O, C, F> {
     pub qb_poly: O,
     /// The four polynomials for the Anemoi/Jive constraints.
     pub q_prk_polys: Vec<O>,
+    /// The permutation for copy constraints.
+    pub permutation: Vec<usize>,
     /// The Plonk verifier parameters.
     pub verifier_params: PlonkVerifierParams<C, F>,
     /// The elements of the group.
@@ -386,6 +388,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         s_polys,
         qb_poly,
         q_prk_polys,
+        permutation: raw_perm,
         verifier_params,
         group,
         coset_quotient,

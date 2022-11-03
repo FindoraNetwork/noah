@@ -7,6 +7,7 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
+use ark_ff::batch_inversion;
 use ark_poly::MixedRadixEvaluationDomain;
 use noah_algebra::cfg_into_iter;
 use noah_algebra::prelude::*;
@@ -160,18 +161,14 @@ pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Domain>(
 /// + \beta * k_j * \omega^i +\gamma)/(fj(\omega^i) + \beta * perm_j(\omega^i) +\gamma)
 /// and setting z(1) = 1 for the base case
 pub(super) fn z_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
-    cs: &CS,
     prover_params: &PlonkPK<PCS>,
     w: &[PCS::Field],
     challenges: &PlonkChallenges<PCS::Field>,
 ) -> FpPolynomial<PCS::Field> {
     let n_wires_per_gate = CS::n_wires_per_gate();
     let (beta, gamma) = challenges.get_beta_gamma().unwrap();
-    let mut z_evals = vec![];
-    let perm = cs.compute_permutation();
+    let perm = &prover_params.permutation;
     let n_constraints = w.len() / n_wires_per_gate;
-    let mut prev = PCS::Field::one();
-    z_evals.push(PCS::Field::one());
     let group = &prover_params.group[..];
 
     // computes permutation values
@@ -186,25 +183,43 @@ pub(super) fn z_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
         };
 
     let k = &prover_params.verifier_params.k;
-    for i in 0..n_constraints - 1 {
-        // 1. numerator = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * k_j * \omega^i + \gamma)
-        // 2. denominator = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * permj(\omega^i) +\gamma)
-        let mut numerator = PCS::Field::one();
-        let mut denominator = PCS::Field::one();
-        for j in 0..n_wires_per_gate {
-            let k_x = k[j].mul(&group[i]);
-            let f_x = &w[j * n_constraints + i];
-            let f_plus_beta_id_plus_gamma = &f_x.add(gamma).add(&beta.mul(&k_x));
-            numerator.mul_assign(&f_plus_beta_id_plus_gamma);
 
-            let p_x = p_of_x(perm[j * n_constraints + i], n_constraints, group, k);
-            let f_plus_beta_perm_plus_gamma = f_x.add(gamma).add(&beta.mul(&p_x));
-            denominator.mul_assign(&f_plus_beta_perm_plus_gamma);
-        }
+    let res = cfg_into_iter!(0..n_constraints - 1)
+        .map(|i| {
+            // 1. numerator = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * k_j * \omega^i + \gamma)
+            // 2. denominator = prod_{j=1..n_wires_per_gate}(fj(\omega^i) + \beta * permj(\omega^i) +\gamma)
+            let mut numerator = PCS::Field::one();
+            let mut denominator = PCS::Field::one();
+            for j in 0..n_wires_per_gate {
+                let k_x = k[j].mul(&group[i]);
+                let f_x = &w[j * n_constraints + i];
+                let f_plus_beta_id_plus_gamma = &f_x.add(gamma).add(&beta.mul(&k_x));
+                numerator.mul_assign(&f_plus_beta_id_plus_gamma);
 
-        // save s(\omega^{i+1}) = s(\omega^i)* a / b
-        let denominator_inv = denominator.inv().unwrap();
-        prev.mul_assign(&numerator.mul(&denominator_inv));
+                let p_x = p_of_x(perm[j * n_constraints + i], n_constraints, group, k);
+                let f_plus_beta_perm_plus_gamma = f_x.add(gamma).add(&beta.mul(&p_x));
+                denominator.mul_assign(&f_plus_beta_perm_plus_gamma);
+            }
+
+            (numerator, denominator)
+        })
+        .collect::<Vec<(PCS::Field, PCS::Field)>>();
+
+    let (numerators, denominators): (Vec<PCS::Field>, Vec<PCS::Field>) =
+        res.iter().cloned().unzip();
+
+    let mut denominators = denominators
+        .iter()
+        .map(|x| x.get_field())
+        .collect::<Vec<<PCS::Field as Domain>::Field>>();
+    batch_inversion(&mut denominators);
+
+    let mut prev = PCS::Field::one();
+    let mut z_evals = vec![];
+    z_evals.push(prev);
+    for (x, y) in denominators.iter().zip(numerators.iter()) {
+        let x = <PCS::Field as Domain>::from_field(*x);
+        prev.mul_assign(&y.mul(&x));
         z_evals.push(prev);
     }
 
@@ -975,8 +990,7 @@ mod test {
 
         let mut challenges = PlonkChallenges::<F>::new();
         challenges.insert_beta_gamma(one, zero).unwrap();
-        let q =
-            z_poly::<KZGCommitmentSchemeBLS, TurboCS<F>>(&cs, &params, &witness[..], &challenges);
+        let q = z_poly::<KZGCommitmentSchemeBLS, TurboCS<F>>(&params, &witness[..], &challenges);
 
         let q0 = q.coefs[0];
         assert_eq!(q0, one);
