@@ -42,7 +42,7 @@ pub trait HomomorphicPolyComElem: ToBytes + Clone + Sync + Send + Default {
 }
 
 /// Trait for polynomial commitment scheme.
-pub trait PolyComScheme: Sized {
+pub trait PolyComScheme: Sized + Sync {
     /// Type of prime field.
     type Field: Domain + Debug + Sync + Send;
 

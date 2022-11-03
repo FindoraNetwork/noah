@@ -2,8 +2,8 @@ use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
     helpers::{
-        first_lagrange_poly, hide_polynomial, pi_poly, r_poly, split_t_and_commit, t_poly, z_poly,
-        PlonkChallenges,
+        first_lagrange_poly, hide_polynomial, hide_polynomial_with_blinds, pi_poly, r_poly,
+        split_t_and_commit, t_poly, z_poly, PlonkChallenges,
     },
     indexer::{get_domain_and_root, PlonkPK, PlonkPf, PlonkProof},
     transcript::{
@@ -15,9 +15,12 @@ use crate::plonk::{
 use crate::poly_commit::{
     field_polynomial::FpPolynomial, pcs::PolyComScheme, transcript::PolyComTranscript,
 };
-use ark_std::{end_timer, start_timer};
+use ark_std::{cfg_iter, end_timer, start_timer};
 use merlin::Transcript;
 use noah_algebra::prelude::*;
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
 /// Proof verifier must use a transcript with same state as prover and match the public parameters,
@@ -128,14 +131,27 @@ pub fn prover_with_lagrange<
     let mut challenges = PlonkChallenges::new();
     let n_constraints = cs.size();
 
-    let lagrange_pcs = if lagrange_pcs.is_some() {
-        if lagrange_pcs.unwrap().max_degree() + 1 == n_constraints {
+    let lagrange_pcs =
+        if lagrange_pcs.is_some() && lagrange_pcs.unwrap().max_degree() + 1 == n_constraints {
             lagrange_pcs
         } else {
             None
+        };
+
+    let commit_by_pcs_or_lagrange_pcs = |evals: &FpPolynomial<PCS::Field>,
+                                         coefs: &FpPolynomial<PCS::Field>,
+                                         blinds: &[PCS::Field]|
+     -> Result<PCS::Commitment> {
+        if let Some(lagrange_pcs) = lagrange_pcs {
+            let cm = lagrange_pcs
+                .commit(evals)
+                .c(d!(PlonkError::CommitmentError))?;
+            let cm = pcs.apply_blind_factors(&cm, blinds, n_constraints);
+            Ok(cm)
+        } else {
+            let cm = pcs.commit(coefs).c(d!(PlonkError::CommitmentError))?;
+            Ok(cm)
         }
-    } else {
-        None
     };
 
     let extended_witness_and_pi_timer =
@@ -146,63 +162,47 @@ pub fn prover_with_lagrange<
     end_timer!(extended_witness_and_pi_timer);
 
     // 1. build witness polynomials, hide them and commit
-    let n_wires_per_gate = CS::n_wires_per_gate();
-    let mut w_polys = vec![];
-    let mut cm_w_vec = vec![];
-
     let w_timer = start_timer!(|| "Round 1: witness polynomials");
-    if let Some(lagrange_pcs) = lagrange_pcs {
-        for i in 0..n_wires_per_gate {
+    let n_wires_per_gate = CS::n_wires_per_gate();
+    let mut w_blinds = vec![];
+    for i in 0..n_wires_per_gate {
+        let mut blinds = Vec::new();
+        for _ in 0..cs.get_hiding_degree(i) {
+            let blind = PCS::Field::random(prng);
+            blinds.push(blind);
+        }
+        w_blinds.push(blinds);
+    }
+
+    let w_polys_and_cms = cfg_iter!(w_blinds)
+        .enumerate()
+        .map(|(i, blinds)| {
             let this_w_timer = start_timer!(|| format!("Round 1: processing wire {}", i));
 
-            let this_w_poly_timer = start_timer!(|| "Prepare the polynomial");
-            let f_eval = FpPolynomial::from_coefs(
+            let this_w_poly_timer =
+                start_timer!(|| format!("Prepare the polynomial of wire {}", i));
+            let eval = FpPolynomial::from_coefs(
                 extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec(),
             );
-            let mut f_coefs = FpPolynomial::ifft_with_domain(
-                &domain,
-                &extended_witness[i * n_constraints..(i + 1) * n_constraints],
-            );
-
-            let blinds =
-                hide_polynomial(prng, &mut f_coefs, cs.get_hiding_degree(i), n_constraints);
+            let mut coef = FpPolynomial::ifft_with_domain(&domain, &eval.coefs);
+            hide_polynomial_with_blinds(&mut coef, blinds.len(), n_constraints, blinds.clone());
             end_timer!(this_w_poly_timer);
 
-            let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
-            let cm_w = lagrange_pcs
-                .commit(&f_eval)
-                .c(d!(PlonkError::CommitmentError))?;
-            let cm_w = pcs.apply_blind_factors(&cm_w, &blinds, n_constraints);
-            transcript.append_commitment::<PCS::Commitment>(&cm_w);
+            let this_w_comm_timer = start_timer!(|| format!("Commit the polynomial of wire {}", i));
+            let cm_z = commit_by_pcs_or_lagrange_pcs(&eval, &coef, blinds).unwrap();
             end_timer!(this_w_comm_timer);
 
-            w_polys.push(f_coefs);
-            cm_w_vec.push(cm_w);
-
             end_timer!(this_w_timer);
-        }
-    } else {
-        for i in 0..n_wires_per_gate {
-            let this_w_timer = start_timer!(|| format!("Round 1: processing wire {}", i));
+            (coef, cm_z)
+        })
+        .collect::<Vec<_>>();
 
-            let this_w_poly_timer = start_timer!(|| "Prepare the polynomial");
-            let mut f_coefs = FpPolynomial::ifft_with_domain(
-                &domain,
-                &extended_witness[i * n_constraints..(i + 1) * n_constraints],
-            );
-            let _ = hide_polynomial(prng, &mut f_coefs, cs.get_hiding_degree(i), n_constraints);
-            end_timer!(this_w_poly_timer);
-
-            let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
-            let cm_w = pcs.commit(&f_coefs).c(d!(PlonkError::CommitmentError))?;
-            transcript.append_commitment::<PCS::Commitment>(&cm_w);
-            end_timer!(this_w_comm_timer);
-
-            w_polys.push(f_coefs);
-            cm_w_vec.push(cm_w);
-
-            end_timer!(this_w_timer);
-        }
+    let mut w_polys = vec![];
+    let mut cm_w_vec = vec![];
+    for (poly, cm) in w_polys_and_cms.into_iter() {
+        w_polys.push(poly);
+        transcript.append_commitment::<PCS::Commitment>(&cm);
+        cm_w_vec.push(cm)
     }
     end_timer!(w_timer);
 
@@ -212,33 +212,16 @@ pub fn prover_with_lagrange<
     challenges.insert_beta_gamma(beta, gamma).unwrap(); // safe unwrap
 
     // 3. build the z polynomial, hide it and commit
-
     let z_timer = start_timer!(|| "Round 2: z polynomial");
-    let (cm_z, z_poly) = if let Some(lagrange_pcs) = lagrange_pcs {
+    let (cm_z, z_poly) = {
         let z_poly_timer = start_timer!(|| "Prepare the polynomial");
-        let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
+        let z_evals = z_poly::<PCS, CS>(prover_params, &extended_witness, &challenges);
         let mut z_coefs = FpPolynomial::ifft_with_domain(&domain, &z_evals.coefs);
         let blinds = hide_polynomial(prng, &mut z_coefs, 3, n_constraints);
         end_timer!(z_poly_timer);
 
         let z_comm_timer = start_timer!(|| "Commit the polynomial");
-        let cm_z = lagrange_pcs
-            .commit(&z_evals)
-            .c(d!(PlonkError::CommitmentError))?;
-        let cm_z = pcs.apply_blind_factors(&cm_z, &blinds, n_constraints);
-        transcript.append_commitment::<PCS::Commitment>(&cm_z);
-        end_timer!(z_comm_timer);
-
-        (cm_z, z_coefs)
-    } else {
-        let z_poly_timer = start_timer!(|| "Prepare the polynomial");
-        let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
-        let mut z_coefs = FpPolynomial::ifft_with_domain(&domain, &z_evals.coefs);
-        let _ = hide_polynomial(prng, &mut z_coefs, 3, n_constraints);
-        end_timer!(z_poly_timer);
-
-        let z_comm_timer = start_timer!(|| "Commit the polynomial");
-        let cm_z = pcs.commit(&z_coefs).c(d!(PlonkError::CommitmentError))?;
+        let cm_z = commit_by_pcs_or_lagrange_pcs(&z_evals, &z_coefs, &blinds)?;
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
         end_timer!(z_comm_timer);
 

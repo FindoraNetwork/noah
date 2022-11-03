@@ -155,6 +155,25 @@ pub(super) fn hide_polynomial<R: CryptoRng + RngCore, F: Domain>(
     blinds
 }
 
+/// Add a random degree `num_hide_points`+`zeroing_degree` polynomial
+/// that vanishes on X^{zeroing_degree} -1. Goal is to randomize
+/// `polynomial` maintaining output values for elements in a sub group
+/// of order N. Eg, when num_hide_points is 1, then it adds
+/// (r1 + r2*X) * (X^zeroing_degree - 1) to `polynomial.
+pub(super) fn hide_polynomial_with_blinds<F: Domain>(
+    polynomial: &mut FpPolynomial<F>,
+    hiding_degree: usize,
+    zeroing_degree: usize,
+    blinds: Vec<F>,
+) {
+    for i in 0..hiding_degree {
+        let mut blind = blinds[i];
+        polynomial.add_coef_assign(&blind, i);
+        blind = blind.neg();
+        polynomial.add_coef_assign(&blind, zeroing_degree + i);
+    }
+}
+
 /// Build the z polynomial, by interpolating
 /// z(\omega^{i+1}) = z(\omega^i)\prod_{j=1}^{n_wires_per_gate}(fj(\omega^i)
 /// + \beta * k_j * \omega^i +\gamma)/(fj(\omega^i) + \beta * perm_j(\omega^i) +\gamma)
