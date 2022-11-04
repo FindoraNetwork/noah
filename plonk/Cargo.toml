@@ -42,6 +42,10 @@ default-features = false
 version = '1.5'
 optional = true
 
+[dependencies.ark-ff]
+version = '^0.3.0'
+default-features = false
+
 [dependencies.rand_chacha]
 version = '0.3'
 default-features = false

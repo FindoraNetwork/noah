@@ -128,15 +128,12 @@ pub fn prover_with_lagrange<
     let mut challenges = PlonkChallenges::new();
     let n_constraints = cs.size();
 
-    let lagrange_pcs = if lagrange_pcs.is_some() {
-        if lagrange_pcs.unwrap().max_degree() + 1 == n_constraints {
+    let lagrange_pcs =
+        if lagrange_pcs.is_some() && lagrange_pcs.unwrap().max_degree() + 1 == n_constraints {
             lagrange_pcs
         } else {
             None
-        }
-    } else {
-        None
-    };
+        };
 
     let extended_witness_and_pi_timer =
         start_timer!(|| "Prepare the extended witness and the input");
@@ -216,7 +213,7 @@ pub fn prover_with_lagrange<
     let z_timer = start_timer!(|| "Round 2: z polynomial");
     let (cm_z, z_poly) = if let Some(lagrange_pcs) = lagrange_pcs {
         let z_poly_timer = start_timer!(|| "Prepare the polynomial");
-        let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
+        let z_evals = z_poly::<PCS, CS>(prover_params, &extended_witness, &challenges);
         let mut z_coefs = FpPolynomial::ifft_with_domain(&domain, &z_evals.coefs);
         let blinds = hide_polynomial(prng, &mut z_coefs, 3, n_constraints);
         end_timer!(z_poly_timer);
@@ -232,7 +229,7 @@ pub fn prover_with_lagrange<
         (cm_z, z_coefs)
     } else {
         let z_poly_timer = start_timer!(|| "Prepare the polynomial");
-        let z_evals = z_poly::<PCS, CS>(cs, prover_params, &extended_witness, &challenges);
+        let z_evals = z_poly::<PCS, CS>(prover_params, &extended_witness, &challenges);
         let mut z_coefs = FpPolynomial::ifft_with_domain(&domain, &z_evals.coefs);
         let _ = hide_polynomial(prng, &mut z_coefs, 3, n_constraints);
         end_timer!(z_poly_timer);
