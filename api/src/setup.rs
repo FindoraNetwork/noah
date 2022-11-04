@@ -17,7 +17,7 @@ use crate::parameters::{
     BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS,
     LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS,
 };
-use ark_bulletproofs_secq256k1::BulletproofGens as BulletproofGensOverSecq256k1;
+use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::CanonicalDeserialize;
 use bulletproofs::BulletproofGens;
 use noah_algebra::ristretto::RistrettoPoint;
