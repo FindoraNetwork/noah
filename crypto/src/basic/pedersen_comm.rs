@@ -73,7 +73,7 @@ pub struct PedersenCommitmentSecq256k1 {
 
 impl Default for PedersenCommitmentSecq256k1 {
     fn default() -> Self {
-        let pc_gens = ark_bulletproofs_secq256k1::PedersenGens::default();
+        let pc_gens = ark_bulletproofs::PedersenGens::default();
         Self {
             B: SECQ256K1G1::from_raw(pc_gens.B),
             B_blinding: SECQ256K1G1::from_raw(pc_gens.B_blinding),
@@ -95,9 +95,9 @@ impl PedersenCommitment<SECQ256K1G1> for PedersenCommitmentSecq256k1 {
     }
 }
 
-impl From<&PedersenCommitmentSecq256k1> for ark_bulletproofs_secq256k1::PedersenGens {
+impl From<&PedersenCommitmentSecq256k1> for ark_bulletproofs::PedersenGens {
     fn from(rp: &PedersenCommitmentSecq256k1) -> Self {
-        ark_bulletproofs_secq256k1::PedersenGens {
+        ark_bulletproofs::PedersenGens {
             B: rp.B.get_raw(),
             B_blinding: rp.B_blinding.get_raw(),
         }

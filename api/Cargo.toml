@@ -38,7 +38,7 @@ crate-type = ['rlib']
 aes = '0.8.1'
 aes-gcm = '0.10.1'
 bincode = '1.3.1'
-bulletproofs = { git = "https://github.com/FindoraNetwork/bp", tag = "v1.0.2-f"  }
+bulletproofs = { git = "https://github.com/FindoraNetwork/bulletproofs", tag = "v1.0.2-f"  }
 digest = '0.10'
 ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek", tag = "v1.0.1-f" }
 lazy_static = "1.4.0"
@@ -121,14 +121,16 @@ default-features = false
 
 [dev-dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v0.2.2'
+tag = 'v1.1.2'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v0.2.2'
+tag = 'v1.1.2'
 
-[dependencies.ark-bulletproofs-secq256k1]
-git = "https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1"
+[dependencies.ark-bulletproofs]
+git = "https://github.com/FindoraNetwork/ark-bulletproofs"
+tag = "v2.0.0-f"
+package = "ark-bulletproofs-secq256k1"
 default-features = false
 features = ["yoloproofs"]
 
@@ -138,7 +140,7 @@ default = [
     'u64_backend',
 ]
 debug = [ 'noah-plonk/debug' ]
-std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs-secq256k1/std', 'ark-std/std']
+std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs/std', 'ark-std/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',
