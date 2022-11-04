@@ -1,36 +1,167 @@
 use aes_gcm::{aead::Aead, KeyInit};
+use core::hash::{Hash, Hasher};
 use digest::{generic_array::GenericArray, Digest};
-use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1, SECP256K1_SCALAR_LEN};
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use serde::{Deserialize, Serialize};
+use ed25519_dalek::{PublicKey as Ed25519PublicKey, SecretKey as Ed25519SecretKey};
+use noah_algebra::{
+    bls12_381::BLSScalar,
+    cmp::Ordering,
+    prelude::*,
+    secp256k1::{SECP256K1Scalar, SECP256K1G1},
+};
+use noah_crypto::basic::hybrid_encryption::{
+    hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
+};
 use wasm_bindgen::prelude::*;
 
 /// The length of the secret key for anonymous transfer.
-pub const AXFR_SECRET_KEY_LENGTH: usize = SECP256K1_SCALAR_LEN;
+pub const AXFR_SECRET_KEY_LENGTH: usize = 33; // keytype + Bytes
 /// The length of the public key for anonymous transfer.
-pub const AXFR_PUBLIC_KEY_LENGTH: usize = SECP256K1G1::COMPRESSED_LEN;
+pub const AXFR_PUBLIC_KEY_LENGTH: usize = 33; // keytype (+positive) + Bytes
 
 /// The spending key.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
-pub struct AXfrSecretKey(pub(crate) SECP256K1Scalar);
+#[derive(Debug)]
+pub enum AXfrSecretKey {
+    Ed25519(Ed25519SecretKey),
+    Secp256k1(SECP256K1Scalar),
+}
+
+impl Clone for AXfrSecretKey {
+    fn clone(&self) -> Self {
+        Self::noah_from_bytes(&self.noah_to_bytes()).unwrap()
+    }
+}
+
+impl Eq for AXfrSecretKey {}
+
+impl PartialEq for AXfrSecretKey {
+    fn eq(&self, other: &AXfrSecretKey) -> bool {
+        self.noah_to_bytes().eq(&other.noah_to_bytes())
+    }
+}
+
+impl Ord for AXfrSecretKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.noah_to_bytes().cmp(&other.noah_to_bytes())
+    }
+}
+
+impl PartialOrd for AXfrSecretKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Default for AXfrSecretKey {
+    fn default() -> Self {
+        AXfrSecretKey::Secp256k1(SECP256K1Scalar::default())
+    }
+}
+
+impl Hash for AXfrSecretKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            AXfrSecretKey::Ed25519(sk) => {
+                sk.as_bytes().hash(state);
+            }
+            AXfrSecretKey::Secp256k1(sk) => {
+                sk.hash(state);
+            }
+        }
+    }
+}
+
+impl NoahFromToBytes for AXfrSecretKey {
+    fn noah_to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(AXFR_SECRET_KEY_LENGTH);
+        match self {
+            AXfrSecretKey::Ed25519(p) => {
+                bytes[0] = 0;
+                bytes.extend(p.as_bytes());
+            }
+            AXfrSecretKey::Secp256k1(p) => {
+                bytes[0] = 1;
+                bytes.append(&mut p.noah_to_bytes());
+            }
+        }
+        bytes
+    }
+
+    fn noah_from_bytes(bytes: &[u8]) -> Result<AXfrSecretKey> {
+        if bytes.len() != AXFR_SECRET_KEY_LENGTH {
+            Err(eg!(NoahError::DeserializationError))
+        } else {
+            match bytes[0] {
+                0 => match Ed25519SecretKey::from_bytes(&bytes[1..]) {
+                    Ok(s) => Ok(AXfrSecretKey::Ed25519(s)),
+                    _ => Err(eg!(NoahError::ParameterError)),
+                },
+                _ => match SECP256K1Scalar::noah_from_bytes(&bytes[1..]) {
+                    Ok(s) => Ok(AXfrSecretKey::Secp256k1(s)),
+                    _ => Err(eg!(NoahError::ParameterError)),
+                },
+            }
+        }
+    }
+}
 
 /// The public key.
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
-pub struct AXfrPubKey(pub(crate) SECP256K1G1);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+pub struct AXfrPubKey(pub(crate) AXfrPubKeyInner);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AXfrPubKeyInner {
+    Ed25519(Ed25519PublicKey),
+    Secp256k1(SECP256K1G1),
+}
+
+impl Default for AXfrPubKeyInner {
+    fn default() -> Self {
+        AXfrPubKeyInner::Secp256k1(SECP256K1G1::default())
+    }
+}
+
+impl Hash for AXfrPubKeyInner {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            AXfrPubKeyInner::Ed25519(pk) => {
+                pk.as_bytes().hash(state);
+            }
+            AXfrPubKeyInner::Secp256k1(pk) => {
+                pk.hash(state);
+            }
+        }
+    }
+}
 
 impl NoahFromToBytes for AXfrPubKey {
     fn noah_to_bytes(&self) -> Vec<u8> {
-        self.0.to_compressed_bytes()
+        let mut bytes = Vec::with_capacity(AXFR_PUBLIC_KEY_LENGTH);
+        match self.inner() {
+            AXfrPubKeyInner::Ed25519(p) => {
+                bytes[0] = u8::MAX;
+                bytes.extend(p.as_bytes()); // 32
+            }
+            AXfrPubKeyInner::Secp256k1(p) => {
+                bytes.extend(p.to_compressed_bytes()); // 33
+            }
+        }
+        bytes
     }
+
     fn noah_from_bytes(bytes: &[u8]) -> Result<AXfrPubKey> {
         if bytes.len() != AXFR_PUBLIC_KEY_LENGTH {
             Err(eg!(NoahError::DeserializationError))
         } else {
-            let group_element = SECP256K1G1::from_compressed_bytes(bytes);
-            match group_element {
-                Ok(g) => Ok(AXfrPubKey(g)),
-                _ => Err(eg!(NoahError::ParameterError)),
+            match bytes[0] {
+                u8::MAX => match Ed25519PublicKey::from_bytes(&bytes[1..]) {
+                    Ok(g) => Ok(AXfrPubKey(AXfrPubKeyInner::Ed25519(g))),
+                    _ => Err(eg!(NoahError::ParameterError)),
+                },
+                _ => match SECP256K1G1::from_compressed_bytes(bytes) {
+                    Ok(g) => Ok(AXfrPubKey(AXfrPubKeyInner::Secp256k1(g))),
+                    _ => Err(eg!(NoahError::ParameterError)),
+                },
             }
         }
     }
@@ -38,7 +169,7 @@ impl NoahFromToBytes for AXfrPubKey {
 
 /// Keypair associated with an Anonymous records. It is used to spending it.
 #[wasm_bindgen]
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 /// The key pair for anonymous payment.
 pub struct AXfrKeyPair {
     /// The random seed that generates the secret key.
@@ -50,7 +181,7 @@ pub struct AXfrKeyPair {
 impl AXfrKeyPair {
     /// Generate a Schnorr keypair from `prng`.
     pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        let spend_key = AXfrSecretKey(SECP256K1Scalar::random(prng));
+        let spend_key = AXfrSecretKey::Secp256k1(SECP256K1Scalar::random(prng));
         Self::from_secret_key(spend_key)
     }
 
@@ -66,9 +197,15 @@ impl AXfrKeyPair {
 
     /// Return the key pair from the spending key.
     pub fn from_secret_key(secret_key: AXfrSecretKey) -> Self {
+        let pk = match &secret_key {
+            AXfrSecretKey::Secp256k1(sk) => {
+                AXfrPubKeyInner::Secp256k1(SECP256K1G1::get_base().mul(sk))
+            }
+            AXfrSecretKey::Ed25519(sk) => AXfrPubKeyInner::Ed25519(sk.into()),
+        };
         Self {
-            secret_key: secret_key.clone(),
-            pub_key: AXfrPubKey(SECP256K1G1::get_base().mul(&secret_key.0)),
+            secret_key,
+            pub_key: AXfrPubKey(pk),
         }
     }
 }
@@ -76,7 +213,10 @@ impl AXfrKeyPair {
 impl AXfrSecretKey {
     /// Return the BLS12-381 scalar representation of the secret key.
     pub fn get_secret_key_scalars(&self) -> Result<[BLSScalar; 2]> {
-        let bytes = self.0.to_bytes();
+        let bytes = match self {
+            AXfrSecretKey::Ed25519(sk) => sk.as_bytes().to_vec(),
+            AXfrSecretKey::Secp256k1(sk) => sk.to_bytes(),
+        };
 
         let first = BLSScalar::from_bytes(&bytes[0..31])?;
         let second = BLSScalar::from_bytes(&bytes[31..])?;
@@ -86,51 +226,75 @@ impl AXfrSecretKey {
 
     #[inline]
     /// Decrypt a ciphertext.
-    pub fn decrypt(&self, share: &AXfrPubKey, ctext: &[u8]) -> Result<Vec<u8>> {
-        let dh = share.0.mul(&self.0);
-
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(&dh.to_compressed_bytes());
-
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
-
-        let nonce = GenericArray::from_slice(&[0u8; 12]);
-
-        let gcm = {
-            let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
-
-            if res.is_err() {
-                return Err(eg!(NoahError::DecryptionError));
+    pub fn decrypt(&self, ctext: &[u8]) -> Result<Vec<u8>> {
+        if ctext.is_empty() {
+            return Err(eg!(NoahError::DecryptionError));
+        }
+        match (ctext[0], self) {
+            (0, AXfrSecretKey::Ed25519(sk)) => {
+                let ctext = NoahHybridCiphertext::noah_from_bytes(&ctext[1..])?;
+                Ok(hybrid_decrypt_with_ed25519_secret_key(&ctext, sk))
             }
+            (1, AXfrSecretKey::Secp256k1(sk)) => {
+                let share_len = SECP256K1G1::COMPRESSED_LEN + 1;
+                if ctext.len() < share_len {
+                    return Err(eg!(NoahError::DecryptionError));
+                }
+                let share = SECP256K1G1::from_compressed_bytes(&ctext[1..share_len])?;
+                let dh = share.mul(sk);
 
-            res.unwrap()
-        };
+                let mut hasher = sha2::Sha512::new();
+                hasher.update(&dh.to_compressed_bytes());
 
-        let res = {
-            let res = gcm.decrypt(nonce, ctext);
+                let mut key = [0u8; 32];
+                key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
 
-            if res.is_err() {
-                return Err(eg!(NoahError::DecryptionError));
+                let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+                let gcm = {
+                    let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+                    if res.is_err() {
+                        return Err(eg!(NoahError::DecryptionError));
+                    }
+
+                    res.unwrap()
+                };
+
+                let res = {
+                    let res = gcm.decrypt(nonce, &ctext[share_len..]);
+
+                    if res.is_err() {
+                        return Err(eg!(NoahError::DecryptionError));
+                    }
+
+                    res.unwrap()
+                };
+                Ok(res)
             }
-
-            res.unwrap()
-        };
-        Ok(res)
+            _ => Err(eg!(NoahError::DecryptionError)),
+        }
     }
 }
 
 impl AXfrPubKey {
+    /// Get the inner type.
+    pub fn inner(&self) -> &AXfrPubKeyInner {
+        &self.0
+    }
+
     /// Return the BLS12-381 scalar representation of the public key.
     pub fn get_public_key_scalars(&self) -> Result<[BLSScalar; 3]> {
-        let bytes = self
-            .0
-            .get_x()
-            .to_bytes()
-            .iter()
-            .chain(self.0.get_y().to_bytes().iter())
-            .copied()
-            .collect::<Vec<u8>>();
+        let bytes = match self.inner() {
+            AXfrPubKeyInner::Ed25519(pk) => pk.to_bytes().to_vec(),
+            AXfrPubKeyInner::Secp256k1(pk) => pk
+                .get_x()
+                .to_bytes()
+                .iter()
+                .chain(pk.get_y().to_bytes().iter())
+                .copied()
+                .collect::<Vec<u8>>(),
+        };
 
         let first = BLSScalar::from_bytes(&bytes[0..31])?;
         let second = BLSScalar::from_bytes(&bytes[31..62])?;
@@ -140,67 +304,71 @@ impl AXfrPubKey {
     }
 
     /// Encrypt the message
-    pub fn encrypt<R: CryptoRng + RngCore>(
-        &self,
-        prng: &mut R,
-        msg: &[u8],
-    ) -> Result<(Self, Vec<u8>)> {
-        let share_scalar = SECP256K1Scalar::random(prng);
-        let share = SECP256K1G1::get_base().mul(&share_scalar);
-
-        let dh = self.0.mul(&share_scalar);
-
-        let mut hasher = sha2::Sha512::new();
-        hasher.update(&dh.to_compressed_bytes());
-
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
-
-        let nonce = GenericArray::from_slice(&[0u8; 12]);
-
-        let gcm = {
-            let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
-
-            if res.is_err() {
-                return Err(eg!(NoahError::EncryptionError));
+    pub fn encrypt<R: CryptoRng + RngCore>(&self, prng: &mut R, msg: &[u8]) -> Result<Vec<u8>> {
+        let mut bytes = vec![];
+        match self.inner() {
+            AXfrPubKeyInner::Ed25519(pk) => {
+                bytes.push(0);
+                bytes.append(&mut hybrid_encrypt_ed25519(prng, &pk, msg).noah_to_bytes());
             }
+            AXfrPubKeyInner::Secp256k1(pk) => {
+                bytes.push(1);
+                let share_scalar = SECP256K1Scalar::random(prng);
+                let share = SECP256K1G1::get_base().mul(&share_scalar);
+                bytes.append(&mut share.to_compressed_bytes());
 
-            res.unwrap()
+                let dh = pk.mul(&share_scalar);
+
+                let mut hasher = sha2::Sha512::new();
+                hasher.update(&dh.to_compressed_bytes());
+
+                let mut key = [0u8; 32];
+                key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+                let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+                let gcm = {
+                    let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+                    if res.is_err() {
+                        return Err(eg!(NoahError::EncryptionError));
+                    }
+
+                    res.unwrap()
+                };
+
+                let ctext = {
+                    let res = gcm.encrypt(nonce, msg);
+
+                    if res.is_err() {
+                        return Err(eg!(NoahError::EncryptionError));
+                    }
+
+                    res.unwrap()
+                };
+                bytes.append(&mut ctext);
+            }
         };
 
-        let ctext = {
-            let res = gcm.encrypt(nonce, msg);
-
-            if res.is_err() {
-                return Err(eg!(NoahError::EncryptionError));
-            }
-
-            res.unwrap()
-        };
-
-        Ok((AXfrPubKey(share), ctext))
+        Ok(bytes)
     }
 }
 
 impl NoahFromToBytes for AXfrKeyPair {
     fn noah_to_bytes(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(self.get_secret_key().0.noah_to_bytes().as_slice());
+        vec.extend_from_slice(self.get_secret_key().noah_to_bytes().as_slice());
         vec.extend_from_slice(self.pub_key.noah_to_bytes().as_slice());
         vec
     }
 
     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != SECP256K1Scalar::bytes_len() + SECP256K1G1::COMPRESSED_LEN {
+        if bytes.len() != AXFR_PUBLIC_KEY_LENGTH + AXFR_SECRET_KEY_LENGTH {
             return Err(eg!(NoahError::DeserializationError));
         }
 
-        let secret_key = AXfrSecretKey(
-            SECP256K1Scalar::from_bytes(&bytes[0..SECP256K1Scalar::bytes_len()]).c(d!())?,
-        );
-
-        let offset = SECP256K1Scalar::bytes_len();
-        let pub_key = AXfrPubKey::noah_from_bytes(&bytes[offset..]).c(d!())?;
+        let secret_key = AXfrSecretKey::noah_from_bytes(&bytes[0..AXFR_SECRET_KEY_LENGTH])?;
+        let pub_key = AXfrPubKey::noah_from_bytes(&bytes[AXFR_SECRET_KEY_LENGTH..])?;
 
         Ok(AXfrKeyPair {
             secret_key,

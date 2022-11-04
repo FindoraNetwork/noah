@@ -314,12 +314,7 @@ pub struct PayeeWitness {
 
 /// Information directed to secret key holder of a BlindAssetRecord
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AxfrOwnerMemo {
-    /// The random point used to generate the shared point.
-    pub point: AXfrPubKey,
-    /// The ciphertext.
-    pub ctext: Vec<u8>,
-}
+pub struct AxfrOwnerMemo(Vec<u8>);
 
 impl AxfrOwnerMemo {
     /// Crate an encrypted memo using the public key.
@@ -328,13 +323,13 @@ impl AxfrOwnerMemo {
         pub_key: &AXfrPubKey,
         msg: &[u8],
     ) -> Result<Self> {
-        let (point, ctext) = pub_key.encrypt(prng, msg)?;
-        Ok(Self { point, ctext })
+        let ctext = pub_key.encrypt(prng, msg)?;
+        Ok(Self(ctext))
     }
 
     /// Decrypt a memo using the viewing key.
     pub fn decrypt(&self, secret_key: &AXfrSecretKey) -> Result<Vec<u8>> {
-        secret_key.decrypt(&self.point, &self.ctext)
+        secret_key.decrypt(&self.0)
     }
 }
 

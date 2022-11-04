@@ -1,4 +1,4 @@
-use crate::anon_xfr::keys::{AXfrPubKey, AXfrSecretKey};
+use crate::anon_xfr::keys::{AXfrPubKey, AXfrPubKeyInner, AXfrSecretKey};
 use ark_serialize::{Flags, SWFlags};
 use digest::consts::U64;
 use ed25519_dalek::{
@@ -190,12 +190,10 @@ impl XfrPublicKey {
             }
             XfrPublicKeyInner::Secp256k1(pk) => {
                 let bytes = convert_point_libsecp256k1_to_algebra(&pk);
-                let gp = AXfrPubKey(SECP256K1G1::from_compressed_bytes(&bytes)?);
-                let (p, mut ctext) = gp.encrypt(prng, msg)?;
-                let mut bytes = vec![];
-                bytes.append(&mut p.0.to_compressed_bytes());
-                bytes.append(&mut ctext);
-                Ok(bytes)
+                let gp = AXfrPubKey(AXfrPubKeyInner::Secp256k1(
+                    SECP256K1G1::from_compressed_bytes(&bytes)?,
+                ));
+                gp.encrypt(prng, msg)
             }
             XfrPublicKeyInner::Address(_) => panic!("Address not supported"),
         }
@@ -364,10 +362,9 @@ impl XfrSecretKey {
             XfrSecretKey::Secp256k1(sk) => {
                 let s: LibSecp256k1Scalar = (*sk).into();
                 let bytes = convert_scalar_libsecp256k1_to_algebra(&s.0);
-                let sk = AXfrSecretKey(SECP256K1Scalar::from_bytes(&bytes)?);
-                let share = AXfrPubKey(SECP256K1G1::from_compressed_bytes(&lock[0..33])?);
+                let sk = AXfrSecretKey::Secp256k1(SECP256K1Scalar::from_bytes(&bytes)?);
 
-                sk.decrypt(&share, &lock[33..])
+                sk.decrypt(&lock)
             }
             XfrSecretKey::Address(_) => panic!("Address not supported"),
         }

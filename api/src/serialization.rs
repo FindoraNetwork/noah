@@ -1,6 +1,9 @@
-use crate::xfr::{
-    sig::{XfrPublicKey, XfrSecretKey, XfrSignature},
-    structs::{AssetType, ASSET_TYPE_LENGTH},
+use crate::{
+    anon_xfr::keys::{AXfrKeyPair, AXfrPubKey, AXfrSecretKey},
+    xfr::{
+        sig::{XfrPublicKey, XfrSecretKey, XfrSignature},
+        structs::{AssetType, ASSET_TYPE_LENGTH},
+    },
 };
 use noah_algebra::prelude::*;
 use serde::Serializer;
@@ -55,6 +58,12 @@ impl NoahFromToBytes for XfrSignature {
 }
 
 serialize_deserialize!(XfrSignature);
+
+serialize_deserialize!(AXfrSecretKey);
+
+serialize_deserialize!(AXfrPubKey);
+
+serialize_deserialize!(AXfrKeyPair);
 
 #[cfg(test)]
 mod test {
