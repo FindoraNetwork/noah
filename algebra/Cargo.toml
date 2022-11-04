@@ -16,7 +16,7 @@ crate-type = ['rlib']
 
 [dependencies]
 base64 = "0.13"
-bulletproofs = { git = "https://github.com/FindoraNetwork/bp", tag = "v1.0.2-f"  }
+bulletproofs = { git = "https://github.com/FindoraNetwork/bulletproofs", tag = "v1.0.2-f"  }
 digest = '0.10'
 itertools = '0.10.0'
 ruc = '1.0'
@@ -77,8 +77,10 @@ version = "0.2"
 [dependencies.num-integer]
 version = "0.1"
 
-[dependencies.ark-bulletproofs-secq256k1]
-git = "https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1"
+[dependencies.ark-bulletproofs]
+git = "https://github.com/FindoraNetwork/ark-bulletproofs"
+tag = "v2.0.0-f"
+package = "ark-bulletproofs-secq256k1"
 default-features = false
 features = ['yoloproofs']
 
@@ -95,7 +97,7 @@ std = [
     'ark-std/std',
     'ark-ff/std',
     'ark-serialize/std',
-    'ark-bulletproofs-secq256k1/std'
+    'ark-bulletproofs/std'
 ]
 alloc = ['curve25519-dalek/alloc']
 nightly = ['curve25519-dalek/nightly']
@@ -107,7 +109,7 @@ parallel = [
     'ark-std/parallel',
     'ark-ec/parallel',
     'ark-ff/parallel',
-    'ark-bulletproofs-secq256k1/parallel'
+    'ark-bulletproofs/parallel'
 ]
 asm = ['ark-ff/asm']
 print-trace = ['ark-std/print-trace']

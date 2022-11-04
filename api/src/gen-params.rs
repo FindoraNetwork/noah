@@ -5,7 +5,7 @@
     allow(unused)
 )]
 
-use ark_bulletproofs_secq256k1::BulletproofGens as BulletproofGensOverSecq256k1;
+use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bulletproofs::BulletproofGens;
 use noah::setup::{

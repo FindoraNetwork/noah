@@ -1,7 +1,7 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::secq256k1::SECQ256K1Scalar;
-use ark_bulletproofs_secq256k1::curve::secp256k1::{Fr, FrParameters, G1Affine, G1Projective};
+use ark_bulletproofs::curve::secp256k1::{Fr, FrParameters, G1Affine, G1Projective};
 use ark_ec::short_weierstrass_jacobian::GroupProjective;
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, BigInteger320, FftField, FftParameters, Field, FpParameters, PrimeField};
@@ -22,7 +22,7 @@ use wasm_bindgen::prelude::*;
 /// The number of bytes for a scalar value over secp256k1
 pub const SECP256K1_SCALAR_LEN: usize = 32;
 
-/// The wrapped struct for [`ark_bulletproofs_secq256k1::curve::secp256k1::Fr`](https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1/blob/main/src/curve/secp256k1/fr.rs)
+/// The wrapped struct for [`ark_bulletproofs::curve::secp256k1::Fr`](https://github.com/FindoraNetwork/ark-bulletproofs/blob/main/src/curve/secp256k1/fr.rs)
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct SECP256K1Scalar(pub(crate) Fr);
@@ -49,7 +49,7 @@ impl SECP256K1Scalar {
     }
 }
 
-/// The wrapped struct for [`ark_bulletproofs_secq256k1::curve::secp256k1::G1Projective`](https://github.com/FindoraNetwork/ark-bulletproofs-secq256k1/blob/main/src/curve/secp256k1/g1.rs)
+/// The wrapped struct for [`ark_bulletproofs::curve::secp256k1::G1Projective`](https://github.com/FindoraNetwork/ark-bulletproofs/blob/main/src/curve/secp256k1/g1.rs)
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq, Hash)]
 pub struct SECP256K1G1(pub(crate) G1Projective);
@@ -222,7 +222,7 @@ impl Scalar for SECP256K1Scalar {
 
     #[inline]
     fn capacity() -> usize {
-        ark_bulletproofs_secq256k1::curve::secp256k1::FrParameters::CAPACITY as usize
+        ark_bulletproofs::curve::secp256k1::FrParameters::CAPACITY as usize
     }
 
     #[inline]
@@ -511,7 +511,7 @@ mod secp256k1_groups_test {
         secp256k1::{SECP256K1Scalar, SECP256K1G1},
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
-    use ark_bulletproofs_secq256k1::curve::secp256k1::G1Affine;
+    use ark_bulletproofs::curve::secp256k1::G1Affine;
     use ark_ec::ProjectiveCurve;
 
     #[test]

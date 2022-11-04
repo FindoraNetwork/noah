@@ -1,8 +1,8 @@
 //! Module for the Bulletproof scalar mul proof scheme
 
 use crate::basic::pedersen_comm::PedersenCommitmentSecq256k1;
-use ark_bulletproofs_secq256k1::BulletproofGens;
-use ark_bulletproofs_secq256k1::{
+use ark_bulletproofs::BulletproofGens;
+use ark_bulletproofs::{
     curve::secp256k1::{Fq, FrParameters, G1Affine},
     curve::secq256k1::G1Affine as G1AffineBig,
     r1cs::{
@@ -269,7 +269,7 @@ impl ScalarMulProof {
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
 
         // 3. Initialize the prover.
-        let pc_gens_for_prover = ark_bulletproofs_secq256k1::PedersenGens::from(&pc_gens);
+        let pc_gens_for_prover = ark_bulletproofs::PedersenGens::from(&pc_gens);
         let mut prover = Prover::new(&pc_gens_for_prover, transcript);
 
         // 4. Allocate `public_key`.
@@ -353,7 +353,7 @@ impl ScalarMulProof {
         )
         .c(d!(NoahError::R1CSProofError))?;
 
-        let pc_gens_for_verifier = ark_bulletproofs_secq256k1::PedersenGens::from(&pc_gens);
+        let pc_gens_for_verifier = ark_bulletproofs::PedersenGens::from(&pc_gens);
         verifier
             .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
             .c(d!(NoahError::R1CSProofError))?;
@@ -363,7 +363,7 @@ impl ScalarMulProof {
 
 #[test]
 fn scalar_mul_test() {
-    use ark_bulletproofs_secq256k1::curve::secp256k1::Fr;
+    use ark_bulletproofs::curve::secp256k1::Fr;
 
     let bp_gens = BulletproofGens::new(2048, 1);
 

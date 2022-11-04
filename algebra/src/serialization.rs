@@ -127,14 +127,14 @@ impl NoahFromToBytes for bulletproofs::r1cs::R1CSProof {
     }
 }
 
-impl NoahFromToBytes for ark_bulletproofs_secq256k1::r1cs::R1CSProof {
+impl NoahFromToBytes for ark_bulletproofs::r1cs::R1CSProof {
     fn noah_to_bytes(&self) -> Vec<u8> {
         let mut cursor = Cursor::new(Vec::new());
         self.serialize(&mut cursor).unwrap();
         cursor.into_inner()
     }
-    fn noah_from_bytes(bytes: &[u8]) -> Result<ark_bulletproofs_secq256k1::r1cs::R1CSProof> {
-        ark_bulletproofs_secq256k1::r1cs::R1CSProof::deserialize(bytes)
+    fn noah_from_bytes(bytes: &[u8]) -> Result<ark_bulletproofs::r1cs::R1CSProof> {
+        ark_bulletproofs::r1cs::R1CSProof::deserialize(bytes)
             .map_err(|_| eg!(NoahError::DeserializationError))
     }
 }
