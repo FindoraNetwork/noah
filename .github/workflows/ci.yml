@@ -6,6 +6,7 @@ on:
       - develop
       - develop-refactoring
       - actions
+      - tttt
 env:
   RUST_BACKTRACE: 1
 
