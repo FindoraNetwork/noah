@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - develop-refactoring
+      - actions
 env:
   RUST_BACKTRACE: 1
 
@@ -189,11 +190,7 @@ jobs:
         fail-fast: true
       steps:
         - uses: actions/checkout@v3
-        - uses: dtolnay/rust-toolchain@stable
-          with:
-            profile: minimal
-            toolchain: nightly
-            override: true
+        - uses: dtolnay/rust-toolchain@nightly
         - uses: taiki-e/install-action@nextest
         - name: Dangling test
           run: | 
@@ -233,11 +230,24 @@ jobs:
         - name: Build verifier parameters
           run: cargo run --release -p noah --features=gen,no_vk --bin gen-params all ./api/parameters
 
-        - name: Check changed files in the parameters folder
-          id: changed-files
-          uses: UnicornGlobal/has-changes-action@v1.0.12
+        - name: Check changed files in the parameters folder1
+          id: verify-changed-files
+          uses: tj-actions/verify-changed-files@v12
+          with:
+            files: |
+              api/parameters/**
+
+        - name: Get changed files in the parameters folder2
+          id: changed-files-specific
+          uses: tj-actions/changed-files@v34
+          with:
+            files: |
+              api/parameters/**
 
         - name: Break if any file(s) change
-          if: steps.changed-files.outputs.changed == 1
+          if: steps.verify-changed-files.outputs.files_changed == 'true' && steps.changed-files-specific.outputs.any_modified != 'true'
           run: |
+            for file in ${{ steps.verify-changed-files.outputs.changed_files }}; do
+              echo "$file was changed"
+            done
             exit 1
