@@ -1,7 +1,7 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
-use noah_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
+use noah_algebra::{bls12_381::BLSFr, jubjub::JubjubPoint, prelude::*};
 
-type F = BLSScalar;
+type F = BLSFr;
 
 /// Represent a curve point in Affine form
 #[derive(Clone)]
@@ -96,7 +96,7 @@ fn compute_base_multiples(base: JubjubPoint, n: usize) -> Vec<Vec<JubjubPoint>> 
     bases
 }
 
-impl TurboCS<BLSScalar> {
+impl TurboCS<BLSFr> {
     /// Create variables for a point.
     pub fn new_point_variable(&mut self, point: Point) -> PointVar {
         let x = self.new_variable(point.0);
@@ -135,10 +135,10 @@ impl TurboCS<BLSScalar> {
             "p_out.y variable index out of bound"
         );
 
-        let edwards_d = BLSScalar::from_bytes(&EDWARDS_D[..]).unwrap();
+        let edwards_d = BLSFr::from_bytes(&EDWARDS_D[..]).unwrap();
         // x-coordinate constraint
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = BLSFr::zero();
+        let one = BLSFr::one();
         self.push_add_selectors(zero, zero, zero, zero);
         self.push_mul_selectors(one, one);
         self.push_constant_selector(zero);
@@ -207,8 +207,8 @@ impl TurboCS<BLSScalar> {
     ) -> ExtendedPointVar {
         assert!(b0_var < self.num_vars, "b0 variable index out of bound");
         assert!(b1_var < self.num_vars, "b1 variable index out of bound");
-        let one = BLSScalar::one();
-        let zero = BLSScalar::zero();
+        let one = BLSFr::one();
+        let zero = BLSFr::zero();
         let p_out_ext: JubjubPoint =
             match (self.witness[b0_var] == one, self.witness[b1_var] == one) {
                 (false, false) => JubjubPoint::get_identity(),
@@ -324,7 +324,7 @@ impl TurboCS<BLSScalar> {
 mod test {
     use crate::plonk::constraint_system::{ecc::Point, TurboCS};
     use noah_algebra::{
-        bls12_381::BLSScalar,
+        bls12_381::BLSFr,
         jubjub::{JubjubPoint, JubjubScalar},
         prelude::*,
     };
@@ -373,7 +373,7 @@ mod test {
             17, 144, 47, 113, 34, 14, 11, 207, 13, 116, 200, 201, 17, 33, 101, 116, 0, 59, 51, 1,
             2, 39, 13, 56, 69, 175, 41, 111, 134, 180, 0, 0,
         ];
-        let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
+        let scalar = BLSFr::from_bytes(&scalar_bytes).unwrap();
         let jubjub_scalar = JubjubScalar::from_bytes(&scalar_bytes).unwrap(); // safe unwrap
         let base_ext = JubjubPoint::get_base();
         let p_out_ext = base_ext.mul(&jubjub_scalar);
@@ -397,13 +397,13 @@ mod test {
         let mut cs = TurboCS::new();
         let base_ext = JubjubPoint::get_base();
         let base_point = Point::from(&base_ext);
-        let scalar_var = cs.new_variable(BLSScalar::zero());
+        let scalar_var = cs.new_variable(BLSFr::zero());
         let p_out_var = cs.scalar_mul(base_ext, scalar_var, 64);
         let mut witness = cs.get_and_clear_witness();
 
         // check p_out is an identity point
-        assert_eq!(witness[p_out_var.0], BLSScalar::zero());
-        assert_eq!(witness[p_out_var.1], BLSScalar::one());
+        assert_eq!(witness[p_out_var.0], BLSFr::zero());
+        assert_eq!(witness[p_out_var.1], BLSFr::one());
         pnk!(cs.verify_witness(&witness[..], &[]));
 
         // wrong witness: p_out = GENERATOR

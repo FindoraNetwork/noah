@@ -407,9 +407,9 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 #[cfg(test)]
 mod test {
     use crate::plonk::indexer::choose_ks;
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSFr, prelude::*};
 
-    type F = BLSScalar;
+    type F = BLSFr;
 
     #[test]
     fn test_choose_ks() {

@@ -21,7 +21,7 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_algebra::{bls12_381::BLSFr, prelude::*};
 use noah_crypto::basic::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
 };
@@ -59,9 +59,9 @@ pub struct AbarToArPreNote {
     /// Witness.
     pub witness: PayerWitness,
     /// The trace of the input commitment.
-    pub input_commitment_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
+    pub input_commitment_trace: AnemoiVLHTrace<BLSFr, 2, 12>,
     /// The trace of the nullifier.
-    pub nullifier_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
+    pub nullifier_trace: AnemoiVLHTrace<BLSFr, 2, 12>,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
 }
@@ -74,7 +74,7 @@ pub struct AbarToArBody {
     /// The new AR to be created.
     pub output: BlindAssetRecord,
     /// The Merkle root hash.
-    pub merkle_root: BLSScalar,
+    pub merkle_root: BLSFr,
     /// The Merkle root version.
     pub merkle_root_version: u64,
     /// The owner memo.
@@ -188,7 +188,7 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
 pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     params: &VerifierParams,
     note: &AbarToArNote,
-    merkle_root: &BLSScalar,
+    merkle_root: &BLSFr,
     hash: D,
 ) -> Result<()> {
     // require the output amount & asset type are non-confidential
@@ -211,7 +211,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     let mut online_inputs = vec![];
     online_inputs.push(note.body.input.clone());
     online_inputs.push(merkle_root.clone());
-    online_inputs.push(BLSScalar::from(payer_amount));
+    online_inputs.push(BLSFr::from(payer_amount));
     online_inputs.push(payer_asset_type.as_scalar());
     online_inputs.extend_from_slice(&address_folding_public_input);
 
@@ -232,7 +232,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
 pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &VerifierParams,
     notes: &[&AbarToArNote],
-    merkle_roots: &[&BLSScalar],
+    merkle_roots: &[&BLSFr],
     hashes: Vec<D>,
 ) -> Result<()> {
     // require the output amount & asset type are non-confidential
@@ -266,7 +266,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
             let mut online_inputs = vec![];
             online_inputs.push(note.body.input.clone());
             online_inputs.push(*merkle_root.clone());
-            online_inputs.push(BLSScalar::from(payer_amount));
+            online_inputs.push(BLSFr::from(payer_amount));
             online_inputs.push(payer_asset_type.as_scalar());
             online_inputs.extend_from_slice(&address_folding_public_input);
 
@@ -291,8 +291,8 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    nullifier_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
@@ -320,8 +320,8 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
     payer_witness: PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    nullifier_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
@@ -345,9 +345,9 @@ pub fn build_abar_to_ar_cs(
         cs.new_variable(secret_key_scalars[1]),
     ];
 
-    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
-    let zero = BLSScalar::zero();
-    let one = BLSScalar::one();
+    let pow_2_64 = BLSFr::from(u64::MAX).add(&BLSFr::one());
+    let zero = BLSFr::zero();
+    let one = BLSFr::one();
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
@@ -399,7 +399,7 @@ pub fn build_abar_to_ar_cs(
     )
     .unwrap();
     let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
-        BLSScalar::from(payer_witness.uid),
+        BLSFr::from(payer_witness.uid),
         commitment,
     ]);
     for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {

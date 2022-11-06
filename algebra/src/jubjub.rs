@@ -1,5 +1,5 @@
 use crate::{
-    bls12_381::BLSScalar,
+    bls12_381::BLSFr,
     cmp::Ordering,
     errors::AlgebraError,
     hash::{Hash, Hasher},
@@ -429,15 +429,15 @@ impl Neg for JubjubPoint {
 impl JubjubPoint {
     /// Get the x-coordinate of the Jubjub affine point.
     #[inline]
-    pub fn get_x(&self) -> BLSScalar {
+    pub fn get_x(&self) -> BLSFr {
         let affine_point = AffinePoint::from(self.0);
-        BLSScalar(affine_point.x)
+        BLSFr(affine_point.x)
     }
     /// Get the y-coordinate of the Jubjub affine point.
     #[inline]
-    pub fn get_y(&self) -> BLSScalar {
+    pub fn get_y(&self) -> BLSFr {
         let affine_point = AffinePoint::from(self.0);
-        BLSScalar(affine_point.y)
+        BLSFr(affine_point.y)
     }
 }
 

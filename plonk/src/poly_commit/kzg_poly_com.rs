@@ -4,8 +4,9 @@ use crate::poly_commit::{
     pcs::{HomomorphicPolyComElem, PolyComScheme, ToBytes},
 };
 use merlin::Transcript;
+use noah_algebra::bls12_381::BLSPairingEngine;
 use noah_algebra::{
-    bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
+    bls12_381::{BLSFr, BLSG1},
     prelude::*,
     traits::{Domain, Pairing},
 };
@@ -24,7 +25,7 @@ where
 }
 
 impl HomomorphicPolyComElem for KZGCommitment<BLSG1> {
-    type Scalar = BLSScalar;
+    type Scalar = BLSFr;
     fn get_base() -> Self {
         KZGCommitment(BLSG1::get_base())
     }
@@ -49,11 +50,11 @@ impl HomomorphicPolyComElem for KZGCommitment<BLSG1> {
         self.0.sub_assign(&other.0)
     }
 
-    fn mul(&self, exp: &BLSScalar) -> Self {
+    fn mul(&self, exp: &BLSFr) -> Self {
         KZGCommitment(self.0.mul(exp))
     }
 
-    fn mul_assign(&mut self, exp: &BLSScalar) {
+    fn mul_assign(&mut self, exp: &BLSFr) {
         self.0.mul_assign(&exp)
     }
 }
@@ -205,14 +206,14 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
 pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
 
 impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
-    type Field = BLSScalar;
+    type Field = BLSFr;
     type Commitment = KZGCommitment<BLSG1>;
 
     fn max_degree(&self) -> usize {
         self.public_parameter_group_1.len() - 1
     }
 
-    fn commit(&self, polynomial: &FpPolynomial<BLSScalar>) -> Result<Self::Commitment> {
+    fn commit(&self, polynomial: &FpPolynomial<BLSFr>) -> Result<Self::Commitment> {
         let coefs = polynomial.get_coefs_ref();
 
         let degree = polynomial.degree();
@@ -221,7 +222,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             return Err(eg!(PolyComSchemeError::DegreeError));
         }
 
-        let coefs_poly_bls_scalar_ref: Vec<&BLSScalar> = coefs.iter().collect();
+        let coefs_poly_bls_scalar_ref: Vec<&BLSFr> = coefs.iter().collect();
         let pub_param_group_1_as_ref: Vec<&BLSG1> = self.public_parameter_group_1[0..degree + 1]
             .iter()
             .collect();
@@ -388,8 +389,9 @@ mod tests_kzg_impl {
         kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
+    use noah_algebra::bls12_381::BLSPairingEngine;
     use noah_algebra::{
-        bls12_381::{BLSPairingEngine, BLSScalar, BLSG1},
+        bls12_381::{BLSFr, BLSG1},
         prelude::*,
         traits::Pairing,
     };
@@ -438,7 +440,7 @@ mod tests_kzg_impl {
     fn test_homomorphic_poly_com_elem() {
         let mut prng = test_rng();
         let pcs = KZGCommitmentSchemeBLS::new(20, &mut prng);
-        type Field = BLSScalar;
+        type Field = BLSFr;
         let one = Field::one();
         let two = one.add(&one);
         let three = two.add(&one);
@@ -481,7 +483,7 @@ mod tests_kzg_impl {
     fn test_commit() {
         let mut prng = test_rng();
         let pcs = KZGCommitmentSchemeBLS::new(10, &mut prng);
-        type Field = BLSScalar;
+        type Field = BLSFr;
         let one = Field::one();
         let two = one.add(&one);
         let three = two.add(&one);
@@ -505,7 +507,7 @@ mod tests_kzg_impl {
     fn test_eval() {
         let mut prng = test_rng();
         let pcs = KZGCommitmentSchemeBLS::new(10, &mut prng);
-        type Field = BLSScalar;
+        type Field = BLSFr;
         let one = Field::one();
         let two = one.add(&one);
         let three = two.add(&one);
