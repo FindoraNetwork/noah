@@ -90,7 +90,9 @@ pub fn elgamal_partial_decrypt<G: Group>(
 
 #[cfg(test)]
 mod elgamal_test {
-    use noah_algebra::bls12_381::{BLSGt, BLSG1, BLSG2};
+    use noah_algebra::bls12_381::g2::BLSG2;
+    use noah_algebra::bls12_381::gt::BLSGt;
+    use noah_algebra::bls12_381::BLSG1;
     use noah_algebra::prelude::*;
     use noah_algebra::ristretto::RistrettoPoint;
 

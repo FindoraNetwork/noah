@@ -26,13 +26,13 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One};
-    /// let poly = FpPolynomial::<BLSScalar>::zero();
-    /// let zero = BLSScalar::zero();
+    /// let poly = FpPolynomial::<BLSFr>::zero();
+    /// let zero = BLSFr::zero();
     /// assert_eq!(poly.degree(), 0);
     /// assert_eq!(poly.eval(&zero), zero);
-    /// assert_eq!(poly.eval(&BLSScalar::one()), zero);
+    /// assert_eq!(poly.eval(&BLSFr::one()), zero);
     /// ```
     pub fn zero() -> Self {
         Self::from_coefs(vec![F::zero()])
@@ -42,13 +42,13 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One};
-    /// let poly = FpPolynomial::<BLSScalar>::one();
-    /// let one = BLSScalar::one();
+    /// let poly = FpPolynomial::<BLSFr>::one();
+    /// let one = BLSFr::one();
     /// assert_eq!(poly.degree(), 0);
     /// assert_eq!(poly.eval(&one), one);
-    /// assert_eq!(poly.eval(&BLSScalar::zero()), one);
+    /// assert_eq!(poly.eval(&BLSFr::zero()), one);
     /// ```
     pub fn one() -> Self {
         Self::from_coefs(vec![F::one()])
@@ -59,10 +59,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let five = two.add(&two).add(&one);
     /// let coefs = vec![one, zero, one];
@@ -86,10 +86,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let five = two.add(&two).add(&one);
     /// let zeroes = [one, zero, five, two];
@@ -123,10 +123,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::prelude::*;
     /// use rand::thread_rng;
-    /// let poly = FpPolynomial::<BLSScalar>::random(&mut thread_rng(), 10);
+    /// let poly = FpPolynomial::<BLSFr>::random(&mut thread_rng(), 10);
     /// assert!(poly.degree() <= 10)
     /// ```
     pub fn random<R: CryptoRng + RngCore>(prng: &mut R, degree: usize) -> FpPolynomial<F> {
@@ -149,11 +149,11 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One};
-    /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::one(); 10]);
+    /// let poly = FpPolynomial::<BLSFr>::from_coefs(vec![BLSFr::one(); 10]);
     /// assert_eq!(poly.degree(), 9);
-    /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::zero(); 10]);
+    /// let poly = FpPolynomial::<BLSFr>::from_coefs(vec![BLSFr::zero(); 10]);
     /// assert_eq!(poly.degree(), 0)
     /// ```
     pub fn degree(&self) -> usize {
@@ -168,11 +168,11 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One};
-    /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::one(); 10]);
+    /// let poly = FpPolynomial::<BLSFr>::from_coefs(vec![BLSFr::one(); 10]);
     /// assert!(!poly.is_zero());
-    /// let poly = FpPolynomial::<BLSScalar>::from_coefs(vec![BLSScalar::zero(); 10]);
+    /// let poly = FpPolynomial::<BLSFr>::from_coefs(vec![BLSFr::zero(); 10]);
     /// assert!(poly.is_zero())
     /// ```
     pub fn is_zero(&self) -> bool {
@@ -211,10 +211,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let three = two.add(&one);
     /// let poly1 = FpPolynomial::from_coefs(vec![zero, one, two, three]);
@@ -235,10 +235,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let three = two.add(&one);
     /// let mut poly1 = FpPolynomial::from_coefs(vec![three, three, two, one]);
@@ -277,10 +277,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let three = two.add(&one);
     /// let poly1 = FpPolynomial::from_coefs(vec![three, three, two, one]);
@@ -299,10 +299,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let minus_one = one.neg();
     /// let mut poly = FpPolynomial::from_coefs(vec![zero, one]);
     /// poly.neg_assign();
@@ -318,10 +318,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let minus_one = one.neg();
     /// let poly = FpPolynomial::from_coefs(vec![zero, one]);
     /// let negated  = poly.neg();
@@ -338,10 +338,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let mut two = one;
     /// two.add_assign(&one);
     /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
@@ -367,10 +367,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
     /// poly.mul_scalar_assign(&two);
@@ -400,10 +400,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
     /// let new = poly.mul_scalar(&two);
@@ -421,10 +421,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let four = two.add(&two);
     /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
@@ -445,10 +445,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let two = one.add(&one);
     /// let four = two.add(&two);
     /// let mut poly = FpPolynomial::from_coefs(vec![zero, one, one]);
@@ -466,10 +466,10 @@ impl<F: Domain> FpPolynomial<F> {
     /// # Example:
     /// ```
     /// use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
-    /// use noah_algebra::bls12_381::BLSScalar;
+    /// use noah_algebra::bls12_381::BLSFr;
     /// use noah_algebra::{Zero, One, ops::*};
-    /// let zero = BLSScalar::zero();
-    /// let one = BLSScalar::one();
+    /// let zero = BLSFr::zero();
+    /// let one = BLSFr::one();
     /// let mut poly = FpPolynomial::from_coefs(vec![one, one, one]);
     /// let mut divisor = FpPolynomial::from_coefs(vec![one, one]);
     /// let expected_quo = FpPolynomial::from_coefs(vec![zero, one]);
@@ -578,7 +578,7 @@ impl<F: Domain> FpPolynomial<F> {
 mod test {
     use crate::poly_commit::field_polynomial::FpPolynomial;
     use ark_poly::MixedRadixEvaluationDomain;
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*, traits::Domain};
+    use noah_algebra::{bls12_381::BLSFr, prelude::*, traits::Domain};
 
     #[test]
     fn from_zeroes() {
@@ -586,17 +586,17 @@ mod test {
         let mut zeroes = vec![];
         let mut prng = test_rng();
         for _ in 0..n {
-            zeroes.push(BLSScalar::random(&mut prng));
+            zeroes.push(BLSFr::random(&mut prng));
         }
         let poly = FpPolynomial::from_zeroes(&zeroes[..]);
         for root in zeroes.iter() {
-            assert_eq!(BLSScalar::zero(), poly.eval(root));
+            assert_eq!(BLSFr::zero(), poly.eval(root));
         }
 
-        let zeroes_ref: Vec<&BLSScalar> = zeroes.iter().collect();
+        let zeroes_ref: Vec<&BLSFr> = zeroes.iter().collect();
         let poly = FpPolynomial::from_zeroes_ref(&zeroes_ref);
         for root in zeroes.iter() {
-            assert_eq!(BLSScalar::zero(), poly.eval(root));
+            assert_eq!(BLSFr::zero(), poly.eval(root));
         }
     }
 
@@ -623,8 +623,8 @@ mod test {
     #[test]
     fn test_fft() {
         let mut prng = test_rng();
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = BLSFr::zero();
+        let one = BLSFr::one();
 
         let polynomial = FpPolynomial::from_coefs(vec![one]);
         let (domian, fft) = polynomial.fft(1).unwrap();
@@ -651,7 +651,7 @@ mod test {
 
         let mut coefs = vec![];
         for _ in 0..16 {
-            coefs.push(BLSScalar::random(&mut prng));
+            coefs.push(BLSFr::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
         let (domian, fft) = polynomial.fft(16).unwrap();
@@ -660,7 +660,7 @@ mod test {
 
         let mut coefs = vec![];
         for _ in 0..32 {
-            coefs.push(BLSScalar::random(&mut prng));
+            coefs.push(BLSFr::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
         let (domian, fft) = polynomial.fft(32).unwrap();
@@ -669,7 +669,7 @@ mod test {
 
         let mut coefs = vec![];
         for _ in 0..3 {
-            coefs.push(BLSScalar::random(&mut prng));
+            coefs.push(BLSFr::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
         let (domian, fft) = polynomial.fft(3).unwrap();
@@ -678,7 +678,7 @@ mod test {
 
         let mut coefs = vec![];
         for _ in 0..48 {
-            coefs.push(BLSScalar::random(&mut prng));
+            coefs.push(BLSFr::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
         let (domian, fft) = polynomial.fft(48).unwrap();

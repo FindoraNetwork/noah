@@ -3,7 +3,7 @@ use crate::anon_xfr::TurboPlonkCS;
 use crate::setup::BulletproofURS;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::bls12_381::BLSFr;
 use noah_algebra::prelude::*;
 use noah_algebra::secp256k1::SECP256K1Scalar;
 use noah_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1};
@@ -73,7 +73,7 @@ impl Default for AXfrAddressFoldingWitness {
                     );
                     3
                 ],
-                r: BLSScalar::default(),
+                r: BLSFr::default(),
                 params_phantom: Default::default(),
                 group_phantom: Default::default(),
             };
@@ -238,10 +238,10 @@ pub fn prove_address_folding_in_cs(
                 flag_smaller_than_modulus || (!secret_key_bit && !flag_meet_first_different_bit);
 
             flag_smaller_than_modulus_var = {
-                let res = cs.new_variable(BLSScalar::from(flag_smaller_than_modulus as u32));
+                let res = cs.new_variable(BLSFr::from(flag_smaller_than_modulus as u32));
 
-                let zero = BLSScalar::zero();
-                let one = BLSScalar::one();
+                let zero = BLSFr::zero();
+                let one = BLSFr::one();
                 let zero_var = cs.zero_var();
 
                 cs.push_add_selectors(one.neg(), one.neg(), one, zero);
@@ -264,10 +264,10 @@ pub fn prove_address_folding_in_cs(
             flag_meet_first_different_bit = flag_meet_first_different_bit || !secret_key_bit;
 
             flag_meet_first_different_bit_var = {
-                let res = cs.new_variable(BLSScalar::from(flag_meet_first_different_bit as u32));
+                let res = cs.new_variable(BLSFr::from(flag_meet_first_different_bit as u32));
 
-                let zero = BLSScalar::zero();
-                let one = BLSScalar::one();
+                let zero = BLSFr::zero();
+                let one = BLSFr::one();
                 let zero_var = cs.zero_var();
 
                 cs.push_add_selectors(zero, one.neg(), zero, zero);
@@ -290,10 +290,10 @@ pub fn prove_address_folding_in_cs(
             flag_meet_first_different_bit = flag_meet_first_different_bit || *secret_key_bit;
 
             flag_meet_first_different_bit_var = {
-                let res = cs.new_variable(BLSScalar::from(flag_meet_first_different_bit as u32));
+                let res = cs.new_variable(BLSFr::from(flag_meet_first_different_bit as u32));
 
-                let zero = BLSScalar::zero();
-                let one = BLSScalar::one();
+                let zero = BLSFr::zero();
+                let one = BLSFr::one();
                 let zero_var = cs.zero_var();
 
                 cs.push_add_selectors(one, one, zero, zero);
@@ -316,8 +316,8 @@ pub fn prove_address_folding_in_cs(
 
     // Enforce `flag_smaller_than_modulus_var = true` and `flag_meet_first_different_bit_var = true`
     {
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = BLSFr::zero();
+        let one = BLSFr::one();
         let zero_var = cs.zero_var();
 
         cs.push_add_selectors(zero, zero, zero, zero);
@@ -471,11 +471,11 @@ pub fn prove_address_folding_in_cs(
     let mut compressed_limbs = Vec::new();
     let mut compressed_limbs_var = Vec::new();
 
-    let num_limbs_compressed = BLSScalar::capacity() / SimFrParamsSecq256k1::BIT_PER_LIMB;
+    let num_limbs_compressed = BLSFr::capacity() / SimFrParamsSecq256k1::BIT_PER_LIMB;
 
     let step_vec = (1..=num_limbs_compressed)
-        .map(|i| BLSScalar::from(&BigUint::one().shl(SimFrParamsSecq256k1::BIT_PER_LIMB * i)))
-        .collect::<Vec<BLSScalar>>();
+        .map(|i| BLSFr::from(&BigUint::one().shl(SimFrParamsSecq256k1::BIT_PER_LIMB * i)))
+        .collect::<Vec<BLSFr>>();
 
     for (limbs, limbs_var) in all_limbs
         .chunks(num_limbs_compressed)
@@ -484,14 +484,13 @@ pub fn prove_address_folding_in_cs(
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <BLSScalar as Into<BigUint>>::into(*limb)
-                    .shl(SimFrParamsSecq256k1::BIT_PER_LIMB * i),
+                <BLSFr as Into<BigUint>>::into(*limb).shl(SimFrParamsSecq256k1::BIT_PER_LIMB * i),
             );
         }
-        compressed_limbs.push(BLSScalar::from(&sum));
+        compressed_limbs.push(BLSFr::from(&sum));
 
-        let one = BLSScalar::one();
-        let zero = BLSScalar::zero();
+        let one = BLSFr::one();
+        let zero = BLSFr::zero();
         let zero_var = cs.zero_var();
 
         let mut sum_var = {
@@ -564,7 +563,7 @@ pub fn prepare_verifier_input(
     instance: &AXfrAddressFoldingInstance,
     beta: &SECQ256K1Scalar,
     lambda: &SECQ256K1Scalar,
-) -> Vec<BLSScalar> {
+) -> Vec<BLSFr> {
     let mut v = vec![instance.delegated_schnorr_proof.inspection_comm];
 
     let lambda_series = vec![SECQ256K1Scalar::one(), *lambda, *lambda * lambda];

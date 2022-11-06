@@ -12,7 +12,7 @@ use crate::xfr::{
     structs::{BlindAssetRecord, OpenAssetRecord},
 };
 use merlin::Transcript;
-use noah_algebra::{bls12_381::BLSScalar, errors::NoahError, prelude::*};
+use noah_algebra::{bls12_381::BLSFr, errors::NoahError, prelude::*};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
 use noah_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
@@ -172,8 +172,8 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     let asset_type = body.input.asset_type.get_asset_type().unwrap();
 
     let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
-    let mut online_inputs: Vec<BLSScalar> = vec![];
-    online_inputs.push(BLSScalar::from(amount));
+    let mut online_inputs: Vec<BLSFr> = vec![];
+    online_inputs.push(BLSFr::from(amount));
     online_inputs.push(asset_type.as_scalar());
     online_inputs.push(body.output.commitment);
 
@@ -191,12 +191,12 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
 /// Construct the transparent-to-anonymous constraint system.
 pub fn build_ar_to_abar_cs(
     payee_data: PayeeWitness,
-    output_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    output_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-    let ar_amount_var = cs.new_variable(BLSScalar::from(payee_data.amount));
+    let ar_amount_var = cs.new_variable(BLSFr::from(payee_data.amount));
     cs.prepare_pi_variable(ar_amount_var);
     let ar_asset_var = cs.new_variable(payee_data.asset_type);
     cs.prepare_pi_variable(ar_asset_var);

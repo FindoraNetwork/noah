@@ -1,8 +1,6 @@
 use ark_std::time::Instant;
-use noah_algebra::{
-    bls12_381::{BLSScalar, BLSG1},
-    prelude::*,
-};
+use noah_algebra::bls12_381::g1::BLSG1;
+use noah_algebra::{bls12_381::BLSFr, prelude::*};
 
 fn main() {
     let mut prng = test_rng();
@@ -18,11 +16,11 @@ fn main() {
     // Sample random scalars
     let mut scalars = Vec::new();
     for _ in 0..count {
-        scalars.push(BLSScalar::random(&mut prng));
+        scalars.push(BLSFr::random(&mut prng));
     }
 
     let points_ptr = points.iter().collect::<Vec<&BLSG1>>();
-    let scalars_ptr = scalars.iter().collect::<Vec<&BLSScalar>>();
+    let scalars_ptr = scalars.iter().collect::<Vec<&BLSFr>>();
 
     let start = Instant::now();
     for _ in 0..10 {

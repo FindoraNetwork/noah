@@ -20,7 +20,7 @@ use crate::xfr::{
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{
-    bls12_381::BLSScalar,
+    bls12_381::BLSFr,
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
@@ -68,9 +68,9 @@ pub struct AbarToBarPreNote {
     /// Witness.
     pub witness: PayerWitness,
     /// The trace of the input commitment.
-    pub input_commitment_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
+    pub input_commitment_trace: AnemoiVLHTrace<BLSFr, 2, 12>,
     /// The trace of the nullifier.
-    pub nullifier_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
+    pub nullifier_trace: AnemoiVLHTrace<BLSFr, 2, 12>,
     /// Input key pair.
     pub input_keypair: AXfrKeyPair,
     /// Inspection data in the delegated Schnorr proof on Ristretto.
@@ -93,7 +93,7 @@ pub struct AbarToBarBody {
     pub delegated_schnorr_proof:
         DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     /// The Merkle root hash.
-    pub merkle_root: BLSScalar,
+    pub merkle_root: BLSFr,
     /// The Merkle root version.
     pub merkle_root_version: u64,
     /// The owner memo.
@@ -255,7 +255,7 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
 pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     params: &VerifierParams,
     note: &AbarToBarNote,
-    merkle_root: &BLSScalar,
+    merkle_root: &BLSFr,
     hash: D,
 ) -> Result<()> {
     if *merkle_root != note.body.merkle_root {
@@ -372,7 +372,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &VerifierParams,
     notes: &[&AbarToBarNote],
-    merkle_roots: &[&BLSScalar],
+    merkle_roots: &[&BLSFr],
     hashes: Vec<D>,
 ) -> Result<()> {
     if merkle_roots
@@ -507,8 +507,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    nullifier_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
@@ -544,8 +544,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
     payer_witness: PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    nullifier_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
@@ -573,17 +573,17 @@ pub fn build_abar_to_bar_cs(
         cs.new_variable(secret_key_scalars[1]),
     ];
 
-    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
-    let zero = BLSScalar::zero();
-    let one = BLSScalar::one();
+    let pow_2_64 = BLSFr::from(u64::MAX).add(&BLSFr::one());
+    let zero = BLSFr::zero();
+    let one = BLSFr::one();
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
-    let step_1 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB));
-    let step_2 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 2));
-    let step_3 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 3));
-    let step_4 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 4));
-    let step_5 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 5));
+    let step_1 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB));
+    let step_2 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 2));
+    let step_3 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 3));
+    let step_4 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 4));
+    let step_5 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 5));
 
     // Commit.
     let com_abar_in_var = commit_in_cs(
@@ -633,7 +633,7 @@ pub fn build_abar_to_bar_cs(
     )
     .unwrap();
     let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
-        BLSScalar::from(payer_witness.uid),
+        BLSFr::from(payer_witness.uid),
         commitment,
     ]);
     for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
@@ -716,11 +716,10 @@ pub fn build_abar_to_bar_cs(
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <BLSScalar as Into<BigUint>>::into(*limb)
-                    .shl(SimFrParamsRistretto::BIT_PER_LIMB * i),
+                <BLSFr as Into<BigUint>>::into(*limb).shl(SimFrParamsRistretto::BIT_PER_LIMB * i),
             );
         }
-        compressed_limbs.push(BLSScalar::from(&sum));
+        compressed_limbs.push(BLSFr::from(&sum));
 
         let mut sum_var = {
             let first_var = *limbs_var.get(0).unwrap_or(&zero_var);

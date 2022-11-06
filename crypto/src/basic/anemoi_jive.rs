@@ -1,4 +1,4 @@
-use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::bls12_381::BLSFr;
 use noah_algebra::new_bls12_381;
 use noah_algebra::prelude::*;
 
@@ -485,7 +485,7 @@ where
 /// let salts = generate_salts::<ark_bls12_381::Fr>(&ark_bls12_381::Fr::from(7u64), 5u32, 64);
 ///
 /// ```
-pub const ANEMOI_JIVE_381_SALTS: [BLSScalar; 64] = [
+pub const ANEMOI_JIVE_381_SALTS: [BLSFr; 64] = [
     new_bls12_381!("6406215194479240286762731634835344236141886914605144794931128113894074089386"),
     new_bls12_381!("25560080366671527635336967422834298208909930660967190727048965370381122828324"),
     new_bls12_381!("50658439267116975037933099803088424427085069111100904739841927317887955508403"),
@@ -555,14 +555,14 @@ pub const ANEMOI_JIVE_381_SALTS: [BLSScalar; 64] = [
 /// The structure that stores the parameters for the Anemoi-Jive hash function for BLS12-381.
 pub struct AnemoiJive381;
 
-impl AnemoiJive<BLSScalar, 2usize, 12usize> for AnemoiJive381 {
+impl AnemoiJive<BLSFr, 2usize, 12usize> for AnemoiJive381 {
     const ALPHA: u32 = 7u32;
-    const GENERATOR: BLSScalar = new_bls12_381!("7");
-    const GENERATOR_INV: BLSScalar = new_bls12_381!(
+    const GENERATOR: BLSFr = new_bls12_381!("7");
+    const GENERATOR_INV: BLSFr = new_bls12_381!(
         "14981678621464625851270783002338847382197300714436467949315331057125308909861"
     );
-    const GENERATOR_SQUARE_PLUS_ONE: BLSScalar = new_bls12_381!("50");
-    const ROUND_KEYS_X: [[BLSScalar; 2usize]; 12usize] = [
+    const GENERATOR_SQUARE_PLUS_ONE: BLSFr = new_bls12_381!("50");
+    const ROUND_KEYS_X: [[BLSFr; 2usize]; 12usize] = [
         [
             new_bls12_381!("39"),
             new_bls12_381!(
@@ -658,7 +658,7 @@ impl AnemoiJive<BLSScalar, 2usize, 12usize> for AnemoiJive381 {
             ),
         ],
     ];
-    const ROUND_KEYS_Y: [[BLSScalar; 2usize]; 12usize] = [
+    const ROUND_KEYS_Y: [[BLSFr; 2usize]; 12usize] = [
         [
             new_bls12_381!(
                 "14981678621464625851270783002338847382197300714436467949315331057125308909900"
@@ -756,7 +756,7 @@ impl AnemoiJive<BLSScalar, 2usize, 12usize> for AnemoiJive381 {
             ),
         ],
     ];
-    const PREPROCESSED_ROUND_KEYS_X: [[BLSScalar; 2usize]; 12usize] = [
+    const PREPROCESSED_ROUND_KEYS_X: [[BLSFr; 2usize]; 12usize] = [
         [
             new_bls12_381!(
                 "19423856244504843308895388963412036786752036425753790350203807573584805634484"
@@ -854,7 +854,7 @@ impl AnemoiJive<BLSScalar, 2usize, 12usize> for AnemoiJive381 {
             ),
         ],
     ];
-    const PREPROCESSED_ROUND_KEYS_Y: [[BLSScalar; 2usize]; 12usize] = [
+    const PREPROCESSED_ROUND_KEYS_Y: [[BLSFr; 2usize]; 12usize] = [
         [
             new_bls12_381!(
                 "48720959343719104324739338388885839802998711550637402773896395605948383052326"
@@ -952,7 +952,7 @@ impl AnemoiJive<BLSScalar, 2usize, 12usize> for AnemoiJive381 {
             ),
         ],
     ];
-    const MDS_MATRIX: [[BLSScalar; 2usize]; 2usize] = [
+    const MDS_MATRIX: [[BLSFr; 2usize]; 2usize] = [
         [new_bls12_381!("1"), new_bls12_381!("7")],
         [new_bls12_381!("7"), new_bls12_381!("50")],
     ];
@@ -973,7 +973,7 @@ mod test {
 
     #[test]
     fn test_jive() {
-        type F = BLSScalar;
+        type F = BLSFr;
 
         let input_x = [F::from(1u64), F::from(2u64)];
         let input_y = [F::from(3u64), F::zero()];
@@ -989,7 +989,7 @@ mod test {
 
     #[test]
     fn test_jive_flatten() {
-        type F = BLSScalar;
+        type F = BLSFr;
 
         let input_x = [F::from(1u64), F::from(2u64)];
         let input_y = [F::from(3u64), F::zero()];
@@ -1093,7 +1093,7 @@ mod test {
 
     #[test]
     fn test_anemoi_variable_length_hash() {
-        type F = BLSScalar;
+        type F = BLSFr;
 
         let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
 
@@ -1108,7 +1108,7 @@ mod test {
 
     #[test]
     fn test_anemoi_variable_length_hash_flatten() {
-        type F = BLSScalar;
+        type F = BLSFr;
 
         let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
 

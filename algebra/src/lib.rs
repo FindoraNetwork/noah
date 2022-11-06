@@ -80,7 +80,7 @@ macro_rules! msg_eq {
 #[macro_export]
 macro_rules! serialize_deserialize {
     ($t:ident) => {
-        impl serde::Serialize for $t {
+        impl Serialize for $t {
             fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
             where
                 S: Serializer,

@@ -140,6 +140,9 @@ pub trait Group:
     /// The scalar type
     type ScalarType: Scalar;
 
+    // The base type
+    // type BaseType: Scalar;
+
     /// The number of bytes for a compressed representation of a group element
     const COMPRESSED_LEN: usize;
 
@@ -424,7 +427,9 @@ pub(crate) mod group_tests {
 
 #[cfg(test)]
 mod multi_exp_tests {
-    use crate::bls12_381::{BLSGt, BLSG1, BLSG2};
+    use crate::bls12_381::BLSGt;
+    use crate::bls12_381::BLSG1;
+    use crate::bls12_381::BLSG2;
     use crate::ristretto::RistrettoPoint;
     use crate::traits::Group;
 

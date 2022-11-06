@@ -4,28 +4,28 @@ use crate::anon_xfr::{
     keys::{AXfrKeyPair, AXfrPubKey},
 };
 use crate::xfr::structs::AssetType;
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_algebra::{bls12_381::BLSFr, prelude::*};
 use noah_plonk::plonk::constraint_system::VarIndex;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 /// The nullifier.
-pub type Nullifier = BLSScalar;
+pub type Nullifier = BLSFr;
 /// The commitment.
-pub type Commitment = BLSScalar;
+pub type Commitment = BLSFr;
 /// The blinding factor.
-pub type BlindFactor = BLSScalar;
+pub type BlindFactor = BLSFr;
 
 /// A Merkle tree node.
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MTNode {
     /// The left child of its parent in a three-ary tree.
-    pub left: BLSScalar,
+    pub left: BLSFr,
     /// The mid child of its parent in a three-ary tree.
-    pub mid: BLSScalar,
+    pub mid: BLSFr,
     /// The right child of its parent in a three-ary tree.
-    pub right: BLSScalar,
+    pub right: BLSFr,
     /// Whether this node is the left child of the parent.
     pub is_left_child: u8,
     /// Whether this node is the mid child of the parent.
@@ -39,7 +39,7 @@ pub struct MTNode {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnonAssetRecord {
     /// The commitment.
-    pub commitment: BLSScalar,
+    pub commitment: BLSFr,
 }
 
 impl AnonAssetRecord {
@@ -63,7 +63,7 @@ pub struct MTLeafInfo {
     /// The Merkle tree path.
     pub path: MTPath,
     /// The root hash.
-    pub root: BLSScalar,
+    pub root: BLSFr,
     /// The version of the Merkle tree.
     pub root_version: u64,
     /// The ID of the commitment.
@@ -74,7 +74,7 @@ impl Default for MTLeafInfo {
     fn default() -> Self {
         MTLeafInfo {
             path: MTPath::new(vec![]),
-            root: BLSScalar::zero(),
+            root: BLSFr::zero(),
             root_version: 0,
             uid: 0,
         }
@@ -86,7 +86,7 @@ impl Default for MTLeafInfo {
 pub struct OpenAnonAssetRecord {
     pub(crate) amount: u64,
     pub(crate) asset_type: AssetType,
-    pub(crate) blind: BLSScalar,
+    pub(crate) blind: BLSFr,
     pub(crate) pub_key: AXfrPubKey,
     pub(crate) owner_memo: Option<AxfrOwnerMemo>,
     pub(crate) mt_leaf_info: Option<MTLeafInfo>,
@@ -116,7 +116,7 @@ impl OpenAnonAssetRecord {
     }
 
     /// Get the blinding value
-    pub fn get_blind(&self) -> BLSScalar {
+    pub fn get_blind(&self) -> BLSFr {
         self.blind
     }
 
@@ -173,7 +173,7 @@ impl OpenAnonAssetRecordBuilder {
             return Err(eg!(NoahError::InconsistentStructureError));
         }
 
-        self.oabar.blind = BLSScalar::random(prng);
+        self.oabar.blind = BLSFr::random(prng);
         let mut msg = vec![];
         msg.extend_from_slice(&self.oabar.amount.to_le_bytes());
         msg.extend_from_slice(&self.oabar.asset_type.0);
@@ -290,7 +290,7 @@ pub struct PayerWitness {
     /// The amount.
     pub amount: u64,
     /// The asset type.
-    pub asset_type: BLSScalar,
+    pub asset_type: BLSFr,
     /// The ID of the commitment to be nullified.
     pub uid: u64,
     /// The Merkle tree path.
@@ -307,7 +307,7 @@ pub struct PayeeWitness {
     /// The blinding factor in the output commitment.
     pub blind: BlindFactor,
     /// The asset type.
-    pub asset_type: BLSScalar,
+    pub asset_type: BLSFr,
     /// The public key.
     pub public_key: AXfrPubKey,
 }
